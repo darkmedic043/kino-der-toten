@@ -63,13 +63,27 @@ export class FirstPersonArms {
       for(const chain of Object.values(S.fingers)){const leaf=chain.at(-1),prev=chain.at(-2);
         if(prev)chain.leafDir=pos(leaf).sub(pos(prev)).applyQuaternion(leaf.getWorldQuaternion(new THREE.Quaternion()).invert());}
     }
-    this.hips.scale.setScalar(1e-3);
-    this.hidden=new WeakSet();this.visible=true;
+    // Keep only triangles skinned to the arm chains, so no body parts stretch.
+    const armBones=new Set();for(const S of Object.values(this.sides))S.arm.traverse(b=>{if(b.isBone)armBones.add(b);});
+    model.traverse(o=>{
+      if(o.isMesh&&!o.isSkinnedMesh)o.visible=false;
+      if(!o.isSkinnedMesh)return;
+      const g=o.geometry.clone(),si=g.attributes.skinIndex,sw=g.attributes.skinWeight,bones=o.skeleton.bones;
+      const armWeight=v=>{let w=0;for(let k=0;k<4;k++)if(armBones.has(bones[si.getComponent(v,k)]))w+=sw.getComponent(v,k);return w;};
+      const idx=g.index?g.index.array:[...Array(g.attributes.position.count).keys()],keep=[];
+      for(let t=0;t<idx.length;t+=3)if(armWeight(idx[t])>.5&&armWeight(idx[t+1])>.5&&armWeight(idx[t+2])>.5)keep.push(idx[t],idx[t+1],idx[t+2]);
+      g.setIndex(keep);o.geometry=g;
+      // The viewmodel lights are strong; tone the arms down to sit with the gun.
+      o.material=[o.material].flat().map(m=>{const c=m.clone();c.color.multiplyScalar(entry.fpArmsTone??.78);return c;});
+      if(o.material.length===1)o.material=o.material[0];
+    });
+    this.hidden=new WeakSet();this.visible=true;this.offsets=null;
   }
   // view: the active ViewWeapon (its hidden T5 hands drive the pose).
   sync(view,visible=true){
     if(!this.ok)return;
-    const hands=view?.hands,show=visible&&!!hands&&view.pivot.visible&&view.ready;
+    // While a new weapon loads the previous rig stays on screen, so follow it.
+    const hands=view?.hands,show=visible&&!!hands&&view.pivot.visible;
     this.root.visible=show;this.holder.visible=show;if(!show)return;
     if(!this.hidden.has(hands)){this.hidden.add(hands);hands.traverse(o=>{if(o.isSkinnedMesh&&o.skeleton?.getBoneByName('j_elbow_ri'))o.visible=false;});}
     view.root.updateWorldMatrix(true,true);
@@ -82,6 +96,15 @@ export class FirstPersonArms {
       const tM=T(`j_mid_${t5}_0`);S.k??=S.palm&&tM?tW.distanceTo(pos(tM))/S.palm:tW.distanceTo(tE)/S.forearm;
       for(const [b,q] of S.rest)b.quaternion.copy(q);
       S.arm.position.copy(tS);S.arm.scale.copy(S.restScale).multiplyScalar(S.k);S.arm.updateWorldMatrix(true,true);
+      if(this.offsets){
+        for(const [bone,t5name,offset] of this.offsets[t5]){
+          const src=T(t5name);if(!src)continue;
+          const want=src.getWorldQuaternion(new THREE.Quaternion()).multiply(offset);
+          bone.parent.getWorldQuaternion(_p);bone.quaternion.copy(_p.invert().multiply(want));bone.updateWorldMatrix(false,true);
+        }
+        S.arm.position.add(tW.clone().sub(pos(S.hand)));S.arm.updateWorldMatrix(false,true);
+        continue;
+      }
       aim(S.arm,pos(S.fore).sub(pos(S.arm)),tE.clone().sub(tS));
       aim(S.fore,pos(S.hand).sub(pos(S.fore)),tW.clone().sub(tE));
       // Keep the wrist exactly on the T5 wrist (the grip), whatever the arm lengths.
@@ -101,8 +124,18 @@ export class FirstPersonArms {
         }
       }
     }
-    // Collapse the unused body between the shoulders, below the view.
-    if(shoulders.length===2){const c=shoulders[0].add(shoulders[1]).multiplyScalar(.5);this.hips.position.copy(this.hips.parent.worldToLocal(c));}
+    // Once the weapon settles into its idle pose, record each bone's rotation
+    // relative to its T5 counterpart; from then on copy full rotations.
+    if(!this.offsets&&view.mode==='idle')this.calibrate(hands);
+  }
+  calibrate(hands){
+    this.offsets={};
+    for(const [t5,S] of Object.entries(this.sides)){
+      const pairs=[[S.arm,'j_shoulder_'+t5],[S.fore,'j_elbow_'+t5],[S.hand,'j_wrist_'+t5]];
+      for(const [name,chain] of Object.entries(S.fingers))chain.forEach((b,i)=>pairs.push([b,`j_${name}_${t5}_${i}`]));
+      this.offsets[t5]=pairs.filter(([,n])=>hands.getObjectByName(n)).map(([bone,n])=>
+        [bone,n,hands.getObjectByName(n).getWorldQuaternion(new THREE.Quaternion()).invert().multiply(bone.getWorldQuaternion(new THREE.Quaternion()))]);
+    }
   }
   dispose(){this.root?.removeFromParent();this.holder.removeFromParent();}
 }
