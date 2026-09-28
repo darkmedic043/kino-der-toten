@@ -4,7 +4,8 @@ import { loadModel, ViewWeapon } from './animation.js';
 import { renderSettings } from './settings.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
 import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout } from './profile.js';
-import { loadCharacterRegistry, createCharacter, armsUrl, tintArms } from './characters.js';
+import { loadCharacterRegistry, createCharacter, armsUrl, tintArms, loadCharacterGltf } from './characters.js';
+import { FirstPersonArms } from './fp-arms.js';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -202,7 +203,7 @@ const stage={active:false,running:false,speed:0,character:null,loading:0,yaw:.5,
     if(!this.dragging)this.yaw+=dt*.25;
     if(this.mode==='fp'){
       this.viewCamera.aspect=w/h;this.viewCamera.updateProjectionMatrix();this.fpTime+=dt;
-      if(this.view?.ready)this.view.update(dt,{moving:this.speed>0,sprint:this.speed>230,ads:false,reloading:false,empty:false,time:this.fpTime});
+      if(this.view?.ready){this.view.update(dt,{moving:this.speed>0,sprint:this.speed>230,ads:false,reloading:false,empty:false,time:this.fpTime});this.fp?.sync(this.view);}
       this.renderer.render(this.viewScene,this.viewCamera);
     }else{
       if(this.character){this.character.root.rotation.y=this.yaw;this.character.update(dt,this.speed);}
@@ -233,6 +234,7 @@ async function showArms(entry){
   await view.equip(weapons[validLoadout(config,profile,weapons).primary]??weapons.m1911_zm);
   if(token!==stage.viewToken)return;
   if(stage.view)stage.viewScene.remove(stage.view.pivot);stage.view=view;stage.viewScene.add(view.pivot);
+  stage.fp?.dispose();stage.fp=entry.fpArms&&entry.type==='gltf'?new FirstPersonArms(stage.viewScene,await loadCharacterGltf(entry),entry):null;
 }
 for(const b of document.querySelectorAll('#char-view button'))b.addEventListener('click',()=>{
   stage.mode=b.dataset.view;for(const x of document.querySelectorAll('#char-view button'))x.classList.toggle('active',x===b);
@@ -304,4 +306,4 @@ function renderMods(){
 
 renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();renderCredits();
 showTab(['play','loadout','character','mods','settings'].includes(location.hash.slice(1))?location.hash.slice(1):'play');
-window.menu={profile:()=>profile,thumb,showTab};
+window.menu={profile:()=>profile,thumb,showTab,stage};

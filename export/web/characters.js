@@ -35,6 +35,7 @@ export async function tintArms(entry){
 }
 
 const gltfCache=new Map();
+export function loadCharacterGltf(entry){return loadGltf(entry.url);}
 // Records textures or buffers that fail to load (common with .gltf files whose
 // side files were not copied along, or textures not embedded in a .glb).
 function loadGltf(url){

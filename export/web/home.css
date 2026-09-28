@@ -88,10 +88,10 @@ main{position:relative;overflow-y:auto;padding:40px 48px 60px}
 .char-card strong{display:block;font-size:13px}.char-card small{color:var(--muted);font-size:10px;letter-spacing:1px}
 .char-stage{position:relative;border:1px solid var(--line);background:radial-gradient(ellipse at 50% 40%,#2a211c,#0a0b0a 70%);height:min(640px,calc(100vh - 170px));min-height:380px;overflow:hidden}
 .char-stage canvas{width:100%;height:100%;display:block;cursor:grab}.char-stage canvas:active{cursor:grabbing}
-.char-caption{position:absolute;left:24px;bottom:22px;max-width:calc(100% - 280px);pointer-events:none}
+.char-caption{position:absolute;left:24px;bottom:22px;max-width:calc(100% - 48px);pointer-events:none}
 .char-caption strong{display:block;overflow-wrap:anywhere;font-family:Impact,'Arial Narrow',sans-serif;font-size:40px;text-transform:uppercase;letter-spacing:-.5px}
 .char-caption p{margin:4px 0 0;font-size:12px}
-.stage-anim{position:absolute;right:18px;bottom:22px}
+.stage-anim{position:absolute;right:18px;top:62px}
 .stage-view{position:absolute;right:18px;top:18px}
 .settings-panel{max-width:640px;border:1px solid var(--line);background:var(--panel);padding:8px 22px 20px}
 

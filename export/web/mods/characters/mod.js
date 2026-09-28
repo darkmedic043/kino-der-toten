@@ -1,6 +1,7 @@
 // Player character + third-person view (T). The character is chosen in the
 // main menu and stored in the shared profile.
-import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tintArms } from '../../characters.js';
+import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tintArms, loadCharacterGltf } from '../../characters.js';
+import { FirstPersonArms } from '../../fp-arms.js';
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { loadProfile } from '../../profile.js';
@@ -33,6 +34,15 @@ export default async function setup(api){
     if(third)view.update(api.world);
   });
   host.on('reset',()=>{third=false;apply();});
+
+  // "fpArms": the character's own arms in first person, posed onto the hidden
+  // T5 viewmodel rig (see fp-arms.js). Perk drinks use their own viewmodels.
+  if(entry.fpArms&&entry.type==='gltf'&&api.viewScene){
+    const fp=new FirstPersonArms(api.viewScene,await loadCharacterGltf(entry),entry);
+    const active=()=>{const d=api.perkDrink;return d?.current?d.views[d.current]:api.view;};
+    host.on('update',()=>fp.sync(active(),!third));
+    fp.sync(active(),true);
+  }
 
   // The current weapon, held in the character's right hand (third person only).
   // Per-character "weapon": {"position":[x,y,z],"rotation":[x,y,z] (degrees)} adjusts the grip.
