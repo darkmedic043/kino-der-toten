@@ -1,19 +1,68 @@
 {
   "maps": [
-    { "id": "kino", "title": "Kino der Toten", "mode": "Zombies", "url": "index.html" },
-    { "id": "moon", "title": "Moon", "mode": "Zombies", "url": "moon.html" },
-    { "id": "shangri-la", "title": "Shangri-La", "mode": "Explore", "url": "shangri-la.html" },
-    { "id": "coast", "title": "Call of the Dead", "mode": "Explore", "url": "call-of-the-dead.html" },
-    { "id": "ascension", "title": "Ascension", "mode": "Explore", "url": "ascension.html" },
+    {
+      "id": "kino",
+      "title": "Kino der Toten",
+      "description": "A ruined Berlin theater. The full solo experience: perks, traps, teleporter, Pack-a-Punch and film reels.",
+      "modes": [
+        "zombies"
+      ],
+      "url": "index.html",
+      "image": "social/kino-preview-v1.png"
+    },
+    {
+      "id": "moon",
+      "title": "Moon",
+      "description": "Griffin Station and Area 51. Includes the solo quest and ending.",
+      "modes": [
+        "zombies"
+      ],
+      "url": "moon.html",
+      "image": "mods/maps/thumbs/moon.jpg"
+    },
+    {
+      "id": "shangri-la",
+      "title": "Shangri-La",
+      "description": "A temple in the jungle. Explore-only map port.",
+      "modes": [
+        "explore"
+      ],
+      "url": "shangri-la.html",
+      "image": "mods/maps/thumbs/shangri-la.jpg"
+    },
+    {
+      "id": "coast",
+      "title": "Call of the Dead",
+      "description": "A frozen lighthouse and shipwreck. Explore-only map port.",
+      "modes": [
+        "explore"
+      ],
+      "url": "call-of-the-dead.html"
+    },
+    {
+      "id": "ascension",
+      "title": "Ascension",
+      "description": "A Soviet cosmodrome. Explore-only map port.",
+      "modes": [
+        "explore"
+      ],
+      "url": "ascension.html",
+      "image": "mods/maps/thumbs/ascension.jpg"
+    },
     {
       "id": "sandbox",
-      "title": "Sandbox (example custom map)",
-      "mode": "Explore",
+      "title": "Sandbox",
+      "description": "Example custom map built from boxes: two rooms, seven windows, wall-buys, all four perks, two Mystery Box spots, Pack-a-Punch and a power switch.",
+      "modes": [
+        "zombies",
+        "explore"
+      ],
       "dir": "mods/maps/sandbox/",
       "model": "sandbox.glb",
       "scale": 39.37,
-      "spawn": { "position": [0, 5, 400], "yaw": 0 },
-      "background": "#2a3136"
+      "background": "#1c2226",
+      "exposure": 0.95,
+      "image": "mods/maps/thumbs/sandbox.jpg"
     }
   ]
 }

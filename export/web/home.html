@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zombies</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="home.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/jsm/","three-mesh-bvh":"./vendor/bvh.js"}}</script>
+</head>
+<body>
+<div class="grain"></div>
+<aside id="rail">
+  <div class="brand"><span class="kicker">CALL OF DUTY <em>BLACK OPS</em></span><strong>ZOMBIES<span>.</span></strong></div>
+  <nav id="tabs">
+    <button data-tab="play" class="active"><span>01</span>PLAY</button>
+    <button data-tab="loadout"><span>02</span>LOADOUT</button>
+    <button data-tab="character"><span>03</span>CHARACTER</button>
+    <button data-tab="mods"><span>04</span>MODS</button>
+  </nav>
+  <div id="profile-card">
+    <div class="row"><span class="eyebrow">RANK</span><strong id="p-level">LEVEL 1</strong></div>
+    <div class="bar"><i id="p-bar"></i></div>
+    <div class="row small"><span id="p-xp">0 / 100 XP</span><span id="p-char"></span></div>
+    <div class="row small muted"><span id="p-stats"></span></div>
+  </div>
+</aside>
+
+<main>
+  <section id="tab-play" class="tab active">
+    <header class="tab-head"><span class="eyebrow">SELECT A MAP</span><div class="chips" id="map-filter"><button data-filter="all" class="active">ALL</button><button data-filter="zombies">ZOMBIES</button><button data-filter="explore">EXPLORE</button></div></header>
+    <article id="map-hero">
+      <div class="hero-art" id="hero-art"></div>
+      <div class="hero-info">
+        <div class="badges" id="hero-badges"></div>
+        <h1 id="hero-title">—</h1>
+        <p id="hero-desc"></p>
+        <p id="hero-best" class="muted"></p>
+        <div class="hero-actions" id="hero-actions"></div>
+      </div>
+    </article>
+    <div id="map-grid" class="map-grid"></div>
+  </section>
+
+  <section id="tab-loadout" class="tab">
+    <header class="tab-head"><span class="eyebrow">LOADOUT</span><span class="muted small">Applies to every map at the start of a game</span></header>
+    <div class="loadout">
+      <div class="slots" id="slots"></div>
+      <div class="picker">
+        <div class="picker-head"><strong id="picker-title">PRIMARY WEAPON</strong><span class="muted small" id="picker-hint"></span></div>
+        <div id="picker-grid" class="picker-grid"></div>
+      </div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </section>
+
+  <section id="tab-character" class="tab">
+    <header class="tab-head"><span class="eyebrow">CHARACTER</span><span class="muted small">Shown in third person · press T in game</span></header>
+    <div class="character">
+      <div class="char-list" id="char-list"></div>
+      <div class="char-stage">
+        <canvas id="char-canvas"></canvas>
+        <div class="char-caption"><strong id="char-name"></strong><p id="char-desc" class="muted"></p></div>
+        <div class="chips stage-anim" id="char-anim"><button data-speed="0" class="active">IDLE</button><button data-speed="190">WALK</button><button data-speed="285">RUN</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-mods" class="tab">
+    <header class="tab-head"><span class="eyebrow">MODS</span><span class="muted small">Enable or disable in mods/mods.json · guide in mods/README.md</span></header>
+    <div id="mod-list" class="mod-list"></div>
+  </section>
+</main>
+<div id="toast"></div>
+<script type="module" src="home.js"></script>
+</body>
+</html>

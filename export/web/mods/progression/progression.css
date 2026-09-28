@@ -7,11 +7,9 @@ body.menu-open #progression-hud{visibility:hidden}
 #loadout-panel .head strong{font-size:13px;letter-spacing:2px;color:#eee8dc}
 #loadout-panel .head .xp{margin-left:auto;color:#9d947e}
 #loadout-panel .bar{height:3px;background:#ffffff1c;margin:8px 0 12px}
-#loadout-panel label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0;text-transform:uppercase;font-size:9px;letter-spacing:2px}
-#loadout-panel select{width:190px;padding:5px 6px;background:#0d0f0f;color:#eee8dc;border:1px solid #68695d77;font:inherit;font-size:11px;letter-spacing:0;text-transform:none}
-#loadout-panel select:disabled{color:#6d6a60}
-#loadout-panel small{display:block;text-align:right;color:#8b8b7f;font-size:9px;margin:-2px 0 6px}
-#loadout-panel .note{color:#d6a94a;min-height:0;margin:6px 0 0}
-#loadout-panel .note:empty{display:none}
 #loadout-panel .stats{margin:10px 0 0;color:#7b7a70;font-size:9px}
+#loadout-panel .line{margin:0;font-size:11px;letter-spacing:.5px;color:#b9b09b;line-height:1.6}
+#loadout-panel .line b{color:#eee8dc;font-weight:600}
+#loadout-panel .edit{display:inline-block;margin-top:10px;color:#d6a94a;text-decoration:none;font-size:9px;letter-spacing:2px;text-transform:uppercase}
+#loadout-panel .edit:hover{color:#f0c465}
 @media(max-width:700px){#progression-hud{left:105px}}

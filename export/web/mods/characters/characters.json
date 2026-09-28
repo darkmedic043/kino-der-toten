@@ -1,0 +1,7 @@
+{
+  "characters": [
+    { "id": "mannequin", "name": "Test Subject", "type": "mannequin", "description": "Placeholder figure until a real model is added.", "color": "#8d8a80", "accent": "#932e25" },
+    { "id": "mannequin_blue", "name": "Test Subject (Blue)", "type": "mannequin", "description": "The placeholder in blue.", "color": "#8d8a80", "accent": "#2f5e8c" },
+    { "id": "honorguard", "name": "Honor Guard", "type": "t5", "description": "The Kino zombie's body, as a rigged-model example.", "body": "c_ger_honorguard_body1", "head": "c_ger_zombie_head2", "walk": "ai_zombie_walk_fast_v1", "run": "ai_zombie_sprint_v1" }
+  ]
+}

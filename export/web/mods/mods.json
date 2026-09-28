@@ -1,3 +1,7 @@
 {
-  "enabled": ["example-weapons", "progression"]
+  "enabled": [
+    "example-weapons",
+    "progression",
+    "characters"
+  ]
 }

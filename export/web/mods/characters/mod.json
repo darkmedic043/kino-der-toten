@@ -1,0 +1,5 @@
+{
+  "name": "Characters",
+  "description": "Pick a player character in the main menu; press T in game for third person.",
+  "script": "mod.js"
+}

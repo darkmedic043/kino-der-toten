@@ -17,17 +17,17 @@ export class GameAudio {
   }
   warmWeapon(def,notifies=[]){
     if(!this.ctx)return;
-    const prefix='resident/wpn/'+shotFolders[def.id.replace('_zm','')]+'/plr/shot/';
+    const prefix='resident/wpn/'+shotFolders[(def.baseId??def.id).replace('_zm','')]+'/plr/shot/';
     const needed=new Set(notifies.map(name=>this.notifyKey(name,def)).filter(Boolean));
     for(const key of Object.keys(this.manifest))if(key.startsWith(prefix)||key.includes('/melee/knife/')||key.includes('/bowie/')||needed.has(key))this.buffer(key).catch(()=>{});
   }
   weapon(kind,def){
-    const prefix=shotFolders[def.id.replace('_zm','')];
+    const prefix=shotFolders[(def.baseId??def.id).replace('_zm','')];
     let cue;
     if(kind==='shot'&&prefix)cue=this.select('resident/wpn/'+prefix+'/plr/shot/shot_');
     if(kind==='shot'&&def.attachmentActive&&def.projectileSpeed>0)cue=this.select('resident/wpn/gren_launcher/attachment/plr/shot/');
-    if(kind==='shot'&&def.id==='ray_gun_zm')cue='resident/wpn/energy/raygun/plr/shot/ray_shot_f';
-    if(kind==='shot'&&def.id==='thundergun_zm')cue='resident/wpn/energy/thundergun/plr/shot/wpn_thundergun_fire_plr';
+    if(kind==='shot'&&(def.baseId??def.id)==='ray_gun_zm')cue='resident/wpn/energy/raygun/plr/shot/ray_shot_f';
+    if(kind==='shot'&&(def.baseId??def.id)==='thundergun_zm')cue='resident/wpn/energy/thundergun/plr/shot/wpn_thundergun_fire_plr';
     if(kind==='empty'&&prefix)cue=this.select('resident/wpn/'+prefix+'/plr/act/');
     this.play(cue??kind,kind==='shot'?.75:1);
   }

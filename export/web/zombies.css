@@ -1,0 +1,4 @@
+/* Custom-map page additions (not part of upstream). */
+.back-link{display:inline-block;margin-bottom:28px;color:#9d947e;text-decoration:none;font-size:10px;letter-spacing:3px}
+.back-link:hover{color:#eee8dc}
+#map-title{text-transform:uppercase;overflow-wrap:anywhere}

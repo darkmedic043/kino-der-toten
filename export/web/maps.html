@@ -1,55 +1,6 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Zombies Maps</title>
-  <link rel="icon" href="data:,">
-  <style>
-    :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; color: #eee8dc; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: linear-gradient(90deg, #070a0a 0%, #0c0f0e 60%, #120d0c); }
-    main { max-width: 760px; margin: 0 auto; padding: 56px 16px; }
-    .kicker { font-size: 17px; font-weight: 900; letter-spacing: 1px; }
-    .kicker span { font-size: 11px; font-weight: 400; letter-spacing: 3px; margin-left: 11px; color: #8f918a; }
-    h1 { font-size: 11px; letter-spacing: 4px; color: #aeb0a1; font-weight: 400; margin: 36px 0 16px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-    a.map { display: flex; flex-direction: column; gap: 6px; padding: 18px; border: 1px solid #776b5244; background: #05050560; color: inherit; text-decoration: none; transition: border-color .15s, background .15s; }
-    a.map:hover { border-color: #b03f31; background: #932e2522; }
-    a.map strong { font-size: 15px; letter-spacing: 1px; }
-    .mode { font-size: 9px; letter-spacing: 3px; color: #9d947e; }
-    .mode.zombies { color: #d05a48; }
-    ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-    li { padding: 12px 16px; border: 1px solid #776b5233; font-size: 12px; color: #b9b09b; }
-    li strong { color: #eee8dc; margin-right: 8px; }
-    .error { color: #d05a48; font-size: 12px; }
-    p.note { font-size: 11px; color: #7b7a70; line-height: 1.6; margin-top: 28px; }
-    code { color: #c7bca4; }
-  </style>
-</head>
-<body>
-<main>
-  <div class="kicker">ZOMBIES <span>BROWSER EDITION</span></div>
-  <h1>MAPS</h1>
-  <div class="grid" id="maps"></div>
-  <h1>ENABLED MODS</h1>
-  <ul id="mods"></ul>
-  <p class="note">Maps are listed in <code>mods/maps.json</code> and mods in <code>mods/mods.json</code>. Mods currently load in Kino der Toten only.</p>
-</main>
-<script type="module">
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-try {
-  const {maps} = await fetch('mods/maps.json').then(r => r.json());
-  document.getElementById('maps').innerHTML = maps.map(m => {
-    const href = m.dir ? `explorer.html?map=${encodeURIComponent(m.id)}` : m.url;
-    return `<a class="map" href="${esc(href)}"><span class="mode ${m.mode === 'Zombies' ? 'zombies' : ''}">${esc(m.mode ?? 'Explore').toUpperCase()}</span><strong>${esc(m.title)}</strong></a>`;
-  }).join('');
-} catch (error) { document.getElementById('maps').innerHTML = `<p class="error">Could not read mods/maps.json: ${esc(error.message)}</p>`; }
-try {
-  const {enabled = []} = await fetch('mods/mods.json').then(r => r.json());
-  const rows = await Promise.all(enabled.map(id => fetch(`mods/${id}/mod.json`).then(r => r.json()).then(m => `<li><strong>${esc(m.name ?? id)}</strong>${esc(m.description)}</li>`).catch(() => `<li><strong>${esc(id)}</strong><span class="error">mod.json missing or invalid</span></li>`)));
-  document.getElementById('mods').innerHTML = rows.join('') || '<li>No mods enabled.</li>';
-} catch (error) { document.getElementById('mods').innerHTML = `<li class="error">Could not read mods/mods.json: ${esc(error.message)}</li>`; }
-</script>
-</body>
-</html>
+<meta charset="utf-8">
+<title>Maps</title>
+<!-- The map list moved into the main menu. -->
+<meta http-equiv="refresh" content="0; url=./#play">
+<a href="./#play">Main menu</a>

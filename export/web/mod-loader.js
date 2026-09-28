@@ -32,7 +32,7 @@ export function resolveWeapons(data){
     if(resolving.has(id))throw new Error(`weapon ${id}: circular "extends"`);
     resolving.add(id);
     const base=resolve(w.extends);if(!base)throw new Error(`weapon ${id}: unknown base weapon "${w.extends}"`);
-    const {extends:_,...own}=w;weapons[id]={...mergePatch(base,own),id};
+    const {extends:_,...own}=w;weapons[id]={...mergePatch(base,own),id,baseId:base.baseId??base.id};
     resolving.delete(id);return weapons[id];
   };
   for(const id of Object.keys(weapons))resolve(id);
@@ -40,7 +40,8 @@ export function resolveWeapons(data){
 }
 
 export class ModHost {
-  constructor(base='mods/'){this.base=new URL(base,document.baseURI);this.mods=[];this.handlers=new Map();this.errors=[];}
+  // camera / hideViewmodel let a mod take over rendering (e.g. third person).
+  constructor(base='mods/'){this.base=new URL(base,document.baseURI);this.mods=[];this.handlers=new Map();this.errors=[];this.camera=null;this.hideViewmodel=false;}
   on(event,fn){if(!this.handlers.has(event))this.handlers.set(event,[]);this.handlers.get(event).push(fn);return()=>this.off(event,fn);}
   off(event,fn){const list=this.handlers.get(event);if(list)list.splice(list.indexOf(fn)>>>0,1);}
   emit(event,...args){
@@ -60,6 +61,8 @@ export class ModHost {
         const manifest=await this.fetchJson(new URL('mod.json',url));
         const mod={id,url,manifest,name:manifest.name??id};
         for(const file of [manifest.data??[]].flat())data=mergePatch(data,await this.fetchJson(new URL(file,url)));
+        // A script may export prepare(data) to adjust data before the game builds anything.
+        if(manifest.script){mod.module=await import(new URL(manifest.script,url).href);if(mod.module.prepare)data=(await mod.module.prepare(data,mod))??data;}
         this.mods.push(mod);
       }catch(error){this.report(`mod ${id}`,error);}
     }
@@ -90,7 +93,7 @@ export class ModHost {
     for(const mod of this.mods){
       if(!mod.manifest.script)continue;
       try{
-        const module=await import(new URL(mod.manifest.script,mod.url).href);
+        const module=mod.module??await import(new URL(mod.manifest.script,mod.url).href);
         await module.default?.({...api,mod,host,on:this.on.bind(this),emit:this.emit.bind(this)});
       }catch(error){this.report(`mod ${mod.id} script`,error);}
     }

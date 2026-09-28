@@ -11,6 +11,8 @@ import { networkInterfaces } from 'node:os';
 const ROOT = process.env.KINO_WEB_ROOT ? resolve(process.env.KINO_WEB_ROOT) : resolve(import.meta.dirname, '..', 'export', 'web');
 const PORT = Number(process.argv[2]) || 5173;
 const LAN = process.argv.includes('--lan');
+// KINO_HOME picks the page served at "/" (the local fork's main menu).
+const HOME = '/' + (process.env.KINO_HOME || 'index.html').replace(/^\/+/, '');
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -41,7 +43,7 @@ createServer((req, res) => {
     return;
   }
 
-  const path = resolve(ROOT, '.'+(url==='/'?'/index.html':url).replace(/\\/g,'/'));
+  const path = resolve(ROOT, '.'+(url==='/'?HOME:url).replace(/\\/g,'/'));
 
   if (!path.toLowerCase().startsWith((ROOT+sep).toLowerCase())) {
     res.writeHead(403).end('forbidden');

@@ -19,10 +19,11 @@ test('weapons can extend other weapons, including chains and upgrades', () => {
     grandchild_zm: {extends: 'child_zm', damage: 99},
   }};
   resolveWeapons(data);
-  assert.deepEqual(data.weapons.child_zm, {id: 'child_zm', name: 'Child', damage: 10, model: 'm.glb', upgrade: {name: 'Child Up', damage: 20, clipSize: 5}});
+  assert.deepEqual(data.weapons.child_zm, {id: 'child_zm', baseId: 'base_zm', name: 'Child', damage: 10, model: 'm.glb', upgrade: {name: 'Child Up', damage: 20, clipSize: 5}});
   assert.equal(data.weapons.grandchild_zm.damage, 99);
   assert.equal(data.weapons.grandchild_zm.name, 'Child');
   assert.equal(data.weapons.grandchild_zm.id, 'grandchild_zm');
+  assert.equal(data.weapons.grandchild_zm.baseId, 'base_zm');
   assert.equal(data.weapons.base_zm.name, 'Base');
 });
 

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zombies</title>
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="zombies.css"><link rel="icon" href="data:,"><link rel="stylesheet" href="touch-controls.css"></head><body class="menu-open">
+<div id="vignette"></div><div id="hurt"></div><div id="flash"></div>
+<div id="top"><span class="red-dot"></span> SOLO <span class="divider">/</span> <span id="top-map">ZOMBIES</span> <span id="location"></span></div>
+<div id="crosshair">＋</div><div id="hitmarker">×</div>
+<div id="announcement"><span id="announcement-small"></span><strong id="announcement-title"></strong></div><div id="prompt"></div><div id="toast"></div>
+<div id="round-panel"><span class="eyebrow">ROUND</span><strong id="round">I</strong><span id="remaining"></span></div>
+<div id="player-panel"><div id="perks"></div><div class="points"><span>✦</span> <strong id="points">500</strong></div><div class="health-track"><i id="health-fill"></i></div><span id="health-label">100 / 100</span></div>
+<div id="weapon-panel"><div id="weapon-name">M1911</div><div id="ammo"><strong id="mag">8</strong><span>/</span><span id="reserve">32</span></div><div id="reload-label"></div><div id="grenades">G · 4 GRENADES</div></div>
+<div id="effects"></div><div id="objective"></div><div id="controls-hint">WASD move · Shift sprint · R reload · F use · V knife · Esc pause</div><div id="debug" hidden></div>
+<section id="menu"><div class="menu-grain"></div><div class="menu-content"><a class="back-link" href="./">← MAIN MENU</a><div class="kicker">ZOMBIES <span>CUSTOM MAP</span></div><p class="chapter">SOLO SURVIVAL</p><h1 id="map-title">LOADING</h1><p class="tagline" id="map-tagline"></p><div id="loading"><span id="load-label">Loading…</span><div><i id="load-progress"></i></div></div><button id="start" disabled>ENTER THE MAP <span>→</span></button><button id="restart" class="secondary" hidden>NEW GAME</button><p id="menu-status">Loading map and equipment</p><div id="results" hidden></div><div class="menu-controls"><span><kbd>W A S D</kbd> MOVE</span><span><kbd>MOUSE</kbd> AIM / SHOOT</span><span><kbd>F</kbd> INTERACT</span><span><kbd>SPACE</kbd> JUMP</span><span><kbd>1 / 2</kbd> WEAPON</span><span><kbd>V</kbd> KNIFE</span><span><kbd>4 / X</kbd> CLAYMORE / MONKEY</span><span><kbd>T</kbd> THIRD PERSON</span></div></div><div class="menu-side"><span>CUSTOM MAP</span><strong>115</strong><span>SURVIVE THE NIGHT.</span></div></section>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/jsm/","three-mesh-bvh":"./vendor/bvh.js","@recast-navigation/core":"./vendor/recast-core.mjs","@recast-navigation/wasm":"./vendor/recast-wasm.js","@recast-navigation/generators":"./vendor/recast-generators.mjs"}}</script><script type="module" src="zombies.js"></script></body></html>

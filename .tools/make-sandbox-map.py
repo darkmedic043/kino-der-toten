@@ -1,55 +1,110 @@
 #!/usr/bin/env python3
-"""Writes export/web/mods/maps/sandbox/sandbox.glb, a tiny box-built test map
-(in metres, like a Blender export) for the custom map explorer. Standard
-library only. Replace it with your own Blender export to make a real map."""
-import json, struct, pathlib
+"""Writes export/web/mods/maps/sandbox/sandbox.glb, a small box-built zombies
+map (in metres, like a Blender export) that uses every map marker. Standard
+library only. It doubles as a reference for building maps in Blender: the
+empties here are what you would add there (see mods/README.md)."""
+import json, math, struct, pathlib
 
 OUT = pathlib.Path(__file__).resolve().parent.parent / 'export/web/mods/maps/sandbox/sandbox.glb'
 FACES = [((1,0,0),[(1,-1,-1),(1,1,-1),(1,1,1),(1,-1,1)]),((-1,0,0),[(-1,-1,1),(-1,1,1),(-1,1,-1),(-1,-1,-1)]),
          ((0,1,0),[(-1,1,-1),(-1,1,1),(1,1,1),(1,1,-1)]),((0,-1,0),[(-1,-1,1),(-1,-1,-1),(1,-1,-1),(1,-1,1)]),
          ((0,0,1),[(1,-1,1),(1,1,1),(-1,1,1),(-1,-1,1)]),((0,0,-1),[(-1,-1,-1),(-1,1,-1),(1,1,-1),(1,-1,-1)])]
-COLORS = {'floor':(.32,.34,.33),'wall':(.55,.5,.44),'crate':(.55,.38,.2),'step':(.45,.46,.5),'pillar':(.62,.12,.1),'platform':(.4,.42,.46)}
-boxes = []  # (material, min xyz, max xyz)
-def box(mat, x0, y0, z0, x1, y1, z1): boxes.append((mat, (x0, y0, z0), (x1, y1, z1)))
+COLORS = {'ground':(.23,.25,.22),'floor':(.42,.4,.36),'yardfloor':(.36,.37,.35),'wall':(.55,.5,.44),'trim':(.3,.27,.24),
+          'crate':(.55,.38,.2),'door':(.35,.22,.13)}
+WALL_H, SILL, LINTEL, WIN = 3.5, .9, 2.1, 1.4
 
-box('floor', -15, -.2, -15, 15, 0, 15)
-for s in (-1, 1):
-    box('wall', -15, 0, s*15-(.3 if s>0 else 0), 15, 3.5, s*15+(0 if s>0 else .3))
-    box('wall', s*15-(.3 if s>0 else 0), 0, -15, s*15+(0 if s>0 else .3), 3.5, 15)
-for x, y, z in [(-6,0,-4),(-5,0,-4),(-5.5,1,-4),(4,0,6),(8,0,-5),(8,0,-4)]:  # 1 m crates, one stacked
-    box('crate', x-.5, y, z-.5, x+.5, y+1, z+.5)
-for i in range(10):  # 0.2 m steps up to a 2 m platform
-    box('step', 2+i*.4, 0, -12, 2.4+i*.4, .2*(i+1), -9)
-box('platform', 6, 0, -14.7, 14.7, 2, -9)
-for x in (-10, 0, 10):
-    box('pillar', x-.4, 0, 2-.4, x+.4, 3.5, 2+.4)
+static, door = [], []   # (material, min xyz, max xyz)
+def box(target, mat, lo, hi): target.append((mat, lo, hi))
 
-prims, blob, views, accessors = [], bytearray(), [], []
-def add(data, fmt, count, target, typ, comp, mn=None, mx=None):
+def wall(axis, fixed, a, b, gaps, t=.3):
+    """A wall along x (axis='x', at z=fixed) or z, from a to b, with window gaps
+    [(centre, kind)] where kind is 'window' (sill + lintel) or 'door' (open)."""
+    def put(lo_along, hi_along, y0, y1):
+        if axis == 'x': box(static, 'wall', (lo_along, y0, fixed - t/2), (hi_along, y1, fixed + t/2))
+        else: box(static, 'wall', (fixed - t/2, y0, lo_along), (fixed + t/2, y1, hi_along))
+    cursor = a
+    for centre, kind, width in sorted(gaps):
+        put(cursor, centre - width/2, 0, WALL_H)
+        if kind == 'window': put(centre - width/2, centre + width/2, 0, SILL)
+        put(centre - width/2, centre + width/2, LINTEL if kind == 'window' else 2.6, WALL_H)
+        cursor = centre + width/2
+    put(cursor, b, 0, WALL_H)
+
+box(static, 'ground', (-17, -.25, -12), (18, -.05, 12))
+box(static, 'floor', (-12, -.05, -8), (0, 0, 8))
+box(static, 'yardfloor', (0, -.05, -8), (14, 0, 8))
+# Lobby x -12..0, yard x 0..14, both z -8..8. Windows at x (north/south) or z (west/east).
+wall('x', -8, -12, 14, [(-8,'window',WIN), (-3,'window',WIN), (7,'window',WIN)])
+wall('x', 8, -12, 14, [(-6,'window',WIN), (10,'window',WIN)])
+wall('z', -12, -8, 8, [(0,'window',WIN)])
+wall('z', 14, -8, 8, [(-3,'window',WIN)])
+wall('z', 0, -8, 8, [(0,'door',2.0)])
+box(door, 'door', (-.12, 0, -1), (.12, 2.6, 1))
+for x, y, z in [(4,0,-2),(4,0,-1),(4,1,-1.5),(9,0,2),(10,0,2),(7,0,4.5)]:  # 1 m crates, one stacked
+    box(static, 'crate', (x-.5, y, z-.5), (x+.5, y+1, z+.5))
+
+def yaw_rotation(deg):  # rotation about +Y; a marker faces its local +X
+    r = math.radians(deg) / 2
+    return [0, math.sin(r), 0, math.cos(r)]
+N, S, W, E = -90, 90, 0, 180   # marker facing: into the room from the north wall faces +Z, etc.
+markers = [
+    ('PLAYER_SPAWN', (-9, 0, 0), W),
+    # Windows sit in the wall openings; each pairs with the nearest ZSPAWN outside it.
+    ('WINDOW_start', (-8, 1.5, -8), 0), ('ZSPAWN_start', (-8, 0, -9.6), 0),
+    ('WINDOW_start', (-3, 1.5, -8), 0), ('ZSPAWN_start', (-3, 0, -9.6), 0),
+    ('WINDOW_start', (-6, 1.5, 8), 0), ('ZSPAWN_start', (-6, 0, 9.6), 0),
+    ('WINDOW_start', (-12, 1.5, 0), 0), ('ZSPAWN_start', (-13.6, 0, 0), 0),
+    ('WINDOW_yard', (7, 1.5, -8), 0), ('ZSPAWN_yard', (7, 0, -9.6), 0),
+    ('WINDOW_yard', (10, 1.5, 8), 0), ('ZSPAWN_yard', (10, 0, 9.6), 0),
+    ('WINDOW_yard', (14, 1.5, -3), 0), ('ZSPAWN_yard', (15.6, 0, -3), 0),
+    ('WALLBUY_m14_zm', (-9.5, 1.4, 7.8), S),
+    ('WALLBUY_rottweil72_zm', (-5.5, 1.4, -7.8), N),
+    ('WALLBUY_mp40_zm', (3.5, 1.4, -7.8), N),
+    ('CLAYMORE', (-11.8, 1.2, -5), W),
+    ('PERK_revive', (-11.3, 0, 5), W),
+    ('BOX_start', (-1.2, 0, -5), E),
+    ('BOX', (12.5, 0, 6.8), S),
+    ('POWER', (13.8, 1.2, 4), E),
+    ('PERK_jugg', (13.2, 0, -6.2), E),
+    ('PERK_speedcola', (2.2, 0, 7.2), S),
+    ('PERK_doubletap', (5.2, 0, 7.2), S),
+    ('PAP', (9, 0, -7.2), N),
+]
+
+blob, views, accessors = bytearray(), [], []
+def add(data, count, target, typ, comp, mn=None, mx=None):
     while len(blob) % 4: blob.append(0)
     views.append({'buffer':0,'byteOffset':len(blob),'byteLength':len(data),'target':target}); blob.extend(data)
     a = {'bufferView':len(views)-1,'componentType':comp,'count':count,'type':typ}
     if mn: a['min'], a['max'] = mn, mx
     accessors.append(a); return len(accessors)-1
 materials = list(COLORS)
-for mat in materials:
-    pos, nor, idx = [], [], []
-    for _, lo, hi in [b for b in boxes if b[0]==mat]:
-        c = [(lo[i]+hi[i])/2 for i in range(3)]; h = [(hi[i]-lo[i])/2 for i in range(3)]
-        for n, corners in FACES:
-            base = len(pos)
-            for v in corners: pos.append(tuple(c[i]+v[i]*h[i] for i in range(3))); nor.append(n)
-            idx += [base, base+1, base+2, base, base+2, base+3]
-    p = add(b''.join(struct.pack('<3f',*v) for v in pos), None, len(pos), 34962, 'VEC3', 5126,
-            [min(v[i] for v in pos) for i in range(3)], [max(v[i] for v in pos) for i in range(3)])
-    n = add(b''.join(struct.pack('<3f',*v) for v in nor), None, len(nor), 34962, 'VEC3', 5126)
-    i = add(struct.pack(f'<{len(idx)}I', *idx), None, len(idx), 34963, 'SCALAR', 5125)
-    prims.append({'attributes':{'POSITION':p,'NORMAL':n},'indices':i,'material':materials.index(mat)})
+def mesh(boxes):
+    prims = []
+    for mat in materials:
+        pos, nor, idx = [], [], []
+        for _, lo, hi in [b for b in boxes if b[0]==mat]:
+            c = [(lo[i]+hi[i])/2 for i in range(3)]; h = [(hi[i]-lo[i])/2 for i in range(3)]
+            for n, corners in FACES:
+                base = len(pos)
+                for v in corners: pos.append(tuple(c[i]+v[i]*h[i] for i in range(3))); nor.append(n)
+                idx += [base, base+1, base+2, base, base+2, base+3]
+        if not pos: continue
+        p = add(b''.join(struct.pack('<3f',*v) for v in pos), len(pos), 34962, 'VEC3', 5126,
+                [min(v[i] for v in pos) for i in range(3)], [max(v[i] for v in pos) for i in range(3)])
+        n = add(b''.join(struct.pack('<3f',*v) for v in nor), len(nor), 34962, 'VEC3', 5126)
+        i = add(struct.pack(f'<{len(idx)}I', *idx), len(idx), 34963, 'SCALAR', 5125)
+        prims.append({'attributes':{'POSITION':p,'NORMAL':n},'indices':i,'material':materials.index(mat)})
+    return {'primitives':prims}
+
+meshes = [mesh(static), mesh(door)]
+nodes = [{'name':'sandbox','mesh':0}, {'name':'DOOR_yard_750','mesh':1}]
+nodes += [{'name':name,'translation':list(pos),'rotation':yaw_rotation(deg)} for name, pos, deg in markers]
 while len(blob) % 4: blob.append(0)
-gltf = {'asset':{'version':'2.0','generator':'make-sandbox-map.py'},'scene':0,'scenes':[{'nodes':[0]}],
-        'nodes':[{'name':'sandbox','mesh':0}],'meshes':[{'primitives':prims}],
+gltf = {'asset':{'version':'2.0','generator':'make-sandbox-map.py'},'scene':0,'scenes':[{'nodes':list(range(len(nodes)))}],
+        'nodes':nodes,'meshes':meshes,
         'materials':[{'name':m,'pbrMetallicRoughness':{'baseColorFactor':[*COLORS[m],1],'metallicFactor':0,'roughnessFactor':.85}} for m in materials],
         'accessors':accessors,'bufferViews':views,'buffers':[{'byteLength':len(blob)}]}
 js = json.dumps(gltf, separators=(',',':')).encode(); js += b' ' * (-len(js) % 4)
 OUT.write_bytes(struct.pack('<III',0x46546C67,2,12+8+len(js)+8+len(blob)) + struct.pack('<II',len(js),0x4E4F534A) + js + struct.pack('<II',len(blob),0x004E4942) + blob)
-print(OUT, OUT.stat().st_size, 'bytes')
+print(OUT, OUT.stat().st_size, 'bytes,', len(markers), 'markers')
