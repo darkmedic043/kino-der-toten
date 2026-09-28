@@ -17,7 +17,13 @@ export async function loadCharacterRegistry(){
 }
 
 const gltfCache=new Map();
-function loadGltf(url){if(!gltfCache.has(url))gltfCache.set(url,new GLTFLoader().loadAsync(url));return gltfCache.get(url);}
+// Records textures or buffers that fail to load (common with .gltf files whose
+// side files were not copied along, or textures not embedded in a .glb).
+function loadGltf(url){
+  if(!gltfCache.has(url)){const manager=new THREE.LoadingManager(),missing=[];manager.onError=u=>missing.push(u.split('/').pop());
+    gltfCache.set(url,new GLTFLoader(manager).loadAsync(url).then(g=>{g.missing=missing;return g;}));}
+  return gltfCache.get(url);
+}
 
 function fitHeight(root,height){
   root.updateMatrixWorld(true);
@@ -44,7 +50,8 @@ export async function createCharacter(entry,data){
     if(!Object.keys(actions).length&&gltf.animations[0])actions.idle=mixer.clipAction(gltf.animations[0]);
     let current=null;
     const play=key=>{const a=actions[key]??actions.walk??actions.idle;if(!a||a===current)return;a.reset().fadeIn(.2).play();current?.fadeOut(.2);current=a;};
-    return {root:holder,update(dt,speed=0){play(speed>230?'run':speed>20?'walk':'idle');mixer.update(dt);},dispose(){mixer.stopAllAction();holder.removeFromParent();}};
+    return {root:holder,clips:gltf.animations.map(a=>a.name),missing:gltf.missing??[],matched:Object.fromEntries(Object.entries(clips).map(([k,c])=>[k,c?.name??null])),
+      update(dt,speed=0){play(speed>230?'run':speed>20?'walk':'idle');mixer.update(dt);},dispose(){mixer.stopAllAction();holder.removeFromParent();}};
   }
   if(entry.type==='t5'){
     const chars=data.characters,body=await loadModel(chars[entry.body]),head=entry.head?await loadModel(chars[entry.head]):null;
@@ -53,34 +60,65 @@ export async function createCharacter(entry,data){
     // T5 models face +X; turn them to the shared +Z convention.
     root.rotation.y=-Math.PI/2;holder.add(root);
     const rig=new Rig(root);
-    for(const [key,name] of [['walk',entry.walk],['run',entry.run]])if(name&&data.animations[name])rig.add(key,await loadAnimation(data.animations[name]),true);
-    rig.play('walk');rig.update(.01);
+    // T5 characters only have zombie animations; idle holds the first frame of
+    // `idle` (default: the walk), which for ai_zombie_walk_v1 is a neutral stance.
+    for(const [key,name] of [['idle',entry.idle??entry.walk],['walk',entry.walk],['run',entry.run]])if(name&&data.animations[name])rig.add(key,await loadAnimation(data.animations[name]),true);
+    rig.play('idle');rig.update(0);
     root.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});
-    return {root:holder,update(dt,speed=0){rig.play(speed>230&&rig.actions.run?'run':'walk');const a=rig.actions[rig.current];if(a)a.timeScale=speed>20?1:0;rig.update(dt);},dispose(){holder.removeFromParent();}};
+    return {root:holder,update(dt,speed=0){
+      const key=speed>230&&rig.actions.run?'run':speed>20?'walk':'idle';rig.play(key);
+      const a=rig.actions[key];if(a)a.timeScale=key==='idle'?0:key==='walk'?THREE.MathUtils.clamp(speed/170,.6,1.4):1;
+      if(key==='idle'&&a)a.time=(entry.idleTime??0);rig.update(dt);
+    },dispose(){holder.removeFromParent();}};
   }
   return mannequin(entry,holder);
 }
 
-// A jointed placeholder figure with a procedural walk cycle.
+// A jointed placeholder figure with procedural idle, walk and run cycles.
+// Faces +Z (the visor side), feet on y=0, about 72 units tall.
 function mannequin(entry,holder){
-  const skin=new THREE.MeshStandardMaterial({color:new THREE.Color(entry.color??'#8d8a80'),roughness:.65}),dark=new THREE.MeshStandardMaterial({color:0x2c2f2e,roughness:.8});
-  const accent=new THREE.MeshStandardMaterial({color:new THREE.Color(entry.accent??'#932e25'),roughness:.6});
-  const part=(geometry,material,parent,x,y,z)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);parent.add(m);return m;};
-  const limb=(parent,x,y,length,radius,material)=>{const pivot=new THREE.Group();pivot.position.set(x,y,0);parent.add(pivot);part(new THREE.CapsuleGeometry(radius,length,4,10),material,pivot,0,-length/2-radius*.5,0);return pivot;};
-  const body=new THREE.Group();holder.add(body);
-  part(new THREE.CapsuleGeometry(8.5,18,4,12),accent,body,0,46,0).scale.set(1,1,.62);
-  part(new THREE.CylinderGeometry(7.5,8,6,12),dark,body,0,33,0).scale.set(1,1,.7);
-  part(new THREE.SphereGeometry(6.2,16,12),skin,body,0,65,0);
-  part(new THREE.BoxGeometry(9,2.4,3),dark,body,0,66,4.8);
-  const legs=[limb(body,-4.2,33,24,3.6,dark),limb(body,4.2,33,24,3.6,dark)];
-  const arms=[limb(body,-11,55,18,2.8,skin),limb(body,11,55,18,2.8,skin)];
-  arms.forEach((a,i)=>a.rotation.z=(i?-1:1)*.12);
-  let phase=0;
+  const mat=(color,rough=.6,metal=0)=>new THREE.MeshStandardMaterial({color:new THREE.Color(color),roughness:rough,metalness:metal});
+  const skin=mat(entry.color??'#8d8a80',.55),accent=mat(entry.accent??'#932e25',.6),dark=mat('#2a2d2c',.8),boot=mat('#161817',.7),visor=mat('#0c0d0d',.25,.6);
+  const mesh=(geometry,material,parent,x=0,y=0,z=0)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m;};
+  const joint=(parent,x,y,z=0)=>{const g=new THREE.Group();g.position.set(x,y,z);parent.add(g);return g;};
+  // Capsule hanging down from a joint: length is joint-to-joint.
+  const bone=(parent,length,r0,r1,material)=>{const g=new THREE.CylinderGeometry(r0,r1,length,14,1);g.translate(0,-length/2,0);mesh(g,material,parent);mesh(new THREE.SphereGeometry(r0,14,10),material,parent);return joint(parent,0,-length);};
+
+  const hips=joint(holder,0,37.5);
+  const pelvis=mesh(new THREE.CylinderGeometry(7.4,6.6,7,16),dark,hips,0,-1);pelvis.scale.z=.72;
+  const spine=joint(hips,0,2.5);
+  const torso=mesh(new THREE.CylinderGeometry(9.6,7.2,21,18),accent,spine,0,10.5);torso.scale.z=.6;
+  mesh(new THREE.CylinderGeometry(7.5,7.5,1.6,16),dark,spine,0,1).scale.z=.66;           // belt
+  const chest=joint(spine,0,21);
+  const neck=joint(chest,0,.5);mesh(new THREE.CylinderGeometry(2.4,2.8,5,12),skin,neck,0,2.5);
+  const head=joint(neck,0,5);
+  const skull=mesh(new THREE.SphereGeometry(5.5,20,16),skin,head,0,4.6);skull.scale.set(.9,1.1,.98);
+  const v=mesh(new THREE.SphereGeometry(5.6,20,12,Math.PI*.14,Math.PI*.72,Math.PI*.36,Math.PI*.22),visor,head,0,4.8,.1);v.scale.set(.93,1.1,1.02);
+  const limbs={};
+  for(const side of [-1,1]){
+    const shoulder=joint(chest,side*10.4,-1.5);mesh(new THREE.SphereGeometry(3.4,14,10),accent,shoulder);
+    const elbow=bone(shoulder,12.5,2.8,2.4,skin),wrist=bone(elbow,11,2.3,1.9,skin);
+    mesh(new THREE.BoxGeometry(3.2,4.6,2),skin,wrist,0,-2.2).rotation.x=.1;
+    const hip=joint(hips,side*4.4,-2.5),knee=bone(hip,16.5,3.9,3.1,dark),ankle=bone(knee,16,3,2.4,dark);
+    mesh(new THREE.BoxGeometry(4.2,3,9.5),boot,ankle,0,-1.2,2.4);
+    limbs[side]={shoulder,elbow,hip,knee};
+  }
+  let phase=0,blend=0,breath=0;
   return {root:holder,update(dt,speed=0){
-    const moving=Math.min(1,speed/190);phase+=dt*(4+speed/40);
-    const swing=Math.sin(phase)*.65*moving;
-    legs[0].rotation.x=swing;legs[1].rotation.x=-swing;arms[0].rotation.x=-swing*.8;arms[1].rotation.x=swing*.8;
-    body.position.y=Math.abs(Math.cos(phase))*1.6*moving+Math.sin(phase*.4)*.3*(1-moving);
+    const target=Math.min(1.4,speed/190);blend+=(target-blend)*Math.min(1,dt*8);breath+=dt;
+    const run=Math.max(0,blend-1)/.4,moving=Math.min(1,blend);
+    phase+=dt*(5+speed/34)*(moving>.02?1:0);
+    const swing=Math.sin(phase)*(.55+.25*run)*moving;
+    for(const side of [-1,1]){
+      const l=limbs[side],s=side===1?1:-1,legSwing=swing*s;
+      l.hip.rotation.x=legSwing;
+      l.knee.rotation.x=Math.max(0,Math.sin(phase*1+ (s>0?0:Math.PI)+.9))*(.7+.6*run)*moving;
+      l.shoulder.rotation.x=-legSwing*.85;l.shoulder.rotation.z=side*(.09+.03*Math.sin(breath*1.3));
+      l.elbow.rotation.x=-(.12+(.25+1.1*run)*moving);
+    }
+    spine.rotation.x=.04+.16*run;chest.scale.set(1,1+Math.sin(breath*1.8)*.006*(1-moving),1);
+    hips.position.y=37.5+Math.abs(Math.cos(phase))*1.5*moving-.8*run;
+    head.rotation.x=-.05*run;
   },dispose(){holder.removeFromParent();}};
 }
 

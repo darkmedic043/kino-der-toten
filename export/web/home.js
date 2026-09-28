@@ -233,6 +233,28 @@ function renderCharacters(){
   if(current&&!stage.character)showCharacter(current);
 }
 
+// Preview a local model file before adding it to characters.json.
+$('char-file').addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;
+  if(/\.gltf$/i.test(file.name))toast('A .gltf with separate files may not load here. Export as .glb if it fails.');
+  const id=file.name.replace(/\.[^.]+$/,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')||'my_character';
+  const entry={id,name:file.name.replace(/\.[^.]+$/,''),type:'gltf',url:URL.createObjectURL(file),description:'Previewing '+file.name};
+  const token=++stage.loading;$('char-name').textContent=entry.name;$('char-desc').textContent='Loading…';
+  const report=$('char-report');report.hidden=false;report.innerHTML='Loading…';
+  try{
+    const c=await createCharacter(entry,baseData);if(token!==stage.loading){c.dispose();return;}
+    stage.character?.dispose();stage.character=c;stage.scene.add(c.root);$('char-desc').textContent=entry.description;
+    const m=c.matched,have=Object.entries(m).filter(([,v])=>v);
+    report.innerHTML=`<b>${esc(file.name)}</b> · ${c.clips.length} animation${c.clips.length===1?'':'s'}${c.clips.length?': '+c.clips.map(esc).join(', '):''}<br>`+
+      ['idle','walk','run'].map(k=>m[k]?`${k.toUpperCase()} → ${esc(m[k])}`:`<span class="bad">${k.toUpperCase()} → none (name a clip "${k}")</span>`).join('<br>')+
+      `<br>If it faces the wrong way, add <b>"yaw": 180</b> (or 90 / -90).<br>Save it as <b>mods/characters/models/${esc(id)}.glb</b> and add this to <b>characters.json</b>:`+
+      `<pre>${esc(JSON.stringify({id,name:entry.name,type:'gltf',model:`models/${id}.glb`,height:72,description:'My character'},null,0))}</pre>`;
+    if(c.missing.length)report.innerHTML+=`<p class="bad">Missing textures (${c.missing.length}): ${esc(c.missing.slice(0,3).join(', '))}${c.missing.length>3?'…':''}. Export as .glb with textures embedded (Blender: Format glTF Binary).</p>`;
+    if(!have.length&&c.clips.length===0)report.innerHTML+='<p class="bad">No animations: it will slide around in a fixed pose. Add Mixamo idle/walk/run clips in Blender.</p>';
+  }catch(error){console.error(error);report.innerHTML=`<span class="bad">Could not load ${esc(file.name)}: ${esc(error.message)}</span>`;$('char-desc').textContent='';}
+  e.target.value='';
+});
+
 // ---- Mods ---------------------------------------------------------------------------
 function renderMods(){
   $('mod-list').innerHTML=mods.map(m=>m.error?`<div class="mod error"><strong>${esc(m.id)}</strong><p>${esc(m.error)}</p></div>`

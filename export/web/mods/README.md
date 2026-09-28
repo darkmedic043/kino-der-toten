@@ -98,6 +98,25 @@ person. Register characters in `characters/characters.json`:
 ```
 
 - **`gltf`**: any `.glb`/`.gltf` in `characters/models/`. It is scaled to `height` units (72 is about 1.83 m), or set `scale` instead. Use `yaw` (degrees) if it doesn't face forward. Animation clips whose names contain `idle`, `walk` and `run`/`sprint` play automatically. Rigged models from Mixamo or Blender work well.
+### Importing your own character
+
+1. **Get a rigged model.** Any humanoid works. The easiest route is
+   [Mixamo](https://www.mixamo.com) (free):
+   - Upload your model, or pick one of theirs, and let it auto-rig.
+   - Download the character as **FBX, With Skin**.
+   - Download an **Idle**, a **Walking** and a **Running** animation, each as **FBX, Without Skin**, "In Place" ticked.
+2. **Combine them in Blender.**
+   - File → Import → FBX, first the character and then each animation.
+   - In the Action Editor (Dope Sheet → Action Editor), rename the actions to `idle`, `walk` and `run`, and push each one down to an NLA track.
+   - Delete the extra imported armatures, so only your character's armature and mesh remain.
+3. **Export.** File → Export → glTF 2.0. Set Format to **glTF Binary (.glb)**, and under Animation turn on **Group by NLA Track**. Textures are embedded automatically.
+4. **Check it.** Main menu → Character → **Preview a model file**, then pick the `.glb`. It shows the model and lists which clips it matched to idle, walk and run and any missing textures. It also prints the exact `characters.json` entry to use.
+5. **Install it.** Copy the `.glb` to `mods/characters/models/`, paste the entry into `characters/characters.json`, and refresh. It now appears in the character list, and in game in third person (T).
+
+Clip names only need to *contain* idle, walk or run/sprint (for example
+`Armature|Walking` works). A model without animations still works; it just
+slides around in a fixed pose. If it faces backwards, add `"yaw": 180`.
+
 - `mannequin`: the built-in placeholder (`color`, `accent`).
 - `t5`: a body/head pair from the game data, like the Honor Guard example.
 - `hands` (advanced): a replacement first-person arms model. It has to use the T5 viewmodel skeleton, so most characters leave it out and keep the default arms.
