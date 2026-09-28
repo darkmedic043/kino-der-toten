@@ -68,7 +68,7 @@
         </div></div>
       <div class="char-stage">
         <canvas id="char-canvas"></canvas>
-        <div class="char-caption"><strong id="char-name"></strong><p id="char-desc" class="muted"></p></div>
+        <div class="char-caption"><strong id="char-name"></strong><p id="char-desc" class="muted"></p><p id="char-credit" class="credit"></p></div>
         <div class="chips stage-view" id="char-view"><button data-view="body" class="active">BODY</button><button data-view="fp">FIRST PERSON</button></div>
         <div class="chips stage-anim" id="char-anim"><button data-speed="0" class="active">IDLE</button><button data-speed="190">WALK</button><button data-speed="285">RUN</button></div>
       </div>
@@ -83,6 +83,8 @@
   <section id="tab-mods" class="tab">
     <header class="tab-head"><span class="eyebrow">MODS</span><span class="muted small">Enable or disable in mods/mods.json · guide in mods/README.md</span></header>
     <div id="mod-list" class="mod-list"></div>
+    <header class="tab-head credits-head"><span class="eyebrow">CREDITS</span></header>
+    <ul id="credit-list" class="credit-list"></ul>
   </section>
 </main>
 <div id="toast"></div>

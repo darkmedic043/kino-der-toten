@@ -113,6 +113,12 @@ person. Register characters in `characters/characters.json`:
 4. **Check it.** Main menu → Character → **Preview a model file**, then pick the `.glb`. It shows the model and lists which clips it matched to idle, walk and run and any missing textures. It also prints the exact `characters.json` entry to use.
 5. **Install it.** Copy the `.glb` to `mods/characters/models/`, paste the entry into `characters/characters.json`, and refresh. It now appears in the character list, and in game in third person (T).
 
+**No animations?** A rigged humanoid without clips (common for Sketchfab downloads) is **animated procedurally**. The skeleton is detected from its shape, and the game drives an idle stance (arms lowered from a T-pose), a walk and run with knee bend, a gun-aiming pose in third person, and a swaying tail if the rig has one. Set `"procedural": false` to turn this off.
+
+**Credits.** For a licensed model (CC-BY, for example), add a `credit` object. It is shown on the character card, in the preview caption, and under Mods → Credits:
+`"credit": {"title": "…", "author": "…", "authorUrl": "…", "source": "…", "license": "CC-BY-4.0", "licenseUrl": "…"}`.
+Keep the model's licence file next to it, and add it to `CREDITS.md` at the repo root.
+
 Clip names only need to *contain* idle, walk or run/sprint (for example
 `Armature|Walking` works). A model without animations still works; it just
 slides around in a fixed pose. If it faces backwards, add `"yaw": 180`.

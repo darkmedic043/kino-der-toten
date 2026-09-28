@@ -242,6 +242,7 @@ for(const b of document.querySelectorAll('#char-anim button'))b.addEventListener
 async function showCharacter(entry){
   currentEntry=entry;if(stage.mode==='fp')showArms(entry);
   const token=++stage.loading;$('char-name').textContent=entry.name;$('char-desc').textContent=entry.description??'';
+  $('char-credit').innerHTML=entry.credit?'Model: '+creditHtml(entry.credit):'';
   try{
     const c=await createCharacter(entry,baseData);if(token!==stage.loading){c.dispose();return;}
     stage.character?.dispose();stage.character=c;stage.scene.add(c.root);
@@ -252,7 +253,7 @@ function renderCharacters(){
   const current=characters.find(c=>c.id===profile.character)??characters[0];
   for(const c of characters){
     const el=document.createElement('button');el.className='char-card'+(c===current?' active':'');
-    el.innerHTML=`<span class="swatch" style="--a:${esc(c.accent??'#3a3a36')};--b:${esc(c.color??'#12110f')}"></span><span><strong>${esc(c.name)}</strong><small>${c.type==='mannequin'?'PLACEHOLDER':c.type==='t5'?'GAME MODEL':'CUSTOM MODEL'}</small></span>`;
+    el.innerHTML=`<span class="swatch" style="--a:${esc(c.accent??'#3a3a36')};--b:${esc(c.color??'#12110f')}"></span><span><strong>${esc(c.name)}</strong><small>${c.type==='mannequin'?'PLACEHOLDER':c.type==='t5'?'GAME MODEL':'CUSTOM MODEL'}${c.credit?' · BY '+esc(c.credit.author).toUpperCase():''}</small></span>`;
     el.addEventListener('click',()=>{profile.character=c.id;save();renderCharacters();showCharacter(c);toast(c.name+' selected');});
     list.append(el);
   }
@@ -282,6 +283,18 @@ $('char-file').addEventListener('change',async e=>{
   e.target.value='';
 });
 
+// ---- Credits -------------------------------------------------------------------
+// Third-party assets carry a "credit" object ({title, author, authorUrl, source,
+// license, licenseUrl}); CC-BY and similar licences require showing it.
+const link=(text,url)=>url?`<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`:esc(text);
+const creditHtml=c=>`"${link(c.title,c.source)}" by ${link(c.author,c.authorUrl)}, licensed under ${link(c.license,c.licenseUrl)}`;
+function renderCredits(){
+  const items=[...characters.filter(c=>c.credit).map(c=>({what:'Character · '+c.name,credit:c.credit})),...mapList.filter(m=>m.credit).map(m=>({what:'Map · '+m.title,credit:m.credit}))];
+  $('credit-list').innerHTML=items.map(i=>`<li><strong>${esc(i.what)}</strong><span>This work is based on ${creditHtml(i.credit)}.</span></li>`).join('')+
+    '<li><strong>Kino der Toten browser Zombies</strong><span>Original project by '+link('Luckey Faraday','https://github.com/luckeyfaraday/kino-der-toten')+' (code under the MIT licence).</span></li>'+
+    '<li><strong>Call of Duty: Black Ops assets</strong><span>Maps, models, sounds and animations remain the property of Activision / Treyarch. Unofficial, non-commercial fan project.</span></li>';
+}
+
 // ---- Mods ---------------------------------------------------------------------------
 function renderMods(){
   $('mod-list').innerHTML=mods.map(m=>m.error?`<div class="mod error"><strong>${esc(m.id)}</strong><p>${esc(m.error)}</p></div>`
@@ -289,6 +302,6 @@ function renderMods(){
     ||'<p class="muted">No mods enabled.</p>';
 }
 
-renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();
+renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();renderCredits();
 showTab(['play','loadout','character','mods','settings'].includes(location.hash.slice(1))?location.hash.slice(1):'play');
 window.menu={profile:()=>profile,thumb,showTab};

@@ -62,6 +62,13 @@ export async function createCharacter(entry,data){
     if(entry.scale){inner.updateMatrixWorld(true);inner.position.y-=new THREE.Box3().setFromObject(inner).min.y;}
     holder.add(inner);
     model.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.castShadow=true;}});
+    // A rigged model with no animation clips is animated procedurally.
+    if(!gltf.animations.length&&entry.procedural!==false){
+      let skinned=false;model.traverse(o=>{if(o.isSkinnedMesh)skinned=true;});
+      const rig=skinned?proceduralRig(model,holder,entry):null;
+      if(rig)return {root:holder,hand:rig.hand,procedural:true,clips:[],matched:{idle:'procedural',walk:'procedural',run:'procedural'},missing:gltf.missing??[],
+        hold:rig.hold,update:rig.update,dispose(){holder.removeFromParent();}};
+    }
     const mixer=new THREE.AnimationMixer(model),pick=re=>gltf.animations.find(a=>re.test(a.name));
     const clips={idle:pick(/idle/i),walk:pick(/walk/i),run:pick(/run|sprint/i)};
     const actions=Object.fromEntries(Object.entries(clips).filter(([,c])=>c).map(([k,c])=>[k,mixer.clipAction(c)]));
@@ -93,6 +100,63 @@ export async function createCharacter(entry,data){
     },dispose(){holder.removeFromParent();}};
   }
   return mannequin(entry,holder);
+}
+
+// Procedural animation for a rigged humanoid that ships without clips. Bones
+// are found from the skeleton's shape (not names): legs hang below the hips,
+// arms are the "arm" chains, sides come from rest positions (+X is the
+// character's left, since characters face +Z). Each bone is aimed along a
+// direction in character space, which works for any bone axis convention.
+function proceduralRig(model,holder,entry){
+  holder.updateMatrixWorld(true);
+  const bones=[];model.traverse(o=>{if(o.isBone)bones.push(o);});
+  // Positions in character space (the holder moves in game, so always use its current matrix).
+  const local=b=>holder.worldToLocal(b.getWorldPosition(new THREE.Vector3()));
+  const firstChild=b=>b?.children.find(c=>c.isBone)??null;
+  const hips=bones.find(b=>/hips|pelvis/i.test(b.name))??bones.find(b=>b.children.filter(c=>c.isBone).length>=3);
+  if(!hips)return null;
+  const hipY=local(hips).y;
+  const legs=hips.children.filter(c=>c.isBone&&firstChild(c)&&local(firstChild(c)).y<hipY-2&&!/tail/i.test(c.name));
+  const arms=bones.filter(b=>/arm/i.test(b.name)&&!/fore|lower|armature/i.test(b.name)&&firstChild(b)&&firstChild(firstChild(b)));
+  const side=b=>local(b).x>0?1:-1;   // +1 left, -1 right
+  const limb=(list,s)=>list.filter(b=>side(b)===s).sort((a,b)=>Math.abs(local(b).x)-Math.abs(local(a).x))[0];
+  const L={arm:limb(arms,1),leg:limb(legs,1)},R={arm:limb(arms,-1),leg:limb(legs,-1)};
+  if(!L.arm||!R.arm||!L.leg||!R.leg){console.warn('[character] could not find arms and legs for procedural animation');return null;}
+  for(const S of [L,R]){S.fore=firstChild(S.arm);S.hand=firstChild(S.fore);S.shin=firstChild(S.leg);S.foot=firstChild(S.shin);}
+  const spine=hips.children.find(c=>c.isBone&&/spine|chest/i.test(c.name))??hips.children.find(c=>c.isBone&&local(firstChild(c)??c).y>hipY);
+  const tail=bones.filter(b=>/tail/i.test(b.name));
+  const rest=new Map(bones.map(b=>[b,b.quaternion.clone()]));
+  const height=new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).y||1;
+  const inner=model.parent,baseY=inner.position.y;
+  const hq=new THREE.Quaternion(),pq=new THREE.Quaternion(),q=new THREE.Quaternion(),v=new THREE.Vector3(),w=new THREE.Vector3();
+  const parentQ=b=>{holder.getWorldQuaternion(hq).invert();b.parent.getWorldQuaternion(pq);return hq.multiply(pq);};
+  // Rotate `bone` (in character space) so the bone->child segment points along `dir`.
+  function aim(bone,child,dir){
+    bone.updateWorldMatrix(true,true);
+    v.copy(local(child)).sub(local(bone)).normalize();w.copy(dir).normalize();
+    q.setFromUnitVectors(v,w);const P=parentQ(bone);
+    bone.quaternion.premultiply(P.clone().invert().multiply(q).multiply(P)).normalize();
+  }
+  function turn(bone,axis,angle){bone.updateWorldMatrix(true,false);const P=parentQ(bone);q.setFromAxisAngle(axis,angle);bone.quaternion.premultiply(P.clone().invert().multiply(q).multiply(P));}
+  const X=new THREE.Vector3(1,0,0),Y=new THREE.Vector3(0,1,0),dir=(x,a)=>new THREE.Vector3(x,-Math.cos(a),Math.sin(a));
+  let phase=0,blend=0,breath=0,holding=false;
+  return {hand:R.hand,hold(value){holding=value;},update(dt,speed=0){
+    const target=Math.min(1.4,speed/190);blend+=(target-blend)*Math.min(1,dt*8);breath+=dt;
+    const run=Math.max(0,blend-1)/.4,moving=Math.min(1,blend);
+    if(moving>.02)phase+=dt*(5+speed/34);
+    const swing=Math.sin(phase)*(.5+.25*run)*moving;
+    for(const [b,r] of rest)b.quaternion.copy(r);
+    if(spine)turn(spine,X,.03+.18*run);
+    for(const [S,s] of [[L,1],[R,-1]]){
+      const legSwing=swing*s,knee=Math.max(0,Math.sin(phase+(s>0?0:Math.PI)+.9))*(.7+.6*run)*moving;
+      aim(S.leg,S.shin,dir(0,legSwing));aim(S.shin,S.foot,dir(0,legSwing-knee));
+      if(holding&&s<0){aim(S.arm,S.fore,new THREE.Vector3(-.12,-.18,1));aim(S.fore,S.hand,new THREE.Vector3(.05,-.05,1));}
+      else if(holding){aim(S.arm,S.fore,new THREE.Vector3(-.3,-.35,.9));aim(S.fore,S.hand,new THREE.Vector3(-.85,-.02,.55));}
+      else{const a=-legSwing*.8,sway=.12+.02*Math.sin(breath*1.3);aim(S.arm,S.fore,dir(s*sway,a));aim(S.fore,S.hand,dir(s*.08,a+.15+(.2+.9*run)*moving));}
+    }
+    tail.forEach((b,i)=>turn(b,Y,Math.sin(breath*2.2-i*.6)*(.08+.06*moving)));
+    inner.position.y=baseY+Math.abs(Math.cos(phase))*height*.02*moving;
+  }};
 }
 
 // A jointed placeholder figure with procedural idle, walk and run cycles.

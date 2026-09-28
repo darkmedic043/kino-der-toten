@@ -102,6 +102,13 @@ main{position:relative;overflow-y:auto;padding:40px 48px 60px}
 #char-report{overflow-wrap:anywhere;margin-top:12px;font-size:11px;line-height:1.6;color:#c7bca4}
 #char-report b{color:var(--text);font-weight:600}#char-report .bad{color:#e8a092}
 #char-report pre{white-space:pre-wrap;word-break:break-all;background:#0a0c0b;border:1px solid #776b5230;padding:8px;margin:8px 0 0;font-size:10px;color:#b9b09b;user-select:all}
+/* Credits */
+.char-caption .credit{margin:6px 0 0;font-size:11px;color:#9d947e;pointer-events:auto}
+.credit a,.credit-list a{color:#d6a94a;text-decoration:none}.credit a:hover,.credit-list a:hover{text-decoration:underline}
+.credits-head{margin-top:34px}
+.credit-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;max-width:900px}
+.credit-list li{border:1px solid var(--line);background:var(--panel);padding:14px 16px;font-size:12px;line-height:1.55;color:#c7bca4}
+.credit-list strong{display:block;color:var(--text);font-size:12px;letter-spacing:1px;margin-bottom:3px}
 /* Mods */
 .mod-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
 .mod{border:1px solid var(--line);background:var(--panel);padding:18px}

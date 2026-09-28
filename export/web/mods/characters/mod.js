@@ -46,7 +46,14 @@ export default async function setup(api){
     const model=await loadModel(def.worldModel);if(key!==heldKey||!model)return;
     for(const tag of api.data.weapons[s.weapon.id]?.hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
     const grip={...grips[entry.type]??grips.gltf,...entry.weapon},pivot=new THREE.Group();pivot.add(model);
-    if(grip.basis&&!entry.weapon?.rotation){
+    if(character.procedural&&!entry.weapon?.rotation){
+      // Procedural rigs: settle the aim pose, then point the barrel forward and
+      // the sights up in character space, whatever the hand bone's axes are.
+      character.hold(true);character.update(0,0);character.root.updateMatrixWorld(true);
+      const hand=character.root.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(character.hand.getWorldQuaternion(new THREE.Quaternion()));
+      const want=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,0,1),new THREE.Vector3(0,1,0),new THREE.Vector3(-1,0,0)));
+      pivot.quaternion.copy(hand.invert().multiply(want));
+    }else if(grip.basis&&!entry.weapon?.rotation){
       // Mannequin wrist: barrel (+X) along the arm (-Y), sights up (+Z when aiming).
       pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,-1,0),new THREE.Vector3(0,0,1),new THREE.Vector3(-1,0,0)));
     }else pivot.rotation.set(...(grip.rotation??[0,0,0]).map(THREE.MathUtils.degToRad));

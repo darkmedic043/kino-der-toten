@@ -42,6 +42,30 @@
       "handsTint": {
         "*": "#a4ab96"
       }
+    },
+    {
+      "id": "female_protogen",
+      "name": "Protogen",
+      "type": "gltf",
+      "model": "models/female_protogen/scene.gltf",
+      "height": 74,
+      "description": "Female Protogen by Jakermates. Animated procedurally (the model has no animation clips).",
+      "color": "#767e8c",
+      "accent": "#c8cde2",
+      "hands": "usmc",
+      "handsTint": {
+        "glovesleeve": "#767e8c",
+        "glove": "#a3a8bf"
+      },
+      "handsFlat": true,
+      "credit": {
+        "title": "Female_Protogen",
+        "author": "Jakermates",
+        "authorUrl": "https://sketchfab.com/jaydidleedoo",
+        "source": "https://sketchfab.com/3d-models/female-protogen-839042536637493b9b7bd983d2a36e5c",
+        "license": "CC-BY-4.0",
+        "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+      }
     }
   ]
 }
