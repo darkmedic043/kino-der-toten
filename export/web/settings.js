@@ -2,9 +2,21 @@
 // the main menu and every game page. `settings` is live; pages read it each frame.
 
 const KEY='kino.settings';
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,renderScale:1,showFps:false};
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,renderScale:1,showFps:false,binds:{}};
+// Rebindable actions and the key each game page listens for. game-menu.js
+// translates a rebound key into its default so the game code stays unchanged.
+export const ACTIONS=[
+  ['forward','Move forward','KeyW'],['back','Move back','KeyS'],['left','Move left','KeyA'],['right','Move right','KeyD'],
+  ['sprint','Sprint (hold)','ShiftLeft'],['jump','Jump','Space'],['crouch','Crouch','KeyC'],['use','Use / buy','KeyF'],
+  ['reload','Reload','KeyR'],['melee','Knife','KeyV'],['grenade','Grenade','KeyG'],['swap','Switch weapon','KeyQ'],
+  ['claymore','Claymore','Digit4'],['monkey','Monkey Bomb','KeyX'],['thirdPerson','Third person','KeyT'],
+];
+export const DEFAULT_BINDS=Object.fromEntries(ACTIONS.map(([id,,code])=>[id,code]));
+export const binds=()=>({...DEFAULT_BINDS,...settings.binds});
+export const keyName=code=>code?code.replace(/^Key/,'').replace(/^Digit/,'').replace(/^Arrow/,'↑').replace('Left','').replace('Right',' R').replace(/([a-z])([A-Z])/g,'$1 $2'):'—';
 export const settings={...DEFAULTS};
 try{Object.assign(settings,JSON.parse(localStorage.getItem(KEY))??{});}catch{}
+settings.binds={...settings.binds};
 const listeners=new Set();
 export function onSettingsChange(fn){listeners.add(fn);return()=>listeners.delete(fn);}
 export function setSetting(key,value){settings[key]=value;try{localStorage.setItem(KEY,JSON.stringify(settings));}catch{}for(const fn of listeners)fn(settings,key);}
@@ -26,13 +38,26 @@ export function renderSettings(container){
   container.classList.add('settings-form');
   container.innerHTML=FIELDS.map(f=>`<label class="setting" data-key="${f.key}"><span class="name">${f.label}${f.hint?`<small>${f.hint}</small>`:''}</span>`+
     (f.type==='range'?`<input type="range" min="${f.min}" max="${f.max}" step="${f.step}"><b class="value"></b>`:`<input type="checkbox"><b class="value"></b>`)+'</label>').join('')+
+    '<div class="settings-sub">CONTROLS <small>Click a key, then press the new one · Esc cancels</small></div><div class="binds">'+
+    ACTIONS.map(([id,label])=>`<div class="bind" data-action="${id}"><span>${label}</span><button type="button" class="key"></button></div>`).join('')+'</div>'+
     '<button type="button" class="settings-reset">RESET TO DEFAULTS</button>';
   const sync=()=>{for(const f of FIELDS){const row=container.querySelector(`[data-key="${f.key}"]`),input=row.querySelector('input');
     if(f.type==='range')input.value=settings[f.key];else input.checked=!!settings[f.key];
-    row.querySelector('.value').textContent=f.type==='range'?f.format(+settings[f.key]):settings[f.key]?'ON':'OFF';}};
+    row.querySelector('.value').textContent=f.type==='range'?f.format(+settings[f.key]):settings[f.key]?'ON':'OFF';}
+    const b=binds();for(const el of container.querySelectorAll('.bind'))if(el!==waiting)el.querySelector('.key').textContent=keyName(b[el.dataset.action]);};
+  let waiting=null;
+  container.addEventListener('click',e=>{const bind=e.target.closest('.bind');if(!bind)return;waiting?.classList.remove('waiting');waiting=bind;bind.classList.add('waiting');bind.querySelector('.key').textContent='Press a key…';});
+  // Capture phase on window so the key never reaches the game while rebinding.
+  addEventListener('keydown',e=>{
+    if(!waiting||!container.isConnected)return;e.preventDefault();e.stopImmediatePropagation();
+    const action=waiting.dataset.action;waiting.classList.remove('waiting');waiting=null;
+    if(e.code!=='Escape'){const next={...binds()},clash=Object.keys(next).find(a=>a!==action&&next[a]===e.code);if(clash)next[clash]=next[action];next[action]=e.code;
+      setSetting('binds',Object.fromEntries(Object.entries(next).filter(([a,c])=>c!==DEFAULT_BINDS[a])));}
+    sync();
+  },true);
   container.addEventListener('input',e=>{const row=e.target.closest('.setting');if(!row)return;const f=FIELDS.find(f=>f.key===row.dataset.key);
     setSetting(f.key,f.type==='range'?+e.target.value:e.target.checked);sync();});
-  container.querySelector('.settings-reset').addEventListener('click',()=>{for(const [k,v] of Object.entries(DEFAULTS))setSetting(k,v);sync();});
+  container.querySelector('.settings-reset').addEventListener('click',()=>{for(const [k,v] of Object.entries(DEFAULTS))setSetting(k,structuredClone(v));sync();});
   // Stop typing/clicks here from reaching the game's handlers.
   for(const type of ['click','mousedown','keydown'])container.addEventListener(type,e=>e.stopPropagation());
   sync();onSettingsChange(sync);

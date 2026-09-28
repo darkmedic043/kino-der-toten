@@ -1,6 +1,8 @@
 // Player character + third-person view (T). The character is chosen in the
 // main menu and stored in the shared profile.
 import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tintArms } from '../../characters.js';
+import * as THREE from 'three';
+import { loadModel } from '../../animation.js';
 import { loadProfile } from '../../profile.js';
 
 async function selected(){
@@ -31,4 +33,29 @@ export default async function setup(api){
     if(third)view.update(api.world);
   });
   host.on('reset',()=>{third=false;apply();});
+
+  // The current weapon, held in the character's right hand (third person only).
+  // Per-character "weapon": {"position":[x,y,z],"rotation":[x,y,z] (degrees)} adjusts the grip.
+  const grips={mannequin:{position:[0,-3.4,1.2],basis:true},t5:{position:[0,0,0],rotation:[0,0,0]},gltf:{position:[0,0,0],rotation:[0,0,0]}};
+  let held=null,heldKey='';
+  async function syncWeapon(){
+    const s=api.session,def=s.def,key=s.weaponUnavailable?'':(def.worldModel??'')+(s.weapon.upgraded?':u':'');
+    if(key===heldKey)return;heldKey=key;
+    held?.removeFromParent();held=null;character.hold?.(false);
+    if(!key||!character.hand)return;
+    const model=await loadModel(def.worldModel);if(key!==heldKey||!model)return;
+    for(const tag of api.data.weapons[s.weapon.id]?.hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
+    const grip={...grips[entry.type]??grips.gltf,...entry.weapon},pivot=new THREE.Group();pivot.add(model);
+    if(grip.basis&&!entry.weapon?.rotation){
+      // Mannequin wrist: barrel (+X) along the arm (-Y), sights up (+Z when aiming).
+      pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,-1,0),new THREE.Vector3(0,0,1),new THREE.Vector3(-1,0,0)));
+    }else pivot.rotation.set(...(grip.rotation??[0,0,0]).map(THREE.MathUtils.degToRad));
+    pivot.position.fromArray(grip.position??[0,0,0]);
+    // Undo the hand's scale (models are resized to fit), so the gun stays true to size.
+    character.root.updateMatrixWorld(true);const hs=character.hand.getWorldScale(new THREE.Vector3()),rs=character.root.getWorldScale(new THREE.Vector3());
+    pivot.scale.set(rs.x/hs.x,rs.y/hs.y,rs.z/hs.z).multiplyScalar(grip.scale??1);
+    character.hand.add(pivot);held=pivot;character.hold?.(true);
+  }
+  host.on('update',()=>{if(third)syncWeapon();});
+  host.on('reset',()=>{heldKey='x';});
 }

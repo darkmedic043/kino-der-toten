@@ -1,7 +1,7 @@
 // In-game additions shared by Kino and custom maps (not part of upstream):
 // Settings and Main menu buttons in the pause menu, a settings overlay, and
 // applying settings that live outside the game loop (volume, resolution, FPS).
-import { settings, onSettingsChange, renderSettings } from './settings.js';
+import { settings, onSettingsChange, renderSettings, DEFAULT_BINDS, binds } from './settings.js';
 
 export function installGameMenu({renderer,audio,pixelRatio,started=()=>false}){
   const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('game-menu.css',import.meta.url).href;document.head.append(css);
@@ -27,6 +27,19 @@ export function installGameMenu({renderer,audio,pixelRatio,started=()=>false}){
   const start=audio.start.bind(audio);audio.start=(...a)=>{const r=start(...a);volume();return r;};
   const proto=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(audio),'enabled');
   Object.defineProperty(audio,'enabled',{configurable:true,get(){return proto.get.call(this);},set(v){proto.set.call(this,v);volume();}});
+
+  // Key rebinding: a rebound key is re-sent as the action's default key, and a
+  // default key whose action moved elsewhere is swallowed. Unlisted keys
+  // (Esc, 1/2, 5, M, F3, Ctrl) pass through untouched.
+  const remap=e=>{
+    if(e.remapped||!Object.keys(settings.binds??{}).length)return;
+    const b=binds(),action=Object.keys(b).find(a=>b[a]===e.code);
+    if(action&&DEFAULT_BINDS[action]!==e.code){
+      e.stopImmediatePropagation();e.preventDefault();
+      const copy=new KeyboardEvent(e.type,{code:DEFAULT_BINDS[action],key:e.key,repeat:e.repeat,bubbles:true,cancelable:true});copy.remapped=true;dispatchEvent(copy);
+    }else if(!action&&Object.values(DEFAULT_BINDS).includes(e.code))e.stopImmediatePropagation();
+  };
+  addEventListener('keydown',remap,true);addEventListener('keyup',remap,true);
 
   const fps=document.createElement('div');fps.id='fps-counter';document.body.append(fps);
   let frames=0,last=performance.now();

@@ -68,7 +68,9 @@ export async function createCharacter(entry,data){
     if(!Object.keys(actions).length&&gltf.animations[0])actions.idle=mixer.clipAction(gltf.animations[0]);
     let current=null;
     const play=key=>{const a=actions[key]??actions.walk??actions.idle;if(!a||a===current)return;a.reset().fadeIn(.2).play();current?.fadeOut(.2);current=a;};
-    return {root:holder,clips:gltf.animations.map(a=>a.name),missing:gltf.missing??[],matched:Object.fromEntries(Object.entries(clips).map(([k,c])=>[k,c?.name??null])),
+    let hand=null;model.traverse(o=>{if(!hand&&/(right.?hand|hand.?r(ight)?$|hand_r$|r_hand)/i.test(o.name))hand=o;});
+    if(entry.handBone)hand=model.getObjectByName(entry.handBone)??hand;
+    return {root:holder,hand,clips:gltf.animations.map(a=>a.name),missing:gltf.missing??[],matched:Object.fromEntries(Object.entries(clips).map(([k,c])=>[k,c?.name??null])),
       update(dt,speed=0){play(speed>230?'run':speed>20?'walk':'idle');mixer.update(dt);},dispose(){mixer.stopAllAction();holder.removeFromParent();}};
   }
   if(entry.type==='t5'){
@@ -83,7 +85,8 @@ export async function createCharacter(entry,data){
     for(const [key,name] of [['idle',entry.idle??entry.walk],['walk',entry.walk],['run',entry.run]])if(name&&data.animations[name])rig.add(key,await loadAnimation(data.animations[name]),true);
     rig.play('idle');rig.update(0);
     root.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});
-    return {root:holder,update(dt,speed=0){
+    const hand=body.getObjectByName(entry.handBone??'j_wrist_ri');
+    return {root:holder,hand,update(dt,speed=0){
       const key=speed>230&&rig.actions.run?'run':speed>20?'walk':'idle';rig.play(key);
       const a=rig.actions[key];if(a)a.timeScale=key==='idle'?0:key==='walk'?THREE.MathUtils.clamp(speed/170,.6,1.4):1;
       if(key==='idle'&&a)a.time=(entry.idleTime??0);rig.update(dt);
@@ -119,10 +122,12 @@ function mannequin(entry,holder){
     mesh(new THREE.BoxGeometry(3.2,4.6,2),skin,wrist,0,-2.2).rotation.x=.1;
     const hip=joint(hips,side*4.4,-2.5),knee=bone(hip,16.5,3.9,3.1,dark),ankle=bone(knee,16,3,2.4,dark);
     mesh(new THREE.BoxGeometry(4.2,3,9.5),boot,ankle,0,-1.2,2.4);
-    limbs[side]={shoulder,elbow,hip,knee};
+    limbs[side]={shoulder,elbow,wrist,hip,knee};
   }
-  let phase=0,blend=0,breath=0;
-  return {root:holder,update(dt,speed=0){
+  let phase=0,blend=0,breath=0,holding=false;
+  // The figure faces +Z, so its right hand is on the -X side.
+  const right=limbs[-1],left=limbs[1];
+  return {root:holder,hand:right.wrist,hold(value){holding=value;},update(dt,speed=0){
     const target=Math.min(1.4,speed/190);blend+=(target-blend)*Math.min(1,dt*8);breath+=dt;
     const run=Math.max(0,blend-1)/.4,moving=Math.min(1,blend);
     phase+=dt*(5+speed/34)*(moving>.02?1:0);
@@ -133,6 +138,11 @@ function mannequin(entry,holder){
       l.knee.rotation.x=Math.max(0,Math.sin(phase*1+ (s>0?0:Math.PI)+.9))*(.7+.6*run)*moving;
       l.shoulder.rotation.x=-legSwing*.85;l.shoulder.rotation.z=side*(.09+.03*Math.sin(breath*1.3));
       l.elbow.rotation.x=-(.12+(.25+1.1*run)*moving);
+    }
+    if(holding){
+      // Aim the weapon forward with both hands; the legs keep walking.
+      right.shoulder.rotation.set(-1.32+.05*Math.sin(breath*1.8),0,.12);right.elbow.rotation.x=-.12;
+      left.shoulder.rotation.set(-1.18,0,-.62);left.elbow.rotation.x=-.75;
     }
     spine.rotation.x=.04+.16*run;chest.scale.set(1,1+Math.sin(breath*1.8)*.006*(1-moving),1);
     hips.position.y=37.5+Math.abs(Math.cos(phase))*1.5*moving-.8*run;

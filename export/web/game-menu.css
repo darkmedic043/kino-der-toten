@@ -17,3 +17,9 @@
 .settings-reset{margin-top:14px;border:1px solid #776b5266;background:#05050550;color:#9d947e;padding:9px 14px;font-size:10px;letter-spacing:2px;cursor:pointer}
 .settings-reset:hover{color:#eee8dc}
 @media(max-width:520px){.settings-form .setting{grid-template-columns:1fr 110px 46px}}
+.settings-sub{margin:22px 0 6px;font-size:10px;letter-spacing:4px;color:#c2b5a0}.settings-sub small{letter-spacing:.5px;color:#7b7a70;margin-left:10px;font-size:10px}
+.binds{display:grid;grid-template-columns:1fr 1fr;column-gap:22px}
+.bind{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #776b5226;font-size:12px;color:#c7bca4}
+.bind .key{min-width:84px;border:1px solid #776b5266;background:#05050580;color:#eee8dc;padding:5px 10px;font:11px Arial,sans-serif;letter-spacing:1px;cursor:pointer}
+.bind .key:hover,.bind.waiting .key{border-color:#b5372c;color:#f0c465}
+@media(max-width:520px){.binds{grid-template-columns:1fr}}
