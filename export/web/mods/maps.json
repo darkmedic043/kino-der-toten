@@ -52,7 +52,7 @@
     {
       "id": "sandbox",
       "title": "Sandbox",
-      "description": "Example custom map built from boxes: two rooms, seven windows, wall-buys, all four perks, two Mystery Box spots, Pack-a-Punch and a power switch.",
+      "description": "Example custom map built from boxes: two rooms, seven windows, wall-buys, all four perks, two Mystery Box spots, Pack-a-Punch, a power switch, an electric trap and a teleporter to a sniper tower.",
       "modes": [
         "zombies",
         "explore"

@@ -40,6 +40,11 @@ wall('z', -12, -8, 8, [(0,'window',WIN)])
 wall('z', 14, -8, 8, [(-3,'window',WIN)])
 wall('z', 0, -8, 8, [(0,'door',2.0)])
 box(door, 'door', (-.12, 0, -1), (.12, 2.6, 1))
+# Sniper tower outside the east wall, reachable only by teleporter.
+box(static, 'floor', (19, 3.8, -3), (25, 4, 3))
+box(static, 'trim', (21.5, -.05, -.5), (22.5, 3.8, .5))
+for lo, hi in [((19, 4, -3), (25, 5, -2.8)), ((19, 4, 2.8), (25, 5, 3)), ((24.8, 4, -3), (25, 5, 3)), ((19, 4, -3), (19.2, 5, 3))]:
+    box(static, 'trim', lo, hi)
 for x, y, z in [(4,0,-2),(4,0,-1),(4,1,-1.5),(9,0,2),(10,0,2),(7,0,4.5)]:  # 1 m crates, one stacked
     box(static, 'crate', (x-.5, y, z-.5), (x+.5, y+1, z+.5))
 
@@ -69,6 +74,13 @@ markers = [
     ('PERK_speedcola', (2.2, 0, 7.2), S),
     ('PERK_doubletap', (5.2, 0, 7.2), S),
     ('PAP', (9, 0, -7.2), N),
+    # Electric trap: the switch on the dividing wall fires the zone at the yard doorway.
+    ('TRAP_door_1000', (.2, 1.2, -2.6), W),
+    ('TRAPZONE_door', (1.3, 0, 0), 0, {'radius': 90}),
+    # One-way teleporter to the tower; it brings you back after 20 seconds.
+    ('TELEPORT_tower', (11, 0, -.5), W),
+    ('TPDEST_tower_20', (20.5, 4, 0), W),
+    ('WALLBUY_dragunov_zm', (24.75, 4.7, 0), E),
 ]
 
 blob, views, accessors = bytearray(), [], []
@@ -99,7 +111,7 @@ def mesh(boxes):
 
 meshes = [mesh(static), mesh(door)]
 nodes = [{'name':'sandbox','mesh':0}, {'name':'DOOR_yard_750','mesh':1}]
-nodes += [{'name':name,'translation':list(pos),'rotation':yaw_rotation(deg)} for name, pos, deg in markers]
+nodes += [{'name':m[0],'translation':list(m[1]),'rotation':yaw_rotation(m[2]),**({'extras':m[3]} if len(m) > 3 else {})} for m in markers]
 while len(blob) % 4: blob.append(0)
 gltf = {'asset':{'version':'2.0','generator':'make-sandbox-map.py'},'scene':0,'scenes':[{'nodes':list(range(len(nodes)))}],
         'nodes':nodes,'meshes':meshes,

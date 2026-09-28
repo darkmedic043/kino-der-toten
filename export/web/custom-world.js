@@ -15,7 +15,8 @@ import { assetManager } from './runtime-assets.js';
 const PERKS={jugg:'specialty_armorvest',juggernog:'specialty_armorvest',armorvest:'specialty_armorvest',revive:'specialty_quickrevive',quickrevive:'specialty_quickrevive',
   speedcola:'specialty_fastreload',speed:'specialty_fastreload',sleight:'specialty_fastreload',fastreload:'specialty_fastreload',doubletap:'specialty_rof',rof:'specialty_rof'};
 const PERK_MODELS={specialty_armorvest:'zombie_vending_jugg',specialty_quickrevive:'zombie_vending_revive',specialty_fastreload:'zombie_vending_sleight',specialty_rof:'zombie_vending_doubletap'};
-const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE)(?:_(.*))?$/i;
+const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE|TRAPZONE|TRAP|TELEPORT|TPDEST)(?:_(.*))?$/i;
+const TRAP_COLORS={electric:0x8cbbff,fire:0xff7a2e};
 const COLLISION_NAME=/^(COL|UCX|collision)[_.-]/i;
 // Machine models face their local +Z; markers face their local +X (Blender's red axis).
 const FACE=Math.PI/2;
@@ -37,7 +38,7 @@ export class CustomWorld {
   constructor(scene,data,entry){
     this.scene=scene;this.data=data;this.entry=entry;
     this.doors=new Map();this.entities=new Map();this.barriers=[];this.dynamic=[];this.navDisabled=new Set();
-    this.interactions=[];this.boxLocations=[];this.openBoxes=new Set();this.fireSale=false;this.hasPower=false;this.zones=[];
+    this.interactions=[];this.boxLocations=[];this.openBoxes=new Set();this.fireSale=false;this.hasPower=false;this.zones=[];this.traps=new Map();this.teleporters=[];
   }
   async load(progress){
     const entry=this.entry,dir=entry.dir.replace(/\/?$/,'/');
@@ -166,6 +167,7 @@ export class CustomWorld {
         location.box=group;location.rubble=rubble;if(rubble){rubble.position.copy(m.position);rubble.rotation.y=m.yaw;this.scene.add(rubble);}
       })());
     }
+    this.buildTraps(markers,place,tasks);this.buildTeleporters(markers);
     await Promise.all(tasks);
     this.boxBeam=new THREE.Mesh(new THREE.CylinderGeometry(8,28,1600,12,1,true),new THREE.MeshBasicMaterial({color:0x8cacdd,transparent:true,opacity:.1,side:THREE.DoubleSide,depthWrite:false}));
     this.boxBeam.visible=!!this.boxLocations.length;this.scene.add(this.boxBeam);
@@ -189,6 +191,62 @@ export class CustomWorld {
     },rayIntersect:(r,n=0,f=Infinity)=>this.raycast(r,n,f,true)};
     this.bounds=bounds;
   }
+  // TRAP_<name>_<cost> switches activate every TRAPZONE_<name> area. A zone
+  // that is a mesh uses its bounding box; an empty uses a cylinder (radius, height).
+  buildTraps(markers,place,tasks){
+    const nameOf=m=>String(m.extras.trap??m.arg.split('_').find(t=>t&&!/^\d+$/.test(t))??'trap').toLowerCase();
+    const trap=name=>{if(!this.traps.has(name))this.traps.set(name,{name,kind:'electric',cost:1000,duration:30,cooldown:90,power:true,zones:[],activeUntil:0,readyAt:0});return this.traps.get(name);};
+    for(const m of markers.filter(m=>m.type==='TRAP')){
+      const t=trap(nameOf(m)),e=m.extras,cost=e.cost??m.arg.split('_').find(x=>/^\d+$/.test(x));
+      if(cost!==undefined)t.cost=+cost;if(e.duration!==undefined)t.duration=+e.duration;if(e.cooldown!==undefined)t.cooldown=+e.cooldown;
+      if(e.kind)t.kind=String(e.kind).toLowerCase();if(e.power!==undefined)t.power=e.power!==false&&e.power!=='false';
+      this.interactions.push({kind:'trap',trap:t.name,position:m.position.clone().addScaledVector(up,10)});
+      const panel=new THREE.Mesh(new THREE.BoxGeometry(22,34,6),new THREE.MeshStandardMaterial({color:0x3b3f3a,roughness:.7,metalness:.4}));
+      panel.position.copy(m.position);panel.rotation.y=m.yaw+FACE;panel.translateZ(-4);this.scene.add(panel);
+      tasks.push(place('zombie_zapper_handle',m.position,m.yaw).then(o=>{(t.handles??=[]).push(o);}));
+    }
+    for(const m of markers.filter(m=>m.type==='TRAPZONE')){
+      const t=trap(nameOf(m)),hasMesh=(()=>{let found=false;m.object.traverse(o=>{if(o.isMesh)found=true;});return found;})();
+      let zone;
+      if(hasMesh){const box=new THREE.Box3().setFromObject(m.object),size=box.getSize(new THREE.Vector3());
+        const mesh=new THREE.Mesh(new THREE.BoxGeometry(size.x,size.y,size.z,1,1,1),null);mesh.position.copy(box.getCenter(new THREE.Vector3()));zone={box,mesh};}
+      else{const radius=+(m.extras.radius??100),height=+(m.extras.height??120);
+        const mesh=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,height,16,1,true),null);mesh.position.copy(m.position).addScaledVector(up,height/2);zone={center:m.position.clone(),radius,height,mesh};}
+      zone.mesh.visible=false;this.scene.add(zone.mesh);t.zones.push(zone);
+      zone.light=new THREE.PointLight(0xffffff,0,420,1.4);zone.light.position.copy(zone.mesh.position);this.scene.add(zone.light);
+    }
+    for(const [name,t] of this.traps){
+      if(!t.zones.length){console.warn(`[map] trap "${name}" has a switch but no TRAPZONE_${name}`);}
+      const material=new THREE.MeshBasicMaterial({color:TRAP_COLORS[t.kind]??TRAP_COLORS.electric,transparent:true,opacity:.24,wireframe:t.kind!=='fire',depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
+      for(const z of t.zones){z.mesh.material=material;z.light.color.setHex(TRAP_COLORS[t.kind]??TRAP_COLORS.electric);}
+    }
+  }
+  inTrapZone(zone,p,margin=0){
+    if(zone.box)return zone.box.clone().expandByScalar(margin).containsPoint(p);
+    const dx=p.x-zone.center.x,dz=p.z-zone.center.z;return dx*dx+dz*dz<(zone.radius+margin)**2&&p.y>zone.center.y-20&&p.y<zone.center.y+zone.height;
+  }
+  // TELEPORT_<name>: two pads with one name link both ways; a pad plus
+  // TPDEST_<name> is one-way, optionally returning after `return` seconds.
+  buildTeleporters(markers){
+    const nameOf=m=>String(m.extras.teleporter??m.arg.split('_').find(t=>t&&!/^\d+$/.test(t))??'teleporter').toLowerCase();
+    const pads=markers.filter(m=>m.type==='TELEPORT'),dests=markers.filter(m=>m.type==='TPDEST');
+    const front=m=>m.position.clone().add(new THREE.Vector3(Math.cos(m.yaw),0,-Math.sin(m.yaw)).multiplyScalar(52));
+    for(const pad of pads){
+      const name=nameOf(pad),dest=dests.find(d=>nameOf(d)===name),other=pads.find(p=>p!==pad&&nameOf(p)===name);
+      if(!dest&&!other){console.warn(`[map] teleporter "${name}" has no partner pad or TPDEST_${name}`);continue;}
+      const e=pad.extras,ret=dest?.extras.return??dest?.arg.split('_').find(t=>/^\d+$/.test(t));
+      const to=dest?{position:dest.position.clone(),yaw:dest.yaw,returnAfter:ret!==undefined?+ret:0,zone:dest.extras.zone?String(dest.extras.zone).toLowerCase():null}
+        :{position:front(other),yaw:other.yaw,returnAfter:0,zone:other.extras.zone?String(other.extras.zone).toLowerCase():null};
+      const tp={name,from:{position:front(pad),yaw:pad.yaw},to,cost:+(e.cost??0),cooldown:+(e.cooldown??(dest?90:20)),power:e.power===undefined?true:e.power!==false&&e.power!=='false',readyAt:0};
+      this.teleporters.push(tp);
+      this.interactions.push({kind:'teleport',teleporter:this.teleporters.length-1,position:pad.position.clone().addScaledVector(up,30)});
+      const base=new THREE.Mesh(new THREE.CylinderGeometry(34,38,4,32),new THREE.MeshStandardMaterial({color:0x2f3336,roughness:.5,metalness:.6}));
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(30,1.6,8,48),new THREE.MeshBasicMaterial({color:0x7fd4ff}));ring.rotation.x=Math.PI/2;ring.position.y=2.4;
+      const glow=new THREE.Mesh(new THREE.CylinderGeometry(30,30,90,32,1,true),new THREE.MeshBasicMaterial({color:0x7fd4ff,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));glow.position.y=47;
+      const group=new THREE.Group();group.add(base,ring,glow);group.position.copy(pad.position).addScaledVector(up,2);this.scene.add(group);
+      tp.ring=ring;tp.glow=glow;
+    }
+  }
   updateBox(){
     if(!this.activeBox)return;
     this.boxBeam.position.fromArray(this.activeBox.position).add(new THREE.Vector3(0,800,0));
@@ -205,11 +263,13 @@ export class CustomWorld {
     for(const d of this.dynamic){if(!d.enabled||d.window)continue;const c=d.box.getCenter(new THREE.Vector3()),h=d.box.getSize(new THREE.Vector3()).multiplyScalar(.5);h.x+=5;h.z+=5;const r=this.query.queryPolygons(c,h);for(const ref of r.polyRefs??[])this.navDisabled.add(ref);}
     for(const ref of this.navDisabled)this.nav.setPolyFlags(ref,0);
   }
-  activeZones(session){const zones=new Set(['start']);for(const d of this.doors.values())if(d.zone&&this.isOpen(d,session))zones.add(d.zone);return zones;}
+  activeZones(session){const zones=new Set(['start']);for(const d of this.doors.values())if(d.zone&&this.isOpen(d,session))zones.add(d.zone);for(const f of session.flags)if(f.startsWith('zone:'))zones.add(f.slice(5));return zones;}
   zoneAt(){return undefined;}
   spawnBarriers(session){const zones=this.activeZones(session);return this.barriers.filter(b=>zones.has(b.group));}
   setBoards(barrier,count){if(!barrier.boards.length){barrier.count=0;return;}barrier.count=Math.max(0,Math.min(barrier.boards.length,count));barrier.boards.forEach((o,i)=>o.visible=i<barrier.count);}
   reset(session){
+    for(const t of this.traps.values()){t.activeUntil=0;t.readyAt=0;for(const z of t.zones){z.mesh.visible=false;z.light.intensity=0;}}
+    for(const tp of this.teleporters)tp.readyAt=0;
     for(const b of this.barriers){this.setBoards(b,b.boards.length);b.reward=0;b.rewardRound=0;}
     this.activeBox=this.boxLocations.find(b=>b.start)??this.boxLocations[0];this.updateBox();this.setDoors(session);
     if(this.powerHandle)this.powerHandle.rotation.x=0;

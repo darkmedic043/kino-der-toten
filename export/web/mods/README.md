@@ -57,6 +57,10 @@ when both are present.
 | `PAP` | Pack-a-Punch (needs power). |
 | `POWER` | Power switch. **Without one, the power is on from the start.** |
 | `CLAYMORE` | Claymore wall-buy (1000). |
+| `TRAP_<name>_<cost>` | Trap switch (default 1000). Activates every `TRAPZONE_<name>`. Properties: `kind` (`electric` or `fire`), `duration` (30 s), `cooldown` (90 s, counted from activation), `power` (needs power, default true). Zombies inside die; players inside take damage. |
+| `TRAPZONE_<name>` | The trap's area. An **empty** makes a cylinder (`radius` 100, `height` 120). A **mesh** makes a zone the size of its bounding box, and the mesh is hidden. Use several for one trap. |
+| `TELEPORT_<name>` | Teleporter pad. **Two pads with the same name** link both ways (you arrive in front of the other pad, facing its red axis). **One pad plus `TPDEST_<name>`** is one-way. Properties: `cost` (0), `cooldown` (20 s for pairs, 90 s one-way), `power` (default true). |
+| `TPDEST_<name>_<seconds>` | One-way destination. With a number or a `return` property, you are sent back to the pad after that many seconds, like Kino's projection room. A `zone` property unlocks that zone's spawns when you arrive. |
 
 The navmesh zombies walk on is generated in the browser from the level's
 geometry at load time (a few seconds on big maps). Zombies can climb steps up to
@@ -66,8 +70,8 @@ cut the navmesh until opened.
 `.tools/make-sandbox-map.py` builds the **Sandbox** example and uses every
 marker. Read it alongside this table.
 
-Not supported on custom maps yet: traps, teleporters, Easter eggs, hellhound
-fog, and custom lighting beyond the map entry settings.
+Not supported on custom maps yet: Easter eggs, hellhound fog, and custom
+lighting beyond the map entry settings.
 
 ---
 

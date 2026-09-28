@@ -48,7 +48,7 @@ viewScene.add(new THREE.AmbientLight(0xe1d9c7,2.8));const vl=new THREE.Direction
 const muzzle=new THREE.PointLight(0xffc276,0,240,1);scene.add(muzzle);
 let entry,data,world,session,player,enemies,view,powerups,perkDrink,mysteryBox,features,ready=false,active=false,started=false,primary=false,primaryPressed=false,ads=false;
 let prompt=null,promptText='',toastUntil=0,announcementUntil=0,hitUntil=0,flashUntil=0;
-let lastPhase='',lastRound=0,frameTime=0,frameCount=0,fps=0,debugVisible=false,repairLeft=0,burstLeft=0;
+let lastPhase='',lastRound=0,frameTime=0,frameCount=0,fps=0,debugVisible=false,repairLeft=0,burstLeft=0,teleportPending=null,returnTrip=null;
 const particles=[],grenades=[];
 const perkInfo={specialty_quickrevive:{name:'Quick Revive',price:500,color:'#509ebc',icon:'QR'},specialty_fastreload:{name:'Speed Cola',price:3000,color:'#478450',icon:'SC'},specialty_rof:{name:'Double Tap',price:2000,color:'#b37528',icon:'DT'},specialty_armorvest:{name:'Juggernog',price:2500,color:'#a53835',icon:'J'}};
 const powerupNames={nuke:'Nuke',insta_kill:'Insta-Kill',double_points:'Double Points',full_ammo:'Max Ammo',carpenter:'Carpenter',fire_sale:'Fire Sale'};
@@ -214,6 +214,8 @@ function findPrompt(){
   if(e.kind==='wallbuy'){const d=data.weapons[e.weapon],owned=session.inventory.find(w=>w.id===d.id&&!w.lost);promptText=owned?d.name+' ammo · '+(owned.upgraded?4500:d.ammoPrice??Math.ceil(d.price/2)):d.name+' · '+d.price;}
   if(e.kind==='perk'){const p=perkInfo[e.perk];promptText=session.perks.has(e.perk)?p.name+' equipped':!session.power&&e.perk!=='specialty_quickrevive'?'The power must be activated':p.name+' · '+p.price;}
   if(e.kind==='power')promptText='Turn on the power';
+  if(e.kind==='trap'){const t=world.traps.get(e.trap),label=t.kind==='fire'?'fire':'electric';promptText=t.power&&!session.power?'The power must be activated':t.activeUntil>session.time?'Trap active':t.readyAt>session.time?'Trap cooling down · '+Math.ceil(t.readyAt-session.time)+'s':'Activate '+label+' trap · '+t.cost;}
+  if(e.kind==='teleport'){const tp=world.teleporters[e.teleporter];promptText=tp.power&&!session.power?'The power must be activated':teleportPending?'Teleporting…':returnTrip?'The teleporter will bring you back':tp.readyAt>session.time?'Teleporter cooling down · '+Math.ceil(tp.readyAt-session.time)+'s':'Teleport'+(tp.cost?' · '+tp.cost:'');}
   if(e.kind==='claymore')promptText=session.claymoresOwned?'Claymores equipped · 4 to place':'Claymores · 1000';
   if(e.kind==='box'){const roll=mysteryBox.at(e);promptText=roll?(roll.ready?(roll.teddy?'The Mystery Box is moving…':'Take '+(data.weapons[roll.weapon]??data.equipment[roll.weapon]).name):'Choosing your weapon…'):'Mystery Box · '+(session.effects.fire_sale>session.time?10:950);}
   if(e.kind==='pap')promptText=!session.power?'The power must be activated':session.pack?(session.time>=session.pack.readyAt?'Take '+data.weapons[session.pack.weapon.id].upgrade.name+' · '+Math.ceil(session.pack.expires-session.time)+'s':'Upgrading weapon…'):session.weapon.upgraded?'Weapon already upgraded':'Pack-a-Punch · 5000';
@@ -242,6 +244,16 @@ function interact(){
   if(e.kind==='power'){
     session.power=true;session.flags.add('power_on');world.setDoors(session);ambient.intensity=1.7;if(world.powerHandle)world.powerHandle.rotation.x=-1.2;announce('Power restored','THE LIGHTS COME ON');audio.play('round');return true;
   }
+  if(e.kind==='trap'){
+    const t=world.traps.get(e.trap);if(t.power&&!session.power){toast('Turn on the power');return false;}
+    if(t.activeUntil>session.time||t.readyAt>session.time){toast('Trap cooling down');return false;}if(!pay(t.cost))return false;
+    t.activeUntil=session.time+t.duration;t.readyAt=session.time+Math.max(t.duration,t.cooldown);for(const h of t.handles??[])if(h)h.rotation.x=-1.2;toast((t.kind==='fire'?'Fire':'Electric')+' trap active · '+t.duration+'s');return true;
+  }
+  if(e.kind==='teleport'){
+    const tp=world.teleporters[e.teleporter];if(tp.power&&!session.power){toast('Turn on the power');return false;}
+    if(teleportPending||returnTrip||tp.readyAt>session.time)return false;if(tp.cost&&!pay(tp.cost))return false;
+    teleportPending={tp,at:session.time+1.6};tp.readyAt=session.time+tp.cooldown;toast('Teleporting…');audio.play('buy');return true;
+  }
   if(e.kind==='claymore'){const ok=session.buyClaymores();if(ok){audio.play('buy');toast('Claymores · press 4 to place');}else if(!session.claymoresOwned)toast('Not enough points');return ok;}
   if(e.kind==='box'){
     if(mysteryBox.at(e)){if(session.pack?.weapon===session.weapon)return false;const weapon=mysteryBox.take(e);if(!weapon)return false;if(weapon==='zombie_cymbal_monkey'){session.giveMonkeys();toast('Monkey Bombs · X to throw');}else{session.giveWeapon(weapon);equipView();toast(data.weapons[weapon].name);}return true;}
@@ -255,6 +267,31 @@ function interact(){
   }
   return false;
 }
+function moveTo(position,yaw){player.setPosition(position.clone());camera.rotation.set(0,yaw-Math.PI/2,0);flashUntil=session.time+.8;}
+function updateTraps(dt){
+  const feet=player.getFeetPosition();
+  for(const t of world.traps.values()){
+    const on=t.activeUntil>session.time;
+    for(const z of t.zones){
+      z.mesh.visible=on;z.light.intensity=on?60+Math.random()*120:0;if(!on)continue;
+      z.mesh.rotation.y+=dt*3;z.mesh.material.opacity=.16+Math.random()*.16;
+      for(const e of [...enemies.list])if(world.inTrapZone(z,e.root.position.clone().add(new THREE.Vector3(0,30,0))))enemies.hurt(e,99999,false,false,t.kind==='fire'?'fire':'electric');
+      if(world.inTrapZone(z,feet.clone().add(new THREE.Vector3(0,30,0)),-25))damage(dt*100);
+    }
+    if(!on)for(const h of t.handles??[])if(h&&t.readyAt<=session.time)h.rotation.x=0;
+  }
+}
+function updateTeleporters(){
+  for(const tp of world.teleporters){const charging=teleportPending?.tp===tp;tp.glow.material.opacity=charging?.25+Math.sin(session.time*20)*.1:0;tp.ring.material.color.setHex(tp.readyAt>session.time&&!charging?0x5d6a70:0x7fd4ff);}
+  if(teleportPending&&session.time>=teleportPending.at){
+    const {tp}=teleportPending;teleportPending=null;const to=tp.to;
+    moveTo(to.position,to.yaw);
+    if(to.zone&&!session.flags.has('zone:'+to.zone)){session.flags.add('zone:'+to.zone);}
+    if(to.returnAfter>0){returnTrip={at:session.time+to.returnAfter,position:tp.from.position,yaw:tp.from.yaw};toast('Returning in '+to.returnAfter+' seconds',4);}
+    else toast(tp.name[0].toUpperCase()+tp.name.slice(1),2);
+  }
+  if(returnTrip&&session.time>=returnTrip.at){const r=returnTrip;returnTrip=null;moveTo(r.position,r.yaw);}
+}
 function repair(b){if(b.count>=b.boards.length||repairLeft>0)return false;repairLeft=.75;world.setBoards(b,b.count+1);if(b.rewardRound!==session.round){b.rewardRound=session.round;b.reward=0;}if(b.reward<50*session.round){session.addPoints(10);b.reward+=10;}audio.play('board');return true;}
 function resetPower(){if(!world.hasPower){session.power=true;session.flags.add('power_on');}ambient.intensity=session.power?1.7:1.2;}
 function reset(){
@@ -264,6 +301,7 @@ function reset(){
   powerups.reset();perkDrink.stop();mysteryBox.reset();features.reset();
   for(const group of [particles,grenades]){for(const item of group){item.mesh.removeFromParent();item.mesh.geometry?.dispose();item.mesh.material?.dispose();}group.length=0;}
   if(audio.ctx)audio.playMusic('ambience');
+  teleportPending=null;returnTrip=null;
   started=false;repairLeft=0;burstLeft=0;lastPhase='';lastRound=0;view.currentId=null;equipView();$('results').hidden=true;$('menu-status').textContent=touchControls.mode?'Tap to start':'Click to capture the mouse';
 }
 function update(dt){
@@ -293,6 +331,7 @@ function update(dt){
       repairLeft=Math.max(0,repairLeft-dt);findPrompt();if((keys.has('KeyF')||keys.has('KeyE')||touch.use)&&prompt?.barrier)repair(prompt.barrier);
       if(session.round!==lastRound||session.phase!==lastPhase){if(session.phase==='fighting'){announce(session.dogRound?'Fetch their souls':'Round '+session.round,session.dogRound?'HELLHOUNDS':'SURVIVE');audio.play(session.dogRound?'dog_round':'round');if(session.dogRound)audio.play('dog_announce');}else if(session.phase==='preparing'&&session.round>1){announce('Round survived','RELOAD. REBUILD. PREPARE.');audio.play('round_end');}lastRound=session.round;lastPhase=session.phase;}
       mysteryBox.update(dt);
+      updateTraps(dt);updateTeleporters();
       powerups.update(dt,player.getFeetPosition(),session.phase!=='reviving',(a,b)=>world.lineClear(a,b));
       for(const g of [...grenades]){
         g.life-=dt;g.velocity.y-=650*dt;const travel=g.velocity.clone().multiplyScalar(dt),ray=new THREE.Ray(g.mesh.position.clone(),travel.clone().normalize()),hit=world.raycast(ray,0,travel.length()+4);
@@ -315,12 +354,12 @@ function hud(){
   $('prompt').innerHTML=active&&promptText?(promptText==='Barricade secured'?promptText:touchControls.mode?'<kbd>USE</kbd> '+promptText.replace('Hold F','Hold USE'):'<kbd>F</kbd> '+promptText):'';
   if(toastUntil<s.time)$('toast').textContent='';if(announcementUntil<s.time)$('announcement').style.opacity=0;
   const perkHtml=[...s.perks].map(id=>`<span class="perk" title="${perkInfo[id].name}" style="background:${perkInfo[id].color}">${perkInfo[id].icon}</span>`).join('');if($('perks').innerHTML!==perkHtml)$('perks').innerHTML=perkHtml;
-  const effectHtml=Object.entries(s.effects).filter(([k,t])=>t>s.time&&powerupNames[k]).map(([k,t])=>`<span class="powerup-timer ${t-s.time<5&&Math.floor(s.time*4)%2?'expiring':''}"><img src="${data.powerups[k].icon}" alt="${powerupNames[k]}"><span>${Math.ceil(t-s.time)}s</span></span>`).join('');if($('effects').innerHTML!==effectHtml)$('effects').innerHTML=effectHtml;
+  const effectHtml=Object.entries(s.effects).filter(([k,t])=>t>s.time&&powerupNames[k]).map(([k,t])=>`<span class="powerup-timer ${t-s.time<5&&Math.floor(s.time*4)%2?'expiring':''}"><img src="${data.powerups[k].icon}" alt="${powerupNames[k]}"><span>${Math.ceil(t-s.time)}s</span></span>`).join('')+(returnTrip?'<span>RETURN IN '+Math.max(0,Math.ceil(returnTrip.at-s.time))+'</span>':'');if($('effects').innerHTML!==effectHtml)$('effects').innerHTML=effectHtml;
   $('objective').textContent=!s.power?'Find the power switch':'';
   if(debugVisible)$('debug').textContent=`${fps} FPS · ${renderer.info.render.calls} calls\n${camera.position.toArray().map(v=>v.toFixed(1)).join(', ')}\n${enemies.list.length} enemies · ${world.navDisabled.size} blocked polygons`;
 }
 
-function getState(){return {map:entry?.id,ready,active,started,input:{touch:touchControls.getState(),primary,ads},...(session?session.snapshot():{}),player:player?{...player.state,rotation:camera.rotation.toArray().slice(0,3),position:camera.position.toArray(),feet:player.getFeetPosition().toArray()}:null,enemies:enemies?.snapshot()??[],prompt:promptText,barriers:world?.barriers?.map(b=>({id:b.id,count:b.count,boards:b.boards.length,group:b.group,inside:b.inside.toArray()}))??[],doors:world?[...world.doors.values()].map(d=>({name:d.name,cost:d.cost,zone:d.zone,open:world.isOpen(d,session)})):[],interactions:world?.interactions?.map(e=>({kind:e.kind,weapon:e.weapon,perk:e.perk,door:e.door,position:Array.isArray(e.position)?e.position:e.position.toArray()}))??[],performance:{fps,calls:renderer.info.render.calls},viewmodelReady:view?.ready??false,errors:[...errors,...mods.errors]};}
+function getState(){return {map:entry?.id,ready,active,started,input:{touch:touchControls.getState(),primary,ads},...(session?session.snapshot():{}),player:player?{...player.state,rotation:camera.rotation.toArray().slice(0,3),position:camera.position.toArray(),feet:player.getFeetPosition().toArray()}:null,enemies:enemies?.snapshot()??[],prompt:promptText,barriers:world?.barriers?.map(b=>({id:b.id,count:b.count,boards:b.boards.length,group:b.group,inside:b.inside.toArray()}))??[],doors:world?[...world.doors.values()].map(d=>({name:d.name,cost:d.cost,zone:d.zone,open:world.isOpen(d,session)})):[],interactions:world?.interactions?.map(e=>({kind:e.kind,weapon:e.weapon,perk:e.perk,door:e.door,position:Array.isArray(e.position)?e.position:e.position.toArray()}))??[],performance:{fps,calls:renderer.info.render.calls},viewmodelReady:view?.ready??false,traps:world?[...world.traps.values()].map(t=>({name:t.name,kind:t.kind,cost:t.cost,zones:t.zones.length,active:t.activeUntil>(session?.time??0),readyIn:Math.max(0,t.readyAt-(session?.time??0))})):[],teleporters:world?.teleporters?.map(t=>({name:t.name,to:t.to.position.toArray(),returnAfter:t.to.returnAfter,readyIn:Math.max(0,t.readyAt-(session?.time??0))}))??[],teleporting:!!teleportPending,returnIn:returnTrip?returnTrip.at-session.time:0,errors:[...errors,...mods.errors]};}
 globalThis.kino={mods,debug:{getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,
   giveWeapon:id=>{session.giveWeapon(id);equipView();},spawnEnemy:(p,kind)=>enemies.spawn(vector(p),null,kind).id,clearEnemies:()=>{for(const z of [...enemies.list])enemies.hurt(z,999999);},collectPowerup:collect,
   step:seconds=>{for(let t=0;t<seconds;t+=1/60)update(Math.min(1/60,seconds-t));},navigationPath:(a,b)=>world.path(vector(a),vector(b)).map(v=>v.toArray()),
