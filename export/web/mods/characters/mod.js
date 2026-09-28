@@ -1,6 +1,6 @@
 // Player character + third-person view (T). The character is chosen in the
 // main menu and stored in the shared profile.
-import { createCharacter, loadCharacterRegistry, ThirdPersonCamera } from '../../characters.js';
+import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tintArms } from '../../characters.js';
 import { loadProfile } from '../../profile.js';
 
 async function selected(){
@@ -8,17 +8,17 @@ async function selected(){
   return list.find(c=>c.id===id)??list[0]??{id:'mannequin',type:'mannequin'};
 }
 
-// Optional first-person arms. They must use the T5 viewmodel skeleton, so
-// most characters leave "hands" unset and keep the default arms.
+// First-person arms follow the character (an arm set plus colours; see characters.js).
 export async function prepare(data){
-  const entry=await selected();
-  if(entry.hands)data.characters.viewmodel_usa_pow_arms=new URL(entry.hands,new URL('mods/characters/',document.baseURI)).href;
+  const url=armsUrl(await selected());
+  if(url)data.characters.viewmodel_usa_pow_arms=url;
   return data;
 }
 
 export default async function setup(api){
   const {host,scene,camera,player}=api;
-  const character=await createCharacter(await selected(),api.data);
+  const entry=await selected();await tintArms(entry);
+  const character=await createCharacter(entry,api.data);
   character.root.visible=false;scene.add(character.root);
   const view=new ThirdPersonCamera(camera);
   let third=false,last=null;

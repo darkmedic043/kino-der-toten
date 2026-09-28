@@ -16,6 +16,24 @@ export async function loadCharacterRegistry(){
   return list.characters.map(c=>({...c,type:c.type??(c.model?'gltf':'mannequin'),url:c.model?new URL(c.model,base).href:null,image:c.image?new URL(c.image,base).href:null}));
 }
 
+// First-person arms. They must be rigged to the T5 viewmodel skeleton, so a
+// character picks one of the game's arm sets (or a compatible file) and
+// recolours it: handsTint maps material-name fragments ("sleeve", "glove",
+// or "*" for all) to colours; handsFlat drops the texture for solid colours.
+export const ARM_SETS={pow:'models/viewmodel_usa_pow_arms.glb',usmc:'models/viewhands_usmc.glb',pressure_suit:'moon/models/viewmodel_zom_pressure_suit_arms.glb'};
+export function armsUrl(entry){const h=entry?.hands;if(!h)return null;return ARM_SETS[h]??new URL(h,new URL('mods/characters/',document.baseURI)).href;}
+export async function tintArms(entry){
+  const url=armsUrl(entry);if(!url)return;
+  // Clones share materials, so recolouring the cached source recolours every
+  // copy. Originals are kept so another character can restore them.
+  const root=await loadModel(url),tint=entry.handsTint??{},keys=Object.keys(tint).sort((a,b)=>b.length-a.length);
+  root.traverse(o=>{if(!o.isMesh)return;for(const m of [o.material].flat()){
+    m.userData.original??={color:m.color.clone(),map:m.map,roughness:m.roughness};
+    m.color.copy(m.userData.original.color);m.map=m.userData.original.map;m.roughness=m.userData.original.roughness;m.needsUpdate=true;
+    const name=(m.name??'').toLowerCase(),k=keys.find(k=>k!=='*'&&name.includes(k.toLowerCase()))??(keys.includes('*')?'*':null);if(!k)continue;
+    m.color.set(entry.handsTint[k]);if(entry.handsFlat){m.map=null;m.roughness=.65;}m.needsUpdate=true;}});
+}
+
 const gltfCache=new Map();
 // Records textures or buffers that fail to load (common with .gltf files whose
 // side files were not copied along, or textures not embedded in a .glb).

@@ -119,7 +119,7 @@ slides around in a fixed pose. If it faces backwards, add `"yaw": 180`.
 
 - `mannequin`: the built-in placeholder (`color`, `accent`).
 - `t5`: a body/head pair from the game data, like the Honor Guard example.
-- `hands` (advanced): a replacement first-person arms model. It has to use the T5 viewmodel skeleton, so most characters leave it out and keep the default arms.
+- **First-person arms**: `hands` picks the arm set shown holding your weapon. Arms have to be rigged to the game's viewmodel skeleton, so choose one of the built-in sets: `pow` (bare forearms, Kino's default), `usmc` (gloves plus sleeves) or `pressure_suit` (Moon's suit). You can also give the path to a compatible `.glb`. Recolour the set with `handsTint`, which maps a material-name fragment to a colour (`usmc` has `glovesleeve` and `glove` materials, and `"*"` matches every material). Add `"handsFlat": true` for solid colours with no texture. Example: `"hands": "usmc", "handsTint": {"glovesleeve": "#2f5e8c", "glove": "#6b6960"}`. Check the result in the menu's Character tab with **First person**.
 
 ---
 

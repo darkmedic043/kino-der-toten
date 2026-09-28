@@ -12,6 +12,8 @@ import { MysteryBox } from './mystery-box.js';
 import { createZombieTouch } from './zombies-touch.js';
 import { configureKinoAssets, assetDiagnostics } from './runtime-assets.js';
 import { ModHost } from './mod-loader.js';
+import { settings } from './settings.js';
+import { installGameMenu } from './game-menu.js';
 
 const $=id=>document.getElementById(id), keys=new Set(),audio=new GameAudio(),mods=new ModHost();
 const profile=configureKinoAssets();
@@ -21,6 +23,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,profile.mobile?1:1.5));renderer
 let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=2.05;renderer.autoClear=false;
 document.body.prepend(renderer.domElement);
+installGameMenu({renderer,audio,pixelRatio:Math.min(devicePixelRatio,profile.mobile?1:1.5),started:()=>started&&session?.phase!=='gameover'});
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x101319);scene.fog=new THREE.FogExp2(0x14181b,.00032);
 const ambient=new THREE.AmbientLight(0xb3bcc7,1.2);scene.add(ambient,new THREE.HemisphereLight(0xd2d9e3,0x574236,2.0));
 const keyLight=new THREE.DirectionalLight(0xffdfb1,1.5);keyLight.position.set(.4,1,.2);scene.add(keyLight);
@@ -77,7 +80,7 @@ addEventListener('pageshow',resumeRendering);
 renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;suspendRendering();$('start').disabled=true;$('menu-status').textContent='Graphics paused. Waiting for Safari to restore the game…';});
 renderer.domElement.addEventListener('webglcontextrestored',()=>{contextLost=false;$('start').disabled=!ready;$('menu-status').textContent='Graphics restored · tap to resume';resumeRendering();});
 addEventListener('blur',()=>{keys.clear();primary=false;ads=false;if(started&&active){setActive(false);document.exitPointerLock?.();}});
-addEventListener('mousemove',e=>{if(!active||document.pointerLockElement!==renderer.domElement)return;const sensitivity=ads?.0012:.002;camera.rotation.y-=e.movementX*sensitivity;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-e.movementY*sensitivity,-1.5,1.5);});
+addEventListener('mousemove',e=>{if(!active||document.pointerLockElement!==renderer.domElement)return;const sensitivity=(ads?.0012*settings.adsSensitivity:.002)*settings.sensitivity;camera.rotation.y-=e.movementX*sensitivity;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-e.movementY*sensitivity*(settings.invertY?-1:1),-1.5,1.5);});
 addEventListener('mousedown',e=>{if(!active||e.sourceCapabilities?.firesTouchEvents||e.target.closest('#touch-controls'))return;if(e.button===0){mousePrimary=primary=true;primaryPressed=true;}if(e.button===2)mouseAim=ads=true;});
 addEventListener('mouseup',e=>{if(e.sourceCapabilities?.firesTouchEvents)return;if(e.button===0)mousePrimary=primary=false;if(e.button===2)mouseAim=ads=false;});
 addEventListener('contextmenu',e=>e.preventDefault());
@@ -329,7 +332,7 @@ function update(dt){
       for(const p of [...particles]){p.life-=dt;p.velocity.y-=200*dt;p.mesh.position.addScaledVector(p.velocity,dt);if(p.life<=0){p.mesh.removeFromParent();p.mesh.geometry.dispose();p.mesh.material.dispose();particles.splice(particles.indexOf(p),1);}}
     }
   }
-  muzzle.intensity=Math.max(0,muzzle.intensity-dt*2200);camera.fov=THREE.MathUtils.damp(camera.fov,ads&&!session.def.dualWield&&!session.drinking&&!session.meleeLeft&&!session.reloadLeft?(session.def.adsFov||56):78,12,dt);camera.updateProjectionMatrix();
+  muzzle.intensity=Math.max(0,muzzle.intensity-dt*2200);camera.fov=THREE.MathUtils.damp(camera.fov,ads&&!session.def.dualWield&&!session.drinking&&!session.meleeLeft&&!session.reloadLeft?(session.def.adsFov||56)*settings.fov/78:settings.fov,12,dt);camera.updateProjectionMatrix();
   hud();
 }
 function hud(){

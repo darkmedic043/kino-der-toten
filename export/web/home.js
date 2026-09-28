@@ -1,9 +1,10 @@
 // Main menu (not part of upstream): map browser, loadout, character and mods.
 import * as THREE from 'three';
-import { loadModel } from './animation.js';
+import { loadModel, ViewWeapon } from './animation.js';
+import { renderSettings } from './settings.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
 import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout } from './profile.js';
-import { loadCharacterRegistry, createCharacter } from './characters.js';
+import { loadCharacterRegistry, createCharacter, armsUrl, tintArms } from './characters.js';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -40,6 +41,7 @@ function showTab(name){
   stage.active=name==='character';if(stage.active)stage.start();
 }
 for(const b of tabs)b.addEventListener('click',()=>showTab(b.dataset.tab));
+renderSettings($('settings-panel'));
 
 // ---- Profile card -------------------------------------------------------------
 function renderProfile(){
@@ -190,7 +192,7 @@ function renderDetail(id,isWeapon,unlocked,level){
 }
 
 // ---- Character ---------------------------------------------------------------------
-const stage={active:false,running:false,speed:0,character:null,loading:0,yaw:.5,
+const stage={active:false,running:false,speed:0,character:null,loading:0,yaw:.5,mode:'body',fpTime:0,view:null,viewToken:0,
   start(){if(this.running)return;this.running=true;this.last=performance.now();requestAnimationFrame(t=>this.frame(t));},
   frame(now){
     if(!this.active){this.running=false;return;}
@@ -198,8 +200,15 @@ const stage={active:false,running:false,speed:0,character:null,loading:0,yaw:.5,
     const c=$('char-canvas'),w=c.clientWidth,h=c.clientHeight;
     if(this.renderer.domElement.width!==Math.floor(w*this.renderer.getPixelRatio())||this.renderer.domElement.height!==Math.floor(h*this.renderer.getPixelRatio())){this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
     if(!this.dragging)this.yaw+=dt*.25;
-    if(this.character){this.character.root.rotation.y=this.yaw;this.character.update(dt,this.speed);}
-    this.renderer.render(this.scene,this.camera);requestAnimationFrame(t=>this.frame(t));
+    if(this.mode==='fp'){
+      this.viewCamera.aspect=w/h;this.viewCamera.updateProjectionMatrix();this.fpTime+=dt;
+      if(this.view?.ready)this.view.update(dt,{moving:this.speed>0,sprint:this.speed>230,ads:false,reloading:false,empty:false,time:this.fpTime});
+      this.renderer.render(this.viewScene,this.viewCamera);
+    }else{
+      if(this.character){this.character.root.rotation.y=this.yaw;this.character.update(dt,this.speed);}
+      this.renderer.render(this.scene,this.camera);
+    }
+    requestAnimationFrame(t=>this.frame(t));
   },
 };
 stage.renderer=new THREE.WebGLRenderer({canvas:$('char-canvas'),antialias:true,alpha:true});
@@ -212,8 +221,26 @@ const floor=new THREE.Mesh(new THREE.CircleGeometry(60,48),new THREE.MeshBasicMa
 $('char-canvas').addEventListener('pointerdown',e=>{stage.dragging=true;stage.dragX=e.clientX;e.target.setPointerCapture(e.pointerId);});
 $('char-canvas').addEventListener('pointermove',e=>{if(!stage.dragging)return;stage.yaw+=(e.clientX-stage.dragX)*.01;stage.dragX=e.clientX;});
 $('char-canvas').addEventListener('pointerup',()=>{stage.dragging=false;});
+// First-person preview: the character's arms holding the loadout's primary weapon.
+stage.viewScene=new THREE.Scene();stage.viewScene.add(new THREE.AmbientLight(0xe1d9c7,2.8));{const l=new THREE.DirectionalLight(0xffefc8,2);l.position.set(0,4,2);stage.viewScene.add(l);}
+stage.viewCamera=new THREE.PerspectiveCamera(60,1,.01,200);
+let currentEntry=null;
+async function showArms(entry){
+  const token=++stage.viewToken;
+  await tintArms(entry);
+  const data={...baseData,weapons,characters:{...baseData.characters}};const url=armsUrl(entry);if(url)data.characters.viewmodel_usa_pow_arms=url;
+  const view=new ViewWeapon(new THREE.Group(),data);
+  await view.equip(weapons[validLoadout(config,profile,weapons).primary]??weapons.m1911_zm);
+  if(token!==stage.viewToken)return;
+  if(stage.view)stage.viewScene.remove(stage.view.pivot);stage.view=view;stage.viewScene.add(view.pivot);
+}
+for(const b of document.querySelectorAll('#char-view button'))b.addEventListener('click',()=>{
+  stage.mode=b.dataset.view;for(const x of document.querySelectorAll('#char-view button'))x.classList.toggle('active',x===b);
+  if(stage.mode==='fp'&&currentEntry)showArms(currentEntry);
+});
 for(const b of document.querySelectorAll('#char-anim button'))b.addEventListener('click',()=>{stage.speed=+b.dataset.speed;for(const x of document.querySelectorAll('#char-anim button'))x.classList.toggle('active',x===b);});
 async function showCharacter(entry){
+  currentEntry=entry;if(stage.mode==='fp')showArms(entry);
   const token=++stage.loading;$('char-name').textContent=entry.name;$('char-desc').textContent=entry.description??'';
   try{
     const c=await createCharacter(entry,baseData);if(token!==stage.loading){c.dispose();return;}
@@ -263,5 +290,5 @@ function renderMods(){
 }
 
 renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();
-showTab(['play','loadout','character','mods'].includes(location.hash.slice(1))?location.hash.slice(1):'play');
+showTab(['play','loadout','character','mods','settings'].includes(location.hash.slice(1))?location.hash.slice(1):'play');
 window.menu={profile:()=>profile,thumb,showTab};

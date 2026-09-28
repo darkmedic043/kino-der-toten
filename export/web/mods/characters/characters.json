@@ -6,7 +6,13 @@
       "type": "mannequin",
       "description": "Placeholder figure until a real model is added.",
       "color": "#8d8a80",
-      "accent": "#932e25"
+      "accent": "#932e25",
+      "hands": "usmc",
+      "handsTint": {
+        "glovesleeve": "#932e25",
+        "glove": "#6b6960"
+      },
+      "handsFlat": true
     },
     {
       "id": "mannequin_blue",
@@ -14,7 +20,13 @@
       "type": "mannequin",
       "description": "The placeholder in blue.",
       "color": "#8d8a80",
-      "accent": "#2f5e8c"
+      "accent": "#2f5e8c",
+      "hands": "usmc",
+      "handsTint": {
+        "glovesleeve": "#2f5e8c",
+        "glove": "#6b6960"
+      },
+      "handsFlat": true
     },
     {
       "id": "honorguard",
@@ -25,7 +37,11 @@
       "head": "c_ger_zombie_head2",
       "walk": "ai_zombie_walk_fast_v1",
       "run": "ai_zombie_sprint_v1",
-      "idle": "ai_zombie_walk_v1"
+      "idle": "ai_zombie_walk_v1",
+      "hands": "pow",
+      "handsTint": {
+        "*": "#a4ab96"
+      }
     }
   ]
 }

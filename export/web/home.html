@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Zombies</title>
 <link rel="icon" href="data:,">
+<link rel="stylesheet" href="game-menu.css">
 <link rel="stylesheet" href="home.css">
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/jsm/","three-mesh-bvh":"./vendor/bvh.js"}}</script>
 </head>
@@ -13,10 +14,11 @@
 <aside id="rail">
   <div class="brand"><span class="kicker">CALL OF DUTY <em>BLACK OPS</em></span><strong>ZOMBIES<span>.</span></strong></div>
   <nav id="tabs">
-    <button data-tab="play" class="active"><span>01</span>PLAY</button>
-    <button data-tab="loadout"><span>02</span>LOADOUT</button>
-    <button data-tab="character"><span>03</span>CHARACTER</button>
-    <button data-tab="mods"><span>04</span>MODS</button>
+    <button data-tab="play" class="active">PLAY</button>
+    <button data-tab="loadout">LOADOUT</button>
+    <button data-tab="character">CHARACTER</button>
+    <button data-tab="mods">MODS</button>
+    <button data-tab="settings">SETTINGS</button>
   </nav>
   <div id="profile-card">
     <div class="row"><span class="eyebrow">RANK</span><strong id="p-level">LEVEL 1</strong></div>
@@ -67,9 +69,15 @@
       <div class="char-stage">
         <canvas id="char-canvas"></canvas>
         <div class="char-caption"><strong id="char-name"></strong><p id="char-desc" class="muted"></p></div>
+        <div class="chips stage-view" id="char-view"><button data-view="body" class="active">BODY</button><button data-view="fp">FIRST PERSON</button></div>
         <div class="chips stage-anim" id="char-anim"><button data-speed="0" class="active">IDLE</button><button data-speed="190">WALK</button><button data-speed="285">RUN</button></div>
       </div>
     </div>
+  </section>
+
+  <section id="tab-settings" class="tab">
+    <header class="tab-head"><span class="eyebrow">SETTINGS</span><span class="muted small">Saved in this browser · also available from the pause menu in game</span></header>
+    <div class="settings-panel" id="settings-panel"></div>
   </section>
 
   <section id="tab-mods" class="tab">
