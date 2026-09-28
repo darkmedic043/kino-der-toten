@@ -61,6 +61,18 @@ when both are present.
 | `TRAPZONE_<name>` | The trap's area. An **empty** makes a cylinder (`radius` 100, `height` 120). A **mesh** makes a zone the size of its bounding box, and the mesh is hidden. Use several for one trap. |
 | `TELEPORT_<name>` | Teleporter pad. **Two pads with the same name** link both ways (you arrive in front of the other pad, facing its red axis). **One pad plus `TPDEST_<name>`** is one-way. Properties: `cost` (0), `cooldown` (20 s for pairs, 90 s one-way), `power` (default true). |
 | `TPDEST_<name>_<seconds>` | One-way destination. With a number or a `return` property, you are sent back to the pad after that many seconds, like Kino's projection room. A `zone` property unlocks that zone's spawns when you arrive. |
+| `EGG_<group>` | Easter-egg collectible. An empty shows a small glowing rock; a mesh uses your own model. Press F to collect it, or give it `shoot: true` to make it a shoot-to-find item. Finding every item in a group gives a reward, set on any item: `reward: "song"` (the 115 song; the default), `points`, `weapon` (an id), `perk` (`jugg`/`revive`/`speedcola`/`doubletap`) and `message` (the announcement). Mods get an `easterEgg` event. |
+
+**Lighting.** Lights added in Blender (point, spot, sun) export with the
+`.glb` and appear in game. Point and spot brightness and range are scaled
+along with the map, so they look the same as in Blender. Name a light
+`POWERLIGHT_...` (or put it under an object with that name) to keep it off until
+the power is on. `background`, `exposure` and `fog` in the map entry set the
+mood. Hellhound rounds add their own fog automatically.
+
+**Warnings.** Markers that can't be used (for example, a window with no
+`ZSPAWN` nearby, an unknown weapon, or a teleporter without a partner) are
+listed in red on the map's start menu, as well as in the browser console.
 
 The navmesh zombies walk on is generated in the browser from the level's
 geometry at load time (a few seconds on big maps). Zombies can climb steps up to
@@ -70,8 +82,8 @@ cut the navmesh until opened.
 `.tools/make-sandbox-map.py` builds the **Sandbox** example and uses every
 marker. Read it alongside this table.
 
-Not supported on custom maps yet: Easter eggs, hellhound fog, and custom
-lighting beyond the map entry settings.
+Not supported on custom maps yet: scripted multi-step quests (use a mod
+script with the `easterEgg`, `kill` and `update` events for those).
 
 ---
 
@@ -136,6 +148,7 @@ It can also export `prepare(data)`, which runs before the game builds anything a
 | event | payload | notes |
 |---|---|---|
 | `ready` | — | all mods set up |
+| `easterEgg` | `{name}` | an `EGG_` group was completed (custom maps) |
 | `start` | — | first round begins |
 | `update` | `dt` | every frame while playing |
 | `kill` | `{enemy, kind, head, melee}` | `kind`: `zombie`, `dog`, `nova` |

@@ -15,7 +15,7 @@ import { assetManager } from './runtime-assets.js';
 const PERKS={jugg:'specialty_armorvest',juggernog:'specialty_armorvest',armorvest:'specialty_armorvest',revive:'specialty_quickrevive',quickrevive:'specialty_quickrevive',
   speedcola:'specialty_fastreload',speed:'specialty_fastreload',sleight:'specialty_fastreload',fastreload:'specialty_fastreload',doubletap:'specialty_rof',rof:'specialty_rof'};
 const PERK_MODELS={specialty_armorvest:'zombie_vending_jugg',specialty_quickrevive:'zombie_vending_revive',specialty_fastreload:'zombie_vending_sleight',specialty_rof:'zombie_vending_doubletap'};
-const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE|TRAPZONE|TRAP|TELEPORT|TPDEST)(?:_(.*))?$/i;
+const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE|TRAPZONE|TRAP|TELEPORT|TPDEST|EGG)(?:_(.*))?$/i;
 const TRAP_COLORS={electric:0x8cbbff,fire:0xff7a2e};
 const COLLISION_NAME=/^(COL|UCX|collision)[_.-]/i;
 // Machine models face their local +Z; markers face their local +X (Blender's red axis).
@@ -38,13 +38,14 @@ export class CustomWorld {
   constructor(scene,data,entry){
     this.scene=scene;this.data=data;this.entry=entry;
     this.doors=new Map();this.entities=new Map();this.barriers=[];this.dynamic=[];this.navDisabled=new Set();
-    this.interactions=[];this.boxLocations=[];this.openBoxes=new Set();this.fireSale=false;this.hasPower=false;this.zones=[];this.traps=new Map();this.teleporters=[];
+    this.interactions=[];this.boxLocations=[];this.openBoxes=new Set();this.fireSale=false;this.hasPower=false;this.zones=[];this.traps=new Map();this.teleporters=[];this.eggs=new Map();this.powerLights=[];this.warnings=[];
   }
   async load(progress){
     const entry=this.entry,dir=entry.dir.replace(/\/?$/,'/');
     progress('Loading '+entry.title,15);
     const gltf=await new GLTFLoader(assetManager).loadAsync(dir+entry.model);
     const root=gltf.scene;root.scale.setScalar(entry.scale??1);this.scene.add(root);root.updateMatrixWorld(true);
+    this.prepareLights(root,entry.scale??1);
     this.root=root;
 
     // Sort the scene into markers, doors, collision-only meshes and scenery.
@@ -92,7 +93,7 @@ export class CustomWorld {
     const models=this.data.models,place=async(key,position,yaw,offset=0)=>{
       const o=await loadModel(models[key]);if(!o)return null;o.position.copy(position);o.rotation.y=yaw+FACE+offset;this.scene.add(o);return o;
     };
-    for(const m of markers)if(m.type!=='DOOR')m.object.visible=false;
+    for(const m of markers)if(m.type!=='DOOR'&&m.type!=='EGG')m.object.visible=false;
     const spawn=markers.find(m=>m.type==='PLAYER_SPAWN');
     this.spawn=spawn?{position:spawn.position.clone(),yaw:spawn.yaw}:{position:new THREE.Vector3(bounds.getCenter(new THREE.Vector3()).x,bounds.max.y+10,bounds.getCenter(new THREE.Vector3()).z),yaw:0};
 
@@ -100,7 +101,7 @@ export class CustomWorld {
     const zspawns=markers.filter(m=>m.type==='ZSPAWN'),paired=new Set();
     for(const [i,m] of markers.filter(m=>m.type==='WINDOW').entries()){
       const near=zspawns.filter(z=>!paired.has(z)).sort((a,b)=>a.position.distanceTo(m.position)-b.position.distanceTo(m.position))[0];
-      if(!near||near.position.distanceTo(m.position)>400){console.warn(`[map] ${rawName(m.object)} has no ZSPAWN within 400 units; skipped`);continue;}
+      if(!near||near.position.distanceTo(m.position)>400){this.warn(`${rawName(m.object)} has no ZSPAWN within 400 units; skipped`);continue;}
       paired.add(near);
       const dir=m.position.clone().sub(near.position).setY(0).normalize(),width=+(m.extras.width??56),height=+(m.extras.height??64);
       const outside=m.position.clone().addScaledVector(dir,-26),inside=this.closest(m.position.clone().addScaledVector(dir,42))??m.position.clone().addScaledVector(dir,42);
@@ -114,7 +115,7 @@ export class CustomWorld {
     }
     for(const [i,m] of zspawns.filter(z=>!paired.has(z)).entries()){
       const inside=this.closest(m.position,{x:120,y:200,z:120});
-      if(!inside){console.warn(`[map] ${rawName(m.object)} is not near walkable ground; skipped`);continue;}
+      if(!inside){this.warn(`${rawName(m.object)} is not near walkable ground; skipped`);continue;}
       this.barriers.push({id:'spawn_'+i,position:inside.clone(),outside:m.position.clone(),inside,group:zoneOf(m),boards:[],count:0,repairTime:0,rewardRound:0,reward:0});
     }
     if(!this.barriers.length)throw new Error('The map has no zombie spawns (ZSPAWN markers)');
@@ -123,14 +124,14 @@ export class CustomWorld {
     for(const m of markers){
       if(m.type==='WALLBUY'){
         const ids=Object.keys(this.data.weapons),weapon=String(m.extras.weapon??'')||ids.filter(k=>m.arg.startsWith(k)||m.arg.startsWith(k.replace(/_zm$/,''))).sort((a,b)=>b.length-a.length)[0];
-        if(!this.data.weapons[weapon]){console.warn(`[map] ${rawName(m.object)}: unknown weapon`);continue;}
+        if(!this.data.weapons[weapon]){this.warn(`${rawName(m.object)}: unknown weapon`);continue;}
         this.interactions.push({kind:'wallbuy',weapon,position:m.position.clone()});
         tasks.push(loadModel(this.data.weapons[weapon].worldModel).then(o=>{if(!o)return;o.position.copy(m.position);o.rotation.y=m.yaw+Math.PI/2;
           for(const tag of this.data.weapons[weapon].hideTags??[]){const bone=o.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}this.scene.add(o);}));
       }
       if(m.type==='PERK'){
         const perk=PERKS[String(m.extras.perk??m.arg.split('_')[0]).toLowerCase()];
-        if(!perk){console.warn(`[map] ${rawName(m.object)}: unknown perk (use jugg, revive, speedcola or doubletap)`);continue;}
+        if(!perk){this.warn(`${rawName(m.object)}: unknown perk (use jugg, revive, speedcola or doubletap)`);continue;}
         this.interactions.push({kind:'perk',perk,position:m.position.clone().addScaledVector(up,40)});
         tasks.push(place(PERK_MODELS[perk],m.position,m.yaw));
       }
@@ -167,7 +168,7 @@ export class CustomWorld {
         location.box=group;location.rubble=rubble;if(rubble){rubble.position.copy(m.position);rubble.rotation.y=m.yaw;this.scene.add(rubble);}
       })());
     }
-    this.buildTraps(markers,place,tasks);this.buildTeleporters(markers);
+    this.buildTraps(markers,place,tasks);this.buildTeleporters(markers);this.buildEggs(markers);
     await Promise.all(tasks);
     this.boxBeam=new THREE.Mesh(new THREE.CylinderGeometry(8,28,1600,12,1,true),new THREE.MeshBasicMaterial({color:0x8cacdd,transparent:true,opacity:.1,side:THREE.DoubleSide,depthWrite:false}));
     this.boxBeam.visible=!!this.boxLocations.length;this.scene.add(this.boxBeam);
@@ -190,6 +191,34 @@ export class CustomWorld {
       return false;
     },rayIntersect:(r,n=0,f=Infinity)=>this.raycast(r,n,f,true)};
     this.bounds=bounds;
+  }
+  warn(message){this.warnings.push(message);console.warn('[map] '+message);}
+  // Blender's glTF lights use physical falloff in metres; the map is scaled to
+  // inches, so point and spot lights are brightened and extended to match.
+  // Lights named POWERLIGHT_... (or under such a node) stay off until the power is on.
+  prepareLights(root,scale){
+    root.traverse(o=>{
+      if(!o.isLight)return;
+      if(o.isPointLight||o.isSpotLight){o.intensity*=scale*scale;if(o.distance)o.distance*=scale;}
+      let n=o,power=false;while(n&&n!==root){if(/^POWERLIGHT/i.test(rawName(n))||n.userData.power===true)power=true;n=n.parent;}
+      if(power)this.powerLights.push({light:o,intensity:o.intensity});
+    });
+  }
+  setPower(on){for(const p of this.powerLights)p.light.intensity=on?p.intensity:0;}
+  // EGG_<group>: collectibles found with F (or by shooting them when `shoot`
+  // is set). Finding a whole group gives its reward (see mods/README.md).
+  buildEggs(markers){
+    for(const m of markers.filter(m=>m.type==='EGG')){
+      const name=String(m.extras.egg??m.arg.split('_').find(t=>t&&!/^\d+$/.test(t))??'egg').toLowerCase();
+      if(!this.eggs.has(name))this.eggs.set(name,{name,items:[],reward:'song',done:false});
+      const g=this.eggs.get(name),e=m.extras;
+      for(const key of ['reward','points','weapon','perk','message'])if(e[key]!==undefined)g[key]=e[key];
+      let object=m.object,hasMesh=false;object.traverse(o=>{if(o.isMesh)hasMesh=true;});
+      if(!hasMesh){object=new THREE.Mesh(new THREE.IcosahedronGeometry(5,0),new THREE.MeshStandardMaterial({color:0x6d5a3c,emissive:0x5a2b0a,roughness:.8,flatShading:true}));object.position.copy(m.position);this.scene.add(object);}
+      const center=new THREE.Box3().setFromObject(object).getCenter(new THREE.Vector3());
+      g.items.push({object,position:center,shoot:e.shoot===true||e.shoot==='true',found:false});
+      if(!(e.shoot===true||e.shoot==='true'))this.interactions.push({kind:'egg',egg:name,item:g.items.length-1,position:center});
+    }
   }
   // TRAP_<name>_<cost> switches activate every TRAPZONE_<name> area. A zone
   // that is a mesh uses its bounding box; an empty uses a cylinder (radius, height).
@@ -216,7 +245,7 @@ export class CustomWorld {
       zone.light=new THREE.PointLight(0xffffff,0,420,1.4);zone.light.position.copy(zone.mesh.position);this.scene.add(zone.light);
     }
     for(const [name,t] of this.traps){
-      if(!t.zones.length){console.warn(`[map] trap "${name}" has a switch but no TRAPZONE_${name}`);}
+      if(!t.zones.length){this.warn(`trap "${name}" has a switch but no TRAPZONE_${name}`);}
       const material=new THREE.MeshBasicMaterial({color:TRAP_COLORS[t.kind]??TRAP_COLORS.electric,transparent:true,opacity:.24,wireframe:t.kind!=='fire',depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
       for(const z of t.zones){z.mesh.material=material;z.light.color.setHex(TRAP_COLORS[t.kind]??TRAP_COLORS.electric);}
     }
@@ -233,7 +262,7 @@ export class CustomWorld {
     const front=m=>m.position.clone().add(new THREE.Vector3(Math.cos(m.yaw),0,-Math.sin(m.yaw)).multiplyScalar(52));
     for(const pad of pads){
       const name=nameOf(pad),dest=dests.find(d=>nameOf(d)===name),other=pads.find(p=>p!==pad&&nameOf(p)===name);
-      if(!dest&&!other){console.warn(`[map] teleporter "${name}" has no partner pad or TPDEST_${name}`);continue;}
+      if(!dest&&!other){this.warn(`teleporter "${name}" has no partner pad or TPDEST_${name}`);continue;}
       const e=pad.extras,ret=dest?.extras.return??dest?.arg.split('_').find(t=>/^\d+$/.test(t));
       const to=dest?{position:dest.position.clone(),yaw:dest.yaw,returnAfter:ret!==undefined?+ret:0,zone:dest.extras.zone?String(dest.extras.zone).toLowerCase():null}
         :{position:front(other),yaw:other.yaw,returnAfter:0,zone:other.extras.zone?String(other.extras.zone).toLowerCase():null};
@@ -270,6 +299,8 @@ export class CustomWorld {
   reset(session){
     for(const t of this.traps.values()){t.activeUntil=0;t.readyAt=0;for(const z of t.zones){z.mesh.visible=false;z.light.intensity=0;}}
     for(const tp of this.teleporters)tp.readyAt=0;
+    for(const g of this.eggs.values()){g.done=false;for(const i of g.items){i.found=false;i.object.visible=true;}}
+    this.setPower(session.power);
     for(const b of this.barriers){this.setBoards(b,b.boards.length);b.reward=0;b.rewardRound=0;}
     this.activeBox=this.boxLocations.find(b=>b.start)??this.boxLocations[0];this.updateBox();this.setDoors(session);
     if(this.powerHandle)this.powerHandle.rotation.x=0;

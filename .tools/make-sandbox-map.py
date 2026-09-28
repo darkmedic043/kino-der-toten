@@ -81,7 +81,13 @@ markers = [
     ('TELEPORT_tower', (11, 0, -.5), W),
     ('TPDEST_tower_20', (20.5, 4, 0), W),
     ('WALLBUY_dragunov_zm', (24.75, 4.7, 0), E),
+    # Easter egg: three fragments (press F on two; shoot the third from the tower).
+    ('EGG_fragments', (-1.2, .1, 7.3), 0, {'points': 2500, 'reward': 'song', 'message': 'The fragments sing'}),
+    ('EGG_fragments', (10.6, .1, 3.2), 0),
+    ('EGG_fragments', (18, .15, -9), 0, {'shoot': True}),  # spot it from the tower
 ]
+# Blender-style lights (KHR_lights_punctual, candela): the yard light only comes on with the power.
+lights = [('lobby_light', (-6, 3.2, 0), (1, .86, .7), 25), ('POWERLIGHT_yard', (7, 3.2, 0), (.75, .88, 1), 40)]
 
 blob, views, accessors = bytearray(), [], []
 def add(data, count, target, typ, comp, mn=None, mx=None):
@@ -111,12 +117,15 @@ def mesh(boxes):
 
 meshes = [mesh(static), mesh(door)]
 nodes = [{'name':'sandbox','mesh':0}, {'name':'DOOR_yard_750','mesh':1}]
+nodes += [{'name':name,'translation':list(pos),'extensions':{'KHR_lights_punctual':{'light':i}}} for i, (name, pos, _, _) in enumerate(lights)]
 nodes += [{'name':m[0],'translation':list(m[1]),'rotation':yaw_rotation(m[2]),**({'extras':m[3]} if len(m) > 3 else {})} for m in markers]
 while len(blob) % 4: blob.append(0)
 gltf = {'asset':{'version':'2.0','generator':'make-sandbox-map.py'},'scene':0,'scenes':[{'nodes':list(range(len(nodes)))}],
         'nodes':nodes,'meshes':meshes,
         'materials':[{'name':m,'pbrMetallicRoughness':{'baseColorFactor':[*COLORS[m],1],'metallicFactor':0,'roughnessFactor':.85}} for m in materials],
-        'accessors':accessors,'bufferViews':views,'buffers':[{'byteLength':len(blob)}]}
+        'accessors':accessors,'bufferViews':views,'buffers':[{'byteLength':len(blob)}],
+        'extensionsUsed':['KHR_lights_punctual'],
+        'extensions':{'KHR_lights_punctual':{'lights':[{'type':'point','color':list(c),'intensity':k} for _, _, c, k in lights]}}}
 js = json.dumps(gltf, separators=(',',':')).encode(); js += b' ' * (-len(js) % 4)
 OUT.write_bytes(struct.pack('<III',0x46546C67,2,12+8+len(js)+8+len(blob)) + struct.pack('<II',len(js),0x4E4F534A) + js + struct.pack('<II',len(blob),0x004E4942) + blob)
 print(OUT, OUT.stat().st_size, 'bytes,', len(markers), 'markers')
