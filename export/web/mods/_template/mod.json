@@ -1,0 +1,6 @@
+{
+  "name": "My mod",
+  "description": "Copy this folder, rename it, and add the folder name to mods.json.",
+  "data": "data.json",
+  "script": "mod.js"
+}

@@ -1,0 +1,19 @@
+{
+  "maps": [
+    { "id": "kino", "title": "Kino der Toten", "mode": "Zombies", "url": "index.html" },
+    { "id": "moon", "title": "Moon", "mode": "Zombies", "url": "moon.html" },
+    { "id": "shangri-la", "title": "Shangri-La", "mode": "Explore", "url": "shangri-la.html" },
+    { "id": "coast", "title": "Call of the Dead", "mode": "Explore", "url": "call-of-the-dead.html" },
+    { "id": "ascension", "title": "Ascension", "mode": "Explore", "url": "ascension.html" },
+    {
+      "id": "sandbox",
+      "title": "Sandbox (example custom map)",
+      "mode": "Explore",
+      "dir": "mods/maps/sandbox/",
+      "model": "sandbox.glb",
+      "scale": 39.37,
+      "spawn": { "position": [0, 5, 400], "yaw": 0 },
+      "background": "#2a3136"
+    }
+  ]
+}

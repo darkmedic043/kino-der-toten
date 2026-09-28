@@ -1,0 +1,5 @@
+{
+  "name": "Progression & Loadouts",
+  "description": "Earn XP from kills and rounds, level up, and unlock starting weapons and bonuses.",
+  "script": "mod.js"
+}

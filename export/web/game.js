@@ -11,8 +11,9 @@ import { PerkDrink } from './perk-drink.js';
 import { MysteryBox } from './mystery-box.js';
 import { createZombieTouch } from './zombies-touch.js';
 import { configureKinoAssets, assetDiagnostics } from './runtime-assets.js';
+import { ModHost } from './mod-loader.js';
 
-const $=id=>document.getElementById(id), keys=new Set(),audio=new GameAudio();
+const $=id=>document.getElementById(id), keys=new Set(),audio=new GameAudio(),mods=new ModHost();
 const profile=configureKinoAssets();
 audio.maxBufferBytes=profile.mobile?16*1024*1024:Infinity;audio.preload=!profile.mobile;
 const renderer=new THREE.WebGLRenderer({antialias:!profile.mobile,powerPreference:profile.mobile?'default':'high-performance'});
@@ -61,7 +62,7 @@ function setActive(value){
   active=!!value&&ready&&session.phase!=='gameover';$('menu').hidden=active;document.body.classList.toggle('menu-open',!active);keys.clear();primary=false;primaryPressed=false;ads=false;reloadShot=false;
   mousePrimary=mouseAim=false;touchControls.reset();touchControls.setEnabled(active&&session.phase!=='reviving',active);
   if(active&&audio.ctx)audio.start();else if(!active)audio.pause();
-  if(active){if(!started){started=true;announce('Round 1','SURVIVE');audio.play('round');}else if(session.phase==='preparing')announce('Round '+session.round,'PREPARE YOURSELF');}
+  if(active){if(!started){started=true;announce('Round 1','SURVIVE');audio.play('round');mods.emit('start');}else if(session.phase==='preparing')announce('Round '+session.round,'PREPARE YOURSELF');}
   else if(started&&session.phase!=='gameover'){$('start').innerHTML='RESUME GAME <span>→</span>';$('restart').hidden=false;$('menu-status').textContent='Paused · Round '+session.round;}
 }
 function start(){if(!ready||contextLost)return;if(session.phase==='gameover')reset();audio.start();warmViewAudio();if(touchControls.mode){setActive(true);return;}renderer.domElement.requestPointerLock?.()?.catch(e=>toast('Click the game to capture the mouse'));}
@@ -302,6 +303,7 @@ function update(dt){
       primaryPressed=false;
       enemies.update(dt,player.getFeetPosition());
       features.update(dt);
+      mods.emit('update',dt);
       repairLeft=Math.max(0,repairLeft-dt);findPrompt();if((keys.has('KeyF')||keys.has('KeyE')||touch.use)&&prompt?.barrier)repair(prompt.barrier);
       if(session.round!==lastRound||session.phase!==lastPhase){if(session.phase==='fighting'){announce(session.dogRound?'Fetch their souls':'Round '+session.round,session.dogRound?'HELLHOUNDS':'SURVIVE');audio.play(session.dogRound?'dog_round':'round');if(session.dogRound)audio.play('dog_announce');}else if(session.phase==='preparing'&&session.round>1){announce('Round survived','RELOAD. REBUILD. PREPARE.');audio.play('round_end');}lastRound=session.round;lastPhase=session.phase;}
       mysteryBox.update(dt);
@@ -347,7 +349,7 @@ function hud(){
 }
 
 function getState(){return {ready,active,started,input:{touch:touchControls.getState(),primary,ads},...(session?session.snapshot():{}),player:player?{...player.state,rotation:camera.rotation.toArray().slice(0,3),position:camera.position.toArray(),feet:player.getFeetPosition().toArray()}:null,enemies:enemies?.snapshot()??[],prompt:promptText,barriers:world?.barriers.map(b=>({id:b.id,count:b.count,position:b.position.toArray(),inside:b.inside.toArray(),group:b.group}))??[],doors:world?[...world.doors.values()].map(d=>({name:d.name,cost:d.cost,flag:d.flag,open:session.openDoors.has(d.name),triggers:d.triggers.map(e=>e.position),parts:d.parts.length})):[],performance:{fps,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},viewmodelReady:view?.ready??false,errors:[...errors]};}
-globalThis.kino={debug:{getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,giveWeapon:id=>{session.giveWeapon(id);equipView();},spawnEnemy:(p,kind)=>enemies.spawn(vector(p),null,kind).id,clearEnemies:()=>{for(const z of [...enemies.list])enemies.hurt(z,999999);},collectPowerup:collect,step:(seconds)=>{for(let t=0;t<seconds;t+=1/60)update(Math.min(1/60,seconds-t));},navigationPath:(a,b)=>world.path(vector(a),vector(b)).map(v=>v.toArray()),getEntities:()=>data.entities.filter(e=>e.classname==='trigger_use'||e.targetname==='initial_spawn_points'),showCollision:value=>{world.collision.setDebugVisible(value);scene.add(world.collision.mesh);}}};
+globalThis.kino={mods,debug:{getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,giveWeapon:id=>{session.giveWeapon(id);equipView();},spawnEnemy:(p,kind)=>enemies.spawn(vector(p),null,kind).id,clearEnemies:()=>{for(const z of [...enemies.list])enemies.hurt(z,999999);},collectPowerup:collect,step:(seconds)=>{for(let t=0;t<seconds;t+=1/60)update(Math.min(1/60,seconds-t));},navigationPath:(a,b)=>world.path(vector(a),vector(b)).map(v=>v.toArray()),getEntities:()=>data.entities.filter(e=>e.classname==='trigger_use'||e.targetname==='initial_spawn_points'),showCollision:value=>{world.collision.setDebugVisible(value);scene.add(world.collision.mesh);}}};
 Object.assign(kino.debug,{
   memoryState:()=>{
     const textures=new Set(),sources=new Set(),geometries=new Set();let textureBytes=0,geometryBytes=0;
@@ -378,7 +380,7 @@ Object.assign(kino.debug,{
   setRound:n=>{enemies.reset();while(session.round<n)session.nextRound();session.countdown=0;session.spawned=0;session.killed=0;},
 });
 try{
-  progress('Loading game data',5);data=await fetch('game-data.json').then(r=>r.json());session=new Session(data);world=new World(scene,data);await world.load(progress);
+  progress('Loading game data',5);data=await mods.load(await fetch('game-data.json').then(r=>r.json()));session=new Session(data);world=new World(scene,data);await world.load(progress);
   spawn=data.entities.find(e=>e.targetname==='initial_spawn_points'&&e.script_int==='1');
   player=new PlayerController(camera,world.physics,{spawn:vector(spawn.position),spawnIsEye:false,radius:14,height:70,eyeHeight:60,moveSpeed:190,sprintSpeed:285,crouchSpeed:95,gravity:800,jumpHeight:39,fallResetY:-800,maxSubSteps:12,groundSnapSpeed:10});
   camera.rotation.set(0,spawn.yaw-Math.PI/2,0);world.setDoors(session);
@@ -386,7 +388,8 @@ try{
   world.actors=()=>enemies.list;
   powerups=new Powerups(scene,data,audio,collect);perkDrink=new PerkDrink(viewScene,data,audio);mysteryBox=new MysteryBox(scene,world,data,session,audio,toast);
   features=new KinoFeatures({scene,world,data,session,enemies,player,camera,audio,effect,damage,toast});
-  await Promise.all([enemies.load(),equipView(),audio.load(),powerups.load(),perkDrink.load(),mysteryBox.load(),features.load()]);player.update(.05,{});ready=true;
+  await Promise.all([enemies.load(),equipView(),audio.load(),powerups.load(),perkDrink.load(),mysteryBox.load(),features.load()]);player.update(.05,{});
+  progress('Loading mods',95);await mods.start({data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,toast,announce,equipView,damage,getState,setActive,reset});ready=true;
   progress('Ready',100);$('loading').hidden=true;$('start').disabled=contextLost;$('menu-status').textContent=contextLost?'Graphics paused. Waiting for Safari to restore the game…':touchControls.mode?'Tap to enter the theater':'Click to capture the mouse · Esc to pause';
 }catch(error){console.error(error);errors.push(String(error));$('load-label').textContent='Unable to start: '+error.message;$('menu-status').textContent='See browser console for details';}
 renderer.info.autoReset=false;

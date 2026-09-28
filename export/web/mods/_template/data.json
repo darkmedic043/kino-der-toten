@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "zombie_score_start_1p": 500
+  },
+  "weapons": {
+    "my_weapon_zm": {
+      "extends": "m14_zm",
+      "name": "My Weapon",
+      "damage": 250
+    }
+  },
+  "boxPool": { "add": ["my_weapon_zm"], "remove": [] }
+}

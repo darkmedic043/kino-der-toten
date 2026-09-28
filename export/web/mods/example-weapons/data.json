@@ -1,0 +1,24 @@
+{
+  "weapons": {
+    "golden_python_zm": {
+      "extends": "python_zm",
+      "name": "Golden Python",
+      "damage": 1800,
+      "minDamage": 1200,
+      "clipSize": 8,
+      "maxAmmo": 96,
+      "startAmmo": 32,
+      "headMultiplier": 5,
+      "upgrade": { "name": "Midas Touch", "damage": 3500, "minDamage": 2500, "clipSize": 12, "maxAmmo": 144 }
+    },
+    "mp40_extended_zm": {
+      "extends": "mp40_zm",
+      "name": "MP40 Drum",
+      "clipSize": 64,
+      "maxAmmo": 320,
+      "reloadTime": 3.2,
+      "reloadEmptyTime": 3.6
+    }
+  },
+  "boxPool": { "add": ["golden_python_zm", "mp40_extended_zm"] }
+}
