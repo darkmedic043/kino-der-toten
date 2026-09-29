@@ -57,7 +57,8 @@ export default async function setup(api){
     }
     save();renderHud();
   }
-  host.on('kill',({kind,head,melee})=>{
+  host.on('kill',({kind,head,melee,remote})=>{
+    if(remote)return;   // a co-op teammate's kill, applied on the host
     const xp=config.xp;
     grant(kind==='dog'?xp.hellhound:xp.kill+(head?xp.headshot:0)+(melee?xp.melee:0));
     profile.kills++;

@@ -100,6 +100,10 @@ async function api(req, res, url) {
     const s = session(req); if (s) { sessions.delete(s.id); saveSessions(); }
     return send(res, 200, { signedIn: false }, { 'Set-Cookie': 'kino_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
   }
+  if (url.startsWith('/api/rooms/') && req.method === 'GET') {
+    const room = rooms.get(url.slice(11).toUpperCase());
+    return room ? send(res, 200, { code: room.code, page: room.page, map: room.map, players: room.players.size, max: MAX_PLAYERS }) : send(res, 404, { error: 'No game with that code' });
+  }
   if (url === '/api/profile') {
     const s = session(req); if (!s) return send(res, 401, { error: 'not signed in' });
     const file = userFile(s.sub);
@@ -138,7 +142,81 @@ function serveFile(req, res, url) {
   if (req.method === 'HEAD') res.end(); else createReadStream(path).on('error', () => res.destroy()).pipe(res);
 }
 
-createServer(async (req, res) => {
+// ---- Co-op rooms over WebSocket (minimal RFC 6455, text frames only) --------
+// The host's browser runs the game; the server only relays messages:
+//   {t:'to', target:'host'|'all'|<id>, data}  ->  {t:'msg', from, data}
+const MAX_PLAYERS = 4, MAX_FRAME = 256 * 1024, rooms = new Map();
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const newCode = () => { let c; do c = Array.from(randomBytes(4), b => CODE_CHARS[b % CODE_CHARS.length]).join(''); while (rooms.has(c)); return c; };
+function wsSend(sock, obj) {
+  if (sock.destroyed) return;
+  const data = Buffer.from(JSON.stringify(obj)), n = data.length;
+  const head = n < 126 ? Buffer.from([0x81, n]) : n < 65536 ? Buffer.from([0x81, 126, n >> 8, n & 255]) : Buffer.concat([Buffer.from([0x81, 127, 0, 0, 0, 0]), Buffer.from([n >>> 24, (n >> 16) & 255, (n >> 8) & 255, n & 255])]);
+  sock.write(Buffer.concat([head, data]));
+}
+function wsFrames(sock, onText) {
+  let buf = Buffer.alloc(0);
+  sock.on('data', chunk => {
+    buf = Buffer.concat([buf, chunk]);
+    while (buf.length >= 2) {
+      const op = buf[0] & 15, masked = buf[1] & 128; let len = buf[1] & 127, off = 2;
+      if (len === 126) { if (buf.length < 4) return; len = buf.readUInt16BE(2); off = 4; }
+      else if (len === 127) { if (buf.length < 10) return; len = Number(buf.readBigUInt64BE(2)); off = 10; }
+      if (len > MAX_FRAME || !masked) { sock.destroy(); return; }
+      if (buf.length < off + 4 + len) return;
+      const mask = buf.subarray(off, off + 4), payload = Buffer.from(buf.subarray(off + 4, off + 4 + len));
+      for (let i = 0; i < payload.length; i++) payload[i] ^= mask[i & 3];
+      buf = buf.subarray(off + 4 + len);
+      if (op === 8) { sock.end(Buffer.from([0x88, 0])); return; }
+      if (op === 9) { sock.write(Buffer.concat([Buffer.from([0x8a, payload.length]), payload])); continue; }
+      if (op === 1) { try { onText(JSON.parse(payload.toString('utf8'))); } catch {} }
+    }
+  });
+}
+function leave(client) {
+  const room = client.room; if (!room) return; client.room = null;
+  room.players.delete(client.id);
+  if (room.host === client.id) {   // the host runs the game; without it the room ends
+    for (const p of room.players.values()) { wsSend(p.sock, { t: 'closed', reason: 'The host left the game' }); p.room = null; }
+    rooms.delete(room.code); return;
+  }
+  for (const p of room.players.values()) wsSend(p.sock, { t: 'left', id: client.id });
+}
+const publicPlayer = p => ({ id: p.id, name: p.name, character: p.character });
+let clientSerial = 0;
+function onSocket(req, sock) {
+  const s = session(req), client = { id: 'p' + (++clientSerial), sock, room: null, name: s?.name || 'Guest ' + (clientSerial % 1000), character: 'mannequin' };
+  sock.setNoDelay(true);
+  const ping = setInterval(() => { if (!sock.destroyed) sock.write(Buffer.from([0x89, 0])); }, 25000);
+  sock.on('close', () => { clearInterval(ping); leave(client); });
+  sock.on('error', () => {});
+  wsFrames(sock, msg => {
+    if (msg.t === 'create' || msg.t === 'join') {
+      leave(client);
+      client.character = String(msg.character || 'mannequin').slice(0, 64);
+      let room;
+      if (msg.t === 'create') {
+        room = { code: newCode(), host: client.id, page: String(msg.page || '/').slice(0, 300), map: String(msg.map || '').slice(0, 64), players: new Map() };
+        rooms.set(room.code, room);
+      } else {
+        room = rooms.get(String(msg.code || '').toUpperCase());
+        if (!room) return wsSend(sock, { t: 'error', error: 'No game with that code' });
+        if (room.players.size >= MAX_PLAYERS) return wsSend(sock, { t: 'error', error: 'That game is full' });
+      }
+      room.players.set(client.id, client); client.room = room;
+      wsSend(sock, { t: 'welcome', id: client.id, code: room.code, host: room.host, page: room.page, players: [...room.players.values()].map(publicPlayer) });
+      for (const p of room.players.values()) if (p !== client) wsSend(p.sock, { t: 'joined', player: publicPlayer(client) });
+      return;
+    }
+    if (msg.t === 'to' && client.room) {
+      const room = client.room, out = { t: 'msg', from: client.id, data: msg.data };
+      if (msg.target === 'all') { for (const p of room.players.values()) if (p !== client) wsSend(p.sock, out); }
+      else { const p = room.players.get(msg.target === 'host' ? room.host : msg.target); if (p && p !== client) wsSend(p.sock, out); }
+    }
+  });
+}
+
+const server = createServer(async (req, res) => {
   let url; try { url = decodeURIComponent(new URL(req.url, 'http://localhost').pathname); } catch { res.writeHead(400).end('bad request'); return; }
   try {
     if (url.startsWith('/api/')) return await api(req, res, url);
@@ -146,4 +224,12 @@ createServer(async (req, res) => {
     if (url === '/__health') return send(res, 200, { app: 'kino-browser-zombies', root: ROOT, accounts: ENABLED });
     serveFile(req, res, url);
   } catch (e) { console.error(e); if (!res.headersSent) send(res, 500, { error: 'server error' }); }
-}).listen(PORT, '0.0.0.0', () => console.log(`kino: http://0.0.0.0:${PORT}/ · data ${DATA} · Discord sign-in ${ENABLED ? 'on' : 'off (set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, KINO_PUBLIC_URL)'}`));
+});
+server.on('upgrade', (req, sock) => {
+  const url = new URL(req.url, 'http://x'), key = req.headers['sec-websocket-key'];
+  if (url.pathname !== '/api/ws' || !key || (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host)) { sock.destroy(); return; }
+  const accept = createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+  sock.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+  onSocket(req, sock);
+});
+server.listen(PORT, '0.0.0.0', () => console.log(`kino: http://0.0.0.0:${PORT}/ · data ${DATA} · Discord sign-in ${ENABLED ? 'on' : 'off (set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, KINO_PUBLIC_URL)'}`));

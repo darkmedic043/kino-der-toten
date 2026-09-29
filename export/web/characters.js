@@ -263,6 +263,32 @@ function mannequin(entry,holder){
   },dispose(){holder.removeFromParent();}};
 }
 
+// Puts a weapon's world model in a character's right hand (third person and
+// co-op players). Per-character "weapon": {position, rotation (deg), scale}.
+const GRIPS={mannequin:{position:[0,-3.4,1.2],basis:true},t5:{position:[0,0,0],rotation:[0,0,0]},gltf:{position:[0,0,0],rotation:[0,0,0]}};
+export async function holdWeapon(character,entry,def,hideTags=def?.hideTags){
+  if(!character.hand||!def?.worldModel)return null;
+  const model=await loadModel(def.worldModel);if(!model)return null;
+  for(const tag of hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
+  const grip={...GRIPS[entry.type]??GRIPS.gltf,...entry.weapon},pivot=new THREE.Group();pivot.add(model);
+  if(character.procedural&&!entry.weapon?.rotation){
+    // Procedural rigs: settle the aim pose, then point the barrel forward and
+    // the sights up in character space, whatever the hand bone's axes are.
+    character.hold(true);character.update(0,0);character.root.updateMatrixWorld(true);
+    const hand=character.root.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(character.hand.getWorldQuaternion(new THREE.Quaternion()));
+    const want=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,0,1),new THREE.Vector3(0,1,0),new THREE.Vector3(-1,0,0)));
+    pivot.quaternion.copy(hand.invert().multiply(want));
+  }else if(grip.basis&&!entry.weapon?.rotation){
+    // Mannequin wrist: barrel (+X) along the arm (-Y), sights up (+Z when aiming).
+    pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,-1,0),new THREE.Vector3(0,0,1),new THREE.Vector3(-1,0,0)));
+  }else pivot.rotation.set(...(grip.rotation??[0,0,0]).map(THREE.MathUtils.degToRad));
+  pivot.position.fromArray(grip.position??[0,0,0]);
+  // Undo the hand's scale (models are resized to fit), so the gun stays true to size.
+  character.root.updateMatrixWorld(true);const hs=character.hand.getWorldScale(new THREE.Vector3()),rs=character.root.getWorldScale(new THREE.Vector3());
+  pivot.scale.set(rs.x/hs.x,rs.y/hs.y,rs.z/hs.z).multiplyScalar(grip.scale??1);
+  character.hand.add(pivot);character.hold?.(true);return pivot;
+}
+
 // A 3/4 head-and-shoulders portrait of a character as an image URL (for the HUD).
 export async function renderPortrait(entry,data,size=160){
   const c=await createCharacter(entry,data);c.hold?.(false);c.update(.016,0);

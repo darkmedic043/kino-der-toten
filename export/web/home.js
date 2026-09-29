@@ -93,7 +93,7 @@ function renderHero(){
   $('hero-title').textContent=m.title;$('hero-desc').textContent=m.description??'';
   $('hero-best').textContent=modesOf(m).includes('zombies')&&best(m)?`Best: round ${best(m)}`:'';
   const actions=[];
-  if(modesOf(m).includes('zombies'))actions.push(`<a class="play-btn" href="${esc(zombiesUrl(m))}">PLAY ZOMBIES <span>→</span></a>`);
+  if(modesOf(m).includes('zombies')){const u=zombiesUrl(m);actions.push(`<a class="play-btn" href="${esc(u)}">PLAY ZOMBIES <span>→</span></a>`,`<a class="play-btn secondary" href="${esc(u+(u.includes('?')?'&':'?')+'mp=host')}">HOST CO-OP GAME <span>+</span></a>`);}
   if(modesOf(m).includes('explore'))actions.push(`<a class="play-btn ${actions.length?'secondary':''}" href="${esc(exploreUrl(m))}">EXPLORE THE MAP <span>→</span></a>`);
   $('hero-actions').innerHTML=actions.join('');
 }
@@ -108,6 +108,13 @@ function renderMaps(){
     grid.append(card);
   }
 }
+// Join a friend's co-op game by its room code.
+$('join-form').addEventListener('submit',async e=>{
+  e.preventDefault();const code=$('join-code').value.trim().toUpperCase();if(!/^[A-Z]{4}$/.test(code)){toast('Room codes are 4 letters');return;}
+  try{const r=await fetch('/api/rooms/'+code);const room=await r.json();if(!r.ok)throw new Error(room.error);
+    if(room.players>=room.max)throw new Error('That game is full');
+    location.href=room.page+(room.page.includes('?')?'&':'?')+'room='+code;}catch(error){toast(error.message||'Could not join');}
+});
 for(const b of document.querySelectorAll('#map-filter button'))b.addEventListener('click',()=>{filter=b.dataset.filter;for(const x of document.querySelectorAll('#map-filter button'))x.classList.toggle('active',x===b);renderMaps();});
 
 // ---- Weapon thumbnails ---------------------------------------------------------

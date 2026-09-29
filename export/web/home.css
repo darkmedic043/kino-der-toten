@@ -39,6 +39,10 @@ main{position:relative;overflow-y:auto;padding:40px 48px 60px}
 .chips button.active,.chips button:hover{color:var(--text);border-color:var(--red-hi)}
 
 /* Play */
+.join{display:flex;gap:6px;margin-left:auto;margin-right:12px}
+.join input{width:84px;background:#05050580;border:1px solid var(--line);color:var(--text);padding:7px 10px;font:12px Arial,sans-serif;letter-spacing:4px;text-transform:uppercase}
+.join input:focus{outline:none;border-color:var(--red-hi)}
+.join button{background:#05050560;border:1px solid var(--line-strong);padding:7px 12px;font-size:10px;letter-spacing:2px;color:#ccc3ae}.join button:hover{border-color:var(--red-hi);color:var(--text)}
 #map-hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,1fr);border:1px solid var(--line);background:var(--panel);min-height:320px}
 .hero-art{position:relative;background-size:cover;background-position:center;min-height:260px;overflow:hidden}
 .hero-info{padding:30px 32px;display:flex;flex-direction:column}

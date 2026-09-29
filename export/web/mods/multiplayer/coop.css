@@ -1,0 +1,7 @@
+/* Co-op HUD (not part of upstream). */
+#coop-panel{position:fixed;top:14px;right:16px;z-index:5;min-width:170px;padding:9px 12px;background:#0a0c0bcc;border:1px solid #776b5266;font:11px Arial,sans-serif;color:#c7bca4;pointer-events:none}
+#coop-panel strong{letter-spacing:3px;color:#eee8dc;font-size:10px;margin-right:8px}
+#coop-panel span{color:#9d947e}#coop-panel .err{display:block;color:#e8a092;margin-top:4px}
+#coop-panel ul{list-style:none;margin:6px 0 0;padding:0}#coop-panel li{padding:2px 0}#coop-panel li.me{color:#f0c465}
+#coop-panel em{font-style:normal;font-size:9px;letter-spacing:2px;color:#b5372c;margin-left:4px}#coop-panel em.down{color:#e8a092}
+#coop-note{font-size:10px;letter-spacing:1px;color:#d6a94a;margin:6px 0 0}

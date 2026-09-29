@@ -34,7 +34,7 @@ export default function setup(api){
     thump(c,t,{from:110,to:36,length:.3,body:1.1*v,knock:.9*v,knockCut:800});
     thump(c,t+.07,{from:70,to:30,length:.25,body:.7*v,knock:.2*v,knockCut:400});
   }
-  host.on('beforeEnemyDamage',e=>{if(['bullet','explosion','melee','thunder'].includes(e.cause)&&e.enemy?.health>0)hitmarker(e.head,e.amount>=e.enemy.health||session.effects.insta_kill>session.time);});
+  host.on('beforeEnemyDamage',e=>{if(!host.remoteDamage&&['bullet','explosion','melee','thunder'].includes(e.cause)&&e.enemy?.health>0)hitmarker(e.head,e.amount>=e.enemy.health||session.effects.insta_kill>session.time);});
 
   // ---- Directional damage indicator --------------------------------------------
   const ring=document.createElement('div');ring.id='damage-ring';document.body.append(ring);

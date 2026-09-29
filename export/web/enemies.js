@@ -69,14 +69,16 @@ export class Enemies {
         z.enterTime+=dt;const t=Math.min(1,z.enterTime/1.2);z.root.position.lerpVectors(z.enterFrom,z.barrier.inside,t);z.root.position.y+=Math.sin(t*Math.PI)*12;
         if(t===1){z.state='chase';z.repath=0;}continue;
       }
-      const lure=this.lureTarget?.(z),goal=lure??player;
-      const dist=z.root.position.distanceTo(player),at=z.root.position.clone().add(new THREE.Vector3(0,z.kind==='dog'?25:45,0)),eye=player.clone().add(new THREE.Vector3(0,40,0));
+      // targetFor (optional, co-op) picks which player this zombie chases.
+      const victim=this.targetFor?.(z,player)??{position:player},tp=victim.position;
+      const lure=this.lureTarget?.(z),goal=lure??tp;
+      const dist=z.root.position.distanceTo(tp),at=z.root.position.clone().add(new THREE.Vector3(0,z.kind==='dog'?25:45,0)),eye=tp.clone().add(new THREE.Vector3(0,40,0));
       if(z.state==='attack'){
         z.attackLeft-=dt;
-        if(!z.attackDealt&&z.attackLeft<.62){z.attackDealt=true;if(!lure&&dist<76&&this.world.lineClear(at,eye))this.onDamage(z.kind==='dog'?40:z.kind==='nova'?45:50);}
+        if(!z.attackDealt&&z.attackLeft<.62){z.attackDealt=true;if(!lure&&dist<76&&this.world.lineClear(at,eye))this.onDamage(z.kind==='dog'?40:z.kind==='nova'?45:50,z,victim);}
         if(z.attackLeft<=0){z.state='chase';z.rig.play('walk');}continue;
       }
-      if(!lure&&dist<62&&Math.abs(z.root.position.y-player.y)<50&&s.phase!=='reviving'&&this.world.lineClear(at,eye)){
+      if(!lure&&dist<62&&Math.abs(z.root.position.y-tp.y)<50&&(victim.id?!victim.down:s.phase!=='reviving')&&this.world.lineClear(at,eye)){
         z.state='attack';z.attackLeft=1.15;z.attackDealt=false;z.rig.play('attack',false);continue;
       }
       z.repath-=dt;

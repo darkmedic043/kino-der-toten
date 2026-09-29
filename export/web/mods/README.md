@@ -208,6 +208,17 @@ Discord; on the LAN address the game still saves locally and links there.
 The server is `.tools/kino-server.mjs`. The Discord client id and secret go in
 `~/.config/kino/discord.env` (never in the repo).
 
+## Co-op (up to 4 players)
+
+Host from the main menu (**Host co-op game** on a zombies map), then share the
+invite link (pause menu → **Copy invite**) or the 4-letter room code (**Join
+co-op** on the Play tab). The host's browser runs the zombies and rounds; the
+server (`.tools/kino-server.mjs`, `/api/ws`) only relays messages. Zombies
+chase the nearest player, rounds grow with the player count, hits from any
+player count (points and XP go to the shooter), and doors and power are shared.
+Not shared yet: Mystery Box, power-ups, traps and teleporters; there are no
+downs or revives yet, and the game pauses if the host pauses or leaves.
+
 ## Updating from upstream
 
 This checkout is the `custom` branch. `upstream` is the original project.
