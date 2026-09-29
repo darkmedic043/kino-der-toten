@@ -1,0 +1,5 @@
+{
+  "name": "Zombie voices",
+  "description": "Growl, attack and death sounds for zombies from clips in this folder (sounds.json). Make them with .tools/split-sounds.py.",
+  "script": "mod.js"
+}

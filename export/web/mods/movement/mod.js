@@ -2,8 +2,8 @@
 // - Heavier gravity (same jump height), momentum, reduced steering in real jumps.
 // - Stairs: walking off a step snaps down onto the next one (no tiny falls,
 //   no lost control, no landing jolts on every step).
-// - Prone (Z): lie down; slow crawl, low profile. Jump or Z again to get up.
-// - Slide: press crouch while sprinting.
+// - One crouch button (C): tap to crouch, hold to go prone, tap while
+//   sprinting to slide. Jump stands up from crouch or prone.
 // - Mantle: jump at a ledge up to chest height to climb over it.
 // - First-person head bob, landing dip (real falls only) and strafe roll.
 import * as THREE from 'three';
@@ -44,10 +44,22 @@ export default function setup(api){
       if(player.crouched)player._setCapsuleHeight(base.crouchHeight);
     }
   }
-  addEventListener('keydown',e=>{
-    if(e.code!=='KeyZ'||e.repeat||!window.kino.debug.getState().active||['reviving','gameover'].includes(session.phase))return;
-    if(state.mantling)return;setProne(!state.prone);
+  // ---- One crouch button (C / Ctrl) ------------------------------------------------------
+  // Tap: toggle crouch. Hold: prone. Tap while sprinting: slide.
+  // (Rebinding "Crouch" in Settings re-sends the key as KeyC, so this follows it.)
+  const CROUCH_KEYS=new Set(['KeyC','ControlLeft','ControlRight']),HOLD=.35;
+  const controls={crouch:false,held:false,holdTime:0,sprinting:false};
+  const canAct=()=>window.kino.debug.getState().active&&!['reviving','gameover'].includes(session.phase)&&!state.mantling;
+  // Hold time is counted in game time (update dt), so it matches what you see.
+  addEventListener('keydown',e=>{if(!CROUCH_KEYS.has(e.code)||e.repeat||!canAct())return;controls.held=true;controls.holdTime=0;});
+  addEventListener('keyup',e=>{
+    if(!CROUCH_KEYS.has(e.code)||!controls.held)return;controls.held=false;
+    if(!canAct()||controls.holdTime>=HOLD)return;   // a hold already went prone
+    if(state.prone){setProne(false);controls.crouch=true;}
+    else if(controls.sprinting&&player.onFloor)startSlide();
+    else controls.crouch=!controls.crouch;
   });
+  addEventListener('blur',()=>{controls.held=false;});
 
   // ---- Mantle -----------------------------------------------------------------------------
   // A wall in front at waist height, a walkable top between step height and
@@ -66,12 +78,26 @@ export default function setup(api){
     return {from:f,top:new THREE.Vector3(f.x,topY+4,f.z).addScaledVector(dir,4),target,t:0,duration:.28+rise/260};
   }
 
+  // ---- Slide ------------------------------------------------------------------------------------
+  // A long, smooth slide: speed eases out along a curve (not linear friction),
+  // with a little steering, ending in a crouch.
+  const SLIDE={duration:1.35,maxSpeed:490,endSpeed:130,steer:.18};
+  const slide={t:0,dir:new THREE.Vector3(),start:0};
+  function startSlide(){
+    const v=player.velocity,h=Math.hypot(v.x,v.z);if(h<200||state.prone)return;
+    state.sliding=true;slide.t=0;slide.dir.set(v.x/h,0,v.z/h);slide.start=Math.min(SLIDE.maxSpeed,h*1.6);
+    controls.crouch=true;host.emit('slide');
+  }
+  const slideSpeed=t=>{const u=Math.min(1,t/SLIDE.duration);return SLIDE.endSpeed+(slide.start-SLIDE.endSpeed)*(1-u)**1.7;};
+
   // ---- Wrapped controller update ----------------------------------------------------------
   const originalUpdate=player.update.bind(player);
-  let prevCrouch=false,prevJump=false,slideT=0;
+  let prevJump=false;
   player.update=(dt,input)=>{
     const down_=['reviving','gameover'].includes(session.phase);
-    if(down_){if(state.prone)setProne(false);state.sliding=false;state.mantling=null;}
+    if(down_){if(state.prone)setProne(false);state.sliding=false;state.mantling=null;controls.crouch=false;}
+    // Holding crouch long enough goes prone.
+    if(controls.held){controls.holdTime+=dt;if(!state.prone&&!state.mantling&&controls.holdTime>=HOLD){state.sliding=false;setProne(true);}}
     // Mantling: a short scripted climb that overrides movement.
     if(state.mantling){
       const mt=state.mantling;mt.t=Math.min(1,mt.t+dt/mt.duration);
@@ -83,36 +109,42 @@ export default function setup(api){
     }
     if(input&&!down_){
       input={...input};
-      const crouch=!!input.crouch,jumpNow=!!(input.jump||input.jumpPressed),horizontal=Math.hypot(player.velocity.x,player.velocity.z);
+      const jumpNow=!!(input.jump||input.jumpPressed),horizontal=Math.hypot(player.velocity.x,player.velocity.z);
+      controls.sprinting=!!input.sprint&&horizontal>220;
+      // Sprinting cancels a toggled crouch, as in Call of Duty.
+      if(input.sprint&&controls.crouch&&!state.sliding&&(input.forward??0)>0)controls.crouch=false;
       // Jump pressed near a ledge: mantle instead (also works mid-air).
       if(jumpNow&&!prevJump||(!player.onFloor&&input.jump&&input.forward>0&&state.airTime>.08)){
         const ledge=!state.prone&&findLedge();
         if(ledge){state.mantling=ledge;state.sliding=false;prevJump=jumpNow;player.velocity.set(0,0,0);return player.state;}
       }
-      // Jump while prone stands up instead.
-      if(state.prone&&jumpNow&&!prevJump){setProne(false);input.jump=false;input.jumpPressed=false;}
-      else if(jumpNow&&!prevJump&&(player.onFloor||state.airTime<.1))state.jumped=true;
-      // Slide: crouch pressed while sprinting on the ground.
-      if(crouch&&!prevCrouch&&!state.prone&&player.onFloor&&input.sprint&&horizontal>220){
-        state.sliding=true;slideT=0;const boost=Math.min(460,horizontal*1.5)/Math.max(horizontal,1);
-        player.velocity.x*=boost;player.velocity.z*=boost;
-      }
+      // Jump from prone or crouch stands up instead; a jump mid-slide becomes a slide-jump.
+      if(jumpNow&&!prevJump&&(state.prone||(controls.crouch&&!state.sliding))){if(state.prone)setProne(false);controls.crouch=false;input.jump=false;input.jumpPressed=false;}
+      else if(jumpNow&&!prevJump&&(player.onFloor||state.airTime<.1)){state.jumped=true;if(state.sliding){state.sliding=false;controls.crouch=false;}}
       if(state.sliding){
-        slideT+=dt;input.sprint=false;input.crouch=true;
-        // Carry momentum: low friction, little steering.
-        player.groundAcceleration=260;input.forward=Math.max(0,input.forward??0);
-        if(slideT>.9||horizontal<120||(!player.onFloor&&state.airTime>.3)||jumpNow){state.sliding=false;}
+        slide.t+=dt;input.sprint=false;
+        player.groundAcceleration=40;   // the slide curve drives the speed, not friction
+        if(slide.t>=SLIDE.duration||(!player.onFloor&&state.airTime>.3))state.sliding=false;
       }
       // On stairs (ground flickering without a jump) use the game's original acceleration,
       // so every step riser doesn't cost speed.
       if(!state.sliding)player.groundAcceleration=state.stairs>0?original.groundAcceleration:base.groundAcceleration;
-      if(state.prone){input.crouch=true;input.sprint=false;}
-      prevCrouch=crouch;prevJump=jumpNow;
+      // The crouch key's own state drives crouching (tap toggles, hold is prone).
+      input.crouch=controls.crouch||state.prone||state.sliding;
+      if(state.prone)input.sprint=false;
+      prevJump=jumpNow;
     }
     // Small drops (stairs) keep full ground control; only real jumps and falls steer weakly.
     player.airAcceleration=!state.jumped&&state.airTime<.2?original.groundAcceleration:base.airAcceleration;
     const wasGrounded=player.onFloor;
     const result=originalUpdate(dt,input);
+    // Slide: apply the eased speed along the slide direction, steering slightly toward input.
+    if(state.sliding){
+      const want=forwardDir();slide.dir.lerp(want,SLIDE.steer*dt*4).normalize();
+      const actual=Math.hypot(player.velocity.x,player.velocity.z),speed=slideSpeed(slide.t);
+      if(slide.t>.12&&actual<speed*.35)state.sliding=false;   // ran into something
+      else{player.velocity.x=slide.dir.x*speed;player.velocity.z=slide.dir.z*speed;}
+    }
     // Stairs: stepping off an edge snaps down onto the step below.
     if(wasGrounded&&!player.onFloor&&!state.jumped&&player.velocity.y<=0){
       const hit=ray(feet().addScaledVector(up,2),down,player.stepHeight+4);
@@ -122,7 +154,25 @@ export default function setup(api){
     if(player.onFloor){state.airTime=0;state.jumped=false;}else state.airTime+=dt;
     return result;
   };
-  host.on('reset',()=>{setProne(false);state.sliding=false;state.mantling=null;});
+  host.on('reset',()=>{setProne(false);state.sliding=false;state.mantling=null;controls.crouch=false;});
+
+  // ---- Slide sound ----------------------------------------------------------------------------------
+  // data.json "slideSound" (a file in this folder) if set; otherwise a synthesized dirt scrape.
+  let slideBuffer=null;
+  if(m.slideSound)fetch(new URL(m.slideSound,api.mod.url)).then(r=>r.ok?r.arrayBuffer():null).then(b=>{if(b)slideBuffer={bytes:b,decoded:null};}).catch(()=>{});
+  host.on('slide',async()=>{
+    const c=api.audio.ctx;if(!c||!api.audio.enabled||!api.audio.master)return;
+    if(slideBuffer){
+      try{slideBuffer.decoded??=await c.decodeAudioData(slideBuffer.bytes.slice(0));}catch{slideBuffer=null;}
+      if(slideBuffer?.decoded){const s=c.createBufferSource(),g=c.createGain();s.buffer=slideBuffer.decoded;g.gain.value=1.4;s.connect(g).connect(api.audio.master);s.start();return;}
+    }
+    const t=c.currentTime,len=SLIDE.duration,b=c.createBuffer(1,Math.ceil(c.sampleRate*len),c.sampleRate),d=b.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(.6+.4*Math.random());
+    const src=c.createBufferSource(),bp=c.createBiquadFilter(),g=c.createGain();src.buffer=b;bp.type='bandpass';bp.Q.value=.8;
+    bp.frequency.setValueAtTime(1800,t);bp.frequency.exponentialRampToValueAtTime(500,t+len);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.9,t+.04);g.gain.exponentialRampToValueAtTime(.001,t+len);
+    src.connect(bp).connect(g).connect(api.audio.master);src.start(t);src.stop(t+len);
+  });
 
   // ---- Camera feel ------------------------------------------------------------------------------
   let phase=0,dip=0,dipV=0,roll=0,wasGrounded=true,lastVy=0,bobBlend=0,fallTime=0,crouchOffset=0;

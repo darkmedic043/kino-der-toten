@@ -233,8 +233,8 @@ server (`.tools/kino-server.mjs`, `/api/ws`) only relays messages.
 `mods/movement/data.json` sets gravity, jump height, ground/air acceleration,
 head bob and landing dip strength. Head bob can be turned off in Settings.
 
-- **Prone:** Z (rebindable) lies down: a tiny hitbox and a slow crawl. Z or jump gets up.
-- **Slide:** press crouch while sprinting.
+- **Crouch button (C):** tap to crouch (toggle), hold to go prone, tap while sprinting to slide. Jump stands up.
+- **Slide sound:** put an audio file in `mods/movement/` and set `"slideSound": "slide.ogg"` in its data.json; without one, a synthesized scrape plays.
 - **Mantle:** jump at a ledge between knee and chest height (about 0.5–1.9 m) to climb onto it; also works while jumping into it.
 - **Stairs:** you stick to steps going down, and keep full speed going up.
 
