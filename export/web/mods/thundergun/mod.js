@@ -117,5 +117,22 @@ export default async function setup(api){
     const t=performance.now()/1000;
     for(const m of energy){m.map.offset.y=(t*.35)%1;m.emissiveIntensity+=(1.6+Math.sin(t*9)*.25-m.emissiveIntensity)*Math.min(1,dt*5);}
   });
-  host.on('reset',()=>{for(const b of blasts)b.t=LIFE;updateBlasts(0);flying.length=0;});
+  host.on('reset',()=>{for(const b of blasts)b.t=LIFE;updateBlasts(0);flying.length=0;reloadCues.length=0;});
+
+  // --- Reload sounds -------------------------------------------------------
+  // The reload animation names its lock cue "cell_lock", but the sound is
+  // "cell_slide_lock"; and the canister eject and the charging beep (cell_on)
+  // have no cue at all. Map the one and time the other two to the reload.
+  for(const d of [def,def.upgrade].filter(Boolean)){d.notetrackSounds={...d.notetrackSounds,'sndnt#fly_thundergun_cell_lock':'fly_thundergun_cell_slide_lock'};}
+  const CUE='resident/wpn/energy/thundergun/reload/plr/';
+  const reloadCues=[];let lastSerial=api.session.reloadSerial;
+  host.on('update',dt=>{
+    const s=api.session,held=(s.def?.baseId??s.def?.id)==='thundergun_zm';
+    if(s.reloadSerial!==lastSerial){lastSerial=s.reloadSerial;
+      if(held&&s.reloadLeft>0){const len=s.reloadLeft;reloadCues.length=0;reloadCues.push({at:len*.06,key:'fly_thundergun_eject'},{at:len*.76,key:'fly_thundergun_cell_on'});}}
+    if(!reloadCues.length)return;
+    if(!held){reloadCues.length=0;return;}   // switched weapons mid-reload
+    for(const c of reloadCues)c.at-=dt;
+    while(reloadCues.length&&reloadCues[0].at<=0)audio.play(CUE+reloadCues.shift().key,.8);
+  });
 }
