@@ -18,6 +18,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { settings, onSettingsChange } from '../../settings.js';
 
 const POOL=12,SWAP=.25;
@@ -171,9 +172,21 @@ function setupPost(api){
     const [w,h]=size(),target=new THREE.WebGLRenderTarget(w,h,{type:THREE.HalfFloatType,samples:4});
     composer=new EffectComposer(renderer,target);composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);
     renderPass=new RenderPass(scene,camera);composer.addPass(renderPass);
+    // Sanitise the HDR frame: a light right against a surface can overflow
+    // half-float to Inf, and the bloom blur smears NaN/Inf into black blocks.
+    composer.addPass(new ShaderPass({uniforms:{tDiffuse:{value:null}},
+      vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader:'uniform sampler2D tDiffuse;varying vec2 vUv;void main(){vec4 c=texture2D(tDiffuse,vUv);if(any(isnan(c))||any(isinf(c)))c=vec4(0.,0.,0.,1.);gl_FragColor=vec4(min(c.rgb,vec3(48.)),c.a);}'}));
     if(q>=2){gtao=new GTAOPass(scene,camera,w,h);gtao.output=GTAOPass.OUTPUT.Default;gtao.blendIntensity=.85;
       gtao.updateGtaoMaterial({radius:28,distanceExponent:1.5,thickness:12,scale:1,samples:q>=3?16:10,distanceFallOff:1});
-      gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:4,rings:2,samples:q>=3?16:8});composer.addPass(gtao);}else gtao=null;
+      gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:4,rings:2,samples:q>=3?16:8});composer.addPass(gtao);
+      // AO renders the scene's depth and normals itself; see-through things
+      // (light beams, dust, glass, decals) must not count as solid surfaces,
+      // or they get shaded as dark bars.
+      const aoRender=gtao.render.bind(gtao);
+      gtao.render=(...args)=>{const hidden=[];scene.traverseVisible(o=>{const m=o.material;if((o.isMesh||o.isPoints||o.isSprite)&&[m].flat().some(x=>x?.transparent||x?.blending>1)){o.visible=false;hidden.push(o);}});
+        try{aoRender(...args);}finally{for(const o of hidden)o.visible=true;}};
+    }else gtao=null;
     bloom=new UnrealBloomPass(new THREE.Vector2(w,h),.38,.55,.82);composer.addPass(bloom);
     composer.addPass(new OutputPass());
   }
