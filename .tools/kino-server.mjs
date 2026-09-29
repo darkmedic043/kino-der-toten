@@ -114,6 +114,11 @@ async function api(req, res, url) {
   return send(res, 404, { error: 'unknown endpoint' });
 }
 
+// Code and data must never go stale (Cloudflare rewrites "no-cache" into a
+// 4-hour browser cache, but leaves "no-store" alone). Heavy assets such as
+// meshes, textures and audio are cached for a day.
+const cacheControl = path => /\.(html|m?js|css|json|md|txt)$/i.test(path) ? 'no-store' : 'public, max-age=86400';
+
 function serveFile(req, res, url) {
   if (url === '/favicon.ico') { res.writeHead(204).end(); return; }
   const path = resolve(ROOT, '.' + (url === '/' ? HOME : url).replace(/\\/g, '/'));
@@ -125,11 +130,11 @@ function serveFile(req, res, url) {
     const start = m?.[1] ? Number(m[1]) : m?.[2] ? Math.max(0, stat.size - Number(m[2])) : NaN;
     const end = m?.[1] && m[2] ? Math.min(Number(m[2]), stat.size - 1) : stat.size - 1;
     if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= stat.size) { res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` }).end(); return; }
-    res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${stat.size}`, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1 });
+    res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${stat.size}`, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, 'Cache-Control': cacheControl(path) });
     if (req.method === 'HEAD') res.end(); else createReadStream(path, { start, end }).on('error', () => res.destroy()).pipe(res);
     return;
   }
-  res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache' });
+  res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size, 'Accept-Ranges': 'bytes', 'Last-Modified': stat.mtime.toUTCString(), 'Cache-Control': cacheControl(path) });
   if (req.method === 'HEAD') res.end(); else createReadStream(path).on('error', () => res.destroy()).pipe(res);
 }
 
