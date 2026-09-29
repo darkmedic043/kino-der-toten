@@ -1,5 +1,5 @@
 {
-  "name": "Ammo read-outs",
-  "description": "Lights the ammo displays on wonder weapons: the Zap Gun and Wave Gun digit counter and the Thundergun's gauge ring.",
+  "name": "Thundergun ammo bulbs",
+  "description": "Restores the red lights on the Thundergun's canister that show how many shots are left in the magazine.",
   "script": "mod.js"
 }

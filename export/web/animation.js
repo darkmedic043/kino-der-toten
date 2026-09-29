@@ -19,6 +19,11 @@ export function makeClip(root, data, locomotion=false){
         // T5 locomotion stores j_mainroot translations as displacement from
         // the bind pelvis, unlike the absolute viewmodel pose tracks.
         if(locomotion&&b.name==='j_mainroot')for(let i=0;i<values.length;i+=3){values[i]=node.position.x;values[i+1]=node.position.y;values[i+2]+=node.position.z;}
+        // Weapon-part translations (bolts, magazines, pumps, the Thundergun's
+        // drum) are displacements from the part's bind position, not absolute.
+        // Read as absolute they pulled parts into the receiver.
+        const bind=node.userData.bindPosition;
+        if(bind)for(let i=0;i<values.length;i+=3){values[i]+=bind.x;values[i+1]+=bind.y;values[i+2]+=bind.z;}
         tracks.push(new THREE.VectorKeyframeTrack(node.uuid+'.position',b.pos.frames.map(f=>f/data.fps),values));
       }
     }
@@ -86,6 +91,9 @@ export class ViewWeapon {
       bone.userData.animationAnchor=true;
       model.matrixAutoUpdate=false;model.matrix.copy(bone.matrixWorld).invert();parent.add(model);
     };
+    // Mark weapon-part bones with their bind position (see makeClip). j_gun
+    // roots stay absolute: they are anchors, or animate perk bottles.
+    for(const model of [gun,leftGun])model?.traverse(n=>{if(n.isBone&&!/^j_gun1?$/.test(n.name))n.userData.bindPosition=n.position.clone();});
     attach(gun,tag,'j_gun');
     this.leftGun=leftGun;
     if(leftGun){const leftTag=hands.getObjectByName('tag_weapon1');if(leftTag)attach(leftGun,leftTag,leftGun.getObjectByName('j_gun1')?'j_gun1':'j_gun');}
