@@ -513,12 +513,21 @@ export class PlayerController {
     let groundedDuringMove = false;
     for (let i = 0; i < moveSteps; i += 1) {
       const beforeStart=this.collider.start.clone(),beforeEnd=this.collider.end.clone();
+      const beforeVX=this.velocity.x,beforeVZ=this.velocity.z;
       this.collider.translate(_movement);
       this._resolveCollisions();
       const wanted=Math.hypot(_movement.x,_movement.z);
       const progress=wanted>0?((this.collider.start.x-beforeStart.x)*_movement.x+(this.collider.start.z-beforeStart.z)*_movement.z)/wanted:0;
-      if(!this.onLadder&&wanted>.001&&progress<wanted*.8&&climbSpeedY<=0&&(wasOnFloor||this._coyoteTimer>0)){
-        this._tryStep(beforeStart,beforeEnd,_movement);
+      // Try a step whenever movement was cut short or the capsule touched a
+      // non-floor surface (a riser can also deflect the rounded capsule upward
+      // without stopping it). A successful step keeps the walking speed that
+      // the riser collision had removed, so stairs don't stutter.
+      // Only a surface facing against the movement counts; an edge brushed while
+      // walking down a flight faces along it and must not hold the player up.
+      const n=this._lastCollision?.normal;
+      const hitRiser=!!n&&n.y<this.floorNormalY&&wanted>0&&(n.x*_movement.x+n.z*_movement.z)/wanted<-.3;
+      if(!this.onLadder&&wanted>.001&&(progress<wanted*.8||hitRiser)&&climbSpeedY<=0&&(wasOnFloor||this._coyoteTimer>0)){
+        if(this._tryStep(beforeStart,beforeEnd,_movement)){this.velocity.x=beforeVX;this.velocity.z=beforeVZ;}
       }
       // Rung tops are walkable-facing triangles.  On a ladder they must not
       // arrest the climb the way a floor would.

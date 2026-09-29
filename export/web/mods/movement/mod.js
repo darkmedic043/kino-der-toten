@@ -56,7 +56,7 @@ export default function setup(api){
     if(!CROUCH_KEYS.has(e.code)||!controls.held)return;controls.held=false;
     if(!canAct()||controls.holdTime>=HOLD)return;   // a hold already went prone
     if(state.prone){setProne(false);controls.crouch=true;}
-    else if(controls.sprinting&&player.onFloor)startSlide();
+    else if(controls.sprinting&&(player.onFloor||state.airTime<.25))startSlide();   // ground contact flickers on slopes
     else controls.crouch=!controls.crouch;
   });
   addEventListener('blur',()=>{controls.held=false;});
@@ -82,10 +82,10 @@ export default function setup(api){
   // A long, smooth slide: speed eases out along a curve (not linear friction),
   // with a little steering, ending in a crouch.
   const SLIDE={duration:1.35,maxSpeed:490,endSpeed:130,steer:.18};
-  const slide={t:0,dir:new THREE.Vector3(),start:0};
+  const slide={t:0,dir:new THREE.Vector3(),start:0,boost:0};
   function startSlide(){
-    const v=player.velocity,h=Math.hypot(v.x,v.z);if(h<200||state.prone)return;
-    state.sliding=true;slide.t=0;slide.dir.set(v.x/h,0,v.z/h);slide.start=Math.min(SLIDE.maxSpeed,h*1.6);
+    const v=player.velocity,h=Math.hypot(v.x,v.z);if(h<160||state.prone)return;
+    state.sliding=true;slide.t=0;slide.boost=0;slide.dir.set(v.x/h,0,v.z/h);slide.start=Math.min(SLIDE.maxSpeed,Math.max(h,220)*1.6);
     controls.crouch=true;host.emit('slide');
   }
   const slideSpeed=t=>{const u=Math.min(1,t/SLIDE.duration);return SLIDE.endSpeed+(slide.start-SLIDE.endSpeed)*(1-u)**1.7;};
@@ -110,7 +110,7 @@ export default function setup(api){
     if(input&&!down_){
       input={...input};
       const jumpNow=!!(input.jump||input.jumpPressed),horizontal=Math.hypot(player.velocity.x,player.velocity.z);
-      controls.sprinting=!!input.sprint&&horizontal>220;
+      controls.sprinting=!!input.sprint&&horizontal>170;   // uphill sprinting is slower
       // Sprinting cancels a toggled crouch, as in Call of Duty.
       if(input.sprint&&controls.crouch&&!state.sliding&&(input.forward??0)>0)controls.crouch=false;
       // Jump pressed near a ledge: mantle instead (also works mid-air).
@@ -124,7 +124,7 @@ export default function setup(api){
       if(state.sliding){
         slide.t+=dt;input.sprint=false;
         player.groundAcceleration=40;   // the slide curve drives the speed, not friction
-        if(slide.t>=SLIDE.duration||(!player.onFloor&&state.airTime>.3))state.sliding=false;
+        if(slide.t>=SLIDE.duration||(!player.onFloor&&state.airTime>.45))state.sliding=false;
       }
       // On stairs (ground flickering without a jump) use the game's original acceleration,
       // so every step riser doesn't cost speed.
@@ -141,8 +141,21 @@ export default function setup(api){
     // Slide: apply the eased speed along the slide direction, steering slightly toward input.
     if(state.sliding){
       const want=forwardDir();slide.dir.lerp(want,SLIDE.steer*dt*4).normalize();
-      const actual=Math.hypot(player.velocity.x,player.velocity.z),speed=slideSpeed(slide.t);
-      if(slide.t>.12&&actual<speed*.35)state.sliding=false;   // ran into something
+      // Follow the ground: stick to slopes (downhill would otherwise launch you
+      // off the surface) and let the slope speed you up or slow you down.
+      const base_=slideSpeed(slide.t),reach=player.stepHeight+4+base_*dt*1.5;
+      const hit=!state.jumped&&player.velocity.y<=60?ray(feet().addScaledVector(up,4),down,reach+4):null;
+      const n=hit?.triangle?.getNormal(new THREE.Vector3());
+      if(hit&&n&&Math.abs(n.y)>.45){
+        if(n.y<0)n.negate();
+        moveFeet(feet().addScaledVector(down,Math.max(0,hit.distance-4-player.skin)));
+        player.onFloor=player.grounded=true;player.velocity.y=0;player._syncCamera();state.airTime=0;
+        const downhill=n.x*slide.dir.x+n.z*slide.dir.z;   // >0 going downhill
+        slide.boost=THREE.MathUtils.clamp(slide.boost+downhill*player.gravity*.9*dt,-slide.start,420);
+        if(downhill>.08)slide.t=Math.max(0,slide.t-dt*Math.min(.85,downhill*4));   // a downhill slide lasts longer
+      }
+      const speed=Math.max(0,slideSpeed(slide.t)+slide.boost),actual=Math.hypot(player.velocity.x,player.velocity.z);
+      if(slide.t>.12&&(actual<speed*.35||speed<SLIDE.endSpeed*.6))state.sliding=false;   // ran into something, or stalled uphill
       else{player.velocity.x=slide.dir.x*speed;player.velocity.z=slide.dir.z*speed;}
     }
     // Stairs: stepping off an edge snaps down onto the step below.
