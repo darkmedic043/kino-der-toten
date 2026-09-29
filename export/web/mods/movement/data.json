@@ -7,7 +7,7 @@
       "airAcceleration": 320,
       "headBob": 1.6,
       "landingDip": 1,
-      "slideSound": null
+      "slideSound": "slide.ogg"
     }
   }
 }

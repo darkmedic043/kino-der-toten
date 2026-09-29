@@ -6,7 +6,7 @@ export default async function setup(api){
   const {host,audio,enemies,camera,mod}=api;
   let sounds;try{sounds=await fetch(new URL('sounds.json',mod.url)).then(r=>{if(!r.ok)throw 0;return r.json();});}catch{console.info('[zombie-sounds] no sounds.json yet; using the built-in growl');return;}
   const buffers=new Map();
-  const load=async file=>{
+  const load=async file=>{if(!audio.ctx)return null;
     if(!buffers.has(file))buffers.set(file,fetch(new URL(file,mod.url)).then(r=>r.arrayBuffer()).then(b=>audio.ctx.decodeAudioData(b)).catch(()=>null));
     return buffers.get(file);
   };
@@ -26,6 +26,17 @@ export default async function setup(api){
   const attacking=new WeakSet();
   host.on('update',()=>{for(const z of enemies.list){if(z.state==='attack'){if(!attacking.has(z)){attacking.add(z);play('attack',z.root.position);}}else attacking.delete(z);}});
   host.on('kill',e=>{if(e.enemy?.root)play('death',e.enemy.root.position,.9);});
+  // Horde: a looping crowd moan that swells with the number of zombies nearby.
+  let horde=null;
+  host.on('update',async dt=>{
+    if(!sounds.horde||!audio.ctx||!audio.master)return;
+    if(!horde){horde={gain:null};const buffer=await load(sounds.horde);if(!buffer){horde=null;return;}
+      const src=audio.ctx.createBufferSource(),g=audio.ctx.createGain();src.buffer=buffer;src.loop=true;g.gain.value=0;src.connect(g).connect(audio.master);src.start();horde.gain=g;}
+    if(!horde.gain)return;
+    let near=0;for(const z of enemies.list){const d=z.root.position.distanceTo(camera.position);if(d<900)near+=1-d/900;}
+    const target=audio.enabled&&window.kino.debug.getState().active?Math.min(.45,near*.07):0;
+    horde.gain.gain.setTargetAtTime(target,audio.ctx.currentTime,.4);
+  });
   // Warm the cache once audio exists.
-  const warm=setInterval(()=>{if(audio.ctx){clearInterval(warm);for(const k of Object.keys(sounds))sounds[k].slice(0,4).forEach(load);}},1000);
+  const warm=setInterval(()=>{if(audio.ctx){clearInterval(warm);for(const v of Object.values(sounds))[v].flat().slice(0,4).forEach(load);}},1000);
 }
