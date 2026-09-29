@@ -24,6 +24,18 @@ import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { settings, onSettingsChange } from '../../settings.js';
 
 const POOL=12,SWAP=.25;
+// Per-light brightness cap in the lighting shader. A lamp sitting inside its
+// own fixture (a stage lamp, a cable plug, a wall sconce) gave that little
+// mesh hundreds of times too much light, which bloomed into a white disc; the
+// collision mesh can't see those small models, so cap it at the source.
+// Scaling by the brightest channel keeps coloured lights their colour.
+// Enabled per material by the LIGHT_CLAMP define (it is also the cap value).
+{const clamp='\n\t\t#ifdef LIGHT_CLAMP\n\t\t{float mx=max(directLight.color.r,max(directLight.color.g,directLight.color.b));if(mx>LIGHT_CLAMP)directLight.color*=LIGHT_CLAMP/mx;}\n\t\t#endif';
+  let c=THREE.ShaderChunk.lights_fragment_begin;
+  for(const call of ['getPointLightInfo( pointLight, geometryPosition, directLight );','getSpotLightInfo( spotLight, geometryPosition, directLight );'])
+    if(c.includes(call)&&!c.includes(call+clamp))c=c.replace(call,call+clamp);
+  THREE.ShaderChunk.lights_fragment_begin=c;}
+const LIGHT_CLAMP='3.2';
 const FIXTURES={
   zombie_theater_chandelier1_off:{color:'#ffd49a',intensity:14,radius:1700,drop:120,power:true,spot:{angle:.95,down:true,beam:.9}},
   zombie_theater_chandelier1arm_off:{color:'#ffcf8a',intensity:3,radius:420,drop:12,power:true},
@@ -102,7 +114,7 @@ function setupKino(api){
     const axis=(s.spot?s.spot.target.clone().sub(s.position):s.dir??down).clone().normalize(),side=new THREE.Vector3().crossVectors(axis,Math.abs(axis.y)>.9?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0)).normalize();
     const probes=[axis,...[0,1,2,3,4,5].map(k=>axis.clone().applyAxisAngle(side,.87).applyAxisAngle(axis,k*Math.PI/3))];
     let near=500;for(const d of probes){const h=ray(s.position,d,500);if(h)near=Math.min(near,h.distance);}
-    if(near<2)near=40;   // the probe started inside the fixture's own geometry
+    if(near<2)near=12;   // the probe started inside geometry (a floor-level light): assume it is close
     s.near=near;s.cap=3.2*Math.pow(Math.max(near,6),1.3);
   }
 
@@ -124,7 +136,9 @@ function setupKino(api){
 
   // Everything static casts and receives; actors are picked up as they appear.
   const shadowReady=new WeakSet();
-  function tagShadows(root){root.traverse(o=>{if(!o.isMesh||shadowReady.has(o))return;shadowReady.add(o);const m=[o.material].flat()[0];
+  function tagShadows(root){root.traverse(o=>{if(!o.isMesh||shadowReady.has(o))return;shadowReady.add(o);
+    for(const x of [o.material].flat())if(x&&!x.isShaderMaterial&&x.defines?.LIGHT_CLAMP!==LIGHT_CLAMP){x.defines={...x.defines,LIGHT_CLAMP};x.needsUpdate=true;}
+    const m=[o.material].flat()[0];
     const see=!m?.transparent&&!(m?.blending>1);o.castShadow=see;o.receiveShadow=true;});}
   tagShadows(scene);let tagTimer=0;
 
