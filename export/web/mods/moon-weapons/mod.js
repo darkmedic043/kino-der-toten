@@ -3,6 +3,7 @@
 // the Death Machine. Moon uses bespoke firing code; here they are instant-hit
 // weapons whose special effects are added through mod events.
 import * as THREE from 'three';
+import { loadModel, loadAnimation } from '../../animation.js';
 
 const IDS=['microwavegundw_zm','microwavegun_zm','minigun_zm'];
 const UPGRADE_NAMES={microwavegundw_zm:"Porter's Zap Guns",microwavegun_zm:"Porter's Mark II Ray Gun"};
@@ -62,19 +63,60 @@ export default async function setup(api){
   });
 
   // B: combine the Zap Guns into the Wave Gun, or split it back (each keeps its own ammo).
+  // The native transitions live on the Zap Gun rig: altDropAnim (dw_2_combo)
+  // snaps the guns together, altRaiseAnim (combo_2_dw) pulls them apart.
   const pair={microwavegundw_zm:'microwavegun_zm',microwavegun_zm:'microwavegundw_zm'};
-  addEventListener('keydown',e=>{
-    if(e.code!=='KeyB'||e.repeat||!window.kino.debug.getState().active)return;
-    const w=session.weapon,next=pair[w?.id];if(!next||session.busy||session.weaponUnavailable)return;
-    session.cancelReload();
+  const {view}=api;let swap=null;
+  function exchange(w,next){
     const nd=data.weapons[next],up=w.upgraded?{...nd,...nd.upgrade}:nd;
     const stash={mag:w.mag,reserve:w.reserve};
     // The first swap gives the other form the same share of its ammo as this one has left.
     const cur=session.def,left=(w.mag+w.reserve)/Math.max(1,cur.clipSize+cur.maxAmmo);
     const back=w.other??{mag:up.clipSize,reserve:Math.round(up.maxAmmo*Math.min(1,left))};
     Object.assign(w,{id:next,mag:back.mag,reserve:back.reserve,other:stash});
-    api.equipView();api.toast(nd.name+' · B to '+(next==='microwavegun_zm'?'split':'combine'),2.5);
+  }
+  // Equip without the normal draw animation, then run `then` on the new rig.
+  async function equipInPlace(then){
+    try{await api.equipView();if(view?.ready){view.rig.play('idleAnim',true,1,0);view.mode='idle';then?.();}}
+    finally{swap=null;}
+  }
+  // Load the other form while holding one, so the hand-over doesn't blink.
+  const warmed=new Set();
+  function warm(id){
+    if(warmed.has(id))return;warmed.add(id);const d=data.weapons[id];if(!d)return;
+    for(const url of [d.model,d.leftModel].filter(Boolean))loadModel(url).catch(()=>{});
+    for(const url of Object.values({...d.animations,...(d.leftAnimations??{})}))loadAnimation(url).catch(()=>{});
+  }
+  const clipTime=key=>view?.rig?.data?.[key]?.duration??0;
+  addEventListener('keydown',e=>{
+    if(e.code!=='KeyB'||e.repeat||swap||!window.kino.debug.getState().active)return;
+    const w=session.weapon,next=pair[w?.id];if(!next||session.busy||session.weaponUnavailable||!view?.ready)return;
+    session.cancelReload();
+    const nd=data.weapons[next];api.toast(nd.name+' · B to '+(next==='microwavegun_zm'?'split':'combine'),2.5);
+    if(next==='microwavegun_zm'&&view.rig.actions.altDropAnim){
+      // Combine: play the snap-together on the Zap Guns, then hand over to the Wave Gun.
+      const time=clipTime('altDropAnim');
+      view.mode='raise';view.aim=0;view.rig.play('altDropAnim',false,1,.08);
+      audio.play('moon/wpn/microwave/reload/wpn_micro_rld_join',.8);
+      session.fireLeft=Math.max(session.fireLeft,time+.1);swap={w,next,left:time};
+    }else{
+      // Split: switch to the Zap Guns and play the pull-apart from the combined pose.
+      exchange(w,next);swap={w,next,left:Infinity};
+      audio.play('moon/wpn/microwave/reload/wpn_micro_rld_separate',.8);
+      equipInPlace(()=>{
+        if(view.rig.actions.altRaiseAnim){const time=clipTime('altRaiseAnim');view.mode='raise';view.rig.play('altRaiseAnim',false,1,0);session.fireLeft=Math.max(session.fireLeft,time);}
+      });
+    }
   });
+  host.on('update',dt=>{
+    if(!swap||swap.left===Infinity)return;
+    if(session.weapon!==swap.w||session.busy){swap=null;return;}   // switched weapons or went down mid-combine
+    swap.left-=dt;if(swap.left>0)return;
+    const {w,next}=swap;swap.left=Infinity;exchange(w,next);
+    equipInPlace();
+  });
+  host.on('update',()=>{const next=pair[current()];if(next)warm(next);});
+  host.on('reset',()=>{swap=null;});
   // Max Ammo also refills the form you aren't holding.
   const powerup=session.powerup.bind(session);
   session.powerup=(type,...rest)=>{
