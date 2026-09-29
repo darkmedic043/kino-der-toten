@@ -1,0 +1,5 @@
+{
+  "name": "Thundergun",
+  "description": "Fixes the Thundergun's see-through parts (glass tubes, wire mesh, glowing energy chambers) and adds a shockwave blast that throws zombies.",
+  "script": "mod.js"
+}
