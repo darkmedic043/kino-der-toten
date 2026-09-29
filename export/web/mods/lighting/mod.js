@@ -206,33 +206,41 @@ function setupKino(api){
 
   // Light beams: soft additive cones with drifting dust.
   const beams=[];
+  // Beams are camera-facing ribbons along the beam axis (the usual fake light
+  // shaft): soft across their width, fading toward the far end and near the
+  // camera. Cone meshes showed their walls edge-on as bright lines and their
+  // rims as rings on real GPUs; a ribbon has neither.
   const beamMaterial=()=>new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,
     uniforms:{color:{value:new THREE.Color()},strength:{value:0},time:{value:0}},
-    vertexShader:`varying float vH;varying vec3 vN;varying vec3 vView;varying vec2 vUv;
-      void main(){vUv=uv;vH=uv.y;vec4 wp=modelMatrix*vec4(position,1.);vN=normalize(mat3(modelMatrix)*normal);vView=normalize(cameraPosition-wp.xyz);gl_Position=projectionMatrix*viewMatrix*wp;}`,
-    fragmentShader:`uniform vec3 color;uniform float strength;uniform float time;varying float vH;varying vec3 vN;varying vec3 vView;varying vec2 vUv;
-      float n(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
-      void main(){float edge=pow(abs(dot(normalize(vN),vView)),2.4);float along=smoothstep(0.,.55,vH)*pow(vH,.6)*(1.-smoothstep(.9,1.,vH));
-        float streak=.75+.25*sin(vUv.x*43.+time*.3)*sin(vUv.x*17.-time*.2);
-        gl_FragColor=vec4(color*strength*edge*along*streak,1.);}`});
+    vertexShader:`varying vec2 vUv;varying float vDist;
+      void main(){vUv=uv;vec4 wp=modelMatrix*vec4(position,1.);vDist=length(cameraPosition-wp.xyz);gl_Position=projectionMatrix*viewMatrix*wp;}`,
+    fragmentShader:`uniform vec3 color;uniform float strength;uniform float time;varying vec2 vUv;varying float vDist;
+      void main(){float x=(vUv.x-.5)*2.;float across=exp(-x*x*3.2)*(1.-x*x);          // soft centre, zero at both edges
+        float along=smoothstep(0.,.5,vUv.y)*(1.-smoothstep(.92,1.,vUv.y));           // fades toward the far end and at the source
+        float near=smoothstep(40.,280.,vDist);
+        float drift=.9+.1*sin(vUv.y*9.-time*.4+x*2.);
+        gl_FragColor=vec4(color*strength*across*along*near*drift*1.35,1.);}`});
   const moteTexture=(()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d'),r=g.createRadialGradient(16,16,0,16,16,16);
     r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(.4,'rgba(255,255,255,.35)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,32,32);return new THREE.CanvasTexture(c);})();
-  // One beam: a cone from `top` along `dir` for `len`, base radius `r`.
   function makeBeam(src,top,dir,len,r,color,strength,warmth=.3,tip=.5){
-    const g=new THREE.CylinderGeometry(tip,r,len,32,1,true).translate(0,-len/2,0);
-    const mesh=new THREE.Mesh(g,beamMaterial());mesh.position.copy(top);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),dir.clone().normalize());
+    // Trapezoid ribbon: tip width at the source (y=0), base width at the far end (y=-len); uv.y = 1 at the source.
+    const g=new THREE.BufferGeometry();const hw0=Math.max(tip,r*.12),hw1=r;
+    g.setAttribute('position',new THREE.Float32BufferAttribute([-hw0,0,0, hw0,0,0, -hw1,-len,0, hw1,-len,0],3));
+    g.setAttribute('uv',new THREE.Float32BufferAttribute([0,1, 1,1, 0,0, 1,0],2));g.setIndex([0,2,1, 1,2,3]);g.computeBoundingSphere();
+    const mesh=new THREE.Mesh(g,beamMaterial());mesh.position.copy(top);mesh.frustumCulled=false;
     mesh.material.uniforms.color.value.copy(color).lerp(new THREE.Color('#fff'),warmth);mesh.renderOrder=5;scene.add(mesh);
+    const axisQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,-1,0),dir.clone().normalize());
     // Dust drifting inside the beam.
     const count=Math.round(Math.min(110,20+len/24+r/2)),pos=new Float32Array(count*3),seed=[];
     for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,h=Math.random(),rr=Math.sqrt(Math.random())*(tip+(r-tip)*h)*.9;seed.push({a,h,rr,sp:.2+Math.random()*.5,ph:Math.random()*100,wob:1+Math.random()*4});}
     const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.BufferAttribute(pos,3));
     // Tiny soft motes (world-sized, so they shrink with distance), kept well under the bloom threshold.
     const dust=new THREE.Points(dg,new THREE.PointsMaterial({color,size:.35,map:moteTexture,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}));
-    dust.position.copy(mesh.position);dust.quaternion.copy(mesh.quaternion);dust.renderOrder=5;scene.add(dust);
-    beams.push({s:src,mesh,dust,seed,len,strength});
+    dust.position.copy(mesh.position);dust.quaternion.copy(axisQ);dust.renderOrder=5;scene.add(dust);
+    beams.push({s:src,mesh,dust,seed,len,strength,top:top.clone(),dir:dir.clone().normalize(),r,tip});
   }
   for(const s of sources){
-    if(!s.spot?.beam||s.spot.length<150)continue;   // too short to read as a beam; it would just be a bright ring
+    if(!s.spot?.beam||s.spot.length<60)continue;   // degenerate (lamp right above a surface)
     const len=Math.min(s.spot.length*.85,1400);
     makeBeam(s,s.position,s.spot.target.clone().sub(s.position),len,Math.tan(s.spot.angle*.8)*len,s.color,s.spot.beam);
   }
@@ -271,7 +279,15 @@ function setupKino(api){
     // Shadows: the world is static, so refresh at 30 Hz on High and every frame on Ultra.
     if(q>=2&&(q>=3||frame%2===0))for(const l of spots)l.shadow.needsUpdate=true;
     if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);}
-    for(const b of beams){const on=q>=1?level(b.s):0,u=b.mesh.material.uniforms;u.time.value=t;u.strength.value+=(on*b.strength*.16-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
+    for(const b of beams){
+      // Standing inside a beam: dim it (you see light around you, not the cone's walls).
+      const rel=camera.position.clone().sub(b.top),along=rel.dot(b.dir),radial=rel.clone().addScaledVector(b.dir,-along).length();
+      // Billboard about the beam axis: local -Y along the beam, +Z toward the camera.
+      {const yAxis=b.dir.clone().negate(),toCam=rel.clone().addScaledVector(b.dir,-along);if(toCam.lengthSq()<1e-4)toCam.set(1,0,0);
+        const xAxis=new THREE.Vector3().crossVectors(yAxis,toCam).normalize(),zAxis=new THREE.Vector3().crossVectors(xAxis,yAxis);
+        b.mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis,yAxis,zAxis));}
+      const inside=along>0&&along<b.len&&radial<b.tip+(b.r-b.tip)*(along/b.len)+40;
+      const on=(q>=1?level(b.s):0)*(inside?.3:1),u=b.mesh.material.uniforms;u.time.value=t;u.strength.value+=(on*b.strength*.16-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
       b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible){b.dust.material.opacity=Math.min(.2,u.strength.value*1.4);const p=b.dust.geometry.attributes.position;
         b.seed.forEach((d,i)=>{d.h=(d.h+dt*.01*d.sp)%1;d.a+=dt*.03*d.sp*(d.ph>50?1:-1);const w=Math.sin(t*.6+d.ph)*d.wob;   // drifting, not orbiting in rings
           p.setXYZ(i,Math.cos(d.a)*d.rr+w,-d.h*b.len+Math.sin(t*.4+d.ph*2)*d.wob,Math.sin(d.a)*d.rr+Math.cos(t*.5+d.ph)*d.wob);});p.needsUpdate=true;}}

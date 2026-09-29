@@ -7,6 +7,7 @@
 // custom maps bring their own materials.
 import * as THREE from 'three';
 import { CollisionWorld } from '../../collision-world.js';
+import { settings, onSettingsChange } from '../../settings.js';
 
 const GLASS=/glass/;
 const MULTIPLY=/decal_(burn_scortch|burntstain|darkstain|grime|lightstain_03|wall_fillet)|eb_dec_pipe_stain|jun_dec_blast_crater/;
@@ -36,8 +37,11 @@ export default async function setup(api){
         Object.assign(m,{transparent:true,alphaTest:.02,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
         counts.soft++;
       }else if(GLOW.test(name)){
-        Object.assign(m,{transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
-        if(m.map){m.emissive=new THREE.Color(1,1,1);m.emissiveMap=m.map;m.emissiveIntensity=1.2;}
+        // Festoon bulb strings strung across the theatre and balconies: solid cables
+        // with a soft warm glow on the bulbs. (Additive at full emissive made every
+        // bulb blinding, and bloom smeared the strings into white lines and rings.)
+        Object.assign(m,{transparent:false,depthWrite:true,blending:THREE.NormalBlending,alphaTest:.3});
+        if(m.map){m.emissive=new THREE.Color('#ffd9a6');m.emissiveMap=m.map;m.emissiveIntensity=.35;}
         counts.glow++;
       }else continue;
       m.needsUpdate=true;
@@ -67,6 +71,36 @@ export default async function setup(api){
     }
     console.info('[map-materials] normal maps on',applied,'materials');
   }).catch(e=>console.warn('[map-materials] normal maps',e));
+
+  // HD textures: AI-upscaled (Real-ESRGAN) copies from .tools/upscale-kino-textures.py,
+  // keyed by material name in hd-materials.json. Swapped in one per frame after
+  // the game starts (decoded off the main thread); Settings → HD textures
+  // switches between them and the originals. Phones keep the originals.
+  const coarse=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
+  fetch(new URL('hd-materials.json',api.mod.url)).then(r=>r.ok?r.json():null).then(table=>{
+    if(!table)return;
+    const byFile=new Map();   // hd url -> {materials, original maps, texture}
+    for(const m of seen){const f=table[m.name];if(!f||!m.map)continue;const e=byFile.get(f)??byFile.set(f,{materials:[],texture:null,loading:null}).get(f);e.materials.push(m);m.userData.sdMap=m.map;}
+    const loader=new THREE.ImageBitmapLoader();loader.setOptions({imageOrientation:'none',premultiplyAlpha:'none'});
+    const queue=[...byFile.entries()];let want=null;
+    const load=([file,e])=>e.loading??=loader.loadAsync(new URL(file,document.baseURI).href).then(bitmap=>{
+      const src=e.materials[0].userData.sdMap,t=new THREE.Texture(bitmap);
+      t.flipY=false;t.colorSpace=src.colorSpace;t.wrapS=src.wrapS;t.wrapT=src.wrapT;t.repeat.copy(src.repeat);t.offset.copy(src.offset);
+      t.anisotropy=aniso;t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.needsUpdate=true;e.texture=t;return t;}).catch(()=>null);
+    function apply(on){
+      want=on;let i=0;
+      const step=async()=>{if(want!==on)return;
+        if(!on){for(const [,e] of queue)for(const m of e.materials){if(m.map!==m.userData.sdMap){m.map=m.userData.sdMap;m.needsUpdate=true;}}return;}
+        const entry=queue[i++];if(!entry){console.info('[map-materials] HD textures on',queue.length);return;}
+        const t=await load(entry);if(t&&want){const sd=new Set();for(const m of entry[1].materials){sd.add(m.userData.sdMap);m.map=t;m.needsUpdate=true;}
+          for(const x of sd)x.dispose();}   // frees the original's GPU copy; it re-uploads if switched back
+        requestAnimationFrame(step);};
+      step();
+    }
+    const enabled=()=>!coarse&&settings.hdTextures!==false;
+    apply(enabled());
+    onSettingsChange((s,key)=>{if(key==='hdTextures'||key===null)apply(enabled());});
+  }).catch(e=>console.warn('[map-materials] HD textures',e));
 
   // The theatre chandelier's opaque slot also holds its bead and crystal cards,
   // which drew as solid dark panels. Cut them out by alpha, but only in the
