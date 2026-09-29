@@ -1,5 +1,5 @@
 // Thundergun: the exported model lost its see-through materials, so the glass
-// tubes, wire mesh and cut-out gauges rendered as flat solid surfaces. This
+// tubes and wire mesh rendered as flat solid surfaces. This
 // restores them (and makes the energy chambers glow and scroll), then adds a
 // visible shockwave to each shot and throws the zombies it kills.
 import * as THREE from 'three';
@@ -11,7 +11,9 @@ export default async function setup(api){
 
   // --- Materials -----------------------------------------------------------
   const energy=[];
-  const CUTOUT=/thundergun$|thundergun_(wires|mesh|plastic|box|box_plastic)$/;
+  // Only the wire-mesh grille is a real cut-out. The body texture's alpha is a
+  // mask for something else (the dashed ammo ring, ribbed strips), not holes.
+  const CUTOUT=/thundergun_mesh$/;
   function patch(root){
     root?.traverse(n=>{for(const m of [n.material].flat()){if(!m||m.userData.thundergun)continue;m.userData.thundergun=true;
       const name=m.name.replace(/^mc\//,'');

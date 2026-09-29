@@ -69,9 +69,18 @@ export default async function setup(api){
     session.cancelReload();
     const nd=data.weapons[next],up=w.upgraded?{...nd,...nd.upgrade}:nd;
     const stash={mag:w.mag,reserve:w.reserve};
-    const back=w.other??{mag:up.clipSize,reserve:Math.min(up.maxAmmo,w.reserve)};
+    // The first swap gives the other form the same share of its ammo as this one has left.
+    const cur=session.def,left=(w.mag+w.reserve)/Math.max(1,cur.clipSize+cur.maxAmmo);
+    const back=w.other??{mag:up.clipSize,reserve:Math.round(up.maxAmmo*Math.min(1,left))};
     Object.assign(w,{id:next,mag:back.mag,reserve:back.reserve,other:stash});
     api.equipView();api.toast(nd.name+' · B to '+(next==='microwavegun_zm'?'split':'combine'),2.5);
   });
+  // Max Ammo also refills the form you aren't holding.
+  const powerup=session.powerup.bind(session);
+  session.powerup=(type,...rest)=>{
+    const result=powerup(type,...rest);
+    if(type==='full_ammo')for(const w of session.inventory){const next=pair[w.id];if(!next||!w.other)continue;const nd=data.weapons[next];w.other.reserve=(w.upgraded?nd.upgrade?.maxAmmo:null)??nd.maxAmmo;}
+    return result;
+  };
   let hinted=false;host.on('update',()=>{if(!hinted&&pair[current()]){hinted=true;api.toast('Press B to combine / split the Zap Guns',4);}});
 }

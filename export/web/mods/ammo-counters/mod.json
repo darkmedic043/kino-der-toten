@@ -1,0 +1,5 @@
+{
+  "name": "Ammo read-outs",
+  "description": "Lights the ammo displays on wonder weapons: the Zap Gun and Wave Gun digit counter and the Thundergun's gauge ring.",
+  "script": "mod.js"
+}
