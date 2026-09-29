@@ -20,6 +20,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { settings, onSettingsChange } from '../../settings.js';
 
@@ -36,6 +37,8 @@ const POOL=12,SWAP=.25;
     if(c.includes(call)&&!c.includes(call+clamp))c=c.replace(call,call+clamp);
   THREE.ShaderChunk.lights_fragment_begin=c;}
 const LIGHT_CLAMP='3.2';
+// Light beams live in their own scene, drawn by the volumetric pass (setupPost).
+const volScene=new THREE.Scene();
 const FIXTURES={
   zombie_theater_chandelier1_off:{color:'#ffd49a',intensity:14,radius:1700,drop:120,power:true,spot:{angle:.95,down:true,beam:.9}},
   zombie_theater_chandelier1arm_off:{color:'#ffcf8a',intensity:3,radius:420,drop:12,power:true},
@@ -206,30 +209,50 @@ function setupKino(api){
 
   // Light beams: soft additive cones with drifting dust.
   const beams=[];
-  // Beams are camera-facing ribbons along the beam axis (the usual fake light
-  // shaft): soft across their width, fading toward the far end and near the
-  // camera. Cone meshes showed their walls edge-on as bright lines and their
-  // rims as rings on real GPUs; a ribbon has neither.
-  const beamMaterial=()=>new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,
-    uniforms:{color:{value:new THREE.Color()},strength:{value:0},time:{value:0}},
-    vertexShader:`varying vec2 vUv;varying float vDist;
-      void main(){vUv=uv;vec4 wp=modelMatrix*vec4(position,1.);vDist=length(cameraPosition-wp.xyz);gl_Position=projectionMatrix*viewMatrix*wp;}`,
-    fragmentShader:`uniform vec3 color;uniform float strength;uniform float time;varying vec2 vUv;varying float vDist;
-      void main(){float x=(vUv.x-.5)*2.;float across=exp(-x*x*3.2)*(1.-x*x);          // soft centre, zero at both edges
-        float along=smoothstep(0.,.5,vUv.y)*(1.-smoothstep(.92,1.,vUv.y));           // fades toward the far end and at the source
-        float near=smoothstep(40.,280.,vDist);
-        float drift=.9+.1*sin(vUv.y*9.-time*.4+x*2.);
-        gl_FragColor=vec4(color*strength*across*along*near*drift*1.35,1.);}`});
+  // Volumetric beams: each beam is a slightly oversized cone drawn back faces
+  // only; for every pixel the shader marches the view ray through the cone and
+  // integrates a smooth density (Gaussian across the beam, fading along it,
+  // stirred by drifting noise that reads as dust in the light), stopping at the
+  // scene depth so beams end softly on walls and floors. There is no visible
+  // surface, so no edge lines or rims, and it works from inside a beam.
+  const beamMaterial=()=>new THREE.ShaderMaterial({transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,side:THREE.BackSide,
+    uniforms:{color:{value:new THREE.Color()},strength:{value:0},time:{value:0},apex:{value:new THREE.Vector3()},axis:{value:new THREE.Vector3()},
+      len:{value:1},rTop:{value:1},rBot:{value:1},depthTex:{value:null},resolution:{value:new THREE.Vector2(1,1)},near:{value:1},far:{value:1},camForward:{value:new THREE.Vector3()}},
+    vertexShader:`varying vec3 vWorld;void main(){vec4 wp=modelMatrix*vec4(position,1.);vWorld=wp.xyz;gl_Position=projectionMatrix*viewMatrix*wp;}`,
+    fragmentShader:`#include <packing>
+      uniform vec3 color,apex,axis,camForward;uniform float strength,time,len,rTop,rBot,near,far;uniform sampler2D depthTex;uniform vec2 resolution;varying vec3 vWorld;
+      float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+      float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
+        return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+                   mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
+      void main(){
+        if(strength<=0.)discard;
+        vec3 toFrag=vWorld-cameraPosition;float tExit=length(toFrag);vec3 rd=toFrag/tExit;
+        float d=texture2D(depthTex,gl_FragCoord.xy/resolution).x;
+        float sceneT=d>=1.?1e9:-perspectiveDepthToViewZ(d,near,far)/max(dot(rd,camForward),1e-3);
+        float tEnd=min(tExit,sceneT),tStart=max(0.,tExit-(len+2.5*rBot));
+        if(tEnd<=tStart)discard;
+        float jitter=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715)))+time*.61803);
+        const int STEPS=28;float stepL=(tEnd-tStart)/float(STEPS),acc=0.;
+        for(int i=0;i<STEPS;i++){
+          vec3 p=cameraPosition+rd*(tStart+(float(i)+jitter)*stepL),v=p-apex;float h=dot(v,axis);
+          if(h<0.||h>len)continue;float u=h/len,R=mix(rTop,rBot,u),q=length(v-axis*h)/R;if(q>1.3)continue;
+          float across=exp(-q*q*4.2),along=smoothstep(0.,.12,u)*(1.-smoothstep(.55,1.,u))/(1.+1.4*u);
+          float dust=.55+.9*noise(p*.018+vec3(0.,time*.05,time*.02))*noise(p*.05-vec3(time*.03,0.,0.));
+          acc+=across*along*dust*stepL;}
+        // Forward scattering: dusty light glows brightest when you look back toward its source.
+        float phase=mix(.7,1.45,pow(max(-dot(rd,axis),0.),4.));
+        gl_FragColor=vec4(color*strength*phase*acc/max(rBot*.7,12.),1.);}`});
   const moteTexture=(()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d'),r=g.createRadialGradient(16,16,0,16,16,16);
     r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(.4,'rgba(255,255,255,.35)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,32,32);return new THREE.CanvasTexture(c);})();
   function makeBeam(src,top,dir,len,r,color,strength,warmth=.3,tip=.5){
-    // Trapezoid ribbon: tip width at the source (y=0), base width at the far end (y=-len); uv.y = 1 at the source.
-    const g=new THREE.BufferGeometry();const hw0=Math.max(tip,r*.12),hw1=r;
-    g.setAttribute('position',new THREE.Float32BufferAttribute([-hw0,0,0, hw0,0,0, -hw1,-len,0, hw1,-len,0],3));
-    g.setAttribute('uv',new THREE.Float32BufferAttribute([0,1, 1,1, 0,0, 1,0],2));g.setIndex([0,2,1, 1,2,3]);g.computeBoundingSphere();
-    const mesh=new THREE.Mesh(g,beamMaterial());mesh.position.copy(top);mesh.frustumCulled=false;
-    mesh.material.uniforms.color.value.copy(color).lerp(new THREE.Color('#fff'),warmth);mesh.renderOrder=5;scene.add(mesh);
-    const axisQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,-1,0),dir.clone().normalize());
+    tip=Math.min(tip,r*.9);const axis=dir.clone().normalize();
+    // Bounding cone, a little larger than the beam so the soft falloff fits inside.
+    const g=new THREE.CylinderGeometry(tip*1.3+4,r*1.35,len*1.04,24,1,false).translate(0,-len*.52,0);
+    const mesh=new THREE.Mesh(g,beamMaterial());mesh.position.copy(top);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),axis);
+    const u=mesh.material.uniforms;u.color.value.copy(color).lerp(new THREE.Color('#fff'),warmth);u.apex.value.copy(top);u.axis.value.copy(axis);u.len.value=len;u.rTop.value=tip;u.rBot.value=r;
+    volScene.add(mesh);
+    const axisQ=mesh.quaternion.clone();
     // Dust drifting inside the beam.
     const count=Math.round(Math.min(110,20+len/24+r/2)),pos=new Float32Array(count*3),seed=[];
     for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,h=Math.random(),rr=Math.sqrt(Math.random())*(tip+(r-tip)*h)*.9;seed.push({a,h,rr,sp:.2+Math.random()*.5,ph:Math.random()*100,wob:1+Math.random()*4});}
@@ -280,14 +303,7 @@ function setupKino(api){
     if(q>=2&&(q>=3||frame%2===0))for(const l of spots)l.shadow.needsUpdate=true;
     if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);}
     for(const b of beams){
-      // Standing inside a beam: dim it (you see light around you, not the cone's walls).
-      const rel=camera.position.clone().sub(b.top),along=rel.dot(b.dir),radial=rel.clone().addScaledVector(b.dir,-along).length();
-      // Billboard about the beam axis: local -Y along the beam, +Z toward the camera.
-      {const yAxis=b.dir.clone().negate(),toCam=rel.clone().addScaledVector(b.dir,-along);if(toCam.lengthSq()<1e-4)toCam.set(1,0,0);
-        const xAxis=new THREE.Vector3().crossVectors(yAxis,toCam).normalize(),zAxis=new THREE.Vector3().crossVectors(xAxis,yAxis);
-        b.mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis,yAxis,zAxis));}
-      const inside=along>0&&along<b.len&&radial<b.tip+(b.r-b.tip)*(along/b.len)+40;
-      const on=(q>=1?level(b.s):0)*(inside?.3:1),u=b.mesh.material.uniforms;u.time.value=t;u.strength.value+=(on*b.strength*.16-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
+      const on=q>=1?level(b.s):0,u=b.mesh.material.uniforms;u.time.value=t;u.strength.value+=(on*b.strength*.45-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
       b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible){b.dust.material.opacity=Math.min(.2,u.strength.value*1.4);const p=b.dust.geometry.attributes.position;
         b.seed.forEach((d,i)=>{d.h=(d.h+dt*.01*d.sp)%1;d.a+=dt*.03*d.sp*(d.ph>50?1:-1);const w=Math.sin(t*.6+d.ph)*d.wob;   // drifting, not orbiting in rings
           p.setXYZ(i,Math.cos(d.a)*d.rr+w,-d.h*b.len+Math.sin(t*.4+d.ph*2)*d.wob,Math.sin(d.a)*d.rr+Math.cos(t*.5+d.ph)*d.wob);});p.needsUpdate=true;}}
@@ -303,17 +319,47 @@ function setupKino(api){
   window.kino.lighting={sources,pool,spots,beams};
 }
 
+// ---- Volumetric beams pass -----------------------------------------------------------------------
+// Renders the beam volumes at half resolution into their own target (they read
+// the scene depth, which must not be attached to the target being drawn), then
+// adds the result onto the frame before AO and bloom.
+class VolumetricPass extends Pass{
+  constructor(volScene,camera){
+    super();this.volScene=volScene;this.camera=camera;this.needsSwap=false;
+    this.target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType});
+    this.quad=new FullScreenQuad(new THREE.ShaderMaterial({uniforms:{tVol:{value:null}},transparent:true,depthTest:false,depthWrite:false,blending:THREE.AdditiveBlending,
+      vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
+      fragmentShader:'uniform sampler2D tVol;varying vec2 vUv;void main(){gl_FragColor=vec4(texture2D(tVol,vUv).rgb,1.);}'}));
+    this.forward=new THREE.Vector3();
+  }
+  setSize(w,h){this.target.setSize(Math.max(1,Math.floor(w/2)),Math.max(1,Math.floor(h/2)));}
+  render(renderer,writeBuffer,readBuffer){
+    if(!this.volScene.children.some(o=>o.visible))return;
+    const cam=this.camera;cam.getWorldDirection(this.forward);
+    for(const o of this.volScene.children){const u=o.material?.uniforms;if(!u)continue;
+      u.depthTex.value=readBuffer.depthTexture;u.resolution.value.set(this.target.width,this.target.height);u.near.value=cam.near;u.far.value=cam.far;u.camForward.value.copy(this.forward);}
+    const old=renderer.getRenderTarget(),oldClear=renderer.autoClear;
+    renderer.setRenderTarget(this.target);renderer.setClearColor(0x000000,0);renderer.clear(true,false,false);renderer.autoClear=false;
+    renderer.render(this.volScene,cam);
+    renderer.setRenderTarget(readBuffer);this.quad.material.uniforms.tVol.value=this.target.texture;this.quad.render(renderer);
+    renderer.setRenderTarget(old);renderer.autoClear=oldClear;
+  }
+  dispose(){this.target.dispose();this.quad.dispose();}
+}
+
 // ---- Post-processing (all maps) ----------------------------------------------------------------
 function setupPost(api){
   const {renderer,scene,camera,host}=api;
-  let composer=null,renderPass=null,gtao=null,bloom=null,builtFor=-1;
+  let composer=null,renderPass=null,volPass=null,gtao=null,bloom=null,builtFor=-1;
   const size=()=>{const v=renderer.getSize(new THREE.Vector2());return [Math.max(1,v.x),Math.max(1,v.y)];};
   function build(q){
     composer?.dispose?.();composer=null;builtFor=q;
     if(q<1)return;
     const [w,h]=size(),target=new THREE.WebGLRenderTarget(w,h,{type:THREE.HalfFloatType,samples:4});
+    target.depthTexture=new THREE.DepthTexture(w,h);   // the volumetric beams read the scene depth
     composer=new EffectComposer(renderer,target);composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);
     renderPass=new RenderPass(scene,camera);composer.addPass(renderPass);
+    volPass=new VolumetricPass(volScene,camera);composer.addPass(volPass);
     // Sanitise the HDR frame: a light right against a surface can overflow
     // half-float to Inf, and the bloom blur smears NaN/Inf into black blocks.
     composer.addPass(new ShaderPass({uniforms:{tDiffuse:{value:null}},
@@ -339,7 +385,7 @@ function setupPost(api){
   host.renderWorld=(sceneToDraw,cam)=>{
     if(builtFor!==quality())build(quality());
     if(!composer){renderer.render(sceneToDraw,cam);return;}
-    renderPass.camera=cam;if(gtao)gtao.camera=cam;
+    renderPass.camera=cam;volPass.camera=cam;if(gtao)gtao.camera=cam;
     const [w,h]=size();if(composer.renderTarget1.width!==Math.floor(w*renderer.getPixelRatio()))resize();
     composer.render();
   };
