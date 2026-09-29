@@ -9,7 +9,7 @@ export const ACTIONS=[
   ['forward','Move forward','KeyW'],['back','Move back','KeyS'],['left','Move left','KeyA'],['right','Move right','KeyD'],
   ['sprint','Sprint (hold)','ShiftLeft'],['jump','Jump','Space'],['crouch','Crouch','KeyC'],['use','Use / buy','KeyF'],
   ['reload','Reload','KeyR'],['melee','Knife','KeyV'],['grenade','Grenade','KeyG'],['swap','Switch weapon','KeyQ'],
-  ['claymore','Claymore','Digit4'],['monkey','Monkey Bomb','KeyX'],['thirdPerson','Third person','KeyT'],
+  ['prone','Prone','KeyZ'],['claymore','Claymore','Digit4'],['monkey','Monkey Bomb','KeyX'],['thirdPerson','Third person','KeyT'],
 ];
 export const DEFAULT_BINDS=Object.fromEntries(ACTIONS.map(([id,,code])=>[id,code]));
 export const binds=()=>({...DEFAULT_BINDS,...settings.binds});

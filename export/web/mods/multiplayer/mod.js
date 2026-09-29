@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Net } from '../../net.js';
 import { roundPopulation } from '../../rules.js';
 import { loadProfile, cloudReady } from '../../profile.js';
-import { loadCharacterRegistry, createCharacter, holdWeapon } from '../../characters.js';
+import { loadCharacterRegistry, createCharacter, holdWeapon, applyStance } from '../../characters.js';
 
 const SNAP_RATE=12,POSE_RATE=15,STATES=['chase','attack','barricade','entering'];
 const BLEED_OUT=30,REVIVE_TIME=3,REVIVE_RANGE=90;
@@ -73,7 +73,7 @@ export default async function setup(api){
   let fireCount=0,lastShots=session.shots;
   net.on('pose',(m,from)=>{
     const r=remotes.get(from);if(!r)return;
-    r.target=v3(m.p);r.targetYaw=m.y;r.vel.fromArray(m.v);r.grounded=m.g;r.lastSeen=performance.now();
+    r.target=v3(m.p);r.targetYaw=m.y;r.stance=m.k??'';r.vel.fromArray(m.v);r.grounded=m.g;r.lastSeen=performance.now();
     if(!!m.d!==r.down||!!m.x!==r.dead){r.down=!!m.d;r.dead=!!m.x;setTag(r);showPanel();}
     if(!r.pos){r.pos=r.target.clone();r.yaw=m.y;}
     if(m.w!==r.weapon){r.weapon=m.w;setRemoteWeapon(r);}
@@ -296,7 +296,7 @@ export default async function setup(api){
       poseTimer=1/POSE_RATE;const f=player.getFeetPosition();
       const w=session.weaponUnavailable?'':session.weapon.id+(session.weapon.upgraded?':u':'');
       net.send('all',{t:'pose',p:[r1(f.x),r1(f.y),r1(f.z)],y:Math.round((camera.rotation.y+Math.PI)*1000)/1000,v:(player.state?.velocity?.toArray()??[0,0,0]).map(r1),
-        g:player.state?.grounded??true,d:me.down,x:me.dead||session.phase==='gameover',w,f:fireCount});
+        g:player.state?.grounded??true,k:window.kino.movement?.state?.prone?'prone':window.kino.movement?.state?.sliding?'slide':window.kino.movement?.state?.mantling?'mantle':'',d:me.down,x:me.dead||session.phase==='gameover',w,f:fireCount});
       const key=[...session.openDoors].sort().join()+'|'+session.power;
       if(key!==worldKey){worldKey=key;if(!net.isHost)net.send('host',{t:'world',doors:[...session.openDoors],power:session.power});}
     }
@@ -311,7 +311,7 @@ export default async function setup(api){
       r.root.position.copy(r.pos);r.root.rotation.y=r.yaw;
       const speed=r.down?0:Math.hypot(r.vel.x,r.vel.z),forward=r.vel.x*Math.sin(r.yaw)+r.vel.z*Math.cos(r.yaw),side=r.vel.x*Math.cos(r.yaw)-r.vel.z*Math.sin(r.yaw);
       r.character.update(dt,speed,{forward,side,vy:r.vel.y,grounded:r.grounded,turn:d/Math.max(dt,1e-3)*.1});
-      r.root.rotation.z=r.down?Math.PI/2*.9:0;
+      r.root.rotation.z=r.down?Math.PI/2*.9:0;if(!r.down)applyStance(r.character,r.stance,dt);
     }
   });
   // The game only updates while the host is playing; if the host pauses or

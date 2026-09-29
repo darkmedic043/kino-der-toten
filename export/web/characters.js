@@ -125,7 +125,7 @@ function motionModel(){
     const grounded=m.grounded??true;
     st.air+=((grounded?0:1)-st.air)*Math.min(1,dt*(grounded?16:7));
     // Landing: an impulse into a spring, so the crouch sinks and recovers.
-    if(grounded&&!st.wasGrounded&&st.lastVy<-120)st.landV+=Math.min(9,-st.lastVy/80);
+    if(grounded&&!st.wasGrounded&&st.lastVy<-300)st.landV+=Math.min(9,-st.lastVy/80);
     [st.land,st.landV]=spring(st.land,st.landV,0,9,.55,dt);st.land=Math.max(-.15,Math.min(1.2,st.land));st.wasGrounded=grounded;st.lastVy=m.vy??0;
     [st.lean,st.leanV]=spring(st.lean,st.leanV,THREE.MathUtils.clamp((m.turn??0)*.09,-.28,.28),5,.6,dt);
     // Secondary sway that lags behind the body (tail).
@@ -175,8 +175,10 @@ function proceduralRig(model,holder,entry){
   const X=new THREE.Vector3(1,0,0),Y=new THREE.Vector3(0,1,0),Z=new THREE.Vector3(0,0,1);
   // Pitch angle a (+ forward) plus sideways x, then rotated by the strafe heading.
   const dir=(x,a,yaw=0)=>new THREE.Vector3(x,-Math.cos(a),Math.sin(a)).applyAxisAngle(Y,yaw);
-  const M=motionModel();let holding=false;
-  return {hand:R.hand,hold(value){holding=value;},update(dt,speed=0,m){
+  const M=motionModel();let holding=false,stance='';
+  // Lying prone, the aim pose is turned past the head so the gun points forward.
+  const hold=v=>stance==='prone'?v.applyAxisAngle(X,-1.45):v;
+  return {hand:R.hand,hold(value){holding=value;},setStance(value){stance=value;},update(dt,speed=0,m){
     const st=M.step(dt,speed,m),{phase,run,moving,breath,air,lean,strafe,accel,sway:lag}=st,land=Math.max(0,st.land);
     for(const [b,r] of rest)b.quaternion.copy(r);
     const idle=1-moving,sway=Math.sin(breath*.55);
@@ -201,8 +203,8 @@ function proceduralRig(model,holder,entry){
       turn(S.foot,X,(Math.sin(phase+off-.6)*.35*moving+air*.5)*(st.dirSign));
       if(holding){
         const bob=Math.sin(phase*2)*.03*moving+Math.sin(breath*1.8)*.015;
-        if(s<0){aim(S.arm,S.fore,new THREE.Vector3(-.12,-.18+bob,1));aim(S.fore,S.hand,new THREE.Vector3(.05,-.05+bob,1));}
-        else{aim(S.arm,S.fore,new THREE.Vector3(-.3,-.35+bob,.9));aim(S.fore,S.hand,new THREE.Vector3(-.85,-.02+bob,.55));}
+        if(s<0){aim(S.arm,S.fore,hold(new THREE.Vector3(-.12,-.18+bob,1)));aim(S.fore,S.hand,hold(new THREE.Vector3(.05,-.05+bob,1)));}
+        else{aim(S.arm,S.fore,hold(new THREE.Vector3(-.3,-.35+bob,.9)));aim(S.fore,S.hand,hold(new THREE.Vector3(-.85,-.02+bob,.55)));}
       }else{
         const a=-thigh*(.85+.45*run)+air*.35,out=s*(.13+.03*Math.sin(breath*1.3+off)+.08*run+air*.5);
         const bend=.2+.3*moving+1.15*run+air*.6+land*.4;
@@ -242,10 +244,10 @@ function mannequin(entry,holder){
     mesh(new THREE.BoxGeometry(4.2,3,9.5),boot,ankle,0,-1.2,2.4);
     limbs[side]={shoulder,elbow,wrist,hip,knee,ankle};
   }
-  const M=motionModel();let holding=false;
+  const M=motionModel();let holding=false,stance='';
   // The figure faces +Z, so its right hand is on the -X side.
   const right=limbs[-1],left=limbs[1];
-  return {root:holder,hand:right.wrist,hold(value){holding=value;},update(dt,speed=0,m){
+  return {root:holder,hand:right.wrist,hold(value){holding=value;},setStance(value){stance=value;},update(dt,speed=0,m){
     const st=M.step(dt,speed,m),{phase,run,moving,breath,air,lean,strafe,accel}=st,land=Math.max(0,st.land),idle=1-moving,sway=Math.sin(breath*.55);
     pelvisRoot.position.set(Math.sin(phase)*.9*moving+sway*.45*idle,37.5+(Math.abs(Math.cos(phase))**1.8-.45)*(1.9+1.7*run)*moving-land*7-air*1.4,0);
     hips.rotation.set(0,Math.sin(phase)*.14*moving+strafe*.45,Math.sin(phase)*.06*moving+sway*.04*idle+lean*.5);
@@ -267,10 +269,24 @@ function mannequin(entry,holder){
     if(holding){
       // Aim the weapon forward with both hands; the legs keep walking.
       const bob=Math.sin(phase*2)*.03*moving+Math.sin(breath*1.8)*.015;
-      right.shoulder.rotation.set(-1.32+bob,0,.12);right.elbow.rotation.x=-.12;
-      left.shoulder.rotation.set(-1.18+bob,0,-.62);left.elbow.rotation.x=-.75;
+      const over=stance==='prone'?-1.45:0;   // lying prone: arms reach past the head
+      right.shoulder.rotation.set(-1.32+bob+over,0,.12);right.elbow.rotation.x=-.12;
+      left.shoulder.rotation.set(-1.18+bob+over,0,-.62);left.elbow.rotation.x=-.75;
     }
   },dispose(){holder.removeFromParent();}};
+}
+
+// Whole-body stance on top of the animation: prone lies forward from the
+// feet, a slide leans back, a mantle hunches forward. `k` blends smoothly.
+export function applyStance(character,stance,dt){
+  const r=character.root,s=r.userData.stance??={pitch:0,lift:0};
+  // Characters face +Z, so a positive pitch tips the head forward (face down).
+  const target=stance==='prone'?1.45:stance==='slide'?-.85:stance==='mantle'?.35:0;
+  s.pitch+=(target-s.pitch)*Math.min(1,dt*9);
+  r.rotation.order='YXZ';r.rotation.x=s.pitch;
+  // Lying down pivots around the feet; lift the pivot a little so the body rests on the floor.
+  r.position.y+=Math.max(0,s.pitch)*6+Math.max(0,-s.pitch)*3;
+  character.setStance?.(stance);
 }
 
 // Puts a weapon's world model in a character's right hand (third person and

@@ -1,6 +1,6 @@
 // Player character + third-person view (T). The character is chosen in the
 // main menu and stored in the shared profile.
-import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tintArms, loadCharacterGltf, renderPortrait, holdWeapon } from '../../characters.js';
+import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tintArms, loadCharacterGltf, renderPortrait, holdWeapon, applyStance } from '../../characters.js';
 import { FirstPersonArms } from '../../fp-arms.js';
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
@@ -47,7 +47,9 @@ export default async function setup(api){
     character.root.position.copy(feet);character.root.rotation.y=yaw;
     // Velocity in the character's frame (+Z forward, +X its left) for strafing/backpedal poses.
     const speed=Math.hypot(vel.x,vel.z),forward=vel.x*Math.sin(yaw)+vel.z*Math.cos(yaw),side=vel.x*Math.cos(yaw)-vel.z*Math.sin(yaw);
-    character.update(dt,speed,{forward,side,vy:vel.y,grounded:player.state?.grounded??player.isGrounded??true,turn});
+    const mv=window.kino.movement?.state,stance=mv?.prone?'prone':mv?.sliding?'slide':mv?.mantling?'mantle':'';
+    character.update(dt,stance==='prone'?speed*.5:stance==='slide'?0:speed,{forward,side,vy:vel.y,grounded:player.state?.grounded??player.isGrounded??true,turn});
+    applyStance(character,stance,dt);
     if(third)view.update(api.world);
   });
   host.on('reset',()=>{third=false;apply();});
