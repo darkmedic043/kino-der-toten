@@ -103,6 +103,29 @@ export async function createCharacter(entry,data){
   return mannequin(entry,holder);
 }
 
+// Shared motion model for the procedural characters. update(dt, speed, m)
+// takes optional m = {forward, side, vy, grounded, turn}: velocity in the
+// character's frame (+side is its left), vertical speed, and yaw rate.
+function motionModel(){
+  const st={phase:0,blend:0,run:0,moving:0,breath:0,air:0,land:0,lean:0,strafe:0,dirSign:1,wasGrounded:true,lastVy:0};
+  st.step=(dt,speed,m={})=>{
+    st.breath+=dt;
+    const target=Math.min(1.4,speed/190);st.blend+=(target-st.blend)*Math.min(1,dt*7);
+    st.run=Math.max(0,st.blend-1)/.4;st.moving=Math.min(1,st.blend);
+    const f=m.forward??speed,sd=m.side??0;
+    if(speed>20){st.dirSign=f<-.35*speed?-1:1;const want=THREE.MathUtils.clamp(Math.atan2(sd,Math.abs(f))*st.dirSign,-1.1,1.1);st.strafe+=(want-st.strafe)*Math.min(1,dt*8);}
+    else st.strafe*=Math.max(0,1-dt*6);
+    if(st.moving>.02)st.phase+=dt*(4.2+speed/32)*st.dirSign;
+    const grounded=m.grounded??true;
+    st.air+=((grounded?0:1)-st.air)*Math.min(1,dt*(grounded?14:8));
+    if(grounded&&!st.wasGrounded&&st.lastVy<-120)st.land=Math.min(1,-st.lastVy/520);
+    st.land=Math.max(0,st.land-dt*3.2);st.wasGrounded=grounded;st.lastVy=m.vy??0;
+    st.lean+=(THREE.MathUtils.clamp((m.turn??0)*.09,-.28,.28)-st.lean)*Math.min(1,dt*6);
+    return st;
+  };
+  return st;
+}
+
 // Procedural animation for a rigged humanoid that ships without clips. Bones
 // are found from the skeleton's shape (not names): legs hang below the hips,
 // arms are the "arm" chains, sides come from rest positions (+X is the
@@ -125,43 +148,63 @@ function proceduralRig(model,holder,entry){
   if(!L.arm||!R.arm||!L.leg||!R.leg){console.warn('[character] could not find arms and legs for procedural animation');return null;}
   for(const S of [L,R]){S.fore=firstChild(S.arm);S.hand=firstChild(S.fore);S.shin=firstChild(S.leg);S.foot=firstChild(S.shin);}
   const spine=hips.children.find(c=>c.isBone&&/spine|chest/i.test(c.name))??hips.children.find(c=>c.isBone&&local(firstChild(c)??c).y>hipY);
+  const chest=firstChild(spine)&&/chest|spine/i.test(firstChild(spine).name)?firstChild(spine):null;
+  const head=bones.find(b=>/^head/i.test(b.name)),neck=bones.find(b=>/neck/i.test(b.name));
   const tail=bones.filter(b=>/tail/i.test(b.name));
   const rest=new Map(bones.map(b=>[b,b.quaternion.clone()]));
   const height=new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).y||1;
-  const inner=model.parent,baseY=inner.position.y;
+  const inner=model.parent,baseY=inner.position.y,baseX=inner.position.x;
   const hq=new THREE.Quaternion(),pq=new THREE.Quaternion(),q=new THREE.Quaternion(),v=new THREE.Vector3(),w=new THREE.Vector3();
   const parentQ=b=>{holder.getWorldQuaternion(hq).invert();b.parent.getWorldQuaternion(pq);return hq.multiply(pq);};
-  // Rotate `bone` (in character space) so the bone->child segment points along `dir`.
   function aim(bone,child,dir){
     bone.updateWorldMatrix(true,true);
     v.copy(local(child)).sub(local(bone)).normalize();w.copy(dir).normalize();
     q.setFromUnitVectors(v,w);const P=parentQ(bone);
     bone.quaternion.premultiply(P.clone().invert().multiply(q).multiply(P)).normalize();
   }
-  function turn(bone,axis,angle){bone.updateWorldMatrix(true,false);const P=parentQ(bone);q.setFromAxisAngle(axis,angle);bone.quaternion.premultiply(P.clone().invert().multiply(q).multiply(P));}
-  const X=new THREE.Vector3(1,0,0),Y=new THREE.Vector3(0,1,0),dir=(x,a)=>new THREE.Vector3(x,-Math.cos(a),Math.sin(a));
-  let phase=0,blend=0,breath=0,holding=false;
-  return {hand:R.hand,hold(value){holding=value;},update(dt,speed=0){
-    const target=Math.min(1.4,speed/190);blend+=(target-blend)*Math.min(1,dt*8);breath+=dt;
-    const run=Math.max(0,blend-1)/.4,moving=Math.min(1,blend);
-    if(moving>.02)phase+=dt*(5+speed/34);
-    const swing=Math.sin(phase)*(.5+.25*run)*moving;
+  function turn(bone,axis,angle){if(!bone||!angle)return;bone.updateWorldMatrix(true,false);const P=parentQ(bone);q.setFromAxisAngle(axis,angle);bone.quaternion.premultiply(P.clone().invert().multiply(q).multiply(P));}
+  const X=new THREE.Vector3(1,0,0),Y=new THREE.Vector3(0,1,0),Z=new THREE.Vector3(0,0,1);
+  // Pitch angle a (+ forward) plus sideways x, then rotated by the strafe heading.
+  const dir=(x,a,yaw=0)=>new THREE.Vector3(x,-Math.cos(a),Math.sin(a)).applyAxisAngle(Y,yaw);
+  const M=motionModel();let holding=false;
+  return {hand:R.hand,hold(value){holding=value;},update(dt,speed=0,m){
+    const st=M.step(dt,speed,m),{phase,run,moving,breath,air,land,lean,strafe}=st;
     for(const [b,r] of rest)b.quaternion.copy(r);
-    if(spine)turn(spine,X,.03+.18*run);
+    const idle=1-moving,sway=Math.sin(breath*.55);
+    // Pelvis: bob twice per stride, shift over the stance leg, twist with the stride.
+    inner.position.y=baseY+((Math.abs(Math.cos(phase))-.5)*height*(.022+.02*run)*moving-land*height*.1-air*height*.02);
+    inner.position.x=baseX+Math.sin(phase)*height*.012*moving+sway*height*.006*idle;
+    turn(hips,Y,Math.sin(phase)*.14*moving+strafe*.45);
+    turn(hips,Z,Math.sin(phase)*.06*moving+sway*.04*idle+lean*.5);
+    // Torso: counter-twist, lean into speed and turns, breathe at rest.
+    const pitch=.04+.22*run+.06*moving+land*.3-air*.1+Math.sin(breath*1.8)*.02*idle;
+    turn(spine,X,pitch*.6);turn(spine,Y,-Math.sin(phase)*.2*moving-strafe*.3);turn(spine,Z,-lean*.9);
+    turn(chest,X,pitch*.4+Math.sin(breath*1.8)*.015);
+    // Head: stays level, glances around when idle.
+    const look=(Math.sin(breath*.37)*.28+Math.sin(breath*.13+1)*.18)*idle*(holding?.2:1);
+    turn(neck,X,-pitch*.5);turn(head??neck,Y,look+Math.sin(phase)*.06*moving);turn(head??neck,X,Math.sin(breath*.29)*.08*idle-land*.15);
     for(const [S,s] of [[L,1],[R,-1]]){
-      const legSwing=swing*s,knee=Math.max(0,Math.sin(phase+(s>0?0:Math.PI)+.9))*(.7+.6*run)*moving;
-      aim(S.leg,S.shin,dir(0,legSwing));aim(S.shin,S.foot,dir(0,legSwing-knee));
-      if(holding&&s<0){aim(S.arm,S.fore,new THREE.Vector3(-.12,-.18,1));aim(S.fore,S.hand,new THREE.Vector3(.05,-.05,1));}
-      else if(holding){aim(S.arm,S.fore,new THREE.Vector3(-.3,-.35,.9));aim(S.fore,S.hand,new THREE.Vector3(-.85,-.02,.55));}
-      else{const a=-legSwing*.8,sway=.12+.02*Math.sin(breath*1.3);aim(S.arm,S.fore,dir(s*sway,a));aim(S.fore,S.hand,dir(s*.08,a+.15+(.2+.9*run)*moving));}
+      const off=s>0?0:Math.PI,thigh=Math.sin(phase+off)*(.5+.32*run)*moving;
+      const knee=(Math.max(0,Math.sin(phase+off+1.1))*(.75+.9*run)+.1)*moving+.05*idle+land*1.35+air*(.9+.3*Math.sin(off));
+      const tuck=air*(.55+.25*Math.sin(off))+land*.35;
+      aim(S.leg,S.shin,dir(s*(.03+.02*idle),thigh+tuck,strafe));aim(S.shin,S.foot,dir(0,thigh+tuck-knee,strafe));
+      turn(S.foot,X,(Math.sin(phase+off-.6)*.35*moving+air*.5)*(st.dirSign));
+      if(holding){
+        const bob=Math.sin(phase*2)*.03*moving+Math.sin(breath*1.8)*.015;
+        if(s<0){aim(S.arm,S.fore,new THREE.Vector3(-.12,-.18+bob,1));aim(S.fore,S.hand,new THREE.Vector3(.05,-.05+bob,1));}
+        else{aim(S.arm,S.fore,new THREE.Vector3(-.3,-.35+bob,.9));aim(S.fore,S.hand,new THREE.Vector3(-.85,-.02+bob,.55));}
+      }else{
+        const a=-thigh*(.85+.45*run)+air*.35,out=s*(.13+.03*Math.sin(breath*1.3+off)+.08*run+air*.5);
+        const bend=.2+.3*moving+1.15*run+air*.6+land*.4;
+        aim(S.arm,S.fore,dir(out,a,strafe*.5));aim(S.fore,S.hand,dir(out*.4,a+bend,strafe*.5));
+      }
     }
-    tail.forEach((b,i)=>turn(b,Y,Math.sin(breath*2.2-i*.6)*(.08+.06*moving)));
-    inner.position.y=baseY+Math.abs(Math.cos(phase))*height*.02*moving;
+    tail.forEach((b,i)=>{turn(b,Y,Math.sin(breath*2.4-i*.7)*(.1+.12*moving)-lean*.6-strafe*.3);turn(b,X,Math.sin(phase*2-i*.5)*.05*moving+air*.12);});
   }};
 }
 
-// A jointed placeholder figure with procedural idle, walk and run cycles.
-// Faces +Z (the visor side), feet on y=0, about 72 units tall.
+// A jointed placeholder figure with procedural idle, walk, run, jump and
+// landing poses. Faces +Z (the visor side), feet on y=0, about 72 units tall.
 function mannequin(entry,holder){
   const mat=(color,rough=.6,metal=0)=>new THREE.MeshStandardMaterial({color:new THREE.Color(color),roughness:rough,metalness:metal});
   const skin=mat(entry.color??'#8d8a80',.55),accent=mat(entry.accent??'#932e25',.6),dark=mat('#2a2d2c',.8),boot=mat('#161817',.7),visor=mat('#0c0d0d',.25,.6);
@@ -170,7 +213,7 @@ function mannequin(entry,holder){
   // Capsule hanging down from a joint: length is joint-to-joint.
   const bone=(parent,length,r0,r1,material)=>{const g=new THREE.CylinderGeometry(r0,r1,length,14,1);g.translate(0,-length/2,0);mesh(g,material,parent);mesh(new THREE.SphereGeometry(r0,14,10),material,parent);return joint(parent,0,-length);};
 
-  const hips=joint(holder,0,37.5);
+  const pelvisRoot=joint(holder,0,37.5),hips=joint(pelvisRoot,0,0);
   const pelvis=mesh(new THREE.CylinderGeometry(7.4,6.6,7,16),dark,hips,0,-1);pelvis.scale.z=.72;
   const spine=joint(hips,0,2.5);
   const torso=mesh(new THREE.CylinderGeometry(9.6,7.2,21,18),accent,spine,0,10.5);torso.scale.z=.6;
@@ -187,31 +230,36 @@ function mannequin(entry,holder){
     mesh(new THREE.BoxGeometry(3.2,4.6,2),skin,wrist,0,-2.2).rotation.x=.1;
     const hip=joint(hips,side*4.4,-2.5),knee=bone(hip,16.5,3.9,3.1,dark),ankle=bone(knee,16,3,2.4,dark);
     mesh(new THREE.BoxGeometry(4.2,3,9.5),boot,ankle,0,-1.2,2.4);
-    limbs[side]={shoulder,elbow,wrist,hip,knee};
+    limbs[side]={shoulder,elbow,wrist,hip,knee,ankle};
   }
-  let phase=0,blend=0,breath=0,holding=false;
+  const M=motionModel();let holding=false;
   // The figure faces +Z, so its right hand is on the -X side.
   const right=limbs[-1],left=limbs[1];
-  return {root:holder,hand:right.wrist,hold(value){holding=value;},update(dt,speed=0){
-    const target=Math.min(1.4,speed/190);blend+=(target-blend)*Math.min(1,dt*8);breath+=dt;
-    const run=Math.max(0,blend-1)/.4,moving=Math.min(1,blend);
-    phase+=dt*(5+speed/34)*(moving>.02?1:0);
-    const swing=Math.sin(phase)*(.55+.25*run)*moving;
+  return {root:holder,hand:right.wrist,hold(value){holding=value;},update(dt,speed=0,m){
+    const st=M.step(dt,speed,m),{phase,run,moving,breath,air,land,lean,strafe}=st,idle=1-moving,sway=Math.sin(breath*.55);
+    pelvisRoot.position.set(Math.sin(phase)*.9*moving+sway*.45*idle,37.5+(Math.abs(Math.cos(phase))-.5)*(1.6+1.4*run)*moving-land*7-air*1.4,0);
+    hips.rotation.set(0,Math.sin(phase)*.14*moving+strafe*.45,Math.sin(phase)*.06*moving+sway*.04*idle+lean*.5);
+    const pitch=.04+.22*run+.06*moving+land*.3-air*.1+Math.sin(breath*1.8)*.02*idle;
+    spine.rotation.set(pitch*.6,-Math.sin(phase)*.2*moving-strafe*.3,-lean*.9);
+    chest.rotation.x=pitch*.4;chest.scale.set(1,1+Math.sin(breath*1.8)*.012*idle,1+Math.sin(breath*1.8)*.02*idle);
+    const look=(Math.sin(breath*.37)*.28+Math.sin(breath*.13+1)*.18)*idle*(holding?.2:1);
+    neck.rotation.x=-pitch*.5;head.rotation.set(Math.sin(breath*.29)*.08*idle-land*.15,look+Math.sin(phase)*.06*moving,0);
     for(const side of [-1,1]){
-      const l=limbs[side],s=side===1?1:-1,legSwing=swing*s;
-      l.hip.rotation.x=legSwing;
-      l.knee.rotation.x=Math.max(0,Math.sin(phase*1+ (s>0?0:Math.PI)+.9))*(.7+.6*run)*moving;
-      l.shoulder.rotation.x=-legSwing*.85;l.shoulder.rotation.z=side*(.09+.03*Math.sin(breath*1.3));
-      l.elbow.rotation.x=-(.12+(.25+1.1*run)*moving);
+      const l=limbs[side],off=side>0?0:Math.PI,thigh=Math.sin(phase+off)*(.5+.32*run)*moving;
+      const knee=(Math.max(0,Math.sin(phase+off+1.1))*(.75+.9*run)+.1)*moving+.05*idle+land*1.35+air*(.9+.3*Math.sin(off));
+      const tuck=air*(.55+.25*Math.sin(off))+land*.35;
+      l.hip.rotation.set(-(thigh+tuck),strafe*.5,side*(.03+.02*idle));l.knee.rotation.x=knee;
+      l.ankle.rotation.x=-(Math.sin(phase+off-.6)*.35*moving+air*.5)*st.dirSign;
+      const armSwing=thigh*(.85+.45*run)-air*.35;   // +x swings the arm back
+      l.shoulder.rotation.set(armSwing,0,side*(.13+.03*Math.sin(breath*1.3+off)+.08*run+air*.5));
+      l.elbow.rotation.x=-(.2+.3*moving+1.15*run+air*.6+land*.4);
     }
     if(holding){
       // Aim the weapon forward with both hands; the legs keep walking.
-      right.shoulder.rotation.set(-1.32+.05*Math.sin(breath*1.8),0,.12);right.elbow.rotation.x=-.12;
-      left.shoulder.rotation.set(-1.18,0,-.62);left.elbow.rotation.x=-.75;
+      const bob=Math.sin(phase*2)*.03*moving+Math.sin(breath*1.8)*.015;
+      right.shoulder.rotation.set(-1.32+bob,0,.12);right.elbow.rotation.x=-.12;
+      left.shoulder.rotation.set(-1.18+bob,0,-.62);left.elbow.rotation.x=-.75;
     }
-    spine.rotation.x=.04+.16*run;chest.scale.set(1,1+Math.sin(breath*1.8)*.006*(1-moving),1);
-    hips.position.y=37.5+Math.abs(Math.cos(phase))*1.5*moving-.8*run;
-    head.rotation.x=-.05*run;
   },dispose(){holder.removeFromParent();}};
 }
 

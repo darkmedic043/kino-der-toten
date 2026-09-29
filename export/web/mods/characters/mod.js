@@ -38,13 +38,16 @@ export default async function setup(api){
   const character=await createCharacter(entry,api.data);
   character.root.visible=false;scene.add(character.root);
   const view=new ThirdPersonCamera(camera);
-  let third=false,last=null;
+  let third=false,last=null,lastYaw=null;
   const apply=()=>{host.camera=third?view.update(api.world):null;host.hideViewmodel=third;character.root.visible=third;};
   addEventListener('keydown',e=>{if(e.code==='KeyT'&&!e.repeat&&api.getState().active){third=!third;apply();api.toast(third?'Third person · T to switch back':'First person',2);}});
   host.on('update',dt=>{
-    const feet=player.getFeetPosition(),speed=last&&dt>0?Math.hypot(feet.x-last.x,feet.z-last.z)/dt:0;last=feet.clone();
-    character.root.position.copy(feet);character.root.rotation.y=camera.rotation.y+Math.PI;
-    character.update(dt,speed);
+    const feet=player.getFeetPosition(),vel=last&&dt>0?feet.clone().sub(last).divideScalar(dt):new THREE.Vector3();last=feet.clone();
+    const yaw=camera.rotation.y+Math.PI,turn=lastYaw===null||dt<=0?0:Math.atan2(Math.sin(yaw-lastYaw),Math.cos(yaw-lastYaw))/dt;lastYaw=yaw;
+    character.root.position.copy(feet);character.root.rotation.y=yaw;
+    // Velocity in the character's frame (+Z forward, +X its left) for strafing/backpedal poses.
+    const speed=Math.hypot(vel.x,vel.z),forward=vel.x*Math.sin(yaw)+vel.z*Math.cos(yaw),side=vel.x*Math.cos(yaw)-vel.z*Math.sin(yaw);
+    character.update(dt,speed,{forward,side,vy:vel.y,grounded:player.state?.grounded??player.isGrounded??true,turn});
     if(third)view.update(api.world);
   });
   host.on('reset',()=>{third=false;apply();});
