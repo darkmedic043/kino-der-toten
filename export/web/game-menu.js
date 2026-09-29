@@ -2,6 +2,7 @@
 // Settings and Main menu buttons in the pause menu, a settings overlay, and
 // applying settings that live outside the game loop (volume, resolution, FPS).
 import { settings, onSettingsChange, renderSettings, DEFAULT_BINDS, binds } from './settings.js';
+import './cloud.js';
 
 export function installGameMenu({renderer,audio,pixelRatio,started=()=>false}){
   const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('game-menu.css',import.meta.url).href;document.head.append(css);

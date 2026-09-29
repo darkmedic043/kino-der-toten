@@ -197,6 +197,17 @@ is skipped.
 
 ---
 
+## Accounts and saving
+
+Progress (XP, loadout, character, settings, best rounds) is saved in the
+browser. When a player signs in with Google from the main menu, it is also
+saved on the server in `~/.local/share/kino`, and whichever copy is newer wins
+when they sign in on another device. Sign-in only works on the https address
+(https://zombies.terminallysleepy.com), because Google refuses plain-http
+sites; on the LAN address the game still saves locally. The server is
+`.tools/kino-server.mjs`. Set `GOOGLE_CLIENT_ID` in the `kino` quadlet to
+enable sign-in.
+
 ## Updating from upstream
 
 This checkout is the `custom` branch. `upstream` is the original project.

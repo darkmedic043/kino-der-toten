@@ -2,6 +2,7 @@
 // upstream): XP, level, loadout, character and stats, saved in localStorage.
 // Unlock rules come from mods/progression/progression.json.
 
+export { cloudReady } from './cloud.js';
 export const PROFILE_KEY='kino.mods.progression';
 
 export function loadProfile(){

@@ -4,9 +4,10 @@ import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tin
 import { FirstPersonArms } from '../../fp-arms.js';
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
-import { loadProfile } from '../../profile.js';
+import { loadProfile, cloudReady } from '../../profile.js';
 
 async function selected(){
+  await cloudReady;
   const list=await loadCharacterRegistry(),id=loadProfile().character;
   return list.find(c=>c.id===id)??list[0]??{id:'mannequin',type:'mannequin'};
 }

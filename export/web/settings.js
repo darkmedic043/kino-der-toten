@@ -21,6 +21,8 @@ const listeners=new Set();
 export function onSettingsChange(fn){listeners.add(fn);return()=>listeners.delete(fn);}
 export function setSetting(key,value){settings[key]=value;try{localStorage.setItem(KEY,JSON.stringify(settings));}catch{}for(const fn of listeners)fn(settings,key);}
 // Another tab (e.g. the menu) changed them.
+// Signed-in progress (including settings) was pulled from the server.
+addEventListener('kino-cloud-pulled',()=>{try{Object.assign(settings,DEFAULTS,JSON.parse(localStorage.getItem(KEY))??{});settings.binds={...settings.binds};}catch{}for(const fn of listeners)fn(settings,null);});
 addEventListener('storage',e=>{if(e.key!==KEY)return;try{Object.assign(settings,DEFAULTS,JSON.parse(e.newValue)??{});}catch{}for(const fn of listeners)fn(settings,null);});
 
 const FIELDS=[

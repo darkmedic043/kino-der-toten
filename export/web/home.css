@@ -16,7 +16,12 @@ button{font:inherit;cursor:pointer;color:inherit}
 #tabs button{background:none;border:0;border-left:2px solid transparent;text-align:left;padding:14px 16px;font-size:13px;font-weight:700;letter-spacing:3px;color:var(--muted);transition:color .15s,background .15s}
 #tabs button:hover{color:var(--text);background:#ffffff06}
 #tabs button.active{color:var(--text);border-left-color:var(--red-hi);background:linear-gradient(90deg,#932e2530,transparent)}
-#profile-card{margin-top:auto;padding:16px;border:1px solid var(--line);background:var(--panel)}
+#account{margin-top:auto;margin-bottom:12px;padding:14px 16px;border:1px solid var(--line);background:var(--panel);min-height:60px}
+#account p{margin:0 0 10px;line-height:1.5}
+#account .acct{display:flex;align-items:center;gap:10px}#account img{width:34px;height:34px;border-radius:50%}
+#account strong{display:block;font-size:12px;letter-spacing:.5px}#account small{font-size:10px;color:var(--gold)}
+#sign-out{margin-top:10px;width:100%;border:1px solid var(--line-strong);background:#05050560;color:#ccc3ae;padding:8px;font-size:10px;letter-spacing:2px}#sign-out:hover{border-color:var(--red-hi)}
+#profile-card{padding:16px;border:1px solid var(--line);background:var(--panel)}
 #profile-card .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 #profile-card strong{font-size:14px;letter-spacing:2px}
 #profile-card .small{margin-top:6px;font-size:10px}
@@ -125,7 +130,7 @@ main{position:relative;overflow-y:auto;padding:40px 48px 60px}
   #rail{flex-direction:row;flex-wrap:wrap;align-items:center;padding:14px 16px;border-right:0;border-bottom:1px solid var(--line);gap:10px}
   .brand strong{font-size:30px;margin-top:4px}.brand .kicker{display:none}
   #tabs{flex-direction:row;margin:0;overflow-x:auto;width:100%}#tabs button{padding:10px 12px;border-left:0;border-bottom:2px solid transparent;white-space:nowrap}#tabs button.active{border-bottom-color:var(--red-hi)}
-  #profile-card{display:none}
+  #profile-card,#account{display:none}
   main{padding:20px 16px 40px;overflow:visible}
   #map-hero{grid-template-columns:1fr}.hero-art{min-height:180px}
   .loadout,.character{grid-template-columns:1fr}

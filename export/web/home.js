@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { loadModel, ViewWeapon } from './animation.js';
 import { renderSettings } from './settings.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
-import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout } from './profile.js';
+import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady } from './profile.js';
+import { getAccount, onAccountChange, renderGoogleButton, signOut } from './cloud.js';
 import { loadCharacterRegistry, createCharacter, armsUrl, tintArms, loadCharacterGltf } from './characters.js';
 import { FirstPersonArms } from './fp-arms.js';
 
@@ -29,6 +30,7 @@ for(const m of mods)for(const file of [m.manifest?.data??[]].flat()){try{data=me
 try{resolveWeapons(data);}catch{}
 const weapons=data.weapons,bonusById=Object.fromEntries(config.bonuses.map(b=>[b.id,b]));
 const weaponLevel=Object.fromEntries(config.weapons.map(w=>[w.id,w.level]));
+await cloudReady;
 let profile=loadProfile();
 const save=()=>{saveProfile(profile);renderProfile();};
 addEventListener('focus',()=>{profile=loadProfile();renderProfile();renderLoadout();});
@@ -51,6 +53,22 @@ function renderProfile(){
   $('p-xp').textContent=`${profile.xp.toLocaleString()} / ${need.toLocaleString()} XP`;$('p-char').textContent=c?.name??'';
   $('p-stats').textContent=`${profile.kills.toLocaleString()} kills · best round ${profile.bestRound||'—'} · ${profile.games} games`;
 }
+
+// ---- Account ------------------------------------------------------------------
+let wasSignedIn=getAccount().signedIn;
+function renderAccount(){
+  const a=getAccount(),el=$('account');
+  if(a.signedIn){
+    el.innerHTML=`<div class="acct">${a.picture?`<img src="${esc(a.picture)}" alt="" referrerpolicy="no-referrer">`:''}<span><strong>${esc(a.name)}</strong><small>Progress saved online</small></span></div><button type="button" id="sign-out">SIGN OUT</button>`;
+    $('sign-out').onclick=async()=>{await signOut();toast('Signed out · progress stays on this device');};
+  }else{
+    el.innerHTML='<p class="small muted">Sign in to save progress online and play on any device.</p><div id="g-button"></div>';
+    renderGoogleButton($('g-button'));
+  }
+}
+// Signing in may pull a newer profile from the server; reload to show it.
+onAccountChange(a=>{if(a.signedIn&&!wasSignedIn){location.reload();return;}wasSignedIn=a.signedIn;renderAccount();});
+renderAccount();
 
 // ---- Play: map browser --------------------------------------------------------
 const modesOf=m=>m.modes??[(m.mode??'explore').toLowerCase()];

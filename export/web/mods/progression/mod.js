@@ -2,10 +2,11 @@
 // starting weapons and passive bonuses. Tuning lives in progression.json; the
 // profile (shared with the main menu) is in ../../profile.js.
 import { makeWeapon } from '../../rules.js';
-import { loadProfile, saveProfile, xpToNext as curve, unlocks as unlocksFor, validLoadout } from '../../profile.js';
+import { loadProfile, saveProfile, xpToNext as curve, unlocks as unlocksFor, validLoadout, cloudReady } from '../../profile.js';
 
 export default async function setup(api){
   const {data,session,host,mod}=api;
+  await cloudReady;
   const config=await fetch(new URL('progression.json',mod.url)).then(r=>r.json());
   const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('progression.css',mod.url).href;document.head.append(css);
 
