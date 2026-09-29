@@ -193,6 +193,7 @@ is skipped.
 
 - **progression**: XP, levels, loadouts and bonuses. Tune it in `progression/progression.json`. The profile is in the browser's localStorage (shared by the menu and every map); `kino.progression.reset()` in a game console wipes it.
 - **characters**: character model plus the third-person view.
+- **moon-weapons**: the Zap Guns / Wave Gun (B combines or splits) and the Death Machine from Moon, using the original assets from this project's Moon export, in the Mystery Box.
 - **example-weapons**: the Golden Python and MP40 Drum.
 
 ---

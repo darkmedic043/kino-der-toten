@@ -2,6 +2,7 @@
   "enabled": [
     "lighting",
     "example-weapons",
+    "moon-weapons",
     "player-health",
     "movement",
     "progression",
