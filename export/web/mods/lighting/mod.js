@@ -189,16 +189,19 @@ function setupKino(api){
       void main(){float edge=pow(abs(dot(normalize(vN),vView)),2.4);float along=smoothstep(0.,.55,vH)*pow(vH,.6)*(1.-smoothstep(.9,1.,vH));
         float streak=.75+.25*sin(vUv.x*43.+time*.3)*sin(vUv.x*17.-time*.2);
         gl_FragColor=vec4(color*strength*edge*along*streak,1.);}`});
+  const moteTexture=(()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d'),r=g.createRadialGradient(16,16,0,16,16,16);
+    r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(.4,'rgba(255,255,255,.35)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,32,32);return new THREE.CanvasTexture(c);})();
   // One beam: a cone from `top` along `dir` for `len`, base radius `r`.
   function makeBeam(src,top,dir,len,r,color,strength,warmth=.3,tip=.5){
     const g=new THREE.CylinderGeometry(tip,r,len,32,1,true).translate(0,-len/2,0);
     const mesh=new THREE.Mesh(g,beamMaterial());mesh.position.copy(top);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),dir.clone().normalize());
     mesh.material.uniforms.color.value.copy(color).lerp(new THREE.Color('#fff'),warmth);mesh.renderOrder=5;scene.add(mesh);
     // Dust drifting inside the beam.
-    const count=Math.round(Math.min(220,40+len/12+r)),pos=new Float32Array(count*3),seed=[];
-    for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,h=Math.random(),rr=Math.sqrt(Math.random())*(tip+(r-tip)*h)*.9;seed.push({a,h,rr,sp:.2+Math.random()*.5});}
+    const count=Math.round(Math.min(110,20+len/24+r/2)),pos=new Float32Array(count*3),seed=[];
+    for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,h=Math.random(),rr=Math.sqrt(Math.random())*(tip+(r-tip)*h)*.9;seed.push({a,h,rr,sp:.2+Math.random()*.5,ph:Math.random()*100,wob:1+Math.random()*4});}
     const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.BufferAttribute(pos,3));
-    const dust=new THREE.Points(dg,new THREE.PointsMaterial({color,size:1.6,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}));
+    // Tiny soft motes (world-sized, so they shrink with distance), kept well under the bloom threshold.
+    const dust=new THREE.Points(dg,new THREE.PointsMaterial({color,size:.35,map:moteTexture,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}));
     dust.position.copy(mesh.position);dust.quaternion.copy(mesh.quaternion);dust.renderOrder=5;scene.add(dust);
     beams.push({s:src,mesh,dust,seed,len,strength});
   }
@@ -243,8 +246,9 @@ function setupKino(api){
     if(q>=2&&(q>=3||frame%2===0))for(const l of spots)l.shadow.needsUpdate=true;
     if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);}
     for(const b of beams){const on=q>=1?level(b.s):0,u=b.mesh.material.uniforms;u.time.value=t;u.strength.value+=(on*b.strength*.16-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
-      b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible){b.dust.material.opacity=Math.min(.55,u.strength.value*4);const p=b.dust.geometry.attributes.position;
-        b.seed.forEach((d,i)=>{d.h=(d.h+dt*.012*d.sp)%1;d.a+=dt*.05*d.sp;const rr=d.rr;p.setXYZ(i,Math.cos(d.a)*rr,-d.h*b.len,Math.sin(d.a)*rr);});p.needsUpdate=true;}}
+      b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible){b.dust.material.opacity=Math.min(.2,u.strength.value*1.4);const p=b.dust.geometry.attributes.position;
+        b.seed.forEach((d,i)=>{d.h=(d.h+dt*.01*d.sp)%1;d.a+=dt*.03*d.sp*(d.ph>50?1:-1);const w=Math.sin(t*.6+d.ph)*d.wob;   // drifting, not orbiting in rings
+          p.setXYZ(i,Math.cos(d.a)*d.rr+w,-d.h*b.len+Math.sin(t*.4+d.ph*2)*d.wob,Math.sin(d.a)*d.rr+Math.cos(t*.5+d.ph)*d.wob);});p.needsUpdate=true;}}
     for(const m of bulbs)m.emissiveIntensity+=((session.power?2.6:0)-m.emissiveIntensity)*Math.min(1,dt*3);
   });
   // Keep lights that stay chosen on their current source to avoid pops.
