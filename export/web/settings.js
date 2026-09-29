@@ -2,7 +2,7 @@
 // the main menu and every game page. `settings` is live; pages read it each frame.
 
 const KEY='kino.settings';
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,renderScale:1,showFps:false,binds:{}};
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,renderScale:1,showFps:false,binds:{}};
 // Rebindable actions and the key each game page listens for. game-menu.js
 // translates a rebound key into its default so the game code stays unchanged.
 export const ACTIONS=[
@@ -29,6 +29,7 @@ const FIELDS=[
   {key:'sensitivity',label:'Mouse sensitivity',type:'range',min:.1,max:3,step:.05,format:v=>v.toFixed(2)+'×'},
   {key:'adsSensitivity',label:'Aim-down-sights sensitivity',type:'range',min:.1,max:2,step:.05,format:v=>v.toFixed(2)+'×'},
   {key:'invertY',label:'Invert look up / down',type:'toggle'},
+  {key:'headBob',label:'Head bob',type:'toggle',hint:'Camera moves with your steps and landings'},
   {key:'fov',label:'Field of view',type:'range',min:60,max:110,step:1,format:v=>v+'°'},
   {key:'volume',label:'Master volume',type:'range',min:0,max:1.5,step:.05,format:v=>Math.round(v*100)+'%'},
   {key:'music',label:'Background music',type:'toggle',hint:'Ambient soundtrack; Easter-egg songs always play'},

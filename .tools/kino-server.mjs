@@ -176,11 +176,10 @@ function wsFrames(sock, onText) {
 function leave(client) {
   const room = client.room; if (!room) return; client.room = null;
   room.players.delete(client.id);
-  if (room.host === client.id) {   // the host runs the game; without it the room ends
-    for (const p of room.players.values()) { wsSend(p.sock, { t: 'closed', reason: 'The host left the game' }); p.room = null; }
-    rooms.delete(room.code); return;
-  }
-  for (const p of room.players.values()) wsSend(p.sock, { t: 'left', id: client.id });
+  if (!room.players.size) { rooms.delete(room.code); return; }
+  // The host runs the game; if it leaves, the longest-connected player takes over.
+  if (room.host === client.id) room.host = room.players.keys().next().value;
+  for (const p of room.players.values()) wsSend(p.sock, { t: 'left', id: client.id, host: room.host });
 }
 const publicPlayer = p => ({ id: p.id, name: p.name, character: p.character });
 let clientSerial = 0;

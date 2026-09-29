@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "movement": {
+      "gravity": 1400,
+      "jumpHeight": 39,
+      "groundAcceleration": 1500,
+      "airAcceleration": 320,
+      "headBob": 1.6,
+      "landingDip": 1
+    }
+  }
+}

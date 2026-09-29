@@ -1,0 +1,6 @@
+{
+  "name": "Weighty movement",
+  "description": "Heavier gravity and momentum, less air control, and first-person head bob and landing dips. Tune in data.json.",
+  "data": "data.json",
+  "script": "mod.js"
+}

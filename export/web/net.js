@@ -17,7 +17,7 @@ export class Net {
         if(m.t==='welcome'){this.id=m.id;this.hostId=m.host;this.code=m.code;this.page=m.page;for(const p of m.players)this.players.set(p.id,p);ok(m);}
         else if(m.t==='error'){fail(new Error(m.error));}
         else if(m.t==='joined'){this.players.set(m.player.id,m.player);this.emit('joined',m.player);}
-        else if(m.t==='left'){const p=this.players.get(m.id);this.players.delete(m.id);this.emit('left',m.id,p);}
+        else if(m.t==='left'){const p=this.players.get(m.id);this.players.delete(m.id);const moved=m.host&&m.host!==this.hostId;if(m.host)this.hostId=m.host;this.emit('left',m.id,p);if(moved)this.emit('host',m.host);}
         else if(m.t==='closed'){this.closedReason=m.reason;this.emit('closed',m.reason);}
         else if(m.t==='msg'){this.emit('msg',m.data,m.from);if(m.data?.t)this.emit(m.data.t,m.data,m.from);}
       };

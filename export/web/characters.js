@@ -107,20 +107,29 @@ export async function createCharacter(entry,data){
 // takes optional m = {forward, side, vy, grounded, turn}: velocity in the
 // character's frame (+side is its left), vertical speed, and yaw rate.
 function motionModel(){
-  const st={phase:0,blend:0,run:0,moving:0,breath:0,air:0,land:0,lean:0,strafe:0,dirSign:1,wasGrounded:true,lastVy:0};
+  const st={phase:0,blend:0,run:0,moving:0,breath:0,air:0,land:0,lean:0,strafe:0,dirSign:1,wasGrounded:true,lastVy:0,
+    speed:0,accel:0,accelV:0,landV:0,leanV:0,sway:0,swayV:0};
+  // Damped spring: slight overshoot gives motion some weight and follow-through.
+  const spring=(x,v,target,freq,damping,dt)=>{v+=(freq*freq*(target-x)-2*damping*freq*v)*dt;return [x+v*dt,v];};
   st.step=(dt,speed,m={})=>{
-    st.breath+=dt;
-    const target=Math.min(1.4,speed/190);st.blend+=(target-st.blend)*Math.min(1,dt*7);
+    dt=Math.min(dt,.05);st.breath+=dt;
+    const target=Math.min(1.4,speed/190);st.blend+=(target-st.blend)*Math.min(1,dt*4.5);
+    // Acceleration lean: forward when speeding up, back when stopping (sprung).
+    const acc=THREE.MathUtils.clamp((speed-st.speed)/Math.max(dt,1e-3)/700,-1,1);st.speed=speed;
+    [st.accel,st.accelV]=spring(st.accel,st.accelV,acc,7,.45,dt);
     st.run=Math.max(0,st.blend-1)/.4;st.moving=Math.min(1,st.blend);
     const f=m.forward??speed,sd=m.side??0;
-    if(speed>20){st.dirSign=f<-.35*speed?-1:1;const want=THREE.MathUtils.clamp(Math.atan2(sd,Math.abs(f))*st.dirSign,-1.1,1.1);st.strafe+=(want-st.strafe)*Math.min(1,dt*8);}
-    else st.strafe*=Math.max(0,1-dt*6);
+    if(speed>20){st.dirSign=f<-.35*speed?-1:1;const want=THREE.MathUtils.clamp(Math.atan2(sd,Math.abs(f))*st.dirSign,-1.1,1.1);st.strafe+=(want-st.strafe)*Math.min(1,dt*5);}
+    else st.strafe*=Math.max(0,1-dt*4);
     if(st.moving>.02)st.phase+=dt*(4.2+speed/32)*st.dirSign;
     const grounded=m.grounded??true;
-    st.air+=((grounded?0:1)-st.air)*Math.min(1,dt*(grounded?14:8));
-    if(grounded&&!st.wasGrounded&&st.lastVy<-120)st.land=Math.min(1,-st.lastVy/520);
-    st.land=Math.max(0,st.land-dt*3.2);st.wasGrounded=grounded;st.lastVy=m.vy??0;
-    st.lean+=(THREE.MathUtils.clamp((m.turn??0)*.09,-.28,.28)-st.lean)*Math.min(1,dt*6);
+    st.air+=((grounded?0:1)-st.air)*Math.min(1,dt*(grounded?16:7));
+    // Landing: an impulse into a spring, so the crouch sinks and recovers.
+    if(grounded&&!st.wasGrounded&&st.lastVy<-120)st.landV+=Math.min(9,-st.lastVy/80);
+    [st.land,st.landV]=spring(st.land,st.landV,0,9,.55,dt);st.land=Math.max(-.15,Math.min(1.2,st.land));st.wasGrounded=grounded;st.lastVy=m.vy??0;
+    [st.lean,st.leanV]=spring(st.lean,st.leanV,THREE.MathUtils.clamp((m.turn??0)*.09,-.28,.28),5,.6,dt);
+    // Secondary sway that lags behind the body (tail).
+    [st.sway,st.swayV]=spring(st.sway,st.swayV,st.lean+st.strafe*.3-st.accel*.3,4,.35,dt);
     return st;
   };
   return st;
@@ -168,16 +177,17 @@ function proceduralRig(model,holder,entry){
   const dir=(x,a,yaw=0)=>new THREE.Vector3(x,-Math.cos(a),Math.sin(a)).applyAxisAngle(Y,yaw);
   const M=motionModel();let holding=false;
   return {hand:R.hand,hold(value){holding=value;},update(dt,speed=0,m){
-    const st=M.step(dt,speed,m),{phase,run,moving,breath,air,land,lean,strafe}=st;
+    const st=M.step(dt,speed,m),{phase,run,moving,breath,air,lean,strafe,accel,sway:lag}=st,land=Math.max(0,st.land);
     for(const [b,r] of rest)b.quaternion.copy(r);
     const idle=1-moving,sway=Math.sin(breath*.55);
     // Pelvis: bob twice per stride, shift over the stance leg, twist with the stride.
-    inner.position.y=baseY+((Math.abs(Math.cos(phase))-.5)*height*(.022+.02*run)*moving-land*height*.1-air*height*.02);
+    // Heavy footfalls: the body drops sharply as each foot lands and rises through the pass.
+    inner.position.y=baseY+((Math.abs(Math.cos(phase))**1.8-.45)*height*(.026+.024*run)*moving-land*height*.1-air*height*.02);
     inner.position.x=baseX+Math.sin(phase)*height*.012*moving+sway*height*.006*idle;
     turn(hips,Y,Math.sin(phase)*.14*moving+strafe*.45);
     turn(hips,Z,Math.sin(phase)*.06*moving+sway*.04*idle+lean*.5);
     // Torso: counter-twist, lean into speed and turns, breathe at rest.
-    const pitch=.04+.22*run+.06*moving+land*.3-air*.1+Math.sin(breath*1.8)*.02*idle;
+    const pitch=.04+.22*run+.06*moving+land*.3-air*.1+accel*.22+Math.sin(breath*1.8)*.02*idle;
     turn(spine,X,pitch*.6);turn(spine,Y,-Math.sin(phase)*.2*moving-strafe*.3);turn(spine,Z,-lean*.9);
     turn(chest,X,pitch*.4+Math.sin(breath*1.8)*.015);
     // Head: stays level, glances around when idle.
@@ -199,7 +209,7 @@ function proceduralRig(model,holder,entry){
         aim(S.arm,S.fore,dir(out,a,strafe*.5));aim(S.fore,S.hand,dir(out*.4,a+bend,strafe*.5));
       }
     }
-    tail.forEach((b,i)=>{turn(b,Y,Math.sin(breath*2.4-i*.7)*(.1+.12*moving)-lean*.6-strafe*.3);turn(b,X,Math.sin(phase*2-i*.5)*.05*moving+air*.12);});
+    tail.forEach((b,i)=>{turn(b,Y,Math.sin(breath*2.4-i*.7)*(.1+.12*moving)-lag*(.7+i*.15));turn(b,X,Math.sin(phase*2-i*.5)*.06*moving+air*.14-accel*.12+land*.2);});
   }};
 }
 
@@ -236,10 +246,10 @@ function mannequin(entry,holder){
   // The figure faces +Z, so its right hand is on the -X side.
   const right=limbs[-1],left=limbs[1];
   return {root:holder,hand:right.wrist,hold(value){holding=value;},update(dt,speed=0,m){
-    const st=M.step(dt,speed,m),{phase,run,moving,breath,air,land,lean,strafe}=st,idle=1-moving,sway=Math.sin(breath*.55);
-    pelvisRoot.position.set(Math.sin(phase)*.9*moving+sway*.45*idle,37.5+(Math.abs(Math.cos(phase))-.5)*(1.6+1.4*run)*moving-land*7-air*1.4,0);
+    const st=M.step(dt,speed,m),{phase,run,moving,breath,air,lean,strafe,accel}=st,land=Math.max(0,st.land),idle=1-moving,sway=Math.sin(breath*.55);
+    pelvisRoot.position.set(Math.sin(phase)*.9*moving+sway*.45*idle,37.5+(Math.abs(Math.cos(phase))**1.8-.45)*(1.9+1.7*run)*moving-land*7-air*1.4,0);
     hips.rotation.set(0,Math.sin(phase)*.14*moving+strafe*.45,Math.sin(phase)*.06*moving+sway*.04*idle+lean*.5);
-    const pitch=.04+.22*run+.06*moving+land*.3-air*.1+Math.sin(breath*1.8)*.02*idle;
+    const pitch=.04+.22*run+.06*moving+land*.3-air*.1+accel*.22+Math.sin(breath*1.8)*.02*idle;
     spine.rotation.set(pitch*.6,-Math.sin(phase)*.2*moving-strafe*.3,-lean*.9);
     chest.rotation.x=pitch*.4;chest.scale.set(1,1+Math.sin(breath*1.8)*.012*idle,1+Math.sin(breath*1.8)*.02*idle);
     const look=(Math.sin(breath*.37)*.28+Math.sin(breath*.13+1)*.18)*idle*(holding?.2:1);

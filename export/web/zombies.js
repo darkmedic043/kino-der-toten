@@ -395,7 +395,7 @@ globalThis.kino={mods,debug:{getState,setActive,pause:()=>setActive(false),resum
   setAutoSpawn:value=>{enemies.autoSpawn=value;enemies.autoRounds=value;},setInvulnerable:value=>{session.effects.invulnerable=value?Infinity:0;},damageEnemy:(id,n=999999)=>{const z=enemies.list.find(z=>z.id===id);if(z)enemies.hurt(z,n);},
   setRound:n=>{enemies.reset();while(session.round<n)session.nextRound();session.countdown=0;session.spawned=0;session.killed=0;},lastShot:()=>lastShot,assets:assetDiagnostics,
   aimAtEnemy:(id,head=true)=>{const z=enemies.list.find(z=>z.id===id);if(z)camera.lookAt(head?enemies.headPosition(z):z.root.position.clone().add(new THREE.Vector3(0,40,0)));},
-  boxState:()=>mysteryBox.snapshot(),fog:()=>scene.fog?.density??0,lights:()=>world.powerLights.map(p=>p.light.intensity),showCollision:value=>{world.collision.setDebugVisible(value);scene.add(world.collision.mesh);}}};
+  boxState:()=>mysteryBox.snapshot(),dropPowerup:(type,p)=>{powerups.spawn(type,vector(p));return powerups.snapshot();},fog:()=>scene.fog?.density??0,lights:()=>world.powerLights.map(p=>p.light.intensity),showCollision:value=>{world.collision.setDebugVisible(value);scene.add(world.collision.mesh);}}};
 try{
   progress('Reading map list',3);
   const id=new URLSearchParams(location.search).get('map'),list=await fetch('mods/maps.json').then(r=>r.json());

@@ -213,11 +213,24 @@ The server is `.tools/kino-server.mjs`. The Discord client id and secret go in
 Host from the main menu (**Host co-op game** on a zombies map), then share the
 invite link (pause menu → **Copy invite**) or the 4-letter room code (**Join
 co-op** on the Play tab). The host's browser runs the zombies and rounds; the
-server (`.tools/kino-server.mjs`, `/api/ws`) only relays messages. Zombies
-chase the nearest player, rounds grow with the player count, hits from any
-player count (points and XP go to the shooter), and doors and power are shared.
-Not shared yet: Mystery Box, power-ups, traps and teleporters; there are no
-downs or revives yet, and the game pauses if the host pauses or leaves.
+server (`.tools/kino-server.mjs`, `/api/ws`) only relays messages.
+
+- Zombies chase the nearest standing player; rounds grow with player count.
+- Hits from any player count; points and XP go to the shooter.
+- Shared: doors, power, window boards, the Mystery Box location (teddy moves
+  and fire sales), power-ups (anyone can grab one; everyone gets the effect)
+  and trap activations. Weapons, perks, points and Pack-a-Punch stay personal.
+- A lethal hit downs you instead (unless you have Quick Revive, which still
+  self-revives). A teammate holds F nearby for 3 s (1.5 s with Quick Revive)
+  to revive you. After 30 s you bleed out and spectate (Space switches
+  player) until the next round. When everyone is down, it's game over.
+- If the host pauses or switches tabs, the game keeps running. If the host
+  leaves, the longest-connected player becomes the new host.
+
+## Movement
+
+`mods/movement/data.json` sets gravity, jump height, ground/air acceleration,
+head bob and landing dip strength. Head bob can be turned off in Settings.
 
 ## Updating from upstream
 
