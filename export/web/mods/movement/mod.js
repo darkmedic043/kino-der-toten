@@ -164,13 +164,13 @@ export default function setup(api){
     const c=api.audio.ctx;if(!c||!api.audio.enabled||!api.audio.master)return;
     if(slideBuffer){
       try{slideBuffer.decoded??=await c.decodeAudioData(slideBuffer.bytes.slice(0));}catch{slideBuffer=null;}
-      if(slideBuffer?.decoded){const s=c.createBufferSource(),g=c.createGain();s.buffer=slideBuffer.decoded;g.gain.value=1.4;s.connect(g).connect(api.audio.master);s.start();return;}
+      if(slideBuffer?.decoded){const s=c.createBufferSource(),g=c.createGain();s.buffer=slideBuffer.decoded;g.gain.value=1;s.connect(g).connect(api.audio.master);s.start();return;}
     }
     const t=c.currentTime,len=SLIDE.duration,b=c.createBuffer(1,Math.ceil(c.sampleRate*len),c.sampleRate),d=b.getChannelData(0);
     for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(.6+.4*Math.random());
     const src=c.createBufferSource(),bp=c.createBiquadFilter(),g=c.createGain();src.buffer=b;bp.type='bandpass';bp.Q.value=.8;
     bp.frequency.setValueAtTime(1800,t);bp.frequency.exponentialRampToValueAtTime(500,t+len);
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.9,t+.04);g.gain.exponentialRampToValueAtTime(.001,t+len);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.65,t+.04);g.gain.exponentialRampToValueAtTime(.001,t+len);
     src.connect(bp).connect(g).connect(api.audio.master);src.start(t);src.stop(t+len);
   });
 
