@@ -16,6 +16,7 @@ export default async function setup(api){
   const glow=new THREE.CanvasTexture(c);glow.colorSpace=THREE.SRGBColorSpace;
   const material=new THREE.SpriteMaterial({map:glow,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
 
+  const OUT=new THREE.Vector3(-.9,0,0);
   let bulbs=[];   // [{slot, sprite}] on the current viewmodel, in firing order
   function attach(){
     bulbs=[];const gun=view.gun,def=view.def;
@@ -23,6 +24,10 @@ export default async function setup(api){
     for(let i=1;i<=8;i++){
       const bone=gun.getObjectByName('tag_bulb'+i);if(!bone)continue;
       const sprite=new THREE.Sprite(material);sprite.scale.setScalar(1.3);sprite.renderOrder=3;sprite.visible=false;
+      // The bulb tags sit 0.15 behind the drum's face (the face is at x≈8.6
+      // facing −X in gun space, tags at x=8.75), inside their windows, so the
+      // glow was buried. Push it out along −X of the gun, in the tag's frame.
+      sprite.position.copy(OUT).applyQuaternion(bone.quaternion.clone().invert());
       bone.add(sprite);bulbs.push({slot:i,sprite});
     }
   }
