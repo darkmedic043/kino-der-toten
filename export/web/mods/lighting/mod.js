@@ -94,6 +94,17 @@ function setupKino(api){
     if(!s.spot.target){const hit=world.raycast?.(new THREE.Ray(s.position.clone().add(new THREE.Vector3(0,-8,0)),down),0,3000);s.spot.target=s.position.clone().add(new THREE.Vector3(0,-(hit?.distance??600),0));}
     s.spot.length=s.position.distanceTo(s.spot.target);
   }
+  // A light a few units from a wall or floor blows that surface out to a big
+  // white disc (and bloom makes it a glowing circle). Cap each light so the
+  // nearest surface gets at most a bright-but-lit level; far reach is unchanged.
+  for(const s of sources){
+    // Only surfaces inside the light's cone can blow out: probe its axis and a ring 50° around it.
+    const axis=(s.spot?s.spot.target.clone().sub(s.position):s.dir??down).clone().normalize(),side=new THREE.Vector3().crossVectors(axis,Math.abs(axis.y)>.9?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0)).normalize();
+    const probes=[axis,...[0,1,2,3,4,5].map(k=>axis.clone().applyAxisAngle(side,.87).applyAxisAngle(axis,k*Math.PI/3))];
+    let near=500;for(const d of probes){const h=ray(s.position,d,500);if(h)near=Math.min(near,h.distance);}
+    if(near<2)near=40;   // the probe started inside the fixture's own geometry
+    s.near=near;s.cap=3.2*Math.pow(Math.max(near,6),1.3);
+  }
 
   // Darker base: less exposure and much less flat fill.
   renderer.toneMappingExposure=1.45;
@@ -222,7 +233,7 @@ function setupKino(api){
   host.on('update',dt=>{
     t+=dt;timer-=dt;frame++;const q=quality();
     applyDay(q);const isDay=day();
-    for(const l of fills){const scale=isDay?(l.isAmbientLight?.42:l.isHemisphereLight?.62:.12):(l.isAmbientLight?.19:l.isHemisphereLight?.21:.12),now=l.isAmbientLight?(session.power?1.5:1.1):base.get(l);l.intensity=now*scale;}
+    for(const l of fills){const scale=isDay?(l.isAmbientLight?.2:l.isHemisphereLight?.3:.08):(l.isAmbientLight?.19:l.isHemisphereLight?.21:.12),now=l.isAmbientLight?(session.power?1.5:1.1):base.get(l);l.intensity=now*scale;}
     // The sun needs its shadows (without them it would light every interior), so Low has none.
     sun.intensity=isDay&&q>=1?5.2:0;sky.position.copy(camera.position);
     if(isDay&&q>=1&&(sunTimer-=dt)<=0){sunTimer=2;sun.shadow.needsUpdate=true;}   // static world; refresh now and then for doors
@@ -238,8 +249,8 @@ function setupKino(api){
       spots.forEach((l,i)=>{const on=cast&&i<nSpots;if(l.castShadow!==on)l.castShadow=on;if(l.shadow.mapSize.x!==size){l.shadow.mapSize.set(size,size);l.shadow.map?.dispose();l.shadow.map=null;}});
       for(const l of spots)l.shadow.needsUpdate=true;
     }
-    for(const l of pool){const s=l.userData.source,target=s?s.intensity*level(s)*560:0;if(s){l.position.copy(s.position);l.target.position.copy(s.position).add(s.dir??down);l.angle=s.angle??1.3;l.color.copy(s.color);l.distance=s.radius;}l.intensity+=(target-l.intensity)*Math.min(1,dt*6);}
-    for(const l of spots){const s=l.userData.source,target=s?Math.min(9,s.intensity)*level(s)*720:0;
+    for(const l of pool){const s=l.userData.source,target=s?Math.min(s.intensity*560,s.cap)*level(s):0;if(s){l.position.copy(s.position);l.target.position.copy(s.position).add(s.dir??down);l.angle=s.angle??1.3;l.color.copy(s.color);l.distance=s.radius;}l.intensity+=(target-l.intensity)*Math.min(1,dt*6);}
+    for(const l of spots){const s=l.userData.source,target=s?Math.min(Math.min(9,s.intensity)*720,s.cap*1.6)*level(s):0;
       if(s){l.position.copy(s.position);l.target.position.copy(s.spot.target);l.color.copy(s.color);l.distance=s.radius*1.6;l.angle=Math.min(1.2,s.spot.angle);l.shadow.camera.far=l.distance;}
       l.intensity+=(target-l.intensity)*Math.min(1,dt*6);}   // never toggle .visible: that recompiles every lit shader
     // Shadows: the world is static, so refresh at 30 Hz on High and every frame on Ultra.
@@ -277,7 +288,7 @@ function setupPost(api){
     composer.addPass(new ShaderPass({uniforms:{tDiffuse:{value:null}},
       vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
       fragmentShader:'uniform sampler2D tDiffuse;varying vec2 vUv;void main(){vec4 c=texture2D(tDiffuse,vUv);if(any(isnan(c))||any(isinf(c)))c=vec4(0.,0.,0.,1.);gl_FragColor=vec4(min(c.rgb,vec3(48.)),c.a);}'}));
-    if(q>=2){gtao=new GTAOPass(scene,camera,w,h);gtao.output=GTAOPass.OUTPUT.Default;gtao.blendIntensity=.85;
+    if(q>=2){gtao=new GTAOPass(scene,camera,w,h);gtao.output=GTAOPass.OUTPUT.Default;gtao.blendIntensity=1;
       gtao.updateGtaoMaterial({radius:28,distanceExponent:1.5,thickness:12,scale:1,samples:q>=3?16:10,distanceFallOff:1});
       gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:4,rings:2,samples:q>=3?16:8});composer.addPass(gtao);
       // AO renders the scene's depth and normals itself; see-through things
