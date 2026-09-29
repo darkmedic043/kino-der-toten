@@ -47,6 +47,37 @@ export default async function setup(api){
   api.scene.traverse(o=>{if(o.isMesh&&[o.material].flat().some(m=>m?.transparent&&GLASS.test(m.name??'')))o.renderOrder=1;});
   console.info('[map-materials]',counts);
 
+  // Sharper textures at glancing angles (floors, walls seen along a corridor).
+  const aniso=api.renderer?.capabilities.getMaxAnisotropy?.()??1;
+  for(const m of seen)if(m.map&&m.map.anisotropy<aniso){m.map.anisotropy=aniso;m.map.needsUpdate=true;}
+
+  // Normal maps: the export never attached them. .tools/build-kino-normals.py
+  // converts the game's (X-in-alpha) maps and lists them by material name.
+  // They load in the background after the game starts.
+  const normalScale=new THREE.Vector2(1,-1);   // DirectX-style green channel
+  fetch(new URL('normals.json',api.mod.url)).then(r=>r.ok?r.json():{}).then(async table=>{
+    const loader=new THREE.TextureLoader(),cache=new Map(),byName=new Map();
+    for(const m of seen)if(table[m.name]&&!m.normalMap)(byName.get(m.name)??byName.set(m.name,[]).get(m.name)).push(m);
+    let applied=0;
+    for(const [name,materials] of byName){
+      const url=new URL(table[name],document.baseURI).href;
+      if(!cache.has(url))cache.set(url,loader.loadAsync(url).then(t=>{t.flipY=false;t.colorSpace=THREE.NoColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=aniso;return t;}).catch(()=>null));
+      const tex=await cache.get(url);if(!tex)continue;
+      for(const m of materials){m.normalMap=tex;m.normalScale=normalScale.clone().multiplyScalar(window.kino.normalStrength??1);m.needsUpdate=true;applied++;}
+    }
+    console.info('[map-materials] normal maps on',applied,'materials');
+  }).catch(e=>console.warn('[map-materials] normal maps',e));
+
+  // The theatre chandelier's opaque slot also holds its bead and crystal cards,
+  // which drew as solid dark panels. Cut them out by alpha, but only in the
+  // strand half of the texture: the brass frame half has zero alpha too.
+  for(const m of seen){
+    if(!/chandel/.test(m.name??'')||m.alphaTest>0)continue;
+    m.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <alphatest_fragment>',
+      '#include <alphatest_fragment>\n#ifdef USE_MAP\nif(fract(vMapUv.x)<.49&&diffuseColor.a<.45)discard;\n#endif');};
+    m.customProgramCacheKey=()=>'chandelier-strands';m.side=THREE.DoubleSide;m.needsUpdate=true;
+  }
+
   // The spawn-room teleporter pad's collision is its visual mesh: a bowl whose
   // rim is at ~89–92 and centre dips to ~78, so walking over it sank you in.
   // Cap the bowl with a flat, invisible floor at rim height.

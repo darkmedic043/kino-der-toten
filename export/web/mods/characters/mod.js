@@ -48,11 +48,43 @@ export default async function setup(api){
     // Velocity in the character's frame (+Z forward, +X its left) for strafing/backpedal poses.
     const speed=Math.hypot(vel.x,vel.z),forward=vel.x*Math.sin(yaw)+vel.z*Math.cos(yaw),side=vel.x*Math.cos(yaw)-vel.z*Math.sin(yaw);
     const mv=window.kino.movement?.state,stance=mv?.prone?'prone':mv?.sliding?'slide':mv?.mantling?'mantle':'';
+    if(character.pose)driveActions(dt,speed,yaw);
     character.update(dt,stance==='prone'?speed*.5:stance==='slide'?0:speed,{forward,side,vy:vel.y,grounded:player.state?.grounded??player.isGrounded??true,turn});
     applyStance(character,stance,dt);
     if(third)view.update(api.world);
   });
   host.on('reset',()=>{third=false;apply();});
+
+  // ---- Action layer: what the player is doing drives the body ----------------------------
+  // Shots kick, reloads work the magazine, the knife slashes, grenades are
+  // thrown, drinks go to the mouth, swaps dip the arms, hits flinch the body.
+  const s=api.session;
+  const act={shots:s.shots,weapon:s.weapon,grenades:s.grenades,reloadSlap:false,meleeLen:0,throwT:0,swapT:0};
+  function driveActions(dt,speed,yaw){
+    if(s.shots>act.shots){const def=s.def,base=def.baseId??def.id;
+      const kick=base==='thundergun_zm'?2.2:THREE.MathUtils.clamp(.3+(def.fireTime??.1)*1.6+(def.pellets>1?.5:0),.3,1.6);character.act('recoil',kick);}
+    act.shots=s.shots;
+    // Reload envelope, with a slap at 60% (the magazine seating).
+    const rl=s.reloadLeft>0&&s.reloadDuration>0?1-s.reloadLeft/s.reloadDuration:0;
+    if(rl>.6&&!act.reloadSlap){act.reloadSlap=true;character.act('slap',1);}if(rl===0)act.reloadSlap=false;
+    // Knife: phase through the strike.
+    if(s.meleeLeft>0){act.meleeLen=Math.max(act.meleeLen,s.meleeLeft);}else act.meleeLen=0;
+    const melee=s.meleeLeft>0?1-s.meleeLeft/act.meleeLen:0;
+    // Grenade thrown: a 0.55 s overhand arc.
+    if(s.grenades<act.grenades)act.throwT=.55;act.grenades=s.grenades;act.throwT=Math.max(0,act.throwT-dt);
+    // Weapon swap: a quick dip.
+    if(s.weapon!==act.weapon){act.weapon=s.weapon;act.swapT=.35;}act.swapT=Math.max(0,act.swapT-dt);
+    const st=api.getState();
+    character.pose({reload:rl>0?Math.min(1,rl/.12,(1-rl)/.12):0,drink:s.drinking?1:0,swap:act.swapT>0?1:0,
+      sprint:speed>230&&!st.input?.ads?1:0,ads:st.input?.ads?1:0,melee,throw:act.throwT>0?1-act.throwT/.55:0});
+  }
+  // Flinch away from the nearest attacking zombie (character frame: +x its left, +z forward).
+  host.on('beforeDamage',()=>{
+    if(!character.act)return;const p=player.getFeetPosition(),yaw=camera.rotation.y+Math.PI;
+    let near=null,best=160;for(const z of api.enemies.list){const d=z.root.position.distanceTo(p);if(d<best){best=d;near=z;}}
+    const away=near?p.clone().sub(near.root.position).setY(0).normalize():new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw)).negate();
+    character.act('flinch',1.2,{x:away.x*Math.cos(yaw)-away.z*Math.sin(yaw),z:away.x*Math.sin(yaw)+away.z*Math.cos(yaw)});
+  });
 
   // "fpArms": the character's own arms in first person, posed onto the hidden
   // T5 viewmodel rig (see fp-arms.js). Perk drinks use their own viewmodels.

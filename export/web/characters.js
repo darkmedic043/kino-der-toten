@@ -130,9 +130,38 @@ function motionModel(){
     [st.lean,st.leanV]=spring(st.lean,st.leanV,THREE.MathUtils.clamp((m.turn??0)*.09,-.28,.28),5,.6,dt);
     // Secondary sway that lags behind the body (tail).
     [st.sway,st.swayV]=spring(st.sway,st.swayV,st.lean+st.strafe*.3-st.accel*.3,4,.35,dt);
+    // Action layer: sprung impulses (recoil, flinch, reload slap) and eased
+    // envelopes (reload, drink, weapon swap, sprint carry, aim) that the rigs
+    // blend over the locomotion pose.
+    [st.recoil,st.recoilV]=spring(st.recoil,st.recoilV,0,16,.42,dt);
+    [st.flinchX,st.flinchXV]=spring(st.flinchX,st.flinchXV,0,10,.38,dt);
+    [st.flinchZ,st.flinchZV]=spring(st.flinchZ,st.flinchZV,0,10,.38,dt);
+    [st.slap,st.slapV]=spring(st.slap,st.slapV,0,14,.4,dt);
+    for(const k in st.env){const rate=k==='swap'?14:k==='ads'?12:8;st.env[k]+=(st.envTarget[k]-st.env[k])*Math.min(1,dt*rate);}
     return st;
   };
+  Object.assign(st,{recoil:0,recoilV:0,flinchX:0,flinchXV:0,flinchZ:0,flinchZV:0,slap:0,slapV:0,melee:0,throw:0,
+    env:{reload:0,drink:0,swap:0,sprint:0,ads:0},envTarget:{reload:0,drink:0,swap:0,sprint:0,ads:0}});
+  // Impulses: recoil (weapon kick), flinch ({x,z} away from the hit, character frame), slap (reload).
+  st.act=(kind,amount=1,dir)=>{
+    if(kind==='recoil')st.recoilV+=amount*12;
+    if(kind==='slap')st.slapV+=amount*9;
+    if(kind==='flinch'){st.flinchXV+=(dir?.x??0)*amount*9;st.flinchZV+=(dir?.z??-1)*amount*9;}
+  };
+  // Held states: envelopes 0..1 (reload, drink, swap, sprint, ads) or phases 0..1 (melee, throw; 0 = idle).
+  st.pose=(values)=>{for(const [k,v] of Object.entries(values)){if(k in st.envTarget)st.envTarget[k]=v;else st[k]=v;}};
   return st;
+}
+// Action-layer offsets shared by the rigs, in the rigs' aim-direction terms.
+function actionPose(st){
+  const {recoil:R,slap,flinchX,flinchZ,melee,throw:th}=st,{reload:rel,drink,swap,sprint,ads}=st.env;
+  // Knife: wind up across the body, then slash through (phase 0..1).
+  const swing=melee>0?(melee<.35?-Math.sin(melee/.35*Math.PI/2):Math.sin((melee-.35)/.65*Math.PI)*1.2-(1-(melee-.35)/.65)*.2):0;
+  // Grenade: arm back and up, then over and forward.
+  const toss=th>0?(th<.4?th/.4:1-(th-.4)/.6):0,release=th>.4?Math.sin((th-.4)/.6*Math.PI):0;
+  return {R,slap,rel,drink,swap,sprint,ads,swing,toss,release,flinchX,flinchZ,melee,th,
+    torsoPitch:-R*.08+flinchZ*.22+rel*.08+sprint*.1-drink*.1,torsoTwist:swing*.45+toss*.3-release*.4,torsoRoll:flinchX*.25,
+    headPitch:rel*.35-drink*.45+ads*.08+flinchZ*.2,headYaw:rel*.15-swing*.2};
 }
 
 // Procedural animation for a rigged humanoid that ships without clips. Bones
@@ -178,8 +207,9 @@ function proceduralRig(model,holder,entry){
   const M=motionModel();let holding=false,stance='';
   // Lying prone, the aim pose is turned past the head so the gun points forward.
   const hold=v=>stance==='prone'?v.applyAxisAngle(X,-1.45):v;
-  return {hand:R.hand,hold(value){holding=value;},setStance(value){stance=value;},update(dt,speed=0,m){
+  return {hand:R.hand,hold(value){holding=value;},setStance(value){stance=value;},act:M.act,pose:M.pose,update(dt,speed=0,m){
     const st=M.step(dt,speed,m),{phase,run,moving,breath,air,lean,strafe,accel,sway:lag}=st,land=Math.max(0,st.land);
+    const A=actionPose(st);
     for(const [b,r] of rest)b.quaternion.copy(r);
     const idle=1-moving,sway=Math.sin(breath*.55);
     // Pelvis: bob twice per stride, shift over the stance leg, twist with the stride.
@@ -190,11 +220,11 @@ function proceduralRig(model,holder,entry){
     turn(hips,Z,Math.sin(phase)*.06*moving+sway*.04*idle+lean*.5);
     // Torso: counter-twist, lean into speed and turns, breathe at rest.
     const pitch=.04+.22*run+.06*moving+land*.3-air*.1+accel*.22+Math.sin(breath*1.8)*.02*idle;
-    turn(spine,X,pitch*.6);turn(spine,Y,-Math.sin(phase)*.2*moving-strafe*.3);turn(spine,Z,-lean*.9);
-    turn(chest,X,pitch*.4+Math.sin(breath*1.8)*.015);
-    // Head: stays level, glances around when idle.
+    turn(spine,X,pitch*.6+A.torsoPitch*.6);turn(spine,Y,-Math.sin(phase)*.2*moving-strafe*.3+A.torsoTwist*.6);turn(spine,Z,-lean*.9+A.torsoRoll);
+    turn(chest,X,pitch*.4+Math.sin(breath*1.8)*.015+A.torsoPitch*.4);turn(chest,Y,A.torsoTwist*.4);
+    // Head: stays level, glances around when idle, follows the hands when busy.
     const look=(Math.sin(breath*.37)*.28+Math.sin(breath*.13+1)*.18)*idle*(holding?.2:1);
-    turn(neck,X,-pitch*.5);turn(head??neck,Y,look+Math.sin(phase)*.06*moving);turn(head??neck,X,Math.sin(breath*.29)*.08*idle-land*.15);
+    turn(neck,X,-pitch*.5-A.torsoPitch*.5);turn(head??neck,Y,look+Math.sin(phase)*.06*moving+A.headYaw);turn(head??neck,X,Math.sin(breath*.29)*.08*idle-land*.15+A.headPitch-A.flinchZ*.3);turn(head??neck,Z,-A.flinchX*.35);
     for(const [S,s] of [[L,1],[R,-1]]){
       const off=s>0?0:Math.PI,thigh=Math.sin(phase+off)*(.5+.32*run)*moving;
       const knee=(Math.max(0,Math.sin(phase+off+1.1))*(.75+.9*run)+.1)*moving+.05*idle+land*1.35+air*(.9+.3*Math.sin(off));
@@ -203,8 +233,21 @@ function proceduralRig(model,holder,entry){
       turn(S.foot,X,(Math.sin(phase+off-.6)*.35*moving+air*.5)*(st.dirSign));
       if(holding){
         const bob=Math.sin(phase*2)*.03*moving+Math.sin(breath*1.8)*.015;
-        if(s<0){aim(S.arm,S.fore,hold(new THREE.Vector3(-.12,-.18+bob,1)));aim(S.fore,S.hand,hold(new THREE.Vector3(.05,-.05+bob,1)));}
-        else{aim(S.arm,S.fore,hold(new THREE.Vector3(-.3,-.35+bob,.9)));aim(S.fore,S.hand,hold(new THREE.Vector3(-.85,-.02+bob,.55)));}
+        // Gun hand: recoil kicks up and back, reload tips the gun down and in,
+        // sprint carries it low across the chest, a swap drops it, aiming lifts it.
+        const lift=A.R*.22-A.rel*.32-A.swap*.7-A.sprint*.42+A.ads*.12,inward=A.rel*.2+A.sprint*.28;
+        if(s<0){
+          let up=new THREE.Vector3(-.12+inward,-.18+bob+lift,1-A.R*.25),fore=new THREE.Vector3(.05+inward*1.6,-.05+bob+lift*1.3,1);
+          if(A.drink){up.lerp(new THREE.Vector3(-.35,.35,.55),A.drink);fore.lerp(new THREE.Vector3(.9,.55,.1),A.drink);}
+          if(A.melee){up.lerp(new THREE.Vector3(-.8+A.swing*1.4,.1+A.swing*.1,.6),.9);fore.lerp(new THREE.Vector3(.2+A.swing,-.1,1),.9);}
+          if(A.th){up.lerp(new THREE.Vector3(-.4,.8*A.toss-.2*A.release,-.4*A.toss+.9*A.release),.95);fore.lerp(new THREE.Vector3(.1,.9*A.toss,.3+A.release),.95);}
+          aim(S.arm,S.fore,hold(up));aim(S.fore,S.hand,hold(fore));
+        }else{
+          // Support hand: under the gun, down to the magazine and back with a slap on reload.
+          const mag=A.rel,slap=A.slap;
+          const up=new THREE.Vector3(-.3+mag*.12,-.35+bob+lift*.8-mag*.28+slap*.12,.9-mag*.15),fore=new THREE.Vector3(-.85+mag*.35,-.02+bob+lift-mag*.45+slap*.5,.55+mag*.1);
+          aim(S.arm,S.fore,hold(up));aim(S.fore,S.hand,hold(fore));
+        }
       }else{
         const a=-thigh*(.85+.45*run)+air*.35,out=s*(.13+.03*Math.sin(breath*1.3+off)+.08*run+air*.5);
         const bend=.2+.3*moving+1.15*run+air*.6+land*.4;
@@ -247,15 +290,16 @@ function mannequin(entry,holder){
   const M=motionModel();let holding=false,stance='';
   // The figure faces +Z, so its right hand is on the -X side.
   const right=limbs[-1],left=limbs[1];
-  return {root:holder,hand:right.wrist,hold(value){holding=value;},setStance(value){stance=value;},update(dt,speed=0,m){
+  return {root:holder,hand:right.wrist,hold(value){holding=value;},setStance(value){stance=value;},act:M.act,pose:M.pose,update(dt,speed=0,m){
     const st=M.step(dt,speed,m),{phase,run,moving,breath,air,lean,strafe,accel}=st,land=Math.max(0,st.land),idle=1-moving,sway=Math.sin(breath*.55);
+    const A=actionPose(st);
     pelvisRoot.position.set(Math.sin(phase)*.9*moving+sway*.45*idle,37.5+(Math.abs(Math.cos(phase))**1.8-.45)*(1.9+1.7*run)*moving-land*7-air*1.4,0);
     hips.rotation.set(0,Math.sin(phase)*.14*moving+strafe*.45,Math.sin(phase)*.06*moving+sway*.04*idle+lean*.5);
     const pitch=.04+.22*run+.06*moving+land*.3-air*.1+accel*.22+Math.sin(breath*1.8)*.02*idle;
-    spine.rotation.set(pitch*.6,-Math.sin(phase)*.2*moving-strafe*.3,-lean*.9);
-    chest.rotation.x=pitch*.4;chest.scale.set(1,1+Math.sin(breath*1.8)*.012*idle,1+Math.sin(breath*1.8)*.02*idle);
+    spine.rotation.set(pitch*.6+A.torsoPitch*.6,-Math.sin(phase)*.2*moving-strafe*.3+A.torsoTwist*.6,-lean*.9+A.torsoRoll);
+    chest.rotation.set(pitch*.4+A.torsoPitch*.4,A.torsoTwist*.4,0);chest.scale.set(1,1+Math.sin(breath*1.8)*.012*idle,1+Math.sin(breath*1.8)*.02*idle);
     const look=(Math.sin(breath*.37)*.28+Math.sin(breath*.13+1)*.18)*idle*(holding?.2:1);
-    neck.rotation.x=-pitch*.5;head.rotation.set(Math.sin(breath*.29)*.08*idle-land*.15,look+Math.sin(phase)*.06*moving,0);
+    neck.rotation.x=-pitch*.5-A.torsoPitch*.5;head.rotation.set(Math.sin(breath*.29)*.08*idle-land*.15+A.headPitch-A.flinchZ*.3,look+Math.sin(phase)*.06*moving+A.headYaw,-A.flinchX*.35);
     for(const side of [-1,1]){
       const l=limbs[side],off=side>0?0:Math.PI,thigh=Math.sin(phase+off)*(.5+.32*run)*moving;
       const knee=(Math.max(0,Math.sin(phase+off+1.1))*(.75+.9*run)+.1)*moving+.05*idle+land*1.35+air*(.9+.3*Math.sin(off));
@@ -270,8 +314,14 @@ function mannequin(entry,holder){
       // Aim the weapon forward with both hands; the legs keep walking.
       const bob=Math.sin(phase*2)*.03*moving+Math.sin(breath*1.8)*.015;
       const over=stance==='prone'?-1.45:0;   // lying prone: arms reach past the head
-      right.shoulder.rotation.set(-1.32+bob+over,0,.12);right.elbow.rotation.x=-.12;
-      left.shoulder.rotation.set(-1.18+bob+over,0,-.62);left.elbow.rotation.x=-.75;
+      // Action layer: recoil lifts the arms, reload drops the gun and works the
+      // magazine, sprint carries it low, a swap drops it, aiming raises it.
+      const lift=A.R*.25-A.rel*.35-A.swap*.8-A.sprint*.55+A.ads*.12;
+      right.shoulder.rotation.set(-1.32+bob+over-lift,A.rel*.25+A.sprint*.3,.12+A.rel*.1);right.elbow.rotation.x=-.12-A.R*.25-A.rel*.35;
+      left.shoulder.rotation.set(-1.18+bob+over-lift+A.rel*.3-A.slap*.25,0,-.62+A.rel*.2);left.elbow.rotation.x=-.75-A.rel*.6-A.slap*.4;
+      if(A.drink){right.shoulder.rotation.x+=( -2.3-right.shoulder.rotation.x)*A.drink;right.shoulder.rotation.z+=(.45-right.shoulder.rotation.z)*A.drink;right.elbow.rotation.x+=(-1.9-right.elbow.rotation.x)*A.drink;}
+      if(A.melee){right.shoulder.rotation.set(-1.1-A.swing*.25,-.9+A.swing*1.5,.3);right.elbow.rotation.x=-.5+A.swing*.3;}
+      if(A.th){right.shoulder.rotation.set(-2.6*A.toss+(-1.2)*A.release,0,.2);right.elbow.rotation.x=-1.4*A.toss*(1-A.release);}
     }
   },dispose(){holder.removeFromParent();}};
 }
