@@ -106,7 +106,7 @@ function damage(n){
   if(session.phase==='gameover'){
     primary=false;ads=false;setActive(false);document.exitPointerLock?.();$('start').innerHTML='TRY AGAIN <span>→</span>';$('restart').hidden=true;
     $('menu-status').textContent='You survived '+session.round+' rounds';$('results').hidden=false;$('results').textContent=session.kills+' kills · '+session.headshots+' headshots · '+Math.floor(session.time/60)+'m '+Math.floor(session.time%60)+'s';
-    try{const best=Math.max(session.round,+(localStorage.getItem('kino.best')||0));localStorage.setItem('kino.best',String(best));}catch{}
+    if(!globalThis.kino?.cheats?.used)try{const best=Math.max(session.round,+(localStorage.getItem('kino.best')||0));localStorage.setItem('kino.best',String(best));}catch{}
   }else if(session.phase==='reviving')announce('A second chance','QUICK REVIVE',4);
 }
 function effect(position,color=0x9e3023,count=7){

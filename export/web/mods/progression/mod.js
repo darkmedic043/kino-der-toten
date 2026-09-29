@@ -39,8 +39,10 @@ export default async function setup(api){
 
   // ---- XP and levels --------------------------------------------------------
   let gameXp=0;
+  // A game where the cheat console was used earns nothing and records no stats.
+  const cheating=()=>!!window.kino.cheats?.used;
   function grant(amount){
-    if(amount<=0)return;
+    if(amount<=0||cheating())return;
     profile.xp+=amount;gameXp+=amount;
     const before=unlocked(profile.level);
     let levelled=false;
@@ -58,15 +60,15 @@ export default async function setup(api){
     save();renderHud();
   }
   host.on('kill',({kind,head,melee,remote})=>{
-    if(remote)return;   // a co-op teammate's kill, applied on the host
+    if(remote||cheating())return;   // a co-op teammate's kill, applied on the host; or a cheat game
     const xp=config.xp;
     grant(kind==='dog'?xp.hellhound:xp.kill+(head?xp.headshot:0)+(melee?xp.melee:0));
     profile.kills++;
   });
-  host.on('roundEnd',({round})=>{grant(round*config.xp.roundSurvivedPerRound);profile.bestRound=Math.max(profile.bestRound,round);});
+  host.on('roundEnd',({round})=>{if(cheating())return;grant(round*config.xp.roundSurvivedPerRound);profile.bestRound=Math.max(profile.bestRound,round);});
   host.on('start',()=>{profile=loadProfile();gameXp=0;profile.games++;save();});
   // The game writes its results line right after this event, so append afterwards.
-  host.on('gameOver',()=>{save(true);renderMenu();queueMicrotask(()=>{const r=document.getElementById('results');if(r)r.textContent+=` · +${gameXp} XP`;});});
+  host.on('gameOver',()=>{save(true);renderMenu();queueMicrotask(()=>{const r=document.getElementById('results');if(r)r.textContent+=cheating()?' · cheats on, no XP or stats':` · +${gameXp} XP`;});});
 
   // ---- HUD --------------------------------------------------------------------
   const hud=document.createElement('div');hud.id='progression-hud';

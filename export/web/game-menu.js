@@ -33,7 +33,7 @@ export function installGameMenu({renderer,audio,pixelRatio,started=()=>false}){
   // default key whose action moved elsewhere is swallowed. Unlisted keys
   // (Esc, 1/2, 5, M, F3, Ctrl) pass through untouched.
   const remap=e=>{
-    if(e.remapped||!Object.keys(settings.binds??{}).length)return;
+    if(e.remapped||!Object.keys(settings.binds??{}).length||e.target?.closest?.('input,textarea,select'))return;   // typing in a text box
     const b=binds(),action=Object.keys(b).find(a=>b[a]===e.code);
     if(action&&DEFAULT_BINDS[action]!==e.code){
       e.stopImmediatePropagation();e.preventDefault();

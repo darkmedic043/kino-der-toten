@@ -1,0 +1,5 @@
+{
+  "name": "Cheat console",
+  "description": "Press ` (backquote) in a game to type commands: give weapons, points, god mode, infinite ammo, perks, Pack-a-Punch, rounds and power-ups. Using any cheat turns off XP, stats and best-round records for that game.",
+  "script": "mod.js"
+}
