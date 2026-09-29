@@ -83,6 +83,8 @@ export class FirstPersonArms {
         if(a&&b&&next)aim(bone,pos(next).sub(pos(bone)),pos(b).sub(pos(a)));
       });
       shift[t5]=tW.clone().sub(pos(S.hand));
+      S.targets=[[S.arm,'j_shoulder_'+t5],[S.fore,'j_elbow_'+t5],[S.hand,'j_wrist_'+t5]];
+      for(const [name,chain] of Object.entries(f))chain.forEach((bone,i)=>{if(T(`j_${name}_${t5}_${i}`))S.targets.push([bone,`j_${name}_${t5}_${i}`]);});
       // Character bone -> T5 bone for skin weights.
       boneMap.set(S.arm,'j_shoulder_'+t5);boneMap.set(S.fore,'j_elbow_'+t5);boneMap.set(S.hand,'j_wrist_'+t5);
       for(const [name,chain] of Object.entries(f))chain.forEach((bone,i)=>{if(T(`j_${name}_${t5}_${i}`))boneMap.set(bone,`j_${name}_${t5}_${i}`);});
@@ -90,13 +92,21 @@ export class FirstPersonArms {
       S.t5=t5;
     }
     holder.updateMatrixWorld(true);
+    // Per-joint offsets: every mapped joint (shoulder, elbow, wrist, each finger
+    // knuckle) is moved exactly onto its T5 joint and the mesh between stretches,
+    // so different arm and finger proportions still close around the grips.
+    // Unmapped bones (twist, tips) follow their nearest mapped ancestor.
+    const offset=new Map();
+    for(const S of Object.values(sides))for(const [bone,name] of S.targets)offset.set(bone,tp(name).sub(pos(bone)));
+    const offsetOf=b=>{let p=b;while(p&&!offset.has(p))p=p.parent;return p?offset.get(p):null;};
 
     // Bake: keep triangles skinned to the arms (the forearm down unless fpArmsUpper),
     // move them into the T5 mesh's bind space and point their weights at T5 bones.
     const t5Bones=template[0].skeleton.bones,t5Index=new Map(t5Bones.map((b,i)=>[b.name,i]));
     // In bind pose a skinned vertex v renders at bindMatrix * v.
     const toBind=template[0].bindMatrix.clone().invert();
-    const keepBones=new Map();for(const S of Object.values(sides))(this.entry.fpArmsUpper?S.arm:S.fore).traverse(b=>{if(b.isBone)keepBones.set(b,S);});
+    // The whole arm by default: forearm-only showed a severed end on long swings (knife).
+    const keepBones=new Map();for(const S of Object.values(sides))(this.entry.fpArmsUpper===false?S.fore:S.arm).traverse(b=>{if(b.isBone)keepBones.set(b,S);});
     const parts=[];
     model.traverse(o=>{
       if(!o.isSkinnedMesh)return;
@@ -105,12 +115,21 @@ export class FirstPersonArms {
       const sideOf=new Array(count),weightOf=new Float32Array(count);
       for(let v=0;v<count;v++){let best=null,w=0;for(let k=0;k<4;k++){const s=keepBones.get(src[si.getComponent(v,k)]);if(s){w+=sw.getComponent(v,k);best??=s;}}sideOf[v]=best;weightOf[v]=w;}
       const idx=g.index?g.index.array:[...Array(count).keys()],tris=[];
-      for(let t=0;t<idx.length;t+=3)if(weightOf[idx[t]]>.5&&weightOf[idx[t+1]]>.5&&weightOf[idx[t+2]]>.5)tris.push(idx[t],idx[t+1],idx[t+2]);
+      // Upper arm: only the half nearest the elbow (enough that a long swing
+      // never shows a cut end; the shoulder and its armour stay out of view).
+      const keepV=new Uint8Array(count),wp=new THREE.Vector3();
+      for(let v=0;v<count;v++){const S=sideOf[v];if(!S||weightOf[v]<=.5)continue;
+        o.getVertexPosition(v,wp);wp.applyMatrix4(o.matrixWorld);const a=pos(S.arm),e=pos(S.fore),ax=e.clone().sub(a),t=wp.clone().sub(a).dot(ax)/ax.lengthSq();
+        keepV[v]=this.entry.fpArmsUpper||t>.5?1:0;}
+      for(let t=0;t<idx.length;t+=3)if(keepV[idx[t]]&&keepV[idx[t+1]]&&keepV[idx[t+2]])tris.push(idx[t],idx[t+1],idx[t+2]);
       if(!tris.length)return;
       const used=[...new Set(tris)],remap=new Map(used.map((v,i)=>[v,i]));
       const P=new Float32Array(used.length*3),UV=g.attributes.uv?new Float32Array(used.length*2):null,SI=new Uint16Array(used.length*4),SW=new Float32Array(used.length*4),v3=new THREE.Vector3();
       used.forEach((v,i)=>{
-        o.getVertexPosition(v,v3);v3.applyMatrix4(o.matrixWorld).add(shift[sideOf[v].t5]).applyMatrix4(toBind);P.set([v3.x,v3.y,v3.z],i*3);
+        o.getVertexPosition(v,v3);v3.applyMatrix4(o.matrixWorld);
+        const move=new THREE.Vector3();let wsum=0;
+        for(let k=0;k<4;k++){const weight=sw.getComponent(v,k);if(!weight)continue;const off=offsetOf(src[si.getComponent(v,k)]);if(off){move.addScaledVector(off,weight);wsum+=weight;}}
+        v3.add(wsum>0?move.divideScalar(wsum):shift[sideOf[v].t5]).applyMatrix4(toBind);P.set([v3.x,v3.y,v3.z],i*3);
         if(UV)UV.set([g.attributes.uv.getX(v),g.attributes.uv.getY(v)],i*2);
         const w=new Map();
         for(let k=0;k<4;k++){const weight=sw.getComponent(v,k);if(!weight)continue;const name=boneMap.get(src[si.getComponent(v,k)])??`j_shoulder_${sideOf[v].t5}`;w.set(name,(w.get(name)??0)+weight);}

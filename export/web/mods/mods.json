@@ -1,5 +1,6 @@
 {
   "enabled": [
+    "hd-weapons",
     "lighting",
     "map-materials",
     "example-weapons",

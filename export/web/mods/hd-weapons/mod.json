@@ -1,0 +1,5 @@
+{
+  "name": "HD weapon textures",
+  "description": "AI-upscaled textures for every weapon (Settings → HD textures).",
+  "script": "mod.js"
+}
