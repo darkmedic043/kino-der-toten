@@ -17,7 +17,7 @@ export default async function setup(api){
     const d=position?position.distanceTo(camera.position):0,gain=volume*Math.max(0,1-d/1400)**1.4;if(gain<.02)return;
     const buffer=await load(list[Math.floor(Math.random()*list.length)]);if(!buffer)return;
     const src=audio.ctx.createBufferSource(),g=audio.ctx.createGain();src.buffer=buffer;src.playbackRate.value=.92+Math.random()*.16;
-    g.gain.value=gain*(kind==='growl'?.8:1.1);src.connect(g).connect(audio.master);src.start();
+    g.gain.value=gain*(kind==='growl'?.45:.65);src.connect(g).connect(audio.master);src.start();
   }
   // Replace the synthesized growl; the game passes a distance-based volume.
   const baseSound=enemies.onSound;
@@ -34,7 +34,7 @@ export default async function setup(api){
       const src=audio.ctx.createBufferSource(),g=audio.ctx.createGain();src.buffer=buffer;src.loop=true;g.gain.value=0;src.connect(g).connect(audio.master);src.start();horde.gain=g;}
     if(!horde.gain)return;
     let near=0;for(const z of enemies.list){const d=z.root.position.distanceTo(camera.position);if(d<900)near+=1-d/900;}
-    const target=audio.enabled&&window.kino.debug.getState().active?Math.min(.45,near*.07):0;
+    const target=audio.enabled&&window.kino.debug.getState().active?Math.min(.25,near*.04):0;
     horde.gain.gain.setTargetAtTime(target,audio.ctx.currentTime,.4);
   });
   // Warm the cache once audio exists.
