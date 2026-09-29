@@ -6,6 +6,7 @@
 // alpha blends, and hides the editor-only HDR light portal. Kino only;
 // custom maps bring their own materials.
 import * as THREE from 'three';
+import { CollisionWorld } from '../../collision-world.js';
 
 const GLASS=/glass/;
 const MULTIPLY=/decal_(burn_scortch|burntstain|darkstain|grime|lightstain_03|wall_fillet)|eb_dec_pipe_stain|jun_dec_blast_crater/;
@@ -45,4 +46,13 @@ export default async function setup(api){
   // Blended surfaces draw after the opaque world, farthest first.
   api.scene.traverse(o=>{if(o.isMesh&&[o.material].flat().some(m=>m?.transparent&&GLASS.test(m.name??'')))o.renderOrder=1;});
   console.info('[map-materials]',counts);
+
+  // The spawn-room teleporter pad's collision is its visual mesh: a bowl whose
+  // rim is at ~89–92 and centre dips to ~78, so walking over it sank you in.
+  // Cap the bowl with a flat, invisible floor at rim height.
+  const PAD={x:2,z:1274,radius:57,top:89.4};
+  if(api.world?.dynamic){
+    const g=new THREE.CylinderGeometry(PAD.radius,PAD.radius,6,32).translate(PAD.x,PAD.top-3,PAD.z);
+    api.world.dynamic.push({collider:new CollisionWorld(g),enabled:true,note:'spawn pad cap'});
+  }
 }

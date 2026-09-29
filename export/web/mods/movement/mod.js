@@ -189,9 +189,14 @@ export default function setup(api){
 
   // ---- Camera feel ------------------------------------------------------------------------------
   let phase=0,dip=0,dipV=0,roll=0,wasGrounded=true,lastVy=0,bobBlend=0,fallTime=0,crouchOffset=0;
-  let lastEye=player._eyeHeight;
+  let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0;
   host.on('update',dt=>{
     const eye=player._eyeHeight;if(eye!==lastEye){crouchOffset+=lastEye-eye;lastEye=eye;}
+    // Stairs: each step up (or snap down) moves the feet several units in one
+    // frame, which shook the camera. Absorb those jumps and ease them out.
+    const feetY=player.getFeetPosition().y,jump=feetY-lastFeetY;lastFeetY=feetY;
+    if(player.onFloor&&!state.mantling&&Math.abs(jump)>1.5&&Math.abs(jump)<=player.stepHeight+6)stairOffset=THREE.MathUtils.clamp(stairOffset-jump,-24,24);
+    else if(Math.abs(jump)>player.stepHeight+6)stairOffset=0;   // teleports, mantles, big drops
     if(!dt||['reviving','gameover'].includes(session.phase))return;
     const st=player.state,v=st.velocity,speed=Math.hypot(v.x,v.z),grounded=st.grounded;
     // Landing dip only after a real fall (not stairs).
@@ -210,7 +215,8 @@ export default function setup(api){
     roll+=(targetRoll-roll)*Math.min(1,dt*7);
     // Ease the eye between standing / crouch / prone heights instead of popping.
     crouchOffset+=(0-crouchOffset)*Math.min(1,dt*10);
-    camera.position.y+=y+dip+crouchOffset;
+    stairOffset+=(0-stairOffset)*Math.min(1,dt*11);
+    camera.position.y+=y+dip+crouchOffset+stairOffset;
     camera.position.x+=Math.cos(camera.rotation.y)*side;camera.position.z-=Math.sin(camera.rotation.y)*side;
     camera.rotation.z=roll+Math.cos(phase)*.004*bob*bobBlend;
   });
