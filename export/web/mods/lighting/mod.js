@@ -103,7 +103,8 @@ function setupKino(api){
   }
   for(const s of sources){
     if(!s.spot)continue;
-    if(!s.spot.target){const hit=world.raycast?.(new THREE.Ray(s.position.clone().add(new THREE.Vector3(0,-8,0)),down),0,3000);s.spot.target=s.position.clone().add(new THREE.Vector3(0,-(hit?.distance??600),0));}
+    // Start below the fixture's own body, or the ray hits the lamp itself (a 30-unit 'beam' that drew as a bright ring).
+    if(!s.spot.target){const hit=world.raycast?.(new THREE.Ray(s.position.clone().add(new THREE.Vector3(0,-40,0)),down),0,3000);s.spot.target=s.position.clone().add(new THREE.Vector3(0,-40-(hit?.distance??600),0));}
     s.spot.length=s.position.distanceTo(s.spot.target);
   }
   // A light a few units from a wall or floor blows that surface out to a big
@@ -231,7 +232,7 @@ function setupKino(api){
     beams.push({s:src,mesh,dust,seed,len,strength});
   }
   for(const s of sources){
-    if(!s.spot?.beam)continue;
+    if(!s.spot?.beam||s.spot.length<150)continue;   // too short to read as a beam; it would just be a bright ring
     const len=Math.min(s.spot.length*.85,1400);
     makeBeam(s,s.position,s.spot.target.clone().sub(s.position),len,Math.tan(s.spot.angle*.8)*len,s.color,s.spot.beam);
   }
