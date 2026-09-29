@@ -1,6 +1,6 @@
 // Player character + third-person view (T). The character is chosen in the
 // main menu and stored in the shared profile.
-import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tintArms, loadCharacterGltf } from '../../characters.js';
+import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tintArms, loadCharacterGltf, renderPortrait } from '../../characters.js';
 import { FirstPersonArms } from '../../fp-arms.js';
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
@@ -22,6 +22,19 @@ export async function prepare(data){
 export default async function setup(api){
   const {host,scene,camera,player}=api;
   const entry=await selected();await tintArms(entry);
+
+  // HUD portrait: who you're playing as (3/4 view of the character's head).
+  const portrait=document.createElement('div');portrait.id='hud-portrait';
+  portrait.innerHTML=`<img alt=""><span>${entry.name.replace(/[&<>]/g,'')}</span>`;document.body.append(portrait);
+  const style=document.createElement('style');style.textContent=`
+    #hud-portrait{position:fixed;left:36px;bottom:196px;z-index:3;display:flex;align-items:center;gap:10px;pointer-events:none}
+    #hud-portrait img{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#3a2a24,#0b0c0c 75%);border:2px solid #b5372c99;box-shadow:0 0 0 1px #000a,0 4px 14px #0008;object-fit:cover}
+    #hud-portrait span{font-size:10px;letter-spacing:3px;color:#c2b5a0;text-transform:uppercase;text-shadow:0 1px 2px #000}
+    #hud-portrait.hurt img{border-color:#ff3b2a;box-shadow:0 0 12px #ff2a1a}
+    body.menu-open #hud-portrait{visibility:hidden}
+    @media(max-width:700px){#hud-portrait{left:20px;bottom:180px}#hud-portrait img{width:48px;height:48px}}`;document.head.append(style);
+  renderPortrait(entry,api.data).then(url=>{portrait.querySelector('img').src=url;}).catch(e=>console.warn('portrait',e));
+  let hurtTimer=0;host.on('beforeDamage',()=>{portrait.classList.add('hurt');clearTimeout(hurtTimer);hurtTimer=setTimeout(()=>portrait.classList.remove('hurt'),350);});
   const character=await createCharacter(entry,api.data);
   character.root.visible=false;scene.add(character.root);
   const view=new ThirdPersonCamera(camera);

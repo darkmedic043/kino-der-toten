@@ -177,7 +177,7 @@ function mannequin(entry,holder){
   mesh(new THREE.CylinderGeometry(7.5,7.5,1.6,16),dark,spine,0,1).scale.z=.66;           // belt
   const chest=joint(spine,0,21);
   const neck=joint(chest,0,.5);mesh(new THREE.CylinderGeometry(2.4,2.8,5,12),skin,neck,0,2.5);
-  const head=joint(neck,0,5);
+  const head=joint(neck,0,5);head.name='head';
   const skull=mesh(new THREE.SphereGeometry(5.5,20,16),skin,head,0,4.6);skull.scale.set(.9,1.1,.98);
   const v=mesh(new THREE.SphereGeometry(5.6,20,12,Math.PI*.14,Math.PI*.72,Math.PI*.36,Math.PI*.22),visor,head,0,4.8,.1);v.scale.set(.93,1.1,1.02);
   const limbs={};
@@ -213,6 +213,25 @@ function mannequin(entry,holder){
     hips.position.y=37.5+Math.abs(Math.cos(phase))*1.5*moving-.8*run;
     head.rotation.x=-.05*run;
   },dispose(){holder.removeFromParent();}};
+}
+
+// A 3/4 head-and-shoulders portrait of a character as an image URL (for the HUD).
+export async function renderPortrait(entry,data,size=160){
+  const c=await createCharacter(entry,data);c.hold?.(false);c.update(.016,0);
+  const scene=new THREE.Scene();scene.add(c.root);c.root.updateMatrixWorld(true);
+  scene.add(new THREE.HemisphereLight(0xe6ddd0,0x2a1d17,1.8));
+  const key=new THREE.DirectionalLight(0xffe6c8,2.4);key.position.set(80,120,140);scene.add(key);
+  const rim=new THREE.DirectionalLight(0xd04a38,1.6);rim.position.set(-120,60,-80);scene.add(rim);
+  const box=new THREE.Box3().setFromObject(c.root),height=box.max.y-box.min.y;
+  let head=null;c.root.traverse(o=>{if(!head&&/^(head|j_head)$|head/i.test(o.name)&&!/headtop|end/i.test(o.name))head=o;});
+  const center=head?head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,height*.02,0)):new THREE.Vector3(0,box.max.y-height*.1,0);
+  const span=height*(entry.portraitSpan??.15);
+  const camera=new THREE.PerspectiveCamera(28,1,1,5000),dir=new THREE.Vector3(Math.sin(.62),.12,Math.cos(.62)).normalize();
+  camera.position.copy(center).addScaledVector(dir,span/Math.tan(THREE.MathUtils.degToRad(14)));camera.lookAt(center);
+  const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});
+  renderer.setSize(size,size);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;
+  renderer.render(scene,camera);const url=renderer.domElement.toDataURL('image/png');
+  renderer.dispose();renderer.forceContextLoss();c.dispose();return url;
 }
 
 // Third-person camera that orbits behind the gameplay (eye) camera.

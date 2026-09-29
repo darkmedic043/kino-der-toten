@@ -1,0 +1,57 @@
+// Combat feedback: synthesized hitmarker / hurt sounds (the game ships no
+// flesh-impact or pain cues) and a red arc around the crosshair pointing at
+// whoever hit you. Works on Kino and custom maps.
+import * as THREE from 'three';
+
+export default function setup(api){
+  const {host,audio,camera,enemies,player,session,mod}=api;
+  const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('hud.css',mod.url).href;document.head.append(css);
+
+  // ---- Sounds (through the game's master gain, so volume settings apply) ----
+  const out=()=>audio.enabled&&audio.ctx?.state==='running'&&audio.master?audio.ctx:null;
+  function noise(c,seconds){const b=c.createBuffer(1,Math.ceil(c.sampleRate*seconds),c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const s=c.createBufferSource();s.buffer=b;return s;}
+  function env(c,t,peak,attack,decay){const g=c.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+attack);g.gain.exponentialRampToValueAtTime(.0001,t+attack+decay);g.connect(audio.master);return g;}
+  let lastHit=0;
+  function hitmarker(head,kill){
+    const c=out();if(!c||c.currentTime-lastHit<.045)return;lastHit=c.currentTime;const t=c.currentTime;
+    const n=noise(c,.06),bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=head?5200:3600;bp.Q.value=4;
+    n.connect(bp).connect(env(c,t,head?.55:.42,.002,.05));n.start(t);n.stop(t+.06);
+    const o=c.createOscillator();o.type='triangle';o.frequency.setValueAtTime(head?1900:1400,t);o.frequency.exponentialRampToValueAtTime(head?1300:950,t+.05);
+    o.connect(env(c,t,head?.32:.24,.002,.055));o.start(t);o.stop(t+.07);
+    if(kill){const k=c.createOscillator();k.type='sine';k.frequency.setValueAtTime(700,t+.03);k.frequency.exponentialRampToValueAtTime(260,t+.16);k.connect(env(c,t+.03,.28,.005,.14));k.start(t+.03);k.stop(t+.2);}
+  }
+  function hurt(amount){
+    const c=out();if(!c)return;const t=c.currentTime,v=Math.min(1,.45+amount/80);
+    const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(48,t+.22);o.connect(env(c,t,.9*v,.004,.25));o.start(t);o.stop(t+.3);
+    const n=noise(c,.2),lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=900;n.connect(lp).connect(env(c,t,.5*v,.003,.16));n.start(t);n.stop(t+.2);
+    const s=noise(c,.12),hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=2500;s.connect(hp).connect(env(c,t+.01,.18*v,.002,.09));s.start(t+.01);s.stop(t+.13);
+  }
+  host.on('beforeEnemyDamage',e=>{if(['bullet','explosion','melee','thunder'].includes(e.cause)&&e.enemy?.health>0)hitmarker(e.head,e.amount>=e.enemy.health||session.effects.insta_kill>session.time);});
+
+  // ---- Directional damage indicator --------------------------------------------
+  const ring=document.createElement('div');ring.id='damage-ring';document.body.append(ring);
+  const marks=[];
+  host.on('beforeDamage',e=>{
+    if(session.effects.invulnerable>session.time||['reviving','gameover'].includes(session.phase))return;
+    hurt(e.amount);
+    // The enemy that just landed its attack (the game doesn't pass the attacker).
+    const feet=player.getFeetPosition();
+    const z=enemies.list.filter(z=>z.state==='attack'&&z.attackDealt).sort((a,b)=>a.root.position.distanceTo(feet)-b.root.position.distanceTo(feet))[0];
+    if(!z||z.root.position.distanceTo(feet)>140)return;
+    let m=marks.find(m=>m.enemy===z);
+    if(!m){const el=document.createElement('i');ring.append(el);m={enemy:z,el};marks.push(m);}
+    m.from=z.root.position.clone();m.life=1.6;m.strength=Math.min(1,.55+e.amount/60);
+  });
+  const fwd=new THREE.Vector3(),right=new THREE.Vector3();
+  host.on('update',dt=>{
+    camera.getWorldDirection(fwd);fwd.y=0;fwd.normalize();right.set(-fwd.z,0,fwd.x);
+    for(const m of [...marks]){
+      m.life-=dt;if(m.enemy&&enemies.list.includes(m.enemy))m.from.copy(m.enemy.root.position);
+      if(m.life<=0){m.el.remove();marks.splice(marks.indexOf(m),1);continue;}
+      const d=m.from.clone().sub(camera.position);d.y=0;
+      const angle=Math.atan2(d.dot(right),d.dot(fwd));
+      m.el.style.transform=`rotate(${angle}rad)`;m.el.style.opacity=Math.min(1,m.life/.6)*m.strength;
+    }
+  });
+  host.on('reset',()=>{for(const m of marks)m.el.remove();marks.length=0;});
+}

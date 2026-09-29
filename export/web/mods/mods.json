@@ -3,6 +3,7 @@
     "lighting",
     "example-weapons",
     "progression",
-    "characters"
+    "characters",
+    "hud"
   ]
 }

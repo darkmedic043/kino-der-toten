@@ -1,0 +1,5 @@
+{
+  "name": "Combat feedback",
+  "description": "Hitmarker sounds when you hit zombies, a hurt sound and a directional damage indicator when they hit you.",
+  "script": "mod.js"
+}

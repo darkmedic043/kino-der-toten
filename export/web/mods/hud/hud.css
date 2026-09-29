@@ -1,0 +1,6 @@
+/* Combat feedback HUD (not part of upstream). */
+#damage-ring{position:fixed;left:50%;top:50%;width:0;height:0;z-index:4;pointer-events:none}
+#damage-ring i{position:absolute;left:-90px;top:-150px;width:180px;height:150px;transform-origin:90px 150px;opacity:0;
+  background:radial-gradient(ellipse 90px 22px at 50% 16%,#e0231bdd 0%,#c0191299 45%,transparent 72%);
+  -webkit-mask:linear-gradient(#000 0 40%,transparent 60%);mask:linear-gradient(#000 0 40%,transparent 60%);filter:drop-shadow(0 0 6px #ff2a1a88)}
+body.menu-open #damage-ring{visibility:hidden}
