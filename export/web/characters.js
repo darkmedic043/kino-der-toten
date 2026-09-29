@@ -224,6 +224,12 @@ export class ThirdPersonCamera {
     const wanted=back.multiplyScalar(this.distance).addScaledVector(right,this.shoulder).add(new THREE.Vector3(0,10,0));
     const length=wanted.length(),hit=world?.raycast?.(new THREE.Ray(s.position.clone(),wanted.clone().normalize()),0,length+8);
     c.position.copy(s.position).addScaledVector(wanted.normalize(),hit?Math.max(8,hit.distance-10):length);
+    // Shots travel along the eye camera's forward ray, so point this camera at
+    // where that ray lands: the screen-centre crosshair then matches the shot.
+    const forward=new THREE.Vector3(0,0,-1).applyQuaternion(s.quaternion);
+    const wall=world?.raycast?.(new THREE.Ray(s.position.clone(),forward),1,6000);
+    const aim=s.position.clone().addScaledVector(forward,Math.max(60,wall?.distance??3000));
+    c.up.set(0,1,0);c.lookAt(aim);
     c.updateMatrixWorld(true);return c;
   }
 }

@@ -1,5 +1,6 @@
 {
   "enabled": [
+    "lighting",
     "example-weapons",
     "progression",
     "characters"

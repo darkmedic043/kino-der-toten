@@ -1,0 +1,5 @@
+{
+  "name": "Map lighting",
+  "description": "Kino's own light entities and fixtures become real light sources; the flat fill light is dimmed. Lights wired to the power switch come on with the power.",
+  "script": "mod.js"
+}

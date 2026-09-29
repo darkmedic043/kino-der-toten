@@ -42,6 +42,13 @@ export function installGameMenu({renderer,audio,pixelRatio,started=()=>false}){
   };
   addEventListener('keydown',remap,true);addEventListener('keyup',remap,true);
 
+  // Background music: the ambient track only plays when the setting is on.
+  const playMusic=audio.playMusic.bind(audio);
+  audio.playMusic=key=>{if(key==='ambience'&&!settings.music){audio.music?.stop();audio.music={stop(){}};return Promise.resolve();}return playMusic(key);};
+  let musicOn=settings.music;
+  onSettingsChange(()=>{if(settings.music===musicOn)return;musicOn=settings.music;
+    if(musicOn){if(audio.ctx){audio.music=null;playMusic('ambience');}}else audio.playMusic('ambience');});
+
   const fps=document.createElement('div');fps.id='fps-counter';document.body.append(fps);
   let frames=0,last=performance.now();
   const tick=now=>{frames++;if(now-last>=500){fps.textContent=Math.round(frames*1000/(now-last))+' FPS';frames=0;last=now;}if(settings.showFps)requestAnimationFrame(tick);};

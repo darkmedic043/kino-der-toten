@@ -2,7 +2,7 @@
 // the main menu and every game page. `settings` is live; pages read it each frame.
 
 const KEY='kino.settings';
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,renderScale:1,showFps:false,binds:{}};
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,renderScale:1,showFps:false,binds:{}};
 // Rebindable actions and the key each game page listens for. game-menu.js
 // translates a rebound key into its default so the game code stays unchanged.
 export const ACTIONS=[
@@ -31,6 +31,7 @@ const FIELDS=[
   {key:'invertY',label:'Invert look up / down',type:'toggle'},
   {key:'fov',label:'Field of view',type:'range',min:60,max:110,step:1,format:v=>v+'°'},
   {key:'volume',label:'Master volume',type:'range',min:0,max:1.5,step:.05,format:v=>Math.round(v*100)+'%'},
+  {key:'music',label:'Background music',type:'toggle',hint:'Ambient soundtrack; Easter-egg songs always play'},
   {key:'renderScale',label:'Render resolution',type:'range',min:.5,max:1.5,step:.05,format:v=>Math.round(v*100)+'%',hint:'Lower it for more FPS'},
   {key:'showFps',label:'Show FPS counter',type:'toggle'},
 ];
