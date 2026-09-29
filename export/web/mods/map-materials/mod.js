@@ -53,6 +53,9 @@ export default async function setup(api){
   const PAD={x:2,z:1274,radius:57,top:89.4};
   if(api.world?.dynamic){
     const g=new THREE.CylinderGeometry(PAD.radius,PAD.radius,6,32).translate(PAD.x,PAD.top-3,PAD.z);
-    api.world.dynamic.push({collider:new CollisionWorld(g),enabled:true,note:'spawn pad cap'});
+    // window:true keeps setDoors from treating it as a door (it would read
+    // .box and block the navmesh under it); the player's collision still hits it.
+    g.computeBoundingBox();
+    api.world.dynamic.push({collider:new CollisionWorld(g),box:g.boundingBox.clone(),enabled:true,window:true,note:'spawn pad cap'});
   }
 }
