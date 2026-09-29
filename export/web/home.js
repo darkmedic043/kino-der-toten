@@ -4,7 +4,7 @@ import { loadModel, ViewWeapon } from './animation.js';
 import { renderSettings } from './settings.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
 import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady } from './profile.js';
-import { getAccount, onAccountChange, renderGoogleButton, signOut } from './cloud.js';
+import { getAccount, onAccountChange, renderSignInButton, signOut } from './cloud.js';
 import { loadCharacterRegistry, createCharacter, armsUrl, tintArms, loadCharacterGltf } from './characters.js';
 import { FirstPersonArms } from './fp-arms.js';
 
@@ -62,13 +62,15 @@ function renderAccount(){
     el.innerHTML=`<div class="acct">${a.picture?`<img src="${esc(a.picture)}" alt="" referrerpolicy="no-referrer">`:''}<span><strong>${esc(a.name)}</strong><small>Progress saved online</small></span></div><button type="button" id="sign-out">SIGN OUT</button>`;
     $('sign-out').onclick=async()=>{await signOut();toast('Signed out · progress stays on this device');};
   }else{
-    el.innerHTML='<p class="small muted">Sign in to save progress online and play on any device.</p><div id="g-button"></div>';
-    renderGoogleButton($('g-button'));
+    el.innerHTML='<p class="small muted">Sign in to save progress online and play on any device.</p><div id="signin"></div>';
+    renderSignInButton($('signin'));
   }
 }
-// Signing in may pull a newer profile from the server; reload to show it.
-onAccountChange(a=>{if(a.signedIn&&!wasSignedIn){location.reload();return;}wasSignedIn=a.signedIn;renderAccount();});
+onAccountChange(a=>{wasSignedIn=a.signedIn;renderAccount();});
 renderAccount();
+// Discord sends players back here; ?signin=... reports a failed attempt.
+{const msg=new URLSearchParams(location.search).get('signin');
+  if(msg){toast({cancelled:'Sign-in cancelled',expired:'Sign-in expired, please try again',failed:'Discord sign-in failed, please try again'}[msg]??'Sign-in failed');history.replaceState(null,'',location.pathname+location.hash);}}
 
 // ---- Play: map browser --------------------------------------------------------
 const modesOf=m=>m.modes??[(m.mode??'explore').toLowerCase()];

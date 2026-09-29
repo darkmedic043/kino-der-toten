@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 // Local fork server (not part of upstream): the static game files plus a small
-// account API for saving progress, with Google sign-in.
+// account API for saving progress, with Discord sign-in (OAuth2 code flow).
 //   node .tools/kino-server.mjs [port]
 // Environment:
 //   KINO_HOME         page served at "/" (default home.html)
 //   KINO_DATA         directory for profiles and sessions (default ~/.local/share/kino)
-//   GOOGLE_CLIENT_ID  OAuth client id; sign-in is disabled without it
+//   DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET  from the Discord developer portal;
+//                     sign-in is disabled without them (keep the secret out of git)
+//   KINO_PUBLIC_URL   public https address, used for the OAuth redirect
 import { createReadStream, statSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { createHash, createPublicKey, randomBytes, verify } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { extname, join, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -16,7 +18,10 @@ const ROOT = resolve(import.meta.dirname, '..', 'export', 'web');
 const PORT = Number(process.argv[2]) || 5190;
 const HOME = '/' + (process.env.KINO_HOME || 'home.html').replace(/^\/+/, '');
 const DATA = resolve(process.env.KINO_DATA || join(homedir(), '.local', 'share', 'kino'));
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const DISCORD_ID = process.env.DISCORD_CLIENT_ID || '', DISCORD_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
+const PUBLIC_URL = (process.env.KINO_PUBLIC_URL || '').replace(/\/$/, '');
+const ENABLED = !!(DISCORD_ID && DISCORD_SECRET && PUBLIC_URL);
+const REDIRECT = PUBLIC_URL + '/api/auth/discord/callback';
 const SESSION_DAYS = 90, MAX_BODY = 256 * 1024;
 mkdirSync(join(DATA, 'profiles'), { recursive: true });
 
@@ -32,29 +37,17 @@ const sessions = new Map(Object.entries(readJson(SESSIONS, {})));
 const saveSessions = () => writeJson(SESSIONS, Object.fromEntries(sessions));
 const userFile = sub => join(DATA, 'profiles', createHash('sha256').update(String(sub)).digest('hex').slice(0, 32) + '.json');
 
-// ---- Google ID token verification (RS256 against Google's published keys) ---
-let keys = { at: 0, byKid: new Map() };
-async function googleKey(kid) {
-  if (!keys.byKid.has(kid) || Date.now() - keys.at > 3600e3) {
-    const r = await fetch('https://www.googleapis.com/oauth2/v3/certs');
-    if (!r.ok) throw new Error('Google keys HTTP ' + r.status);
-    const { keys: list } = await r.json();
-    keys = { at: Date.now(), byKid: new Map(list.map(k => [k.kid, createPublicKey({ key: k, format: 'jwk' })])) };
-  }
-  return keys.byKid.get(kid);
-}
-const b64 = s => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
-async function verifyGoogle(token) {
-  const [h, p, s] = String(token).split('.');
-  if (!s) throw new Error('malformed token');
-  const header = JSON.parse(b64(h)), claims = JSON.parse(b64(p));
-  if (header.alg !== 'RS256') throw new Error('unexpected algorithm');
-  const key = await googleKey(header.kid);
-  if (!key || !verify('RSA-SHA256', Buffer.from(h + '.' + p), key, b64(s))) throw new Error('bad signature');
-  if (claims.aud !== CLIENT_ID) throw new Error('token is for another app');
-  if (!['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss)) throw new Error('bad issuer');
-  if (claims.exp * 1000 < Date.now()) throw new Error('token expired');
-  return claims;
+// ---- Discord OAuth2 ------------------------------------------------------------
+async function discordUser(code) {
+  const token = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: DISCORD_ID, client_secret: DISCORD_SECRET, grant_type: 'authorization_code', code, redirect_uri: REDIRECT }) });
+  if (!token.ok) throw new Error('token exchange HTTP ' + token.status);
+  const { access_token } = await token.json();
+  const me = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: 'Bearer ' + access_token } });
+  if (!me.ok) throw new Error('user lookup HTTP ' + me.status);
+  const u = await me.json();
+  return { sub: 'discord:' + u.id, name: u.global_name || u.username,
+    picture: u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64` : `https://cdn.discordapp.com/embed/avatars/${(BigInt(u.id) >> 22n) % 6n}.png` };
 }
 
 // ---- HTTP helpers ------------------------------------------------------------
@@ -79,19 +72,29 @@ function session(req) {
 async function api(req, res, url) {
   // Cross-site writes are refused; the game only calls its own origin.
   if (req.method !== 'GET' && req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) return send(res, 403, { error: 'cross-origin request' });
-  if (url === '/api/config' && req.method === 'GET') return send(res, 200, { googleClientId: CLIENT_ID || null });
+  if (url === '/api/config' && req.method === 'GET') return send(res, 200, { signIn: ENABLED ? 'discord' : null, publicUrl: PUBLIC_URL || null });
   if (url === '/api/me' && req.method === 'GET') {
-    const s = session(req); return send(res, 200, s ? { signedIn: true, name: s.name, email: s.email, picture: s.picture } : { signedIn: false });
+    const s = session(req); return send(res, 200, s ? { signedIn: true, name: s.name, picture: s.picture } : { signedIn: false });
   }
-  if (url === '/api/auth/google' && req.method === 'POST') {
-    if (!CLIENT_ID) return send(res, 503, { error: 'Google sign-in is not configured on this server' });
-    let claims;
-    try { claims = await verifyGoogle((await body(req)).credential); } catch (e) { return send(res, 401, { error: 'Sign-in failed: ' + e.message }); }
+  // Step 1: send the player to Discord with a one-time state value.
+  if (url === '/api/auth/discord' && req.method === 'GET') {
+    if (!ENABLED) return send(res, 503, { error: 'Discord sign-in is not configured on this server' });
+    const state = randomBytes(18).toString('base64url');
+    const to = 'https://discord.com/oauth2/authorize?' + new URLSearchParams({ client_id: DISCORD_ID, response_type: 'code', redirect_uri: REDIRECT, scope: 'identify', state, prompt: 'none' });
+    res.writeHead(302, { Location: to, 'Set-Cookie': `kino_oauth=${state}; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=600${secure(req) ? '; Secure' : ''}`, 'Cache-Control': 'no-store' });
+    return res.end();
+  }
+  // Step 2: Discord sends them back with a code; check state, exchange, start a session.
+  if (url === '/api/auth/discord/callback' && req.method === 'GET') {
+    const q = new URL(req.url, 'http://x').searchParams, back = (msg) => { res.writeHead(302, { Location: '/' + (msg ? '?signin=' + encodeURIComponent(msg) : ''), 'Set-Cookie': 'kino_oauth=; Path=/api/auth; Max-Age=0', 'Cache-Control': 'no-store' }); res.end(); };
+    if (q.get('error')) return back('cancelled');
+    if (!q.get('code') || !q.get('state') || q.get('state') !== cookies(req).kino_oauth) return back('expired');
+    let user; try { user = await discordUser(q.get('code')); } catch (e) { console.error('discord sign-in:', e.message); return back('failed'); }
     const id = randomBytes(32).toString('base64url');
-    sessions.set(id, { sub: claims.sub, name: claims.name || claims.email, email: claims.email, picture: claims.picture, expires: Date.now() + SESSION_DAYS * 864e5 });
-    saveSessions();
-    const cookie = `kino_session=${id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${secure(req) ? '; Secure' : ''}`;
-    return send(res, 200, { signedIn: true, name: claims.name || claims.email, email: claims.email, picture: claims.picture }, { 'Set-Cookie': cookie });
+    sessions.set(id, { ...user, expires: Date.now() + SESSION_DAYS * 864e5 }); saveSessions();
+    res.writeHead(302, { Location: '/', 'Cache-Control': 'no-store', 'Set-Cookie': [
+      `kino_session=${id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${secure(req) ? '; Secure' : ''}`, 'kino_oauth=; Path=/api/auth; Max-Age=0'] });
+    return res.end();
   }
   if (url === '/api/auth/logout' && req.method === 'POST') {
     const s = session(req); if (s) { sessions.delete(s.id); saveSessions(); }
@@ -104,7 +107,7 @@ async function api(req, res, url) {
     if (req.method === 'PUT') {
       let doc; try { doc = await body(req); } catch (e) { return send(res, 400, { error: e.message }); }
       if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return send(res, 400, { error: 'expected an object' });
-      writeJson(file, { ...doc, account: { name: s.name, email: s.email }, savedAt: Date.now() });
+      writeJson(file, { ...doc, account: { name: s.name, id: s.sub }, savedAt: Date.now() });
       return send(res, 200, { ok: true });
     }
   }
@@ -135,7 +138,7 @@ createServer(async (req, res) => {
   try {
     if (url.startsWith('/api/')) return await api(req, res, url);
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
-    if (url === '/__health') return send(res, 200, { app: 'kino-browser-zombies', root: ROOT, accounts: !!CLIENT_ID });
+    if (url === '/__health') return send(res, 200, { app: 'kino-browser-zombies', root: ROOT, accounts: ENABLED });
     serveFile(req, res, url);
   } catch (e) { console.error(e); if (!res.headersSent) send(res, 500, { error: 'server error' }); }
-}).listen(PORT, '0.0.0.0', () => console.log(`kino: http://0.0.0.0:${PORT}/ · data ${DATA} · Google sign-in ${CLIENT_ID ? 'on' : 'off (set GOOGLE_CLIENT_ID)'}`));
+}).listen(PORT, '0.0.0.0', () => console.log(`kino: http://0.0.0.0:${PORT}/ · data ${DATA} · Discord sign-in ${ENABLED ? 'on' : 'off (set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, KINO_PUBLIC_URL)'}`));

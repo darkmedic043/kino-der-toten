@@ -47,26 +47,18 @@ async function start(){
 // Pages await this before reading the profile.
 export const cloudReady=store?Promise.race([start(),new Promise(r=>setTimeout(r,4000))]):Promise.resolve();
 
-// ---- Google sign-in ------------------------------------------------------------
-let gisLoaded=null;
-const loadGis=()=>gisLoaded??=new Promise((ok,fail)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;s.onload=ok;s.onerror=()=>fail(new Error('Could not load Google sign-in'));document.head.append(s);});
-export async function signInConfig(){try{return (await fetch('/api/config').then(r=>r.json())).googleClientId;}catch{return null;}}
-// Renders Google's button into `el`; resolves once signed in.
-export async function renderGoogleButton(el,{theme='filled_black'}={}){
-  const clientId=await signInConfig();
-  if(!clientId){el.textContent='Sign-in is not set up on this server yet.';return false;}
-  if(location.protocol!=='https:'&&!/^(localhost|127\.)/.test(location.hostname)){el.innerHTML='Sign in on the secure site to save progress online.';return false;}
-  await loadGis();
-  google.accounts.id.initialize({client_id:clientId,ux_mode:'popup',callback:async({credential})=>{
-    const r=await fetch('/api/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential}),credentials:'same-origin'});
-    const result=await r.json();
-    if(!r.ok){alert(result.error??'Sign-in failed');return;}
-    account=result;await sync();emit();
-  }});
-  google.accounts.id.renderButton(el,{theme,size:'large',text:'signin_with',shape:'rectangular',width:220});
+// ---- Discord sign-in -----------------------------------------------------------
+export async function signInConfig(){try{return await fetch('/api/config').then(r=>r.json());}catch{return {};}}
+// Renders a "Sign in with Discord" button into `el` (a full-page redirect).
+export async function renderSignInButton(el){
+  const cfg=await signInConfig();
+  if(cfg.signIn!=='discord'){el.textContent='Sign-in is not set up on this server yet.';return false;}
+  // Sessions belong to the public https site; elsewhere, point players there.
+  if(cfg.publicUrl&&new URL(cfg.publicUrl).origin!==location.origin){el.innerHTML=`<a class="signin-link" href="${cfg.publicUrl}/">Sign in on ${new URL(cfg.publicUrl).host}</a> to save progress online.`;return false;}
+  el.innerHTML='<a class="discord-btn" href="/api/auth/discord"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.6 1.3a18.3 18.3 0 0 0-5.6 0L8.6 3a19.7 19.7 0 0 0-4.9 1.5C.6 9.1-.3 13.6.1 18.1A19.9 19.9 0 0 0 6.1 21l1.3-2.1a12.9 12.9 0 0 1-2-1l.5-.4a14.2 14.2 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l1.3 2.1a19.8 19.8 0 0 0 6-3c.5-5.2-.8-9.7-3.6-13.6ZM8.5 15.4c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Zm7 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4Z"/></svg>SIGN IN WITH DISCORD</a>';
   return true;
 }
 export async function signOut(){
   try{await fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'});}catch{}
-  account={signedIn:false};try{google?.accounts?.id?.disableAutoSelect();}catch{}emit();
+  account={signedIn:false};emit();
 }
