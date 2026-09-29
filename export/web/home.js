@@ -25,8 +25,10 @@ const [mapList,modList,config,characters,baseData]=await Promise.all([
 const mods=await Promise.all(modList.map(async id=>{
   try{const manifest=await fetchJson(`mods/${id}/mod.json`);return {id,manifest};}catch(error){return {id,error:error.message};}
 }));
-let data={weapons:baseData.weapons,boxPool:baseData.boxPool};
+let data={weapons:baseData.weapons,boxPool:baseData.boxPool,characters:{...baseData.characters}};
 for(const m of mods)for(const file of [m.manifest?.data??[]].flat()){try{data=mergePatch(data,await fetchJson(`mods/${m.id}/${file}`));}catch{}}
+// Mods that add weapons from a script (prepare) must show up here too.
+for(const m of mods)if(m.manifest?.script){try{const module=await import(`./mods/${m.id}/${m.manifest.script}`);if(module.prepare)data=(await module.prepare(data,{id:m.id,url:new URL(`mods/${m.id}/`,document.baseURI),manifest:m.manifest}))??data;}catch(error){console.warn('[menu] mod',m.id,error);}}
 try{resolveWeapons(data);}catch{}
 const weapons=data.weapons,bonusById=Object.fromEntries(config.bonuses.map(b=>[b.id,b]));
 const weaponLevel=Object.fromEntries(config.weapons.map(w=>[w.id,w.level]));
@@ -201,7 +203,7 @@ function renderPicker(u,l){
 }
 function weaponClass(d){
   const b=d.baseId??d.id;
-  if(/ray_gun|thundergun/.test(b))return 'Wonder weapon';if(d.projectileSpeed>0||d.explosionRadius)return 'Launcher';if(d.pellets>1)return 'Shotgun';
+  if(/ray_gun|thundergun|microwavegun/.test(b))return 'Wonder weapon';if(/minigun/.test(b))return 'Death Machine';if(d.projectileSpeed>0||d.explosionRadius)return 'Launcher';if(d.pellets>1)return 'Shotgun';
   if(/l96|dragunov/.test(b))return 'Sniper rifle';if(/hk21|rpk/.test(b))return 'Light machine gun';if(/m1911|python|cz75/.test(b))return 'Pistol';
   if(/mp40|mp5k|mpl|pm63|ak74u|spectre|g11/.test(b))return 'Submachine gun';return 'Rifle';
 }

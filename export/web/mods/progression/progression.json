@@ -29,7 +29,9 @@
     { "id": "hk21_zm", "level": 36 },
     { "id": "china_lake_zm", "level": 38 },
     { "id": "crossbow_explosive_zm", "level": 41 },
+    { "id": "microwavegundw_zm", "level": 43 },
     { "id": "ray_gun_zm", "level": 45 },
+    { "id": "minigun_zm", "level": 47 },
     { "id": "thundergun_zm", "level": 50 }
   ],
   "bonuses": [
