@@ -1,6 +1,7 @@
 {
   "enabled": [
     "lighting",
+    "map-materials",
     "example-weapons",
     "moon-weapons",
     "thundergun",
