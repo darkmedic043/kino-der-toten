@@ -10,21 +10,29 @@ export default function setup(api){
   // ---- Sounds (through the game's master gain, so volume settings apply) ----
   const out=()=>audio.enabled&&audio.ctx?.state==='running'&&audio.master?audio.ctx:null;
   function noise(c,seconds){const b=c.createBuffer(1,Math.ceil(c.sampleRate*seconds),c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const s=c.createBufferSource();s.buffer=b;return s;}
-  function env(c,t,peak,attack,decay){const g=c.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+attack);g.gain.exponentialRampToValueAtTime(.0001,t+attack+decay);g.connect(audio.master);return g;}
+  // A compressor on our own bus lets the thumps be loud without clipping.
+  let bus=null;
+  const output=c=>{if(!bus||bus.context!==c){const comp=c.createDynamicsCompressor();comp.threshold.value=-10;comp.knee.value=6;comp.ratio.value=8;comp.attack.value=.001;comp.release.value=.12;
+    bus=c.createGain();bus.gain.value=2.4;bus.connect(comp).connect(audio.master);}return bus;};
+  function env(c,t,peak,attack,decay){const g=c.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+attack);g.gain.exponentialRampToValueAtTime(.0001,t+attack+decay);g.connect(output(c));return g;}
+  // A thump: a sine punch dropping fast in pitch, plus a muffled noise knock.
+  function thump(c,t,{from,to,length,body,knock,knockCut}){
+    const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(from,t);o.frequency.exponentialRampToValueAtTime(to,t+length*.6);
+    o.connect(env(c,t,body,.003,length));o.start(t);o.stop(t+length+.05);
+    const n=noise(c,.08),lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=knockCut;
+    n.connect(lp).connect(env(c,t,knock,.001,.05));n.start(t);n.stop(t+.08);
+  }
   let lastHit=0;
   function hitmarker(head,kill){
-    const c=out();if(!c||c.currentTime-lastHit<.045)return;lastHit=c.currentTime;const t=c.currentTime;
-    const n=noise(c,.06),bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=head?5200:3600;bp.Q.value=4;
-    n.connect(bp).connect(env(c,t,head?.55:.42,.002,.05));n.start(t);n.stop(t+.06);
-    const o=c.createOscillator();o.type='triangle';o.frequency.setValueAtTime(head?1900:1400,t);o.frequency.exponentialRampToValueAtTime(head?1300:950,t+.05);
-    o.connect(env(c,t,head?.32:.24,.002,.055));o.start(t);o.stop(t+.07);
-    if(kill){const k=c.createOscillator();k.type='sine';k.frequency.setValueAtTime(700,t+.03);k.frequency.exponentialRampToValueAtTime(260,t+.16);k.connect(env(c,t+.03,.28,.005,.14));k.start(t+.03);k.stop(t+.2);}
+    const c=out();if(!c||c.currentTime-lastHit<.04)return;lastHit=c.currentTime;const t=c.currentTime;
+    thump(c,t,head?{from:230,to:90,length:.12,body:1,knock:.7,knockCut:2600}:{from:170,to:65,length:.13,body:.95,knock:.55,knockCut:1500});
+    // Kills land with a second, deeper thud.
+    if(kill)thump(c,t+.05,{from:120,to:42,length:.22,body:1,knock:.35,knockCut:700});
   }
   function hurt(amount){
-    const c=out();if(!c)return;const t=c.currentTime,v=Math.min(1,.45+amount/80);
-    const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(48,t+.22);o.connect(env(c,t,.9*v,.004,.25));o.start(t);o.stop(t+.3);
-    const n=noise(c,.2),lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=900;n.connect(lp).connect(env(c,t,.5*v,.003,.16));n.start(t);n.stop(t+.2);
-    const s=noise(c,.12),hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=2500;s.connect(hp).connect(env(c,t+.01,.18*v,.002,.09));s.start(t+.01);s.stop(t+.13);
+    const c=out();if(!c)return;const t=c.currentTime,v=Math.min(1,.6+amount/100);
+    thump(c,t,{from:110,to:36,length:.3,body:1.1*v,knock:.9*v,knockCut:800});
+    thump(c,t+.07,{from:70,to:30,length:.25,body:.7*v,knock:.2*v,knockCut:400});
   }
   host.on('beforeEnemyDamage',e=>{if(['bullet','explosion','melee','thunder'].includes(e.cause)&&e.enemy?.health>0)hitmarker(e.head,e.amount>=e.enemy.health||session.effects.insta_kill>session.time);});
 

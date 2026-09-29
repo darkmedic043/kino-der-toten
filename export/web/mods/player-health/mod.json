@@ -1,0 +1,6 @@
+{
+  "name": "Player health",
+  "description": "150 health by default (3 zombie hits), 250 with Juggernog. Tune in data.json.",
+  "data": "data.json",
+  "script": "mod.js"
+}

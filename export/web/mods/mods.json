@@ -2,6 +2,7 @@
   "enabled": [
     "lighting",
     "example-weapons",
+    "player-health",
     "progression",
     "characters",
     "hud"

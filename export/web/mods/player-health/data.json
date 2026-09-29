@@ -1,0 +1,6 @@
+{
+  "rules": {
+    "player_health": 150,
+    "player_health_juggernog": 250
+  }
+}
