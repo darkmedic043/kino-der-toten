@@ -95,7 +95,7 @@ class NT:
 METAL = {}   # material name -> socket feeding Metallic (for the metallic bake)
 
 
-def grimy(name, base, rough=.55, metal=0., wear=.5, grime=.6, bare='#8c8f91', stripes=None, rust=.35, bare_metal=True):
+def grimy(name, base, rough=.55, metal=0., wear=.5, grime=.6, bare='#8c8f91', stripes=None, rust=.5, bare_metal=True):
     """Worn industrial surface: paint chipped to bare metal on edges, dirt in
     crevices and near the floor, rust streaks running down."""
     m = bpy.data.materials.new(name); m.use_nodes = True
@@ -115,28 +115,46 @@ def grimy(name, base, rough=.55, metal=0., wear=.5, grime=.6, bare='#8c8f91', st
     geo = t.new('ShaderNodeNewGeometry')
     dot = t.new('ShaderNodeVectorMath', operation='DOT_PRODUCT')
     t.link(bev.outputs['Normal'], dot.inputs[0]); t.link(geo.outputs['Normal'], dot.inputs[1])
-    edge = t.mr(dot.outputs['Value'], .995, .9)
-    chip = t.mr(t.noise(obj, 1.6, 8), .42, .58)
-    worn = t.math('MULTIPLY', t.math('MULTIPLY', edge, chip), wear, clamp=True)
+    edge = t.mr(dot.outputs['Value'], .997, .92)
+    chip = t.mr(t.noise(obj, 1.6, 8), .36, .54)
+    worn = t.math('MULTIPLY', edge, chip)
+    # worn-through patches on flat faces, and scratches (stretched noise, thin bands)
+    patch = t.mr(t.noise(obj, .35, 7), .6, .7)
+    worn = t.math('ADD', worn, t.math('MULTIPLY', patch, .7))
+    for sc, sz in (((3.0, 3.0, .22), 5.0), ((.25, 3.0, 3.0), 4.0)):
+        scm = t.new('ShaderNodeMapping'); t.link(obj, scm.inputs['Vector']); scm.inputs['Scale'].default_value = sc
+        scm.inputs['Rotation'].default_value = (random.random(), random.random(), random.random())
+        n = t.noise(scm.outputs['Vector'], sz, 2, .4)
+        worn = t.math('ADD', worn, t.math('MULTIPLY', t.mr(t.math('ABSOLUTE', t.math('SUBTRACT', n, .5)), .012, 0), .8))
+    worn = t.math('MULTIPLY', worn, wear, clamp=True)
     # dirt: large blotches, crevices (AO), heavier near the floor, vertical streaks
-    blot = t.mr(t.noise(obj, .08, 8), .4, .72)
+    blot = t.mr(t.noise(obj, .08, 8), .36, .66)
     ao = t.new('ShaderNodeAmbientOcclusion', samples=12, only_local=False)
-    ao.inputs['Distance'].default_value = 3.0
-    crev = t.mr(ao.outputs['AO'], .85, .25)
-    low = t.mr(sock(z, 'Z', True), 2, 30)
+    ao.inputs['Distance'].default_value = 3.5
+    crev = t.mr(ao.outputs['AO'], .9, .3)
+    low = t.mr(sock(z, 'Z', True), 2, 36)
     low = t.math('SUBTRACT', 1, low)
     sm = t.new('ShaderNodeMapping'); t.link(obj, sm.inputs['Vector']); sm.inputs['Scale'].default_value = (1.0, 1.0, .06)
-    streak = t.mr(t.noise(sm.outputs['Vector'], .9, 4), .5, .7)
-    dirt = t.math('ADD', t.math('MULTIPLY', blot, .6), t.math('MULTIPLY', crev, 1.0))
-    dirt = t.math('ADD', dirt, t.math('MULTIPLY', low, .5))
+    streak = t.mr(t.noise(sm.outputs['Vector'], .9, 4), .44, .64)
+    rustp = t.mr(t.noise(obj, .22, 7), .58, .7)
+    rusty = t.math('MINIMUM', 1, t.math('MULTIPLY', t.math('ADD', streak, t.math('MULTIPLY', rustp, .9)), rust))
+    dirt = t.math('ADD', t.math('MULTIPLY', blot, .75), t.math('MULTIPLY', crev, 1.1))
+    dirt = t.math('ADD', dirt, t.math('MULTIPLY', low, .6))
     dirt = t.math('MULTIPLY', dirt, grime, clamp=True)
+    # dust settled on upward-facing surfaces
+    up = t.new('ShaderNodeSeparateXYZ'); t.link(geo.outputs['Normal'], up.inputs[0])
+    dust = t.math('MULTIPLY', t.mr(sock(up, 'Z', True), .45, .9), t.mr(t.noise(obj, .5, 5), .3, .65))
+    dust = t.math('MULTIPLY', dust, grime * .85, clamp=True)
     c = t.mixc(worn, col, srgb(bare))
-    c = t.mixc(t.math('MULTIPLY', streak, rust), c, srgb('#5a2e14'))
-    c = t.mixc(dirt, c, srgb('#1b150f'))
-    r = t.mixf(worn, rough, .38)
-    r = t.mixf(dirt, r, .92)
+    c = t.mixc(rusty, c, srgb('#5e2c12'))
+    c = t.mixc(dirt, c, srgb('#130e09'))
+    c = t.mixc(dust, c, srgb('#5d564b'))
+    r = t.mixf(worn, rough, .36)
+    r = t.mixf(rusty, r, .88)
+    r = t.mixf(dirt, r, .93)
+    r = t.mixf(dust, r, .97)
     mt = t.mixf(worn, metal, 1.0) if bare_metal else t.mixf(worn, metal, metal)
-    mt = t.mixf(t.math('MULTIPLY', dirt, .8), mt, 0.0)
+    mt = t.mixf(t.math('MAXIMUM', t.math('MULTIPLY', dirt, .85), t.math('MAXIMUM', rusty, dust)), mt, 0.0)
     t.link(c, bsdf.inputs['Base Color']); t.link(r, bsdf.inputs['Roughness']); t.link(mt, bsdf.inputs['Metallic'])
     METAL[name] = mt
     # rounded edges and fine surface pitting
@@ -161,24 +179,24 @@ def plain(name, base, rough=.5, metal=0., emit=None, strength=0., alpha=1.):
 
 
 M = dict(
-    paint=grimy('paint', '#3f524c', .6, 0, wear=.7, grime=.65),
-    paint2=grimy('paint2', '#2f3d3a', .6, 0, wear=.5, grime=.7),
-    orange=grimy('orange', '#b0521d', .55, 0, wear=.8, grime=.55),
-    hazard=grimy('hazard', '#000000', .6, 0, wear=.8, grime=.6, stripes=('#d8a51e', '#16140f')),
-    steel=grimy('steel', '#7d8184', .42, 1, wear=0, grime=.5, rust=.2),
-    dsteel=grimy('dsteel', '#393b3d', .5, 1, wear=.3, grime=.55, rust=.3),
-    brass=grimy('brass', '#a8854e', .35, 1, wear=0, grime=.55, rust=0),
-    copper=grimy('copper', '#a0603c', .38, 1, wear=0, grime=.5, rust=0),
-    crt=grimy('crt', '#b3aa90', .5, 0, wear=.25, grime=.6, bare='#8a826c', rust=.05, bare_metal=False),
-    bezel=grimy('bezel', '#5a5549', .55, 0, wear=.2, grime=.5, bare='#777060', rust=0, bare_metal=False),
-    kbd=grimy('kbd', '#48443c', .6, 0, wear=.2, grime=.55, bare='#6a655a', rust=0, bare_metal=False),
-    key=grimy('key', '#cfc5a8', .5, 0, wear=.1, grime=.45, bare='#bdb293', rust=0, bare_metal=False),
-    keyd=grimy('keyd', '#3d3a34', .55, 0, wear=.2, grime=.4, bare='#5c574d', rust=0, bare_metal=False),
-    keyr=grimy('keyr', '#9c2a1c', .5, 0, wear=.2, grime=.4, bare='#6e2016', rust=0, bare_metal=False),
-    rubber=grimy('rubber', '#1b1b1b', .85, 0, wear=0, grime=.35, rust=0, bare_metal=False),
-    hose=grimy('hose', '#2a2b2a', .7, 0, wear=.2, grime=.5, bare='#4a4c4a', rust=.1, bare_metal=False),
-    gauge=grimy('gauge', '#d9d2bd', .45, 0, wear=0, grime=.5, rust=0, bare_metal=False),
-    red=grimy('red', '#8f1d15', .5, 0, wear=.3, grime=.4),
+    paint=grimy('paint', '#3f524c', .6, 0, wear=1, grime=0.85),
+    paint2=grimy('paint2', '#2f3d3a', .6, 0, wear=0.75, grime=0.91),
+    orange=grimy('orange', '#b0521d', .55, 0, wear=1, grime=0.72),
+    hazard=grimy('hazard', '#000000', .6, 0, wear=1, grime=0.78, stripes=('#d8a51e', '#16140f')),
+    steel=grimy('steel', '#7d8184', .42, 1, wear=0.1, grime=0.65, rust=0.28),
+    dsteel=grimy('dsteel', '#393b3d', .5, 1, wear=0.49, grime=0.72, rust=0.42),
+    brass=grimy('brass', '#a8854e', .35, 1, wear=0, grime=0.72, rust=0),
+    copper=grimy('copper', '#a0603c', .38, 1, wear=0, grime=0.65, rust=0),
+    crt=grimy('crt', '#a99c7a', .5, 0, wear=0.6, grime=1, bare='#8a826c', rust=0.07, bare_metal=False),
+    bezel=grimy('bezel', '#5a5549', .55, 0, wear=0.5, grime=0.9, bare='#777060', rust=0, bare_metal=False),
+    kbd=grimy('kbd', '#48443c', .6, 0, wear=0.5, grime=0.95, bare='#6a655a', rust=0, bare_metal=False),
+    key=grimy('key', '#c4b692', .5, 0, wear=0.35, grime=0.85, bare='#bdb293', rust=0, bare_metal=False),
+    keyd=grimy('keyd', '#3d3a34', .55, 0, wear=0.45, grime=0.8, bare='#5c574d', rust=0, bare_metal=False),
+    keyr=grimy('keyr', '#9c2a1c', .5, 0, wear=0.36, grime=0.52, bare='#6e2016', rust=0, bare_metal=False),
+    rubber=grimy('rubber', '#1b1b1b', .85, 0, wear=0, grime=0.45, rust=0, bare_metal=False),
+    hose=grimy('hose', '#2a2b2a', .7, 0, wear=0.36, grime=0.65, bare='#4a4c4a', rust=0.14, bare_metal=False),
+    gauge=grimy('gauge', '#d9d2bd', .45, 0, wear=0, grime=0.65, rust=0, bare_metal=False),
+    red=grimy('red', '#8f1d15', .5, 0, wear=0.49, grime=0.52),
 )
 MX = dict(
     glass=plain('glass', '#9fb8b4', .08, 0, alpha=.16),

@@ -76,7 +76,7 @@ export default async function setup(api){
       const n=o.name,m=o.material;
       o.castShadow=o.receiveShadow=true;
       if(n==='crt_screen'){b.screen=screen(cfg.screen);o.material=b.screen.material;o.castShadow=false;}
-      else if(n==='sign_glow'){b.sign=sign(cfg.sign??'TERMINAL');o.material=b.sign.material;o.castShadow=false;}
+      else if(n==='sign_glow'){b.sign=sign(cfg.sign??'MelonTerm 2.7');o.material=b.sign.material;o.castShadow=false;}
       else if(/^glass/.test(n)||/glass/.test(m.name)){o.material=m.clone();Object.assign(o.material,{transparent:true,depthWrite:false,opacity:.18,roughness:.08,metalness:0});o.material.color.set('#1a2828');o.renderOrder=2;o.castShadow=false;}
       else if(/^coolant/.test(n)){o.material=m.clone();const t=flowTexture();o.material.emissiveMap=t;o.material.emissive.set('#2ef2ff');o.material.emissiveIntensity=2.2;o.castShadow=false;b.coolant.push({mat:o.material,tex:t});}
       else if(/^led_/.test(n)){o.material=m.clone();o.castShadow=false;b.leds.push(ledFor(n,o.material));}
@@ -134,24 +134,56 @@ export default async function setup(api){
 
   // ----------------------------------------------------------------- sign
   function sign(text){
+    // A weathered sign: chipped and scratched letters, grime and drips over the
+    // face, and one failing letter that stutters on its own.
     const c=document.createElement('canvas');c.width=1024;c.height=128;const g=c.getContext('2d');
     const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;tex.anisotropy=4;
-    const material=new THREE.MeshStandardMaterial({color:0x000000,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:1.6,roughness:.4});
-    let off=0;
-    function set(t){text=t;
-      g.fillStyle='#120804';g.fillRect(0,0,1024,128);
-      g.font='bold 78px "Arial Narrow", Arial, sans-serif';g.textAlign='center';g.textBaseline='middle';
-      const spaced=[...String(t).toUpperCase()].join('  ');
-      g.shadowColor='#ff7a1a';g.shadowBlur=26;g.fillStyle='#ffb45c';g.fillText(spaced,512,68);
-      g.shadowBlur=6;g.fillStyle='#fff0d8';g.fillText(spaced,512,68);g.shadowBlur=0;
-      g.fillStyle='rgba(255,140,40,.55)';g.fillRect(40,14,944,3);g.fillRect(40,111,944,3);
-      tex.needsUpdate=true;}
+    const material=new THREE.MeshStandardMaterial({color:0x000000,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:1.15,roughness:.4});
+    let off=0,bad=-1,badOn=true,badT=0,layout=null,rnd;
+    const seeded=str=>{let h=1779033703;for(const ch of str)h=Math.imul(h^ch.charCodeAt(0),3432918353);return ()=>{h=Math.imul(h^h>>>15,2246822507);h=Math.imul(h^h>>>13,3266489909);return ((h^=h>>>16)>>>0)/4294967296;};};
+    function set(t){
+      text=String(t);rnd=seeded(text);
+      g.font='bold 76px "Arial Narrow", Arial, sans-serif';
+      const chars=[...text],gap=9,widths=chars.map(ch=>g.measureText(ch).width),total=widths.reduce((a,w)=>a+w,0)+gap*(chars.length-1);
+      let x=512-total/2;layout=chars.map((ch,i)=>{const at=x;x+=widths[i]+gap;return {ch,x:at,w:widths[i]};});
+      const lit=layout.map((l,i)=>i).filter(i=>layout[i].ch.trim());bad=lit[Math.floor(rnd()*lit.length)]??-1;
+      // chips, bites and scratches, fixed per text
+      layout.chips=[];for(let i=0;i<90;i++)layout.chips.push([rnd()*1024,rnd()*128,.8+rnd()**3*6,rnd()]);
+      for(const l of layout)if(l.ch.trim())for(let i=0,n=8+Math.floor(rnd()*10);i<n;i++)layout.chips.push([l.x+rnd()*l.w,36+rnd()*62,1.2+rnd()**2*8,rnd()]);
+      layout.scratch=[];for(let i=0;i<26;i++){const x0=rnd()*1024,y0=rnd()*128;layout.scratch.push([x0,y0,x0+(rnd()-.5)*260,y0+(rnd()-.5)*50,.35+rnd()*.5]);}
+      layout.dirt=[];for(let i=0;i<55;i++)layout.dirt.push([rnd()*1024,rnd()*128,8+rnd()*46,.2+rnd()*.4]);
+      layout.drips=[];for(let i=0;i<14;i++)layout.drips.push([rnd()*1024,4+rnd()*20,20+rnd()*90,2+rnd()*5]);
+      draw();
+    }
+    function draw(){
+      g.globalCompositeOperation='source-over';g.fillStyle='#0f0804';g.fillRect(0,0,1024,128);
+      g.font='bold 76px "Arial Narrow", Arial, sans-serif';g.textBaseline='middle';g.textAlign='left';
+      layout.forEach((l,i)=>{
+        const dim=i===bad?(badOn?.55:.06):1;
+        g.globalAlpha=dim;g.shadowColor='#ff7a1a';g.shadowBlur=22;g.fillStyle='#e8913e';g.fillText(l.ch,l.x,68);
+        g.shadowBlur=4;g.fillStyle='#f6cf9c';g.fillText(l.ch,l.x,68);});
+      g.globalAlpha=1;g.shadowBlur=0;
+      g.fillStyle='rgba(255,140,40,.5)';g.fillRect(40,12,944,3);g.fillRect(40,113,944,3);
+      // chipped paint: bites out of the letters and trim
+      g.globalCompositeOperation='destination-out';
+      for(const [x,y,r,k] of layout.chips){g.globalAlpha=k<.7?1:.6;g.beginPath();
+        for(let j=0;j<6;j++){const a=j/6*Math.PI*2,rr=r*(.55+((k*97+j*13)%1)*.8);g.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr);}g.fill();}
+      g.lineCap='round';for(const [x0,y0,x1,y1,a] of layout.scratch){g.globalAlpha=a;g.lineWidth=1+a*1.5;g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();}
+      g.globalAlpha=1;g.globalCompositeOperation='source-over';
+      // grime blotches and rust drips from the top edge
+      for(const [x,y,r,a] of layout.dirt){const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,`rgba(12,8,4,${a})`);gr.addColorStop(1,'rgba(12,8,4,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,r*2,r*2);}
+      for(const [x,y,len,w] of layout.drips){const gr=g.createLinearGradient(0,y,0,y+len);gr.addColorStop(0,'rgba(70,32,10,.55)');gr.addColorStop(1,'rgba(70,32,10,0)');g.fillStyle=gr;g.fillRect(x,y,w,len);}
+      const edge=g.createLinearGradient(0,0,0,128);edge.addColorStop(0,'rgba(0,0,0,.45)');edge.addColorStop(.2,'rgba(0,0,0,0)');edge.addColorStop(.8,'rgba(0,0,0,0)');edge.addColorStop(1,'rgba(0,0,0,.55)');g.fillStyle=edge;g.fillRect(0,0,1024,128);
+      tex.needsUpdate=true;
+    }
     set(text);
     function update(dt,power){
-      // an old tube: now and then it stutters
+      // an old tube: now and then the whole sign stutters
       off-=dt;let k=power?1:.12;
       if(off<0){if(off<-.35)off=3+Math.random()*9;else k*=Math.random()<.5?.25:1;}
-      material.emissiveIntensity=1.6*k;
+      material.emissiveIntensity=1.15*k;
+      // the failing letter buzzes on and off by itself
+      badT-=dt;if(power&&badT<=0){badOn=!badOn;badT=badOn?.4+Math.random()*2.5:.04+Math.random()*.18;draw();}
     }
     return {material,set,update};
   }
@@ -186,7 +218,7 @@ export default async function setup(api){
 
   // ----------------------------------------------------------------- leds
   function ledFor(name,mat){
-    const base=mat.emissiveIntensity||4;mat.emissiveIntensity=base*.6;
+    const base=/strip/.test(name)?2:(mat.emissiveIntensity||4);mat.emissiveIntensity=base*.6;
     const mode=/power|strip/.test(name)?'steady':/kb/.test(name)?'busy':/jbox/.test(name)?'blink':/lamp/.test(name)?'lamp':'slow';
     return {mat,base:base*.6,mode,t:Math.random()*3,on:true};
   }
