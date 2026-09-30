@@ -157,7 +157,7 @@ function shoot(){
   if(session.def.projectileSpeed>0){features.shoot(session.def,forward);return true;}
   const pellets=Math.max(1,session.def.pellets);
   for(let i=0;i<pellets;i++){
-    const direction=forward.clone();if(pellets>1||!ads){const spread=pellets>1?.055:.012;direction.x+=(Math.random()-.5)*spread;direction.y+=(Math.random()-.5)*spread;direction.z+=(Math.random()-.5)*spread;direction.normalize();}
+    const direction=forward.clone();if(pellets>1||!ads){const spread=pellets>1?(session.def.pelletSpread??.055):(session.def.hipSpread??.012);direction.x+=(Math.random()-.5)*spread;direction.y+=(Math.random()-.5)*spread;direction.z+=(Math.random()-.5)*spread;direction.normalize();}
     const ray=new THREE.Ray(camera.position.clone(),direction),wall=world.raycast(ray,1,8000),target=enemies.rayHit(ray,wall?.distance??8000);
     shootEggs(ray,Math.min(wall?.distance??8000,target?.distance??8000));
     lastShot={origin:ray.origin.toArray(),direction:direction.toArray(),wallDistance:wall?.distance??null,target:target?{id:target.z.id,head:target.head,distance:target.distance}:null};

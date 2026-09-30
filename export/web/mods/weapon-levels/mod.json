@@ -1,0 +1,5 @@
+{
+  "name": "Weapon levels",
+  "description": "Kills level up the gun you use; each level unlocks an attachment (sights, suppressor, mags, grip, ACOG, IR, grenade launcher, Masterkey). Equip them in Loadout → Gunsmith or the pause menu.",
+  "script": "mod.js"
+}

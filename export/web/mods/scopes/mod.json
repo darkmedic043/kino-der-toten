@@ -1,0 +1,5 @@
+{
+  "name": "Scopes",
+  "description": "Scoped guns work: see-through glass, glowing red dots, a full-screen scope view with reticles for sniper, ACOG, LPS and IR optics, scope sway, and hold Shift to steady your breath.",
+  "script": "mod.js"
+}

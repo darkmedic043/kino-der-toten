@@ -4,6 +4,8 @@ import { loadModel, ViewWeapon } from './animation.js';
 import { renderSettings } from './settings.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
 import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady } from './profile.js';
+import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
+import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { getAccount, onAccountChange, renderSignInButton, signOut } from './cloud.js';
 import { loadCharacterRegistry, createCharacter, armsUrl, tintArms, loadCharacterGltf } from './characters.js';
 import { FirstPersonArms } from './fp-arms.js';
@@ -150,6 +152,8 @@ function thumb(id){
 function fillThumb(el,id){if(!id){el.style.backgroundImage='';return;}thumb(id).then(url=>{if(el.dataset.weapon===id&&url)el.style.backgroundImage=`url(${url})`;});el.dataset.weapon=id;}
 
 // ---- Loadout ----------------------------------------------------------------------
+let gunsmith=null;
+loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
 const slots=[{key:'primary',label:'PRIMARY'},{key:'secondary',label:'SECONDARY'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
 let activeSlot='primary',focus=null;
 const weaponList=()=>config.weapons.filter(w=>weapons[w.id]);
@@ -217,8 +221,11 @@ function renderDetail(id,isWeapon,unlocked,level){
     ${bar('DAMAGE',Math.log10(Math.max(10,d.damage*pellets)),Math.log10(3000),Math.round(d.damage)+(pellets>1?'×'+pellets:''))}
     ${bar('FIRE RATE',rpm,1000,rpm)}${bar('MAGAZINE',d.clipSize,100,d.clipSize)}${bar('RESERVE',d.maxAmmo,600,d.maxAmmo)}${bar('RELOAD',1/Math.max(.3,d.reloadTime),1/.8,(d.reloadTime??0).toFixed(1)+'s')}
     <p>${d.upgrade?`Pack-a-Punch: <b>${esc(d.upgrade.name)}</b>`:'Cannot be upgraded'} · ${esc(d.fireType??'')}</p>
-    <p class="muted">${unlocked?'Unlocked':'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}</p>`;
+    <p class="muted">${unlocked?'Unlocked':'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}</p><div class="gunsmith-slot"></div>`;
   fillThumb(el.querySelector('.thumb'),id);
+  // Weapon levels and attachments (mods/weapon-levels).
+  if(gunsmith)renderGunsmith(el.querySelector('.gunsmith-slot'),{cat:gunsmith,def:d,id,profile,
+    onOpen:()=>openGunsmith({cat:gunsmith,weapons,profile,id,ids:weaponList().map(w=>w.id),onChange:()=>save(),onClose:()=>{focus={id,isWeapon:true};renderLoadout();}})});
 }
 
 // ---- Character ---------------------------------------------------------------------

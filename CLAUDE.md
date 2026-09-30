@@ -18,6 +18,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby) | `coop.md` |
 | Props: terminal booth (Blender generator, bake, placement mod) | `props.md` |
+| Weapon levels, attachments (Gunsmith), working scopes | `weapon-levels.md` |
 | Session history log | `history.md` |
 
 ## Setup essentials
@@ -40,4 +41,4 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 
 ## Upstream files with local edits (keep them small)
 
-`enemies.js` (co-op `targetFor` hook), `mystery-box.js` (display cache and warm-up), `animation.js` (weapon-part position tracks relative to bind), `player-controller.js` (step-up keeps speed), `settings.js` (graphics quality), `game.js`/`zombies.js` (`renderer` in the mod api and the `mods.renderWorld` hook), `game.js` (mod hooks, render camera, settings sensitivity/FOV, `installGameMenu`, box warm-up, cheat check on best round), `audio.js` (`def.baseId??def.id`), `.tools/serve.mjs` (`KINO_HOME`). Watch for these when merging upstream.
+`enemies.js` (co-op `targetFor` hook), `mystery-box.js` (display cache and warm-up), `animation.js` (weapon-part position tracks relative to bind), `player-controller.js` (step-up keeps speed), `settings.js` (graphics quality), `game.js`/`zombies.js` (`renderer` in the mod api and the `mods.renderWorld` hook), `game.js` (mod hooks, render camera, settings sensitivity/FOV, `installGameMenu`, box warm-up, cheat check on best round), `audio.js` (`def.baseId??def.id`), `.tools/serve.mjs` (`KINO_HOME`), `game.js`/`zombies.js` (hip/pellet spread read `def.hipSpread`/`def.pelletSpread`). Watch for these when merging upstream.

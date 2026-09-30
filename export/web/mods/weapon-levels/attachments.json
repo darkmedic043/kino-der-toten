@@ -1,0 +1,216 @@
+{
+  "xp": {
+    "kill": 10,
+    "headshot": 5
+  },
+  "curve": {
+    "base": 120,
+    "exponent": 1.25
+  },
+  "slots": {
+    "optic": "Optic",
+    "muzzle": "Muzzle",
+    "mag": "Magazine",
+    "under": "Underbarrel"
+  },
+  "mountTags": [
+    "tag_scope_rail",
+    "tag_scope_mount",
+    "tag_flatrail"
+  ],
+  "builtInOptic": [
+    "dragunov_zm",
+    "l96a1_zm",
+    "g11_lps_zm",
+    "aug_acog_zm",
+    "crossbow_explosive_zm"
+  ],
+  "attachments": [
+    {
+      "id": "reflex",
+      "name": "Reflex Sight",
+      "slot": "optic",
+      "tags": [
+        "tag_elbit",
+        "tag_scope_pka",
+        "tag_cobra_mounted"
+      ],
+      "scope": "reflex",
+      "desc": "A glowing dot sight. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "extmag",
+      "name": "Extended Mag",
+      "slot": "mag",
+      "tags": [
+        "tag_ext_clip",
+        "tag_extended_clip",
+        "tag_clip_extended",
+        "tag_ammo_expander"
+      ],
+      "extraTags": [
+        "j_bigammo"
+      ],
+      "desc": "+50% magazine size.",
+      "stats": {
+        "clipMul": 1.5
+      }
+    },
+    {
+      "id": "suppressor",
+      "name": "Suppressor",
+      "slot": "muzzle",
+      "tags": [
+        "tag_suppressor",
+        "tag_silencer"
+      ],
+      "desc": "Much quieter shots. \u221215% damage and range.",
+      "stats": {
+        "damageMul": 0.85,
+        "rangeMul": 0.85,
+        "suppressed": true
+      }
+    },
+    {
+      "id": "reddot",
+      "name": "Red Dot Sight",
+      "slot": "optic",
+      "tags": [
+        "tag_aimpoint"
+      ],
+      "scope": "reflex",
+      "desc": "A compact red dot. Tighter zoom than the reflex.",
+      "stats": {
+        "adsFovMul": 0.88
+      }
+    },
+    {
+      "id": "grip",
+      "name": "Grip",
+      "slot": "under",
+      "tags": [
+        "tag_grip",
+        "tag_foregrip"
+      ],
+      "desc": "Hip fire spreads 45% less.",
+      "stats": {
+        "hipSpreadMul": 0.55
+      }
+    },
+    {
+      "id": "drum",
+      "name": "Drum Mag",
+      "slot": "mag",
+      "tags": [
+        "tag_drum"
+      ],
+      "desc": "Double magazine size, slower reload.",
+      "stats": {
+        "clipMul": 2,
+        "reloadMul": 1.2
+      }
+    },
+    {
+      "id": "dualmag",
+      "name": "Dual Mag",
+      "slot": "mag",
+      "tags": [
+        "tag_dual_clip",
+        "tag_double_clip",
+        "tag_duel_clip"
+      ],
+      "desc": "Taped mags: reloads 30% faster.",
+      "stats": {
+        "reloadMul": 0.7
+      }
+    },
+    {
+      "id": "acog",
+      "name": "ACOG Scope",
+      "slot": "optic",
+      "tags": [
+        "tag_scope_colt"
+      ],
+      "scope": "acog",
+      "desc": "4\u00d7 scope with an illuminated chevron. +25% headshot damage.",
+      "stats": {
+        "adsFov": 30,
+        "headMul": 1.25
+      }
+    },
+    {
+      "id": "gl",
+      "name": "Grenade Launcher",
+      "slot": "under",
+      "tags": [
+        "tag_grenade_launcher",
+        "tag_m203",
+        "tag_bouncing_grenade_launcher"
+      ],
+      "extraTags": [
+        "j_grenade_ammo",
+        "j_m16m203_slide",
+        "j_m203_slide",
+        "j_m203_ammo",
+        "j_bouncing_grenade_ammo"
+      ],
+      "underbarrel": "gl",
+      "desc": "Underbarrel 40mm launcher. Press 5 to switch to it."
+    },
+    {
+      "id": "masterkey",
+      "name": "Masterkey",
+      "slot": "under",
+      "tags": [
+        "tag_masterkey"
+      ],
+      "extraTags": [
+        "tag_mk_ammo",
+        "tag_mk_pump",
+        "tag_pump2",
+        "tag_ammo2"
+      ],
+      "underbarrel": "mk",
+      "desc": "Underbarrel shotgun. Press 5 to switch to it."
+    },
+    {
+      "id": "flamer",
+      "name": "Flamethrower",
+      "slot": "under",
+      "tags": [
+        "tag_flame_unit"
+      ],
+      "extraTags": [
+        "tag_flamer_bracket",
+        "tag_flame_bracket",
+        "tag_flamer_ak_bracket",
+        "tag_flamer_bottle",
+        "tag_flamer_button",
+        "tag_flamer_ring",
+        "tag_flamer_heat_guard",
+        "tag_flamer_pilot_light",
+        "tag_heat_guard",
+        "tag_ft_flash"
+      ],
+      "underbarrel": "ft",
+      "desc": "Underbarrel flamethrower: sets zombies alight at short range. Press 5 to switch to it."
+    },
+    {
+      "id": "ir",
+      "name": "IR Scope",
+      "slot": "optic",
+      "tags": [
+        "tag_scope_anpvs",
+        "tag_nsp3a"
+      ],
+      "scope": "ir",
+      "desc": "Thermal scope: zombies glow white through it.",
+      "stats": {
+        "adsFov": 28
+      }
+    }
+  ]
+}
