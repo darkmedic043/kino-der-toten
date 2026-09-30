@@ -1,7 +1,8 @@
 // Terminal booth prop: a payphone-style booth whose phone is a CRT terminal,
 // built by .tools/build-terminal-booth.py. Placed per map from placements.json
-// (snapped to the floor and flush against the wall behind it), with a blocking
-// collider. Live parts: the terminal screen and roof sign are canvases, the
+// ({position, yaw, model?, scale?}; snapped to the floor and flush against the
+// wall behind it), with a blocking collider, a faint white interior light, and
+// zombie paths routed around its footprint (the navmesh is baked without it). Live parts: the terminal screen and roof sign are canvases, the
 // live wires carry travelling pulses, LEDs blink, the coolant tubes flow, and
 // the severed wires under the roof spark. Before the power is on, the booth
 // idles on standby.
@@ -22,26 +23,35 @@ export default async function setup(api){
   if(!spots?.length)return;
   const {scene,world,session,camera,audio,host}=api;
   const col=world.collision;
-  let pulseTex;
+  let pulseTex,meshes;
   const booths=[];
-  for(const spot of spots)booths.push(build(await loadModel(BASE+'terminal_booth.glb'),spot));
+  for(const spot of spots)booths.push(build(await loadModel(BASE+(spot.model??'terminal_booth.glb')),spot));
+  routeAround(booths);
   window.kino.terminalBooth={booths};
   window.kino.lighting?.tag?.(scene);
 
   // ------------------------------------------------------------- placement
   function snap(root,spot){
     const yaw=THREE.MathUtils.degToRad(spot.yaw??0),fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-    const p=new THREE.Vector3(...spot.position);
+    const p=new THREE.Vector3(...spot.position),sc=spot.scale??1;
     const cast=(o,d,far)=>col?.raycastFirst?.(new THREE.Ray(o,d.clone().normalize()),0,far);
+    // The visible wall can stand proud of its collision (Kino's under-stair
+    // wall is 8 in front), so the back also snaps to the rendered meshes.
+    const rc=new THREE.Raycaster();
+    const seen=(o,d,far)=>{rc.set(o,d.clone().normalize());rc.far=far;return rc.intersectObjects(visibleMeshes(),false)[0];};
     const floor=cast(p.clone().addScaledVector(fwd,15).add(new THREE.Vector3(0,60,0)),new THREE.Vector3(0,-1,0),200);
     if(floor)p.y=floor.point.y;
     // The nearest wall surface behind, measured at a few heights and offsets.
     let back=null;const side=new THREE.Vector3(fwd.z,0,-fwd.x);
     for(const h of [20,45,70])for(const s of [-15,0,15]){
-      const o=p.clone().addScaledVector(fwd,40).addScaledVector(side,s);o.y=p.y+h;
-      const hit=cast(o,fwd.clone().negate(),90);if(hit&&(back===null||hit.distance<back))back=hit.distance;}
+      const o=p.clone().addScaledVector(fwd,40).addScaledVector(side,s*sc);o.y=p.y+h*sc;
+      for(const hit of [cast(o,fwd.clone().negate(),90),seen(o,fwd.clone().negate(),90)])if(hit&&(back===null||hit.distance<back))back=hit.distance;}
     if(back!==null)p.addScaledVector(fwd,40-back+.15);
-    root.position.copy(p);root.rotation.set(0,yaw,0);root.updateMatrixWorld(true);
+    root.position.copy(p);root.rotation.set(0,yaw,0);root.scale.setScalar(spot.scale??1);root.updateMatrixWorld(true);
+  }
+
+  function visibleMeshes(){
+    return meshes??=(()=>{const list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&o.visible&&!o.material?.transparent)list.push(o);});return list;})();
   }
 
   function collide(root){
@@ -55,8 +65,11 @@ export default async function setup(api){
 
   // ---------------------------------------------------------------- build
   function build(root,spot){
-    root.name='terminal_booth';scene.add(root);snap(root,spot);collide(root);
-    const b={root,leds:[],wires:[],sparks:[],cut:[],coolant:[],t:Math.random()*10};
+    root.name='terminal_booth';snap(root,spot);scene.add(root);collide(root);
+    const b={root,spot,leds:[],wires:[],sparks:[],cut:[],coolant:[],t:Math.random()*10};
+    // A faint white light from the strip under the roof, filling the inside.
+    // Added during loading and never toggled, so no shader recompiles later.
+    b.light=new THREE.PointLight(0xf2f6ff,cfg.lightIntensity??700,78*(spot.scale??1),2);b.light.position.set(0,82,13);b.light.castShadow=false;root.add(b.light);
     root.traverse(o=>{
       if(o.name.startsWith('spark_')){b.sparks.push({node:o,next:2+Math.random()*5,parts:null});return;}
       if(!o.isMesh)return;
@@ -64,7 +77,7 @@ export default async function setup(api){
       o.castShadow=o.receiveShadow=true;
       if(n==='crt_screen'){b.screen=screen(cfg.screen);o.material=b.screen.material;o.castShadow=false;}
       else if(n==='sign_glow'){b.sign=sign(cfg.sign??'TERMINAL');o.material=b.sign.material;o.castShadow=false;}
-      else if(/^glass/.test(n)||/glass/.test(m.name)){o.material=m.clone();Object.assign(o.material,{transparent:true,depthWrite:false,opacity:.3,roughness:.08,metalness:0});o.material.color.set('#101a1a');o.renderOrder=2;o.castShadow=false;}
+      else if(/^glass/.test(n)||/glass/.test(m.name)){o.material=m.clone();Object.assign(o.material,{transparent:true,depthWrite:false,opacity:.18,roughness:.08,metalness:0});o.material.color.set('#1a2828');o.renderOrder=2;o.castShadow=false;}
       else if(/^coolant/.test(n)){o.material=m.clone();const t=flowTexture();o.material.emissiveMap=t;o.material.emissive.set('#2ef2ff');o.material.emissiveIntensity=2.2;o.castShadow=false;b.coolant.push({mat:o.material,tex:t});}
       else if(/^led_/.test(n)){o.material=m.clone();o.castShadow=false;b.leds.push(ledFor(n,o.material));}
       else if(/^wire_/.test(n)&&LIVE.test(n)&&WIRE_COLOR[m.name]){
@@ -174,7 +187,7 @@ export default async function setup(api){
   // ----------------------------------------------------------------- leds
   function ledFor(name,mat){
     const base=mat.emissiveIntensity||4;mat.emissiveIntensity=base*.6;
-    const mode=/power/.test(name)?'steady':/kb/.test(name)?'busy':/jbox/.test(name)?'blink':/lamp/.test(name)?'lamp':'slow';
+    const mode=/power|strip/.test(name)?'steady':/kb/.test(name)?'busy':/jbox/.test(name)?'blink':/lamp/.test(name)?'lamp':'slow';
     return {mat,base:base*.6,mode,t:Math.random()*3,on:true};
   }
   function updateLed(l,dt,power){
@@ -222,6 +235,49 @@ export default async function setup(api){
     src.connect(bp).connect(gain).connect(out);src.start();
   }
 
+  // ------------------------------------------------------ zombie routing
+  // Zombies path on a navmesh baked without the booth. Path segments that
+  // would cut through its footprint get detour points at its front corners,
+  // and navmesh snaps that land inside it are pushed back out.
+  function routeAround(list){
+    const R=16;   // zombie radius plus a little room
+    const obs=list.map(b=>{const s=b.spot.scale??1,yaw=b.root.rotation.y;
+      return {p:b.root.position.clone(),c:Math.cos(yaw),s:Math.sin(yaw),X:22*s+R,Z:30*s+R,y0:b.root.position.y-40,y1:b.root.position.y+100*s};});
+    const local=(o,v)=>{const x=v.x-o.p.x,z=v.z-o.p.z;return {x:x*o.c-z*o.s,z:x*o.s+z*o.c};};
+    const toWorld=(o,x,z,y)=>new THREE.Vector3(o.p.x+x*o.c+z*o.s,y,o.p.z-x*o.s+z*o.c);
+    const inside=(o,v)=>{if(v.y<o.y0||v.y>o.y1)return false;const l=local(o,v);return Math.abs(l.x)<o.X&&l.z<o.Z&&l.z>-60;};
+    function crosses(o,a,b){   // segment vs the footprint rectangle (Liang–Barsky)
+      if(Math.max(a.y,b.y)<o.y0||Math.min(a.y,b.y)>o.y1)return false;
+      const A=local(o,a),B=local(o,b),dx=B.x-A.x,dz=B.z-A.z;let t0=0,t1=1;
+      for(const [p,q] of [[-dx,A.x+o.X],[dx,o.X-A.x],[-dz,A.z+60],[dz,o.Z-A.z]]){
+        if(p===0){if(q<0)return false;continue;}const r=q/p;if(p<0){if(r>t1)return false;if(r>t0)t0=r;}else{if(r<t0)return false;if(r<t1)t1=r;}}
+      return t0<t1;
+    }
+    function detour(o,a,b){
+      const A=local(o,a),B=local(o,b),y=(a.y+b.y)/2,cx=o.X+4,cz=o.Z+4,pts=[];
+      const sa=Math.sign(A.x)||1,sb=Math.sign(B.x)||-sa;
+      if(A.z<o.Z)pts.push(toWorld(o,sa*cx,cz,y));
+      if(B.z<o.Z&&(sb!==sa||A.z>=o.Z))pts.push(toWorld(o,sb*cx,cz,y));
+      return pts;
+    }
+    function pushOut(o,v){
+      const l=local(o,v),front=o.Z-l.z,left=l.x+o.X,right=o.X-l.x,m=Math.min(front,left,right);
+      return m===front?toWorld(o,l.x,o.Z+1,v.y):m===left?toWorld(o,-o.X-1,l.z,v.y):toWorld(o,o.X+1,l.z,v.y);
+    }
+    const path=world.path.bind(world),closest=world.closest.bind(world);
+    world.path=(a,b)=>{
+      const p=path(a,b);if(p.length<2)return p;
+      const out=[p[0]];
+      for(let i=1;i<p.length;i++){let q=p[i];
+        for(const o of obs){if(i<p.length-1&&inside(o,q))q=pushOut(o,q);if(crosses(o,out.at(-1),q))out.push(...detour(o,out.at(-1),q));}
+        out.push(q);}
+      return out;
+    };
+    world.closest=(v,ext)=>{let r=closest(v,ext);if(!r)return r;
+      for(const o of obs)if(inside(o,r)){const q=pushOut(o,r);r=closest(q,ext)??q;if(inside(o,r))r=q;}
+      return r;};
+  }
+
   // --------------------------------------------------------------- update
   host.on('update',dt=>{
     const power=!!session.power;
@@ -233,6 +289,7 @@ export default async function setup(api){
         let k=power?1:.15;if(w.flash){w.flash-=dt;k=6;if(w.flash<=0)w.flash=0;}w.mat.emissiveIntensity=1.8*k;}
       for(const c of b.coolant){c.tex.offset.y+=dt*(power?.35:.05);c.mat.emissiveIntensity=power?2.2:.5;}
       b.glow.opacity=(power?.22:.06)*(.93+Math.random()*.07);
+      b.light.intensity=(cfg.lightIntensity??700)*(.97+Math.random()*.03);
       for(const s of b.sparks){
         if(s.parts)tickSpark(s,dt);
         else if(power&&(s.next-=dt)<=0){s.next=1.5+Math.random()*6;burst(s,b);}

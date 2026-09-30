@@ -3,7 +3,11 @@
 # wiring. Everything is generated here; grime, edge wear, crevice dirt and
 # rounded edges are baked (Cycles) into one texture set for the game.
 #
-#   blender -b -P .tools/build-terminal-booth.py -- <out.glb> [--nobake] [--render <dir>]
+#   blender -b -P .tools/build-terminal-booth.py -- <out.glb> [--nobake] [--render <dir>] [--compact]
+#
+# --compact leaves out everything above the roof (conduit risers, cable spans)
+# and moves the roof vent forward, for spots with low headroom near the wall
+# (under Kino's west staircase).
 #
 # Units are inches (Kino units). Blender Z-up, the wall is the y=0 plane and
 # the booth stands in -Y; after glTF export it faces +Z with its back at z=0.
@@ -16,6 +20,7 @@ argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 OUT = argv[0] if argv else '/tmp/terminal_booth.glb'
 BAKE = '--nobake' not in argv
 RENDER = argv[argv.index('--render') + 1] if '--render' in argv else None
+COMPACT = '--compact' in argv
 TEX = 2048
 random.seed(20260930)
 
@@ -179,6 +184,7 @@ MX = dict(
     glass=plain('glass', '#9fb8b4', .08, 0, alpha=.16),
     screen=plain('crt_screen', '#050806', .2, 0, emit='#39ff88', strength=2.0),
     sign=plain('sign_glow', '#1a0b04', .4, 0, emit='#ff8a2a', strength=6.0),
+    strip=plain('led_strip', '#e8eef2', .3, 0, emit='#f2f6ff', strength=5),
     coolant=plain('coolant', '#0a3a40', .1, 0, emit='#2ef2ff', strength=4.0),
     led_r=plain('led_red', '#330000', .3, 0, emit='#ff2a1a', strength=8),
     led_g=plain('led_green', '#003300', .3, 0, emit='#30ff50', strength=8),
@@ -402,9 +408,13 @@ if f.normal.y > 0:
     f.normal_flip()
 finish('sign_glow', bm, MX['sign'], bake=False)
 # roof vent and caged lamp
-box('vent', -9, 9, -19, -6, 95, 97.5, M['dsteel'], .3)
+VY = (-24, -13) if COMPACT else (-19, -6)
+box('vent', -9, 9, VY[0], VY[1], 95, 97.5, M['dsteel'], .3)
 for x in range(-8, 9, 2):
-    box('vent_slat', x - .3, x + .3, -19.4, -5.6, 97.5, 98.3, M['steel'], .1, 1)
+    box('vent_slat', x - .3, x + .3, VY[0] - .4, VY[1] + .4, 97.5, 98.3, M['steel'], .1, 1)
+# interior light strip under the roof (the game adds a faint white light here)
+box('strip_housing', -11.5, 11.5, -21, -18.2, 87.3, 88, M['dsteel'], .15, 1)
+box('led_strip', -11, 11, -20.4, -18.8, 86.9, 87.3, MX['strip'], 0, bake=False)
 cyl('lamp_base', 1.6, 1.2, M['dsteel'], (14, -22, 86.8))
 sphere('lamp_bulb', 1.1, (14, -22, 85.2), MX['led_a'], 12, bake=False).name = 'led_lamp'
 for a in range(0, 360, 60):
@@ -539,11 +549,14 @@ for x in (-11.5, 11.5):
 
 # ------------------------------------------- conduits along the back wall
 for x in (-15.2, 15.2):
-    path = [Vector((x, -3.2, 3.75)), Vector((x, -3.2, 128)), Vector((x, -3.2 + 1.5, 131)), Vector((x, -.4, 132))]
-    sweep('conduit', resample(catmull([(x, -3.2, 3.75), (x, -3.2, 60), (x, -3.2, 120), (x, -2.4, 128), (x, -.2, 130)], .8), 1.0), 1.0, M['steel'], 14)
-    for z in (12, 30, 50, 80, 104, 122):
+    if COMPACT:   # up into the roof
+        sweep('conduit', resample([Vector((x, -3.2, 3.75)), Vector((x, -3.2, 88.5))], 1.0), 1.0, M['steel'], 14)
+    else:
+        sweep('conduit', resample(catmull([(x, -3.2, 3.75), (x, -3.2, 60), (x, -3.2, 120), (x, -2.4, 128), (x, -.2, 130)], .8), 1.0), 1.0, M['steel'], 14)
+    for z in (12, 30, 50, 80) if COMPACT else (12, 30, 50, 80, 104, 122):
         box('clamp', x - 1.4, x + 1.4, -4.6, -1.6, z, z + 1.2, M['dsteel'], .25)
-    cyl('coupler', 1.3, 2.2, M['brass'], (x, -3.2, 97.5), seg=16)
+    if not COMPACT:
+        cyl('coupler', 1.3, 2.2, M['brass'], (x, -3.2, 97.5), seg=16)
 # junction box on the right conduit
 box('jbox', 11.5, 17.6, -7.8, -1.6, 66, 76, M['orange'], .45)
 box('jbox_lid', 11.9, 17.2, -8.2, -7.6, 66.4, 75.6, M['paint2'], .25)
@@ -597,9 +610,9 @@ for i, (x, m) in enumerate(((-5, MX['w_red']), (-3.8, MX['w_yel']), (4.5, MX['w_
     wire(f'wire_cut{i}', [(x, -20, 88), (x + .4, -21, 85), (x + .2 * i, -21.6 - .3 * i, 88 - L)], .17, m)
     empty(f'spark_{i}', (x + .2 * i, -21.6 - .3 * i, 88 - L - .2))
 # sagging cable runs strung between the conduits above the roof, and down the left side
-for i, (z, sag, m) in enumerate(((112, 7, MX['w_blk']), (116, 9, MX['w_blk']), (120, 5.5, MX['w_red']), (109, 11, MX['w_blk']))):
+for i, (z, sag, m) in enumerate(() if COMPACT else ((112, 7, MX['w_blk']), (116, 9, MX['w_blk']), (120, 5.5, MX['w_red']), (109, 11, MX['w_blk']))):
     wire(f'wire_span{i}', [(-14.2, -2.4 - i * .5, z), (-7, -4 - i * .6, z - sag * .8), (0, -4.5 - i * .6, z - sag), (7, -4 - i * .6, z - sag * .8), (14.2, -2.4 - i * .5, z)], .28 if m is MX['w_blk'] else .2, m)
-for i, z in enumerate((103, 118)):
+for i, z in enumerate(() if COMPACT else (103, 118)):
     box('tie', -15.9, -14.5, -4.8, -1.6, z, z + .8, M['brass'], .1, 1)
 for i, (m, dz) in enumerate(((MX['w_blk'], 0), (MX['w_yel'], 1.2), (MX['w_blk'], 2.4))):
     wire(f'wire_side{i}', [(-19.7, -3 - i, 86 - dz), (-21.5, -5 - i, 70), (-21.2, -6 - i, 45), (-21.8, -4 - i, 20), (-22.5, -1.2, 8 + dz)], .3 if m is MX['w_blk'] else .2, m)

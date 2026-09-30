@@ -1,8 +1,10 @@
 {
   "sign": "TERMINAL",
+  "lightIntensity": 700,
   "maps": {
     "kino": [
-      { "position": [-388, 82, 1338], "yaw": 90, "note": "spawn room, west wall pilaster between the wall-buy and the window" }
+      { "position": [-208, 82, 880], "yaw": 90, "model": "terminal_booth_compact.glb", "scale": 0.9,
+        "note": "lobby, the wall under the west staircase next to the arch; compact + 0.9 scale because the stair stringer is ~87 above the floor" }
     ]
   }
 }
