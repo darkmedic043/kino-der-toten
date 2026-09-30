@@ -39,6 +39,7 @@ const SWAP=.25;
 const LIGHT_CLAMP='3.2';
 // Light beams live in their own scene, drawn by the volumetric pass (setupPost).
 const volScene=new THREE.Scene();
+let VM=null;   // the first-person weapon's lights (set up in setup())
 const FIXTURES={
   zombie_theater_chandelier1_off:{color:'#ffd49a',intensity:14,radius:1700,drop:120,power:true,spot:{angle:.95,down:true,beam:.9}},
   zombie_theater_chandelier1arm_off:{color:'#ffcf8a',intensity:3,radius:420,drop:12,power:true},
@@ -58,7 +59,6 @@ export default async function setup(api){
   // Light fixtures placed in the static map (chandeliers, sconces, hanging lamps,
   // mirror bulbs, stage lamps...), baked from kino.gltf's nodes.
   const fixtures=kino?await fetch(new URL('fixtures.json',import.meta.url)).then(r=>r.ok?r.json():[]).catch(()=>[]):[];
-  if(kino)setupKino(api,fixtures);
   if(renderer)setupPost(api);
   // First-person weapons are lit by their own scene: a flat ambient 2.8 plus
   // one light, which bleached every gun to grey-white. Give them a softer
@@ -67,7 +67,9 @@ export default async function setup(api){
     for(const l of [...api.viewScene.children])if(l.isAmbientLight){l.intensity=.6;l.color.set(0xf2e8da);}else if(l.isDirectionalLight){l.intensity=2.2;l.color.set(0xfff0dc);l.position.set(1.2,3,1.5);}
     const fill=new THREE.HemisphereLight(0xece6dc,0x2e2620,.7);const rim=new THREE.DirectionalLight(0xe6e2dc,.7);rim.position.set(-2,1.2,-2.5);
     api.viewScene.add(fill,rim);
+    VM={amb:api.viewScene.children.find(l=>l.isAmbientLight),key:api.viewScene.children.find(l=>l.isDirectionalLight&&l!==rim),fill,rim};
   }
+  if(kino)setupKino(api,fixtures);
 }
 
 // ---- Kino lights ------------------------------------------------------------------------------
@@ -398,6 +400,7 @@ function setupKino(api,fixtures=[]){
       b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible){b.dust.material.opacity=Math.min(.2,u.strength.value*1.4);const p=b.dust.geometry.attributes.position;
         b.seed.forEach((d,i)=>{d.h=(d.h+dt*.01*d.sp)%1;d.a+=dt*.03*d.sp*(d.ph>50?1:-1);const w=Math.sin(t*.6+d.ph)*d.wob;   // drifting, not orbiting in rings
           p.setXYZ(i,Math.cos(d.a)*d.rr+w,-d.h*b.len+Math.sin(t*.4+d.ph*2)*d.wob,Math.sin(d.a)*d.rr+Math.cos(t*.5+d.ph)*d.wob);});p.needsUpdate=true;}}
+    if(VM&&frame%3===0)lightTheGun(dt*3);
     for(const m of bulbs)m.emissiveIntensity+=((session.power?2.6:0)-m.emissiveIntensity)*Math.min(1,dt*3);
     if(halos.material){const target=session.power?.55+Math.sin(t*7.3)*.04+Math.sin(t*11.1)*.03:0;halos.material.opacity+=(target-halos.material.opacity)*Math.min(1,dt*3);}
   };
@@ -405,6 +408,28 @@ function setupKino(api,fixtures=[]){
   // Settle the light setup now (shadow casters, sun) so shaders compiled during
   // loading match the ones used in play; otherwise the first frame recompiled them all.
   tick(1/60);
+  // The gun is drawn in its own scene; make its lights follow the world: sum
+  // the live lights reaching the camera (distance, cone, and a wall check),
+  // plus sunlight inside a sun shaft, then dim/tint/aim the gun's key light.
+  const occl=new Map(),toL=new THREE.Vector3(),keyDir=new THREE.Vector3(),mix=new THREE.Color(),tmp=new THREE.Color();let gunLevel=1,occlFrame=0;
+  function lightTheGun(dt){
+    const cam=camera.position;let sum=0;keyDir.set(0,0,0);mix.setRGB(0,0,0);occlFrame++;
+    for(const l of [...pool,...spots]){
+      if(l.intensity<1||!l.distance)continue;toL.copy(l.position).sub(cam);const d=toL.length();if(d>l.distance)continue;
+      const along=l.target.position.clone().sub(l.position).normalize(),cosA=-toL.dot(along)/Math.max(d,1e-3),c0=Math.cos(l.angle);
+      const cone=THREE.MathUtils.clamp((cosA-c0)/Math.max(1e-3,1-c0)*2.5,0,1);if(cone<=0)continue;
+      if(!occl.has(l)||occlFrame%4===0){const hit=ray(cam,toL.clone().normalize(),Math.max(1,d-20));occl.set(l,hit?0:1);}
+      const c=l.intensity*Math.pow(1-d/l.distance,2)*cone*occl.get(l)/(d*d+2500);if(c<=0)continue;
+      sum+=c;keyDir.addScaledVector(toL.normalize(),c);mix.add(tmp.copy(l.color).multiplyScalar(c));
+    }
+    // Sunlight: standing inside a sun shaft.
+    for(const b of beams)if(b.s.kind==='sun'&&b.mesh.visible){const rel=cam.clone().sub(b.top),a=rel.dot(b.dir);if(a>0&&a<b.len&&rel.addScaledVector(b.dir,-a).length()<b.r){const c=.12;sum+=c;keyDir.addScaledVector(sunDir,c);mix.add(tmp.setRGB(1,.95,.86).multiplyScalar(c));}}
+    const target=THREE.MathUtils.clamp(.22+sum*8,.22,1.3);gunLevel+=(target-gunLevel)*Math.min(1,dt*3);
+    VM.key.intensity=2.2*gunLevel;VM.amb.intensity=.6*(.45+.55*gunLevel);VM.fill.intensity=.7*(.4+.6*gunLevel);VM.rim.intensity=.7*(.3+.7*gunLevel);
+    if(sum>0){mix.multiplyScalar(1/sum);VM.key.color.lerp(tmp.setRGB(Math.min(1,.55+mix.r*.6),Math.min(1,.55+mix.g*.6),Math.min(1,.55+mix.b*.6)),Math.min(1,dt*2));
+      // Key light from the brightest direction, in the gun's (camera) space.
+      const v=keyDir.normalize().applyQuaternion(camera.quaternion.clone().invert());VM.key.position.lerp(v.multiplyScalar(4).add(new THREE.Vector3(0,1.2,0)),Math.min(1,dt*2));}
+  }
   // Keep lights that stay chosen on their current source to avoid pops.
   // Hysteresis: a waiting light takes a slot only from one it clearly outshines,
   // so small moves don't swap lights back and forth.
