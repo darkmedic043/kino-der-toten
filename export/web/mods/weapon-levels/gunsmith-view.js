@@ -75,6 +75,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
   if(!document.getElementById('gsv-css')){const st=document.createElement('style');st.id='gsv-css';st.textContent=CSS;document.head.append(st);}
   const list=(ids??Object.keys(weapons)).filter(w=>weapons[w]&&available(cat,weapons[w],w).length);
   if(!list.includes(id))id=list[0];
+  const single=list.length<2;
   const root=document.createElement('div');root.id='gsv';
   root.innerHTML=`<canvas class="stage"></canvas><svg class="lines"></svg>
     <div class="top"><div><div class="crumb">LOADOUT  ›  GUNSMITH</div><h1></h1></div>
@@ -86,6 +87,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
     <button class="back">BACK</button>`;
   document.body.append(root);
   const $=s=>root.querySelector(s);
+  if(single)$('.switch').style.display='none';
 
   // ---- 3D stage ------------------------------------------------------------------
   const canvas=$('canvas.stage');
@@ -129,6 +131,17 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
     box.setFromObject(gun,true);box.getCenter(center);gun.position.sub(center);gun.updateMatrixWorld(true);
     radius=box.getSize(new THREE.Vector3()).length()/2;
     dist=distGoal=radius*3.1;focus.set(0,0,0);focusGoal.set(0,0,0);
+    // Where each slot's parts actually sit: fit a representative attachment
+    // for a moment and measure its geometry (bone origins can be far off; the
+    // M16's grenade-launcher bone is back by the grip). Used for empty slots.
+    home.clear();const cur=equipped(cat,def,id,profile);
+    for(const sl of SLOT_ORDER){
+      const opts=available(cat,def,id).filter(a=>a.slot===sl);if(!opts.length)continue;
+      const pick=cur.find(a=>opts.some(o=>o.id===a))??opts[0].id;
+      showParts([...cur.filter(a=>cat.attachments.find(x=>x.id===a)?.slot!==sl),pick]);gun.updateMatrixWorld(true);
+      const c=partCentre(sl);if(c)home.set(sl,gun.worldToLocal(c));
+    }
+    showParts(cur);
     renderUI();
   }
   // Anchor a slot on its fitted part's actual geometry (bone origins can sit
@@ -147,9 +160,11 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
       for(let k=0;k<count;k+=step){const i=I?I.getX(k):k;vv.fromBufferAttribute(P,i);if(o.isSkinnedMesh)o.applyBoneTransform(i,vv);o.localToWorld(vv);sum.add(vv);n++;}});
     const c=n?gun.worldToLocal(sum.divideScalar(n)):null;centres.set(key,c);return c&&gun.localToWorld(c.clone());
   }
+  const home=new Map();
   const anchorOf=s=>{
     if(!gun)return null;
     const part=partCentre(s);if(part)return part;
+    if(home.has(s))return gun.localToWorld(home.get(s).clone());
     const own=available(cat,def,id).filter(a=>a.slot===s).flatMap(a=>a.tags);
     for(const n of [...own,...ANCHORS[s]]){const b=gun.getObjectByName(n);if(b)return b.getWorldPosition(new THREE.Vector3());}
     return null;
@@ -278,6 +293,15 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
     }
     svg.innerHTML=paths;
   }
+  // Only tags the gun hides by default are attachment parts (the M16's stock
+  // handguard is skinned to tag_heat_guard, which the flamer also lists).
+  let tagSlots=null,tagSlotsFor=null;
+  function partTags(){
+    if(tagSlotsFor===id)return tagSlots;
+    const hidden=new Set(previewDef(cat,def,id,[]).hideTags??[]);tagSlots=new Map();tagSlotsFor=id;
+    for(const a of available(cat,def,id))for(const t of [...a.tags,...(a.extraTags??[])])if(hidden.has(t)&&!tagSlots.has(t))tagSlots.set(t,a.slot);
+    return tagSlots;
+  }
   // which slot a mesh belongs to: the dominant bone of its first indexed vertex
   const partCache=new WeakMap();
   function partOf(o){
@@ -285,7 +309,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
     let res=null;const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight;
     if(o.isSkinnedMesh&&si&&sw){const i=g.index?g.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const wv=sw.getComponent(i,k);if(wv>bw){bw=wv;best=si.getComponent(i,k);}}
       const bone=o.skeleton.bones[best]?.name;
-      for(const a of cat.attachments)if([...a.tags,...(a.extraTags??[])].includes(bone)){res=a.slot;break;}}
+      res=partTags().get(bone)??null;}
     partCache.set(o,res);return res;
   }
   function close(){if(!alive)return;alive=false;

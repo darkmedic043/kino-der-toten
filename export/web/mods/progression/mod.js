@@ -18,7 +18,10 @@ export default async function setup(api){
   let profile=loadProfile();
   addEventListener('focus',()=>{if(!api.getState().started){profile=loadProfile();renderMenu();renderHud();}});
   let saveTimer=0;
-  function save(now=false){clearTimeout(saveTimer);if(now)saveProfile(profile);else saveTimer=setTimeout(()=>saveProfile(profile),1500);}
+  // Weapon XP and attachments belong to the weapon-levels mod, which saves them
+  // itself; take the stored ones so this (older) copy never overwrites them.
+  const write=()=>{const fresh=loadProfile();profile.weaponXp=fresh.weaponXp;profile.attachments=fresh.attachments;saveProfile(profile);};
+  function save(now=false){clearTimeout(saveTimer);if(now)write();else saveTimer=setTimeout(write,1500);}
   addEventListener('pagehide',()=>save(true));
 
   // ---- Applying the loadout to each new game -------------------------------

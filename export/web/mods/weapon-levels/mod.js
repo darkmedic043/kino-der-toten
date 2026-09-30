@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Weapon levels: kills with a gun level that gun up, and each level unlocks an
 // attachment the gun's model carries (sights, suppressor, mags, grip, ACOG,
 // IR, and working underbarrels on key 5). Equip them in the main menu's
@@ -6,6 +7,7 @@
 import { loadProfile, saveProfile, cloudReady } from '../../profile.js';
 import { setupFlamer } from './flamer.js';
 import { openGunsmith } from './gunsmith-view.js';
+import { previewDef } from './gunsmith.js';
 import { loadCatalog, applyAttachments, grantWeaponXp, weaponProgress, xpToNext, maxLevel, available, renderGunsmith, GUNSMITH_CSS } from './gunsmith.js';
 
 export default async function setup(api){
@@ -33,8 +35,38 @@ export default async function setup(api){
     const hidden=new Set(def?.hideTags??[]);
     view.gun?.traverse(o=>{if(o.isBone&&o.scale.x<1e-3&&attachmentTags.has(o.name)&&!hidden.has(o.name))o.scale.setScalar(1);});
     flamer.placePilot();
+    magFollow(def);
     return r;
   };
+
+  // Bigger mags hang off their own bones, which the reload animations never
+  // move (they animate tag_clip, the stock mag). While one is fitted, hide the
+  // stock mag and drive the fitted mag's bone from tag_clip every frame,
+  // keeping their rest-pose offset, so it comes out and goes back in.
+  const MAG_TAGS=['tag_ext_clip','tag_extended_clip','tag_clip_extended','tag_dual_clip','tag_double_clip','tag_duel_clip','tag_drum','tag_ammo_expander'];
+  let follow=null;
+  const restWorld=(skel,bone)=>{const i=skel.bones.indexOf(bone);return i<0?null:skel.boneInverses[i].clone().invert();};
+  function magFollow(def){
+    const g=view.gun;follow=null;if(!g)return;
+    const hidden=new Set(def?.hideTags??[]),clip=g.getObjectByName('tag_clip');
+    let skel=null;g.traverse(o=>{if(o.isSkinnedMesh&&!skel)skel=o.skeleton;});
+    // stock mag meshes: dominant bone tag_clip (restored when no bigger mag is fitted)
+    const mag=MAG_TAGS.map(t=>g.getObjectByName(t)).find(b=>b&&!hidden.has(b.name));
+    g.traverse(o=>{if(!o.isSkinnedMesh)return;const gg=o.geometry,si=gg.attributes.skinIndex,sw=gg.attributes.skinWeight;if(!si||!sw)return;
+      const i=gg.index?gg.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
+      if(o.skeleton.bones[best]===clip)o.visible=!mag;});
+    if(!mag||!clip||!skel)return;
+    const rc=restWorld(skel,clip),rm=restWorld(skel,mag);if(!rc||!rm)return;
+    follow={mag,clip,rel:rc.clone().invert().multiply(rm),m:new THREE.Matrix4(),p:new THREE.Matrix4()};
+  }
+  host.on('update',()=>{
+    if(!follow||!view.gun)return;const {mag,clip,rel,m,p}=follow;
+    clip.updateWorldMatrix(true,false);mag.parent.updateWorldMatrix(true,false);
+    m.copy(clip.matrixWorld).multiply(rel);                 // where the fitted mag should be
+    p.copy(mag.parent.matrixWorld).invert().multiply(m);     // in its parent's space
+    const sc=mag.scale.clone();p.decompose(mag.position,mag.quaternion,mag.scale);mag.scale.copy(sc);
+    mag.updateMatrixWorld(true);
+  });
 
   const flamer=setupFlamer(api);
 
@@ -59,13 +91,12 @@ export default async function setup(api){
     const id=session.weapon.id,def=data.weapons[id];if(!def||!available(cat,def,id).length)return;
     profile=loadProfile();
     const news=grantWeaponXp(cat,def,id,profile,cat.xp.kill+(head?cat.xp.headshot:0));
-    // New attachments go straight on when their slot is free.
-    for(const a of news){const cur=profile.attachments?.[id]??[];if(!cur.some(x=>cat.attachments.find(y=>y.id===x)?.slot===a.slot)){profile.attachments??={};profile.attachments[id]=[...cur,a.id];}}
     save();
     if(news.length){
       const lv=weaponProgress(profile,id).level;
-      api.toast(`${def.name} level ${lv} · ${news.map(a=>a.name).join(', ')} unlocked${news.every(a=>(profile.attachments[id]??[]).includes(a.id))?' and equipped':''}`,5);
-      apply();api.equipView?.();renderPanel();
+      // unlocked only: equipping is the player's choice, in the Gunsmith
+      api.toast(`${def.name} level ${lv} · ${news.map(a=>a.name).join(', ')} unlocked · equip it in the Gunsmith`,5);
+      renderPanel();
     }
     renderHud();
   });
@@ -100,5 +131,6 @@ export default async function setup(api){
   renderPanel();
 
   window.kino.weaponLevels={cat,get profile(){return profile;},apply,
+    hideTagsFor:(id,ids)=>{const d=data.weapons[id];return d?previewDef(cat,d,id,ids).hideTags??[]:[];},
     grant:(id,amount)=>{profile=loadProfile();const n=grantWeaponXp(cat,data.weapons[id],id,profile,amount);save();apply();renderHud();renderPanel();return n.map(a=>a.id);}};
 }

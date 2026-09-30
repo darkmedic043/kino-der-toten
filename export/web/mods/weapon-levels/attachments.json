@@ -211,6 +211,25 @@
       "stats": {
         "adsFov": 28
       }
+    },
+    {
+      "id": "vzoom",
+      "name": "Variable Zoom",
+      "slot": "optic",
+      "tags": [
+        "tag_scope_vzoom"
+      ],
+      "scope": "vzoom",
+      "builtIn": true,
+      "replaces": [
+        "tag_dragunov_scope",
+        "tag_scope",
+        "tag_scope_g11"
+      ],
+      "desc": "Swaps the stock scope for a variable zoom: mouse wheel steps 4\u00d7\u201310\u00d7 while scoped.",
+      "stats": {
+        "adsFov": 16
+      }
     }
   ]
 }

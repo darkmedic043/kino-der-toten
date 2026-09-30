@@ -99,7 +99,7 @@ export default async function setup(api){
   // Per-character "weapon": {"position":[x,y,z],"rotation":[x,y,z] (degrees)} adjusts the grip.
   let held=null,heldKey='';
   async function syncWeapon(){
-    const s=api.session,def=s.def,key=s.weaponUnavailable?'':(def.worldModel??'')+(s.weapon.upgraded?':u':'');
+    const s=api.session,def=s.def,key=s.weaponUnavailable?'':(def.worldModel??'')+(s.weapon.upgraded?':u':'')+':'+(api.data.weapons[s.weapon.id]?.attachments??'');
     if(key===heldKey)return;heldKey=key;
     held?.removeFromParent();held=null;character.hold?.(false);
     if(!key)return;

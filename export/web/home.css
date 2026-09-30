@@ -143,3 +143,5 @@ main{position:relative;overflow-y:auto;padding:40px 48px 60px}
   .loadout,.character{grid-template-columns:1fr}
   .char-stage{height:420px}
 }
+.slot .slot-gs{align-self:flex-start;margin-top:8px;padding:5px 9px;border:1px solid #f3a33a;color:#f3c27a;font-size:9px;letter-spacing:2px;background:#f3a33a14;cursor:pointer}
+.slot .slot-gs:hover{background:#f3a33a33}

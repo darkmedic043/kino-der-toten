@@ -1,0 +1,5 @@
+{
+  "name": "Pack-a-Punch sound",
+  "description": "Pack-a-Punched guns fire with a laser pew layer on top of their shot, as in Black Ops zombies.",
+  "script": "mod.js"
+}

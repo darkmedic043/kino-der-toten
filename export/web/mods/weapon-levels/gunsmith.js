@@ -25,7 +25,8 @@ export function available(cat,def,id){
   // the gun's own attachment parts: its original hidden tags (applying attachments un-hides some)
   const hidden=new Set((pristine.get(def)?.hideTags)??def.hideTags??[]);
   return cat.attachments.filter(a=>{
-    if(a.slot==='optic'&&cat.builtInOptic.includes(id))return false;
+    // guns with a built-in scope only take optics made to replace it
+    if(a.slot==='optic'&&cat.builtInOptic.includes(id)!==!!a.builtIn)return false;
     return a.tags.some(t=>hidden.has(t));
   });
 }
@@ -96,6 +97,8 @@ function applyStats(obj,list,cat,show){
     if(a.scope)obj.scope=a.scope;
   }
   if(obj.hideTags)obj.hideTags=obj.hideTags.filter(t=>!show.has(t));
+  // optics that replace the stock scope hide it
+  for(const a of list)for(const t of a.replaces??[])if(obj.hideTags&&!obj.hideTags.includes(t))obj.hideTags.push(t);
   obj.attachments=list.map(a=>a.id).join('+');
   return show;
 }

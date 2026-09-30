@@ -36,7 +36,8 @@ const weapons=data.weapons,bonusById=Object.fromEntries(config.bonuses.map(b=>[b
 const weaponLevel=Object.fromEntries(config.weapons.map(w=>[w.id,w.level]));
 await cloudReady;
 let profile=loadProfile();
-const save=()=>{saveProfile(profile);renderProfile();};
+// Weapon XP is earned in game (maybe in another tab): keep the stored value.
+const save=()=>{profile.weaponXp=loadProfile().weaponXp;saveProfile(profile);renderProfile();};
 addEventListener('focus',()=>{profile=loadProfile();renderProfile();renderLoadout();});
 
 // ---- Tabs -------------------------------------------------------------------
@@ -153,6 +154,12 @@ function fillThumb(el,id){if(!id){el.style.backgroundImage='';return;}thumb(id).
 
 // ---- Loadout ----------------------------------------------------------------------
 let gunsmith=null;
+const gunsmithHas=id=>gunsmith&&weapons[id]&&gunsmith.attachments.some(a=>a.tags.some(t=>(weapons[id].hideTags??[]).includes(t)));
+// Opened from the loadout: the arrows only move between the loadout's weapons.
+function openLoadoutGunsmith(id){
+  const l=validLoadout(config,profile,weapons),ids=[l.primary,l.secondary].filter(w=>w&&gunsmithHas(w));
+  openGunsmith({cat:gunsmith,weapons,profile,id,ids:ids.includes(id)?ids:[id],onChange:()=>save(),onClose:()=>{focus={id,isWeapon:true};renderLoadout();}});
+}
 loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
 const slots=[{key:'primary',label:'PRIMARY'},{key:'secondary',label:'SECONDARY'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
 let activeSlot='primary',focus=null;
@@ -171,9 +178,10 @@ function renderLoadout(){
     el.className='slot'+(s.key===activeSlot?' active':'')+(st.locked?' locked':'');
     const name=st.locked?'Locked':isWeapon?(st.value?weapons[st.value].name:'None'):(st.value?bonusById[st.value].name:'None');
     const sub=st.locked??(isWeapon?'':st.value?bonusById[st.value].description:'No bonus equipped');
-    el.innerHTML=`<span class="label">${s.label}</span>${isWeapon?'<div class="thumb"></div>':''}<strong>${esc(name)}</strong>${sub?`<small>${esc(sub)}</small>`:''}`;
+    const canMod=isWeapon&&!st.locked&&st.value&&gunsmith&&gunsmithHas(st.value);
+    el.innerHTML=`<span class="label">${s.label}</span>${isWeapon?'<div class="thumb"></div>':''}<strong>${esc(name)}</strong>${sub?`<small>${esc(sub)}</small>`:''}${canMod?'<span class="slot-gs">GUNSMITH  ›</span>':''}`;
     if(isWeapon)fillThumb(el.querySelector('.thumb'),st.locked?'':st.value);
-    el.addEventListener('click',()=>{if(st.locked){toast(st.locked);return;}activeSlot=s.key;focus=null;renderLoadout();});
+    el.addEventListener('click',e=>{if(st.locked){toast(st.locked);return;}if(e.target.closest('.slot-gs')){openLoadoutGunsmith(st.value);return;}activeSlot=s.key;focus=null;renderLoadout();});
     $('slots').append(el);
   }
   renderPicker(u,l);
@@ -193,6 +201,8 @@ function renderPicker(u,l){
     else el.innerHTML=o.id?`<strong>${esc(bonusById[o.id].name)}</strong><small>${esc(bonusById[o.id].description)}</small>`:'<strong>None</strong><small>No bonus</small>';
     if(!unlocked)el.insertAdjacentHTML('beforeend',`<span class="lock">LV ${o.level}</span>`);
     el.addEventListener('mouseenter',()=>renderDetail(o.id,isWeapon,unlocked,o.level));
+    // hovering previews; leaving goes back to the weapon actually in the slot (with its Gunsmith)
+    el.addEventListener('mouseleave',()=>{const now=slotState(activeSlot,unlocks(config,profile.level,weapons),validLoadout(config,profile,weapons)).value??'';renderDetail(now,isWeapon,true,1);});
     el.addEventListener('click',()=>{
       if(!unlocked){toast(`Reach level ${o.level} to unlock`);return;}
       if(o.id&&o.id===other){toast('Already in your other slot');return;}
@@ -203,7 +213,7 @@ function renderPicker(u,l){
     });
     grid.append(el);
   }
-  const f=focus??{id:current,isWeapon};renderDetail(f.id,f.isWeapon,true,1);
+  renderDetail(current,isWeapon,true,1);
 }
 function weaponClass(d){
   const b=d.baseId??d.id;
@@ -224,8 +234,9 @@ function renderDetail(id,isWeapon,unlocked,level){
     <p class="muted">${unlocked?'Unlocked':'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}</p><div class="gunsmith-slot"></div>`;
   fillThumb(el.querySelector('.thumb'),id);
   // Weapon levels and attachments (mods/weapon-levels).
-  if(gunsmith)renderGunsmith(el.querySelector('.gunsmith-slot'),{cat:gunsmith,def:d,id,profile,
-    onOpen:()=>openGunsmith({cat:gunsmith,weapons,profile,id,ids:weaponList().map(w=>w.id),onChange:()=>save(),onClose:()=>{focus={id,isWeapon:true};renderLoadout();}})});
+  // Attachments are edited for the weapon in the selected slot only, not whatever is hovered.
+  const inSlot=slotState(activeSlot,unlocks(config,profile.level,weapons),validLoadout(config,profile,weapons)).value;
+  if(gunsmith&&id===inSlot)renderGunsmith(el.querySelector('.gunsmith-slot'),{cat:gunsmith,def:d,id,profile,onOpen:()=>openLoadoutGunsmith(id)});
 }
 
 // ---- Character ---------------------------------------------------------------------

@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 
 const BUILT_IN={dragunov_zm:'pso',l96a1_zm:'duplex',g11_lps_zm:'lps',aug_acog_zm:'acog'};
-const MAGNIFIED={pso:{zoom:15,radius:.46,sway:1},duplex:{zoom:15,radius:.46,sway:1},lps:{zoom:26,radius:.44,sway:.45},acog:{zoom:30,radius:.4,sway:.35},ir:{zoom:28,radius:.42,sway:.4}};
+const MAGNIFIED={vzoom:{zoom:16,radius:.46,sway:.9},pso:{zoom:15,radius:.46,sway:1},duplex:{zoom:15,radius:.46,sway:1},lps:{zoom:26,radius:.44,sway:.45},acog:{zoom:30,radius:.4,sway:.35},ir:{zoom:28,radius:.42,sway:.4}};
 const DOTS=/red_dot|reflex_red|aimpoint_red|scope_pka_crosshair/;
 const GLASS=/lens(?!_interior)|reflex_lens/;
 
@@ -27,7 +27,11 @@ export default async function setup(api){
   // ---- glass and glowing dots, patched on every equipped viewmodel ---------
   const patched=new WeakSet();
   function glass(root){
-    root?.traverse(o=>{if(!o.isMesh)return;for(const m of [o.material].flat()){if(!m||patched.has(m))continue;patched.add(m);const n=m.name??'';
+    root?.traverse(o=>{if(!o.isMesh)return;
+      // dot cards are hidden per mesh: materials are shared between copies of a model,
+      // so a material-level 'already done' check would skip later copies
+      if([o.material].flat().some(m=>DOTS.test(m?.name??''))){o.visible=false;return;}
+      for(const m of [o.material].flat()){if(!m||patched.has(m))continue;patched.add(m);const n=m.name??'';
       // the model's dot cards have mixed backgrounds (some glow as blobs): hide
       // them; a clean dot is drawn at the screen centre while aiming instead
       if(DOTS.test(n)){o.visible=false;}
@@ -62,7 +66,12 @@ export default async function setup(api){
     const stroke=(x0,y0,x1,y1,w,c)=>{g.strokeStyle=c;g.lineWidth=w;g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();};
     const line=(x0,y0,x1,y1,w,c)=>{if(c.startsWith('rgba(8'))stroke(x0,y0,x1,y1,w+2.2*px,'rgba(220,225,230,.22)');stroke(x0,y0,x1,y1,w,c);};
     const ink='rgba(8,8,8,.92)';
-    if(kind==='duplex'){
+    if(kind==='vzoom'){
+      // mil-dot duplex with the current magnification
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){line(cx+dx*R,cy+dy*R,cx+dx*R*.35,cy+dy*R*.35,5*px,ink);line(cx+dx*R*.35,cy+dy*R*.35,cx,cy,1.3*px,ink);
+        for(let i=1;i<=4;i++){g.fillStyle=ink;g.beginPath();g.arc(cx+dx*R*.075*i,cy+dy*R*.075*i,2*px,0,7);g.fill();}}
+      g.fillStyle='rgba(235,240,245,.8)';g.font=`${13*px}px monospace`;g.fillText(`${ZOOMS[zoomAt].x}×  ▲▼ WHEEL`,cx+R*.18,cy+R*.62);
+    }else if(kind==='duplex'){
       for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){line(cx+dx*R,cy+dy*R,cx+dx*R*.3,cy+dy*R*.3,6*px,ink);line(cx+dx*R*.3,cy+dy*R*.3,cx,cy,1.4*px,ink);}
     }else if(kind==='pso'){
       // PSO-1: glowing main chevron, three below for range, windage scale, rangefinder curve
@@ -89,7 +98,7 @@ export default async function setup(api){
       line(cx-R,cy,cx-R*.06,cy,1.2*px,w);line(cx+R*.06,cy,cx+R,cy,1.2*px,w);line(cx,cy+R*.06,cx,cy+R,1.2*px,w);line(cx,cy-R*.06,cx,cy-R,1.2*px,w);
       g.fillStyle=w;g.font=`${12*px}px monospace`;g.fillText('IR  WHT-HOT',cx-R*.6,cy-R*.72);
     }
-    drawn=kind+W+'x'+H;
+    drawn=kind+W+'x'+H+(kind==='vzoom'?zoomAt:'');
   }
 
   // ---- thermal look for the IR scope ----------------------------------------
@@ -99,6 +108,15 @@ export default async function setup(api){
     if(on){for(const z of enemies?.list??[])z.root?.traverse(o=>{if(!o.isMesh)return;for(const m of [o.material].flat())if(m?.emissive&&!hot.has(m)){hot.set(m,[m.emissive.clone(),m.emissiveIntensity]);m.emissive.set('#ffffff');m.emissiveIntensity=1.6;}});}
     else{for(const [m,[c,i]] of hot){m.emissive.copy(c);m.emissiveIntensity=i;}hot.clear();}
   }
+
+  // ---- variable zoom: the wheel steps magnification while scoped ------------
+  const ZOOMS=[{x:4,fov:24},{x:6,fov:16},{x:8,fov:12},{x:10,fov:9}];let zoomAt=1;
+  function setZoom(i){
+    zoomAt=Math.max(0,Math.min(ZOOMS.length-1,i));const id=session.weapon?.id,d=data.weapons[id];if(!d)return;
+    d.adsFov=ZOOMS[zoomAt].fov;if(d.upgrade)d.upgrade.adsFov=ZOOMS[zoomAt].fov;
+  }
+  // capture phase on window, before the game's wheel = switch weapon
+  addEventListener('wheel',e=>{if(!scoped||scopeOf(session.def)!=='vzoom')return;e.stopImmediatePropagation();e.preventDefault();setZoom(zoomAt+(e.deltaY<0?1:-1));},{capture:true,passive:false});
 
   // ---- sway and holding breath ---------------------------------------------
   let shift=false,breath=3,gasp=0,t=0,sx=0,sy=0;
@@ -147,7 +165,7 @@ export default async function setup(api){
     const want=!!(kind&&MAGNIFIED[kind]&&aim>.92&&session.weapon&&!session.reloadLeft);
     if(want!==scoped){scoped=want;overlay.style.display=want?'block':'none';host.hideViewmodel=want;
       const ch=document.getElementById('crosshair');if(ch)ch.style.visibility=want?'hidden':'';thermal(want&&kind==='ir');if(!want){breath=Math.min(breath,3);}}
-    if(scoped&&drawn!==kind+(innerWidth*devicePixelRatio)+'x'+(innerHeight*devicePixelRatio))draw(kind);
+    if(scoped&&drawn!==kind+(innerWidth*devicePixelRatio)+'x'+(innerHeight*devicePixelRatio)+(kind==='vzoom'?zoomAt:''))draw(kind);
     // sway (and breath) moves the actual aim, so undo last frame's offset first
     camera.rotation.y-=prevSway[0];camera.rotation.x-=prevSway[1];prevSway=[0,0];
     if(scoped){
