@@ -120,6 +120,8 @@ export default async function setup(api){
   (document.getElementById('loadout-panel')??document.querySelector('#menu .menu-controls'))?.after(panel);
   panel.addEventListener('click',e=>e.stopPropagation());
   function renderPanel(){
+    // this mod loads before progression, so its loadout card appears later: sit under it
+    const lp=document.getElementById('loadout-panel');if(lp&&lp.nextElementSibling!==panel)lp.after(panel);
     const id=session.weapon?.id,def=data.weapons[id];
     if(!def||session.attachmentMode){panel.innerHTML='';return;}
     renderGunsmith(panel,{cat,def,id,profile,compact:true,onOpen:()=>openGunsmith({cat,weapons:data.weapons,profile,id,ids:[id],
