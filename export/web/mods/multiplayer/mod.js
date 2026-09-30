@@ -328,6 +328,55 @@ export default async function setup(api){
 
   if(net.isHost)becomeHost(false);else becomeClient();
   addEventListener('pagehide',()=>net.close());
+
+  // ---- Lobby: nobody starts until everyone has fully loaded -------------------------
+  // Each player reports 'ready' once their game has finished loading; the host
+  // keeps the list and broadcasts it. The host's START GAME unlocks when all are
+  // ready and starts everyone; someone joining a game in progress goes straight in.
+  const lobby={ready:new Set(),started:false,go:false};
+  const lob=document.createElement('div');lob.id='coop-lobby';
+  const st=document.createElement('style');st.textContent=`
+    #coop-lobby{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(6,6,8,.72);backdrop-filter:blur(3px);font:14px/1.5 system-ui,sans-serif;color:#e8e2d6}
+    #coop-lobby[hidden]{display:none}
+    #coop-lobby .card{width:min(420px,calc(100vw - 32px));background:#15130f;border:1px solid #4a3a2c;border-radius:10px;padding:22px 22px 18px;box-shadow:0 20px 60px #000a}
+    #coop-lobby h2{margin:0 0 2px;font:600 13px/1.4 system-ui;letter-spacing:.2em;color:#c9a46a}
+    #coop-lobby .code{font:600 30px/1.2 ui-monospace,monospace;letter-spacing:.25em;color:#fff;margin-bottom:12px}
+    #coop-lobby ul{list-style:none;margin:0 0 16px;padding:0;border-top:1px solid #2c261f}
+    #coop-lobby li{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid #2c261f}
+    #coop-lobby li em{font-style:normal;color:#8c8272}#coop-lobby li .ok{color:#7fd36a}
+    #coop-lobby .row{display:flex;gap:10px}
+    #coop-lobby button{flex:1;padding:11px;border-radius:6px;border:1px solid #6b4a2e;background:#2a1f16;color:#f0e6d6;font:600 12px system-ui;letter-spacing:.14em;cursor:pointer}
+    #coop-lobby button.go{background:#8a2f22;border-color:#c0453a}
+    #coop-lobby button:disabled{opacity:.45;cursor:default}
+    #coop-lobby .hint{margin:12px 0 0;color:#8c8272;font-size:12px;text-align:center}`;
+  document.head.append(st);document.body.append(lob);
+  const isReady=id=>lobby.ready.has(id);
+  function renderLobby(){
+    if(lobby.go){lob.hidden=true;return;}
+    const all=[...net.players.values()],allReady=all.length>0&&all.every(p=>isReady(p.id));
+    lob.hidden=false;
+    lob.innerHTML=`<div class="card"><h2>CO-OP LOBBY</h2><div class="code">${esc(net.code)}</div>
+      <ul>${all.map(p=>`<li><span>${esc(p.name)}${p.id===net.hostId?' <em>· host</em>':''}${p.id===net.id?' <em>· you</em>':''}</span>${isReady(p.id)?'<span class="ok">Ready</span>':'<em>Loading…</em>'}</li>`).join('')}</ul>
+      <div class="row"><button type="button" class="invite">COPY INVITE</button>${net.isHost?`<button type="button" class="go" ${allReady?'':'disabled'}>START GAME</button>`:''}</div>
+      <p class="hint">${net.isHost?(allReady?'Everyone is in. Start when ready.':'Waiting for everyone to finish loading…'):lobby.started?'The game has started: click to join in.':'Waiting for the host to start…'}</p></div>`;
+    lob.querySelector('.invite').onclick=async e=>{e.stopPropagation();try{await navigator.clipboard.writeText(invite);e.target.textContent='LINK COPIED';}catch{prompt('Invite link',invite);}};
+    const go=lob.querySelector('.go');if(go)go.onclick=e=>{e.stopPropagation();startAll();};
+    if(!net.isHost&&lobby.started){lob.querySelector('.card').style.cursor='pointer';lob.onclick=()=>{enter();};}
+  }
+  function enter(){lobby.go=true;lob.hidden=true;document.getElementById('start')?.click();}
+  function startAll(){lobby.started=true;broadcastLobby();enter();}
+  function broadcastLobby(){if(net.isHost)net.send('all',{t:'lobby',ready:[...lobby.ready],started:lobby.started});renderLobby();}
+  // The start button stays locked until the lobby lets you in.
+  document.getElementById('start')?.addEventListener('click',e=>{if(!lobby.go){e.stopImmediatePropagation();e.preventDefault();renderLobby();}},true);
+  net.on('ready',(m,from)=>{if(net.isHost){lobby.ready.add(from);broadcastLobby();}});
+  net.on('lobby',m=>{lobby.ready=new Set(m.ready);if(m.started&&!lobby.started){lobby.started=true;api.toast('The host started the game: click to join',6);}renderLobby();});
+  net.on('joined',()=>{if(net.isHost)broadcastLobby();else renderLobby();});
+  net.on('left',id=>{lobby.ready.delete(id);if(net.isHost)broadcastLobby();else renderLobby();});
+  net.on('host',()=>{if(net.isHost){lobby.ready.add(net.id);broadcastLobby();}});
+  // Report ready once this game has finished loading (and is past the loading screen).
+  (async()=>{while(!window.kino.debug.getState().ready)await new Promise(r=>setTimeout(r,250));
+    if(net.isHost){lobby.ready.add(net.id);broadcastLobby();}else net.send('host',{t:'ready'});})();
+  renderLobby();
   showPanel();
   api.toast(net.isHost?`Co-op room ${net.code} · invite friends from the pause menu`:`Joined ${net.players.get(net.hostId)?.name??'the host'}'s game`,5);
 }

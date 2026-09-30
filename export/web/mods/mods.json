@@ -1,6 +1,5 @@
 {
   "enabled": [
-    "hd-weapons",
     "lighting",
     "map-materials",
     "example-weapons",
@@ -14,6 +13,7 @@
     "characters",
     "hud",
     "zombie-sounds",
-    "multiplayer"
+    "multiplayer",
+    "hd-weapons"
   ]
 }

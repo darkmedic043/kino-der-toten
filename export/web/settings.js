@@ -2,7 +2,7 @@
 // the main menu and every game page. `settings` is live; pages read it each frame.
 
 const KEY='kino.settings';
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,renderScale:1,graphics:2,hdTextures:true,daytime:true,showFps:false,binds:{}};
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,renderScale:1,graphics:2,hdTextures:true,daytime:true,devConsole:false,showFps:false,binds:{}};
 // Rebindable actions and the key each game page listens for. game-menu.js
 // translates a rebound key into its default so the game code stays unchanged.
 export const ACTIONS=[
@@ -38,15 +38,19 @@ const FIELDS=[
   {key:'daytime',label:'Daytime (Kino)',type:'toggle',hint:'Sunlight and sky; off for the original night'},
   {key:'hdTextures',label:'HD textures',type:'toggle',hint:'AI-upscaled map textures (Kino). Uses more video memory'},
   {key:'showFps',label:'Show FPS counter',type:'toggle'},
+  // Dev section (collapsed by default).
+  {key:'devConsole',label:'Cheat console',type:'toggle',group:'dev',hint:'Press ` in a game to open it. A game where you use cheats earns no XP or stats'},
 ];
 
 // Builds the settings form into `container` (used by the menu and the in-game overlay).
 export function renderSettings(container){
   container.classList.add('settings-form');
-  container.innerHTML=FIELDS.map(f=>`<label class="setting" data-key="${f.key}"><span class="name">${f.label}${f.hint?`<small>${f.hint}</small>`:''}</span>`+
-    (f.type==='range'?`<input type="range" min="${f.min}" max="${f.max}" step="${f.step}"><b class="value"></b>`:`<input type="checkbox"><b class="value"></b>`)+'</label>').join('')+
+  const field=f=>`<label class="setting" data-key="${f.key}"><span class="name">${f.label}${f.hint?`<small>${f.hint}</small>`:''}</span>`+
+    (f.type==='range'?`<input type="range" min="${f.min}" max="${f.max}" step="${f.step}"><b class="value"></b>`:`<input type="checkbox"><b class="value"></b>`)+'</label>';
+  container.innerHTML=FIELDS.filter(f=>!f.group).map(field).join('')+
     '<div class="settings-sub">CONTROLS <small>Click a key, then press the new one · Esc cancels</small></div><div class="binds">'+
     ACTIONS.map(([id,label])=>`<div class="bind" data-action="${id}"><span>${label}</span><button type="button" class="key"></button></div>`).join('')+'</div>'+
+    `<details class="settings-dev"><summary>DEV</summary>${FIELDS.filter(f=>f.group==='dev').map(field).join('')}</details>`+
     '<button type="button" class="settings-reset">RESET TO DEFAULTS</button>';
   const sync=()=>{for(const f of FIELDS){const row=container.querySelector(`[data-key="${f.key}"]`),input=row.querySelector('input');
     if(f.type==='range')input.value=settings[f.key];else input.checked=!!settings[f.key];

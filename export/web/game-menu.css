@@ -23,3 +23,8 @@
 .bind .key{min-width:84px;border:1px solid #776b5266;background:#05050580;color:#eee8dc;padding:5px 10px;font:11px Arial,sans-serif;letter-spacing:1px;cursor:pointer}
 .bind .key:hover,.bind.waiting .key{border-color:#b5372c;color:#f0c465}
 @media(max-width:520px){.binds{grid-template-columns:1fr}}
+
+.settings-form .settings-dev{margin-top:18px;border-top:1px solid #776b5226}
+.settings-form .settings-dev summary{cursor:pointer;padding:12px 0 6px;font-size:11px;letter-spacing:3px;color:#9c8f78;list-style:none}
+.settings-form .settings-dev summary::before{content:'▸ ';}
+.settings-form .settings-dev[open] summary::before{content:'▾ ';}

@@ -1,3 +1,4 @@
+import { settings } from '../../settings.js';
 // Cheat console: press ` (or the pause menu's Console button) and type a
 // command. The first cheat marks the game as a cheat game until the next new
 // game: the progression mod grants no XP or stats and the best round isn't
@@ -77,8 +78,7 @@ export default async function setup(api){
     #cheat-console input{flex:1;background:transparent;border:0;outline:0;color:inherit;font:inherit}
     #cheat-console .hint{padding:0 12px 8px;color:#6f6a62;font-size:11px}
     #cheat-badge{position:fixed;top:14px;right:16px;z-index:40;padding:3px 8px;border:1px solid #c8452f;border-radius:4px;color:#e8765f;font:600 11px/1.4 system-ui,sans-serif;letter-spacing:.12em;background:rgba(0,0,0,.45);pointer-events:none}
-    #cheat-badge[hidden]{display:none}
-    .game-menu-row:has(#open-console) .secondary{letter-spacing:1px;padding-left:4px;padding-right:4px;white-space:nowrap}`;
+    #cheat-badge[hidden]{display:none}`;
   document.head.append(css);
   const panel=document.createElement('div');panel.id='cheat-console';panel.hidden=true;
   panel.innerHTML='<div class="log"></div><form autocomplete="off"><b>&gt;</b><input spellcheck="false" placeholder="type help"></form><div class="hint">Enter runs · Tab completes · ↑↓ history · Esc or ` closes</div>';
@@ -115,14 +115,10 @@ export default async function setup(api){
     else if(e.code==='ArrowDown'&&history.length){e.preventDefault();historyAt=Math.min(history.length,historyAt+1);input.value=history[historyAt]??'';}
   });
   input.addEventListener('keyup',e=>e.stopPropagation());
-  addEventListener('keydown',e=>{if(e.code==='Backquote'&&!e.repeat&&panel.hidden&&!e.target.closest?.('input,textarea,select')&&api.getState().ready!==false){e.preventDefault();e.stopImmediatePropagation();open();}},true);
+  addEventListener('keydown',e=>{if(e.code==='Backquote'&&settings.devConsole&&!e.repeat&&panel.hidden&&!e.target.closest?.('input,textarea,select')&&api.getState().ready!==false){e.preventDefault();e.stopImmediatePropagation();open();}},true);
   panel.addEventListener('click',e=>e.stopPropagation());panel.addEventListener('mousedown',e=>e.stopPropagation());
 
-  // A Console button in the pause menu, next to Settings / Main menu.
-  const addButton=()=>{const row=document.querySelector('#open-settings')?.parentElement;if(!row||row.querySelector('#open-console'))return !!row;
-    const b=document.createElement('button');b.type='button';b.id='open-console';b.className=document.querySelector('#open-settings').className;b.textContent='CONSOLE';
-    b.addEventListener('click',e=>{e.stopPropagation();open();});row.append(b);return true;};
-  if(!addButton()){const t=setInterval(()=>{if(addButton())clearInterval(t);},500);setTimeout(()=>clearInterval(t),15000);}
+  // Opened with ` when Settings → Dev → Cheat console is on (no pause-menu button).
 
   // ---- Per-frame effects and new games -------------------------------------
   host.on('update',()=>{
