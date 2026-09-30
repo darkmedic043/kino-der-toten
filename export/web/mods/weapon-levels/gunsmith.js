@@ -120,12 +120,20 @@ function underbarrel(kind,def,weapons,id,shownTags){
   return u;
 }
 
+// With an optic fitted, the gun's rear iron sight comes off (where that bone
+// is only the rear sight; see attachments.json ironSights).
+function foldIronSights(obj,list,cat,id){
+  const tag=cat.ironSights?.[id];if(!obj||!tag||!list.some(a=>a.slot==='optic'))return;
+  obj.hideTags=[...(obj.hideTags??[]).filter(t=>t!==tag),tag];
+}
+
 // A copy of the weapon's pristine definition with the given attachments
 // applied: for stat previews in the Gunsmith (doesn't touch the game data).
 export function previewDef(cat,def,id,ids){
   const base=structuredClone(pristine.has(def)?{...def,...pristine.get(def)}:def);
   const list=ids.map(a=>cat.attachments.find(x=>x.id===a)).filter(Boolean);
   applyStats(base,list,cat,shownTags(base,list,cat));
+  foldIronSights(base,list,cat,id);
   return base;
 }
 
@@ -138,8 +146,8 @@ export function applyAttachments(cat,weapons,profile){
     if(!ids.length)continue;
     const list=ids.map(a=>cat.attachments.find(x=>x.id===a));
     const shown=shownTags(def,list,cat);
-    applyStats(def,list,cat,shown);
-    if(def.upgrade){const keep=def.upgrade.attachment;applyStats(def.upgrade,list.filter(a=>!a.underbarrel),cat,shown);if(keep)def.upgrade.attachment=keep;}
+    applyStats(def,list,cat,shown);foldIronSights(def,list,cat,id);
+    if(def.upgrade){const keep=def.upgrade.attachment;applyStats(def.upgrade,list.filter(a=>!a.underbarrel),cat,shown);foldIronSights(def.upgrade,list,cat,id);if(keep)def.upgrade.attachment=keep;}
     const ub=list.find(a=>a.underbarrel);
     if(ub)def.attachment=underbarrel(ub.underbarrel,def,weapons,id,shown);
   }

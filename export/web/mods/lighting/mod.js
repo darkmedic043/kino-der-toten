@@ -13,6 +13,7 @@
 // quality (0 Low: none, 1 Medium: bloom + beams, 2 High: + shadows + AO,
 // 3 Ultra: sharper shadows, more shadow lights, full-rate updates).
 import * as THREE from 'three';
+import { loadModel } from '../../animation.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
@@ -73,11 +74,13 @@ export default async function setup(api){
   // Baked lighting (see baked.js); ?bakeLight runs the bake instead of using it.
   const baking=/bakeLight/.test(location.search);
   const volume=kino&&!baking?await loadVolume(import.meta.url):null;
-  if(kino)setupKino(api,fixtures,volume,baking);
+  // the caged bulbs for the box-location maps (dropped by the export)
+  const cage=kino?await loadModel('models/zombie_zapper_cagelight.glb').catch(()=>null):null;
+  if(kino)setupKino(api,fixtures,volume,baking,cage);
 }
 
 // ---- Kino lights ------------------------------------------------------------------------------
-function setupKino(api,fixtures=[],volume=null,baking=false){
+function setupKino(api,fixtures=[],volume=null,baking=false,cage=null){
   const {scene,camera,session,data,host,renderer,world}=api;
   const rgb=s=>{const [r,g,b]=String(s).trim().split(/\s+/).map(Number);return r+g+b>0?new THREE.Color(r,g,b):new THREE.Color('#fff4dc');};
   const sources=[];
@@ -119,13 +122,47 @@ function setupKino(api,fixtures=[],volume=null,baking=false){
     else if(k.beam&&f.kind==='hang')s.spot={angle:.9,down:true,beam:k.beam};
     sources.push(s);
   }
-  // Mystery box lamps: with the power on, a green lamp glows above wherever the
-  // box currently is (a light source here plus a halo sprite, set up below).
+  // Mystery box maps. Behind each box location hangs a chalkboard map of the
+  // theatre with a caged bulb for every box location (the level's
+  // magic_box_loc_light structs; the export dropped the bulbs). The bulb for
+  // wherever the box currently is glows green on every map. Each bulb's wall
+  // normal is found by probing for the nearest surface around it.
+  const mapBulbs=[];
+  {
+    // The chalkboards aren't in the collision mesh, so aim at the rendered
+    // board: from the room side (toward the nearest box) back at the bulb.
+    const rc=new THREE.Raycaster(),boxesAt=(world.boxLocations??[]).map(e=>new THREE.Vector3(...e.position));
+    const meshes=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&o.visible&&!o.material?.transparent)meshes.push(o);});
+    for(const st of (api.data.entities??[]).filter(e=>e.targetname==='magic_box_loc_light'&&e.position)){
+      const p=new THREE.Vector3(...st.position);
+      const box=boxesAt.slice().sort((a,b)=>a.distanceTo(p)-b.distanceTo(p))[0]??p.clone().add(new THREE.Vector3(1,0,0));
+      const out=box.clone().sub(p);out.y=0;out.normalize();
+      const nearby=meshes.filter(m=>{if(!m.geometry.boundingSphere)m.geometry.computeBoundingSphere();const c=m.geometry.boundingSphere.center.clone().applyMatrix4(m.matrixWorld);return c.distanceTo(p)<m.geometry.boundingSphere.radius*m.matrixWorld.getMaxScaleOnAxis()+30;});
+      rc.set(p.clone().addScaledVector(out,30),out.clone().negate());rc.far=45;
+      const hit=rc.intersectObjects(nearby,false)[0];
+      let normal=out.clone();
+      if(hit?.face){normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);if(normal.dot(out)<0)normal.negate();}
+      const bulb={loc:st.script_noteworthy?.replace(/_loc$/,''),pos:p.clone().addScaledVector(normal,1.5),normal,mats:[]};
+      if(cage){const m=cage.clone(true);m.position.copy(bulb.pos);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),normal);
+        m.traverse(o=>{if(!o.isMesh)return;o.material=o.material.clone();if(/glass|filament/.test(o.material.name)){o.material.emissive?.set('#000000');bulb.mats.push(o.material);}});
+        scene.add(m);bulb.model=m;}
+      // its own small glow, shown while lit
+      const hc=document.createElement('canvas');hc.width=hc.height=64;const hg=hc.getContext('2d'),hr=hg.createRadialGradient(32,32,0,32,32,32);
+      hr.addColorStop(0,'rgba(220,255,225,1)');hr.addColorStop(.2,'rgba(90,255,120,.8)');hr.addColorStop(.55,'rgba(40,220,80,.18)');hr.addColorStop(1,'rgba(20,200,60,0)');hg.fillStyle=hr;hg.fillRect(0,0,64,64);
+      const ht=new THREE.CanvasTexture(hc);ht.colorSpace=THREE.SRGBColorSpace;
+      bulb.halo=new THREE.Sprite(new THREE.SpriteMaterial({map:ht,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0}));
+      bulb.halo.position.copy(bulb.pos).addScaledVector(normal,4.5);bulb.halo.scale.setScalar(11);bulb.halo.renderOrder=6;scene.add(bulb.halo);
+      mapBulbs.push(bulb);
+    }
+    console.info('[lighting] box map bulbs',mapBulbs.length);window.kino.boxMapBulbs=mapBulbs;
+  }
+  // A green light source at the lit bulb on the map behind each box location
+  // (so the glow comes from the map, not mid-air), on while the box is there.
   const boxLamps=[];
   for(const e of world.boxLocations??[]){
-    const p=new THREE.Vector3(...e.position),hit=world.raycast?.(new THREE.Ray(p.clone().add(new THREE.Vector3(0,40,0)),new THREE.Vector3(0,1,0)),0,400);
-    const at=p.clone().add(new THREE.Vector3(0,Math.min(150,(hit?.distance??150)+20),0));
-    const src={position:at,color:new THREE.Color('#44ff6a'),intensity:4.5,radius:360,kind:'box',box:e.id,beamOK:false,fixture:'boxlamp',dir:new THREE.Vector3(0,-1,0),angle:1.3};
+    const p=new THREE.Vector3(...e.position),own=mapBulbs.filter(b=>b.loc===e.script_noteworthy).sort((a,b)=>a.pos.distanceTo(p)-b.pos.distanceTo(p))[0];
+    if(!own||own.pos.distanceTo(p)>400)continue;
+    const src={position:own.pos.clone().addScaledVector(own.normal,5),color:new THREE.Color('#44ff6a'),intensity:2.2,radius:240,kind:'box',box:e.id,beamOK:false,fixture:'boxlamp',dir:own.normal.clone(),angle:1.3};
     sources.push(src);boxLamps.push(src);
   }
   // A beam must come out of something you can see: keep beams only on sources
@@ -383,7 +420,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false){
   const boxHalos=boxLamps.map(src=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),r=g.createRadialGradient(32,32,0,32,32,32);
     r.addColorStop(0,'rgba(220,255,225,1)');r.addColorStop(.18,'rgba(90,255,120,.85)');r.addColorStop(.5,'rgba(40,220,80,.22)');r.addColorStop(1,'rgba(20,200,60,0)');g.fillStyle=r;g.fillRect(0,0,64,64);
     const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;
-    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0}));sp.position.copy(src.position);sp.scale.setScalar(26);scene.add(sp);return {src,sp};});
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0}));sp.position.copy(src.position);sp.scale.setScalar(9);sp.userData.off=true;return {src,sp};});   // the glow is on the map bulbs now
   // The box's beacon: the game's flat cylinder becomes a volumetric column of
   // light rising from the active box, with dust, following it when it moves.
   let boxBeam=null;
@@ -435,6 +472,13 @@ function setupKino(api,fixtures=[],volume=null,baking=false){
     if(volume){const u=volume.uniforms.bakedPowerMix;u.value+=((session.power?1:0)-u.value)*Math.min(1,dt*1.5);}
     if(VM&&frame%3===0)lightTheGun(dt*3);
     for(const h of boxHalos){const on=level(h.src);h.sp.material.opacity+=(on*(.85+Math.sin(t*3)*.08)-h.sp.material.opacity)*Math.min(1,dt*3);h.sp.visible=h.sp.material.opacity>.01;}
+    // map bulbs: the box's location glows green on every map (all in a fire
+    // sale); while the teddy bear is carrying it away they flicker
+    {const moving=[...(api.mysteryBox?.boxes?.values()??[])].some(b=>b.roll?.teddy&&b.roll.ready);
+     const here=world.activeBox?.script_noteworthy,power=session.power?1:.45;
+     for(const b of mapBulbs){const on=moving?(Math.sin(t*23+b.pos.x)>.2?1:0):(world.fireSale||b.loc===here)?1:0;
+       for(const m of b.mats){m.emissive?.setRGB(.25*on*power,1*on*power,.4*on*power);if(m.emissive)m.emissiveIntensity=2.2;}
+       if(b.halo){b.halo.material.opacity=on*power*(.8+Math.sin(t*3)*.08);b.halo.visible=on>0;}}}
     if(boxBeam){
       // Beam upward from the box: the column is brightest at the box, fading into the air above.
       const p=world.boxBeam.position,key=p.x+','+p.z;

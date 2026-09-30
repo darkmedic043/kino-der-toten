@@ -29,3 +29,5 @@ require. They are also listed in the main menu under **Mods → Credits**.
   (https://github.com/luckeyfaraday/kino-der-toten), code under the MIT licence.
 - Call of Duty: Black Ops maps, models, sounds and animations remain the
   property of Activision / Treyarch; see `ASSET_NOTICE.md`.
+
+- `export/web/mods/pap-sound/pap-layer*.ogg`: Pack-a-Punch weapon fire layer, cut from a Call of Duty: Black Ops (Treyarch/Activision) gameplay recording on YouTube (https://www.youtube.com/watch?v=dSUVsrvncyU), supplied by the user for this personal fork.

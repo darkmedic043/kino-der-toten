@@ -231,5 +231,16 @@
         "adsFov": 16
       }
     }
-  ]
+  ],
+  "ironSights": {
+    "galil_zm": "tag_iron_sights",
+    "mp5k_zm": "tag_iron_sight",
+    "spectre_zm": "tag_iron_sights",
+    "fnfal_zm": "tag_iron_sights",
+    "mpl_zm": "tag_iron_sights",
+    "ak74u_zm": "tag_iron_sight",
+    "hk21_zm": "tag_iron_sight",
+    "rpk_zm": "tag_rear_sight"
+  },
+  "_ironSightsNote": "Rear iron sight removed when an optic is fitted, only where that bone is just the rear sight (checked in side renders; the M16/Commando bone is the whole carry handle with the front post, the FAMAS optics sit on its handle)."
 }
