@@ -24,7 +24,7 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { settings, onSettingsChange } from '../../settings.js';
 
-const POOL=12,SWAP=.25;
+const POOL=16,SWAP=.25;
 // Per-light brightness cap in the lighting shader. A lamp sitting inside its
 // own fixture (a stage lamp, a cable plug, a wall sconce) gave that little
 // mesh hundreds of times too much light, which bloomed into a white disc; the
@@ -52,15 +52,18 @@ const PERKS={zombie_vending_jugg:{color:'#ff3524'},zombie_vending_sleight:{color
 const coarse=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
 const quality=()=>Math.min(coarse?1:3,THREE.MathUtils.clamp(Math.round(settings.graphics??2),0,3));
 
-export default function setup(api){
+export default async function setup(api){
   const {scene,camera,session,data,host,renderer}=api;
   const kino=!api.map;
-  if(kino)setupKino(api);
+  // Light fixtures placed in the static map (chandeliers, sconces, hanging lamps,
+  // mirror bulbs, stage lamps...), baked from kino.gltf's nodes.
+  const fixtures=kino?await fetch(new URL('fixtures.json',import.meta.url)).then(r=>r.ok?r.json():[]).catch(()=>[]):[];
+  if(kino)setupKino(api,fixtures);
   if(renderer)setupPost(api);
 }
 
 // ---- Kino lights ------------------------------------------------------------------------------
-function setupKino(api){
+function setupKino(api,fixtures=[]){
   const {scene,camera,session,data,host,renderer,world}=api;
   const rgb=s=>{const [r,g,b]=String(s).trim().split(/\s+/).map(Number);return r+g+b>0?new THREE.Color(r,g,b):new THREE.Color('#fff4dc');};
   const sources=[];
@@ -82,6 +85,30 @@ function setupKino(api){
     const f=FIXTURES[e.model?.replace(/^,/,'')];
     if(e.classname==='script_model'&&f)sources.push({position:new THREE.Vector3(...e.position).add(new THREE.Vector3(0,-f.drop,0)),color:new THREE.Color(f.color),intensity:f.intensity,radius:f.radius,kind:f.power?'power':'solid',spot:f.spot?{...f.spot}:null,fixture:e.model});
   }
+  // Fixtures from the map itself. Kinds: light colour, strength, reach, and
+  // whether they need the power (chandeliers, stage lamps) or are always lit.
+  const KIND={chandelier:{color:'#ffcf8f',intensity:10,radius:1300,drop:60,power:true},sconce:{color:'#ffc987',intensity:5,radius:460,power:false},
+    hang:{color:'#ffd49a',intensity:5,radius:480,drop:20,power:false,beam:.45},dress:{color:'#ffdcae',intensity:4,radius:400,power:true},
+    stage_on:{color:'#fff1d8',intensity:7,radius:900,power:true,beam:.6,along:true},cage_on:{color:'#ff9a3a',intensity:3,radius:300,power:true},
+    street:{color:'#ffd9a0',intensity:6,radius:700,power:false},overhead:{color:'#fff0d6',intensity:6,radius:600,power:true},
+    tinhat:{color:'#ffd49a',intensity:4,radius:450,power:true},wall:{color:'#ffd49a',intensity:4,radius:420,power:false}};
+  const fixturePoints=[];
+  for(const f of fixtures){
+    const k=KIND[f.kind];if(!k)continue;const p=new THREE.Vector3(...f.p);fixturePoints.push(p);
+    if(f.kind==='chandelier'&&(p.y<200||Math.abs(f.x[1])>.2))continue;   // the fallen chandelier on the theatre seats
+    if(f.kind==='stage_on'&&p.y<300)continue;                            // stage lamps lying on the floor (props, not lights)
+    if(f.kind==='sconce'&&Math.abs(f.x[1])>.5)continue;                   // a sconce knocked askew: broken, unlit
+    const at=p.clone().add(new THREE.Vector3(0,-(k.drop??0),0));
+    if(sources.some(s=>s.position.distanceTo(at)<55))continue;            // already lit by a map light
+    const s={position:at,color:new THREE.Color(k.color),intensity:k.intensity*(f.kind==='dress'?Math.min(1.6,.7+(f.n??1)*.08):1),radius:k.radius,kind:k.power?'power':'solid',fixture:f.kind,beamOK:!!k.beam};
+    if(k.along){const x=new THREE.Vector3(...f.x);s.spot={angle:.6,target:p.clone().addScaledVector(x,700),beam:k.beam};}
+    else if(k.beam&&f.kind==='hang')s.spot={angle:.9,down:true,beam:k.beam};
+    sources.push(s);
+  }
+  // A beam must come out of something you can see: keep beams only on sources
+  // at a real fixture (the map's ceiling 'spots' in the theatre have none).
+  for(const s of sources)if(s.spot&&!s.beamOK&&!fixturePoints.some(p=>p.distanceTo(s.position)<130)&&!s.fixture)s.spot.beam=0;
+  for(const s of sources)if(/chandelier1_off/.test(s.fixture??'')&&s.spot)s.spot.beam=0;   // chandeliers glow, they don't cast a cone
   // Where each spot points: at its target, or straight down to the floor.
   const down=new THREE.Vector3(0,-1,0);
   // Every other light behaves like a bulb in a fixture: wall-mounted ones shine
@@ -99,7 +126,18 @@ function setupKino(api){
     let near=null;
     for(const d of [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0]].map(v=>new THREE.Vector3(...v))){const h=ray(s.position,d,95);if(h&&(!near||h.distance<near.h.distance))near={h,d};}
     if(near&&near.d.y===0){
-      const n=near.h.triangle?.getNormal(new THREE.Vector3())??near.d.clone().negate();if(n.dot(near.d)>0)n.negate();n.y=0;n.normalize();
+      const n=near.h.triangle?.getNormal(new THREE.Vector3())??near.d.clone().negate();n.y=0;n.normalize();
+      // Face whichever side of the wall is the room: a fixture sitting a hair
+      // behind the wall surface would otherwise put its light inside the wall.
+      // The room side is where the players walk: the side with navmesh floor below it.
+      const walk=d=>{const c=near.h.position.clone().addScaledVector(d,45);const q=world.closest?.(new THREE.Vector3(c.x,c.y-150,c.z),{x:25,y:260,z:25});return q?1/(1+Math.hypot(q.x-c.x,q.z-c.z)):0;};
+      const open=d=>{const c=near.h.position.clone().addScaledVector(d,30).setY(s.position.y);return ray(c,d,600)?.distance??600;};
+      // First choice: face the room the neighbouring lights are in (their centre).
+      const mates=sources.filter(o=>o!==s&&o.position.distanceTo(s.position)<750);
+      const centre=mates.length>=2?mates.reduce((v,o)=>v.add(o.position),new THREE.Vector3()).divideScalar(mates.length):null;
+      const toward=centre?centre.clone().sub(near.h.position).setY(0):null;
+      if(toward&&toward.length()>60){if(toward.dot(n)<0)n.negate();}
+      else{const a=walk(n),b=walk(n.clone().negate());if(b>a||(a===b&&open(n.clone().negate())>open(n)))n.negate();}
       s.position.copy(near.h.position).addScaledVector(n,30).setY(s.position.y);s.dir=n.clone().add(new THREE.Vector3(0,-.55,0)).normalize();s.angle=1.2;
     }else if(near){s.dir=down.clone();s.angle=1.15;s.position.y=Math.min(s.position.y,near.h.position.y-18);}
     else{s.dir=down.clone();s.angle=s.fixture?1.4:1.3;}
@@ -117,13 +155,13 @@ function setupKino(api){
     // Only surfaces inside the light's cone can blow out: probe its axis and a ring 50° around it.
     const axis=(s.spot?s.spot.target.clone().sub(s.position):s.dir??down).clone().normalize(),side=new THREE.Vector3().crossVectors(axis,Math.abs(axis.y)>.9?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0)).normalize();
     const probes=[axis,...[0,1,2,3,4,5].map(k=>axis.clone().applyAxisAngle(side,.87).applyAxisAngle(axis,k*Math.PI/3))];
-    let near=500;for(const d of probes){const h=ray(s.position,d,500);if(h)near=Math.min(near,h.distance);}
+    let near=500;for(const d of probes){const skip=s.fixture?25:0,h=ray(s.position.clone().addScaledVector(d,skip),d,500);if(h)near=Math.min(near,h.distance+skip);}   // fixtures: skip their own body
     if(near<2)near=12;   // the probe started inside geometry (a floor-level light): assume it is close
-    s.near=near;s.cap=3.2*Math.pow(Math.max(near,6),1.3);
+    s.near=near;s.cap=(near>40?10:3.2)*Math.pow(Math.max(near,6),1.3);   // lights hugging a surface stay strictly capped
   }
 
   // Darker base: less exposure and much less flat fill.
-  renderer.toneMappingExposure=1.45;
+  renderer.toneMappingExposure=1.7;
   const fills=scene.children.filter(o=>o.isAmbientLight||o.isHemisphereLight||o.isDirectionalLight);
   const base=new Map(fills.map(l=>[l,l.intensity]));
   scene.fog=new THREE.FogExp2(0x0c0e11,.00042);scene.background=new THREE.Color(0x07080a);
@@ -273,15 +311,33 @@ function setupKino(api){
   {const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,128,128);g.fillStyle='#fff';g.fillRect(0,0,20,20);
     const tex=new THREE.CanvasTexture(c);tex.flipY=false;
     const seen=new Set();scene.traverse(o=>{for(const m of [o.material].flat())if(m&&!seen.has(m)&&/chandel/.test(m.name??'')){seen.add(m);m.emissive=new THREE.Color('#ffc27a');m.emissiveMap=tex;m.emissiveIntensity=0;m.needsUpdate=true;bulbs.push(m);}});}
+  // Candle halos: find each candle bulb (vertices mapped to the bulb block of
+  // the chandelier texture) and give it a small soft glow, so a chandelier
+  // reads as a cluster of little flames rather than a haze.
+  const halos=[];
+  {const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),r=g.createRadialGradient(32,32,0,32,32,32);
+    r.addColorStop(0,'rgba(255,244,220,1)');r.addColorStop(.12,'rgba(255,214,150,.9)');r.addColorStop(.35,'rgba(255,170,80,.28)');r.addColorStop(1,'rgba(255,140,40,0)');
+    g.fillStyle=r;g.fillRect(0,0,64,64);const glow=new THREE.CanvasTexture(c);glow.colorSpace=THREE.SRGBColorSpace;
+    const mat=new THREE.SpriteMaterial({map:glow,color:0xffffff,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0});
+    const points=[],v=new THREE.Vector3();
+    scene.traverse(o=>{if(!o.isMesh||![o.material].flat().some(m=>/chandel/.test(m?.name??'')))return;const g=o.geometry,uv=g.attributes.uv,pos=g.attributes.position;if(!uv)return;o.updateWorldMatrix(true,false);
+      const groups=g.groups.length?g.groups:[{start:0,count:g.index?g.index.count:pos.count,materialIndex:0}];
+      for(const gr of groups){const m=[o.material].flat()[gr.materialIndex];if(!/chandel/.test(m?.name??''))continue;
+        for(let i=gr.start;i<gr.start+gr.count;i++){const vi=g.index?g.index.getX(i):i;const u=uv.getX(vi),w=uv.getY(vi);
+          if(u>=0&&u<.156&&w>=0&&w<.156){v.fromBufferAttribute(pos,vi).applyMatrix4(o.matrixWorld);if(!points.some(p=>p.distanceToSquared(v)<16))points.push(v.clone());}}}});
+    // Merge nearby bulb vertices into one candle each.
+    const candles=[];for(const p of points){const c=candles.find(c=>c.p.distanceTo(p)<5);if(c){c.sum.add(p);c.n++;c.p.copy(c.sum).divideScalar(c.n);}else candles.push({p:p.clone(),sum:p.clone(),n:1});}
+    for(const c of candles){const sp=new THREE.Sprite(mat);sp.position.copy(c.p).add(new THREE.Vector3(0,2.5,0));sp.scale.setScalar(16);sp.renderOrder=6;scene.add(sp);halos.push(sp);}
+    halos.material=mat;console.info('[lighting] candle halos',candles.length);}
 
   let timer=0,t=0,frame=0;
   const level=s=>s.kind==='sun'?(day()?1:0):s.kind==='power'?(session.power?1:0):s.kind==='fire'?.85+Math.sin(t*23+s.position.x)*.1+Math.random()*.12:1;
   host.on('update',dt=>{
     t+=dt;timer-=dt;frame++;const q=quality();
     applyDay(q);const isDay=day();
-    for(const l of fills){const scale=isDay?(l.isAmbientLight?.2:l.isHemisphereLight?.3:.08):(l.isAmbientLight?.19:l.isHemisphereLight?.21:.12),now=l.isAmbientLight?(session.power?1.5:1.1):base.get(l);l.intensity=now*scale;}
+    for(const l of fills){const scale=isDay?(l.isAmbientLight?.11:l.isHemisphereLight?.17:.05):(l.isAmbientLight?.12:l.isHemisphereLight?.14:.08),now=l.isAmbientLight?(session.power?1.5:1.1):base.get(l);l.intensity=now*scale;}
     // The sun needs its shadows (without them it would light every interior), so Low has none.
-    sun.intensity=isDay&&q>=1?5.2:0;sky.position.copy(camera.position);
+    sun.intensity=isDay&&q>=1?3.4:0;sky.position.copy(camera.position);
     if(isDay&&q>=1&&(sunTimer-=dt)<=0){sunTimer=2;sun.shadow.needsUpdate=true;}   // static world; refresh now and then for doors
     if(timer<=0){
       timer=SWAP;const eye=camera.position;
@@ -308,6 +364,7 @@ function setupKino(api){
         b.seed.forEach((d,i)=>{d.h=(d.h+dt*.01*d.sp)%1;d.a+=dt*.03*d.sp*(d.ph>50?1:-1);const w=Math.sin(t*.6+d.ph)*d.wob;   // drifting, not orbiting in rings
           p.setXYZ(i,Math.cos(d.a)*d.rr+w,-d.h*b.len+Math.sin(t*.4+d.ph*2)*d.wob,Math.sin(d.a)*d.rr+Math.cos(t*.5+d.ph)*d.wob);});p.needsUpdate=true;}}
     for(const m of bulbs)m.emissiveIntensity+=((session.power?2.6:0)-m.emissiveIntensity)*Math.min(1,dt*3);
+    if(halos.material){const target=session.power?.55+Math.sin(t*7.3)*.04+Math.sin(t*11.1)*.03:0;halos.material.opacity+=(target-halos.material.opacity)*Math.min(1,dt*3);}
   });
   // Keep lights that stay chosen on their current source to avoid pops.
   function assign(lights,ranked){
@@ -316,7 +373,7 @@ function setupKino(api){
     const taken=new Set(lights.map(l=>l.userData.source).filter(Boolean));
     for(const {s} of ranked)if(!taken.has(s)){const l=lights.find(l=>!l.userData.source);if(!l)break;l.userData.source=s;l.intensity=0;taken.add(s);}
   }
-  window.kino.lighting={sources,pool,spots,beams};
+  window.kino.lighting={sources,pool,spots,beams,volScene};
 }
 
 // ---- Volumetric beams pass -----------------------------------------------------------------------
@@ -375,7 +432,7 @@ function setupPost(api){
       gtao.render=(...args)=>{const hidden=[];scene.traverseVisible(o=>{const m=o.material;if((o.isMesh||o.isPoints||o.isSprite)&&[m].flat().some(x=>x?.transparent||x?.blending>1)){o.visible=false;hidden.push(o);}});
         try{aoRender(...args);}finally{for(const o of hidden)o.visible=true;}};
     }else gtao=null;
-    bloom=new UnrealBloomPass(new THREE.Vector2(w,h),.28,.32,.9);composer.addPass(bloom);
+    bloom=new UnrealBloomPass(new THREE.Vector2(w,h),.28,.32,1.05);composer.addPass(bloom);
     composer.addPass(new OutputPass());
   }
   const resize=()=>{if(!composer)return;const [w,h]=size();composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);};

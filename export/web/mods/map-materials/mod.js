@@ -26,7 +26,7 @@ export default async function setup(api){
       if(!m||seen.has(m))continue;seen.add(m);
       const name=m.name??'';if(name.includes(':'))continue;   // layered base:decal blends are already baked
       if(GLASS.test(name)){
-        Object.assign(m,{transparent:true,alphaTest:0,depthWrite:false,roughness:.12,metalness:0});
+        Object.assign(m,{transparent:true,alphaTest:0,depthWrite:false,roughness:.42,metalness:0});   // glossier made pin-point sun glints that bloomed into orbs
         m.opacity=1;counts.glass++;
       }else if(MULTIPLY.test(name)){
         // Dark-on-white decals darken what's under them.
