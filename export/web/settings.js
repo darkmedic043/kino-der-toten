@@ -34,7 +34,7 @@ const FIELDS=[
   {key:'volume',label:'Master volume',type:'range',min:0,max:1.5,step:.05,format:v=>Math.round(v*100)+'%'},
   {key:'music',label:'Background music',type:'toggle',hint:'Ambient soundtrack; Easter-egg songs always play'},
   {key:'renderScale',label:'Render resolution',type:'range',min:.5,max:1.5,step:.05,format:v=>Math.round(v*100)+'%',hint:'Lower it for more FPS'},
-  {key:'graphics',label:'Graphics quality',type:'range',min:0,max:3,step:1,format:v=>['Low','Medium','High','Ultra'][v]??v,hint:'Shadows, ambient occlusion, bloom and light beams. Lower it for more FPS'},
+  {key:'graphics',label:'Graphics quality',type:'range',min:0,max:3,step:1,format:v=>['Low','Medium','High','Ultra'][v]??v,hint:'Medium: bloom and light beams. High: + light shadows. Ultra: + ambient occlusion (heavy). Lower it for more FPS'},
   {key:'daytime',label:'Daytime (Kino)',type:'toggle',hint:'Sunlight and sky; off for the original night'},
   {key:'hdTextures',label:'HD textures',type:'toggle',hint:'AI-upscaled map textures (Kino). Uses more video memory'},
   {key:'showFps',label:'Show FPS counter',type:'toggle'},

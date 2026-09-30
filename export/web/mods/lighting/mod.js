@@ -24,7 +24,7 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { settings, onSettingsChange } from '../../settings.js';
 
-const POOL=16,SWAP=.25;
+const POOL=10,SWAP=.25;   // each light is paid for on every pixel of a forward-rendered frame
 // Per-light brightness cap in the lighting shader. A lamp sitting inside its
 // own fixture (a stage lamp, a cable plug, a wall sconce) gave that little
 // mesh hundreds of times too much light, which bloomed into a white disc; the
@@ -206,11 +206,21 @@ function setupKino(api,fixtures=[]){
   const sun=new THREE.DirectionalLight(0xfff0da,0);sun.castShadow=true;sun.position.copy(center).addScaledVector(sunDir,extent*1.5);sun.target.position.copy(center);
   Object.assign(sun.shadow.camera,{left:-extent,right:extent,top:extent,bottom:-extent,near:1,far:extent*3.2});sun.shadow.camera.updateProjectionMatrix();
   sun.shadow.bias=-.0002;sun.shadow.normalBias=1.4;sun.shadow.autoUpdate=false;sun.shadow.needsUpdate=true;scene.add(sun,sun.target);
-  let sunTimer=0,wasDay=null;
+  let sunSig='',wasDay=null;
   // Sun shafts: trace sunlight down onto the map on a grid; spots it reaches
   // that still have a roof overhead are under a hole. Neighbouring spots form
   // one shaft, drawn back up along the sun (built in slices so loading doesn't stall).
+  // Shafts are baked (mods/lighting/sunshafts.json, made by tracing once with
+  // ?bakeShafts in the URL): tracing at runtime built a ray index over every map
+  // mesh, which froze the first minute of play in ~0.75 s chunks.
+  const warmSun=new THREE.Color('#fff1d6'),baked=[];
+  const addShaft=b=>{baked.push(b);makeBeam({kind:'sun'},new THREE.Vector3(...b.top),into0.clone(),b.len,b.r,warmSun,1.1,.1,b.r*.95);};
+  const into0=sunDir.clone().negate();
   (async()=>{
+    if(!/bakeShafts/.test(location.search)){
+      const table=await fetch(new URL('sunshafts.json',import.meta.url)).then(r=>r.ok?r.json():null).catch(()=>null);
+      if(table){for(const b of table)addShaft(b);console.info('[lighting] sun shafts',table.length,'(baked)');return;}
+    }
     // The collision mesh has no roofs, so trace against the visible, opaque map geometry.
     const solids=[];scene.traverse(o=>{if(!o.isMesh||o.isSkinnedMesh||o===sky||skyBrushes.includes(o)||!o.geometry?.attributes?.position)return;
       const m=[o.material].flat();if(m.some(x=>x?.transparent||x?.blending>1||x?.alphaTest>0))return;solids.push(o);});
@@ -241,14 +251,14 @@ function setupKino(api,fixtures=[]){
     for(const g of groups.slice(0,28)){
       const c=g.reduce((v,a)=>v.add(a.p),new THREE.Vector3()).divideScalar(g.length),roofY=g.reduce((m,a)=>Math.max(m,a.roofY),0);
       const len=Math.min(1600,Math.max(120,(roofY-c.y)/sunDir.y)),r=Math.sqrt(g.length*STEP*STEP/Math.PI)*.9;
-      makeBeam({kind:'sun'},c.clone().addScaledVector(sunDir,len),into,len*.97,r,warm,1.1,.1,r*.95);
+      addShaft({top:c.clone().addScaledVector(sunDir,len).toArray().map(v=>+v.toFixed(1)),len:+(len*.97).toFixed(1),r:+r.toFixed(1)});
     }
     console.info('[lighting] sun shafts',Math.min(28,groups.length),'from',lit.size,'sunlit spots');
   })();
   function applyDay(q){
-    const on=day();if(on===wasDay&&sun.shadow.mapSize.x===(q>=2?4096:2048))return;wasDay=on;
+    const on=day();if(on===wasDay&&sun.shadow.mapSize.x===(q>=3?4096:2048))return;wasDay=on;
     sky.visible=on;for(const o of skyBrushes)o.visible=!on;
-    const size=q>=2?4096:2048;if(sun.shadow.mapSize.x!==size){sun.shadow.mapSize.set(size,size);sun.shadow.map?.dispose();sun.shadow.map=null;}
+    const size=q>=3?4096:2048;if(sun.shadow.mapSize.x!==size){sun.shadow.mapSize.set(size,size);sun.shadow.map?.dispose();sun.shadow.map=null;}
     sun.castShadow=on&&q>=1;sun.shadow.needsUpdate=true;
     scene.fog=on?new THREE.FogExp2(0x9aa7b3,.00016):new THREE.FogExp2(0x0c0e11,.00042);scene.background=on?null:new THREE.Color(0x07080a);
   }
@@ -340,19 +350,21 @@ function setupKino(api,fixtures=[]){
 
   let timer=0,t=0,frame=0;
   const level=s=>s.kind==='sun'?(day()?1:0):s.kind==='power'?(session.power?1:0):s.kind==='fire'?.85+Math.sin(t*23+s.position.x)*.1+Math.random()*.12:1;
-  host.on('update',dt=>{
+  const tick=dt=>{
     t+=dt;timer-=dt;frame++;const q=quality();
     applyDay(q);const isDay=day();
     for(const l of fills){const scale=isDay?(l.isAmbientLight?.11:l.isHemisphereLight?.17:.05):(l.isAmbientLight?.12:l.isHemisphereLight?.14:.08),now=l.isAmbientLight?(session.power?1.5:1.1):base.get(l);l.intensity=now*scale;}
     // The sun needs its shadows (without them it would light every interior), so Low has none.
     sun.intensity=isDay&&q>=1?3.4:0;sky.position.copy(camera.position);
-    if(isDay&&q>=1&&(sunTimer-=dt)<=0){sunTimer=2;sun.shadow.needsUpdate=true;}   // static world; refresh now and then for doors
+    // The world is static: redraw the sun's shadow only when a door opens or the power changes
+    // (a full-map shadow render every 2 s was a periodic hitch).
+    {const sig=(api.session.openDoors?.size??0)+'/'+api.session.power;if(isDay&&q>=1&&sig!==sunSig){sunSig=sig;sun.shadow.needsUpdate=true;}}
     if(timer<=0){
       timer=SWAP;const eye=camera.position;
       const score=s=>level(s)?s.intensity*s.radius/Math.max(80,s.position.distanceTo(eye)):0;
       const ranked=sources.map(s=>({s,score:score(s)})).filter(r=>r.score>0).sort((a,b)=>b.score-a.score);
       assign(pool,ranked.filter(r=>!r.s.spot||q<2).slice(0,POOL));
-      const nSpots=q>=3?4:q>=2?2:0;
+      const nSpots=q>=3?3:q>=2?1:0;
       assign(spots,ranked.filter(r=>r.s.spot).slice(0,nSpots));
       // Shadow settings change only with the quality level (each change recompiles shaders).
       const size=q>=3?2048:1024,cast=q>=2;
@@ -364,7 +376,7 @@ function setupKino(api,fixtures=[]){
       if(s){l.position.copy(s.position);l.target.position.copy(s.spot.target);l.color.copy(s.color);l.distance=s.radius*1.6;l.angle=Math.min(1.2,s.spot.angle);l.shadow.camera.far=l.distance;}
       l.intensity+=(target-l.intensity)*Math.min(1,dt*6);}   // never toggle .visible: that recompiles every lit shader
     // Shadows: the world is static, so refresh at 30 Hz on High and every frame on Ultra.
-    if(q>=2&&(q>=3||frame%2===0))for(const l of spots)l.shadow.needsUpdate=true;
+    if(q>=2&&frame%(q>=3?2:3)===0)for(const l of spots)l.shadow.needsUpdate=true;
     if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);}
     for(const b of beams){
       const on=q>=1?level(b.s):0,u=b.mesh.material.uniforms;u.time.value=t;u.strength.value+=(on*b.strength*.45-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
@@ -373,7 +385,11 @@ function setupKino(api,fixtures=[]){
           p.setXYZ(i,Math.cos(d.a)*d.rr+w,-d.h*b.len+Math.sin(t*.4+d.ph*2)*d.wob,Math.sin(d.a)*d.rr+Math.cos(t*.5+d.ph)*d.wob);});p.needsUpdate=true;}}
     for(const m of bulbs)m.emissiveIntensity+=((session.power?2.6:0)-m.emissiveIntensity)*Math.min(1,dt*3);
     if(halos.material){const target=session.power?.55+Math.sin(t*7.3)*.04+Math.sin(t*11.1)*.03:0;halos.material.opacity+=(target-halos.material.opacity)*Math.min(1,dt*3);}
-  });
+  };
+  host.on('update',tick);
+  // Settle the light setup now (shadow casters, sun) so shaders compiled during
+  // loading match the ones used in play; otherwise the first frame recompiled them all.
+  tick(1/60);
   // Keep lights that stay chosen on their current source to avoid pops.
   function assign(lights,ranked){
     const chosen=new Set(ranked.map(r=>r.s));
@@ -381,7 +397,7 @@ function setupKino(api,fixtures=[]){
     const taken=new Set(lights.map(l=>l.userData.source).filter(Boolean));
     for(const {s} of ranked)if(!taken.has(s)){const l=lights.find(l=>!l.userData.source);if(!l)break;l.userData.source=s;l.intensity=0;taken.add(s);}
   }
-  window.kino.lighting={sources,pool,spots,beams,volScene};
+  window.kino.lighting={sources,pool,spots,beams,volScene,shafts:baked};
 }
 
 // ---- Volumetric beams pass -----------------------------------------------------------------------
@@ -430,7 +446,7 @@ function setupPost(api){
     composer.addPass(new ShaderPass({uniforms:{tDiffuse:{value:null}},
       vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
       fragmentShader:'uniform sampler2D tDiffuse;varying vec2 vUv;void main(){vec4 c=texture2D(tDiffuse,vUv);if(any(isnan(c))||any(isinf(c)))c=vec4(0.,0.,0.,1.);gl_FragColor=vec4(min(c.rgb,vec3(48.)),c.a);}'}));
-    if(q>=2){gtao=new GTAOPass(scene,camera,w,h);gtao.output=GTAOPass.OUTPUT.Default;gtao.blendIntensity=1;
+    if(q>=3){gtao=new GTAOPass(scene,camera,w,h);gtao.output=GTAOPass.OUTPUT.Default;gtao.blendIntensity=1;
       gtao.updateGtaoMaterial({radius:28,distanceExponent:1.5,thickness:12,scale:1,samples:q>=3?16:10,distanceFallOff:1});
       gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:4,rings:2,samples:q>=3?16:8});composer.addPass(gtao);
       // AO renders the scene's depth and normals itself; see-through things

@@ -57,20 +57,19 @@ export default async function setup(api){
 
   // Normal maps: the export never attached them. .tools/build-kino-normals.py
   // converts the game's (X-in-alpha) maps and lists them by material name.
-  // They load in the background after the game starts.
+  // They load during the loading screen (in parallel) so the shader recompiles
+  // they cause happen before play, not as a freeze after joining.
   const normalScale=new THREE.Vector2(1,-1);   // DirectX-style green channel
-  fetch(new URL('normals.json',api.mod.url)).then(r=>r.ok?r.json():{}).then(async table=>{
-    const loader=new THREE.TextureLoader(),cache=new Map(),byName=new Map();
-    for(const m of seen)if(table[m.name]&&!m.normalMap)(byName.get(m.name)??byName.set(m.name,[]).get(m.name)).push(m);
-    let applied=0;
-    for(const [name,materials] of byName){
-      const url=new URL(table[name],document.baseURI).href;
-      if(!cache.has(url))cache.set(url,loader.loadAsync(url).then(t=>{t.flipY=false;t.colorSpace=THREE.NoColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=aniso;return t;}).catch(()=>null));
-      const tex=await cache.get(url);if(!tex)continue;
-      for(const m of materials){m.normalMap=tex;m.normalScale=normalScale.clone().multiplyScalar(window.kino.normalStrength??1);m.needsUpdate=true;applied++;}
-    }
-    console.info('[map-materials] normal maps on',applied,'materials');
-  }).catch(e=>console.warn('[map-materials] normal maps',e));
+  try{
+    const table=await fetch(new URL('normals.json',api.mod.url)).then(r=>r.ok?r.json():{});
+    // ImageBitmapLoader decodes off the main thread (TextureLoader decoded on first upload, mid-frame).
+    const loader=new THREE.ImageBitmapLoader(),cache=new Map();loader.setOptions({imageOrientation:'none',premultiplyAlpha:'none',colorSpaceConversion:'none'});
+    const jobs=[...seen].filter(m=>table[m.name]&&!m.normalMap).map(async m=>{
+      const url=new URL(table[m.name],document.baseURI).href;
+      if(!cache.has(url))cache.set(url,loader.loadAsync(url).then(b=>new THREE.Texture(b)).then(t=>{t.needsUpdate=true;t.flipY=false;t.colorSpace=THREE.NoColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=aniso;return t;}).catch(()=>null));
+      const tex=await cache.get(url);if(tex){m.normalMap=tex;m.normalScale=normalScale.clone().multiplyScalar(window.kino.normalStrength??1);m.needsUpdate=true;}});
+    await Promise.all(jobs);console.info('[map-materials] normal maps on',jobs.length,'materials');
+  }catch(e){console.warn('[map-materials] normal maps',e);}
 
   // HD textures: AI-upscaled (Real-ESRGAN) copies from .tools/upscale-kino-textures.py,
   // keyed by material name in hd-materials.json. Swapped in one per frame after
@@ -90,9 +89,9 @@ export default async function setup(api){
     function apply(on){
       want=on;let i=0;
       const step=async()=>{if(want!==on)return;
-        if(!on){for(const [,e] of queue)for(const m of e.materials){if(m.map!==m.userData.sdMap){m.map=m.userData.sdMap;m.needsUpdate=true;}}return;}
+        if(!on){for(const [,e] of queue)for(const m of e.materials){if(m.map!==m.userData.sdMap)m.map=m.userData.sdMap;}return;}
         const entry=queue[i++];if(!entry){console.info('[map-materials] HD textures on',queue.length);return;}
-        const t=await load(entry);if(t&&want){const sd=new Set();for(const m of entry[1].materials){sd.add(m.userData.sdMap);m.map=t;m.needsUpdate=true;}
+        const t=await load(entry);if(t&&want){const sd=new Set();for(const m of entry[1].materials){sd.add(m.userData.sdMap);m.map=t;}   // same program: no needsUpdate (it forced a rebuild per swap)
           for(const x of sd)x.dispose();}   // frees the original's GPU copy; it re-uploads if switched back
         requestAnimationFrame(step);};
       step();
@@ -123,4 +122,12 @@ export default async function setup(api){
     g.computeBoundingBox();
     api.world.dynamic.push({collider:new CollisionWorld(g),box:g.boundingBox.clone(),enabled:true,window:true,note:'spawn pad cap'});
   }
+
+  // Compile every shader now, during loading (normal maps, light clamp, the
+  // lighting mod's changes), instead of hitching on the first frames of play.
+  try{const t0=performance.now();await api.renderer?.compileAsync?.(api.scene,api.camera);if(api.viewScene)await api.renderer?.compileAsync?.(api.viewScene,api.camera);
+    // Draw one full frame too (shadow maps, post-processing targets, texture
+    // uploads) so that cost lands behind the loading screen, not on joining.
+    const R=api.renderer;if(R){(api.host?.renderWorld??((sc,c)=>R.render(sc,c)))(api.scene,api.camera);if(api.viewScene)R.render(api.viewScene,api.camera);}
+    console.info('[map-materials] shaders precompiled and first frame drawn in',Math.round(performance.now()-t0),'ms');}catch(e){console.warn('[map-materials] precompile',e);}
 }
