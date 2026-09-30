@@ -1,0 +1,5 @@
+{
+  "name": "Terminal booth",
+  "description": "A payphone-style booth with a live CRT terminal, retro keyboard, sparking wires and coolant tubes. Placed per map in placements.json.",
+  "script": "mod.js"
+}

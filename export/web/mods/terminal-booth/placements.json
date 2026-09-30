@@ -1,0 +1,8 @@
+{
+  "sign": "TERMINAL",
+  "maps": {
+    "kino": [
+      { "position": [-388, 82, 1338], "yaw": 90, "note": "spawn room, west wall pilaster between the wall-buy and the window" }
+    ]
+  }
+}

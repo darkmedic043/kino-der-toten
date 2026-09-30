@@ -1,6 +1,7 @@
 {
   "enabled": [
     "lighting",
+    "terminal-booth",
     "map-materials",
     "example-weapons",
     "moon-weapons",

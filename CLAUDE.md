@@ -17,6 +17,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Movement mod (crouch/prone/slide/mantle), stairs | `movement.md` |
 | Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby) | `coop.md` |
+| Props: terminal booth (Blender generator, bake, placement mod) | `props.md` |
 | Session history log | `history.md` |
 
 ## Setup essentials
