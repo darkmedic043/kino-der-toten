@@ -6,9 +6,13 @@
 //   sprinting to slide. Jump stands up from crouch or prone.
 // - Mantle: jump at a ledge up to chest height to climb over it.
 // - First-person head bob, landing dip (real falls only) and strafe roll.
+// - Black Ops 7 omnimovement: sprint and slide in any direction, dive (hold
+//   crouch while sprinting), wall jump (jump into a wall while airborne).
+//   First-person gun and hand animation for all of it is in fp.js.
 import * as THREE from 'three';
 import { Capsule } from 'three/addons/math/Capsule.js';
 import { settings } from '../../settings.js';
+import { setupFirstPerson } from './fp.js';
 
 export default function setup(api){
   const {player,camera,host,data,session}=api,m=data.rules.movement??{};
@@ -19,13 +23,16 @@ export default function setup(api){
   const base={groundAcceleration:player.groundAcceleration,airAcceleration:player.airAcceleration,crouchHeight:player.crouchHeight,crouchEyeHeight:player.crouchEyeHeight,crouchSpeed:player.crouchSpeed};
   const PRONE={height:Math.max(player.radius*2+2,30),eye:17,speed:45};
   const up=new THREE.Vector3(0,1,0),down=new THREE.Vector3(0,-1,0);
-  const state={prone:false,sliding:false,mantling:null,airTime:0,jumped:false,grounded:true,stairs:0};
+  const state={prone:false,sliding:false,mantling:null,diving:null,wallJumps:0,wallKick:0,airTime:0,jumped:false,grounded:true,stairs:0};
   window.kino.movement={player,settings:m,state};
 
   const ray=(origin,dir,far)=>player.worldOctree.rayIntersect?.(new THREE.Ray(origin,dir),0,far);
   const normalY=hit=>hit.normal?.y??hit.triangle?.getNormal(new THREE.Vector3()).y??1;
   const feet=()=>player.getFeetPosition().clone();
   const forwardDir=()=>new THREE.Vector3(-Math.sin(camera.rotation.y),0,-Math.cos(camera.rotation.y));
+  // the direction the player is pushing (forward/strafe input), falling back to the view
+  let lastInput={forward:0,strafe:0};
+  const moveDir=()=>{const f=forwardDir(),r=new THREE.Vector3(-f.z,0,f.x),d=f.multiplyScalar(lastInput.forward??0).addScaledVector(r,lastInput.strafe??0);return d.lengthSq()>1e-4?d.normalize():forwardDir();};
   const moveFeet=target=>{const d=target.clone().sub(feet());player.collider.translate(d);};
   const capsuleAt=(feetPos,height)=>{const c=new Capsule(new THREE.Vector3(),new THREE.Vector3(),player.radius);
     c.start.set(feetPos.x,feetPos.y+player.radius,feetPos.z);c.end.set(feetPos.x,feetPos.y+Math.max(.01,height-2*player.radius)+player.radius,feetPos.z);return c;};
@@ -56,7 +63,7 @@ export default function setup(api){
     if(!CROUCH_KEYS.has(e.code)||!controls.held)return;controls.held=false;
     if(!canAct()||controls.holdTime>=HOLD)return;   // a hold already went prone
     if(state.prone){setProne(false);controls.crouch=true;}
-    else if(controls.sprinting&&(player.onFloor||state.airTime<.25))startSlide();   // ground contact flickers on slopes
+    else if(controls.sprinting&&!state.diving&&(player.onFloor||state.airTime<.25))startSlide();   // ground contact flickers on slopes
     else controls.crouch=!controls.crouch;
   });
   addEventListener('blur',()=>{controls.held=false;});
@@ -75,7 +82,10 @@ export default function setup(api){
     if(rise<=player.stepHeight+1||rise>74)return null;
     const target=new THREE.Vector3(probe.x,topY+player.skin*2,probe.z);
     if(!fits(target,player.height))return null;
-    return {from:f,top:new THREE.Vector3(f.x,topY+4,f.z).addScaledVector(dir,4),target,t:0,duration:.28+rise/260};
+    // where the left hand plants: on the ledge's edge, a little left of centre
+    const left=new THREE.Vector3(dir.z,0,-dir.x);
+    const hand=f.clone().addScaledVector(dir,wall.distance+3).addScaledVector(left,7);hand.y=topY+.5;
+    return {from:f,top:new THREE.Vector3(f.x,topY+4,f.z).addScaledVector(dir,4),target,hand,rise,t:0,duration:.34+rise/240};
   }
 
   // ---- Slide ------------------------------------------------------------------------------------
@@ -88,6 +98,31 @@ export default function setup(api){
     state.sliding=true;slide.t=0;slide.boost=0;slide.dir.set(v.x/h,0,v.z/h);slide.start=Math.min(SLIDE.maxSpeed,Math.max(h,220)*1.6);
     controls.crouch=true;host.emit('slide');
   }
+  // ---- Dive (BO6/BO7): a low forward leap in the move direction, landing prone ------------
+  const DIVE_HOLD=.2;
+  function startDive(){
+    const d=moveDir(),h=Math.hypot(player.velocity.x,player.velocity.z);
+    const speed=Math.max(380,h*1.45);
+    state.sliding=false;state.diving={t:0,dir:d.clone(),speed};state.jumped=true;
+    player.velocity.set(d.x*speed,250,d.z*speed);player.onFloor=player.grounded=false;
+    host.emit('dive');
+  }
+  // ---- Wall jump (BO7): jump while airborne next to a wall to kick off it --------------------
+  const WALL={reach:20,max:3,cooldown:.28,out:290,up:.95};
+  function tryWallJump(){
+    if(state.wallJumps>=WALL.max||state.wallKick>0)return false;
+    let best=null;
+    for(const hgt of [22,46])for(let i=0;i<12;i++){const a=i/12*Math.PI*2,d=new THREE.Vector3(Math.cos(a),0,Math.sin(a)),f=feet().addScaledVector(up,hgt);
+      const h=ray(f,d,player.radius+WALL.reach);if(!h||Math.abs(normalY(h))>.3)continue;if(!best||h.distance<best.h.distance)best={h,d};}
+    if(!best)return false;
+    const n=(best.h.normal?.clone()??best.h.triangle?.getNormal(new THREE.Vector3()))??best.d.clone().negate();n.y=0;n.normalize();if(n.dot(best.d)>0)n.negate();
+    if(state.lastWall&&state.lastWall.dot(n)>.9&&state.wallJumps>0)return false;   // not the same wall twice in a row
+    const v=player.velocity,into=v.x*n.x+v.z*n.z;
+    const along=new THREE.Vector3(v.x-n.x*into,0,v.z-n.z*into).multiplyScalar(.85);
+    player.velocity.set(along.x+n.x*WALL.out,player.jumpSpeed*WALL.up,along.z+n.z*WALL.out);
+    state.wallJumps++;state.wallKick=WALL.cooldown;state.lastWall=n;state.jumped=true;
+    host.emit('walljump',{normal:n});return true;
+  }
   const slideSpeed=t=>{const u=Math.min(1,t/SLIDE.duration);return SLIDE.endSpeed+(slide.start-SLIDE.endSpeed)*(1-u)**1.7;};
 
   // ---- Wrapped controller update ----------------------------------------------------------
@@ -97,7 +132,10 @@ export default function setup(api){
     const down_=['reviving','gameover'].includes(session.phase);
     if(down_){if(state.prone)setProne(false);state.sliding=false;state.mantling=null;controls.crouch=false;}
     // Holding crouch long enough goes prone.
-    if(controls.held){controls.holdTime+=dt;if(!state.prone&&!state.mantling&&controls.holdTime>=HOLD){state.sliding=false;setProne(true);}}
+    if(controls.held){controls.holdTime+=dt;
+      // holding crouch while sprinting dives (a quick tap still slides)
+      if(controls.sprinting&&!state.diving&&!state.mantling&&!state.prone&&controls.holdTime>=DIVE_HOLD&&(player.onFloor||state.airTime<.2)){controls.held=false;startDive();}
+      else if(!state.prone&&!state.mantling&&!state.diving&&controls.holdTime>=HOLD){state.sliding=false;setProne(true);}}
     // Mantling: a short scripted climb that overrides movement.
     if(state.mantling){
       const mt=state.mantling;mt.t=Math.min(1,mt.t+dt/mt.duration);
@@ -107,12 +145,24 @@ export default function setup(api){
       if(mt.t>=1){state.mantling=null;player.onFloor=player.grounded=true;player._resolveCollisions?.();const d=forwardDir();player.velocity.set(d.x*90,0,d.z*90);}
       return player.state;
     }
+    // Diving: momentum carries the player; landing ends it prone.
+    if(state.diving){
+      state.diving.t+=dt;
+      if(input)input={...input,forward:0,strafe:0,sprint:false,jump:false,jumpPressed:false,crouch:false};
+      const r=originalUpdate(dt,input);
+      // the leap keeps its momentum in the air (air control would brake it toward zero input)
+      if(!player.onFloor){const dv=state.diving,sp=dv.speed*Math.exp(-dv.t*.6),h=Math.hypot(player.velocity.x,player.velocity.z);if(h>1){const k=Math.min(1,sp/h);player.velocity.x=dv.dir.x*Math.max(h*k,sp);player.velocity.z=dv.dir.z*Math.max(h*k,sp);}}
+      if((player.onFloor&&state.diving.t>.12)||state.diving.t>1.6){state.diving=null;setProne(true);controls.crouch=true;const v=player.velocity;v.x*=.35;v.z*=.35;host.emit('diveLand');}
+      if(player.onFloor){state.airTime=0;state.jumped=false;}else state.airTime+=dt;
+      return r;
+    }
+    state.wallKick=Math.max(0,state.wallKick-dt);
     if(input&&!down_){
-      input={...input};
+      input={...input};lastInput={forward:input.forward??0,strafe:input.strafe??0};
       const jumpNow=!!(input.jump||input.jumpPressed),horizontal=Math.hypot(player.velocity.x,player.velocity.z);
       controls.sprinting=!!input.sprint&&horizontal>170;   // uphill sprinting is slower
       // Sprinting cancels a toggled crouch, as in Call of Duty.
-      if(input.sprint&&controls.crouch&&!state.sliding&&(input.forward??0)>0)controls.crouch=false;
+      if(input.sprint&&controls.crouch&&!state.sliding&&Math.hypot(input.forward??0,input.strafe??0)>.01)controls.crouch=false;
       // Jump pressed near a ledge: mantle instead (also works mid-air).
       if(jumpNow&&!prevJump||(!player.onFloor&&input.jump&&input.forward>0&&state.airTime>.08)){
         const ledge=!state.prone&&findLedge();
@@ -121,6 +171,7 @@ export default function setup(api){
       // Jump from prone or crouch stands up instead; a jump mid-slide becomes a slide-jump.
       if(jumpNow&&!prevJump&&(state.prone||(controls.crouch&&!state.sliding))){if(state.prone)setProne(false);controls.crouch=false;input.jump=false;input.jumpPressed=false;}
       else if(jumpNow&&!prevJump&&(player.onFloor||state.airTime<.1)){state.jumped=true;if(state.sliding){state.sliding=false;controls.crouch=false;}}
+      else if(jumpNow&&!prevJump&&!player.onFloor&&state.airTime>.12&&!state.prone&&tryWallJump()){input.jump=false;input.jumpPressed=false;}
       if(state.sliding){
         slide.t+=dt;input.sprint=false;
         player.groundAcceleration=40;   // the slide curve drives the speed, not friction
@@ -140,7 +191,7 @@ export default function setup(api){
     const result=originalUpdate(dt,input);
     // Slide: apply the eased speed along the slide direction, steering slightly toward input.
     if(state.sliding){
-      const want=forwardDir();slide.dir.lerp(want,SLIDE.steer*dt*4).normalize();
+      const want=moveDir();slide.dir.lerp(want,SLIDE.steer*dt*4).normalize();
       // Follow the ground: stick to slopes (downhill would otherwise launch you
       // off the surface) and let the slope speed you up or slow you down.
       const base_=slideSpeed(slide.t),reach=player.stepHeight+4+base_*dt*1.5;
@@ -164,10 +215,11 @@ export default function setup(api){
       if(hit&&normalY(hit)>.6){moveFeet(feet().addScaledVector(down,Math.max(0,hit.distance-2-player.skin)));player.onFloor=player.grounded=true;player.velocity.y=0;player._syncCamera();}
     }
     if(player.onFloor!==wasGrounded&&!state.jumped)state.stairs=.35;state.stairs=Math.max(0,state.stairs-dt);
-    if(player.onFloor){state.airTime=0;state.jumped=false;}else state.airTime+=dt;
+    if(player.onFloor){state.airTime=0;state.jumped=false;state.wallJumps=0;state.lastWall=null;}else state.airTime+=dt;
     return result;
   };
-  host.on('reset',()=>{setProne(false);state.sliding=false;state.mantling=null;controls.crouch=false;});
+  host.on('reset',()=>{setProne(false);state.sliding=false;state.mantling=null;state.diving=null;controls.crouch=false;});
+  setupFirstPerson(api,state);
 
   // ---- Slide sound ----------------------------------------------------------------------------------
   // data.json "slideSound" (a file in this folder) if set; otherwise a synthesized dirt scrape.

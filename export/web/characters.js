@@ -331,7 +331,7 @@ function mannequin(entry,holder){
 export function applyStance(character,stance,dt){
   const r=character.root,s=r.userData.stance??={pitch:0,lift:0};
   // Characters face +Z, so a positive pitch tips the head forward (face down).
-  const target=stance==='prone'?1.45:stance==='slide'?-.85:stance==='mantle'?.35:0;
+  const target=stance==='prone'?1.45:stance==='dive'?1.25:stance==='slide'?-.85:stance==='mantle'?.35:0;   // dive: flat, face-down leap
   s.pitch+=(target-s.pitch)*Math.min(1,dt*9);
   r.rotation.order='YXZ';r.rotation.x=s.pitch;
   // Lying down pivots around the feet; lift the pivot a little so the body rests on the floor.

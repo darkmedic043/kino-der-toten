@@ -299,7 +299,7 @@ export default async function setup(api){
       // id, :u if upgraded, and the equipped attachments (weapon-levels) so teammates see them
       const w=session.weaponUnavailable?'':session.weapon.id+':'+(session.weapon.upgraded?'u':'')+':'+(data.weapons[session.weapon.id]?.attachments??'');
       net.send('all',{t:'pose',p:[r1(f.x),r1(f.y),r1(f.z)],y:Math.round((camera.rotation.y+Math.PI)*1000)/1000,v:(player.state?.velocity?.toArray()??[0,0,0]).map(r1),
-        g:player.state?.grounded??true,k:window.kino.movement?.state?.prone?'prone':window.kino.movement?.state?.sliding?'slide':window.kino.movement?.state?.mantling?'mantle':'',d:me.down,x:me.dead||session.phase==='gameover',w,f:fireCount});
+        g:player.state?.grounded??true,k:window.kino.movement?.state?.diving?'dive':window.kino.movement?.state?.prone?'prone':window.kino.movement?.state?.sliding?'slide':window.kino.movement?.state?.mantling?'mantle':'',d:me.down,x:me.dead||session.phase==='gameover',w,f:fireCount});
       const key=[...session.openDoors].sort().join()+'|'+session.power;
       if(key!==worldKey){worldKey=key;if(!net.isHost)net.send('host',{t:'world',doors:[...session.openDoors],power:session.power});}
     }

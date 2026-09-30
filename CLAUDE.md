@@ -14,7 +14,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Map materials, normal maps, HD textures (map + weapons) | `materials.md` |
 | Performance measurements and load-time warm-ups | `performance.md` |
 | Health, HUD/hit sounds, zombie voices, music, cheat console | `gameplay.md` |
-| Movement mod (crouch/prone/slide/mantle), stairs, debris smoothing | `movement.md` |
+| Movement mod (crouch/prone/slide/mantle, BO7 omnimovement, dive, wall jump), first-person motion and mantle hand IK, stairs | `movement.md` |
 | Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby) | `coop.md` |
 | Props: terminal booth (Blender generator, bake, placement mod) | `props.md` |
@@ -46,4 +46,4 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 
 ## Upstream files with local edits (keep them small)
 
-`enemies.js` (co-op `targetFor` hook), `mystery-box.js` (display cache and warm-up), `animation.js` (weapon-part position tracks relative to bind), `player-controller.js` (step-up keeps speed), `settings.js` (graphics quality), `game.js`/`zombies.js` (`renderer` in the mod api and the `mods.renderWorld` hook), `game.js` (mod hooks, render camera, settings sensitivity/FOV, `installGameMenu`, box warm-up, cheat check on best round), `audio.js` (`def.baseId??def.id`), `.tools/serve.mjs` (`KINO_HOME`), `game.js`/`zombies.js` (hip/pellet spread read `def.hipSpread`/`def.pelletSpread`). Watch for these when merging upstream.
+`enemies.js` (co-op `targetFor` hook), `mystery-box.js` (display cache and warm-up), `animation.js` (weapon-part position tracks relative to bind), `player-controller.js` (step-up keeps speed), `settings.js` (graphics quality), `game.js`/`zombies.js` (`renderer` in the mod api and the `mods.renderWorld` hook), `game.js` (mod hooks, render camera, settings sensitivity/FOV, `installGameMenu`, box warm-up, cheat check on best round), `audio.js` (`def.baseId??def.id`), `.tools/serve.mjs` (`KINO_HOME`), `game.js`/`zombies.js` (hip/pellet spread read `def.hipSpread`/`def.pelletSpread`; sprint on any move direction, not while sliding/diving). Watch for these when merging upstream.
