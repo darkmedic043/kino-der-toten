@@ -115,6 +115,15 @@ function setupKino(api,fixtures=[]){
     else if(k.beam&&f.kind==='hang')s.spot={angle:.9,down:true,beam:k.beam};
     sources.push(s);
   }
+  // Mystery box lamps: with the power on, a green lamp glows above wherever the
+  // box currently is (a light source here plus a halo sprite, set up below).
+  const boxLamps=[];
+  for(const e of world.boxLocations??[]){
+    const p=new THREE.Vector3(...e.position),hit=world.raycast?.(new THREE.Ray(p.clone().add(new THREE.Vector3(0,40,0)),new THREE.Vector3(0,1,0)),0,400);
+    const at=p.clone().add(new THREE.Vector3(0,Math.min(150,(hit?.distance??150)+20),0));
+    const src={position:at,color:new THREE.Color('#44ff6a'),intensity:4.5,radius:360,kind:'box',box:e.id,beamOK:false,fixture:'boxlamp',dir:new THREE.Vector3(0,-1,0),angle:1.3};
+    sources.push(src);boxLamps.push(src);
+  }
   // A beam must come out of something you can see: keep beams only on sources
   // at a real fixture (the map's ceiling 'spots' in the theatre have none).
   for(const s of sources)if(s.spot&&!s.beamOK&&!fixturePoints.some(p=>p.distanceTo(s.position)<130)&&!s.fixture)s.spot.beam=0;
@@ -361,8 +370,22 @@ function setupKino(api,fixtures=[]){
     for(const c of candles){const sp=new THREE.Sprite(mat);sp.position.copy(c.p).add(new THREE.Vector3(0,2.5,0));sp.scale.setScalar(16);sp.renderOrder=6;scene.add(sp);halos.push(sp);}
     halos.material=mat;console.info('[lighting] candle halos',candles.length);}
 
+  // Green halos for the box lamps.
+  const boxHalos=boxLamps.map(src=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),r=g.createRadialGradient(32,32,0,32,32,32);
+    r.addColorStop(0,'rgba(220,255,225,1)');r.addColorStop(.18,'rgba(90,255,120,.85)');r.addColorStop(.5,'rgba(40,220,80,.22)');r.addColorStop(1,'rgba(20,200,60,0)');g.fillStyle=r;g.fillRect(0,0,64,64);
+    const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0}));sp.position.copy(src.position);sp.scale.setScalar(26);scene.add(sp);return {src,sp};});
+  // The box's beacon: the game's flat cylinder becomes a volumetric column of
+  // light rising from the active box, with dust, following it when it moves.
+  let boxBeam=null;
+  if(world.boxBeam){
+    world.boxBeam.visible=false;world.boxBeam.material.opacity=0;
+    const len=1500,base=new THREE.Vector3().copy(world.boxBeam.position).add(new THREE.Vector3(0,-800,0));
+    makeBeam({kind:'boxbeam'},base.clone().add(new THREE.Vector3(0,30,0)),new THREE.Vector3(0,1,0),len,34,new THREE.Color('#a9c8ff'),1.3,.25,9);
+    boxBeam=beams.at(-1);boxBeam.base=base;boxBeam.lastKey='';
+  }
   let timer=0,t=0,frame=0;
-  const level=s=>s.kind==='sun'?(day()?1:0):s.kind==='power'?(session.power?1:0):s.kind==='fire'?.85+Math.sin(t*23+s.position.x)*.1+Math.random()*.12:1;
+  const level=s=>s.kind==='off'?0:s.kind==='box'?(session.power&&world.activeBox?.id===s.box?1:0):s.kind==='boxbeam'?1:s.kind==='sun'?(day()?1:0):s.kind==='power'?(session.power?1:0):s.kind==='fire'?.85+Math.sin(t*23+s.position.x)*.1+Math.random()*.12:1;
   const tick=dt=>{
     t+=dt;timer-=dt;frame++;const q=quality();
     applyDay(q);const isDay=day();
@@ -401,6 +424,14 @@ function setupKino(api,fixtures=[]){
         b.seed.forEach((d,i)=>{d.h=(d.h+dt*.01*d.sp)%1;d.a+=dt*.03*d.sp*(d.ph>50?1:-1);const w=Math.sin(t*.6+d.ph)*d.wob;   // drifting, not orbiting in rings
           p.setXYZ(i,Math.cos(d.a)*d.rr+w,-d.h*b.len+Math.sin(t*.4+d.ph*2)*d.wob,Math.sin(d.a)*d.rr+Math.cos(t*.5+d.ph)*d.wob);});p.needsUpdate=true;}}
     if(VM&&frame%3===0)lightTheGun(dt*3);
+    for(const h of boxHalos){const on=level(h.src);h.sp.material.opacity+=(on*(.85+Math.sin(t*3)*.08)-h.sp.material.opacity)*Math.min(1,dt*3);h.sp.visible=h.sp.material.opacity>.01;}
+    if(boxBeam){
+      // Beam upward from the box: the column is brightest at the box, fading into the air above.
+      const p=world.boxBeam.position,key=p.x+','+p.z;
+      if(key!==boxBeam.lastKey){boxBeam.lastKey=key;const top=new THREE.Vector3(p.x,p.y-800+30,p.z),u=boxBeam.mesh.material.uniforms;
+        boxBeam.top=top;boxBeam.mesh.position.copy(top);u.apex.value.copy(top);boxBeam.dust.position.copy(top);}
+      boxBeam.s.kind=world.boxBeam.parent&&!world.fireSale?'boxbeam':'off';
+    }
     for(const m of bulbs)m.emissiveIntensity+=((session.power?2.6:0)-m.emissiveIntensity)*Math.min(1,dt*3);
     if(halos.material){const target=session.power?.55+Math.sin(t*7.3)*.04+Math.sin(t*11.1)*.03:0;halos.material.opacity+=(target-halos.material.opacity)*Math.min(1,dt*3);}
   };
