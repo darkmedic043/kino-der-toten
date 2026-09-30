@@ -22,6 +22,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
+import { bakeVolume, loadVolume, patchMaterial } from './baked.js';
 import { settings, onSettingsChange } from '../../settings.js';
 
 const SWAP=.25;
@@ -69,11 +70,14 @@ export default async function setup(api){
     api.viewScene.add(fill,rim);
     VM={amb:api.viewScene.children.find(l=>l.isAmbientLight),key:api.viewScene.children.find(l=>l.isDirectionalLight&&l!==rim),fill,rim};
   }
-  if(kino)setupKino(api,fixtures);
+  // Baked lighting (see baked.js); ?bakeLight runs the bake instead of using it.
+  const baking=/bakeLight/.test(location.search);
+  const volume=kino&&!baking?await loadVolume(import.meta.url):null;
+  if(kino)setupKino(api,fixtures,volume,baking);
 }
 
 // ---- Kino lights ------------------------------------------------------------------------------
-function setupKino(api,fixtures=[]){
+function setupKino(api,fixtures=[],volume=null,baking=false){
   const {scene,camera,session,data,host,renderer,world}=api;
   const rgb=s=>{const [r,g,b]=String(s).trim().split(/\s+/).map(Number);return r+g+b>0?new THREE.Color(r,g,b):new THREE.Color('#fff4dc');};
   const sources=[];
@@ -188,7 +192,11 @@ function setupKino(api,fixtures=[]){
   // Point-light pool (cheap, many sources).
   // The live light budget grows with quality (every light is paid for per pixel,
   // and changing the count recompiles shaders, so it only changes with the setting).
-  const poolSize=q=>q>=3?20:q>=2?14:q>=1?10:8;
+  // With the baked volume only spotlights, fire and the box lamp are live, so far fewer slots.
+  const poolSize=q=>volume?(q>=3?8:q>=2?6:5):(q>=3?20:q>=2?14:q>=1?10:8);
+  // With the baked volume, only these stay dynamic: spotlights (beams, shadows),
+  // flickering fire, the box lamp. Everything else is in the bake.
+  const dynamicOnly=s=>!!s.spot||['fire','box','boxbeam','sun','off'].includes(s.kind);
   const pool=[];
   function resizePool(n){
     while(pool.length<n){const l=new THREE.SpotLight(0xffffff,0,1,1.2,1,1.3);scene.add(l,l.target);pool.push(l);}
@@ -207,6 +215,7 @@ function setupKino(api,fixtures=[]){
   const shadowReady=new WeakSet();
   function tagShadows(root){root.traverse(o=>{if(!o.isMesh||shadowReady.has(o))return;shadowReady.add(o);
     for(const x of [o.material].flat())if(x&&!x.isShaderMaterial&&x.defines?.LIGHT_CLAMP!==LIGHT_CLAMP){x.defines={...x.defines,LIGHT_CLAMP};x.needsUpdate=true;}
+    if(volume)for(const x of [o.material].flat())if(x&&!x.isShaderMaterial)patchMaterial(x,volume.uniforms);
     const m=[o.material].flat()[0];
     const see=!m?.transparent&&!(m?.blending>1);o.castShadow=see;o.receiveShadow=true;});}
   tagShadows(scene);let tagTimer=0;
@@ -400,7 +409,7 @@ function setupKino(api,fixtures=[]){
       const score=s=>level(s)?s.intensity*s.radius/Math.max(80,s.position.distanceTo(eye)):0;
       const ranked=sources.map(s=>({s,score:score(s)})).filter(r=>r.score>0).sort((a,b)=>b.score-a.score);
       if(pool.length!==poolSize(q))resizePool(poolSize(q));
-      assignPool(ranked.filter(r=>!r.s.spot||q<2));
+      assignPool(ranked.filter(r=>(!r.s.spot||q<2)&&(!volume||dynamicOnly(r.s))));
       const nSpots=q>=3?3:q>=2?1:0;
       assign(spots,ranked.filter(r=>r.s.spot).slice(0,nSpots));
       // Shadow settings change only with the quality level (each change recompiles shaders).
@@ -423,6 +432,7 @@ function setupKino(api,fixtures=[]){
       b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible){b.dust.material.opacity=Math.min(.2,u.strength.value*1.4);const p=b.dust.geometry.attributes.position;
         b.seed.forEach((d,i)=>{d.h=(d.h+dt*.01*d.sp)%1;d.a+=dt*.03*d.sp*(d.ph>50?1:-1);const w=Math.sin(t*.6+d.ph)*d.wob;   // drifting, not orbiting in rings
           p.setXYZ(i,Math.cos(d.a)*d.rr+w,-d.h*b.len+Math.sin(t*.4+d.ph*2)*d.wob,Math.sin(d.a)*d.rr+Math.cos(t*.5+d.ph)*d.wob);});p.needsUpdate=true;}}
+    if(volume){const u=volume.uniforms.bakedPowerMix;u.value+=((session.power?1:0)-u.value)*Math.min(1,dt*1.5);}
     if(VM&&frame%3===0)lightTheGun(dt*3);
     for(const h of boxHalos){const on=level(h.src);h.sp.material.opacity+=(on*(.85+Math.sin(t*3)*.08)-h.sp.material.opacity)*Math.min(1,dt*3);h.sp.visible=h.sp.material.opacity>.01;}
     if(boxBeam){
@@ -455,6 +465,8 @@ function setupKino(api,fixtures=[]){
     }
     // Sunlight: standing inside a sun shaft.
     for(const b of beams)if(b.s.kind==='sun'&&b.mesh.visible){const rel=cam.clone().sub(b.top),a=rel.dot(b.dir);if(a>0&&a<b.len&&rel.addScaledVector(b.dir,-a).length()<b.r){const c=.12;sum+=c;keyDir.addScaledVector(sunDir,c);mix.add(tmp.setRGB(1,.95,.86).multiplyScalar(c));}}
+    // Baked lamps: their light at the camera (irradiance ≈ what a surface facing them receives).
+    if(volume){const c=volume.sample(cam,volume.uniforms.bakedPowerMix.value);const lum=(c.r+c.g+c.b)/3;if(lum>0){const w=lum*.06;sum+=w;mix.add(tmp.copy(c).multiplyScalar(w/Math.max(lum,1e-4)));}}
     const target=THREE.MathUtils.clamp(.22+sum*8,.22,1.3);gunLevel+=(target-gunLevel)*Math.min(1,dt*3);
     VM.key.intensity=2.2*gunLevel;VM.amb.intensity=.6*(.45+.55*gunLevel);VM.fill.intensity=.7*(.4+.6*gunLevel);VM.rim.intensity=.7*(.3+.7*gunLevel);
     if(sum>0){mix.multiplyScalar(1/sum);VM.key.color.lerp(tmp.setRGB(Math.min(1,.55+mix.r*.6),Math.min(1,.55+mix.g*.6),Math.min(1,.55+mix.b*.6)),Math.min(1,dt*2));
@@ -492,7 +504,10 @@ function setupKino(api,fixtures=[]){
     const taken=new Set(lights.map(l=>l.userData.source).filter(Boolean));
     for(const {s} of ranked)if(!taken.has(s)){const l=lights.find(l=>!l.userData.source);if(!l)break;l.userData.source=s;l.intensity=0;taken.add(s);}
   }
-  window.kino.lighting={sources,pool,spots,beams,volScene,shafts:baked,tag:tagShadows};
+  window.kino.lighting={sources,pool,spots,beams,volScene,shafts:baked,tag:tagShadows,volume};
+  if(baking)(async()=>{const t0=performance.now();
+    const r=await bakeVolume({scene,sources,exclude:dynamicOnly,cell:32,onProgress:(i,n)=>{if(i%10===0)console.info('[bake] slice',i,'/',n);}});
+    window.kino.lighting.bakeResult=r;console.info('[bake] done in',Math.round((performance.now()-t0)/1000),'s',r.meta.dims.join('x'));})();
 }
 
 // ---- Volumetric beams pass -----------------------------------------------------------------------
