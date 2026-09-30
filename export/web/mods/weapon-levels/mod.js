@@ -24,6 +24,8 @@ export default async function setup(api){
   const save=()=>{const fresh=loadProfile();fresh.weaponXp=profile.weaponXp;fresh.attachments=profile.attachments;saveProfile(fresh);};
   // Every tag some weapon hides by default: the attachment parts.
   const attachmentTags=new Set(Object.values(data.weapons).flatMap(d=>d?.hideTags??[]));
+  // What each gun hides out of the box (base and Pack-a-Punched), before any attachment
+  const stockHidden=new Map(Object.entries(data.weapons).map(([id,d])=>[id,{base:new Set(d?.hideTags??[]),up:new Set(d?.upgrade?.hideTags??[])}]));
   const apply=()=>applyAttachments(cat,data.weapons,profile);
   apply();
 
@@ -49,9 +51,12 @@ export default async function setup(api){
   function magFollow(def){
     const g=view.gun;follow=null;if(!g)return;
     const hidden=new Set(def?.hideTags??[]),clip=g.getObjectByName('tag_clip');
+    // only mags an attachment added: built-in ones (the Pack-a-Punched Commando's dual
+    // mag, the PM63's extended mag) have their own reload animation
+    const stock=stockHidden.get(session.weapon?.id)?.[session.weapon?.upgraded?'up':'base']??new Set();
     let skel=null;g.traverse(o=>{if(o.isSkinnedMesh&&!skel)skel=o.skeleton;});
     // stock mag meshes: dominant bone tag_clip (restored when no bigger mag is fitted)
-    const mag=MAG_TAGS.map(t=>g.getObjectByName(t)).find(b=>b&&!hidden.has(b.name));
+    const mag=MAG_TAGS.map(t=>g.getObjectByName(t)).find(b=>b&&!hidden.has(b.name)&&stock.has(b.name));
     g.traverse(o=>{if(!o.isSkinnedMesh)return;const gg=o.geometry,si=gg.attributes.skinIndex,sw=gg.attributes.skinWeight;if(!si||!sw)return;
       const i=gg.index?gg.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
       if(o.skeleton.bones[best]===clip)o.visible=!mag;});

@@ -123,8 +123,8 @@ function underbarrel(kind,def,weapons,id,shownTags){
 // With an optic fitted, the gun's rear iron sight comes off (where that bone
 // is only the rear sight; see attachments.json ironSights).
 function foldIronSights(obj,list,cat,id){
-  const tag=cat.ironSights?.[id];if(!obj||!tag||!list.some(a=>a.slot==='optic'))return;
-  obj.hideTags=[...(obj.hideTags??[]).filter(t=>t!==tag),tag];
+  const tags=[cat.ironSights?.[id]].flat().filter(Boolean);if(!obj||!tags.length||!list.some(a=>a.slot==='optic'))return;
+  obj.hideTags=[...(obj.hideTags??[]).filter(t=>!tags.includes(t)),...tags];
 }
 
 // A copy of the weapon's pristine definition with the given attachments
