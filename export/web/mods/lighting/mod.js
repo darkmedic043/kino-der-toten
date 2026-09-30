@@ -60,6 +60,14 @@ export default async function setup(api){
   const fixtures=kino?await fetch(new URL('fixtures.json',import.meta.url)).then(r=>r.ok?r.json():[]).catch(()=>[]):[];
   if(kino)setupKino(api,fixtures);
   if(renderer)setupPost(api);
+  // First-person weapons are lit by their own scene: a flat ambient 2.8 plus
+  // one light, which bleached every gun to grey-white. Give them a softer
+  // ambient and a key/fill/rim set so metal and wood keep their contrast.
+  if(api.viewScene){
+    for(const l of [...api.viewScene.children])if(l.isAmbientLight){l.intensity=.6;l.color.set(0xf2e8da);}else if(l.isDirectionalLight){l.intensity=2.2;l.color.set(0xfff0dc);l.position.set(1.2,3,1.5);}
+    const fill=new THREE.HemisphereLight(0xece6dc,0x2e2620,.7);const rim=new THREE.DirectionalLight(0xe6e2dc,.7);rim.position.set(-2,1.2,-2.5);
+    api.viewScene.add(fill,rim);
+  }
 }
 
 // ---- Kino lights ------------------------------------------------------------------------------
