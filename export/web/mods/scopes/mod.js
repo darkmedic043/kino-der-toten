@@ -14,7 +14,8 @@ import * as THREE from 'three';
 
 const BUILT_IN={dragunov_zm:'pso',l96a1_zm:'duplex',g11_lps_zm:'lps',aug_acog_zm:'acog'};
 const MAGNIFIED={vzoom:{zoom:16,radius:.46,sway:.9},pso:{zoom:15,radius:.46,sway:1},duplex:{zoom:15,radius:.46,sway:1},lps:{zoom:26,radius:.44,sway:.45},acog:{zoom:30,radius:.4,sway:.35},ir:{zoom:28,radius:.42,sway:.4}};
-const DOTS=/red_dot|reflex_red|aimpoint_red|scope_pka_crosshair/;
+// dot cards only; mtl_t5_aimpoint_red_dot is the whole Aimpoint sight body, not a card
+const DOTS=/reflex_red_dot|scope_pka_crosshair/;
 const GLASS=/lens(?!_interior)|reflex_lens/;
 
 export default async function setup(api){
@@ -134,7 +135,7 @@ export default async function setup(api){
     const shown=o=>{if(!o.isSkinnedMesh)return true;const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight;if(!si||!sw)return true;
       const i=g.index?g.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
       for(let b=o.skeleton.bones[best];b;b=b.parent)if(b.isBone&&b.scale.x<1e-3)return false;return true;};
-    view.gun.traverse(o=>{if(!o.isMesh||!o.visible)return;const m=[o.material].flat()[0];if(!(DOTS.test(m?.name)||/reflex_lens|scope_pka_lens/.test(m?.name))||!shown(o))return;
+    view.gun.traverse(o=>{if(!o.isMesh||!o.visible)return;const m=[o.material].flat()[0];if(!(DOTS.test(m?.name)||/reflex_lens|scope_pka_lens|aimpoint_red_dot/.test(m?.name))||!shown(o))return;
       // surfaces share one vertex buffer; only the indexed vertices are this mesh's
       const P=o.geometry.attributes.position,I=o.geometry.index,count=I?I.count:P.count,step=Math.max(1,Math.floor(count/60));
       for(let k=0;k<count;k+=step){const i=I?I.getX(k):k;v.fromBufferAttribute(P,i);if(o.isSkinnedMesh)o.applyBoneTransform(i,v);o.localToWorld(v);

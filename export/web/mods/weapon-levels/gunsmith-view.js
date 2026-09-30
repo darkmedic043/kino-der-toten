@@ -106,9 +106,15 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
   const attachmentTags=new Set(Object.values(weapons).flatMap(d=>d?.hideTags??[]));
 
   function tagsFor(ids){const d=previewDef(cat,def,id,ids);return new Set(d.hideTags??[]);}
+  const MAG_TAGS=['tag_ext_clip','tag_extended_clip','tag_clip_extended','tag_dual_clip','tag_double_clip','tag_duel_clip','tag_drum','tag_ammo_expander'];
+  function domBone(o){const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight;if(!o.isSkinnedMesh||!si||!sw)return null;
+    const i=g.index?g.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}return o.skeleton.bones[best];}
   function showParts(ids){
     if(!gun)return;const hidden=tagsFor(ids);gun.userData.shown=ids;
     gun.traverse(o=>{if(!o.isBone)return;if(hidden.has(o.name))o.scale.setScalar(1e-6);else if(attachmentTags.has(o.name))o.scale.setScalar(1);});
+    // a fitted bigger mag replaces the stock one (tag_clip), as in game
+    const stock=new Set(previewDef(cat,def,id,[]).hideTags??[]),bigMag=MAG_TAGS.some(t=>stock.has(t)&&!hidden.has(t)&&gun.getObjectByName(t));
+    gun.traverse(o=>{if(o.isSkinnedMesh&&domBone(o)?.name==='tag_clip')o.visible=!bigMag;});
   }
   async function loadGun(){
     def=weapons[id];const token=id;
@@ -116,7 +122,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
     if(gun){pivot.remove(gun);}
     gun=model;gun.traverse(o=>{if(!o.isMesh)return;o.frustumCulled=false;
       for(const m of [o.material].flat()){const n=m?.name??'';
-        if(/red_dot|reflex_red|aimpoint_red|scope_pka_crosshair|clan_tag|player_icon/.test(n))o.visible=false;
+        if(/reflex_red_dot|scope_pka_crosshair|clan_tag|player_icon/.test(n))o.visible=false;   // aimpoint_red_dot is the Aimpoint body: keep it
         else if(/lens(?!_interior)/.test(n)){m.transparent=true;m.opacity=.15;m.depthWrite=false;}
         m.userData.emissive0??=m.emissive?.clone();}});
     // centre the gun and turn it so the barrel runs along +X
