@@ -1,0 +1,14 @@
+# Performance work
+
+- **Performance (2026-09-29)**: measured with headless Chromium on the GTX 1660 Ti at 1600×900 (`--use-angle=vulkan --enable-gpu --ignore-gpu-blocklist --disable-gpu-vsync --disable-frame-rate-limit`). Findings and fixes:
+  - GTAO re-renders the whole scene and cost ~24 ms, so it is Ultra-only now.
+  - POOL 10; shadow spots High 1 (refreshed every 3 frames), Ultra 3 (every 2).
+  - Sun shadow 2048 on High, 4096 on Ultra, redrawn only when doors or power change (it had been every 2 s).
+  - Runtime sun-shaft tracing built a BVH per map mesh, about 0.75 s freezes for a minute after joining. The shafts are now baked into `mods/lighting/sunshafts.json` by `.tools/bake-sunshafts.mjs` (it loads the page with `?bakeShafts`).
+  - Normal maps load during loading (ImageBitmapLoader, in parallel). map-materials then runs `renderer.compileAsync` on the scene and viewScene and draws one full frame, so the compiles and uploads happen behind the loading screen.
+  - The lighting mod runs `tick(1/60)` at setup so the shadow-caster and sun setup are final before that compile (otherwise every shader recompiled on the first played frame).
+  - HD map texture swaps no longer set `needsUpdate` (it forced a program rebuild per swap).
+  Result: median 47 → 24 ms, p99 175 → 42 ms, max 930 → 116 ms; ready in about 12 s.
+- **Mystery box**: `warm()` also runs `kino.lighting.tag` (LIGHT_CLAMP define, shadow flags), turns off castShadow and frustum culling on the display copies (the first cull of a rigged model computes bounds through its bones), and renders one frame. Spin worst frame 470–580 → about 60 ms.
+- **Weapon preloading** (`mods/hd-weapons` setup, last in mods.json so it compiles against the final lights): during loading it fetches every obtainable weapon's viewmodel and animations (loadout, wall guns, boxPool) and runs one `compileAsync` over viewScene (36 weapons in about 3.3 s). It deliberately skips texture uploads, because uploading every gun's HD textures filled VRAM and slowed everything. Targeted preloads do upload: the box's `roll.weapon` as soon as the spin starts (the weapon is chosen then), and wall guns within 260. Taking a box weapon had been a ~370 ms freeze.
+- **Mystery box performance** (upstream `mystery-box.js` edit): each weapon's centred display copy is cloned once (`display(id)`, cached in `this.displays`) and reused, instead of a SkeletonUtils clone and dispose on every spin swap (about 30 ms each, up to 20 per second). `warm(renderer,camera)` compiles shaders and uploads every box weapon's textures during loading; game.js and zombies.js call it after `mods.start`, desktop only (skipped on mobile for memory).
