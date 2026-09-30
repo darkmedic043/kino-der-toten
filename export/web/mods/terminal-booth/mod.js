@@ -27,6 +27,7 @@ export default async function setup(api){
   const booths=[];
   for(const spot of spots)booths.push(build(await loadModel(BASE+(spot.model??'terminal_booth.glb')),spot));
   routeAround(booths);
+  for(const b of booths)clearDebris(b);
   window.kino.terminalBooth={booths};
   window.kino.lighting?.tag?.(scene);
 
@@ -85,6 +86,9 @@ export default async function setup(api){
         o.material.emissive.set(WIRE_COLOR[m.name]);o.material.emissiveMap=t;o.material.emissiveIntensity=1.8;
         const w={mat:o.material,tex:t,speed:.8+Math.random()*1.2};b.wires.push(w);if(/^wire_cut/.test(n))b.cut[+n.slice(8)]=w;}
     });
+    // Sharp baked textures at glancing angles (the keyboard deck, the sides).
+    const aniso=api.renderer?.capabilities?.getMaxAnisotropy?.()??1;
+    root.traverse(o=>{for(const m of [o.material].flat())if(m)for(const k of ['map','normalMap','roughnessMap','metalnessMap','aoMap'])if(m[k]&&m[k].anisotropy<aniso){m[k].anisotropy=aniso;m[k].needsUpdate=true;}});
     b.glow=floorGlow(root);
     b.print=line=>b.screen?.print(line);b.setSign=text=>b.sign?.set(text);
     return b;
@@ -106,7 +110,7 @@ export default async function setup(api){
         acc+=dt;while(queue.length&&acc>.035){acc-=.035;const target=queue[0];
           if(typed.length<target.length)typed=target.slice(0,typed.length+1);else{lines.push(typed);typed='';queue.shift();acc-=.25;}dirty=true;}
         if(!queue.length){acc=0;idleIn-=dt;if(idleIn<=0){idleIn=4+Math.random()*7;print(idle[Math.floor(Math.random()*idle.length)]);}}
-        while(lines.length>10)lines.shift();
+        while(lines.length>9)lines.shift();
       }
       cursor+=dt;roll=(roll+dt*.18)%1.3;
       drawAcc+=dt;if(drawAcc<1/15)return;drawAcc=0;draw(power);
@@ -116,10 +120,10 @@ export default async function setup(api){
     function draw(power){
       const w=c.width,h=c.height;
       g.fillStyle=power?'#031208':'#010402';g.fillRect(0,0,w,h);
-      g.font='bold 20px "Courier New", monospace';g.textBaseline='top';
+      g.font='bold 22px "Courier New", monospace';g.textBaseline='top';
       g.shadowColor='#3dff8a';g.shadowBlur=power?10:4;g.fillStyle=power?'#6bff9e':'#1f6b3a';
       const all=[...lines];if(power&&(typed||cursor%1<.55))all.push(typed+(cursor%1<.55?'█':''));
-      all.slice(-12).forEach((l,i)=>g.fillText(l,40,30+i*27));
+      all.slice(-11).forEach((l,i)=>g.fillText(l,62,52+i*27));
       g.shadowBlur=0;
       // rolling refresh bar, scanlines, vignette
       const y=(roll-.15)*h;const bar=g.createLinearGradient(0,y,0,y+60);
@@ -266,6 +270,40 @@ export default async function setup(api){
     const gain=ctx.createGain();gain.gain.value=.5*(1-d/700)**2;
     src.connect(bp).connect(gain).connect(out);src.start();
   }
+
+  // ----------------------------------------------------- debris clearance
+  // Loose planks and rubble in front of a booth made standing at the terminal
+  // bumpy. They're part of the map's merged meshes, so the low debris
+  // triangles inside the booth's front area are removed from both the
+  // rendered meshes (made degenerate) and the collision (pointed at a vertex
+  // far under the map, then the BVH is refit). The floor itself is untouched.
+  function clearDebris(b){
+    const s=b.spot.scale??1,yaw=b.root.rotation.y,c=Math.cos(yaw),sn=Math.sin(yaw),o=b.root.position,floor=o.y;
+    const X=22*s+34,Z=30*s+60;
+    const inArea=(x,z)=>{const dx=x-o.x,dz=z-o.z,lx=dx*c-dz*sn,lz=dx*sn+dz*c;return Math.abs(lx)<X&&lz>-4&&lz<Z;};
+    const debris=(P,ia,ib,ic,m)=>{let hi=false;for(const i of [ia,ib,ic]){v.fromBufferAttribute(P,i);if(m)v.applyMatrix4(m);
+      if(!inArea(v.x,v.z)||v.y<floor-1||v.y>floor+10)return false;if(v.y>floor+.8)hi=true;}return hi;};
+    const v=new THREE.Vector3();let n=0,nc=0;
+    const area=new THREE.Box3();for(const [lx,lz] of [[-X,-4],[X,-4],[-X,Z],[X,Z]])area.expandByPoint(new THREE.Vector3(o.x+lx*c+lz*sn,floor,o.z-lx*sn+lz*c));
+    area.min.y=floor-1;area.max.y=floor+10;
+    // rendered map meshes (skip geometry shared by several meshes)
+    const users=new Map();scene.traverse(m=>{if(m.isMesh)users.set(m.geometry,(users.get(m.geometry)??0)+1);});
+    scene.traverse(m=>{
+      if(!m.isMesh||m.isSkinnedMesh||users.get(m.geometry)>1||b.root===m||isChildOf(m,b.root))return;
+      const g=m.geometry;if(!g.index||!g.attributes.position)return;
+      if(!g.boundingBox)g.computeBoundingBox();if(!g.boundingBox.clone().applyMatrix4(m.matrixWorld).intersectsBox(area))return;
+      const I=g.index,P=g.attributes.position;let hit=false;
+      for(let t=0;t<I.count;t+=3){const a=I.getX(t),bb=I.getX(t+1),cc=I.getX(t+2);if(debris(P,a,bb,cc,m.matrixWorld)){I.setX(t+1,a);I.setX(t+2,a);hit=true;n++;}}
+      if(hit)I.needsUpdate=true;});
+    // collision
+    const cg=col?.geometry,bvh=col?.bvh;
+    if(cg?.index&&bvh){const I=cg.index,P=cg.attributes.position;let far=0;
+      for(let i=1;i<P.count;i++)if(P.getY(i)<P.getY(far))far=i;
+      for(let t=0;t<I.count;t+=3){const a=I.getX(t),bb=I.getX(t+1),cc=I.getX(t+2);if(debris(P,a,bb,cc,null)){I.setX(t,far);I.setX(t+1,far);I.setX(t+2,far);nc++;}}
+      if(nc){I.needsUpdate=true;bvh.refit();}}
+    console.info('[terminal-booth] cleared debris triangles: render',n,'collision',nc);
+  }
+  function isChildOf(o,root){for(let p=o.parent;p;p=p.parent)if(p===root)return true;return false;}
 
   // ------------------------------------------------------ zombie routing
   // Zombies path on a navmesh baked without the booth. Path segments that

@@ -190,12 +190,23 @@ export default function setup(api){
   // ---- Camera feel ------------------------------------------------------------------------------
   let phase=0,dip=0,dipV=0,roll=0,wasGrounded=true,lastVy=0,bobBlend=0,fallTime=0,crouchOffset=0;
   let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0;
+  const downRay=new THREE.Ray(new THREE.Vector3(),new THREE.Vector3(0,-1,0));
+  function flatUnderfoot(){
+    const col=api.world?.collision;if(!col?.raycastFirst)return false;
+    downRay.origin.copy(player.getFeetPosition());downRay.origin.y+=12;
+    const hit=col.raycastFirst(downRay,0,30);return !!hit?.face&&Math.abs(hit.face.normal.y)>.985;
+  }
   host.on('update',dt=>{
     const eye=player._eyeHeight;if(eye!==lastEye){crouchOffset+=lastEye-eye;lastEye=eye;}
     // Stairs: each step up (or snap down) moves the feet several units in one
     // frame, which shook the camera. Absorb those jumps and ease them out.
     const feetY=player.getFeetPosition().y,jump=feetY-lastFeetY;lastFeetY=feetY;
     if(player.onFloor&&!state.mantling&&Math.abs(jump)>1.5&&Math.abs(jump)<=player.stepHeight+6)stairOffset=THREE.MathUtils.clamp(stairOffset-jump,-24,24);
+    // Debris: riding over planks and rubble on flat floor moves the feet a
+    // little every frame, which read as camera shake. On flat ground (a down
+    // ray finds a level surface) small bumps are eased out too; on ramps they
+    // pass straight through so the camera doesn't lag the slope.
+    else if(player.onFloor&&!state.mantling&&Math.abs(jump)>.12&&flatUnderfoot())stairOffset=THREE.MathUtils.clamp(stairOffset-jump,-24,24);
     else if(Math.abs(jump)>player.stepHeight+6)stairOffset=0;   // teleports, mantles, big drops
     if(!dt||['reviving','gameover'].includes(session.phase))return;
     const st=player.state,v=st.velocity,speed=Math.hypot(v.x,v.z),grounded=st.grounded;

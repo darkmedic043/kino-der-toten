@@ -27,7 +27,8 @@ random.seed(20260930)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 COL = scene.collection
-BAKED = []      # objects joined and baked into the shared texture set
+BAKED = {'shell': [], 'front': [], 'term': []}   # bake groups: each gets its own texture set
+GROUP = 'shell'
 LOOSE = []      # emissive / transparent / animated parts kept separate
 
 
@@ -115,17 +116,26 @@ def grimy(name, base, rough=.55, metal=0., wear=.5, grime=.6, bare='#8c8f91', st
     geo = t.new('ShaderNodeNewGeometry')
     dot = t.new('ShaderNodeVectorMath', operation='DOT_PRODUCT')
     t.link(bev.outputs['Normal'], dot.inputs[0]); t.link(geo.outputs['Normal'], dot.inputs[1])
-    edge = t.mr(dot.outputs['Value'], .997, .92)
-    chip = t.mr(t.noise(obj, 1.6, 8), .36, .54)
-    worn = t.math('MULTIPLY', edge, chip)
-    # worn-through patches on flat faces, and scratches (stretched noise, thin bands)
-    patch = t.mr(t.noise(obj, .35, 7), .6, .7)
-    worn = t.math('ADD', worn, t.math('MULTIPLY', patch, .7))
-    for sc, sz in (((3.0, 3.0, .22), 5.0), ((.25, 3.0, 3.0), 4.0)):
-        scm = t.new('ShaderNodeMapping'); t.link(obj, scm.inputs['Vector']); scm.inputs['Scale'].default_value = sc
-        scm.inputs['Rotation'].default_value = (random.random(), random.random(), random.random())
-        n = t.noise(scm.outputs['Vector'], sz, 2, .4)
-        worn = t.math('ADD', worn, t.math('MULTIPLY', t.mr(t.math('ABSOLUTE', t.math('SUBTRACT', n, .5)), .012, 0), .8))
+    edge = t.mr(dot.outputs['Value'], .998, .9)
+    # chipped paint: crisp-edged flakes along edges, plus a few bigger bites
+    chip = t.mr(t.noise(obj, 3.4, 10, .6), .45, .48)
+    bite = t.mr(t.noise(obj, 1.1, 6), .56, .58)
+    worn = t.math('MULTIPLY', edge, t.math('MAXIMUM', chip, bite))
+    # worn-through patches on flat faces
+    patch = t.mr(t.noise(obj, .35, 7), .62, .68)
+    worn = t.math('ADD', worn, t.math('MULTIPLY', patch, .75))
+    # scratches: thin sharp lines, dense inside scrape zones and sparse elsewhere
+    zone = t.mr(t.noise(obj, .45, 4), .5, .62)
+    scratch = 0.0
+    for k in range(4):
+        scm = t.new('ShaderNodeMapping'); t.link(obj, scm.inputs['Vector'])
+        scm.inputs['Scale'].default_value = ((4.0, 4.0, .18), (.2, 4.0, 4.0), (4.0, .2, 4.0), (3.0, 3.0, .3))[k]
+        scm.inputs['Rotation'].default_value = (random.random() * 3, random.random() * 3, random.random() * 3)
+        n = t.noise(scm.outputs['Vector'], (6.0, 5.0, 7.0, 9.0)[k], 2, .35)
+        line = t.mr(t.math('ABSOLUTE', t.math('SUBTRACT', n, .5)), .007, 0)
+        scratch = t.math('MAXIMUM', scratch, line)
+    scratch = t.math('MULTIPLY', scratch, t.math('ADD', t.math('MULTIPLY', zone, .85), .15))
+    worn = t.math('MAXIMUM', worn, scratch)
     worn = t.math('MULTIPLY', worn, wear, clamp=True)
     # dirt: large blotches, crevices (AO), heavier near the floor, vertical streaks
     blot = t.mr(t.noise(obj, .08, 8), .36, .66)
@@ -159,8 +169,9 @@ def grimy(name, base, rough=.55, metal=0., wear=.5, grime=.6, bare='#8c8f91', st
     METAL[name] = mt
     # rounded edges and fine surface pitting
     bev2 = t.new('ShaderNodeBevel'); bev2.inputs['Radius'].default_value = .18; bev2.samples = 8
-    bump = t.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = .12; bump.inputs['Distance'].default_value = .05
-    t.link(t.noise(obj, 6, 4), bump.inputs['Height']); t.link(bev2.outputs['Normal'], bump.inputs['Normal'])
+    bump = t.new('ShaderNodeBump'); bump.inputs['Strength'].default_value = .3; bump.inputs['Distance'].default_value = .035
+    height = t.math('SUBTRACT', t.math('MULTIPLY', t.noise(obj, 6, 4), .25), worn)   # chips and scratches sit below the paint
+    t.link(height, bump.inputs['Height']); t.link(bev2.outputs['Normal'], bump.inputs['Normal'])
     t.link(bump.outputs['Normal'], bsdf.inputs['Normal'])
     return m
 
@@ -192,6 +203,7 @@ M = dict(
     kbd=grimy('kbd', '#48443c', .6, 0, wear=0.5, grime=0.95, bare='#6a655a', rust=0, bare_metal=False),
     key=grimy('key', '#c4b692', .5, 0, wear=0.35, grime=0.85, bare='#bdb293', rust=0, bare_metal=False),
     keyd=grimy('keyd', '#3d3a34', .55, 0, wear=0.45, grime=0.8, bare='#5c574d', rust=0, bare_metal=False),
+    keyf=grimy('keyf', '#a4582a', .5, 0, wear=.4, grime=.75, bare='#7a4222', rust=0, bare_metal=False),
     keyr=grimy('keyr', '#9c2a1c', .5, 0, wear=0.36, grime=0.52, bare='#6e2016', rust=0, bare_metal=False),
     rubber=grimy('rubber', '#1b1b1b', .85, 0, wear=0, grime=0.45, rust=0, bare_metal=False),
     hose=grimy('hose', '#2a2b2a', .7, 0, wear=0.36, grime=0.65, bare='#4a4c4a', rust=0.14, bare_metal=False),
@@ -203,6 +215,8 @@ MX = dict(
     screen=plain('crt_screen', '#050806', .2, 0, emit='#39ff88', strength=2.0),
     sign=plain('sign_glow', '#1a0b04', .4, 0, emit='#ff8a2a', strength=6.0),
     strip=plain('led_strip', '#e8eef2', .3, 0, emit='#f2f6ff', strength=5),
+    legend_dark=plain('legend_dark', '#2a2118', .6),
+    legend_light=plain('legend_light', '#ddd0b3', .55),
     coolant=plain('coolant', '#0a3a40', .1, 0, emit='#2ef2ff', strength=4.0),
     led_r=plain('led_red', '#330000', .3, 0, emit='#ff2a1a', strength=8),
     led_g=plain('led_green', '#003300', .3, 0, emit='#30ff50', strength=8),
@@ -221,7 +235,7 @@ def finish(name, bm, mat, bake=True, smooth=38):
     ob = bpy.data.objects.new(name, me); COL.objects.link(ob)
     me.materials.append(mat)
     me.shade_smooth(); me.set_sharp_from_angle(angle=math.radians(smooth))
-    (BAKED if bake else LOOSE).append(ob)
+    (BAKED[GROUP] if bake else LOOSE).append(ob)
     return ob
 
 
@@ -441,100 +455,264 @@ for a in range(0, 360, 60):
 cyl('cage_ring', 1.6, .25, M['steel'], (14, -22, 83.5), seg=16, bev=0)
 
 # ------------------------------------------------------------ CRT terminal
-box('crt_shelf', -12, 12, -18, -1.6, 43.5, 45, M['dsteel'], .3)
-for x in (-10, 10):
-    poly_prism('gusset', [(-1.6, 43.5), (-15, 43.5), (-1.6, 32)], x - .4, x + .4, M['dsteel'], .15)
-box('crt_body', -11, 11, -16.5, -4.5, 45, 63, M['crt'], 1.2, 3)
-box('crt_back', -8, 8, -5, -1.7, 47, 61, M['crt'], 1.4, 3, taper=.85)
-for i, x in enumerate(range(-7, 8, 2)):
-    box('crt_vent', x - .35, x + .35, -14, -6, 63, 63.35, M['bezel'], .1, 1)
-SX, SZ0, SZ1 = 7.4, 50.2, 60.8
-box('bez_b', -10.6, 10.6, -17.4, -16.3, 45.8, SZ0, M['bezel'], .35)
-box('bez_t', -10.6, 10.6, -17.4, -16.3, SZ1, 62.4, M['bezel'], .35)
-box('bez_l', -10.6, -SX, -17.4, -16.3, SZ0, SZ1, M['bezel'], .35)
-box('bez_r', SX, 10.6, -17.4, -16.3, SZ0, SZ1, M['bezel'], .35)
-# screen: a bulged grid with a 0..1 UV (u right, v up)
+# An all-in-one retro terminal (think PET / VT-series): a moulded housing
+# with a sloped keyboard deck in front and a hooded CRT rising behind it,
+# sitting on the lower cabinet like the phone unit of a payphone.
+GROUP = 'term'
+
+
+def prism_bm(pts_yz, x0, x1):
+    bm = bmesh.new()
+    a = [bm.verts.new((x0, y, z)) for y, z in pts_yz]
+    b = [bm.verts.new((x1, y, z)) for y, z in pts_yz]
+    bm.faces.new(a[::-1]); bm.faces.new(b)
+    for i in range(len(a)):
+        j = (i + 1) % len(a)
+        bm.faces.new((a[i], a[j], b[j], b[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    return bm
+
+
+def rrect(w, h, r, n=4):
+    """Rounded rectangle outline (CCW), w×h centred on 0, n points per corner."""
+    r = min(r, w / 2 - 1e-3, h / 2 - 1e-3)
+    pts = []
+    for cx, cy, a0 in ((w / 2 - r, h / 2 - r, 0), (-w / 2 + r, h / 2 - r, 90), (-w / 2 + r, -h / 2 + r, 180), (w / 2 - r, -h / 2 + r, 270)):
+        for k in range(n):
+            a = math.radians(a0 + 90 * k / (n - 1))
+            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
+
+
+def loft_bm(rings, bm=None, caps=True):
+    """Faces between rings of equal length (Vectors); ends capped."""
+    bm = bm or bmesh.new()
+    vs = [[bm.verts.new(p) for p in ring] for ring in rings]
+    n = len(rings[0])
+    for a, b in zip(vs, vs[1:]):
+        for i in range(n):
+            j = (i + 1) % n
+            bm.faces.new((a[i], a[j], b[j], b[i]))
+    if caps:
+        bm.faces.new(vs[0][::-1]); bm.faces.new(vs[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    return bm
+
+
+def solid(name, bm, mat, cut=None, cut_mat=None, bw=.5, seg=3, ang=30):
+    """A mesh with an optional boolean cut, then rounded edges (bevel modifier), applied."""
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free(); me.materials.append(mat)
+    ob = bpy.data.objects.new(name, me); COL.objects.link(ob)
+    co = None
+    if cut is not None:
+        cm = bpy.data.meshes.new(name + '_cut'); cut.to_mesh(cm); cut.free(); cm.materials.append(cut_mat or mat)
+        co = bpy.data.objects.new(name + '_cut', cm); COL.objects.link(co); co.hide_render = True
+        bo = ob.modifiers.new('cut', 'BOOLEAN'); bo.operation = 'DIFFERENCE'; bo.object = co; bo.solver = 'EXACT'
+        bo.material_mode = 'TRANSFER'
+    if bw > 0:
+        bv = ob.modifiers.new('bev', 'BEVEL'); bv.width = bw; bv.segments = seg; bv.limit_method = 'ANGLE'
+        bv.angle_limit = math.radians(ang); bv.profile = .5
+    bpy.context.view_layer.update()
+    nm = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    ob.modifiers.clear(); old = ob.data; ob.data = nm; nm.name = name; bpy.data.meshes.remove(old)
+    if co:
+        cm = co.data; bpy.data.objects.remove(co); bpy.data.meshes.remove(cm)
+    if not nm.uv_layers:
+        nm.uv_layers.new(name='UVMap')
+    nm.shade_smooth(); nm.set_sharp_from_angle(angle=math.radians(40))
+    BAKED[GROUP].append(ob)
+    return ob
+
+
+def text_mesh(body, size, font_align=('CENTER', 'CENTER')):
+    cu = bpy.data.curves.new('txt', 'FONT'); cu.body = body; cu.size = size
+    cu.align_x, cu.align_y = font_align; cu.resolution_u = 3
+    ob = bpy.data.objects.new('txt', cu); COL.objects.link(ob); bpy.context.view_layer.update()
+    me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    bpy.data.objects.remove(ob); bpy.data.curves.remove(cu)
+    return me
+
+
+LEGENDS = {'dark': bmesh.new(), 'light': bmesh.new()}
+
+
+def add_legend(kind, body, size, mw):
+    me = text_mesh(body, size); me.transform(mw)
+    LEGENDS[kind].from_mesh(me); bpy.data.meshes.remove(me)
+
+
+# --- the housing: keyboard base (deck) and monitor, as side profiles
+BASE_W, MON_W = 13.4, 12.9
+deck0, deck1 = Vector((0, -27.2, 38.2)), Vector((0, -14.4, 41.0))     # deck surface, front → back
+DA = (deck1 - deck0).normalized()                                      # along the deck, toward the back
+DN = Vector((0, -DA.z, DA.y)) if DA.y > 0 else Vector((0, DA.z, -DA.y))
+if DN.z < 0:
+    DN = -DN
+
+
+def deck(x, a, h):
+    return Vector((x, 0, 0)) + deck0 + DA * a + DN * h
+
+
+# keyboard well and a speaker grille cut into the deck
+cut = bmesh.new()
+WELL = dict(x=8.9, a0=1.35, a1=7.95)
+wring = lambda inset, h: [deck(x, (WELL['a0'] + WELL['a1']) / 2 + y, h) for x, y in rrect(2 * WELL['x'] - 2 * inset, WELL['a1'] - WELL['a0'] - 2 * inset, .55 - inset)]
+loft_bm([wring(-.12, 1.2), wring(-.12, 0), wring(0, -.18), wring(.05, -.5)], cut)
+for i in range(6):
+    xx = -9.6 + i * .9
+    loft_bm([[deck(xx + x, 10.9 + y, h) for x, y in rrect(.34, 2.2, .16)] for h in (1, -.35)], cut)
+base_pts = [(-1.8, 36.5), (deck0.y - .1, 36.5), (deck0.y - .1, deck0.z - .05), (deck1.y, deck1.z), (-1.8, deck1.z)]
+solid('term_base', prism_bm(base_pts, -BASE_W, BASE_W), M['crt'], cut, M['kbd'], bw=.45, seg=3, ang=30)
+
+# monitor: hooded top, face tilted back, deep rounded shell
+P0, P1 = Vector((0, -14.3, 41.2)), Vector((0, -12.7, 62.3))          # screen face, bottom → top
+FU = (P1 - P0).normalized()                                           # up along the face
+FN = Vector((0, -FU.z, FU.y))                                         # out of the face (toward the viewer)
+if FN.y > 0:
+    FN = -FN
+FACE_LEN = (P1 - P0).length
+SCR_W, SCR_H, SCR_U = 17.6, 13.0, 12.1                                # screen size, centre along the face
+FC = P0 + FU * SCR_U
+
+
+def face(x, u, n):
+    return Vector((x, 0, 0)) + FC + FU * u + FN * n
+
+
+mon_pts = [(-1.8, deck1.z - .3), (P0.y, P0.z - .3), (P1.y, P1.z), (P1.y - 1.3, P1.z + 1.1), (P1.y - 1.1, 65.3),
+           (-2.9, 65.7), (-1.8, 64.9)]
+cut = bmesh.new()
+# screen recess: a chamfered, rounded opening down into the housing
+ring = lambda w, h, r, n: [face(x, y, n) for x, y in rrect(w, h, r, 5)]
+loft_bm([ring(SCR_W + 2.8, SCR_H + 2.8, 2.4, 1.2), ring(SCR_W + 2.8, SCR_H + 2.8, 2.4, 0),
+         ring(SCR_W + .5, SCR_H + .5, 1.5, -1.7), ring(SCR_W + .5, SCR_H + .5, 1.5, -4)], cut)
+# vent slots on the hood and both sides
+for i in range(9):
+    y = -4.6 - i * .95
+    loft_bm([[Vector((x, y + yy, z)) for x, yy in rrect(9.5, .38, .18)] for z in (67, 65.0)], cut)
+for sx in (-1, 1):
+    for i in range(7):
+        z = 49.5 + i * 1.5
+        loft_bm([[Vector((sx * xx, -5.8 + y, z + zz)) for y, zz in rrect(4.6, .42, .2)] for xx in (MON_W + 1, MON_W - .35)], cut)
+solid('term_monitor', prism_bm(mon_pts, -MON_W, MON_W), M['crt'], cut, M['bezel'], bw=.75, seg=4, ang=28)
+
+# CRT glass: bulged, 0..1 UV (u right, v up), sitting just behind the inner lip
 bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
-GX, GZ = 28, 20
-grid = [[bm.verts.new((-SX + 2 * SX * i / GX, -16.6 - .55 * (1 - ((2 * i / GX - 1) ** 2)) * (1 - ((2 * j / GZ - 1) ** 2)),
-                       SZ0 + (SZ1 - SZ0) * j / GZ)) for i in range(GX + 1)] for j in range(GZ + 1)]
+GX, GZ = 32, 24
+SW, SH = SCR_W + .5, SCR_H + .5
+grid = [[bm.verts.new(face(-SW / 2 + SW * i / GX, -SH / 2 + SH * j / GZ,
+                           -1.95 + .75 * (1 - (2 * i / GX - 1) ** 2) * (1 - (2 * j / GZ - 1) ** 2)))
+         for i in range(GX + 1)] for j in range(GZ + 1)]
 for j in range(GZ):
     for i in range(GX):
         f = bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
         for l, (a, b) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))):
             l[uvl].uv = (a / GX, b / GZ)
-bm.normal_update()
-bm.faces.ensure_lookup_table()
-if bm.faces[0].normal.y > 0:
+bm.normal_update(); bm.faces.ensure_lookup_table()
+if bm.faces[0].normal.dot(FN) < 0:
     for f in bm.faces:
         f.normal_flip()
 finish('crt_screen', bm, MX['screen'], bake=False, smooth=89)
-# chin: badge, knobs, power led
-box('badge', -9.4, -4.2, -17.6, -17.3, 46.8, 48.9, M['brass'], .1, 1)
-for x in (4.3, 6.2, 8.1):
-    cyl('knob', .55, .8, M['keyd'], (x, -17.7, 47.9), axis=(0, 1, 0), seg=14)
-sphere('led_power', .28, (9.6, -17.45, 49.2), MX['led_g'], 8, bake=False).name = 'led_power'
-# side port and cable glands
-cyl('port', .9, 1, M['steel'], (11.3, -11, 50), axis=(1, 0, 0), seg=12)
-cyl('gland', .8, 1.2, M['brass'], (-11.4, -9, 49.5), axis=(1, 0, 0), seg=12)
-cyl('gland', .8, 1.2, M['brass'], (7.5, -8, 63.6), seg=12)
-cyl('gland', .8, 1.2, M['brass'], (-7.5, -8, 63.6), seg=12)
-
-# ------------------------------------------------------ keyboard shelf
-box('kb_shelf', -15, 15, -30, -1.6, 36.5, 38, M['paint2'], .35)
-box('kb_trim', -15.2, 15.2, -30.6, -29.6, 36.3, 38.3, M['rubber'], .3)
-for x in (-12.5, 12.5):
-    poly_prism('kb_gusset', [(-1.6, 36.5), (-26, 36.5), (-1.6, 20)], x - .4, x + .4, M['paint2'], .15)
-# keyboard case: a wedge, low at the front
-KB = dict(x0=-11.5, x1=11.5, y0=-28.3, y1=-18.3, z=38, hf=1.1, hb=2.5)
-bm = bmesh.new()
-pts = [(KB['x0'], KB['y0'], 0), (KB['x1'], KB['y0'], 0), (KB['x1'], KB['y1'], 0), (KB['x0'], KB['y1'], 0),
-       (KB['x0'], KB['y0'], KB['hf']), (KB['x1'], KB['y0'], KB['hf']), (KB['x1'], KB['y1'], KB['hb']), (KB['x0'], KB['y1'], KB['hb'])]
-v = [bm.verts.new((x, y, KB['z'] + z)) for x, y, z in pts]
-for q in ((0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)):
-    bm.faces.new([v[i] for i in q])
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:]); bevel(bm, .35, 2, ang=10)
-finish('kb_case', bm, M['kbd'])
-slope = math.atan2(KB['hb'] - KB['hf'], KB['y1'] - KB['y0'])
 
 
-def ktop(y):
-    return KB['z'] + KB['hf'] + (y - KB['y0']) / (KB['y1'] - KB['y0']) * (KB['hb'] - KB['hf'])
+def on_face(x, u, n=0.):
+    """Matrix placing a local object (its +Z out of the face) on the monitor face."""
+    return Matrix.Translation(face(x, u, n)) @ Matrix(((1, 0, 0, 0), (0, FU.y, FN.y, 0), (0, FU.z, FN.z, 0), (0, 0, 0, 1)))
 
 
-def key(x, y, w, mat, h=.6, d=1.2):
-    zb = ktop(y) - .1
-    rot = Matrix.Rotation(-slope, 4, 'X')
-    mw = Matrix.Translation((x, y, zb)) @ rot
-    return box('key', -w / 2, w / 2, -d / 2, d / 2, 0, h, mat, .14, 1, mw=mw, taper=.82)
+# chin: nameplate with raised lettering, knobs, rocker switch, power LED
+CHIN = -SCR_H / 2 - 1.4 - 2.4
+box('nameplate', -5.2, 5.2, -.9, .9, -.02, .14, M['brass'], .08, 1, mw=on_face(-4.2, CHIN))
+add_legend('dark', 'MelonTerm 2.7', .95, on_face(-4.2, CHIN, .15))
+for i, x in enumerate((4.6, 6.6)):
+    cyl('knob', .62, .9, M['keyd'], (0, 0, 0), seg=24).data.transform(on_face(x, CHIN, .45))
+    cyl('knob_cap', .35, .12, M['steel'], (0, 0, 0), seg=16, bev=0).data.transform(on_face(x, CHIN, .95))
+box('rocker_well', -.6, .6, -.85, .85, -.1, .2, M['keyd'], .1, 1, mw=on_face(9.2, CHIN))
+box('rocker', -.45, .45, -.7, .7, 0, .35, M['keyr'], .12, 1, mw=on_face(9.2, CHIN, .15) @ Matrix.Rotation(math.radians(-10), 4, 'X'))
+sphere('led_power', .26, face(8.0 - 6.2, CHIN + .1, .1), MX['led_g'], 8, bake=False).name = 'led_power'
+# side port for the junction box wires, glands on the hood for the hoses
+cyl('port', .95, 1.1, M['steel'], (MON_W + .3, -11, 47), axis=(1, 0, 0), seg=14)
+cyl('gland', .85, 1.2, M['brass'], (7.5, -6.6, 65.8), seg=14)
+cyl('gland', .85, 1.2, M['brass'], (-7.5, -6.6, 65.8), seg=14)
+cyl('gland', .7, 1.0, M['brass'], (-MON_W - .3, -4.6, 48), axis=(1, 0, 0), seg=12)
+# brackets under the front of the deck, down to the cabinet
+for x in (-10.5, 10.5):
+    poly_prism('deck_bracket', [(-14, 36.5), (deck0.y + 2, 36.5), (-14, 29)], x - .45, x + .45, M['dsteel'], .15)
+
+# --- keyboard: sculpted, dished keycaps in the well, with legends
+KP = .9                                    # key pitch (inches)
+ROWTILT = [9, 5, 1.5, -2, -5.5, -7]        # sculpted row profile, degrees (back rows tip toward the user)
+ROWLIFT = [.1, .04, 0, 0, .03, .02]
 
 
-P = 1.42
-rows = [  # (y, [(width_in_units, kind)])
-    (-27.2, [(1.5, 'd'), (1.5, 'd'), (7.5, 'k'), (1.5, 'd'), (1.5, 'd'), (1.5, 'r')]),
-    (-25.7, [(2.2, 'd')] + [(1, 'k')] * 10 + [(2.2, 'd')]),
-    (-24.2, [(1.8, 'd')] + [(1, 'k')] * 11 + [(2.2, 'r')]),
-    (-22.7, [(1.5, 'd')] + [(1, 'k')] * 12 + [(1.5, 'd')]),
-    (-21.2, [(1, 'k')] * 14 + [(1, 'd')]),
-    (-19.5, [(1, 'd')] * 4 + [(.6, 'gap')] + [(1, 'd')] * 4 + [(.6, 'gap')] + [(1, 'd')] * 4),
+def keycap(x, a, w_units, kind, label, row):
+    W, D = w_units * KP - .1, KP - .1
+    H = .48 + ROWLIFT[row]
+    tilt = math.radians(ROWTILT[row])
+    lift = lambda yy: yy * math.tan(tilt)
+    dish = .035 if w_units < 4 else .012
+    rings = []
+    for (dw, dd, r, h, tilted) in ((0, 0, .07, 0, False), (.04, .04, .08, .05, False), (.2, .22, .13, H - .07, True), (.27, .29, .11, H, True)):
+        rings.append([Vector((xx, yy, h + (lift(yy) if tilted else 0))) for xx, yy in rrect(W - dw, D - dd, r)])
+    top = rrect(W - .27, D - .29, .11)
+    rings.append([Vector((xx * .55, yy * .55, H - dish * .7 + lift(yy * .55))) for xx, yy in top])
+    bm = loft_bm(rings, caps=False)
+    c = bm.verts.new((0, 0, H - dish)); last = bm.verts[-len(top) - 1:-1]
+    bm.verts.ensure_lookup_table()
+    ring_v = [bm.verts[i] for i in range(len(bm.verts) - 1 - len(top), len(bm.verts) - 1)]
+    for i in range(len(ring_v)):
+        bm.faces.new((ring_v[i], ring_v[(i + 1) % len(ring_v)], c))
+    bottom = [bm.verts[i] for i in range(len(top))]
+    bm.faces.new(bottom[::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    mw = Matrix.Translation(deck(x, a, -.45)) @ Matrix(((1, 0, 0, 0), (0, DA.y, DN.y, 0), (0, DA.z, DN.z, 0), (0, 0, 0, 1)))
+    bm.transform(mw)
+    mat = {'a': M['key'], 'm': M['keyd'], 'f': M['keyf']}[kind]
+    finish('key', bm, mat, smooth=50)
+    if label:
+        size = .27 if len(label) == 1 else (.15 if len(label) <= 3 else .12)
+        lm = mw @ Matrix.Translation((0, 0, H - dish * .5 + .004)) @ Matrix.Rotation(tilt, 4, 'X')
+        add_legend('dark' if kind == 'a' else 'light', label, size, lm)
+
+
+ALPHA = lambda s: [(c, 1, 'a') for c in s]
+rows = [
+    [('ESC', 1.25, 'm'), ('', .35, None)] + [(f'F{i}', 1, 'f') for i in range(1, 5)] + [('', .35, None)] + [(f'F{i}', 1, 'f') for i in range(5, 9)] + [('', .35, None), ('BRK', 1.25, 'm'), ('CLR', 1.25, 'm')],
+    ALPHA('`1234567890-=') + [('DEL', 1.5, 'm')],
+    [('TAB', 1.5, 'm')] + ALPHA('QWERTYUIOP[]\\'),
+    [('CTRL', 1.75, 'm')] + ALPHA("ASDFGHJKL;'") + [('RETURN', 1.75, 'm')],
+    [('SHIFT', 2.25, 'm')] + ALPHA('ZXCVBNM,./') + [('SHIFT', 2.25, 'm')],
+    [('', 3.0, None), ('', 8, 'a'), ('', 3.5, None)],
 ]
-missing = {(2, 5), (4, 11)}
-for ri, (y, row) in enumerate(rows):
-    width = sum(w for w, _ in row) * P
-    x = -width / 2
-    for ci, (w, k) in enumerate(row):
-        cx = x + w * P / 2
-        if k != 'gap' and (ri, ci) not in missing:
-            mat = {'k': M['key'], 'd': M['keyd'], 'r': M['keyr']}[k]
-            key(cx, y, w * P - .22, mat, .55 if ri < 5 else .45, 1.2 if ri < 5 else .9)
-        x += w * P
-# keyboard status leds and a brass nameplate
+pad = [['PF1', 'PF2', 'PF3', 'PF4'], ['7', '8', '9', '-'], ['4', '5', '6', ','], ['1', '2', '3', 'ENT'], [('0', 2), '.', '+']]
+MAIN_W, PAD_GAP = 14.5, .6
+total = (MAIN_W + PAD_GAP + 4) * KP
+x0 = -total / 2
+missing = {(2, 6), (4, 9)}              # a couple of caps long gone
+for r, row in enumerate(rows):
+    a = WELL['a1'] - .55 - r * KP
+    w = sum(u for _, u, _ in row) * KP
+    x = x0 + (MAIN_W * KP - w) / 2
+    for c, (label, u, kind) in enumerate(row):
+        if kind and (r, c) not in missing:
+            keycap(x + u * KP / 2, a, u, kind, label, r)
+        x += u * KP
+    x = x0 + (MAIN_W + PAD_GAP) * KP
+    for item in pad[r] if r < len(pad) else []:
+        label, u = (item, 1) if isinstance(item, str) else item
+        keycap(x + u * KP / 2, a, u, 'm' if label in ('ENT', '+', '-', ',') or label.startswith('PF') else 'a', label, r)
+        x += u * KP
+# status lights on the deck behind the keys
 for i, m in enumerate((MX['led_g'], MX['led_a'], MX['led_r'])):
-    sphere(f'led_kb{i}', .18, (8.6 + i * .9, -18.75, ktop(-18.75) + .05), m, 6, bake=False)
-# coiled cord from the keyboard's back to the terminal (the payphone cord)
-coil('kb_cord', [(-10, -18.4, 40.4), (-12.6, -19, 39), (-14.3, -15, 40.2), (-13.8, -11, 45), (-11.7, -9, 49.5)], .42, .13, M['rubber'])
+    sphere(f'led_kb{i}', .17, deck(5.4 + i * .85, 9.6, .06), m, 6, bake=False)
+    cyl('led_bezel', .28, .12, M['steel'], (0, 0, 0), seg=10, bev=0).data.transform(
+        Matrix.Translation(deck(5.4 + i * .85, 9.6, 0)) @ Matrix(((1, 0, 0, 0), (0, DA.y, DN.y, 0), (0, DA.z, DN.z, 0), (0, 0, 0, 1))))
+finish('key_legends_dark', LEGENDS['dark'], MX['legend_dark'], bake=False, smooth=10)
+finish('key_legends_light', LEGENDS['light'], MX['legend_light'], bake=False, smooth=10)
 
 # -------------------------------------------------------------- handset
+GROUP = 'front'
 box('hook', -18, -16.4, -15, -12, 62, 66.5, M['dsteel'], .25)
 cyl('handset', .95, 7.5, M['rubber'], (-15.6, -13.5, 63.2), seg=14)
 for z in (59.6, 66.8):
@@ -566,6 +744,7 @@ for x in (-11.5, 11.5):
         cyl('screw', .35, .3, M['steel'], (x, -14.6, z), axis=(0, 1, 0), seg=8, bev=.05)
 
 # ------------------------------------------- conduits along the back wall
+GROUP = 'shell'
 for x in (-15.2, 15.2):
     if COMPACT:   # up into the roof
         sweep('conduit', resample([Vector((x, -3.2, 3.75)), Vector((x, -3.2, 88.5))], 1.0), 1.0, M['steel'], 14)
@@ -576,6 +755,7 @@ for x in (-15.2, 15.2):
     if not COMPACT:
         cyl('coupler', 1.3, 2.2, M['brass'], (x, -3.2, 97.5), seg=16)
 # junction box on the right conduit
+GROUP = 'front'
 box('jbox', 11.5, 17.6, -7.8, -1.6, 66, 76, M['orange'], .45)
 box('jbox_lid', 11.9, 17.2, -8.2, -7.6, 66.4, 75.6, M['paint2'], .25)
 sphere('led_jbox', .3, (16.3, -8.35, 74.6), MX['led_r'], 8, bake=False).name = 'led_jbox'
@@ -583,9 +763,10 @@ for z in (67.5, 70, 72.5):
     cyl('jbox_gland', .5, .8, M['brass'], (11.2, -5, z), axis=(1, 0, 0), seg=10)
 
 # --------------------------------------------------- corrugated hoses
-hose('hose_r', [(8.5, -8, 63.8), (9.5, -9, 72), (12, -12, 80), (14.5, -14, 87.9)], 1.25)
-hose('hose_l', [(-8.5, -8, 63.8), (-9, -10, 70), (-12, -13, 79), (-14.5, -15, 87.9)], 1.25)
-hose('hose_back', [(0, -4, 60), (0, -3, 70), (3, -2.8, 78), (10, -2.8, 83), (15.2, -3.2, 88)], .9)
+GROUP = 'shell'
+hose('hose_r', [(7.5, -6.6, 66.2), (8.5, -8, 70), (12, -12, 80), (14.5, -14, 87.9)], 1.25)
+hose('hose_l', [(-7.5, -6.6, 66.2), (-8.5, -8.5, 71), (-12, -13, 79), (-14.5, -15, 87.9)], 1.25)
+hose('hose_back', [(0, -3.2, 65.4), (1, -2.8, 71), (3, -2.8, 78), (10, -2.8, 83), (15.2, -3.2, 88)], .9)
 # outside: off the roof and down to the floor, snaking out along it
 hose('hose_out_r', [(21, -12, 91.5), (24.5, -12, 90), (26.5, -13, 70), (26, -16, 30), (25.5, -18, 4), (27, -22, 1.2), (32, -30, 1.3), (36, -38, 1.3)], 1.5)
 hose('hose_out_l', [(-21, -6, 92), (-24, -6, 91), (-25.5, -7, 60), (-25, -9, 20), (-26, -12, 2.5), (-30, -12, 1.4), (-34, -5, 1.4), (-36, -.5, 2)], 1.2)
@@ -618,10 +799,10 @@ WM = [MX['w_red'], MX['w_yel'], MX['w_blu'], MX['w_grn'], MX['w_wht']]
 for i, m in enumerate(WM):
     dy = -7 - i * .9
     wire(f'wire_cab{i}', [(-13, dy, 29 + i * .6), (-15.8, dy - 1, 27.5 + i), (-16.6 - i * .15, dy - 1.5, 36),
-                         (-16.3, dy - 1, 41), (-11.8, dy - .5, 43.6)], .2, m)
+                         (-15.4, dy - 1, 38.6), (-13.3, dy - .5, 39.2)], .2, m)
 # junction box → terminal side port, drooping
 for i, m in enumerate(WM[:4]):
-    wire(f'wire_jb{i}', [(11.2, -5, 67.5 + i * .5 if i < 3 else 70), (13, -9 - i * .4, 60 - i), (12.4, -11 - i * .2, 52.5), (11.4, -11, 50)], .19, m)
+    wire(f'wire_jb{i}', [(11.2, -5, 67.5 + i * .5 if i < 3 else 70), (13.9, -9 - i * .4, 60 - i), (14.2, -11.5 - i * .2, 52), (13.4, -11, 47.3)], .19, m)
 # severed ends hanging from under the roof, sparking
 for i, (x, m) in enumerate(((-5, MX['w_red']), (-3.8, MX['w_yel']), (4.5, MX['w_blu']))):
     L = 7 + i * 1.6
@@ -637,7 +818,7 @@ for i, (m, dz) in enumerate(((MX['w_blk'], 0), (MX['w_yel'], 1.2), (MX['w_blk'],
 hose('hose_jb', [(17.6, -5, 67), (19.8, -6, 60), (20.2, -8, 45), (19.8, -10, 36)], .7, pitch=.5)
 # a bundle of black power cable from the terminal back into the wall
 for i in range(3):
-    wire(f'wire_pwr{i}', [(-4 + i, -1.8, 52 + i * .6), (-5 + i * 1.3, -3, 49), (-3 + i, -3.2, 44.8)], .32, MX['w_blk'])
+    wire(f'wire_pwr{i}', [(-MON_W - .6, -4.6 + i * .3, 48), (-15.2 - i * .3, -4 + i * .5, 45), (-16 - i * .3, -2.6, 38), (-15.8, -1.9, 30 - i * 2)], .3, MX['w_blk'])
 
 
 # ================================================================== BAKE
@@ -664,74 +845,82 @@ def setup_cycles(samples):
     scene.cycles.samples = samples
 
 
-booth = join(BAKED, 'terminal_booth')
-bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
-bpy.ops.uv.smart_project(angle_limit=math.radians(55), island_margin=.004, area_weight=0.0, scale_to_bounds=False)
-bpy.ops.uv.pack_islands(margin=.004, rotate=True)
-bpy.ops.object.mode_set(mode='OBJECT')
-print('booth tris', sum(len(p.vertices) - 2 for p in booth.data.polygons))
+parts = {}
+for gname, objs in BAKED.items():
+    if not objs:
+        continue
+    ob = join(objs, 'booth_' + gname)
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=math.radians(55), island_margin=.003, area_weight=0.0, scale_to_bounds=False)
+    bpy.ops.uv.pack_islands(margin=.003, rotate=True, shape_method='CONCAVE')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    parts[gname] = ob
+    print(gname, 'tris', sum(len(p.vertices) - 2 for p in ob.data.polygons))
 
 world = bpy.data.worlds.new('w'); scene.world = world; world.use_nodes = True
 world.light_settings.distance = 4.0
+ORM_TEX = TEX // 2
+texnodes = {}
 
-if BAKE:
-    setup_cycles(48)
+
+def bake_part(gname, ob):
+    """Bake one group into its own base colour, normal and packed ORM maps,
+    then give the joined mesh a single material using them."""
     imgs = {}
-    for k, nc in (('col', False), ('rough', True), ('metal', True), ('ao', True), ('nrm', True)):
-        im = bpy.data.images.new('booth_' + k, TEX, TEX, alpha=False)
+    for k, nc, size in (('col', False, TEX), ('nrm', True, TEX), ('rough', True, ORM_TEX), ('metal', True, ORM_TEX), ('ao', True, ORM_TEX)):
+        im = bpy.data.images.new(f'{gname}_{k}', size, size, alpha=False)
         if nc:
             im.colorspace_settings.name = 'Non-Color'
         imgs[k] = im
-    texnodes = {}
-    for m in booth.data.materials:
-        n = m.node_tree.nodes.new('ShaderNodeTexImage'); texnodes[m.name] = n
-        m.node_tree.nodes.active = n
+    mats = list(ob.data.materials)
+    for m in mats:
+        if m.name not in texnodes:
+            texnodes[m.name] = m.node_tree.nodes.new('ShaderNodeTexImage')
+        m.node_tree.nodes.active = texnodes[m.name]
 
-    def bake(kind, img, **kw):
-        for n in texnodes.values():
-            n.image = img
-        bpy.ops.object.select_all(action='DESELECT'); booth.select_set(True)
-        bpy.context.view_layer.objects.active = booth
-        bpy.ops.object.bake(type=kind, margin=8, use_clear=True, **kw)
-        print('baked', kind)
+    def bake(kind, img, samples, **kw):
+        scene.cycles.samples = samples
+        for m in mats:
+            texnodes[m.name].image = img
+        bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.object.bake(type=kind, margin=12, use_clear=True, **kw)
+        print('baked', gname, kind)
 
+    # the diffuse colour bake returns black for metals, so zero metallic first
     mlinks = {}
-    for m in booth.data.materials:
+    for m in mats:
         b = m.node_tree.nodes['Principled BSDF']; lk = b.inputs['Metallic'].links
         if lk:
             mlinks[m.name] = lk[0].from_socket; m.node_tree.links.remove(lk[0])
         b.inputs['Metallic'].default_value = 0
-    bake('DIFFUSE', imgs['col'], pass_filter={'COLOR'})
-    for m in booth.data.materials:
+    bake('DIFFUSE', imgs['col'], 128, pass_filter={'COLOR'})
+    for m in mats:
         if m.name in mlinks:
             m.node_tree.links.new(mlinks[m.name], m.node_tree.nodes['Principled BSDF'].inputs['Metallic'])
-    bake('ROUGHNESS', imgs['rough'])
-    bake('NORMAL', imgs['nrm'], normal_space='TANGENT')
-    scene.cycles.samples = 96
-    bake('AO', imgs['ao'])
-    # metallic: route the metallic socket through an emission shader
+    bake('ROUGHNESS', imgs['rough'], 96)
+    bake('NORMAL', imgs['nrm'], 128, normal_space='TANGENT')
+    bake('AO', imgs['ao'], 128)
     saved = {}
-    for m in booth.data.materials:
+    for m in mats:
         nt = m.node_tree; out = nt.nodes['Material Output']
         saved[m.name] = out.inputs['Surface'].links[0].from_socket
         em = nt.nodes.new('ShaderNodeEmission'); nt.links.new(METAL[m.name], em.inputs['Color'])
         nt.links.new(em.outputs[0], out.inputs['Surface'])
-    scene.cycles.samples = 4
-    bake('EMIT', imgs['metal'])
-    for m in booth.data.materials:
+    bake('EMIT', imgs['metal'], 8)
+    for m in mats:
         m.node_tree.links.new(saved[m.name], m.node_tree.nodes['Material Output'].inputs['Surface'])
 
-    # pack ORM (R occlusion, G roughness, B metallic)
     import numpy as np
     px = lambda im: np.array(im.pixels[:], dtype=np.float32).reshape(-1, 4)
     ao, ro, me = px(imgs['ao']), px(imgs['rough']), px(imgs['metal'])
     orm = np.stack([ao[:, 0], ro[:, 0], me[:, 0], np.ones(len(ao), np.float32)], 1)
-    im = bpy.data.images.new('booth_orm', TEX, TEX, alpha=False); im.colorspace_settings.name = 'Non-Color'
+    im = bpy.data.images.new(f'{gname}_orm', ORM_TEX, ORM_TEX, alpha=False); im.colorspace_settings.name = 'Non-Color'
     im.pixels = orm.ravel(); imgs['orm'] = im
     for k in ('col', 'orm', 'nrm'):
         imgs[k].pack()
 
-    fm = bpy.data.materials.new('terminal_booth'); fm.use_nodes = True
+    fm = bpy.data.materials.new('booth_' + gname); fm.use_nodes = True
     nt = fm.node_tree; b = nt.nodes['Principled BSDF']
     tc = nt.nodes.new('ShaderNodeTexImage'); tc.image = imgs['col']; nt.links.new(tc.outputs['Color'], b.inputs['Base Color'])
     to = nt.nodes.new('ShaderNodeTexImage'); to.image = imgs['orm']
@@ -739,15 +928,23 @@ if BAKE:
     nt.links.new(sep.outputs['Green'], b.inputs['Roughness']); nt.links.new(sep.outputs['Blue'], b.inputs['Metallic'])
     tn = nt.nodes.new('ShaderNodeTexImage'); tn.image = imgs['nrm']
     nm = nt.nodes.new('ShaderNodeNormalMap'); nt.links.new(tn.outputs['Color'], nm.inputs['Color']); nt.links.new(nm.outputs['Normal'], b.inputs['Normal'])
-    grp = bpy.data.node_groups.new('glTF Material Output', 'ShaderNodeTree')
-    grp.interface.new_socket('Occlusion', in_out='INPUT', socket_type='NodeSocketFloat')
+    grp = bpy.data.node_groups.get('glTF Material Output')
+    if not grp:
+        grp = bpy.data.node_groups.new('glTF Material Output', 'ShaderNodeTree')
+        grp.interface.new_socket('Occlusion', in_out='INPUT', socket_type='NodeSocketFloat')
     g = nt.nodes.new('ShaderNodeGroup'); g.node_tree = grp; nt.links.new(sep.outputs['Red'], g.inputs['Occlusion'])
-    booth.data.materials.clear(); booth.data.materials.append(fm)
-    for p in booth.data.polygons:
+    ob.data.materials.clear(); ob.data.materials.append(fm)
+    for p in ob.data.polygons:
         p.material_index = 0
 
+
+if BAKE:
+    setup_cycles(128)
+    for gname, ob in parts.items():
+        bake_part(gname, ob)
+
 os.makedirs(os.path.dirname(os.path.abspath(OUT)), exist_ok=True)
-bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_image_format='WEBP', export_image_quality=88,
+bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_image_format='WEBP', export_image_quality=92,
                           export_yup=True, export_apply=True, export_texcoords=True, export_normals=True,
                           export_materials='EXPORT', export_extras=False, export_cameras=False, export_lights=False)
 print('wrote', OUT, os.path.getsize(OUT) // 1024, 'KB')
