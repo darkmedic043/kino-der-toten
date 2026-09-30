@@ -411,7 +411,7 @@ function setupKino(api,fixtures=[]){
     for(const l of pool){const u=l.userData;
       // Handover: fade the old light out, then the new one in (about 1 s total), so lights never pop.
       if(u.next&&l.intensity<2){u.source=u.next;u.next=null;}
-      const s=u.source,target=s&&!u.next&&!u.fadeOut?Math.min(s.intensity*560,s.cap)*level(s):0;if(s){l.position.copy(s.position);l.target.position.copy(s.position).add(s.dir??down);l.angle=s.angle??1.3;l.color.copy(s.color);l.distance=s.radius;}l.intensity+=(target-l.intensity)*Math.min(1,dt*(u.next?4:2.2));}
+      const s=u.source,target=s&&!u.next&&!u.fadeOut?Math.min(s.intensity*560,s.cap)*level(s)*(s.weight??1):0;if(s){l.position.copy(s.position);l.target.position.copy(s.position).add(s.dir??down);l.angle=s.angle??1.3;l.color.copy(s.color);l.distance=s.radius;}{const step=(target-l.intensity)*Math.min(1,dt*(u.next?2.5:1.1)),limit=Math.max(1,dt*900);l.intensity+=THREE.MathUtils.clamp(step,-limit,limit);}}   // eased and rate-limited: no visible jumps
     for(const l of spots){const s=l.userData.source,target=s?Math.min(Math.min(9,s.intensity)*720,s.cap*1.6)*level(s):0;
       if(s){l.position.copy(s.position);l.target.position.copy(s.spot.target);l.color.copy(s.color);l.distance=s.radius*1.6;l.angle=Math.min(1.2,s.spot.angle);l.shadow.camera.far=l.distance;}
       l.intensity+=(target-l.intensity)*Math.min(1,dt*6);}   // never toggle .visible: that recompiles every lit shader
@@ -466,6 +466,11 @@ function setupKino(api,fixtures=[]){
   // so small moves don't swap lights back and forth.
   function assignPool(ranked){
     const n=pool.length,score=new Map(ranked.map(r=>[r.s,r.score])),want=ranked.slice(0,n);
+    // Brightness follows importance: a light just above the budget's cutoff is
+    // faint and ramps up as it matters more, so joining or leaving the pool is
+    // invisible instead of a pop.
+    const cutoff=ranked[n]?.score??0;
+    for(const r of ranked.slice(0,Math.ceil(n*1.5)))r.s.weight=cutoff>0?THREE.MathUtils.smoothstep(r.score,cutoff,cutoff*2.2):1;
     const keep=new Set(ranked.slice(0,Math.ceil(n*1.5)).map(r=>r.s));
     for(const l of pool){const u=l.userData;if(u.source&&!keep.has(u.source)&&!u.next)u.fadeOut=true;}
     const busy=new Set(pool.flatMap(l=>[l.userData.source,l.userData.next]).filter(Boolean));
