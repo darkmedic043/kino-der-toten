@@ -49,6 +49,12 @@ export class MysteryBox {
     const holder=new THREE.Group(),groups=Object.keys(this.models).map(id=>this.display(id)).filter(Boolean);
     camera.updateMatrixWorld();holder.position.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(80));
     for(const g of groups)holder.add(g);this.scene.add(holder);
+    // Give the box weapons the lighting mod's material setup now; applied on first
+    // display it recompiled shaders mid-spin. They're small: no shadow casting.
+    globalThis.kino?.lighting?.tag?.(holder);
+    // No shadows, and no frustum culling: a rigged model's first cull computes its bounds through every bone (a hitch per new weapon).
+    holder.traverse(o=>{if(o.isMesh){o.castShadow=false;o.frustumCulled=false;}});
+    renderer.render(this.scene,camera);   // uploads every texture and settles every program now, behind the loading screen
     try{renderer.compile(this.scene,camera);holder.traverse(n=>{for(const m of [n.material].flat())if(m)for(const k of ['map','normalMap','emissiveMap','alphaMap','roughnessMap','metalnessMap'])if(m[k])renderer.initTexture(m[k]);});}
     catch(e){console.warn('[mystery-box] warm-up failed',e);}
     holder.removeFromParent();for(const g of groups)holder.remove(g);

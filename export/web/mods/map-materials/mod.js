@@ -51,6 +51,30 @@ export default async function setup(api){
   api.scene.traverse(o=>{if(o.isMesh&&[o.material].flat().some(m=>m?.transparent&&GLASS.test(m.name??'')))o.renderOrder=1;});
   console.info('[map-materials]',counts);
 
+  // Smooth shading. The map export gave every triangle its own flat normal,
+  // so rounded props (columns, rails, seats, trim) showed each polygon as a
+  // facet. Vertices at the same spot now share an averaged normal when their
+  // faces meet at under CREASE, so curves shade smoothly and hard edges stay hard.
+  {const t0=performance.now(),CREASE=Math.cos(THREE.MathUtils.degToRad(50));let n=0;
+    const done=new WeakSet();
+    api.scene.traverse(o=>{if(!o.isMesh||o.isSkinnedMesh||done.has(o.geometry))return;const g=o.geometry;if(!g.attributes.normal||!g.attributes.position)return;done.add(g);smooth(g);n++;});
+    function smooth(g){
+      const P=g.attributes.position,N=g.attributes.normal,idx=g.index,count=idx?idx.count:P.count,vc=P.count;
+      const fn=new Float32Array(count),faceOf=new Int32Array(vc).fill(-1),a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
+      for(let t=0;t<count;t+=3){const i0=idx?idx.getX(t):t,i1=idx?idx.getX(t+1):t+1,i2=idx?idx.getX(t+2):t+2;
+        a.fromBufferAttribute(P,i0);b.fromBufferAttribute(P,i1).sub(a);c.fromBufferAttribute(P,i2).sub(a);b.cross(c);   // area-weighted face normal
+        fn[t]=b.x;fn[t+1]=b.y;fn[t+2]=b.z;for(const i of [i0,i1,i2])if(faceOf[i]<0)faceOf[i]=t;}
+      const key=i=>Math.round(P.getX(i)*20)+','+Math.round(P.getY(i)*20)+','+Math.round(P.getZ(i)*20);
+      const groups=new Map();for(let i=0;i<vc;i++){if(faceOf[i]<0)continue;const k=key(i);(groups.get(k)??groups.set(k,[]).get(k)).push(i);}
+      const own=new THREE.Vector3(),other=new THREE.Vector3(),sum=new THREE.Vector3();
+      for(const verts of groups.values()){if(verts.length<2)continue;
+        for(const i of verts){const f=faceOf[i];own.set(fn[f],fn[f+1],fn[f+2]).normalize();sum.set(0,0,0);
+          for(const j of verts){const h=faceOf[j];other.set(fn[h],fn[h+1],fn[h+2]);const len=other.length();if(len&&other.dot(own)/len>=CREASE)sum.add(other);}
+          if(sum.lengthSq()>0){sum.normalize();N.setXYZ(i,sum.x,sum.y,sum.z);}}}
+      N.needsUpdate=true;
+    }
+    console.info('[map-materials] smoothed',n,'meshes in',Math.round(performance.now()-t0),'ms');}
+
   // Sharper textures at glancing angles (floors, walls seen along a corridor).
   const aniso=api.renderer?.capabilities.getMaxAnisotropy?.()??1;
   for(const m of seen)if(m.map&&m.map.anisotropy<aniso){m.map.anisotropy=aniso;m.map.needsUpdate=true;}

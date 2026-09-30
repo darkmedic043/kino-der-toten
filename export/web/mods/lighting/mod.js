@@ -24,7 +24,7 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { settings, onSettingsChange } from '../../settings.js';
 
-const POOL=10,SWAP=.25;   // each light is paid for on every pixel of a forward-rendered frame
+const SWAP=.25;
 // Per-light brightness cap in the lighting shader. A lamp sitting inside its
 // own fixture (a stage lamp, a cable plug, a wall sconce) gave that little
 // mesh hundreds of times too much light, which bloomed into a white disc; the
@@ -175,7 +175,15 @@ function setupKino(api,fixtures=[]){
   scene.fog=new THREE.FogExp2(0x0c0e11,.00042);scene.background=new THREE.Color(0x07080a);
 
   // Point-light pool (cheap, many sources).
-  const pool=[...Array(POOL)].map(()=>{const l=new THREE.SpotLight(0xffffff,0,1,1.2,1,1.3);scene.add(l,l.target);return l;});
+  // The live light budget grows with quality (every light is paid for per pixel,
+  // and changing the count recompiles shaders, so it only changes with the setting).
+  const poolSize=q=>q>=3?20:q>=2?14:q>=1?10:8;
+  const pool=[];
+  function resizePool(n){
+    while(pool.length<n){const l=new THREE.SpotLight(0xffffff,0,1,1.2,1,1.3);scene.add(l,l.target);pool.push(l);}
+    while(pool.length>n){const l=pool.pop();scene.remove(l,l.target);l.dispose();}
+  }
+  resizePool(poolSize(quality()));
   // Shadow-casting spots (expensive, the nearest few).
   const SPOTS=4;
   const spots=[...Array(SPOTS)].map(()=>{
@@ -198,6 +206,9 @@ function setupKino(api,fixtures=[]){
   const sunDir=new THREE.Vector3(-.42,.82,.39).normalize();
   const sky=new Sky();sky.scale.setScalar(11000);Object.assign(sky.material.uniforms.turbidity,{value:5});sky.material.uniforms.rayleigh.value=1.4;
   sky.material.uniforms.mieCoefficient.value=.004;sky.material.uniforms.mieDirectionalG.value=.82;sky.material.uniforms.sunPosition.value.copy(sunDir);
+  // The analytic sky outputs physical radiance; through this exposure it was
+  // blinding (and bloomed). Scale it down in its shader.
+  sky.material.fragmentShader=sky.material.fragmentShader.replace('gl_FragColor = vec4( texColor, 1.0 );','gl_FragColor = vec4( texColor * 0.2, 1.0 );');
   sky.frustumCulled=false;sky.castShadow=sky.receiveShadow=false;shadowReady.add(sky);scene.add(sky);
   // The map's sky brushes (a 64 px placeholder filling roof holes and windows) would block the sun.
   const skyBrushes=[];scene.traverse(o=>{if(o.isMesh&&[o.material].flat().some(m=>/sky_day/.test(m?.name??'')))skyBrushes.push(o);});
@@ -363,7 +374,8 @@ function setupKino(api,fixtures=[]){
       timer=SWAP;const eye=camera.position;
       const score=s=>level(s)?s.intensity*s.radius/Math.max(80,s.position.distanceTo(eye)):0;
       const ranked=sources.map(s=>({s,score:score(s)})).filter(r=>r.score>0).sort((a,b)=>b.score-a.score);
-      assign(pool,ranked.filter(r=>!r.s.spot||q<2).slice(0,POOL));
+      if(pool.length!==poolSize(q))resizePool(poolSize(q));
+      assignPool(ranked.filter(r=>!r.s.spot||q<2));
       const nSpots=q>=3?3:q>=2?1:0;
       assign(spots,ranked.filter(r=>r.s.spot).slice(0,nSpots));
       // Shadow settings change only with the quality level (each change recompiles shaders).
@@ -371,7 +383,10 @@ function setupKino(api,fixtures=[]){
       spots.forEach((l,i)=>{const on=cast&&i<nSpots;if(l.castShadow!==on)l.castShadow=on;if(l.shadow.mapSize.x!==size){l.shadow.mapSize.set(size,size);l.shadow.map?.dispose();l.shadow.map=null;}});
       for(const l of spots)l.shadow.needsUpdate=true;
     }
-    for(const l of pool){const s=l.userData.source,target=s?Math.min(s.intensity*560,s.cap)*level(s):0;if(s){l.position.copy(s.position);l.target.position.copy(s.position).add(s.dir??down);l.angle=s.angle??1.3;l.color.copy(s.color);l.distance=s.radius;}l.intensity+=(target-l.intensity)*Math.min(1,dt*6);}
+    for(const l of pool){const u=l.userData;
+      // Handover: fade the old light out, then the new one in (about 1 s total), so lights never pop.
+      if(u.next&&l.intensity<2){u.source=u.next;u.next=null;}
+      const s=u.source,target=s&&!u.next&&!u.fadeOut?Math.min(s.intensity*560,s.cap)*level(s):0;if(s){l.position.copy(s.position);l.target.position.copy(s.position).add(s.dir??down);l.angle=s.angle??1.3;l.color.copy(s.color);l.distance=s.radius;}l.intensity+=(target-l.intensity)*Math.min(1,dt*(u.next?4:2.2));}
     for(const l of spots){const s=l.userData.source,target=s?Math.min(Math.min(9,s.intensity)*720,s.cap*1.6)*level(s):0;
       if(s){l.position.copy(s.position);l.target.position.copy(s.spot.target);l.color.copy(s.color);l.distance=s.radius*1.6;l.angle=Math.min(1.2,s.spot.angle);l.shadow.camera.far=l.distance;}
       l.intensity+=(target-l.intensity)*Math.min(1,dt*6);}   // never toggle .visible: that recompiles every lit shader
@@ -391,13 +406,32 @@ function setupKino(api,fixtures=[]){
   // loading match the ones used in play; otherwise the first frame recompiled them all.
   tick(1/60);
   // Keep lights that stay chosen on their current source to avoid pops.
+  // Hysteresis: a waiting light takes a slot only from one it clearly outshines,
+  // so small moves don't swap lights back and forth.
+  function assignPool(ranked){
+    const n=pool.length,score=new Map(ranked.map(r=>[r.s,r.score])),want=ranked.slice(0,n);
+    const keep=new Set(ranked.slice(0,Math.ceil(n*1.5)).map(r=>r.s));
+    for(const l of pool){const u=l.userData;if(u.source&&!keep.has(u.source)&&!u.next)u.fadeOut=true;}
+    const busy=new Set(pool.flatMap(l=>[l.userData.source,l.userData.next]).filter(Boolean));
+    for(const {s,score:sc} of want){
+      if(busy.has(s))continue;
+      let slot=pool.find(l=>!l.userData.source&&!l.userData.next)??pool.find(l=>l.userData.fadeOut&&!l.userData.next);
+      if(!slot){const weakest=pool.filter(l=>!l.userData.next).sort((a,b)=>(score.get(a.userData.source)??0)-(score.get(b.userData.source)??0))[0];
+        if(weakest&&(score.get(weakest.userData.source)??0)*1.4<sc)slot=weakest;}
+      if(!slot)continue;
+      if(slot.userData.source)slot.userData.next=s;else slot.userData.source=s;
+      slot.userData.fadeOut=false;busy.add(s);
+    }
+    // Lights no longer wanted at all fade out and free their slot.
+    for(const l of pool){const u=l.userData;if(u.fadeOut&&!u.next&&l.intensity<2){u.source=null;u.fadeOut=false;}}
+  }
   function assign(lights,ranked){
     const chosen=new Set(ranked.map(r=>r.s));
     for(const l of lights)if(l.userData.source&&!chosen.has(l.userData.source))l.userData.source=null;
     const taken=new Set(lights.map(l=>l.userData.source).filter(Boolean));
     for(const {s} of ranked)if(!taken.has(s)){const l=lights.find(l=>!l.userData.source);if(!l)break;l.userData.source=s;l.intensity=0;taken.add(s);}
   }
-  window.kino.lighting={sources,pool,spots,beams,volScene,shafts:baked};
+  window.kino.lighting={sources,pool,spots,beams,volScene,shafts:baked,tag:tagShadows};
 }
 
 // ---- Volumetric beams pass -----------------------------------------------------------------------
