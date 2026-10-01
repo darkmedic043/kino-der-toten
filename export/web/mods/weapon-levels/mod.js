@@ -57,12 +57,17 @@ export default async function setup(api){
     let skel=null;g.traverse(o=>{if(o.isSkinnedMesh&&!skel)skel=o.skeleton;});
     // stock mag meshes: dominant bone tag_clip (restored when no bigger mag is fitted)
     const mag=MAG_TAGS.map(t=>g.getObjectByName(t)).find(b=>b&&!hidden.has(b.name)&&stock.has(b.name));
+    // A Pack-a-Punched gun may show a bigger mag by itself (the Predator's dual
+    // mag); its reload animation moves that bone, so a fitted mag follows it
+    // instead of tag_clip, and the built-in mag's meshes are hidden.
+    const native=MAG_TAGS.map(t=>g.getObjectByName(t)).find(b=>b&&!hidden.has(b.name)&&!stock.has(b.name));
+    const ref=mag&&native?native:clip;
     g.traverse(o=>{if(!o.isSkinnedMesh)return;const gg=o.geometry,si=gg.attributes.skinIndex,sw=gg.attributes.skinWeight;if(!si||!sw)return;
       const i=gg.index?gg.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
-      if(o.skeleton.bones[best]===clip)o.visible=!mag;});
-    if(!mag||!clip||!skel)return;
-    const rc=restWorld(skel,clip),rm=restWorld(skel,mag);if(!rc||!rm)return;
-    follow={mag,clip,rel:rc.clone().invert().multiply(rm),m:new THREE.Matrix4(),p:new THREE.Matrix4()};
+      const b=o.skeleton.bones[best];if(b===clip||(native&&b===native))o.visible=!mag||(b===native&&!mag);});
+    if(!mag||!ref||!skel)return;
+    const rc=restWorld(skel,ref),rm=restWorld(skel,mag);if(!rc||!rm)return;
+    follow={mag,clip:ref,rel:rc.clone().invert().multiply(rm),m:new THREE.Matrix4(),p:new THREE.Matrix4()};
   }
   host.on('update',()=>{
     if(!follow||!view.gun)return;const {mag,clip,rel,m,p}=follow;
