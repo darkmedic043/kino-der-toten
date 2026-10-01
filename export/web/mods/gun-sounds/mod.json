@@ -1,0 +1,5 @@
+{
+  "name": "Gun sounds",
+  "description": "BO1's full player gunshots: the ring-off tail when you stop firing, the low-end thump, real suppressed shots, and real shots for the Commando and LAW. Needs .tools/build_gun_sounds.py run against your own BO1 install.",
+  "script": "mod.js"
+}

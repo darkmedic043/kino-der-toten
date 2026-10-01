@@ -110,6 +110,7 @@ function damage(n){
   }else if(session.phase==='reviving')announce('A second chance','QUICK REVIVE',4);
 }
 function effect(position,color=0x9e3023,count=7){
+  {const e={position,color,count,handled:false};mods.emit('effect',e);if(e.handled)return;}   // mods may draw it instead (fx mod)
   for(let i=0;i<count;i++){
     const mesh=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.5,1.5),new THREE.MeshBasicMaterial({color}));mesh.position.copy(position);scene.add(mesh);
     particles.push({mesh,velocity:new THREE.Vector3((Math.random()-.5)*100,Math.random()*90,(Math.random()-.5)*100),life:.45+Math.random()*.3});

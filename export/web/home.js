@@ -29,7 +29,7 @@ const [mapList,modList,config,characters,baseData]=await Promise.all([
 const mods=await Promise.all(modList.map(async id=>{
   try{const manifest=await fetchJson(`mods/${id}/mod.json`);return {id,manifest};}catch(error){return {id,error:error.message};}
 }));
-let data={weapons:baseData.weapons,boxPool:baseData.boxPool,characters:{...baseData.characters}};
+let data={weapons:baseData.weapons,equipment:{...baseData.equipment},boxPool:baseData.boxPool,characters:{...baseData.characters}};
 for(const m of mods)for(const file of [m.manifest?.data??[]].flat()){try{data=mergePatch(data,await fetchJson(`mods/${m.id}/${file}`));}catch{}}
 // Mods that add weapons from a script (prepare) must show up here too.
 for(const m of mods)if(m.manifest?.script){try{const module=await import(`./mods/${m.id}/${m.manifest.script}`);if(module.prepare)data=(await module.prepare(data,{id:m.id,url:new URL(`mods/${m.id}/`,document.baseURI),manifest:m.manifest}))??data;}catch(error){console.warn('[menu] mod',m.id,error);}}
@@ -139,7 +139,7 @@ let thumbQueue=Promise.resolve();
 function thumb(id){
   if(thumbs.has(id))return Promise.resolve(thumbs.get(id));
   if(!thumbWaiters.has(id))thumbWaiters.set(id,thumbQueue=thumbQueue.then(async()=>{
-    const def=weapons[id];let url='';
+    const def=weapons[id]??data.equipment?.[id];let url='';
     try{
       const model=await loadModel(def?.worldModel);
       if(model){
@@ -174,12 +174,13 @@ function openLoadoutGunsmith(id){
     onChange:()=>save(),onClose:()=>{focus={id,isWeapon:true};renderLoadout();}});
 }
 loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
-const slots=[{key:'primary',label:'PRIMARY'},{key:'secondary',label:'SECONDARY'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
+const slots=[{key:'primary',label:'PRIMARY'},{key:'secondary',label:'SECONDARY'},{key:'tactical',label:'TACTICAL'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
 let activeSlot='primary',focus=null;
 const weaponList=()=>config.weapons.filter(w=>weapons[w.id]);
 function slotState(key,u,l){
   if(key==='primary')return {value:l.primary};
   if(key==='secondary')return u.secondary?{value:l.secondary}:{locked:`Unlocks at level ${config.secondaryLevel}`};
+  if(key==='tactical')return u.tacticalSlot?{value:l.tactical}:{locked:`Unlocks at level ${config.tacticalLevel}`};
   const i=+key.slice(5);return i<u.bonusSlots?{value:l.bonuses[i]??''}:{locked:`Unlocks at level ${config.secondBonusLevel}`};
 }
 function renderLoadout(){
@@ -187,13 +188,13 @@ function renderLoadout(){
   if(slotState(activeSlot,u,l).locked)activeSlot='primary';
   $('slots').innerHTML='';
   for(const s of slots){
-    const st=slotState(s.key,u,l),isWeapon=!s.key.startsWith('bonus'),el=document.createElement('button');
+    const st=slotState(s.key,u,l),isTac=s.key==='tactical',isWeapon=!s.key.startsWith('bonus')&&!isTac,el=document.createElement('button');
     el.className='slot'+(s.key===activeSlot?' active':'')+(st.locked?' locked':'');
-    const name=st.locked?'Locked':isWeapon?(st.value?weapons[st.value].name:'None'):(st.value?bonusById[st.value].name:'None');
-    const sub=st.locked??(isWeapon?'':st.value?bonusById[st.value].description:'No bonus equipped');
+    const name=st.locked?'Locked':isWeapon?(st.value?weapons[st.value].name:'None'):isTac?(st.value?tacById[st.value].name:'None'):(st.value?bonusById[st.value].name:'None');
+    const sub=st.locked??(isWeapon?'':isTac?(st.value?'':'No tactical'):st.value?bonusById[st.value].description:'No bonus equipped');
     const canMod=isWeapon&&!st.locked&&st.value&&gunsmith&&gunsmithHas(st.value);
-    el.innerHTML=`<span class="label">${s.label}</span>${isWeapon?'<div class="thumb"></div>':''}<strong>${esc(name)}</strong>${sub?`<small>${esc(sub)}</small>`:''}${canMod?'<span class="slot-gs">GUNSMITH  ›</span>':''}`;
-    if(isWeapon)fillThumb(el.querySelector('.thumb'),st.locked?'':st.value);
+    el.innerHTML=`<span class="label">${s.label}</span>${isWeapon||isTac&&st.value?'<div class="thumb"></div>':''}<strong>${esc(name)}</strong>${sub?`<small>${esc(sub)}</small>`:''}${canMod?'<span class="slot-gs">GUNSMITH  ›</span>':''}`;
+    if(isWeapon||isTac&&st.value)fillThumb(el.querySelector('.thumb'),st.locked?'':st.value);
     el.addEventListener('click',e=>{if(st.locked){toast(st.locked);return;}if(e.target.closest('.slot-gs')){openLoadoutGunsmith(st.value);return;}activeSlot=s.key;focus=null;renderLoadout();});
     $('slots').append(el);
   }
@@ -201,10 +202,10 @@ function renderLoadout(){
 }
 function renderPicker(u,l){
   const grid=$('picker-grid');grid.innerHTML='';
-  const isWeapon=!activeSlot.startsWith('bonus'),current=slotState(activeSlot,u,l).value??'';
-  $('picker-title').textContent={primary:'PRIMARY WEAPON',secondary:'SECONDARY WEAPON',bonus0:'BONUS',bonus1:'SECOND BONUS'}[activeSlot];
-  $('picker-hint').textContent=isWeapon?`${u.weapons.length} / ${weaponList().length} unlocked`:`${u.bonuses.length} / ${config.bonuses.length} unlocked`;
-  let options=isWeapon?weaponList().map(w=>({id:w.id,level:w.level})):config.bonuses.map(b=>({id:b.id,level:b.level}));
+  const isTac=activeSlot==='tactical',isWeapon=!activeSlot.startsWith('bonus')&&!isTac,current=slotState(activeSlot,u,l).value??'';
+  $('picker-title').textContent={primary:'PRIMARY WEAPON',secondary:'SECONDARY WEAPON',tactical:'TACTICAL',bonus0:'BONUS',bonus1:'SECOND BONUS'}[activeSlot];
+  $('picker-hint').textContent=isWeapon?`${u.weapons.length} / ${weaponList().length} unlocked`:isTac?`${u.tactical.length} / ${tacList().length} unlocked`:`${u.bonuses.length} / ${config.bonuses.length} unlocked`;
+  let options=isWeapon?weaponList().map(w=>({id:w.id,level:w.level})):isTac?tacList().map(t=>({id:t.id,level:t.level})):config.bonuses.map(b=>({id:b.id,level:b.level}));
   // weapon class tabs (only classes with guns in the list)
   const cats=$('picker-cats');cats.innerHTML='';cats.hidden=!isWeapon;
   if(isWeapon){
@@ -217,27 +218,37 @@ function renderPicker(u,l){
   }
   if(activeSlot!=='primary')options.unshift({id:'',level:1});
   for(const o of options){
-    const unlocked=!o.id||(isWeapon?u.weapons:u.bonuses).includes(o.id);
+    const unlocked=!o.id||(isWeapon?u.weapons:isTac?u.tactical:u.bonuses).includes(o.id);
     const other=activeSlot==='primary'?l.secondary:activeSlot==='secondary'?l.primary:l.bonuses[activeSlot==='bonus0'?1:0];
-    const el=document.createElement('button');el.className='opt'+(isWeapon?'':' bonus')+(o.id===current?' selected':'')+(unlocked?'':' locked');
+    const el=document.createElement('button');el.className='opt'+(isWeapon||isTac?'':' bonus')+(o.id===current?' selected':'')+(unlocked?'':' locked');
     if(isWeapon){const d=weapons[o.id];
       el.innerHTML=o.id?`<div class="thumb"></div><strong>${esc(d.name)}</strong><div class="badges">${weaponBadges(o.id)}</div>`:`<div class="thumb"></div><strong>None</strong><small>Start with one weapon</small>`;if(o.id)fillThumb(el.querySelector('.thumb'),o.id);}
+    else if(isTac){el.innerHTML=o.id?`<div class="thumb"></div><strong>${esc(tacById[o.id].name)}</strong><small>${esc(tacById[o.id].description)}</small>`:`<div class="thumb"></div><strong>None</strong><small>No tactical</small>`;if(o.id)fillThumb(el.querySelector('.thumb'),o.id);}
     else el.innerHTML=o.id?`<strong>${esc(bonusById[o.id].name)}</strong><small>${esc(bonusById[o.id].description)}</small>`:'<strong>None</strong><small>No bonus</small>';
     if(!unlocked)el.insertAdjacentHTML('beforeend',`<span class="lock">LV ${o.level}</span>`);
-    el.addEventListener('mouseenter',()=>renderDetail(o.id,isWeapon,unlocked,o.level));
+    el.addEventListener('mouseenter',()=>isTac?renderTactical(o.id,unlocked):renderDetail(o.id,isWeapon,unlocked,o.level));
     // hovering previews; leaving goes back to the weapon actually in the slot (with its Gunsmith)
-    el.addEventListener('mouseleave',()=>{const now=slotState(activeSlot,unlocks(config,profile.level,weapons),validLoadout(config,profile,weapons)).value??'';renderDetail(now,isWeapon,true,1);});
+    el.addEventListener('mouseleave',()=>{const now=slotState(activeSlot,unlocks(config,profile.level,weapons),validLoadout(config,profile,weapons)).value??'';isTac?renderTactical(now,true):renderDetail(now,isWeapon,true,1);});
     el.addEventListener('click',()=>{
       if(!unlocked){toast(`Reach level ${o.level} to unlock`);return;}
       if(o.id&&o.id===other){toast('Already in your other slot');return;}
       const lo=profile.loadout;
-      if(activeSlot==='primary')lo.primary=o.id;else if(activeSlot==='secondary')lo.secondary=o.id;
+      if(activeSlot==='primary')lo.primary=o.id;else if(activeSlot==='secondary')lo.secondary=o.id;else if(isTac)lo.tactical=o.id;
       else{const b=[...l.bonuses];b[activeSlot==='bonus0'?0:1]=o.id;lo.bonuses=b.filter(Boolean);}
       focus={id:o.id,isWeapon};save();renderLoadout();
     });
     grid.append(el);
   }
-  renderDetail(current,isWeapon,true,1);
+  if(isTac)renderTactical(current,true);else renderDetail(current,isWeapon,true,1);
+}
+// Tactical slot: Monkey Bombs, Gersh Device, QED (the latter two from the moon-equipment mod)
+const tacById=Object.fromEntries((config.tactical??[]).map(t=>[t.id,t]));
+const tacList=()=>(config.tactical??[]).filter(t=>data.equipment?.[t.id]);
+function renderTactical(id,unlocked){
+  const el=$('detail');
+  if(!id){el.innerHTML='<h2>None</h2><p class="muted">Start without a tactical. You can still buy or find one in game.</p>';return;}
+  const t=tacById[id];el.innerHTML=`<div class="thumb"></div><span class="eyebrow">TACTICAL</span><h2>${esc(t.name)}</h2><p>${esc(t.description)}</p><p>3 per game · X to throw · Max Ammo refills them</p><p class="muted">Unlocks at level ${t.level}${unlocked?'':' · locked'}</p>`;
+  fillThumb(el.querySelector('.thumb'),id);
 }
 // weapon level and camo progress on a weapon card
 function weaponBadges(id){

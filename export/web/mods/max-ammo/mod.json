@@ -1,0 +1,5 @@
+{
+  "name": "Max Ammo reloads",
+  "description": "Max Ammo also fills every gun's magazine (and its underbarrel), not just the reserve.",
+  "script": "mod.js"
+}

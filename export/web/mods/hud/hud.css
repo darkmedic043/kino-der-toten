@@ -4,3 +4,21 @@
   background:radial-gradient(ellipse 90px 22px at 50% 16%,#e0231bdd 0%,#c0191299 45%,transparent 72%);
   -webkit-mask:linear-gradient(#000 0 40%,transparent 60%);mask:linear-gradient(#000 0 40%,transparent 60%);filter:drop-shadow(0 0 6px #ff2a1a88)}
 body.menu-open #damage-ring{visibility:hidden}
+/* Equipment cluster, bottom-right under the ammo: lethal | tactical | claymores. */
+body.equip-hud #grenades{display:none}
+#equip-hud{position:fixed;right:40px;bottom:24px;z-index:3;display:flex;gap:14px;pointer-events:none}
+#equip-hud .slot{position:relative;width:46px;height:46px}
+#equip-hud i{position:absolute;inset:0;background:center/contain no-repeat;filter:grayscale(1) brightness(1.25) contrast(.9);opacity:.75}
+#equip-hud .empty i{opacity:.22}
+#equip-hud b{position:absolute;right:-4px;bottom:-2px;font:700 13px/1 Arial,sans-serif;color:#e2dbcd;text-shadow:0 1px 3px #000}
+#equip-hud .empty b{color:#8a8173}
+#equip-hud kbd{position:absolute;left:50%;top:-11px;transform:translateX(-50%);font:600 8px/1 Arial,sans-serif;letter-spacing:1px;color:#b5ac98aa}
+body.menu-open #equip-hud{visibility:hidden}
+body.touch-mode #equip-hud kbd{display:none}
+/* Real BO1 perk icons in place of the coloured letter badges (Kino's four perks;
+   others keep the badge). */
+.perk:is([title="Juggernog"],[title="Double Tap"],[title="Speed Cola"],[title="Quick Revive"]){border:0;border-radius:0;width:30px;height:30px;font-size:0;background-color:transparent!important;background-size:contain!important;background-repeat:no-repeat!important;background-position:center!important;filter:drop-shadow(0 1px 2px #000)}
+.perk[title="Juggernog"]{background-image:url(../../textures/specialty_juggernaut_zombies.png)!important}
+.perk[title="Double Tap"]{background-image:url(../../textures/specialty_doubletap_zombies.png)!important}
+.perk[title="Speed Cola"]{background-image:url(../../textures/specialty_fastreload_zombies.png)!important}
+.perk[title="Quick Revive"]{background-image:url(../../textures/specialty_quickrevive_zombies.png)!important}

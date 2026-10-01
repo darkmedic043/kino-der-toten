@@ -16,6 +16,11 @@ export async function prepare(data){
     // Hit-scan instead of Kino's slow projectile path; effects come from setup().
     Object.assign(def,{projectileSpeed:0,explosionRadius:0});
     if(def.upgrade)Object.assign(def.upgrade,{projectileSpeed:0,explosionRadius:0,name:def.upgrade.name??UPGRADE_NAMES[id]});
+    if(id==='minigun_zm'){
+      Object.assign(def,{reloadTime:3,reloadEmptyTime:3});
+      // Never Pack-a-Punchable in BO1/BO2 (a power-up there): our own upgrade, with a faster spin-up (see setup).
+      def.upgrade??={name:'The Reaper',clipSize:750,maxAmmo:1500,startAmmo:1500,damage:900,minDamage:550,range:2200,headMultiplier:2.5,reloadTime:2.6,reloadEmptyTime:2.6};
+    }
     data.weapons[id]=def;
   }
   data.boxPool=[...new Set([...(data.boxPool??[]),'microwavegun_zm','minigun_zm'])];
@@ -125,4 +130,42 @@ export default async function setup(api){
     return result;
   };
   let hinted=false;host.on('update',()=>{if(!hinted&&pair[current()]){hinted=true;api.toast('Press B to combine / split the Zap Guns',4);}});
+
+  // ---- Death Machine: barrel wind-up and a reload -----------------------------------------
+  // The barrels must spin up (about 0.75 s) before it fires, so it isn't instant
+  // death on tap. Holding aim (right mouse) spins them too, to pre-spin before a
+  // push. Reloading lowers it off screen with belt and latch sounds.
+  const DM='minigun_zm',SPIN_UP=.75,SPIN_DOWN=1.1;
+  let spin=0,lmb=false,rmb=false,tried=0,loop=null,loopToken=0,barrel=null,bind=null,angle=0,lastReload=0;
+  addEventListener('mousedown',e=>{if(e.button===0)lmb=true;if(e.button===2)rmb=true;});
+  addEventListener('mouseup',e=>{if(e.button===0)lmb=false;if(e.button===2)rmb=false;});
+  addEventListener('blur',()=>{lmb=rmb=false;});
+  const fire=session.fire.bind(session);
+  session.fire=(...a)=>{if(session.weapon?.id===DM&&!session.attachmentMode){tried=session.time;if(spin<1)return false;}return fire(...a);};
+  const cue=k=>Object.keys(audio.manifest).find(x=>x.endsWith(k));
+  const SPIN={start:cue('dmachine/plr/wpn_minigun_start_plr')??cue('wpn_minigun_start_plr'),stop:cue('dmachine/plr/wpn_minigun_stop_plr')??cue('wpn_minigun_stop_plr'),loop:cue('wpn_minigun_loop_plr_l')};
+  const RELOAD=[[.15,'fly_gear_reload_plr_00'],[.42,'lmg/rpk/reload/fly_rpk_mag_out'],[.62,'minigun/foley/fly_minigun_up'],[1.35,'lmg/hk21/reload/fly_hk21_mag_in'],[1.8,'lmg/rpk/reload/fly_rpk_futz'],[2.25,'lmg/hk21/reload/fly_hk21_pull'],[2.5,'lmg/hk21/reload/fly_hk21_release'],[2.75,'fly_gear_reload_plr_01']].map(([t,k])=>[t,cue(k)]).filter(([,k])=>k);
+  function startLoop(){if(loop||!SPIN.loop||!audio.ctx||!audio.enabled)return;const token=++loopToken;loop='pending';audio.native(SPIN.loop,.35,true).then(src=>{if(token!==loopToken)src.stop();else loop=src;}).catch(()=>{loop=null;});}
+  function stopLoop(){loopToken++;if(loop&&loop!=='pending')try{loop.stop();}catch{}loop=null;}
+  host.on('reset',()=>{spin=0;stopLoop();});
+  host.on('update',dt=>{
+    if(!dt)return;
+    const on=session.weapon?.id===DM&&!session.weaponUnavailable;
+    if(!on){if(spin>0){spin=0;stopLoop();}barrel=null;return;}
+    const reloading=session.reloadLeft>0,held=!reloading&&!session.busy&&(lmb||rmb||session.time-tried<.1);
+    const before=spin;spin=held?Math.min(1,spin+dt/(session.weapon.upgraded?SPIN_UP*.6:SPIN_UP)):Math.max(0,spin-dt/SPIN_DOWN);
+    if(before===0&&spin>0&&SPIN.start)audio.play(SPIN.start,.6);
+    if(held&&spin>.5)startLoop();else if(loop){stopLoop();if(before>.5&&SPIN.stop)audio.play(SPIN.stop,.6);}
+    // barrels: spin the j_barrel bone on top of the animation
+    const root=api.view?.root;if(root&&(!barrel||!root.getObjectById(barrel.id))){barrel=root.getObjectByName('j_barrel');bind=barrel?.quaternion.clone();}
+    if(barrel){angle+=dt*spin*spin*40;barrel.quaternion.copy(bind).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),angle));}
+    // reload: lower it off screen and back, with sounds along the way
+    if(reloading){
+      const dur=session.reloadDuration||3,t=dur-session.reloadLeft;
+      if(session.reloadSerial!==lastReload){lastReload=session.reloadSerial;session.reloadCues=RELOAD.slice();}
+      while(session.reloadCues?.length&&session.reloadCues[0][0]<=t)audio.play(session.reloadCues.shift()[1],.65);
+      const down=Math.min(1,t/.4,(dur-t)/.45),e=down*down*(3-2*down),P=api.view.pivot;
+      P.position.y-=18*e;P.position.z+=4*e;P.rotation.x-=.6*e;
+    }
+  });
 }

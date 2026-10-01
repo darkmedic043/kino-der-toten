@@ -54,3 +54,7 @@ A full-screen, BO7-style Gunsmith opened from Main menu → Loadout (weapon deta
 - Profile saves keep camo: weapon-levels `save`, progression `write` (takes stored `camo`), and the menu's `save` (stored progress, menu's `on`).
 - Counts raised at the user's request (2026-10-01): Woodland 500 kills, Tiger 200 headshots, Digital 150 low, Urban 75 moving, Red Tiger 40 multi-kills; Gold still needs all five.
 - **Diamond** (`classMastery`, 2026-10-01): unlocks for every gun in a class once every gun in that class has Gold (all challenge camos done). Classes are shared in camo.js (`weaponClass`, `CLASSES`, `classOf`, `classGuns`; home.js imports them): AR 7, SMG 7, shotgun 4, LMG 2, sniper 2, pistol 4, launcher 4 (includes the crossbow and ballistic knife) in base game data. Mod-added guns count too (e.g. MP40 Drum, Golden Python, Moon weapons). No Diamond for Specials. `camoUnlocked`/`equippedCamo`/`countCamoKill` take `weapons`. The Gunsmith shows "Gold on every assault rifle · n / m", and the toast reads "Diamond camo unlocked for every assault rifle". Placeholder texture: faceted ice-blue and white triangles with sparkles, metallic.
+
+## Suppressor drop bonus (2026-10-01)
+
+Kills with a suppressed gun (bullets, not the underbarrel) get one extra 1% power-up roll after the game's own 3% (`PowerupDirector.tryDrop` wrapped in weapon-levels; re-wrapped when `session.drops` is recreated). Simulated: 3.0% → 4.1% of kills drop at random. The per-round cap (4), the shuffled deck and the score-threshold drops are untouched.

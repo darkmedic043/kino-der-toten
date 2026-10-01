@@ -1,0 +1,6 @@
+# Built locally from your own Black Ops install by .tools/build_wonder_weapons.py; not redistributable
+weapons.json
+models/
+textures/
+animations/
+audio/

@@ -6,7 +6,7 @@ import * as THREE from 'three';
 // the UI are in gunsmith.js; tuning in attachments.json.
 import { loadProfile, saveProfile, cloudReady } from '../../profile.js';
 import { setupFlamer } from './flamer.js';
-import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress } from './camo.js';
+import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress, camoTime, PAP_CAMO } from './camo.js';
 import { openGunsmith } from './gunsmith-view.js';
 import { previewDef } from './gunsmith.js';
 import { loadCatalog, applyAttachments, grantWeaponXp, weaponProgress, xpToNext, maxLevel, available, renderGunsmith, GUNSMITH_CSS } from './gunsmith.js';
@@ -35,13 +35,24 @@ export default async function setup(api){
 
   // Show the equipped attachment parts on the viewmodel. Viewmodels are cached
   // per weapon, so a part hidden on an earlier equip has to be shown again.
+  // Pack-a-Punched guns wear the BO1 PaP camo, unless the upgrade has its own model (Ray Gun, wonder weapons).
+  const papLook=w=>{const d=w?.upgraded&&data.weapons[w.id];return !!d&&(!d.upgrade?.model||d.upgrade.model===d.model);};
+  host.on('update',dt=>{camoTime.value+=dt||0;});
+  // Suppressed kills: one extra 1% power-up roll on top of the base 3% (about a third more
+  // random drops). The per-round cap and the drop deck are the game's own, so it can't flood.
+  let suppressedKill=0;
+  host.on('beforeEnemyDamage',e=>{if(e.enemy&&e.amount>=e.enemy.health&&e.cause==='bullet'&&!e.melee&&session.def?.suppressed&&!session.def.attachmentActive)suppressedKill=session.time;});
+  const wrapDrops=d=>{if(!d||d.suppressorWrapped)return;d.suppressorWrapped=true;const tryDrop=d.tryDrop.bind(d);
+    d.tryDrop=(s,...a)=>{const r=tryDrop(s,...a);if(r||session.time-suppressedKill>.05||s.random()>=.01)return r;
+      const was=d.pending;d.pending=true;const extra=tryDrop(s,...a);if(!extra)d.pending=was;return extra;};};
+  host.on('update',()=>wrapDrops(session.drops));
   const equip=view.equip.bind(view);
   view.equip=async(def,...rest)=>{
     const r=await equip(def,...rest);
     const hidden=new Set(def?.hideTags??[]);
     view.gun?.traverse(o=>{if(o.isBone&&o.scale.x<1e-3&&attachmentTags.has(o.name)&&!hidden.has(o.name))o.scale.setScalar(1);});
     flamer.placePilot();
-    applyCamo(view.gun,camoById(data.weapons[session.weapon?.id]?.camo));
+    applyCamo(view.gun,papLook(session.weapon)?PAP_CAMO:camoById(data.weapons[session.weapon?.id]?.camo));
     magFollow(def);
     return r;
   };
@@ -104,7 +115,7 @@ export default async function setup(api){
     const now=performance.now()/1000,multi=now-(lastKill.get(session.weapon.id)??-9)<1.5;lastKill.set(session.weapon.id,now);
     const cause=lastCause.get(enemy);
     const launcher=session.def?.projectileSpeed>0;
-    if(!(cause==='bullet'||cause==='projectile'||cause==='thunder'||cause==='flame'||(cause==='explosion'&&launcher)))return;
+    if(!(cause==='bullet'||cause==='projectile'||cause==='thunder'||cause==='flame'||cause==='freeze'||(cause==='explosion'&&launcher)))return;
     const id=session.weapon.id,def=data.weapons[id];if(!def)return;
     profile=loadProfile();
     // camo challenges (any gun)

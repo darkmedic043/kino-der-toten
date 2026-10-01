@@ -1,0 +1,5 @@
+{
+  "name": "Wonder weapons",
+  "description": "BO1 wonder weapons built from your own game install (.tools/build_wonder_weapons.py): Winter's Howl, from the Mystery Box.",
+  "script": "mod.js"
+}

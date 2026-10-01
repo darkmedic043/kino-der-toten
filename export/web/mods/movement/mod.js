@@ -283,4 +283,25 @@ export default function setup(api){
     camera.position.x+=Math.cos(camera.rotation.y)*side;camera.position.z-=Math.sin(camera.rotation.y)*side;
     camera.rotation.z=roll+Math.cos(phase)*.004*bob*bobBlend;
   });
+
+  // ---- Dive sounds: weight on the launch and the landing --------------------------------------
+  // Launch: cloth and gear rustle with an arm swing. Landing: a BO1 body fall (wood or dirt,
+  // from the gun-sounds build), gear rattle and a synthesized low thump under it.
+  {
+    const audio=api.audio,keys=()=>Object.keys(audio?.manifest??{});
+    const any=p=>{const k=keys().filter(x=>x.includes(p));return k[Math.floor(Math.random()*k.length)];};
+    const play=(p,v)=>{const k=any(p);if(k)audio.play(k,v);};
+    function thump(volume){
+      const c=audio?.ctx,out=audio?.master;if(!c||c.state!=='running'||!out||!audio.enabled)return;const t=c.currentTime;
+      const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(95,t);o.frequency.exponentialRampToValueAtTime(38,t+.18);
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(volume,t+.006);g.gain.exponentialRampToValueAtTime(.0001,t+.3);o.connect(g).connect(out);o.start(t);o.stop(t+.35);
+      const n=c.createBufferSource(),b=c.createBuffer(1,c.sampleRate*.12,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length);
+      const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=900;const ng=c.createGain();ng.gain.value=volume*.6;n.buffer=b;n.connect(lp).connect(ng).connect(out);n.start(t);
+    }
+    host.on('dive',()=>{play('fly/gear/cloth/',.8);play('fly/melee/melee_swing/',.55);setTimeout(()=>play('fly/gear/rattle/',.45),90);});
+    host.on('diveLand',()=>{
+      const wood=Math.random()<.65;play(wood?'fly/bodyfall/wood/':'fly/bodyfall/dirt/',1);
+      play('fly/gear/rattle/',.7);setTimeout(()=>play('fly/gear/weapon/',.55),60);thump(.9);
+    });
+  }
 }

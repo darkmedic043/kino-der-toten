@@ -1,44 +1,194 @@
 {
-  "xp": { "kill": 10, "headshot": 5, "melee": 10, "hellhound": 15, "roundSurvivedPerRound": 25 },
-  "levelCurve": { "base": 100, "exponent": 1.15 },
+  "xp": {
+    "kill": 10,
+    "headshot": 5,
+    "melee": 10,
+    "hellhound": 15,
+    "roundSurvivedPerRound": 25
+  },
+  "levelCurve": {
+    "base": 100,
+    "exponent": 1.15
+  },
   "secondaryLevel": 5,
   "secondBonusLevel": 25,
   "weapons": [
-    { "id": "m1911_zm", "level": 1 },
-    { "id": "rottweil72_zm", "level": 2 },
-    { "id": "m14_zm", "level": 3 },
-    { "id": "mp5k_zm", "level": 4 },
-    { "id": "mp40_zm", "level": 6 },
-    { "id": "ak74u_zm", "level": 8 },
-    { "id": "mp40_extended_zm", "level": 9 },
-    { "id": "spectre_zm", "level": 10 },
-    { "id": "m16_zm", "level": 12 },
-    { "id": "mpl_zm", "level": 13 },
-    { "id": "pm63_zm", "level": 14 },
-    { "id": "famas_zm", "level": 16 },
-    { "id": "ithaca_zm", "level": 18 },
-    { "id": "golden_python_zm", "level": 20 },
-    { "id": "galil_zm", "level": 21 },
-    { "id": "commando_zm", "level": 23 },
-    { "id": "aug_acog_zm", "level": 24 },
-    { "id": "spas_zm", "level": 26 },
-    { "id": "hs10_zm", "level": 28 },
-    { "id": "python_zm", "level": 30 },
-    { "id": "dragunov_zm", "level": 32 },
-    { "id": "rpk_zm", "level": 34 },
-    { "id": "hk21_zm", "level": 36 },
-    { "id": "china_lake_zm", "level": 38 },
-    { "id": "crossbow_explosive_zm", "level": 41 },
-    { "id": "microwavegundw_zm", "level": 43 },
-    { "id": "ray_gun_zm", "level": 45 },
-    { "id": "minigun_zm", "level": 47 },
-    { "id": "thundergun_zm", "level": 50 }
+    {
+      "id": "m1911_zm",
+      "level": 1
+    },
+    {
+      "id": "rottweil72_zm",
+      "level": 2
+    },
+    {
+      "id": "m14_zm",
+      "level": 3
+    },
+    {
+      "id": "mp5k_zm",
+      "level": 4
+    },
+    {
+      "id": "mp40_zm",
+      "level": 6
+    },
+    {
+      "id": "ak74u_zm",
+      "level": 8
+    },
+    {
+      "id": "mp40_extended_zm",
+      "level": 9
+    },
+    {
+      "id": "spectre_zm",
+      "level": 10
+    },
+    {
+      "id": "m16_zm",
+      "level": 12
+    },
+    {
+      "id": "mpl_zm",
+      "level": 13
+    },
+    {
+      "id": "pm63_zm",
+      "level": 14
+    },
+    {
+      "id": "famas_zm",
+      "level": 16
+    },
+    {
+      "id": "ithaca_zm",
+      "level": 18
+    },
+    {
+      "id": "golden_python_zm",
+      "level": 20
+    },
+    {
+      "id": "galil_zm",
+      "level": 21
+    },
+    {
+      "id": "commando_zm",
+      "level": 23
+    },
+    {
+      "id": "aug_acog_zm",
+      "level": 24
+    },
+    {
+      "id": "spas_zm",
+      "level": 26
+    },
+    {
+      "id": "hs10_zm",
+      "level": 28
+    },
+    {
+      "id": "python_zm",
+      "level": 30
+    },
+    {
+      "id": "dragunov_zm",
+      "level": 32
+    },
+    {
+      "id": "rpk_zm",
+      "level": 34
+    },
+    {
+      "id": "hk21_zm",
+      "level": 36
+    },
+    {
+      "id": "china_lake_zm",
+      "level": 38
+    },
+    {
+      "id": "crossbow_explosive_zm",
+      "level": 41
+    },
+    {
+      "id": "microwavegundw_zm",
+      "level": 43
+    },
+    {
+      "id": "ray_gun_zm",
+      "level": 45
+    },
+    {
+      "id": "minigun_zm",
+      "level": 47
+    },
+    {
+      "id": "freezegun_zm",
+      "level": 49
+    },
+    {
+      "id": "thundergun_zm",
+      "level": 50
+    }
   ],
   "bonuses": [
-    { "id": "deep_pockets", "name": "Deep Pockets", "description": "Start with +1000 points", "level": 3, "value": 1000 },
-    { "id": "iron_skin", "name": "Iron Skin", "description": "Take 20% less damage", "level": 7, "value": 0.2 },
-    { "id": "scavenger", "name": "Scavenger", "description": "Earn 20% more points", "level": 11, "value": 0.2 },
-    { "id": "hollow_points", "name": "Hollow Points", "description": "Bullets deal 25% more damage", "level": 15, "value": 0.25 },
-    { "id": "bandolier", "name": "Bandolier", "description": "Loadout weapons start with full reserve ammo", "level": 19 }
+    {
+      "id": "deep_pockets",
+      "name": "Deep Pockets",
+      "description": "Start with +1000 points",
+      "level": 3,
+      "value": 1000
+    },
+    {
+      "id": "iron_skin",
+      "name": "Iron Skin",
+      "description": "Take 20% less damage",
+      "level": 7,
+      "value": 0.2
+    },
+    {
+      "id": "scavenger",
+      "name": "Scavenger",
+      "description": "Earn 20% more points",
+      "level": 11,
+      "value": 0.2
+    },
+    {
+      "id": "hollow_points",
+      "name": "Hollow Points",
+      "description": "Bullets deal 25% more damage",
+      "level": 15,
+      "value": 0.25
+    },
+    {
+      "id": "bandolier",
+      "name": "Bandolier",
+      "description": "Loadout weapons start with full reserve ammo",
+      "level": 19
+    }
+  ],
+  "tacticalLevel": 6,
+  "tactical": [
+    {
+      "id": "zombie_cymbal_monkey",
+      "name": "Monkey Bombs",
+      "description": "Lures zombies to it, then explodes",
+      "level": 6
+    },
+    {
+      "id": "zombie_black_hole_bomb",
+      "name": "Gersh Device",
+      "description": "A black hole that drags zombies in; walk in to teleport",
+      "level": 22
+    },
+    {
+      "id": "zombie_quantum_bomb",
+      "name": "QED",
+      "description": "Something random happens, good or bad",
+      "level": 33
+    }
   ]
 }

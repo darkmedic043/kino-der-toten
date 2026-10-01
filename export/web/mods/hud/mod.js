@@ -2,10 +2,12 @@
 // flesh-impact or pain cues) and a red arc around the crosshair pointing at
 // whoever hit you. Works on Kino and custom maps.
 import * as THREE from 'three';
+import { setupEquipmentHud } from './equipment.js';
 
 export default function setup(api){
   const {host,audio,camera,enemies,player,session,mod}=api;
   const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('hud.css',mod.url).href;document.head.append(css);
+  setupEquipmentHud(api);
 
   // ---- Sounds (through the game's master gain, so volume settings apply) ----
   const out=()=>audio.enabled&&audio.ctx?.state==='running'&&audio.master?audio.ctx:null;

@@ -28,6 +28,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 - Discord secrets are in `~/.config/kino/discord.env`. Never print or commit them. Player data is in `~/.local/share/kino`.
 - git-lfs is at `~/.local/bin/git-lfs` (about 1 GB of assets). Host Node is 20 (`npm test` still passes); the container uses 24.
 - No system browser. Use Playwright's Chromium in `~/.cache/ms-playwright`. The upstream `.tools/test-*.mjs` scripts hard-code Windows paths.
+- BO1 (base game) is installed via Steam; OpenAssetTools is built at `~/.local/opt/OpenAssetTools`. `.tools/build_wonder_weapons.py` builds extra wonder weapons from it into `mods/wonder-weapons/` (git-ignored assets; see `weapons.md`).
 - Blender 5.2.2 (portable, `~/.local/bin/blender`) builds the terminal booth: `.tools/build-terminal-booth.py` (about 14 min per variant with the bake).
 
 ## Rules that bite if forgotten
@@ -46,4 +47,4 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 
 ## Upstream files with local edits (keep them small)
 
-`enemies.js` (co-op `targetFor` hook), `mystery-box.js` (display cache and warm-up), `animation.js` (weapon-part position tracks relative to bind), `player-controller.js` (step-up keeps speed), `settings.js` (graphics quality), `game.js`/`zombies.js` (`renderer` in the mod api and the `mods.renderWorld` hook), `game.js` (mod hooks, render camera, settings sensitivity/FOV, `installGameMenu`, box warm-up, cheat check on best round), `audio.js` (`def.baseId??def.id`), `.tools/serve.mjs` (`KINO_HOME`), `game.js`/`zombies.js` (hip/pellet spread read `def.hipSpread`/`def.pelletSpread`; sprint on any move direction, not while sliding/diving). Watch for these when merging upstream.
+`enemies.js` (co-op `targetFor` hook), `game.js`/`zombies.js` (`effect()` emits `effect` for the fx mod), `mystery-box.js` (display cache and warm-up), `animation.js` (weapon-part position tracks relative to bind), `player-controller.js` (step-up keeps speed), `settings.js` (graphics quality), `game.js`/`zombies.js` (`renderer` in the mod api and the `mods.renderWorld` hook), `game.js` (mod hooks, render camera, settings sensitivity/FOV, `installGameMenu`, box warm-up, cheat check on best round), `audio.js` (`def.baseId??def.id`), `.tools/serve.mjs` (`KINO_HOME`), `game.js`/`zombies.js` (hip/pellet spread read `def.hipSpread`/`def.pelletSpread`; sprint on any move direction, not while sliding/diving). Watch for these when merging upstream.

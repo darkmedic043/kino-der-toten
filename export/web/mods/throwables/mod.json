@@ -1,0 +1,5 @@
+{
+  "name": "Held throws",
+  "description": "Grenades and tacticals come up in your hand with their BO1 animations. Hold G or X to keep holding (the frag cooks: 3.5 s fuse, it goes off in your hand), release to throw.",
+  "script": "mod.js"
+}

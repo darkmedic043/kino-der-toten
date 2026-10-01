@@ -1,0 +1,5 @@
+{
+  "name": "Dismemberment",
+  "description": "BO1 gibbing with the real gib parts: arms and legs come off (legless zombies crawl), headshot kills can pop the head. Needs .tools/build_dismemberment.py run against your own BO1 install.",
+  "script": "mod.js"
+}

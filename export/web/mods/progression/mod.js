@@ -32,6 +32,8 @@ export default async function setup(api){
     session.inventory=[active.primary,active.secondary].filter(Boolean).map(id=>makeWeapon(data.weapons[id],full));
     session.slot=0;
     if(active.bonuses.has('deep_pockets'))session.points+=bonuses.deep_pockets.value;
+    // the loadout's tactical (Monkey Bombs, or the Gersh/QED from the moon-equipment mod)
+    if(l.tactical==='zombie_cymbal_monkey')session.giveMonkeys?.();else if(l.tactical)window.kino.tactical?.give?.(l.tactical,true);
   }
   host.on('reset',applyLoadout);
   applyLoadout();await api.equipView();

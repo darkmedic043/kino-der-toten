@@ -56,11 +56,15 @@ export function camoTexture(camo,base=import.meta.url){
 }
 
 // ---- applying -----------------------------------------------------------------------------
+// one clock for every Pack-a-Punch camo (advanced by the weapon-levels mod)
+export const camoTime={value:0};
+export const PAP_CAMO={id:'pap',name:'Pack-a-Punch',texture:'../../textures/camo_packapunch_c.png',glow:'../../textures/camo_packapunch_env.png',scale:2,mix:.88};
 const matCache=new Map();   // original material uuid + camo id → camo material
 function camoMaterial(orig,camo){
   const key=orig.uuid+'|'+camo.id;if(matCache.has(key))return matCache.get(key);
   const m=orig.clone();m.userData={...orig.userData,camoOf:orig,camo:camo.id};
   const uniforms={camoMap:{value:camoTexture(camo)},camoScale:{value:camo.scale??2.5},camoMix:{value:camo.mix??.92}};
+  if(camo.glow)Object.assign(uniforms,{camoGlow:{value:camoTexture({texture:camo.glow})},camoTime});
   if(camo.metal){m.metalness=Math.max(m.metalness??0,.85);m.roughness=Math.min(m.roughness??1,.35);}
   const prev=orig.onBeforeCompile;
   m.onBeforeCompile=(shader,renderer)=>{prev?.call(m,shader,renderer);Object.assign(shader.uniforms,uniforms);
@@ -70,8 +74,17 @@ function camoMaterial(orig,camo){
 { vec3 camoC=texture2D(camoMap,vMapUv*camoScale).rgb;
   float camoL=dot(diffuseColor.rgb,vec3(.299,.587,.114));
   diffuseColor.rgb=mix(diffuseColor.rgb,camoC*(.3+camoL*1.9),camoMix); }
+#endif`);
+    // Pack-a-Punch: the circuit traces glow, a colour wave running through them
+    if(camo.glow)shader.fragmentShader=shader.fragmentShader.replace('uniform sampler2D camoMap;','uniform sampler2D camoMap;uniform sampler2D camoGlow;uniform float camoTime;')
+      .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+#ifdef USE_MAP
+{ vec2 cu=vMapUv*camoScale;float trace=smoothstep(.36,.62,texture2D(camoGlow,cu).r);
+  float w=.5+.5*sin(camoTime*2.2-(cu.x+cu.y)*5.);
+  vec3 col=mix(vec3(.55,.18,1.),vec3(.1,.55,1.),.5+.5*sin(camoTime*.7+cu.y*2.));
+  totalEmissiveRadiance+=col*trace*(.6+2.2*w*w); }
 #endif`);};
-  m.customProgramCacheKey=()=>(orig.customProgramCacheKey?.()??'')+'|camo';
+  m.customProgramCacheKey=()=>(orig.customProgramCacheKey?.()??'')+(camo.glow?'|camo-pap':'|camo');
   m.needsUpdate=true;matCache.set(key,m);return m;
 }
 export const isBody=m=>!!m&&!SKIP.test(m.name??'')&&!!m.map;
@@ -88,7 +101,7 @@ export function applyCamo(root,camo){
 // ---- weapon classes (shared with the loadout picker) -----------------------------------------
 export function weaponClass(d){
   const b=d.baseId??d.id;
-  if(/ray_gun|thundergun|microwavegun/.test(b))return 'Wonder weapon';if(/minigun/.test(b))return 'Death Machine';if(d.projectileSpeed>0||d.explosionRadius)return 'Launcher';if(d.pellets>1)return 'Shotgun';
+  if(/ray_gun|thundergun|microwavegun|freezegun/.test(b))return 'Wonder weapon';if(/minigun/.test(b))return 'Death Machine';if(d.projectileSpeed>0||d.explosionRadius)return 'Launcher';if(d.pellets>1)return 'Shotgun';
   if(/l96|dragunov/.test(b))return 'Sniper rifle';if(/hk21|rpk/.test(b))return 'Light machine gun';if(/m1911|python|cz75/.test(b))return 'Pistol';
   if(/mp40|mp5k|mpl|pm63|ak74u|spectre|g11/.test(b))return 'Submachine gun';return 'Rifle';
 }

@@ -29,6 +29,7 @@ export default async function setup(api){
   // ---- the tactical slot ----------------------------------------------------------------
   const tac={id:null,count:0};
   window.kino.tactical=tac;
+  tac.give=(id,quiet)=>{if(!IDS.includes(id))return false;tac.id=id;tac.count=3;session.monkeys=0;session.monkeysOwned=false;if(!quiet)api.toast(`${data.equipment[id].name} · X to throw`,3);hud();return true;};
   const give=id=>{tac.id=id;tac.count=3;session.monkeys=0;session.monkeysOwned=false;api.toast(`${data.equipment[id].name} · X to throw`,3);hud();};
   // the box hands out its prize with session.giveWeapon; these aren't guns
   const giveWeapon=session.giveWeapon.bind(session);
@@ -40,16 +41,13 @@ export default async function setup(api){
   if(powerup)session.powerup=(type,...rest)=>{if(type==='full_ammo'&&tac.id)tac.count=3;hud();return powerup(type,...rest);};
   host.on('reset',()=>{tac.id=null;tac.count=0;hud();});
 
-  const el=document.createElement('div');el.id='tactical-hud';
-  el.style.cssText='position:fixed;right:40px;bottom:150px;font:600 10px/1 system-ui,sans-serif;letter-spacing:2px;color:#cfc3ff;pointer-events:none;z-index:3;text-align:right';
-  document.body.append(el);
-  function hud(){el.textContent=tac.id&&tac.count?`${data.equipment[tac.id].name.toUpperCase()} × ${tac.count}  ·  X`:'';}
-  hud();
+  // Shown by the hud mod's equipment cluster (window.kino.tactical).
+  function hud(){}
 
   // ---- throwing ----------------------------------------------------------------------------
   let throwing=false;
   addEventListener('keydown',e=>{
-    if(e.code!=='KeyX'||e.repeat||!tac.id)return;
+    if(e.code!=='KeyX'||e.repeat||!tac.id||window.kino.throwables)return;   // the throwables mod holds and throws when loaded
     e.stopImmediatePropagation();throwIt();
   },true);
   async function throwIt(){
@@ -65,6 +63,7 @@ export default async function setup(api){
     finally{throwing=false;await api.equipView?.();if(tac.count<=0){tac.id=null;hud();}}
   }
   const flying=[];
+  tac.launch=id=>launch(id);
   function launch(id){
     const mesh=world_[id].clone(true);mesh.position.copy(camera.position);scene.add(mesh);
     const dir=camera.getWorldDirection(new THREE.Vector3());
@@ -78,7 +77,11 @@ export default async function setup(api){
     g.fillStyle=r;g.fillRect(0,0,128,128);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;})();
   function blackHole(at){
     const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glow,transparent:true,depthWrite:false}));sp.position.copy(at).addScaledVector(up,30);sp.scale.setScalar(10);scene.add(sp);
-    const light=new THREE.PointLight(0x9a66ff,0,420,1.6);light.position.copy(sp.position);scene.add(light);
+    // Lit through the lighting mod's fixed pool: adding a THREE light to the scene
+    // recompiles every lit shader (a multi-second freeze), and again on removal.
+    const light={position:sp.position.clone(),color:new THREE.Color(0x9a66ff),intensity:4,radius:420,kind:'solid',dynamic:true,cap:2000,weight:0};
+    window.kino.lighting?.sources.push(light);
+    window.kino.fx?.gersh?.(sp.position,10);
     holes.push({sp,light,life:10,teleported:false});audio.play('teleport');
   }
   // somewhere else in the active part of the map: the inside spot of a barricade window
@@ -89,7 +92,7 @@ export default async function setup(api){
     api.announce?.('Gersh Device','TELEPORTED',2);
   }
   function qed(at){
-    effect(at,0x83c7ff);audio.play('teleport');
+    if(window.kino.fx?.qed)window.kino.fx.qed(at.clone().addScaledVector(up,20));else effect(at,0x83c7ff);audio.play('teleport');
     const say=t=>api.toast('QED: '+t,3),near=r=>enemies.list.filter(z=>z.root.position.distanceTo(at)<r);
     const roll=Math.floor(Math.random()*11);
     if(roll===0){window.kino.debug.collectPowerup?.('full_ammo');say('Max Ammo');}
@@ -126,7 +129,7 @@ export default async function setup(api){
     const feet=player.getFeetPosition();
     for(const h of [...holes]){
       h.life-=dt;const grow=Math.min(1,(10-h.life)/.6),fade=Math.min(1,h.life/.6),s=(90+Math.sin(h.life*9)*8)*grow*fade;
-      h.sp.scale.setScalar(Math.max(1,s));h.sp.material.rotation+=dt*3;h.light.intensity=12*grow*fade;
+      h.sp.scale.setScalar(Math.max(1,s));h.sp.material.rotation+=dt*3;h.light.weight=grow*fade;
       // zombies walk toward it (to the nearest walkable point; it may hang over a ledge),
       // and anything close is dragged through the air into it, shrinking, and destroyed
       h.walk??=world.closest?.(h.sp.position.clone(),{x:120,y:160,z:120})??h.sp.position.clone();
@@ -139,7 +142,7 @@ export default async function setup(api){
           if(d<28&&!host.remoteDamage){z.root.scale.setScalar(z.sucked);enemies.hurt(z,z.health,false,false,'gersh');z.root.visible=false;}
         }else{z.path=[z.root.position.clone(),h.walk.clone()];z.pathIndex=1;z.repath=1;}}
       if(!h.teleported&&feet.distanceTo(h.sp.position)<70){h.teleported=true;teleportPlayer();}
-      if(h.life<=0){for(const z of enemies.list)if(z.sucked!==undefined){z.root.scale.setScalar(z.sucked);delete z.sucked;}scene.remove(h.sp,h.light);h.sp.material.dispose();holes.splice(holes.indexOf(h),1);}
+      if(h.life<=0){for(const z of enemies.list)if(z.sucked!==undefined){z.root.scale.setScalar(z.sucked);delete z.sucked;}window.kino.fx?.implode?.(h.sp.position);scene.remove(h.sp);h.sp.material.dispose();{const l=window.kino.lighting?.sources,i=l?.indexOf(h.light)??-1;if(i>=0)l.splice(i,1);}holes.splice(holes.indexOf(h),1);}
     }
     for(const e of [...fx]){e.t+=dt;e.m.scale.setScalar(20+e.t*260);e.m.material.opacity=Math.max(0,.7-e.t*1.2);if(e.t>.6){scene.remove(e.m);e.m.geometry.dispose();e.m.material.dispose();fx.splice(fx.indexOf(e),1);}}
   });

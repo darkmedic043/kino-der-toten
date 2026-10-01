@@ -1,0 +1,5 @@
+{
+  "name": "Effects",
+  "description": "Real explosions (fireball, flash, embers, rising smoke, floor dust), blood mist and spray on hits, Ray Gun bursts and impact dust, using BO1's own effect textures instead of the little cubes.",
+  "script": "mod.js"
+}

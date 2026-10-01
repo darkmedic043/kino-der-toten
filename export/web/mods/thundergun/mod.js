@@ -53,9 +53,11 @@ export default async function setup(api){
     const forward=camera.getWorldDirection(new THREE.Vector3()),up=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion),right=new THREE.Vector3().crossVectors(forward,up);
     const origin=camera.position.clone().addScaledVector(forward,34).addScaledVector(up,-9).addScaledVector(right,7),aim=origin.clone().add(forward);
     const tint=upgraded?0xffd9a0:0xcfe6ff,group=new THREE.Group();group.position.copy(origin);group.lookAt(aim);
-    const coneMaterial=new THREE.MeshBasicMaterial(additive({color:tint,map:streaks.clone(),opacity:.55}));coneMaterial.map.needsUpdate=true;
+    const coneMaterial=new THREE.MeshBasicMaterial(additive({color:tint,map:streaks.clone(),opacity:window.kino?.fx?.thunder?.35:.55}));coneMaterial.map.needsUpdate=true;
     const cone=new THREE.Mesh(coneGeometry,coneMaterial);group.add(cone);
-    const rings=[0,.06,.12].map(delay=>{const m=new THREE.Mesh(ringGeometry,new THREE.MeshBasicMaterial(additive({color:tint,opacity:.6})));group.add(m);return {mesh:m,delay};});
+    // BO1's smoky shockwave rings and smoke cloud come from the fx mod; flat rings are the fallback
+    const fx=window.kino?.fx?.thunder;if(fx)fx(origin,forward,upgraded);
+    const rings=fx?[]:[0,.06,.12].map(delay=>{const m=new THREE.Mesh(ringGeometry,new THREE.MeshBasicMaterial(additive({color:tint,opacity:.6})));group.add(m);return {mesh:m,delay};});
     const flash=new THREE.Sprite(new THREE.SpriteMaterial({map:glow,color:tint,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));group.add(flash);
     const dustGeo=dustGeometry(),dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({color:0xd8d0c0,size:3,map:glow,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:.8}));group.add(dust);
     const motes=Array.from({length:48},()=>{const a=Math.random()*Math.PI*2,s=Math.sqrt(Math.random())*SPREAD;return {dir:new THREE.Vector3(Math.cos(a)*s,Math.sin(a)*s,1).normalize(),speed:900+Math.random()*900,d:Math.random()*20};});
@@ -67,7 +69,7 @@ export default async function setup(api){
   function updateBlasts(dt){
     for(const b of [...blasts]){
       b.t+=dt;const u=Math.min(1,b.t/LIFE),reach=RANGE*(1-(1-u)**3);
-      b.cone.scale.set(reach*SPREAD,reach*SPREAD,reach);b.cone.material.opacity=.55*(1-u)**1.5;b.cone.material.map.offset.y-=dt*3.5;
+      b.cone.scale.set(reach*SPREAD,reach*SPREAD,reach);b.cone.material.opacity=(window.kino?.fx?.thunder?.35:.55)*(1-u)**1.5;b.cone.material.map.offset.y-=dt*3.5;
       for(const r of b.rings){const v=THREE.MathUtils.clamp((b.t-r.delay)/(LIFE-r.delay),0,1),d=RANGE*(1-(1-v)**2.4);
         r.mesh.position.z=d;r.mesh.scale.setScalar(Math.max(.01,d*SPREAD*.92));r.mesh.material.opacity=v>0?.6*(1-v)**1.3:0;}
       b.flash.scale.setScalar(Math.max(0,70*(1-b.t/.14)));
@@ -106,7 +108,7 @@ export default async function setup(api){
       if(len>0){ray.origin.copy(p).y+=30;ray.direction.copy(step).normalize();if(world.raycast(ray,0,len+14)){f.v.x*=-.15;f.v.z*=-.15;}else p.add(step);}
       f.v.y-=1400*dt;p.y+=f.v.y*dt;
       if(f.v.y<0){ray.origin.copy(p).y+=40;ray.direction.copy(down);const ground=world.raycast(ray,0,45);
-        if(ground){p.y=ground.position.y;flying.splice(flying.indexOf(f),1);}}
+        if(ground){p.y=ground.position.y;flying.splice(flying.indexOf(f),1);window.kino?.fx?.knockback?.(p.clone());}}
       f.tilt=Math.min(1.35,f.tilt+f.spin*dt);
       f.z.root.quaternion.copy(q.setFromAxisAngle(f.axis,f.tilt)).multiply(f.base);
     }

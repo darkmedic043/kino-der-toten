@@ -67,7 +67,7 @@
         "tag_suppressor",
         "tag_silencer"
       ],
-      "desc": "Much quieter shots. \u221215% damage and range.",
+      "desc": "Much quieter shots. Kills are a little more likely to drop a power-up. \u221215% damage and range.",
       "stats": {
         "damageMul": 0.85,
         "rangeMul": 0.85,

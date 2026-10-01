@@ -233,7 +233,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null){
   const poolSize=q=>volume?(q>=3?8:q>=2?6:5):(q>=3?20:q>=2?14:q>=1?10:8);
   // With the baked volume, only these stay dynamic: spotlights (beams, shadows),
   // flickering fire, the box lamp. Everything else is in the bake.
-  const dynamicOnly=s=>!!s.spot||['fire','box','boxbeam','sun','off'].includes(s.kind);
+  const dynamicOnly=s=>!!s.spot||!!s.dynamic||['fire','box','boxbeam','sun','off'].includes(s.kind);
   const pool=[];
   function resizePool(n){
     while(pool.length<n){const l=new THREE.SpotLight(0xffffff,0,1,1.2,1,1.3);scene.add(l,l.target);pool.push(l);}

@@ -1,0 +1,5 @@
+{
+  "name": "Reload sounds",
+  "description": "Fixes silent reloads: maps reload notetracks whose sound alias doesn't match a file name (wpn_mp5_mag_out, l96a1 bolt_up, ...) to the shipped sound, borrowing a similar gun's sound when one has none.",
+  "script": "mod.js"
+}

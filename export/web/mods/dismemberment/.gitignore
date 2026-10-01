@@ -1,0 +1,5 @@
+# Built from the user's own BO1 install by .tools/build_dismemberment.py. Never commit.
+models/
+textures/
+animations/
+gibs.json
