@@ -99,12 +99,13 @@ export default async function setup(api){
   // Per-character "weapon": {"position":[x,y,z],"rotation":[x,y,z] (degrees)} adjusts the grip.
   let held=null,heldKey='';
   async function syncWeapon(){
-    const s=api.session,def=s.def,key=s.weaponUnavailable?'':(def.worldModel??'')+(s.weapon.upgraded?':u':'')+':'+(api.data.weapons[s.weapon.id]?.attachments??'');
+    const s=api.session,def=s.def,key=s.weaponUnavailable?'':(def.worldModel??'')+(s.weapon.upgraded?':u':'')+':'+(api.data.weapons[s.weapon.id]?.attachments??'')+':'+(api.data.weapons[s.weapon.id]?.camo??'');
     if(key===heldKey)return;heldKey=key;
     held?.removeFromParent();held=null;character.hold?.(false);
     if(!key)return;
     const pivot=await holdWeapon(character,entry,def,api.data.weapons[s.weapon.id]?.hideTags);
     if(key!==heldKey){pivot?.removeFromParent();return;}held=pivot;
+    window.kino.camo?.apply(pivot,api.data.weapons[s.weapon.id]?.camo);
   }
   host.on('update',()=>{if(third)syncWeapon();});
   host.on('reset',()=>{heldKey='x';});

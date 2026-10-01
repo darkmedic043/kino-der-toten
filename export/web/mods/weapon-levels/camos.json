@@ -1,0 +1,65 @@
+{
+  "_note": "Camos per gun, unlocked by challenges with that gun. To use a real camo, add \"texture\": \"camos/<file>.png\" (a tileable square image next to this file) and drop \"procedural\". scale = how many times the texture repeats across the gun's UVs; mix = how strongly it covers the base.",
+  "challenges": {
+    "kills": "Kills",
+    "headshots": "Headshot kills",
+    "low": "Kills while crouched or prone",
+    "moving": "Kills while sliding or diving",
+    "multi": "Multi-kills (2+ within 1.5 s)"
+  },
+  "camos": [
+    {
+      "id": "woodland",
+      "name": "Woodland",
+      "challenge": "kills",
+      "count": 500,
+      "procedural": "woodland"
+    },
+    {
+      "id": "tiger",
+      "name": "Tiger",
+      "challenge": "headshots",
+      "count": 200,
+      "procedural": "tiger"
+    },
+    {
+      "id": "digital",
+      "name": "Digital",
+      "challenge": "low",
+      "count": 150,
+      "procedural": "digital"
+    },
+    {
+      "id": "urban",
+      "name": "Urban",
+      "challenge": "moving",
+      "count": 75,
+      "procedural": "urban"
+    },
+    {
+      "id": "redtiger",
+      "name": "Red Tiger",
+      "challenge": "multi",
+      "count": 40,
+      "procedural": "redtiger"
+    },
+    {
+      "id": "gold",
+      "name": "Gold",
+      "mastery": true,
+      "procedural": "gold",
+      "metal": true,
+      "mix": 0.97,
+      "scale": 1
+    },
+    {
+      "id": "diamond",
+      "name": "Diamond",
+      "classMastery": true,
+      "procedural": "diamond",
+      "metal": true,
+      "mix": 0.95,
+      "scale": 1.5
+    }
+  ]
+}

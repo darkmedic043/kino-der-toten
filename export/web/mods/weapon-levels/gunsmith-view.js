@@ -6,6 +6,7 @@
 // previews it on the model. Used by the main menu and the in-game pause menu.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress } from './camo.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef } from './gunsmith.js';
 
 const SLOT_ORDER=['optic','muzzle','mag','under'];
@@ -51,6 +52,7 @@ const CSS=`
 #gsv .marker.sel i{color:#f3a33a}
 @keyframes gsvpulse{0%{box-shadow:0 0 0 0 #f3a33a99}100%{box-shadow:0 0 0 14px #f3a33a00}}
 #gsv .opts{position:absolute;right:40px;top:130px;width:330px;max-height:calc(100vh - 330px);overflow:auto}
+#gsv .opts:has(.camo-opt){max-height:calc(100vh - 200px)}
 #gsv .opt{display:block;width:100%;text-align:left;margin-bottom:6px;padding:10px 12px;border:1px solid #ffffff1c;background:#0b0d10e6;transition:border-color .12s}
 #gsv .opt:hover{border-color:#ffffff66}
 #gsv .opt.on{border-color:#f3a33a;background:#f3a33a1c}
@@ -59,6 +61,9 @@ const CSS=`
 #gsv .opt .pc{margin-top:5px;font-size:11px;display:flex;flex-wrap:wrap;gap:4px 10px}
 #gsv .pro{color:#7fd48a}#gsv .con{color:#e46b5a}#gsv .neu{color:#a09a8d}
 #gsv .stats{position:absolute;right:40px;bottom:70px;width:330px}
+#gsv .swatch{background-size:cover;background-position:center}
+#gsv .camo-row{display:flex;gap:10px;align-items:center}#gsv .camo-row .sw{width:44px;height:44px;flex:none;background-size:cover;border:1px solid #ffffff30}
+#gsv .camo-row>div{flex:1}#gsv .cbar{height:3px;background:#ffffff14;margin-top:6px}#gsv .cbar b{display:block;height:100%;background:#7fd48a}
 #gsv .stat{display:grid;grid-template-columns:86px 1fr 70px;align-items:center;gap:8px;margin:7px 0;font-size:10px;letter-spacing:2px;color:#a09a8d}
 #gsv .stat .tr{position:relative;height:5px;background:#ffffff14}
 #gsv .stat .tr i{position:absolute;top:0;bottom:0;left:0;background:#d8d2c4}
@@ -71,8 +76,9 @@ const CSS=`
 @media (max-width:1100px){#gsv .opts,#gsv .stats{width:260px}#gsv .slots{width:210px}}
 `;
 
-export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}){
+export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,label}){
   if(!document.getElementById('gsv-css')){const st=document.createElement('style');st.id='gsv-css';st.textContent=CSS;document.head.append(st);}
+  const cats=await loadCamos().catch(()=>null);
   const list=(ids??Object.keys(weapons)).filter(w=>weapons[w]&&available(cat,weapons[w],w).length);
   if(!list.includes(id))id=list[0];
   const single=list.length<2;
@@ -127,7 +133,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
         m.userData.emissive0??=m.emissive?.clone();}});
     // centre the gun and turn it so the barrel runs along +X
     pivot.add(gun);gun.position.set(0,0,0);gun.rotation.set(0,0,0);gun.updateMatrixWorld(true);
-    showParts(equipped(cat,def,id,profile));gun.updateMatrixWorld(true);
+    showParts(equipped(cat,def,id,profile));if(cats)applyCamo(gun,equippedCamo(cats,profile,id,weapons));gun.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(gun,true),size=box.getSize(new THREE.Vector3());box.getCenter(center);
     const flash=gun.getObjectByName('tag_flash')?.getWorldPosition(new THREE.Vector3());
     const long=size.x>=size.z?'x':'z';
@@ -168,7 +174,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
   }
   const home=new Map();
   const anchorOf=s=>{
-    if(!gun)return null;
+    if(!gun||!ANCHORS[s])return null;   // the camo row has no part to point at
     const part=partCentre(s);if(part)return part;
     if(home.has(s))return gun.localToWorld(home.get(s).clone());
     const own=available(cat,def,id).filter(a=>a.slot===s).flatMap(a=>a.tags);
@@ -182,21 +188,40 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
   function renderUI(){
     if(!def)return;
     const p=weaponProgress(profile,id),cap=maxLevel(cat,def,id),need=xpToNext(cat,p.level);
-    $('h1').textContent=def.name;
+    $('h1').textContent=def.name;$('.crumb').textContent='LOADOUT  ›  GUNSMITH'+(label?.(id)?'  ·  '+label(id):'');
     $('.lvl b').textContent=`WEAPON LEVEL ${p.level}${p.level>=cap?'  ·  MAX':''}`;
     $('.lvl i').style.width=(p.level>=cap?100:100*p.xp/need).toFixed(1)+'%';
     $('.lvl small').textContent=p.level>=cap?'Every attachment unlocked':`${p.xp} / ${need} XP to the next unlock · earn XP with kills using this gun`;
-    const slots=slotsOf();if(!slots.includes(slot))slot=null;
+    const slots=slotsOf();if(slot!=='camo'&&!slots.includes(slot))slot=null;
     const on=equipped(cat,def,id,profile);
     $('.slots').innerHTML='<h3>ATTACHMENTS</h3>'+SLOT_ORDER.map(s=>{
       const has=slots.includes(s),eq=on.find(a=>cat.attachments.find(x=>x.id===a)?.slot===s);
       return `<button class="slot${s===slot?' sel':''}${has?'':' na'}${eq?'':' empty'}" data-slot="${s}">
         <div class="ico">${cat.slots[s].slice(0,2).toUpperCase()}</div><div><span>${esc(cat.slots[s].toUpperCase())}</span><strong>${has?esc(eq?nameOf(eq):'None'):'—'}</strong></div></button>`;}).join('');
+    if(cats){const c=equippedCamo(cats,profile,id,weapons),done=camoUnlocked(cats,profile,id,weapons).size;
+      $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CAMO</h3><button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
+        <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.length} UNLOCKED</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
     $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc(cat.slots[s].toUpperCase())}</i></div>`).join('');
     renderOptions();renderStats();
+    $('.stats').style.display=slot==='camo'?'none':'';   // camos don't change stats; the list needs the room
+  }
+  const swatchCache=new Map();
+  function swatch(c){if(swatchCache.has(c.id))return swatchCache.get(c.id);const img=camoTexture(c).image;let url='';
+    try{if(img instanceof HTMLCanvasElement)url=img.toDataURL('image/jpeg',.7);else if(img?.src)url=img.src;}catch{}swatchCache.set(c.id,url);return url;}
+  function renderCamos(el){
+    const done=camoUnlocked(cats,profile,id,weapons),p=camoProgress(profile,id),on=equippedCamo(cats,profile,id,weapons)?.id,base=cats.camos.filter(c=>!c.mastery&&!c.classMastery),cp=classProgress(cats,profile,id,weapons);
+    el.innerHTML='<h3>CAMO</h3>'+`<button class="opt${on?'':' on'}" data-camo=""><strong>None</strong><div class="pc"><span class="neu">Factory finish</span></div></button>`+
+      cats.camos.filter(c=>!c.classMastery||cp).map(c=>{const locked=!done.has(c.id);
+        const have=c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:Math.min(c.count,p[c.challenge]??0),need=c.classMastery?cp.total:c.mastery?base.length:c.count;
+        const what=c.classMastery?`Gold on every ${cp.label.toLowerCase().replace(/s$/,'')}`:c.mastery?'Complete every challenge camo':cats.challenges[c.challenge];
+        return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'LOCKED':''}</span>
+          <div class="camo-row"><i class="sw" style="background-image:url(${swatch(c)})"></i><div><strong>${esc(c.name)}</strong>
+          <div class="pc"><span class="${locked?'neu':'pro'}">${esc(what)} · ${have} / ${need}</span></div>
+          <div class="cbar"><b style="width:${(100*have/need).toFixed(1)}%"></b></div></div></div></button>`;}).join('');
   }
   function renderOptions(){
     const el=$('.opts');
+    if(slot==='camo'&&cats){renderCamos(el);return;}
     if(!slot){el.innerHTML='<h3>SELECT A SLOT</h3><p class="neu">Pick an attachment slot on the left; the camera moves to that part of the gun.</p>';return;}
     const all=available(cat,def,id),unlocked=new Set(unlockedAttachments(cat,def,id,profile).map(a=>a.id)),on=new Set(equipped(cat,def,id,profile));
     const opts=all.filter(a=>a.slot===slot);
@@ -239,6 +264,9 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
   root.addEventListener('click',e=>{
     const s=e.target.closest('.slot');if(s&&!s.classList.contains('na')){slot=slot===s.dataset.slot?null:s.dataset.slot;hover=null;renderUI();aim();return;}
     const o=e.target.closest('.opt');
+    if(o&&o.dataset.camo!==undefined&&!o.classList.contains('locked')){
+      profile.camo??={};const ent=profile.camo[id]??={p:{}};if(o.dataset.camo)ent.on=o.dataset.camo;else delete ent.on;
+      hover=null;onChange?.(id);applyCamo(gun,equippedCamo(cats,profile,id,weapons));renderUI();return;}
     if(o&&!o.classList.contains('locked')){
       const att=o.dataset.att,cur=equipped(cat,def,id,profile),inSlot=cur.find(a=>cat.attachments.find(x=>x.id===a)?.slot===slot);
       if(att&&att!==inSlot)toggle(cat,def,id,profile,att);else if(!att&&inSlot)toggle(cat,def,id,profile,inSlot);
@@ -248,7 +276,10 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose}
     if(e.target.closest('.back'))close();
   });
   root.addEventListener('mouseover',e=>{
-    const o=e.target.closest('.opt');const h=o&&!o.classList.contains('locked')?o.dataset.att:null;
+    const o=e.target.closest('.opt');
+    if(slot==='camo'&&cats){const cid=o&&!o.classList.contains('locked')?o.dataset.camo:undefined;
+      applyCamo(gun,cid===undefined?equippedCamo(cats,profile,id,weapons):cats.camos.find(c=>c.id===cid)??null);return;}
+    const h=o&&!o.classList.contains('locked')?o.dataset.att:null;
     if(h!==hover){hover=h;
       const cur=equipped(cat,def,id,profile);
       if(hover!==null&&slot){const others=cur.filter(a=>cat.attachments.find(x=>x.id===a)?.slot!==slot);showParts(hover?[...others,hover]:others);}

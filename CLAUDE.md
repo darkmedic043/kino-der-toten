@@ -18,7 +18,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby) | `coop.md` |
 | Props: terminal booth (Blender generator, bake, placement mod) | `props.md` |
-| Weapon levels, attachments, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound | `weapon-levels.md` |
+| Weapon levels, attachments, camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound | `weapon-levels.md` |
 | Session history log | `history.md` |
 
 ## Setup essentials
@@ -39,7 +39,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 - Colliders pushed onto `world.dynamic` need `.box` unless `window:true`, or `world.setDoors` crashes.
 - Don't publish ripped or third-party game assets. The user supplies downloads: yt-dlp is blocked for me by the classifier, so give the user a command with the output template quoted (`-o "$HOME/Downloads/name.%(ext)s"`).
 - **Mod order matters** (`mods/mods.json`): `weapon-levels` must load before `progression`, or the starting gun is built before attachments apply.
-- **Profile saves**: `kino.mods.progression` is shared. Any code that saves a cached copy must take `weaponXp`/`attachments` from storage first, or it wipes weapon XP.
+- **Profile saves**: `kino.mods.progression` is shared. Any code that saves a cached copy must take `weaponXp`/`attachments`/`camo` from storage first, or it wipes weapon XP and camo progress.
 - **Attachments**: BO1 viewmodels carry every attachment, hidden by `hideTags`. Read availability from the *pristine* `hideTags` (applying attachments un-hides tags). Viewmodels are cached, so re-show bones on equip. Surfaces share one vertex buffer, so iterate a mesh's **index**, and treat a mesh as hidden when its dominant bone chain is scaled ~0. Some Pack-a-Punched guns show extra parts natively (the Commando's dual mag, the PM63's extended mag): compare against the stock base/upgrade `hideTags` before treating a part as attachment-added.
 - Materials are shared between copies of a model: per-mesh changes (hiding dot cards) must not be skipped by a per-material "already patched" check, and temporary material changes (Gunsmith pulse) must be restored.
 - When adding a system, add its detail to the matching `docs/fork/*.md` file and a one-line entry to `history.md`. Keep this file short.

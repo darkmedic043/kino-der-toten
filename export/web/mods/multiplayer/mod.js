@@ -81,11 +81,12 @@ export default async function setup(api){
   });
   async function setRemoteWeapon(r){
     const key=r.weapon;r.held?.removeFromParent();r.held=null;r.character?.hold?.(false);
-    const [id,up,att]=key.split(':'),def=data.weapons[id];if(!def||!r.character)return;
+    const [id,up,att,camo]=key.split(':'),def=data.weapons[id];if(!def||!r.character)return;
     // their attachments, not ours: rebuild the hidden parts from the list they sent
     const wl=window.kino.weaponLevels,hide=wl?wl.hideTagsFor(id,att?att.split('+'):[]):def.hideTags;
     const pivot=await holdWeapon(r.character,r.entry,up?{...def,...def.upgrade}:def,hide);
     if(r.weapon!==key){pivot?.removeFromParent();return;}r.held=pivot;
+    if(camo)window.kino.camo?.apply(pivot,camo);   // their camo
   }
   const flash=new THREE.PointLight(0xffc276,0,260,1.2);scene.add(flash);
   function remoteShot(r){
@@ -297,7 +298,7 @@ export default async function setup(api){
     if(poseTimer<=0){
       poseTimer=1/POSE_RATE;const f=player.getFeetPosition();
       // id, :u if upgraded, and the equipped attachments (weapon-levels) so teammates see them
-      const w=session.weaponUnavailable?'':session.weapon.id+':'+(session.weapon.upgraded?'u':'')+':'+(data.weapons[session.weapon.id]?.attachments??'');
+      const w=session.weaponUnavailable?'':session.weapon.id+':'+(session.weapon.upgraded?'u':'')+':'+(data.weapons[session.weapon.id]?.attachments??'')+':'+(data.weapons[session.weapon.id]?.camo??'');
       net.send('all',{t:'pose',p:[r1(f.x),r1(f.y),r1(f.z)],y:Math.round((camera.rotation.y+Math.PI)*1000)/1000,v:(player.state?.velocity?.toArray()??[0,0,0]).map(r1),
         g:player.state?.grounded??true,k:window.kino.movement?.state?.diving?'dive':window.kino.movement?.state?.prone?'prone':window.kino.movement?.state?.sliding?'slide':window.kino.movement?.state?.mantling?'mantle':'',d:me.down,x:me.dead||session.phase==='gameover',w,f:fireCount});
       const key=[...session.openDoors].sort().join()+'|'+session.power;

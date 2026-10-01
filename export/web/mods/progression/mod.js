@@ -20,7 +20,7 @@ export default async function setup(api){
   let saveTimer=0;
   // Weapon XP and attachments belong to the weapon-levels mod, which saves them
   // itself; take the stored ones so this (older) copy never overwrites them.
-  const write=()=>{const fresh=loadProfile();profile.weaponXp=fresh.weaponXp;profile.attachments=fresh.attachments;saveProfile(profile);};
+  const write=()=>{const fresh=loadProfile();profile.weaponXp=fresh.weaponXp;profile.attachments=fresh.attachments;profile.camo=fresh.camo;saveProfile(profile);};
   function save(now=false){clearTimeout(saveTimer);if(now)write();else saveTimer=setTimeout(write,1500);}
   addEventListener('pagehide',()=>save(true));
 

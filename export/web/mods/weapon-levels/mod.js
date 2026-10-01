@@ -6,6 +6,7 @@ import * as THREE from 'three';
 // the UI are in gunsmith.js; tuning in attachments.json.
 import { loadProfile, saveProfile, cloudReady } from '../../profile.js';
 import { setupFlamer } from './flamer.js';
+import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress } from './camo.js';
 import { openGunsmith } from './gunsmith-view.js';
 import { previewDef } from './gunsmith.js';
 import { loadCatalog, applyAttachments, grantWeaponXp, weaponProgress, xpToNext, maxLevel, available, renderGunsmith, GUNSMITH_CSS } from './gunsmith.js';
@@ -14,6 +15,7 @@ export default async function setup(api){
   const {data,session,host,view,audio}=api;
   await cloudReady;
   const cat=await loadCatalog(import.meta.url);
+  const cats=await loadCamos(import.meta.url);
   const style=document.createElement('style');style.textContent=GUNSMITH_CSS+`
     #weapon-level{position:fixed;right:40px;bottom:112px;display:flex;align-items:center;gap:8px;font:600 9px/1 system-ui,sans-serif;letter-spacing:2px;color:#d6a94a;pointer-events:none;z-index:3}
     #weapon-level i{display:block;width:70px;height:3px;background:#ffffff1f}#weapon-level i b{display:block;height:100%;background:#d6a94a}
@@ -21,12 +23,14 @@ export default async function setup(api){
   document.head.append(style);
 
   let profile=loadProfile();
-  const save=()=>{const fresh=loadProfile();fresh.weaponXp=profile.weaponXp;fresh.attachments=profile.attachments;saveProfile(fresh);};
+  const save=()=>{const fresh=loadProfile();fresh.weaponXp=profile.weaponXp;fresh.attachments=profile.attachments;fresh.camo=profile.camo;saveProfile(fresh);};
   // Every tag some weapon hides by default: the attachment parts.
   const attachmentTags=new Set(Object.values(data.weapons).flatMap(d=>d?.hideTags??[]));
   // What each gun hides out of the box (base and Pack-a-Punched), before any attachment
   const stockHidden=new Map(Object.entries(data.weapons).map(([id,d])=>[id,{base:new Set(d?.hideTags??[]),up:new Set(d?.upgrade?.hideTags??[])}]));
-  const apply=()=>applyAttachments(cat,data.weapons,profile);
+  // attachments, plus each gun's equipped camo id on its definition (read by third person, co-op and the box)
+  const apply=()=>{applyAttachments(cat,data.weapons,profile);for(const [id,d] of Object.entries(data.weapons))if(d&&typeof d==='object')d.camo=equippedCamo(cats,profile,id,data.weapons)?.id;};
+  const camoById=id=>cats.camos.find(c=>c.id===id)??null;
   apply();
 
   // Show the equipped attachment parts on the viewmodel. Viewmodels are cached
@@ -37,6 +41,7 @@ export default async function setup(api){
     const hidden=new Set(def?.hideTags??[]);
     view.gun?.traverse(o=>{if(o.isBone&&o.scale.x<1e-3&&attachmentTags.has(o.name)&&!hidden.has(o.name))o.scale.setScalar(1);});
     flamer.placePilot();
+    applyCamo(view.gun,camoById(data.weapons[session.weapon?.id]?.camo));
     magFollow(def);
     return r;
   };
@@ -93,13 +98,21 @@ export default async function setup(api){
   const cheating=()=>!!window.kino.cheats?.used;
   const lastCause=new WeakMap();
   host.on('beforeEnemyDamage',e=>{if(e.enemy)lastCause.set(e.enemy,e.cause);});
+  const lastKill=new Map();
   host.on('kill',({enemy,head,melee,remote})=>{
     if(remote||melee||cheating()||!session.weapon)return;
+    const now=performance.now()/1000,multi=now-(lastKill.get(session.weapon.id)??-9)<1.5;lastKill.set(session.weapon.id,now);
     const cause=lastCause.get(enemy);
     const launcher=session.def?.projectileSpeed>0;
     if(!(cause==='bullet'||cause==='projectile'||cause==='thunder'||cause==='flame'||(cause==='explosion'&&launcher)))return;
-    const id=session.weapon.id,def=data.weapons[id];if(!def||!available(cat,def,id).length)return;
+    const id=session.weapon.id,def=data.weapons[id];if(!def)return;
     profile=loadProfile();
+    // camo challenges (any gun)
+    const mv=window.kino.movement?.state;
+    const camos=countCamoKill(cats,profile,id,{head,low:!!(mv?.prone||api.player?.crouched),moving:!!(mv?.sliding||mv?.diving),multi},data.weapons);
+    if(camos.length){const dia=camos.find(c=>c.classMastery),cls=window.kino.camoClass?.(id);
+      api.toast(dia?`Diamond camo unlocked for every ${cls??'gun in this class'} · equip it in the Gunsmith`:`${def.name} · ${camos.map(c=>c.name).join(', ')} camo unlocked · equip it in the Gunsmith`,6);}
+    if(!available(cat,def,id).length){save();return;}
     const news=grantWeaponXp(cat,def,id,profile,cat.xp.kill+(head?cat.xp.headshot:0));
     save();
     if(news.length){
@@ -142,7 +155,12 @@ export default async function setup(api){
   addEventListener('focus',()=>{if(!api.getState().active){profile=loadProfile();apply();renderPanel();renderHud();}});
   renderPanel();
 
-  window.kino.weaponLevels={cat,get profile(){return profile;},apply,
+  // the box's floating display copies wear the gun's camo too
+  const display=api.mysteryBox?.display?.bind(api.mysteryBox);
+  if(display)api.mysteryBox.display=id=>{const g=display(id);if(g)applyCamo(g.userData.model??g,camoById(data.weapons[id]?.camo));return g;};
+  window.kino.camo={cats,byId:camoById,apply:(root,id)=>applyCamo(root,camoById(id))};
+  window.kino.camoClass=id=>classProgress(cats,profile,id,data.weapons)?.label?.toLowerCase().replace(/^smgs$/,'SMG').replace(/^lmgs$/,'LMG').replace(/s$/,'');
+  window.kino.weaponLevels={cat,cats,get profile(){return profile;},apply,
     hideTagsFor:(id,ids)=>{const d=data.weapons[id];return d?previewDef(cat,d,id,ids).hideTags??[]:[];},
     grant:(id,amount)=>{profile=loadProfile();const n=grantWeaponXp(cat,data.weapons[id],id,profile,amount);save();apply();renderHud();renderPanel();return n.map(a=>a.id);}};
 }
