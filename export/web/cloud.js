@@ -2,7 +2,7 @@
 // when signed in it is mirrored to the server (/api/profile), newest copy wins.
 // Tracked keys are caught at localStorage.setItem, so game code needs no changes.
 
-const TRACKED=/^kino\.(mods\.progression|settings|best(\..+)?)$/;
+const TRACKED=/^kino\.(mods\.progression|mods\.classes|mods\.career|settings|best(\..+)?)$/;
 const STAMP='kino.cloud.updatedAt';
 const store=(()=>{try{return localStorage;}catch{return null;}})();
 const rawSet=store?Storage.prototype.setItem.bind(store):()=>{};

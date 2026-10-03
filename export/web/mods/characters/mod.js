@@ -8,8 +8,10 @@ import { loadProfile, cloudReady } from '../../profile.js';
 
 async function selected(){
   await cloudReady;
-  const list=await loadCharacterRegistry(),id=loadProfile().character;
-  return list.find(c=>c.id===id)??list[0]??{id:'mannequin',type:'mannequin'};
+  const list=await loadCharacterRegistry(),profile=loadProfile(),id=profile.character;
+  const entry=list.find(c=>c.id===id)??list[0]??{id:'mannequin',type:'mannequin'};
+  entry.choice=profile.variants?.[entry.id];   // customisation picks (Armory > Operator)
+  return entry;
 }
 
 // First-person arms follow the character (an arm set plus colours; see characters.js).
@@ -20,6 +22,7 @@ export async function prepare(data){
 }
 
 export default async function setup(api){
+  (window.kino??={}).view=api.view;   // debug: the first-person viewmodel
   const {host,scene,camera,player}=api;
   const entry=await selected();await tintArms(entry);
 
@@ -37,8 +40,11 @@ export default async function setup(api){
   let hurtTimer=0;host.on('beforeDamage',()=>{portrait.classList.add('hurt');clearTimeout(hurtTimer);hurtTimer=setTimeout(()=>portrait.classList.remove('hurt'),350);});
   const character=await createCharacter(entry,api.data);
   character.root.visible=false;scene.add(character.root);
+  // Spring chains (coat, tail) rest on the level itself: stairs, ledges, slopes.
+  {const down=new THREE.Vector3(0,-1,0),from=new THREE.Vector3(),ray=new THREE.Ray(from,down);
+    for(const sp of character.springs??[])sp.ground=(x,y,z)=>{from.set(x,y+40,z);const h=api.world?.raycast(ray,0,400);return h?from.y-h.distance:null;};}window.kino.character=character;   // debug handle
   const view=new ThirdPersonCamera(camera);
-  let third=false,last=null,lastYaw=null;
+  let third=false,last=null,lastYaw=null,airT=0;
   const apply=()=>{host.camera=third?view.update(api.world):null;host.hideViewmodel=third;character.root.visible=third;};
   addEventListener('keydown',e=>{if(e.code==='KeyT'&&!e.repeat&&api.getState().active){third=!third;apply();api.toast(third?'Third person · T to switch back':'First person',2);}});
   host.on('update',dt=>{
@@ -47,9 +53,13 @@ export default async function setup(api){
     character.root.position.copy(feet);character.root.rotation.y=yaw;
     // Velocity in the character's frame (+Z forward, +X its left) for strafing/backpedal poses.
     const speed=Math.hypot(vel.x,vel.z),forward=vel.x*Math.sin(yaw)+vel.z*Math.cos(yaw),side=vel.x*Math.cos(yaw)-vel.z*Math.sin(yaw);
-    const mv=window.kino.movement?.state,stance=mv?.diving?'dive':mv?.prone?'prone':mv?.sliding?'slide':mv?.mantling?'mantle':'';
+    const mv=window.kino.movement?.state,stance=mv?.diving?'dive':mv?.prone?'prone':mv?.sliding?'slide':mv?.mantling?'mantle':player.crouched?'crouch':'';
     if(character.pose)driveActions(dt,speed,yaw);
-    character.update(dt,stance==='prone'?speed*.5:stance==='slide'?0:speed,{forward,side,vy:vel.y,grounded:player.state?.grounded??player.isGrounded??true,turn});
+    // Stairs and small bumps leave the ground for a few frames: only a jump or a real drop
+    // (over a quarter second in the air) counts as airborne for the jump/fall/land poses.
+    const onGround=player.state?.grounded??player.isGrounded??true;airT=onGround?0:airT+dt;
+    const airborne=!onGround&&(mv?.jumped||airT>.25);
+    character.update(dt,stance==='prone'?speed*.5:stance==='slide'?0:speed,{forward,side,vy:airborne?vel.y:0,grounded:!airborne,turn,pitch:camera.rotation.x});
     applyStance(character,stance,dt);
     if(third)view.update(api.world);
   });
@@ -90,7 +100,7 @@ export default async function setup(api){
   // T5 viewmodel rig (see fp-arms.js). Perk drinks use their own viewmodels.
   if(entry.fpArms&&entry.type==='gltf'&&api.viewScene){
     const fp=new FirstPersonArms(api.viewScene,await loadCharacterGltf(entry),entry);
-    const active=()=>{const d=api.perkDrink;return d?.current?d.views[d.current]:api.view;};
+    const active=()=>{const k=window.kino.knuckles;if(k?.active)return k.view;const d=api.perkDrink;return d?.current?d.views[d.current]:api.view;};
     host.on('update',()=>fp.sync(active(),!third));
     fp.sync(active(),true);
   }

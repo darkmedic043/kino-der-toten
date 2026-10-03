@@ -9,8 +9,11 @@ import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
 import { weaponProgress, maxLevel } from './mods/weapon-levels/gunsmith.js';
 import { getAccount, onAccountChange, renderSignInButton, signOut } from './cloud.js';
-import { loadCharacterRegistry, createCharacter, armsUrl, tintArms, loadCharacterGltf } from './characters.js';
+import { renderCareer } from './career-view.js';
+import { loadCharacterRegistry, createCharacter, armsUrl, tintArms, loadCharacterGltf, applyVariants, renderPortrait } from './characters.js';
 import { FirstPersonArms } from './fp-arms.js';
+import { loadClasses, loadClassProfile, saveClassProfile } from './mods/classes/classes.js';
+import { renderClasses, CLASS_CSS } from './mods/classes/tree-view.js';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -46,14 +49,23 @@ const save=()=>{const stored=loadProfile();profile.weaponXp=stored.weaponXp;
 addEventListener('focus',()=>{profile=loadProfile();renderProfile();renderLoadout();});
 
 // ---- Tabs -------------------------------------------------------------------
-const tabs=[...document.querySelectorAll('#tabs button')];
+const tabs=[...document.querySelectorAll('#tabs button')],panes=[...document.querySelectorAll('#armory-nav button')];
+// Armory holds Loadout, Classes and Operator as panes. Old links (#loadout, #classes,
+// #character) open the matching pane.
+const PANES={loadout:'loadout',classes:'classes',operator:'operator',character:'operator'};
+let pane=PANES[location.hash.slice(1)]??'loadout';
 function showTab(name){
+  if(PANES[name]){pane=PANES[name];name='armory';}
   for(const b of tabs)b.classList.toggle('active',b.dataset.tab===name);
   for(const s of document.querySelectorAll('.tab'))s.classList.toggle('active',s.id==='tab-'+name);
-  if(location.hash!=='#'+name)history.replaceState(null,'','#'+name);
-  stage.active=name==='character';if(stage.active)stage.start();
+  for(const b of panes)b.classList.toggle('active',b.dataset.pane===pane);
+  for(const s of document.querySelectorAll('.pane'))s.classList.toggle('active',s.id==='pane-'+pane);
+  const hash=name==='armory'?pane:name;if(location.hash!=='#'+hash)history.replaceState(null,'','#'+hash);
+  stage.active=name==='armory'&&pane==='operator';if(stage.active)stage.start();
+  if(name==='career')renderCareer($('career-root'),{mapList,weapons:baseData?.weapons??{}});
 }
 for(const b of tabs)b.addEventListener('click',()=>showTab(b.dataset.tab));
+for(const b of panes)b.addEventListener('click',()=>showTab(b.dataset.pane));
 renderSettings($('settings-panel'));
 
 // ---- Profile card -------------------------------------------------------------
@@ -275,7 +287,7 @@ function renderDetail(id,isWeapon,unlocked,level){
   if(gunsmith&&id===inSlot)renderGunsmith(el.querySelector('.gunsmith-slot'),{cat:gunsmith,def:d,id,profile,onOpen:()=>openLoadoutGunsmith(id)});
 }
 
-// ---- Character ---------------------------------------------------------------------
+// ---- Operator (character) --------------------------------------------------------------
 const stage={active:false,running:false,speed:0,character:null,loading:0,yaw:.5,mode:'body',fpTime:0,view:null,viewToken:0,
   start(){if(this.running)return;this.running=true;this.last=performance.now();requestAnimationFrame(t=>this.frame(t));},
   frame(now){
@@ -324,7 +336,33 @@ for(const b of document.querySelectorAll('#char-view button'))b.addEventListener
   if(stage.mode==='fp'&&currentEntry)showArms(currentEntry);
 });
 for(const b of document.querySelectorAll('#char-anim button'))b.addEventListener('click',()=>{stage.speed=+b.dataset.speed;for(const x of document.querySelectorAll('#char-anim button'))x.classList.toggle('active',x===b);});
+// Customisation: the operator's variant groups (characters.json `variants`) as chips; picks are
+// saved per operator in profile.variants and shown live on the preview.
+function renderVariants(entry){
+  const box=$('char-variants'),groups=entry.variants??[];box.hidden=!groups.length;box.innerHTML='';if(!groups.length)return;
+  const choice=entry.choice??{};
+  box.innerHTML='<span class="eyebrow">CUSTOMISE</span>';
+  for(const g of groups){
+    const current=g.options.find(o=>o.id===choice[g.id])??g.options.find(o=>o.default)??g.options[0];
+    const row=document.createElement('div');row.className='variant-row';
+    row.innerHTML=`<span class="variant-label">${esc(g.label)}${g.note?`<small>${esc(g.note)}</small>`:''}</span><div class="chips"></div>`;
+    for(const o of g.options){
+      const b=document.createElement('button');b.textContent=o.label;b.classList.toggle('active',o===current);
+      b.addEventListener('click',()=>{
+        profile.variants={...profile.variants,[entry.id]:{...profile.variants?.[entry.id],[g.id]:o.id}};save();
+        entry.choice=profile.variants[entry.id];renderVariants(entry);
+        // Bone poses (a tail, an eye) change the rest pose the rig and spring bones captured: rebuild.
+        if(g.options.some(x=>x.bones))showCharacter(entry);else if(stage.character)applyVariants(stage.character.root,entry);
+        portraits.delete(entry.id);renderCharacters();
+        if(stage.mode==='fp')showArms(entry);
+      });
+      row.querySelector('.chips').append(b);
+    }
+    box.append(row);
+  }
+}
 async function showCharacter(entry){
+  entry.choice=profile.variants?.[entry.id];renderVariants(entry);
   currentEntry=entry;if(stage.mode==='fp')showArms(entry);
   const token=++stage.loading;$('char-name').textContent=entry.name;$('char-desc').textContent=entry.description??'';
   $('char-credit').innerHTML=entry.credit?'Model: '+creditHtml(entry.credit):'';
@@ -333,16 +371,40 @@ async function showCharacter(entry){
     stage.character?.dispose();stage.character=c;stage.scene.add(c.root);
   }catch(error){console.error(error);$('char-desc').textContent='Could not load this model: '+error.message;}
 }
+// Operators and skins (Black Ops 7 style): the operators on the left, the selected operator's
+// skins in a strip under the stage. A skin is its own characters.json entry with
+// "skinOf": "<operator id>" and "skinName"; the operator entry is its default skin. The
+// equipped skin is profile.character; profile.skins remembers each operator's last skin.
+const portraits=new Map();let portraitQueue=Promise.resolve();
+function portrait(entry,img){
+  if(!portraits.has(entry.id))portraits.set(entry.id,portraitQueue=portraitQueue.then(()=>{entry.choice??=profile.variants?.[entry.id];return renderPortrait(entry,baseData,192);}).catch(()=>null));
+  portraits.get(entry.id).then(url=>{if(url&&img.isConnected)img.src=url;});
+}
+const operatorOf=c=>characters.find(o=>o.id===c?.skinOf)??c;
+const skinsOf=op=>[op,...characters.filter(c=>c.skinOf===op.id)];
+function equip(c){
+  const op=operatorOf(c);profile.character=c.id;profile.skins={...profile.skins,[op.id]:c.id};save();renderCharacters();showCharacter(c);
+  toast(op.name+(c.skinOf||skinsOf(op).length>1?' · '+(c.skinName??'Default'):'')+' equipped');
+}
+function card(c,label,sub,active,onClick,cls){
+  const el=document.createElement('button');el.className=cls+(active?' active':'');
+  el.innerHTML=`<span class="thumb" style="--a:${esc(c.accent??'#3a3a36')};--b:${esc(c.color??'#12110f')}"><img alt=""></span><span class="label"><strong>${esc(label)}</strong><small>${sub}</small></span>`;
+  el.addEventListener('click',onClick);portrait(c,el.querySelector('img'));return el;
+}
 function renderCharacters(){
   const list=$('char-list');list.innerHTML='';
-  const current=characters.find(c=>c.id===profile.character)??characters[0];
-  for(const c of characters){
-    const el=document.createElement('button');el.className='char-card'+(c===current?' active':'');
-    el.innerHTML=`<span class="swatch" style="--a:${esc(c.accent??'#3a3a36')};--b:${esc(c.color??'#12110f')}"></span><span><strong>${esc(c.name)}</strong><small>${c.type==='mannequin'?'PLACEHOLDER':c.type==='t5'?'GAME MODEL':'CUSTOM MODEL'}${c.credit?' · BY '+esc(c.credit.author).toUpperCase():''}</small></span>`;
-    el.addEventListener('click',()=>{profile.character=c.id;save();renderCharacters();showCharacter(c);toast(c.name+' selected');});
-    list.append(el);
+  const current=characters.find(c=>c.id===profile.character)??characters[0],currentOp=operatorOf(current);
+  for(const op of characters.filter(c=>!c.skinOf)){
+    const skins=skinsOf(op),shown=skins.find(s=>s.id===(op===currentOp?current.id:profile.skins?.[op.id]))??op;
+    const sub=`${op.type==='mannequin'?'PLACEHOLDER':op.type==='t5'?'GAME MODEL':'CUSTOM MODEL'}${skins.length>1?' · '+skins.length+' SKINS':''}`;
+    list.append(card(shown,op.name,sub,op===currentOp,()=>{if(op!==currentOp)equip(shown);},'char-card'));
   }
   if(!characters.length)list.innerHTML='<p class="muted small">No characters registered (mods/characters/characters.json).</p>';
+  const row=$('char-skins');row.innerHTML='';
+  if(currentOp){
+    const skins=skinsOf(currentOp);$('skin-count').textContent=skins.length+(skins.length===1?' skin':' skins');
+    for(const s of skins)row.append(card(s,s.skinName??'Default',s===current?'EQUIPPED':s===currentOp?'DEFAULT':s.credit?'BY '+esc(s.credit.author).toUpperCase():'&nbsp;',s===current,()=>{if(s!==current)equip(s);},'skin-card'));
+  }
   if(current&&!stage.character)showCharacter(current);
 }
 
@@ -374,7 +436,7 @@ $('char-file').addEventListener('change',async e=>{
 const link=(text,url)=>url?`<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`:esc(text);
 const creditHtml=c=>`"${link(c.title,c.source)}" by ${link(c.author,c.authorUrl)}, licensed under ${link(c.license,c.licenseUrl)}`;
 function renderCredits(){
-  const items=[...characters.filter(c=>c.credit).map(c=>({what:'Character · '+c.name,credit:c.credit})),...mapList.filter(m=>m.credit).map(m=>({what:'Map · '+m.title,credit:m.credit}))];
+  const items=[...characters.filter(c=>c.credit).map(c=>({what:'Operator · '+c.name,credit:c.credit})),...mapList.filter(m=>m.credit).map(m=>({what:'Map · '+m.title,credit:m.credit}))];
   $('credit-list').innerHTML=items.map(i=>`<li><strong>${esc(i.what)}</strong><span>This work is based on ${creditHtml(i.credit)}.</span></li>`).join('')+
     '<li><strong>Kino der Toten browser Zombies</strong><span>Original project by '+link('Luckey Faraday','https://github.com/luckeyfaraday/kino-der-toten')+' (code under the MIT licence).</span></li>'+
     '<li><strong>Call of Duty: Black Ops assets</strong><span>Maps, models, sounds and animations remain the property of Activision / Treyarch. Unofficial, non-commercial fan project.</span></li>';
@@ -388,5 +450,13 @@ function renderMods(){
 }
 
 renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();renderCredits();
-showTab(['play','loadout','character','mods','settings'].includes(location.hash.slice(1))?location.hash.slice(1):'play');
+showTab(['play','armory','career','mods','settings',...Object.keys(PANES)].includes(location.hash.slice(1))?location.hash.slice(1):'play');
 window.menu={profile:()=>profile,thumb,showTab,stage};
+
+// ---- Classes (mods/classes): skill trees; progress in its own storage key ------------------
+try{
+  const classCfg=await loadClasses(new URL('mods/classes/',document.baseURI));
+  const style=document.createElement('style');style.textContent=CLASS_CSS;document.head.append(style);
+  const view=renderClasses($('classes-root'),classCfg,{getState:()=>loadClassProfile(classCfg),setState:s=>saveClassProfile(s)});
+  addEventListener('focus',()=>view.redraw());
+}catch(error){console.warn('[classes]',error);$('classes-root').textContent='Classes unavailable: '+error.message;}

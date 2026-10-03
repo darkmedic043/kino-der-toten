@@ -26,7 +26,12 @@
     "hud",
     "dismemberment",
     "zombie-sounds",
+    "classes",
     "multiplayer",
-    "hd-weapons"
+    "hd-weapons",
+    "controller",
+    "event-sounds",
+    "pap-knuckles",
+    "career"
   ]
 }

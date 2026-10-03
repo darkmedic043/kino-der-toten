@@ -1,0 +1,5 @@
+{
+  "name": "Event sounds",
+  "description": "Black Ops' own sounds for the teleporter (linking, warm-up, teleport), hellhound spawns, grenade bounces and explosions, and the Gersh / QED vortex.",
+  "script": "mod.js"
+}

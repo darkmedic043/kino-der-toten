@@ -15,8 +15,8 @@
   <div class="brand"><span class="kicker">CALL OF DUTY <em>BLACK OPS</em></span><strong>ZOMBIES<span>.</span></strong></div>
   <nav id="tabs">
     <button data-tab="play" class="active">PLAY</button>
-    <button data-tab="loadout">LOADOUT</button>
-    <button data-tab="character">CHARACTER</button>
+    <button data-tab="armory">ARMORY</button>
+    <button data-tab="career">CAREER</button>
     <button data-tab="mods">MODS</button>
     <button data-tab="settings">SETTINGS</button>
   </nav>
@@ -45,38 +45,56 @@
     <div id="map-grid" class="map-grid"></div>
   </section>
 
-  <section id="tab-loadout" class="tab">
-    <header class="tab-head"><span class="eyebrow">LOADOUT</span><span class="muted small">Applies to every map at the start of a game</span></header>
-    <div class="loadout">
-      <div class="slots" id="slots"></div>
-      <div class="picker">
-        <div class="picker-head"><strong id="picker-title">PRIMARY WEAPON</strong><span class="muted small" id="picker-hint"></span></div>
-        <div id="picker-cats" class="picker-cats"></div>
-        <div id="picker-grid" class="picker-grid"></div>
+  <section id="tab-armory" class="tab">
+    <nav class="armory-nav" id="armory-nav">
+      <button data-pane="loadout" class="active">LOADOUT</button>
+      <button data-pane="classes">CLASSES</button>
+      <button data-pane="operator">OPERATOR</button>
+    </nav>
+    <section id="pane-loadout" class="pane">
+      <header class="tab-head"><span class="eyebrow">LOADOUT</span><span class="muted small">Applies to every map at the start of a game</span></header>
+      <div class="loadout">
+        <div class="slots" id="slots"></div>
+        <div class="picker">
+          <div class="picker-head"><strong id="picker-title">PRIMARY WEAPON</strong><span class="muted small" id="picker-hint"></span></div>
+          <div id="picker-cats" class="picker-cats"></div>
+          <div id="picker-grid" class="picker-grid"></div>
+        </div>
+        <div class="detail" id="detail"></div>
       </div>
-      <div class="detail" id="detail"></div>
-    </div>
-  </section>
+    </section>
 
-  <section id="tab-character" class="tab">
-    <header class="tab-head"><span class="eyebrow">CHARACTER</span><span class="muted small">Shown in third person · press T in game</span></header>
-    <div class="character">
-      <div class="char-side"><div class="char-list" id="char-list"></div>
-        <div class="char-import">
-          <span class="eyebrow">IMPORT A MODEL</span>
-          <p class="muted small">Test a .glb/.gltf from this computer. It is only previewed here; see the steps below to add it for real.</p>
-          <label class="play-btn secondary file-btn">PREVIEW A MODEL FILE <span>+</span><input type="file" id="char-file" accept=".glb,.gltf" hidden></label>
-          <div id="char-report" hidden></div>
-        </div></div>
-      <div class="char-stage">
-        <canvas id="char-canvas"></canvas>
-        <div class="char-caption"><strong id="char-name"></strong><p id="char-desc" class="muted"></p><p id="char-credit" class="credit"></p></div>
-        <div class="chips stage-view" id="char-view"><button data-view="body" class="active">BODY</button><button data-view="fp">FIRST PERSON</button></div>
-        <div class="chips stage-anim" id="char-anim"><button data-speed="0" class="active">IDLE</button><button data-speed="190">WALK</button><button data-speed="285">RUN</button></div>
+    <section id="pane-classes" class="pane">
+      <header class="tab-head"><span class="eyebrow">CLASSES</span><span class="muted small">Each class levels up on its own as you play it · Z uses its action skill</span></header>
+      <div id="classes-root"></div>
+    </section>
+    <section id="pane-operator" class="pane">
+      <header class="tab-head"><span class="eyebrow">OPERATOR</span><span class="muted small">Shown in third person · press T in game</span></header>
+      <div class="character">
+        <div class="char-side"><span class="eyebrow">OPERATORS</span><div class="char-list" id="char-list"></div>
+          <div class="char-import">
+            <span class="eyebrow">IMPORT A MODEL</span>
+            <p class="muted small">Test a .glb/.gltf from this computer. It is only previewed here; see the steps below to add it for real.</p>
+            <label class="play-btn secondary file-btn">PREVIEW A MODEL FILE <span>+</span><input type="file" id="char-file" accept=".glb,.gltf" hidden></label>
+            <div id="char-report" hidden></div>
+          </div></div>
+        <div class="char-main"><div class="char-stage">
+          <canvas id="char-canvas"></canvas>
+          <div class="char-caption"><strong id="char-name"></strong><p id="char-desc" class="muted"></p><p id="char-credit" class="credit"></p></div>
+          <div class="chips stage-view" id="char-view"><button data-view="body" class="active">BODY</button><button data-view="fp">FIRST PERSON</button></div>
+          <div class="chips stage-anim" id="char-anim"><button data-speed="0" class="active">IDLE</button><button data-speed="190">WALK</button><button data-speed="285">RUN</button></div>
+        </div>
+          <div class="skin-strip"><div class="skin-head"><span class="eyebrow">SKINS</span><span class="muted small" id="skin-count"></span></div><div class="skin-row" id="char-skins"></div></div>
+          <div class="char-variants" id="char-variants" hidden></div>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
 
+  </section>
+  <section id="tab-career" class="tab">
+    <header class="tab-head"><span class="eyebrow">CAREER</span><span class="muted small">Lifetime stats · overall, per map and per weapon</span></header>
+    <div id="career-root" class="career"></div>
+  </section>
   <section id="tab-settings" class="tab">
     <header class="tab-head"><span class="eyebrow">SETTINGS</span><span class="muted small">Saved in this browser · also available from the pause menu in game</span></header>
     <div class="settings-panel" id="settings-panel"></div>

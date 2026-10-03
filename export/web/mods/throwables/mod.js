@@ -138,7 +138,7 @@ export default async function setup(api){
     }
     for(const g of [...frags]){
       g.life-=dt;g.velocity.y-=650*dt;const travel=g.velocity.clone().multiplyScalar(dt),hit=world.raycast(new THREE.Ray(g.mesh.position.clone(),travel.clone().normalize()),0,travel.length()+4);
-      if(hit){g.velocity.y=Math.abs(g.velocity.y)*.4;g.velocity.x*=-.4;g.velocity.z*=-.4;g.spin.multiplyScalar(.5);}else g.mesh.position.add(travel);
+      if(hit){if(g.velocity.length()>120)window.kino.eventSounds?.bounce?.(g.mesh.position);g.velocity.y=Math.abs(g.velocity.y)*.4;g.velocity.x*=-.4;g.velocity.z*=-.4;g.spin.multiplyScalar(.5);}else g.mesh.position.add(travel);
       g.mesh.rotation.x+=g.spin.x*dt;g.mesh.rotation.y+=g.spin.y*dt;
       if(g.life<=0){explode(g.mesh.position.clone(),false);g.mesh.removeFromParent();frags.splice(frags.indexOf(g),1);}
     }

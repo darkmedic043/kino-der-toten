@@ -122,6 +122,8 @@ export default function setup(api){
     for(let i=0;i<3;i++)emit({key:'rring',at:at.clone(),size:[10,180+i*60],life:.5+i*.12,fade:[.02,.8],additive:true,color:0x8fc8ff,opacity:.9});
     for(let i=0;i<10;i++)emit({key:'sparks',at:at.clone().add(jitter(10)),vel:jitter(260),size:[30,90],life:rnd(.4,.8),fade:[.02,.7],additive:true,color:0xa8dcff});
   }
+  function muzzle(at){emit({key:'glow',at:at.clone(),size:[10,26],life:.06,fade:[.01,.7],additive:true,color:0xffd28a});}
+  function burn(at){emit({key:'fire',at:at.clone().add(jitter(8)),vel:up.clone().multiplyScalar(40),size:[10,30],life:.4,fade:[.1,.6],additive:true,opacity:.8});}
   host.on('update',dt=>{if(!dt)return;for(let i=emitters.length-1;i>=0;i--){gershTick(emitters[i],dt);if(emitters[i].t>=emitters[i].life)emitters.splice(i,1);}});
   host.on('reset',()=>{emitters.length=0;});
 
@@ -133,5 +135,66 @@ export default function setup(api){
     else if(color===0x9e3023||near(color,.62,.19,.14)||near(color,.43,.04,.03)){bloodHit(at,count>8?1.8:1);e.handled=true;}
     else if(near(color,.72,.64,.53)&&count<=4){dust(at);e.handled=true;}
   });
-  (window.kino??={}).fx={thunder,knockback,gersh,implode,qed,explosion:(p,s)=>explosion(new THREE.Vector3(...p),s),blood:(p,a)=>bloodHit(new THREE.Vector3(...p),a),live:()=>live.length};
+  // ---- lightning (BO1 fxt_env_* textures): teleports and hellhound spawns ---------------------
+  // Bolts are tall billboards that only turn about the vertical axis, flickering through the
+  // atlas cells; a lighting-pool source flashes with them (adding THREE lights recompiles shaders).
+  const boltTex={ground:[ 'fxt_env_lighting_bolt_ground.png',4,2],arc:['fxt_env_electric_arc1.png',4,1],trail:['fxt_env_lightning_trail.png',1,1]};
+  for(const [k,[f]] of Object.entries(boltTex))load('b_'+k,f);
+  const bolts=[],boltFree=[],flashes=[],boltGeo=new THREE.PlaneGeometry(1,1).translate(0,.5,0);
+  function bolt(kind,at,{height=300,width=90,life=.45,color=0x9fc4ff,yaw=null,tilt=0}={}){
+    const [,c,r]=boltTex[kind];let m=boltFree.pop();
+    if(!m){m=new THREE.Mesh(boltGeo,new THREE.MeshBasicMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false}));m.frustumCulled=false;m.renderOrder=6;}
+    const mat=m.material;if(mat.userData.kind!==kind){mat.map=tex['b_'+kind].clone();mat.map.repeat.set(1/c,1/r);mat.userData.kind=kind;}
+    mat.color.set(color);m.position.copy(at);m.scale.set(width,height,1);m.rotation.set(0,0,tilt);m.visible=true;scene.add(m);
+    bolts.push({m,t:0,life,c,r,yaw,next:0});
+  }
+  function flash(at,{color=0x8fb4ff,intensity=6,radius=600,life=.5}={}){
+    const src={position:at.clone(),color:new THREE.Color(color),intensity,radius,kind:'solid',dynamic:true,cap:2000,weight:1};
+    const pool=window.kino.lighting?.sources;if(!pool)return;pool.push(src);flashes.push({src,t:0,life});
+  }
+  host.on('update',dt=>{
+    if(!dt)return;
+    for(let i=bolts.length-1;i>=0;i--){const b=bolts[i];b.t+=dt;
+      if(b.t>=b.life){b.m.visible=false;b.m.removeFromParent();boltFree.push(b.m);bolts.splice(i,1);continue;}
+      if(b.t>=b.next){b.next=b.t+rnd(.03,.07);const cell=Math.floor(Math.random()*b.c*b.r);b.m.material.map.offset.set((cell%b.c)/b.c,1-(Math.floor(cell/b.c)+1)/b.r);
+        b.m.material.opacity=rnd(.55,1)*(1-b.t/b.life)**.5;b.m.scale.x=Math.abs(b.m.scale.x)*(Math.random()<.5?-1:1);}
+      b.m.rotation.y=b.yaw??Math.atan2(camera.position.x-b.m.position.x,camera.position.z-b.m.position.z);
+    }
+    for(let i=flashes.length-1;i>=0;i--){const f=flashes[i];f.t+=dt;const k=f.t/f.life;
+      f.src.weight=k>=1?0:(1-k)*(Math.random()*.5+.5);
+      if(k>=1){const pool=window.kino.lighting?.sources,j=pool?.indexOf(f.src)??-1;if(j>=0)pool.splice(j,1);flashes.splice(i,1);}}
+  });
+  // A lightning strike from above onto a point (hellhound spawn).
+  function strike(at,{scale=1,color=0xa9c8ff}={}){
+    const S=scale,g=at.clone();
+    bolt('ground',g,{height:420*S,width:150*S,life:.5,color});bolt('ground',g,{height:380*S,width:120*S,life:.35,color:0xffffff});
+    emit({key:'glow',at:g.clone().addScaledVector(up,12),size:[40*S,220*S],life:.4,fade:[.02,.8],additive:true,color});
+    for(let i=0;i<3;i++)emit({key:'sparks',at:g.clone().addScaledVector(up,8),size:[30*S,110*S],life:rnd(.25,.4),fade:[.02,.7],additive:true,color:0xcfe0ff,spin:rnd(-3,3)});
+    for(let i=0;i<5;i++)emit({key:'smoke',at:g.clone().add(new THREE.Vector3(rnd(-25,25),4,rnd(-25,25))),vel:new THREE.Vector3(rnd(-90,90),rnd(20,50),rnd(-90,90)),size:[30*S,130*S],life:rnd(1.2,1.8),fade:[.1,.7],opacity:.45,color:0x5a5a66,drag:1.5});
+    flash(g.clone().addScaledVector(up,60),{color,intensity:7,radius:700,life:.55});
+  }
+  // Teleport: arcs crawl over the pad you leave, bolts flicker where you land, and the screen
+  // fills with BO1's electric-shock overlay.
+  function teleportFx(from,to){
+    for(const [p,n] of [[from,3],[to,2]])for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,off=new THREE.Vector3(Math.cos(a)*rnd(10,35),0,Math.sin(a)*rnd(10,35));
+      bolt('ground',p.clone().add(off),{height:rnd(140,200),width:rnd(50,80),life:rnd(.35,.6)});bolt('arc',p.clone().add(off).addScaledVector(up,rnd(10,60)),{height:rnd(40,70),width:rnd(90,140),life:rnd(.3,.5),color:0xb8c8ff});}
+    for(const p of [from,to])flash(p.clone().addScaledVector(up,50),{intensity:2.5,radius:450,life:.6});
+    shock();
+  }
+  const overlay=document.createElement('div');overlay.id='fx-shock';document.body.append(overlay);
+  const oStyle=document.createElement('style');oStyle.textContent=`#fx-shock{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;mix-blend-mode:screen;background:url(${new URL('textures/fullscreen_electric_shock.png',document.baseURI).href}) 0 0/400% 400%}`;document.head.append(oStyle);
+  let shockT=0,shockOn=false;
+  function shock(){shockT=0;shockOn=true;}
+  host.on('update',dt=>{if(!shockOn)return;shockT+=dt;const k=shockT/.9;if(k>=1){shockOn=false;overlay.style.opacity=0;return;}
+    const f=Math.floor(shockT*20)%16;overlay.style.backgroundPosition=`${(f%4)*33.333}% ${Math.floor(f/4)*33.333}%`;overlay.style.opacity=((1-k)*.85).toFixed(3);});
+  // Hooks: a sudden jump in the player's position is a teleport (the theater, custom-map
+  // teleporters); a hellhound that wasn't there last frame has just spawned.
+  {let last=null;const seen=new WeakSet();
+    host.on('update',()=>{
+      const feet=api.player?.getFeetPosition?.();if(feet){if(last&&feet.distanceTo(last)>300)teleportFx(last.clone(),feet.clone());last=feet.clone();}
+      for(const z of api.enemies?.list??[])if(!seen.has(z)){seen.add(z);if(z.kind==='dog')strike(z.root.position.clone());}
+    });
+    host.on('reset',()=>{last=null;});}
+
+  (window.kino??={}).fx={strike:(p,o)=>strike(new THREE.Vector3(...p),o),teleport:(a,b)=>teleportFx(new THREE.Vector3(...a),new THREE.Vector3(...b)),muzzle,burn,thunder,knockback,gersh,implode,qed,explosion:(p,s)=>explosion(new THREE.Vector3(...p),s),blood:(p,a)=>bloodHit(new THREE.Vector3(...p),a),live:()=>live.length};
 }

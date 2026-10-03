@@ -1,0 +1,5 @@
+{
+  "name": "Career stats",
+  "description": "Records lifetime stats (kills, headshots, rounds, best round, time played and more) overall, per map and per weapon, shown in the main menu's Career tab.",
+  "script": "mod.js"
+}

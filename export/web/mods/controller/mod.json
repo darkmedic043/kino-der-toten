@@ -1,0 +1,5 @@
+{
+  "name": "Controller support",
+  "description": "Play with a gamepad (Xbox / PlayStation layout): analog move and look, triggers to aim and fire, grenade cooking on the bumpers, rumble.",
+  "script": "mod.js"
+}

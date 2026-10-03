@@ -8,12 +8,20 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { Rig, loadModel, loadAnimation } from './animation.js';
+import { bo1Rig } from './bo1-motion.js';
+import { SpringBones } from './spring-bones.js';
 
 export async function loadCharacterRegistry(){
   const url=new URL('mods/characters/characters.json',document.baseURI);
   const list=await fetch(url).then(r=>r.ok?r.json():{characters:[]}).catch(()=>({characters:[]}));
   const base=new URL('./',url);
-  return list.characters.map(c=>({...c,type:c.type??(c.model?'gltf':'mannequin'),url:c.model?new URL(c.model,base).href:null,image:c.image?new URL(c.image,base).href:null}));
+  const all=list.characters.map(c=>({...c,type:c.type??(c.model?'gltf':'mannequin'),url:c.model?new URL(c.model,base).href:null,image:c.image?new URL(c.image,base).href:null}));
+  // `optional` entries are built locally (git-ignored models): skip them when the file isn't there
+  // Their URL also carries the file's modification time: binaries are cached for a day, and a
+  // rebuilt model must not be served stale.
+  const present=await Promise.all(all.map(c=>c.optional&&c.url?fetch(c.url,{method:'HEAD',cache:'no-store'}).then(r=>{
+    if(!r.ok)return false;const m=r.headers.get('last-modified');if(m)c.url+=(c.url.includes('?')?'&':'?')+'v='+Date.parse(m);return true;}).catch(()=>false):true));
+  return all.filter((c,i)=>present[i]);
 }
 
 // First-person arms. They must be rigged to the T5 viewmodel skeleton, so a
@@ -35,6 +43,64 @@ export async function tintArms(entry){
 }
 
 const gltfCache=new Map();
+// Customisation (characters.json `variants`): groups of options. An option can set
+//   morphs   {shapeKey: weight, "Mesh/shapeKey": weight}   (unnamed shape keys go to 0; a mesh-prefixed key
+//             wins on that mesh, for shape keys several meshes share, e.g. Transform/ClawShrinkL)
+//   bones    {bone: {scale, rot:[x,y,z]° added to the rest pose, pos:[x,y,z] added}}
+//   meshes   {node: visible}
+//   surfaces {mesh node or material name: {map, normalMap, emissiveMap, alphaMap (files next to
+//             the model), alphaTest, emissiveIntensity}}
+//   when     {"group:option": {...same keys}}   extra settings when another group has that pick
+// `variantBase` holds the same keys applied first (the model's own defaults). `choice` is
+// {group: option id} (profile.variants[character id]); a missing pick uses the option marked
+// default, else the first.
+export function variantPick(entry,choice={}){
+  return Object.fromEntries((entry.variants??[]).map(g=>[g.id,g.options.find(o=>o.id===choice?.[g.id])??g.options.find(o=>o.default)??g.options[0]]));
+}
+export function variantSpec(entry,choice={}){
+  const spec={morphs:{},bones:{},meshes:{},surfaces:{}},pick=variantPick(entry,choice);
+  const merge=o=>{if(!o)return;Object.assign(spec.morphs,o.morphs);Object.assign(spec.meshes,o.meshes);
+    for(const [k,v] of Object.entries(o.bones??{}))spec.bones[k]={...spec.bones[k],...v};
+    for(const [k,v] of Object.entries(o.surfaces??{}))spec.surfaces[k]={...spec.surfaces[k],...v};};
+  merge(entry.variantBase);for(const o of Object.values(pick))merge(o);
+  for(const o of Object.values(pick))for(const [cond,extra] of Object.entries(o?.when??{})){const [g,id]=cond.split(':');if(pick[g]?.id===id)merge(extra);}
+  return spec;
+}
+export function variantMorphs(entry,choice={}){return variantSpec(entry,choice).morphs;}
+const variantTextures=new Map();
+function variantTexture(entry,file,colour){
+  const url=new URL(file,entry.url).href.replace(/\?.*$/,'');
+  if(!variantTextures.has(url)){const t=new THREE.TextureLoader().load(url);t.flipY=false;if(colour)t.colorSpace=THREE.SRGBColorSpace;variantTextures.set(url,t);}
+  return variantTextures.get(url);
+}
+export function applyVariants(root,entry,choice=entry.choice){
+  if(!entry.variants&&!entry.variantBase)return;
+  const spec=variantSpec(entry,choice),touched=new Set([...[entry.variantBase],...(entry.variants??[]).flatMap(g=>g.options)].flatMap(o=>o?[o,...Object.values(o.when??{})]:[]));
+  const all={bones:new Set(),meshes:new Set()};for(const o of touched){Object.keys(o.bones??{}).forEach(k=>all.bones.add(k));Object.keys(o.meshes??{}).forEach(k=>all.meshes.add(k));}
+  root.traverse(o=>{
+    if(o.morphTargetDictionary){const mesh=o.name.replace(/_\d+$/,'');for(const [k,i] of Object.entries(o.morphTargetDictionary))o.morphTargetInfluences[i]=spec.morphs[mesh+'/'+k]??spec.morphs[k]??0;}
+    if(all.bones.has(o.name)){
+      const r=o.userData.variantRest??={q:o.quaternion.clone(),p:o.position.clone(),s:o.scale.clone()},b=spec.bones[o.name]??{};
+      o.quaternion.copy(r.q);o.position.copy(r.p);o.scale.copy(r.s);
+      if(b.rot)o.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...b.rot.map(THREE.MathUtils.degToRad))));
+      if(b.pos)o.position.add(new THREE.Vector3(...b.pos));
+      if(b.scale!=null)o.scale.multiplyScalar(b.scale);
+    }
+    const node=o.isMesh?o.name.replace(/_\d+$/,''):null;   // three renames a mesh that shares a bone's name (Tank → Tank_1)
+    if(o.isMesh&&(all.meshes.has(o.name)||all.meshes.has(node)))o.visible=spec.meshes[o.name]??spec.meshes[node]??true;
+    if(o.isMesh){
+      const base=o.userData.variantMaterial??=o.material,mats=[base].flat();
+      const looks=mats.map(m=>spec.surfaces[o.name]??spec.surfaces[node]??spec.surfaces[m.name]??spec.surfaces[m.name.replace(/\.\d+$/,'')]);
+      if(!looks.some(Boolean)){o.material=base;return;}
+      const made=mats.map((m,i)=>{const l=looks[i];if(!l)return m;const c=m.clone();
+        for(const k of ['map','emissiveMap'])if(l[k])c[k]=variantTexture(entry,l[k],true);
+        for(const k of ['normalMap','alphaMap'])if(l[k])c[k]=variantTexture(entry,l[k],false);
+        if(l.alphaTest!=null)c.alphaTest=l.alphaTest;if(l.emissiveIntensity!=null)c.emissiveIntensity=l.emissiveIntensity;
+        if(l.visible===false)c.visible=false;return c;});
+      o.material=Array.isArray(base)?made:made[0];
+    }
+  });
+}
 export function loadCharacterGltf(entry){return loadGltf(entry.url);}
 // Records textures or buffers that fail to load (common with .gltf files whose
 // side files were not copied along, or textures not embedded in a .glb).
@@ -62,13 +128,25 @@ export async function createCharacter(entry,data){
     if(entry.scale)inner.scale.setScalar(entry.scale);else fitHeight(inner,entry.height??72);
     if(entry.scale){inner.updateMatrixWorld(true);inner.position.y-=new THREE.Box3().setFromObject(inner).min.y;}
     holder.add(inner);
+    // Customisation after fitting: a grown tail or long coat must not shrink the character.
+    applyVariants(model,entry);
     model.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.castShadow=true;}});
+    // "springBones": dangling chains (coat tails) simulated after the body is posed (spring-bones.js).
+    // (one group or a list, e.g. a coat and a tail with their own settings)
+    const springs=[entry.springBones??[]].flat().map(cfg=>new SpringBones(model,cfg));
+    const withSprings=c=>{c.springs=springs;if(springs.length){const u=c.update;c.update=(dt,...a)=>{u.call(c,dt,...a);for(const sp of springs)sp.update(dt);};}return c;};
+    // "motion": "bo1": Black Ops' own player animations, retargeted (bo1-motion.js).
+    if(entry.motion==='bo1'){
+      const rig=await bo1Rig(model,holder,entry,data).catch(e=>{console.warn('[bo1-motion]',e);return null;});
+      if(rig)return withSprings({root:holder,hand:rig.hand,bo1:true,stanceAnimated:true,clips:[],matched:{idle:'bo1',walk:'bo1',run:'bo1'},missing:gltf.missing??[],
+        hold:rig.hold,setStance:rig.setStance,act:rig.act,pose:rig.pose,update:rig.update,dispose(){holder.removeFromParent();}});
+    }
     // A rigged model with no animation clips is animated procedurally.
     if(!gltf.animations.length&&entry.procedural!==false){
       let skinned=false;model.traverse(o=>{if(o.isSkinnedMesh)skinned=true;});
       const rig=skinned?proceduralRig(model,holder,entry):null;
-      if(rig)return {root:holder,hand:rig.hand,procedural:true,clips:[],matched:{idle:'procedural',walk:'procedural',run:'procedural'},missing:gltf.missing??[],
-        hold:rig.hold,update:rig.update,dispose(){holder.removeFromParent();}};
+      if(rig)return withSprings({root:holder,hand:rig.hand,procedural:true,clips:[],matched:{idle:'procedural',walk:'procedural',run:'procedural'},missing:gltf.missing??[],
+        hold:rig.hold,update:rig.update,dispose(){holder.removeFromParent();}});
     }
     const mixer=new THREE.AnimationMixer(model),pick=re=>gltf.animations.find(a=>re.test(a.name));
     const clips={idle:pick(/idle/i),walk:pick(/walk/i),run:pick(/run|sprint/i)};
@@ -78,8 +156,8 @@ export async function createCharacter(entry,data){
     const play=key=>{const a=actions[key]??actions.walk??actions.idle;if(!a||a===current)return;a.reset().fadeIn(.2).play();current?.fadeOut(.2);current=a;};
     let hand=null;model.traverse(o=>{if(!hand&&/(right.?hand|hand.?r(ight)?$|hand_r$|r_hand)/i.test(o.name))hand=o;});
     if(entry.handBone)hand=model.getObjectByName(entry.handBone)??hand;
-    return {root:holder,hand,clips:gltf.animations.map(a=>a.name),missing:gltf.missing??[],matched:Object.fromEntries(Object.entries(clips).map(([k,c])=>[k,c?.name??null])),
-      update(dt,speed=0){play(speed>230?'run':speed>20?'walk':'idle');mixer.update(dt);},dispose(){mixer.stopAllAction();holder.removeFromParent();}};
+    return withSprings({root:holder,hand,clips:gltf.animations.map(a=>a.name),missing:gltf.missing??[],matched:Object.fromEntries(Object.entries(clips).map(([k,c])=>[k,c?.name??null])),
+      update(dt,speed=0){play(speed>230?'run':speed>20?'walk':'idle');mixer.update(dt);},dispose(){mixer.stopAllAction();holder.removeFromParent();}});
   }
   if(entry.type==='t5'){
     const chars=data.characters,body=await loadModel(chars[entry.body]),head=entry.head?await loadModel(chars[entry.head]):null;
@@ -329,6 +407,8 @@ function mannequin(entry,holder){
 // Whole-body stance on top of the animation: prone lies forward from the
 // feet, a slide leans back, a mantle hunches forward. `k` blends smoothly.
 export function applyStance(character,stance,dt){
+  // Animated stances (bo1 rigs) lie down, crouch and slide in the clips themselves.
+  if(character.stanceAnimated){character.setStance?.(stance);return;}
   const r=character.root,s=r.userData.stance??={pitch:0,lift:0};
   // Characters face +Z, so a positive pitch tips the head forward (face down).
   const target=stance==='prone'?1.45:stance==='dive'?1.25:stance==='slide'?-.85:stance==='mantle'?.35:0;   // dive: flat, face-down leap
@@ -375,7 +455,8 @@ export async function renderPortrait(entry,data,size=160){
   const box=new THREE.Box3().setFromObject(c.root),height=box.max.y-box.min.y;
   let head=null;c.root.traverse(o=>{if(!head&&/^(head|j_head)$|head/i.test(o.name)&&!/headtop|end/i.test(o.name))head=o;});
   const center=head?head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,height*.02,0)):new THREE.Vector3(0,box.max.y-height*.1,0);
-  const span=height*(entry.portraitSpan??.15);
+  // Frame by the character's set height: a raised tail or wings would blow up the bounding box.
+  const span=(entry.type==='gltf'&&entry.height?entry.height:height)*(entry.portraitSpan??.15);
   const camera=new THREE.PerspectiveCamera(28,1,1,5000),dir=new THREE.Vector3(Math.sin(.62),.12,Math.cos(.62)).normalize();
   camera.position.copy(center).addScaledVector(dir,span/Math.tan(THREE.MathUtils.degToRad(14)));camera.lookAt(center);
   const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});

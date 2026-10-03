@@ -1,0 +1,5 @@
+{
+  "name": "Classes",
+  "description": "Classes with their own levels and Borderlands-style skill trees (Classes tab in the main menu). The Engineer's action skill (Z) deploys a Sentry Turret.",
+  "script": "mod.js"
+}
