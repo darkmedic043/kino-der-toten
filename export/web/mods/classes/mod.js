@@ -1,7 +1,8 @@
 // Classes in game: the selected class earns its own XP (kills, headshots,
 // rounds), its skill trees apply passives, and Z uses its action skill.
 // The Engineer's action skill is a deployable Sentry Turret (BO1's auto
-// turret model) whose augments come from the trees. Data: classes.json,
+// turret model) whose augments come from the trees; the Fortifier's is a
+// Barricade Wall (fortifier.js). Data: classes.json,
 // rules: classes.js, menu UI: tree-view.js.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
@@ -10,6 +11,7 @@ import { zombieHealth } from '../../rules.js';
 import { binds } from '../../settings.js';
 import { loadClasses, loadClassProfile, saveClassProfile, classById, grantClassXp, xpToNext, stats as treeStats, actionStats } from './classes.js';
 import { cloudReady } from '../../profile.js';
+import { setupFortifier } from './fortifier.js';
 
 const up=new THREE.Vector3(0,1,0);
 
@@ -92,7 +94,10 @@ export default async function setup(api){
     if(S['turret.explode'])blast(t.at.clone().addScaledVector(up,20),280,.9);
     t.mesh.removeFromParent();turrets.splice(turrets.indexOf(t),1);
   }
-  addEventListener('keydown',e=>{if(e.code==='KeyZ'&&!e.repeat)deploy();});   // game-menu re-sends a rebound key as the default KeyZ
+  // The Fortifier's Barricade Wall instead of the turret
+  const fort=cls.action.id==='wall'?setupFortifier({api,cls,S:()=>S,A:()=>A,blast,hud:()=>hud(),getCooldown:()=>cooldown,setCooldown:v=>{cooldown=v;}}):null;
+  const actionUp=()=>turrets.length>0||!!fort?.up();
+  addEventListener('keydown',e=>{if(e.code==='KeyZ'&&!e.repeat)(fort?fort.deploy:deploy)();});   // game-menu re-sends a rebound key as the default KeyZ
   // Lockdown augment: zombies go for the turret for its first seconds
   const lure=enemies.lureTarget?.bind(enemies);
   enemies.lureTarget=z=>{const t=turrets.find(t=>t.age<(S['turret.lure']??0));if(t&&z.kind!=='dog'&&z.root.position.distanceTo(t.at)<1536)return t.at;return lure?lure(z):null;};
@@ -100,7 +105,7 @@ export default async function setup(api){
   const slowed=new Set();
   host.on('update',dt=>{
     if(!dt)return;
-    if(cooldown>0&&!turrets.length){cooldown=Math.max(0,cooldown-dt);if(cooldown===0){audio.play('buy',.35);api.toast?.(cls.action.name+' ready',1.2);}}
+    if(cooldown>0&&!actionUp()){cooldown=Math.max(0,cooldown-dt);if(cooldown===0){audio.play('buy',.35);api.toast?.(cls.action.name+' ready',1.2);}}
     for(let i=tracers.length-1;i>=0;i--){const t=tracers[i];t.t-=dt;t.l.material.opacity=Math.max(0,t.t/.06);if(t.t<=0){t.l.removeFromParent();t.l.geometry.dispose();t.l.material.dispose();tracers.splice(i,1);}}
     for(const z of [...slowed]){if(!enemies.list.includes(z)||session.time>z.turretSlowUntil){if(enemies.list.includes(z))z.speed/=z.turretSlowK;slowed.delete(z);}}
     for(const z of enemies.list)if(z.turretBurn&&session.time<z.turretBurn.until&&(z.turretBurn.tick-=dt)<=0){z.turretBurn.tick=.5;enemies.hurt(z,z.turretBurn.dps*.5,false,false,'turret',false);window.kino.fx?.burn?.(z.root.position.clone().addScaledVector(up,40));}
@@ -151,7 +156,7 @@ export default async function setup(api){
   host.on('reset',()=>{for(const t of [...turrets])t.mesh.removeFromParent();turrets.length=0;cooldown=0;slowed.clear();lastRound=session.round;hud();});
 
   // ---- HUD: the action skill icon, its cooldown and the class level ------------------------
-  const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4"/></svg>';
+  const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="'+(cls.action.icon==='wall'?'M3 6h18v12H3zM3 10h18M3 14h18M9 6v4M15 10v4M9 14v4':'M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4')+'"/></svg>';
   const style=document.createElement('style');style.textContent=`
     #class-skill{position:relative;width:52px;height:58px;color:${cls.color};pointer-events:none;margin-right:6px}
     #class-skill .hex{position:absolute;inset:0;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:${cls.color}}
@@ -170,16 +175,16 @@ export default async function setup(api){
   const place=()=>{const cluster=document.getElementById('equip-hud');if(cluster){cluster.prepend(el);el.classList.remove('free');}else{document.body.append(el);el.classList.add('free');}};
   place();setTimeout(place,500);
   function hud(){
-    const cool=cooldown>0&&!turrets.length;
-    el.classList.toggle('cooling',cool);el.classList.toggle('active',turrets.length>0);
+    const cool=cooldown>0&&!actionUp();
+    el.classList.toggle('cooling',cool);el.classList.toggle('active',actionUp());
     el.style.setProperty('--p',cool?Math.round(cooldown/A.cooldown*100)+'%':'0%');
     el.querySelector('.cd').style.background=cool?`conic-gradient(#000c ${Math.round(cooldown/A.cooldown*360)}deg,transparent 0)`:'none';
-    const num=cool?Math.ceil(cooldown):turrets.length?Math.ceil(Math.max(...turrets.map(t=>t.life))):'';
+    const num=cool?Math.ceil(cooldown):fort?.up()?fort.left():turrets.length?Math.ceil(Math.max(...turrets.map(t=>t.life))):'';
     el.querySelector('b').textContent=num;el.querySelector('svg').style.opacity=num===''?1:.18;
     el.querySelector('kbd').textContent=(binds().ability??'KeyZ').replace(/^Key/,'');
     el.querySelector('small').textContent=`${cls.name.toUpperCase()} ${state().level}`;
   }
   let hudT=0;host.on('update',dt=>{if((hudT-=dt)<=0){hudT=.2;hud();}});
   hud();
-  window.kino.classes={get state(){return state();},cls,stats:()=>S,action:()=>A,deploy,get cooldown(){return cooldown;},gain,turrets};
+  window.kino.classes={get state(){return state();},cls,stats:()=>S,action:()=>A,deploy:fort?fort.deploy:deploy,get cooldown(){return cooldown;},gain,turrets,fort};
 }

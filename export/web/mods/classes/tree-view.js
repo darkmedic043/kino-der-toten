@@ -3,10 +3,11 @@
 // points go into that tree (a spine fills as you invest). Passives have ranks,
 // augments (diamonds) change the action skill, the capstone sits at the bottom.
 // Left click adds a point, right click takes one out; Respec refunds everything.
-import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, describe } from './classes.js';
+import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, actionRows, describe } from './classes.js';
 
 const ICONS={
   turret:'<path d="M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4"/>',
+  wall:'<path d="M3 6h18v12H3zM3 10h18M3 14h18M9 6v4M15 10v4M9 14v4"/>',
   crosshair:'<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>',
   clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
   snow:'<path d="M12 3v18M4 7.5l16 9M4 16.5l16-9M9 4l3 2 3-2M9 20l3-2 3 2"/>',
@@ -29,6 +30,12 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 
 export const CLASS_CSS=`
 .cls{display:grid;gap:18px}
+.cls-pick{display:flex;gap:10px;flex-wrap:wrap}
+.cls-pick button{display:flex;align-items:center;gap:10px;padding:9px 16px 9px 11px;border:1px solid var(--line);background:#0b0b0bcc;color:#cfc8ba;font:600 11px/1 inherit;letter-spacing:.14em;cursor:pointer}
+.cls-pick button svg{width:20px;height:20px;color:var(--pc)}
+.cls-pick button small{color:#8b857a;letter-spacing:.08em}
+.cls-pick button.on{border-color:var(--pc);background:linear-gradient(90deg,color-mix(in srgb,var(--pc) 22%,transparent),#0b0b0bcc);color:#fff}
+.cls-pick button:hover{border-color:var(--pc)}
 .cls-head{display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding:18px 22px;border:1px solid var(--line);background:linear-gradient(90deg,color-mix(in srgb,var(--cc) 18%,transparent),#05050580 55%)}
 .cls-emblem{width:64px;height:64px;color:var(--cc);display:grid;place-items:center;border:1px solid color-mix(in srgb,var(--cc) 60%,transparent);clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);background:#0008}
 .cls-emblem svg{width:34px;height:34px}
@@ -103,8 +110,9 @@ export function renderClasses(root,cfg,{getState,setState}){
     const need=xpToNext(cfg,state.level),maxed=state.level>=cfg.xp.maxLevel;
     root.style.setProperty('--cc',cls.color);
     root.innerHTML=`<div class="cls">
+      ${cfg.classes.length>1?`<div class="cls-pick">${cfg.classes.map(c=>`<button data-class="${c.id}" style="--pc:${c.color}"${c.id===cls.id?' class="on"':''}>${icon(c.action.icon)}${esc(c.name.toUpperCase())} <small>LV ${st.classes[c.id]?.level??1}</small></button>`).join('')}</div>`:''}
       <div class="cls-head">
-        <div class="cls-emblem">${icon('wrench')}</div>
+        <div class="cls-emblem">${icon(cls.id==='engineer'?'wrench':cls.action.icon)}</div>
         <div class="cls-title"><span class="eyebrow">CLASS</span><strong>${esc(cls.name.toUpperCase())}</strong><small>${esc(cls.tagline)}</small>
           <div class="cls-xp">LEVEL ${state.level}${maxed?' · MAX':''}<div class="bar"><i style="width:${maxed?100:Math.round(state.xp/need*100)}%"></i></div>${maxed?'':`${state.xp} / ${need} XP`}</div></div>
         <div class="cls-points"><b>${available(state)}</b><span>SKILL POINTS</span><br><button data-act="respec">RESPEC</button></div>
@@ -114,9 +122,7 @@ export function renderClasses(root,cfg,{getState,setState}){
           <div class="cls-action"><div class="top"><div class="ic">${icon(cls.action.icon)}</div><div><span class="eyebrow">ACTION SKILL · Z</span><strong>${esc(cls.action.name)}</strong></div></div>
             <p>${esc(cls.action.desc)}</p>
             <div class="cls-stats">
-              <span${up(a.cooldown,b.cooldown)}>COOLDOWN <b>${a.cooldown.toFixed(0)}s</b></span><span${up(a.duration,b.duration)}>DURATION <b>${a.duration.toFixed(0)}s</b></span>
-              <span${up(a.damage,b.damage)}>DAMAGE <b>${Math.round(a.damage*100)}%</b></span><span${up(a.rate,b.rate)}>FIRE RATE <b>${a.rate.toFixed(1)}/s</b></span>
-              <span${up(a.range,b.range)}>RANGE <b>${Math.round(a.range)}</b></span><span${a.count>1?' class="up"':''}>TURRETS <b>${a.count}</b></span>
+              ${actionRows(cls,a).map(([label,value,better])=>`<span${better?' class="up"':''}>${label} <b>${value}</b></span>`).join('')}
             </div></div>
           <div class="cls-detail" id="cls-detail"></div>
         </div>
@@ -156,6 +162,7 @@ export function renderClasses(root,cfg,{getState,setState}){
     setState(st);draw();
   }
   root.addEventListener('click',e=>{
+    const pick=e.target.closest('[data-class]');if(pick){const st=getState();st.selected=pick.dataset.class;setState(st);sel=null;draw();return;}
     if(e.target.closest('[data-act="respec"]')){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];st.classes[cls.id].points={};setState(st);draw();return;}
     change(e,1);
   });

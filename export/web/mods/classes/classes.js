@@ -11,6 +11,8 @@ export function loadClassProfile(cfg){
   let p;try{p=JSON.parse(localStorage.getItem(CLASSES_KEY));}catch{}
   p??={};p.classes??={};p.selected??=cfg?.classes?.[0]?.id??null;
   for(const c of cfg?.classes??[])p.classes[c.id]??={level:1,xp:0,points:{}};
+  // renamed nodes keep their points (Fortifier: Extra Bolts -> Field Repairs when the wall became permanent)
+  const pts=p.classes.fortifier?.points;if(pts?.bolts){pts.repairs=(pts.repairs??0)+pts.bolts;delete pts.bolts;}
   return p;
 }
 export function saveClassProfile(p){try{localStorage.setItem(CLASSES_KEY,JSON.stringify(p));}catch{}}
@@ -59,6 +61,16 @@ export function stats(cls,state){
 // The action skill's numbers with the trees applied
 export function actionStats(cls,state){
   const s=stats(cls,state),b=cls.action.base;
+  if(cls.action.id==='wall'){   // Fortifier's Barricade Wall
+    const two=!!s['fort.double'];
+    return {
+      cooldown:b.cooldown*Math.max(.3,1-(s['fort.cooldown']??0)),
+      repair:s['fort.roundRepair']??0,
+      health:Math.round(b.health*(1+(s['fort.health']??0))*(two?.75:1)),
+      width:b.width*(1+(s['fort.width']??0)),height:b.height,
+      spikes:s['fort.spikes']??0,count:two?2:1,
+    };
+  }
   const double=!!s['turret.double'];
   return {
     cooldown:b.cooldown*Math.max(.3,1-(s['turret.cooldown']??0)),
@@ -68,6 +80,18 @@ export function actionStats(cls,state){
     range:b.range*(1+(s['turret.range']??0)),
     count:double?2:1,
   };
+}
+// The action card's stat lines: [label, value, improved-over-base]
+export function actionRows(cls,a){
+  const b=cls.action.base,up=(x,y)=>Math.abs(x-y)>1e-6;
+  if(cls.action.id==='wall')return [
+    ['COOLDOWN',a.cooldown.toFixed(0)+'s',up(a.cooldown,b.cooldown)],['LASTS','UNTIL BROKEN',false],
+    ['HITS',String(a.health),a.health!==b.health],['REPAIR / ROUND',a.repair?String(a.repair):'—',a.repair>0],['WIDTH',String(Math.round(a.width)),up(a.width,b.width)],
+    ['SPIKES',a.spikes?Math.round(a.spikes*100)+'%':'—',a.spikes>0],['WALLS',String(a.count),a.count>1]];
+  return [
+    ['COOLDOWN',a.cooldown.toFixed(0)+'s',up(a.cooldown,b.cooldown)],['DURATION',a.duration.toFixed(0)+'s',up(a.duration,b.duration)],
+    ['DAMAGE',Math.round(a.damage*100)+'%',up(a.damage,b.damage)],['FIRE RATE',a.rate.toFixed(1)+'/s',up(a.rate,b.rate)],
+    ['RANGE',String(Math.round(a.range)),up(a.range,b.range)],['TURRETS',String(a.count),a.count>1]];
 }
 export function describe(node,rank){
   const k=Object.keys(node.effects??{})[0],per=node.effects?.[k]??0,v=per*Math.max(1,rank);

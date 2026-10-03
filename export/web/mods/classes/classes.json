@@ -1,403 +1,790 @@
 {
- "_doc": "Classes: each levels independently from kills/rounds played as it; one skill point per level. Trees unlock a tier every `tierPoints` points spent in that tree (BL4 style). Node effects add per rank to the stat keys read by mod.js (see classes.js STATS).",
- "xp": {
-  "kill": 12,
-  "headshot": 6,
-  "round": 60,
-  "base": 400,
-  "growth": 1.11,
-  "maxLevel": 40
- },
- "tierPoints": 5,
- "classes": [
-  {
-   "id": "engineer",
-   "name": "Engineer",
-   "tagline": "Builds the defences everyone else hides behind.",
-   "color": "#e0a83a",
-   "action": {
-    "id": "sentry",
-    "name": "Sentry Turret",
-    "key": "ability",
-    "icon": "turret",
-    "desc": "Deploy an automatic turret in front of you. It tracks and shoots the nearest zombie it can see until it runs out of power.",
-    "base": {
-     "cooldown": 60,
-     "duration": 20,
-     "damage": 0.1,
-     "rate": 7,
-     "range": 900
-    }
-   },
-   "trees": [
+  "_doc": "Classes: each levels independently from kills/rounds played as it; one skill point per level. Trees unlock a tier every `tierPoints` points spent in that tree (BL4 style). Node effects add per rank to the stat keys read by mod.js (see classes.js STATS).",
+  "xp": {
+    "kill": 12,
+    "headshot": 6,
+    "round": 60,
+    "base": 400,
+    "growth": 1.11,
+    "maxLevel": 40
+  },
+  "tierPoints": 5,
+  "classes": [
     {
-     "id": "sentry",
-     "name": "Sentry Protocol",
-     "color": "#e0a83a",
-     "desc": "Turret firepower and uptime.",
-     "nodes": [
-      {
-       "id": "calibrated",
-       "name": "Calibrated Barrels",
-       "tier": 1,
-       "ranks": 5,
-       "icon": "crosshair",
-       "desc": "Turret damage +{v}%.",
-       "effects": {
-        "turret.damage": 0.08
-       }
+      "id": "engineer",
+      "name": "Engineer",
+      "tagline": "Builds the defences everyone else hides behind.",
+      "color": "#e0a83a",
+      "action": {
+        "id": "sentry",
+        "name": "Sentry Turret",
+        "key": "ability",
+        "icon": "turret",
+        "desc": "Deploy an automatic turret in front of you. It tracks and shoots the nearest zombie it can see until it runs out of power.",
+        "base": {
+          "cooldown": 60,
+          "duration": 20,
+          "damage": 0.1,
+          "rate": 7,
+          "range": 900
+        }
       },
-      {
-       "id": "capacitors",
-       "name": "Spare Capacitors",
-       "tier": 1,
-       "ranks": 5,
-       "icon": "clock",
-       "desc": "Turret lasts {v}s longer.",
-       "effects": {
-        "turret.duration": 2
-       },
-       "fmt": "s"
-      },
-      {
-       "id": "tripwire",
-       "name": "Tripwire Rounds",
-       "tier": 2,
-       "ranks": 1,
-       "type": "augment",
-       "icon": "snow",
-       "desc": "Augment: turret shots slow zombies by 40% for 1.5s.",
-       "effects": {
-        "turret.slow": 0.4
-       }
-      },
-      {
-       "id": "motor",
-       "name": "Servo Motor",
-       "tier": 2,
-       "ranks": 3,
-       "icon": "gear",
-       "desc": "Turret fire rate +{v}%.",
-       "effects": {
-        "turret.rate": 0.1
-       }
-      },
-      {
-       "id": "longsight",
-       "name": "Long Sight",
-       "tier": 3,
-       "ranks": 3,
-       "icon": "target",
-       "desc": "Turret range +{v}%.",
-       "effects": {
-        "turret.range": 0.12
-       }
-      },
-      {
-       "id": "recycler",
-       "name": "Recycler",
-       "tier": 3,
-       "ranks": 5,
-       "icon": "recycle",
-       "desc": "Each turret kill takes {v}s off its cooldown.",
-       "effects": {
-        "turret.killCdr": 0.4
-       },
-       "fmt": "s"
-      },
-      {
-       "id": "arcwelder",
-       "name": "Arc Welder",
-       "tier": 4,
-       "ranks": 1,
-       "type": "augment",
-       "icon": "bolt",
-       "desc": "Augment: turret shots arc to one more zombie nearby for half damage.",
-       "effects": {
-        "turret.chain": 1
-       }
-      },
-      {
-       "id": "overdrive",
-       "name": "Overdrive",
-       "tier": 4,
-       "ranks": 5,
-       "icon": "bolt",
-       "desc": "Turret damage +{v}% against zombies above half health.",
-       "effects": {
-        "turret.fresh": 0.1
-       }
-      },
-      {
-       "id": "redundancy",
-       "name": "Redundancy",
-       "tier": 5,
-       "ranks": 3,
-       "icon": "clock",
-       "desc": "Turret cooldown \u2212{v}%.",
-       "effects": {
-        "turret.cooldown": 0.06
-       }
-      },
-      {
-       "id": "twin",
-       "name": "Twin Sentries",
-       "tier": 6,
-       "ranks": 1,
-       "type": "capstone",
-       "icon": "double",
-       "desc": "Capstone: deploy two turrets at once, each lasting 25% shorter.",
-       "effects": {
-        "turret.double": 1
-       }
-      }
-     ]
+      "trees": [
+        {
+          "id": "sentry",
+          "name": "Sentry Protocol",
+          "color": "#e0a83a",
+          "desc": "Turret firepower and uptime.",
+          "nodes": [
+            {
+              "id": "calibrated",
+              "name": "Calibrated Barrels",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "crosshair",
+              "desc": "Turret damage +{v}%.",
+              "effects": {
+                "turret.damage": 0.08
+              }
+            },
+            {
+              "id": "capacitors",
+              "name": "Spare Capacitors",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Turret lasts {v}s longer.",
+              "effects": {
+                "turret.duration": 2
+              },
+              "fmt": "s"
+            },
+            {
+              "id": "tripwire",
+              "name": "Tripwire Rounds",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "snow",
+              "desc": "Augment: turret shots slow zombies by 40% for 1.5s.",
+              "effects": {
+                "turret.slow": 0.4
+              }
+            },
+            {
+              "id": "motor",
+              "name": "Servo Motor",
+              "tier": 2,
+              "ranks": 3,
+              "icon": "gear",
+              "desc": "Turret fire rate +{v}%.",
+              "effects": {
+                "turret.rate": 0.1
+              }
+            },
+            {
+              "id": "longsight",
+              "name": "Long Sight",
+              "tier": 3,
+              "ranks": 3,
+              "icon": "target",
+              "desc": "Turret range +{v}%.",
+              "effects": {
+                "turret.range": 0.12
+              }
+            },
+            {
+              "id": "recycler",
+              "name": "Recycler",
+              "tier": 3,
+              "ranks": 5,
+              "icon": "recycle",
+              "desc": "Each turret kill takes {v}s off its cooldown.",
+              "effects": {
+                "turret.killCdr": 0.4
+              },
+              "fmt": "s"
+            },
+            {
+              "id": "arcwelder",
+              "name": "Arc Welder",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bolt",
+              "desc": "Augment: turret shots arc to one more zombie nearby for half damage.",
+              "effects": {
+                "turret.chain": 1
+              }
+            },
+            {
+              "id": "overdrive",
+              "name": "Overdrive",
+              "tier": 4,
+              "ranks": 5,
+              "icon": "bolt",
+              "desc": "Turret damage +{v}% against zombies above half health.",
+              "effects": {
+                "turret.fresh": 0.1
+              }
+            },
+            {
+              "id": "redundancy",
+              "name": "Redundancy",
+              "tier": 5,
+              "ranks": 3,
+              "icon": "clock",
+              "desc": "Turret cooldown −{v}%.",
+              "effects": {
+                "turret.cooldown": 0.06
+              }
+            },
+            {
+              "id": "twin",
+              "name": "Twin Sentries",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "double",
+              "desc": "Capstone: deploy two turrets at once, each lasting 25% shorter.",
+              "effects": {
+                "turret.double": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "mechanic",
+          "name": "Field Mechanic",
+          "color": "#4fb3d9",
+          "desc": "Keeping yourself in the fight.",
+          "nodes": [
+            {
+              "id": "plating",
+              "name": "Scrap Plating",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Take {v}% less damage.",
+              "effects": {
+                "player.armor": 0.03
+              }
+            },
+            {
+              "id": "quickhands",
+              "name": "Quick Hands",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "wrench",
+              "desc": "Reload {v}% faster.",
+              "effects": {
+                "player.reload": 0.04
+              }
+            },
+            {
+              "id": "patchkit",
+              "name": "Patch Kit",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "heart",
+              "desc": "Augment: standing near your turret slowly regenerates health faster.",
+              "effects": {
+                "turret.heal": 1
+              }
+            },
+            {
+              "id": "wrench",
+              "name": "Heavy Wrench",
+              "tier": 2,
+              "ranks": 3,
+              "icon": "wrench",
+              "desc": "Knife damage +{v}%.",
+              "effects": {
+                "player.melee": 0.15
+              }
+            },
+            {
+              "id": "spareparts",
+              "name": "Spare Parts",
+              "tier": 3,
+              "ranks": 3,
+              "icon": "grenade",
+              "desc": "Gain {v} extra grenade(s) each round.",
+              "effects": {
+                "player.grenades": 1
+              },
+              "fmt": "n"
+            },
+            {
+              "id": "hazard",
+              "name": "Hazard Pay",
+              "tier": 3,
+              "ranks": 5,
+              "icon": "coin",
+              "desc": "Points earned +{v}%.",
+              "effects": {
+                "player.points": 0.04
+              }
+            },
+            {
+              "id": "lockdown",
+              "name": "Lockdown",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "magnet",
+              "desc": "Augment: the turret draws zombies to it like a monkey bomb for its first 5 seconds.",
+              "effects": {
+                "turret.lure": 5
+              }
+            },
+            {
+              "id": "grit",
+              "name": "Grit",
+              "tier": 4,
+              "ranks": 3,
+              "icon": "shield",
+              "desc": "Take {v}% less damage while your turret is up.",
+              "effects": {
+                "player.armorTurret": 0.06
+              }
+            },
+            {
+              "id": "toolbelt",
+              "name": "Toolbelt",
+              "tier": 5,
+              "ranks": 3,
+              "icon": "clock",
+              "desc": "Turret cooldown −{v}%.",
+              "effects": {
+                "turret.cooldown": 0.05
+              }
+            },
+            {
+              "id": "bulwark",
+              "name": "Bulwark",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "shield",
+              "desc": "Capstone: while your turret is up, zombie hits on you are halved.",
+              "effects": {
+                "player.bulwark": 0.5
+              }
+            }
+          ]
+        },
+        {
+          "id": "demo",
+          "name": "Demolitions",
+          "color": "#d9573f",
+          "desc": "Making things go bang.",
+          "nodes": [
+            {
+              "id": "powder",
+              "name": "Black Powder",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "bomb",
+              "desc": "Explosive damage +{v}%.",
+              "effects": {
+                "player.explosive": 0.06
+              }
+            },
+            {
+              "id": "flak",
+              "name": "Flak Lining",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Take {v}% less damage from your own explosions.",
+              "effects": {
+                "player.blastResist": 0.12
+              }
+            },
+            {
+              "id": "incendiary",
+              "name": "Incendiary Rounds",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "flame",
+              "desc": "Augment: turret shots set zombies alight, burning for extra damage.",
+              "effects": {
+                "turret.burn": 1
+              }
+            },
+            {
+              "id": "shrapnel",
+              "name": "Shrapnel",
+              "tier": 2,
+              "ranks": 3,
+              "icon": "bomb",
+              "desc": "Explosion radius effects +{v}% damage at the edges.",
+              "effects": {
+                "player.explosive": 0.04
+              }
+            },
+            {
+              "id": "stockpile",
+              "name": "Stockpile",
+              "tier": 3,
+              "ranks": 3,
+              "icon": "grenade",
+              "desc": "Gain {v} extra grenade(s) each round.",
+              "effects": {
+                "player.grenades": 1
+              },
+              "fmt": "n"
+            },
+            {
+              "id": "fuse",
+              "name": "Short Fuse",
+              "tier": 3,
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Turret cooldown −{v}%.",
+              "effects": {
+                "turret.cooldown": 0.03
+              }
+            },
+            {
+              "id": "selfdestruct",
+              "name": "Self-Destruct",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bomb",
+              "desc": "Augment: when the turret's power runs out it explodes.",
+              "effects": {
+                "turret.explode": 1
+              }
+            },
+            {
+              "id": "chainreaction",
+              "name": "Chain Reaction",
+              "tier": 4,
+              "ranks": 3,
+              "icon": "bolt",
+              "desc": "Explosive kills have a {v}% chance to explode again.",
+              "effects": {
+                "player.chainBlast": 0.08
+              }
+            },
+            {
+              "id": "ordnance",
+              "name": "Heavy Ordnance",
+              "tier": 5,
+              "ranks": 3,
+              "icon": "bomb",
+              "desc": "Explosive damage +{v}%.",
+              "effects": {
+                "player.explosive": 0.08
+              }
+            },
+            {
+              "id": "bigbang",
+              "name": "Big Bang",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "bomb",
+              "desc": "Capstone: the turret fires a grenade every 3 seconds alongside its bullets.",
+              "effects": {
+                "turret.grenade": 3
+              }
+            }
+          ]
+        }
+      ]
     },
     {
-     "id": "mechanic",
-     "name": "Field Mechanic",
-     "color": "#4fb3d9",
-     "desc": "Keeping yourself in the fight.",
-     "nodes": [
-      {
-       "id": "plating",
-       "name": "Scrap Plating",
-       "tier": 1,
-       "ranks": 5,
-       "icon": "shield",
-       "desc": "Take {v}% less damage.",
-       "effects": {
-        "player.armor": 0.03
-       }
+      "id": "fortifier",
+      "name": "Fortifier",
+      "tagline": "Puts steel between you and the horde.",
+      "color": "#7fb0c8",
+      "action": {
+        "id": "wall",
+        "name": "Barricade Wall",
+        "key": "ability",
+        "icon": "wall",
+        "desc": "Raise a waist-high steel barricade in front of you. It stays until it's destroyed: zombies stop at it and tear at it, and you can see and shoot over it. Press again to pick it up and move it (it keeps its damage). The cooldown starts once it's destroyed.",
+        "base": {
+          "cooldown": 45,
+          "health": 40,
+          "width": 130,
+          "height": 40
+        }
       },
-      {
-       "id": "quickhands",
-       "name": "Quick Hands",
-       "tier": 1,
-       "ranks": 5,
-       "icon": "wrench",
-       "desc": "Reload {v}% faster.",
-       "effects": {
-        "player.reload": 0.04
-       }
-      },
-      {
-       "id": "patchkit",
-       "name": "Patch Kit",
-       "tier": 2,
-       "ranks": 1,
-       "type": "augment",
-       "icon": "heart",
-       "desc": "Augment: standing near your turret slowly regenerates health faster.",
-       "effects": {
-        "turret.heal": 1
-       }
-      },
-      {
-       "id": "wrench",
-       "name": "Heavy Wrench",
-       "tier": 2,
-       "ranks": 3,
-       "icon": "wrench",
-       "desc": "Knife damage +{v}%.",
-       "effects": {
-        "player.melee": 0.15
-       }
-      },
-      {
-       "id": "spareparts",
-       "name": "Spare Parts",
-       "tier": 3,
-       "ranks": 3,
-       "icon": "grenade",
-       "desc": "Gain {v} extra grenade(s) each round.",
-       "effects": {
-        "player.grenades": 1
-       },
-       "fmt": "n"
-      },
-      {
-       "id": "hazard",
-       "name": "Hazard Pay",
-       "tier": 3,
-       "ranks": 5,
-       "icon": "coin",
-       "desc": "Points earned +{v}%.",
-       "effects": {
-        "player.points": 0.04
-       }
-      },
-      {
-       "id": "lockdown",
-       "name": "Lockdown",
-       "tier": 4,
-       "ranks": 1,
-       "type": "augment",
-       "icon": "magnet",
-       "desc": "Augment: the turret draws zombies to it like a monkey bomb for its first 5 seconds.",
-       "effects": {
-        "turret.lure": 5
-       }
-      },
-      {
-       "id": "grit",
-       "name": "Grit",
-       "tier": 4,
-       "ranks": 3,
-       "icon": "shield",
-       "desc": "Take {v}% less damage while your turret is up.",
-       "effects": {
-        "player.armorTurret": 0.06
-       }
-      },
-      {
-       "id": "toolbelt",
-       "name": "Toolbelt",
-       "tier": 5,
-       "ranks": 3,
-       "icon": "clock",
-       "desc": "Turret cooldown \u2212{v}%.",
-       "effects": {
-        "turret.cooldown": 0.05
-       }
-      },
-      {
-       "id": "bulwark",
-       "name": "Bulwark",
-       "tier": 6,
-       "ranks": 1,
-       "type": "capstone",
-       "icon": "shield",
-       "desc": "Capstone: while your turret is up, zombie hits on you are halved.",
-       "effects": {
-        "player.bulwark": 0.5
-       }
-      }
-     ]
-    },
-    {
-     "id": "demo",
-     "name": "Demolitions",
-     "color": "#d9573f",
-     "desc": "Making things go bang.",
-     "nodes": [
-      {
-       "id": "powder",
-       "name": "Black Powder",
-       "tier": 1,
-       "ranks": 5,
-       "icon": "bomb",
-       "desc": "Explosive damage +{v}%.",
-       "effects": {
-        "player.explosive": 0.06
-       }
-      },
-      {
-       "id": "flak",
-       "name": "Flak Lining",
-       "tier": 1,
-       "ranks": 5,
-       "icon": "shield",
-       "desc": "Take {v}% less damage from your own explosions.",
-       "effects": {
-        "player.blastResist": 0.12
-       }
-      },
-      {
-       "id": "incendiary",
-       "name": "Incendiary Rounds",
-       "tier": 2,
-       "ranks": 1,
-       "type": "augment",
-       "icon": "flame",
-       "desc": "Augment: turret shots set zombies alight, burning for extra damage.",
-       "effects": {
-        "turret.burn": 1
-       }
-      },
-      {
-       "id": "shrapnel",
-       "name": "Shrapnel",
-       "tier": 2,
-       "ranks": 3,
-       "icon": "bomb",
-       "desc": "Explosion radius effects +{v}% damage at the edges.",
-       "effects": {
-        "player.explosive": 0.04
-       }
-      },
-      {
-       "id": "stockpile",
-       "name": "Stockpile",
-       "tier": 3,
-       "ranks": 3,
-       "icon": "grenade",
-       "desc": "Gain {v} extra grenade(s) each round.",
-       "effects": {
-        "player.grenades": 1
-       },
-       "fmt": "n"
-      },
-      {
-       "id": "fuse",
-       "name": "Short Fuse",
-       "tier": 3,
-       "ranks": 5,
-       "icon": "clock",
-       "desc": "Turret cooldown \u2212{v}%.",
-       "effects": {
-        "turret.cooldown": 0.03
-       }
-      },
-      {
-       "id": "selfdestruct",
-       "name": "Self-Destruct",
-       "tier": 4,
-       "ranks": 1,
-       "type": "augment",
-       "icon": "bomb",
-       "desc": "Augment: when the turret's power runs out it explodes.",
-       "effects": {
-        "turret.explode": 1
-       }
-      },
-      {
-       "id": "chainreaction",
-       "name": "Chain Reaction",
-       "tier": 4,
-       "ranks": 3,
-       "icon": "bolt",
-       "desc": "Explosive kills have a {v}% chance to explode again.",
-       "effects": {
-        "player.chainBlast": 0.08
-       }
-      },
-      {
-       "id": "ordnance",
-       "name": "Heavy Ordnance",
-       "tier": 5,
-       "ranks": 3,
-       "icon": "bomb",
-       "desc": "Explosive damage +{v}%.",
-       "effects": {
-        "player.explosive": 0.08
-       }
-      },
-      {
-       "id": "bigbang",
-       "name": "Big Bang",
-       "tier": 6,
-       "ranks": 1,
-       "type": "capstone",
-       "icon": "bomb",
-       "desc": "Capstone: the turret fires a grenade every 3 seconds alongside its bullets.",
-       "effects": {
-        "turret.grenade": 3
-       }
-      }
-     ]
+      "trees": [
+        {
+          "id": "hardpoint",
+          "name": "Hardpoint",
+          "color": "#7fb0c8",
+          "desc": "A tougher, bigger, faster wall.",
+          "nodes": [
+            {
+              "id": "plating",
+              "name": "Thick Plating",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Wall takes {v}% more hits.",
+              "effects": {
+                "fort.health": 0.1
+              }
+            },
+            {
+              "id": "repairs",
+              "name": "Field Repairs",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "wrench",
+              "desc": "At the start of each round the wall repairs {v} hits.",
+              "effects": {
+                "fort.roundRepair": 4
+              },
+              "fmt": "n"
+            },
+            {
+              "id": "selfseal",
+              "name": "Self-Sealing",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "heart",
+              "desc": "Augment: the wall repairs 2 hits a second while nothing is attacking it.",
+              "effects": {
+                "fort.regen": 1
+              }
+            },
+            {
+              "id": "span",
+              "name": "Wide Span",
+              "tier": 2,
+              "ranks": 3,
+              "icon": "double",
+              "desc": "Wall {v}% wider.",
+              "effects": {
+                "fort.width": 0.12
+              }
+            },
+            {
+              "id": "quickset",
+              "name": "Quick-Set Frame",
+              "tier": 3,
+              "ranks": 3,
+              "icon": "clock",
+              "desc": "Wall cooldown −{v}%.",
+              "effects": {
+                "fort.cooldown": 0.06
+              }
+            },
+            {
+              "id": "salvage",
+              "name": "Salvage",
+              "tier": 3,
+              "ranks": 3,
+              "icon": "recycle",
+              "desc": "When the wall is destroyed, its cooldown is {v}% shorter.",
+              "effects": {
+                "fort.salvage": 0.1
+              }
+            },
+            {
+              "id": "rebar",
+              "name": "Rebar Core",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "magnet",
+              "desc": "Augment: zombies that hit the wall are knocked back.",
+              "effects": {
+                "fort.knock": 1
+              }
+            },
+            {
+              "id": "overbuild",
+              "name": "Overbuild",
+              "tier": 4,
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Wall takes {v}% more hits.",
+              "effects": {
+                "fort.health": 0.06
+              }
+            },
+            {
+              "id": "logistics",
+              "name": "Logistics",
+              "tier": 5,
+              "ranks": 3,
+              "icon": "gear",
+              "desc": "Wall cooldown −{v}%.",
+              "effects": {
+                "fort.cooldown": 0.05
+              }
+            },
+            {
+              "id": "fortress",
+              "name": "Fortress",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "wall",
+              "desc": "Capstone: raise two walls in a V, each taking 25% fewer hits.",
+              "effects": {
+                "fort.double": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "teeth",
+          "name": "Teeth",
+          "color": "#c8735f",
+          "desc": "Make hitting the wall hurt.",
+          "nodes": [
+            {
+              "id": "spikes",
+              "name": "Spiked Face",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "target",
+              "desc": "Zombies hitting the wall take {v}% of their health per hit.",
+              "effects": {
+                "fort.spikes": 0.04
+              }
+            },
+            {
+              "id": "razor",
+              "name": "Razor Wire",
+              "tier": 1,
+              "ranks": 3,
+              "icon": "snow",
+              "desc": "Zombies near the wall move {v}% slower.",
+              "effects": {
+                "fort.slow": 0.12
+              }
+            },
+            {
+              "id": "current",
+              "name": "Live Current",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bolt",
+              "desc": "Augment: every hit on the wall shocks the attacker and arcs to one zombie nearby.",
+              "effects": {
+                "fort.shock": 1
+              }
+            },
+            {
+              "id": "serrated",
+              "name": "Serrated Edges",
+              "tier": 2,
+              "ranks": 3,
+              "icon": "target",
+              "desc": "Spikes deal {v}% more of a zombie's health per hit.",
+              "effects": {
+                "fort.spikes": 0.03
+              }
+            },
+            {
+              "id": "barbs",
+              "name": "Barbs",
+              "tier": 3,
+              "ranks": 3,
+              "icon": "flame",
+              "desc": "Spiked zombies bleed {v}% of their health a second for 3s.",
+              "effects": {
+                "fort.bleed": 0.03
+              }
+            },
+            {
+              "id": "toll",
+              "name": "Toll Gate",
+              "tier": 3,
+              "ranks": 3,
+              "icon": "coin",
+              "desc": "+{v} points every time a zombie hits the wall.",
+              "effects": {
+                "fort.toll": 2
+              },
+              "fmt": "n"
+            },
+            {
+              "id": "shrapnel",
+              "name": "Shrapnel Charge",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bomb",
+              "desc": "Augment: the wall explodes when it is destroyed.",
+              "effects": {
+                "fort.shrapnel": 1
+              }
+            },
+            {
+              "id": "honed",
+              "name": "Honed Points",
+              "tier": 4,
+              "ranks": 5,
+              "icon": "target",
+              "desc": "Spikes deal {v}% more of a zombie's health per hit.",
+              "effects": {
+                "fort.spikes": 0.03
+              }
+            },
+            {
+              "id": "dread",
+              "name": "Dread Wire",
+              "tier": 5,
+              "ranks": 3,
+              "icon": "snow",
+              "desc": "Zombies near the wall move {v}% slower.",
+              "effects": {
+                "fort.slow": 0.08
+              }
+            },
+            {
+              "id": "maiden",
+              "name": "Iron Maiden",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "crosshair",
+              "desc": "Capstone: zombies below 35% health die on the wall.",
+              "effects": {
+                "fort.execute": 0.35
+              }
+            }
+          ]
+        },
+        {
+          "id": "bunker",
+          "name": "Bunker",
+          "color": "#a9b06a",
+          "desc": "Fight from behind the wall.",
+          "nodes": [
+            {
+              "id": "cover",
+              "name": "Hard Cover",
+              "tier": 1,
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Take {v}% less damage near your wall.",
+              "effects": {
+                "player.armorWall": 0.04
+              }
+            },
+            {
+              "id": "steady",
+              "name": "Steady Hands",
+              "tier": 1,
+              "ranks": 3,
+              "icon": "clock",
+              "desc": "Reload {v}% faster near your wall.",
+              "effects": {
+                "player.reloadWall": 0.06
+              }
+            },
+            {
+              "id": "cache",
+              "name": "Ammo Cache",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "grenade",
+              "desc": "Augment: near the wall, your reserve ammo refills 5% every 2s.",
+              "effects": {
+                "fort.ammo": 1
+              }
+            },
+            {
+              "id": "brace",
+              "name": "Brace",
+              "tier": 2,
+              "ranks": 3,
+              "icon": "shield",
+              "desc": "Take {v}% less damage everywhere.",
+              "effects": {
+                "player.armor": 0.03
+              }
+            },
+            {
+              "id": "crate",
+              "name": "Grenade Crate",
+              "tier": 3,
+              "ranks": 2,
+              "icon": "grenade",
+              "desc": "+{v} grenade each round.",
+              "effects": {
+                "player.grenades": 1
+              },
+              "fmt": "n"
+            },
+            {
+              "id": "overwatch",
+              "name": "Overwatch",
+              "tier": 3,
+              "ranks": 3,
+              "icon": "crosshair",
+              "desc": "Your bullets deal {v}% more damage near your wall.",
+              "effects": {
+                "player.wallDamage": 0.05
+              }
+            },
+            {
+              "id": "tripwire",
+              "name": "Tripwire Line",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bomb",
+              "desc": "Augment: two claymores are planted in front of every wall.",
+              "effects": {
+                "fort.claymore": 1
+              }
+            },
+            {
+              "id": "hunker",
+              "name": "Hunker Down",
+              "tier": 4,
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Take {v}% less damage near your wall.",
+              "effects": {
+                "player.armorWall": 0.03
+              }
+            },
+            {
+              "id": "hold",
+              "name": "Hold the Line",
+              "tier": 5,
+              "ranks": 3,
+              "icon": "coin",
+              "desc": "+{v}% points.",
+              "effects": {
+                "player.points": 0.04
+              }
+            },
+            {
+              "id": "laststand",
+              "name": "Last Stand",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "heart",
+              "desc": "Capstone: a hit that would down you near your wall hits the wall instead (once per wall).",
+              "effects": {
+                "fort.laststand": 1
+              }
+            }
+          ]
+        }
+      ]
     }
-   ]
-  }
- ]
+  ]
 }
