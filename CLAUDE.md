@@ -10,7 +10,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Main menu, profile, mod loader, settings, keybinds | `core.md` |
 | Custom maps (`CustomWorld`, markers, navmesh, traps, teleporters) | `custom-maps.md` |
 | Characters, motion model, procedural rig, FP arms, portraits | `characters.md` |
-| Lighting mod, baked irradiance volume, beams, sun, viewmodel light, mystery box map bulbs | `lighting.md` |
+| Lighting mod, baked irradiance volume, beams, sun, viewmodel light, mystery box map bulbs, Moon lighting | `lighting.md` |
 | Map materials, normal maps, HD textures (map + weapons) | `materials.md` |
 | Performance measurements and load-time warm-ups | `performance.md` |
 | Health, HUD/hit sounds, zombie voices, music, cheat console | `gameplay.md` |
@@ -20,6 +20,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Props: terminal booth (Blender generator, bake, placement mod) | `props.md` |
 | Weapon levels, attachments, camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound | `weapon-levels.md` |
 | Classes, skill trees, Engineer turret | `classes.md` |
+| One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
 | Session history log | `history.md` |
 
 ## Setup essentials
@@ -47,5 +48,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 - When adding a system, add its detail to the matching `docs/fork/*.md` file and a one-line entry to `history.md`. Keep this file short.
 
 ## Upstream files with local edits (keep them small)
+
+**Architecture (2026-10-02, user decision):** upstream's `game.js`, `moon.js` and `moon-combat.js` (and the fork's `zombies.js`) were replaced by one engine, `engine.js` (play.html?map=<id>), with map modules `maps/kino.js`, `maps/moon.js`, `maps/custom.js`; `index.html`/`zombies.html`/`moon.html` redirect. Upstream changes to those files no longer merge: port them by hand into the engine or the map module. Upstream's Cloudflare staging (`.tools/stage-cloudflare.mjs`) still bundles game.js and is unused here (the fork serves through kino-server + tunnel). The edits listed below that say game.js/zombies.js now live in engine.js.
 
 `enemies.js` (co-op `targetFor` hook), `game.js`/`zombies.js` (`effect()` emits `effect` for the fx mod), `mystery-box.js` (display cache and warm-up), `animation.js` (weapon-part position tracks relative to bind), `player-controller.js` (step-up keeps speed), `settings.js` (graphics quality), `game.js`/`zombies.js` (`renderer` in the mod api and the `mods.renderWorld` hook), `game.js` (mod hooks, render camera, settings sensitivity/FOV, `installGameMenu`, box warm-up, cheat check on best round), `audio.js` (`def.baseId??def.id`), `.tools/serve.mjs` (`KINO_HOME`), `game.js`/`zombies.js` (analog `kino.gamepad.move` added to forward/strafe/sprint for the controller mod), `game.js`/`zombies.js` (hip/pellet spread read `def.hipSpread`/`def.pelletSpread`; sprint on any move direction, not while sliding/diving). Watch for these when merging upstream.

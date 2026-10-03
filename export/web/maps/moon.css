@@ -1,0 +1,13 @@
+/* Moon's HUD panel in the shared game page (maps/moon.js). */
+#moon-hud{position:fixed;inset:0;pointer-events:none;z-index:3;font-family:inherit;color:#e8edf3}
+body.menu-open #moon-hud .moon-systems,body.menu-open #moon-hud #oxygen,body.menu-open #moon-hud #equipment,body.menu-open #moon-hud #hazard,body.menu-open #moon-hud #journal{visibility:hidden}
+#earth-flash{position:fixed;inset:0;background:#fff2d6;pointer-events:none;z-index:3;opacity:0}
+#visor{position:fixed;inset:0;z-index:2;pointer-events:none;border:min(3vw,30px) solid #05101888;border-radius:17%;box-shadow:inset 0 0 85px 24px #07121ddb}
+#moon-hud .moon-systems{position:absolute;top:110px;right:36px;display:flex;flex-direction:column;text-align:right;gap:5px;font-size:10px;letter-spacing:.16em;color:#b9c8d6;text-shadow:0 1px 2px #000}
+#moon-hud #oxygen{position:absolute;bottom:150px;left:50%;transform:translateX(-50%);width:300px;text-align:center;color:#ffb59c;font-size:12px;letter-spacing:.1em;text-shadow:0 1px 2px #000}
+#moon-hud #oxygen progress{display:block;width:100%;height:5px;margin-top:8px;accent-color:#ee805f}
+#moon-hud #equipment{position:absolute;right:36px;bottom:205px;font-size:11px;letter-spacing:.12em;color:#cfe3f4;text-shadow:0 1px 2px #000}
+#moon-hud #hazard{position:absolute;top:150px;left:50%;transform:translateX(-50%);font-size:12px;letter-spacing:.12em;color:#ff9b7a;text-shadow:0 1px 3px #000}
+#moon-hud #hack-progress{position:absolute;top:58%;left:50%;transform:translateX(-50%);width:220px;height:6px;accent-color:#7fd4ff}
+#moon-hud #journal{position:absolute;top:50%;right:36px;transform:translateY(-50%);width:min(340px,80vw);padding:16px 18px;background:#05090ddd;border:1px solid #ffffff22;font-size:12px;line-height:1.55;pointer-events:auto}
+#moon-hud #journal strong{display:block;font-size:10px;letter-spacing:.2em;color:#9fc4e0;margin-bottom:8px}

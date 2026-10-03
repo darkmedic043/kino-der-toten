@@ -11,8 +11,11 @@ restarting.
 - `characters/characters.json` lists playable characters.
 - `_template/` is a starting point for a new mod.
 
-Mods load in **Kino der Toten** (`index.html`) and on **custom zombies maps**
-(`zombies.html`). Moon and the explore-only ports don't load mods.
+Every zombies map runs in one engine, `play.html?map=<id>` (`engine.js` plus a map
+module in `maps/`: `kino.js`, `moon.js`, `custom.js` for custom maps), so mods load on
+Kino, Moon and custom maps alike (`index.html`, `zombies.html` and `moon.html` redirect).
+`api.map` is the map's `maps.json` entry. A `mod.json` can list `"maps"` (only these map
+ids) or `"skipMaps"` (not these). The explore-only ports don't load mods.
 
 ---
 
@@ -28,7 +31,7 @@ Mods load in **Kino der Toten** (`index.html`) and on **custom zombies maps**
 ```
 
 - An entry with `url` links to an existing page, such as the built-in maps.
-- An entry with `dir` + `model` is a custom map. `"zombies"` opens `zombies.html?map=<id>`, and `"explore"` opens the walk/fly `explorer.html?map=<id>`.
+- An entry with `dir` + `model` is a custom map. `"zombies"` opens `play.html?map=<id>`, and `"explore"` opens the walk/fly `explorer.html?map=<id>`.
 - `scale`: game units are inches, and Blender exports metres, so use **39.37**.
 - `image` is optional. Without one, the menu draws a title card.
 
@@ -246,7 +249,9 @@ This checkout is the `custom` branch. `upstream` is the original project.
 git fetch upstream && git merge upstream/main && git lfs pull
 ```
 
-Upstream files with small local edits: `game.js` (mod hooks), `audio.js`
+The fork replaced upstream's separate game pages (`game.js`, `moon.js`, `moon-combat.js`)
+with `engine.js` + `maps/*.js`, so upstream changes to those must be ported by hand.
+Other upstream files with small local edits: `audio.js`
 (`baseId` for extended weapons' sounds) and `.tools/serve.mjs` (`KINO_HOME`).
 All other fork files are new: `home.*`, `zombies.*`, `custom-world.js`,
 `characters.js`, `profile.js`, `mod-loader.js`, `explorer.*`, `mods/` and

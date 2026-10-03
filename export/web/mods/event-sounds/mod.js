@@ -24,7 +24,7 @@ export default async function setup(api){
   // Teleporter: lever + warm-up when linking starts, beam + sparks when the link completes,
   // sparks and the warm-up hum while it charges ("Teleporting…"), the whoosh on arrival.
   let link=session?.teleporter,last=null;
-  // game.js shows "Teleporting…" on its own toast when the pad charges (2 s before the jump)
+  // the engine (Kino's map) shows "Teleporting…" on its own toast when the pad charges (2 s before the jump)
   const toastEl=document.getElementById('toast');let charging=false;
   if(toastEl)new MutationObserver(()=>{const on=/^Teleporting/.test(toastEl.textContent);if(on&&!charging){say('evt/zombie_global/teleporter/warmup/warmup',.9);say('evt/zombie_global/teleporter/warmup/top_spark',.8);}charging=on;}).observe(toastEl,{childList:true,characterData:true,subtree:true});
   const seen=new WeakSet();

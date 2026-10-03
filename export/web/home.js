@@ -96,7 +96,7 @@ renderAccount();
 
 // ---- Play: map browser --------------------------------------------------------
 const modesOf=m=>m.modes??[(m.mode??'explore').toLowerCase()];
-const zombiesUrl=m=>m.dir?`zombies.html?map=${encodeURIComponent(m.id)}`:m.url;
+const zombiesUrl=m=>m.dir?`play.html?map=${encodeURIComponent(m.id)}`:m.url;   // every zombies map runs in the one engine (engine.js)
 const exploreUrl=m=>m.dir?`explorer.html?map=${encodeURIComponent(m.id)}`:m.url;
 function art(el,m,hero=false){
   el.className=(hero?'hero-art':'art')+(m.image?'':' generated');

@@ -1,7 +1,7 @@
 // Explosions, blood mist and impact puffs drawn with BO1's own effect textures
 // (textures/fxt_*: fireball atlas, glow, embers, smoke puffs, the blood-burst
 // flipbook, blood cloud and gush), in place of the game's little cubes.
-// game.js/zombies.js effect() emits 'effect' first; this claims the ones it
+// engine.js's effect() emits 'effect' first; this claims the ones it
 // recognises by colour (orange = explosion, the default red = a blood hit,
 // green = Ray Gun, tan = a wall hit) and leaves the rest to the cubes.
 // Sprites are pooled; no lights are added (that would recompile every shader).

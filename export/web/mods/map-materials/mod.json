@@ -1,5 +1,8 @@
 {
   "name": "Kino map materials",
   "description": "Restores see-through glass, multiply-blended stains and soft decals on Kino der Toten, and hides an editor-only light portal.",
-  "script": "mod.js"
+  "script": "mod.js",
+  "maps": [
+    "kino"
+  ]
 }

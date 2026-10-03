@@ -7,8 +7,11 @@
       "modes": [
         "zombies"
       ],
-      "url": "index.html",
-      "image": "social/kino-preview-v1.png"
+      "url": "play.html?map=kino",
+      "image": "social/kino-preview-v1.png",
+      "tagline": "The lights are out. The show goes on.",
+      "place": "BERLIN, GERMANY",
+      "kicker": "CALL OF DUTY <span>BLACK OPS</span>"
     },
     {
       "id": "moon",
@@ -17,8 +20,12 @@
       "modes": [
         "zombies"
       ],
-      "url": "moon.html",
-      "image": "mods/maps/thumbs/moon.jpg"
+      "url": "play.html?map=moon",
+      "image": "mods/maps/thumbs/moon.jpg",
+      "module": "moon",
+      "place": "GRIFFIN STATION",
+      "kicker": "CALL OF DUTY <span>BLACK OPS</span>",
+      "tagline": "From No Man’s Land to Griffin Station."
     },
     {
       "id": "shangri-la",

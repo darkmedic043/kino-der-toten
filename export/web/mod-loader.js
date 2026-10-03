@@ -3,7 +3,8 @@
 // mods/mods.json lists enabled mod folders in load order. Each folder has a
 // mod.json manifest that may name a data patch (merged into game-data.json
 // before the game builds anything) and a script (an ES module whose default
-// export receives the ModHost API once the game has loaded).
+// export receives the ModHost API once the game has loaded). A manifest may list
+// "maps" (only these map ids) or "skipMaps" (not these); the engine sets mapId.
 
 const isObject=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 
@@ -59,6 +60,7 @@ export class ModHost {
       const url=new URL(id+'/',this.base);
       try{
         const manifest=await this.fetchJson(new URL('mod.json',url));
+        if(this.mapId&&(manifest.maps&&!manifest.maps.includes(this.mapId)||manifest.skipMaps?.includes(this.mapId)))continue;   // not for this map
         const mod={id,url,manifest,name:manifest.name??id};
         for(const file of [manifest.data??[]].flat())data=mergePatch(data,await this.fetchJson(new URL(file,url)));
         // A script may export prepare(data) to adjust data before the game builds anything.

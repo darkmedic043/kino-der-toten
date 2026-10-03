@@ -16,7 +16,7 @@ const HIDE=/hdrportal/;
 const GLOW=/clothcable_glow/;
 
 export default async function setup(api){
-  if(api.map)return;
+  if(api.map&&api.map.id!=='kino')return;   // Kino's materials only
   const seen=new Set(),counts={glass:0,multiply:0,soft:0,hidden:0,glow:0};
   api.scene.traverse(o=>{
     if(!o.isMesh)return;

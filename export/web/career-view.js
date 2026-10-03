@@ -37,7 +37,6 @@ export function renderCareer(root,{mapList=[],weapons={}}={}){
       const list=ids.map(id=>{const m=c.maps[id]??{};return `<button data-map="${esc(id)}" class="row ${id===mapSel?'active':''}"><strong>${esc(mapName(id))}</strong><small>${m.games?`${num(m.games)} games · best round ${num(m.bestRound)}`:'Not played yet'}</small></button>`;}).join('');
       const m=c.maps[mapSel]??{};
       body=`<div class="split"><div class="list">${list}</div><div class="detail"><h3>${esc(mapName(mapSel))}</h3>
-        ${mapSel==='moon'?'<p class="muted small">Moon runs without mods, so its games aren&#39;t recorded yet.</p>':''}
         <div class="stat-grid">${block(m)}${card('Deaths',num(m.deaths))}</div></div></div>`;
     }
     if(view==='weapons'){

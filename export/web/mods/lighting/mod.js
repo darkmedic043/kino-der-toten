@@ -8,6 +8,8 @@
 // fill and the exposure are lowered so rooms get real light pools and dark
 // corners. With the power on, the chandelier's candle bulbs glow.
 //
+// Moon: see moon.js (the map's lamp models and light entities, a low sun).
+//
 // Every map: bloom and ground-contact ambient occlusion through a
 // post-processing chain (mods.renderWorld), scaled by Settings → Graphics
 // quality (0 Low: none, 1 Medium: bloom + beams, 2 High: + shadows + AO,
@@ -25,6 +27,7 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { bakeVolume, loadVolume, patchMaterial } from './baked.js';
 import { settings, onSettingsChange } from '../../settings.js';
+import { setupMoon } from './moon.js';
 
 const SWAP=.25;
 // Per-light brightness cap in the lighting shader. A lamp sitting inside its
@@ -57,7 +60,7 @@ const quality=()=>Math.min(coarse?1:3,THREE.MathUtils.clamp(Math.round(settings.
 
 export default async function setup(api){
   const {scene,camera,session,data,host,renderer}=api;
-  const kino=!api.map;
+  const kino=!api.map||api.map.id==='kino';   // the engine passes every map's entry, Kino's included
   // Light fixtures placed in the static map (chandeliers, sconces, hanging lamps,
   // mirror bulbs, stage lamps...), baked from kino.gltf's nodes.
   const fixtures=kino?await fetch(new URL('fixtures.json',import.meta.url)).then(r=>r.ok?r.json():[]).catch(()=>[]):[];
@@ -77,6 +80,7 @@ export default async function setup(api){
   // the caged bulbs for the box-location maps (dropped by the export)
   const cage=kino?await loadModel('models/zombie_zapper_cagelight.glb').catch(()=>null):null;
   if(kino)setupKino(api,fixtures,volume,baking,cage);
+  else if(api.map?.id==='moon'&&renderer)window.kino.lighting=setupMoon(api,{quality,LIGHT_CLAMP});
 }
 
 // ---- Kino lights ------------------------------------------------------------------------------

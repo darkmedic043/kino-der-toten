@@ -8,7 +8,7 @@ import { loadCareer, CAREER_KEY } from './career.js';
 
 export default function setup(api){
   const {host,session}=api;
-  const map=location.pathname.endsWith('zombies.html')?new URLSearchParams(location.search).get('map')??'custom':'kino';
+  const map=api.map?.id??'kino';   // the engine passes every map's mods/maps.json entry
   const cheating=()=>!!window.kino?.cheats?.used;
   let career=loadCareer(),dirty=false,saveT=0;
   const T=()=>career.total,M=()=>career.maps[map]??={},W=id=>career.weapons[id]??={};

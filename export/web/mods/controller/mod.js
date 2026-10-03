@@ -1,6 +1,6 @@
 // Controller support (not part of upstream). Polls the Gamepad API every animation frame
 // (also while paused, so Start resumes). The left stick feeds analog movement through
-// kino.gamepad.move (read by game.js/zombies.js); the right stick turns the camera; every
+// kino.gamepad.move (read by engine.js); the right stick turns the camera; every
 // button is sent as the key or mouse event the game and the other mods already listen for
 // (default key codes, flagged `remapped` so the keybind remapper passes them through).
 // Standard mapping, Xbox names (PlayStation: A=Cross, B=Circle, X=Square, Y=Triangle).
