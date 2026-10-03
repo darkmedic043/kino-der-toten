@@ -80,7 +80,7 @@ export default async function setup(api){
   // the caged bulbs for the box-location maps (dropped by the export)
   const cage=kino?await loadModel('models/zombie_zapper_cagelight.glb').catch(()=>null):null;
   if(kino)setupKino(api,fixtures,volume,baking,cage);
-  else if(api.map?.id==='moon'&&renderer)window.kino.lighting=setupMoon(api,{quality,LIGHT_CLAMP});
+  else if(api.map?.id==='moon'&&renderer)window.kino.lighting=setupMoon(api,{quality,LIGHT_CLAMP,baking,volume:baking?null:await loadVolume(import.meta.url,'moon-light')});
 }
 
 // ---- Kino lights ------------------------------------------------------------------------------

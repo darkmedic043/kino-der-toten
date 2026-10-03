@@ -109,6 +109,26 @@ export async function createMap(ctx,entry){
     ctx.toast(destination==='area51'?'Reach the teleporter at the far end of the yard.':onMoon&&!state.hasSuit?'Find the P.E.S. station. F to equip life support.':landmark.label,destination==='area51'?7:4);
   }
 
+  // ---- distance culling ---------------------------------------------------------------------
+  // Moon has no fog and a 70 000-unit view, so every prop batch on the map was drawn (~2 200 draw
+  // calls in the station). Small static meshes drop out past a distance scaled by their size
+  // (a 30-unit prop at ~2 700, a 100-unit one at ~9 000); the terrain, shells and big structures stay.
+  // Culling moves a mesh to layer 1 rather than touching .visible, which the Moon features own.
+  const cullable=[];let cullTimer=0;
+  function buildCuller(roots){
+    const sphere=new THREE.Sphere();
+    for(const root of roots)root.traverse(o=>{
+      if(!o.isMesh||o.isSkinnedMesh||!o.geometry)return;
+      if(o.isInstancedMesh){o.computeBoundingSphere();sphere.copy(o.boundingSphere);}else{o.geometry.boundingSphere||o.geometry.computeBoundingSphere();sphere.copy(o.geometry.boundingSphere);}
+      sphere.applyMatrix4(o.matrixWorld);if(sphere.radius>1500)return;
+      cullable.push({o,center:sphere.center.clone(),far:Math.max(1500,sphere.radius*90)+sphere.radius,shown:true});
+    });
+  }
+  function cull(dt){
+    if((cullTimer-=dt)>0)return;cullTimer=.2;const eye=camera.position;
+    for(const c of cullable){const show=c.center.distanceToSquared(eye)<c.far*c.far;if(show!==c.shown){c.shown=show;show?c.o.layers.enable(0):c.o.layers.disable(0);}}
+  }
+
   // ---- the "combat" MoonFeatures / MoonPresentation work through ---------------------------
   const worldApi={
     get physics(){return {capsuleIntersect,rayIntersect};},get navigation(){return navigation;},get collision(){return collision;},
@@ -129,6 +149,7 @@ export async function createMap(ctx,entry){
   class MoonMapFeatures extends MapFeatures {
     async load(){await super.load();await features.load();presentation=new MoonPresentation(scene,camera,features);await presentation.load();}
     placeClaymore(){return false;}
+    packMachine(){return features.one('zombie_vending_upgrade');}   // the gun shown in the machine sits in Moon's machine
     throwMonkey(){   // X: the Gersh Device / QED
       const s=S();if(!s.canAct||!s.equipment||s.equipmentAmmo<=0)return false;
       s.equipmentAmmo--;const mesh=clone(equipmentModels[s.equipment]);mesh.position.copy(camera.position);scene.add(mesh);
@@ -169,7 +190,9 @@ export async function createMap(ctx,entry){
       });
       for(const o of detach){scene.attach(o);o.matrixAutoUpdate=true;}
       for(const id of moving){const part=makePart(mapData.entities[id],objects.get(id));if(part){part.hazard=hazardIds.includes(id);part.window=windowIds.includes(id);part.removable=part.hazard||boardIds.includes(id);if(part.hazard)part.amount=1;parts.set(id,part);}}
-      optimizeStaticScene(gltf.scene,{cellSize:1024});
+      if(!/bakeLight/.test(location.search)){   // the light bake traces the plain meshes (instancing would hide them from its rays)
+      optimizeStaticScene(gltf.scene,{cellSize:4096});
+      buildCuller([gltf.scene,...[...objects].filter(([id])=>!parts.has(id)).map(([,o])=>o)]);}
       navigation=new MoonNavigation(mapData);await navigation.load();navigation.setDoors(parts);
       relocate('area51');
       return worldApi;
@@ -268,6 +291,7 @@ export async function createMap(ctx,entry){
       if(e.code==='Tab'){const j=document.getElementById('journal');if(j)j.hidden=!j.hidden;}
     },
     update(dt){
+      cull(dt);
       const s=S(),keys=ctx.keys;
       water?.update(Math.min(.25,dt));
       updateDoors(dt);

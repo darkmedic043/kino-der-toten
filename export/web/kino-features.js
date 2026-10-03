@@ -133,8 +133,8 @@ export class KinoFeatures {
     const ready=this.session.time>=pack.readyAt,id=pack.weapon.id+(ready?':ready':'');
     if(id!==this.packId){
       this.packMesh?.removeFromParent();disposeSkeletons(this.packMesh);const def=this.data.weapons[pack.weapon.id],url=ready?def.upgrade.worldModel:def.worldModel;
-      this.packMesh=this.model(url);const machine=this.data.entities.find(e=>e.targetname==='zombie_vending_upgrade');
-      this.packMesh.position.fromArray(machine.position);this.packMesh.position.y-=8;this.scene.add(this.packMesh);this.packId=id;
+      this.packMesh=this.model(url);const machine=this.packMachine?.()??this.data.entities.find(e=>e.targetname==='zombie_vending_upgrade');   // maps can say where their machine is (Moon's isn't in this data)
+      if(machine)this.packMesh.position.fromArray(machine.position);this.packMesh.position.y-=8;this.scene.add(this.packMesh);this.packId=id;
     }
     this.packMesh.visible=ready||pack.readyAt-this.session.time>3.5;
   }

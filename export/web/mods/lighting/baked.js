@@ -1,4 +1,4 @@
-// Baked static lighting for Kino: a 3D grid ("irradiance volume") over the map
+// Baked static lighting for Kino and Moon: a 3D grid ("irradiance volume") over the map
 // holding the light every fixed lamp casts at each point (walls block it), so
 // every lamp lights its area from any distance with no per-frame cost and no
 // pop-in. Only a few lights (spotlights with beams, fire, the box lamp) stay
@@ -55,10 +55,10 @@ export async function bakeVolume({scene,sources,exclude,cell=32,onProgress}){
 }
 
 // Runtime: load the volume into 3D textures and return the uniforms to share.
-export async function loadVolume(baseUrl){
-  const meta=await fetch(new URL('baked-light.json',baseUrl)).then(r=>r.ok?r.json():null).catch(()=>null);if(!meta)return null;
+export async function loadVolume(baseUrl,name='baked-light'){   // Moon's is moon-light
+  const meta=await fetch(new URL(name+'.json',baseUrl)).then(r=>r.ok?r.json():null).catch(()=>null);if(!meta)return null;
   // Shipped gzipped (1.5 MB instead of 17 MB; mostly empty space) and inflated in the browser.
-  const res=await fetch(new URL('baked-light.bin.gz',baseUrl));if(!res.ok)return null;
+  const res=await fetch(new URL(name+'.bin.gz',baseUrl));if(!res.ok)return null;
   const bin=new Uint8Array(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
   const [X,Y,Z]=meta.dims,n=X*Y*Z;
   const tex=(offset)=>{const rgba=new Uint8Array(n*4);for(let i=0;i<n;i++){rgba[i*4]=bin[offset+i*3];rgba[i*4+1]=bin[offset+i*3+1];rgba[i*4+2]=bin[offset+i*3+2];rgba[i*4+3]=255;}

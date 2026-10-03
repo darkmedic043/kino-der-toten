@@ -11,6 +11,7 @@
 // turned down so rooms get light pools and dark corners, lamp materials glow
 // (and bloom), and the power switch brightens the station.
 import * as THREE from 'three';
+import { bakeVolume, patchMaterial } from './baked.js';
 
 // Lamp models in moon.gltf (instanced nodes `i_<model>_<n>`): colour, strength, reach.
 const LAMPS={
@@ -31,7 +32,7 @@ const LAMPS={
 // Materials of lit lamps: they glow, so bloom picks them up.
 const GLOWING=/fixture_on|lightfixture|tube_light(?!_off)|tube_light_(red|green|ye)|lightbox_on|yellow_ligh|lab_light_neon|lampost|teleporter_glow|filament/i;
 
-export function setupMoon(api,{quality,LIGHT_CLAMP}){
+export function setupMoon(api,{quality,LIGHT_CLAMP,volume=null,baking=false}){
   const {scene,camera,renderer,data,host}=api;
   let st={};const readState=()=>{st=api.getState?.()?.moon??{};};   // the full engine snapshot: read it 4× a second, not every frame
   // ---- sources -------------------------------------------------------------------------------
@@ -40,7 +41,7 @@ export function setupMoon(api,{quality,LIGHT_CLAMP}){
     // Neighbouring lamps (rows of beam lamps, twin tubes) share one light.
     const near=sources.find(s=>s.position.distanceTo(position)<90&&s.color.equals(color));
     if(near){near.intensity=Math.min(near.intensity*1.25,12);near.radius=Math.max(near.radius,radius)*1.05;return;}
-    sources.push({position,color,intensity,radius,...extra});
+    sources.push({position,color,intensity,radius,...extra,earth:position.x>9000});   // Area 51 (No Man's Land) sits far out at x≈14 000
   };
   scene.traverse(o=>{
     const m=/^i_(.+?)(?:[_.]\d+)?$/.exec(o.name);const k=m&&LAMPS[m[1]];if(!k)return;
@@ -70,34 +71,43 @@ export function setupMoon(api,{quality,LIGHT_CLAMP}){
   const sunDir=new THREE.Vector3(Math.cos(pitch)*Math.cos(yaw),-Math.sin(pitch),-Math.cos(pitch)*Math.sin(yaw)).normalize();
   const [sr,sg,sb]=String(ws.suncolor??'.84 .89 .89').split(/\s+/).map(Number);
   const sun=new THREE.DirectionalLight(new THREE.Color(sr,sg,sb),0);sun.castShadow=true;
-  const R=2400;Object.assign(sun.shadow.camera,{left:-R,right:R,top:R,bottom:-R,near:10,far:9000});sun.shadow.camera.updateProjectionMatrix();
+  const R=2900;Object.assign(sun.shadow.camera,{left:-R,right:R,top:R,bottom:-R,near:10,far:9000});sun.shadow.camera.updateProjectionMatrix();
   sun.shadow.bias=-.0003;sun.shadow.normalBias=1.6;sun.shadow.autoUpdate=false;sun.shadow.needsUpdate=true;scene.add(sun,sun.target);
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;
   const shadowReady=new WeakSet();
   const tagShadows=root=>root.traverse(o=>{if(!o.isMesh||shadowReady.has(o))return;shadowReady.add(o);
     for(const x of [o.material].flat())if(x&&!x.isShaderMaterial&&x.defines?.LIGHT_CLAMP!==LIGHT_CLAMP){x.defines={...x.defines,LIGHT_CLAMP};x.needsUpdate=true;}
+    if(volume)for(const x of [o.material].flat())if(x&&!x.isShaderMaterial)patchMaterial(x,volume.uniforms);
     const m=[o.material].flat()[0],sky=/sky/i.test(m?.name??''),glass=/glass|window_warehouse/i.test(m?.name??'');   // the biodome's dome and the windows let the sun in
-    o.castShadow=!sky&&!glass&&!m?.transparent&&!(m?.blending>1)&&!glow.has(m);o.receiveShadow=!sky;});
+    if(!o.geometry.boundingSphere)o.geometry.computeBoundingSphere();
+    const small=!o.isSkinnedMesh&&!o.isInstancedMesh&&o.geometry.boundingSphere.radius*o.getWorldScale(P).x<30;   // tiny props: shadows nobody sees, but each is a shadow-pass draw
+    o.castShadow=!small&&!sky&&!glass&&!m?.transparent&&!(m?.blending>1)&&!glow.has(m);o.receiveShadow=!sky;});
   tagShadows(scene);let tagTimer=0;
   const snap=new THREE.Vector3(Infinity,0,0);let sunTimer=0,sunSig='';
   function placeSun(force){
-    // Follow the player in 200-unit steps (a moving shadow map shimmers); redraw on a move,
-    // a door, or every half second on High so zombies and the player cast shadows too.
+    // Follow the player in 500-unit steps (a moving shadow map shimmers) and redraw only then:
+    // re-rendering the map into the shadow map is costly. Ultra also redraws 3× a second so
+    // zombies and the player cast shadows.
     const c=camera.position,q=quality();
-    const moved=Math.abs(c.x-snap.x)>200||Math.abs(c.z-snap.z)>200||Math.abs(c.y-snap.y)>200;
-    if(moved){snap.set(Math.round(c.x/200)*200,Math.round(c.y/200)*200,Math.round(c.z/200)*200);sun.target.position.copy(snap);sun.position.copy(snap).addScaledVector(sunDir,4500);sun.target.updateMatrixWorld();}
+    const moved=Math.abs(c.x-snap.x)>500||Math.abs(c.z-snap.z)>500||Math.abs(c.y-snap.y)>500;
+    if(moved){snap.set(Math.round(c.x/500)*500,Math.round(c.y/500)*500,Math.round(c.z/500)*500);sun.target.position.copy(snap);sun.position.copy(snap).addScaledVector(sunDir,4500);sun.target.updateMatrixWorld();}
     const size=q>=3?4096:2048;if(sun.shadow.mapSize.x!==size){sun.shadow.mapSize.set(size,size);sun.shadow.map?.dispose();sun.shadow.map=null;}
-    if(force||moved||(q>=2&&sunTimer<=0)){sun.shadow.needsUpdate=true;sunTimer=q>=3?.15:.4;}
+    if(force||moved||(q>=3&&sunTimer<=0)){sun.shadow.needsUpdate=true;sunTimer=.35;}
   }
 
   // ---- the light pool --------------------------------------------------------------------------
-  const poolSize=q=>q>=3?20:q>=2?14:q>=1?10:6;
+  // Every lit pixel loops over the whole pool (14 lights cost ~11 fps here), so with the baked volume
+  // only the lights it leaves out are live: Area 51's floodlights and the flickering lamps.
+  const baked=s=>!!volume&&!s.earth&&!s.flicker;
+  // On the Moon side the volume covers everything but one flickering lamp; the pool regrows on Earth
+  // (a one-off shader recompile, hidden by the teleport).
+  const poolSize=(q,moon)=>volume?(moon?1:q>=3?6:q>=2?4:3):(q>=3?12:q>=2?8:q>=1?6:4);
   const pool=[];
   function resizePool(n){
     while(pool.length<n){const l=new THREE.SpotLight(0xffffff,0,1,1.35,1,1.3);l.userData={};scene.add(l,l.target);pool.push(l);}
     while(pool.length>n){const l=pool.pop();scene.remove(l,l.target);l.dispose();}
   }
-  resizePool(poolSize(quality()));
+  resizePool(poolSize(quality(),true));
   let t=0,timer=0,power=0;
   const level=s=>(s.power?power:.55+.45*power)*(s.flicker?.85+Math.sin(t*23+s.position.x)*.1+Math.random()*.1:1);
   const tick=dt=>{
@@ -109,8 +119,8 @@ export function setupMoon(api,{quality,LIGHT_CLAMP}){
     if(q>=1)placeSun(false);
     if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);}
     if(timer<=0){
-      timer=.25;if(pool.length!==poolSize(q))resizePool(poolSize(q));
-      const eye=camera.position,ranked=sources.filter(s=>s.earth!==moon).map(s=>({s,score:level(s)*s.intensity*s.radius/Math.max(80,s.position.distanceTo(eye))}))
+      timer=.25;if(pool.length!==poolSize(q,moon))resizePool(poolSize(q,moon));
+      const eye=camera.position,ranked=sources.filter(s=>!!s.earth!==moon&&!baked(s)).map(s=>({s,score:level(s)*s.intensity*s.radius/Math.max(80,s.position.distanceTo(eye))}))
         .filter(r=>r.score>0&&r.s.position.distanceTo(eye)<r.s.radius*3).sort((a,b)=>b.score-a.score).slice(0,pool.length);
       const want=new Set(ranked.map(r=>r.s));
       // Keep lights that still rank; free the rest (they fade out first, then take a new source).
@@ -126,9 +136,19 @@ export function setupMoon(api,{quality,LIGHT_CLAMP}){
       l.intensity+=(target-l.intensity)*Math.min(1,dt*(target<l.intensity?4:1.6));   // never toggle .visible: it recompiles every lit shader
     }
     for(const m of glow)m.emissiveIntensity=.7+.8*power;
+    if(volume)volume.uniforms.bakedPowerMix.value=power;
   };
   host.on('update',tick);
   readState();placeSun(true);tick(1/60);
-  return {sources,pool,sun,tag:tagShadows};
+  if(volume)volume.uniforms.bakedStrength.value=.45;   // it lands in indirect diffuse with no shadowing from the fill: 1 washed the tunnels out
+  const out={sources,pool,sun,tag:tagShadows,volume};
+  // ?bakeLight: bake the station's lamps (.tools/bake-lighting.mjs moon → moon-light.bin.gz). Each lamp
+  // goes in twice to match level(): 55% always on, 45% with the power; light_off lamps power only.
+  if(baking)(async()=>{const t0=performance.now(),list=[];
+    for(const s of sources){if(s.earth||s.flicker)continue;const I=s.intensity*520/560,c={position:s.position,color:s.color,radius:s.radius,angle:1.35,dir:DOWN};
+      if(s.power)list.push({...c,intensity:I,kind:'power'});else list.push({...c,intensity:I*.55,kind:'solid'},{...c,intensity:I*.45,kind:'power'});}
+    const r=await bakeVolume({scene,sources:list,exclude:()=>false,cell:40,onProgress:(i,n)=>{if(i%10===0)console.info('[bake] slice',i,'/',n);}});
+    out.bakeResult=r;console.info('[bake] done in',Math.round((performance.now()-t0)/1000),'s',r.meta.dims.join('x'));})();
+  return out;
 }
 const DOWN=new THREE.Vector3(0,-1,0);

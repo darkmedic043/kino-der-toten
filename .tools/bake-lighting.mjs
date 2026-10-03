@@ -2,7 +2,8 @@
 // Bakes Kino's static lighting volume (see export/web/mods/lighting/baked.js):
 // loads the game with ?bakeLight in headless Chromium (GPU), waits for the bake
 // and writes export/web/mods/lighting/baked-light.{bin,json}.
-//   node .tools/bake-lighting.mjs   (needs the game served on :5190)
+//   node .tools/bake-lighting.mjs [moon]   (needs the game served on :5190; moon writes moon-light.*)
+const MAP=process.argv[2]??'kino',NAME=MAP==='kino'?'baked-light':MAP+'-light';
 import {chromium} from 'playwright-core';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,7 +14,7 @@ const page=await browser.newPage({viewport:{width:320,height:180}});
 page.on('console',m=>{if(/\[bake\]|rror/.test(m.text()))console.log(m.text());});
 page.on('pageerror',e=>console.log('ERR',String(e)));
 await page.addInitScript(()=>{try{localStorage.setItem('kino.settings',JSON.stringify({graphics:2}));}catch{}});
-await page.goto('http://127.0.0.1:5190/index.html?bakeLight');
+await page.goto(`http://127.0.0.1:5190/play.html?map=${MAP}&bakeLight`);
 await page.waitForFunction(()=>kino?.debug.getState().ready,null,{timeout:300000});
 await page.waitForFunction(()=>kino.lighting?.bakeResult,null,{timeout:3600000,polling:2000});
 const meta=await page.evaluate(()=>kino.lighting.bakeResult.meta);
@@ -26,7 +27,7 @@ for(const key of ['solidRGB','powerRGB','dirRGB']){
   }
 }
 const out=new URL('../export/web/mods/lighting/',import.meta.url);
-fs.writeFileSync(new URL('baked-light.bin.gz',out),(await import('node:zlib')).gzipSync(Buffer.concat(chunks),{level:9}));
-fs.writeFileSync(new URL('baked-light.json',out),JSON.stringify(meta));
+fs.writeFileSync(new URL(NAME+'.bin.gz',out),(await import('node:zlib')).gzipSync(Buffer.concat(chunks),{level:9}));
+fs.writeFileSync(new URL(NAME+'.json',out),JSON.stringify(meta));
 console.log('wrote',meta.dims.join('x'),'cells,',Buffer.concat(chunks).length,'bytes');
 await browser.close();
