@@ -1,0 +1,6 @@
+# Built from the user's own BO3 install by .tools/build_bo3_weapons.py: not redistributable.
+weapons.json
+models/
+animations/
+audio/
+textures/

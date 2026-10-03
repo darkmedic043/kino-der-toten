@@ -22,3 +22,22 @@ In `moon-weapons`: the barrels must spin up (0.75 s, 0.45 s Pack-a-Punched) befo
 ## Gersh light
 
 The Gersh black hole used to add a `PointLight` to the scene: adding or removing a light recompiles every lit shader (a multi-second freeze each time). It now pushes a `dynamic:true` source into `kino.lighting.sources`, which the fixed light pool picks up.
+
+## Black Ops III assets (Greyhound) and the Wunderwaffe DG-2
+
+BO3 (`/mass_drive/SteamLibrary/steamapps/common/Call of Duty Black Ops III`) can't be read by OpenAssetTools; its assets come from the running game through Greyhound 1.46.3.2, copied to `C:\greyhound` in the BO3 Proton prefix (`compatdata/311210`).
+
+**Exporting**
+- Greyhound must run **inside the game's Steam Runtime container**, or it can't see the game (each container has its own wineserver). Set the BO3 launch options to `STEAM_COMPAT_LAUNCHER_SERVICE=proton %command%`, load a map, then `~/.local/share/Steam/steamapps/common/SteamLinuxRuntime_4/pressure-vessel/bin/steam-runtime-launch-client --bus-name=com.steampowered.App311210 --directory='' -- wine 'C:\greyhound\Greyhound.exe'`. Protontricks starts a separate container: no good. The prefix needed `vcrun2022` (mfc140u.dll).
+- `greyhound.json`: `exportmodelimg` off (exporting a model *with* its images froze Greyhound), `cdn_downloader` off, `showximage` on. Export images separately by searching their names (`i_wpn_t7_zmb_dg2`).
+- Driving it: BO3's window can't be screen-captured (Vulkan), Greyhound's can (`ffmpeg -f x11grab -window_id`). xdotool clicks work on a fresh Greyhound, but **after one export its input stops**: kill it and relaunch for each batch. Its list never shows a selection, so search the exact name and use Export All (it exports what the list shows).
+- Exports are copied to `export_game/bo3/` (git-ignored): `xmodels/`, `xanims/` (SEAnim), `ximages/` (PNG), `sounds/`.
+- **Sounds** don't need the game: Greyhound's Load File opens BO3's sound banks (`zone/snd/all/*.sabl`, 680 of them; type the relative path, e.g. `zone\snd\all\zm_common.all.sabl`, into the dialog's File name). Names have no folders, so Export All the bank (`keepsndpath` keeps `wpn/energy/dg2/...`) and copy the weapon's folder. Find which bank has a weapon with `strings -n 8 <bank>.sabl | grep -i <name>` (the DG-2: `zm_common`; The Giant's `zm_factory` has a patched fire). The build converts them to Ogg (`audio/`, keyed by path in weapons.json `sounds`).
+
+**Building** (`python3 .tools/build_bo3_weapons.py`): `.tools/semodel_to_glb.py` (SEModel → skinned GLB, Z-up → Y-up, CoD winding flipped, WebP textures via EXT_texture_webp, roughness from BO3 gloss), `.tools/seanim.py` (SEAnim reader) → `mods/bo3-weapons/` (models/, animations/ in the xanim_to_json clip format, weapons.json; all git-ignored).
+- BO3 first-person rigs match BO1's layout (tag_view > tag_ads > tag_torso > shoulders) at about **2.2× the scale**; that's harmless, the camera sits at tag_view. Each BO3 weapon carries its own BO3 arms as `handsModel` (Dempsey's viewhands).
+- Renames: `tag_weapon_right` → `tag_weapon` (the mount ViewWeapon attaches to); the gun's own root `tag_weapon` track is dropped (it's the anchor). BO3 finger joints `_1.._3` are BO1's `_0.._2` (BO3's `*base` joints are extra helpers): shifted so `fp-arms.js` finds them.
+- Gun-part translations are written as offsets from the part's bind (ViewWeapon adds the bind back), hands translations absolute.
+- `fp-arms.js` now builds the character's first-person arms **per hands rig** (keyed by the hands geometry): built once from BO1's hands they were placed wrong on BO3's rig.
+
+**Wunderwaffe DG-2** (`tesla_gun_zm`, Mystery Box; PaP: Wunderwaffe DG-3 JZ): `mods/bo3-weapons/mod.js`. A shot arcs to the zombie nearest the aim (out to 1000) and chains from each kill to the next within 300, up to 10 kills (PaP 1200 / 420 / 24), one kill every 0.12 s, with jagged additive arcs. Sounds are BO3's own: the layered player shot (front/LFE/rear; a separate last shot), flux + impact per arc, reload foley on the reload animation's `sndnt#wpn_tesla_*` notetracks (via `view.onSound`), and the idle hum while it's in hand. Clip 3, max ammo 12 (PaP 6 / 24). Verified headless (Sandbox): one shot, 5 of 6 zombies; fire/reload/raise animations play; Bondrewd's arms follow the BO3 rig.

@@ -29,7 +29,7 @@ function handBasis(wrist,mid,index,little){
 
 export class FirstPersonArms {
   // gltf: the character's loaded glTF; entry: its characters.json entry.
-  constructor(scene,gltf,entry){this.gltf=gltf;this.entry=entry;this.attached=new WeakSet();this.ok=true;}
+  constructor(scene,gltf,entry){this.gltf=gltf;this.entry=entry;this.attached=new WeakSet();this.ok=true;this.builds=new Map();}
 
   // Finds the character's arm chains (+X is the character's left; they face +Z).
   rig(model,holder){
@@ -209,8 +209,14 @@ export class FirstPersonArms {
   // Swap the character's arms into a weapon rig (once per rig).
   attach(hands){
     if(this.attached.has(hands))return;this.attached.add(hands);
-    if(!this.parts&&!this.build(hands)){this.ok=false;return;}
-    let template=null;hands.traverse(o=>{if(isT5Arms(o)){o.visible=false;template??=o;}});
+    // One build per hands rig (keyed by its shared geometry): BO1's arms and a BO3 weapon's own
+    // arms (def.handsModel, ~2.2x the scale, another bind pose) each need theirs.
+    let template=null;hands.traverse(o=>{if(!template&&isT5Arms(o))template=o;});if(!template)return;
+    const key=template.geometry.uuid;
+    if(!this.builds.has(key))this.builds.set(key,this.build(hands)?{parts:this.parts,rt:this.rt}:null);
+    const built=this.builds.get(key);if(!built)return;   // this rig keeps its own arms
+    this.parts=built.parts;this.rt=built.rt;
+    hands.traverse(o=>{if(isT5Arms(o))o.visible=false;});
     const skeleton=this.rt&&this.retargetSkeleton(template.skeleton);
     for(const {geometry,material} of this.parts){
       const mesh=new THREE.SkinnedMesh(geometry,material);mesh.frustumCulled=false;mesh.name='fp_arms';

@@ -15,7 +15,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Performance measurements and load-time warm-ups | `performance.md` |
 | Health, HUD/hit sounds, zombie voices, music, cheat console | `gameplay.md` |
 | Movement mod (crouch/prone/slide/mantle, BO7 omnimovement, dive, wall jump), first-person motion and mantle hand IK, stairs | `movement.md` |
-| Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs | `weapons.md` |
+| Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs, BO3 imports (Greyhound, DG-2) | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby) | `coop.md` |
 | Props: terminal booth (Blender generator, bake, placement mod) | `props.md` |
 | Weapon levels, attachments, camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound | `weapon-levels.md` |

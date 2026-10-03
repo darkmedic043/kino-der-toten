@@ -1,0 +1,5 @@
+{
+  "name": "BO3 weapons",
+  "description": "Black Ops III weapons built from your own BO3 install (.tools/build_bo3_weapons.py, Greyhound exports): the Wunderwaffe DG-2 with BO3 arms and animations, from the Mystery Box.",
+  "script": "mod.js"
+}
