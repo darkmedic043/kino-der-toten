@@ -3,11 +3,18 @@
 // points go into that tree (a spine fills as you invest). Passives have ranks,
 // augments (diamonds) change the action skill, the capstone sits at the bottom.
 // Left click adds a point, right click takes one out; Respec refunds everything.
-import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, actionRows, describe } from './classes.js';
+// BL4 loadout: each tree header equips its action skill; clicking an unlocked
+// augment (free once its tier opens; of the equipped tree, 2 slots) or capstone
+// (a point, any tree, 1 slot) equips it.
+import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, actionRows, describe, actionOf, equippedTree, equipAction, toggleAugment, toggleCapstone, isEquipped, unlocked, pruneLoadout } from './classes.js';
 
 const ICONS={
   turret:'<path d="M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4"/>',
   wall:'<path d="M3 6h18v12H3zM3 10h18M3 14h18M9 6v4M15 10v4M9 14v4"/>',
+  drone:'<path d="M9 10h6v4H9zM4 6h4M16 6h4M4 18h4M16 18h4M6 6l3 4M18 6l-3 4M6 18l3-4M18 18l-3-4"/>',
+  mortar:'<path d="M5 20h14M8 20l3-10h2l3 10M10 7l2-4 2 4M12 3v-1"/>',
+  snare:'<path d="M3 15c2-3 4 3 6 0s4 3 6 0 4 3 6 0M3 10c2-3 4 3 6 0s4 3 6 0 4 3 6 0M6 6v12M18 6v12"/>',
+  nest:'<path d="M4 19V11a8 8 0 0 1 16 0v8M4 15h4M16 15h4M4 11h4M16 11h4M8 7l2 3M16 7l-2 3"/>',
   crosshair:'<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>',
   clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
   snow:'<path d="M12 3v18M4 7.5l16 9M4 16.5l16-9M9 4l3 2 3-2M9 20l3-2 3 2"/>',
@@ -97,6 +104,19 @@ export const CLASS_CSS=`
 .node.capstone .shape{clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:linear-gradient(160deg,var(--tc),color-mix(in srgb,var(--tc) 30%,#000))}
 .node.capstone svg{width:32px;height:32px}
 .node.can .shape{animation:nodepulse 1.6s ease-in-out infinite}
+.node.on{filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 9px var(--tc))}
+.node.on .shape{background:#fff}
+.node.off svg{opacity:.45}
+.tree-act{display:flex;align-items:center;gap:10px;margin:10px auto 2px;padding:7px 10px;border:1px solid color-mix(in srgb,var(--tc) 40%,transparent);background:#0008;width:fit-content;max-width:100%;cursor:pointer;color:var(--text);font:600 11px/1.1 inherit;letter-spacing:.06em}
+.tree-act svg{width:22px;height:22px;color:var(--tc);flex:none}
+.tree-act span{text-align:left}.tree-act small{display:block;font-size:8px;letter-spacing:2px;color:var(--muted);margin-bottom:3px}
+.tree-act.on{border-color:var(--tc);background:color-mix(in srgb,var(--tc) 22%,#000a);box-shadow:0 0 14px color-mix(in srgb,var(--tc) 50%,transparent)}
+.tree-act.on small{color:var(--tc)}
+.cls-loadout{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
+.cls-loadout div{border:1px dashed #ffffff26;padding:8px 6px;min-height:46px;text-align:center;font-size:9px;letter-spacing:1px;color:var(--muted)}
+.cls-loadout div small{display:block;font-size:7.5px;letter-spacing:2px;margin-bottom:5px;color:var(--dim)}
+.cls-loadout div.full{border-style:solid;border-color:color-mix(in srgb,var(--sc) 70%,transparent);color:var(--text);background:color-mix(in srgb,var(--sc) 12%,transparent)}
+.cls-detail .why{color:#c9a65a;font-size:11px;margin-top:10px}
 @keyframes nodepulse{50%{box-shadow:0 0 0 0 transparent;filter:brightness(1.25)}}
 @media(max-width:1100px){.cls-body{grid-template-columns:1fr}.cls-side{position:static}}
 @media(max-width:820px){.cls-trees{grid-template-columns:1fr}.cls-head{grid-template-columns:1fr}.cls-points{text-align:left}}
@@ -106,35 +126,42 @@ export function renderClasses(root,cfg,{getState,setState}){
   let sel=null;
   function draw(){
     const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0],state=st.classes[cls.id];
-    const a=actionStats(cls,state),b=cls.action.base,up=(x,y)=>Math.abs(x-y)>1e-6?' class="up"':'';
+    const act=actionOf(cls,state),eq=equippedTree(cls,state),a=actionStats(cls,state),L=state.loadout;
+    const capNode=cls.trees.flatMap(t=>t.nodes.map(n=>({...n,tree:t.id,tc:t.color}))).find(n=>n.id===L.capstone);
+    const slot=(label,n,color)=>`<div class="${n?'full':''}" style="--sc:${color}"><small>${label}</small>${n?esc(n.name):'EMPTY'}</div>`;
     const need=xpToNext(cfg,state.level),maxed=state.level>=cfg.xp.maxLevel;
     root.style.setProperty('--cc',cls.color);
     root.innerHTML=`<div class="cls">
-      ${cfg.classes.length>1?`<div class="cls-pick">${cfg.classes.map(c=>`<button data-class="${c.id}" style="--pc:${c.color}"${c.id===cls.id?' class="on"':''}>${icon(c.action.icon)}${esc(c.name.toUpperCase())} <small>LV ${st.classes[c.id]?.level??1}</small></button>`).join('')}</div>`:''}
+      ${cfg.classes.length>1?`<div class="cls-pick">${cfg.classes.map(c=>`<button data-class="${c.id}" style="--pc:${c.color}"${c.id===cls.id?' class="on"':''}>${icon(c.trees[0].action.icon)}${esc(c.name.toUpperCase())} <small>LV ${st.classes[c.id]?.level??1}</small></button>`).join('')}</div>`:''}
       <div class="cls-head">
-        <div class="cls-emblem">${icon(cls.id==='engineer'?'wrench':cls.action.icon)}</div>
+        <div class="cls-emblem">${icon(cls.id==='engineer'?'wrench':'shield')}</div>
         <div class="cls-title"><span class="eyebrow">CLASS</span><strong>${esc(cls.name.toUpperCase())}</strong><small>${esc(cls.tagline)}</small>
           <div class="cls-xp">LEVEL ${state.level}${maxed?' · MAX':''}<div class="bar"><i style="width:${maxed?100:Math.round(state.xp/need*100)}%"></i></div>${maxed?'':`${state.xp} / ${need} XP`}</div></div>
         <div class="cls-points"><b>${available(state)}</b><span>SKILL POINTS</span><br><button data-act="respec">RESPEC</button></div>
       </div>
       <div class="cls-body">
         <div class="cls-side">
-          <div class="cls-action"><div class="top"><div class="ic">${icon(cls.action.icon)}</div><div><span class="eyebrow">ACTION SKILL · Z</span><strong>${esc(cls.action.name)}</strong></div></div>
-            <p>${esc(cls.action.desc)}</p>
+          <div class="cls-action" style="--cc:${eq.color}"><div class="top"><div class="ic">${icon(act.icon)}</div><div><span class="eyebrow">ACTION SKILL · Z · ${esc(eq.name.toUpperCase())}</span><strong>${esc(act.name)}</strong></div></div>
+            <p>${esc(act.desc)}</p>
             <div class="cls-stats">
-              ${actionRows(cls,a).map(([label,value,better])=>`<span${better?' class="up"':''}>${label} <b>${value}</b></span>`).join('')}
-            </div></div>
+              ${actionRows(cls,state,a).map(([label,value,better])=>`<span${better?' class="up"':''}>${label} <b>${value}</b></span>`).join('')}
+            </div>
+            <div class="cls-loadout">${slot('AUGMENT 1',eq.nodes.find(n=>n.id===L.augments[0]),eq.color)}${slot('AUGMENT 2',eq.nodes.find(n=>n.id===L.augments[1]),eq.color)}${slot('CAPSTONE',capNode,capNode?.tc??'#888')}</div></div>
           <div class="cls-detail" id="cls-detail"></div>
         </div>
         <div class="cls-trees">${cls.trees.map(t=>{
           const spentT=treeSpent(cls,state,t.id),tiers=Math.max(...t.nodes.map(n=>n.tier)),fill=Math.min(1,spentT/tierNeed(cfg,tiers));
-          return `<div class="tree" style="--tc:${t.color}"><div class="tree-head"><strong>${esc(t.name)}</strong><small>${esc(t.desc)}</small><br><span class="spent">${spentT} PTS</span></div>
+          return `<div class="tree" style="--tc:${t.color}"><div class="tree-head"><strong>${esc(t.name)}</strong><small>${esc(t.desc)}</small><br><span class="spent">${spentT} PTS</span>
+            <button class="tree-act${t.id===eq.id?' on':''}" data-equip="${t.id}">${icon(t.action.icon)}<span><small>${t.id===eq.id?'EQUIPPED':'EQUIP ACTION SKILL'}</small>${esc(t.action.name)}</span></button></div>
             <div class="tree-body"><div class="spine"><i style="height:${fill*100}%"></i></div>
             ${Array.from({length:tiers},(_,i)=>{const tier=i+1,locked=spentT<tierNeed(cfg,tier);
               return `<div class="tier${locked?' locked':''}"><span class="need">${tier===1?'':(locked?'🔒 ':'')+tierNeed(cfg,tier)}</span>${t.nodes.filter(n=>n.tier===tier).map(n=>{
-                const r=state.points[n.id]??0,node={...n,tree:t.id};
-                return `<button class="node ${n.type??'passive'}${r?' invested':''}${r>=n.ranks?' max':''}${canAdd(cfg,cls,state,node)?' can':''}${sel===n.id?' sel':''}" data-node="${n.id}" data-tree="${t.id}">
-                  <span class="shape"></span>${icon(n.icon)}<span class="pips">${Array.from({length:n.ranks},(_,k)=>`<i${k<r?' class="on"':''}></i>`).join('')}</span></button>`;}).join('')}</div>`;}).join('')}
+                const aug=n.type==='augment',node={...n,tree:t.id},open=aug&&unlocked(cfg,cls,state,node),r=aug?(open?1:0):state.points[n.id]??0;
+                const slotted=aug||n.type==='capstone',on=slotted&&r>0&&isEquipped(state,node);
+                // free augments: lit when their tier is open, pulse when one could go in a free slot right now
+                const can=aug?open&&!on&&t.id===state.loadout.action&&state.loadout.augments.length<(cfg.augmentSlots??2):canAdd(cfg,cls,state,node);
+                return `<button class="node ${n.type??'passive'}${r?' invested':''}${r>=n.ranks?' max':''}${on?' on':''}${slotted&&r>0&&!on?' off':''}${can?' can':''}${sel===n.id?' sel':''}" data-node="${n.id}" data-tree="${t.id}">
+                  <span class="shape"></span>${icon(n.icon)}${aug?'':`<span class="pips">${Array.from({length:n.ranks},(_,k)=>`<i${k<r?' class="on"':''}></i>`).join('')}</span>`}</button>`;}).join('')}</div>`;}).join('')}
             </div></div>`;}).join('')}</div>
       </div></div>`;
     detail(cls,state);
@@ -142,12 +169,16 @@ export function renderClasses(root,cfg,{getState,setState}){
   function detail(cls,state){
     const el=root.querySelector('#cls-detail');if(!el)return;
     const t=cls.trees.find(t=>t.nodes.some(n=>n.id===sel)),n=t?.nodes.find(n=>n.id===sel);
-    if(!n){el.innerHTML=`<span class="kind">SKILL</span><p>Hover a skill to see what it does. Left click to spend a point, right click to take it back. Every ${cfg.tierPoints} points in a tree opens its next tier.</p>`;return;}
-    const r=state.points[n.id]??0,node={...n,tree:t.id},locked=treeSpent(cls,state,t.id)<tierNeed(cfg,n.tier);
-    const kind=n.type==='augment'?'AUGMENT · CHANGES THE ACTION SKILL':n.type==='capstone'?'CAPSTONE':'PASSIVE';
+    if(!n){el.innerHTML=`<span class="kind">SKILL</span><p>Hover a skill to see what it does. Left click to spend a point, right click to take it back. Augments are free once their tier opens: click to equip two for your action skill. Every ${cfg.tierPoints} points in a tree opens its next tier.</p>`;return;}
+    const node={...n,tree:t.id},locked=treeSpent(cls,state,t.id)<tierNeed(cfg,n.tier),r=n.type==='augment'?(locked?0:1):state.points[n.id]??0;
+    const kind=n.type==='augment'?'AUGMENT · '+esc(t.action.name.toUpperCase()):n.type==='capstone'?'CAPSTONE · ANY ACTION SKILL':'PASSIVE';
+    const eqd=isEquipped(state,node),L=state.loadout;
+    const why=n.type==='augment'?(r?(eqd?'Equipped. Click to unequip.':t.id!==L.action?`Equip ${esc(t.action.name)} to use this augment.`:L.augments.length>=(cfg.augmentSlots??2)?`Both augment slots are full: click one of the equipped ones to free a slot.`:'Unlocked. Click to equip (2 slots).'):'Free: unlocks when '+esc(t.name)+' reaches this tier. Only works on '+esc(t.action.name)+'.')
+      :n.type==='capstone'?(r?(eqd?'Equipped. Click to unequip.':'Click to equip (1 capstone, works with any action skill).'):'Spend a point to unlock it, then click to equip it.'):'';
     el.style.setProperty('--dc',t.color);
-    el.innerHTML=`<span class="kind">${kind} · ${esc(t.name.toUpperCase())}</span><strong>${esc(n.name)}</strong><span class="rank">RANK ${r} / ${n.ranks}</span>
+    el.innerHTML=`<span class="kind">${kind} · ${esc(t.name.toUpperCase())}</span><strong>${esc(n.name)}</strong><span class="rank">${n.type==='augment'?(r?'UNLOCKED':'LOCKED'):`RANK ${r} / ${n.ranks}`}</span>
       <p>${esc(describe(n,r||1))}</p>${r&&r<n.ranks?`<p class="next">Next rank: ${esc(describe(n,r+1))}</p>`:''}
+      ${why?`<div class="why">${why}</div>`:''}
       ${locked?`<div class="lock">Needs ${tierNeed(cfg,n.tier)} points in ${esc(t.name)} (${treeSpent(cls,state,t.id)} spent)</div>`:''}
       ${!locked&&r<n.ranks&&available(state)<=0?`<div class="lock">No skill points: level the ${esc(cls.name)} up by playing as it.</div>`:''}`;
   }
@@ -156,14 +187,22 @@ export function renderClasses(root,cfg,{getState,setState}){
     const b=e.target.closest('.node');if(!b)return;e.preventDefault();
     const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0],state=st.classes[cls.id];
     const n={...cls.trees.find(t=>t.id===b.dataset.tree).nodes.find(n=>n.id===b.dataset.node),tree:b.dataset.tree};sel=n.id;
-    if(dir>0&&canAdd(cfg,cls,state,n))state.points[n.id]=(state.points[n.id]??0)+1;
+    const r=state.points[n.id]??0;
+    if(n.type==='augment'){   // free: click toggles it once its tier is open, right click takes it out
+      if(dir<0){if(!state.loadout.augments.includes(n.id))return;state.loadout.augments=state.loadout.augments.filter(id=>id!==n.id);}
+      else if(toggleAugment(cfg,cls,state,n)){detail(cls,state);return;}
+    }
+    else if(dir>0&&n.type==='capstone'&&r>0){if(toggleCapstone(state,n)){detail(cls,state);return;}}
+    else if(dir>0&&canAdd(cfg,cls,state,n)){state.points[n.id]=r+1;if(n.type==='capstone'&&!state.loadout.capstone)state.loadout.capstone=n.id;}   // a new capstone goes straight in
     else if(dir<0&&canRemove(cfg,cls,state,n)){state.points[n.id]--;if(!state.points[n.id])delete state.points[n.id];}
     else return;
+    pruneLoadout(cfg,cls,state);   // a relocked tier takes its augments out
     setState(st);draw();
   }
   root.addEventListener('click',e=>{
+    const eqb=e.target.closest('[data-equip]');if(eqb){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];equipAction(cls,st.classes[cls.id],eqb.dataset.equip);setState(st);draw();return;}
     const pick=e.target.closest('[data-class]');if(pick){const st=getState();st.selected=pick.dataset.class;setState(st);sel=null;draw();return;}
-    if(e.target.closest('[data-act="respec"]')){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];st.classes[cls.id].points={};setState(st);draw();return;}
+    if(e.target.closest('[data-act="respec"]')){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];st.classes[cls.id].points={};st.classes[cls.id].loadout={action:st.classes[cls.id].loadout?.action??cls.trees[0].id,augments:[],capstone:null};setState(st);draw();return;}
     change(e,1);
   });
   root.addEventListener('contextmenu',e=>change(e,-1));

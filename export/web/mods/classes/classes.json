@@ -1,5 +1,5 @@
 {
-  "_doc": "Classes: each levels independently from kills/rounds played as it; one skill point per level. Trees unlock a tier every `tierPoints` points spent in that tree (BL4 style). Node effects add per rank to the stat keys read by mod.js (see classes.js STATS).",
+  "_doc": "Classes (BL4 style): each tree has its own action skill; you equip one (loadout.action = tree id). Passives (points, ranks) are generic ability.* / player.* stats and work with whichever skill is equipped. Augments are free: a tree's augment unlocks when the tree reaches its tier; up to augmentSlots are equipped, from the equipped skill's tree. One capstone (a point, any tree) works with whichever skill is equipped. Tiers open every `tierPoints` points spent in that tree.",
   "xp": {
     "kill": 12,
     "headshot": 6,
@@ -13,219 +13,152 @@
     {
       "id": "engineer",
       "name": "Engineer",
-      "tagline": "Builds the defences everyone else hides behind.",
+      "tagline": "Builds the machines everyone else hides behind.",
       "color": "#e0a83a",
-      "action": {
-        "id": "sentry",
-        "name": "Sentry Turret",
-        "key": "ability",
-        "icon": "turret",
-        "desc": "Deploy an automatic turret in front of you. It tracks and shoots the nearest zombie it can see until it runs out of power.",
-        "base": {
-          "cooldown": 60,
-          "duration": 20,
-          "damage": 0.1,
-          "rate": 7,
-          "range": 900
-        }
-      },
       "trees": [
         {
           "id": "sentry",
           "name": "Sentry Protocol",
           "color": "#e0a83a",
-          "desc": "Turret firepower and uptime.",
+          "desc": "A turret that holds a spot.",
+          "action": {
+            "id": "sentry",
+            "name": "Sentry Turret",
+            "icon": "turret",
+            "desc": "Deploy an automatic turret in front of you. It tracks and shoots the nearest zombie it can see until it runs out of power.",
+            "base": {
+              "cooldown": 60,
+              "duration": 20,
+              "damage": 0.1,
+              "rate": 7,
+              "range": 900
+            }
+          },
           "nodes": [
             {
               "id": "calibrated",
               "name": "Calibrated Barrels",
-              "tier": 1,
               "ranks": 5,
               "icon": "crosshair",
-              "desc": "Turret damage +{v}%.",
+              "desc": "Ability damage +{v}%: turret and drone shots and mortar shells hit harder.",
               "effects": {
-                "turret.damage": 0.08
-              }
+                "ability.damage": 0.05
+              },
+              "tier": 1
             },
             {
               "id": "capacitors",
               "name": "Spare Capacitors",
-              "tier": 1,
               "ranks": 5,
               "icon": "clock",
-              "desc": "Turret lasts {v}s longer.",
+              "desc": "Ability duration +{v}%: the turret, drones and mortar barrage last longer.",
               "effects": {
-                "turret.duration": 2
+                "ability.duration": 0.08
               },
-              "fmt": "s"
-            },
-            {
-              "id": "tripwire",
-              "name": "Tripwire Rounds",
-              "tier": 2,
-              "ranks": 1,
-              "type": "augment",
-              "icon": "snow",
-              "desc": "Augment: turret shots slow zombies by 40% for 1.5s.",
-              "effects": {
-                "turret.slow": 0.4
-              }
+              "tier": 1
             },
             {
               "id": "motor",
               "name": "Servo Motor",
-              "tier": 2,
-              "ranks": 3,
+              "ranks": 5,
               "icon": "gear",
-              "desc": "Turret fire rate +{v}%.",
+              "desc": "Ability fire rate +{v}%: the turret and drones shoot faster, mortar shells fall faster.",
               "effects": {
-                "turret.rate": 0.1
-              }
+                "ability.rate": 0.06
+              },
+              "tier": 1
             },
             {
-              "id": "longsight",
-              "name": "Long Sight",
-              "tier": 3,
+              "id": "tripwire",
+              "name": "Tripwire Rounds",
               "ranks": 3,
-              "icon": "target",
-              "desc": "Turret range +{v}%.",
+              "icon": "snow",
+              "desc": "Turret, drone and mortar hits slow zombies by {v}% for 1.5s.",
               "effects": {
-                "turret.range": 0.12
+                "ability.slow": 0.08
+              },
+              "tier": 2
+            },
+            {
+              "id": "sights",
+              "name": "Long Sights",
+              "ranks": 5,
+              "icon": "target",
+              "desc": "Ability range +{v}%: turret and drone range, mortar range and blast radius.",
+              "effects": {
+                "ability.size": 0.06
+              },
+              "tier": 2
+            },
+            {
+              "id": "arcwelder",
+              "name": "Arc Welder",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bolt",
+              "desc": "Every shot arcs to two more zombies nearby for half damage.",
+              "effects": {
+                "turret.chain": 2
               }
             },
             {
               "id": "recycler",
               "name": "Recycler",
-              "tier": 3,
               "ranks": 5,
               "icon": "recycle",
-              "desc": "Each turret kill takes {v}s off its cooldown.",
+              "desc": "Each kill by your turret, drones or mortar takes {v}s off the cooldown.",
               "effects": {
-                "turret.killCdr": 0.4
+                "ability.killCdr": 0.3
               },
-              "fmt": "s"
+              "fmt": "s",
+              "tier": 3
             },
             {
-              "id": "arcwelder",
-              "name": "Arc Welder",
-              "tier": 4,
+              "id": "bounty",
+              "name": "Bounty Protocol",
+              "ranks": 3,
+              "icon": "coin",
+              "desc": "+{v} points for each kill by your turret, drones or mortar.",
+              "effects": {
+                "ability.killPoints": 10
+              },
+              "fmt": "n",
+              "tier": 3
+            },
+            {
+              "id": "incendiary",
+              "name": "Incendiary Belt",
+              "tier": 3,
               "ranks": 1,
               "type": "augment",
-              "icon": "bolt",
-              "desc": "Augment: turret shots arc to one more zombie nearby for half damage.",
+              "icon": "flame",
+              "desc": "Shots set zombies on fire, burning for 60% of the hit over 3s.",
               "effects": {
-                "turret.chain": 1
+                "turret.burn": 1
               }
             },
             {
-              "id": "overdrive",
-              "name": "Overdrive",
-              "tier": 4,
+              "id": "overclock",
+              "name": "Overclock",
               "ranks": 5,
               "icon": "bolt",
-              "desc": "Turret damage +{v}% against zombies above half health.",
+              "desc": "Ability fire rate +{v}%: the turret and drones shoot faster, mortar shells fall faster.",
               "effects": {
-                "turret.fresh": 0.1
-              }
+                "ability.rate": 0.05
+              },
+              "tier": 4
             },
             {
-              "id": "redundancy",
-              "name": "Redundancy",
-              "tier": 5,
-              "ranks": 3,
-              "icon": "clock",
-              "desc": "Turret cooldown −{v}%.",
-              "effects": {
-                "turret.cooldown": 0.06
-              }
-            },
-            {
-              "id": "twin",
-              "name": "Twin Sentries",
-              "tier": 6,
-              "ranks": 1,
-              "type": "capstone",
-              "icon": "double",
-              "desc": "Capstone: deploy two turrets at once, each lasting 25% shorter.",
-              "effects": {
-                "turret.double": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "mechanic",
-          "name": "Field Mechanic",
-          "color": "#4fb3d9",
-          "desc": "Keeping yourself in the fight.",
-          "nodes": [
-            {
-              "id": "plating",
-              "name": "Scrap Plating",
-              "tier": 1,
+              "id": "hardened",
+              "name": "Hardened Casing",
               "ranks": 5,
               "icon": "shield",
-              "desc": "Take {v}% less damage.",
+              "desc": "Ability duration +{v}%: the turret, drones and mortar barrage last longer.",
               "effects": {
-                "player.armor": 0.03
-              }
-            },
-            {
-              "id": "quickhands",
-              "name": "Quick Hands",
-              "tier": 1,
-              "ranks": 5,
-              "icon": "wrench",
-              "desc": "Reload {v}% faster.",
-              "effects": {
-                "player.reload": 0.04
-              }
-            },
-            {
-              "id": "patchkit",
-              "name": "Patch Kit",
-              "tier": 2,
-              "ranks": 1,
-              "type": "augment",
-              "icon": "heart",
-              "desc": "Augment: standing near your turret slowly regenerates health faster.",
-              "effects": {
-                "turret.heal": 1
-              }
-            },
-            {
-              "id": "wrench",
-              "name": "Heavy Wrench",
-              "tier": 2,
-              "ranks": 3,
-              "icon": "wrench",
-              "desc": "Knife damage +{v}%.",
-              "effects": {
-                "player.melee": 0.15
-              }
-            },
-            {
-              "id": "spareparts",
-              "name": "Spare Parts",
-              "tier": 3,
-              "ranks": 3,
-              "icon": "grenade",
-              "desc": "Gain {v} extra grenade(s) each round.",
-              "effects": {
-                "player.grenades": 1
+                "ability.duration": 0.06
               },
-              "fmt": "n"
-            },
-            {
-              "id": "hazard",
-              "name": "Hazard Pay",
-              "tier": 3,
-              "ranks": 5,
-              "icon": "coin",
-              "desc": "Points earned +{v}%.",
-              "effects": {
-                "player.points": 0.04
-              }
+              "tier": 4
             },
             {
               "id": "lockdown",
@@ -234,43 +167,281 @@
               "ranks": 1,
               "type": "augment",
               "icon": "magnet",
-              "desc": "Augment: the turret draws zombies to it like a monkey bomb for its first 5 seconds.",
+              "desc": "Zombies nearby go for the turret instead of you for its first 8s.",
               "effects": {
-                "turret.lure": 5
+                "turret.lure": 8
               }
             },
             {
-              "id": "grit",
-              "name": "Grit",
-              "tier": 4,
+              "id": "deadeye",
+              "name": "Deadeye",
+              "ranks": 5,
+              "icon": "crosshair",
+              "desc": "Ability damage +{v}%: turret and drone shots and mortar shells hit harder.",
+              "effects": {
+                "ability.damage": 0.06
+              },
+              "tier": 5
+            },
+            {
+              "id": "stopping",
+              "name": "Stopping Power",
               "ranks": 3,
-              "icon": "shield",
-              "desc": "Take {v}% less damage while your turret is up.",
+              "icon": "target",
+              "desc": "Turret, drone and mortar hits have a {v}% chance to stagger a zombie.",
               "effects": {
-                "player.armorTurret": 0.06
-              }
+                "ability.stun": 0.05
+              },
+              "tier": 5
             },
             {
-              "id": "toolbelt",
-              "name": "Toolbelt",
+              "id": "bigbang",
+              "name": "Grenade Launcher",
               "tier": 5,
-              "ranks": 3,
-              "icon": "clock",
-              "desc": "Turret cooldown −{v}%.",
+              "ranks": 1,
+              "type": "augment",
+              "icon": "grenade",
+              "desc": "The turret also lobs a grenade at its target every 3s.",
               "effects": {
-                "turret.cooldown": 0.05
+                "turret.grenade": 3
               }
             },
             {
-              "id": "bulwark",
-              "name": "Bulwark",
+              "id": "masterwork",
+              "name": "Masterwork",
+              "ranks": 5,
+              "icon": "gear",
+              "desc": "Ability cooldown −{v}%: deploy the turret, drones or beacon sooner.",
+              "effects": {
+                "ability.cooldown": 0.04
+              },
+              "tier": 6
+            },
+            {
+              "id": "twin",
+              "name": "Double Deployment",
               "tier": 6,
               "ranks": 1,
               "type": "capstone",
-              "icon": "shield",
-              "desc": "Capstone: while your turret is up, zombie hits on you are halved.",
+              "icon": "double",
+              "desc": "Capstone: your action skill comes in twos (two turrets, two drones or two mortar beacons), each lasting 25% shorter.",
               "effects": {
-                "player.bulwark": 0.5
+                "cap.double": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "drone",
+          "name": "Drone Ops",
+          "color": "#6fc3c9",
+          "desc": "A gun that follows you.",
+          "action": {
+            "id": "drone",
+            "name": "Hunter Drone",
+            "icon": "drone",
+            "desc": "Launch a drone that orbits you and shoots the nearest zombie it can see until its battery runs out.",
+            "base": {
+              "cooldown": 45,
+              "duration": 25,
+              "damage": 0.07,
+              "rate": 5,
+              "range": 800
+            }
+          },
+          "nodes": [
+            {
+              "id": "rotors",
+              "name": "Fast Charge",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Ability cooldown −{v}%: deploy the turret, drones or beacon sooner.",
+              "effects": {
+                "ability.cooldown": 0.04
+              },
+              "tier": 1
+            },
+            {
+              "id": "optics",
+              "name": "Targeting Optics",
+              "ranks": 5,
+              "icon": "crosshair",
+              "desc": "Ability damage +{v}%: turret and drone shots and mortar shells hit harder.",
+              "effects": {
+                "ability.damage": 0.05
+              },
+              "tier": 1
+            },
+            {
+              "id": "quickhands",
+              "name": "Quick Hands",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Reload {v}% faster.",
+              "effects": {
+                "player.reload": 0.04
+              },
+              "tier": 1
+            },
+            {
+              "id": "frame",
+              "name": "Light Frame",
+              "ranks": 5,
+              "icon": "gear",
+              "desc": "Ability fire rate +{v}%: the turret and drones shoot faster, mortar shells fall faster.",
+              "effects": {
+                "ability.rate": 0.06
+              },
+              "tier": 2
+            },
+            {
+              "id": "spotter",
+              "name": "Spotter",
+              "ranks": 3,
+              "icon": "target",
+              "desc": "Zombies your turret, drones or mortar hit take {v}% more damage from you for 3s.",
+              "effects": {
+                "ability.mark": 0.05
+              },
+              "tier": 2
+            },
+            {
+              "id": "wingman",
+              "name": "Wingman",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "double",
+              "desc": "Launch a second drone; each deals 70% damage.",
+              "effects": {
+                "drone.count": 1
+              }
+            },
+            {
+              "id": "nanites",
+              "name": "Nanites",
+              "ranks": 5,
+              "icon": "heart",
+              "desc": "Kills by your turret, drones or mortar heal you {v}.",
+              "effects": {
+                "ability.killHeal": 4
+              },
+              "fmt": "n",
+              "tier": 3
+            },
+            {
+              "id": "boost",
+              "name": "Signal Boost",
+              "ranks": 5,
+              "icon": "bolt",
+              "desc": "Ability range +{v}%: turret and drone range, mortar range and blast radius.",
+              "effects": {
+                "ability.size": 0.06
+              },
+              "tier": 3
+            },
+            {
+              "id": "kamikaze",
+              "name": "Kamikaze",
+              "tier": 3,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bomb",
+              "desc": "When its battery runs out (or you press Z again) the drone dives into the biggest crowd and explodes.",
+              "effects": {
+                "drone.kamikaze": 1
+              }
+            },
+            {
+              "id": "battery",
+              "name": "Battery Pack",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Ability duration +{v}%: the turret, drones and mortar barrage last longer.",
+              "effects": {
+                "ability.duration": 0.08
+              },
+              "tier": 4
+            },
+            {
+              "id": "scavenger",
+              "name": "Scavenger",
+              "ranks": 3,
+              "icon": "coin",
+              "desc": "+{v} points for each kill by your turret, drones or mortar.",
+              "effects": {
+                "ability.killPoints": 10
+              },
+              "fmt": "n",
+              "tier": 4
+            },
+            {
+              "id": "medic",
+              "name": "Medic Rig",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "heart",
+              "desc": "The drone heals you 10 health a second whenever you're hurt.",
+              "effects": {
+                "drone.heal": 10
+              }
+            },
+            {
+              "id": "jammer",
+              "name": "Jammer",
+              "ranks": 3,
+              "icon": "snow",
+              "desc": "Turret, drone and mortar hits slow zombies by {v}% for 1.5s.",
+              "effects": {
+                "ability.slow": 0.06
+              },
+              "tier": 5
+            },
+            {
+              "id": "wrench",
+              "name": "Big Wrench",
+              "ranks": 3,
+              "icon": "wrench",
+              "desc": "Melee damage +{v}%.",
+              "effects": {
+                "player.melee": 0.15
+              },
+              "tier": 5
+            },
+            {
+              "id": "shock",
+              "name": "Shock Rounds",
+              "tier": 5,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bolt",
+              "desc": "Drone shots arc to two more zombies and stun them briefly.",
+              "effects": {
+                "drone.chain": 2
+              }
+            },
+            {
+              "id": "uplink",
+              "name": "Uplink",
+              "ranks": 3,
+              "icon": "target",
+              "desc": "Zombies your turret, drones or mortar hit take {v}% more damage from you for 3s.",
+              "effects": {
+                "ability.mark": 0.05
+              },
+              "tier": 6
+            },
+            {
+              "id": "perpetual",
+              "name": "Perpetual Motion",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "recycle",
+              "desc": "Capstone: every kill by your action skill adds 1.5s to it.",
+              "effects": {
+                "cap.killExtend": 1.5
               }
             }
           ]
@@ -278,121 +449,215 @@
         {
           "id": "demo",
           "name": "Demolitions",
-          "color": "#d9573f",
-          "desc": "Making things go bang.",
+          "color": "#d06a3a",
+          "desc": "Shells from the sky.",
+          "action": {
+            "id": "mortar",
+            "name": "Mortar Beacon",
+            "icon": "mortar",
+            "desc": "Throw down a beacon. Mortar shells rain on the zombies around it until the barrage ends.",
+            "base": {
+              "cooldown": 55,
+              "duration": 10,
+              "damage": 0.55,
+              "interval": 1.1,
+              "range": 650,
+              "radius": 180
+            }
+          },
           "nodes": [
             {
               "id": "powder",
               "name": "Black Powder",
-              "tier": 1,
               "ranks": 5,
               "icon": "bomb",
               "desc": "Explosive damage +{v}%.",
               "effects": {
-                "player.explosive": 0.06
-              }
+                "player.explosive": 0.05
+              },
+              "tier": 1
             },
             {
               "id": "flak",
               "name": "Flak Lining",
-              "tier": 1,
               "ranks": 5,
               "icon": "shield",
-              "desc": "Take {v}% less damage from your own explosions.",
+              "desc": "Take {v}% less damage from explosions.",
               "effects": {
-                "player.blastResist": 0.12
-              }
-            },
-            {
-              "id": "incendiary",
-              "name": "Incendiary Rounds",
-              "tier": 2,
-              "ranks": 1,
-              "type": "augment",
-              "icon": "flame",
-              "desc": "Augment: turret shots set zombies alight, burning for extra damage.",
-              "effects": {
-                "turret.burn": 1
-              }
+                "player.blastResist": 0.1
+              },
+              "tier": 1
             },
             {
               "id": "shrapnel",
-              "name": "Shrapnel",
-              "tier": 2,
-              "ranks": 3,
-              "icon": "bomb",
-              "desc": "Explosion radius effects +{v}% damage at the edges.",
+              "name": "Wide Spread",
+              "ranks": 5,
+              "icon": "target",
+              "desc": "Ability range +{v}%: turret and drone range, mortar range and blast radius.",
               "effects": {
-                "player.explosive": 0.04
-              }
+                "ability.size": 0.05
+              },
+              "tier": 1
             },
             {
               "id": "stockpile",
               "name": "Stockpile",
-              "tier": 3,
-              "ranks": 3,
+              "ranks": 2,
               "icon": "grenade",
-              "desc": "Gain {v} extra grenade(s) each round.",
+              "desc": "+{v} grenade each round.",
               "effects": {
                 "player.grenades": 1
               },
-              "fmt": "n"
+              "fmt": "n",
+              "tier": 2
             },
             {
-              "id": "fuse",
-              "name": "Short Fuse",
-              "tier": 3,
+              "id": "heavy",
+              "name": "Heavy Shells",
               "ranks": 5,
-              "icon": "clock",
-              "desc": "Turret cooldown −{v}%.",
+              "icon": "bomb",
+              "desc": "Ability damage +{v}%: turret and drone shots and mortar shells hit harder.",
               "effects": {
-                "turret.cooldown": 0.03
-              }
+                "ability.damage": 0.05
+              },
+              "tier": 2
             },
             {
-              "id": "selfdestruct",
-              "name": "Self-Destruct",
-              "tier": 4,
+              "id": "napalm",
+              "name": "Napalm Shells",
+              "tier": 2,
               "ranks": 1,
               "type": "augment",
-              "icon": "bomb",
-              "desc": "Augment: when the turret's power runs out it explodes.",
+              "icon": "flame",
+              "desc": "Every shell leaves burning ground for 4s.",
               "effects": {
-                "turret.explode": 1
+                "mortar.napalm": 1
               }
             },
             {
               "id": "chainreaction",
               "name": "Chain Reaction",
-              "tier": 4,
-              "ranks": 3,
-              "icon": "bolt",
-              "desc": "Explosive kills have a {v}% chance to explode again.",
-              "effects": {
-                "player.chainBlast": 0.08
-              }
-            },
-            {
-              "id": "ordnance",
-              "name": "Heavy Ordnance",
-              "tier": 5,
-              "ranks": 3,
+              "ranks": 5,
               "icon": "bomb",
-              "desc": "Explosive damage +{v}%.",
+              "desc": "Explosive kills have a {v}% chance to set off another blast.",
               "effects": {
-                "player.explosive": 0.08
+                "player.chainBlast": 0.06
+              },
+              "tier": 3
+            },
+            {
+              "id": "concussion",
+              "name": "Concussion",
+              "ranks": 3,
+              "icon": "snow",
+              "desc": "Turret, drone and mortar hits have a {v}% chance to stagger a zombie.",
+              "effects": {
+                "ability.stun": 0.05
+              },
+              "tier": 3
+            },
+            {
+              "id": "cluster",
+              "name": "Cluster Shells",
+              "tier": 3,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "grenade",
+              "desc": "Every shell splits into three bomblets.",
+              "effects": {
+                "mortar.cluster": 3
               }
             },
             {
-              "id": "bigbang",
-              "name": "Big Bang",
+              "id": "fuse",
+              "name": "Fast Fuse",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Ability fire rate +{v}%: the turret and drones shoot faster, mortar shells fall faster.",
+              "effects": {
+                "ability.rate": 0.06
+              },
+              "tier": 4
+            },
+            {
+              "id": "demopay",
+              "name": "Demolition Pay",
+              "ranks": 3,
+              "icon": "coin",
+              "desc": "+{v} points every time your turret, drones or mortar damage a zombie.",
+              "effects": {
+                "ability.toll": 1
+              },
+              "fmt": "n",
+              "tier": 4
+            },
+            {
+              "id": "danger",
+              "name": "Danger Close",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "crosshair",
+              "desc": "The beacon stays on you: shells land around you and can't hurt you.",
+              "effects": {
+                "mortar.follow": 1
+              }
+            },
+            {
+              "id": "payload",
+              "name": "Bigger Payload",
+              "ranks": 5,
+              "icon": "bomb",
+              "desc": "Ability range +{v}%: turret and drone range, mortar range and blast radius.",
+              "effects": {
+                "ability.size": 0.05
+              },
+              "tier": 5
+            },
+            {
+              "id": "supply",
+              "name": "Steady Supply",
+              "ranks": 5,
+              "icon": "gear",
+              "desc": "Ability cooldown −{v}%: deploy the turret, drones or beacon sooner.",
+              "effects": {
+                "ability.cooldown": 0.04
+              },
+              "tier": 5
+            },
+            {
+              "id": "barrage",
+              "name": "Sustained Barrage",
+              "tier": 5,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "clock",
+              "desc": "The barrage lasts 60% longer and fires faster.",
+              "effects": {
+                "mortar.sustain": 0.6
+              }
+            },
+            {
+              "id": "saturation",
+              "name": "Saturation",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Ability duration +{v}%: the turret, drones and mortar barrage last longer.",
+              "effects": {
+                "ability.duration": 0.08
+              },
+              "tier": 6
+            },
+            {
+              "id": "carpet",
+              "name": "Final Payload",
               "tier": 6,
               "ranks": 1,
               "type": "capstone",
               "icon": "bomb",
-              "desc": "Capstone: the turret fires a grenade every 3 seconds alongside its bullets.",
+              "desc": "Capstone: your action skill goes out with a bang: the turret self-destructs, drones dive into the crowd, a barrage ends with a carpet of shells.",
               "effects": {
-                "turret.grenade": 3
+                "cap.finale": 1
               }
             }
           ]
@@ -404,48 +669,80 @@
       "name": "Fortifier",
       "tagline": "Puts steel between you and the horde.",
       "color": "#7fb0c8",
-      "action": {
-        "id": "wall",
-        "name": "Barricade Wall",
-        "key": "ability",
-        "icon": "wall",
-        "desc": "Raise a waist-high steel barricade in front of you. It stays until it's destroyed: zombies stop at it and tear at it, and you can see and shoot over it. Press again to pick it up and move it (it keeps its damage). The cooldown starts once it's destroyed.",
-        "base": {
-          "cooldown": 45,
-          "health": 40,
-          "width": 130,
-          "height": 40
-        }
-      },
       "trees": [
         {
           "id": "hardpoint",
           "name": "Hardpoint",
           "color": "#7fb0c8",
-          "desc": "A tougher, bigger, faster wall.",
+          "desc": "A wall that holds a line.",
+          "action": {
+            "id": "wall",
+            "name": "Barricade Wall",
+            "icon": "wall",
+            "desc": "Raise a waist-high steel barricade in front of you. It stays until it's destroyed: zombies stop at it and tear at it, and you can see and shoot over it. Press again to pick it up and move it (it keeps its damage). The cooldown starts once it's destroyed.",
+            "base": {
+              "cooldown": 45,
+              "health": 40,
+              "width": 130,
+              "height": 40
+            }
+          },
           "nodes": [
             {
               "id": "plating",
               "name": "Thick Plating",
-              "tier": 1,
               "ranks": 5,
               "icon": "shield",
-              "desc": "Wall takes {v}% more hits.",
+              "desc": "Ability durability +{v}%: walls and sandbags take more hits, the wire lasts longer.",
               "effects": {
-                "fort.health": 0.1
-              }
+                "ability.duration": 0.08
+              },
+              "tier": 1
             },
             {
               "id": "repairs",
               "name": "Field Repairs",
-              "tier": 1,
               "ranks": 5,
               "icon": "wrench",
-              "desc": "At the start of each round the wall repairs {v} hits.",
+              "desc": "Each new round, your wall, sandbags or wire get {v} hits back (or {v}s off the cooldown if they're down).",
               "effects": {
-                "fort.roundRepair": 4
+                "ability.repair": 3
               },
-              "fmt": "n"
+              "fmt": "n",
+              "tier": 1
+            },
+            {
+              "id": "span",
+              "name": "Wide Span",
+              "ranks": 5,
+              "icon": "double",
+              "desc": "Ability size +{v}%: wider walls, a bigger wire field, a roomier nest.",
+              "effects": {
+                "ability.size": 0.06
+              },
+              "tier": 1
+            },
+            {
+              "id": "quickset",
+              "name": "Quick-Set Frame",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Ability cooldown −{v}%: rebuild a destroyed wall, wire or nest sooner.",
+              "effects": {
+                "ability.cooldown": 0.04
+              },
+              "tier": 2
+            },
+            {
+              "id": "rivets",
+              "name": "Reinforced Rivets",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Take {v}% less damage near your wall, wire or nest.",
+              "effects": {
+                "player.armorNear": 0.03
+              },
+              "tier": 2
             },
             {
               "id": "selfseal",
@@ -454,77 +751,124 @@
               "ranks": 1,
               "type": "augment",
               "icon": "heart",
-              "desc": "Augment: the wall repairs 2 hits a second while nothing is attacking it.",
+              "desc": "The wall repairs 2 hits a second while nothing is attacking it.",
               "effects": {
                 "fort.regen": 1
               }
             },
             {
-              "id": "span",
-              "name": "Wide Span",
-              "tier": 2,
-              "ranks": 3,
-              "icon": "double",
-              "desc": "Wall {v}% wider.",
-              "effects": {
-                "fort.width": 0.12
-              }
-            },
-            {
-              "id": "quickset",
-              "name": "Quick-Set Frame",
-              "tier": 3,
-              "ranks": 3,
-              "icon": "clock",
-              "desc": "Wall cooldown −{v}%.",
-              "effects": {
-                "fort.cooldown": 0.06
-              }
-            },
-            {
               "id": "salvage",
               "name": "Salvage",
-              "tier": 3,
-              "ranks": 3,
+              "ranks": 5,
               "icon": "recycle",
-              "desc": "When the wall is destroyed, its cooldown is {v}% shorter.",
+              "desc": "When your wall, wire or nest is destroyed, the cooldown is {v}% shorter.",
               "effects": {
-                "fort.salvage": 0.1
-              }
+                "ability.salvage": 0.08
+              },
+              "tier": 3
+            },
+            {
+              "id": "rebuildpay",
+              "name": "Contractor",
+              "ranks": 3,
+              "icon": "coin",
+              "desc": "+{v} points for each kill by your fortifications.",
+              "effects": {
+                "ability.killPoints": 10
+              },
+              "fmt": "n",
+              "tier": 3
             },
             {
               "id": "rebar",
               "name": "Rebar Core",
-              "tier": 4,
+              "tier": 3,
               "ranks": 1,
               "type": "augment",
               "icon": "magnet",
-              "desc": "Augment: zombies that hit the wall are knocked back.",
+              "desc": "Zombies that hit the wall are thrown back.",
               "effects": {
                 "fort.knock": 1
               }
             },
             {
-              "id": "overbuild",
-              "name": "Overbuild",
-              "tier": 4,
+              "id": "galvanized",
+              "name": "Galvanized",
               "ranks": 5,
               "icon": "shield",
-              "desc": "Wall takes {v}% more hits.",
+              "desc": "Ability durability +{v}%: walls and sandbags take more hits, the wire lasts longer.",
               "effects": {
-                "fort.health": 0.06
+                "ability.duration": 0.06
+              },
+              "tier": 4
+            },
+            {
+              "id": "gauge",
+              "name": "Heavy Gauge",
+              "ranks": 5,
+              "icon": "bolt",
+              "desc": "Ability damage +{v}%: the wire, Live Current and every other fortification effect hit harder.",
+              "effects": {
+                "ability.damage": 0.06
+              },
+              "tier": 4
+            },
+            {
+              "id": "current",
+              "name": "Live Current",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bolt",
+              "desc": "Every hit on the wall shocks the attacker for 15% of its health and arcs to a zombie nearby.",
+              "effects": {
+                "fort.shock": 1
               }
             },
             {
-              "id": "logistics",
-              "name": "Logistics",
-              "tier": 5,
+              "id": "absorbers",
+              "name": "Shock Absorbers",
               "ranks": 3,
-              "icon": "gear",
-              "desc": "Wall cooldown −{v}%.",
+              "icon": "shield",
+              "desc": "Take {v}% less damage from explosions.",
               "effects": {
-                "fort.cooldown": 0.05
+                "player.blastResist": 0.1
+              },
+              "tier": 5
+            },
+            {
+              "id": "engineering",
+              "name": "Engineering",
+              "ranks": 5,
+              "icon": "gear",
+              "desc": "Ability cooldown −{v}%: rebuild a destroyed wall, wire or nest sooner.",
+              "effects": {
+                "ability.cooldown": 0.04
+              },
+              "tier": 5
+            },
+            {
+              "id": "shrapnel",
+              "name": "Shrapnel Charge",
+              "tier": 5,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bomb",
+              "desc": "The wall explodes when it is destroyed.",
+              "effects": {
+                "fort.shrapnel": 1
               }
+            },
+            {
+              "id": "bulwark",
+              "name": "Bulwark",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Take {v}% less damage everywhere.",
+              "effects": {
+                "player.armor": 0.03
+              },
+              "tier": 6
             },
             {
               "id": "fortress",
@@ -533,9 +877,9 @@
               "ranks": 1,
               "type": "capstone",
               "icon": "wall",
-              "desc": "Capstone: raise two walls in a V, each taking 25% fewer hits.",
+              "desc": "Capstone: your fortifications come doubled: two walls in a V, two snares, or a nest whose sandbags take 75% more hits.",
               "effects": {
-                "fort.double": 1
+                "cap.double": 1
               }
             }
           ]
@@ -544,109 +888,203 @@
           "id": "teeth",
           "name": "Teeth",
           "color": "#c8735f",
-          "desc": "Make hitting the wall hurt.",
+          "desc": "Wire that shreds.",
+          "action": {
+            "id": "snare",
+            "name": "Razor Snare",
+            "icon": "snare",
+            "desc": "Throw out a field of razor wire. Zombies in it are slowed and shredded. It stays until it's worn out by the zombies caught in it; press again to move it.",
+            "base": {
+              "cooldown": 40,
+              "radius": 110,
+              "durability": 60,
+              "damage": 0.08,
+              "slow": 0.45
+            }
+          },
           "nodes": [
             {
               "id": "spikes",
-              "name": "Spiked Face",
-              "tier": 1,
+              "name": "Honed Edges",
               "ranks": 5,
               "icon": "target",
-              "desc": "Zombies hitting the wall take {v}% of their health per hit.",
+              "desc": "Ability damage +{v}%: the wire, Live Current and every other fortification effect hit harder.",
               "effects": {
-                "fort.spikes": 0.04
-              }
+                "ability.damage": 0.06
+              },
+              "tier": 1
             },
             {
               "id": "razor",
-              "name": "Razor Wire",
-              "tier": 1,
-              "ranks": 3,
+              "name": "Wide Coil",
+              "ranks": 5,
+              "icon": "double",
+              "desc": "Ability size +{v}%: wider walls, a bigger wire field, a roomier nest.",
+              "effects": {
+                "ability.size": 0.05
+              },
+              "tier": 1
+            },
+            {
+              "id": "dread",
+              "name": "Dread",
+              "ranks": 5,
               "icon": "snow",
-              "desc": "Zombies near the wall move {v}% slower.",
+              "desc": "Zombies caught in your wire are a further {v}% slower.",
               "effects": {
-                "fort.slow": 0.12
-              }
-            },
-            {
-              "id": "current",
-              "name": "Live Current",
-              "tier": 2,
-              "ranks": 1,
-              "type": "augment",
-              "icon": "bolt",
-              "desc": "Augment: every hit on the wall shocks the attacker and arcs to one zombie nearby.",
-              "effects": {
-                "fort.shock": 1
-              }
-            },
-            {
-              "id": "serrated",
-              "name": "Serrated Edges",
-              "tier": 2,
-              "ranks": 3,
-              "icon": "target",
-              "desc": "Spikes deal {v}% more of a zombie's health per hit.",
-              "effects": {
-                "fort.spikes": 0.03
-              }
-            },
-            {
-              "id": "barbs",
-              "name": "Barbs",
-              "tier": 3,
-              "ranks": 3,
-              "icon": "flame",
-              "desc": "Spiked zombies bleed {v}% of their health a second for 3s.",
-              "effects": {
-                "fort.bleed": 0.03
-              }
+                "ability.slow": 0.04
+              },
+              "tier": 1
             },
             {
               "id": "toll",
               "name": "Toll Gate",
-              "tier": 3,
               "ranks": 3,
               "icon": "coin",
-              "desc": "+{v} points every time a zombie hits the wall.",
+              "desc": "+{v} points every time your fortifications damage a zombie.",
               "effects": {
-                "fort.toll": 2
+                "ability.toll": 1
               },
-              "fmt": "n"
+              "fmt": "n",
+              "tier": 2
             },
             {
-              "id": "shrapnel",
-              "name": "Shrapnel Charge",
+              "id": "tough",
+              "name": "Tough Wire",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Ability durability +{v}%: walls and sandbags take more hits, the wire lasts longer.",
+              "effects": {
+                "ability.duration": 0.08
+              },
+              "tier": 2
+            },
+            {
+              "id": "barbs",
+              "name": "Barbs",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "flame",
+              "desc": "Zombies that leave the wire bleed 10% of their health a second for 4s.",
+              "effects": {
+                "snare.bleed": 0.1
+              }
+            },
+            {
+              "id": "serrated",
+              "name": "Serrated",
+              "ranks": 5,
+              "icon": "target",
+              "desc": "Ability damage +{v}%: the wire, Live Current and every other fortification effect hit harder.",
+              "effects": {
+                "ability.damage": 0.05
+              },
+              "tier": 3
+            },
+            {
+              "id": "bloodletting",
+              "name": "Bloodletting",
+              "ranks": 5,
+              "icon": "heart",
+              "desc": "Kills by your fortifications heal you {v}.",
+              "effects": {
+                "ability.killHeal": 3
+              },
+              "fmt": "n",
+              "tier": 3
+            },
+            {
+              "id": "snarl",
+              "name": "Snarl",
+              "tier": 3,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "snow",
+              "desc": "Zombies entering the wire are held in place for 2s.",
+              "effects": {
+                "snare.root": 2
+              }
+            },
+            {
+              "id": "snagging",
+              "name": "Snagging Barbs",
+              "ranks": 3,
+              "icon": "snow",
+              "desc": "Hits from your fortifications have a {v}% chance to stagger a zombie.",
+              "effects": {
+                "ability.stun": 0.05
+              },
+              "tier": 4
+            },
+            {
+              "id": "shred",
+              "name": "Fast Shred",
+              "ranks": 5,
+              "icon": "gear",
+              "desc": "Shred rate +{v}%: the wire damages zombies caught in it more often.",
+              "effects": {
+                "ability.rate": 0.06
+              },
+              "tier": 4
+            },
+            {
+              "id": "electrified",
+              "name": "Electrified",
               "tier": 4,
               "ranks": 1,
               "type": "augment",
-              "icon": "bomb",
-              "desc": "Augment: the wall explodes when it is destroyed.",
+              "icon": "bolt",
+              "desc": "The wire shocks a zombie in it every half second, arcing to another.",
               "effects": {
-                "fort.shrapnel": 1
+                "snare.shock": 1
               }
             },
             {
-              "id": "honed",
-              "name": "Honed Points",
-              "tier": 4,
-              "ranks": 5,
-              "icon": "target",
-              "desc": "Spikes deal {v}% more of a zombie's health per hit.",
-              "effects": {
-                "fort.spikes": 0.03
-              }
-            },
-            {
-              "id": "dread",
-              "name": "Dread Wire",
-              "tier": 5,
+              "id": "trophy",
+              "name": "Trophy Hunter",
               "ranks": 3,
-              "icon": "snow",
-              "desc": "Zombies near the wall move {v}% slower.",
+              "icon": "coin",
+              "desc": "+{v} points for each kill by your fortifications.",
               "effects": {
-                "fort.slow": 0.08
+                "ability.killPoints": 10
+              },
+              "fmt": "n",
+              "tier": 5
+            },
+            {
+              "id": "butcher",
+              "name": "Butcher",
+              "ranks": 3,
+              "icon": "wrench",
+              "desc": "Melee damage +{v}%.",
+              "effects": {
+                "player.melee": 0.15
+              },
+              "tier": 5
+            },
+            {
+              "id": "reelin",
+              "name": "Reel In",
+              "tier": 5,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "magnet",
+              "desc": "Zombies within 300 of the wire are dragged toward it.",
+              "effects": {
+                "snare.pull": 1
               }
+            },
+            {
+              "id": "storm",
+              "name": "Razor Storm",
+              "ranks": 5,
+              "icon": "double",
+              "desc": "Ability size +{v}%: wider walls, a bigger wire field, a roomier nest.",
+              "effects": {
+                "ability.size": 0.05
+              },
+              "tier": 6
             },
             {
               "id": "maiden",
@@ -655,9 +1093,9 @@
               "ranks": 1,
               "type": "capstone",
               "icon": "crosshair",
-              "desc": "Capstone: zombies below 35% health die on the wall.",
+              "desc": "Capstone: zombies below 35% health die when they touch your wall, wire or sandbags.",
               "effects": {
-                "fort.execute": 0.35
+                "cap.execute": 0.35
               }
             }
           ]
@@ -666,29 +1104,75 @@
           "id": "bunker",
           "name": "Bunker",
           "color": "#a9b06a",
-          "desc": "Fight from behind the wall.",
+          "desc": "Dig in and fight.",
+          "action": {
+            "id": "nest",
+            "name": "Sandbag Nest",
+            "icon": "nest",
+            "desc": "Throw up a waist-high horseshoe of sandbags around you, open behind. Zombies have to tear through it, and you're harder to kill inside. It stays until every wall is down; press again to move it.",
+            "base": {
+              "cooldown": 50,
+              "health": 25,
+              "radius": 80,
+              "width": 105,
+              "height": 40
+            }
+          },
           "nodes": [
             {
               "id": "cover",
               "name": "Hard Cover",
-              "tier": 1,
               "ranks": 5,
               "icon": "shield",
-              "desc": "Take {v}% less damage near your wall.",
+              "desc": "Take {v}% less damage near your wall, wire or nest.",
               "effects": {
-                "player.armorWall": 0.04
-              }
+                "player.armorNear": 0.03
+              },
+              "tier": 1
             },
             {
               "id": "steady",
               "name": "Steady Hands",
-              "tier": 1,
-              "ranks": 3,
+              "ranks": 5,
               "icon": "clock",
-              "desc": "Reload {v}% faster near your wall.",
+              "desc": "Reload {v}% faster near your wall, wire or nest.",
               "effects": {
-                "player.reloadWall": 0.06
-              }
+                "player.reloadNear": 0.05
+              },
+              "tier": 1
+            },
+            {
+              "id": "brace",
+              "name": "Brace",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Take {v}% less damage everywhere.",
+              "effects": {
+                "player.armor": 0.02
+              },
+              "tier": 1
+            },
+            {
+              "id": "overwatch",
+              "name": "Overwatch",
+              "ranks": 5,
+              "icon": "crosshair",
+              "desc": "Your bullets deal {v}% more damage near your wall, wire or nest.",
+              "effects": {
+                "player.damageNear": 0.04
+              },
+              "tier": 2
+            },
+            {
+              "id": "sandbagger",
+              "name": "Sandbagger",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Ability durability +{v}%: walls and sandbags take more hits, the wire lasts longer.",
+              "effects": {
+                "ability.duration": 0.06
+              },
+              "tier": 2
             },
             {
               "id": "cache",
@@ -697,78 +1181,125 @@
               "ranks": 1,
               "type": "augment",
               "icon": "grenade",
-              "desc": "Augment: near the wall, your reserve ammo refills 5% every 2s.",
+              "desc": "In the nest, your reserve ammo refills 5% every 2s.",
               "effects": {
                 "fort.ammo": 1
               }
             },
             {
-              "id": "brace",
-              "name": "Brace",
-              "tier": 2,
-              "ranks": 3,
+              "id": "hunker",
+              "name": "Hunker Down",
+              "ranks": 5,
               "icon": "shield",
-              "desc": "Take {v}% less damage everywhere.",
+              "desc": "Take {v}% less damage near your wall, wire or nest.",
               "effects": {
-                "player.armor": 0.03
+                "player.armorNear": 0.02
+              },
+              "tier": 3
+            },
+            {
+              "id": "discipline",
+              "name": "Ammo Discipline",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Reload {v}% faster.",
+              "effects": {
+                "player.reload": 0.03
+              },
+              "tier": 3
+            },
+            {
+              "id": "tripwire",
+              "name": "Tripwire Line",
+              "tier": 3,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "bomb",
+              "desc": "A claymore in front of every sandbag wall.",
+              "effects": {
+                "fort.claymore": 1
               }
             },
             {
               "id": "crate",
               "name": "Grenade Crate",
-              "tier": 3,
               "ranks": 2,
               "icon": "grenade",
               "desc": "+{v} grenade each round.",
               "effects": {
                 "player.grenades": 1
               },
-              "fmt": "n"
-            },
-            {
-              "id": "overwatch",
-              "name": "Overwatch",
-              "tier": 3,
-              "ranks": 3,
-              "icon": "crosshair",
-              "desc": "Your bullets deal {v}% more damage near your wall.",
-              "effects": {
-                "player.wallDamage": 0.05
-              }
-            },
-            {
-              "id": "tripwire",
-              "name": "Tripwire Line",
-              "tier": 4,
-              "ranks": 1,
-              "type": "augment",
-              "icon": "bomb",
-              "desc": "Augment: two claymores are planted in front of every wall.",
-              "effects": {
-                "fort.claymore": 1
-              }
-            },
-            {
-              "id": "hunker",
-              "name": "Hunker Down",
-              "tier": 4,
-              "ranks": 5,
-              "icon": "shield",
-              "desc": "Take {v}% less damage near your wall.",
-              "effects": {
-                "player.armorWall": 0.03
-              }
+              "fmt": "n",
+              "tier": 4
             },
             {
               "id": "hold",
               "name": "Hold the Line",
-              "tier": 5,
-              "ranks": 3,
+              "ranks": 5,
               "icon": "coin",
               "desc": "+{v}% points.",
               "effects": {
-                "player.points": 0.04
+                "player.points": 0.03
+              },
+              "tier": 4
+            },
+            {
+              "id": "medic",
+              "name": "Field Medic",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "heart",
+              "desc": "In the nest you heal 6 health a second.",
+              "effects": {
+                "nest.heal": 6
               }
+            },
+            {
+              "id": "position",
+              "name": "Fortified Position",
+              "ranks": 5,
+              "icon": "double",
+              "desc": "Ability size +{v}%: wider walls, a bigger wire field, a roomier nest.",
+              "effects": {
+                "ability.size": 0.05
+              },
+              "tier": 5
+            },
+            {
+              "id": "redeploy",
+              "name": "Rapid Redeploy",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Ability cooldown −{v}%: rebuild a destroyed wall, wire or nest sooner.",
+              "effects": {
+                "ability.cooldown": 0.04
+              },
+              "tier": 5
+            },
+            {
+              "id": "ring",
+              "name": "Ring of Steel",
+              "tier": 5,
+              "ranks": 1,
+              "type": "augment",
+              "icon": "nest",
+              "desc": "The nest closes into a full ring.",
+              "effects": {
+                "nest.ring": 1
+              }
+            },
+            {
+              "id": "ironwill",
+              "name": "Iron Will",
+              "ranks": 5,
+              "icon": "heart",
+              "desc": "Kills by your fortifications heal you {v}.",
+              "effects": {
+                "ability.killHeal": 4
+              },
+              "fmt": "n",
+              "tier": 6
             },
             {
               "id": "laststand",
@@ -777,14 +1308,16 @@
               "ranks": 1,
               "type": "capstone",
               "icon": "heart",
-              "desc": "Capstone: a hit that would down you near your wall hits the wall instead (once per wall).",
+              "desc": "Capstone: a hit that would down you near any of your fortifications hits it instead (once per deployment).",
               "effects": {
-                "fort.laststand": 1
+                "cap.laststand": 1
               }
             }
           ]
         }
       ]
     }
-  ]
+  ],
+  "augmentSlots": 2,
+  "capstoneSlots": 1
 }

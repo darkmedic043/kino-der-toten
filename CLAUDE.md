@@ -19,7 +19,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby) | `coop.md` |
 | Props: terminal booth (Blender generator, bake, placement mod) | `props.md` |
 | Weapon levels, attachments, camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound | `weapon-levels.md` |
-| Classes, skill trees, Engineer turret, Fortifier wall | `classes.md` |
+| Classes (BL4 loadouts), skill trees, all six action skills | `classes.md` |
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
 | Session history log | `history.md` |
 
