@@ -28,6 +28,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 ## Setup essentials
 
 - Branch `custom` = local work. `upstream` = original repo (`git fetch upstream && git merge upstream/main && git lfs pull`). `origin` = backup fork github.com/darkmedic043/kino-der-toten; push `custom` there after committing.
+- **Do not push commit `c4b3719` (the Cheese Cube port) or anything built on it to `origin`** (user decision, 2026-10-04: the map stays on the website only, not in the repo). `custom` contains it, so a plain `git push origin custom` would publish it. To push other work, cherry-pick that work onto a branch from `origin/custom` and push that, or ask first.
 - Served by the quadlet `kino.container` on **port 5190** (5173 is taken by deskpet) via `.tools/kino-server.mjs`, with the checkout mounted read-only. Edits show on a browser refresh; no restart needed. Public at https://zombies.terminallysleepy.com through the user tunnel `cloudflared-deskpet-memory` (leave the root `cloudflared.service` alone).
 - Discord secrets are in `~/.config/kino/discord.env`. Never print or commit them. Player data is in `~/.local/share/kino`.
 - git-lfs is at `~/.local/bin/git-lfs` (about 1 GB of assets). Host Node is 20 (`npm test` still passes); the container uses 24.
