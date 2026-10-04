@@ -1,0 +1,5 @@
+{
+  "name": "Phone controls and layout",
+  "description": "Touch controls for the fork's additions (class skill, hold breath while scoped) and a HUD that no longer sits under the buttons. Only active on touch devices.",
+  "script": "mod.js"
+}

@@ -25,11 +25,16 @@ export function configureKinoAssets() {
     // the browser would still incur Safari's original memory spike.
     assetManager.addHandler(/\.(?:png|webp|jpe?g)(?:\?.*)?$/i, {
       load(url, onLoad, onProgress, onError) {
-        const resolved = new URL(url, document.baseURI);
-        if (resolved.origin === location.origin) resolved.pathname = resolved.pathname.replace('/textures/', '/textures-mobile/');
+        const original = new URL(url, document.baseURI);
+        const resolved = new URL(original);
+        // Only the top-level /textures/ has a -mobile copy (the maps' and mods' own texture folders do not),
+        // and a missing mobile copy falls back to the full-size image instead of failing to load.
+        const hasMobileCopy = resolved.origin === location.origin && resolved.pathname.startsWith('/textures/');
+        if (hasMobileCopy) resolved.pathname = resolved.pathname.replace('/textures/', '/textures-mobile/');
         const key = resolved.href;
+        const request = href => new Promise((resolve, reject) => { queue.push({ url: href, resolve, reject }); pump(); });
         if (!textures.has(key)) {
-          const pending = new Promise((resolve, reject) => { queue.push({ url: key, resolve, reject }); pump(); });
+          const pending = hasMobileCopy ? request(key).catch(() => request(original.href)) : request(key);
           textures.set(key, pending);
           pending.catch(() => textures.delete(key));
         }

@@ -21,6 +21,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Weapon levels, attachments (incl. mounted BO3 parts), camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound | `weapon-levels.md` |
 | Classes (BL4 loadouts), skill trees, all six action skills | `classes.md` |
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
+| Phone/touch support (touch-extras mod, mobile textures, defaults) | `mobile.md` |
 | Session history log | `history.md` |
 
 ## Setup essentials

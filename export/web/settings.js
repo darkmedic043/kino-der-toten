@@ -2,7 +2,9 @@
 // the main menu and every game page. `settings` is live; pages read it each frame.
 
 const KEY='kino.settings';
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,renderScale:1,graphics:2,hdTextures:true,daytime:true,devConsole:false,showFps:false,binds:{}};
+// Phones start on Low graphics without HD textures (the lighting and HD texture work is heavy there); a saved choice wins.
+const COARSE=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,renderScale:1,graphics:COARSE?0:2,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,binds:{}};
 // Rebindable actions and the key each game page listens for. game-menu.js
 // translates a rebound key into its default so the game code stays unchanged.
 export const ACTIONS=[
