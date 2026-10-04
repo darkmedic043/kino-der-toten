@@ -205,7 +205,7 @@ export class CustomWorld {
     this.physics={capsuleIntersect:c=>{
       const hit=this.collision.capsuleIntersect(c);if(hit)return hit;
       for(const d of this.dynamic)if(d.enabled&&d.collider){const h=d.collider.capsuleIntersect(c);if(h)return h;}
-      for(const m of this.movers){if(!m.near.containsPoint(c.start)&&!m.near.containsPoint(c.end))continue;const t=c.clone();t.translate(_negOffset.copy(m.offset).negate());const h=m.collider.capsuleIntersect(t);if(h)return h;}
+      for(const m of this.movers){if(m.disabled)continue;if(!m.near.containsPoint(c.start)&&!m.near.containsPoint(c.end))continue;const t=c.clone();t.translate(_negOffset.copy(m.offset).negate());const h=m.collider.capsuleIntersect(t);if(h)return h;}
       for(const z of this.actors?.()??[]){
         if(z.state==='barricade'||z.state==='entering')continue;
         const p=z.root.position,feet=c.start.y-c.radius,top=c.end.y+c.radius;
@@ -309,7 +309,7 @@ export class CustomWorld {
   closest(p,extents){const r=this.query.findClosestPoint({x:p.x,y:p.y,z:p.z},extents?{halfExtents:extents}:undefined);return r.success?new THREE.Vector3(r.point.x,r.point.y,r.point.z):null;}
   path(a,b){const r=this.query.computePath({x:a.x,y:a.y,z:a.z},{x:b.x,y:b.y,z:b.z});return r.success?r.path.map(p=>new THREE.Vector3(p.x,p.y,p.z)):[];}
   raycast(ray,near=0,far=Infinity,windows=false){let hit=this.collision.rayIntersect(ray,near,far);
-    for(const m of this.movers??[]){const r=new THREE.Ray(ray.origin.clone().sub(m.offset),ray.direction),h=m.collider.rayIntersect(r,near,hit?Math.min(hit.distance,far):far);if(h){h.position.add(m.offset);h.point.add(m.offset);hit=h;}}for(const d of this.dynamic){if(!d.enabled||!d.collider||(!windows&&d.window))continue;const h=d.collider.rayIntersect(ray,near,hit?Math.min(hit.distance,far):far);if(h)hit=h;}return hit;}
+    for(const m of this.movers??[]){if(m.disabled)continue;const r=new THREE.Ray(ray.origin.clone().sub(m.offset),ray.direction),h=m.collider.rayIntersect(r,near,hit?Math.min(hit.distance,far):far);if(h){h.position.add(m.offset);h.point.add(m.offset);hit=h;}}for(const d of this.dynamic){if(!d.enabled||!d.collider||(!windows&&d.window))continue;const h=d.collider.rayIntersect(ray,near,hit?Math.min(hit.distance,far):far);if(h)hit=h;}return hit;}
   lineClear(a,b){const v=b.clone().sub(a),dist=v.length();return !this.raycast(new THREE.Ray(a,v.normalize()),1,Math.max(1,dist-4));}
   isOpen(door,session){return session.openDoors.has(door.name)||(door.electric&&session.power);}
   setDoors(session){
@@ -332,12 +332,19 @@ export class CustomWorld {
     const scale=this.entry.scale??1;
     for(const m of this.movers){
       const d=m.def,dur=d.duration??2,cycle=d.cycle??12,p=(((time-(d.delay??0))%cycle)+cycle)%cycle;
-      let f=0;if(p>=d.out&&p<d.out+dur)f=(p-d.out)/dur;else if(p>=d.out+dur&&p<d.back)f=1;else if(p>=d.back&&p<d.back+dur)f=1-(p-d.back)/dur;
+      let f=0;
+      if(d.manual){const a=m.slide;f=a?a.from+(a.to-a.from)*Math.min(1,Math.max(0,(time-a.t0)/Math.max(.001,a.dur))):(m.f??0);m.f=f;}   // a mod drives it with slideMover
+      else if(p>=d.out&&p<d.out+dur)f=(p-d.out)/dur;else if(p>=d.out+dur&&p<d.back)f=1;else if(p>=d.back&&p<d.back+dur)f=1-(p-d.back)/dur;
       m.prev.copy(m.offset);m.offset.copy(m.delta).multiplyScalar(f);
       m.objects.forEach((o,i)=>{o.position.copy(m.base[i]).addScaledVector(m.offset,1/scale);o.updateMatrix();o.updateMatrixWorld(true);});
       m.near.copy(m.box).translate(m.offset).expandByScalar(40);
     }
   }
+  // Mod control of a `manual` mover: slideMover(id, to 0..1, seconds, now) eases it there; enableMover(id, false) hides it and
+  // removes its collision (resetMovers puts everything back).
+  slideMover(id,to,seconds,now){const m=this.movers.find(x=>x.def.id===String(id).toLowerCase());if(m)m.slide={from:m.f??0,to,t0:now,dur:seconds};return m;}
+  enableMover(id,on){const m=this.movers.find(x=>x.def.id===String(id).toLowerCase());if(!m)return;m.disabled=!on;for(const o of m.objects)o.visible=on;}
+  resetMovers(){for(const m of this.movers){m.disabled=false;m.slide=null;m.f=0;for(const o of m.objects)o.visible=true;}}
   // Hooks for map mods (see mods/README.md): extra press-F spots and shootable targets.
   //   addInteraction({position: Vector3, text(): string, use(e): boolean, hidden?(), locked?(), lockedText?})
   //   addShootTarget({position: Vector3, radius, weapons?: [ids], hit(target)})   (a target is removed once it is hit)

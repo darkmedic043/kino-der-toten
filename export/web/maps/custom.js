@@ -107,11 +107,15 @@ export async function createMap(ctx,entry){
       return false;
     },
     onShot(ray,far){
-      for(const t of [...(W().shootTargets??[])]){
+      // a shot hits the nearest shoot target on its path (not every one it passes through)
+      let nearest=null,nearestDistance=Infinity,nearestPoint=null;
+      for(const t of W().shootTargets??[]){
         if(t.weapons&&![S().def?.id,S().def?.baseId].some(i=>t.weapons.includes(i)))continue;
-        const hit=ray.intersectSphere(new THREE.Sphere(t.position,t.radius??20),new THREE.Vector3());
-        if(hit&&hit.distanceTo(ray.origin)<=far+(t.radius??20)){W().shootTargets.splice(W().shootTargets.indexOf(t),1);t.hit?.(t);}
+        const hit=t.box?ray.intersectBox(t.box,new THREE.Vector3()):ray.intersectSphere(new THREE.Sphere(t.position,t.radius??20),new THREE.Vector3());   // box (a Box3) for thin targets
+        const d=hit?hit.distanceTo(ray.origin):Infinity;
+        if(hit&&d<=far+(t.radius??20)&&d<nearestDistance){nearest=t;nearestDistance=d;nearestPoint=hit;}
       }
+      if(nearest){const list=W().shootTargets;list.splice(list.indexOf(nearest),1);nearest.hit?.(nearest,ray,nearestPoint);}
       for(const g of W().eggs.values())for(const i of g.items){
         if(i.found||!i.shoot)continue;const hit=ray.intersectSphere(new THREE.Sphere(i.position,14),new THREE.Vector3());
         if(hit&&hit.distanceTo(ray.origin)<=far+14)findEgg(g,i);
@@ -135,6 +139,7 @@ export async function createMap(ctx,entry){
         world.updateMovers(s.time);
         const pc=ctx.player.collider,fy=pc.start.y-pc.radius;
         for(const m of world.movers){
+          if(m.disabled)continue;
           const dx=m.offset.x-m.prev.x,dy=m.offset.y-m.prev.y,dz=m.offset.z-m.prev.z;if(!dx&&!dy&&!dz)continue;
           const probe=new THREE.Ray(new THREE.Vector3(pc.start.x,fy+8,pc.start.z).sub(m.offset),new THREE.Vector3(0,-1,0));
           const under=m.collider.rayIntersect(probe,0,24);   // a surface of this platform within ~16 units below the feet
@@ -163,7 +168,7 @@ export async function createMap(ctx,entry){
       for(const g of world.eggs.values())for(const i of g.items)if(!i.found)i.object.rotation.y+=dt*.8;
     },
     beforeReset(){},
-    reset(){for(const r of W().rising??[])r.alarmed=false;W().updateRising?.(0);W().updateMovers?.(0);resetPower();teleportPending=null;returnTrip=null;},
+    reset(){for(const r of W().rising??[])r.alarmed=false;W().updateRising?.(0);W().resetMovers?.();W().updateMovers?.(0);resetPower();teleportPending=null;returnTrip=null;},
     hudEffects:()=>returnTrip?'<span>RETURN IN '+Math.max(0,Math.ceil(returnTrip.at-S().time))+'</span>':'',
     objective:()=>!S().power?'Find the power switch':'',
     state(){

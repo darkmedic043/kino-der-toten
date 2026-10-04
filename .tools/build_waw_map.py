@@ -313,7 +313,7 @@ def main():
     for name, _ in mover_nodes:
         sp = mover_specs[name]
         dx, dy, dz = sp['delta']
-        movers_out.append({'id': name.lower(), 'delta': [dx, dz, -dy], 'out': sp['out'], 'back': sp['back'], 'cycle': sp['cycle'], 'duration': sp.get('duration', 2)})
+        movers_out.append({'id': name.lower(), 'delta': [dx, dz, -dy], 'out': sp.get('out', 0), 'back': sp.get('back', 0), 'cycle': sp.get('cycle', 1), 'duration': sp.get('duration', 2), 'manual': bool(sp.get('manual'))})
     if movers_out:
         (out / 'movers.json').write_text(json.dumps(movers_out))
     for name, groups in ent_meshes.items():

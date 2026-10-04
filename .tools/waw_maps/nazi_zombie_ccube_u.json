@@ -32,14 +32,30 @@
   },
   "powerSwitch": "turn_power_on",
   "entityMeshes": [
+    "cheese_ending_clip",
+    "iron_door",
+    "left_button_ric",
+    "middle_button_ric",
+    "piece_left_ric",
+    "piece_middle_ric",
+    "piece_right_ric",
+    "ric_answer_block",
+    "right_button_ric",
+    "spawn_part_cage",
     "target1",
     "target2",
     "target3",
     "target4",
     "target5",
-    "cheese_ending_clip",
-    "iron_door",
-    "spawn_part_cage"
+    "trivia1",
+    "trivia2",
+    "trivia3",
+    "trivia4",
+    "trivia5",
+    "trivia6",
+    "trivia7",
+    "trivia8",
+    "trivia9"
   ],
   "entityProps": [
     "panel_pick",
@@ -328,6 +344,15 @@
       "back": 19,
       "cycle": 20,
       "duration": 2
+    },
+    {
+      "target": "thor_ending_door",
+      "delta": [
+        0,
+        0,
+        300
+      ],
+      "manual": true
     }
   ]
 }
