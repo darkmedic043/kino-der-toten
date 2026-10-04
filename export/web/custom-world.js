@@ -117,7 +117,7 @@ export class CustomWorld {
     const models=this.data.models,place=async(key,position,yaw,offset=0)=>{
       const o=await loadModel(models[key]);if(!o)return null;o.position.copy(position);o.rotation.y=yaw+FACE+offset;this.scene.add(o);return o;
     };
-    for(const m of markers)if(m.type!=='DOOR'&&m.type!=='EGG')m.object.visible=false;
+    for(const m of markers)if(!['DOOR','EGG','RISING','MOVER'].includes(m.type))m.object.visible=false;
     const spawn=markers.find(m=>m.type==='PLAYER_SPAWN');
     this.spawn=spawn?{position:spawn.position.clone(),yaw:spawn.yaw}:{position:new THREE.Vector3(bounds.getCenter(new THREE.Vector3()).x,bounds.max.y+10,bounds.getCenter(new THREE.Vector3()).z),yaw:0};
 

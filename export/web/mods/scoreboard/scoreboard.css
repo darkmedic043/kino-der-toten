@@ -1,40 +1,47 @@
+/* Mob of the Dead (Black Ops 2) style: a grey, grainy prison board, no colour but white, steel and a little gold */
 #scoreboard{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;pointer-events:none;
-  background:radial-gradient(ellipse at 50% 45%,#000a 0%,#000d 70%);font:13px/1.3 system-ui,'Segoe UI',sans-serif;color:#e9e4d8;letter-spacing:.04em}
+  background:#0000008c;font:13px/1.3 'Arial Narrow',system-ui,sans-serif;color:#e8e8e6;letter-spacing:.05em}
 #scoreboard.on{display:flex}
-#scoreboard .sb-panel{width:min(1020px,94vw);max-height:92vh;display:flex;flex-direction:column;gap:18px;padding:26px 30px 22px;
-  background:linear-gradient(180deg,#14100cf0,#0a0807f5);border:1px solid #ffffff1c;box-shadow:0 0 0 1px #000,0 18px 70px #000c}
-#scoreboard .sb-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;border-bottom:1px solid #ffffff22;padding-bottom:12px}
-#scoreboard .sb-head h2{margin:0;font:900 34px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.06em;text-transform:uppercase}
-#scoreboard .sb-head small{display:block;color:#f3a33a;font-size:10px;letter-spacing:.38em;margin-bottom:4px}
-#scoreboard .sb-meta{display:flex;gap:26px;text-align:right}
-#scoreboard .sb-meta b{display:block;font:600 22px/1.1 Impact,'Arial Narrow',sans-serif;color:#f4efe3}
-#scoreboard .sb-meta span{font-size:10px;letter-spacing:.3em;color:#a09a8d}
-#scoreboard .sb-objective{margin:-6px 0 0;color:#cfc7b4;font-size:12px;letter-spacing:.06em;border-left:2px solid #f3a33a;padding:2px 0 2px 10px}
-#scoreboard table{width:100%;border-collapse:collapse}
-#scoreboard th{font-weight:600;font-size:10px;letter-spacing:.3em;color:#a09a8d;text-align:right;padding:0 14px 8px}
-#scoreboard th:first-child,#scoreboard td:first-child{text-align:left;padding-left:8px}
-#scoreboard td{padding:11px 14px;text-align:right;font:600 20px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.04em;border-top:1px solid #ffffff12}
-#scoreboard tr.me td{background:#f3a33a16}
-#scoreboard tr.me td:first-child{box-shadow:inset 3px 0 #f3a33a}
+#scoreboard .sb-panel{width:min(980px,94vw);max-height:92vh;display:flex;flex-direction:column;gap:10px;padding:0}
+#scoreboard .sb-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding:0 4px 8px;border-bottom:3px solid #e8e8e6}
+#scoreboard .sb-head h2{margin:0;font:900 40px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#f2f2f0}
+#scoreboard .sb-head small{display:block;color:#a8a8a4;font-size:11px;letter-spacing:.4em;margin-bottom:5px}
+#scoreboard .sb-meta{display:flex;gap:28px;text-align:right;align-items:flex-end}
+#scoreboard .sb-meta b{display:block;font:600 22px/1.1 Impact,'Arial Narrow',sans-serif;color:#d6d6d2}
+#scoreboard .sb-meta span{font-size:10px;letter-spacing:.32em;color:#8c8c88}
+#scoreboard .sb-round b{font-size:44px;color:#f2f2f0}
+#scoreboard .sb-objective{margin:0;color:#bdbdb8;font-size:12px;letter-spacing:.06em;border-left:3px solid #e8e8e6;padding:2px 0 2px 10px}
+#scoreboard table{width:100%;border-collapse:separate;border-spacing:0 5px}
+#scoreboard th{font-weight:600;font-size:11px;letter-spacing:.3em;color:#9a9a96;text-align:right;padding:0 16px 2px}
+#scoreboard th:nth-child(2){text-align:left}
+#scoreboard td{padding:10px 16px;text-align:right;font:600 22px/1 Impact,'Arial Narrow',sans-serif;letter-spacing:.05em;background:#26262499;border-top:1px solid #ffffff14;border-bottom:1px solid #00000066;color:#dededa}
+#scoreboard td.sb-n{width:44px;padding:10px 0;text-align:center;font-size:26px;color:#8c8c88;background:#1a1a18cc}
+#scoreboard td:nth-child(2){text-align:left;padding-left:12px}
+#scoreboard td.sb-score{color:#f2f2f0;font-size:26px}
+#scoreboard tr.me td{background:#4a4a46cc;color:#fff;border-top-color:#ffffff40}
+#scoreboard tr.me td.sb-n{background:#e8e8e6;color:#111}
 #scoreboard tr.out td{opacity:.45}
-#scoreboard .sb-who{display:flex;align-items:center;gap:12px;font:600 17px/1.1 system-ui,sans-serif;letter-spacing:.05em}
-#scoreboard .sb-who i{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#3a2a24,#0b0c0c 75%);border:2px solid #b5372c99;font:700 16px/1 system-ui;font-style:normal;color:#e9e4d8;overflow:hidden;flex:none}
+#scoreboard .sb-who{display:flex;align-items:center;gap:12px;font:600 18px/1.1 'Arial Narrow',system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase}
+#scoreboard .sb-who i{display:grid;place-items:center;width:42px;height:42px;background:#0c0c0b;border:2px solid #cfcfca;font:700 16px/1 system-ui;font-style:normal;color:#e8e8e6;overflow:hidden;flex:none;filter:grayscale(.85) contrast(1.1)}
 #scoreboard .sb-who i img{width:100%;height:100%;object-fit:cover}
-#scoreboard .sb-who em{display:block;font-style:normal;font-size:9px;letter-spacing:.3em;color:#f3a33a;margin-top:3px}
-#scoreboard .sb-collect h3{margin:0 0 10px;font-size:10px;letter-spacing:.38em;color:#a09a8d;font-weight:600;display:flex;align-items:center;gap:12px}
-#scoreboard .sb-collect h3::after{content:'';flex:1;height:1px;background:#ffffff1c}
-#scoreboard .sb-tiles{display:flex;flex-wrap:wrap;gap:8px}
-#scoreboard .sb-tile{min-width:118px;padding:8px 12px;border:1px solid #ffffff1f;background:#ffffff08}
-#scoreboard .sb-tile span{display:block;font-size:9px;letter-spacing:.26em;color:#a09a8d;text-transform:uppercase}
-#scoreboard .sb-tile b{display:block;margin-top:4px;font:600 17px/1.1 Impact,'Arial Narrow',sans-serif;letter-spacing:.05em}
-#scoreboard .sb-tile.done{border-color:#f3a33a99;background:#f3a33a14}
-#scoreboard .sb-tile.done b{color:#f3a33a}
-#scoreboard .sb-tile.sb-perk{border-left:3px solid var(--c,#888)}
-#scoreboard .sb-none{color:#6d675c;font-size:12px;letter-spacing:.08em}
-body.touch-mode #scoreboard .sb-panel{padding:14px 16px;gap:10px;max-height:96vh;overflow:hidden}
-body.touch-mode #scoreboard .sb-head h2{font-size:22px}
+#scoreboard .sb-who em{display:block;font-style:normal;font-size:9px;letter-spacing:.3em;color:#c9a23a;margin-top:3px}
+#scoreboard .sb-collect{margin-top:8px;padding:10px 4px 0;border-top:1px solid #ffffff30}
+#scoreboard .sb-collect h3{margin:0 0 8px;font-size:11px;letter-spacing:.4em;color:#9a9a96;font-weight:600}
+#scoreboard .sb-tiles{display:flex;flex-wrap:wrap;gap:6px}
+#scoreboard .sb-tile{min-width:118px;padding:7px 12px;border-left:3px solid #6c6c68;background:#26262499}
+#scoreboard .sb-tile span{display:block;font-size:9px;letter-spacing:.26em;color:#9a9a96;text-transform:uppercase}
+#scoreboard .sb-tile b{display:block;margin-top:3px;font:600 17px/1.1 Impact,'Arial Narrow',sans-serif;letter-spacing:.05em;color:#dededa}
+#scoreboard .sb-tile.done{border-left-color:#c9a23a;background:#3a372a99}
+#scoreboard .sb-tile.done b{color:#e6c35a}
+#scoreboard .sb-tile.sb-perk{border-left-color:var(--c,#888)}
+#scoreboard .sb-none{color:#6d6d68;font-size:12px;letter-spacing:.08em}
+body.touch-mode #scoreboard .sb-panel{gap:6px;max-height:96vh;overflow:hidden}
+body.touch-mode #scoreboard .sb-head h2{font-size:24px}
+body.touch-mode #scoreboard .sb-round b{font-size:28px}
 body.touch-mode #scoreboard td{padding:6px 8px;font-size:15px}
-body.touch-mode #scoreboard th{padding:0 8px 4px;font-size:8px;letter-spacing:.18em}
+body.touch-mode #scoreboard td.sb-score{font-size:17px}
+body.touch-mode #scoreboard td.sb-n{font-size:16px;width:28px}
+body.touch-mode #scoreboard th{padding:0 8px 2px;font-size:8px;letter-spacing:.16em}
 body.touch-mode #scoreboard .sb-who i{width:28px;height:28px}
 body.touch-mode #scoreboard .sb-tile{min-width:92px;padding:5px 8px}
-@media (max-width:700px){#scoreboard .sb-meta{display:none}#scoreboard .sb-panel{padding:14px}#scoreboard td{font-size:15px;padding:8px 6px}#scoreboard th{padding:0 6px 6px;letter-spacing:.12em}}
+@media (max-width:700px){#scoreboard .sb-meta div:not(.sb-round){display:none}#scoreboard td{font-size:15px;padding:8px 6px}#scoreboard th{padding:0 6px 2px;letter-spacing:.1em}}

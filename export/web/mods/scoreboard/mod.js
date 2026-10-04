@@ -1,4 +1,5 @@
-// Hold Tab: every player's points, kills, headshots, downs and accuracy, with what you have collected along the bottom
+// Hold Tab: a Mob of the Dead (Black Ops 2) style scoreboard: every player's score, kills, downs, revives and headshots,
+// with what you have collected along the bottom
 // (perks, equipment, Easter egg progress and any collectibles a map or mod registers).
 //   kino.scoreboard.addCollectible({id, label, value(): string|number, done?(): boolean})   (re-adding an id replaces it)
 // In co-op each client shares its stats with the others about twice a second (kino.coop, a `stats` message).
@@ -14,14 +15,15 @@ export default async function setup(api){
   window.kino.scoreboard={addCollectible(def){collectibles.set(def.id,def);return def;},removeCollectible(id){collectibles.delete(id);}};
 
   // ---- stats ---------------------------------------------------------------------------------------
-  let downs=0,lastPhase=session.phase;
+  let downs=0,revives=0,lastPhase=session.phase;
   const peers=new Map();let subscribed=false,sendAt=0;
-  const mine=()=>({p:Math.round(session.points),k:session.kills,h:session.headshots,d:downs,a:session.shots?Math.round(100*session.hits/session.shots):0});
-  host.on('reset',()=>{downs=0;lastPhase=session.phase;});
+  const mine=()=>({p:Math.round(session.points),k:session.kills,h:session.headshots,d:downs,r:revives});
+  host.on('reset',()=>{downs=0;revives=0;lastPhase=session.phase;});
   function pump(){
     if(session.phase==='reviving'&&lastPhase!=='reviving')downs++;lastPhase=session.phase;
     const net=window.kino.coop;
-    if(net&&!subscribed){subscribed=true;net.on('stats',(m,from)=>peers.set(from,m));}
+    if(net&&!subscribed){subscribed=true;net.on('stats',(m,from)=>peers.set(from,m));
+      const send=net.send.bind(net);net.send=(to,msg,...rest)=>{if(msg?.t==='revive')revives++;return send(to,msg,...rest);};}   // count the revives you give
     if(net?.id&&performance.now()>sendAt){sendAt=performance.now()+500;net.send('all',{t:'stats',...mine()});}
   }
 
@@ -30,11 +32,11 @@ export default async function setup(api){
   const avatar=name=>{const src=document.querySelector('#hud-portrait img')?.src;return src?`<img src="${esc(src)}" alt="">`:esc((name||'?')[0].toUpperCase());};
   const mapTitle=()=>api.map?.title??(/\/\s*([^\n]+)/.exec(document.getElementById('top')?.innerText??'')?.[1]??'Zombies');
   const clock=()=>{const t=Math.floor(session.time);return `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;};
-  const row=(name,s,cls,tag,av)=>`<tr class="${cls}"><td><div class="sb-who"><i>${av}</i><div>${esc(name)}${tag?`<em>${tag}</em>`:''}</div></div></td><td>${s?s.p.toLocaleString():'—'}</td><td>${s?s.k:'—'}</td><td>${s?s.h:'—'}</td><td>${s?s.d:'—'}</td><td>${s?s.a+'%':'—'}</td></tr>`;
+  const row=(i,name,s,cls,tag,av)=>`<tr class="${cls}"><td class="sb-n">${i}</td><td><div class="sb-who"><i>${av}</i><div>${esc(name)}${tag?`<em>${tag}</em>`:''}</div></div></td><td class="sb-score">${s?s.p.toLocaleString():'—'}</td><td>${s?s.k:'—'}</td><td>${s?s.d:'—'}</td><td>${s?s.r??0:'—'}</td><td>${s?s.h:'—'}</td></tr>`;
   const tile=(label,value,done,cls='',style='')=>`<div class="sb-tile${done?' done':''}${cls?' '+cls:''}"${style?` style="${style}"`:''}><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
   function html(){
-    const net=window.kino.coop,me=mine(),rows=[row(localName()||'You',me,'me',net?.id&&net.id===net.hostId?'HOST':'',avatar(localName()))];
-    for(const p of net?.players?.values?.()??[]){if(p.id===net.id)continue;rows.push(row(p.name,peers.get(p.id),'',p.id===net.hostId?'HOST':'',esc((p.name||'?')[0].toUpperCase())));}
+    const net=window.kino.coop,me=mine(),rows=[row(1,localName()||'You',me,'me',net?.id&&net.id===net.hostId?'HOST':'',avatar(localName()))];
+    for(const p of net?.players?.values?.()??[]){if(p.id===net.id)continue;rows.push(row(rows.length+1,p.name,peers.get(p.id),'',p.id===net.hostId?'HOST':'',esc((p.name||'?')[0].toUpperCase())));}
     const tiles=[];
     for(const id of session.perks??[]){const [name,color]=PERKS[id]??[id.replace(/^specialty_/,'').replace(/_/g,' '),'#888'];tiles.push(tile('Perk',name,false,'sb-perk','--c:'+color));}
     if(session.grenades!=null)tiles.push(tile('Grenades',session.grenades,false));
@@ -44,9 +46,9 @@ export default async function setup(api){
     for(const c of collectibles.values()){let v='',done=false;try{v=c.value();done=!!c.done?.();}catch{}tiles.push(tile(c.label,v,done));}
     const objective=document.getElementById('moon-objective')?.textContent?.trim();
     return `<div class="sb-panel"><div class="sb-head"><div><small>${net?.id?'CO-OP':'SOLO'}</small><h2>${esc(mapTitle())}</h2></div>
-      <div class="sb-meta"><div><b>${session.round}</b><span>ROUND</span></div><div><b>${clock()}</b><span>TIME</span></div></div></div>
+      <div class="sb-meta"><div><b>${clock()}</b><span>TIME</span></div><div class="sb-round"><b>${session.round}</b><span>ROUND</span></div></div></div>
       ${objective?`<p class="sb-objective">${esc(objective)}</p>`:''}
-      <table><thead><tr><th>PLAYER</th><th>POINTS</th><th>KILLS</th><th>HEADSHOTS</th><th>DOWNS</th><th>ACCURACY</th></tr></thead><tbody>${rows.join('')}</tbody></table>
+      <table><thead><tr><th></th><th>PLAYER</th><th>SCORE</th><th>KILLS</th><th>DOWNS</th><th>REVIVES</th><th>HEADSHOTS</th></tr></thead><tbody>${rows.join('')}</tbody></table>
       <div class="sb-collect"><h3>COLLECTIBLES</h3><div class="sb-tiles">${tiles.join('')||'<span class="sb-none">Nothing collected yet</span>'}</div></div></div>`;
   }
 
