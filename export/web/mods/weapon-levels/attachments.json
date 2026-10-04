@@ -262,7 +262,8 @@
       "tags": [
         "tag_sra",
         "tag_sra1",
-        "tag_laser_box"
+        "tag_laser_box",
+        "tag_sight"
       ],
       "desc": "Tighter hip fire.",
       "stats": {

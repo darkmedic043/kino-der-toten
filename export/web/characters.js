@@ -10,6 +10,7 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { Rig, loadModel, loadAnimation } from './animation.js';
 import { bo1Rig } from './bo1-motion.js';
 import { SpringBones } from './spring-bones.js';
+import { poseIdle } from './mods/bo3-weapons/pose.js';
 
 export async function loadCharacterRegistry(){
   const url=new URL('mods/characters/characters.json',document.baseURI);
@@ -425,6 +426,7 @@ const GRIPS={mannequin:{position:[0,-3.4,1.2],basis:true},t5:{position:[0,0,0],r
 export async function holdWeapon(character,entry,def,hideTags=def?.hideTags){
   if(!character.hand||!def?.worldModel)return null;
   const model=await loadModel(def.worldModel);if(!model)return null;
+  await poseIdle(model,def);   // imported BO3 guns: parts sit where the idle animation puts them
   for(const tag of hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
   const grip={...GRIPS[entry.type]??GRIPS.gltf,...entry.weapon},pivot=new THREE.Group();pivot.add(model);
   if(character.procedural&&!entry.weapon?.rotation){

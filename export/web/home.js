@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { loadModel, ViewWeapon } from './animation.js';
 import { applyGlow, tickGlow } from './mods/bo3-weapons/glow.js';
+import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
 import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady } from './profile.js';
@@ -156,6 +157,7 @@ function thumb(id){
     try{
       const model=await loadModel(def?.worldModel);
       if(model){
+        await poseIdle(model,def);
         for(const tag of def.hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
         if(def.glow)tickGlow(applyGlow(model,def.glow,{depthTest:true}),1);   // BO3 mod guns' lights, as in game
         const pivot=new THREE.Group();pivot.add(model);pivot.rotation.set(.12,-.35,0);thumbScene.add(pivot);pivot.updateMatrixWorld(true);

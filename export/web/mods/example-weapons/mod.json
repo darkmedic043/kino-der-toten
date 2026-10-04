@@ -1,5 +1,0 @@
-{
-  "name": "Example weapons",
-  "description": "Shows how to add weapons with \"extends\" and put them in the Mystery Box.",
-  "data": "data.json"
-}

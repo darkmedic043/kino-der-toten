@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import { loadModel } from './animation.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
+import { poseIdle } from './mods/bo3-weapons/pose.js';
 
 const cycleTime=3.9,offerTime=12;
 export class MysteryBox {
   constructor(scene,world,data,session,audio,toast){Object.assign(this,{scene,world,data,session,audio,toast});this.boxes=new Map();this.models={};this.displays=new Map();this.moves=0;this.uses=0;}
   async load(){
-    await Promise.all(Object.entries(this.data.weapons).map(async([id,d])=>{this.models[id]=await loadModel(d.worldModel);}));
+    // def.lazyWorld (the imported BO3 guns): loaded in the background, not awaited; they join the box pool once loaded
+    const all=Object.entries(this.data.weapons),eager=all.filter(([,d])=>!d.lazyWorld);
+    await Promise.all(eager.map(async([id,d])=>{this.models[id]=await loadModel(d.worldModel);}));
+    for(const [id,d] of all)if(d.lazyWorld)loadModel(d.worldModel).then(m=>poseIdle(m,d)).then(m=>{this.models[id]=m;}).catch(e=>console.warn('[mystery-box]',id,e));
     if(this.data.equipment?.zombie_cymbal_monkey)this.models.zombie_cymbal_monkey=await loadModel(this.data.equipment.zombie_cymbal_monkey.projectileModel);
     this.models.teddy=await loadModel(this.data.boxTeddy);
     this.world.openBoxes=new Set();

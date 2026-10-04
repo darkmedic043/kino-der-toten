@@ -3,6 +3,7 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { loadModel, loadAnimation, Rig } from './animation.js';
 import { KinoEvents } from './kino-events.js';
 import { disposeSkeletons } from './runtime-assets.js';
+import { poseIdle } from './mods/bo3-weapons/pose.js';
 
 const up=new THREE.Vector3(0,1,0),v=a=>new THREE.Vector3(...a);
 export class KinoFeatures {
@@ -12,8 +13,10 @@ export class KinoFeatures {
   }
   async load(){
     const defs=[...Object.values(this.data.weapons).flatMap(d=>[d,d.upgrade,d.upgrade?.attachment]),...Object.values(this.data.equipment)];
-    const urls=new Set(defs.filter(Boolean).flatMap(d=>[d.projectileModel,d.worldModel]).filter(Boolean));
+    const urls=new Set(defs.filter(Boolean).flatMap(d=>[d.projectileModel,d.lazyWorld?null:d.worldModel]).filter(Boolean));
     await Promise.all([...urls].map(async url=>this.models.set(url,await loadModel(url))));
+    // def.lazyWorld world models (imported BO3 guns): loaded in the background; model() falls back until then
+    for(const d of defs.filter(d=>d?.lazyWorld))if(d.worldModel&&!urls.has(d.worldModel)){const url=d.worldModel;urls.add(url);loadModel(url).then(m=>poseIdle(m,d)).then(m=>this.models.set(url,m)).catch(()=>{});}
     this.reelTemplate=await loadModel(this.data.reelModel);this.reelModels=new Map();
     if(this.data.animations.o_monkey_bomb)this.monkeyAnimation=await loadAnimation(this.data.animations.o_monkey_bomb);
     for(const e of this.data.entities.filter(e=>e.targetname?.startsWith('trigger_movie_reel_'))){

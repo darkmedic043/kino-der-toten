@@ -8,8 +8,9 @@ import { loadModel } from '../../animation.js';
 export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>true){
   if(!gun)return;
   for(const o of gun.userData.mounts??[])o.removeFromParent();gun.userData.mounts=[];
-  for(const id of ids){
-    const m=def?.mounts?.[id],bone=m&&gun.getObjectByName(m.tag);if(!bone)continue;
+  // def.fixedParts: always-on parts that are their own model (the AS50's scope), mounted the same way
+  for(const m of [...(def?.fixedParts??[]),...ids.map(id=>def?.mounts?.[id])]){
+    const bone=m&&gun.getObjectByName(m.tag);if(!bone)continue;
     const part=await loadModel(m.model).catch(()=>null);if(!part||!stillCurrent())return;
     part.updateMatrixWorld(true);let root=null;part.traverse(o=>{if(!root&&o.isBone)root=o;});
     part.matrixAutoUpdate=false;if(root)part.matrix.copy(root.matrixWorld).invert();

@@ -34,16 +34,28 @@
       "level": 6
     },
     {
+      "id": "bo3_ak117",
+      "level": 6
+    },
+    {
       "id": "ak74u_zm",
       "level": 8
     },
     {
-      "id": "mp40_extended_zm",
-      "level": 9
+      "id": "bo3_sa80",
+      "level": 8
     },
     {
       "id": "spectre_zm",
       "level": 10
+    },
+    {
+      "id": "bo3_mp7_flanker",
+      "level": 10
+    },
+    {
+      "id": "bo3_smg5_tool",
+      "level": 11
     },
     {
       "id": "m16_zm",
@@ -62,8 +74,20 @@
       "level": 14
     },
     {
+      "id": "bo3_umg_dmz",
+      "level": 14
+    },
+    {
+      "id": "bo3_93r_dystopic",
+      "level": 15
+    },
+    {
       "id": "famas_zm",
       "level": 16
+    },
+    {
+      "id": "bo3_spas12_irradiated",
+      "level": 17
     },
     {
       "id": "ithaca_zm",
@@ -74,7 +98,11 @@
       "level": 18
     },
     {
-      "id": "golden_python_zm",
+      "id": "bo3_f2000_tech",
+      "level": 19
+    },
+    {
+      "id": "bo3_uzi_irradiated",
       "level": 20
     },
     {
@@ -90,12 +118,28 @@
       "level": 23
     },
     {
+      "id": "bo3_k9_heaven",
+      "level": 23
+    },
+    {
       "id": "aug_acog_zm",
       "level": 24
     },
     {
+      "id": "bo3_aa12_btf",
+      "level": 25
+    },
+    {
       "id": "spas_zm",
       "level": 26
+    },
+    {
+      "id": "bo3_tommy_modern",
+      "level": 26
+    },
+    {
+      "id": "bo3_g37h_water",
+      "level": 27
     },
     {
       "id": "hs10_zm",
@@ -110,6 +154,14 @@
       "level": 30
     },
     {
+      "id": "bo3_rpd_ornate",
+      "level": 30
+    },
+    {
+      "id": "bo3_m1887",
+      "level": 31
+    },
+    {
       "id": "dragunov_zm",
       "level": 32
     },
@@ -122,7 +174,15 @@
       "level": 34
     },
     {
+      "id": "bo3_striker",
+      "level": 34
+    },
+    {
       "id": "hk21_zm",
+      "level": 36
+    },
+    {
+      "id": "bo3_m240_ice",
       "level": 36
     },
     {
@@ -130,12 +190,28 @@
       "level": 38
     },
     {
+      "id": "bo3_rpg_dragon",
+      "level": 38
+    },
+    {
+      "id": "bo3_as50_rare",
+      "level": 40
+    },
+    {
       "id": "crossbow_explosive_zm",
       "level": 41
     },
     {
+      "id": "bo3_mg4_heaven",
+      "level": 42
+    },
+    {
       "id": "microwavegundw_zm",
       "level": 43
+    },
+    {
+      "id": "bo3_bow",
+      "level": 44
     },
     {
       "id": "ray_gun_zm",

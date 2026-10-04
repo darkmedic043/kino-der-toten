@@ -156,6 +156,8 @@ def to_glb(model, out, tex_dir=None, texture_loader=None, rename=None, glow=None
         r = texture((m.get('diffuse') or '').replace('_c.png', '_g.png'), 'rough') if m.get('diffuse') else None
         if d is not None: mat['pbrMetallicRoughness']['baseColorTexture'] = {'index': d}
         elif 'black_color' in (m.get('diffuse') or ''): mat['pbrMetallicRoughness']['baseColorFactor'] = [.02, .02, .02, 1]   # BO3's built-in $black_color
+        elif '$color_black_' in (m.get('diffuse') or ''):   # $color_black_40 etc.: a grey of that percentage
+            g = 1-int(m['diffuse'].split('$color_black_')[1].split('.')[0])/100; mat['pbrMetallicRoughness']['baseColorFactor'] = [g*.25, g*.25, g*.25, 1]
         if n is not None: mat['normalTexture'] = {'index': n}
         if r is not None: mat['pbrMetallicRoughness']['metallicRoughnessTexture'] = {'index': r}; mat['pbrMetallicRoughness']['roughnessFactor'] = 1
         materials.append(mat)
@@ -179,7 +181,9 @@ def to_glb(model, out, tex_dir=None, texture_loader=None, rename=None, glow=None
         if m['mats'] and 0 <= m['mats'][0] < len(materials): prim['material'] = m['mats'][0]
         src = model['materials'][prim['material']] if 'material' in prim else {}
         if materials[prim.get('material', 0)]['name'].startswith('mtl_hud'): continue   # in-world HUD screens (need BO3's live UI)
-        if 'diffuse' in src and not src['diffuse'] and not src.get('normal'): continue   # no images at all: shader-only (sight reticles), would render white
+        if 'diffuse' in src and not src['diffuse'] and not src.get('normal'): continue
+        if 'blacktransparent' in (src.get('diffuse') or ''): continue
+        if '$white_diffuse' in (src.get('diffuse') or '') and (len(m['pos']) <= 24 or 'lensflare' in src.get('name', '')): continue   # untextured helper box (the bow's lambert1), lens-flare cards   # BO3's $blacktransparent_color: invisible helper geometry   # no images at all: shader-only (sight reticles), would render white
         prims.append(prim)
     mesh_node = len(nodes); nodes.append({'name': 'mesh', 'mesh': 0})
     gltf = {'asset': {'version': '2.0', 'generator': 'semodel_to_glb.py'}, 'scene': 0,

@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { applyGlow, tickGlow } from '../bo3-weapons/glow.js';
+import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress } from './camo.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef } from './gunsmith.js';
@@ -129,6 +130,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   async function loadGun(){
     def=weapons[id];const token=id;
     const model=await loadModel(def.model);if(!alive||token!==id)return;
+    await poseIdle(model,def);if(!alive||token!==id)return;
     if(gun){pivot.remove(gun);}
     gun=model;glow=def.glow?applyGlow(gun,def.glow,{depthTest:true}):null;   // BO3 mod guns' lights, as in game (before emissive0 is recorded)
     gun=model;gun.traverse(o=>{if(!o.isMesh)return;o.frustumCulled=false;

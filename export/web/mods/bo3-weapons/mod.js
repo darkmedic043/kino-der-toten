@@ -56,6 +56,8 @@ export default async function setup(api){
         const ctx=audio.ctx;if(prevShot&&ctx){const g=prevShot.g.gain;g.cancelScheduledValues(ctx.currentTime);g.setValueAtTime(g.value,ctx.currentTime);g.linearRampToValueAtTime(0,ctx.currentTime+.12);prevShot.src.stop(ctx.currentTime+.13);prevShot=null;}
         const token=++shotToken,gain=(SHOT_GAIN[modId(def)]??.85)*(.88+Math.random()*.2);
         play(list[Math.floor(Math.random()*list.length)],{gain,rate:.96+Math.random()*.08}).then(h=>{if(h&&!last&&token===shotToken)prevShot=h;});return;}}
+    // no fire sound in the mod (Tommy, RPG): the BO1 gun it's built on
+    if(kind==='shot'&&isMod(def)&&def.soundAs)return weaponSound(kind,{...def,id:def.soundAs,baseId:def.soundAs},...rest);
     if(kind==='shot'&&isTesla(def)){
       // quieter than BO3's mix, a little pitch drift per shot, and the previous shot's layers fade when firing fast
       const ctx=audio.ctx,rate=.96+Math.random()*.08,v=.9+Math.random()*.15;
@@ -198,6 +200,8 @@ export default async function setup(api){
     updateLights(dt);
     setHum(isTesla(session.def)&&!(session.reloadLeft>0)&&session.phase!=='gameover');
     updateModGlow();modFlash=Math.max(0,modFlash-dt*6);
+    // RPG: the rocket (a fixed part on tag_clip) is gone once fired, back with the reload
+    if(view?.def?.hideClipEmpty)for(const part of view.gun?.userData.mounts??[])if(part.parent?.name==='tag_clip')part.visible=(session.weapon?.mag??1)>0||session.reloadLeft>0;
     if(session.shots!==lastShots){const fired=session.shots>lastShots;lastShots=session.shots;if(fired&&isTesla(session.def))fire();if(fired&&isMod(session.def))modShot();}
     for(const p of [...pending]){p.at-=dt;if(p.at<=0){pending.splice(pending.indexOf(p),1);zap(p);}}
     for(const a of [...arcs]){a.t+=dt;const k=1-a.t/a.life;

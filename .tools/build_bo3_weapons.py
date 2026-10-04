@@ -42,10 +42,20 @@ def webp(stem, kind):
 # heavy assets are browser-cached for a day (kino-server.mjs): stamp URLs with a content hash so rebuilds reach players
 def ver(path): return '?v='+hashlib.md5(pathlib.Path(path).read_bytes()).hexdigest()[:8]
 
-def model(name, out_name=None, rename=None, glow=None, glow_maps=None):
+def webp_small(stem, kind):
+    # world models (Mystery Box, Pack-a-Punch, co-op third person): every weapon's is preloaded at startup, and the
+    # viewmodel GLBs add up to ~60 MB; these carry only a 256 px colour map (no normal/roughness)
+    if kind != 'diffuse': return None
+    src = SRC/'ximages'/(stem+'.png')
+    if not src.exists(): return None
+    with tempfile.NamedTemporaryFile(suffix='.webp') as out:
+        subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', str(src), '-vf', "scale='min(256,iw)':-2", '-c:v', 'libwebp', '-quality', '80', out.name], check=True)
+        return pathlib.Path(out.name).read_bytes(), 'image/webp'
+
+def model(name, out_name=None, rename=None, glow=None, glow_maps=None, light=False):
     sem = SEM.read_semodel(SRC/'xmodels'/name/(name+'_LOD0.semodel'))
     out = MOD/'models'/((out_name or name)+'.glb')
-    SEM.to_glb(sem, out, texture_loader=webp, rename=rename, glow=glow, glow_maps=glow_maps)
+    SEM.to_glb(sem, out, texture_loader=webp_small if light else webp, rename=rename, glow=glow, glow_maps=glow_maps)
     print('model', out.name, f'{out.stat().st_size/1e6:.1f} MB')
     return WEB+'models/'+out.name+ver(out), sem
 
@@ -153,10 +163,33 @@ GLOW_MAPS = {
     'mtl_as50_as50heloderma_glow': ('i_as50_as50heloderma_glow_e', [.3, 0], True),
     'mtl_wea_augoctopus_glow': ('i_wea_augoctopus_glow_c_rightone', [.25, 0], True),
     'mtl_iro_glow_m4a1techdeatheg': ('i_iro_glow_m4a1techdeatheg_e', [0, 0], False),
+    'mtl_wea_ak47_ak47_blue_led': ('i_wea_ak47_ak47_blue_led_c', [.4, 0], False),       # Uzi: travelling cyan spot
+    'mtl_wea_ak47_ak47_blue_bullet': ('i_wea_ak47_ak47_blue_bullet_c', [0, 0], True),
+    'mtl_wea_ak47_ak47_blue_lighting': ('i_wea_ak47_ak47_blue_lighting_c', [.15, .07], False),   # lightning ring, crawling
+    'mtl_wea_aa12btf_purple_lighting': ('i_wea_aa12btf_purple_lighting_c', [.15, .07], True),
+    'mtl_wea_aa12btf_purple_lighting_2': ('i_wea_aa12btf_purple_lighting_2_c', [0, 0], True),
+    'mtl_aa12_glow_ani': ('i_glow_blue_ani_c', [.5, 0], True),   # its own image isn't in the mod's packages
+    'mtl_bow_heloderma_glow': ('i_as50_as50heloderma_glow_e', [.3, 0], True),
+    'mtl_wea_bow_bowss_light': ('i_wea_bow_bowss_light_e', [0, 0], True),
+    'mtl_wea_bow_bowss_blk_glow': ('i_wea_bow_bowss_blk_glow_e', [0, 0], True),
 }
 # notetrack aliases with no file of that name in the mod's bank (its alias table isn't exportable):
 # stand-ins from the same bank, copied to sounds/codolbf/weapons/_generic/ (see docs/fork/weapons.md)
-NOTE_ALIAS = {'ins1': 'fly_cloth_01', 'ins2': 'fly_cloth_02', 'ins3': 'fly_cloth_03', 'weap_raise_plr': 'weap_ariarm27_raise_plr'}
+NOTE_ALIAS = {'ins1': 'fly_cloth_01', 'ins2': 'fly_cloth_02', 'ins3': 'fly_cloth_03', 'weap_raise_plr': 'weap_ariarm27_raise_plr',
+              # AS50 and 93R reload foley isn't in the mod's banks (base-game aliases): other guns' bolt and mag sounds
+              'wpfoly_as50_reload_chamber_v1': 'sr2_boltpull1', 'wpfoly_as50_reload_open_v1': 'sr2_boltpull2', 'wpfoly_as50_reload_clipout_v1': 'm240_boxout',
+              'wpfoly_as50_reload_lift_v1': 'm240_coverup1', 'wpfoly_as50_reload_clipin_v1': 'm240_boxin', '93r_clipout': 'js2_clipout', '93r_clipin': 'js2_clipin',
+              'wpfoly_spas12_reload_loop_v1': 'dao12_insertshell', 'wpfoly_spas12_reload_open_v1': 'm240_coverup2', 'wpfoly_spas12_reload_close_v1': 'm240_coverdown2',
+              'wpfoly_spas12_reload_lift_v1': 'm240_coverup1', 'ins': 'fly_cloth_02', 'wpn_bowss_pull': 'wpn_bowss_pull_01',
+              'aek971_clipin': 'aek971_clipin2', 'wpfoly_ak47_reload_lift_v4': 'fly_cloth_02',
+              'wpfoly_g36c_reload_chamber_v1': 'sa80_boltpull1', 'wpfoly_g36c_reload_chamber_v2': 'sa80_boltpull2', 'wpfoly_g36c_reload_lift_v1': 'fly_cloth_01',
+              'wpfoly_g36c_reload_clipout_v1': 'sa80_clipout', 'wpfoly_g36c_reload_clipin_v1': 'sa80_clipin',
+              'weap_vector_chamber_plr': 'ump_boltback', 'weap_vector_clipout_plr': 'weap_vectorhw_clipout_hvn_plr', 'weap_vector_lift_plr': 'weap_vectorhw_lift_plr', 'weap_vector_clipin_plr': 'weap_vectorhw_clipin_hvn_plr',
+              'wpfoly_mp5k_reload_lift_v1': 'fly_cloth_01', 'wpfoly_mp5k_reload_clipout_v1': 'mp7_clipout', 'wpfoly_mp5k_reload_clipin_v1': 'mp7_clipin1',
+              'weap_m1887_open_plr': 'js2_boltpull1', 'weap_m1887_close_plr': 'js2_boltpull2', 'weap_m1887_lift_plr': 'fly_cloth_03', 'weap_m1887_loop_plr': 'dao12_insertshell',
+              'weap_mg4_chamber_plr': 'm240_boltpull1', 'weap_mg4_chamber_plr2': 'm240_boltpull2', 'weap_mg4_cliphit_plr': 'm240_chain', 'weap_mg4_clipin_plr': 'm240_boxin',
+              'weap_mg4_clipout_plr': 'm240_boxout', 'weap_mg4_clippull_plr': 'm240_chain', 'weap_mg4_close_plr': 'm240_coverdown1', 'weap_mg4_close_plr2': 'm240_coverdown2',
+              'weap_mg4_open_plr': 'm240_coverup1', 'weap_mg4_open_plr2': 'm240_coverup2'}
 _png = {}
 def png(stem):   # RGBA png, at most 256 px (keeps alpha, unlike the webp path)
     if stem not in _png:
@@ -188,6 +221,95 @@ MODW = [
        stats=dict(clipSize=33, maxAmmo=264, startAmmo=264, damage=110, minDamage=70, fireTime=.055, automatic=True, fireType='Full Auto', price=900),
        roles=dict(idle='idle', emptyIdle='idle_empty', fire='fire', lastShot='lastshot', adsFire='fireads', adsLastShot='lastshotads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
        ads=('vm_g18_adsup', 'vm_g18_adsdown'), shots=['g18-1', 'g18-2', 'g18-3'], glow='#ff3a3a'),
+  # second batch (2026-10-04)
+  dict(cls='Light machine gun', id='bo3_m240_ice', name='M240 Ice', up='M240 Permafrost', model='m240_ice_vmgun', pre='vm_m240', tpl='rpk_zm',
+       stats=dict(clipSize=100, maxAmmo=400, startAmmo=400, damage=130, minDamage=90, fireTime=.075, price=2000),
+       roles=dict(idle='idle', emptyIdle='idle_empty', fire='fire', lastShot='lastshot', adsFire='fireads', adsLastShot='lastshot_ads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart_empty', sprintLoop='runing_empty', sprintOut='runover_empty'),
+       ads=('vm_m240_adsup', 'vm_m240_adsdown'), shots=['m240-1', 'm240-2', 'm240-3'], glow='#8fe3ff'),
+  dict(cls='Sniper rifle', id='bo3_as50_rare', name='AS50 Overgrowth', up='AS50 Wildwood', model='as50_rare_vmgun', pre='vm_as50', tpl='dragunov_zm',
+       stats=dict(clipSize=10, maxAmmo=60, startAmmo=60, damage=1000, minDamage=700, fireTime=.3, price=2500, scope='duplex'),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', reloadEmpty='reloadempty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_as50_adsup', 'vm_as50_adsdown'), shots=['m82-1', 'm82-2', 'm82-3'], glow='#9aff6a', fixed=[('as50_rare_scope_vmgun', 'tag_scope')]),
+  dict(cls='Submachine gun', id='bo3_uzi_irradiated', name='Uzi Irradiated', up='Uzi Meltdown', model='uzi_irradiated_blue_vmgun', pre='vm_uzi', tpl='mp5k_zm',
+       stats=dict(clipSize=32, maxAmmo=256, startAmmo=256, damage=90, minDamage=55, fireTime=.055, price=1100),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_uzi_adsup', 'vm_uzi_adsdown'), shots=['wpn_miniuziss_rifle_fire_plr'], glow='#36e0ff'),
+  dict(cls='Pistol', id='bo3_93r_dystopic', name='93R Dystopic', up='93R Collapse', model='93r_dystopic_vmgun', pre='vm_93r', tpl='cz75_zm',
+       stats=dict(clipSize=20, maxAmmo=180, startAmmo=180, damage=120, minDamage=80, fireTime=.06, fireType='3-Round Burst', automatic=False, price=800),
+       roles=dict(idle='idle', emptyIdle='idle_empty', fire='fire', lastShot='lastshot', adsFire='adsfire', adsLastShot='lastshot_ads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_93r_adsup', 'vm_93r_adsdown'), shots=['93r-1', '93r-2', '93r-3'], glow='#ff5a3a'),
+  dict(cls='Shotgun', id='bo3_aa12_btf', name='AA-12 Breach', up='AA-12 Rift', model='aa12_btf_vmgun', pre='vm_aa12_grip', tpl='spas_zm',
+       stats=dict(clipSize=20, maxAmmo=120, startAmmo=120, damage=140, minDamage=20, fireTime=.2, pellets=8, automatic=True, fireType='Full Auto', segmentedReload=False, price=2000),
+       roles=dict(idle='idle', fire='fire', adsFire='fire_ads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='run_start', sprintLoop='run_in', sprintOut='run_stop'),
+       ads=('vm_aa12_adsup', 'vm_aa12_adsdown'), shots=['u12-1', 'u12-2', 'u12-3'], glow='#b45cff'),
+  # third batch (2026-10-04)
+  dict(cls='Light machine gun', id='bo3_rpd_ornate', name='RPD Ornate', up='RPD Gilded', model='rpd_ornate_vmgun', pre='vm_rpd', tpl='rpk_zm',
+       stats=dict(clipSize=100, maxAmmo=400, startAmmo=400, damage=125, minDamage=85, fireTime=.08, price=1800),
+       roles=dict(idle='idle', fire='fire', adsFire='adsfire', reload='reload', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_rpd_adsup', 'vm_rpd_adsdown'), shots=['wpn_h1_rpd_shot_01', 'wpn_h1_rpd_shot_02', 'wpn_h1_rpd_shot_03', 'wpn_h1_rpd_shot_04'], glow='#ffd36a'),
+  dict(cls='Shotgun', id='bo3_spas12_irradiated', name='SPAS-12 Irradiated', up='SPAS-12 Fallout', model='spas12_irradiated_vmgun', pre='vm_spas12', tpl='spas_zm',
+       stats=dict(clipSize=8, maxAmmo=64, startAmmo=64, damage=170, minDamage=25, fireTime=.7, pellets=8, price=1500),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reloadloop', reloadStart='reloadstart', reloadEnd='reloadend_irr', rais='pullout', firstRaise='pullout_first_irr', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_spas12_adsup', 'vm_spas12_adsdown'), shots=['spas12-1', 'spas12-2', 'spas12-3'], glow='#7dff3a'),
+  dict(cls='Submachine gun', id='bo3_mp7_flanker', name='MP7 Flanker', up='MP7 Outrider', model='mp7_flanker_vmgun', pre='vm_mp7', tpl='mp5k_zm',
+       stats=dict(clipSize=40, maxAmmo=280, startAmmo=280, damage=95, minDamage=60, fireTime=.06, price=1200),
+       roles=dict(idle='idle', fire='fire', adsFire='fire_ads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runing', sprintLoop='runing', sprintOut='runing'),
+       ads=('vm_mp7_adsup', 'vm_mp7_adsdown'), shots=['mp7-1', 'mp7-2', 'mp7-3'], glow='#5ab4ff'),
+  dict(cls='Submachine gun', id='bo3_tommy_modern', name='Tommy Modern', up='Tommy Syndicate', model='tommy_modern_vmgun', pre='vm_tommy', tpl='mp40_zm',
+       stats=dict(clipSize=50, maxAmmo=300, startAmmo=300, damage=110, minDamage=70, fireTime=.075, price=1400, soundAs='mp40_zm'),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', lastShot='lastshot', adsLastShot='lastshotads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_tommy_adsup', 'vm_tommy_adsdown'), shots=[], glow='#ff9a3a',
+       # the model is rigged as the left gun of an akimbo pair (tag_weapon_le, bones suffixed 1): renamed so the single-gun anims drive it
+       rename={'tag_weapon_le': 'tag_weapon', 'tag_flash_le': 'tag_flash', 'tag_brass_le': 'tag_brass', **{b+'1': b for b in ['j_bolt', 'tag_up', 'tag_down', 'tag_stock', 'tag_clip', 'tag_ironsight', 'tag_grip', 'tag_foregrip', 'tag_flash', 'tag_brass', 'tag_silencer', 'tag_sra']}}),
+  # unique ones
+  dict(cls='Wonder weapon', id='bo3_bow', name='Heloderma Bow', up="Gila's Wrath", model='bowss_vmgun', pre='vm_bow', tpl='crossbow_explosive_zm',
+       stats=dict(clipSize=1, maxAmmo=40, startAmmo=40, damage=900, minDamage=0, explosionRadius=200, explosionInnerDamage=900, explosionOuterDamage=150, price=3000),
+       roles=dict(idle='idle', fire='fire', reload='charge', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runloop', sprintOut='runover'),
+       ads=('vm_bow_ads_up', 'vm_bow_ads_down'), shots=['wpn_bowss_fire_quick', 'wpn_bowss_fire_med', 'wpn_bowss_fire_long'], glow='#ff7a2a'),
+  dict(cls='Launcher', id='bo3_rpg_dragon', name='RPG Dragon', up='RPG Wyrm', model='rpg_dragon_rh_vmgun', pre='vm_rpg', tpl='m72_law_zm',
+       stats=dict(clipSize=1, maxAmmo=12, startAmmo=12, price=2500, soundAs='m72_law_zm', hideClipEmpty=True),
+       roles=dict(idle='idle', fire='fire', reload='reload', rais='pullout', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_rpg_adsup', 'vm_rpg_adsdown'), shots=[], glow='#ff5a1a', fixed=[('rpg_dragon_rocket_vmgun', 'tag_clip')], projectile='rpg_dragon_rocket_vmgun'),  # fourth batch (2026-10-04)
+  dict(cls='Rifle', id='bo3_ak117', name='AK117', up='AK117 Overdrive', model='ak117_vmgun', pre='vm_ak117', tpl='galil_zm',
+       stats=dict(clipSize=30, maxAmmo=270, startAmmo=270, damage=135, minDamage=87, fireTime=0.075, automatic=True, fireType='Full Auto', price=1300),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_ak117_adsup', 'vm_ak117_adsdown'), shots=['ak12-1', 'ak12-2', 'ak12-3'], glow='#ff7a3a'),
+  dict(cls='Rifle', id='bo3_f2000_tech', name='F2000 Tech', up='F2000 Mainframe', model='f2000tech_vmgun', pre='vm_f2000', tpl='famas_zm',
+       stats=dict(clipSize=30, maxAmmo=270, startAmmo=270, damage=130, minDamage=84, fireTime=0.068, automatic=True, fireType='Full Auto', price=1300),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_f2000_adsup', 'vm_f2000_adsdown'), shots=['f2000-1', 'f2000-2', 'f2000-3'], glow='#3affd2'),
+  dict(cls='Rifle', id='bo3_g37h_water', name='G37H Tidal', up='G37H Riptide', model='g37h_water_vmgun', pre='vm_g37h', tpl='commando_zm',
+       stats=dict(clipSize=30, maxAmmo=270, startAmmo=270, damage=125, minDamage=81, fireTime=0.07, automatic=True, fireType='Full Auto', price=1300),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_g37h_adsup', 'vm_g37h_adsdown'), shots=['g36-1', 'g36-2', 'g36-3'], glow='#3aa8ff'),
+  dict(cls='Rifle', id='bo3_sa80', name='SA80', up='SA80 Sovereign', model='sa80_vmgun', pre='vm_sa80', tpl='m16_zm',
+       stats=dict(clipSize=30, maxAmmo=270, startAmmo=270, damage=140, minDamage=91, fireTime=0.08, automatic=True, fireType='Full Auto', price=1300),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_sa80_adsup', 'vm_sa80_adsdown'), shots=['l85-1', 'l85-2', 'l85-3'], glow='#ffcf5a'),
+  dict(cls='Submachine gun', id='bo3_k9_heaven', name='K9 Heaven', up='K9 Seraph', model='k9_heaven_vmgun', pre='vm_k9', tpl='mp5k_zm',
+       stats=dict(clipSize=33, maxAmmo=264, startAmmo=264, damage=95, minDamage=61, fireTime=0.05, automatic=True, fireType='Full Auto', price=1200),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', reloadEmpty='reloadempty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_k9_adsup', 'vm_k9_adsdown'), shots=['weap_decho_fire_plr_01', 'weap_decho_fire_plr_02', 'weap_decho_fire_plr_03', 'weap_decho_fire_plr_04', 'weap_decho_fire_plr_05', 'weap_decho_fire_plr_06'], glow='#fff2a8'),
+  dict(cls='Submachine gun', id='bo3_smg5_tool', name='SMG5 Tool', up='SMG5 Workshop', model='smg5_tool_vmgun', pre='vm_smg5', tpl='mp5k_zm',
+       stats=dict(clipSize=30, maxAmmo=240, startAmmo=240, damage=95, minDamage=61, fireTime=0.065, automatic=True, fireType='Full Auto', price=1000),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_smg5_adsup', 'vm_smg5_adsdown'), shots=['wpn_h1_ak74u_shot_01'], glow='#ffb03a'),
+  dict(cls='Submachine gun', id='bo3_umg_dmz', name='UMG DMZ', up='UMG Exclusion Zone', model='umg_dmz_vmgun', pre='vm_umg', tpl='mp5k_zm',
+       stats=dict(clipSize=25, maxAmmo=250, startAmmo=250, damage=110, minDamage=71, fireTime=0.09, automatic=True, fireType='Full Auto', price=1100),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_umg_adsup', 'vm_umg_adsdown'), shots=['ump45-1', 'ump45-2', 'ump45-3'], glow='#9aff3a'),
+  dict(cls='Shotgun', id='bo3_m1887', name='M1887', up='M1887 Lead Rain', model='m1887_vmgun', pre='vm_m1887', tpl='spas_zm',
+       stats=dict(clipSize=7, maxAmmo=56, startAmmo=56, damage=180, minDamage=25, fireTime=.8, pellets=8, price=1500),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reloading', reloadStart='reloadstart', reloadEnd='reloadend', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_m1887_adsup', 'vm_m1887_adsdown'), shots=['870-1', '870-2', '870-3'], glow='#ffa23a'),
+  dict(cls='Shotgun', id='bo3_striker', name='Striker', up='Striker Thunderclap', model='striker_vmgun', pre='vm_striker', tpl='spas_zm',
+       stats=dict(clipSize=12, maxAmmo=72, startAmmo=72, damage=150, minDamage=20, fireTime=.25, pellets=8, price=1700),
+       roles=dict(idle='idle', fire='fire', reload='reload_loop', reloadStart='reload_start', reloadEnd='reload_end', rais='pullout_first', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runloop', sprintOut='runover'),
+       ads=('vm_striker_adsup', 'vm_striker_adsdown'), shots=['spas12-1', 'spas12-2', 'spas12-3'], glow='#5affd8'),
+  dict(cls='Light machine gun', id='bo3_mg4_heaven', name='MG4 Heaven', up='MG4 Archangel', model='mag43_heaven_vmgun', pre='vm_mag43', tpl='rpk_zm',
+       stats=dict(clipSize=100, maxAmmo=400, startAmmo=400, damage=135, minDamage=90, fireTime=.07, price=2200),
+       roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', rais='pullout', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
+       ads=('vm_mag43_adsup', 'vm_mag43_adsdown'), shots=['weap_mg4_hvn_fire_plr'], glow='#ff3a3a'),
 ]
 # the mod's attachment models, mounted on the guns' tags by the weapon-levels mod (def.mounts)
 MOUNTS = {}
@@ -195,11 +317,18 @@ for att, mdl, tag in [('reddot', 'reflex_vmgun', 'tag_red_dot'), ('holo', 'eotec
                       ('reflex2x', '2xreflex_vmgun', 'tag_red_dot'), ('suppressor', 'vm_sup', 'tag_silencer')]:
     if (SRC/'xmodels'/mdl).exists(): MOUNTS[att] = {'model': model(mdl, 'attach_'+mdl)[0], 'tag': tag}
 # in-model parts that start hidden and unlock (lasers, foregrips), and stat-only unlocks
-PARTS = {'bo3_mr23_tesla': ['tag_sra', 'tag_foregrip'], 'bo3_p90_orbit': ['tag_sra1'], 'bo3_m1014_jellyfish': ['tag_foregripd']}
+BUILT_IN_SIGHT = {'bo3_g18_death'}
+# j_frontsight (MR23): a front-sight block the animations never position, hovering above the barrel
+PARTS = {'bo3_mr23_tesla': ['tag_sra', 'tag_foregrip', 'j_frontsight'], 'bo3_p90_orbit': ['tag_sra1'], 'bo3_m1014_jellyfish': ['tag_foregripd'],
+         'bo3_m240_ice': ['tag_foregrip'], 'bo3_uzi_irradiated': ['tag_sight', 'tag_foregrip'], 'bo3_aa12_btf': ['tag_foregrip'],
+         'bo3_spas12_irradiated': ['tag_sra'], 'bo3_ak117': ['tag_sra'], 'bo3_f2000_tech': ['tag_foregrip'], 'bo3_g37h_water': ['tag_sra', 'tag_foregrip'],
+         'bo3_sa80': ['tag_sra'], 'bo3_smg5_tool': ['tag_sra'], 'bo3_umg_dmz': ['tag_sra', 'tag_foregrip'], 'bo3_m1887': ['tag_sra', 'tag_foregrip'],
+         'bo3_mg4_heaven': ['tag_sra', 'tag_foregrip']}
 modsounds = {}
 for w in MODW:
     if not (SRC/'xmodels'/w['model']).exists(): print('skip', w['id']); continue
-    view, gm = model(w['model'], glow=w['glow'], glow_maps={k: (png(v[0]), v[1], v[2]) for k, v in GLOW_MAPS.items() if png(v[0])})
+    view, gm = model(w['model'], rename=w.get('rename'), glow=w['glow'], glow_maps={k: (png(v[0]), v[1], v[2]) for k, v in GLOW_MAPS.items() if png(v[0])})
+    world_url = model(w['model'], w['model']+'_world', rename=w.get('rename'), glow=w['glow'], light=True)[0]
     gb = {b['name']: b['lpos'] for b in gm['bones'] if 'lpos' in b and b['parent'] >= 0}
     A2, T2, notes = {}, {}, set()
     for role, suffix in w['roles'].items():
@@ -223,9 +352,14 @@ for w in MODW:
              reloadTime=T2['reload'], reloadEmptyTime=T2.get('reloadEmpty', T2['reload']))
     if 'inspect' in T2: t['inspectTime'] = T2['inspect']
     if t.get('segmentedReload'): t.update(reloadStartTime=T2['reloadStart'], reloadEndTime=T2['reloadEnd'])
-    mounts = {k: v for k, v in MOUNTS.items() if v['tag'] in {b['name'] for b in gm['bones']}}
-    common2 = {**t, 'hideTags': PARTS.get(w['id'], []), 'mounts': mounts, 'statAttachments': ['extmag'], 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands, 'animations': A2, 'model': view, 'worldModel': view,
-               'bo3': True, 'modWeapon': True, 'glow': w['glow'], 'arc': w.get('arc', False), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls']}
+    # guns with their own sight built in take no optic mounts (the G18's tag_eotech sits behind the slide and its
+    # tag_red_dot inside the built-in holo, so a mounted sight floated off the gun)
+    mounts = {k: v for k, v in MOUNTS.items() if v['tag'] in {b['name'] for b in gm['bones']} and not (w['id'] in BUILT_IN_SIGHT and k in ('reddot', 'holo', 'reflex2x'))}
+    common2 = {**t, 'hideTags': PARTS.get(w['id'], []), 'mounts': mounts, 'statAttachments': ['extmag'], 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands, 'animations': A2, 'model': view, 'worldModel': world_url, 'lazyWorld': True,
+               'bo3': True, 'modWeapon': True, 'glow': w['glow'], 'arc': w.get('arc', False), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls'],
+               # parts that are always on (the AS50's scope is its own model): mounted like attachments (mods/weapon-levels/mounts.js)
+               'fixedParts': [{'model': model(mdl, 'part_'+mdl)[0], 'tag': tag} for mdl, tag in w.get('fixed', []) if (SRC/'xmodels'/mdl).exists()]}
+    if w.get('projectile'): common2['projectileModel'] = model(w['projectile'], 'part_'+w['projectile'])[0]   # fired as the rocket
     up = {**common2, 'name': w['up'], 'clipSize': int(t['clipSize']*1.5), 'maxAmmo': int(t['maxAmmo']*1.5), 'startAmmo': int(t['maxAmmo']*1.5),
           'damage': t['damage']*2.2, 'minDamage': t['minDamage']*2.2}
     for k in ('bo3', 'modWeapon', 'price'): up.pop(k, None)
