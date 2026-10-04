@@ -17,6 +17,8 @@ const MAGNIFIED={vzoom:{zoom:16,radius:.46,sway:.9},pso:{zoom:15,radius:.46,sway
 // dot cards only; mtl_t5_aimpoint_red_dot is the whole Aimpoint sight body, not a card
 const DOTS=/reflex_red_dot|scope_pka_crosshair/;
 const GLASS=/lens(?!_interior)|reflex_lens/;
+// a gun's own built-in holo window (the G18 Death's): renamed like a mounted lens (weapon-levels/mounts.js) so measure() centres it
+const HOLO=/^eotech_ret$/;
 
 export default async function setup(api){
   const {host,view,data,session,camera,renderer,enemies}=api;
@@ -36,7 +38,7 @@ export default async function setup(api){
       // the model's dot cards have mixed backgrounds (some glow as blobs): hide
       // them; a clean dot is drawn at the screen centre while aiming instead
       if(DOTS.test(n)){o.visible=false;}
-      else if(GLASS.test(n)){Object.assign(m,{transparent:true,depthWrite:false,opacity:.1,roughness:.05,metalness:0});o.renderOrder=2;m.needsUpdate=true;}}});
+      else if(GLASS.test(n)||HOLO.test(n)){if(HOLO.test(n))m.name='reflex_lens '+n;Object.assign(m,{transparent:true,depthWrite:false,opacity:.1,roughness:.05,metalness:0});o.renderOrder=2;m.needsUpdate=true;}}});
   }
   const equip=view.equip.bind(view);
   view.equip=async(...args)=>{const r=await equip(...args);glass(view.gun);align.key=null;return r;};

@@ -356,7 +356,7 @@ for w in MODW:
     # tag_red_dot inside the built-in holo, so a mounted sight floated off the gun)
     mounts = {k: v for k, v in MOUNTS.items() if v['tag'] in {b['name'] for b in gm['bones']} and not (w['id'] in BUILT_IN_SIGHT and k in ('reddot', 'holo', 'reflex2x'))}
     common2 = {**t, 'hideTags': PARTS.get(w['id'], []), 'mounts': mounts, 'statAttachments': ['extmag'], 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands, 'animations': A2, 'model': view, 'worldModel': world_url, 'lazyWorld': True,
-               'bo3': True, 'modWeapon': True, 'glow': w['glow'], 'arc': w.get('arc', False), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls'],
+               'bo3': True, 'modWeapon': True, **({'scope': 'reflex'} if w['id'] in BUILT_IN_SIGHT else {}), 'glow': w['glow'], 'arc': w.get('arc', False), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls'],
                # parts that are always on (the AS50's scope is its own model): mounted like attachments (mods/weapon-levels/mounts.js)
                'fixedParts': [{'model': model(mdl, 'part_'+mdl)[0], 'tag': tag} for mdl, tag in w.get('fixed', []) if (SRC/'xmodels'/mdl).exists()]}
     if w.get('projectile'): common2['projectileModel'] = model(w['projectile'], 'part_'+w['projectile'])[0]   # fired as the rocket
