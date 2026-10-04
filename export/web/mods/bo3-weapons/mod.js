@@ -39,20 +39,30 @@ export default async function setup(api){
   const isMod=def=>!!(def?.modWeapon||data.weapons[def?.baseId??def?.id]?.modWeapon),modId=def=>def?.baseId??def?.id;
   async function buffer(key){const ctx=audio.ctx,url=S[key]??AK[key];if(!ctx||!url)return null;
     if(!buffers.has(key))buffers.set(key,fetch(new URL(url,document.baseURI)).then(r=>r.arrayBuffer()).then(b=>ctx.decodeAudioData(b)).catch(()=>null));return buffers.get(key);}
-  async function play(key,{gain=1,at=null,loop=false}={}){
+  async function play(key,{gain=1,at=null,loop=false,rate=1}={}){
     const ctx=audio.ctx,out=audio.master;if(!ctx||!out)return null;const b=await buffer(key);if(!b)return null;
     let k=gain;if(at){k*=Math.max(0,1-camera.position.distanceTo(at)/2200);if(k<=.01)return null;}
-    const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=b;src.loop=loop;g.gain.value=k;src.connect(g).connect(out);src.start();return {src,g};
+    const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=b;src.loop=loop;src.playbackRate.value=rate;g.gain.value=k;src.connect(g).connect(out);src.start();return {src,g};
   }
   const flux=(gain=1,at=null)=>{for(const side of ['l','r'])play('projectile/flux/wpn_tesla_flux_'+side,{gain,at});};
   // the shot: the player layers (front, low end, rear); the engine's stand-in stays quiet
+  const SHOT_GAIN={bo3_mr23_tesla:.6};let prevShot=null,shotToken=0,teslaLayers=[];
   const weaponSound=audio.weapon.bind(audio);
   audio.weapon=(kind,def,...rest)=>{
     if(kind==='shot'&&isMod(def)){   // the mod's own fire sounds: a random variant (MR23: its own last shot)
-      const m=MS[modId(def)];if(m?.shots?.length){const last=(session.weapon?.mag??1)<=0&&m.last?.length;const list=last?m.last:m.shots;play(list[Math.floor(Math.random()*list.length)],{gain:.85});return;}}
+      const m=MS[modId(def)];if(m?.shots?.length){const last=(session.weapon?.mag??1)<=0&&m.last?.length;const list=last?m.last:m.shots;
+        // rapid fire: each shot fades the previous one's tail out (it otherwise stacks up loud: the MR23's sample
+        // rings for 1.5 s at 12 shots/s), and a small random pitch/level keeps it from sounding like one loop
+        const ctx=audio.ctx;if(prevShot&&ctx){const g=prevShot.g.gain;g.cancelScheduledValues(ctx.currentTime);g.setValueAtTime(g.value,ctx.currentTime);g.linearRampToValueAtTime(0,ctx.currentTime+.12);prevShot.src.stop(ctx.currentTime+.13);prevShot=null;}
+        const token=++shotToken,gain=(SHOT_GAIN[modId(def)]??.85)*(.88+Math.random()*.2);
+        play(list[Math.floor(Math.random()*list.length)],{gain,rate:.96+Math.random()*.08}).then(h=>{if(h&&!last&&token===shotToken)prevShot=h;});return;}}
     if(kind==='shot'&&isTesla(def)){
-      if((session.weapon?.mag??1)<=0)play('plr/shot/shot_last_00_f',{gain:.95});
-      else{play('plr/shot/shot_00_f',{gain:.95});play('plr/shot/shot_00_lfe',{gain:.8});play('plr/shot/shot_00_rs',{gain:.6});}
+      // quieter than BO3's mix, a little pitch drift per shot, and the previous shot's layers fade when firing fast
+      const ctx=audio.ctx,rate=.96+Math.random()*.08,v=.9+Math.random()*.15;
+      if(ctx)for(const h of teslaLayers){const g=h.g.gain;g.cancelScheduledValues(ctx.currentTime);g.setValueAtTime(g.value,ctx.currentTime);g.linearRampToValueAtTime(0,ctx.currentTime+.15);h.src.stop(ctx.currentTime+.16);}
+      teslaLayers=[];const keep=p=>p.then(h=>{if(h)teslaLayers.push(h);});
+      if((session.weapon?.mag??1)<=0)play('plr/shot/shot_last_00_f',{gain:.7*v,rate});
+      else{keep(play('plr/shot/shot_00_f',{gain:.68*v,rate}));keep(play('plr/shot/shot_00_lfe',{gain:.55*v,rate}));keep(play('plr/shot/shot_00_rs',{gain:.38*v,rate}));}
       return;}
     return weaponSound(kind,def,...rest);
   };

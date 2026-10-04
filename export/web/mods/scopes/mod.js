@@ -130,6 +130,9 @@ export default async function setup(api){
   function measure(){
     // centroid of the visible dot / lens vertices, skinned, in view space
     const sum=new THREE.Vector3();let n=0;
+    // view.update moves the pivot but only refreshes the gun below it: recompute the pivot too, or the measure
+    // sees last frame's alignment offset (and the continuous re-measure settles halfway)
+    view.pivot.updateMatrixWorld(true);
     // Every optic is in the mesh; hidden ones are collapsed onto a bone scaled
     // to ~0. Only measure sights whose bone chain is actually shown.
     const shown=o=>{if(!o.isSkinnedMesh)return true;const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight;if(!si||!sw)return true;
@@ -157,7 +160,9 @@ export default async function setup(api){
     align.applied.set(0,0,0);
     if(kind&&!MAGNIFIED[kind]&&view.gun&&view.pivot){
       const key=def.id+(def.attachments??'');
-      if(align.key!==key&&aim>.97){const off=measure();if(off){align.offset.copy(off);align.key=key;}}
+      // re-measured while aiming (the ADS pose and mounted parts are still settling when aim first passes .97,
+      // so a one-off measurement could leave the dot well off the sight); eased so it doesn't jitter
+      if(aim>.6){const off=measure();if(off){if(align.key!==key){align.offset.copy(off);align.key=key;}else align.offset.lerp(off,1-Math.exp(-dt*10));}}
       if(align.key===key){align.applied.copy(align.offset).multiplyScalar(aim);view.pivot.position.add(align.applied);view.root?.updateMatrixWorld(true);}
     }
     const wantDot=!!(kind&&!MAGNIFIED[kind]&&aim>.85&&!session.reloadLeft);
@@ -178,5 +183,5 @@ export default async function setup(api){
       camera.rotation.y+=sx;camera.rotation.x+=sy;prevSway=[sx,sy];
     }
   });
-  window.kino.scopes={scopeOf,get scoped(){return scoped;}};
+  window.kino.scopes={scopeOf,get scoped(){return scoped;},align,measure,view};
 }

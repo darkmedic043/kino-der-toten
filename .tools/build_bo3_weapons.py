@@ -154,6 +154,9 @@ GLOW_MAPS = {
     'mtl_wea_augoctopus_glow': ('i_wea_augoctopus_glow_c_rightone', [.25, 0], True),
     'mtl_iro_glow_m4a1techdeatheg': ('i_iro_glow_m4a1techdeatheg_e', [0, 0], False),
 }
+# notetrack aliases with no file of that name in the mod's bank (its alias table isn't exportable):
+# stand-ins from the same bank, copied to sounds/codolbf/weapons/_generic/ (see docs/fork/weapons.md)
+NOTE_ALIAS = {'ins1': 'fly_cloth_01', 'ins2': 'fly_cloth_02', 'ins3': 'fly_cloth_03', 'weap_raise_plr': 'weap_ariarm27_raise_plr'}
 _png = {}
 def png(stem):   # RGBA png, at most 256 px (keeps alpha, unlike the webp path)
     if stem not in _png:
@@ -205,7 +208,7 @@ for w in MODW:
         if not (SRC/'xanims'/(name+'.seanim')).exists(): print('  no anim', name); continue
         A2[role+'Anim'], T2[role] = animation(name, gb, role in ('idle', 'emptyIdle', 'sprintLoop'))
         notes |= {n for _, n in read_seanim(SRC/'xanims'/(name+'.seanim'))['notes'] if n.startswith('sndnt#')}
-    for name in (w['pre']+'_inspect_full', w['pre']+'_inspect'):   # weapon inspect (hold reload; mods/inspect)
+    for name in (w['pre']+'_inspect', w['pre']+'_inspect_full'):   # weapon inspect (hold reload; mods/inspect)
         if (SRC/'xanims'/(name+'.seanim')).exists():
             A2['inspectAnim'], T2['inspect'] = animation(name, gb)
             notes |= {n for _, n in read_seanim(SRC/'xanims'/(name+'.seanim'))['notes'] if n.startswith('sndnt#')}; break
@@ -228,7 +231,7 @@ for w in MODW:
     for k in ('bo3', 'modWeapon', 'price'): up.pop(k, None)
     weapons[w['id']] = {'id': w['id'], 'name': w['name'], **common2, 'upgrade': up}
     modsounds[w['id']] = {'shots': [k for k in map(snd, w['shots']) if k], 'last': [k for k in map(snd, w.get('last', [])) if k],
-                          'notes': {n: k for n in sorted(notes) if (k := snd(n[6:]) or snd(n[6:]+'_r'))}}
+                          'notes': {n: k for n in sorted(notes) if (k := snd(n[6:]) or snd(n[6:]+'_r') or snd(NOTE_ALIAS.get(n[6:], '')))}}
     print(w['id'], 'anims', len(A2), 'sounds', len(modsounds[w['id']]['shots']), '+', len(modsounds[w['id']]['notes']), 'notes of', len(notes))
 (MOD/'weapons.json').write_text(json.dumps({'weapons': weapons, 'sounds': {'dg2': sounds, 'mod': modsounds, 'audio': audio_keys}, 'fx': fx}, indent=1))
 print('wrote', MOD/'weapons.json')

@@ -73,3 +73,5 @@
 - 2026-10-03: BO3 sight reticle quads dropped (rendered white); BO3 model URLs content-hashed (day-long browser cache hid rebuilds); fixed the DG-2 reload-foley line lost inside a comment.
 - 2026-10-03: Mod-gun glows reworked: additive cards with hot cores and bone-attached halos, BO3's real scrolling glow textures (pattern in alpha) for the _ani/lowspeed/orbit parts, sight lenses as faint glass.
 - 2026-10-03: Glow code moved to mods/bo3-weapons/glow.js and applied in the Gunsmith, loadout thumbnails and Operator preview so they match the game.
+- 2026-10-03: Inspect/raise foley for the mod guns (stand-ins for unexportable aliases via NOTE_ALIAS); Greyhound runs without BO3 for Load File via Proton's wine.
+- 2026-10-03: Sights fixed: glow.js had renamed mounted lens glass (scopes couldn't centre), scopes now re-measure while aiming with the pivot matrix refreshed; MR23 sight glass no longer an opaque panel. MR23/DG-2 rapid-fire sound: tail cut, pitch/level variation, quieter.

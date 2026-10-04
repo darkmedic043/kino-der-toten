@@ -39,8 +39,11 @@ function buildGlow(gun,color,depthTest){
         sp.scale.setScalar(size);c.bone.updateMatrixWorld(true);sp.position.copy(c.bone.worldToLocal(c.c.clone()));sp.renderOrder=10;sp.frustumCulled=false;
         sp.scale.divide(c.bone.getWorldScale(new THREE.Vector3()));c.bone.add(sp);lights.push({mat:sm,phase:Math.random()*6.28,speed:2+Math.random()*3,halo:true});}
       return;}
-    if(/_ret|lens/i.test(o.material.name)&&!/glow/i.test(o.material.name)){   // sight lens glass: a faint tint, not a lit panel
-      o.material=new THREE.MeshBasicMaterial({map:o.material.map,color:color.clone().multiplyScalar(.12),blending:THREE.AdditiveBlending,transparent:true,depthWrite:false,toneMapped:false});return;}
+    // mounted sights' glass (mods/weapon-levels/mounts.js names it 'reflex_lens …'): leave it; the scopes mod finds it by name to centre the sight
+    if(o.material.name.startsWith('reflex_lens'))return;
+    if(!bg&&(/_ret|lens/i.test(o.material.name)&&!/glow/i.test(o.material.name)||/glass/i.test(o.material.name))){   // the gun's own sight glass (MR23: mtl_eot_tesla_glass_glow): a faint tint, not a lit panel you can't see through
+      const m=new THREE.MeshBasicMaterial({map:o.material.map,color:color.clone().multiplyScalar(.12),blending:THREE.AdditiveBlending,transparent:true,depthWrite:false,toneMapped:false});
+      m.name=o.material.name;o.material=m;return;}
     o.material=o.material.clone();o.material.emissive=color.clone();if(o.material.map)o.material.emissiveMap=o.material.map;else o.material.color.set(0x000000);mats.push(o.material);
   });
   return {mats,lights};
