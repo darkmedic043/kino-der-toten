@@ -50,16 +50,19 @@ export async function createMap(ctx,entry){
       const world=W();if(world.warnings.length){const w=document.createElement('ul');w.id='map-warnings';w.innerHTML='<li>Map warnings:</li>'+world.warnings.map(m=>`<li>${m.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</li>`).join('');document.getElementById('menu-status').after(w);}},
     boardCount:b=>b.boards.length,
     findPrompt(cam){
-      const s=S(),world=W(),data=ctx.data;let best=null,distance=110;
+      const s=S(),world=W(),data=ctx.data;let best=null,distance=110,lockedBest=null,lockedDistance=110;   // a locked spot yields to any usable one in range
       for(const e of world.interactions){
         if(e.kind==='box'&&!ctx.mysteryBox.available(e))continue;
         if(e.kind==='power'&&s.power)continue;
         if(e.kind==='egg'&&world.eggs.get(e.egg).items[e.item].found)continue;
+        if(e.hidden?.())continue;
         let d;
         if(e.kind==='door'){const door=world.doors.get(e.door);if(world.isOpen(door,s))continue;d=e.box.distanceToPoint(cam.position)+50;}
         else d=cam.position.distanceTo(e.kind==='box'?vector(e.position):e.position);
-        if(d<distance){distance=d;best=e;}
+        if(e.locked?.()){if(d<lockedDistance){lockedDistance=d;lockedBest=e;}}
+        else if(d<distance){distance=d;best=e;}
       }
+      if(!best&&lockedBest){best=lockedBest;distance=lockedDistance;}
       if(!best)return null;
       const e=best;let text='';
       if(e.kind==='door'){const d=world.doors.get(e.door);text=d.electric?'The power must be activated':'Open door · '+d.cost;}
@@ -72,10 +75,14 @@ export async function createMap(ctx,entry){
       if(e.kind==='claymore')text=s.claymoresOwned?'Claymores equipped · 4 to place':'Claymores · 1000';
       if(e.kind==='box')text=shop.boxPrompt(e);
       if(e.kind==='pap')text=shop.packPrompt(true);
+      if(e.kind==='custom')text=e.text?.()??'';
+      if(e.locked?.())text=e.lockedText??'';
       return {target:e,text,distance};
     },
     interact(e){
       const s=S(),world=W();
+      if(e.locked?.()){if(e.lockedText)ctx.toast(e.lockedText);return false;}
+      if(e.kind==='custom')return !!e.use?.(e);
       if(e.kind==='door'){
         const d=world.doors.get(e.door);if(d.electric){ctx.toast('Turn on the power');return false;}if(!shop.pay(d.cost))return false;
         s.openDoors.add(d.name);world.setDoors(s);ctx.toast(d.zone?'Door opened · '+d.zone:'Door opened');return true;
@@ -100,6 +107,11 @@ export async function createMap(ctx,entry){
       return false;
     },
     onShot(ray,far){
+      for(const t of [...(W().shootTargets??[])]){
+        if(t.weapons&&![S().def?.id,S().def?.baseId].some(i=>t.weapons.includes(i)))continue;
+        const hit=ray.intersectSphere(new THREE.Sphere(t.position,t.radius??20),new THREE.Vector3());
+        if(hit&&hit.distanceTo(ray.origin)<=far+(t.radius??20)){W().shootTargets.splice(W().shootTargets.indexOf(t),1);t.hit?.(t);}
+      }
       for(const g of W().eggs.values())for(const i of g.items){
         if(i.found||!i.shoot)continue;const hit=ray.intersectSphere(new THREE.Sphere(i.position,14),new THREE.Vector3());
         if(hit&&hit.distanceTo(ray.origin)<=far+14)findEgg(g,i);
@@ -107,6 +119,7 @@ export async function createMap(ctx,entry){
     },
     update(dt){
       const s=S(),world=W(),feet=ctx.player.getFeetPosition();
+      world.playerFeet=feet;
       for(const t of world.traps.values()){
         const on=t.activeUntil>s.time;
         for(const z of t.zones){
@@ -116,6 +129,17 @@ export async function createMap(ctx,entry){
           if(world.inTrapZone(z,feet.clone().add(new THREE.Vector3(0,30,0)),-25))ctx.damage(dt*100);
         }
         if(!on)for(const h of t.handles??[])if(h&&t.readyAt<=s.time)h.rotation.x=0;
+      }
+      // Moving platforms (MOVER meshes): advance, and carry the player standing on one
+      if(world.movers?.length){
+        world.updateMovers(s.time);
+        const pc=ctx.player.collider,fy=pc.start.y-pc.radius;
+        for(const m of world.movers){
+          const dx=m.offset.x-m.prev.x,dy=m.offset.y-m.prev.y,dz=m.offset.z-m.prev.z;if(!dx&&!dy&&!dz)continue;
+          const probe=new THREE.Ray(new THREE.Vector3(pc.start.x,fy+8,pc.start.z).sub(m.offset),new THREE.Vector3(0,-1,0));
+          const under=m.collider.rayIntersect(probe,0,24);   // a surface of this platform within ~16 units below the feet
+          if(under){pc.start.x+=dx;pc.start.y+=dy;pc.start.z+=dz;pc.end.x+=dx;pc.end.y+=dy;pc.end.z+=dz;ctx.player._syncCamera?.();}
+        }
       }
       // Rising death plane (RISING marker): game over on touch, even with Quick Revive.
       if(world.rising?.length){
@@ -139,7 +163,7 @@ export async function createMap(ctx,entry){
       for(const g of world.eggs.values())for(const i of g.items)if(!i.found)i.object.rotation.y+=dt*.8;
     },
     beforeReset(){},
-    reset(){for(const r of W().rising??[])r.alarmed=false;W().updateRising?.(0);resetPower();teleportPending=null;returnTrip=null;},
+    reset(){for(const r of W().rising??[])r.alarmed=false;W().updateRising?.(0);W().updateMovers?.(0);resetPower();teleportPending=null;returnTrip=null;},
     hudEffects:()=>returnTrip?'<span>RETURN IN '+Math.max(0,Math.ceil(returnTrip.at-S().time))+'</span>':'',
     objective:()=>!S().power?'Find the power switch':'',
     state(){

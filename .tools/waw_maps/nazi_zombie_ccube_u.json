@@ -2,7 +2,332 @@
   "_comment": "Per-map settings for build_waw_map.py. Coordinates are CoD units (x, y, z up).",
   "dropSpawnersBelow": 30,
   "extraSpawns": {
-    "start": [[239, 129, 253], [-151, 221, 109], [54, 252, 181], [170, 217, 217]]
+    "start": [
+      [
+        239,
+        129,
+        253
+      ],
+      [
+        -151,
+        221,
+        109
+      ],
+      [
+        54,
+        252,
+        181
+      ],
+      [
+        170,
+        217,
+        217
+      ]
+    ]
   },
-  "rising": {"material": "wc/cheese_melt", "delay": 100, "speed": 2.3}
+  "rising": {
+    "material": "wc/cheese_melt",
+    "delay": 100,
+    "speed": 2.3
+  },
+  "powerSwitch": "turn_power_on",
+  "entityMeshes": [
+    "target1",
+    "target2",
+    "target3",
+    "target4",
+    "target5",
+    "cheese_ending_clip",
+    "iron_door",
+    "spawn_part_cage"
+  ],
+  "entityProps": [
+    "panel_pick",
+    "panel_build",
+    "handle_pick",
+    "handle_build",
+    "wire_pick",
+    "wire_build",
+    "thor_hammer",
+    "pick_arm_l",
+    "pick_arm_r"
+  ],
+  "movers": [
+    {
+      "target": "step_move1",
+      "delta": [
+        0,
+        -175,
+        0
+      ],
+      "out": 0,
+      "back": 3,
+      "cycle": 6,
+      "duration": 2
+    },
+    {
+      "target": "step_move2",
+      "delta": [
+        -175,
+        0,
+        0
+      ],
+      "out": 0.0,
+      "back": 6.0,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move3",
+      "delta": [
+        -175,
+        0,
+        0
+      ],
+      "out": 1.5,
+      "back": 7.5,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move4",
+      "delta": [
+        -175,
+        0,
+        0
+      ],
+      "out": 3.0,
+      "back": 9.0,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move5",
+      "delta": [
+        -175,
+        0,
+        0
+      ],
+      "out": 4.5,
+      "back": 10.5,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move7",
+      "delta": [
+        0,
+        0,
+        175
+      ],
+      "out": 0.0,
+      "back": 6.0,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move8",
+      "delta": [
+        0,
+        0,
+        175
+      ],
+      "out": 1.5,
+      "back": 7.5,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move9",
+      "delta": [
+        0,
+        0,
+        175
+      ],
+      "out": 3.0,
+      "back": 9.0,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move10",
+      "delta": [
+        0,
+        0,
+        175
+      ],
+      "out": 4.5,
+      "back": 10.5,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move11",
+      "delta": [
+        0,
+        50,
+        0
+      ],
+      "out": 0.0,
+      "back": 6.0,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move12",
+      "delta": [
+        0,
+        50,
+        0
+      ],
+      "out": 1.5,
+      "back": 7.5,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move13",
+      "delta": [
+        0,
+        50,
+        0
+      ],
+      "out": 3.0,
+      "back": 9.0,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move14",
+      "delta": [
+        0,
+        50,
+        0
+      ],
+      "out": 4.5,
+      "back": 10.5,
+      "cycle": 12,
+      "duration": 2
+    },
+    {
+      "target": "step_move15",
+      "delta": [
+        0,
+        200,
+        0
+      ],
+      "out": 0,
+      "back": 10,
+      "cycle": 20,
+      "duration": 2
+    },
+    {
+      "target": "step_move16",
+      "delta": [
+        0,
+        200,
+        0
+      ],
+      "out": 1,
+      "back": 11,
+      "cycle": 20,
+      "duration": 2
+    },
+    {
+      "target": "step_move17",
+      "delta": [
+        0,
+        200,
+        0
+      ],
+      "out": 2,
+      "back": 12,
+      "cycle": 20,
+      "duration": 2
+    },
+    {
+      "target": "step_move18",
+      "delta": [
+        0,
+        200,
+        0
+      ],
+      "out": 3,
+      "back": 13,
+      "cycle": 20,
+      "duration": 2
+    },
+    {
+      "target": "step_move19",
+      "delta": [
+        200,
+        0,
+        0
+      ],
+      "out": 4,
+      "back": 14,
+      "cycle": 20,
+      "duration": 2
+    },
+    {
+      "target": "step_move20",
+      "delta": [
+        200,
+        0,
+        0
+      ],
+      "out": 5,
+      "back": 15,
+      "cycle": 20,
+      "duration": 2
+    },
+    {
+      "target": "step_move21",
+      "delta": [
+        200,
+        0,
+        0
+      ],
+      "out": 6,
+      "back": 16,
+      "cycle": 20,
+      "duration": 2
+    },
+    {
+      "target": "step_move22",
+      "delta": [
+        200,
+        0,
+        0
+      ],
+      "out": 7,
+      "back": 17,
+      "cycle": 20,
+      "duration": 2
+    },
+    {
+      "target": "step_move23",
+      "delta": [
+        0,
+        -200,
+        0
+      ],
+      "out": 8,
+      "back": 18,
+      "cycle": 20,
+      "duration": 2
+    },
+    {
+      "target": "step_move24",
+      "delta": [
+        -200,
+        0,
+        0
+      ],
+      "out": 9,
+      "back": 19,
+      "cycle": 20,
+      "duration": 2
+    }
+  ]
 }

@@ -59,7 +59,7 @@ export default async function setup(api){
     const claymore=toolbar.querySelector('[data-touch=claymore]');if(claymore)claymore.hidden=true;
     const tap=(kind,text,code)=>{const b=document.createElement('button');b.type='button';b.className='touch-button touch-'+kind;b.setAttribute('aria-label',text);b.innerHTML='<span>'+text+'</span>';
       b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();key('keydown',code);key('keyup',code);});toolbar.append(b);};
-    tap('suit','P.E.S.','KeyP');tap('journal','OBJECTIVE','Tab');
+    tap('suit','P.E.S.','KeyP');
     // HACK is held (the hack keeps going while H is down)
     const hack=document.createElement('button');hack.type='button';hack.className='touch-button touch-hack-hold';hack.setAttribute('aria-label','Hack');hack.innerHTML='<span>HACK</span>';
     let hacking=false;
@@ -67,6 +67,13 @@ export default async function setup(api){
     hack.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();hack.setPointerCapture?.(e.pointerId);if(hacking)return;hacking=true;hack.classList.add('pressed');key('keydown','KeyH');});
     for(const type of ['pointerup','pointercancel','lostpointercapture'])hack.addEventListener(type,stop);
     root.append(hack);
+  }
+
+  // Scoreboard (Tab, which also shows Moon's objective): a toolbar button toggles it.
+  if(toolbar){
+    const sc=document.createElement('button');sc.type='button';sc.className='touch-button touch-scores-btn';sc.setAttribute('aria-label','Scoreboard');sc.innerHTML='<span>SCORES</span>';
+    sc.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();key('keydown','Tab');key('keyup','Tab');});
+    toolbar.append(sc);
   }
 
   // Hold your breath while looking through a scope (the scopes mod reads Shift).

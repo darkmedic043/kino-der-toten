@@ -60,6 +60,8 @@ when both are present.
 | `PAP` | Pack-a-Punch (needs power). |
 | `POWER` | Power switch. **Without one, the power is on from the start.** |
 | `RISING_<delay>_<speed>` | A **mesh** (not an empty): a death plane such as rising lava or cheese. After `<delay>` seconds of game time it rises at `<speed>` units/s (scene units, after the map `scale`) and ends the game on touch, even with Quick Revive. It is render-only: no collision or navigation. Zombie spawn points it has covered stop being used. Properties `delay` and `speed` also work. |
+| `MOVER_<id>` | A **mesh** (not an empty): a moving platform. The map entry `movers` names a JSON file in the map folder with `[{id, delta:[x,y,z], out, back, cycle, duration}]` (scene units and seconds of game time: out at `out`, back at `back`, each leg `duration` long, repeating every `cycle`). It is left out of the static collision and the navmesh, gets its own moving collision, and carries a player standing on it. |
+| map entry `nearbySpawns` | Zombies cannot cross gaps between navmesh islands (moving platforms, gaps), so only spawn points that can walk to the player are used; if none can, points are found on the player's own island. |
 | map entry `doorMargin`, `doorHeadroom` | Grow each closed door's collision by `doorMargin` units sideways and `doorHeadroom` upward (default 0). The navmesh cut around a door covers every polygon its box touches, so zombies are sealed off while the player can still squeeze past the bare box or stand on it. |
 | map entry `stairSmoothing`, `stairSmoothRate` | Ease the eye over stair steps (movement mod `stairOffset`): counts every low-speed vertical move, not only frames flagged on the floor, which a step-up often is not. `stairSmoothRate` is the easing speed (default 8; 5 measured about 60% less camera jerk while climbing).
 | `CLAYMORE` | Claymore wall-buy (1000). |
@@ -258,3 +260,13 @@ Other upstream files with small local edits: `audio.js`
 All other fork files are new: `home.*`, `zombies.*`, `custom-world.js`,
 `characters.js`, `profile.js`, `mod-loader.js`, `explorer.*`, `mods/` and
 `vendor/recast-generators.mjs`.
+
+## Custom-map hooks for mods (custom maps)
+
+- `world.addInteraction({position, text(), use(e), hidden?(), locked?(), lockedText?})`: an extra press-F spot. Any interaction (the built-in kinds too, for example the power switch) may carry `locked()` and `lockedText`; a locked spot yields to any usable one in range.
+- `world.addShootTarget({position, radius, weapons?, hit(target)})`: a target that `hit` fires on once when a shot passes through it (`weapons` limits it to those weapon ids).
+- `kino.scoreboard.addCollectible({id, label, value(), done?()})`: a tile in the Tab scoreboard's collectibles strip.
+
+## Scoreboard (`mods/scoreboard`)
+
+Hold Tab on any map: every player's points, kills, headshots, downs and accuracy (in co-op each client shares its stats about twice a second, a `stats` message on `kino.coop`), with perks, equipment, Easter egg progress and registered collectibles along the bottom. Moon's objective is shown there too (Tab no longer toggles the journal). A synthetic Tab (the touch SCORES button) toggles it instead of holding.

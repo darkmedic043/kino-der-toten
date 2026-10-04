@@ -15,12 +15,12 @@ import { assetManager } from './runtime-assets.js';
 const PERKS={jugg:'specialty_armorvest',juggernog:'specialty_armorvest',armorvest:'specialty_armorvest',revive:'specialty_quickrevive',quickrevive:'specialty_quickrevive',
   speedcola:'specialty_fastreload',speed:'specialty_fastreload',sleight:'specialty_fastreload',fastreload:'specialty_fastreload',doubletap:'specialty_rof',rof:'specialty_rof'};
 const PERK_MODELS={specialty_armorvest:'zombie_vending_jugg',specialty_quickrevive:'zombie_vending_revive',specialty_fastreload:'zombie_vending_sleight',specialty_rof:'zombie_vending_doubletap'};
-const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE|TRAPZONE|TRAP|TELEPORT|TPDEST|EGG|RISING)(?:_(.*))?$/i;
+const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE|TRAPZONE|TRAP|TELEPORT|TPDEST|EGG|RISING|MOVER)(?:_(.*))?$/i;
 const TRAP_COLORS={electric:0x8cbbff,fire:0xff7a2e};
 const COLLISION_NAME=/^(COL|UCX|collision)[_.-]/i;
 // Machine models face their local +Z; markers face their local +X (Blender's red axis).
 const FACE=Math.PI/2;
-const up=new THREE.Vector3(0,1,0);
+const up=new THREE.Vector3(0,1,0),_negOffset=new THREE.Vector3();
 
 function rawName(o){return String(o.userData.name??o.name).replace(/\.\d{3}$/,'');}
 function worldYaw(o){const f=new THREE.Vector3(1,0,0).applyQuaternion(o.getWorldQuaternion(new THREE.Quaternion()));return Math.atan2(-f.z,f.x);}
@@ -73,6 +73,17 @@ export class CustomWorld {
       const box=new THREE.Box3().setFromObject(m.object);
       return {object:m.object,baseY:m.object.position.y,delay:m.extras.delay??tokens[0]??60,speed:m.extras.speed??tokens[1]??1,topAtStart:box.max.y,top:box.max.y};
     });
+
+    // MOVER_<id> meshes are moving platforms: map entry `movers` names a JSON file in the map folder with their timing
+    // [{id, delta:[x,y,z] (scene units), out, back, cycle, duration}] (seconds of game time). They are left out of the
+    // static collision and navmesh and get their own moving collision, which also carries the player.
+    this.movers=[];
+    if(entry.movers){
+      const defs=await fetch(dir+entry.movers).then(r=>r.json()).catch(()=>[]),byId=new Map(defs.map(d=>[String(d.id).toLowerCase(),d]));
+      const groups=new Map();
+      for(const m of markers.filter(m=>m.type==='MOVER')){const d=byId.get(m.arg);if(!d)continue;if(!groups.has(m.arg))groups.set(m.arg,{def:d,objects:[]});groups.get(m.arg).objects.push(m.object);}
+      for(const {def,objects} of groups.values())this.addMover(def,objects);
+    }
 
     // Doors keep their own geometry and are left out of collision and navigation.
     for(const m of markers.filter(m=>m.type==='DOOR')){
@@ -194,6 +205,7 @@ export class CustomWorld {
     this.physics={capsuleIntersect:c=>{
       const hit=this.collision.capsuleIntersect(c);if(hit)return hit;
       for(const d of this.dynamic)if(d.enabled&&d.collider){const h=d.collider.capsuleIntersect(c);if(h)return h;}
+      for(const m of this.movers){if(!m.near.containsPoint(c.start)&&!m.near.containsPoint(c.end))continue;const t=c.clone();t.translate(_negOffset.copy(m.offset).negate());const h=m.collider.capsuleIntersect(t);if(h)return h;}
       for(const z of this.actors?.()??[]){
         if(z.state==='barricade'||z.state==='entering')continue;
         const p=z.root.position,feet=c.start.y-c.radius,top=c.end.y+c.radius;
@@ -296,7 +308,8 @@ export class CustomWorld {
   }
   closest(p,extents){const r=this.query.findClosestPoint({x:p.x,y:p.y,z:p.z},extents?{halfExtents:extents}:undefined);return r.success?new THREE.Vector3(r.point.x,r.point.y,r.point.z):null;}
   path(a,b){const r=this.query.computePath({x:a.x,y:a.y,z:a.z},{x:b.x,y:b.y,z:b.z});return r.success?r.path.map(p=>new THREE.Vector3(p.x,p.y,p.z)):[];}
-  raycast(ray,near=0,far=Infinity,windows=false){let hit=this.collision.rayIntersect(ray,near,far);for(const d of this.dynamic){if(!d.enabled||!d.collider||(!windows&&d.window))continue;const h=d.collider.rayIntersect(ray,near,hit?Math.min(hit.distance,far):far);if(h)hit=h;}return hit;}
+  raycast(ray,near=0,far=Infinity,windows=false){let hit=this.collision.rayIntersect(ray,near,far);
+    for(const m of this.movers??[]){const r=new THREE.Ray(ray.origin.clone().sub(m.offset),ray.direction),h=m.collider.rayIntersect(r,near,hit?Math.min(hit.distance,far):far);if(h){h.position.add(m.offset);h.point.add(m.offset);hit=h;}}for(const d of this.dynamic){if(!d.enabled||!d.collider||(!windows&&d.window))continue;const h=d.collider.rayIntersect(ray,near,hit?Math.min(hit.distance,far):far);if(h)hit=h;}return hit;}
   lineClear(a,b){const v=b.clone().sub(a),dist=v.length();return !this.raycast(new THREE.Ray(a,v.normalize()),1,Math.max(1,dist-4));}
   isOpen(door,session){return session.openDoors.has(door.name)||(door.electric&&session.power);}
   setDoors(session){
@@ -307,7 +320,53 @@ export class CustomWorld {
   }
   activeZones(session){const zones=new Set(['start']);for(const d of this.doors.values())if(d.zone&&this.isOpen(d,session))zones.add(d.zone);for(const f of session.flags)if(f.startsWith('zone:'))zones.add(f.slice(5));return zones;}
   zoneAt(){return undefined;}
-  spawnBarriers(session){const zones=this.activeZones(session);return this.barriers.filter(b=>zones.has(b.group)&&!b.submerged);}
+  addMover(def,objects){
+    const meshes=[];for(const o of objects)o.traverse(c=>{if(c.isMesh)meshes.push(c);});
+    const g=positionsOf(meshes);if(!g)return;
+    const box=new THREE.Box3().setFromBufferAttribute(g.attributes.position);
+    this.movers.push({def,objects,base:objects.map(o=>o.position.clone()),collider:new CollisionWorld(g),box,near:new THREE.Box3(),delta:new THREE.Vector3(...def.delta),offset:new THREE.Vector3(),prev:new THREE.Vector3()});
+    this.updateMovers(0);
+  }
+  // Moves every platform to game time `time` (out at def.out, back at def.back, each leg def.duration long, repeating every def.cycle).
+  updateMovers(time){
+    const scale=this.entry.scale??1;
+    for(const m of this.movers){
+      const d=m.def,dur=d.duration??2,cycle=d.cycle??12,p=(((time-(d.delay??0))%cycle)+cycle)%cycle;
+      let f=0;if(p>=d.out&&p<d.out+dur)f=(p-d.out)/dur;else if(p>=d.out+dur&&p<d.back)f=1;else if(p>=d.back&&p<d.back+dur)f=1-(p-d.back)/dur;
+      m.prev.copy(m.offset);m.offset.copy(m.delta).multiplyScalar(f);
+      m.objects.forEach((o,i)=>{o.position.copy(m.base[i]).addScaledVector(m.offset,1/scale);o.updateMatrix();o.updateMatrixWorld(true);});
+      m.near.copy(m.box).translate(m.offset).expandByScalar(40);
+    }
+  }
+  // Hooks for map mods (see mods/README.md): extra press-F spots and shootable targets.
+  //   addInteraction({position: Vector3, text(): string, use(e): boolean, hidden?(), locked?(), lockedText?})
+  //   addShootTarget({position: Vector3, radius, weapons?: [ids], hit(target)})   (a target is removed once it is hit)
+  // Any interaction (also the built-in kinds, e.g. the power switch) may carry locked()/lockedText.
+  addInteraction(def){const e={kind:'custom',...def};this.interactions.push(e);return e;}
+  addShootTarget(def){(this.shootTargets??=[]).push(def);return def;}
+  spawnBarriers(session){
+    const zones=this.activeZones(session),list=this.barriers.filter(b=>zones.has(b.group)&&!b.submerged);
+    if(!this.entry.nearbySpawns||!this.playerFeet)return list;
+    // Map entry nearbySpawns: zombies cannot cross the gaps between navmesh islands (moving platforms, gaps), so only spawn
+    // points that can walk to the player are used; if none can, points are found on the player's own island.
+    const pf=this.playerFeet,now=session.time;
+    if(this._near&&now-this._near.t<1.5&&this._near.at.distanceTo(pf)<60)return this._near.list;
+    const target=this.closest(pf,{x:60,y:120,z:60});
+    const reach=p=>{if(!target)return false;const path=this.path(p,pf),last=path[path.length-1];return !!last&&last.distanceTo(target)<12;};
+    let ok=list.filter(b=>reach(b.inside));
+    if(!ok.length)ok=this.nearbyBarriers(pf,reach);
+    this._near={t:now,at:pf.clone(),list:ok};return ok;
+  }
+  // Walkable points 450-900 units around `pf` that can reach it (a ring of probes snapped to the navmesh).
+  nearbyBarriers(pf,reach){
+    const out=[];
+    for(let k=0;k<28&&out.length<6;k++){
+      const a=k*2.399,r=450+((k*137)%450),probe={x:pf.x+Math.cos(a)*r,y:pf.y,z:pf.z+Math.sin(a)*r};
+      const p=this.closest(probe,{x:70,y:260,z:70});if(!p||p.distanceTo(pf)<300||!reach(p))continue;
+      out.push({id:'near_'+out.length,position:p,outside:p.clone(),inside:p.clone(),group:'near',boards:[],count:0,repairTime:0,rewardRound:0,reward:0});
+    }
+    return out;
+  }
   // Advances the RISING planes to game time `time`; spawn points they have covered stop being used. Returns the highest top.
   updateRising(time){
     let top=-Infinity;

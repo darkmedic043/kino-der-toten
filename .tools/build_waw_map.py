@@ -280,10 +280,46 @@ def main():
         doors.append((zone_id, int(e.get('zombie_cost', 750)), wanted))
         door_surfaces |= wanted
 
+    # Easter egg pieces that a map mod needs to find, hide or move: brush-model entities listed in cfg['entityMeshes']
+    # become their own `ENT_<targetname>` mesh nodes (several entities may share a name).
+    wanted_names = set(cfg.get('entityMeshes', []))
+    ent_meshes = collections.defaultdict(list)
+    ent_surface_ids = set()
+    for e in ents:
+        if e.get('targetname') in wanted_names and e.get('model', '').startswith('*') and int(e['model'][1:]) in brush:
+            m = brush[int(e['model'][1:])]
+            ids = set(range(m['startSurface'], m['startSurface'] + m['surfaceCount']))
+            ent_meshes[e['targetname']].append([sf for sf in surfaces if sf['idx'] in ids])
+            ent_surface_ids |= ids
+    # Moving platforms (cfg['movers']): brush-model entities become `MOVER_<targetname>` meshes (render-only here; the map
+    # loader gives them their own moving collision) and movers.json holds their timing in game space (see mods/README.md).
+    mover_specs = {m['target']: m for m in cfg.get('movers', [])}
+    mover_nodes, mover_ids = [], set()
+    for e in ents:
+        spec = mover_specs.get(e.get('targetname'))
+        if spec and e.get('model', '').startswith('*') and int(e['model'][1:]) in brush:
+            m = brush[int(e['model'][1:])]
+            ids = set(range(m['startSurface'], m['startSurface'] + m['surfaceCount']))
+            mover_nodes.append((e['targetname'], [sf for sf in surfaces if sf['idx'] in ids]))
+            mover_ids |= ids
     rising = cfg.get('rising')
     rising_surfaces = [s for s in surfaces if rising and s['mat'] == rising['material']]
-    world_surfaces = [s for s in surfaces if s['idx'] not in door_surfaces and s not in rising_surfaces]
+    world_surfaces = [s for s in surfaces if s['idx'] not in door_surfaces and s['idx'] not in ent_surface_ids and s['idx'] not in mover_ids and s not in rising_surfaces]
     b.add_mesh_node('world', surfaces_to_prims(b, world_surfaces, flip))
+    for name, group in mover_nodes:
+        if group:
+            b.add_mesh_node('MOVER_' + name, surfaces_to_prims(b, group, flip))
+    movers_out = []
+    for name, _ in mover_nodes:
+        sp = mover_specs[name]
+        dx, dy, dz = sp['delta']
+        movers_out.append({'id': name.lower(), 'delta': [dx, dz, -dy], 'out': sp['out'], 'back': sp['back'], 'cycle': sp['cycle'], 'duration': sp.get('duration', 2)})
+    if movers_out:
+        (out / 'movers.json').write_text(json.dumps(movers_out))
+    for name, groups in ent_meshes.items():
+        for group in groups:
+            if group:
+                b.add_mesh_node('ENT_' + name, surfaces_to_prims(b, group, flip))
     if rising_surfaces:  # a death plane that climbs (see RISING in mods/README.md): render-only, no collision or navigation
         b.add_mesh_node(f"RISING_{rising['delay']}_{rising['speed']}", surfaces_to_prims(b, rising_surfaces, flip))
     for zone_id, cost, wanted in doors:
@@ -325,6 +361,36 @@ def main():
             o, yaw = site(e)
             b.add_marker('BOX_start' if e.get('script_noteworthy') == 'start_chest' else 'BOX', o, yaw)
 
+    # script_model props a mod needs (cfg['entityProps'] targetnames): placed like static models, as ENT_<targetname>
+    for e in ents:
+        if e.get('classname') == 'script_model' and e.get('targetname') in set(cfg.get('entityProps', [])):
+            path = dump / 'model_export' / (e['model'] + '_lod0.glb')
+            if not path.exists():
+                continue
+            R = rot(vec(e.get('angles')))
+            inst = {'origin': vec(e['origin']), 'axis': [[R[0][c], R[1][c], R[2][c]] for c in range(3)], 'scale': float(e.get('modelscale', 1) or 1)}
+            prims = load_static_glb(b, path, inst, flip)
+            if prims:
+                b.add_mesh_node('ENT_' + e['targetname'], prims)
+    if cfg.get('powerSwitch'):
+        sw = next((e for e in ents if e.get('targetname') == cfg['powerSwitch']), None)
+        if sw:
+            b.add_marker('POWER', vec(sw['origin']), vec(sw.get('angles'))[1])
+    # every named entity with its position in game space, for map mods (trigger volumes carry their bounds)
+    named = []
+    for e in ents:
+        t = e.get('targetname')
+        if not t or e.get('classname') == 'node_pathnode':
+            continue
+        o = vec(e.get('origin'))
+        row = {'name': t, 'class': e.get('classname'), 'origin': [round(c, 2) for c in g(o)], 'yaw': vec(e.get('angles'))[1], 'model': e.get('model', '')}
+        mi = int(e['model'][1:]) if e.get('model', '').startswith('*') else None
+        if mi in brush and 'mins' in brush[mi]:
+            lo, hi = brush[mi]['mins'], brush[mi]['maxs']
+            corners = [g((o[0] + x, o[1] + y, o[2] + z)) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
+            row['bounds'] = [[round(min(c[i] for c in corners), 1) for i in range(3)], [round(max(c[i] for c in corners), 1) for i in range(3)]]
+        named.append(row)
+    (out / 'entities.json').write_text(json.dumps(named, separators=(',', ':')))
     # placed static models (props; skinned models such as characters are skipped)
     placed = 0
     for inst in json.load(open(str(obj_base) + '.smodels.json'))['models']:

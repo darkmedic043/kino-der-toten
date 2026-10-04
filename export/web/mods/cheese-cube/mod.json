@@ -1,0 +1,5 @@
+{
+  "name": "Cheese Cube Unlimited extras",
+  "description": "The Cheese Cube map's own quests: building the power switch, the Cheese Brothers targets and the ending. Only active on that map.",
+  "script": "mod.js"
+}

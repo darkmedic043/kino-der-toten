@@ -23,6 +23,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
 | Phone/touch support (touch-extras mod, mobile textures, defaults) | `mobile.md` |
 | Porting World at War maps (OpenAssetTools GfxWorld dumper, `build_waw_map.py`, Cheese Cube) | `waw-ports.md` |
+| Custom-map hooks, scoreboard (Tab), moving platforms | `mods/README.md` (end) and `waw-ports.md` |
 | Session history log | `history.md` |
 
 ## Setup essentials
