@@ -6,6 +6,7 @@
 // previews it on the model. Used by the main menu and the in-game pause menu.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { applyGlow, tickGlow } from '../bo3-weapons/glow.js';
 import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress } from './camo.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef } from './gunsmith.js';
@@ -108,7 +109,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   const fill=new THREE.DirectionalLight(0x8fb4ff,.6);fill.position.set(0,-40,60);scene.add(fill);
   const pivot=new THREE.Group();scene.add(pivot);
 
-  let gun=null,def=null,slot=null,hover=null,yaw=-.35,pitch=.08,dragging=null,radius=40,alive=true;
+  let gun=null,glow=null,def=null,slot=null,hover=null,yaw=-.35,pitch=.08,dragging=null,radius=40,alive=true;
   const focus=new THREE.Vector3(),focusGoal=new THREE.Vector3(),center=new THREE.Vector3();let dist=80,distGoal=80;
   const attachmentTags=new Set(Object.values(weapons).flatMap(d=>d?.hideTags??[]));
 
@@ -129,10 +130,11 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     def=weapons[id];const token=id;
     const model=await loadModel(def.model);if(!alive||token!==id)return;
     if(gun){pivot.remove(gun);}
+    gun=model;glow=def.glow?applyGlow(gun,def.glow,{depthTest:true}):null;   // BO3 mod guns' lights, as in game (before emissive0 is recorded)
     gun=model;gun.traverse(o=>{if(!o.isMesh)return;o.frustumCulled=false;
       for(const m of [o.material].flat()){const n=m?.name??'';
         if(/reflex_red_dot|scope_pka_crosshair|clan_tag|player_icon/.test(n))o.visible=false;   // aimpoint_red_dot is the Aimpoint body: keep it
-        else if(/lens(?!_interior)/.test(n)){m.transparent=true;m.opacity=.15;m.depthWrite=false;}
+        else if(/lens(?!_interior)/.test(n)&&!m.isMeshBasicMaterial){m.transparent=true;m.opacity=.15;m.depthWrite=false;}
         m.userData.emissive0??=m.emissive?.clone();}});
     // centre the gun and turn it so the barrel runs along +X
     pivot.add(gun);gun.position.set(0,0,0);gun.rotation.set(0,0,0);gun.updateMatrixWorld(true);
@@ -315,6 +317,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     // pulse the parts of the selected slot
     if(gun){const pulse=.12+.1*Math.sin(t*5);gun.traverse(o=>{if(!o.isMesh||!o.visible)return;const m=o.material;if(!m?.emissive)return;
       const hot=slot&&partOf(o)===slot;m.emissive.copy(hot?new THREE.Color('#f3a33a').multiplyScalar(pulse):m.userData.emissive0??new THREE.Color(0));});}
+    tickGlow(glow,t);
     renderer.render(scene,camera);
     // markers and leader lines from each slot row to its part on the gun
     let paths='';const rootBox=root.getBoundingClientRect();

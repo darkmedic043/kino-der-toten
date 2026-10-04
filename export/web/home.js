@@ -1,6 +1,7 @@
 // Main menu (not part of upstream): map browser, loadout, character and mods.
 import * as THREE from 'three';
 import { loadModel, ViewWeapon } from './animation.js';
+import { applyGlow, tickGlow } from './mods/bo3-weapons/glow.js';
 import { renderSettings } from './settings.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
 import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady } from './profile.js';
@@ -156,6 +157,7 @@ function thumb(id){
       const model=await loadModel(def?.worldModel);
       if(model){
         for(const tag of def.hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
+        if(def.glow)tickGlow(applyGlow(model,def.glow,{depthTest:true}),1);   // BO3 mod guns' lights, as in game
         const pivot=new THREE.Group();pivot.add(model);pivot.rotation.set(.12,-.35,0);thumbScene.add(pivot);pivot.updateMatrixWorld(true);
         const box=new THREE.Box3().setFromObject(pivot),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
         pivot.position.sub(center);const span=Math.max(size.x/thumbCamera.aspect,size.y,size.z*.6);
@@ -300,6 +302,7 @@ const stage={active:false,running:false,speed:0,character:null,loading:0,yaw:.5,
     if(this.mode==='fp'){
       this.viewCamera.aspect=w/h;this.viewCamera.updateProjectionMatrix();this.fpTime+=dt;
       if(this.view?.ready){this.view.update(dt,{moving:this.speed>0,sprint:this.speed>230,ads:false,reloading:false,empty:false,time:this.fpTime});this.fp?.sync(this.view);}
+      if(this.view?.ready&&this.view.def?.glow)tickGlow(applyGlow(this.view.gun,this.view.def.glow),this.fpTime);
       this.renderer.render(this.viewScene,this.viewCamera);
     }else{
       if(this.character){this.character.root.rotation.y=this.yaw;this.character.update(dt,this.speed);}

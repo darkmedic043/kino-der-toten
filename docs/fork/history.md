@@ -72,3 +72,4 @@
 - 2026-10-03: Mod-gun glow cards no longer render as boxes (radial emissive spot in the converter); weapon inspect mod (hold R; BO3 inspect clips for the mod guns, procedural turn for the rest).
 - 2026-10-03: BO3 sight reticle quads dropped (rendered white); BO3 model URLs content-hashed (day-long browser cache hid rebuilds); fixed the DG-2 reload-foley line lost inside a comment.
 - 2026-10-03: Mod-gun glows reworked: additive cards with hot cores and bone-attached halos, BO3's real scrolling glow textures (pattern in alpha) for the _ani/lowspeed/orbit parts, sight lenses as faint glass.
+- 2026-10-03: Glow code moved to mods/bo3-weapons/glow.js and applied in the Gunsmith, loadout thumbnails and Operator preview so they match the game.
