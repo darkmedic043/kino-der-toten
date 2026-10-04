@@ -14,7 +14,10 @@ export async function poseIdle(model,def){
   // it: its bind carries a 90 degree roll that the animation's root track resets, which left the
   // static views lying on their side.
   let root=model.getObjectByName('j_gun');model.traverse(n=>{if(!root&&n.isBone)root=n;});
-  model.traverse(n=>{if(!n.isBone)return;if(n===root||/^j_gun1?$/.test(n.name))n.userData.animationAnchor=true;else n.userData.bindPosition??=n.position.clone();});
+  // Loose shells (j_ammo_NN) of the shell-loaded guns only belong in the reload; the idle frame throws
+  // the M1887's 100 units away from the gun, so they keep their bind position.
+  const shell=n=>def.segmentedReload&&/^j_ammo_\d+$/.test(n.name);
+  model.traverse(n=>{if(!n.isBone)return;if(n===root||shell(n)||/^j_gun1?$/.test(n.name))n.userData.animationAnchor=true;else n.userData.bindPosition??=n.position.clone();});
   const mixer=new THREE.AnimationMixer(model);mixer.clipAction(makeClip(model,data)).play();mixer.update(0);
   // left as is: stopping the action would restore the bind pose
   model.userData.bo3Posed=true;model.updateMatrixWorld(true);return model;
