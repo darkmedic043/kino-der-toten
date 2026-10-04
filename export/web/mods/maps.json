@@ -70,6 +70,21 @@
       "background": "#1c2226",
       "exposure": 0.95,
       "image": "mods/maps/thumbs/sandbox.jpg"
+    },
+    {
+      "id": "cheese-cube",
+      "title": "Cheese Cube Unlimited",
+      "description": "A World at War custom map ported from its compiled zones: a vertical cheese cube with eight gated zones, perks, a Mystery Box and Pack-a-Punch.",
+      "modes": [
+        "zombies",
+        "explore"
+      ],
+      "dir": "mods/maps/cheese-cube/",
+      "model": "cheese-cube.glb",
+      "scale": 1,
+      "background": "#10151a",
+      "exposure": 1.1,
+      "image": "mods/maps/cheese-cube/thumb.jpg"
     }
   ]
 }

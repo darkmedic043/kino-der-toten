@@ -1,0 +1,24 @@
+# World at War map ports
+
+How a compiled World at War (T4) custom map becomes a Kino custom map (2026-10-04, first port: Cheese Cube Unlimited, `nazi_zombie_ccube_u`).
+
+**Pipeline**
+1. The map ships as an NSIS installer holding `<map>.ff`, `<map>.iwd` and a mod folder. Unpack it with `7z x` (never run it), put the files outside the repo, e.g. `~/projects/waw-cheese-cube/`.
+2. OpenAssetTools (`~/.local/opt/OpenAssetTools`) loads T4 zones and dumps models (GLB), images (DDS), materials, map entities (`.ents`), scripts and weapons. It had **no dumper for the world mesh** (`gfxworld`), so `.tools/oat/GfxWorldDumperT4.{h,cpp}` adds one: copy both into `src/ObjWriting/Game/T4/GfxWorld/`, add `#include "GfxWorld/GfxWorldDumperT4.h"` and `RegisterAssetDumper(std::make_unique<gfx_world::DumperT4>());` to `ObjWriterT4.cpp`, run `./generate.sh`, then `make -C build -j6 config=release_x64 UnlinkerCli`. It writes `<zone>.d3dbsp.obj` (one object per surface, only the vertices a surface uses), `.smodels.json` (placed static models) and `.brushmodels.json` (door/barrier brush models).
+3. Dump with the game's archives on the search path so stock textures resolve: `Unlinker --search-path "<WaW>/main;<map folder>" --model-format GLB --image-format DDS --include-assets xmodel,mapents,image,material,rawfile,gfxworld -o <out>/?zone? <map>.ff`.
+4. `python3 .tools/build_waw_map.py <dump dir> export/web/mods/maps/<id>` writes `<id>.glb` (CoD inches, Y up, scale 1) with the markers. Per-map settings live in `.tools/waw_maps/<zone>.json`.
+5. Add an entry to `mods/maps.json` (`dir`, `model`, `scale: 1`). The map folder gets a `.gitignore` for everything but itself: **ripped game data stays out of git** (the maps.json entry is tracked, the files are not).
+
+**What the build script does**
+- World surfaces become one mesh grouped by material. Each triangle is wound to agree with its vertex normals (the dumped winding is not uniform, and the navmesh builder decides walkable floors from it). Textures: DDS to WebP (max 512) through ffmpeg, embedded with `EXT_texture_webp`. Material name to colour map comes from the material JSON; alpha test or glass sets the glTF alpha mode.
+- Oversized surfaces (a plane tens of thousands of units wide) are clipped to the map footprint: the game sizes its navmesh cells from the bounds, and one huge plane made them too coarse for corridors (the zombies had no navmesh on most floors).
+- Doors: each `zombie_door`/`zombie_debris` trigger's `target` names `script_brushmodel`s; their surfaces (via the brush model indices) become a `DOOR_<zone>_<cost>` mesh. Debris doors open `enter_zoneN`; plain doors take the nearest zone by height.
+- Markers: `initial_spawn_points` to `PLAYER_SPAWN`, `<zone>_spawners_rise` to `ZSPAWN_<zone>` (`start_zone` is `start`), `weapon_upgrade` to `WALLBUY_` through `WEAPON_MAP` (the map's own weapons are not in the game), `zombie_vending` to `PERK_` (only the four supported perks), `zombie_vending_upgrade` to `PAP`, the start chest to `BOX_start`. Marker yaw is the CoD yaw about the up axis.
+- Static props (placed `xmodel`s) are baked in with their placement; skinned models (characters), `viewmodel_` and `weapon_` models are skipped.
+- Config keys: `dropSpawnersBelow` (spawn points on a floor the navmesh does not connect to would leave zombies stuck, which blocks rounds), `extraSpawns` (replacements, picked from floor points that can path to the player), `rising` (material, delay, speed: the surface becomes a `RISING_<delay>_<speed>` mesh).
+
+**Cheese Cube Unlimited**
+- The gimmick (from `nazi_zombie_ccube_u.gsc`): `cheese_bottom` rises 4600 units over 2000 s (2.3 units/s) after 97 s plus a 3 s alarm; touching it kills even with Quick Revive. Ported as `RISING_100_2.3` (see `mods/README.md`; engine side is `updateRising` in `custom-world.js` and the hazard block in `maps/custom.js`).
+- Start-zone ground spawners (z below 30) were on a floor island the navmesh does not connect to the stairs: dropped, and four reachable spiral-stair points added.
+- Verified in a real browser: no map warnings, zombies spawn, chase and attack, the cheese is at height 70 at t=130 s, standing below it ends the game.
+- Not ported: the cheese puzzle, Iron Man suits and other scripted extras, the `cheese_ending` trigger, the map's custom weapons, the PHD Flopper and Vulture-style perks (no marker), and the lights (the dump has no light data, so the map is lit by the engine defaults).

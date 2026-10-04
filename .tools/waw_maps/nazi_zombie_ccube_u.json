@@ -1,0 +1,8 @@
+{
+  "_comment": "Per-map settings for build_waw_map.py. Coordinates are CoD units (x, y, z up).",
+  "dropSpawnersBelow": 30,
+  "extraSpawns": {
+    "start": [[239, 129, 253], [-151, 221, 109], [54, 252, 181], [170, 217, 217]]
+  },
+  "rising": {"material": "wc/cheese_melt", "delay": 100, "speed": 2.3}
+}

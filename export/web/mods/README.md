@@ -59,6 +59,7 @@ when both are present.
 | `BOX` / `BOX_start` | Mystery Box location. Add several so it can move. `BOX_start` is where it begins. |
 | `PAP` | Pack-a-Punch (needs power). |
 | `POWER` | Power switch. **Without one, the power is on from the start.** |
+| `RISING_<delay>_<speed>` | A **mesh** (not an empty): a death plane such as rising lava or cheese. After `<delay>` seconds of game time it rises at `<speed>` units/s (scene units, after the map `scale`) and ends the game on touch, even with Quick Revive. It is render-only: no collision or navigation. Zombie spawn points it has covered stop being used. Properties `delay` and `speed` also work. |
 | `CLAYMORE` | Claymore wall-buy (1000). |
 | `TRAP_<name>_<cost>` | Trap switch (default 1000). Activates every `TRAPZONE_<name>`. Properties: `kind` (`electric` or `fire`), `duration` (30 s), `cooldown` (90 s, counted from activation), `power` (needs power, default true). Zombies inside die; players inside take damage. |
 | `TRAPZONE_<name>` | The trap's area. An **empty** makes a cylinder (`radius` 100, `height` 120). A **mesh** makes a zone the size of its bounding box, and the mesh is hidden. Use several for one trap. |

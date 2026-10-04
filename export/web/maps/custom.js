@@ -117,6 +117,14 @@ export async function createMap(ctx,entry){
         }
         if(!on)for(const h of t.handles??[])if(h&&t.readyAt<=s.time)h.rotation.x=0;
       }
+      // Rising death plane (RISING marker): game over on touch, even with Quick Revive.
+      if(world.rising?.length){
+        const top=world.updateRising(s.time);
+        for(const r of world.rising){
+          if(!r.alarmed&&s.time>=r.delay){r.alarmed=true;ctx.toast('The cheese is rising. Keep climbing.',4);}
+          if(s.phase!=='gameover'&&feet.y<r.top+2){s.perks?.clear?.();ctx.damage(1e9);ctx.toast('You touched the dark side of the cheese',4);}
+        }
+      }
       for(const tp of world.teleporters){const charging=teleportPending?.tp===tp;tp.glow.material.opacity=charging?.25+Math.sin(s.time*20)*.1:0;tp.ring.material.color.setHex(tp.readyAt>s.time&&!charging?0x5d6a70:0x7fd4ff);}
       if(teleportPending&&s.time>=teleportPending.at){
         const {tp}=teleportPending;teleportPending=null;const to=tp.to;
@@ -131,7 +139,7 @@ export async function createMap(ctx,entry){
       for(const g of world.eggs.values())for(const i of g.items)if(!i.found)i.object.rotation.y+=dt*.8;
     },
     beforeReset(){},
-    reset(){resetPower();teleportPending=null;returnTrip=null;},
+    reset(){for(const r of W().rising??[])r.alarmed=false;W().updateRising?.(0);resetPower();teleportPending=null;returnTrip=null;},
     hudEffects:()=>returnTrip?'<span>RETURN IN '+Math.max(0,Math.ceil(returnTrip.at-S().time))+'</span>':'',
     objective:()=>!S().power?'Find the power switch':'',
     state(){

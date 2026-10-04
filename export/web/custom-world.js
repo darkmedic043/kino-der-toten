@@ -15,7 +15,7 @@ import { assetManager } from './runtime-assets.js';
 const PERKS={jugg:'specialty_armorvest',juggernog:'specialty_armorvest',armorvest:'specialty_armorvest',revive:'specialty_quickrevive',quickrevive:'specialty_quickrevive',
   speedcola:'specialty_fastreload',speed:'specialty_fastreload',sleight:'specialty_fastreload',fastreload:'specialty_fastreload',doubletap:'specialty_rof',rof:'specialty_rof'};
 const PERK_MODELS={specialty_armorvest:'zombie_vending_jugg',specialty_quickrevive:'zombie_vending_revive',specialty_fastreload:'zombie_vending_sleight',specialty_rof:'zombie_vending_doubletap'};
-const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE|TRAPZONE|TRAP|TELEPORT|TPDEST|EGG)(?:_(.*))?$/i;
+const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE|TRAPZONE|TRAP|TELEPORT|TPDEST|EGG|RISING)(?:_(.*))?$/i;
 const TRAP_COLORS={electric:0x8cbbff,fire:0xff7a2e};
 const COLLISION_NAME=/^(COL|UCX|collision)[_.-]/i;
 // Machine models face their local +Z; markers face their local +X (Blender's red axis).
@@ -65,6 +65,14 @@ export class CustomWorld {
     const solid=positionsOf(dedicated.length?dedicated:meshes);
     if(!solid)throw new Error('The map has no meshes to stand on');
     this.collision=new CollisionWorld(solid);
+
+    // RISING_<delay>_<speed>: a mesh (a death plane such as rising lava or cheese) that starts rising after <delay>
+    // seconds of game time at <speed> units/s and kills whatever it reaches. Render-only: no collision or navigation.
+    this.rising=markers.filter(m=>m.type==='RISING').map(m=>{
+      const tokens=m.arg.split('_').filter(Boolean).map(Number).filter(Number.isFinite);
+      const box=new THREE.Box3().setFromObject(m.object);
+      return {object:m.object,baseY:m.object.position.y,delay:m.extras.delay??tokens[0]??60,speed:m.extras.speed??tokens[1]??1,topAtStart:box.max.y,top:box.max.y};
+    });
 
     // Doors keep their own geometry and are left out of collision and navigation.
     for(const m of markers.filter(m=>m.type==='DOOR')){
@@ -294,7 +302,16 @@ export class CustomWorld {
   }
   activeZones(session){const zones=new Set(['start']);for(const d of this.doors.values())if(d.zone&&this.isOpen(d,session))zones.add(d.zone);for(const f of session.flags)if(f.startsWith('zone:'))zones.add(f.slice(5));return zones;}
   zoneAt(){return undefined;}
-  spawnBarriers(session){const zones=this.activeZones(session);return this.barriers.filter(b=>zones.has(b.group));}
+  spawnBarriers(session){const zones=this.activeZones(session);return this.barriers.filter(b=>zones.has(b.group)&&!b.submerged);}
+  // Advances the RISING planes to game time `time`; spawn points they have covered stop being used. Returns the highest top.
+  updateRising(time){
+    let top=-Infinity;
+    for(const r of this.rising??[]){
+      const rise=Math.max(0,time-r.delay)*r.speed;r.object.position.y=r.baseY+rise;r.top=r.topAtStart+rise;top=Math.max(top,r.top);
+    }
+    if(top>-Infinity)for(const b of this.barriers)b.submerged=b.position.y<top+12;
+    return top;
+  }
   setBoards(barrier,count){if(!barrier.boards.length){barrier.count=0;return;}barrier.count=Math.max(0,Math.min(barrier.boards.length,count));barrier.boards.forEach((o,i)=>o.visible=i<barrier.count);}
   reset(session){
     for(const t of this.traps.values()){t.activeUntil=0;t.readyAt=0;for(const z of t.zones){z.mesh.visible=false;z.light.intensity=0;}}

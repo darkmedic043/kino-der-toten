@@ -22,6 +22,7 @@ The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstructi
 | Classes (BL4 loadouts), skill trees, all six action skills | `classes.md` |
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
 | Phone/touch support (touch-extras mod, mobile textures, defaults) | `mobile.md` |
+| Porting World at War maps (OpenAssetTools GfxWorld dumper, `build_waw_map.py`, Cheese Cube) | `waw-ports.md` |
 | Session history log | `history.md` |
 
 ## Setup essentials
