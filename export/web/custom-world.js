@@ -80,7 +80,12 @@ export class CustomWorld {
       const cost=+(m.extras.cost??tokens.find(t=>/^\d+$/.test(t))??750);
       const zone=String(m.extras.zone??tokens.find(t=>!/^\d+$/.test(t))??'').toLowerCase()||null;
       const box=new THREE.Box3().setFromObject(m.object);
-      const part={object:m.object,collider:boxCollider(box),box,enabled:true};
+      // The navmesh cut around a closed door covers every polygon the box touches (up to ~48 units beyond it), so
+      // the player's collision can be grown the same way (map entry doorMargin / doorHeadroom, in scene units):
+      // otherwise you squeeze past the door pieces, or stand on top of them.
+      const grow=this.entry.doorMargin??0,up=this.entry.doorHeadroom??0,plug=box.clone();
+      if(grow||up){plug.min.x-=grow;plug.min.z-=grow;plug.max.x+=grow;plug.max.z+=grow;plug.max.y+=up;}
+      const part={object:m.object,collider:boxCollider(plug),box,enabled:true};
       this.doors.set(name,{name,cost,zone,electric:!!m.extras.electric,parts:[part],box});this.dynamic.push(part);
       this.interactions.push({kind:'door',door:name,position:box.getCenter(new THREE.Vector3()),box});
     }
@@ -307,7 +312,8 @@ export class CustomWorld {
   updateRising(time){
     let top=-Infinity;
     for(const r of this.rising??[]){
-      const rise=Math.max(0,time-r.delay)*r.speed;r.object.position.y=r.baseY+rise;r.top=r.topAtStart+rise;top=Math.max(top,r.top);
+      const rise=Math.max(0,time-r.delay)*r.speed;r.object.position.y=r.baseY+rise/(this.entry.scale??1);r.top=r.topAtStart+rise;top=Math.max(top,r.top);
+      r.object.updateMatrix();r.object.updateMatrixWorld(true);   // the static-scene optimizer froze matrixAutoUpdate on every object
     }
     if(top>-Infinity)for(const b of this.barriers)b.submerged=b.position.y<top+12;
     return top;

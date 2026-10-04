@@ -84,7 +84,11 @@
       "scale": 1,
       "background": "#10151a",
       "exposure": 1.1,
-      "image": "mods/maps/cheese-cube/thumb.jpg"
+      "image": "mods/maps/cheese-cube/thumb.jpg",
+      "stairSmoothing": true,
+      "doorMargin": 40,
+      "doorHeadroom": 80,
+      "stairSmoothRate": 5
     }
   ]
 }

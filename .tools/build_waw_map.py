@@ -183,7 +183,7 @@ def surfaces_to_prims(b, surfaces, flip):
     for s in surfaces:
         pos, nor, uv, idx = by_mat[s['mat']]
         base = len(pos)
-        pos.extend(g(p) for p in s['v']); nor.extend(g(n) for n in s['vn']); uv.extend(s['vt'])
+        pos.extend(g(p) for p in s['v']); nor.extend(g(n) for n in s['vn']); uv.extend((t[0], 1 - t[1]) for t in s['vt'])  # the OBJ's v is flipped (v up); glTF's points down
         idx.extend((base + a, base + c, base + d) for a, c, d in s['f'])
     return [b.primitive(mat, *data, flip) for mat, data in by_mat.items() if data[3]]
 
@@ -201,6 +201,30 @@ def main():
     ents = parse_ents(str(obj_base) + '.ents')
     brush = {m['index']: m for m in json.load(open(str(obj_base) + '.brushmodels.json'))['brushModels']}
     surfaces = [s for s in read_obj(str(obj_base) + '.obj') if s['mat'] and not SKIP_MATERIAL.search(s['mat'])]
+    # Brush models (everything but model 0: doors, moving stairs, plates, the rising plane...) store their geometry
+    # relative to their entity's origin. Place each one with its entity's origin and angles.
+    def rot(angles):
+        pitch, yaw, roll = (math.radians(a) for a in angles)
+        cp, sp, cy, sy, cr, sr = math.cos(pitch), math.sin(pitch), math.cos(yaw), math.sin(yaw), math.cos(roll), math.sin(roll)
+        return [[cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+                [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+                [-sp, cp * sr, cp * cr]]
+    by_index = {s['idx']: s for s in surfaces}
+    placed_models = 0
+    for e in ents:
+        if not e.get('model', '').startswith('*') or int(e['model'][1:]) == 0 or int(e['model'][1:]) not in brush:
+            continue
+        m = brush[int(e['model'][1:])]
+        o, R = vec(e.get('origin')), rot(vec(e.get('angles')))
+        for k in range(m['startSurface'], m['startSurface'] + m['surfaceCount']):
+            sf = by_index.get(k)
+            if not sf:
+                continue
+            sf['v'] = [tuple(o[i] + sum(R[i][j] * v[j] for j in range(3)) for i in range(3)) for v in sf['v']]
+            sf['vn'] = [tuple(sum(R[i][j] * n[j] for j in range(3)) for i in range(3)) for n in sf['vn']]
+        placed_models += 1
+    print(f'placed {placed_models} brush models at their entity origins')
+
     # Clip oversized surfaces (a death/ground plane tens of thousands of units wide) to the map's footprint: the
     # game sizes its navmesh cells from the bounds, so one huge plane makes them too coarse for corridors.
     small = [s for s in surfaces if max(max(v[i] for v in s['v']) - min(v[i] for v in s['v']) for i in (0, 1)) <= 2500]

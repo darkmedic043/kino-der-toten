@@ -253,7 +253,10 @@ export default function setup(api){
     // Stairs: each step up (or snap down) moves the feet several units in one
     // frame, which shook the camera. Absorb those jumps and ease them out.
     const feetY=player.getFeetPosition().y,jump=feetY-lastFeetY;lastFeetY=feetY;
-    if(player.onFloor&&!state.mantling&&Math.abs(jump)>1.5&&Math.abs(jump)<=player.stepHeight+6)stairOffset=THREE.MathUtils.clamp(stairOffset-jump,-24,24);
+    // Map entry stairSmoothing: a step-up flags the capsule as off the floor for several frames of the rise, so counting
+    // only onFloor frames missed most of it and the eye lurched. Count every low-speed vertical move instead.
+    const smooth=!!api.world?.entry?.stairSmoothing,climbing=smooth&&!state.jumped&&Math.abs(player.velocity.y)<140;
+    if((player.onFloor||climbing)&&!state.mantling&&Math.abs(jump)>(smooth?.2:1.5)&&Math.abs(jump)<=player.stepHeight+6)stairOffset=THREE.MathUtils.clamp(stairOffset-jump,-24,24);
     // Debris: riding over planks and rubble on flat floor moves the feet a
     // little every frame, which read as camera shake. On flat ground (a down
     // ray finds a level surface) small bumps are eased out too; on ramps they
@@ -278,7 +281,7 @@ export default function setup(api){
     roll+=(targetRoll-roll)*Math.min(1,dt*7);
     // Ease the eye between standing / crouch / prone heights instead of popping.
     crouchOffset+=(0-crouchOffset)*Math.min(1,dt*10);
-    stairOffset+=(0-stairOffset)*Math.min(1,dt*11);
+    stairOffset+=(0-stairOffset)*Math.min(1,dt*(api.world?.entry?.stairSmoothing?(api.world.entry.stairSmoothRate??8):11));
     camera.position.y+=y+dip+crouchOffset+stairOffset;
     camera.position.x+=Math.cos(camera.rotation.y)*side;camera.position.z-=Math.sin(camera.rotation.y)*side;
     camera.rotation.z=roll+Math.cos(phase)*.004*bob*bobBlend;
