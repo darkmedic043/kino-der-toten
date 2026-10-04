@@ -77,6 +77,24 @@ const CSS=`
 #gsv .back{position:absolute;right:40px;bottom:18px;padding:9px 18px;border:1px solid #ffffff40;background:#00000066;letter-spacing:3px;font-size:11px}
 #gsv .back:hover{border-color:#f3a33a;color:#f3a33a}
 @media (max-width:1100px){#gsv .opts,#gsv .stats{width:260px}#gsv .slots{width:210px}}
+/* Landscape phones (about 390px tall): the desktop layout stacks its panels on top of each other. */
+@media (pointer:coarse) and (max-height:560px){
+  #gsv .foot{display:none}
+  #gsv .top{left:16px;right:16px;top:10px;gap:12px}
+  #gsv h1{font-size:26px}
+  #gsv .crumb{font-size:9px;letter-spacing:3px}
+  #gsv .lvl{min-width:0;max-width:240px}#gsv .lvl small{display:none}
+  #gsv .slots{left:16px;top:70px;bottom:60px;width:200px;gap:5px;overflow-y:auto;overflow-x:hidden}
+  #gsv .slot{padding:6px 8px;gap:8px;grid-template-columns:28px 1fr}
+  #gsv .slot .ico{width:28px;height:28px;font-size:11px}
+  #gsv .slot strong{font-size:12px}
+  #gsv .opts,#gsv .opts:has(.camo-opt){right:16px;top:70px;width:250px;max-height:calc(100vh - 140px)}
+  #gsv .opt{padding:7px 9px;margin-bottom:4px}
+  #gsv .stats{left:236px;right:282px;bottom:56px;width:auto;display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+  #gsv .stats h3{grid-column:1/-1;margin:0 0 2px}
+  #gsv .stat{margin:2px 0;padding:3px 8px;min-height:0;grid-template-columns:62px 1fr 48px;font-size:9px;letter-spacing:1px}
+  #gsv .back{right:16px;bottom:10px;padding:8px 14px}
+}
 `;
 
 export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,label}){
@@ -293,9 +311,17 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       else showParts(cur);
       renderStats();}
   });
-  canvas.addEventListener('pointerdown',e=>{dragging={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);});
-  canvas.addEventListener('pointermove',e=>{if(!dragging)return;yaw+=(e.clientX-dragging.x)*.008;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-dragging.y)*.005,-.6,.8);dragging={x:e.clientX,y:e.clientY};});
-  canvas.addEventListener('pointerup',()=>{dragging=null;});
+  // One pointer turns the gun, two (touch) pinch to zoom. touch-action:none so a drag is not taken as a page scroll.
+  canvas.style.touchAction='none';
+  const pointers=new Map();let pinch=0;
+  const release=e=>{pointers.delete(e.pointerId);pinch=0;dragging=pointers.size===1?{...[...pointers.values()][0]}:null;};
+  canvas.addEventListener('pointerdown',e=>{pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);
+    if(pointers.size===2){const [a,b]=[...pointers.values()];pinch=Math.hypot(a.x-b.x,a.y-b.y);dragging=null;}else dragging={x:e.clientX,y:e.clientY};});
+  canvas.addEventListener('pointermove',e=>{
+    if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size===2){const [a,b]=[...pointers.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch>0&&d>0)distGoal=THREE.MathUtils.clamp(distGoal*pinch/d,radius*1.2,radius*5);pinch=d;return;}
+    if(!dragging)return;yaw+=(e.clientX-dragging.x)*.008;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-dragging.y)*.005,-.6,.8);dragging={x:e.clientX,y:e.clientY};});
+  canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);
   canvas.addEventListener('wheel',e=>{distGoal=THREE.MathUtils.clamp(distGoal*(1+Math.sign(e.deltaY)*.1),radius*1.2,radius*5);e.preventDefault();},{passive:false});
   const onKey=e=>{if(e.code==='Escape'){e.stopPropagation();e.preventDefault();close();}};
   addEventListener('keydown',onKey,true);

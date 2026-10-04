@@ -1,6 +1,6 @@
 // The base game's touch layer (touch-controls.js, zombies-touch.js) predates the fork's HUD and actions, so on a phone:
 // the class badge, grenade/monkey counters and weapon level sat under the buttons, the class skill could not be used,
-// and a scope could not hold its breath. Touch devices only; desktop is untouched.
+// a scope could not hold its breath, and third person (where the operator shows) had no key. Touch devices only; desktop is untouched.
 export default async function setup(api){
   if(!matchMedia('(pointer: coarse)').matches)return;
   const root=document.getElementById('touch-controls');if(!root)return;
@@ -30,6 +30,15 @@ export default async function setup(api){
     if(!e.target.closest?.('#class-skill'))return;
     e.preventDefault();e.stopPropagation();key('keydown','KeyZ');key('keyup','KeyZ');
   },true);
+
+  // Third person (T), where the chosen operator is shown: no key on a phone, so a toolbar button.
+  const toolbar=root.querySelector('.touch-toolbar');
+  if(toolbar){
+    const view=document.createElement('button');view.type='button';view.className='touch-button touch-view';view.setAttribute('aria-label','Third person');
+    view.innerHTML='<span>VIEW</span>';
+    view.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();key('keydown','KeyT');key('keyup','KeyT');});
+    toolbar.append(view);
+  }
 
   // Hold your breath while looking through a scope (the scopes mod reads Shift).
   const breath=document.createElement('button');
