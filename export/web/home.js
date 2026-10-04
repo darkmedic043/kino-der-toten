@@ -175,7 +175,8 @@ loadCamos(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{camoCats=c;r
 // Weapon classes, Black Ops style: the picker shows one class at a time.
 const classOf=id=>classOfIn(weapons,id);
 const activeClass={};
-const gunsmithHas=id=>gunsmith&&weapons[id]&&gunsmith.attachments.some(a=>a.tags.some(t=>(weapons[id].hideTags??[]).includes(t)));
+const gunsmithHas=id=>gunsmith&&weapons[id]&&(Object.keys(weapons[id].mounts??{}).length>0||weapons[id].statAttachments?.length>0   // imported guns: mounted / stat-only attachments
+  ||gunsmith.attachments.some(a=>a.tags.some(t=>(weapons[id].hideTags??[]).includes(t))));
 // Opened from the loadout: the arrows go through every gun with attachments,
 // loadout guns first, so box and wall guns can be set up before you find them
 // (attachments are saved per gun and apply however you get it).

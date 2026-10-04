@@ -100,6 +100,7 @@ export function applyCamo(root,camo){
 
 // ---- weapon classes (shared with the loadout picker) -----------------------------------------
 export function weaponClass(d){
+  if(d.weaponClass)return d.weaponClass;   // imported guns say what they are (mods/bo3-weapons)
   const b=d.baseId??d.id;
   if(/ray_gun|thundergun|microwavegun|freezegun/.test(b))return 'Wonder weapon';if(/minigun/.test(b))return 'Death Machine';if(d.projectileSpeed>0||d.explosionRadius)return 'Launcher';if(d.pellets>1)return 'Shotgun';
   if(/l96|dragunov/.test(b))return 'Sniper rifle';if(/hk21|rpk/.test(b))return 'Light machine gun';if(/m1911|python|cz75/.test(b))return 'Pistol';

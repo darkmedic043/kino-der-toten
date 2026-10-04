@@ -23,7 +23,9 @@ function rotateWorld(bone,delta){
 const aim=(bone,from,to)=>rotateWorld(bone,new THREE.Quaternion().setFromUnitVectors(from.clone().normalize(),to.clone().normalize()));
 function handBasis(wrist,mid,index,little){
   const f=mid.clone().sub(wrist).normalize(),l=index.clone().sub(little).normalize();
-  const up=new THREE.Vector3().crossVectors(f,l).normalize(),side=new THREE.Vector3().crossVectors(up,f).normalize();
+  // a proper rotation (right-handed: side = f × up); with up × f it was a reflection, which turned into a
+  // wrong quaternion and left retargeted hands rolled
+  const up=new THREE.Vector3().crossVectors(f,l).normalize(),side=new THREE.Vector3().crossVectors(f,up).normalize();
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(f,up,side));
 }
 
@@ -123,7 +125,11 @@ export class FirstPersonArms {
       const sh=new THREE.Matrix4().makeTranslation(shift[t5]);
       const add=(bone,info)=>{const t=info.t5&&T(info.t5);rtIndex.set(bone,rt.length);
         rt.push({...info,name:bone.name,t5:t?info.t5:null,bind:sh.clone().multiply(bone.matrixWorld),t5BindInv:t?t.matrixWorld.clone().invert():null,parent:rtIndex.get(bone.parent)??-1});};
-      add(S.hand,{kind:'anchor',t5:'j_wrist_'+t5});
+      // the hand turns with T5's palm (its knuckles), not just the wrist bone: T5's animations move the
+      // knuckles relative to the wrist, and following the wrist alone left the hand rolled up to ~110°
+      const kn=['mid','index','pinky'].map(n=>`j_${n}_${t5}_0`);
+      const knOk=kn.every(n=>T(n))&&T('j_wrist_'+t5);
+      add(S.hand,{kind:'anchor',t5:'j_wrist_'+t5,kn:knOk?kn:null,qBindInv:knOk?handBasis(tp('j_wrist_'+t5),tp(kn[0]),tp(kn[1]),tp(kn[2])).invert():null,t5BindPos:tp('j_wrist_'+t5)});
       add(S.fore,{kind:'back',t5:'j_elbow_'+t5,child:rtIndex.get(S.hand)});
       add(S.arm,{kind:'back',t5:'j_shoulder_'+t5,child:rtIndex.get(S.fore)});
       const finger=new Map();for(const [n,ch] of Object.entries(S.fingers))ch.forEach((b,i)=>finger.set(b,`j_${n}_${t5}_${i}`));
@@ -228,13 +234,19 @@ export class FirstPersonArms {
   }
   // Bones driven by a live T5 skeleton (fpArmsRetarget); their matrixWorld is set directly.
   retargetSkeleton(t5){
-    const rt=this.rt,live=rt.map(e=>e.t5?t5.getBoneByName(e.t5):null);
+    const rt=this.rt,live=rt.map(e=>e.t5?t5.getBoneByName(e.t5):null),knLive=rt.map(e=>e.kn?e.kn.map(n=>t5.getBoneByName(n)):null);
+    const q=new THREE.Quaternion(),v0=new THREE.Vector3(),v1=new THREE.Vector3(),v2=new THREE.Vector3(),v3=new THREE.Vector3(),R=new THREE.Matrix4(),Tm=new THREE.Matrix4();
     const bones=rt.map(e=>{const b=new THREE.Bone();b.name=e.name;b.matrixAutoUpdate=false;b.matrixWorldAutoUpdate=false;return b;});
     const skeleton=new THREE.Skeleton(bones,rt.map(e=>e.bind.clone().invert()));
     const m=new THREE.Matrix4(),p=new THREE.Vector3();
     skeleton.solve=()=>rt.forEach((e,i)=>{
       const W=bones[i].matrixWorld,t=live[i];
-      if(t)W.multiplyMatrices(t.matrixWorld,e.t5BindInv).multiply(e.bind);   // T5's rotation since bind
+      const kl=knLive[i];
+      if(t&&kl&&kl.every(Boolean)){   // the palm: rotate by how T5's knuckle frame turned since bind, pinned to T5's wrist
+        q.copy(handBasis(v0.setFromMatrixPosition(t.matrixWorld),v1.setFromMatrixPosition(kl[0].matrixWorld),v2.setFromMatrixPosition(kl[1].matrixWorld),v3.setFromMatrixPosition(kl[2].matrixWorld))).multiply(e.qBindInv);
+        R.makeRotationFromQuaternion(q);W.makeTranslation(-e.t5BindPos.x,-e.t5BindPos.y,-e.t5BindPos.z).premultiply(R).premultiply(Tm.makeTranslation(v0.x,v0.y,v0.z)).multiply(e.bind);
+      }
+      else if(t)W.multiplyMatrices(t.matrixWorld,e.t5BindInv).multiply(e.bind);   // T5's rotation since bind
       // forearm/upper arm: rotate like T5, then hang back from their (already solved) child joint
       if(e.kind==='back'){W.setPosition(0,0,0);p.copy(e.d).applyMatrix4(W);W.setPosition(new THREE.Vector3().setFromMatrixPosition(bones[e.child].matrixWorld).sub(p));}
       else if(e.kind==='follow'&&e.parent>=0){m.multiplyMatrices(bones[e.parent].matrixWorld,e.local);if(t)W.setPosition(p.setFromMatrixPosition(m));else W.copy(m);}

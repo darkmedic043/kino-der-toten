@@ -39,6 +39,8 @@ export class GameAudio {
   }
   notifyKey(name,def){
     if(name.startsWith('rmbnt#'))return;
+    // generic animation markers (BO3 clips end every loop with them) would match any sound named like that
+    if(/^(end|loop_end|start|loop_start)$/.test(name))return;
     name=def.notetrackSounds?.[name]??name.replace(/^sndnt#/, '');
     const bottle={evt_perk_bottle_open:'open/openmn_00',bottle_open:'open/openmn_00',evt_perk_swallow:'swallow/swallowmn_00',swallow:'swallow/swallowmn_00',evt_bottle_break:'break/breakmn_00',bottle_break:'break/breakmn_00',evt_belch:'belch/belchmn_00',belch:'belch/belchmn_00'}[name];
     if(bottle)return 'resident/evt/zombie_global/perksacola/bottle/'+bottle;

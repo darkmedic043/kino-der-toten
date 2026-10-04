@@ -58,3 +58,13 @@ A full-screen, BO7-style Gunsmith opened from Main menu → Loadout (weapon deta
 ## Suppressor drop bonus (2026-10-01)
 
 Kills with a suppressed gun (bullets, not the underbarrel) get one extra 1% power-up roll after the game's own 3% (`PowerupDirector.tryDrop` wrapped in weapon-levels; re-wrapped when `session.drops` is recreated). Simulated: 3.0% → 4.1% of kills drop at random. The per-round cap (4), the shuffled deck and the score-threshold drops are untouched.
+
+## Imported BO3 / mod guns (2026-10-03)
+
+The CoD Online mod guns (`mods/bo3-weapons`) level up like the rest. Their models don't carry hidden attachment parts the BO1 way, so:
+- **Mounted attachments** (`def.mounts` {attId: {model, tag}}, from `.tools/build_bo3_weapons.py` `MOUNTS`): the mod's own attachment models, exported with Greyhound (`reflex_vmgun` → `reddot` on `tag_red_dot`, `eotech_vmgun` → `holo` on `tag_eotech`, `2xreflex_vmgun` → `reflex2x` on `tag_red_dot`, `vm_sup` → `suppressor` on `tag_silencer`). `gunsmith.js` counts them as available and records the equipped ones in `def.mounted` (a STAT_FIELD); `mounts.js` parents each model's root bone to the tag on the viewmodel (game: `mod.js` view.equip; menu: `gunsmith-view.js` showParts). Lenses become see-through glass renamed `reflex_lens …` so the scopes mod centres the sight on them; reticle cards hide (the scopes mod draws the dot). The mounts run after the scopes mod's glass pass, which is why they patch their own lenses.
+- **In-model parts** start hidden via `hideTags` and unlock through the existing tag system: MR23 laser (`tag_sra`) and foregrip (`tag_foregrip`), P90 laser (`tag_sra1`), M1014 grip (`tag_foregripd`, added to the catalogue's grip tags). New catalogue entries: `holo`, `reflex2x` (optics, scope `reflex`), `laser` (new `laser` slot, tighter hip fire).
+- **Stat-only**: `def.statAttachments` (`extmag` for all five; no model).
+- **Iron sights** fold with an optic on the AUG (`tag_up`, `tag_down`) and M1014 (`tag_up`) (`ironSights`).
+- **Camo class**: `weaponClass(d)` honours `d.weaponClass` (the build sets it: the DG-2 is a Wonder weapon, G18 Pistol, P90 SMG, M1014 Shotgun, MR23/AUG Rifle). The DG-2 has no attachments (wonder weapon).
+- `$black_color` diffuse (BO3 placeholder) → black base colour in `semodel_to_glb.py`.

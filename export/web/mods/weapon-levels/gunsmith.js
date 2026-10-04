@@ -1,7 +1,9 @@
 // Weapon levels and attachments, shared by the weapon-levels mod (in game)
 // and the main menu's Gunsmith. Kills with a gun earn that gun XP; each weapon
 // level unlocks the next attachment the gun's model actually carries (BO1
-// viewmodels ship every attachment, hidden via def.hideTags). The profile
+// viewmodels ship every attachment, hidden via def.hideTags). Imported BO3 guns
+// add def.mounts {attId: {model, tag}} (separate models mounted on a tag) and
+// def.statAttachments [ids] (no model). The profile
 // (kino.mods.progression, cloud-synced) stores
 //   profile.weaponXp[id]    = {level, xp}
 //   profile.attachments[id] = [attachment ids]   (one per slot)
@@ -27,6 +29,8 @@ export function available(cat,def,id){
   return cat.attachments.filter(a=>{
     // guns with a built-in scope only take optics made to replace it
     if(a.slot==='optic'&&cat.builtInOptic.includes(id)!==!!a.builtIn)return false;
+    // imported guns (mods/bo3-weapons): attachment models mounted on the gun's tags, and stat-only unlocks
+    if(def.mounts?.[a.id]||def.statAttachments?.includes(a.id))return true;
     return a.tags.some(t=>hidden.has(t));
   });
 }
@@ -65,7 +69,7 @@ export function grantWeaponXp(cat,def,id,profile,amount){
   return unlockedAttachments(cat,def,id,profile).slice(before);
 }
 
-const STAT_FIELDS=['damage','minDamage','range','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','suppressed','attachments','attachment'];
+const STAT_FIELDS=['damage','minDamage','range','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','suppressed','attachments','attachment','mounted'];
 function snapshot(obj){if(!pristine.has(obj)){const s={};for(const k of STAT_FIELDS)s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);pristine.set(obj,s);}return pristine.get(obj);}
 function restore(obj){const s=snapshot(obj);for(const k of STAT_FIELDS){if(s[k]===undefined)delete obj[k];else obj[k]=structuredClone(s[k]);}}
 
@@ -100,6 +104,8 @@ function applyStats(obj,list,cat,show){
   // optics that replace the stock scope hide it
   for(const a of list)for(const t of a.replaces??[])if(obj.hideTags&&!obj.hideTags.includes(t))obj.hideTags.push(t);
   obj.attachments=list.map(a=>a.id).join('+');
+  // attachment models the weapon-levels mod mounts on the viewmodel's tags
+  if(obj.mounts)obj.mounted=list.filter(a=>obj.mounts[a.id]).map(a=>a.id);
   return show;
 }
 

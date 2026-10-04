@@ -1,7 +1,8 @@
 // The Fortifier's action skills (see classes.json; one is equipped per loadout):
 //   wall  Barricade Wall: a waist-high steel barricade (Hardpoint)
 //   snare Razor Snare: a field of razor wire that slows and shreds (Teeth)
-//   nest  Sandbag Nest: waist-high sandbag walls in a horseshoe around you (Bunker)
+//   nest  Sandbag Nest: waist-high sandbag walls in a horseshoe around you (Bunker); its
+//         segments share one pool of hits, so a hit on any side wears the whole nest down
 // All are permanent: they stand until broken (walls) or worn out (wire), and the
 // cooldown starts when the last one is gone. Using the skill again picks them up
 // and puts them down where you're facing, keeping their damage.
@@ -94,7 +95,8 @@ export function setupFortifier(ctx){
   }
 
   // ---- placing ---------------------------------------------------------------------------------
-  function addSegment(kind,at,yaw,width,height,hits,group){
+  // pool: sandbag segments of one nest share a pool of hits (a hit on any side drains the whole nest)
+  function addSegment(kind,at,yaw,width,height,hits,group,pool=null){
     const mesh=kind==='sandbag'?sandbags(width,height):steelWall(width,height);
     mesh.position.copy(at);mesh.rotation.y=yaw;mesh.scale.y=.01;mesh.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;}});scene.add(mesh);
     const geo=new THREE.BoxGeometry(width,height,kind==='sandbag'?16:10);geo.translate(0,height/2,0);geo.rotateY(yaw);geo.translate(at.x,at.y,at.z);geo.computeBoundingBox();
@@ -102,6 +104,7 @@ export function setupFortifier(ctx){
     const w={kind,mesh,at:at.clone(),yaw,width,height,depth:kind==='sandbag'?16:12,dyn,hits,maxHits:hits,age:0,shake:0,touched:0,group,
       // local frame: x along the wall, z out through the zombies' side
       ax:new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw)),az:new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw))};
+    if(pool){w.pool=pool;delete w.hits;delete w.maxHits;Object.defineProperty(w,'hits',{get:()=>pool.hits,set:v=>{pool.hits=v;}});Object.defineProperty(w,'maxHits',{get:()=>pool.maxHits});}
     walls.push(w);return w;
   }
   function raise(fresh){
@@ -114,9 +117,9 @@ export function setupFortifier(ctx){
       else placed.push(addSegment('steel',ground(at),facing,a.width,a.height,a.health,++deployId));
     }else if(act.id==='nest'){
       // around your feet, open behind (a full ring with Ring of Steel)
-      const id=++deployId,angles=a.segments>3?[0,Math.PI/2,Math.PI,-Math.PI/2]:[0,Math.PI/2,-Math.PI/2];
+      const id=++deployId,angles=a.segments>3?[0,Math.PI/2,Math.PI,-Math.PI/2]:[0,Math.PI/2,-Math.PI/2],pool={hits:a.health,maxHits:a.health};
       for(const ang of angles){const yaw=facing+ang,dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-        placed.push(addSegment('sandbag',ground(feet.clone().addScaledVector(dir,a.radius)),yaw,a.width,a.height,a.health,id));}
+        placed.push(addSegment('sandbag',ground(feet.clone().addScaledVector(dir,a.radius)),yaw,a.width,a.height,a.health,id,pool));}
     }else if(act.id==='snare'){
       const at=ahead(a.radius+60);
       const spots=a.count>1?[at.clone().addScaledVector(side,-a.radius*1.05),at.clone().addScaledVector(side,a.radius*1.05)]:[at];
@@ -182,7 +185,8 @@ export function setupFortifier(ctx){
   // ---- a zombie strikes a wall or sandbags ---------------------------------------------------------
   function strike(w,z){
     const s=S();
-    w.hits-=z.kind==='dog'?.5:1;w.shake=.25;w.touched=1.5;audio.play('board',.35);
+    w.hits-=z.kind==='dog'?.5:1;audio.play('board',.35);
+    for(const o of w.pool?walls.filter(o=>o.pool===w.pool):[w]){o.shake=.25;o.touched=1.5;}   // the whole nest feels it
     if(execute(z))return;
     const face=z.root.position.clone().addScaledVector(up,40);
     if(s['fort.shock']){zap(w.at.clone().addScaledVector(up,w.height*.8),face);hurt(z,full()*.15);
@@ -228,6 +232,9 @@ export function setupFortifier(ctx){
     api.toast?.('Last Stand: your fortification took it',1.6);audio.play('board',.7);
   });
 
+  // one entry per independent pool of hits (a wall, or a whole nest)
+  const unique=()=>walls.filter((w,i)=>!w.pool||walls.findIndex(o=>o.pool===w.pool)===i);
+
   // ---- per frame ---------------------------------------------------------------------------------
   const L=new THREE.Vector3();let ammoT=0;
   host.on('update',dt=>{
@@ -245,7 +252,7 @@ export function setupFortifier(ctx){
       w.mesh.scale.y=Math.min(1,w.age/.35);w.shake=Math.max(0,w.shake-dt);
       w.mesh.position.copy(w.at).addScaledVector(w.ax,Math.sin(w.age*70)*w.shake*3);
       w.mesh.userData.tint?.color.setScalar(.55+.45*Math.max(0,w.hits/w.maxHits));
-      if(s['fort.regen']&&w.touched<=0&&w.hits<w.maxHits)w.hits=Math.min(w.maxHits,w.hits+2*dt);
+      if(s['fort.regen']&&w.touched<=0&&w.hits<w.maxHits&&(!w.pool||walls.find(o=>o.pool===w.pool)===w))w.hits=Math.min(w.maxHits,w.hits+2*dt);
       if(w.hits<=0){removeWall(w,true);continue;}
       // hold zombies at the face: in the wall's frame, push anything inside the slab back to the side it came from
       const half=w.width/2+14,depth=w.depth;
@@ -276,8 +283,10 @@ export function setupFortifier(ctx){
   return {deploy,walls,snares,mines,
     near:(f,r)=>walls.some(w=>w.at.distanceTo(f)<r)||snares.some(s=>s.at.distanceTo(f)<r),
     // Field Repairs (mod.js, each new round): hits back on walls and sandbags, wear back on the wire
-    repair:n=>{for(const w of walls)w.hits=Math.min(w.maxHits,w.hits+n);for(const s of snares)s.wear=Math.min(s.maxWear,s.wear+n*1.5);},
+    repair:n=>{for(const w of unique())w.hits=Math.min(w.maxHits,w.hits+n);for(const s of snares)s.wear=Math.min(s.maxWear,s.wear+n*1.5);},
     up:()=>walls.length>0||snares.length>0,
     // the HUD shows what's left: wall hits, or the wire's wear
-    left:()=>walls.length?Math.ceil(walls.reduce((a,w)=>a+Math.max(0,w.hits),0)):snares.length?Math.ceil(snares.reduce((a,s)=>a+s.wear,0)):0};
+    // the HUD bar: what's left of the whole deployment, 0..1
+    health:()=>{const u=unique();if(u.length)return u.reduce((a,w)=>a+Math.max(0,w.hits),0)/u.reduce((a,w)=>a+w.maxHits,0);if(snares.length)return snares.reduce((a,s)=>a+s.wear,0)/snares.reduce((a,s)=>a+s.maxWear,0);return 0;},
+    left:()=>walls.length?Math.ceil(unique().reduce((a,w)=>a+Math.max(0,w.hits),0)):snares.length?Math.ceil(snares.reduce((a,s)=>a+s.wear,0)):0};
 }

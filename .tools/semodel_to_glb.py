@@ -67,7 +67,7 @@ def mat4(t, q):   # column-major TRS (no scale)
 def inv_rigid(t, q):
     qi = qinv(q); ti = qrot(qi, (-t[0], -t[1], -t[2])); return mat4(ti, qi)
 
-def to_glb(model, out, tex_dir=None, texture_loader=None, rename=None):
+def to_glb(model, out, tex_dir=None, texture_loader=None, rename=None, glow=None, glow_maps=None):
     """texture_loader(name, kind) -> (bytes, mime) or None, kind in diffuse/normal/rough;
     rename: {old bone name: new} (e.g. BO3 hands' tag_weapon_right -> tag_weapon)."""
     rename = rename or {}
@@ -123,11 +123,39 @@ def to_glb(model, out, tex_dir=None, texture_loader=None, rename=None):
             if p.exists(): got = (p.read_bytes(), 'image/png')
         tex_index[key] = embed(*got) if got else None
         return tex_index[key]
+    glow_tex = None
+    def radial():   # soft white spot with alpha falloff, for BO3's effect-only glow cards
+        import zlib
+        n = 64; rows = b''
+        for y in range(n):
+            rows += b'\0'
+            for x in range(n):
+                d = min(1, math.hypot(x-n/2+.5, y-n/2+.5)/(n/2)); a = int(255*(1-d)**2)
+                rows += bytes([255, 255, 255, a])
+        chunk = lambda t, d: struct.pack('>I', len(d))+t+d+struct.pack('>I', zlib.crc32(t+d) & 0xffffffff)
+        return b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR', struct.pack('>IIBBBBB', n, n, 8, 6, 0, 0, 0))+chunk(b'IDAT', zlib.compress(rows))+chunk(b'IEND', b'')
     for m in model['materials']:
         mat = {'name': m['name'], 'pbrMetallicRoughness': {'metallicFactor': 0, 'roughnessFactor': .7}}
+        if 'fullalpha' in (m.get('diffuse') or ''):
+            # BO3 draws these (light cards, glow shells) with an effect shader; its colour slot is blank.
+            # Show them as a soft emissive spot that fades out, so they don't render as solid boxes.
+            gm = (glow_maps or {}).get(m['name'])   # (png bytes, [scroll u, v] per s, tint by gun colour?)
+            if gm:   # BO3's own glow image (pattern in its alpha), scrolled at runtime (mods/bo3-weapons: bo3glow)
+                t = embed(gm[0], 'image/png'); c = [int(glow.lstrip('#')[i:i+2], 16)/255 for i in (0, 2, 4)] if glow and gm[2] else [1, 1, 1]
+                mat.update({'alphaMode': 'BLEND', 'doubleSided': True, 'emissiveTexture': {'index': t}, 'emissiveFactor': c,
+                            'extras': {'bo3glow': {'scroll': gm[1], 'tint': gm[2]}}})
+                mat['pbrMetallicRoughness'].update({'baseColorTexture': {'index': t}, 'baseColorFactor': [0, 0, 0, 1]})
+                materials.append(mat); continue
+            mat['extras'] = {'bo3glow': {'card': True}}
+            if glow_tex is None: glow_tex = embed(radial(), 'image/png')
+            c = [int(glow.lstrip('#')[i:i+2], 16)/255 for i in (0, 2, 4)] if glow else [1, 1, 1]
+            mat.update({'alphaMode': 'BLEND', 'doubleSided': True, 'emissiveTexture': {'index': glow_tex}, 'emissiveFactor': c})
+            mat['pbrMetallicRoughness'].update({'baseColorTexture': {'index': glow_tex}, 'baseColorFactor': [0, 0, 0, 1]})
+            materials.append(mat); continue
         d = texture(m.get('diffuse'), 'diffuse'); n = texture(m.get('normal'), 'normal')
         r = texture((m.get('diffuse') or '').replace('_c.png', '_g.png'), 'rough') if m.get('diffuse') else None
         if d is not None: mat['pbrMetallicRoughness']['baseColorTexture'] = {'index': d}
+        elif 'black_color' in (m.get('diffuse') or ''): mat['pbrMetallicRoughness']['baseColorFactor'] = [.02, .02, .02, 1]   # BO3's built-in $black_color
         if n is not None: mat['normalTexture'] = {'index': n}
         if r is not None: mat['pbrMetallicRoughness']['metallicRoughnessTexture'] = {'index': r}; mat['pbrMetallicRoughness']['roughnessFactor'] = 1
         materials.append(mat)
@@ -149,6 +177,9 @@ def to_glb(model, out, tex_dir=None, texture_loader=None, rename=None):
         idx = b''.join(struct.pack('<III', f[0], f[2], f[1]) for f in m['faces'])   # CoD winding is clockwise
         prim = {'attributes': attrs, 'indices': add(idx, 5125, 'SCALAR', len(m['faces'])*3, 34963)}
         if m['mats'] and 0 <= m['mats'][0] < len(materials): prim['material'] = m['mats'][0]
+        src = model['materials'][prim['material']] if 'material' in prim else {}
+        if materials[prim.get('material', 0)]['name'].startswith('mtl_hud'): continue   # in-world HUD screens (need BO3's live UI)
+        if 'diffuse' in src and not src['diffuse'] and not src.get('normal'): continue   # no images at all: shader-only (sight reticles), would render white
         prims.append(prim)
     mesh_node = len(nodes); nodes.append({'name': 'mesh', 'mesh': 0})
     gltf = {'asset': {'version': '2.0', 'generator': 'semodel_to_glb.py'}, 'scene': 0,

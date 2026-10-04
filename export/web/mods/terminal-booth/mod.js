@@ -9,6 +9,7 @@
 //
 // window.kino.terminalBooth exposes the booths for other mods:
 //   .booths[i].print(line)  .booths[i].setSign(text)  .booths[i].root
+//   .booths[i].tapScreen.set(lines)  (the beer tap's screen: what's on tap, e.g. the Wunderfizz's perk)
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
@@ -58,7 +59,8 @@ export default async function setup(api){
   function collide(root){
     if(!world.dynamic)return;
     // The body and the keyboard ledge; the hoses on the floor are left walkable.
-    const g=new THREE.BoxGeometry(44,100,30).translate(0,50,15).applyMatrix4(root.matrixWorld);
+    // 44 wide, plus the beer tap on the left wing (out to local x −31)
+    const g=new THREE.BoxGeometry(53,100,30).translate(-4.5,50,15).applyMatrix4(root.matrixWorld);
     g.computeBoundingBox();
     // window:true keeps setDoors from treating it as a door; the player still collides.
     world.dynamic.push({collider:new CollisionWorld(g),box:g.boundingBox.clone(),enabled:true,window:true,note:'terminal booth'});
@@ -77,9 +79,11 @@ export default async function setup(api){
       const n=o.name,m=o.material;
       o.castShadow=o.receiveShadow=true;
       if(n==='crt_screen'){b.screen=screen(cfg.screen);o.material=b.screen.material;o.castShadow=false;}
+      else if(n==='tap_screen'){b.tapScreen=tapScreen();o.material=b.tapScreen.material;o.castShadow=false;}
       else if(n==='sign_glow'){b.sign=sign(cfg.sign??'MelonTerm 2.7');o.material=b.sign.material;o.castShadow=false;}
       else if(/^glass/.test(n)||/glass/.test(m.name)){o.material=m.clone();Object.assign(o.material,{transparent:true,depthWrite:false,opacity:.18,roughness:.08,metalness:0});o.material.color.set('#1a2828');o.renderOrder=2;o.castShadow=false;}
-      else if(/^coolant/.test(n)){o.material=m.clone();const t=flowTexture();o.material.emissiveMap=t;o.material.emissive.set('#2ef2ff');o.material.emissiveIntensity=2.2;o.castShadow=false;b.coolant.push({mat:o.material,tex:t});}
+      else if(/^coolant/.test(n)){o.material=m.clone();const t=flowTexture();o.material.emissiveMap=t;if(!/tap/.test(n))o.material.emissive.set('#2ef2ff');   // the tap's beer line keeps its amber
+        o.material.emissiveIntensity=2.2;o.castShadow=false;b.coolant.push({mat:o.material,tex:t});}
       else if(/^led_/.test(n)){o.material=m.clone();o.castShadow=false;b.leds.push(ledFor(n,o.material));}
       else if(/^wire_/.test(n)&&LIVE.test(n)&&WIRE_COLOR[m.name]){
         o.material=m.clone();const t=pulseTexture().clone();t.repeat.set(4+Math.random()*4,1);t.offset.x=Math.random();
@@ -137,6 +141,28 @@ export default async function setup(api){
   }
 
   // ----------------------------------------------------------------- sign
+  // The beer tap's little screen (tap_screen): vertical neon text, ready for the Wunderfizz
+  // to show what's on tap. b.tapScreen.set(lines) replaces it.
+  function tapScreen(){
+    const c=document.createElement('canvas');c.width=128;c.height=512;const g=c.getContext('2d');
+    const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;
+    const material=new THREE.MeshStandardMaterial({color:0x000000,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:1.3,roughness:.3});
+    let lines=['ON','TAP'],t=0,scan=0;
+    function draw(power){
+      g.fillStyle='#07020a';g.fillRect(0,0,128,512);
+      g.strokeStyle='#ff2fd055';g.lineWidth=3;g.strokeRect(6,6,116,500);
+      const text=lines.join(' ').split('');g.textAlign='center';g.textBaseline='middle';
+      const step=Math.min(64,440/Math.max(1,text.length));g.font=`bold ${Math.round(step*.9)}px "Arial Narrow", Arial, sans-serif`;
+      text.forEach((ch,i)=>{const y=40+i*step;g.shadowColor='#ff2fd0';g.shadowBlur=18;g.fillStyle=power?'#ffd2f4':'#5a2a50';g.fillText(ch,64,y);g.shadowBlur=0;});
+      g.fillStyle='#2ef2ff';g.fillRect(14,492,100*(.5+.5*Math.sin(t*1.7)),4);   // a little level bar
+      g.fillStyle='rgba(255,255,255,.06)';for(let y=(scan%8);y<512;y+=8)g.fillRect(0,y,128,2);
+      tex.needsUpdate=true;
+    }
+    draw(true);
+    return {material,set:l=>{lines=[].concat(l).map(String);draw(true);},
+      update:(dt,power)=>{t+=dt;scan+=dt*20;material.emissiveIntensity=(power?1.3:.35)*(.95+Math.random()*.05);if(Math.floor(t*6)!==Math.floor((t-dt)*6))draw(power);}};
+  }
+
   function sign(text){
     // A weathered sign: chipped and scratched letters, grime and drips over the
     // face, and one failing letter that stutters on its own.
@@ -223,7 +249,7 @@ export default async function setup(api){
   // ----------------------------------------------------------------- leds
   function ledFor(name,mat){
     const base=/strip/.test(name)?2:(mat.emissiveIntensity||4);mat.emissiveIntensity=base*.6;
-    const mode=/power|strip/.test(name)?'steady':/kb/.test(name)?'busy':/jbox/.test(name)?'blink':/lamp/.test(name)?'lamp':'slow';
+    const mode=/tapstrip|tap_handle/.test(name)?'neon':/power|strip/.test(name)?'steady':/kb/.test(name)?'busy':/jbox/.test(name)?'blink':/lamp/.test(name)?'lamp':'slow';
     return {mat,base:base*.6,mode,t:Math.random()*3,on:true};
   }
   function updateLed(l,dt,power){
@@ -232,6 +258,7 @@ export default async function setup(api){
     else if(l.mode==='blink')k=l.t%1<.5?1:.05;
     else if(l.mode==='slow')k=.55+.45*Math.sin(l.t*2.2);
     else if(l.mode==='lamp')k=.92+Math.random()*.08;
+    else if(l.mode==='neon'){if(l.flick>0){l.flick-=dt;k=Math.random()<.5?.15:1;}else{k=.96+Math.random()*.04;if(Math.random()<dt*.08)l.flick=.15+Math.random()*.3;}}   // neon: steady, now and then a stutter
     else k=.95+Math.random()*.05;
     if(!power)k*=l.mode==='blink'||l.mode==='steady'?.6:.04;
     l.mat.emissiveIntensity=l.base*k;
@@ -353,7 +380,7 @@ export default async function setup(api){
     const power=!!session.power;
     for(const b of booths){
       b.t+=dt;
-      b.screen?.update(dt,power);b.sign?.update(dt,power);
+      b.screen?.update(dt,power);b.sign?.update(dt,power);b.tapScreen?.update(dt,power);
       for(const l of b.leds)updateLed(l,dt,power);
       for(const w of b.wires){w.tex.offset.x-=dt*w.speed*(power?1:.25);
         let k=power?1:.15;if(w.flash){w.flash-=dt;k=6;if(w.flash<=0)w.flash=0;}w.mat.emissiveIntensity=1.8*k;}

@@ -50,6 +50,10 @@
       "level": 12
     },
     {
+      "id": "bo3_g18_death",
+      "level": 12
+    },
+    {
       "id": "mpl_zm",
       "level": 13
     },
@@ -66,12 +70,20 @@
       "level": 18
     },
     {
+      "id": "bo3_p90_orbit",
+      "level": 18
+    },
+    {
       "id": "golden_python_zm",
       "level": 20
     },
     {
       "id": "galil_zm",
       "level": 21
+    },
+    {
+      "id": "bo3_m1014_jellyfish",
+      "level": 22
     },
     {
       "id": "commando_zm",
@@ -90,12 +102,20 @@
       "level": 28
     },
     {
+      "id": "bo3_aug_octopus",
+      "level": 28
+    },
+    {
       "id": "python_zm",
       "level": 30
     },
     {
       "id": "dragunov_zm",
       "level": 32
+    },
+    {
+      "id": "bo3_mr23_tesla",
+      "level": 33
     },
     {
       "id": "rpk_zm",
@@ -123,6 +143,10 @@
     },
     {
       "id": "minigun_zm",
+      "level": 47
+    },
+    {
+      "id": "tesla_gun_zm",
       "level": 47
     },
     {

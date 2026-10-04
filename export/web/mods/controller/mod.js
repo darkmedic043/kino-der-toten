@@ -20,7 +20,7 @@ export default async function setup(api){
 const key=(code,down)=>{const e=new KeyboardEvent(down?'keydown':'keyup',{code,key:code,bubbles:true,cancelable:true});e.remapped=true;(document.body??window).dispatchEvent(e);};
   const mouse=(button,down)=>renderer.domElement.dispatchEvent(new MouseEvent(down?'mousedown':'mouseup',{button,bubbles:true,cancelable:true}));
   const held=new Map();   // button -> what it is holding down (a key code or a mouse button)
-  let prev=[],sprintLatch=false,useHeld=false,lastT=performance.now(),shots=api.session?.shots??0;
+  let prev=[],sprintLatch=false,useHeld=false,reloadHeld=false,lastT=performance.now(),shots=api.session?.shots??0;
   const style=document.createElement('style');
   style.textContent='body.using-pad #prompt kbd{font-size:0}body.using-pad #prompt kbd::after{content:"X";font-size:12px}';
   document.head.append(style);
@@ -28,7 +28,7 @@ const key=(code,down)=>{const e=new KeyboardEvent(down?'keydown':'keyup',{code,k
   addEventListener('gamepaddisconnected',()=>{release();api.toast?.('Controller disconnected',2);});
   // Mouse or keyboard use hands the prompts back to keyboard glyphs.
   for(const t of ['mousemove','keydown'])addEventListener(t,e=>{if(!e.remapped&&e.isTrusted)document.body.classList.remove('using-pad');},true);
-  function release(){for(const [,h] of held)typeof h==='number'?mouse(h,false):key(h,false);held.clear();if(sprintLatch)key('ShiftLeft',false);sprintLatch=false;pad.move.forward=pad.move.strafe=0;}
+  function release(){for(const [,h] of held)typeof h==='number'?mouse(h,false):key(h,false);held.clear();if(reloadHeld)key('KeyR',false);reloadHeld=false;if(sprintLatch)key('ShiftLeft',false);sprintLatch=false;pad.move.forward=pad.move.strafe=0;}
   const hold=(b,what,down)=>{if(down&&!held.has(b)){held.set(b,what);typeof what==='number'?mouse(what,true):key(what,true);}else if(!down&&held.has(b)){const h=held.get(b);held.delete(b);typeof h==='number'?mouse(h,false):key(h,false);}};
   const stick=(x,y)=>{const m=Math.hypot(x,y);if(m<DEAD)return [0,0];const k=Math.min(1,(m-DEAD)/(1-DEAD))/m;return [x*k,y*k];};
   const rumble=(gp,strong,weak,ms)=>gp?.vibrationActuator?.playEffect?.('dual-rumble',{duration:ms,strongMagnitude:strong,weakMagnitude:weak}).catch(()=>{});
@@ -65,8 +65,9 @@ const key=(code,down)=>{const e=new KeyboardEvent(down?'keydown':'keyup',{code,k
     for(const [i,code] of Object.entries(KEYS))hold(+i,code,b[+i]);
     // X: hold to use when there's a prompt (buy, repair, Pack-a-Punch), otherwise tap to reload.
     if(pressed(RELOAD)){const prompt=document.getElementById('prompt')?.textContent.trim();
-      if(prompt&&!/secured/i.test(prompt)){useHeld=true;key('KeyF',true);}else{key('KeyR',true);key('KeyR',false);}}
+      if(prompt&&!/secured/i.test(prompt)){useHeld=true;key('KeyF',true);}else{reloadHeld=true;key('KeyR',true);}}   // held: inspect (mods/inspect)
     if(useHeld&&!b[RELOAD]){useHeld=false;key('KeyF',false);}
+    if(reloadHeld&&!b[RELOAD]){reloadHeld=false;key('KeyR',false);}
     // Light kick on each shot.
     const s=api.session?.shots??0;if(s>shots)rumble(gp,.15,.35,45);shots=s;
     prev=b;

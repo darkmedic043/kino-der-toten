@@ -209,6 +209,7 @@ M = dict(
     hose=grimy('hose', '#2a2b2a', .7, 0, wear=0.36, grime=0.65, bare='#4a4c4a', rust=0.14, bare_metal=False),
     gauge=grimy('gauge', '#d9d2bd', .45, 0, wear=0, grime=0.65, rust=0, bare_metal=False),
     red=grimy('red', '#8f1d15', .5, 0, wear=0.49, grime=0.52),
+    chrome=grimy('chrome', '#17191c', .22, 1, wear=0.2, grime=0.45, rust=0),   # the beer tap's black chrome
 )
 MX = dict(
     glass=plain('glass', '#9fb8b4', .08, 0, alpha=.16),
@@ -224,6 +225,12 @@ MX = dict(
     w_red=plain('wire_red', '#8c1a12', .45), w_yel=plain('wire_yellow', '#b98d12', .45),
     w_blu=plain('wire_blue', '#1d3f8c', .45), w_grn=plain('wire_green', '#1e6b2c', .45),
     w_wht=plain('wire_white', '#c9c4b5', .45), w_blk=plain('wire_black', '#141414', .6),
+    # the beer tap: neon trim, the beer line, the pint, its little screen
+    tap_pink=plain('tap_neon_pink', '#330022', .3, 0, emit='#ff2fd0', strength=9),
+    tap_cyan=plain('tap_neon_cyan', '#002a30', .3, 0, emit='#2ef2ff', strength=9),
+    beer=plain('beer', '#7a4208', .15, 0, emit='#ffab2e', strength=3.0),
+    foam=plain('foam', '#f2ead8', .7),
+    tap_screen=plain('tap_screen', '#05040a', .2, 0, emit='#ff2fd0', strength=1.5),
 )
 
 
@@ -782,6 +789,66 @@ for i, y in enumerate((-8.5, -14.5)):
         cyl('tube_cap', 2.1, 1.8, M['brass'], (x, y, z), seg=18)
         box('tube_arm', 19.6, x - 1.5, y - .6, y + .6, z - .5, z + .5, M['dsteel'], .15)
     cyl('tube_valve', .6, 2.6, M['copper'], (x, y, 78), seg=10)
+# ------------------------------------------------- cyberpunk beer tap (left wing)
+# A tap tower bolted to the outside of the left wing: black chrome, pink/cyan neon
+# trim, a glowing beer line, a grated drip tray with a pint under the spout, and a
+# small screen on the tower (tap_screen, 0..1 UVs) for the game to draw on (the
+# future Wunderfizz: perks on tap). Live parts follow the booth's naming: led_*
+# (lights; "strip" = steady), glass_* (transparent), coolant_* (scrolling flow).
+GROUP = 'front'
+TX, TY = -21.0, -15.5           # the wing's outside face, and the tap's centre line
+box('tap_bracket', TX - .9, TX + .3, -21, -10, 27, 64, M['dsteel'], .3)
+for y in (-20.2, -10.8):
+    for z in (28.2, 62.8):
+        cyl('tap_bolt', .45, .5, M['steel'], (TX - 1.05, y, z), axis=(1, 0, 0), seg=6, bev=.08)
+# drip tray on two struts, a grate on top and a neon lip
+box('tap_tray', TX - 9.5, TX - .9, TY - 4.5, TY + 4.5, 29.5, 31.2, M['dsteel'], .35)
+for i in range(7):
+    y = TY - 3.6 + i * 1.2
+    box('tap_grate', TX - 9, TX - 1.4, y - .25, y + .25, 31.2, 31.6, M['steel'], .08, 1)
+for y in (TY - 3.5, TY + 3.5):
+    box('tap_strut', -.35, .35, -.35, .35, 0, 9.5, M['dsteel'], .12, 1,
+        mw=Matrix.Translation((TX - 1.2, y, 22)) @ Matrix.Rotation(math.radians(-40), 4, 'Y'))
+box('led_tapstrip_tray', TX - 9.4, TX - 1.2, TY - 4.65, TY - 4.45, 29.9, 30.7, MX['tap_pink'], 0, bake=False)
+box('led_tapstrip_tray2', TX - 9.7, TX - 9.5, TY - 4.3, TY + 4.3, 29.9, 30.7, MX['tap_pink'], 0, bake=False)
+# the tower, its neon edges and its screen
+box('tap_tower', TX - 4.6, TX - .9, TY - 2.2, TY + 2.2, 31.6, 60, M['chrome'], .45)
+for y in (TY - 2.25, TY + 2.25):
+    box('led_tapstrip_edge', TX - 4.7, TX - 4.4, y - .12, y + .12, 33, 58.5, MX['tap_cyan'], 0, bake=False)
+for z in (34, 57):
+    box('tap_band', TX - 4.8, TX - .8, TY - 2.4, TY + 2.4, z, z + 1.1, M['brass'], .2, 1)
+bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap')
+sx = TX - 4.62
+vs = [bm.verts.new(p) for p in ((sx, TY + 1.7, 37.5), (sx, TY - 1.7, 37.5), (sx, TY - 1.7, 54), (sx, TY + 1.7, 54))]
+f = bm.faces.new(vs)
+for l, u in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+    l[uvl].uv = u
+bm.normal_update()
+if f.normal.x > 0:
+    f.normal_flip()
+finish('tap_screen', bm, MX['tap_screen'], bake=False)
+# the crown over the tray, the spout, and a tall handle with a neon core
+box('tap_crown', TX - 9, TX - .9, TY - 1.7, TY + 1.7, 59, 62, M['chrome'], .5)
+box('led_tapstrip_crown', TX - 8.9, TX - 1.5, TY - 1.8, TY - 1.65, 59.6, 60, MX['tap_pink'], 0, bake=False)
+cyl('tap_spout', .75, 4.2, M['chrome'], (TX - 7.6, TY, 56.9), seg=14, r2=.55)
+cyl('tap_spout_tip', .85, .7, M['brass'], (TX - 7.6, TY, 54.8), seg=14, bev=.05)
+cyl('tap_handle_base', 1.0, 1.2, M['brass'], (TX - 7.6, TY, 62.6), seg=14)
+cyl('glass_tap_handle', 1.05, 8, MX['glass'], (TX - 7.6, TY, 67.2), seg=16, r2=1.3, bev=0, bake=False)
+cyl('led_tap_handle', .45, 7.2, MX['tap_cyan'], (TX - 7.6, TY, 67.2), seg=10, bev=0, bake=False)
+cyl('tap_handle_cap', 1.4, .9, M['chrome'], (TX - 7.6, TY, 71.5), seg=16)
+# the beer line: a glass tube up the tower's side with glowing beer in it, fed by a hose from the wing
+cyl('glass_tapline', 1.15, 26, MX['glass'], (TX - 2.75, TY + 2.95, 45.5), seg=14, bev=0, bake=False)
+cyl('coolant_tap', .8, 25.6, MX['beer'], (TX - 2.75, TY + 2.95, 45.5), seg=12, bev=0, bake=False)
+for z in (32.8, 58.2):
+    cyl('tap_line_cap', 1.45, 1.1, M['brass'], (TX - 2.75, TY + 2.95, z), seg=14)
+hose('tap_hose', [(TX - 2.75, TY + 2.95, 32.2), (TX - 2.2, TY + 4.5, 28.5), (TX - .6, TY + 5.5, 26.5), (TX + .4, TY + 5.5, 25)], .55, pitch=.4)
+# a pint under the spout
+cyl('glass_pint', 1.55, 5.6, MX['glass'], (TX - 7.6, TY, 34.45), seg=18, r2=1.85, bev=0, bake=False)
+cyl('tap_beer', 1.4, 4.4, MX['beer'], (TX - 7.6, TY, 33.95), seg=16, r2=1.62, bev=0, bake=False)
+cyl('tap_foam', 1.66, .8, MX['foam'], (TX - 7.6, TY, 36.55), seg=16, bev=.25, bake=False)
+sphere('led_tap_status', .35, (TX - 4.75, TY, 55.6), MX['led_g'], 8, bake=False)
+GROUP = 'shell'
+
 # coolant UVs: v along height so the game can scroll the flow
 for ob in LOOSE:
     if ob.name.startswith('coolant_'):
@@ -964,7 +1031,8 @@ if RENDER:
         L.rotation_euler = (Vector((0, 0, 50)) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler()
     views = {'full': ((70, -150, 75), (0, -10, 55), 32, (900, 1200)),
              'terminal': ((22, -52, 64), (0, -14, 48), 40, (1200, 900)),
-             'keys': ((6, -38, 52), (0, -16, 40), 35, (1200, 800))}
+             'keys': ((6, -38, 52), (0, -16, 40), 35, (1200, 800)),
+             'tap': ((-62, -58, 62), (-26, -14, 47), 42, (1100, 1100))}
     for name, (loc, tgt, lens, res) in views.items():
         cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); COL.objects.link(cam)
         cam.location = loc; cam.data.lens = lens; cam.data.clip_end = 2000

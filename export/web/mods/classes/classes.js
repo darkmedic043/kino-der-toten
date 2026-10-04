@@ -119,7 +119,8 @@ export function actionStats(cls,state){
   switch(act.id){
     case 'wall':return {...common,health:Math.round(b.health*dur*(two?.75:1)),width:b.width*size,height:b.height,count:two?2:1};
     case 'snare':return {...common,radius:b.radius*size,durability:Math.round(b.durability*dur),damage:b.damage*dmg,tick:.5/rate,slow:Math.min(.85,b.slow+slow),count:two?2:1};
-    case 'nest':return {...common,health:Math.round(b.health*dur*(two?1.75:1)),radius:b.radius*size,width:b.width*size,height:b.height,segments:k('nest.ring')?4:3};
+    case 'nest':return {...common,health:Math.round(b.health*(k('nest.ring')?4:3)*dur*(two?1.75:1)),   // one pool for the whole nest
+      radius:b.radius*size,width:b.width*size,height:b.height,segments:k('nest.ring')?4:3};
     case 'drone':{const n=(1+k('drone.count'))*(two?2:1);return {...common,duration:b.duration*dur*(two?.75:1),damage:b.damage*dmg*(n>1?.7:1),rate:b.rate*rate,range:b.range*size,count:n};}
     case 'mortar':{const sus=k('mortar.sustain');return {...common,count:two?2:1,duration:b.duration*dur*(1+sus)*(two?.75:1),damage:b.damage*dmg,interval:b.interval/rate*(sus?.75:1),range:b.range*size,radius:b.radius*size};}
     default:return {...common,duration:b.duration*dur*(two?.75:1),damage:b.damage*dmg,rate:b.rate*rate,range:b.range*size,count:two?2:1};
@@ -132,7 +133,7 @@ export function actionRows(cls,state,a){
   switch(act.id){
     case 'wall':return [cdRow,['LASTS','UNTIL BROKEN',false],['HITS',String(a.health),a.health!==b.health],['WIDTH',String(Math.round(a.width)),up(a.width,b.width)],['DAMAGE',pct(a.dmgMul-1)==='0%'?'—':'+'+pct(a.dmgMul-1),a.dmgMul>1],['WALLS',String(a.count),a.count>1]];
     case 'snare':return [cdRow,['LASTS','UNTIL WORN',false],['WEAR',a.durability+' zombie-s',a.durability!==b.durability],['DAMAGE',pct(a.damage)+'/s',up(a.damage,b.damage)],['SLOW',pct(a.slow),up(a.slow,b.slow)],['RADIUS',String(Math.round(a.radius)),up(a.radius,b.radius)]];
-    case 'nest':return [cdRow,['LASTS','UNTIL BROKEN',false],['HITS / WALL',String(a.health),a.health!==b.health],['RADIUS',String(Math.round(a.radius)),up(a.radius,b.radius)],['DAMAGE',pct(a.dmgMul-1)==='0%'?'—':'+'+pct(a.dmgMul-1),a.dmgMul>1],['WALLS',String(a.segments),a.segments>3]];
+    case 'nest':return [cdRow,['LASTS','UNTIL BROKEN',false],['HITS (WHOLE NEST)',String(a.health),false],['RADIUS',String(Math.round(a.radius)),up(a.radius,b.radius)],['DAMAGE',pct(a.dmgMul-1)==='0%'?'—':'+'+pct(a.dmgMul-1),a.dmgMul>1],['WALLS',String(a.segments),a.segments>3]];
     case 'drone':return [cdRow,['DURATION',sec(a.duration),up(a.duration,b.duration)],['DAMAGE',pct(a.damage),up(a.damage,b.damage)],['FIRE RATE',a.rate.toFixed(1)+'/s',up(a.rate,b.rate)],['RANGE',String(Math.round(a.range)),up(a.range,b.range)],['DRONES',String(a.count),a.count>1]];
     case 'mortar':return [cdRow,['DURATION',sec(a.duration),up(a.duration,b.duration)],['DAMAGE',pct(a.damage),up(a.damage,b.damage)],['SHELL EVERY',a.interval.toFixed(1)+'s',up(a.interval,b.interval)],['BLAST',String(Math.round(a.radius)),up(a.radius,b.radius)],['BEACONS',String(a.count),a.count>1]];
     default:return [cdRow,['DURATION',sec(a.duration),up(a.duration,b.duration)],['DAMAGE',pct(a.damage),up(a.damage,b.damage)],['FIRE RATE',a.rate.toFixed(1)+'/s',up(a.rate,b.rate)],['RANGE',String(Math.round(a.range)),up(a.range,b.range)],slowRow];

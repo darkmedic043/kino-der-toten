@@ -11,7 +11,8 @@
     "optic": "Optic",
     "muzzle": "Muzzle",
     "mag": "Magazine",
-    "under": "Underbarrel"
+    "under": "Underbarrel",
+    "laser": "Laser"
   },
   "mountTags": [
     "tag_scope_rail",
@@ -67,7 +68,7 @@
         "tag_suppressor",
         "tag_silencer"
       ],
-      "desc": "Much quieter shots. Kills are a little more likely to drop a power-up. \u221215% damage and range.",
+      "desc": "Much quieter shots. Kills are a little more likely to drop a power-up. −15% damage and range.",
       "stats": {
         "damageMul": 0.85,
         "rangeMul": 0.85,
@@ -93,7 +94,8 @@
       "slot": "under",
       "tags": [
         "tag_grip",
-        "tag_foregrip"
+        "tag_foregrip",
+        "tag_foregripd"
       ],
       "desc": "Hip fire spreads 45% less.",
       "stats": {
@@ -135,7 +137,7 @@
         "tag_scope_colt"
       ],
       "scope": "acog",
-      "desc": "4\u00d7 scope with an illuminated chevron. +25% headshot damage.",
+      "desc": "4× scope with an illuminated chevron. +25% headshot damage.",
       "stats": {
         "adsFov": 30,
         "headMul": 1.25
@@ -226,9 +228,45 @@
         "tag_scope",
         "tag_scope_g11"
       ],
-      "desc": "Swaps the stock scope for a variable zoom: mouse wheel steps 4\u00d7\u201310\u00d7 while scoped.",
+      "desc": "Swaps the stock scope for a variable zoom: mouse wheel steps 4×–10× while scoped.",
       "stats": {
         "adsFov": 16
+      }
+    },
+    {
+      "id": "holo",
+      "name": "Holographic Sight",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A wide holographic window with a glowing reticle. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.9
+      }
+    },
+    {
+      "id": "reflex2x",
+      "name": "2× Reflex",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A reflex sight with a 2× lens: noticeably tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.72
+      }
+    },
+    {
+      "id": "laser",
+      "name": "Laser Sight",
+      "slot": "laser",
+      "tags": [
+        "tag_sra",
+        "tag_sra1",
+        "tag_laser_box"
+      ],
+      "desc": "Tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.65
       }
     }
   ],
@@ -270,6 +308,13 @@
     ],
     "rpk_zm": [
       "tag_rear_sight"
+    ],
+    "bo3_aug_octopus": [
+      "tag_up",
+      "tag_down"
+    ],
+    "bo3_m1014_jellyfish": [
+      "tag_up"
     ]
   },
   "_ironSightsNote": "Iron sights (front and rear) removed when an optic is fitted, so the front post doesn't show through the sight window. On the M16/Commando the bone is the carry handle with the front post; on the FAMAS it's the handle."

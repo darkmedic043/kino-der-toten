@@ -172,6 +172,8 @@ export class ViewWeapon {
     const bob=moving&&this.mode!=='melee'?(1-this.aim)*.13:0;
     this.pivot.position.set(Math.sin(time*(sprint?13:9))*bob,Math.cos(time*(sprint?26:18))*bob*.7,this.recoil*.25);
     this.pivot.rotation.set(this.recoil*.012,0,0);
+    // def.viewOffset [x,y,z] (view space): where the weapon rests at the hip (e.g. BO3 guns sit lower, in the corner); gone in ADS
+    if(this.def.viewOffset)this.pivot.position.add(new THREE.Vector3(...this.def.viewOffset).multiplyScalar(1-this.aim));
     // Ray Gun uses authored weapon offsets in place of sprint XAnims.
     const offsetSprint=sprint&&!this.rig.actions.sprintLoopAnim&&this.mode==='sprint';
     this.sprintBlend=THREE.MathUtils.damp(this.sprintBlend,offsetSprint?1:0,16,dt);

@@ -1,0 +1,5 @@
+{
+  "name": "Weapon inspect",
+  "description": "Hold reload to inspect your weapon. Guns with an authored inspect animation (the BO3 imports) play it; the rest turn the gun over procedurally.",
+  "script": "mod.js"
+}

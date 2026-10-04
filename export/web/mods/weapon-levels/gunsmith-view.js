@@ -6,6 +6,7 @@
 // previews it on the model. Used by the main menu and the in-game pause menu.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress } from './camo.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef } from './gunsmith.js';
 
@@ -121,6 +122,8 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     // a fitted bigger mag replaces the stock one (tag_clip), as in game
     const stock=new Set(previewDef(cat,def,id,[]).hideTags??[]),bigMag=MAG_TAGS.some(t=>stock.has(t)&&!hidden.has(t)&&gun.getObjectByName(t));
     gun.traverse(o=>{if(o.isSkinnedMesh&&domBone(o)?.name==='tag_clip')o.visible=!bigMag;});
+    // imported guns: attachment models mounted on their tags
+    if(def?.mounts){const g=gun;mountParts(g,def,previewDef(cat,def,id,ids).mounted??[],()=>gun===g);}
   }
   async function loadGun(){
     def=weapons[id];const token=id;

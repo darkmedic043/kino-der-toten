@@ -681,7 +681,7 @@
             "icon": "wall",
             "desc": "Raise a waist-high steel barricade in front of you. It stays until it's destroyed: zombies stop at it and tear at it, and you can see and shoot over it. Press again to pick it up and move it (it keeps its damage). The cooldown starts once it's destroyed.",
             "base": {
-              "cooldown": 45,
+              "cooldown": 75,
               "health": 40,
               "width": 130,
               "height": 40
@@ -895,7 +895,7 @@
             "icon": "snare",
             "desc": "Throw out a field of razor wire. Zombies in it are slowed and shredded. It stays until it's worn out by the zombies caught in it; press again to move it.",
             "base": {
-              "cooldown": 40,
+              "cooldown": 65,
               "radius": 110,
               "durability": 60,
               "damage": 0.08,
@@ -1109,9 +1109,9 @@
             "id": "nest",
             "name": "Sandbag Nest",
             "icon": "nest",
-            "desc": "Throw up a waist-high horseshoe of sandbags around you, open behind. Zombies have to tear through it, and you're harder to kill inside. It stays until every wall is down; press again to move it.",
+            "desc": "Throw up a waist-high horseshoe of sandbags around you, open behind. The whole nest shares one pool of hits: zombies tearing at any side wear it all down, and it falls together. You're harder to kill inside. It stays until it's destroyed; press again to move it.",
             "base": {
-              "cooldown": 50,
+              "cooldown": 80,
               "health": 25,
               "radius": 80,
               "width": 105,

@@ -203,9 +203,12 @@ export default async function setup(api){
     #class-skill kbd{position:absolute;left:50%;top:-11px;transform:translateX(-50%);font:600 8px/1 Arial,sans-serif;letter-spacing:1px;color:#b5ac98aa}
     #class-skill small{position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);white-space:nowrap;font:600 8px/1 Arial,sans-serif;letter-spacing:1px;color:${cls.color}aa}
     body.menu-open #class-skill{visibility:hidden}
-    #class-skill.free{position:fixed;right:250px;bottom:24px;z-index:3}`;
+    #class-skill.free{position:fixed;right:250px;bottom:24px;z-index:3}
+    #class-skill .hp{position:absolute;left:4px;right:4px;bottom:-21px;height:4px;background:#0009;border:1px solid #ffffff30;display:none}
+    #class-skill .hp i{display:block;height:100%;background:${cls.color};box-shadow:0 0 6px ${cls.color};transition:width .15s}
+    #class-skill .hp.low i{background:#e0503a;box-shadow:0 0 6px #e0503a}`;
   document.head.append(style);
-  const el=document.createElement('div');el.id='class-skill';el.innerHTML=`<span class="hex"></span><span class="cd"></span>${ICON}<b></b><kbd></kbd><small></small>`;
+  const el=document.createElement('div');el.id='class-skill';el.innerHTML=`<span class="hex"></span><span class="cd"></span>${ICON}<b></b><kbd></kbd><small></small><span class="hp"><i></i></span>`;
   const place=()=>{const cluster=document.getElementById('equip-hud');if(cluster){cluster.prepend(el);el.classList.remove('free');}else{document.body.append(el);el.classList.add('free');}};
   place();setTimeout(place,500);
   function hud(){
@@ -217,6 +220,9 @@ export default async function setup(api){
     el.querySelector('b').textContent=num;el.querySelector('svg').style.opacity=num===''?1:.18;
     el.querySelector('kbd').textContent=(binds().ability??'KeyZ').replace(/^Key/,'');
     el.querySelector('small').textContent=`${cls.name.toUpperCase()} ${state().level}`;
+    // a fortification's health (the wall, the whole nest, the wire's wear)
+    const hp=el.querySelector('.hp'),f=other?.health&&other.up()?other.health():null;hp.style.display=f==null?'none':'block';
+    if(f!=null){hp.firstChild.style.width=Math.round(Math.max(0,Math.min(1,f))*100)+'%';hp.classList.toggle('low',f<.3);}
   }
   let hudT=0;host.on('update',dt=>{if((hudT-=dt)<=0){hudT=.2;hud();}});
   hud();

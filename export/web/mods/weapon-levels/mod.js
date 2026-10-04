@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mountParts as mountGunParts } from './mounts.js';
 // Weapon levels: kills with a gun level that gun up, and each level unlocks an
 // attachment the gun's model carries (sights, suppressor, mags, grip, ACOG,
 // IR, and working underbarrels on key 5). Equip them in the main menu's
@@ -52,10 +53,14 @@ export default async function setup(api){
     const hidden=new Set(def?.hideTags??[]);
     view.gun?.traverse(o=>{if(o.isBone&&o.scale.x<1e-3&&attachmentTags.has(o.name)&&!hidden.has(o.name))o.scale.setScalar(1);});
     flamer.placePilot();
+    mountParts(def);
     applyCamo(view.gun,papLook(session.weapon)?PAP_CAMO:camoById(data.weapons[session.weapon?.id]?.camo));
     magFollow(def);
     return r;
   };
+
+  // Imported guns (mods/bo3-weapons): equipped attachment models on their tags (mounts.js)
+  const mountParts=def=>{const g=view.gun;mountGunParts(g,def,def?.mounted??[],()=>view.gun===g);};
 
   // Bigger mags hang off their own bones, which the reload animations never
   // move (they animate tag_clip, the stock mag). While one is fitted, hide the

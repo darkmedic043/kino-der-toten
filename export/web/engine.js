@@ -47,7 +47,7 @@ let lastPhase='',lastRound=0,frameTime=0,frameCount=0,fps=0,debugVisible=false,r
 const particles=[],grenades=[];
 const errors=[];
 let lastShot=null;
-let pendingMelee=null,lastReloadSerial=0,reloadShot=false;
+let pendingMelee=null,lastReloadSerial=0,reloadShot=false,reloadHeld=0;
 let mousePrimary=false,mouseAim=false;
 const touchControls=createZombieTouch({
   onLook:(x,y,sensitivity)=>{
@@ -69,7 +69,7 @@ function progress(text,percent){$('load-label').textContent=text;$('load-progres
 function toast(text,duration=2.5){$('toast').textContent=text;toastUntil=(session?.time??0)+duration;}
 function announce(title,small=(map?.announceTitle??entry?.title??'Zombies').toUpperCase(),duration=4){$('announcement-title').textContent=title;$('announcement-small').textContent=small;$('announcement').style.opacity=1;announcementUntil=session.time+duration;}
 function setActive(value){
-  active=!!value&&ready&&session.phase!=='gameover';$('menu').hidden=active;document.body.classList.toggle('menu-open',!active);keys.clear();primary=false;primaryPressed=false;ads=false;reloadShot=false;
+  active=!!value&&ready&&session.phase!=='gameover';$('menu').hidden=active;document.body.classList.toggle('menu-open',!active);keys.clear();primary=false;primaryPressed=false;ads=false;reloadShot=false;reloadHeld=0;
   mousePrimary=mouseAim=false;touchControls.reset();touchControls.setEnabled(active&&session.phase!=='reviving',active);
   if(active&&audio.ctx)audio.start();else if(!active)audio.pause();
   if(active){if(!started){started=true;announce('Round 1','SURVIVE');audio.play('round');mods.emit('start');}else if(session.phase==='preparing')announce('Round '+session.round,'PREPARE YOURSELF');}
@@ -93,7 +93,8 @@ addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('keydown',e=>{
   if(['Space','Tab','F3'].includes(e.code))e.preventDefault();
   keys.add(e.code);if(e.repeat||!active)return;
-  if(e.code==='KeyR')reload();if(e.code==='KeyV')melee();if(e.code==='KeyG')throwGrenade();if(e.code==='KeyF'||e.code==='KeyE')interact();
+  // R: tap to reload, hold to inspect (mods/inspect); an empty mag reloads at once
+  if(e.code==='KeyR'){if(session.weapon?.mag===0)reload();else reloadHeld=performance.now();}if(e.code==='KeyV')melee();if(e.code==='KeyG')throwGrenade();if(e.code==='KeyF'||e.code==='KeyE')interact();
   if(e.code==='Digit4')features.placeClaymore();if(e.code==='KeyX')features.throwMonkey();
   if(e.code==='Digit5'&&session.toggleAttachment())equipView();
   if(['Digit1','Digit2','Digit3'].includes(e.code)){session.switchWeapon(+e.code.at(-1)-1);equipView();}
@@ -103,7 +104,7 @@ addEventListener('keydown',e=>{
   if(e.code==='Escape'){setActive(false);document.exitPointerLock?.();}
   map?.keydown?.(e);
 });
-addEventListener('keyup',e=>keys.delete(e.code));
+addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='KeyR'&&reloadHeld){reloadHeld=0;if(active)reload();}});
 addEventListener('wheel',()=>{if(active){session.switchWeapon();equipView();}});
 addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{const width=innerWidth,height=innerHeight,current=renderer.getSize(new THREE.Vector2());if(current.x===width&&current.y===height)return;camera.aspect=viewCamera.aspect=width/height;camera.updateProjectionMatrix();viewCamera.updateProjectionMatrix();renderer.setSize(width,height);},profile.mobile?150:0);});
 
@@ -272,7 +273,7 @@ function update(dt){
       if(!map.prePlayer?.(dt))player.update(dt,session.phase==='reviving'?{}:{forward,strafe,sprint,crouch:keys.has('ControlLeft')||keys.has('ControlRight')||keys.has('KeyC')||touch.crouch,jump:keys.has('Space'),jumpPressed:touch.jump});
       if(world.bounds&&player.getFeetPosition().y<world.bounds.min.y-600){player.respawn();toast('You fell out of the map');}
       view.update(dt,{moving,sprint,ads:ads&&!session.def.dualWield,reloading:session.reloadLeft>0,empty:session.weapon.mag===0,time:session.time});
-      view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();
+      view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();view.input={sprint,ads};   // this frame's input, for mods (inspect cancels on sprint/aim)
       perkDrink.update(dt,session);
       if(!sprint&&session.phase!=='reviving'&&(primaryPressed||(primary&&session.def.automatic)||burstLeft>0||reloadShot)){
         if(shoot()){reloadShot=false;if(burstLeft>0)burstLeft--;else if(session.def.fireType==='3-Round Burst')burstLeft=2;}
@@ -280,6 +281,7 @@ function update(dt){
       primaryPressed=false;
       enemies.update(dt,player.getFeetPosition());
       features.update(dt);
+      if(reloadHeld&&performance.now()-reloadHeld>350){reloadHeld=0;mods.emit('inspect');}
       mods.emit('update',dt);
       repairLeft=Math.max(0,repairLeft-dt);findPrompt();if((keys.has('KeyF')||keys.has('KeyE')||touch.use)&&prompt?.barrier)repair(prompt.barrier);
       if((session.round!==lastRound||session.phase!==lastPhase)&&map.announceRounds?.()!==false){if(session.phase==='fighting'){announce(session.dogRound?'Fetch their souls':'Round '+session.round,session.dogRound?'HELLHOUNDS':'SURVIVE');audio.play(session.dogRound?'dog_round':'round');if(session.dogRound)audio.play('dog_announce');}else if(session.phase==='preparing'&&session.round>1){announce('Round survived','RELOAD. REBUILD. PREPARE.');audio.play('round_end');}lastRound=session.round;lastPhase=session.phase;}
