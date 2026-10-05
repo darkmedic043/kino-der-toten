@@ -104,3 +104,24 @@ Third class, **Pilot** (`classes.json` id `mech`; named Mech until the user aske
   - Salvo Core's rockets now use `mechWeapon` (the Ordnance damage and radius passives).
   - Verified in game: 6 rocket kills with Kill Feed ×3 added 2.7 s against 2.6 s of drain.
 - **Other classes, same audit:** the class `blast()` takes `credit`. Skill-made explosions (the turret's Grenade Launcher, Final Payload, Shrapnel Charge, claymores) call `onHit` (Recycler, Bounty, Nanites, Contractor, Spotter, slows…), pay the skill's 50 points per kill instead of gun points, and the Fortifier's Shrapnel Charge and claymores now scale with ability damage (Heavy Gauge, Honed Edges). Chain Reaction (a player passive) stays uncredited.
+- **Marcy model (2026-10-05, user request):** the mech is now RainOnTheMoon's "Animated Mech - Marceline Sentinel Armor (Marcy)" (Sketchfab, CC-BY-4.0, credited in CREDITS.md and on the class card). `.tools/build_mech.sh <zip>` → `.tools/build_mech_blend.py` → `mods/classes/models/mech.glb` (7 MB, git-ignored). Without the GLB, `createMech` falls back to the procedural chassis.
+  - **Build cuts** (each vertex goes with its strongest bone weight; positions in Blender units, the model is ~1.35 tall with fins):
+    - The blade forearms are cut 0.17 past the elbow (palm and fingers dropped).
+    - A cockpit is opened: chest vertices with y < 0.1 and z < 1.0 (the "UNIT 17" brow stays as a canopy) and waist vertices with y < 0.05.
+    - The forearm stumps are also copied out as `FP_ArmL`/`FP_ArmR` (elbow at the origin, forearm along +Z) for the first-person view.
+    - The two clips are dropped; textures go to 2048/1024 WebP.
+  - **Kept procedural:** `marcyMech` turns its bones in code every frame (each driven bone back to rest, then `turn()` about the mech's own axes):
+    - Digitigrade walk: thigh, middle leg and shin, with the ankle levelled.
+    - Pelvis bob, ribcage sway and pitch, booster flaps and fins.
+    - Arm aim: the upper arm takes 35% of the look pitch; the forearm has its rest slope and outward yaw cancelled, then takes the rest of the pitch.
+    - Weapons aren't bone children: each frame they're placed at the stump end (stored in the forearm bone's frame) pointing along the aim, scaled ×1.45.
+    - Scale 175 (about 2.4 players).
+    - Rear hardpoint on `EngineHead`; `gunnerSeat` (0, 191, −58).
+  - **Pilot:** a copy of the operator (`window.kino.characterEntry`; co-op mirrors use the teammate's `r.entry`) sits in the cockpit (`seat`: hips at (0, 133, −17.5), with a back panel over the model's unseen checkerboard interior and two control sticks).
+    - `seatCharacter()` (characters.js) poses any character without running its animation: thighs forward, shins down, hands on the sticks, recoil kicks, the head follows the aim.
+    - It works on the mannequin (now exposes `joints`) and on rigged models (bones found by shape). It only uses bones the visible meshes are skinned to: bo1 rigs also carry Black Ops' hidden skeleton, whose "pelvis" was picked for Gyro.
+    - Legs prefer leg/thigh-named chains: Gyro's holsters hang off his hips further out than his thighs.
+    - Zoroark (Blockbench, no hips or legs it can find) sits upright.
+    - Mine shows only in third person; teammates' always show.
+  - **Camera:** first person sits at the pilot's eyes (`eye` 171 above the feet, clamped under ceilings). Third person pulls back (`kino.thirdPersonCamera` distance 270, shoulder 60, recomputed after the lift) and is restored on eject.
+  - **Heat (user request):** an overheated arm stays locked for 1.2 s (`VENT_DELAY`, HUD "OVERHEAT", then "VENTING") before venting at .4/s (was .55). Normal cooling is .28/s after 0.5 s without firing (was .38 after .35).

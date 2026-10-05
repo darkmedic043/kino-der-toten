@@ -18,14 +18,17 @@
 import * as THREE from 'three';
 import { zombieHealth } from '../../rules.js';
 import { mechStats, mechWeapon } from './classes.js';
-import { createMech, mechArms, WEAPON_BUILDERS } from './mech-model.js';
+import { createMech, mechArms, WEAPON_BUILDERS, loadMechModel } from './mech-model.js';
+import { createCharacter, seatCharacter } from '../../characters.js';
 
 const up=new THREE.Vector3(0,1,0);
 const LIFT=34;            // the cockpit sits this much above a player's eye
 const DROP_TIME=1.1;      // seconds from the sky to the ground
-const SEAT=new THREE.Vector3(0,104,-30);   // the rear gunner's feet, in the mech's frame (facing +Z)
+const VENT_DELAY=1.2;     // an overheated arm sits locked this long before it starts venting
+const SEAT=new THREE.Vector3(0,104,-30);   // the rear gunner's feet on the procedural mech (the Marcy model has its own gunnerSeat)
 
-export function setupMech(ctx){
+export async function setupMech(ctx){
+  await loadMechModel();   // the Marcy model when built (falls back to the procedural mech)
   const {api,blast,onHit,sync}=ctx;
   const {host,session,data,scene,camera,player,enemies,world,audio,view,viewScene}=api;
   const cfg=ctx.cfg,cls=ctx.cls;
@@ -47,6 +50,16 @@ export function setupMech(ctx){
   const fp=mechArms();fp.root.visible=false;if(pilot)viewScene?.add(fp.root);
   const mgView=WEAPON_BUILDERS.mg();mgView.scale.setScalar(.55);mgView.position.set(9,-12,-26);mgView.rotation.y=Math.PI;mgView.visible=false;viewScene?.add(mgView);
 
+  // ---- the pilot, seated in the cockpit (a copy of the operator, posed by seatCharacter) -------------------------------
+  // Mine shows in third person (in first person the camera is at its eyes); other pilots' always show on their mirrors.
+  async function seatPilot(mech,entry){
+    if(!entry||!mech.seat)return null;
+    const c=await createCharacter(entry,data).catch(()=>null);if(!c)return null;
+    const pose=seatCharacter(c);
+    c.root.position.y=-(pose?.hipHeight??30);mech.seat.add(c.root);c.root.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});
+    return {c,pose,dispose(){c.root.removeFromParent();c.dispose?.();}};
+  }
+  let myPilot=null,myPilotEntry=null;
   // ---- sounds (made here: none of the game's, and nothing from Cheese Cube's suits) -------------------------------
   const ac=()=>audio.ctx&&audio.ctx.state==='running'?audio.ctx:null;
   function tone({f=200,f2=f,type='sawtooth',dur=.2,vol=.2,noise=0,lp=2000,at=0}){
@@ -148,7 +161,7 @@ export function setupMech(ctx){
       el.querySelector('.mh-heat b').style.width=(Math.min(1,a.heat)*100)+'%';
       const mark=el.querySelector('.mh-heat s');mark.style.display=a.w.mode==='charge'&&a.charge>0?'block':'none';mark.style[side==='left'?'right':'left']=(a.charge*100)+'%';
       el.classList.toggle('over',a.over);
-      el.querySelector('.mh-state').textContent=a.over?'OVERHEAT · VENTING':a.w.mode==='charge'&&a.charge>0?'CHARGING '+Math.round(a.charge*100)+'%':a.w.mode==='auto'&&trig[side]&&a.spin<1?'SPINNING UP':a.cd>0?'':'READY';
+      el.querySelector('.mh-state').textContent=a.over?(session.time-a.shotT<VENT_DELAY?'OVERHEAT':'VENTING'):a.w.mode==='charge'&&a.charge>0?'CHARGING '+Math.round(a.charge*100)+'%':a.w.mode==='auto'&&trig[side]&&a.spin<1?'SPINNING UP':a.cd>0?'':'READY';
     }
     $h('.mh-warn').textContent=f<.25?'INTEGRITY CRITICAL':'';
     const smart=M.mech.smart&&session.time-landedAt<M.mech.smart;
@@ -268,8 +281,10 @@ export function setupMech(ctx){
     a.cd=Math.max(0,a.cd-dt);a.punch=Math.max(0,a.punch-dt*3);
     // venting / cooling
     const since=session.time-a.shotT;
-    if(a.over){a.heat=Math.max(0,a.heat-dt*.55*M.mech.cool);if(a.heat<=0)a.over=false;}
-    else if(since>.35&&!(held&&(w.mode==='auto'||w.mode==='beam')))a.heat=Math.max(0,a.heat-dt*.38*M.mech.cool);
+    // overheated: locked for VENT_DELAY before it starts venting, then vents back to zero; otherwise heat bleeds off after
+    // half a second without firing
+    if(a.over){if(since>VENT_DELAY)a.heat=Math.max(0,a.heat-dt*.4*M.mech.cool);if(a.heat<=0)a.over=false;}
+    else if(since>.5&&!(held&&(w.mode==='auto'||w.mode==='beam')))a.heat=Math.max(0,a.heat-dt*.28*M.mech.cool);
     if(a.over){a.spin=Math.max(0,a.spin-dt*2);a.charge=0;a.pressed=false;return;}
     const f=aimDir(),from=camera.position.clone();
     if(w.mode==='auto'){
@@ -381,10 +396,12 @@ export function setupMech(ctx){
     player.moveSpeed=saved.move*.82*M.mech.speed;player.sprintSpeed=saved.move*1.12*M.mech.speed;player.jumpHeight=0;player.crouchSpeed=player.moveSpeed;
     const g=at.clone();player.setPosition(g);
     document.body.classList.add('mech-pilot');boot();drawHud();ctx.hud();
+    const entry=window.kino.characterEntry;if(entry&&entry!==myPilotEntry){myPilotEntry=entry;myPilot?.dispose();myPilot=null;seatPilot(world3,entry).then(p=>{myPilot=p;});}
   }
   function eject(destroyed){
     if(phase!=='piloting')return;
     phase='idle';document.body.classList.remove('mech-pilot');fp.root.visible=false;
+    const tp=window.kino.thirdPersonCamera;if(tp){tp.distance=105;tp.shoulder=38;}
     if(saved){player.moveSpeed=saved.move;player.sprintSpeed=saved.sprint;player.jumpHeight=saved.jump;player.crouchSpeed=saved.crouch;saved=null;}
     trig.left=trig.right=false;
     const at=player.getFeetPosition(),wreck=world3.root;wreck.position.copy(at);wreck.visible=true;
@@ -445,8 +462,12 @@ export function setupMech(ctx){
       if(integrity<=0){eject(true);return;}
       // the cockpit: higher eye, no gun, the mech's arms; the mech itself in third person
       const third=!!host.hideViewmodel;
-      const head=world.raycast(new THREE.Ray(camera.position.clone(),up),0,LIFT+12),lift=head?Math.max(0,head.distance-12):LIFT;
+      const want=world3.eye?world3.eye-player.eyeHeight:LIFT;   // the pilot's eyes in the cockpit
+      const head=world.raycast(new THREE.Ray(camera.position.clone(),up),0,want+12),lift=head?Math.max(0,head.distance-12):want;
       camera.position.y+=lift;
+      // third person: pull the camera well back (the mech is ~2.4 players tall) and redo it from the lifted eye (the
+      // characters mod placed it before this lift)
+      const tp=window.kino.thirdPersonCamera;if(tp){tp.distance=270;tp.shoulder=60;if(third)tp.update(world);}
       if(view?.pivot)view.pivot.visible=false;
       fp.root.visible=!third;
       const ch=window.kino.character?.root;if(ch)ch.visible=false;
@@ -456,6 +477,7 @@ export function setupMech(ctx){
       for(const side of ['left','right'])fireArm(side,dt);
       const pose={speed,pitch,spin:{left:arms.left.spin,right:arms.right.spin},charge:{left:arms.left.charge,right:arms.right.charge},heat:{left:arms.left.heat,right:arms.right.heat},punch:{left:arms.left.punch,right:arms.right.punch}};
       fp.update(dt,pose);world3.update(dt,pose);
+      if(myPilot){myPilot.c.root.visible=third;if(third)myPilot.pose?.update(dt,{pitch,kick:{left:world3.arms.left.kick??0,right:world3.arms.right.kick??0},jolt:camKick*.6});}
       if(speed>40&&(stepT-=dt*speed/130)<=0){stepT=1;sfx.step();camKick=Math.max(camKick,.15);}
       if(camKick>0){camKick=Math.max(0,camKick-dt*3);camera.position.y+=Math.sin(session.time*55)*camKick*1.2;}
       drawHud();
@@ -509,16 +531,16 @@ export function setupMech(ctx){
     // mirrors
     for(const [id,p] of pilots){
       const r=remote(id);
-      if(!p.on||!r?.pos){if(p.mech){p.mech.root.removeFromParent();p.mech=null;setAvatarHidden(r,false);}continue;}
-      if(!p.mech){p.mech=createMech({mount:p.mount});scene.add(p.mech.root);}
+      if(!p.on||!r?.pos){if(p.mech){p.mech.root.removeFromParent();p.mech=null;p.pilot?.dispose();p.pilot=null;setAvatarHidden(r,false);}continue;}
+      if(!p.mech){p.mech=createMech({mount:p.mount});scene.add(p.mech.root);const m=p.mech;seatPilot(m,r.entry).then(x=>{if(p.mech===m)p.pilot=x;else x?.dispose();});}
       p.mech.setWeapons(p.l,p.r);p.mech.setMount(p.mount);p.mech.root.position.copy(r.pos);p.mech.root.rotation.y=r.yaw??0;
-      p.mech.update(dt,{speed:r.vel?.length?.()??0,pitch:p.pitch??0});setAvatarHidden(r,true);
+      p.mech.update(dt,{speed:r.vel?.length?.()??0,pitch:p.pitch??0});setAvatarHidden(r,true);p.pilot?.pose?.update(dt,{pitch:p.pitch??0});
     }
     // riding a teammate's mech
     if(riding){
       const r=remote(riding),p=pilots.get(riding);
       if(!r?.pos||!p?.on){dismount();return;}
-      const yaw=r.yaw??0,seat=SEAT.clone().applyAxisAngle(up,yaw);player.setPosition(r.pos.clone().add(seat));
+      const yaw=r.yaw??0,seat=(p.mech?.gunnerSeat??SEAT).clone().applyAxisAngle(up,yaw);player.setPosition(r.pos.clone().add(seat));
       session.effects.invulnerable=Math.max(session.effects.invulnerable??0,session.time+.25);
       if(view?.pivot)view.pivot.visible=false;const ch=window.kino.character?.root;if(ch)ch.visible=!!host.hideViewmodel;
       mgView.visible=!host.hideViewmodel;

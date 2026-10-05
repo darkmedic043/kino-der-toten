@@ -42,8 +42,8 @@ export default async function setup(api){
   character.root.visible=false;scene.add(character.root);
   // Spring chains (coat, tail) rest on the level itself: stairs, ledges, slopes.
   {const down=new THREE.Vector3(0,-1,0),from=new THREE.Vector3(),ray=new THREE.Ray(from,down);
-    for(const sp of character.springs??[])sp.ground=(x,y,z)=>{from.set(x,y+40,z);const h=api.world?.raycast(ray,0,400);return h?from.y-h.distance:null;};}window.kino.character=character;   // debug handle
-  const view=new ThirdPersonCamera(camera);
+    for(const sp of character.springs??[])sp.ground=(x,y,z)=>{from.set(x,y+40,z);const h=api.world?.raycast(ray,0,400);return h?from.y-h.distance:null;};}window.kino.character=character;window.kino.characterEntry=entry;   // debug handle (the Pilot class seats a copy of the operator in its mech)
+  const view=new ThirdPersonCamera(camera);window.kino.thirdPersonCamera=view;   // the Pilot class pulls it back while in its mech
   let third=false,last=null,lastYaw=null,airT=0;
   const apply=()=>{host.camera=third?view.update(api.world):null;host.hideViewmodel=third;character.root.visible=third;};
   addEventListener('keydown',e=>{if(e.code==='KeyT'&&!e.repeat&&api.getState().active){third=!third;apply();api.toast(third?'Third person · T to switch back':'First person',2);}});

@@ -8,6 +8,19 @@
 // heat: {left, right}}.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+
+// ---- the Marcy model (RainOnTheMoon, CC-BY-4.0; .tools/build_mech.sh, git-ignored) -----------------------------------
+// When it's there, createMech/mechArms use it, animated in code: its bones are turned each frame (walk, aim, recoil),
+// the loadout's weapons sit on its cut forearm stumps, and the pilot sits in the opened cockpit. Without it, the
+// procedural chassis below.
+const MECH_URL=new URL('models/mech.glb',import.meta.url).href;
+const SCALE=175;          // model units (the mesh is ~1.35 tall with its fins) to game units: about 2.4 players tall
+const STUMP=.17;          // forearm left past the elbow by the build (model units)
+let mechGltf=null,mechLoad=null;
+export function loadMechModel(){mechLoad??=new GLTFLoader().loadAsync(MECH_URL).then(g=>{mechGltf=g;return g;}).catch(()=>null);return mechLoad;}
+export const mechModelReady=()=>!!mechGltf;
 
 // ---- materials ---------------------------------------------------------------------------------------------------
 let mats=null;
@@ -30,8 +43,8 @@ function materials(){
   const panel=panelTexture();
   mats={
     hull:new THREE.MeshStandardMaterial({color:0xffffff,map:panel,metalness:.45,roughness:.62}),
-    plate:new THREE.MeshStandardMaterial({color:0x6c7158,metalness:.5,roughness:.55}),
-    paint:new THREE.MeshStandardMaterial({color:0xd9772e,metalness:.3,roughness:.6}),
+    plate:new THREE.MeshStandardMaterial({color:0x4f5840,metalness:.55,roughness:.55}),
+    paint:new THREE.MeshStandardMaterial({color:0x9a5a2e,metalness:.35,roughness:.65}),   // rust, to sit with the Marcy model
     dark:new THREE.MeshStandardMaterial({color:0x22252a,metalness:.7,roughness:.45}),
     steel:new THREE.MeshStandardMaterial({color:0x8c9196,metalness:.85,roughness:.32}),
     visor:new THREE.MeshStandardMaterial({color:0x0b1a20,emissive:0x5fe0ff,emissiveIntensity:1.6,metalness:.2,roughness:.2}),
@@ -113,7 +126,8 @@ export const WEAPON_BUILDERS={
 const weapon=id=>(WEAPON_BUILDERS[id]??WEAPON_BUILDERS.chaingun)();
 
 // ---- the mech ----------------------------------------------------------------------------------------------------
-export function createMech({mount=false}={}){
+export function createMech(opts={}){return mechGltf?marcyMech(opts):proceduralMech(opts);}
+function proceduralMech({mount=false}={}){
   const M=materials(),root=group('mech');
   const hips=group('hips');hips.position.y=64;root.add(hips);
   hips.add(at(box(40,16,26,M.dark),0,0,0),at(box(34,9,22,M.plate),0,-6,2));
@@ -183,11 +197,13 @@ export function createMech({mount=false}={}){
 
 // ---- first person: the two forearms and their weapons in the viewmodel scene ----------------------------------------
 export function mechArms(){
-  const M=materials(),root=group('mech_arms'),arms={};
+  const M=materials(),root=group('mech_arms'),arms={},stumps=mechGltf?{left:mechGltf.scene.getObjectByName('FP_ArmL'),right:mechGltf.scene.getObjectByName('FP_ArmR')}:null;
   for(const [side,x] of [['left',-1],['right',1]]){
     const pivot=group('fp_'+side);pivot.position.set(x*20,-17,-34);root.add(pivot);
     const fore=group('fore');pivot.add(fore);fore.rotation.set(.2,Math.PI+x*.12,0);   // weapons point down +Z: turn them to face away from the camera
-    fore.add(at(box(17,17,22,M.plate,3),0,0,-8),at(box(5,1.6,16,M.paint,.6),0,8.7,-7),at(box(12,12,10,M.dark,2),0,-1,-22));
+    const stump=stumps?.[side];
+    if(stump){const c=stump.clone();c.position.set(0,0,4-STUMP*SCALE*.62);c.scale.setScalar(SCALE*.62);c.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});fore.add(c);}   // the Marcy forearm stump, elbow first
+    else fore.add(at(box(17,17,22,M.plate,3),0,0,-8),at(box(5,1.6,16,M.paint,.6),0,8.7,-7),at(box(12,12,10,M.dark,2),0,-1,-22));
     const mountPt=group('weapon');mountPt.position.z=4;fore.add(mountPt);
     pivot.scale.setScalar(.5);
     arms[side]={pivot,fore,mount:mountPt,weapon:null,kick:0,base:pivot.position.clone()};
@@ -208,4 +224,87 @@ export function mechArms(){
       }
     },
     muzzle(side,out=new THREE.Vector3()){const m=arms[side].weapon?.getObjectByName('muzzle');root.updateMatrixWorld(true);return m?m.getWorldPosition(out):arms[side].mount.getWorldPosition(out);}};
+}
+
+// ---- the Marcy mech, bones turned in code ------------------------------------------------------------------------
+// Facing +Z, feet on y=0 (the build exports it so). Pose each frame: every driven bone back to its rest rotation, then
+// turned about the mech's own axes (turn()): digitigrade walk (thigh, knee joint, shin, ankle kept level), the pelvis
+// bobbing, the ribcage swaying, upper arms and forearms raised so the stumps aim along the look pitch, recoil. The
+// weapons aren't children of the bones: each frame they're put at the stump's end, pointing along the aim.
+function marcyMech({mount=false}={}){
+  const root=group('mech'),model=cloneSkinned(mechGltf.scene);
+  for(const n of ['FP_ArmL','FP_ArmR'])model.getObjectByName(n)?.removeFromParent();
+  model.scale.setScalar(SCALE);root.add(model);
+  model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}});
+  const B=n=>model.getObjectByName(n);
+  const bones={pelvis:B('MechPelvis_01'),ribcage:B('MechRibcage_016'),engine:B('EngineHead_045'),
+    flaps:[B('MechBoosterFlapL_049'),B('MechBoosterFlapR_047')],fins:[B('MechTopFinL2_053'),B('MechTopFinR2_051')]};
+  const legs={left:{thigh:B('ThighL_02'),mid:B('MiddleLegL_03'),shin:B('ShinL_04'),ankle:B('AnkleL_00')},right:{thigh:B('ThighR_08'),mid:B('MiddleLegR_09'),shin:B('ShinR_010'),ankle:B('AnkleR_011')}};
+  const arms={left:{upper:B('MechArmL1_018'),fore:B('MechArmL2_019'),palm:B('MechPalmL_020'),kick:0},
+    right:{upper:B('MechArmR1_031'),fore:B('MechArmR2_032'),palm:B('MechPalmR_033'),kick:0}};
+  const driven=[bones.pelvis,bones.ribcage,...bones.flaps,...bones.fins,...Object.values(legs).flatMap(l=>Object.values(l)),...Object.values(arms).flatMap(a=>[a.upper,a.fore])].filter(Boolean);
+  const rest=new Map(driven.map(b=>[b,b.quaternion.clone()])),restModelY=model.position.y;
+  root.updateMatrixWorld(true);
+  const local=o=>root.worldToLocal(o.getWorldPosition(new THREE.Vector3()));
+  // each forearm's rest aim (elbow -> palm, mech space): its downward slope and outward yaw, taken out so the stump aims
+  // straight ahead; the stump's end in the forearm bone's own frame (the weapon mount)
+  for(const [side,a] of Object.entries(arms)){
+    const e=local(a.fore),d=local(a.palm).sub(e).normalize();
+    a.slope=Math.asin(-d.y);a.yaw=Math.atan2(d.x,d.z);
+    a.end=a.fore.worldToLocal(root.localToWorld(e.clone().addScaledVector(d,STUMP*SCALE)));
+    a.mount=group('weapon_'+side);root.add(a.mount);a.weapon=null;a.id=null;
+  }
+  const seat=group('seat');seat.position.set(0,.76*SCALE,-.1*SCALE);root.add(seat);   // the pilot's hips (cockpit, under the brow)
+  // the cockpit: a padded back panel over the model's unseen interior (opened by the build) and two control sticks
+  {const M=materials();seat.add(at(box(40,50,4,M.dark,2),0,20,-15),at(box(30,5,26,M.dark,2),0,-2,-2),at(box(26,30,3,M.tube,1.5),0,22,-12.8));
+    for(const x of [-11,11])seat.add(at(cyl(1.2,1.2,16,M.steel,8),x,6,15,-.35),at(box(3.2,4.5,3.2,M.dark,1),x,13,17.5));}
+  const hard=group('hardpoint');root.add(hard);hard.visible=mount;
+  hard.add(at(cyl(2.2,2.2,12,materials().dark,10),0,6,0),at(box(18,3,14,materials().dark,1),0,-1,-10));
+  const mg=weapon('mg');mg.position.set(0,14,2);hard.add(mg);
+  const X=new THREE.Vector3(1,0,0),Y=new THREE.Vector3(0,1,0),tq=new THREE.Quaternion(),rq=new THREE.Quaternion(),q=new THREE.Quaternion(),ax=new THREE.Vector3();
+  // turn a bone about an axis given in the mech's frame
+  function turn(bone,axis,angle){
+    if(!bone||!angle)return;bone.parent.updateWorldMatrix(true,false);
+    bone.parent.getWorldQuaternion(tq).invert();root.getWorldQuaternion(rq);
+    ax.copy(axis).applyQuaternion(rq).applyQuaternion(tq).normalize();bone.quaternion.premultiply(q.setFromAxisAngle(ax,angle));
+  }
+  let phase=0,t=0;
+  const v=new THREE.Vector3(),wq=new THREE.Quaternion();
+  const api={root,arms,legs,seat,seatFacing:0,
+    eye:.98*SCALE,   // the pilot's eye above the feet (first person)
+    gunnerSeat:new THREE.Vector3(0,1.09*SCALE,-.33*SCALE),
+    setWeapons(left,right){for(const [side,id] of [['left',left],['right',right]]){const a=arms[side];if(a.id===id)continue;a.weapon?.removeFromParent();a.weapon=weapon(id);a.weapon.scale.setScalar(1.45);a.id=id;a.weapon.traverse(o=>{if(o.isMesh)o.castShadow=true;});a.mount.add(a.weapon);}},
+    setMount(on){hard.visible=on;},
+    mountGun:mg,
+    recoil(side,k=1){arms[side].kick=Math.min(1.5,arms[side].kick+k);},
+    muzzle(side,out=new THREE.Vector3()){const m=arms[side].weapon?.getObjectByName('muzzle');root.updateMatrixWorld(true);return m?m.getWorldPosition(out):arms[side].mount.getWorldPosition(out);},
+    update(dt,pose={}){
+      const speed=pose.speed??0,stride=Math.min(1,speed/110),pitch=pose.pitch??0;
+      phase+=dt*(1.4+speed/60);t+=dt;
+      for(const [b,r] of rest)b.quaternion.copy(r);
+      model.position.y=restModelY-Math.abs(Math.sin(phase))*4*stride+Math.sin(t*1.2)*.6*(1-stride);
+      turn(bones.pelvis,Y,Math.sin(phase)*.05*stride);
+      for(const [side,s] of [['left',0],['right',Math.PI]]){
+        const L=legs[side],p=Math.sin(phase+s)*stride,lift=Math.max(0,Math.cos(phase+s))*stride;
+        const th=-p*.4-lift*.2,mid=lift*.45,sh=-lift*.35;
+        turn(L.thigh,X,th);turn(L.mid,X,mid);turn(L.shin,X,sh);turn(L.ankle,X,-(th+mid+sh)*.9);
+      }
+      turn(bones.ribcage,Y,-Math.sin(phase)*.04*stride);turn(bones.ribcage,X,Math.sin(t*1.2)*.01-pitch*.12);
+      bones.flaps.forEach((f,i)=>turn(f,X,-(.2+.35*stride)*Math.abs(Math.sin(t*9+i))));
+      bones.fins.forEach((f,i)=>turn(f,X,Math.sin(t*2+i)*.03+stride*.06));
+      for(const [side,a] of Object.entries(arms)){
+        a.kick=Math.max(0,a.kick-dt*8);
+        // upper arm lifts a little with the aim, the forearm the rest of the way: the stump points along the look
+        turn(a.upper,X,-pitch*.35+a.kick*.08);
+        turn(a.fore,Y,-a.yaw);turn(a.fore,X,a.slope-pitch*.65-a.kick*.05);
+        root.updateMatrixWorld(true);
+        a.mount.position.copy(root.worldToLocal(a.fore.localToWorld(v.copy(a.end))));
+        a.mount.quaternion.setFromAxisAngle(X,-pitch);a.mount.position.z-=a.kick*4;
+        const spin=a.weapon?.getObjectByName('spin');if(spin)spin.rotation.z+=dt*30*(pose.spin?.[side]??0);
+        const glow=a.weapon?.getObjectByName('glow');if(glow)glow.traverse(o=>{if(o.material?.emissiveIntensity!=null)o.material.emissiveIntensity=1+(pose.charge?.[side]??0)*5;});
+      }
+      // rear hardpoint rides the engine
+      if(bones.engine){root.updateMatrixWorld(true);hard.position.copy(root.worldToLocal(bones.engine.getWorldPosition(v))).add(new THREE.Vector3(0,12,-4));}
+    }};
+  return api;
 }

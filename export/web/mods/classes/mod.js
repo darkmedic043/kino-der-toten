@@ -135,7 +135,7 @@ export default async function setup(api){
   const fort=['wall','snare','nest'].includes(act.id)?setupFortifier(actx):null;
   const eng=['drone','mortar'].includes(act.id)?setupEngineer(actx):null;
   // the Pilot class: one action skill, weapons on its arms. Every class runs it for co-op (riding a teammate's mech).
-  const mechSkill=setupMech(actx),mech=act.id==='mech'?mechSkill:null;
+  const mechSkill=await setupMech(actx),mech=act.id==='mech'?mechSkill:null;
   const other=fort??eng??mech;
   const actionUp=()=>turrets.length>0||!!other?.up();
   setupCoopSkills({api,turrets,fort,eng,sync,A:()=>A});   // other players see (and the host enforces) what you deploy

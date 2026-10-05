@@ -2072,7 +2072,11 @@
             }
           ]
         }
-      ]
+      ],
+      "credit": {
+        "text": "Mech model: \"Animated Mech - Marceline Sentinel Armor (Marcy)\" by RainOnTheMoon, CC-BY-4.0 (cut and re-animated)",
+        "url": "https://sketchfab.com/3d-models/animated-mech-marceline-sentinel-armor-marcy-9f169c3bcc61445993bf0ce269edc863"
+      }
     }
   ],
   "augmentSlots": 2,

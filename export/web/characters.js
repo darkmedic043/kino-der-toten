@@ -380,7 +380,7 @@ function mannequin(entry,holder){
   const M=motionModel();let holding=false,stance='';
   // The figure faces +Z, so its right hand is on the -X side.
   const right=limbs[-1],left=limbs[1];
-  return {root:holder,hand:right.wrist,hold(value){holding=value;},setStance(value){stance=value;},act:M.act,pose:M.pose,update(dt,speed=0,m){
+  return {root:holder,hand:right.wrist,joints:{pelvisRoot,hips,spine,chest,neck,head,limbs},hold(value){holding=value;},setStance(value){stance=value;},act:M.act,pose:M.pose,update(dt,speed=0,m){
     const st=M.step(dt,speed,m),{phase,run,moving,breath,air,lean,strafe,accel}=st,land=Math.max(0,st.land),idle=1-moving,sway=Math.sin(breath*.55);
     const A=actionPose(st);
     pelvisRoot.position.set(Math.sin(phase)*.9*moving+sway*.45*idle,37.5+(Math.abs(Math.cos(phase))**1.8-.45)*(1.9+1.7*run)*moving-land*7-air*1.4,0);
@@ -495,4 +495,67 @@ export class ThirdPersonCamera {
     c.up.set(0,1,0);c.lookAt(aim);
     c.updateMatrixWorld(true);return c;
   }
+}
+
+// Seated (the Pilot class's mech): a pose for a character instance that isn't otherwise animated (don't call its update).
+// Thighs forward, shins down, hands forward on two control sticks, the head following the aim; `kick` jolts an arm
+// (recoil), `jolt` the body (landing, hits). Works on the mannequin (its joints) and on rigged models (bones found by
+// shape, like the procedural rig). hipHeight: the hips above the feet standing, so the seat can place the hips.
+// seatCharacter(character) -> {hipHeight, update(dt, {pitch, kick:{left,right}, jolt})} or null
+export function seatCharacter(character){
+  const holder=character.root;holder.updateMatrixWorld(true);
+  if(character.joints){
+    const J=character.joints,hipHeight=J.pelvisRoot.position.y;
+    return {hipHeight,update(dt,{pitch=0,kick={},jolt=0}={}){
+      J.pelvisRoot.position.set(0,hipHeight-jolt*2,0);J.hips.rotation.set(0,0,0);
+      J.spine.rotation.set(.12+jolt*.15,0,0);J.chest.rotation.set(.05,0,0);J.neck.rotation.set(0,0,0);J.head.rotation.set(-pitch*.7,0,0);
+      for(const side of [-1,1]){
+        const l=J.limbs[side],k=(side<0?kick.right:kick.left)??0;
+        l.hip.rotation.set(-1.5,0,side*.08);l.knee.rotation.x=1.45;l.ankle.rotation.x=.1;
+        l.shoulder.rotation.set(-.85-pitch*.3+k*.2,0,side*.12);l.elbow.rotation.x=-1+k*.3;
+      }
+    }};
+  }
+  // only the bones the visible meshes are skinned to: bo1 rigs also carry Black Ops' own (hidden) skeleton, whose
+  // "pelvis" was found first for Gyro
+  const skin=new Set();holder.traverse(o=>{if(o.isSkinnedMesh&&o.visible)o.skeleton.bones.forEach(b=>skin.add(b));});
+  const bones=[];holder.traverse(o=>{if(o.isBone&&(!skin.size||skin.has(o)))bones.push(o);});if(!bones.length)return null;
+  const local=b=>holder.worldToLocal(b.getWorldPosition(new THREE.Vector3()));
+  const firstChild=b=>b?.children.find(c=>c.isBone&&(!skin.size||skin.has(c)))??null;
+  // legs: bones named leg/thigh at the top of their chain when there are two (Gyro's holsters also hang off his hips,
+  // further out than his thighs; Zoroark has no hips bone, its legs' parent stands in), else the hips' children going down
+  const namedLegs=bones.filter(b=>/leg|thigh/i.test(b.name)&&!/coat|tail|skirt/i.test(b.name)&&!/leg|thigh/i.test(b.parent?.name??'')&&firstChild(b));
+  const hips=bones.find(b=>/hips|pelvis/i.test(b.name))??(namedLegs.length>=2?namedLegs[0].parent:null)??bones.find(b=>b.children.filter(c=>c.isBone).length>=3);if(!hips)return null;
+  const hipY=local(hips).y;
+  const legs=namedLegs.length>=2?namedLegs:hips.children.filter(c=>c.isBone&&firstChild(c)&&local(firstChild(c)).y<hipY-2&&!/tail/i.test(c.name));
+  const arms=bones.filter(b=>/arm/i.test(b.name)&&!/fore|lower|armature/i.test(b.name)&&!/arm/i.test(b.parent?.name??'')&&firstChild(b)&&firstChild(firstChild(b)));
+  const side=b=>local(b).x>0?1:-1;
+  const limb=(list,s)=>list.filter(b=>side(b)===s).sort((a,b)=>Math.abs(local(b).x)-Math.abs(local(a).x))[0];
+  const L={arm:limb(arms,1),leg:limb(legs,1),s:1},R={arm:limb(arms,-1),leg:limb(legs,-1),s:-1};
+  if(!L.leg||!R.leg)return null;
+  for(const S of [L,R]){S.shin=firstChild(S.leg);S.foot=firstChild(S.shin);if(S.arm){S.fore=firstChild(S.arm);S.hand=firstChild(S.fore);}}
+  const head=bones.find(b=>/^head/i.test(b.name))??bones.find(b=>/head/i.test(b.name)&&!/end|top/i.test(b.name));
+  const spine=hips.children.find(c=>c.isBone&&/spine|chest|torso/i.test(c.name));
+  const used=[hips,spine,head,...[L,R].flatMap(S=>[S.leg,S.shin,S.foot,S.arm,S.fore])].filter(Boolean);
+  const rest=new Map(used.map(b=>[b,b.quaternion.clone()]));
+  const hq=new THREE.Quaternion(),pq=new THREE.Quaternion(),q=new THREE.Quaternion(),v=new THREE.Vector3(),w=new THREE.Vector3(),X=new THREE.Vector3(1,0,0);
+  const parentQ=b=>{holder.getWorldQuaternion(hq).invert();b.parent.getWorldQuaternion(pq);return hq.multiply(pq);};
+  function aim(bone,child,dir){
+    if(!bone||!child)return;bone.updateWorldMatrix(true,true);
+    v.copy(local(child)).sub(local(bone)).normalize();w.copy(dir).normalize();q.setFromUnitVectors(v,w);
+    const P=parentQ(bone);bone.quaternion.premultiply(P.clone().invert().multiply(q).multiply(P)).normalize();
+  }
+  function turn(bone,axis,angle){if(!bone||!angle)return;bone.updateWorldMatrix(true,false);const P=parentQ(bone);q.setFromAxisAngle(axis,angle);bone.quaternion.premultiply(P.clone().invert().multiply(q).multiply(P));}
+  const D=(x,y,z)=>new THREE.Vector3(x,y,z);
+  return {hipHeight:hipY,update(dt,{pitch=0,kick={},jolt=0}={}){
+    for(const [b,r] of rest)b.quaternion.copy(r);
+    turn(spine??hips,X,.1+jolt*.15);
+    for(const S of [L,R]){
+      const k=(S.s>0?kick.left:kick.right)??0;
+      aim(S.leg,S.shin,D(S.s*.12,-.12,1));aim(S.shin,S.foot,D(0,-1,.12));
+      if(S.arm){aim(S.arm,S.fore,D(S.s*.32,-.78,.55-k*.2));aim(S.fore,S.hand,D(-S.s*.12,.05-k*.3,1));}
+    }
+    if(head)turn(head,X,-pitch*.7);
+    for(const sp of character.springs??[])sp.update(dt);
+  }};
 }

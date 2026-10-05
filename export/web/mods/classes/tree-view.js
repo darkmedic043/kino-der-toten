@@ -170,7 +170,7 @@ export function renderClasses(root,cfg,{getState,setState}){
       <div class="cls-body">
         <div class="cls-side">
           <div class="cls-action" style="--cc:${eq.color}"><div class="top"><div class="ic">${icon(act.icon)}</div><div><span class="eyebrow">ACTION SKILL · Z${cls.mech?'':' · '+esc(eq.name.toUpperCase())}</span><strong>${esc(act.name)}</strong></div></div>
-            <p>${esc(act.desc)}</p>
+            <p>${esc(act.desc)}</p>${cls.credit?`<p style="font-size:10px;color:var(--muted);margin-top:-6px"><a href="${esc(cls.credit.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(cls.credit.text)}</a></p>`:''}
             <div class="cls-stats">
               ${actionRows(cls,state,a).map(([label,value,better])=>`<span${better?' class="up"':''}>${label} <b>${value}</b></span>`).join('')}
             </div>

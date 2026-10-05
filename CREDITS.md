@@ -12,6 +12,10 @@ require. They are also listed in the main menu under **Mods → Credits**.
   (http://creativecommons.org/licenses/by/4.0/).
   Changes: animated procedurally in the browser (no changes to the model file).
 
+## Classes
+
+- **Pilot class mech** (`export/web/mods/classes/models/mech.glb`, built locally by `.tools/build_mech.sh`, not committed): based on "Animated Mech - Marceline Sentinel Armor (Marcy)" (https://sketchfab.com/3d-models/animated-mech-marceline-sentinel-armor-marcy-9f169c3bcc61445993bf0ce269edc863) by RainOnTheMoon (https://sketchfab.com/RainOnTheMoon), licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/). Changes: forearms cut off at the elbows (the game mounts its own weapons there), the chest opened into a cockpit, animations removed and replaced by code, textures downsized.
+
 ## Sounds
 
 - **Zombie voices** (`export/web/mods/zombie-sounds/`): cut from "call of duty
