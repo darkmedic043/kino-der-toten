@@ -35,6 +35,14 @@ export default async function setup(api){
   if(mp40){
     api.data.weapons.cheese_gun={...mp40,id:'cheese_gun',baseId:'mp40_zm',name:'Cheese Gun',price:1000,damage:250,minDamage:250,clipSize:30,startAmmo:210,maxAmmo:210};
     for(const e of world.interactions)if(e.kind==='wallbuy'&&e.weapon==='mp40_zm')e.weapon='cheese_gun';
+    // Its own camo: the map's swiss cheese texture, always on this gun (the weapon-levels camo system paints it on the
+    // viewmodel, the held gun and the box). Added as a camo nobody can earn, so it only shows on the Cheese Gun.
+    const camos=window.kino.camo?.cats;
+    if(camos){
+      camos.challenges??={};camos.challenges.cheese='Own the Cheese Gun';
+      camos.camos.push({id:'cheese',name:'Swiss Cheese',challenge:'cheese',count:1,texture:new URL(api.map.dir.replace(/\/?$/,'/')+'camo/swiss_cheese.png',document.baseURI).href,scale:1.4,mix:.92});
+      Object.defineProperty(api.data.weapons.cheese_gun,'camo',{get:()=>'cheese',set(){},configurable:true,enumerable:true});
+    }
   }
 
   // ---- tweens for the small moving pieces (the static-scene optimizer froze their transforms, so update the matrices)

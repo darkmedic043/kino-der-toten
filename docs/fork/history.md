@@ -94,3 +94,4 @@
 - **2026-10-04 (doorways)**: zombies froze in narrow doorways (e.g. the Jugg alcove door): the straight step left the navmesh, `closest` found no point within 38 and the step was dropped every frame. `enemies.js` now hops a blocked zombie (0.5 s) to its next path point when that is within 130 units. Also: War Machine cage and holograms, Stark Tower prop.
 - **2026-10-04 (stands)**: Cheese Cube suit alcove doors and stands animate with the suits, the holograms turn at the map's speeds.
 - **2026-10-04 (cheese gun)**: the Cheese Gun is a real weapon now (an MP40 clone sold at its two wall buys); the Cheese Brothers need it instead of the Ray Gun. Verified by buying it, firing it at a brother from a clear vantage point (+2000).
+- **2026-10-04 (cheese camo)**: the Cheese Gun wears the map's swiss cheese texture through the camo system (fixed on that gun, a locked entry elsewhere).
