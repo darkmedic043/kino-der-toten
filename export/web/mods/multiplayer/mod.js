@@ -39,7 +39,7 @@ export default async function setup(api){
   const top=document.getElementById('top');if(top)for(const n of top.childNodes)if(n.nodeType===3&&/SOLO/.test(n.textContent))n.textContent=n.textContent.replace('SOLO','CO-OP');
 
   // ---- Panel and pause-menu additions ----------------------------------------------------
-  const remotes=new Map();
+  const remotes=new Map();net.remotes=remotes;   // other mods read teammates' avatars (the Mech class's mirrors and rear gun)
   function showPanel(error){
     if(error){panel.innerHTML=`<strong>CO-OP</strong><span class="err">${esc(error)}</span>`;return;}
     const status=id=>{if(id===net.id)return me.dead?' <em class="down">DEAD</em>':me.down?' <em class="down">DOWN</em>':'';const r=remotes.get(id);return r?.dead?' <em class="down">DEAD</em>':r?.down?' <em class="down">DOWN</em>':'';};

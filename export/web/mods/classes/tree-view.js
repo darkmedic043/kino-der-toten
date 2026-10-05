@@ -6,7 +6,7 @@
 // BL4 loadout: each tree header equips its action skill; clicking an unlocked
 // augment (free once its tier opens; of the equipped tree, 2 slots) or capstone
 // (a point, any tree, 1 slot) equips it.
-import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, actionRows, describe, actionOf, equippedTree, equipAction, toggleAugment, toggleCapstone, isEquipped, unlocked, pruneLoadout } from './classes.js';
+import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, actionRows, describe, actionOf, equippedTree, equipAction, toggleAugment, toggleCapstone, isEquipped, unlocked, pruneLoadout, mechWeapons, augmentsOn, equipArm } from './classes.js';
 
 const ICONS={
   turret:'<path d="M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4"/>',
@@ -31,6 +31,12 @@ const ICONS={
   magnet:'<path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4z"/>',
   flame:'<path d="M12 21c-4 0-6-3-6-6 0-4 4-6 4-10 3 2 4 4 4 6 1-1 1.5-2 1.5-3 2 2 2.5 4 2.5 6 0 4-2 7-6 7z"/>',
   bomb:'<circle cx="11" cy="14" r="6.5"/><path d="M15 9l3-3M18 6l1-1M17 3.5l.5 1.5M20.5 7l-1.5-.5"/>',
+  mech:'<path d="M9 3h6l2 4H7zM7 7h10v7H7zM10 9.5h4M4 8h3v6H4zM17 8h3v6h-3zM8 14l-1 7M16 14l1 7M6 21h3M15 21h3"/>',
+  chaingun:'<path d="M3 9h11v6H3zM14 10h7M14 12h7M14 14h7M6 15v3M10 15v3"/>',
+  rail:'<path d="M2 12h20M4 9h14v6H4zM7 9v6M11 9v6M15 9v6M18 12l3-2v4z"/>',
+  rockets:'<rect x="3" y="6" width="13" height="12" rx="1"/><circle cx="7" cy="10" r="1.5"/><circle cx="12" cy="10" r="1.5"/><circle cx="7" cy="14" r="1.5"/><circle cx="12" cy="14" r="1.5"/><path d="M16 12h5"/>',
+  fist:'<path d="M6 10h11a2 2 0 0 1 2 2v4a4 4 0 0 1-4 4H9a3 3 0 0 1-3-3zM9 10V6M12 10V5M15 10V6M6 13H4"/>',
+  mount:'<path d="M4 18h16M7 18l2-6h6l2 6M12 12V8M8 8h10M18 8l3-1M10 6h4"/>',
 };
 const icon=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]??ICONS.gear}</svg>`;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -103,6 +109,21 @@ export const CLASS_CSS=`
 .node.capstone{width:78px;height:86px}
 .node.capstone .shape{clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:linear-gradient(160deg,var(--tc),color-mix(in srgb,var(--tc) 30%,#000))}
 .node.capstone svg{width:32px;height:32px}
+.node.weapon{width:70px;height:62px}
+.node.weapon .shape{clip-path:polygon(12% 0,88% 0,100% 50%,88% 100%,12% 100%,0 50%);background:linear-gradient(160deg,color-mix(in srgb,var(--tc) 70%,#fff),color-mix(in srgb,var(--tc) 30%,#000))}
+.node.weapon svg{width:28px;height:28px}
+.tree-weapon{display:flex;align-items:center;gap:10px;margin:10px auto 2px;padding:7px 10px;border:1px solid color-mix(in srgb,var(--tc) 40%,transparent);background:#0008;width:fit-content;max-width:100%;color:var(--text);font:600 11px/1.1 inherit;letter-spacing:.06em}
+.tree-weapon svg{width:22px;height:22px;color:var(--tc);flex:none}.tree-weapon small{display:block;font-size:8px;letter-spacing:2px;color:var(--muted);margin-bottom:3px}
+.mech-arms{display:grid;gap:10px;margin-top:14px}
+.mech-arm{border:1px solid #ffffff1f;padding:8px;background:#0006}
+.mech-arm>small{display:block;font-size:8px;letter-spacing:2px;color:var(--muted);margin-bottom:6px}
+.mech-arm .chips{display:flex;flex-wrap:wrap;gap:4px}
+.mech-arm .chips button{display:flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid #ffffff26;background:#0009;color:#cfc8ba;font:600 9px/1 inherit;letter-spacing:.05em;cursor:pointer}
+.mech-arm .chips button svg{width:14px;height:14px;color:var(--wc)}
+.mech-arm .chips button.on{border-color:var(--wc);background:color-mix(in srgb,var(--wc) 25%,#000a);color:#fff}
+.mech-arm .augs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px}
+.mech-arm .augs div{border:1px dashed #ffffff26;padding:5px;font-size:8.5px;letter-spacing:1px;color:var(--muted);text-align:center}
+.mech-arm .augs div.full{border-style:solid;border-color:color-mix(in srgb,var(--wc) 70%,transparent);color:var(--text);background:color-mix(in srgb,var(--wc) 12%,transparent)}
 .node.can .shape{animation:nodepulse 1.6s ease-in-out infinite}
 .node.on{filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 9px var(--tc))}
 .node.on .shape{background:#fff}
@@ -124,6 +145,13 @@ export const CLASS_CSS=`
 
 export function renderClasses(root,cfg,{getState,setState}){
   let sel=null;
+  // Mech: a weapon on each arm (chips of the weapons unlocked so far) and that weapon's augment slots
+  function mechArms(cls,state){
+    const L=state.loadout,have=mechWeapons(cls,state),W=cls.mech.weapons,color=w=>cls.trees.find(t=>t.id===W[w].tree)?.color??'#888';
+    return `<div class="mech-arms">${[['left','LEFT ARM · LEFT CLICK'],['right','RIGHT ARM · RIGHT CLICK']].map(([arm,label])=>{const w=L[arm],augs=augmentsOn(cls,state,w);
+      return `<div class="mech-arm" style="--wc:${color(w)}"><small>${label}</small><div class="chips">${have.map(id=>`<button data-arm="${arm}" data-weapon="${id}" style="--wc:${color(id)}"${id===w?' class="on"':''}>${icon(W[id].icon)}${esc(W[id].name)}</button>`).join('')}</div>
+        <div class="augs">${[0,1].slice(0,cls.mech.augmentSlots??2).map(i=>`<div class="${augs[i]?'full':''}">${augs[i]?esc(augs[i].name):'AUGMENT '+(i+1)}</div>`).join('')}</div></div>`;}).join('')}</div>`;
+  }
   function draw(){
     const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0],state=st.classes[cls.id];
     const act=actionOf(cls,state),eq=equippedTree(cls,state),a=actionStats(cls,state),L=state.loadout;
@@ -134,32 +162,32 @@ export function renderClasses(root,cfg,{getState,setState}){
     root.innerHTML=`<div class="cls">
       ${cfg.classes.length>1?`<div class="cls-pick">${cfg.classes.map(c=>`<button data-class="${c.id}" style="--pc:${c.color}"${c.id===cls.id?' class="on"':''}>${icon(c.trees[0].action.icon)}${esc(c.name.toUpperCase())} <small>LV ${st.classes[c.id]?.level??1}</small></button>`).join('')}</div>`:''}
       <div class="cls-head">
-        <div class="cls-emblem">${icon(cls.id==='engineer'?'wrench':'shield')}</div>
+        <div class="cls-emblem">${icon(cls.id==='engineer'?'wrench':cls.mech?'mech':'shield')}</div>
         <div class="cls-title"><span class="eyebrow">CLASS</span><strong>${esc(cls.name.toUpperCase())}</strong><small>${esc(cls.tagline)}</small>
           <div class="cls-xp">LEVEL ${state.level}${maxed?' · MAX':''}<div class="bar"><i style="width:${maxed?100:Math.round(state.xp/need*100)}%"></i></div>${maxed?'':`${state.xp} / ${need} XP`}</div></div>
         <div class="cls-points"><b>${available(state)}</b><span>SKILL POINTS</span><br><button data-act="respec">RESPEC</button></div>
       </div>
       <div class="cls-body">
         <div class="cls-side">
-          <div class="cls-action" style="--cc:${eq.color}"><div class="top"><div class="ic">${icon(act.icon)}</div><div><span class="eyebrow">ACTION SKILL · Z · ${esc(eq.name.toUpperCase())}</span><strong>${esc(act.name)}</strong></div></div>
+          <div class="cls-action" style="--cc:${eq.color}"><div class="top"><div class="ic">${icon(act.icon)}</div><div><span class="eyebrow">ACTION SKILL · Z${cls.mech?'':' · '+esc(eq.name.toUpperCase())}</span><strong>${esc(act.name)}</strong></div></div>
             <p>${esc(act.desc)}</p>
             <div class="cls-stats">
               ${actionRows(cls,state,a).map(([label,value,better])=>`<span${better?' class="up"':''}>${label} <b>${value}</b></span>`).join('')}
             </div>
-            <div class="cls-loadout">${slot('AUGMENT 1',eq.nodes.find(n=>n.id===L.augments[0]),eq.color)}${slot('AUGMENT 2',eq.nodes.find(n=>n.id===L.augments[1]),eq.color)}${slot('CAPSTONE',capNode,capNode?.tc??'#888')}</div></div>
+            ${cls.mech?mechArms(cls,state)+`<div class="cls-loadout" style="grid-template-columns:1fr">${slot('CAPSTONE (CORE)',capNode,capNode?.tc??'#888')}</div>`:`<div class="cls-loadout">${slot('AUGMENT 1',eq.nodes.find(n=>n.id===L.augments[0]),eq.color)}${slot('AUGMENT 2',eq.nodes.find(n=>n.id===L.augments[1]),eq.color)}${slot('CAPSTONE',capNode,capNode?.tc??'#888')}</div>`}</div>
           <div class="cls-detail" id="cls-detail"></div>
         </div>
         <div class="cls-trees">${cls.trees.map(t=>{
           const spentT=treeSpent(cls,state,t.id),tiers=Math.max(...t.nodes.map(n=>n.tier)),fill=Math.min(1,spentT/tierNeed(cfg,tiers));
           return `<div class="tree" style="--tc:${t.color}"><div class="tree-head"><strong>${esc(t.name)}</strong><small>${esc(t.desc)}</small><br><span class="spent">${spentT} PTS</span>
-            <button class="tree-act${t.id===eq.id?' on':''}" data-equip="${t.id}">${icon(t.action.icon)}<span><small>${t.id===eq.id?'EQUIPPED':'EQUIP ACTION SKILL'}</small>${esc(t.action.name)}</span></button></div>
+            ${cls.mech?`<div class="tree-weapon">${icon(cls.mech.weapons[t.weapon].icon)}<span><small>BASE WEAPON</small>${esc(cls.mech.weapons[t.weapon].name)}</span></div>`:`<button class="tree-act${t.id===eq.id?' on':''}" data-equip="${t.id}">${icon(t.action.icon)}<span><small>${t.id===eq.id?'EQUIPPED':'EQUIP ACTION SKILL'}</small>${esc(t.action.name)}</span></button>`}</div>
             <div class="tree-body"><div class="spine"><i style="height:${fill*100}%"></i></div>
             ${Array.from({length:tiers},(_,i)=>{const tier=i+1,locked=spentT<tierNeed(cfg,tier);
               return `<div class="tier${locked?' locked':''}"><span class="need">${tier===1?'':(locked?'🔒 ':'')+tierNeed(cfg,tier)}</span>${t.nodes.filter(n=>n.tier===tier).map(n=>{
                 const aug=n.type==='augment',node={...n,tree:t.id},open=aug&&unlocked(cfg,cls,state,node),r=aug?(open?1:0):state.points[n.id]??0;
                 const slotted=aug||n.type==='capstone',on=slotted&&r>0&&isEquipped(state,node);
                 // free augments: lit when their tier is open, pulse when one could go in a free slot right now
-                const can=aug?open&&!on&&t.id===state.loadout.action&&state.loadout.augments.length<(cfg.augmentSlots??2):canAdd(cfg,cls,state,node);
+                const can=aug?open&&!on&&(cls.mech?[L.left,L.right].includes(n.weapon)&&augmentsOn(cls,state,n.weapon).length<(cls.mech.augmentSlots??2):t.id===state.loadout.action&&state.loadout.augments.length<(cfg.augmentSlots??2)):canAdd(cfg,cls,state,node);
                 return `<button class="node ${n.type??'passive'}${r?' invested':''}${r>=n.ranks?' max':''}${on?' on':''}${slotted&&r>0&&!on?' off':''}${can?' can':''}${sel===n.id?' sel':''}" data-node="${n.id}" data-tree="${t.id}">
                   <span class="shape"></span>${icon(n.icon)}${aug?'':`<span class="pips">${Array.from({length:n.ranks},(_,k)=>`<i${k<r?' class="on"':''}></i>`).join('')}</span>`}</button>`;}).join('')}</div>`;}).join('')}
             </div></div>`;}).join('')}</div>
@@ -171,13 +199,16 @@ export function renderClasses(root,cfg,{getState,setState}){
     const t=cls.trees.find(t=>t.nodes.some(n=>n.id===sel)),n=t?.nodes.find(n=>n.id===sel);
     if(!n){el.innerHTML=`<span class="kind">SKILL</span><p>Hover a skill to see what it does. Left click to spend a point, right click to take it back. Augments are free once their tier opens: click to equip two for your action skill. Every ${cfg.tierPoints} points in a tree opens its next tier.</p>`;return;}
     const node={...n,tree:t.id},locked=treeSpent(cls,state,t.id)<tierNeed(cfg,n.tier),r=n.type==='augment'?(locked?0:1):state.points[n.id]??0;
-    const kind=n.type==='augment'?'AUGMENT · '+esc(t.action.name.toUpperCase()):n.type==='capstone'?'CAPSTONE · ANY ACTION SKILL':'PASSIVE';
+    const W=cls.mech?.weapons,wname=n.weapon&&W?.[n.weapon]?.name;
+    const kind=n.type==='weapon'?'WEAPON UNLOCK':n.type==='augment'?'AUGMENT · '+esc((wname??t.action.name).toUpperCase()):n.type==='capstone'?(cls.mech?'CAPSTONE · MECH CORE':'CAPSTONE · ANY ACTION SKILL'):'PASSIVE';
     const eqd=isEquipped(state,node),L=state.loadout;
-    const why=n.type==='augment'?(r?(eqd?'Equipped. Click to unequip.':t.id!==L.action?`Equip ${esc(t.action.name)} to use this augment.`:L.augments.length>=(cfg.augmentSlots??2)?`Both augment slots are full: click one of the equipped ones to free a slot.`:'Unlocked. Click to equip (2 slots).'):'Free: unlocks when '+esc(t.name)+' reaches this tier. Only works on '+esc(t.action.name)+'.')
+    const why=cls.mech&&n.type==='weapon'?(r?`Unlocked: pick it for an arm in the loadout on the left.`:`Spend a point to unlock the ${esc(wname)}.`)
+      :cls.mech&&n.type==='augment'?(r?(eqd?'Equipped. Click to unequip.':![L.left,L.right].includes(n.weapon)?`Put the ${esc(wname)} on an arm to use this augment.`:augmentsOn(cls,state,n.weapon).length>=(cls.mech.augmentSlots??2)?`That arm's two augment slots are full.`:'Unlocked. Click to equip (2 per arm).'):`Free: unlocks when ${esc(t.name)} reaches this tier. Only works on the ${esc(wname)}.`)
+      :n.type==='augment'?(r?(eqd?'Equipped. Click to unequip.':t.id!==L.action?`Equip ${esc(t.action.name)} to use this augment.`:L.augments.length>=(cfg.augmentSlots??2)?`Both augment slots are full: click one of the equipped ones to free a slot.`:'Unlocked. Click to equip (2 slots).'):'Free: unlocks when '+esc(t.name)+' reaches this tier. Only works on '+esc(t.action.name)+'.')
       :n.type==='capstone'?(r?(eqd?'Equipped. Click to unequip.':'Click to equip (1 capstone, works with any action skill).'):'Spend a point to unlock it, then click to equip it.'):'';
     el.style.setProperty('--dc',t.color);
     el.innerHTML=`<span class="kind">${kind} · ${esc(t.name.toUpperCase())}</span><strong>${esc(n.name)}</strong><span class="rank">${n.type==='augment'?(r?'UNLOCKED':'LOCKED'):`RANK ${r} / ${n.ranks}`}</span>
-      <p>${esc(describe(n,r||1))}</p>${r&&r<n.ranks?`<p class="next">Next rank: ${esc(describe(n,r+1))}</p>`:''}
+      <p>${esc(describe(n,r||1))}${n.type==='weapon'&&W?.[n.weapon]?' '+esc(W[n.weapon].desc):''}</p>${r&&r<n.ranks?`<p class="next">Next rank: ${esc(describe(n,r+1))}</p>`:''}
       ${why?`<div class="why">${why}</div>`:''}
       ${locked?`<div class="lock">Needs ${tierNeed(cfg,n.tier)} points in ${esc(t.name)} (${treeSpent(cls,state,t.id)} spent)</div>`:''}
       ${!locked&&r<n.ranks&&available(state)<=0?`<div class="lock">No skill points: level the ${esc(cls.name)} up by playing as it.</div>`:''}`;
@@ -200,9 +231,10 @@ export function renderClasses(root,cfg,{getState,setState}){
     setState(st);draw();
   }
   root.addEventListener('click',e=>{
-    const eqb=e.target.closest('[data-equip]');if(eqb){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];equipAction(cls,st.classes[cls.id],eqb.dataset.equip);setState(st);draw();return;}
+    const armb=e.target.closest('[data-arm]');if(armb){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];equipArm(cls,st.classes[cls.id],armb.dataset.arm,armb.dataset.weapon);setState(st);draw();return;}
+        const eqb=e.target.closest('[data-equip]');if(eqb){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];equipAction(cls,st.classes[cls.id],eqb.dataset.equip);setState(st);draw();return;}
     const pick=e.target.closest('[data-class]');if(pick){const st=getState();st.selected=pick.dataset.class;setState(st);sel=null;draw();return;}
-    if(e.target.closest('[data-act="respec"]')){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];st.classes[cls.id].points={};st.classes[cls.id].loadout={action:st.classes[cls.id].loadout?.action??cls.trees[0].id,augments:[],capstone:null};setState(st);draw();return;}
+    if(e.target.closest('[data-act="respec"]')){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];st.classes[cls.id].points={};st.classes[cls.id].loadout={action:st.classes[cls.id].loadout?.action??cls.trees[0].id,augments:[],capstone:null,left:st.classes[cls.id].loadout?.left,right:st.classes[cls.id].loadout?.right};pruneLoadout(cfg,cls,st.classes[cls.id]);setState(st);draw();return;}
     change(e,1);
   });
   root.addEventListener('contextmenu',e=>change(e,-1));

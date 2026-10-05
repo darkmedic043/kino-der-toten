@@ -27,6 +27,7 @@ export function loadClassProfile(cfg){
       const best=[...c.trees].sort((a,b)=>treeSpent(c,s,b.id)-treeSpent(c,s,a.id))[0];
       s.loadout={action:best.id,augments:best.nodes.filter(n=>n.type==='augment'&&unlocked(cfg,c,s,{...n,tree:best.id})).slice(0,cfg.augmentSlots??2).map(n=>n.id)};
     }
+    if(c.mech){const w=mechWeapons(c,s);if(!w.includes(s.loadout.left))s.loadout.left=c.trees[0].weapon;if(!w.includes(s.loadout.right)||s.loadout.right===s.loadout.left)s.loadout.right=c.trees[1].weapon;}
     if(s.loadout.capstone&&!s.points[s.loadout.capstone])s.loadout.capstone=null;
     s.loadout.capstone??=nodes(c).find(n=>n.type==='capstone'&&s.points[n.id])?.id??null;
     pruneLoadout(cfg,c,s);
@@ -51,7 +52,13 @@ export const tierNeed=(cfg,tier)=>(tier-1)*cfg.tierPoints;
 export const unlocked=(cfg,cls,state,node)=>treeSpent(cls,state,node.tree)>=tierNeed(cfg,node.tier);
 // Drop equipped augments that are no longer usable (tier relocked, other tree) and a capstone without its point.
 export function pruneLoadout(cfg,cls,state){
-  const L=state.loadout,t=tree(cls,L.action);
+  const L=state.loadout;
+  if(cls.mech){   // mech: augments follow the weapon on each arm, up to mech.augmentSlots per arm
+    const w=mechWeapons(cls,state);if(!w.includes(L.left))L.left=cls.trees[0].weapon;if(!w.includes(L.right)||L.right===L.left)L.right=w.find(x=>x!==L.left);
+    const per={};L.augments=(L.augments??[]).filter(id=>{const n=nodes(cls).find(n=>n.id===id);if(!n||n.type!=='augment'||!unlocked(cfg,cls,state,n)||![L.left,L.right].includes(n.weapon))return false;per[n.weapon]=(per[n.weapon]??0)+1;return per[n.weapon]<=(cls.mech.augmentSlots??2);});
+    if(L.capstone&&!state.points[L.capstone])L.capstone=null;return;
+  }
+  const t=tree(cls,L.action);
   L.augments=(L.augments??[]).filter(id=>{const n=t.nodes.find(n=>n.id===id);return n&&unlocked(cfg,cls,state,{...n,tree:t.id});}).slice(0,cfg.augmentSlots??2);
   if(L.capstone&&!state.points[L.capstone])L.capstone=null;
 }
@@ -85,6 +92,11 @@ export function toggleAugment(cfg,cls,state,node){
   const l=state.loadout,slots=cfg.augmentSlots??2;
   if(l.augments.includes(node.id)){l.augments=l.augments.filter(id=>id!==node.id);return null;}
   if(!unlocked(cfg,cls,state,node))return 'locked';
+  if(cls.mech){   // a mech augment works on its weapon, on whichever arm holds it
+    if(![l.left,l.right].includes(node.weapon))return 'weapon';
+    if(augmentsOn(cls,state,node.weapon).length>=(cls.mech.augmentSlots??2))return 'full';
+    l.augments.push(node.id);return null;
+  }
   if(node.tree!==l.action)return 'tree';
   if(l.augments.length>=slots)return 'full';
   l.augments.push(node.id);return null;
@@ -117,6 +129,7 @@ export function actionStats(cls,state){
   const dmg=1+k('ability.damage'),dur=1+k('ability.duration'),cd=b.cooldown*Math.max(.3,1-k('ability.cooldown')),rate=1+k('ability.rate'),size=1+k('ability.size'),slow=k('ability.slow'),two=!!k('cap.double');
   const common={cooldown:cd,dmgMul:dmg,slow:Math.min(.8,slow)};
   switch(act.id){
+    case 'mech':{const m=mechStats(cls,state).mech;return {...common,cooldown:m.cooldown,duration:m.duration,hitCost:m.hitCost};}
     case 'wall':return {...common,health:Math.round(b.health*dur*(two?.75:1)),width:b.width*size,height:b.height,count:two?2:1};
     case 'snare':return {...common,radius:b.radius*size,durability:Math.round(b.durability*dur),damage:b.damage*dmg,tick:.5/rate,slow:Math.min(.85,b.slow+slow),count:two?2:1};
     case 'nest':return {...common,health:Math.round(b.health*(k('nest.ring')?4:3)*dur*(two?1.75:1)),   // one pool for the whole nest
@@ -131,6 +144,7 @@ export function actionRows(cls,state,a){
   const act=actionOf(cls,state),b=act.base,up=(x,y)=>Math.abs(x-y)>1e-6,pct=v=>Math.round(v*100)+'%',sec=v=>v.toFixed(0)+'s';
   const cdRow=['COOLDOWN',sec(a.cooldown),up(a.cooldown,b.cooldown)],slowRow=['SLOW',a.slow?pct(a.slow):'—',a.slow>0];
   switch(act.id){
+    case 'mech':return [cdRow,['INTEGRITY',sec(a.duration),up(a.duration,b.duration)],['PER HIT','−'+a.hitCost.toFixed(1)+'s',up(a.hitCost,b.hitCost)],['ARMS','LMB · RMB',false]];
     case 'wall':return [cdRow,['LASTS','UNTIL BROKEN',false],['HITS',String(a.health),a.health!==b.health],['WIDTH',String(Math.round(a.width)),up(a.width,b.width)],['DAMAGE',pct(a.dmgMul-1)==='0%'?'—':'+'+pct(a.dmgMul-1),a.dmgMul>1],['WALLS',String(a.count),a.count>1]];
     case 'snare':return [cdRow,['LASTS','UNTIL WORN',false],['WEAR',a.durability+' zombie-s',a.durability!==b.durability],['DAMAGE',pct(a.damage)+'/s',up(a.damage,b.damage)],['SLOW',pct(a.slow),up(a.slow,b.slow)],['RADIUS',String(Math.round(a.radius)),up(a.radius,b.radius)]];
     case 'nest':return [cdRow,['LASTS','UNTIL BROKEN',false],['HITS (WHOLE NEST)',String(a.health),false],['RADIUS',String(Math.round(a.radius)),up(a.radius,b.radius)],['DAMAGE',pct(a.dmgMul-1)==='0%'?'—':'+'+pct(a.dmgMul-1),a.dmgMul>1],['WALLS',String(a.segments),a.segments>3]];
@@ -143,4 +157,44 @@ export function describe(node,rank){
   const k=Object.keys(node.effects??{})[0],per=node.effects?.[k]??0,v=per*Math.max(1,rank);
   const txt=node.fmt==='s'?+v.toFixed(1):node.fmt==='n'?Math.round(v):Math.round(v*100);
   return node.desc.replace('{v}',txt);
+}
+
+// ---- the Mech class ----------------------------------------------------------------------------
+// Each tree has a weapon (tree.weapon, always available) and unlocks a second one halfway down (a `weapon` node: a
+// point, like a passive). The loadout puts one weapon on each arm (loadout.left / loadout.right, never the same);
+// augments carry the weapon they modify (node.weapon) and work while that weapon is on an arm, up to
+// mech.augmentSlots per arm. Weapon numbers: cls.mech.weapons; the trees' stats scale them (mechWeapon).
+export function mechWeapons(cls,state){
+  const out=cls.trees.map(t=>t.weapon).filter(Boolean);
+  for(const n of nodes(cls))if(n.type==='weapon'&&state.points?.[n.id]>0&&!out.includes(n.weapon))out.push(n.weapon);
+  return out;
+}
+export const augmentsOn=(cls,state,weapon)=>(state.loadout?.augments??[]).map(id=>nodes(cls).find(n=>n.id===id)).filter(n=>n?.weapon===weapon);
+export function equipArm(cls,state,arm,weapon){
+  const L=state.loadout,other=arm==='left'?'right':'left';
+  if(!mechWeapons(cls,state).includes(weapon))return;
+  if(L[other]===weapon)L[other]=L[arm];   // swap arms
+  L[arm]=weapon;
+  L.augments=(L.augments??[]).filter(id=>{const n=nodes(cls).find(n=>n.id===id);return n&&[L.left,L.right].includes(n.weapon);});
+}
+// The mech's own numbers (integrity, cooldown, hit cost, speed) and each weapon's, with the trees applied.
+export function mechStats(cls,state){
+  const s=stats(cls,state),k=(key,def=0)=>s[key]??def,b=actionOf(cls,state).base;
+  const mech={cooldown:b.cooldown*Math.max(.35,1-k('mech.cooldown')),duration:b.duration*(1+k('mech.duration')),hitCost:b.hitCost*Math.max(.25,1-k('mech.armor')),
+    cool:1+k('mech.cool'),speed:1+k('mech.speed'),mount:!!k('mech.mount'),mountDamage:1+k('mech.mountDamage'),killTime:k('mech.killTime'),riderTime:k('mech.riderTime'),
+    regen:k('mech.regen'),eject:k('mech.eject'),killPoints:k('mech.killPoints'),burn:1+k('mech.burn'),radius:1+k('mech.radius'),
+    smart:k('cap.core.smart'),salvoCore:k('cap.core.salvo'),berserk:k('cap.core.berserk')};
+  return {mech,stats:s,left:mechWeapon(cls,s,state.loadout.left),right:mechWeapon(cls,s,state.loadout.right)};
+}
+export function mechWeapon(cls,s,id){
+  const w=cls.mech.weapons[id];if(!w)return null;const k=(key,def=0)=>s[key]??def;
+  const dmg=1+k('mech.damage.'+w.kind),aug=key=>k(id+'.'+key);
+  const out={...w,id,damageMul:dmg};
+  if(id==='chaingun')Object.assign(out,{rate:w.rate*(1+aug('rate')),spread:w.spread*Math.max(.2,1-aug('spread')),spin:aug('nospin')?0:w.spin,pierce:aug('pierce'),burn:!!aug('burn')});
+  if(id==='rail')Object.assign(out,{charge:w.charge/(1+aug('charge')),blast:!!aug('blast'),split:aug('split')||1});
+  if(id==='salvo')Object.assign(out,{count:w.count+aug('count'),refire:w.refire/(1+k('ordnance.rate')),homing:!!aug('homing'),cluster:aug('cluster'),radius:w.radius*(1+k('mech.radius'))});
+  if(id==='thermite')Object.assign(out,{refire:w.refire/(1+k('ordnance.rate')),pool:w.pool*(1+aug('long')),split:aug('split')||1,radius:w.radius*(1+k('mech.radius')),burn:w.burn*(1+k('mech.burn'))});
+  if(id==='fist')Object.assign(out,{pound:!!aug('pound'),dash:!!aug('dash'),execute:aug('execute')});
+  if(id==='arc')Object.assign(out,{range:w.range*(1+aug('range')),chain:w.chain+aug('chain'),stun:!!aug('stun')});
+  return out;
 }

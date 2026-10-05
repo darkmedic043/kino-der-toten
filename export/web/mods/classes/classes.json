@@ -1316,6 +1316,763 @@
           ]
         }
       ]
+    },
+    {
+      "id": "mech",
+      "name": "Mech",
+      "tagline": "Call down a mech. Two arms, two weapons, one integrity bar.",
+      "color": "#9ccf5a",
+      "mech": {
+        "weapons": {
+          "chaingun": {
+            "name": "Thresher Chaingun",
+            "icon": "chaingun",
+            "tree": "ballistics",
+            "kind": "ballistic",
+            "mode": "auto",
+            "desc": "Hold to spin up and fire a stream of heavy rounds.",
+            "rate": 13,
+            "damage": 0.12,
+            "flat": 30,
+            "heat": 0.022,
+            "spin": 0.45,
+            "spread": 0.018,
+            "range": 3200
+          },
+          "rail": {
+            "name": "Longbow Rail",
+            "icon": "rail",
+            "tree": "ballistics",
+            "kind": "ballistic",
+            "mode": "charge",
+            "desc": "Hold to charge, release to fire a beam that pierces every zombie in a line. A full charge hits far harder.",
+            "charge": 1.1,
+            "damage": 0.7,
+            "full": 2.2,
+            "heat": 0.32,
+            "range": 4000,
+            "refire": 0.35
+          },
+          "salvo": {
+            "name": "Quad Rocket Pod",
+            "icon": "rockets",
+            "tree": "ordnance",
+            "kind": "ordnance",
+            "mode": "semi",
+            "desc": "Four dumbfire rockets per pull, each with its own blast.",
+            "count": 4,
+            "damage": 0.42,
+            "radius": 130,
+            "speed": 1900,
+            "heat": 0.2,
+            "refire": 0.6
+          },
+          "thermite": {
+            "name": "Thermite Launcher",
+            "icon": "flame",
+            "tree": "ordnance",
+            "kind": "ordnance",
+            "mode": "semi",
+            "desc": "Lobs a thermite shell that bursts into a pool of fire, burning zombies that walk through it.",
+            "damage": 0.3,
+            "radius": 125,
+            "burn": 0.32,
+            "pool": 4.5,
+            "speed": 1350,
+            "heat": 0.28,
+            "refire": 0.8
+          },
+          "fist": {
+            "name": "Hydraulic Fist",
+            "icon": "fist",
+            "tree": "vanguard",
+            "kind": "brawl",
+            "mode": "semi",
+            "desc": "A piston-driven punch that crushes everything in front of you and throws the rest back.",
+            "damage": 1.1,
+            "range": 135,
+            "arc": 70,
+            "knock": 140,
+            "heat": 0.11,
+            "refire": 0.5
+          },
+          "arc": {
+            "name": "Arc Thrower",
+            "icon": "bolt",
+            "tree": "vanguard",
+            "kind": "brawl",
+            "mode": "beam",
+            "desc": "Hold to throw a lightning arc at the nearest zombie in front of you; it jumps to more nearby.",
+            "damage": 0.085,
+            "tick": 0.1,
+            "range": 650,
+            "chain": 2,
+            "chainRange": 230,
+            "heat": 0.035
+          }
+        },
+        "augmentSlots": 2
+      },
+      "trees": [
+        {
+          "id": "ballistics",
+          "name": "Ballistics",
+          "color": "#e2b13c",
+          "desc": "Guns that chew through hordes.",
+          "weapon": "chaingun",
+          "action": {
+            "id": "mech",
+            "name": "Call In Mech",
+            "icon": "mech",
+            "desc": "Call a mech down from orbit: it crushes what it lands on and you climb in. Left click fires the left arm, right click the right arm; each weapon has its own heat. Hits land on the mech, not you: every hit takes time off its integrity bar, and when the bar runs out you eject. Press again to eject early.",
+            "base": {
+              "cooldown": 150,
+              "duration": 45,
+              "hitCost": 1.4
+            }
+          },
+          "nodes": [
+            {
+              "id": "mshroud",
+              "name": "Barrel Shroud",
+              "ranks": 5,
+              "icon": "crosshair",
+              "desc": "Chaingun and Rail damage +{v}%.",
+              "effects": {
+                "mech.damage.ballistic": 0.05
+              },
+              "tier": 1
+            },
+            {
+              "id": "msinks",
+              "name": "Heat Sinks",
+              "ranks": 5,
+              "icon": "snow",
+              "desc": "Every mech weapon sheds heat {v}% faster.",
+              "effects": {
+                "mech.cool": 0.06
+              },
+              "tier": 1
+            },
+            {
+              "id": "mframe",
+              "name": "Reinforced Frame",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Mech integrity +{v}%: the bar is longer.",
+              "effects": {
+                "mech.duration": 0.06
+              },
+              "tier": 1
+            },
+            {
+              "id": "mtungsten",
+              "name": "Tungsten Rounds",
+              "ranks": 5,
+              "icon": "target",
+              "desc": "Chaingun and Rail damage +{v}%.",
+              "effects": {
+                "mech.damage.ballistic": 0.05
+              },
+              "tier": 2
+            },
+            {
+              "id": "mgyro",
+              "name": "Gyro Stabilizers",
+              "ranks": 3,
+              "icon": "crosshair",
+              "desc": "Chaingun spread −{v}%.",
+              "effects": {
+                "chaingun.spread": 0.12
+              },
+              "tier": 2
+            },
+            {
+              "id": "mspinlock",
+              "name": "Spin Lock",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "chaingun",
+              "icon": "gear",
+              "desc": "The chaingun keeps its barrels spinning: no spin-up.",
+              "effects": {
+                "chaingun.nospin": 1
+              }
+            },
+            {
+              "id": "mplating",
+              "name": "Composite Plating",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Each hit takes {v}% less off the integrity bar.",
+              "effects": {
+                "mech.armor": 0.06
+              },
+              "tier": 3
+            },
+            {
+              "id": "mrail",
+              "name": "Longbow Rail",
+              "tier": 3,
+              "ranks": 1,
+              "type": "weapon",
+              "weapon": "rail",
+              "icon": "rail",
+              "desc": "Unlocks the Longbow Rail for either arm.",
+              "effects": {}
+            },
+            {
+              "id": "mshred",
+              "name": "Shredder Rounds",
+              "tier": 3,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "chaingun",
+              "icon": "target",
+              "desc": "Chaingun rounds punch through one zombie into the next.",
+              "effects": {
+                "chaingun.pierce": 1
+              }
+            },
+            {
+              "id": "mcaps",
+              "name": "Capacitor Banks",
+              "ranks": 5,
+              "icon": "bolt",
+              "desc": "The Rail charges {v}% faster.",
+              "effects": {
+                "rail.charge": 0.08
+              },
+              "tier": 4
+            },
+            {
+              "id": "moverchg",
+              "name": "Overcharge",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "rail",
+              "icon": "bomb",
+              "desc": "A fully charged Rail shot explodes where it ends.",
+              "effects": {
+                "rail.blast": 1
+              }
+            },
+            {
+              "id": "mincend",
+              "name": "Incendiary Belt",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "chaingun",
+              "icon": "flame",
+              "desc": "Chaingun hits set zombies on fire.",
+              "effects": {
+                "chaingun.burn": 1
+              }
+            },
+            {
+              "id": "mfeed",
+              "name": "Ammo Feed",
+              "ranks": 5,
+              "icon": "gear",
+              "desc": "Chaingun fire rate +{v}%.",
+              "effects": {
+                "chaingun.rate": 0.05
+              },
+              "tier": 5
+            },
+            {
+              "id": "msplit",
+              "name": "Ion Splitter",
+              "tier": 5,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "rail",
+              "icon": "double",
+              "desc": "The Rail beam splits into three.",
+              "effects": {
+                "rail.split": 3
+              }
+            },
+            {
+              "id": "mkillfeed",
+              "name": "Kill Feed",
+              "ranks": 3,
+              "icon": "heart",
+              "desc": "Each kill while piloting adds {v}s to the integrity bar.",
+              "effects": {
+                "mech.killTime": 0.15
+              },
+              "fmt": "s",
+              "tier": 5
+            },
+            {
+              "id": "mflush",
+              "name": "Coolant Flush",
+              "ranks": 5,
+              "icon": "snow",
+              "desc": "Every mech weapon sheds heat {v}% faster.",
+              "effects": {
+                "mech.cool": 0.05
+              },
+              "tier": 6
+            },
+            {
+              "id": "msmartcore",
+              "name": "Smart Core",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "target",
+              "desc": "Capstone: for the first 10s after the mech lands, its weapons build no heat and hit 25% harder.",
+              "effects": {
+                "cap.core.smart": 10
+              }
+            }
+          ]
+        },
+        {
+          "id": "ordnance",
+          "name": "Ordnance",
+          "color": "#d9643a",
+          "desc": "Explosives by the rack.",
+          "weapon": "salvo",
+          "action": {
+            "id": "mech",
+            "name": "Call In Mech",
+            "icon": "mech",
+            "desc": "Call a mech down from orbit: it crushes what it lands on and you climb in. Left click fires the left arm, right click the right arm; each weapon has its own heat. Hits land on the mech, not you: every hit takes time off its integrity bar, and when the bar runs out you eject. Press again to eject early.",
+            "base": {
+              "cooldown": 150,
+              "duration": 45,
+              "hitCost": 1.4
+            }
+          },
+          "nodes": [
+            {
+              "id": "mwarheads",
+              "name": "Warheads",
+              "ranks": 5,
+              "icon": "bomb",
+              "desc": "Rocket and Thermite damage +{v}%.",
+              "effects": {
+                "mech.damage.ordnance": 0.05
+              },
+              "tier": 1
+            },
+            {
+              "id": "mblast",
+              "name": "Blast Radius",
+              "ranks": 5,
+              "icon": "target",
+              "desc": "Rocket and Thermite radius +{v}%.",
+              "effects": {
+                "mech.radius": 0.05
+              },
+              "tier": 1
+            },
+            {
+              "id": "mbeacon",
+              "name": "Orbital Beacon",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Mech cooldown −{v}%.",
+              "effects": {
+                "mech.cooldown": 0.04
+              },
+              "tier": 1
+            },
+            {
+              "id": "mreactive",
+              "name": "Reactive Armour",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Each hit takes {v}% less off the integrity bar.",
+              "effects": {
+                "mech.armor": 0.05
+              },
+              "tier": 2
+            },
+            {
+              "id": "mloader",
+              "name": "Autoloader",
+              "ranks": 3,
+              "icon": "gear",
+              "desc": "Rocket Pod and Thermite fire {v}% faster.",
+              "effects": {
+                "ordnance.rate": 0.06
+              },
+              "tier": 2
+            },
+            {
+              "id": "mtracker",
+              "name": "Tracker Rockets",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "salvo",
+              "icon": "crosshair",
+              "desc": "Rockets curve onto the zombie nearest the crosshair.",
+              "effects": {
+                "salvo.homing": 1
+              }
+            },
+            {
+              "id": "mdemopay",
+              "name": "Demolition Pay",
+              "ranks": 3,
+              "icon": "coin",
+              "desc": "+{v} points for each kill by your mech.",
+              "effects": {
+                "mech.killPoints": 10
+              },
+              "fmt": "n",
+              "tier": 3
+            },
+            {
+              "id": "mthermite",
+              "name": "Thermite Launcher",
+              "tier": 3,
+              "ranks": 1,
+              "type": "weapon",
+              "weapon": "thermite",
+              "icon": "flame",
+              "desc": "Unlocks the Thermite Launcher for either arm.",
+              "effects": {}
+            },
+            {
+              "id": "mcluster",
+              "name": "Cluster Warheads",
+              "tier": 3,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "salvo",
+              "icon": "grenade",
+              "desc": "Each rocket scatters three bomblets.",
+              "effects": {
+                "salvo.cluster": 3
+              }
+            },
+            {
+              "id": "mnapalm",
+              "name": "Napalm Mix",
+              "ranks": 5,
+              "icon": "flame",
+              "desc": "Mech burn damage +{v}%.",
+              "effects": {
+                "mech.burn": 0.1
+              },
+              "tier": 4
+            },
+            {
+              "id": "mslowburn",
+              "name": "Slow Burn",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "thermite",
+              "icon": "clock",
+              "desc": "Thermite fire lasts 60% longer.",
+              "effects": {
+                "thermite.long": 0.6
+              }
+            },
+            {
+              "id": "mbigpod",
+              "name": "Big Payload",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "salvo",
+              "icon": "double",
+              "desc": "Six rockets per pull instead of four.",
+              "effects": {
+                "salvo.count": 2
+              }
+            },
+            {
+              "id": "meject",
+              "name": "Ejection Charge",
+              "ranks": 3,
+              "icon": "bomb",
+              "desc": "When the mech goes down it explodes for {v}% of a zombie's health.",
+              "effects": {
+                "mech.eject": 0.6
+              },
+              "tier": 5
+            },
+            {
+              "id": "mvents",
+              "name": "Exhaust Vents",
+              "ranks": 5,
+              "icon": "snow",
+              "desc": "Every mech weapon sheds heat {v}% faster.",
+              "effects": {
+                "mech.cool": 0.05
+              },
+              "tier": 5
+            },
+            {
+              "id": "mmeteor",
+              "name": "Meteor",
+              "tier": 5,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "thermite",
+              "icon": "grenade",
+              "desc": "Thermite shells split into three fire pools.",
+              "effects": {
+                "thermite.split": 3
+              }
+            },
+            {
+              "id": "mwarheads2",
+              "name": "Shaped Charges",
+              "ranks": 5,
+              "icon": "bomb",
+              "desc": "Rocket and Thermite damage +{v}%.",
+              "effects": {
+                "mech.damage.ordnance": 0.06
+              },
+              "tier": 6
+            },
+            {
+              "id": "msalvocore",
+              "name": "Salvo Core",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "rockets",
+              "desc": "Capstone: fire both arms together while both are cool to launch a 16-rocket barrage, once per drop.",
+              "effects": {
+                "cap.core.salvo": 16
+              }
+            }
+          ]
+        },
+        {
+          "id": "vanguard",
+          "name": "Vanguard",
+          "color": "#58b8d8",
+          "desc": "Up close, and a gunner on your back.",
+          "weapon": "fist",
+          "action": {
+            "id": "mech",
+            "name": "Call In Mech",
+            "icon": "mech",
+            "desc": "Call a mech down from orbit: it crushes what it lands on and you climb in. Left click fires the left arm, right click the right arm; each weapon has its own heat. Hits land on the mech, not you: every hit takes time off its integrity bar, and when the bar runs out you eject. Press again to eject early.",
+            "base": {
+              "cooldown": 150,
+              "duration": 45,
+              "hitCost": 1.4
+            }
+          },
+          "nodes": [
+            {
+              "id": "mservo",
+              "name": "Servo Strength",
+              "ranks": 5,
+              "icon": "fist",
+              "desc": "Fist and Arc damage +{v}%.",
+              "effects": {
+                "mech.damage.brawl": 0.06
+              },
+              "tier": 1
+            },
+            {
+              "id": "mabsorb",
+              "name": "Shock Absorbers",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Each hit takes {v}% less off the integrity bar.",
+              "effects": {
+                "mech.armor": 0.05
+              },
+              "tier": 1
+            },
+            {
+              "id": "mstride",
+              "name": "Long Stride",
+              "ranks": 5,
+              "icon": "gear",
+              "desc": "Mech move speed +{v}%.",
+              "effects": {
+                "mech.speed": 0.04
+              },
+              "tier": 1
+            },
+            {
+              "id": "mhardpoint",
+              "name": "Rear Hardpoint",
+              "ranks": 1,
+              "icon": "mount",
+              "desc": "A machine gun on the mech's back: in co-op a teammate can climb on (F) to shoot from it. Riders can't be hurt.",
+              "effects": {
+                "mech.mount": 1
+              },
+              "tier": 2
+            },
+            {
+              "id": "mgunner",
+              "name": "Gunner Training",
+              "ranks": 3,
+              "icon": "crosshair",
+              "desc": "Rear gun damage +{v}%.",
+              "effects": {
+                "mech.mountDamage": 0.12
+              },
+              "tier": 2
+            },
+            {
+              "id": "mpound",
+              "name": "Ground Pound",
+              "tier": 2,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "fist",
+              "icon": "bomb",
+              "desc": "Punches also slam the ground, hitting every zombie around you.",
+              "effects": {
+                "fist.pound": 1
+              }
+            },
+            {
+              "id": "mbattery",
+              "name": "Battery Cells",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Mech integrity +{v}%: the bar is longer.",
+              "effects": {
+                "mech.duration": 0.06
+              },
+              "tier": 3
+            },
+            {
+              "id": "marc",
+              "name": "Arc Thrower",
+              "tier": 3,
+              "ranks": 1,
+              "type": "weapon",
+              "weapon": "arc",
+              "icon": "bolt",
+              "desc": "Unlocks the Arc Thrower for either arm.",
+              "effects": {}
+            },
+            {
+              "id": "mrocketfist",
+              "name": "Rocket Fist",
+              "tier": 3,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "fist",
+              "icon": "fist",
+              "desc": "Punching drives the mech forward into the crowd.",
+              "effects": {
+                "fist.dash": 1
+              }
+            },
+            {
+              "id": "mconduct",
+              "name": "Conductors",
+              "ranks": 5,
+              "icon": "bolt",
+              "desc": "Arc range +{v}%.",
+              "effects": {
+                "arc.range": 0.08
+              },
+              "tier": 4
+            },
+            {
+              "id": "moverload",
+              "name": "Overload",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "arc",
+              "icon": "double",
+              "desc": "Arcs jump to two more zombies.",
+              "effects": {
+                "arc.chain": 2
+              }
+            },
+            {
+              "id": "mexecute",
+              "name": "Execution",
+              "tier": 4,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "fist",
+              "icon": "target",
+              "desc": "Punches kill zombies below 40% health outright.",
+              "effects": {
+                "fist.execute": 0.4
+              }
+            },
+            {
+              "id": "mrepair",
+              "name": "Repair Drones",
+              "ranks": 3,
+              "icon": "heart",
+              "desc": "Integrity regenerates {v}s a second after 3s without a hit.",
+              "effects": {
+                "mech.regen": 0.3
+              },
+              "fmt": "s",
+              "tier": 5
+            },
+            {
+              "id": "mcover",
+              "name": "Covering Fire",
+              "ranks": 3,
+              "icon": "coin",
+              "desc": "Each kill by your rear gunner adds {v}s to the integrity bar.",
+              "effects": {
+                "mech.riderTime": 0.3
+              },
+              "fmt": "s",
+              "tier": 5
+            },
+            {
+              "id": "mstatic",
+              "name": "Static Field",
+              "tier": 5,
+              "ranks": 1,
+              "type": "augment",
+              "weapon": "arc",
+              "icon": "snow",
+              "desc": "Arcs stun the zombies they hit.",
+              "effects": {
+                "arc.stun": 1
+              }
+            },
+            {
+              "id": "mbond",
+              "name": "Neural Link",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Mech integrity +{v}%: the bar is longer.",
+              "effects": {
+                "mech.duration": 0.05
+              },
+              "tier": 6
+            },
+            {
+              "id": "mberserk",
+              "name": "Berserker Core",
+              "tier": 6,
+              "ranks": 1,
+              "type": "capstone",
+              "icon": "fist",
+              "desc": "Capstone: every kill restores 0.5s of integrity.",
+              "effects": {
+                "cap.core.berserk": 0.5
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "augmentSlots": 2,

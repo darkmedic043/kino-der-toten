@@ -53,3 +53,48 @@ User requests: passives must work with every action skill, neutral wording ("Abi
 - **2026-10-03 tweaks**: Fortifier cooldowns raised (wall 75 s, snare 65 s, nest 80 s). The Sandbag Nest's segments share one pool of hits (`addSegment(..., pool)`: `hits`/`maxHits` become accessors on the pool; base 25 × segments; a hit on any side shakes every segment; regen and Field Repairs count once per pool via `unique()`; the nest falls together). The HUD skill hex has a health bar (`other.health()`: a wall, the whole nest, or the wire's wear) that turns red under 30%.
 - **Co-op (2026-10-05, `coop.js`)**: other players see your action skill. The owner sends, 10×/s, adds/removes of what stands (turrets, steel walls, sandbag segments, wire fields, claymores, drones, beacons), drone/following-beacon positions and wall wear; turret/drone tracers and skill blasts as they happen (`{t:'ab', op}`). Everyone else builds mirrors from the same models (the builders are module-level exports now: `steelWall`, `sandbags`, `wireField`, `mineModel`, `droneModel`, `beaconModel`). Damage already reached the host like gunshots. The host's mirrors of walls/sandbags hold its (real) zombies and send each strike to the owner (`op:'hit'`), whose wall loses the hit (pool-aware) and disappears for everyone when broken; mirrored wire slows zombies inside on the host. A guest's own walls don't hold locally (their zombies are copies; strikes would count twice). Mirrors block players. Late joiners get what is standing; a leaver's mirrors are removed. Verified with two browsers: a guest's sandbag nest shows for the host, holds zombies there and lost 5 hits to their strikes; a guest's turret and drones show and move. Not mirrored: turret aim, napalm discs, mortar warning rings.
 
+
+## Mech (2026-10-05)
+
+Third class (`classes.json` `mech`, colour `#9ccf5a`). One action skill for all three trees, **Call In Mech** (`mech.js`), and a weapon per arm.
+- **Data:**
+  - `cls.mech.weapons` holds the six weapons' numbers. Each tree has a base weapon (`tree.weapon`, always available): Ballistics (Thresher Chaingun), Ordnance (Quad Rocket Pod), Vanguard (Hydraulic Fist).
+  - Halfway down each tree (tier 3) a `type:'weapon'` node unlocks a second weapon for a point: Longbow Rail, Thermite Launcher, Arc Thrower. It renders as a wide hexagon.
+  - Augments carry `weapon` (the weapon they modify) and work while that weapon is on an arm, `mech.augmentSlots` (2) per arm.
+  - Capstones are "cores": Smart Core, Salvo Core, Berserker Core.
+- **Rules** (`classes.js`): the loadout adds `left`/`right` (never the same weapon; picking the other arm's weapon swaps them). Helpers:
+  - `mechWeapons` (available weapons) and `equipArm`.
+  - `augmentsOn`, plus a mech branch in `toggleAugment`/`pruneLoadout`.
+  - `mechStats`: the mech's integrity, cooldown, hit cost, cooling, speed and passives, and each arm's weapon via `mechWeapon`, with the trees applied.
+- **Menu** (`tree-view.js`): the action card shows the arm loadout (weapon chips per arm, that arm's two augment slots) and the capstone slot. Tree headers show the base weapon instead of an action-skill button.
+- **Model** (`mech-model.js`): built in code from rounded boxes (three's `RoundedBoxGeometry`, vendored into `vendor/jsm/geometries/` from three r185) and an extruded hull. It reuses no game or Cheese Cube Iron Man assets: the user wants the Iron Man suit kept for a future scorestreak.
+  - Titanfall-style: canvas panel texture with hazard stripes and a "KD-07" stencil, cockpit hatch with a visor, pauldrons, legs, a reactor pack, and a rear hardpoint (post, seat, MG).
+  - `createMech()` takes swappable arm weapons and runs a procedural walk, aim pitch, recoil, chaingun spin and charge glow. `mechArms()` gives the first-person forearms for the viewmodel scene.
+- **Game** (`mech.js`; every class runs it for the co-op half, only the Mech class pilots):
+  - **Drop:** Z drops the mech 150 ahead (1.1 s fall from 1,800 up, a whistle). The landing blasts zombies (1.3× health, 230 radius), then you're in. Integrity = duration (45 s base) and drains a second a second. Z again ejects.
+  - **Damage:** each `beforeDamage` hit costs `hitCost × clamp(amount/45, .5, 3)` seconds. The player is kept invulnerable (`session.effects.invulnerable` refreshed each frame), so the HUD mod's damage effects stay off.
+  - **Eject:** at 0 integrity you're pushed back 60, get 2 s of invulnerability, the wreck explodes (Ejection Charge makes it damage), and the cooldown starts.
+  - **Cockpit:**
+    - The camera is lifted 34, less under a low ceiling.
+    - The gun viewmodel is hidden (`view.pivot.visible`) and the mech forearms are drawn instead. In third person (T) you see the mech.
+    - Movement speed is ×0.82 and jumping is off.
+    - A capture-phase `mousedown` takes left/right click (stopImmediatePropagation, so the gun neither fires nor aims). Gun keys are blocked: R V G F E Q X, 1–5.
+  - **Weapons**, by `mode`:
+    - `auto` (chaingun): spin-up, hitscan with spread, pierce augment.
+    - `charge` (rail): hold to charge, damage scales with charge², pierces the whole line.
+    - `semi`: rocket bursts as projectiles with splash, homing and cluster augments; thermite shells under gravity that leave fire pools; the fist hits a cone with knockback, plus pound, dash and execute augments.
+    - `beam` (arc): ticks onto the zombie nearest the crosshair and chains.
+    - Damage is a fraction of the round's zombie health (like the other classes' skills), through `enemies.hurt(..., 'mech')` (score on).
+  - **Heat** per arm: firing adds it, and it cools at .38/s after 0.35 s idle. At 1 the arm overheats and vents at .55/s back to 0 before it can fire again.
+  - **Sounds** are synthesized with Web Audio.
+  - **HUD** (`#mech-hud`, `body.mech-pilot` hides the weapon panel and crosshair):
+    - Integrity bar at the top (segmented, a white ghost for the last hit, a shake on hits, red below 25% with INTEGRITY CRITICAL).
+    - A heat gauge per arm beside the reticle (LMB/RMB, weapon name, READY / SPINNING UP / CHARGING % / OVERHEAT · VENTING).
+    - Bracket reticle, corner frame and scanlines, a boot readout on landing, and core status.
+- **Rear Hardpoint** (Vanguard tier 2 passive): the mech carries a back MG.
+  - Co-op messages: `{t:'mech', op:'st'}` 10×/s from pilots (on, mount, rider, arm weapons, pitch, gunner damage bonus).
+  - Every player builds a mirror mech on a pilot's avatar and hides the avatar. The multiplayer mod now exposes `net.remotes`.
+  - A teammate within 150 presses F (`op:'mount'`) to ride: their feet are pinned to the seat (`SEAT`, rotated by the pilot's yaw), they're invulnerable, and left click fires the MG (11/s, 7.5% of zombie health + 25).
+  - Their kills send `op:'rkill'`, which feeds Covering Fire. F or Space dismounts, and the pilot ejecting (`op:'off'`) throws them off.
+  - Tested with two browsers: mount, ride, rider immunity, dismount on eject.
+- Debug: `kino.mech` (`phase`, `integrity`, `arms`, `deploy`, `eject`, `trig`, `mount()`, `pilots`).
