@@ -354,6 +354,7 @@ export class CustomWorld {
   spawnBarriers(session){
     const zones=this.activeZones(session),list=this.barriers.filter(b=>zones.has(b.group)&&!b.submerged);
     if(!this.entry.nearbySpawns||!this.playerFeet)return list;
+    if(this.offMesh(this.playerFeet))return this.freeBarriers(this.playerFeet,session.time);
     // Map entry nearbySpawns: zombies cannot cross the gaps between navmesh islands (moving platforms, gaps), so only spawn
     // points that can walk to the player are used; if none can, points are found on the player's own island.
     const pf=this.playerFeet,now=session.time;
@@ -374,10 +375,35 @@ export class CustomWorld {
     }
     return out;
   }
+  // Parkour: the player stands on something the navmesh does not cover (a moving platform): zombies there walk freely on its surface.
+  offMesh(pf){const c=this.closest(pf,{x:40,y:70,z:40});return !c||Math.hypot(c.x-pf.x,c.z-pf.z)>25||Math.abs(c.y-pf.y)>25;}
+  surfaceY(x,y,z){const h=this.raycast(new THREE.Ray(new THREE.Vector3(x,y+40,z),new THREE.Vector3(0,-1,0)),0,110);return h?y+40-h.distance:null;}
+  // The platform movement since the last frame under `pos`, or null.
+  carryDelta(pos){
+    for(const m of this.movers??[]){
+      if(m.disabled)continue;const d=m.offset.clone().sub(m.prev);if(!d.x&&!d.y&&!d.z)continue;
+      const probe=new THREE.Ray(new THREE.Vector3(pos.x,pos.y+8,pos.z).sub(m.offset),new THREE.Vector3(0,-1,0));
+      if(m.collider.rayIntersect(probe,0,24))return d;
+    }
+    return null;
+  }
+  // Points 40-240 units around `pf` on a nearby surface (the same platform or the next one along the parkour) that a zombie can stand on.
+  freeBarriers(pf,time,all=false){
+    if(!all&&this._free&&time-this._free.t<1&&this._free.at.distanceTo(pf)<40)return this._free.list;
+    const eye=pf.clone(),out=[];eye.y+=40;
+    for(let k=0;k<60&&out.length<6;k++){
+      const a=k*2.399,r=40+((k*53)%200),x=pf.x+Math.cos(a)*r,z=pf.z+Math.sin(a)*r,y=this.surfaceY(x,pf.y,z);
+      if(y===null||Math.abs(y-pf.y)>60)continue;
+      const p=new THREE.Vector3(x,y,z),head=p.clone();head.y+=40;if(!this.lineClear(head,eye))continue;
+      out.push({id:'free_'+out.length,position:p,outside:p.clone(),inside:p.clone(),group:'free',free:true,boards:[],count:0,repairTime:0,rewardRound:0,reward:0});
+    }
+    this._free={t:time,at:pf.clone(),list:out};return out;
+  }
   // A zombie stuck on an island that cannot walk to the player (a gap, a moving platform): a walkable point 120-450 units
   // from the player that can, preferring one out of sight. null when the zombie can walk there itself or nothing fits.
   rescuePoint(from,pf){
     if(!this.entry.nearbySpawns)return null;
+    if(this.offMesh(pf)){const f=this.freeBarriers(pf,0,true)[0];if(!f)return null;const p=f.position.clone();p.free=true;return p;}
     const target=this.closest(pf,{x:60,y:120,z:60});if(!target)return null;
     const reach=p=>{const path=this.path(p,pf),last=path[path.length-1];return !!last&&last.distanceTo(target)<12;};
     const direct=this.path(from,pf),end=direct[direct.length-1];

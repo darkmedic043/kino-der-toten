@@ -46,15 +46,18 @@ export class Enemies {
     if(this.autoSpawn!==false&&s.phase==='fighting'&&s.spawned<s.total&&this.list.length<24){
       this.nextSpawn-=dt;
       if(this.nextSpawn<=0){
-        const candidates=this.world.spawnBarriers(s).filter(b=>{const p=this.world.path(b.inside,player);return p.length>1&&p.at(-1).distanceTo(player)<150;});
+        const candidates=this.world.spawnBarriers(s).filter(b=>{if(b.free)return true;const p=this.world.path(b.inside,player);return p.length>1&&p.at(-1).distanceTo(player)<150;});
         if(candidates.length){
           const b=candidates[Math.floor(s.random()*candidates.length)],nova=s.power&&!s.dogRound&&s.spawned%5===4&&['foyer_zone','foyer2_zone','theater_zone','stage_zone','dining_zone'].includes(this.world.zoneAt(player.clone().add(new THREE.Vector3(0,35,0))));
-          this.spawn(s.dogRound||nova?b.inside:null,s.dogRound||nova?null:b,s.dogRound?'dog':nova?'nova':'zombie');
+          const nz=this.spawn(s.dogRound||nova?b.inside:null,s.dogRound||nova?null:b,s.dogRound?'dog':nova?'nova':'zombie');if(b.free&&nz)nz.free=true;
           this.nextSpawn=Math.max(.35,(this.data.rules.zombie_spawn_delay??2)*Math.pow(.95,s.round-1));
         }
         else this.nextSpawn=1;
       }
     }
+    // Parkour (custom maps): while the player is on a surface the navmesh lacks, zombies on that surface walk freely.
+    this.freeClock=(this.freeClock??0)-dt;
+    if(this.freeClock<=0){this.freeClock=.3;this.freeMode=!!(this.world.offMesh&&this.world.playerFeet&&this.world.entry?.nearbySpawns&&this.world.offMesh(this.world.playerFeet));}
     for(const z of [...this.list]){
       z.rig.update(dt);z.growl-=dt;
       if(z.growl<0){this.onSound?.('growl',z.root.position);z.growl=6+s.random()*7;}
@@ -81,9 +84,12 @@ export class Enemies {
       if(!lure&&dist<62&&Math.abs(z.root.position.y-tp.y)<50&&(victim.id?!victim.down:s.phase!=='reviving')&&this.world.lineClear(at,eye)){
         z.state='attack';z.attackLeft=1.15;z.attackDealt=false;z.rig.play('attack',false);continue;
       }
-      z.repath-=dt;
-      if(z.repath<=0){z.path=this.world.path(z.root.position,goal);z.pathIndex=1;z.repath=.55+(z.id%5)*.07;}
-      const target=z.path[z.pathIndex];
+      if(!this.freeMode)z.free=false;
+      const freeWalk=!!(this.freeMode&&z.free);
+      if(freeWalk)this.walkFree(z,goal,dt);
+      else{z.repath-=dt;
+      if(z.repath<=0){z.path=this.world.path(z.root.position,goal);z.pathIndex=1;z.repath=.55+(z.id%5)*.07;}}
+      const target=freeWalk?null:z.path[z.pathIndex];
       if(target){
         const delta=target.clone().sub(z.root.position),horizontal=Math.hypot(delta.x,delta.z);
         if(horizontal<10){z.pathIndex++;}
@@ -99,9 +105,10 @@ export class Enemies {
       // player's side of the gap after a few seconds instead of standing at the edge.
       if(this.world.rescuePoint&&z.state==='chase'){
         z.probeT=(z.probeT??0)+dt;
-        if(z.probeT>2.5){
+        const below=this.freeMode&&z.root.position.y<(this.world.playerFeet?.y??1e9)-150;   // fell off the parkour
+        if(z.probeT>(below?1:2.5)){
           z.probeT=0;const last=z.probePos??z.root.position.clone();z.probePos=z.root.position.clone();
-          if(last.distanceTo(z.root.position)<6&&dist>90){const p=this.world.rescuePoint(z.root.position,this.world.playerFeet??tp);if(p){z.root.position.copy(p);z.path=[];z.repath=0;z.probePos=null;}}
+          if((below||last.distanceTo(z.root.position)<6)&&dist>90){const p=this.world.rescuePoint(z.root.position,this.world.playerFeet??tp);if(p){z.root.position.copy(p);z.free=!!p.free;z.path=[];z.repath=0;z.probePos=null;}}
         }
       }
       z.stuck+=dt;
@@ -109,6 +116,37 @@ export class Enemies {
     }
     for(const d of [...this.dead]){d.life-=dt;d.rig.update(dt);if(d.life<2)d.root.position.y-=dt*24;if(d.life<=0){d.root.removeFromParent();d.rig.mixer.uncacheRoot(d.root);disposeSkeletons(d.root);this.dead.splice(this.dead.indexOf(d),1);}}
     if(this.autoRounds!==false&&s.phase==='fighting'&&s.spawned>=s.total&&this.list.length===0){if(s.dogRound)this.onKill?.(null,'full_ammo',this.lastDogDeath??player);s.nextRound();this.nextSpawn=0;this.lastDogDeath=null;}
+  }
+  // Free walking on a platform: straight toward the goal, staying on whatever surface is underfoot (moving platforms carry them).
+  walkFree(z,goal,dt){
+    const pos=z.root.position,dx=goal.x-pos.x,dz=goal.z-pos.z,h=Math.hypot(dx,dz);
+    z.root.rotation.y=Math.atan2(-dz,dx);
+    if(z.leap){   // a hop across a gap: an arc to the landing spot
+      const l=z.leap;l.t+=dt/l.dur;const k=Math.min(1,l.t);
+      pos.lerpVectors(l.from,l.to,k);pos.y+=Math.sin(k*Math.PI)*34;
+      if(k>=1){pos.copy(l.to);z.leap=null;}
+      return;
+    }
+    const carry=this.world.carryDelta?.(pos);
+    if(carry)pos.add(carry);
+    const here=this.world.surfaceY(pos.x,pos.y,pos.z);
+    if(here===null)pos.y-=400*dt;   // nothing underfoot: fall
+    else if(here<pos.y)pos.y=Math.max(here,pos.y-400*dt);
+    else if(here-pos.y<14)pos.y=here;
+    if(h<=8||here===null)return;
+    const step=Math.min(h,z.speed*dt);let ux=dx/h,uz=dz/h;
+    for(const o of this.list){if(o===z||o.state==='barricade')continue;const sx=pos.x-o.root.position.x,sz=pos.z-o.root.position.z,d=Math.hypot(sx,sz);if(d<29&&d>.01){ux+=sx/d*(29-d)/29*1.5;uz+=sz/d*(29-d)/29*1.5;}}
+    const n=Math.hypot(ux,uz)||1;ux/=n;uz/=n;
+    for(const [mx,mz] of [[ux,uz],[ux,0],[0,uz]]){
+      const nx=pos.x+mx*step,nz=pos.z+mz*step,y=this.world.surfaceY(nx,pos.y,nz);
+      if(y!==null&&y>pos.y-30&&y<pos.y+14){pos.set(nx,y,nz);return;}
+    }
+    // The way on is a gap: leap to the nearest surface ahead (up to 150 units, a little higher or much lower), toward the goal.
+    const d0=Math.hypot(dx,dz)||1,fx=dx/d0,fz=dz/d0;
+    for(let r=45;r<=150;r+=15){
+      const lx=pos.x+fx*r,lz=pos.z+fz*r,y=this.world.surfaceY(lx,pos.y+30,lz);
+      if(y!==null&&y>pos.y-90&&y<pos.y+45){z.leap={from:pos.clone(),to:new THREE.Vector3(lx,y,lz),t:0,dur:.45+r/320};return;}
+    }
   }
   remove(z){z.root.removeFromParent();z.rig.mixer.uncacheRoot(z.root);disposeSkeletons(z.root);this.list.splice(this.list.indexOf(z),1);}
   hurt(z,damage,head=false,melee=false,cause='bullet',score=true){
