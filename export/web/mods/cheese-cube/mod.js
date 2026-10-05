@@ -23,8 +23,22 @@ export default async function setup(api){
   const now=()=>session.time;
   // The map's own sounds (map folder `sounds/`, git-ignored); a failed load is silent.
   const soundBase=api.map.dir.replace(/\/?$/,'/')+'sounds/',playing=new Set();
+  // Played through the game's Web Audio mixer (a gain per sound into its master): an <audio> element's own volume is
+  // ignored on iPhone/iPad (always full), so positional sounds like the perk jingles were heard map-wide there, and the
+  // game's volume setting did not apply. `a.volume` on the returned element drives that gain (x2.4 makes up the
+  // master's .42, so loudness matches the old direct playback).
+  const LEVEL=1/.42;
   const sound=(name,{volume=.7,loop=false}={})=>{
-    try{const a=new Audio(soundBase+name+'.ogg');a.volume=volume;a.loop=loop;a.play().catch(()=>{});playing.add(a);a.addEventListener('ended',()=>playing.delete(a));return a;}catch{return null;}
+    try{
+      const a=new Audio(soundBase+name+'.ogg');a.loop=loop;
+      const ctx=audio?.ctx,master=audio?.master;
+      if(ctx&&master){
+        const g=ctx.createGain();g.gain.value=volume*LEVEL;ctx.createMediaElementSource(a).connect(g).connect(master);
+        Object.defineProperty(a,'volume',{configurable:true,get:()=>g.gain.value/LEVEL,set:v=>{g.gain.value=Math.max(0,v)*LEVEL;}});
+        if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+      }else a.volume=volume;
+      a.play().catch(()=>{});playing.add(a);a.addEventListener('ended',()=>playing.delete(a));return a;
+    }catch{return null;}
   };
   host.on('reset',()=>{for(const a of playing)a.pause();playing.clear();});
   const board=window.kino.scoreboard;

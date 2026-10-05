@@ -2,7 +2,7 @@
 //   Cap's shield: four plates; shoot the one the shield lies on and it flies to the next. After the fourth it
 //     plays one of three Avengers themes (they cycle).
 //   Stan Lee: shoot him and he shoots back (you go down), then he and Clementine complain.
-//   The poster target, the cheese alarm 97 s in, and the PhD and Double Dip jingles once the power is on.
+//   The poster target and the cheese alarm 97 s in. (The map's PhD / Double Dip machine jingles are left out.)
 // The sounds are the map's own, kept in the map folder's `sounds/` (git-ignored, like the rest of the map's assets).
 import * as THREE from 'three';
 
@@ -69,32 +69,17 @@ export function setupEggs({world,session,host,toast,named,center,boxOf,tween,twe
   const armPoster=()=>poster&&arm({position:center(poster),box:fat(boxOf(poster),4),radius:8,hit(){toast('This is just a poster you idiot',3);armPoster();}});
   armPoster();
 
-  // ---- The cheese alarm and the perk jingles --------------------------------------------------------------
-  // The jingles are positional (WaW `playsound` on an entity): only heard near their machine, in 3D, since the map is a
-  // tall tower. Each playing one is tracked (the 98 s Double-Dew jingle outlasts the 80 s gap before the next).
-  let alarmed=false,jingleAt=0,jingle=0,live=[];
-  const jingles=[{name:'jingle_phd',ent:named('sound_phd')[0],gap:90},{name:'dd_jingle',ent:named('sound_dd')[0]??named('sound_here_dd')[0],gap:80}];
-  const JINGLE_RANGE=600;
+  // ---- The cheese alarm --------------------------------------------------------------------------------------
+  // The map also plays the PhD and Double Dip jingles from their machines on a loop once the power is on; at the
+  // user's request they are left out (a perk's sting still plays when you drink it, perks.js).
+  let alarmed=false;
   host.on('update',()=>{
     if(!alarmed&&session.time>=97&&session.phase==='fighting'){alarmed=true;sound('alarm',{volume:.7});}
-    if(session.power&&session.phase==='fighting'){
-      if(!jingleAt)jingleAt=now()+1;
-      if(now()>=jingleAt){const j=jingles[jingle%2];jingle++;jingleAt=now()+j.gap;
-        if(j.ent){const a=sound(j.name,{volume:0});if(a)live.push({a,at:center(j.ent)});}}
-    }
-    const feet=player.getFeetPosition();
-    live=live.filter(j=>{
-      if(j.a.ended||j.a.paused)return false;
-      if(session.phase!=='fighting'){j.a.pause();return false;}
-      const k=1-feet.distanceTo(j.at)/JINGLE_RANGE;
-      j.a.volume=Math.max(0,Math.min(.8,k*k*.8));
-      return true;
-    });
   });
 
   host.on('reset',()=>{
     for(const t of [...shots])disarm(t);
-    shieldTarget=null;stanTarget=null;at=0;musicUntil=0;stanBusy=false;alarmed=false;jingleAt=0;jingle=0;for(const j of live)j.a.pause();live=[];track?.pause();track=null;
+    shieldTarget=null;stanTarget=null;at=0;musicUntil=0;stanBusy=false;alarmed=false;track?.pause();track=null;
     for(const axis of ['x','y','z'])tween('ENT_cap_shield',axis,0,.001,undefined);
     armShield();armStan();armPoster();
   });

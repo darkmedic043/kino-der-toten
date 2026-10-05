@@ -107,3 +107,4 @@
 - **2026-10-05 (Mk5, ending)**: Cheese Cube: Mark V suitcase; the hammer ending's roll, flight and thunder.
 - **2026-10-05 (Gyro)**: Gyro Zeppeli operator (JoJo SBR fan rip, built locally with `.tools/build_gyro.sh`; see characters.md).
 - **2026-10-05 (co-op skins)**: teammates see your operator's customisation (Blessing, outfit, ...) in co-op (coop.md).
+- **2026-10-05 (jingles off)**: Cheese Cube's looping PhD/Double Dip machine jingles removed at the user's request (heard map-wide by co-op players); the perk sting on drinking stays. The map's sounds now play through the game's Web Audio master (an <audio> element's volume is ignored on iOS, and they skipped the volume setting).
