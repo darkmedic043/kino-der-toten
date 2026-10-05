@@ -468,6 +468,9 @@ export class PlayerController {
     const wasOnFloor = this.onFloor;
     if (wasOnFloor) this._coyoteTimer = this.coyoteTime;
     else this._coyoteTimer = Math.max(0, this._coyoteTimer - dt);
+    // Stairs: time off the floor without a jump (see the step condition below).
+    this._airTime = wasOnFloor ? 0 : (this._airTime ?? 0) + dt;
+    this._jumpGuard = Math.max(0, (this._jumpGuard ?? 0) - dt);
     this._jumpBufferTimer = Math.max(0, this._jumpBufferTimer - dt);
 
     this._updateCrouchState();
@@ -482,6 +485,7 @@ export class PlayerController {
 
     if (!this.onLadder && this._jumpBufferTimer > 0 && (this.onFloor || this._coyoteTimer > 0)) {
       this.velocity.y = this.jumpSpeed;
+      this._jumpGuard = 0.6;
       this.onFloor = false;
       this.grounded = false;
       this._jumpBufferTimer = 0;
@@ -526,7 +530,11 @@ export class PlayerController {
       // walking down a flight faces along it and must not hold the player up.
       const n=this._lastCollision?.normal;
       const hitRiser=!!n&&n.y<this.floorNormalY&&wanted>0&&(n.x*_movement.x+n.z*_movement.z)/wanted<-.3;
-      if(!this.onLadder&&wanted>.001&&(progress<wanted*.8||hitRiser)&&climbSpeedY<=0&&(wasOnFloor||this._coyoteTimer>0)){
+      // Sprinting up stairs, the rounded capsule rides up the last riser's edge and leaves the floor moving upward for a
+      // moment; the next riser arrived inside that window and stopped the player dead ("caught on the stairs"). Allow a
+      // step while briefly airborne with a small upward speed, unless the player jumped.
+      const stepAir=!this._jumpGuard&&this._airTime<.35&&climbSpeedY<=160;
+      if(!this.onLadder&&wanted>.001&&(progress<wanted*.8||hitRiser)&&(climbSpeedY<=0&&(wasOnFloor||this._coyoteTimer>0)||stepAir)){
         if(this._tryStep(beforeStart,beforeEnd,_movement)){this.velocity.x=beforeVX;this.velocity.z=beforeVZ;}
       }
       // Rung tops are walkable-facing triangles.  On a ladder they must not

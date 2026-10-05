@@ -397,6 +397,8 @@
       },
       "fpArms": true,
       "fpArmsRetarget": true,
+      "_fpArmsVariantDoc": "First person only: the Blessed/Fur fur shell keeps the base mask (the knife lunge swings the forearm across the screen and the full fur filled the view); claws stay.",
+      "fpArmsVariant": {"when": {"blessing:blessed": {"surfaces": {"Transform": {"alphaMap": "fur_mask_inv.webp", "alphaTest": 0.5}}}, "blessing:fur": {"surfaces": {"Transform": {"alphaMap": "fur_mask_inv.webp", "alphaTest": 0.5}}}}},
       "springBones": [
         {
           "chains": [
