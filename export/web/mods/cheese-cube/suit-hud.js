@@ -14,6 +14,7 @@ const LAYOUTS={
   // Mk4 and Mk6: one ring per stat, the number in its middle
   mk4:{img:'interface_mk4',ring:[.795,.256],stats:{kills:[.156,.112],headshots:[.238,.225],gibs:[.144,.304],left:[.224,.406],downs:[.141,.498],revives:[.236,.596]}},
   mk6:{img:'interface_mk6',ring:[.797,.256],low:'interface_mk6_red',stats:{kills:[.194,.566],headshots:[.268,.685],gibs:[.359,.738],left:[.458,.738],downs:[.556,.738],revives:[.656,.738]}},
+  mk16:{img:'interface_mk16',ring:[.797,.256],stats:{kills:[.194,.566],headshots:[.268,.685],gibs:[.359,.738],left:[.458,.738],downs:[.556,.738],revives:[.656,.738]}},
   // Mk5: nodes on two arcs, the number beside each node
   mk5:{img:'interface_mk5',ring:[.689,.188],stats:{kills:[.215,.194,'l'],headshots:[.182,.338,'l'],left:[.178,.513,'l'],gibs:[.205,.669,'l'],revives:[.808,.194,'r'],downs:[.838,.444,'r']}},
   // Mk1: no interface in the original, only the faceplate and the power number
@@ -24,7 +25,7 @@ export function createSuitHud({base}){
   const url=n=>base+'hud/'+n+'.webp';
   const root=document.createElement('div');root.id='jarvis-hud';
   root.innerHTML=`<div class="jv-frame"><img class="jv-ui" alt=""><div class="jv-stats"></div></div><div class="jv-power"></div>
-    <img class="jv-mask" alt=""><div class="jv-warn"></div>`;
+    <img class="jv-mask" alt=""><div class="jv-warn"></div><div class="jv-stealth">Stealth-Mode</div>`;
   const style=document.createElement('style');style.textContent=`
     #jarvis-hud{position:fixed;inset:0;z-index:4;pointer-events:none;overflow:hidden;opacity:0;transition:opacity .5s}
     #jarvis-hud.on{opacity:1}
@@ -43,6 +44,14 @@ export function createSuitHud({base}){
     #jarvis-hud .jv-warn{position:absolute;left:0;right:0;top:25vh;text-align:center;font:700 6vh/1 'Arial Narrow',system-ui,sans-serif;color:#dc143c;text-shadow:0 0 1vh #000;opacity:0}
     #jarvis-hud .jv-warn.flash{animation:jv-flash .6s steps(1) 4}
     @keyframes jv-flash{0%{opacity:1}50%{opacity:0}}
+    /* Mk16 Stealth-Mode: the HUD turns green (the map recolours it) and the view softens */
+    #jarvis-hud.cloak .jv-ui{filter:sepia(1) saturate(6) hue-rotate(70deg) brightness(.9)}
+    #jarvis-hud.cloak .jv-n,#jarvis-hud.cloak .jv-power{color:#3cd03c;text-shadow:0 0 .8vh #1e8b1e,0 0 .2vh #000}
+    #jarvis-hud.cloak::before{content:'';position:absolute;inset:0;z-index:0;backdrop-filter:blur(1.5px);background:#0a2a0a22}
+    #jarvis-hud .jv-frame,#jarvis-hud .jv-power,#jarvis-hud .jv-mask,#jarvis-hud .jv-warn,#jarvis-hud .jv-stealth{z-index:1}
+    #jarvis-hud .jv-stealth{position:absolute;left:0;right:0;top:15vh;text-align:center;font:700 5vh/1 'Arial Narrow',system-ui,sans-serif;color:#fff;text-shadow:0 0 1vh #000;opacity:0}
+    #jarvis-hud.cloak .jv-stealth{animation:jv-pulse 4s ease-in-out infinite}
+    @keyframes jv-pulse{0%,100%{opacity:0}50%{opacity:1}}
     body.menu-open #jarvis-hud{visibility:hidden}`;
   document.head.append(style);document.body.append(root);
   const frame=root.querySelector('.jv-frame'),ui=root.querySelector('.jv-ui'),mask=root.querySelector('.jv-mask'),powerEl=root.querySelector('.jv-power'),
@@ -64,7 +73,8 @@ export function createSuitHud({base}){
     maskTimer=setTimeout(()=>{mask.className='jv-mask fade';},2400);
     root.classList.add('on');
   }
-  function hide(){root.classList.remove('on');clearTimeout(maskTimer);mask.className='jv-mask';}
+  function setCloak(on){root.classList.toggle('cloak',on);}
+  function hide(){root.classList.remove('on','cloak');clearTimeout(maskTimer);mask.className='jv-mask';}
   function update(power,stats){
     if(!layout)return;
     const p=Math.max(0,Math.round(power));powerEl.textContent=p;powerEl.classList.toggle('low',p<=25);
@@ -72,5 +82,5 @@ export function createSuitHud({base}){
     for(const [k,el] of Object.entries(cells)){const v=String(stats[k]??0);if(el.textContent!==v)el.textContent=v;}
   }
   function warn(text){warnEl.textContent=text;warnEl.className='jv-warn';void warnEl.offsetWidth;warnEl.className='jv-warn flash';}
-  return {show,hide,update,warn,root};
+  return {show,hide,update,warn,setCloak,root};
 }
