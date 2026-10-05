@@ -38,15 +38,23 @@ export class Enemies {
     rig.play('walk');rig.update(.01);
     // A spawn point without boards (custom maps): climb out of the ground (BO1's riser clips, mods/zombie-rise) instead
     // of appearing in place. Fast zombies use the quicker clip; both play sped up to about 3 s.
-    const riseClip=kind==='zombie'&&barrier&&!barrier.boards?.length?this.anims[speed>=110?'ai_zombie_traverse_ground_climbout_fast':'ai_zombie_traverse_ground_v1_run']??this.anims.ai_zombie_traverse_ground_climbout_fast:null;
-    let rise=null;
-    if(riseClip){rig.add('rise',riseClip,true);const dur=3;rig.play('rise',false,(riseClip.duration??dur)/dur,0);rig.update(.01);
-      root.position.copy(barrier.inside);rise={y:root.position.y,dur};root.position.y-=50;}
+    const riseHere=kind==='zombie'&&barrier&&!barrier.boards?.length&&this.riseClip(speed);
     root.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});
     const z={id,kind,root,rig,speed,health:kind==='dog'?([400,900,1300,1600][Math.min(3,Math.max(0,this.session.dogRounds-1))]):zombieHealth(round,this.data.rules),state:barrier?'barricade':'chase',barrier,path:[],pathIndex:0,repath:0,attackLeft:0,attackDealt:false,tearLeft:1.1,stuck:0,lastPosition:root.position.clone(),growl:3+id%7};
     if(kind==='nova')z.health=Math.trunc(z.health*.75);
-    if(rise){z.state='rising';z.rise=rise;z.riseT=0;}
+    if(riseHere)this.riseAt(z,barrier.inside);
     z.maxHealth=z.health;this.list.push(z);this.session.spawned++;return z;
+  }
+  // The riser clip for a zombie of this speed (mods/zombie-rise), or null when the clips aren't built.
+  riseClip(speed){return this.anims[speed>=110?'ai_zombie_traverse_ground_climbout_fast':'ai_zombie_traverse_ground_v1_run']??this.anims.ai_zombie_traverse_ground_climbout_fast??null;}
+  // Climb out of the ground at `at` (spawn points without boards, and zombies moved to the player when stuck).
+  riseAt(z,at){
+    const clip=z.kind==='zombie'&&this.riseClip(z.speed);
+    if(!clip){z.root.position.copy(at);return false;}
+    if(!z.rig.actions.rise)z.rig.add('rise',clip,true);
+    const dur=3;z.rig.play('rise',false,(clip.duration??dur)/dur,0);z.rig.update(.01);
+    z.root.position.copy(at);z.rise={y:at.y,dur};z.root.position.y-=50;z.state='rising';z.riseT=0;
+    return true;
   }
   update(dt,player){
     const s=this.session;
@@ -125,7 +133,7 @@ export class Enemies {
         const below=this.freeMode&&z.root.position.y<(this.world.playerFeet?.y??1e9)-150;   // fell off the parkour
         if(z.probeT>(below?1:2.5)){
           z.probeT=0;const last=z.probePos??z.root.position.clone();z.probePos=z.root.position.clone();
-          if((below||last.distanceTo(z.root.position)<6)&&dist>90){const p=this.world.rescuePoint(z.root.position,this.world.playerFeet??tp);if(p){z.root.position.copy(p);z.free=!!p.free;z.path=[];z.repath=0;z.probePos=null;}}
+          if((below||last.distanceTo(z.root.position)<6)&&dist>90){const p=this.world.rescuePoint(z.root.position,this.world.playerFeet??tp);if(p){this.riseAt(z,p);z.free=!!p.free;z.path=[];z.repath=0;z.probePos=null;}}
         }
       }
       if(!freeWalk&&!target&&this.freeMode&&dist>40&&z.state==='chase')this.walkFree(z,goal,dt);   // the last stretch to a spot the navmesh does not reach
