@@ -231,7 +231,25 @@ export default async function setup(api){
     for(const n of ['ENT_piece_right_ric','ENT_piece_middle_ric','ENT_piece_left_ric','ENT_right_button_ric','ENT_middle_button_ric','ENT_left_button_ric','ENT_ric_answer_block'])show(n,true);
   });
 
+
+  // ---- Credits: four seconds after any game over, "Special Thanks to" and the map makers' names, one card at a time
+  const CREDITS=['Special Thanks to','offthewall','Redspace200','Stuffed Oatmeal','HexZombies','MrTomBone8'];
+  let creditsRan=false,creditTimers=[];
+  const creditEl=document.createElement('div');
+  creditEl.style.cssText='position:fixed;inset:0;z-index:70;display:grid;place-items:center;pointer-events:none;color:#fff;font:600 30px/1.2 Georgia,serif;letter-spacing:.08em;text-shadow:0 0 12px #000;opacity:0;transition:opacity 1s';
+  document.body.append(creditEl);
+  host.on('gameOver',()=>{
+    if(creditsRan)return;creditsRan=true;
+    CREDITS.forEach((name,i)=>{
+      creditTimers.push(setTimeout(()=>{creditEl.textContent=name;creditEl.style.opacity=1;},(4+i*4.25)*1000));
+      creditTimers.push(setTimeout(()=>{creditEl.style.opacity=0;},(4+i*4.25+3.25)*1000));
+    });
+  });
+  host.on('reset',()=>{creditsRan=false;for(const t of creditTimers)clearTimeout(t);creditTimers=[];creditEl.style.opacity=0;});
+
   // ---- The smaller eggs (own file; after the reset handler above so their resets run last)
   const {setupEggs}=await import('./eggs.js');
   setupEggs({world,session,host,toast,named,center,boxOf,tween,tweens,nodes,now,sound,player:api.player});
+  const {setupPerks}=await import('./perks.js');
+  await setupPerks({api,world,session,host,toast,named,center,beep,sound});
 }

@@ -107,7 +107,8 @@
     "mk5",
     "mk6",
     "wm_model",
-    "cap_shield"
+    "cap_shield",
+    "vending_phd_flopper"
   ],
   "movers": [
     {
