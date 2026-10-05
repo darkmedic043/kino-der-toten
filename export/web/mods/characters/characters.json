@@ -1289,6 +1289,28 @@
           ]
         }
       ]
+    },
+    {
+      "id": "gyro",
+      "name": "Gyro Zeppeli",
+      "type": "gltf",
+      "motion": "bo1",
+      "model": "models/gyro/gyro.glb",
+      "yaw": 180,
+      "height": 78,
+      "color": "#4a2a78",
+      "accent": "#d8a628",
+      "fpArms": true,
+      "fpArmsRetarget": true,
+      "optional": true,
+      "description": "Gyro Zeppeli of Steel Ball Run: Neapolitan executioner, master of the Spin. GO! GO! ZEPPELI!",
+      "credit": {
+        "title": "Gyro Zeppeli (JoJo's Bizarre Adventure: Steel Ball Run)",
+        "author": "Steam Workshop model, reworked in Blender by its uploader",
+        "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=1862915551",
+        "license": "Ripped fan model; the uploader claims no rights",
+        "note": "Gyro Zeppeli is from JoJo's Bizarre Adventure by Hirohiko Araki (Shueisha); the model is from Bandai Namco's game. Built locally with .tools/build_gyro.sh, not published."
+      }
     }
   ]
 }
