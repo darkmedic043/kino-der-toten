@@ -215,8 +215,10 @@ export class FirstPersonArms {
       geo.setAttribute('position',new THREE.BufferAttribute(P,3));if(UV)geo.setAttribute('uv',new THREE.BufferAttribute(UV,2));
       geo.setAttribute('skinIndex',new THREE.BufferAttribute(SI,4));geo.setAttribute('skinWeight',new THREE.BufferAttribute(SW,4));
       geo.setIndex(tris.map(v=>remap.get(v)));geo.computeVertexNormals();
-      // The viewmodel lights are strong; tone the arms down to sit with the gun.
-      const material=[o.material].flat()[0].clone();material.color.multiplyScalar(this.entry.fpArmsTone??.8);
+      // The viewmodel lights are strong; tone the arms down to sit with the gun. fpArmsTone: a factor, or [r,g,b] to
+      // also warm them (the viewmodel light reads cooler than the map's on light fur)
+      const material=[o.material].flat()[0].clone(),tone=this.entry.fpArmsTone??.8;
+      if(Array.isArray(tone))material.color.multiply(new THREE.Color(...tone));else material.color.multiplyScalar(tone);
       material.vertexColors=false;   // colours aren't baked; a material expecting them renders black
       // fpArmsNearCut (view units): the arm surface is cut away where it comes closer to the camera than this (a clean
       // near-plane cut; a dithered fade read as noise). Bondrewd's Blessed fur filled the whole screen as the knife lunge swung the forearm past the lens.

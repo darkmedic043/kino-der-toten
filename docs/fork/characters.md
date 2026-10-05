@@ -35,10 +35,12 @@
     - Fur the clothing hides: FurNeck (2,0) under the scarf; FurArms (0,1)+(2,1) under the arm wraps; FurLegs (1,1)+(2,3) under the leg wraps; FurMuzzle (1,0) plus the 3D mouth under the balaclava.
   - **Fur colourways:** Albino (`Body_Base_color 1`, the Albino toggle's texture), and Gold flecks, Striped and Piebald (the package's LIT colourways), each × the body AO. They are surface swaps on the five fur materials.
   - **Scarf colours:** the scarf region (`scarf_mask`) hue-turned on a 1024 copy of the clothing atlas.
-  - **Eye colours:** hue turns of the eye atlas.
+  - **Eye colours:** HSV hue turns of the eye atlas (`.tools/build_experiment_eyes.py`, Blender's numpy), keeping each pixel's saturation and value. The first build used ffmpeg's `hue`, which keeps luma: bright amber turned a washed lavender instead of blue (user: the colours "break").
   - **Eye styles:** the avatar shifts the eye atlas UVs (`_MainTex_ST`). The new surface option `uvOffset [u,v]` does the same (characters.js clones the texture with RepeatWrapping and an offset; glTF's v runs down, so the offsets are the avatar's negated).
   - **Spring bones:** scarf (`scarfb`/`scarff`, gravity 2) and tail (`tail01`, nearly no gravity). The scarf tails are modelled straight out, so `variantBase` bones hang them down (back −75°, front −45°) for the menu and portraits.
   - **Gotchas:**
     - The copied bandage bones came first under the elbows, and fp-arms (first child) took one for the hand: "no fingers", arms floating off screen. The build re-sorts GLB node children body-bones-first, as for Gyro.
     - First person uses offset mode (`fpArmsRetarget: false`; retarget put the paws off screen), forearm only, `fpArmsScale` .85, `fpArmsExclude: bandage` (the hanging wrap strips).
+    - Portraits are one-shot renders and drew before a picked variant texture had loaded, giving black eyes or fur on the tile. `renderPortrait` now awaits `variantTexturesReady()` (characters.js tracks pending variant textures).
+    - First-person colour: the viewmodel light reads cooler than the map's, so albino arms came out grey against the cream body. `fpArmsTone` now also takes `[r,g,b]`; the Experiment uses [.78,.68,.56].
     - The new `fpArmsChoice` (variant picks forced for the FP bake) turns the arm wraps off, because stretched onto T5 they crumpled into a mess over the screen.

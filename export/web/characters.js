@@ -69,10 +69,13 @@ export function variantSpec(entry,choice={}){
   return spec;
 }
 export function variantMorphs(entry,choice={}){return variantSpec(entry,choice).morphs;}
-const variantTextures=new Map();
+const variantTextures=new Map(),pendingTextures=new Set();
+// Resolves when every variant texture asked for so far has loaded (or failed): one-shot renders (portraits) wait for
+// it, or a picked fur or eye colour shows as black.
+export function variantTexturesReady(){return Promise.all([...pendingTextures].map(t=>new Promise(r=>{const prev=t.userData.ready;t.userData.ready=()=>{prev?.();r();};})));}
 function variantTexture(entry,file,colour,offset){
   const url=new URL(file,entry.url).href.replace(/\?.*$/,''),key=offset?url+'@'+offset:url;
-  if(!variantTextures.has(key)){const t=new THREE.TextureLoader().load(url);t.flipY=false;if(colour)t.colorSpace=THREE.SRGBColorSpace;
+  if(!variantTextures.has(key)){const t=new THREE.TextureLoader().load(url,done,undefined,done);t.flipY=false;pendingTextures.add(t);function done(){pendingTextures.delete(t);t.userData.ready?.();}if(colour)t.colorSpace=THREE.SRGBColorSpace;
     if(offset){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.offset.set(...offset);}variantTextures.set(key,t);}
   return variantTextures.get(key);
 }
@@ -457,7 +460,7 @@ export async function holdWeapon(character,entry,def,hideTags=def?.hideTags){
 
 // A 3/4 head-and-shoulders portrait of a character as an image URL (for the HUD).
 export async function renderPortrait(entry,data,size=160){
-  const c=await createCharacter(entry,data);c.hold?.(false);c.update(.016,0);
+  const c=await createCharacter(entry,data);await variantTexturesReady();c.hold?.(false);c.update(.016,0);
   const scene=new THREE.Scene();scene.add(c.root);c.root.updateMatrixWorld(true);
   scene.add(new THREE.HemisphereLight(0xe6ddd0,0x2a1d17,1.8));
   const key=new THREE.DirectionalLight(0xffe6c8,2.4);key.position.set(80,120,140);scene.add(key);

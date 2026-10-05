@@ -46,9 +46,9 @@ for spec in blue:h=-140 green:h=120 purple:h=-75 gold:h=45:b=1 black:s=0:b=-1.4 
     "[0]scale=1024:1024,format=gbrp[c];[1]scale=1024:1024,format=gbrp[ao];[c][ao]blend=all_mode=multiply,split[x][y];[y]hue=$hue[r];[2]scale=1024:1024,format=gray,dilation,dilation,format=gbrp[m];[x][r][m]maskedmerge" \
     -c:v libwebp -quality 85 "$out/scarf_$c.webp"
 done
-# eye colours: hue turns of the eye atlas (amber by default)
-for spec in blue:-160 green:80 red:-30 purple:-110 pink:-60 cyan:150; do
-  ff -i "$tmp/tex/eyes.png" -vf "scale=1024:1024,hue=h=${spec#*:}" -c:v libwebp -quality 90 "$out/eyes_${spec%%:*}.webp"
-done
+# eye colours: HSV hue turns of the eye atlas (amber, about 35 degrees, by default)
+blender -b -P "$root/.tools/build_experiment_eyes.py" -- "$tmp/tex/eyes.png" "$tmp/tex" \
+  blue:180 cyan:150 green:85 red:-35 purple:-120 pink:-70 | grep -E "done|Error" || true
+for c in blue cyan green red purple pink; do ff -i "$tmp/tex/eyes_$c.png" -c:v libwebp -quality 90 "$out/eyes_$c.webp"; done
 ls -la "$out"
 echo "bump the ?v= on its model path in characters.json after a rebuild, or browsers keep the old one for a day"
