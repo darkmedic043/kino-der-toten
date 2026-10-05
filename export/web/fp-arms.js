@@ -262,7 +262,7 @@ export class FirstPersonArms {
     const Rm=new THREE.Matrix4(),Qa=new THREE.Quaternion(),Qb=new THREE.Quaternion(),Qc=new THREE.Quaternion(),Qd=new THREE.Quaternion(),Qe=new THREE.Quaternion(),Qf=new THREE.Quaternion();
     const TWIST_SHARE=.6;   // how much of the hand-against-forearm roll the forearm takes on
     const bones=rt.map(e=>{const b=new THREE.Bone();b.name=e.name;b.matrixAutoUpdate=false;b.matrixWorldAutoUpdate=false;return b;});
-    const skeleton=new THREE.Skeleton(bones,rt.map(e=>e.bind.clone().invert()));
+    const skeleton=new THREE.Skeleton(bones,rt.map(e=>e.bind.clone().invert())),reach=this.entry.fpArmsReach!==false;
     const m=new THREE.Matrix4(),p=new THREE.Vector3();
     skeleton.solve=()=>rt.forEach((e,i)=>{
       const W=bones[i].matrixWorld,t=live[i];
@@ -274,7 +274,9 @@ export class FirstPersonArms {
       else if(t)W.multiplyMatrices(t.matrixWorld,e.t5BindInv).multiply(e.bind);   // T5's rotation since bind
       // A character arm shorter than T5's cannot reach T5's wrist on a full stretch (the knife lunge): hanging the arm back
       // from there dragged its shoulder in front of the camera. Keep the hand within the arm's own reach of T5's shoulder.
-      if(e.kind==='anchor'&&e.reach&&live[e.shoulder]){
+      // fpArmsReach: false skips it, for arms much shorter than T5's that are shrunk to fit (the Experiment's stubby
+      // paws): clamped, the hands sat behind the camera.
+      if(reach&&e.kind==='anchor'&&e.reach&&live[e.shoulder]){
         const sp=v1.setFromMatrixPosition(live[e.shoulder].matrixWorld),hp=v2.setFromMatrixPosition(W).sub(sp),len=hp.length(),max=e.reach*.97;
         if(len>max)W.setPosition(hp.multiplyScalar(max/len).add(sp));
       }

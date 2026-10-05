@@ -40,7 +40,10 @@
   - **Spring bones:** scarf (`scarfb`/`scarff`, gravity 2) and tail (`tail01`, nearly no gravity). The scarf tails are modelled straight out, so `variantBase` bones hang them down (back −75°, front −45°) for the menu and portraits.
   - **Gotchas:**
     - The copied bandage bones came first under the elbows, and fp-arms (first child) took one for the hand: "no fingers", arms floating off screen. The build re-sorts GLB node children body-bones-first, as for Gyro.
-    - First person uses offset mode (`fpArmsRetarget: false`; retarget put the paws off screen), forearm only, `fpArmsScale` .85, `fpArmsExclude: bandage` (the hanging wrap strips).
-    - Portraits are one-shot renders and drew before a picked variant texture had loaded, giving black eyes or fur on the tile. `renderPortrait` now awaits `variantTexturesReady()` (characters.js tracks pending variant textures).
-    - First-person colour: the viewmodel light reads cooler than the map's, so albino arms came out grey against the cream body. `fpArmsTone` now also takes `[r,g,b]`; the Experiment uses [.78,.68,.56].
-    - The new `fpArmsChoice` (variant picks forced for the FP bake) turns the arm wraps off, because stretched onto T5 they crumpled into a mess over the screen.
+    - First person (2026-10-05, second pass; user: the bandages didn't show and the hands looked like "default repainted"). The first pass used offset mode with the wraps forced off (`fpArmsChoice`), which stretched the paws onto T5's hand shape. Now:
+      - Retarget mode keeps the paws' own shape, with the wraps.
+      - `fpArmsFingers` maps RingFinger as the pinky: the paw has three fingers and a thumb, and with no pinky the palm-basis step never ran, so the paw sat palm-up under the gun.
+      - `fpArmsScale` .65: palm sizing blew the stubby arms up to fill the screen.
+      - The new `fpArmsReach: false` skips the shoulder-reach clamp, which pulled the shrunk short arms back behind the camera.
+      - `fpArmsExclude: bandage` still drops the dangling wrap strips.
+      - `fpArmsChoice` (variant picks forced in first person) stays available in fp-arms.js but is unused.

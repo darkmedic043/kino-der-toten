@@ -117,3 +117,4 @@
 - **2026-10-05 (menu load)**: main menu shows its map list in 0.7 s instead of 6-10 s through the tunnel (performance.md).
 - **2026-10-05 (Experiment)**: new operator, Akittu's Stylized Experiment (user's purchased avatar, git-ignored), with its VRChat menu as customisation: fur colourways, eye styles/colours, scarf colours, arm/leg wraps, kevlar, pouch, balaclava, builds and faces. New `uvOffset` surface option and `fpArmsChoice` (characters.md).
 - **2026-10-05 (Experiment colours)**: eye colours rebuilt as HSV hue turns (were washed out), portraits wait for variant textures (were black), warm `fpArmsTone` [r,g,b] so the first-person arms match the body.
+- **2026-10-05 (Experiment FP)**: first-person arms in retarget mode (own paw shape and arm wraps), ring finger as pinky, new `fpArmsReach: false`.

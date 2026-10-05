@@ -1370,7 +1370,7 @@
       "color": "#2c5aa0",
       "accent": "#e2557a",
       "fpArms": true,
-      "fpArmsRetarget": false,
+      "fpArmsRetarget": true,
       "optional": true,
       "springBones": [
         {
@@ -2032,11 +2032,7 @@
         "note": "Built locally with .tools/build_experiment.sh, not published."
       },
       "fpArmsExclude": "bandage",
-      "fpArmsChoice": {
-        "armWraps": "off"
-      },
-      "fpArmsUpper": false,
-      "fpArmsScale": 0.85,
+      "fpArmsScale": 0.65,
       "variantBase": {
         "_doc": "The scarf tails are modelled straight out front and back (the avatar's physbones drop them): hang them down so the menu and portraits show them hanging; the springs start from there.",
         "bones": {
@@ -2060,7 +2056,14 @@
         0.78,
         0.68,
         0.56
-      ]
+      ],
+      "fpArmsReach": false,
+      "fpArmsFingers": {
+        "thumb": "^Thumb",
+        "index": "^IndexFinger",
+        "mid": "^MiddleFinger",
+        "pinky": "^RingFinger"
+      }
     }
   ]
 }
