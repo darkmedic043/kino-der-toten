@@ -36,9 +36,16 @@ export class Enemies {
     const death=kind==='nova'?'ai_zombie_quad_death':kind==='dog'?'zombie_dog_death_front':'ai_zombie_death_v1';
     if(this.anims[death])rig.add('death',this.anims[death],true);
     rig.play('walk');rig.update(.01);
+    // A spawn point without boards (custom maps): climb out of the ground (BO1's riser clips, mods/zombie-rise) instead
+    // of appearing in place. Fast zombies use the quicker clip; both play sped up to about 3 s.
+    const riseClip=kind==='zombie'&&barrier&&!barrier.boards?.length?this.anims[speed>=110?'ai_zombie_traverse_ground_climbout_fast':'ai_zombie_traverse_ground_v1_run']??this.anims.ai_zombie_traverse_ground_climbout_fast:null;
+    let rise=null;
+    if(riseClip){rig.add('rise',riseClip,true);const dur=3;rig.play('rise',false,(riseClip.duration??dur)/dur,0);rig.update(.01);
+      root.position.copy(barrier.inside);rise={y:root.position.y,dur};root.position.y-=50;}
     root.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});
     const z={id,kind,root,rig,speed,health:kind==='dog'?([400,900,1300,1600][Math.min(3,Math.max(0,this.session.dogRounds-1))]):zombieHealth(round,this.data.rules),state:barrier?'barricade':'chase',barrier,path:[],pathIndex:0,repath:0,attackLeft:0,attackDealt:false,tearLeft:1.1,stuck:0,lastPosition:root.position.clone(),growl:3+id%7};
     if(kind==='nova')z.health=Math.trunc(z.health*.75);
+    if(rise){z.state='rising';z.rise=rise;z.riseT=0;}
     z.maxHealth=z.health;this.list.push(z);this.session.spawned++;return z;
   }
   update(dt,player){
@@ -61,6 +68,12 @@ export class Enemies {
     for(const z of [...this.list]){
       z.rig.update(dt);z.growl-=dt;
       if(z.growl<0){this.onSound?.('growl',z.root.position);z.growl=6+s.random()*7;}
+      if(z.state==='rising'){   // up out of the ground over the clip's first three quarters, facing the player
+        z.riseT+=dt;const k=Math.min(1,z.riseT/z.rise.dur),e=1-(1-Math.min(1,k/.75))**2;z.root.position.y=z.rise.y-50*(1-e);
+        z.root.rotation.y=Math.atan2(-(player.z-z.root.position.z),player.x-z.root.position.x);
+        if(k>=1){z.state='chase';z.repath=0;z.rig.play('walk');}
+        continue;
+      }
       if(z.state==='barricade'){
         z.root.rotation.y=Math.atan2(-(z.barrier.inside.z-z.root.position.z),z.barrier.inside.x-z.root.position.x);
         z.tearLeft-=dt;

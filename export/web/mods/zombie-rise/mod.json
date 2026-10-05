@@ -1,0 +1,5 @@
+{
+  "name": "Zombies rise from the ground",
+  "description": "Zombies at spawn points without a window climb out of the ground (BO1's riser animations) instead of appearing in place.",
+  "script": "mod.js"
+}
