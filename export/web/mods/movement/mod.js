@@ -241,7 +241,7 @@ export default function setup(api){
 
   // ---- Camera feel ------------------------------------------------------------------------------
   let phase=0,dip=0,dipV=0,roll=0,wasGrounded=true,lastVy=0,bobBlend=0,fallTime=0,crouchOffset=0;
-  let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0;
+  let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0,stairVel=0;
   const downRay=new THREE.Ray(new THREE.Vector3(),new THREE.Vector3(0,-1,0));
   function flatUnderfoot(){
     const col=api.world?.collision;if(!col?.raycastFirst)return false;
@@ -262,7 +262,7 @@ export default function setup(api){
     // ray finds a level surface) small bumps are eased out too; on ramps they
     // pass straight through so the camera doesn't lag the slope.
     else if(player.onFloor&&!state.mantling&&Math.abs(jump)>.12&&flatUnderfoot())stairOffset=THREE.MathUtils.clamp(stairOffset-jump,-24,24);
-    else if(Math.abs(jump)>player.stepHeight+6)stairOffset=0;   // teleports, mantles, big drops
+    else if(Math.abs(jump)>player.stepHeight+6){stairOffset=0;stairVel=0;}   // teleports, mantles, big drops
     if(!dt||['reviving','gameover'].includes(session.phase))return;
     const st=player.state,v=st.velocity,speed=Math.hypot(v.x,v.z),grounded=st.grounded;
     // Landing dip only after a real fall (not stairs).
@@ -281,7 +281,14 @@ export default function setup(api){
     roll+=(targetRoll-roll)*Math.min(1,dt*7);
     // Ease the eye between standing / crouch / prone heights instead of popping.
     crouchOffset+=(0-crouchOffset)*Math.min(1,dt*10);
-    stairOffset+=(0-stairOffset)*Math.min(1,dt*(api.world?.entry?.stairSmoothing?(api.world.entry.stairSmoothRate??8):11));
+    // Maps with stairSmoothing ease the eye with a critically damped spring instead: the first-order ease restarted at
+    // every step, so the eye's climbing speed pulsed with each riser (about ±50% on Cheese Cube's 12-unit steps). The
+    // spring keeps that speed continuous, so a staircase reads as one smooth ramp.
+    if(api.world?.entry?.stairSmoothing){
+      const w=2*(api.world.entry.stairSmoothRate??8),h=Math.min(dt,.05);
+      stairVel+=(-w*w*stairOffset-2*w*stairVel)*h;stairOffset=THREE.MathUtils.clamp(stairOffset+stairVel*h,-24,24);
+    }
+    else stairOffset+=(0-stairOffset)*Math.min(1,dt*11);
     camera.position.y+=y+dip+crouchOffset+stairOffset;
     camera.position.x+=Math.cos(camera.rotation.y)*side;camera.position.z-=Math.sin(camera.rotation.y)*side;
     camera.rotation.z=roll+Math.cos(phase)*.004*bob*bobBlend;
