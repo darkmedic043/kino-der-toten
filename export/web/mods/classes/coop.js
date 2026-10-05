@@ -135,7 +135,7 @@ export function setupCoopSkills({api,turrets,fort,eng,sync,A}){
         // the host holds zombies at the face, as fortifier.js does for its own walls, and reports each strike
         const half=r.width/2+14,depth=r.depth;
         for(const z of enemies.list){
-          if(z.state==='dead'||z.state==='barricade'||z.state==='entering')continue;
+          if(z.state==='dead'||z.state==='barricade'||z.state==='entering'||z.state==='rising')continue;
           L.copy(z.root.position).sub(r.at);const x=L.dot(r.ax),zz=L.dot(r.az),y=z.root.position.y-r.at.y;
           if(Math.abs(x)>half||y<-40||y>r.height+20){if(z.fortWall===r)z.fortWall=null;continue;}
           const side=z.fortWall===r&&z.fortSide?z.fortSide:(Math.sign(zz)||1);

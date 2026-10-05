@@ -217,7 +217,7 @@ export function setupFortifier(ctx){
     s.age+=dt;s.mesh.scale.setScalar(Math.min(1,s.age/.3));
     s.mesh.position.y=s.at.y-(1-s.wear/s.maxWear)*5;   // sinks into the ground as it wears out
     for(const z of enemies.list){
-      if(z.state==='barricade'||z.state==='entering')continue;
+      if(z.state==='barricade'||z.state==='entering'||z.state==='rising')continue;
       const d=Math.hypot(z.root.position.x-s.at.x,z.root.position.z-s.at.z),inside=d<s.radius&&Math.abs(z.root.position.y-s.at.y)<50;
       if(inside&&!s.inside.has(z)){s.inside.add(z);z.snareK=1-a.slow;z.speed*=z.snareK;if(st['snare.root'])z.snareRoot={until:session.time+st['snare.root'],at:z.root.position.clone()};}
       else if(!inside&&s.inside.has(z))release(z,s);
@@ -273,7 +273,7 @@ export function setupFortifier(ctx){
       if(window.kino.coop?.id&&!window.kino.coop.isHost)continue;
       const half=w.width/2+14,depth=w.depth;
       for(const z of enemies.list){
-        if(z.state==='dead'||z.state==='barricade'||z.state==='entering')continue;
+        if(z.state==='dead'||z.state==='barricade'||z.state==='entering'||z.state==='rising')continue;   // a zombie still climbing out of the ground can't strike
         L.copy(z.root.position).sub(w.at);const x=L.dot(w.ax),zz=L.dot(w.az),y=z.root.position.y-w.at.y;
         if(Math.abs(x)>half||y<-40||y>w.height+20){if(z.fortWall===w)z.fortWall=null;continue;}
         const side=z.fortWall===w&&z.fortSide?z.fortSide:(Math.sign(zz)||1);
