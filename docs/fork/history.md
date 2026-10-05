@@ -101,3 +101,4 @@
 - **2026-10-05 (fps)**: the phone 30 FPS cap is now a setting (`fpsCap`, Settings → 30 FPS cap). Desktop Cheese Cube measured 60 fps (the headless display rate).
 - **2026-10-05 (stairs)**: stair camera on `stairSmoothing` maps uses a critically damped spring (smooth climb speed instead of a pulse per step). See movement.md.
 - **2026-10-05 (knife, stairs)**: Bondrewd Premium Blessed/Fur: first-person arms keep the fur mask (`fpArmsVariant`), fixing the fur filling the screen on the knife lunge. Stairs: step-ups also allowed briefly airborne without a jump, fixing sprint snags (movement.md).
+- **2026-10-05 (suits)**: Cheese Cube Iron Man suits use their own weapons (repulsors, wrist rockets, Mk1 flamethrower, War Machine guns) while worn, with the JARVIS HUD from the map (waw-ports.md).

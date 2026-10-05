@@ -2,15 +2,49 @@
 //   1. Six parts lie around the map (helmet, body, two arms, two legs). Carry each to the Hall of Armors and add it.
 //   2. With all six built the suits can be bought at their stands: Mk1 5000, Mk3 7500, Mk4 10000, Mk5 12500, Mk6 15000.
 //      The War Machine (10000) also needs the trivia reward.
-//   3. Use a bought suit's stand to put it on (one suit at a time): more health, a different walking speed, the suit's
-//      weapon on the first wear (stand-ins from the weapon list). Use the stand again to take it off. The suit returns to
-//      its stand and recharges for 20 s. Dying also takes the suit off.
-// Flight (hold Space in the air, with a power bar), the stand and door animations, the spinning holograms, the War Machine
-// cage and JARVIS lines are ported. Not ported: the JARVIS screen overlays and the Mk16 suit itself (its scanner joke is).
+//   3. Use a bought suit's stand to put it on (one suit at a time): more health, a different walking speed, and the
+//      suit's own weapons in place of yours (repulsors and wrist rockets; Mk1 flamethrower; War Machine minigun and
+//      handgun), as the map does. Your guns come back when the suit comes off. Use the stand again to take it off.
+//   4. Suit power (the JARVIS HUD, suit-hud.js): each repulsor shot costs 1, a rocket 5, flying (hold Space in the air)
+//      6 a second, and it does not recharge while worn. At zero the suit shuts down and goes back to its stand, which
+//      recharges it for 30 s. Dying also takes the suit off.
+// The weapons reuse BO1 guns' viewmodels (Ray Gun, LAW, HK21, CZ75, RPK) with the map's stats and fire sounds.
+// Not ported: the Mk16 suit itself (its scanner joke is), the Mk5 suitcase and Mk6 laser.
 import * as THREE from 'three';
+import { createSuitHud } from './suit-hud.js';
 
 export function setupSuits({api,world,session,host,toast,announce,named,center,nodes,show,beep,now,board,player,triviaDone,sync,sound}){
-  const {equipView,data}=api;
+  const {equipView,data,audio}=api;
+
+  // ---- the suits' weapons (the map's weapons/sp files), as defs on BO1 guns ----------------------------------------
+  const W=data?.weapons??{},clone=(id,base,extra)=>{if(!W[base])return;W[id]={...W[base],id,baseId:base,price:0,upgrade:undefined,attachment:undefined,suitWeapon:true,...extra};};
+  clone('iron_repulsor','ray_gun_zm',{name:'Repulsor',hideGun:true,damage:2000,minDamage:2000,fireTime:.33,fireType:'Single Shot',automatic:false,clipSize:10,startAmmo:120,maxAmmo:120,
+    reloadTime:1,reloadEmptyTime:1,projectileSpeed:3200,explosionRadius:64,explosionInnerDamage:1500,explosionOuterDamage:300,suitSound:'suit_repulsor',suitPower:1});
+  clone('iron_rocket','m72_law_zm',{name:'Wrist-Rocket',hideGun:true,damage:10000,minDamage:10000,fireTime:.33,clipSize:3,startAmmo:20,maxAmmo:20,reloadTime:1.2,reloadEmptyTime:1.2,
+    projectileSpeed:2100,explosionRadius:256,explosionInnerDamage:600,explosionOuterDamage:75,suitSound:'suit_missile',suitPower:5});
+  clone('iron_mk1_rocket','m72_law_zm',{name:'Mk1 Wrist-Rocket',hideGun:true,damage:10000,minDamage:10000,fireTime:.33,clipSize:1,startAmmo:2,maxAmmo:2,reloadTime:1.2,reloadEmptyTime:1.2,
+    projectileSpeed:2100,explosionRadius:500,explosionInnerDamage:20000,explosionOuterDamage:150,suitSound:'suit_missile',suitPower:5});
+  clone('iron_mk6_rocket','m72_law_zm',{name:'Mk6 Wrist-Rocket',hideGun:true,damage:10000,minDamage:10000,fireType:'Full Auto',automatic:true,fireTime:.2,clipSize:10,startAmmo:30,maxAmmo:30,
+    reloadTime:1.2,reloadEmptyTime:1.2,projectileSpeed:2300,explosionRadius:200,explosionInnerDamage:1200,explosionOuterDamage:75,suitSound:'suit_missile',suitPower:5});
+  // the flamethrower mod (weapon-levels/flamer.js) burns for any weapon flagged `flamethrower`
+  clone('iron_mk1_flamer','rpk_zm',{name:'Mk1 Flamethrower',hideGun:true,flamethrower:true,clipSize:100,startAmmo:300,maxAmmo:300,fireTime:.1,automatic:true,fireType:'Full Auto',
+    damage:1,minDamage:1,range:40,pellets:1,headMultiplier:1,reloadTime:1.83,reloadEmptyTime:1.83,projectileSpeed:0,explosionRadius:0,suitPower:.25});
+  clone('iron_wm_minigun','hk21_zm',{name:'War Machine Minigun',damage:1000,minDamage:90,fireTime:.1,clipSize:125,startAmmo:500,maxAmmo:500,reloadTime:5,reloadEmptyTime:5,
+    suitSound:'suit_minigun',suitPower:.2});
+  clone('iron_wm_handgun','cz75_zm',{name:'War Machine Handgun',fireType:'Full Auto',automatic:true,damage:750,minDamage:90,fireTime:.15,clipSize:125,startAmmo:500,maxAmmo:500,
+    reloadTime:2,reloadEmptyTime:2,suitPower:.2});
+  // Repulsors, wrist rockets and the Mk1 flamethrower are part of the suit: their base gun's mesh is hidden, leaving the
+  // arms (in the base gun's pose). The view caches gun models, so hidden meshes are shown again for any other weapon.
+  const hiddenGun=new Set();
+  host.on('update',()=>{
+    const gun=api.view?.gun,hide=!!session.def?.hideGun;
+    for(const o of hiddenGun)if(!hide||!gun||!o.parent||o.parent!==gun&&!isIn(o,gun)){o.visible=true;hiddenGun.delete(o);}
+    if(hide&&gun)gun.traverse(o=>{if(o.isMesh&&o.visible){o.visible=false;hiddenGun.add(o);}});
+  });
+  const isIn=(o,root)=>{for(let p=o.parent;p;p=p.parent)if(p===root)return true;return false;};
+  // the map's own fire sounds in place of the base guns'
+  if(audio?.weapon){const play=audio.weapon.bind(audio);audio.weapon=(kind,def)=>{if(kind==='shot'&&def?.suitSound){sound?.(def.suitSound,{volume:.7});return;}return play(kind,def);};}
+
 
   // ---- parts -------------------------------------------------------------------------------------
   const PARTS=[
@@ -53,27 +87,24 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
 
   // ---- suits -------------------------------------------------------------------------------------
   const SUITS=[
-    {id:'mk3',name:'Mark III',cost:7500,trig:'give_iron',hp:285,speed:1.05,holo:'rotate_iron',door:'iron_door',stand:'iron_stand',weapon:'ray_gun_zm'},
-    {id:'mk1',name:'Mark I',cost:5000,trig:'give_mk1',hp:350,speed:.85,noSprint:true,holo:'rotate_mk1',display:'mk1',door:'mk1_door',stand:'mk1_stand',weapon:'ray_gun_zm'},
-    {id:'mk4',name:'Mark IV',cost:10000,trig:'give_mk4',hp:285,speed:1.1,holo:'rotate_mk4',display:'mk4',door:'mk4_door',stand:'mk4_stand',weapon:'m72_law_zm'},
-    {id:'mk5',name:'Mark V',cost:12500,trig:'give_mk5',hp:200,speed:1.2,holo:'rotate_mk5',display:'mk5',door:'mk5_door',stand:'mk5_stand',weapon:'ray_gun_zm'},
-    {id:'mk6',name:'Mark VI',cost:15000,trig:'give_mk6',hp:285,speed:1.1,holo:'rotate_mk6',display:'mk6',door:'mk6_door',stand:'mk6_stand',weapon:'m72_law_zm'},
-    {id:'wm',name:'War Machine',cost:10000,trig:'give_wm',hp:320,speed:.95,holo:'wm_holo_red',holoOn:'wm_holo',display:'wm_model',weapon:'m72_law_zm',needsTrivia:true},
-  ].map(s=>({...s,owned:false,given:false,readyAt:0}));
+    {id:'mk3',name:'Mark III',cost:7500,trig:'give_iron',hp:285,speed:1.05,holo:'rotate_iron',door:'iron_door',stand:'iron_stand',weapons:['iron_repulsor','iron_rocket']},
+    {id:'mk1',name:'Mark I',cost:5000,trig:'give_mk1',hp:350,speed:.85,noSprint:true,holo:'rotate_mk1',display:'mk1',door:'mk1_door',stand:'mk1_stand',weapons:['iron_mk1_flamer','iron_mk1_rocket']},
+    {id:'mk4',name:'Mark IV',cost:10000,trig:'give_mk4',hp:285,speed:1.1,holo:'rotate_mk4',display:'mk4',door:'mk4_door',stand:'mk4_stand',weapons:['iron_repulsor','iron_rocket']},
+    {id:'mk5',name:'Mark V',cost:12500,trig:'give_mk5',hp:200,speed:1.2,holo:'rotate_mk5',display:'mk5',door:'mk5_door',stand:'mk5_stand',weapons:['iron_repulsor']},
+    {id:'mk6',name:'Mark VI',cost:15000,trig:'give_mk6',hp:285,speed:1.1,holo:'rotate_mk6',display:'mk6',door:'mk6_door',stand:'mk6_stand',weapons:['iron_repulsor','iron_mk6_rocket']},
+    {id:'wm',name:'War Machine',cost:10000,trig:'give_wm',hp:320,speed:.95,holo:'wm_holo_red',holoOn:'wm_holo',display:'wm_model',weapons:['iron_wm_minigun','iron_wm_handgun','iron_rocket'],needsTrivia:true},
+  ].map(s=>({...s,owned:false,readyAt:0}));
   const suitOf=id=>SUITS.find(s=>s.id===id);
-  let worn=null,originalSpeed=null,power=100,spaceHeld=false,flying=false,wornBefore=false,lowWarned=false,hallHeard=false;
+  let worn=null,originalSpeed=null,power=100,spaceHeld=false,flying=false,wornBefore=false,lowWarned=false,critWarned=false,hallHeard=false,saved=null,lastShots=0,healthVoiceAt=0;
   const voice=(n,v=.8)=>sound?.('jarvis_'+n,{volume:v});
-  const MAX_POWER=100,DRAIN=22,REGEN=16,THRUST=1500,RISE_CAP=260;
+  const MAX_POWER=100,FLY_DRAIN=6,THRUST=1500,RISE_CAP=260,RECHARGE=30;
 
   // The suit's health: maxHealth becomes the larger of the normal value and the suit's.
   const own=Object.getOwnPropertyDescriptor(session,'maxHealth');
   const baseMax=own?.get?()=>own.get.call(session):()=>own?.value??100;
   Object.defineProperty(session,'maxHealth',{configurable:true,get(){return Math.max(baseMax(),worn?.hp??0);},set(){}});
 
-  const overlay=document.createElement('div');overlay.id='suit-hud';
-  overlay.style.cssText='position:fixed;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity 1.2s;background:radial-gradient(ellipse at center,transparent 55%,#b8211a55 100%);box-shadow:inset 0 0 90px #e8a02a55';
-  overlay.innerHTML='<div id="suit-name" style="position:absolute;left:50%;bottom:44px;transform:translateX(-50%);font:600 12px/1 system-ui,sans-serif;letter-spacing:.36em;color:#f4c84a;text-shadow:0 0 8px #000">ARMOR ONLINE</div><div style="position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:220px;height:7px;background:#000a;border:1px solid #f4c84a99"><i id="suit-power" style="display:block;height:100%;width:100%;background:linear-gradient(90deg,#e8a02a,#f4e08a)"></i></div>';
-  document.body.append(overlay);
+  const hud=createSuitHud({base:api.map.dir.replace(/\/?$/,'/')});
 
   // A suit leaves its stand by sinking out of sight and comes back by rising, like the map's stands do.
   const anims=[];
@@ -115,16 +146,23 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
   addEventListener('keydown',e=>{if(e.code==='Space')spaceHeld=true;});
   addEventListener('keyup',e=>{if(e.code==='Space')spaceHeld=false;});
   addEventListener('blur',()=>{spaceHeld=false;});
-  const bar=overlay.querySelector('#suit-power');
+  const stats=()=>{const b=window.kino.scoreboard?.stats?.()??{};
+    return {kills:session.kills??b.k??0,headshots:session.headshots??b.h??0,gibs:window.kino.dismemberment?.gibs??0,
+      left:Math.max(0,(session.total??0)-(session.killed??0)),downs:b.d??0,revives:b.r??0};};
   host.on('update',(dt)=>{
     const step=typeof dt==='number'&&dt>0&&dt<.25?dt:1/60;
-    if(!worn){flying=false;return;}
+    if(!worn){flying=false;lastShots=session.shots??0;return;}
     const grounded=player.isGrounded??player.onFloor;
     flying=spaceHeld&&!grounded&&power>0&&session.phase==='fighting';
-    if(flying){power=Math.max(0,power-DRAIN*step);player.velocity.y=Math.min(RISE_CAP,Math.max(player.velocity.y,0)+THRUST*step);}
-    else power=Math.min(MAX_POWER,power+(grounded?REGEN:REGEN*.35)*step);
-    bar.style.width=(100*power/MAX_POWER)+'%';
-    if(flying&&power<20&&!lowWarned){lowWarned=true;voice('power_low');}
+    if(flying){power-=FLY_DRAIN*step;player.velocity.y=Math.min(RISE_CAP,Math.max(player.velocity.y,0)+THRUST*step);}
+    // each shot of a suit weapon costs power (the map: repulsor 1, rocket 5)
+    const shots=session.shots??0;if(shots>lastShots)power-=(session.def?.suitPower??0)*(shots-lastShots);lastShots=shots;
+    power=Math.max(0,power);
+    if(power<25&&!lowWarned){lowWarned=true;hud.warn('POWER LEVELS LOW');voice('power_low_'+Math.floor(Math.random()*6));}
+    if(power<11&&!critWarned){critWarned=true;hud.warn('POWER LEVELS CRITICAL');voice('power_low_'+Math.floor(Math.random()*6));}
+    if(session.health<75&&now()>=healthVoiceAt){healthVoiceAt=now()+10;voice('health_low_'+Math.floor(Math.random()*6));}
+    hud.update(power,stats());
+    if(power<=0){const s=worn;takeOff(s,'Suit power depleted. The armor returns to its stand.');}
   });
 
   // The stands, as the map does them: the alcove door slides down, the suit and its stand sink, the door closes again.
@@ -147,19 +185,31 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     player.moveSpeed=originalSpeed.move*s.speed;player.sprintSpeed=s.noSprint?player.moveSpeed:originalSpeed.sprint*s.speed;
     standDown(s);
     show('ENT_'+(s.holoOn??s.holo+'_on'),false);if(s.id==='mk3')show('ENT_rotate_iron_on',false);
-    overlay.querySelector('#suit-name').textContent=s.name.toUpperCase()+' ARMOR ONLINE';power=MAX_POWER;overlay.style.opacity=1;
-    if(!s.given&&data?.weapons?.[s.weapon]){s.given=true;session.giveWeapon(s.weapon);equipView?.();}
-    voice(wornBefore?'suit_up_0'+Math.floor(Math.random()*3):'suit_up_first');wornBefore=true;lowWarned=false;
+    power=MAX_POWER;lowWarned=critWarned=false;lastShots=session.shots??0;
+    // the suit's weapons replace yours until it comes off
+    const kit=s.weapons.filter(id=>W[id]);
+    if(kit.length){
+      session.cancelReload?.();saved={inventory:session.inventory.map(w=>({...w})),slot:session.slot};
+      session.inventory=kit.map(id=>({id,mag:W[id].clipSize,reserve:Math.max(0,W[id].maxAmmo-W[id].clipSize),upgraded:false}));session.slot=0;equipView?.();
+    }
+    hud.show(s.id);sound?.(s.id==='mk1'?'suit_on_mk1':'suit_on',{volume:.7});
+    voice(wornBefore?'suit_up_0'+Math.floor(Math.random()*3):'suit_up_first');wornBefore=true;
     announce(`${s.name} armor`,'SUIT ONLINE',3);beep();
   }
   function takeOff(s,why){
     if(worn!==s)return;
-    worn=null;s.readyAt=now()+20;
+    worn=null;s.readyAt=now()+RECHARGE;
+    // your guns come back (anything bought while suited is kept, in front)
+    if(saved){
+      const extra=session.inventory.filter(w=>!W[w.id]?.suitWeapon);
+      session.cancelReload?.();session.inventory=[...extra,...saved.inventory].slice(0,Math.max(saved.inventory.length,extra.length));
+      session.slot=extra.length?0:Math.min(saved.slot,session.inventory.length-1);saved=null;equipView?.();
+    }
     if(originalSpeed){player.moveSpeed=originalSpeed.move;player.sprintSpeed=originalSpeed.sprint;}
     if(session.health>session.maxHealth)session.health=session.maxHealth;
     standUp(s);
     show('ENT_'+(s.holoOn??s.holo+'_on'),true);if(s.id==='mk3')show('ENT_rotate_iron_on',true);
-    overlay.style.opacity=0;flying=false;
+    hud.hide();flying=false;sound?.(s.id==='mk1'?'suit_off_mk1':'suit_off',{volume:.7});
     voice('charging');
     toast(why??`${s.name} armor is recharging`,3);
   }
@@ -220,8 +270,8 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
   host.on('reset',()=>{
     hallHeard=false;wornBefore=false;cageOpen=false;carrying.clear();placed.clear();assembled=false;doorOpen=false;scanUntil=0;power=MAX_POWER;anims.length=0;
     for(const [o,y] of baseY){o.position.y=y;o.updateMatrix();o.updateMatrixWorld(true);}show('ENT_malibu_wall',true);show('ENT_purchase_armors',true);show('ENT_mk16_door',true);show('ENT_wm_cage',true);lower('wm_cage',true,{depth:100,dur:2,hide:false});
-    if(worn){worn=null;if(originalSpeed){player.moveSpeed=originalSpeed.move;player.sprintSpeed=originalSpeed.sprint;}overlay.style.opacity=0;}
-    for(const s of SUITS){s.owned=false;s.given=false;s.readyAt=0;if(s.display)show('ENT_'+s.display,true);show('ENT_'+s.holo,true);show('ENT_'+(s.holoOn??s.holo+'_on'),false);}
+    if(worn){worn=null;if(originalSpeed){player.moveSpeed=originalSpeed.move;player.sprintSpeed=originalSpeed.sprint;}hud.hide();}saved=null;
+    for(const s of SUITS){s.owned=false;s.readyAt=0;if(s.display)show('ENT_'+s.display,true);show('ENT_'+s.holo,true);show('ENT_'+(s.holoOn??s.holo+'_on'),false);}
     setPartVisuals();
   });
   setPartVisuals();

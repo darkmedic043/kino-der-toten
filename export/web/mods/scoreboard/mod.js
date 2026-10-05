@@ -17,6 +17,7 @@ export default async function setup(api){
   let downs=0,revives=0,lastPhase=session.phase;
   const peers=new Map();let subscribed=false,sendAt=0;
   const mine=()=>({p:Math.round(session.points),k:session.kills,h:session.headshots,d:downs,r:revives});
+  window.kino.scoreboard.stats=mine;   // your own row (Cheese Cube's JARVIS HUD reads it)
   host.on('reset',()=>{downs=0;revives=0;lastPhase=session.phase;});
   function pump(){
     if(session.phase==='reviving'&&lastPhase!=='reviving')downs++;lastPhase=session.phase;

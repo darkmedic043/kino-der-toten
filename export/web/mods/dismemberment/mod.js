@@ -148,8 +148,9 @@ export default async function setup(api){
     else if(h>34&&Math.abs(side)>7&&Math.random()<(kills?.5:big?.3:.08))cut(z,side>0?'larm':'rarm',toward);
   });
 
+  let gibCount=0;   // limbs and heads taken off this game (Cheese Cube's JARVIS HUD shows it)
   function cut(z,limb,toward){
-    const g=split(z);if(g.lost.has(limb))return;g.lost.add(limb);
+    const g=split(z);if(g.lost.has(limb))return;g.lost.add(limb);gibCount++;
     if(limb==='rarm'||limb==='larm'){
       const both=g.lost.has('rarm')&&g.lost.has('larm');
       // BO1 has no model with both arms gone; the second arm keeps the first's torso
@@ -162,13 +163,13 @@ export default async function setup(api){
     }
   }
   function behead(z,toward){
-    const g=split(z);if(g.lost.has('head'))return;g.lost.add('head');
+    const g=split(z);if(g.lost.has('head'))return;g.lost.add('head');gibCount++;
     // BO1 attaches the neck stump as an extra piece; it doesn't replace the torso
     g.meshes.stump=bindPiece(z,'behead');
     popHead(z,toward);
   }
 
-  host.on('reset',()=>{for(const f of flying)f.piece.removeFromParent();flying.length=0;});
+  host.on('reset',()=>{gibCount=0;for(const f of flying)f.piece.removeFromParent();flying.length=0;});
   const ray=new THREE.Raycaster();
   host.on('update',dt=>{
     if(!dt)return;
@@ -189,5 +190,5 @@ export default async function setup(api){
   });
   // debug: kino.dismemberment.cut(zombieId,'rarm'|'larm'|'legs') / .behead(zombieId)
   const byId=id=>enemies.list.find(z=>z.id===id);
-  window.kino.dismemberment={cut:(id,limb)=>{const z=byId(id);if(z)cut(z,limb,new THREE.Vector3(1,0,0));return !!z;},behead:id=>{const z=byId(id);if(z)behead(z,new THREE.Vector3(1,0,0));return !!z;},state:id=>{const z=byId(id);return z&&{lost:[...(z.gib?.lost??[])],crawler:!!z.crawler,speed:z.speed,anim:z.rig.current};}};
+  window.kino.dismemberment={get gibs(){return gibCount;},cut:(id,limb)=>{const z=byId(id);if(z)cut(z,limb,new THREE.Vector3(1,0,0));return !!z;},behead:id=>{const z=byId(id);if(z)behead(z,new THREE.Vector3(1,0,0));return !!z;},state:id=>{const z=byId(id);return z&&{lost:[...(z.gib?.lost??[])],crawler:!!z.crawler,speed:z.speed,anim:z.rig.current};}};
 }
