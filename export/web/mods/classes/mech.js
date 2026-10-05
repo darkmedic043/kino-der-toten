@@ -24,7 +24,7 @@ import { createCharacter, seatCharacter } from '../../characters.js';
 const up=new THREE.Vector3(0,1,0);
 const LIFT=34;            // the cockpit sits this much above a player's eye
 const DROP_TIME=1.1;      // seconds from the sky to the ground
-const VENT_DELAY=1.2;     // an overheated arm sits locked this long before it starts venting
+const VENT_DELAY=2.2;     // an overheated arm sits locked this long before it starts venting (was 1.2, then 'more punishing')
 const SEAT=new THREE.Vector3(0,104,-30);   // the rear gunner's feet on the procedural mech (the Marcy model has its own gunnerSeat)
 
 export async function setupMech(ctx){
@@ -302,8 +302,8 @@ export async function setupMech(ctx){
     const since=session.time-a.shotT;
     // overheated: locked for VENT_DELAY before it starts venting, then vents back to zero; otherwise heat bleeds off after
     // half a second without firing
-    if(a.over){if(since>VENT_DELAY)a.heat=Math.max(0,a.heat-dt*.4*M.mech.cool);if(a.heat<=0)a.over=false;}
-    else if(since>.5&&!(held&&(w.mode==='auto'||w.mode==='beam')))a.heat=Math.max(0,a.heat-dt*.28*M.mech.cool);
+    if(a.over){if(since>VENT_DELAY)a.heat=Math.max(0,a.heat-dt*.28*M.mech.cool);if(a.heat<=0)a.over=false;}
+    else if(since>.8&&!(held&&(w.mode==='auto'||w.mode==='beam')))a.heat=Math.max(0,a.heat-dt*.2*M.mech.cool);
     if(a.over){a.spin=Math.max(0,a.spin-dt*2);a.charge=0;a.pressed=false;return;}
     const f=aimDir(),from=camera.position.clone();
     if(w.mode==='auto'){

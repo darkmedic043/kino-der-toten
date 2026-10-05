@@ -164,3 +164,4 @@ Third class, **Pilot** (`classes.json` id `mech`; named Mech until the user aske
     - Last Stand: below 25%, +damage and half hit cost.
     - Long Stride, Rear Hardpoint, Gunner Training, Repair Drones and Covering Fire kept.
   - Tested: all flags load; 6 s of chaingun with them killed 8 and overheated; 10 hits cost 0.05 s (shield).
+- **Heat, more punishing (2026-10-05):** overheat lock 2.2 s before venting (was 1.2), vent .28/s (was .4), so an overheated arm is out for about 5.8 s base. Normal cooling .2/s after 0.8 s without firing (was .28 after 0.5).
