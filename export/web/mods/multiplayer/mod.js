@@ -28,8 +28,10 @@ export default async function setup(api){
   const page=location.pathname+(api.map?`?map=${encodeURIComponent(api.map.id)}`:'');
   const panel=document.createElement('div');panel.id='coop-panel';document.body.append(panel);
   try{
-    if(hosting)await net.create({page,map:api.map?.id??'kino',character:profile.character});
-    else await net.join(code,{character:profile.character});
+    // the character's customisation picks go along, so teammates see the same skin options (Blessing, outfit, ...)
+    const variants=profile.variants?.[profile.character];
+    if(hosting)await net.create({page,map:api.map?.id??'kino',character:profile.character,variants});
+    else await net.join(code,{character:profile.character,variants});
   }catch(error){api.toast('Co-op: '+error.message,8);panel.innerHTML=`<strong>CO-OP</strong><span class="err">${esc(error.message)}</span>`;return;}
   const url=new URL(location.href);url.searchParams.delete('mp');url.searchParams.set('room',net.code);history.replaceState(null,'',url);
   const invite=url.href;
@@ -59,7 +61,7 @@ export default async function setup(api){
   function setTag(r){r.tag?.removeFromParent();r.tag=nameTag(r.dead?r.name+' · DEAD':r.down?r.name+' · DOWN':r.name,r.down||r.dead);r.tag.position.set(0,r.down?40:86,0);r.root?.add(r.tag);}
   async function addRemote(p){
     if(p.id===net.id||remotes.has(p.id))return;
-    const entry=registry.find(e=>e.id===p.character)??registry[0];
+    const base=registry.find(e=>e.id===p.character)??registry[0],entry={...base,choice:p.variants??base.choice};
     const r={id:p.id,name:p.name,entry,pos:null,target:null,yaw:0,targetYaw:0,vel:new THREE.Vector3(),grounded:true,down:false,dead:false,weapon:'',held:null,fire:0,lastSeen:performance.now()};
     remotes.set(p.id,r);
     r.character=await createCharacter(entry,data);r.root=r.character.root;r.root.visible=false;scene.add(r.root);setTag(r);showPanel();

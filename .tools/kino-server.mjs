@@ -181,7 +181,14 @@ function leave(client) {
   if (room.host === client.id) room.host = room.players.keys().next().value;
   for (const p of room.players.values()) wsSend(p.sock, { t: 'left', id: client.id, host: room.host });
 }
-const publicPlayer = p => ({ id: p.id, name: p.name, character: p.character });
+const publicPlayer = p => ({ id: p.id, name: p.name, character: p.character, variants: p.variants });
+// A player's customisation picks for their character ({group: option id}, characters.json `variants`), kept small.
+const cleanVariants = v => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const out = {};
+  for (const [k, x] of Object.entries(v).slice(0, 32)) if (typeof x === 'string') out[String(k).slice(0, 32)] = x.slice(0, 32);
+  return out;
+};
 let clientSerial = 0;
 function onSocket(req, sock) {
   const s = session(req), client = { id: 'p' + (++clientSerial), sock, room: null, name: s?.name || 'Guest ' + (clientSerial % 1000), character: 'mannequin' };
@@ -193,6 +200,7 @@ function onSocket(req, sock) {
     if (msg.t === 'create' || msg.t === 'join') {
       leave(client);
       client.character = String(msg.character || 'mannequin').slice(0, 64);
+      client.variants = cleanVariants(msg.variants);
       let room;
       if (msg.t === 'create') {
         room = { code: newCode(), host: client.id, page: String(msg.page || '/').slice(0, 300), map: String(msg.map || '').slice(0, 64), players: new Map() };

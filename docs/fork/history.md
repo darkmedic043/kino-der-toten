@@ -106,3 +106,4 @@
 - **2026-10-05 (Mk16)**: Cheese Cube: per-suit power with the Hall of Armors power screens; the Mark 16 Nightclub suit (earned by owning all six armors) with Stealth-Mode cloaking.
 - **2026-10-05 (Mk5, ending)**: Cheese Cube: Mark V suitcase; the hammer ending's roll, flight and thunder.
 - **2026-10-05 (Gyro)**: Gyro Zeppeli operator (JoJo SBR fan rip, built locally with `.tools/build_gyro.sh`; see characters.md).
+- **2026-10-05 (co-op skins)**: teammates see your operator's customisation (Blessing, outfit, ...) in co-op (coop.md).
