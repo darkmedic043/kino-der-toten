@@ -22,3 +22,4 @@
     - Main menu: a SOCIAL tab with a request badge on the nav. It lists friends sorted in game / online / offline with a status dot, JOIN when their co-op room has space, and remove. It also shows your card (@username, friend ID, COPY), ADD FRIEND by username, name or ID, and incoming and sent requests.
     - Game: `mods/social` reports In game with the map and co-op room every 2 s on change. The co-op lobby has + ADD FRIEND on signed-in players (or FRIEND / REQUESTED) and an INVITE FRIENDS list (online first, INVITE, then SENT).
   - Tested with a throwaway server (`KINO_DATA` in the scratchpad, port 5199) and two made-up sessions: request by username, then the notification and ACCEPT; status online, then in game (co-op 1/4, JOIN); lobby INVITE gave a JOIN notification that opened the room.
+- **Lobby avatars (2026-10-05):** room players carry `picture` (their Discord avatar, signed in); lobby cards show it round, falling back to the name's initial.

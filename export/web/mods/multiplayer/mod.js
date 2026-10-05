@@ -388,6 +388,7 @@ export default async function setup(api){
     #coop-lobby .pl{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #776b5226}
     #coop-lobby .av{width:42px;height:42px;display:grid;place-items:center;background:#1a1714;border:1px solid #776b5266;font:700 18px Georgia,serif;color:#d9c3a0}
     #coop-lobby .pl.me .av{border-color:#b5372c}
+    #coop-lobby .av{overflow:hidden;border-radius:50%}#coop-lobby .av img{width:100%;height:100%;object-fit:cover;display:block}
     #coop-lobby .nm{font-size:14px;color:#eee8dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #coop-lobby .nm em{font-style:normal;font-size:9px;letter-spacing:2px;color:#b82f27;margin-left:8px}
     #coop-lobby .sub{font-size:10px;letter-spacing:1px;color:#8c8272;margin-top:3px}
@@ -426,7 +427,7 @@ export default async function setup(api){
       const tag=i.in?'<span class="tag in">IN GAME</span>':ready?'<span class="tag ok">READY</span>':`<span class="tag">LOADING ${pct}%</span>`;
       // ADD FRIEND: signed-in players who aren't friends yet (and only when I'm signed in)
       const soc=socialState(),add=p.id!==net.id&&p.uid&&soc.signedIn&&p.uid!==soc.me?.id?(isFriend(p.uid)?'<span class="fr-tag">FRIEND</span>':isPending(p.uid)?'<span class="fr-tag">REQUESTED</span>':`<button type="button" class="add" data-uid="${esc(p.uid)}">+ ADD FRIEND</button>`):'';
-      return `<div class="pl${p.id===net.id?' me':''}"><div class="av">${esc((p.name||'?')[0].toUpperCase())}</div>
+      return `<div class="pl${p.id===net.id?' me':''}"><div class="av">${p.picture?`<img src="${esc(p.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${esc((p.name||'?')[0].toUpperCase())}'))">`:esc((p.name||'?')[0].toUpperCase())}</div>
         <div><div class="nm">${esc(p.name)}${p.id===net.hostId?'<em>HOST</em>':''}${p.id===net.id?'<em>YOU</em>':''}</div><div class="sub">${esc(sub)}</div>${ready?'':`<div class="bar"><i style="width:${pct}%"></i></div>`}${add}</div>${tag}</div>`;};
     // friends to invite: online ones not already here
     const soc=socialState(),here=new Set(all.map(p=>p.uid).filter(Boolean));

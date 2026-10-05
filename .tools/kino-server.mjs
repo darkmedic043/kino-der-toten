@@ -287,7 +287,7 @@ function leave(client) {
   if (room.host === client.id) room.host = room.players.keys().next().value;
   for (const p of room.players.values()) wsSend(p.sock, { t: 'left', id: client.id, host: room.host });
 }
-const publicPlayer = p => ({ id: p.id, name: p.name, character: p.character, variants: p.variants, uid: p.uid ?? null });   // uid: the account's friend id (signed in)
+const publicPlayer = p => ({ id: p.id, name: p.name, character: p.character, variants: p.variants, uid: p.uid ?? null, picture: p.picture ?? null });   // picture: their Discord avatar (signed in)   // uid: the account's friend id (signed in)
 // A player's customisation picks for their character ({group: option id}, characters.json `variants`), kept small.
 const cleanVariants = v => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
@@ -297,7 +297,7 @@ const cleanVariants = v => {
 };
 let clientSerial = 0;
 function onSocket(req, sock) {
-  const s = session(req), client = { id: 'p' + (++clientSerial), sock, room: null, name: s?.name || 'Guest ' + (clientSerial % 1000), character: 'mannequin', uid: s ? pubId(s.sub) : null, sub: s?.sub ?? null };
+  const s = session(req), client = { id: 'p' + (++clientSerial), sock, room: null, name: s?.name || 'Guest ' + (clientSerial % 1000), character: 'mannequin', uid: s ? pubId(s.sub) : null, sub: s?.sub ?? null, picture: s?.picture ?? null };
   if (s) remember(s);
   sock.setNoDelay(true);
   const ping = setInterval(() => { if (!sock.destroyed) sock.write(Buffer.from([0x89, 0])); }, 25000);
