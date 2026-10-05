@@ -57,7 +57,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     {id:'mk4',name:'Mark IV',cost:10000,trig:'give_mk4',hp:285,speed:1.1,holo:'rotate_mk4',display:'mk4',weapon:'m72_law_zm'},
     {id:'mk5',name:'Mark V',cost:12500,trig:'give_mk5',hp:200,speed:1.2,holo:'rotate_mk5',display:'mk5',weapon:'ray_gun_zm'},
     {id:'mk6',name:'Mark VI',cost:15000,trig:'give_mk6',hp:285,speed:1.1,holo:'rotate_mk6',display:'mk6',weapon:'m72_law_zm'},
-    {id:'wm',name:'War Machine',cost:10000,trig:'give_wm',hp:320,speed:.95,display:'wm_model',weapon:'m72_law_zm',needsTrivia:true},
+    {id:'wm',name:'War Machine',cost:10000,trig:'give_wm',hp:320,speed:.95,holo:'wm_holo_red',holoOn:'wm_holo',display:'wm_model',weapon:'m72_law_zm',needsTrivia:true},
   ].map(s=>({...s,owned:false,given:false,readyAt:0}));
   const suitOf=id=>SUITS.find(s=>s.id===id);
   let worn=null,originalSpeed=null,power=100,spaceHeld=false,flying=false,wornBefore=false,lowWarned=false,hallHeard=false;
@@ -77,23 +77,23 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
   // A suit leaves its stand by sinking out of sight and comes back by rising, like the map's stands do.
   const anims=[];
   const baseY=new Map();
-  function lower(name,down){
+  function lower(name,down,{depth=120,from=0,dur=down?1.5:2.5,hide=true}={}){
     const objs=nodes('ENT_'+name);if(!objs.length)return;
     for(const o of objs)if(!baseY.has(o))baseY.set(o,o.position.y);
     for(let i=anims.length-1;i>=0;i--)if(anims[i].name===name)anims.splice(i,1);
     if(!down)for(const o of objs)o.visible=true;
-    anims.push({name,objs,down,t0:now(),dur:down?1.5:2.5});
+    anims.push({name,objs,down,depth,from,hide,t0:now(),dur});
   }
   host.on('update',()=>{
     for(let i=anims.length-1;i>=0;i--){
-      const a=anims[i],k=Math.min(1,(now()-a.t0)/a.dur),d=-120*(a.down?k:1-k);
+      const a=anims[i],k=Math.min(1,(now()-a.t0)/a.dur),d=-(a.down?a.from+(a.depth-a.from)*k:a.depth*(1-k));
       for(const o of a.objs){o.position.y=baseY.get(o)+d;o.updateMatrix();o.updateMatrixWorld(true);}
-      if(k>=1){if(a.down)for(const o of a.objs)o.visible=false;anims.splice(i,1);}
+      if(k>=1){if(a.down&&a.hide)for(const o of a.objs)o.visible=false;anims.splice(i,1);}
     }
   });
 
   // The Hall of Armors holograms turn on the spot.
-  const SPIN=['rotate_head','rotate_head_on','rotate_body','rotate_body_on','rotate_left_arm','rotate_left_arm_on','rotate_right_arm','rotate_right_arm_on','rotate_left_leg','rotate_left_leg_on','rotate_right_leg','rotate_right_leg_on','rotate_iron','rotate_iron_on','rotate_mk1','rotate_mk1_on','rotate_mk4','rotate_mk4_on','rotate_mk5','rotate_mk5_on','rotate_mk6','rotate_mk6_on'];
+  const SPIN=['rotate_head','rotate_head_on','rotate_body','rotate_body_on','rotate_left_arm','rotate_left_arm_on','rotate_right_arm','rotate_right_arm_on','rotate_left_leg','rotate_left_leg_on','rotate_right_leg','rotate_right_leg_on','rotate_iron','rotate_iron_on','rotate_mk1','rotate_mk1_on','rotate_mk4','rotate_mk4_on','rotate_mk5','rotate_mk5_on','rotate_mk6','rotate_mk6_on','wm_holo','wm_holo_red'];
   const spinners=SPIN.flatMap(n=>nodes('ENT_'+n)).map(o=>{
     o.updateWorldMatrix(true,true);const box=new THREE.Box3().setFromObject(o),c=box.getCenter(new THREE.Vector3());
     return {o,c,base:o.position.clone()};
@@ -128,7 +128,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     if(!originalSpeed)originalSpeed={move:player.moveSpeed,sprint:player.sprintSpeed};
     player.moveSpeed=originalSpeed.move*s.speed;player.sprintSpeed=s.noSprint?player.moveSpeed:originalSpeed.sprint*s.speed;
     if(s.display)lower(s.display,true);
-    show('ENT_'+s.holo+'_on',false);if(s.id==='mk3')show('ENT_rotate_iron_on',false);
+    show('ENT_'+(s.holoOn??s.holo+'_on'),false);if(s.id==='mk3')show('ENT_rotate_iron_on',false);
     overlay.querySelector('#suit-name').textContent=s.name.toUpperCase()+' ARMOR ONLINE';power=MAX_POWER;overlay.style.opacity=1;
     if(!s.given&&data?.weapons?.[s.weapon]){s.given=true;session.giveWeapon(s.weapon);equipView?.();}
     voice(wornBefore?'suit_up_0'+Math.floor(Math.random()*3):'suit_up_first');wornBefore=true;lowWarned=false;
@@ -140,14 +140,14 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     if(originalSpeed){player.moveSpeed=originalSpeed.move;player.sprintSpeed=originalSpeed.sprint;}
     if(session.health>session.maxHealth)session.health=session.maxHealth;
     if(s.display)lower(s.display,false);
-    show('ENT_'+s.holo+'_on',true);if(s.id==='mk3')show('ENT_rotate_iron_on',true);
+    show('ENT_'+(s.holoOn??s.holo+'_on'),true);if(s.id==='mk3')show('ENT_rotate_iron_on',true);
     overlay.style.opacity=0;flying=false;
     voice('charging');
     toast(why??`${s.name} armor is recharging`,3);
   }
   const buy=s=>{
     if(s.owned)return;s.owned=true;setPartVisuals();
-    show('ENT_'+s.holo,false);show('ENT_'+s.holo+'_on',true);if(s.id==='mk3')show('ENT_rotate_iron',false);
+    show('ENT_'+s.holo,false);show('ENT_'+(s.holoOn??s.holo+'_on'),true);if(s.id==='mk3')show('ENT_rotate_iron',false);
     if(SUITS.filter(x=>x.id!=='mk16'&&x.owned).length===6){show('ENT_malibu_wall',false);show('ENT_purchase_armors',false);announce('All six armors are yours','THE WALL FALLS AWAY',4);voice('armors_purchased');}
   };
   sync?.on('ir-buy',id=>{const s=suitOf(id);if(s){buy(s);toast(`A teammate bought the ${s.name} armor`,3);}});
@@ -185,6 +185,10 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
       },4000);
       return true;
     }});
+  // The War Machine's cage sinks 100 at the start and goes away once the trivia is done.
+  let cageOpen=false;
+  lower('wm_cage',true,{depth:100,dur:2,hide:false});
+  host.on('update',()=>{if(!cageOpen&&triviaDone()){cageOpen=true;lower('wm_cage',true,{depth:250,from:100,dur:4});}});
   const hall=named('hall_of_armors')[0];
   host.on('update',()=>{
     if(!hallHeard&&hall&&session.phase==='fighting'){
@@ -196,14 +200,14 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     if(worn&&(['reviving','gameover'].includes(session.phase)))takeOff(worn,'The armor was lost');
   });
   host.on('reset',()=>{
-    hallHeard=false;wornBefore=false;carrying.clear();placed.clear();assembled=false;doorOpen=false;scanUntil=0;power=MAX_POWER;anims.length=0;
-    for(const [o,y] of baseY){o.position.y=y;o.updateMatrix();o.updateMatrixWorld(true);}show('ENT_malibu_wall',true);show('ENT_purchase_armors',true);show('ENT_mk16_door',true);
+    hallHeard=false;wornBefore=false;cageOpen=false;carrying.clear();placed.clear();assembled=false;doorOpen=false;scanUntil=0;power=MAX_POWER;anims.length=0;
+    for(const [o,y] of baseY){o.position.y=y;o.updateMatrix();o.updateMatrixWorld(true);}show('ENT_malibu_wall',true);show('ENT_purchase_armors',true);show('ENT_mk16_door',true);show('ENT_wm_cage',true);lower('wm_cage',true,{depth:100,dur:2,hide:false});
     if(worn){worn=null;if(originalSpeed){player.moveSpeed=originalSpeed.move;player.sprintSpeed=originalSpeed.sprint;}overlay.style.opacity=0;}
-    for(const s of SUITS){s.owned=false;s.given=false;s.readyAt=0;if(s.display)show('ENT_'+s.display,true);show('ENT_'+s.holo,true);show('ENT_'+s.holo+'_on',false);}
+    for(const s of SUITS){s.owned=false;s.given=false;s.readyAt=0;if(s.display)show('ENT_'+s.display,true);show('ENT_'+s.holo,true);show('ENT_'+(s.holoOn??s.holo+'_on'),false);}
     setPartVisuals();
   });
   setPartVisuals();
-  for(const s of SUITS)show('ENT_'+s.holo+'_on',false);
+  for(const s of SUITS)show('ENT_'+(s.holoOn??s.holo+'_on'),false);
 
   board?.addCollectible({id:'cc-iron-parts',label:'Iron Man armor',value:()=>`${placed.size} / 6 built`,done:()=>assembled,
     parts:()=>PARTS.map(p=>({label:p.label,short:{head:'HD',body:'BD',arml:'LA',armr:'RA',legl:'LL',legr:'RL'}[p.id],state:placed.has(p.id)?'placed':carrying.has(p.id)?'carried':'none'}))});

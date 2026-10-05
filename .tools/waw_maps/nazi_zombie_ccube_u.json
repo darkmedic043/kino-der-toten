@@ -58,7 +58,8 @@
     "trivia6",
     "trivia7",
     "trivia8",
-    "trivia9"
+    "trivia9",
+    "wm_cage"
   ],
   "entityProps": [
     "panel_pick",
@@ -108,7 +109,10 @@
     "mk6",
     "wm_model",
     "cap_shield",
-    "vending_phd_flopper"
+    "vending_phd_flopper",
+    "wm_holo",
+    "wm_holo_red",
+    "stark_tower"
   ],
   "movers": [
     {

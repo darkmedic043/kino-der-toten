@@ -97,7 +97,11 @@ export class Enemies {
           const next=z.root.position.clone().addScaledVector(delta,Math.min(1,z.speed*dt/horizontal));
           for(const other of this.list){if(other===z||other.state==='barricade')continue;const sep=next.clone().sub(other.root.position);sep.y=0;const d=sep.length();if(d<29&&d>.01)next.addScaledVector(sep,(29-d)/d*dt*2);}
           const safe=this.world.closest(next,{x:22,y:36,z:22});
-          if(safe&&safe.distanceTo(next)<38)z.root.position.copy(safe);
+          if(safe&&safe.distanceTo(next)<38){z.root.position.copy(safe);z.blockT=0;}
+          else{   // the straight step leaves the navmesh (a doorway only a few cells wide): after a moment hop to the path point
+            z.blockT=(z.blockT??0)+dt;
+            if(z.blockT>.5&&horizontal<130){z.root.position.copy(target);z.blockT=0;z.pathIndex++;}
+          }
           z.root.rotation.y=Math.atan2(-delta.z,delta.x);
         }
       }
