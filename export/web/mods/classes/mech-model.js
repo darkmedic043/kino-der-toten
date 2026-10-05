@@ -16,8 +16,8 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 // the loadout's weapons sit on its cut forearm stumps, and the pilot sits in the opened cockpit. Without it, the
 // procedural chassis below.
 const MECH_URL=new URL('models/mech.glb',import.meta.url).href;
-const SCALE=130;          // model units (the mesh is ~1.35 tall with its fins) to game units: about 1.8 players tall (175 was too tall)
-const PILOT_SCALE=SCALE/175;   // the cockpit was fitted at 175: the seated operator shrinks with the mech
+const SCALE=105;          // model units (the mesh is ~1.35 tall with its fins) to game units: the body tops out at ~120, like the first (procedural) mech; 175 and 130 were too tall
+const PILOT_SCALE=.72;   // the seated operator (and the cockpit's panel and sticks); a little larger than the mech's own scale (105/175) so the pilot stays readable
 const STUMP=.17;          // forearm left past the elbow by the build (model units)
 let mechGltf=null,mechLoad=null;
 export function loadMechModel(){mechLoad??=new GLTFLoader().loadAsync(MECH_URL).then(g=>{mechGltf=g;return g;}).catch(()=>null);return mechLoad;}
@@ -258,7 +258,7 @@ function marcyMech({mount=false}={}){
   }
   const seat=group('seat');seat.position.set(0,.76*SCALE,-.1*SCALE);seat.scale.setScalar(PILOT_SCALE);root.add(seat);   // the pilot's hips (cockpit, under the brow)
   // the cockpit: a padded back panel over the model's unseen interior (opened by the build) and two control sticks
-  {const M=materials();seat.add(at(box(40,50,4,M.dark,2),0,20,-15),at(box(30,5,26,M.dark,2),0,-2,-2),at(box(26,30,3,M.tube,1.5),0,22,-12.8));
+  {const M=materials();seat.add(at(box(40,50,4,M.dark,2),0,20,-15),at(box(30,5,26,M.dark,2),0,-2,-2),at(box(26,30,3,M.tube,1.5),0,22,-12.8));   // back panel, seat, padding
     for(const x of [-11,11])seat.add(at(cyl(1.2,1.2,16,M.steel,8),x,6,15,-.35),at(box(3.2,4.5,3.2,M.dark,1),x,13,17.5));}
   const hard=group('hardpoint');root.add(hard);hard.visible=mount;
   hard.add(at(cyl(2.2,2.2,12,materials().dark,10),0,6,0),at(box(18,3,14,materials().dark,1),0,-1,-10));
@@ -275,7 +275,7 @@ function marcyMech({mount=false}={}){
   const api={root,arms,legs,seat,seatFacing:0,pilotScale:PILOT_SCALE,
     eye:.98*SCALE,   // the pilot's eye above the feet (first person)
     gunnerSeat:new THREE.Vector3(0,1.09*SCALE,-.33*SCALE),
-    setWeapons(left,right){for(const [side,id] of [['left',left],['right',right]]){const a=arms[side];if(a.id===id)continue;a.weapon?.removeFromParent();a.weapon=weapon(id);a.weapon.scale.setScalar(1.1);a.id=id;a.weapon.traverse(o=>{if(o.isMesh)o.castShadow=true;});a.mount.add(a.weapon);}},
+    setWeapons(left,right){for(const [side,id] of [['left',left],['right',right]]){const a=arms[side];if(a.id===id)continue;a.weapon?.removeFromParent();a.weapon=weapon(id);a.weapon.scale.setScalar(.85);a.id=id;a.weapon.traverse(o=>{if(o.isMesh)o.castShadow=true;});a.mount.add(a.weapon);}},
     setMount(on){hard.visible=on;},
     mountGun:mg,
     recoil(side,k=1){arms[side].kick=Math.min(1.5,arms[side].kick+k);},

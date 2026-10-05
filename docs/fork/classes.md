@@ -137,3 +137,30 @@ Third class, **Pilot** (`classes.json` id `mech`; named Mech until the user aske
     - Thermite: the radial engine as its drum.
     - Arc: the drum with prongs and a core.
   - The plain steel parts are only half metallic: the game's scenes have no environment map, so strongly metallic materials rendered black.
+- **Height again:** scale 105. The body tops out about where the procedural mech did ("make it around the same height as the original"). The pilot and cockpit use `PILOT_SCALE` .72 and the weapons ×.85.
+- **Universal passives (user: "not really universal… make them more unique, use BL3/BL4 as reference"):** Pilot passives no longer name weapons. Every passive works with every weapon; only augments stay weapon-specific (they sit on that weapon's arm). `mechStats` gives the flags. `bonus(z, arm)` in mech.js applies the damage conditions per hit; every hit carries its arm, including rockets and shells via `s.arm`.
+  - **Ballistics (precision and sustained fire):**
+    - Hot Barrels: +1.5%/rank per 25% heat on the firing arm.
+    - Cold Open: +6%/rank below 20% heat.
+    - Target Lock: +2%/rank per consecutive hit on the same zombie, up to 5 stacks (3 s).
+    - Steady Aim: +8%/rank standing still.
+    - Rapid Cycling: every weapon's rate.
+    - Vent Shockwave: an overheat blasts around the mech.
+    - Heat Sinks, Reinforced Frame, Composite Plating and Kill Feed kept.
+  - **Ordnance (explosions and fire):**
+    - Scorched Earth: burning zombies take more.
+    - Collateral: every mech explosion is bigger, through `mblast`.
+    - Reactive Armour: a hit sets off a charge, at most every 0.3 s.
+    - Chain Reaction: kills can explode.
+    - Napalm Coating: every hit ignites.
+    - Crossfire: while one arm is overheated, the other hits harder.
+    - Big Entrance: a bigger landing blast.
+    - Orbital Beacon, Demolition Pay and Ejection Charge kept.
+  - **Vanguard (on the move, up close, the team):**
+    - Momentum: +4%/rank while moving.
+    - Deflector Plating: a chance a hit costs nothing ("DEFLECTED").
+    - Overshield: seconds of shield on landing, drawn as a white segment on the integrity bar.
+    - Crushing Stride: trample zombies within 75 while walking.
+    - Last Stand: below 25%, +damage and half hit cost.
+    - Long Stride, Rear Hardpoint, Gunner Training, Repair Drones and Covering Fire kept.
+  - Tested: all flags load; 6 s of chaingun with them killed 8 and overheated; 10 hits cost 0.05 s (shield).

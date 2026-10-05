@@ -182,19 +182,25 @@ export function mechStats(cls,state){
   const s=stats(cls,state),k=(key,def=0)=>s[key]??def,b=actionOf(cls,state).base;
   const mech={cooldown:b.cooldown*Math.max(.35,1-k('mech.cooldown')),duration:b.duration*(1+k('mech.duration')),hitCost:b.hitCost*Math.max(.25,1-k('mech.armor')),
     cool:1+k('mech.cool'),speed:1+k('mech.speed'),mount:!!k('mech.mount'),mountDamage:1+k('mech.mountDamage'),killTime:k('mech.killTime'),riderTime:k('mech.riderTime'),
-    regen:k('mech.regen'),eject:k('mech.eject'),killPoints:k('mech.killPoints'),burn:1+k('mech.burn'),radius:1+k('mech.radius'),
+    regen:k('mech.regen'),eject:k('mech.eject'),killPoints:k('mech.killPoints'),burn:1,radius:1+k('mech.radius'),
+    // the universal passives (every weapon): conditional damage, triggers, defence
+    hot:k('mech.hot'),cold:k('mech.cold'),focus:k('mech.focus'),still:k('mech.still'),moving:k('mech.moving'),burnVuln:k('mech.burnVuln'),cross:k('mech.cross'),
+    lastStand:k('mech.lastStand'),ventBlast:k('mech.ventBlast'),reactive:k('mech.reactive'),chain:k('mech.chain'),ignite:k('mech.ignite'),landing:k('mech.landing'),
+    deflect:k('mech.deflect'),shield:k('mech.shield'),stomp:k('mech.stomp'),
     smart:k('cap.core.smart'),salvoCore:k('cap.core.salvo'),berserk:k('cap.core.berserk')};
   return {mech,stats:s,left:mechWeapon(cls,s,state.loadout.left),right:mechWeapon(cls,s,state.loadout.right)};
 }
 export function mechWeapon(cls,s,id){
   const w=cls.mech.weapons[id];if(!w)return null;const k=(key,def=0)=>s[key]??def;
-  const dmg=1+k('mech.damage.'+w.kind),aug=key=>k(id+'.'+key);
-  const out={...w,id,damageMul:dmg};
-  if(id==='chaingun')Object.assign(out,{rate:w.rate*(1+aug('rate')),spread:w.spread*Math.max(.2,1-aug('spread')),spin:aug('nospin')?0:w.spin,pierce:aug('pierce'),burn:!!aug('burn')});
-  if(id==='rail')Object.assign(out,{charge:w.charge/(1+aug('charge')),blast:!!aug('blast'),split:aug('split')||1});
-  if(id==='salvo')Object.assign(out,{count:w.count+aug('count'),refire:w.refire/(1+k('ordnance.rate')),homing:!!aug('homing'),cluster:aug('cluster'),radius:w.radius*(1+k('mech.radius'))});
-  if(id==='thermite')Object.assign(out,{refire:w.refire/(1+k('ordnance.rate')),pool:w.pool*(1+aug('long')),split:aug('split')||1,radius:w.radius*(1+k('mech.radius')),burn:w.burn*(1+k('mech.burn'))});
-  if(id==='fist')Object.assign(out,{pound:!!aug('pound'),dash:!!aug('dash'),execute:aug('execute')});
-  if(id==='arc')Object.assign(out,{range:w.range*(1+aug('range')),chain:w.chain+aug('chain'),stun:!!aug('stun')});
+  // passives are universal (mechStats; damage conditions are applied per hit in mech.js); here only Rapid Cycling
+  // (every weapon's rate) and the weapon's own augments
+  const aug=key=>k(id+'.'+key),rate=1+k('mech.rate');
+  const out={...w,id,damageMul:1};
+  if(id==='chaingun')Object.assign(out,{rate:w.rate*rate,spin:aug('nospin')?0:w.spin/rate,pierce:aug('pierce'),burn:!!aug('burn')});
+  if(id==='rail')Object.assign(out,{charge:w.charge/rate,refire:w.refire/rate,blast:!!aug('blast'),split:aug('split')||1});
+  if(id==='salvo')Object.assign(out,{count:w.count+aug('count'),refire:w.refire/rate,homing:!!aug('homing'),cluster:aug('cluster')});
+  if(id==='thermite')Object.assign(out,{refire:w.refire/rate,pool:w.pool*(1+aug('long')),split:aug('split')||1});
+  if(id==='fist')Object.assign(out,{refire:w.refire/rate,pound:!!aug('pound'),dash:!!aug('dash'),execute:aug('execute')});
+  if(id==='arc')Object.assign(out,{tick:w.tick/rate,chain:w.chain+aug('chain'),stun:!!aug('stun')});
   return out;
 }

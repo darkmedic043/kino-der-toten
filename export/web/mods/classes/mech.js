@@ -40,6 +40,7 @@ export async function setupMech(ctx){
 
   // ---- state -----------------------------------------------------------------------------------------------------
   let phase='idle';        // idle | falling | piloting
+  let shield=0,reactiveT=-9,stompT=0;   // Overshield (seconds of integrity), Reactive Armour and Crushing Stride timers
   let integrity=0,maxIntegrity=1,lastHitT=-9,landedAt=0,coreUsed=false;
   let drop=null;           // {mech, at, t}
   const arms={left:null,right:null};   // per-arm weapon state
@@ -90,7 +91,7 @@ export async function setupMech(ctx){
   // ---- HUD ---------------------------------------------------------------------------------------------------------
   const hudEl=document.createElement('div');hudEl.id='mech-hud';
   hudEl.innerHTML=`<div class="mh-frame"><i></i><i></i><i></i><i></i></div>
-    <div class="mh-top"><span class="mh-label">MECH INTEGRITY</span><div class="mh-bar"><b class="ghost"></b><b class="fill"></b></div><span class="mh-time"></span></div>
+    <div class="mh-top"><span class="mh-label">MECH INTEGRITY</span><div class="mh-bar"><b class="ghost"></b><b class="fill"></b><b class="shield"></b></div><span class="mh-time"></span></div>
     <div class="mh-arm left"><span class="mh-key">LMB</span><span class="mh-name"></span><div class="mh-heat"><b></b><s></s></div><span class="mh-state"></span></div>
     <div class="mh-arm right"><span class="mh-key">RMB</span><span class="mh-name"></span><div class="mh-heat"><b></b><s></s></div><span class="mh-state"></span></div>
     <div class="mh-reticle"><i></i><i></i><i></i><i></i></div>
@@ -109,6 +110,7 @@ export async function setupMech(ctx){
     #mech-hud .mh-bar{position:relative;height:14px;margin:5px 0 3px;border:1px solid #8fe3ff99;background:#02121a99;clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,8px 100%,0 50%)}
     #mech-hud .mh-bar b{position:absolute;left:0;top:0;bottom:0;transition:width .12s linear}
     #mech-hud .mh-bar .fill{background:repeating-linear-gradient(90deg,var(--hc) 0 9px,transparent 9px 11px);box-shadow:0 0 10px var(--hc)}
+    #mech-hud .mh-bar .shield{background:repeating-linear-gradient(90deg,#fff 0 9px,transparent 9px 11px);opacity:.85;box-shadow:0 0 10px #fff;left:auto!important;right:0}
     #mech-hud .mh-bar .ghost{background:#fff;opacity:.85;transition:width .5s ease-in .35s}
     #mech-hud .mh-time{font:700 20px/1 'Arial Narrow',Arial,sans-serif;letter-spacing:2px;text-shadow:0 0 8px var(--hc)}
     #mech-hud.low{--hc:#ff5a44}#mech-hud.low .mh-time{color:#ff8a78}
@@ -151,7 +153,7 @@ export async function setupMech(ctx){
   let ghostT=0;
   function drawHud(){
     if(phase!=='piloting')return;
-    const f=Math.max(0,integrity/maxIntegrity);$h('.fill').style.width=(f*100)+'%';
+    const f=Math.max(0,integrity/maxIntegrity);$h('.fill').style.width=(f*100)+'%';$h('.shield').style.width=(Math.min(1,shield/maxIntegrity)*100)+'%';
     if(session.time>ghostT)$h('.ghost').style.width=(f*100)+'%';
     $h('.mh-time').textContent=Math.ceil(Math.max(0,integrity))+'s';
     hudEl.classList.toggle('low',f<.25);
@@ -209,25 +211,42 @@ export async function setupMech(ctx){
     return {hits:out.sort((a,b)=>a.t-b.t),end:from.clone().addScaledVector(dir,max)};
   }
   const smartOn=()=>M.mech.smart&&session.time-landedAt<M.mech.smart;
-  function hurt(z,frac,w,{head=false,flat=0,cause='mech'}={}){
+  // the universal damage passives, for a hit by the arm `side` (or by the mech: explosions, fire, trampling)
+  function bonus(z,side){
+    const P=M.mech,a=side?arms[side]:null,other=side?arms[side==='left'?'right':'left']:null;let k=0;
+    if(a&&P.hot)k+=P.hot*Math.floor(Math.min(1,a.heat)/.25);                     // Hot Barrels
+    if(a&&P.cold&&a.heat<.2)k+=P.cold;                                            // Cold Open
+    if(P.focus){const f=z.mechFocus;const n=f&&session.time-f.t<3?f.n:0;k+=P.focus*Math.min(5,n);z.mechFocus={n:n+1,t:session.time};}   // Target Lock
+    if(P.still&&speed<15)k+=P.still;                                              // Steady Aim
+    if(P.moving&&speed>40)k+=P.moving;                                            // Momentum
+    if(P.burnVuln&&burning.has(z))k+=P.burnVuln;                                  // Scorched Earth
+    if(P.cross&&other?.over)k+=P.cross;                                           // Crossfire
+    if(P.lastStand&&integrity<maxIntegrity*.25)k+=P.lastStand;                    // Last Stand
+    return (1+k)*(smartOn()?1.25:1);
+  }
+  function hurt(z,frac,w,{head=false,flat=0,cause='mech',arm=null}={}){
     if(!enemies.list.includes(z))return false;
-    const dmg=(health()*frac+flat)*(w?.damageMul??1)*(smartOn()?1.25:1)*(head?1.5:1);
+    const at=z.root.position.clone();
+    const dmg=(health()*frac+flat)*(w?.damageMul??1)*bonus(z,arm)*(head?1.5:1);
     enemies.hurt(z,dmg,head,cause==='melee','mech');
     const killed=!enemies.list.includes(z);onHit(z,killed);
-    if(killed)onKill();
+    if(killed)onKill(at);
+    else if(M.mech.ignite&&cause!=='fire'){const dps=health()*M.mech.ignite/3;if((burning.get(z)?.dps??0)<dps)burn(z,dps);}   // Napalm Coating
     return killed;
   }
-  function onKill(){
+  function onKill(at){
     if(phase!=='piloting')return;
     integrity=Math.min(maxIntegrity,integrity+(M.mech.killTime??0)+(M.mech.berserk??0));
     if(M.mech.killPoints)session.addPoints?.(Math.round(M.mech.killPoints));
+    if(at&&M.mech.chain&&Math.random()<M.mech.chain)setTimeout(()=>mblast(at.clone().addScaledVector(up,30),120,.4),120);   // Chain Reaction
   }
   // the mech's explosions: like the class blast, but every zombie goes through hurt() so explosive kills count for the
   // kill passives (Kill Feed, Demolition Pay, Berserker Core) and Smart Core's bonus applies
-  function mblast(at,radius,frac){
+  function mblast(at,radius,frac,arm=null){
+    radius*=M.mech.radius??1;   // Collateral: every mech explosion
     window.kino.fx?.explosion?.([at.x,at.y,at.z],radius/260);audio.play('explosion',.6);sync.boom(at,radius);
     for(const z of [...enemies.list]){const d=z.root.position.distanceTo(at);
-      if(d<radius&&z.state!=='rising'&&world.lineClear(at.clone().addScaledVector(up,20),z.root.position.clone().addScaledVector(up,30)))hurt(z,frac*(1-.5*d/radius),null);}
+      if(d<radius&&z.state!=='rising'&&world.lineClear(at.clone().addScaledVector(up,20),z.root.position.clone().addScaledVector(up,30)))hurt(z,frac*(1-.5*d/radius),null,{arm});}
   }
   const burning=new Map();   // zombie -> {until, dps, tick}
   function burn(z,dps,secs=3){burning.set(z,{until:session.time+secs,dps,tick:burning.get(z)?.tick??.5});}
@@ -264,10 +283,10 @@ export async function setupMech(ctx){
   function explode(s,at){
     const w=s.w;
     if(s.kind==='rocket'){
-      mblast(at,s.radius??w.radius,w.damage*w.damageMul*(s.scale??1));   // w.radius already has Blast Radius
+      mblast(at,s.radius??w.radius,w.damage*w.damageMul*(s.scale??1),s.arm);   // w.radius already has Blast Radius
       if(w.cluster&&!s.bomblet)for(let i=0;i<w.cluster;i++){const d=new THREE.Vector3(Math.random()-.5,.9,Math.random()-.5).normalize();shells.push({kind:'rocket',mesh:new THREE.Mesh(shellGeo,shellMat),vel:d.multiplyScalar(420),w,life:.6,bomblet:true,scale:.4,radius:w.radius*.6,gravity:900});shells.at(-1).mesh.position.copy(at).addScaledVector(up,8);scene.add(shells.at(-1).mesh);}
     }else{
-      mblast(at,w.radius*.8,w.damage*w.damageMul);
+      mblast(at,w.radius*.8,w.damage*w.damageMul,s.arm);
       const n=w.split||1;for(let i=0;i<n;i++){const off=n>1?new THREE.Vector3(Math.cos(i/n*6.28)*w.radius*1.1,0,Math.sin(i/n*6.28)*w.radius*1.1):new THREE.Vector3();
         const p=at.clone().add(off),g=world.raycast(new THREE.Ray(p.clone().addScaledVector(up,60),up.clone().negate()),0,240);if(g)p.y=(g.point?.y??p.y);firePool(p,w);}
     }
@@ -275,7 +294,7 @@ export async function setupMech(ctx){
 
   // ---- the weapons ------------------------------------------------------------------------------------------------
   function newArm(w){return {w,heat:0,over:false,cd:0,spin:0,charge:0,shotT:-9,tick:0,pressed:false,punch:0,burst:0,burstT:0};}
-  function addHeat(a,h){if(smartOn())return;a.heat+=h;a.shotT=session.time;if(a.heat>=1){a.heat=1;a.over=true;a.charge=0;sfx.overheat();setTimeout(sfx.vent,200);}}
+  function addHeat(a,h){if(smartOn())return;a.heat+=h;a.shotT=session.time;if(a.heat>=1){a.heat=1;a.over=true;a.charge=0;sfx.overheat();if(M.mech.ventBlast)mblast(player.getFeetPosition().addScaledVector(up,30),170,M.mech.ventBlast);setTimeout(sfx.vent,200);}}
   function fireArm(side,dt){
     const a=arms[side],w=a.w,held=trig[side];
     a.cd=Math.max(0,a.cd-dt);a.punch=Math.max(0,a.punch-dt*3);
@@ -294,7 +313,7 @@ export async function setupMech(ctx){
         const d=f.clone().add(new THREE.Vector3((Math.random()-.5)*2*w.spread,(Math.random()-.5)*2*w.spread,(Math.random()-.5)*2*w.spread)).normalize();
         const {hits,end}=along(from,d,w.range,18);
         const n=1+(w.pierce??0);let last=end;
-        hits.slice(0,n).forEach((h,i)=>{hurt(h.z,w.damage,w,{head:h.head,flat:w.flat});if(w.burn)burn(h.z,health()*.05*M.mech.burn);last=i===n-1?from.clone().addScaledVector(d,h.t):last;});
+        hits.slice(0,n).forEach((h,i)=>{hurt(h.z,w.damage,w,{head:h.head,flat:w.flat,arm:side});if(w.burn)burn(h.z,health()*.05*M.mech.burn);last=i===n-1?from.clone().addScaledVector(d,h.t):last;});
         line(muzzle(side),hits.length&&hits.length<=n?from.clone().addScaledVector(d,hits.at(-1).t):last,0xffd890,.05);
         window.kino.fx?.muzzle?.(muzzle(side));
         addHeat(a,w.heat);recoil(side,.25);sfx.chaingun();
@@ -306,9 +325,9 @@ export async function setupMech(ctx){
         const frac=w.damage+(w.full-w.damage)*c*c,dirs=w.split>1?[0,-.05,.05]:[0];
         for(const yaw of dirs){
           const d=f.clone().applyAxisAngle(up,yaw);const {hits,end}=along(from,d,w.range,20);
-          for(const h of hits)hurt(h.z,frac,w,{head:h.head});
+          for(const h of hits)hurt(h.z,frac,w,{head:h.head,arm:side});
           line(muzzle(side),end,0x7fd8ff,.12,2.2*(.4+c));
-          if(w.blast&&c>=.99)mblast(end,160,.8*w.damageMul);
+          if(w.blast&&c>=.99)mblast(end,160,.8*w.damageMul,side);
         }
         addHeat(a,w.heat*(.5+.5*c));recoil(side,.6+c);sfx.rail();
       }
@@ -316,13 +335,13 @@ export async function setupMech(ctx){
       if(a.pressed&&a.cd<=0){
         a.pressed=false;a.cd=w.refire;
         if(w.id==='salvo'){a.burst=w.count;a.burstT=0;addHeat(a,w.heat);}
-        if(w.id==='thermite'){launch('shell',muzzle(side),f.clone().addScaledVector(up,.12).normalize(),w,{gravity:900});addHeat(a,w.heat);recoil(side,.8);sfx.thermite();}
+        if(w.id==='thermite'){launch('shell',muzzle(side),f.clone().addScaledVector(up,.12).normalize(),w,{gravity:900,arm:side});addHeat(a,w.heat);recoil(side,.8);sfx.thermite();}
         if(w.id==='fist')punch(side,a,w,f);
       }
       if(a.burst>0&&(a.burstT-=dt)<=0){
         a.burst--;a.burstT=.07;
         const d=f.clone().add(new THREE.Vector3((Math.random()-.5)*.05,(Math.random()-.5)*.04,(Math.random()-.5)*.05)).normalize();
-        launch('rocket',muzzle(side),d,w,{homing:w.homing});recoil(side,.35);sfx.rocket();
+        launch('rocket',muzzle(side),d,w,{homing:w.homing,arm:side});recoil(side,.35);sfx.rocket();
       }
     }else if(w.mode==='beam'){
       if(held&&(a.tick-=dt)<=0){
@@ -330,9 +349,9 @@ export async function setupMech(ctx){
         const target=enemies.list.filter(z=>z.state!=='rising').map(z=>{const c=z.root.position.clone().addScaledVector(up,38),v=c.clone().sub(from),d=v.length();return {z,c,d,dot:v.normalize().dot(f)};})
           .filter(o=>o.d<w.range&&o.dot>.9&&world.lineClear(from,o.c)).sort((a,b)=>b.dot*2-a.d/w.range-(a.dot*2-b.d/w.range))[0];
         if(target){
-          let from2=muzzle(side),prev=target;lightning(from2,target.c);hurt(target.z,w.damage,w);if(w.stun)stunned.set(target.z,{until:session.time+.4,at:target.z.root.position.clone()});
+          let from2=muzzle(side),prev=target;lightning(from2,target.c);hurt(target.z,w.damage,w,{arm:side});if(w.stun)stunned.set(target.z,{until:session.time+.4,at:target.z.root.position.clone()});
           const done=new Set([target.z]);
-          for(let i=0;i<w.chain;i++){const n=enemies.list.filter(z=>!done.has(z)&&z.root.position.distanceTo(prev.z.root.position)<w.chainRange).sort((a,b)=>a.root.position.distanceTo(prev.z.root.position)-b.root.position.distanceTo(prev.z.root.position))[0];if(!n)break;done.add(n);const c=n.root.position.clone().addScaledVector(up,38);lightning(prev.c,c);hurt(n,w.damage*.7,w);if(w.stun)stunned.set(n,{until:session.time+.4,at:n.root.position.clone()});prev={z:n,c};}
+          for(let i=0;i<w.chain;i++){const n=enemies.list.filter(z=>!done.has(z)&&z.root.position.distanceTo(prev.z.root.position)<w.chainRange).sort((a,b)=>a.root.position.distanceTo(prev.z.root.position)-b.root.position.distanceTo(prev.z.root.position))[0];if(!n)break;done.add(n);const c=n.root.position.clone().addScaledVector(up,38);lightning(prev.c,c);hurt(n,w.damage*.7,w,{arm:side});if(w.stun)stunned.set(n,{until:session.time+.4,at:n.root.position.clone()});prev={z:n,c};}
           sfx.arc();
         }else lightning(muzzle(side),from.clone().addScaledVector(f,180).add(new THREE.Vector3((Math.random()-.5)*40,(Math.random()-.5)*40,(Math.random()-.5)*40)));
         addHeat(a,w.heat);recoil(side,.05);
@@ -349,8 +368,8 @@ export async function setupMech(ctx){
       const v=z.root.position.clone().sub(center).setY(0),d=v.length();
       const inFront=d<w.range+(w.dash?70:0)&&v.normalize().dot(flat)>cos,around=w.pound&&d<170;
       if(!inFront&&!around)continue;
-      if(w.execute&&z.health<(z.maxHealth??health())*w.execute){hurt(z,99,w,{cause:'melee'});continue;}
-      const killed=hurt(z,inFront?w.damage:w.damage*.6,w,{cause:'melee'});
+      if(w.execute&&z.health<(z.maxHealth??health())*w.execute){hurt(z,99,w,{cause:'melee',arm:side});continue;}
+      const killed=hurt(z,inFront?w.damage:w.damage*.6,w,{cause:'melee',arm:side});
       if(!killed&&enemies.list.includes(z)){const push=(d>1?v:flat).clone().multiplyScalar(w.knock*(inFront?1:.6)),to=z.root.position.clone().add(push);if(world.lineClear(z.root.position.clone().addScaledVector(up,30),to.clone().addScaledVector(up,30)))z.root.position.copy(to);z.stuck=0;}
     }
     if(w.pound){window.kino.fx?.knockback?.(center);sync.boom(center,170);}
@@ -387,10 +406,10 @@ export async function setupMech(ctx){
   }
   function land(){
     const at=drop.at;world3.root.position.copy(at);
-    sfx.land();mblast(at,230,1.3);window.kino.fx?.knockback?.(at);camKick=1.4;
+    sfx.land();mblast(at,230*(1+(M.mech.landing??0)),1.3*(1+(M.mech.landing??0)));window.kino.fx?.knockback?.(at);camKick=1.4;
     // climb in
     phase='piloting';landedAt=session.time;coreUsed=false;lastHitT=session.time;
-    maxIntegrity=integrity=M.mech.duration;
+    maxIntegrity=integrity=M.mech.duration;shield=M.mech.shield??0;
     arms.left=newArm(M.left);arms.right=newArm(M.right);fp.setWeapons(M.left.id,M.right.id);
     saved={move:player.moveSpeed,sprint:player.sprintSpeed,jump:player.jumpHeight,crouch:player.crouchSpeed};
     player.moveSpeed=saved.move*.82*M.mech.speed;player.sprintSpeed=saved.move*1.12*M.mech.speed;player.jumpHeight=0;player.crouchSpeed=player.moveSpeed;
@@ -422,8 +441,12 @@ export async function setupMech(ctx){
   host.on('beforeDamage',e=>{
     if(riding){session.effects.invulnerable=Math.max(session.effects.invulnerable??0,session.time+.2);e.amount=0;return;}
     if(phase!=='piloting')return;
-    const cost=M.mech.hitCost*THREE.MathUtils.clamp(e.amount/45,.5,3);
-    integrity-=cost;lastHitT=session.time;e.amount=0;
+    let cost=M.mech.hitCost*THREE.MathUtils.clamp(e.amount/45,.5,3);e.amount=0;lastHitT=session.time;
+    if(M.mech.lastStand&&integrity<maxIntegrity*.25)cost*=.5;                                          // Last Stand
+    if(M.mech.deflect&&Math.random()<M.mech.deflect){cost=0;api.toast?.('DEFLECTED',.6);}                // Deflector Plating
+    if(shield>0){const s=Math.min(shield,cost);shield-=s;cost-=s;}                                     // Overshield
+    if(M.mech.reactive&&session.time-reactiveT>.3){reactiveT=session.time;mblast(player.getFeetPosition().addScaledVector(up,30),110,M.mech.reactive);}   // Reactive Armour
+    integrity-=cost;
     ghostT=session.time+.4;hudEl.classList.remove('hit');void hudEl.offsetWidth;hudEl.classList.add('hit');sfx.hit();
     if(integrity/maxIntegrity<.25&&(integrity+cost)/maxIntegrity>=.25)sfx.warn();
   });
@@ -474,6 +497,7 @@ export async function setupMech(ctx){
       world3.root.visible=third;world3.root.position.copy(feet);world3.root.rotation.y=camera.rotation.y+Math.PI;
       const pitch=camera.rotation.x;
       if(trig.left&&trig.right)core();
+      if(M.mech.stomp&&speed>40&&(stompT-=dt)<=0){stompT=.5;const f=player.getFeetPosition();for(const z of [...enemies.list])if(z.state!=='rising'&&z.root.position.distanceTo(f)<75)hurt(z,M.mech.stomp*.5,null);}   // Crushing Stride
       for(const side of ['left','right'])fireArm(side,dt);
       const pose={speed,pitch,spin:{left:arms.left.spin,right:arms.right.spin},charge:{left:arms.left.charge,right:arms.right.charge},heat:{left:arms.left.heat,right:arms.right.heat},punch:{left:arms.left.punch,right:arms.right.punch}};
       fp.update(dt,pose);world3.update(dt,pose);
