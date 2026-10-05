@@ -6,6 +6,7 @@
 //   trivia: shoot the answer to each question on the screen; a wrong answer locks it for two minutes
 //   puzzle: set three dials to the combination; it opens the door to the ending
 //   ending: 25000 at the top, once the puzzle is solved
+//   Iron Man suits: six parts to build, then buyable armors (suits.js)
 import * as THREE from 'three';
 
 export default async function setup(api){
@@ -168,6 +169,10 @@ export default async function setup(api){
   }
 
   window.kino.cheeseCube={log:[],state:()=>({captured,placed:[...placed],lastAnswer,step,triviaDone,retryAt,dials:DIALS.map(d=>d.digit),solved,doorOpen,endingReady,won})};   // for tests
+
+  // ---- Iron Man suits (own file)
+  const {setupSuits}=await import('./suits.js');
+  window.kino.cheeseCube.suits=setupSuits({api,world,session,host,toast,announce,named,center,show,beep,now,board,player:api.player,triviaDone:()=>triviaDone}).state;
 
   // ---- Scoreboard collectibles
   board?.addCollectible({id:'cc-brothers',label:'Cheese Brothers',value:()=>`${captured} / 5`,done:()=>captured>=5});
