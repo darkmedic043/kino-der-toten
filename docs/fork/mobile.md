@@ -15,3 +15,4 @@ Upstream has the touch layer (`touch-controls.js`, `zombies-touch.js`: stick, lo
 - **Testing without a phone**: Playwright Chromium with `isMobile`, `hasTouch`, `deviceScaleFactor 2`, an iPhone UA (gives `pointer: coarse`), real GPU flags. Taps go through `page.tap`, holds through CDP `Input.dispatchTouchEvent`. Check the console for errors and failed requests too.
 - Known leftovers: the third-person toast still says "T to switch back"; the other 3D menu previews (loadout thumbnails, Operator, characters) were only checked for layout, not touch input.
 - Not verified on a real phone (memory, thermals, real touch feel).
+- **30 FPS cap** (setting `fpsCap`, default on only where `(pointer: coarse)` matches): the game loop renders at most 30 fps while playing and 5 fps in menus. It used to follow `profile.mobile` with no way to turn it off. A steady 30 with the setting off is the browser's own battery saver (Chrome Energy Saver / Edge efficiency mode).

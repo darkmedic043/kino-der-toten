@@ -4,7 +4,7 @@
 const KEY='kino.settings';
 // Phones start on Low graphics without HD textures (the lighting and HD texture work is heavy there); a saved choice wins.
 const COARSE=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,renderScale:1,graphics:COARSE?0:2,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,binds:{}};
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,renderScale:1,graphics:COARSE?0:2,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,fpsCap:COARSE,binds:{}};
 // Rebindable actions and the key each game page listens for. game-menu.js
 // translates a rebound key into its default so the game code stays unchanged.
 export const ACTIONS=[
@@ -40,6 +40,7 @@ const FIELDS=[
   {key:'daytime',label:'Daytime (Kino)',type:'toggle',hint:'Sunlight and sky; off for the original night'},
   {key:'hdTextures',label:'HD textures',type:'toggle',hint:'AI-upscaled map textures (Kino). Uses more video memory'},
   {key:'showFps',label:'Show FPS counter',type:'toggle'},
+  {key:'fpsCap',label:'30 FPS cap',type:'toggle',hint:'Saves battery; on by default only on phones and tablets. A steady 30 with this off is the browser\'s battery saver'},
   // Dev section (collapsed by default).
   {key:'devConsole',label:'Cheat console',type:'toggle',group:'dev',hint:'Press ` in a game to open it. A game where you use cheats earns no XP or stats'},
 ];
