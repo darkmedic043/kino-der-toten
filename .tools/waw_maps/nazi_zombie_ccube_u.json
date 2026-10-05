@@ -34,10 +34,19 @@
   "entityMeshes": [
     "cheese_ending_clip",
     "iron_door",
+    "iron_stand",
     "left_button_ric",
     "malibu_wall",
     "middle_button_ric",
     "mk16_door",
+    "mk1_door",
+    "mk1_stand",
+    "mk4_door",
+    "mk4_stand",
+    "mk5_door",
+    "mk5_stand",
+    "mk6_door",
+    "mk6_stand",
     "piece_left_ric",
     "piece_middle_ric",
     "piece_right_ric",
@@ -112,7 +121,8 @@
     "vending_phd_flopper",
     "wm_holo",
     "wm_holo_red",
-    "stark_tower"
+    "stark_tower",
+    "rotate"
   ],
   "movers": [
     {

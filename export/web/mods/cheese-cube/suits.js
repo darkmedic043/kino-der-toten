@@ -52,11 +52,11 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
 
   // ---- suits -------------------------------------------------------------------------------------
   const SUITS=[
-    {id:'mk3',name:'Mark III',cost:7500,trig:'give_iron',hp:285,speed:1.05,holo:'rotate_iron',weapon:'ray_gun_zm'},
-    {id:'mk1',name:'Mark I',cost:5000,trig:'give_mk1',hp:350,speed:.85,noSprint:true,holo:'rotate_mk1',display:'mk1',weapon:'ray_gun_zm'},
-    {id:'mk4',name:'Mark IV',cost:10000,trig:'give_mk4',hp:285,speed:1.1,holo:'rotate_mk4',display:'mk4',weapon:'m72_law_zm'},
-    {id:'mk5',name:'Mark V',cost:12500,trig:'give_mk5',hp:200,speed:1.2,holo:'rotate_mk5',display:'mk5',weapon:'ray_gun_zm'},
-    {id:'mk6',name:'Mark VI',cost:15000,trig:'give_mk6',hp:285,speed:1.1,holo:'rotate_mk6',display:'mk6',weapon:'m72_law_zm'},
+    {id:'mk3',name:'Mark III',cost:7500,trig:'give_iron',hp:285,speed:1.05,holo:'rotate_iron',door:'iron_door',stand:'iron_stand',weapon:'ray_gun_zm'},
+    {id:'mk1',name:'Mark I',cost:5000,trig:'give_mk1',hp:350,speed:.85,noSprint:true,holo:'rotate_mk1',display:'mk1',door:'mk1_door',stand:'mk1_stand',weapon:'ray_gun_zm'},
+    {id:'mk4',name:'Mark IV',cost:10000,trig:'give_mk4',hp:285,speed:1.1,holo:'rotate_mk4',display:'mk4',door:'mk4_door',stand:'mk4_stand',weapon:'m72_law_zm'},
+    {id:'mk5',name:'Mark V',cost:12500,trig:'give_mk5',hp:200,speed:1.2,holo:'rotate_mk5',display:'mk5',door:'mk5_door',stand:'mk5_stand',weapon:'ray_gun_zm'},
+    {id:'mk6',name:'Mark VI',cost:15000,trig:'give_mk6',hp:285,speed:1.1,holo:'rotate_mk6',display:'mk6',door:'mk6_door',stand:'mk6_stand',weapon:'m72_law_zm'},
     {id:'wm',name:'War Machine',cost:10000,trig:'give_wm',hp:320,speed:.95,holo:'wm_holo_red',holoOn:'wm_holo',display:'wm_model',weapon:'m72_law_zm',needsTrivia:true},
   ].map(s=>({...s,owned:false,given:false,readyAt:0}));
   const suitOf=id=>SUITS.find(s=>s.id===id);
@@ -93,15 +93,18 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
   });
 
   // The Hall of Armors holograms turn on the spot.
-  const SPIN=['rotate_head','rotate_head_on','rotate_body','rotate_body_on','rotate_left_arm','rotate_left_arm_on','rotate_right_arm','rotate_right_arm_on','rotate_left_leg','rotate_left_leg_on','rotate_right_leg','rotate_right_leg_on','rotate_iron','rotate_iron_on','rotate_mk1','rotate_mk1_on','rotate_mk4','rotate_mk4_on','rotate_mk5','rotate_mk5_on','rotate_mk6','rotate_mk6_on','wm_holo','wm_holo_red'];
-  const spinners=SPIN.flatMap(n=>nodes('ENT_'+n)).map(o=>{
+  // Seconds per turn, from each holo's `speed` in the map.
+  const SPIN={rotate:5,rotate_head:25,rotate_head_on:25,rotate_body:25,rotate_body_on:25,rotate_left_arm:17,rotate_left_arm_on:17,rotate_right_arm:17,rotate_right_arm_on:17,
+    rotate_left_leg:35,rotate_left_leg_on:35,rotate_right_leg:30,rotate_right_leg_on:30,rotate_iron:10,rotate_iron_on:10,rotate_mk1:15,rotate_mk1_on:15,rotate_mk4:17,rotate_mk4_on:17,
+    rotate_mk5:12,rotate_mk5_on:12,rotate_mk6:14,rotate_mk6_on:14,wm_holo:12,wm_holo_red:12,stark_tower:10};
+  const spinners=Object.entries(SPIN).flatMap(([n,period])=>nodes('ENT_'+n).map(o=>({o,period}))).map(({o,period})=>{
     o.updateWorldMatrix(true,true);const box=new THREE.Box3().setFromObject(o),c=box.getCenter(new THREE.Vector3());
-    return {o,c,base:o.position.clone()};
+    return {o,c,base:o.position.clone(),w:Math.PI*2/period};
   });
   host.on('update',()=>{
-    const th=now()*.9,cs=Math.cos(th),sn=Math.sin(th);
-    for(const {o,c,base} of spinners){
+    for(const {o,c,base,w} of spinners){
       if(!o.visible)continue;
+      const th=now()*w,cs=Math.cos(th),sn=Math.sin(th);
       o.rotation.y=th;o.position.set(base.x+c.x-(c.x*cs+c.z*sn),base.y,base.z+c.z-(-c.x*sn+c.z*cs));
       o.updateMatrix();o.updateMatrixWorld(true);
     }
@@ -123,11 +126,25 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     if(flying&&power<20&&!lowWarned){lowWarned=true;voice('power_low');}
   });
 
+  // The stands, as the map does them: the alcove door slides down, the suit and its stand sink, the door closes again.
+  function standDown(s){
+    if(!s.door){if(s.display)lower(s.display,true);return;}
+    lower(s.door,true,{depth:100,dur:2,hide:false});
+    setTimeout(()=>{if(s.display)lower(s.display,true);if(s.stand)lower(s.stand,true,{hide:false,dur:1.5});},2000);
+    setTimeout(()=>lower(s.door,false,{depth:100,dur:3}),4000);
+  }
+  function standUp(s){
+    if(!s.door){if(s.display)lower(s.display,false);return;}
+    lower(s.door,true,{depth:100,dur:3,hide:false});
+    setTimeout(()=>{if(s.display)lower(s.display,false,{dur:3});if(s.stand)lower(s.stand,false,{dur:3});},3000);
+    setTimeout(()=>lower(s.door,false,{depth:100,dur:3}),6200);
+  }
+
   function putOn(s){
     worn=s;session.health=session.maxHealth;
     if(!originalSpeed)originalSpeed={move:player.moveSpeed,sprint:player.sprintSpeed};
     player.moveSpeed=originalSpeed.move*s.speed;player.sprintSpeed=s.noSprint?player.moveSpeed:originalSpeed.sprint*s.speed;
-    if(s.display)lower(s.display,true);
+    standDown(s);
     show('ENT_'+(s.holoOn??s.holo+'_on'),false);if(s.id==='mk3')show('ENT_rotate_iron_on',false);
     overlay.querySelector('#suit-name').textContent=s.name.toUpperCase()+' ARMOR ONLINE';power=MAX_POWER;overlay.style.opacity=1;
     if(!s.given&&data?.weapons?.[s.weapon]){s.given=true;session.giveWeapon(s.weapon);equipView?.();}
@@ -139,7 +156,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     worn=null;s.readyAt=now()+20;
     if(originalSpeed){player.moveSpeed=originalSpeed.move;player.sprintSpeed=originalSpeed.sprint;}
     if(session.health>session.maxHealth)session.health=session.maxHealth;
-    if(s.display)lower(s.display,false);
+    standUp(s);
     show('ENT_'+(s.holoOn??s.holo+'_on'),true);if(s.id==='mk3')show('ENT_rotate_iron_on',true);
     overlay.style.opacity=0;flying=false;
     voice('charging');
