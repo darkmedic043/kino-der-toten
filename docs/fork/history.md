@@ -113,3 +113,4 @@
 - **2026-10-05 (co-op respawn)**: co-op players respawn next to a living teammate (Cheese Cube's spawn is under the rising cheese).
 - **2026-10-05 (crawl)**: downed players can crawl (about 40 units/s).
 - **2026-10-05 (risers)**: zombies climb out of the ground at boardless spawn points (mods/zombie-rise, gameplay.md).
+- **2026-10-05 (Malibu ending)**: Cheese Cube's ending now follows the map: the Malibu lounge, the shutters opening, the drum and cards (waw-ports.md).

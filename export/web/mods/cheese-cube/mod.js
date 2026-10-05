@@ -260,25 +260,59 @@ export default async function setup(api){
       if(k<1&&won!==null)requestAnimationFrame(roll);};
     roll();
     thunder(named('thor_fx')[0],11.5);
+    // The rest, on the map's own timeline (hammer_end, black_screen, intermission_ending, malibu_text), in game time:
+    //   11.5 s  fade to black (2 s), held 15 s
+    //   15.5 s  everyone is moved to the Malibu lounge above the tower (ending_spawn), unarmed, HUD off, held in
+    //           place; the zombies are gone; the ending music (cheese_ending)
+    //   28.5 s  the black fades out: the lounge
+    //   31.5 s  the window shutters (window_shader) slide 1200 aside over 10 s: Malibu outside
+    //   75.5 s  a dramatic drum, black again; after 10 s the cards ("Have you ever wanted...", "Malibu Drive",
+    //           "Avengers: Age of Apocalypse", "Coming Soon"), each fading in and out over 3 s
+    //   114.5 s the end (then the credits, see gameOver)
     const veil=document.createElement('div');
-    veil.style.cssText='position:fixed;inset:0;z-index:60;background:#000;opacity:0;transition:opacity 2s;display:grid;place-items:center;pointer-events:none';
-    const line=document.createElement('div');line.style.cssText='color:#fff;font:600 28px/1.3 Georgia,serif;letter-spacing:.06em;text-align:center;max-width:80vw;opacity:0;transition:opacity 3s';
-    veil.append(line);document.body.append(veil);
-    const cards=[[0,'Have you ever wanted to be a superhero in the zombie apocalypse?',5],[8,'Malibu Drive',6],[16,'Avengers: Age of Apocalypse',6],[26,'Coming Soon',5]];
-    setTimeout(()=>{veil.style.opacity=1;sound('ending_music',{volume:.55});},12000);
-    for(const [t,text,hold] of cards){
-      setTimeout(()=>{line.textContent=text;line.style.opacity=1;setTimeout(()=>{line.style.opacity=0;},hold*1000);},(14+t)*1000);
-    }
-    setTimeout(()=>veil.remove(),46000);
-    host.on('reset',()=>veil.remove());
+    veil.style.cssText='position:fixed;inset:0;z-index:60;background:#000;opacity:0;transition:opacity 2s;pointer-events:none';
+    document.body.append(veil);
+    const cardStyle=document.createElement('style');cardStyle.textContent=`
+      .cc-card{position:fixed;left:0;right:0;text-align:center;color:#fff;font:600 3.4vh/1.3 Georgia,serif;letter-spacing:.06em;z-index:61;opacity:0;transition:opacity 3s;pointer-events:none}
+      body.cc-cinematic :is(#top,#crosshair,#hitmarker,#round-panel,#player-panel,#weapon-panel,#objective,#controls-hint,#prompt,#perks,#effects,#hud-portrait,#class-skill,#equip-hud,#jarvis-hud,#coop-panel,#weapon-level,#announcement,#toast,#fps-counter){visibility:hidden!important}`;
+    document.head.append(cardStyle);
+    const card=(y,text,hold,size)=>{const c=document.createElement('div');c.className='cc-card';c.textContent=text;c.style.top=`calc(50% + ${y/4.8}vh)`;c.style.fontSize=size+'vh';document.body.append(c);
+      void c.offsetWidth;c.style.opacity=1;at(now()+3+hold,()=>{c.style.opacity=0;});at(now()+6+hold,()=>c.remove());};
+    const at=(t,fn)=>timeline.push({t,fn});
+    const T=now();
+    at(T+11.5,()=>{veil.style.opacity=1;});
+    at(T+15.5,()=>{
+      document.body.classList.add('cc-cinematic');host.hideViewmodel=true;cinematic=true;
+      const spot=named('ending_spawn')[0];if(spot){lounge=new THREE.Vector3(...spot.origin);api.player.setPosition(lounge);const w=named('window_shader')[0];if(w)api.camera.lookAt(new THREE.Vector3(w.origin[0],lounge.y+40,w.origin[2]));}
+      api.enemies.autoSpawn=false;for(const z of [...api.enemies.list]){z.root.removeFromParent();}api.enemies.list.length=0;
+      sound('ending_music',{volume:.55});
+    });
+    at(T+28.5,()=>{veil.style.opacity=0;});
+    at(T+31.5,()=>tween('ENT_window_shader','x',1200,10,0));
+    at(T+75.5,()=>{sound('drum',{volume:.8});veil.style.transition='none';veil.style.opacity=1;void veil.offsetWidth;veil.style.transition='opacity 2s';});
+    at(T+85.5,()=>card(50,'Have you ever wanted to be a superhero in the zombie apocalypse?',5,2.6));
+    at(T+90.5,()=>card(0,'Malibu Drive',20,4.4));
+    at(T+95.5,()=>card(50,'Avengers: Age of Apocalypse',15,3.2));
+    at(T+105.5,()=>card(80,'Coming Soon',5,2.2));
+    at(T+120.5,()=>{veil.style.opacity=0;});
+    host.on('reset',()=>{veil.remove();cardStyle.remove();for(const c of document.querySelectorAll('.cc-card'))c.remove();});
   }
+  // the ending's schedule (game time) and the lounge hold: no walking off, no shooting (Esc still opens the menu)
+  const timeline=[];let cinematic=false,lounge=null;
+  host.on('update',()=>{
+    for(let i=timeline.length-1;i>=0;i--)if(now()>=timeline[i].t){const e=timeline[i];timeline.splice(i,1);e.fn();}
+    if(cinematic&&lounge&&api.player.getFeetPosition().distanceTo(lounge)>2)api.player.setPosition(lounge);
+  });
+  const swallow=e=>{if(cinematic&&!(e.type==='keydown'&&e.code==='Escape'))e.stopImmediatePropagation();};
+  for(const t of ['mousedown','keydown'])addEventListener(t,swallow,true);
+  host.on('reset',()=>{timeline.length=0;cinematic=false;lounge=null;host.hideViewmodel=false;document.body.classList.remove('cc-cinematic');});
   let won=null;
   if(ending){
     const e=world.addInteraction({position:center(ending),text:()=>'Press F if thou art worthy · Tis expensive: 25000',hidden:()=>!!won,
       use(){
         if(session.phase==='reviving'||window.kino.coop?.anyDown?.()){toast('All players must be alive to be worthy',2);return false;}
         if(session.points<25000){toast('Thou art not worthy',4);setTimeout(()=>toast('Get some more money you idiot',3),4000);return false;}
-        session.spend(25000);beep();show('ENT_cheese_ending_clip',false);won=now()+46;
+        session.spend(25000);beep();show('ENT_cheese_ending_clip',false);won=now()+114.5;
         announce('THOU ART WORTHY','THE HAMMER IS YOURS',6);theEnding();return true;
       }});
     e.locked=()=>!endingReady;e.lockedText='The hammer is sealed away. Solve the puzzle.';

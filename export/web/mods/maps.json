@@ -80,7 +80,7 @@
         "explore"
       ],
       "dir": "mods/maps/cheese-cube/",
-      "model": "cheese-cube.glb",
+      "model": "cheese-cube.glb?v=3",
       "scale": 1,
       "background": "#10151a",
       "exposure": 1.1,
