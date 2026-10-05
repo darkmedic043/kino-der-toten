@@ -2,7 +2,7 @@
 // the custom-map hooks `world.addInteraction` / `world.addShootTarget` / `world.slideMover` and the build's `entities.json`
 // (positions and bounds of every named entity) and `ENT_<targetname>` meshes. Does nothing on other maps.
 //   power switch: carry the panel, handle and wire to the switch (the perks need the power)
-//   Cheese Brothers: five targets, shot with the cheese gun (the Ray Gun stands in for it)
+//   Cheese Brothers: five targets, shot with the Cheese Gun (an MP40 clone sold at the two wall buys)
 //   trivia: shoot the answer to each question on the screen; a wrong answer locks it for two minutes
 //   puzzle: set three dials to the combination; it opens the door to the ending
 //   ending: 25000 at the top, once the puzzle is solved
@@ -29,6 +29,14 @@ export default async function setup(api){
   host.on('reset',()=>{for(const a of playing)a.pause();playing.clear();});
   const board=window.kino.scoreboard;
 
+  // ---- The Cheese Gun: in the map it is an MP40 that hits for 250 (the weapon file reuses the MP40 viewmodel). The two
+  // wall buys are built as MP40 spots; they sell this weapon. Sounds and animations come from the MP40 (baseId).
+  const mp40=api.data?.weapons?.mp40_zm;
+  if(mp40){
+    api.data.weapons.cheese_gun={...mp40,id:'cheese_gun',baseId:'mp40_zm',name:'Cheese Gun',price:1000,damage:250,minDamage:250,clipSize:30,startAmmo:210,maxAmmo:210};
+    for(const e of world.interactions)if(e.kind==='wallbuy'&&e.weapon==='mp40_zm')e.weapon='cheese_gun';
+  }
+
   // ---- tweens for the small moving pieces (the static-scene optimizer froze their transforms, so update the matrices)
   const tweens=[];
   const bases=new Map();
@@ -50,7 +58,7 @@ export default async function setup(api){
   let captured=0;
   for(let n=1;n<=5;n++){
     const trigger=named('cheese_target'+n)[0];if(!trigger)continue;
-    world.addShootTarget({position:center(trigger),radius:26,weapons:['ray_gun_zm'],hit(){
+    world.addShootTarget({position:center(trigger),radius:26,weapons:['cheese_gun'],hit(){
       show('ENT_target'+n,false);session.addPoints(2000);beep();captured++;
       toast(`Cheese Brother captured · ${captured} / 5 · +2000`,3);
       if(captured===5){session.addPoints(4000);announce('You captured all the Cheese Brothers!',"WE'LL KEEP THEM BEHIND BARS",5);}

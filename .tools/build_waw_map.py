@@ -14,7 +14,7 @@ import collections, json, math, pathlib, re, struct, subprocess, sys, tempfile
 
 SKIP_MATERIAL = re.compile(r'sky|clip|trigger|nodraw|caulk|portal|hint|origin', re.I)
 # Wall weapons the map names -> weapons this game has (the map's own are not in the game)
-WEAPON_MAP = {'kap40': 'bo3_g18_death', 'pdw': 'bo3_mp7_flanker', 'cheese_gun': 'ray_gun_zm', 'm1927': 'bo3_tommy_modern',
+WEAPON_MAP = {'kap40': 'bo3_g18_death', 'pdw': 'bo3_mp7_flanker', 'cheese_gun': 'mp40_zm', 'm1927': 'bo3_tommy_modern',
               'm27': 'bo3_sa80', 'aek': 'bo3_ak117', 'an94': 'bo3_f2000_tech'}
 PERK_MAP = {'specialty_armorvest': 'jugg', 'specialty_quickrevive': 'revive', 'specialty_fastreload': 'speedcola', 'specialty_rof': 'doubletap'}
 
