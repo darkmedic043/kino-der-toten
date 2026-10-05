@@ -270,7 +270,9 @@ function update(dt){
       const pad=globalThis.kino?.gamepad?.move;   // controller analog stick (mods/controller)
       const forward=Number(keys.has('KeyW'))-Number(keys.has('KeyS'))+touch.forward+(pad?.forward??0),strafe=Number(keys.has('KeyD'))-Number(keys.has('KeyA'))+touch.strafe+(pad?.strafe??0);
       const moving=Math.hypot(forward,strafe)>.01,sprint=((keys.has('ShiftLeft')||keys.has('ShiftRight'))&&moving||touch.sprint||pad?.sprint&&moving)&&!globalThis.kino?.movement?.state?.sliding&&!globalThis.kino?.movement?.state?.diving&&!ads&&!session.reloadLeft&&!session.meleeLeft&&!session.drinking;
-      if(!map.prePlayer?.(dt))player.update(dt,session.phase==='reviving'?{}:{forward,strafe,sprint,crouch:keys.has('ControlLeft')||keys.has('ControlRight')||keys.has('KeyC')||touch.crouch,jump:keys.has('Space'),jumpPressed:touch.jump});
+      // Downed (co-op, or Quick Revive's self-revive): crawl about 40 units/s, low to the ground, instead of lying frozen.
+      const crawl=40/Math.max(1,player.crouchSpeed??player.moveSpeed);
+      if(!map.prePlayer?.(dt))player.update(dt,session.phase==='reviving'?{forward:forward*crawl,strafe:strafe*crawl,crouch:true}:{forward,strafe,sprint,crouch:keys.has('ControlLeft')||keys.has('ControlRight')||keys.has('KeyC')||touch.crouch,jump:keys.has('Space'),jumpPressed:touch.jump});
       if(world.bounds&&player.getFeetPosition().y<world.bounds.min.y-600){player.respawn();toast('You fell out of the map');}
       view.update(dt,{moving,sprint,ads:ads&&!session.def.dualWield,reloading:session.reloadLeft>0,empty:session.weapon.mag===0,time:session.time});
       view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();view.input={sprint,ads};   // this frame's input, for mods (inspect cancels on sprint/aim)

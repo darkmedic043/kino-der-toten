@@ -111,3 +111,4 @@
 - **2026-10-05 (co-op skills)**: action skills are mirrored for co-op players; the host enforces teammates' walls/sandbags/wire (classes.md).
 - **2026-10-05 (no wall jump)**: wall jumping turned off (`WALL_JUMP` in the movement mod); it got in the way of mantling.
 - **2026-10-05 (co-op respawn)**: co-op players respawn next to a living teammate (Cheese Cube's spawn is under the rising cheese).
+- **2026-10-05 (crawl)**: downed players can crawl (about 40 units/s).
