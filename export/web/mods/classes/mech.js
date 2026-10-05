@@ -1,4 +1,4 @@
-// The Mech class's action skill: call a mech down, climb in, fight from the cockpit (mods/classes, docs/fork/classes.md).
+// The Pilot class's action skill: call a mech down, climb in, fight from the cockpit (mods/classes, docs/fork/classes.md).
 //
 // Z calls it in: it falls from the sky onto a spot in front of you (crushing what's there) and you climb in. Inside, left
 // click fires the left arm's weapon and right click the right arm's (classes.js mechStats: the loadout and the trees);
@@ -29,7 +29,7 @@ export function setupMech(ctx){
   const {api,blast,onHit,sync}=ctx;
   const {host,session,data,scene,camera,player,enemies,world,audio,view,viewScene}=api;
   const cfg=ctx.cfg,cls=ctx.cls;
-  // Every class runs this for the co-op half (riding a teammate's mech, seeing other pilots' mechs); only the Mech
+  // Every class runs this for the co-op half (riding a teammate's mech, seeing other pilots' mechs); only the Pilot
   // class can call one in (pilot).
   const pilot=!!cls.mech;
   let M=pilot?mechStats(cls,ctx.state()):{mech:{},left:null,right:null};   // fixed when the mech lands (the loadout can change in the menu between drops)

@@ -159,7 +159,7 @@ export function describe(node,rank){
   return node.desc.replace('{v}',txt);
 }
 
-// ---- the Mech class ----------------------------------------------------------------------------
+// ---- the Pilot class (its mech) ------------------------------------------------------------------------
 // Each tree has a weapon (tree.weapon, always available) and unlocks a second one halfway down (a `weapon` node: a
 // point, like a passive). The loadout puts one weapon on each arm (loadout.left / loadout.right, never the same);
 // augments carry the weapon they modify (node.weapon) and work while that weapon is on an arm, up to

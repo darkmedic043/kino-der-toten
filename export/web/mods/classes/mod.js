@@ -132,7 +132,7 @@ export default async function setup(api){
   const actx={api,act,S:()=>S,A:()=>A,blast,hud:()=>hud(),onHit,getCooldown:()=>cooldown,setCooldown:v=>startCooldown(v),sync,cfg,cls,state};
   const fort=['wall','snare','nest'].includes(act.id)?setupFortifier(actx):null;
   const eng=['drone','mortar'].includes(act.id)?setupEngineer(actx):null;
-  // the Mech class: one action skill, weapons on its arms. Every class runs it for co-op (riding a teammate's mech).
+  // the Pilot class: one action skill, weapons on its arms. Every class runs it for co-op (riding a teammate's mech).
   const mechSkill=setupMech(actx),mech=act.id==='mech'?mechSkill:null;
   const other=fort??eng??mech;
   const actionUp=()=>turrets.length>0||!!other?.up();

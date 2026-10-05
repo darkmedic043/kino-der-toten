@@ -1,4 +1,4 @@
-// The Mech class's mech, built in code (no game assets): a Titanfall-style chassis about twice a player's height:
+// The Pilot class's mech, built in code (no game assets): a Titanfall-style chassis about twice a player's height:
 // armoured hull with a cockpit hatch and visor, pauldrons, digitigrade legs, a reactor pack on the back and, with
 // the Rear Hardpoint passive, a gunner's machine gun on top of it. Each arm ends in a swappable weapon. Faces +Z,
 // stands on y=0. Also the first-person cockpit arms (mechArms), which share the weapon builders.
