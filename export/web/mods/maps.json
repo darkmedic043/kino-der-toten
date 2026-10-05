@@ -89,7 +89,7 @@
       "doorMargin": 40,
       "doorHeadroom": 80,
       "stairSmoothRate": 5,
-      "perkYaw": 90,
+      "perkYaw": 270,
       "movers": "movers.json",
       "nearbySpawns": true
     }

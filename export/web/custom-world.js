@@ -174,7 +174,7 @@ export class CustomWorld {
         this.interactions.push({kind:'power',position:m.position.clone().addScaledVector(up,10)});
         const panel=new THREE.Mesh(new THREE.BoxGeometry(22,34,6),new THREE.MeshStandardMaterial({color:0x3b3f3a,roughness:.7,metalness:.4}));
         panel.position.copy(m.position);panel.rotation.y=m.yaw+FACE;panel.translateZ(-4);this.scene.add(panel);
-        tasks.push(place('zombie_power_lever_handle',m.position,m.yaw).then(o=>{this.powerHandle=o;}));
+        tasks.push(place('zombie_power_lever_handle',m.position,m.yaw,(entry.perkYaw??0)*Math.PI/180).then(o=>{this.powerHandle=o;}));
       }
     }
     // The upstream Mystery Box reads its locations from map entities, so each
