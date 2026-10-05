@@ -312,10 +312,12 @@ export default async function setup(api){
       use(){
         if(session.phase==='reviving'||window.kino.coop?.anyDown?.()){toast('All players must be alive to be worthy',2);return false;}
         if(session.points<25000){toast('Thou art not worthy',4);setTimeout(()=>toast('Get some more money you idiot',3),4000);return false;}
-        session.spend(25000);beep();show('ENT_cheese_ending_clip',false);won=now()+114.5;
-        announce('THOU ART WORTHY','THE HAMMER IS YOURS',6);theEnding();return true;
+        session.spend(25000);beep();sync.emit('ending');startEnding();return true;
       }});
     e.locked=()=>!endingReady;e.lockedText='The hammer is sealed away. Solve the puzzle.';
+    // everyone in a co-op game goes through the ending together (as the map does)
+    function startEnding(){if(won!==null)return;show('ENT_cheese_ending_clip',false);won=now()+114.5;announce('THOU ART WORTHY','THE HAMMER IS YOURS',6);theEnding();}
+    sync.on('ending',()=>startEnding());
     host.on('update',()=>{
       if(won!==null&&now()>=won&&session.phase!=='gameover'){won=null;session.phase='gameover';session.lastEvent='You conquered the Cheese Cube';host.emit('gameOver',{round:session.round,kills:session.kills});}
     });
