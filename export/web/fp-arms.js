@@ -65,7 +65,8 @@ export class FirstPersonArms {
     template[0].skeleton.pose();ref.updateMatrixWorld(true);
     const T=n=>ref.getObjectByName(n),tp=n=>pos(T(n));
 
-    const holder=new THREE.Group(),model=clone(this.gltf.scene);applyVariants(model,this.entry);model.rotation.y=THREE.MathUtils.degToRad(this.entry.yaw??0);
+    // fpArmsChoice: variant picks forced in first person (the Experiment's arm wraps crumple when stretched onto T5)
+    const holder=new THREE.Group(),model=clone(this.gltf.scene);applyVariants(model,this.entry,{...this.entry.choice,...this.entry.fpArmsChoice});model.rotation.y=THREE.MathUtils.degToRad(this.entry.yaw??0);
     holder.add(model);holder.updateMatrixWorld(true);
     const sides=this.rig(model,holder);if(!sides){console.warn('[fp-arms] no arms found on',this.entry.id);return false;}
     // Size by the palm (wrist to middle knuckle) so the hands fit the guns.

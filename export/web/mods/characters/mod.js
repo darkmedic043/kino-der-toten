@@ -99,7 +99,7 @@ export default async function setup(api){
   // "fpArms": the character's own arms in first person, posed onto the hidden
   // T5 viewmodel rig (see fp-arms.js). Perk drinks use their own viewmodels.
   if(entry.fpArms&&entry.type==='gltf'&&api.viewScene){
-    const fp=new FirstPersonArms(api.viewScene,await loadCharacterGltf(entry),entry);
+    const fp=new FirstPersonArms(api.viewScene,await loadCharacterGltf(entry),entry);window.kino.fpArms=fp;   // debug handle
     const active=()=>{const k=window.kino.knuckles;if(k?.active)return k.view;const d=api.perkDrink;return d?.current?d.views[d.current]:api.view;};
     host.on('update',()=>fp.sync(active(),!third));
     fp.sync(active(),true);

@@ -50,7 +50,8 @@ const gltfCache=new Map();
 //   bones    {bone: {scale, rot:[x,y,z]° added to the rest pose, pos:[x,y,z] added}}
 //   meshes   {node: visible}
 //   surfaces {mesh node or material name: {map, normalMap, emissiveMap, alphaMap (files next to
-//             the model), alphaTest, emissiveIntensity}}
+//             the model), alphaTest, emissiveIntensity, uvOffset [u,v] (shifts map and emissiveMap, wrapping: picks
+//             a cell of an atlas, e.g. the Experiment's eye styles)}}
 //   when     {"group:option": {...same keys}}   extra settings when another group has that pick
 // `variantBase` holds the same keys applied first (the model's own defaults). `choice` is
 // {group: option id} (profile.variants[character id]); a missing pick uses the option marked
@@ -69,10 +70,17 @@ export function variantSpec(entry,choice={}){
 }
 export function variantMorphs(entry,choice={}){return variantSpec(entry,choice).morphs;}
 const variantTextures=new Map();
-function variantTexture(entry,file,colour){
-  const url=new URL(file,entry.url).href.replace(/\?.*$/,'');
-  if(!variantTextures.has(url)){const t=new THREE.TextureLoader().load(url);t.flipY=false;if(colour)t.colorSpace=THREE.SRGBColorSpace;variantTextures.set(url,t);}
-  return variantTextures.get(url);
+function variantTexture(entry,file,colour,offset){
+  const url=new URL(file,entry.url).href.replace(/\?.*$/,''),key=offset?url+'@'+offset:url;
+  if(!variantTextures.has(key)){const t=new THREE.TextureLoader().load(url);t.flipY=false;if(colour)t.colorSpace=THREE.SRGBColorSpace;
+    if(offset){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.offset.set(...offset);}variantTextures.set(key,t);}
+  return variantTextures.get(key);
+}
+// the model's own (already loaded) texture, shifted: a clone sharing its image
+function offsetTexture(t,offset){
+  const key=t.uuid+'@'+offset;
+  if(!variantTextures.has(key)){const c=t.clone();c.wrapS=c.wrapT=THREE.RepeatWrapping;c.offset.set(...offset);c.needsUpdate=true;variantTextures.set(key,c);}
+  return variantTextures.get(key);
 }
 export function applyVariants(root,entry,choice=entry.choice){
   if(!entry.variants&&!entry.variantBase)return;
@@ -94,7 +102,7 @@ export function applyVariants(root,entry,choice=entry.choice){
       const looks=mats.map(m=>spec.surfaces[o.name]??spec.surfaces[node]??spec.surfaces[m.name]??spec.surfaces[m.name.replace(/\.\d+$/,'')]);
       if(!looks.some(Boolean)){o.material=base;return;}
       const made=mats.map((m,i)=>{const l=looks[i];if(!l)return m;const c=m.clone();
-        for(const k of ['map','emissiveMap'])if(l[k])c[k]=variantTexture(entry,l[k],true);
+        for(const k of ['map','emissiveMap'])if(l[k])c[k]=variantTexture(entry,l[k],true,l.uvOffset);else if(l.uvOffset&&c[k])c[k]=offsetTexture(c[k],l.uvOffset);
         for(const k of ['normalMap','alphaMap'])if(l[k])c[k]=variantTexture(entry,l[k],false);
         if(l.alphaTest!=null)c.alphaTest=l.alphaTest;if(l.emissiveIntensity!=null)c.emissiveIntensity=l.emissiveIntensity;
         if(l.visible===false)c.visible=false;return c;});

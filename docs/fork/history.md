@@ -115,3 +115,4 @@
 - **2026-10-05 (risers)**: zombies climb out of the ground at boardless spawn points (mods/zombie-rise, gameplay.md).
 - **2026-10-05 (Malibu ending)**: Cheese Cube's ending now follows the map: the Malibu lounge, the shutters opening, the drum and cards (waw-ports.md).
 - **2026-10-05 (menu load)**: main menu shows its map list in 0.7 s instead of 6-10 s through the tunnel (performance.md).
+- **2026-10-05 (Experiment)**: new operator, Akittu's Stylized Experiment (user's purchased avatar, git-ignored), with its VRChat menu as customisation: fur colourways, eye styles/colours, scarf colours, arm/leg wraps, kevlar, pouch, balaclava, builds and faces. New `uvOffset` surface option and `fpArmsChoice` (characters.md).

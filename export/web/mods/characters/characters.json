@@ -1304,19 +1304,52 @@
       "fpArmsRetarget": false,
       "springBones": {
         "_doc": "Cape (the rip's mant bones, three strips under mant00): swings with movement; hips, spine and legs push it out. Sizes in model units (he is 2.87 tall).",
-        "chains": ["7jir01t0 mant10", "7jir01t0 mant20", "7jir01t0 mant30"],
+        "chains": [
+          "7jir01t0 mant10",
+          "7jir01t0 mant20",
+          "7jir01t0 mant30"
+        ],
         "childMatch": "mant",
-        "stiffness": 0.03, "drag": 0.18, "gravity": 2.5, "maxAngle": 22, "follow": 0.6, "radius": 0.06,
+        "stiffness": 0.03,
+        "drag": 0.18,
+        "gravity": 2.5,
+        "maxAngle": 22,
+        "follow": 0.6,
+        "radius": 0.06,
         "colliders": [
-          {"bone": "Hips", "to": "bip_spine_1", "radius": 0.3},
-          {"bone": "bip_spine_1", "to": "bip_spine_2", "radius": 0.3},
-          {"bone": "Thigh_L", "to": "bip_knee_L", "radius": 0.17},
-          {"bone": "bip_knee_L", "to": "bip_foot_L", "radius": 0.14},
-          {"bone": "Thigh_R", "to": "bip_knee_R", "radius": 0.17},
-          {"bone": "bip_knee_R", "to": "bip_foot_R", "radius": 0.14}
+          {
+            "bone": "Hips",
+            "to": "bip_spine_1",
+            "radius": 0.3
+          },
+          {
+            "bone": "bip_spine_1",
+            "to": "bip_spine_2",
+            "radius": 0.3
+          },
+          {
+            "bone": "Thigh_L",
+            "to": "bip_knee_L",
+            "radius": 0.17
+          },
+          {
+            "bone": "bip_knee_L",
+            "to": "bip_foot_L",
+            "radius": 0.14
+          },
+          {
+            "bone": "Thigh_R",
+            "to": "bip_knee_R",
+            "radius": 0.17
+          },
+          {
+            "bone": "bip_knee_R",
+            "to": "bip_foot_R",
+            "radius": 0.14
+          }
         ]
       },
-            "optional": true,
+      "optional": true,
       "description": "Gyro Zeppeli of Steel Ball Run: Neapolitan executioner, master of the Spin. GO! GO! ZEPPELI!",
       "credit": {
         "title": "Gyro Zeppeli (JoJo's Bizarre Adventure: Steel Ball Run)",
@@ -1324,6 +1357,704 @@
         "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=1862915551",
         "license": "Ripped fan model; the uploader claims no rights",
         "note": "Gyro Zeppeli is from JoJo's Bizarre Adventure by Hirohiko Araki (Shueisha); the model is from Bandai Namco's game. Built locally with .tools/build_gyro.sh, not published."
+      }
+    },
+    {
+      "id": "experiment",
+      "name": "Experiment",
+      "type": "gltf",
+      "motion": "bo1",
+      "model": "models/experiment/experiment.glb?v=3",
+      "height": 64,
+      "description": "Akittu's Stylized Experiment: a dark-furred alien experiment with big ears, a long tail and a scarf, animated with Black Ops' own player animations. Fur, eyes, scarf and gear are customisable.",
+      "color": "#2c5aa0",
+      "accent": "#e2557a",
+      "fpArms": true,
+      "fpArmsRetarget": false,
+      "optional": true,
+      "springBones": [
+        {
+          "_doc": "Scarf tails (front and back): hang and swing; the body pushes them out.",
+          "chains": [
+            "scarfb",
+            "scarff"
+          ],
+          "childMatch": "scarf",
+          "stiffness": 0.02,
+          "drag": 0.16,
+          "gravity": 2,
+          "maxAngle": 80,
+          "follow": 0.6,
+          "followY": 1,
+          "radius": 0.03,
+          "colliders": [
+            {
+              "bone": "Hips",
+              "to": "Spine",
+              "radius": 0.13
+            },
+            {
+              "bone": "Spine",
+              "to": "Chest",
+              "radius": 0.15
+            },
+            {
+              "bone": "Chest",
+              "to": "Neck",
+              "radius": 0.15
+            },
+            {
+              "bone": "Left_leg",
+              "to": "Left_knee",
+              "radius": 0.09
+            },
+            {
+              "bone": "Left_knee",
+              "to": "Left_ankle",
+              "radius": 0.07
+            },
+            {
+              "bone": "Right_leg",
+              "to": "Right_knee",
+              "radius": 0.09
+            },
+            {
+              "bone": "Right_knee",
+              "to": "Right_ankle",
+              "radius": 0.07
+            }
+          ]
+        },
+        {
+          "_doc": "Tail: keeps its shape (no gravity), lags and sways with movement.",
+          "chains": [
+            "tail01"
+          ],
+          "childMatch": "tail",
+          "stiffness": 0.08,
+          "drag": 0.2,
+          "gravity": 0.2,
+          "maxAngle": 30,
+          "follow": 0.7,
+          "followY": 1,
+          "radius": 0.04,
+          "colliders": [
+            {
+              "bone": "Left_leg",
+              "to": "Left_knee",
+              "radius": 0.09
+            },
+            {
+              "bone": "Left_knee",
+              "to": "Left_ankle",
+              "radius": 0.07
+            },
+            {
+              "bone": "Right_leg",
+              "to": "Right_knee",
+              "radius": 0.09
+            },
+            {
+              "bone": "Right_knee",
+              "to": "Right_ankle",
+              "radius": 0.07
+            }
+          ]
+        }
+      ],
+      "variants": [
+        {
+          "id": "fur",
+          "label": "Fur",
+          "options": [
+            {
+              "id": "default",
+              "label": "Midnight",
+              "default": true
+            },
+            {
+              "id": "albino",
+              "label": "Albino",
+              "surfaces": {
+                "Experiment": {
+                  "map": "fur_albino.webp"
+                },
+                "FurNeck": {
+                  "map": "fur_albino.webp"
+                },
+                "FurArms": {
+                  "map": "fur_albino.webp"
+                },
+                "FurLegs": {
+                  "map": "fur_albino.webp"
+                },
+                "FurMuzzle": {
+                  "map": "fur_albino.webp"
+                }
+              }
+            },
+            {
+              "id": "gold",
+              "label": "Gold flecks",
+              "surfaces": {
+                "Experiment": {
+                  "map": "fur_gold.webp"
+                },
+                "FurNeck": {
+                  "map": "fur_gold.webp"
+                },
+                "FurArms": {
+                  "map": "fur_gold.webp"
+                },
+                "FurLegs": {
+                  "map": "fur_gold.webp"
+                },
+                "FurMuzzle": {
+                  "map": "fur_gold.webp"
+                }
+              }
+            },
+            {
+              "id": "striped",
+              "label": "Striped",
+              "surfaces": {
+                "Experiment": {
+                  "map": "fur_striped.webp"
+                },
+                "FurNeck": {
+                  "map": "fur_striped.webp"
+                },
+                "FurArms": {
+                  "map": "fur_striped.webp"
+                },
+                "FurLegs": {
+                  "map": "fur_striped.webp"
+                },
+                "FurMuzzle": {
+                  "map": "fur_striped.webp"
+                }
+              }
+            },
+            {
+              "id": "piebald",
+              "label": "Piebald",
+              "surfaces": {
+                "Experiment": {
+                  "map": "fur_piebald.webp"
+                },
+                "FurNeck": {
+                  "map": "fur_piebald.webp"
+                },
+                "FurArms": {
+                  "map": "fur_piebald.webp"
+                },
+                "FurLegs": {
+                  "map": "fur_piebald.webp"
+                },
+                "FurMuzzle": {
+                  "map": "fur_piebald.webp"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "eyes",
+          "label": "Eyes",
+          "options": [
+            {
+              "id": "round",
+              "label": "Round",
+              "default": true
+            },
+            {
+              "id": "small",
+              "label": "Pinprick",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "uvOffset": [
+                    0,
+                    0.25
+                  ]
+                }
+              }
+            },
+            {
+              "id": "sparkle",
+              "label": "Sparkle",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "uvOffset": [
+                    0,
+                    0.5
+                  ]
+                }
+              }
+            },
+            {
+              "id": "slit",
+              "label": "Slit",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "uvOffset": [
+                    0,
+                    0.75
+                  ]
+                }
+              }
+            },
+            {
+              "id": "thin",
+              "label": "Thin slit",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "uvOffset": [
+                    0.5,
+                    0
+                  ]
+                }
+              }
+            },
+            {
+              "id": "glow",
+              "label": "Glow",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "uvOffset": [
+                    0.5,
+                    0.5
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "eyeColour",
+          "label": "Eye colour",
+          "options": [
+            {
+              "id": "amber",
+              "label": "Amber",
+              "default": true
+            },
+            {
+              "id": "red",
+              "label": "Red",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "map": "eyes_red.webp",
+                  "emissiveMap": "eyes_red.webp"
+                }
+              }
+            },
+            {
+              "id": "pink",
+              "label": "Pink",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "map": "eyes_pink.webp",
+                  "emissiveMap": "eyes_pink.webp"
+                }
+              }
+            },
+            {
+              "id": "purple",
+              "label": "Purple",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "map": "eyes_purple.webp",
+                  "emissiveMap": "eyes_purple.webp"
+                }
+              }
+            },
+            {
+              "id": "blue",
+              "label": "Blue",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "map": "eyes_blue.webp",
+                  "emissiveMap": "eyes_blue.webp"
+                }
+              }
+            },
+            {
+              "id": "cyan",
+              "label": "Cyan",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "map": "eyes_cyan.webp",
+                  "emissiveMap": "eyes_cyan.webp"
+                }
+              }
+            },
+            {
+              "id": "green",
+              "label": "Green",
+              "surfaces": {
+                "ExperimentEyes": {
+                  "map": "eyes_green.webp",
+                  "emissiveMap": "eyes_green.webp"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "scarf",
+          "label": "Scarf",
+          "options": [
+            {
+              "id": "red",
+              "label": "Red",
+              "default": true,
+              "surfaces": {
+                "FurNeck": {
+                  "visible": false
+                }
+              }
+            },
+            {
+              "id": "blue",
+              "label": "Blue",
+              "surfaces": {
+                "FurNeck": {
+                  "visible": false
+                },
+                "ClothScarf": {
+                  "map": "scarf_blue.webp"
+                }
+              }
+            },
+            {
+              "id": "green",
+              "label": "Green",
+              "surfaces": {
+                "FurNeck": {
+                  "visible": false
+                },
+                "ClothScarf": {
+                  "map": "scarf_green.webp"
+                }
+              }
+            },
+            {
+              "id": "purple",
+              "label": "Purple",
+              "surfaces": {
+                "FurNeck": {
+                  "visible": false
+                },
+                "ClothScarf": {
+                  "map": "scarf_purple.webp"
+                }
+              }
+            },
+            {
+              "id": "gold",
+              "label": "Gold",
+              "surfaces": {
+                "FurNeck": {
+                  "visible": false
+                },
+                "ClothScarf": {
+                  "map": "scarf_gold.webp"
+                }
+              }
+            },
+            {
+              "id": "black",
+              "label": "Black",
+              "surfaces": {
+                "FurNeck": {
+                  "visible": false
+                },
+                "ClothScarf": {
+                  "map": "scarf_black.webp"
+                }
+              }
+            },
+            {
+              "id": "white",
+              "label": "White",
+              "surfaces": {
+                "FurNeck": {
+                  "visible": false
+                },
+                "ClothScarf": {
+                  "map": "scarf_white.webp"
+                }
+              }
+            },
+            {
+              "id": "off",
+              "label": "Off",
+              "surfaces": {
+                "ClothScarf": {
+                  "visible": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "armWraps",
+          "label": "Arm wraps",
+          "options": [
+            {
+              "id": "on",
+              "label": "On",
+              "default": true,
+              "surfaces": {
+                "FurArms": {
+                  "visible": false
+                }
+              }
+            },
+            {
+              "id": "off",
+              "label": "Off",
+              "surfaces": {
+                "ClothArmWraps": {
+                  "visible": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "legWraps",
+          "label": "Leg wraps",
+          "options": [
+            {
+              "id": "on",
+              "label": "On",
+              "default": true,
+              "surfaces": {
+                "FurLegs": {
+                  "visible": false
+                }
+              }
+            },
+            {
+              "id": "off",
+              "label": "Off",
+              "surfaces": {
+                "ClothLegWraps": {
+                  "visible": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "kevlar",
+          "label": "Kevlar",
+          "options": [
+            {
+              "id": "off",
+              "label": "Off",
+              "default": true,
+              "surfaces": {
+                "ClothKevlar": {
+                  "visible": false
+                }
+              }
+            },
+            {
+              "id": "on",
+              "label": "With mags"
+            },
+            {
+              "id": "nomags",
+              "label": "No mags",
+              "morphs": {
+                "Clothing - Kevlar - No Mags": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "pouch",
+          "label": "Leg pouch",
+          "options": [
+            {
+              "id": "on",
+              "label": "On"
+            },
+            {
+              "id": "off",
+              "label": "Off",
+              "default": true,
+              "surfaces": {
+                "ClothPouch": {
+                  "visible": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "balaclava",
+          "label": "Balaclava",
+          "options": [
+            {
+              "id": "on",
+              "label": "On",
+              "surfaces": {
+                "FurMuzzle": {
+                  "visible": false
+                },
+                "ExperimentMouthMuzzle": {
+                  "visible": false
+                }
+              }
+            },
+            {
+              "id": "off",
+              "label": "Off",
+              "default": true,
+              "surfaces": {
+                "ClothBalaclava": {
+                  "visible": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "build",
+          "label": "Build",
+          "options": [
+            {
+              "id": "standard",
+              "label": "Standard",
+              "default": true
+            },
+            {
+              "id": "lore",
+              "label": "Lore accurate",
+              "morphs": {
+                "Body - LORE ACCURATE": 1
+              }
+            },
+            {
+              "id": "male",
+              "label": "Male",
+              "morphs": {
+                "Body - Male Style": 1
+              }
+            },
+            {
+              "id": "slim",
+              "label": "Slim",
+              "morphs": {
+                "Body - Emaciated": 1
+              }
+            },
+            {
+              "id": "chunky",
+              "label": "Chunky",
+              "morphs": {
+                "Body - Obese": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "face",
+          "label": "Face",
+          "options": [
+            {
+              "id": "neutral",
+              "label": "Neutral",
+              "default": true
+            },
+            {
+              "id": "happy",
+              "label": "Happy",
+              "morphs": {
+                "MouthSmileLeft": 1,
+                "MouthSmileRight": 1,
+                "Eye - Eyelid Glee": 1
+              }
+            },
+            {
+              "id": "angry",
+              "label": "Angry",
+              "morphs": {
+                "Angry": 1,
+                "EyebrowAngledInL": 1,
+                "EyebrowAngledInR": 1
+              }
+            },
+            {
+              "id": "sad",
+              "label": "Sad",
+              "morphs": {
+                "MouthSadLeft": 1,
+                "MouthSadRight": 1
+              }
+            },
+            {
+              "id": "blep",
+              "label": "Blep",
+              "morphs": {
+                "TongueOut": 1,
+                "MouthSmileLeft": 0.5,
+                "MouthSmileRight": 0.5
+              }
+            },
+            {
+              "id": "surprise",
+              "label": "Surprised",
+              "morphs": {
+                "JawOpen": 0.6,
+                "WideEyeL": 1,
+                "WideEyeR": 1
+              }
+            },
+            {
+              "id": "sleepy",
+              "label": "Sleepy",
+              "morphs": {
+                "Eye - Eyelid Closed": 1
+              }
+            }
+          ]
+        }
+      ],
+      "credit": {
+        "title": "Stylized Experiment V3",
+        "author": "Akittu",
+        "source": "Purchased VRChat/Resonite avatar (user's own copy)",
+        "license": "Paid avatar; personal use",
+        "note": "Built locally with .tools/build_experiment.sh, not published."
+      },
+      "fpArmsExclude": "bandage",
+      "fpArmsChoice": {
+        "armWraps": "off"
+      },
+      "fpArmsUpper": false,
+      "fpArmsScale": 0.85,
+      "variantBase": {
+        "_doc": "The scarf tails are modelled straight out front and back (the avatar's physbones drop them): hang them down so the menu and portraits show them hanging; the springs start from there.",
+        "bones": {
+          "scarfb": {
+            "rot": [
+              -75,
+              0,
+              0
+            ]
+          },
+          "scarff": {
+            "rot": [
+              -45,
+              0,
+              0
+            ]
+          }
+        }
       }
     }
   ]
