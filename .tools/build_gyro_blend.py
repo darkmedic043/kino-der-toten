@@ -27,6 +27,10 @@ hips.head = (hl.head + hr.head) / 2
 hips.head.z = spine.head.z
 hips.tail = hips.head.copy(); hips.tail.z += (spine.tail - spine.head).length * .5
 for b in (spine, hl, hr): b.parent = hips
+# the belt and steel-ball holsters (about 2,600 vertices at the waist) hung from the armature root: they stayed put
+# while the hips moved, so the waist looked frozen
+for n in ('7jir01t0 l holster b01', '7jir01t0 r holster b01'):
+    if n in eb: eb[n].parent = hips
 bpy.ops.object.mode_set(mode='OBJECT')
 for old, new in {'bip_hip_L': 'Thigh_L', 'bip_hip_R': 'Thigh_R', 'bip_collar_L': 'Shoulder_L', 'bip_collar_R': 'Shoulder_R', 'bip_head': 'Head'}.items():
     arm.data.bones[old].name = new   # vertex groups follow the rename

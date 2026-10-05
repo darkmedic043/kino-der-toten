@@ -1301,8 +1301,22 @@
       "color": "#4a2a78",
       "accent": "#d8a628",
       "fpArms": true,
-      "fpArmsRetarget": true,
-      "optional": true,
+      "fpArmsRetarget": false,
+      "springBones": {
+        "_doc": "Cape (the rip's mant bones, three strips under mant00): swings with movement; hips, spine and legs push it out. Sizes in model units (he is 2.87 tall).",
+        "chains": ["7jir01t0 mant10", "7jir01t0 mant20", "7jir01t0 mant30"],
+        "childMatch": "mant",
+        "stiffness": 0.03, "drag": 0.18, "gravity": 2.5, "maxAngle": 22, "follow": 0.6, "radius": 0.06,
+        "colliders": [
+          {"bone": "Hips", "to": "bip_spine_1", "radius": 0.3},
+          {"bone": "bip_spine_1", "to": "bip_spine_2", "radius": 0.3},
+          {"bone": "Thigh_L", "to": "bip_knee_L", "radius": 0.17},
+          {"bone": "bip_knee_L", "to": "bip_foot_L", "radius": 0.14},
+          {"bone": "Thigh_R", "to": "bip_knee_R", "radius": 0.17},
+          {"bone": "bip_knee_R", "to": "bip_foot_R", "radius": 0.14}
+        ]
+      },
+            "optional": true,
       "description": "Gyro Zeppeli of Steel Ball Run: Neapolitan executioner, master of the Spin. GO! GO! ZEPPELI!",
       "credit": {
         "title": "Gyro Zeppeli (JoJo's Bizarre Adventure: Steel Ball Run)",
