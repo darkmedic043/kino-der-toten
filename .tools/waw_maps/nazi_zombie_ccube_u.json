@@ -106,7 +106,8 @@
     "mk4",
     "mk5",
     "mk6",
-    "wm_model"
+    "wm_model",
+    "cap_shield"
   ],
   "movers": [
     {

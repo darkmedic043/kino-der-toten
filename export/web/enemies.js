@@ -111,6 +111,7 @@ export class Enemies {
           if((below||last.distanceTo(z.root.position)<6)&&dist>90){const p=this.world.rescuePoint(z.root.position,this.world.playerFeet??tp);if(p){z.root.position.copy(p);z.free=!!p.free;z.path=[];z.repath=0;z.probePos=null;}}
         }
       }
+      if(!freeWalk&&!target&&this.freeMode&&dist>40&&z.state==='chase')this.walkFree(z,goal,dt);   // the last stretch to a spot the navmesh does not reach
       z.stuck+=dt;
       if(z.stuck>12){const moved=z.lastPosition.distanceTo(z.root.position);z.lastPosition.copy(z.root.position);z.stuck=0;if(moved<5&&dist>100){z.path=[];z.repath=0;z.stuckCount=(z.stuckCount??0)+1;if(z.stuckCount>=3){this.remove(z);s.spawned--;}}else z.stuckCount=0;}
     }
@@ -137,7 +138,10 @@ export class Enemies {
     const step=Math.min(h,z.speed*dt);let ux=dx/h,uz=dz/h;
     for(const o of this.list){if(o===z||o.state==='barricade')continue;const sx=pos.x-o.root.position.x,sz=pos.z-o.root.position.z,d=Math.hypot(sx,sz);if(d<29&&d>.01){ux+=sx/d*(29-d)/29*1.5;uz+=sz/d*(29-d)/29*1.5;}}
     const n=Math.hypot(ux,uz)||1;ux/=n;uz/=n;
+    const probe=new THREE.Ray(new THREE.Vector3(pos.x,pos.y+30,pos.z),new THREE.Vector3()),dir=probe.direction;
     for(const [mx,mz] of [[ux,uz],[ux,0],[0,uz]]){
+      const l=Math.hypot(mx,mz);if(l<.01)continue;
+      dir.set(mx/l,0,mz/l);if(this.world.raycast(probe,0,step+16))continue;   // a wall or a closed door is in the way
       const nx=pos.x+mx*step,nz=pos.z+mz*step,y=this.world.surfaceY(nx,pos.y,nz);
       if(y!==null&&y>pos.y-30&&y<pos.y+14){pos.set(nx,y,nz);return;}
     }

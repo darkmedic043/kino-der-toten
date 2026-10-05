@@ -21,6 +21,12 @@ export default async function setup(api){
   const show=(n,on)=>{for(const o of nodes(n))o.visible=on;};
   const beep=()=>audio?.play?.('buy');
   const now=()=>session.time;
+  // The map's own sounds (map folder `sounds/`, git-ignored); a failed load is silent.
+  const soundBase=api.map.dir.replace(/\/?$/,'/')+'sounds/',playing=new Set();
+  const sound=(name,{volume=.7,loop=false}={})=>{
+    try{const a=new Audio(soundBase+name+'.ogg');a.volume=volume;a.loop=loop;a.play().catch(()=>{});playing.add(a);a.addEventListener('ended',()=>playing.delete(a));return a;}catch{return null;}
+  };
+  host.on('reset',()=>{for(const a of playing)a.pause();playing.clear();});
   const board=window.kino.scoreboard;
 
   // ---- tweens for the small moving pieces (the static-scene optimizer froze their transforms, so update the matrices)
@@ -169,13 +175,30 @@ export default async function setup(api){
 
   // ---- The ending: pay 25000 at the top ("if thou art worthy") once the puzzle is solved, then the map is won
   const ending=named('cheese_ending')[0];
+  // The hammer rises with thunder, the screen goes black, then the map's closing cards (as the original: about 45 s).
+  function theEnding(){
+    sound('thor_end',{volume:.85});
+    tween('ENT_thor_hammer','y',100,4,0);
+    tweens.push({objs:nodes('ENT_thor_hammer'),axis:'y',from:100,to:170,t0:now()+4,dur:10});
+    const veil=document.createElement('div');
+    veil.style.cssText='position:fixed;inset:0;z-index:60;background:#000;opacity:0;transition:opacity 2s;display:grid;place-items:center;pointer-events:none';
+    const line=document.createElement('div');line.style.cssText='color:#fff;font:600 28px/1.3 Georgia,serif;letter-spacing:.06em;text-align:center;max-width:80vw;opacity:0;transition:opacity 3s';
+    veil.append(line);document.body.append(veil);
+    const cards=[[0,'Have you ever wanted to be a superhero in the zombie apocalypse?',5],[8,'Malibu Drive',6],[16,'Avengers: Age of Apocalypse',6],[26,'Coming Soon',5]];
+    setTimeout(()=>{veil.style.opacity=1;sound('ending_music',{volume:.55});},12000);
+    for(const [t,text,hold] of cards){
+      setTimeout(()=>{line.textContent=text;line.style.opacity=1;setTimeout(()=>{line.style.opacity=0;},hold*1000);},(14+t)*1000);
+    }
+    setTimeout(()=>veil.remove(),46000);
+    host.on('reset',()=>veil.remove());
+  }
   let won=null;
   if(ending){
     const e=world.addInteraction({position:center(ending),text:()=>'Press F if thou art worthy · Tis expensive: 25000',hidden:()=>!!won,
       use(){
         if(session.points<25000){toast('Thou art not worthy. Get some more money.',4);return false;}
-        session.spend(25000);beep();show('ENT_cheese_ending_clip',false);won=now()+7;
-        announce('THOU ART WORTHY','THE HAMMER IS YOURS',6);return true;
+        session.spend(25000);beep();show('ENT_cheese_ending_clip',false);won=now()+46;
+        announce('THOU ART WORTHY','THE HAMMER IS YOURS',6);theEnding();return true;
       }});
     e.locked=()=>!endingReady;e.lockedText='The hammer is sealed away. Solve the puzzle.';
     host.on('update',()=>{
@@ -187,7 +210,7 @@ export default async function setup(api){
 
   // ---- Iron Man suits (own file)
   const {setupSuits}=await import('./suits.js');
-  window.kino.cheeseCube.suits=setupSuits({api,world,session,host,toast,announce,named,center,nodes,show,beep,now,board,player:api.player,triviaDone:()=>triviaDone,sync}).state;
+  window.kino.cheeseCube.suits=setupSuits({api,world,session,host,toast,announce,named,center,nodes,show,beep,now,board,player:api.player,triviaDone:()=>triviaDone,sync,sound}).state;
 
   // ---- Scoreboard collectibles
   board?.addCollectible({id:'cc-brothers',label:'Cheese Brothers',value:()=>`${captured} / 5`,done:()=>captured>=5});
@@ -207,4 +230,8 @@ export default async function setup(api){
     for(const d of DIALS){d.digit=5;d.busyUntil=0;for(const o of nodes(`ENT_piece_${d.k}_ric`)){o.position.copy(baseOf(o));o.updateMatrix();o.updateMatrixWorld(true);}}
     for(const n of ['ENT_piece_right_ric','ENT_piece_middle_ric','ENT_piece_left_ric','ENT_right_button_ric','ENT_middle_button_ric','ENT_left_button_ric','ENT_ric_answer_block'])show(n,true);
   });
+
+  // ---- The smaller eggs (own file; after the reset handler above so their resets run last)
+  const {setupEggs}=await import('./eggs.js');
+  setupEggs({world,session,host,toast,named,center,boxOf,tween,tweens,nodes,now,sound,player:api.player});
 }

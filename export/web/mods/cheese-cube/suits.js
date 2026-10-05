@@ -8,7 +8,7 @@
 // Not ported: flight, the suit HUD, power meter, the stand and door animations, the Mk16 and the holo spinning.
 import * as THREE from 'three';
 
-export function setupSuits({api,world,session,host,toast,announce,named,center,nodes,show,beep,now,board,player,triviaDone,sync}){
+export function setupSuits({api,world,session,host,toast,announce,named,center,nodes,show,beep,now,board,player,triviaDone,sync,sound}){
   const {equipView,data}=api;
 
   // ---- parts -------------------------------------------------------------------------------------
@@ -60,7 +60,8 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     {id:'wm',name:'War Machine',cost:10000,trig:'give_wm',hp:320,speed:.95,display:'wm_model',weapon:'m72_law_zm',needsTrivia:true},
   ].map(s=>({...s,owned:false,given:false,readyAt:0}));
   const suitOf=id=>SUITS.find(s=>s.id===id);
-  let worn=null,originalSpeed=null,power=100,spaceHeld=false,flying=false;
+  let worn=null,originalSpeed=null,power=100,spaceHeld=false,flying=false,wornBefore=false,lowWarned=false,hallHeard=false;
+  const voice=(n,v=.8)=>sound?.('jarvis_'+n,{volume:v});
   const MAX_POWER=100,DRAIN=22,REGEN=16,THRUST=1500,RISE_CAP=260;
 
   // The suit's health: maxHealth becomes the larger of the normal value and the suit's.
@@ -119,6 +120,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     if(flying){power=Math.max(0,power-DRAIN*step);player.velocity.y=Math.min(RISE_CAP,Math.max(player.velocity.y,0)+THRUST*step);}
     else power=Math.min(MAX_POWER,power+(grounded?REGEN:REGEN*.35)*step);
     bar.style.width=(100*power/MAX_POWER)+'%';
+    if(flying&&power<20&&!lowWarned){lowWarned=true;voice('power_low');}
   });
 
   function putOn(s){
@@ -129,6 +131,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     show('ENT_'+s.holo+'_on',false);if(s.id==='mk3')show('ENT_rotate_iron_on',false);
     overlay.querySelector('#suit-name').textContent=s.name.toUpperCase()+' ARMOR ONLINE';power=MAX_POWER;overlay.style.opacity=1;
     if(!s.given&&data?.weapons?.[s.weapon]){s.given=true;session.giveWeapon(s.weapon);equipView?.();}
+    voice(wornBefore?'suit_up_0'+Math.floor(Math.random()*3):'suit_up_first');wornBefore=true;lowWarned=false;
     announce(`${s.name} armor`,'SUIT ONLINE',3);beep();
   }
   function takeOff(s,why){
@@ -139,12 +142,13 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     if(s.display)lower(s.display,false);
     show('ENT_'+s.holo+'_on',true);if(s.id==='mk3')show('ENT_rotate_iron_on',true);
     overlay.style.opacity=0;flying=false;
+    voice('charging');
     toast(why??`${s.name} armor is recharging`,3);
   }
   const buy=s=>{
     if(s.owned)return;s.owned=true;setPartVisuals();
     show('ENT_'+s.holo,false);show('ENT_'+s.holo+'_on',true);if(s.id==='mk3')show('ENT_rotate_iron',false);
-    if(SUITS.filter(x=>x.id!=='mk16'&&x.owned).length===6){show('ENT_malibu_wall',false);show('ENT_purchase_armors',false);announce('All six armors are yours','THE WALL FALLS AWAY',4);}
+    if(SUITS.filter(x=>x.id!=='mk16'&&x.owned).length===6){show('ENT_malibu_wall',false);show('ENT_purchase_armors',false);announce('All six armors are yours','THE WALL FALLS AWAY',4);voice('armors_purchased');}
   };
   sync?.on('ir-buy',id=>{const s=suitOf(id);if(s){buy(s);toast(`A teammate bought the ${s.name} armor`,3);}});
   for(const s of SUITS){
@@ -158,7 +162,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
           toast(`${s.name} armor bought. Use the stand to put it on.`,4);return true;
         }
         if(worn===s){takeOff(s);return true;}
-        if(worn){toast('You can only wear one armor at a time',3);return false;}
+        if(worn){voice('dup_armor_'+Math.floor(Math.random()*5));toast('You can only wear one armor at a time',3);return false;}
         if(now()<s.readyAt){toast('The armor is still charging',2);return false;}
         putOn(s);return true;
       }});
@@ -181,11 +185,18 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
       },4000);
       return true;
     }});
+  const hall=named('hall_of_armors')[0];
+  host.on('update',()=>{
+    if(!hallHeard&&hall&&session.phase==='fighting'){
+      const c=center(hall),f=player.getFeetPosition();
+      if(Math.hypot(f.x-c.x,f.z-c.z)<220&&Math.abs(f.y-c.y)<220){hallHeard=true;voice('hall_of_armors');}
+    }
+  });
   host.on('update',()=>{
     if(worn&&(['reviving','gameover'].includes(session.phase)))takeOff(worn,'The armor was lost');
   });
   host.on('reset',()=>{
-    carrying.clear();placed.clear();assembled=false;doorOpen=false;scanUntil=0;power=MAX_POWER;anims.length=0;
+    hallHeard=false;wornBefore=false;carrying.clear();placed.clear();assembled=false;doorOpen=false;scanUntil=0;power=MAX_POWER;anims.length=0;
     for(const [o,y] of baseY){o.position.y=y;o.updateMatrix();o.updateMatrixWorld(true);}show('ENT_malibu_wall',true);show('ENT_purchase_armors',true);show('ENT_mk16_door',true);
     if(worn){worn=null;if(originalSpeed){player.moveSpeed=originalSpeed.move;player.sprintSpeed=originalSpeed.sprint;}overlay.style.opacity=0;}
     for(const s of SUITS){s.owned=false;s.given=false;s.readyAt=0;if(s.display)show('ENT_'+s.display,true);show('ENT_'+s.holo,true);show('ENT_'+s.holo+'_on',false);}
