@@ -143,7 +143,10 @@ export class FirstPersonArms {
         e.twistAxis=hp.sub(fp).normalize();
         e.qFb=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(e.bind)).invert();
         e.qHb=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(rt[e.child].bind)).invert();
+        rt[e.child].foreLen=fp.distanceTo(new THREE.Vector3().setFromMatrixPosition(rt[e.child].bind));
       }
+      // the upper arm: the hand remembers the whole arm's reach and T5's shoulder (see solve)
+      if(e.kind==='back'&&rt[e.child].kind==='back'&&e.t5){const h=rt[rt[e.child].child];if(h?.kind==='anchor'){h.reach=h.foreLen+new THREE.Vector3().setFromMatrixPosition(e.bind).distanceTo(new THREE.Vector3().setFromMatrixPosition(rt[e.child].bind));h.shoulder=rt.indexOf(e);}}
       if(e.parent>=0)e.local=rt[e.parent].bind.clone().invert().multiply(e.bind);
     }
     // Per-joint offsets: every mapped joint (shoulder, elbow, wrist, each finger
@@ -256,6 +259,12 @@ export class FirstPersonArms {
         R.makeRotationFromQuaternion(q);W.makeTranslation(-e.t5BindPos.x,-e.t5BindPos.y,-e.t5BindPos.z).premultiply(R).premultiply(Tm.makeTranslation(v0.x,v0.y,v0.z)).multiply(e.bind);
       }
       else if(t)W.multiplyMatrices(t.matrixWorld,e.t5BindInv).multiply(e.bind);   // T5's rotation since bind
+      // A character arm shorter than T5's cannot reach T5's wrist on a full stretch (the knife lunge): hanging the arm back
+      // from there dragged its shoulder in front of the camera. Keep the hand within the arm's own reach of T5's shoulder.
+      if(e.kind==='anchor'&&e.reach&&live[e.shoulder]){
+        const sp=v1.setFromMatrixPosition(live[e.shoulder].matrixWorld),hp=v2.setFromMatrixPosition(W).sub(sp),len=hp.length(),max=e.reach*.97;
+        if(len>max)W.setPosition(hp.multiplyScalar(max/len).add(sp));
+      }
       // forearm/upper arm: rotate like T5, then hang back from their (already solved) child joint
       if(e.kind==='back'&&e.twistAxis){
         // The hand follows T5's palm while the forearm follows T5's elbow; where the knife swing rolls the wrist, the

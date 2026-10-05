@@ -70,25 +70,31 @@ export function setupEggs({world,session,host,toast,named,center,boxOf,tween,twe
   armPoster();
 
   // ---- The cheese alarm and the perk jingles --------------------------------------------------------------
-  let alarmed=false,jingleAt=0,jingle=0,current=null;
+  // The jingles are positional (WaW `playsound` on an entity): only heard near their machine, in 3D, since the map is a
+  // tall tower. Each playing one is tracked (the 98 s Double-Dew jingle outlasts the 80 s gap before the next).
+  let alarmed=false,jingleAt=0,jingle=0,live=[];
   const jingles=[{name:'jingle_phd',ent:named('sound_phd')[0],gap:90},{name:'dd_jingle',ent:named('sound_dd')[0]??named('sound_here_dd')[0],gap:80}];
+  const JINGLE_RANGE=600;
   host.on('update',()=>{
     if(!alarmed&&session.time>=97&&session.phase==='fighting'){alarmed=true;sound('alarm',{volume:.7});}
     if(session.power&&session.phase==='fighting'){
       if(!jingleAt)jingleAt=now()+1;
       if(now()>=jingleAt){const j=jingles[jingle%2];jingle++;jingleAt=now()+j.gap;
-        if(j.ent){current={a:sound(j.name,{volume:0}),ent:j.ent};}}
+        if(j.ent){const a=sound(j.name,{volume:0});if(a)live.push({a,at:center(j.ent)});}}
     }
-    if(current?.a){   // a jingle is heard from where its machine is
-      const d=Math.hypot(player.getFeetPosition().x-center(current.ent).x,player.getFeetPosition().z-center(current.ent).z);
-      current.a.volume=Math.max(0,Math.min(.8,1-d/900));
-      if(current.a.ended)current=null;
-    }
+    const feet=player.getFeetPosition();
+    live=live.filter(j=>{
+      if(j.a.ended||j.a.paused)return false;
+      if(session.phase!=='fighting'){j.a.pause();return false;}
+      const k=1-feet.distanceTo(j.at)/JINGLE_RANGE;
+      j.a.volume=Math.max(0,Math.min(.8,k*k*.8));
+      return true;
+    });
   });
 
   host.on('reset',()=>{
     for(const t of [...shots])disarm(t);
-    shieldTarget=null;stanTarget=null;at=0;musicUntil=0;stanBusy=false;alarmed=false;jingleAt=0;jingle=0;current=null;track?.pause();track=null;
+    shieldTarget=null;stanTarget=null;at=0;musicUntil=0;stanBusy=false;alarmed=false;jingleAt=0;jingle=0;for(const j of live)j.a.pause();live=[];track?.pause();track=null;
     for(const axis of ['x','y','z'])tween('ENT_cap_shield',axis,0,.001,undefined);
     armShield();armStan();armPoster();
   });

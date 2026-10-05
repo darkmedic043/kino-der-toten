@@ -14,7 +14,7 @@ export async function setupPerks({api,world,session,host,toast,named,center,beep
     if(info)info[p.id]={name:p.name,price:p.cost,color:p.color,icon:p.icon};
     const trig=named('zombie_vending').find(e=>Math.hypot(e.origin[0]-p.at[0],e.origin[1]-p.at[1],e.origin[2]-p.at[2])<8);
     if(!trig)continue;
-    const e=world.addInteraction({position:center(trig),
+    const e=world.addInteraction({position:center(trig),sight:true,
       text:()=>session.perks.has(p.id)?`${p.name} equipped`:`${p.name} · ${p.cost}`,
       hidden:()=>false,
       use(){

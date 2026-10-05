@@ -61,7 +61,7 @@ export async function createMap(ctx,entry){
         else{
           const at=e.kind==='box'?vector(e.position):e.position;d=cam.position.distanceTo(at);
           // Machines and buys behind a closed door or wall cannot be used through it.
-          if(d<distance&&['perk','pap','wallbuy','box'].includes(e.kind)&&d>20){
+          if(d<distance&&(['perk','pap','wallbuy','box'].includes(e.kind)||e.sight)&&d>20){
             const dir=at.clone().sub(cam.position).normalize(),hit=world.raycast(new THREE.Ray(cam.position,dir),0,d);
             if(hit&&hit.distance<d-16)continue;
           }
@@ -117,9 +117,11 @@ export async function createMap(ctx,entry){
       // a shot hits the nearest shoot target on its path (not every one it passes through)
       let nearest=null,nearestDistance=Infinity,nearestPoint=null;
       for(const t of W().shootTargets??[]){
-        if(t.weapons&&![S().def?.id,S().def?.baseId].some(i=>t.weapons.includes(i)))continue;
+        const wrongGun=t.weapons&&![S().def?.id,S().def?.baseId].some(i=>t.weapons.includes(i));
+        if(wrongGun&&!t.wrong)continue;
         const hit=t.box?ray.intersectBox(t.box,new THREE.Vector3()):ray.intersectSphere(new THREE.Sphere(t.position,t.radius??20),new THREE.Vector3());   // box (a Box3) for thin targets
         const d=hit?hit.distanceTo(ray.origin):Infinity;
+        if(wrongGun){if(hit&&d<=far+(t.radius??20))t.wrong(t);continue;}   // hit with another gun: the target stays (wrong() may explain)
         if(hit&&d<=far+(t.radius??20)&&d<nearestDistance){nearest=t;nearestDistance=d;nearestPoint=hit;}
       }
       if(nearest){const list=W().shootTargets;list.splice(list.indexOf(nearest),1);nearest.hit?.(nearest,ray,nearestPoint);}

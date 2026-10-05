@@ -93,9 +93,13 @@ export class CustomWorld {
       const box=new THREE.Box3().setFromObject(m.object);
       // The navmesh cut around a closed door covers every polygon the box touches (up to ~48 units beyond it), so
       // the player's collision can be grown the same way (map entry doorMargin / doorHeadroom, in scene units):
-      // otherwise you squeeze past the door pieces, or stand on top of them.
-      const grow=this.entry.doorMargin??0,up=this.entry.doorHeadroom??0,plug=box.clone();
-      if(grow||up){plug.min.x-=grow;plug.min.z-=grow;plug.max.x+=grow;plug.max.z+=grow;plug.max.y+=up;}
+      // otherwise you squeeze past the door pieces, or stand on top of them. Only the door's width grows by the full margin;
+      // its thickness (the facing direction) grows by at most 6, or a thin door becomes an invisible wall in front of it.
+      const grow=this.entry.doorMargin??0,up=this.entry.doorHeadroom??0,plug=box.clone(),size=box.getSize(new THREE.Vector3());
+      if(grow||up){
+        const thin=Math.min(grow,6),gx=size.x>=size.z?grow:thin,gz=size.z>size.x?grow:thin;
+        plug.min.x-=gx;plug.min.z-=gz;plug.max.x+=gx;plug.max.z+=gz;plug.max.y+=up;
+      }
       const part={object:m.object,collider:boxCollider(plug),box,plug,enabled:true};
       this.doors.set(name,{name,cost,zone,electric:!!m.extras.electric,parts:[part],box});this.dynamic.push(part);
       this.interactions.push({kind:'door',door:name,position:box.getCenter(new THREE.Vector3()),box});
@@ -346,8 +350,10 @@ export class CustomWorld {
   enableMover(id,on){const m=this.movers.find(x=>x.def.id===String(id).toLowerCase());if(!m)return;m.disabled=!on;for(const o of m.objects)o.visible=on;}
   resetMovers(){for(const m of this.movers){m.disabled=false;m.slide=null;m.f=0;for(const o of m.objects)o.visible=true;}}
   // Hooks for map mods (see mods/README.md): extra press-F spots and shootable targets.
-  //   addInteraction({position: Vector3, text(): string, use(e): boolean, hidden?(), locked?(), lockedText?})
+  //   addInteraction({position: Vector3, text(): string, use(e): boolean, hidden?(), locked?(), lockedText?, sight?})
+  //     (sight: true = not usable through a wall or closed door, like the built-in machines)
   //   addShootTarget({position: Vector3, radius, weapons?: [ids], hit(target)})   (a target is removed once it is hit)
+  //     wrong?(target): called (the target stays) when one of the `weapons` list is required and another gun hit it
   // Any interaction (also the built-in kinds, e.g. the power switch) may carry locked()/lockedText.
   addInteraction(def){const e={kind:'custom',...def};this.interactions.push(e);return e;}
   addShootTarget(def){(this.shootTargets??=[]).push(def);return def;}

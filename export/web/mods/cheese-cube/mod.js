@@ -61,7 +61,9 @@ export default async function setup(api){
   let captured=0;
   for(let n=1;n<=5;n++){
     const trigger=named('cheese_target'+n)[0];if(!trigger)continue;
-    world.addShootTarget({position:center(trigger),radius:26,weapons:['cheese_gun'],hit(){
+    let hintAt=-99;
+    world.addShootTarget({position:center(trigger),radius:26,weapons:['cheese_gun'],
+      wrong(){if(now()-hintAt>6){hintAt=now();toast('Only the Cheese Gun can capture a Cheese Brother',3);}},hit(){
       show('ENT_target'+n,false);session.addPoints(2000);beep();captured++;
       toast(`Cheese Brother captured · ${captured} / 5 · +2000`,3);
       if(captured===5){session.addPoints(4000);announce('You captured all the Cheese Brothers!',"WE'LL KEEP THEM BEHIND BARS",5);}
