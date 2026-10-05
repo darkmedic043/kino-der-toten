@@ -25,8 +25,20 @@ function toast(text){const t=$('toast');t.textContent=text;t.classList.add('show
 
 // ---- Data --------------------------------------------------------------------
 const fetchJson=url=>fetch(url).then(r=>{if(!r.ok)throw new Error(url+' HTTP '+r.status);return r.json();});
+// The map list draws as soon as maps.json is in (a first paint; the full menu, which needs weapons, mods and
+// characters, replaces it a moment later): through the tunnel the rest takes a couple of seconds.
+const mapsReady=fetchJson('mods/maps.json').then(d=>d.maps).catch(()=>[]);
+mapsReady.then(list=>{
+  if(!list.length||document.querySelector('#map-grid .map-card'))return;
+  const pick=list.find(m=>m.id===store.get('kino.menu.map'))??list[0],g=document.getElementById('map-grid');
+  const bg=m=>m.image?`linear-gradient(0deg,#050606cc,transparent 55%),url("${m.image}")`:'';
+  if(g)g.innerHTML=list.map(m=>`<button class="map-card${m.id===pick.id?' active':''}"><div class="art" style='background-image:${bg(m)}'>${m.image?'':esc(m.title)}</div><div class="meta"><strong>${esc(m.title)}</strong></div></button>`).join('');
+  const ha=document.getElementById('hero-art');if(ha){ha.className='hero-art';ha.style.backgroundImage=bg(pick);}
+  const ht=document.getElementById('hero-title');if(ht)ht.textContent=pick.title;
+  const hd=document.getElementById('hero-desc');if(hd)hd.textContent=pick.description??'';
+});
 const [mapList,modList,config,characters,baseData]=await Promise.all([
-  fetchJson('mods/maps.json').then(d=>d.maps).catch(()=>[]),
+  mapsReady,
   fetchJson('mods/mods.json').then(d=>d.enabled??[]).catch(()=>[]),
   loadProgression(),loadCharacterRegistry(),fetchJson('game-data.json'),
 ]);
@@ -34,10 +46,14 @@ const [mapList,modList,config,characters,baseData]=await Promise.all([
 const mods=await Promise.all(modList.map(async id=>{
   try{const manifest=await fetchJson(`mods/${id}/mod.json`);return {id,manifest};}catch(error){return {id,error:error.message};}
 }));
+// Fetch every mod's data patches and scripts at once (one after another took about 6 s through the tunnel: ~35
+// round trips), then apply them in mods.json order as before.
+const [patches,scripts]=await Promise.all([Promise.all(mods.map(m=>Promise.all([m.manifest?.data??[]].flat().map(file=>fetchJson(`mods/${m.id}/${file}`).catch(()=>null))))),
+  Promise.all(mods.map(m=>m.manifest?.script?import(`./mods/${m.id}/${m.manifest.script}`).catch(()=>null):null))]);
 let data={weapons:baseData.weapons,equipment:{...baseData.equipment},boxPool:baseData.boxPool,characters:{...baseData.characters}};
-for(const m of mods)for(const file of [m.manifest?.data??[]].flat()){try{data=mergePatch(data,await fetchJson(`mods/${m.id}/${file}`));}catch{}}
+for(const list of patches)for(const patch of list){if(patch)try{data=mergePatch(data,patch);}catch{}}
 // Mods that add weapons from a script (prepare) must show up here too.
-for(const m of mods)if(m.manifest?.script){try{const module=await import(`./mods/${m.id}/${m.manifest.script}`);if(module.prepare)data=(await module.prepare(data,{id:m.id,url:new URL(`mods/${m.id}/`,document.baseURI),manifest:m.manifest}))??data;}catch(error){console.warn('[menu] mod',m.id,error);}}
+for(const [k,m] of mods.entries())if(m.manifest?.script){try{const module=scripts[k];if(module?.prepare)data=(await module.prepare(data,{id:m.id,url:new URL(`mods/${m.id}/`,document.baseURI),manifest:m.manifest}))??data;}catch(error){console.warn('[menu] mod',m.id,error);}}
 try{resolveWeapons(data);}catch{}
 const weapons=data.weapons,bonusById=Object.fromEntries(config.bonuses.map(b=>[b.id,b]));
 const weaponLevel=Object.fromEntries(config.weapons.map(w=>[w.id,w.level]));
