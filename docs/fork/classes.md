@@ -54,9 +54,9 @@ User requests: passives must work with every action skill, neutral wording ("Abi
 - **Co-op (2026-10-05, `coop.js`)**: other players see your action skill. The owner sends, 10×/s, adds/removes of what stands (turrets, steel walls, sandbag segments, wire fields, claymores, drones, beacons), drone/following-beacon positions and wall wear; turret/drone tracers and skill blasts as they happen (`{t:'ab', op}`). Everyone else builds mirrors from the same models (the builders are module-level exports now: `steelWall`, `sandbags`, `wireField`, `mineModel`, `droneModel`, `beaconModel`). Damage already reached the host like gunshots. The host's mirrors of walls/sandbags hold its (real) zombies and send each strike to the owner (`op:'hit'`), whose wall loses the hit (pool-aware) and disappears for everyone when broken; mirrored wire slows zombies inside on the host. A guest's own walls don't hold locally (their zombies are copies; strikes would count twice). Mirrors block players. Late joiners get what is standing; a leaver's mirrors are removed. Verified with two browsers: a guest's sandbag nest shows for the host, holds zombies there and lost 5 hits to their strikes; a guest's turret and drones show and move. Not mirrored: turret aim, napalm discs, mortar warning rings.
 
 
-## Mech (2026-10-05)
+## Pilot (the mech class, 2026-10-05)
 
-Third class (`classes.json` `mech`, colour `#9ccf5a`). One action skill for all three trees, **Call In Mech** (`mech.js`), and a weapon per arm.
+Third class, **Pilot** (`classes.json` id `mech`; named Mech until the user asked for a role name like the others, colour `#9ccf5a`). One action skill for all three trees, **Call In Mech** (`mech.js`), and a weapon per arm.
 - **Data:**
   - `cls.mech.weapons` holds the six weapons' numbers. Each tree has a base weapon (`tree.weapon`, always available): Ballistics (Thresher Chaingun), Ordnance (Quad Rocket Pod), Vanguard (Hydraulic Fist).
   - Halfway down each tree (tier 3) a `type:'weapon'` node unlocks a second weapon for a point: Longbow Rail, Thermite Launcher, Arc Thrower. It renders as a wide hexagon.
