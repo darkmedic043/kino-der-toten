@@ -16,7 +16,8 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 // the loadout's weapons sit on its cut forearm stumps, and the pilot sits in the opened cockpit. Without it, the
 // procedural chassis below.
 const MECH_URL=new URL('models/mech.glb',import.meta.url).href;
-const SCALE=175;          // model units (the mesh is ~1.35 tall with its fins) to game units: about 2.4 players tall
+const SCALE=130;          // model units (the mesh is ~1.35 tall with its fins) to game units: about 1.8 players tall (175 was too tall)
+const PILOT_SCALE=SCALE/175;   // the cockpit was fitted at 175: the seated operator shrinks with the mech
 const STUMP=.17;          // forearm left past the elbow by the build (model units)
 let mechGltf=null,mechLoad=null;
 export function loadMechModel(){mechLoad??=new GLTFLoader().loadAsync(MECH_URL).then(g=>{mechGltf=g;return g;}).catch(()=>null);return mechLoad;}
@@ -123,7 +124,8 @@ export const WEAPON_BUILDERS={
     g.add(at(new THREE.Object3D(),0,1,40));g.children.at(-1).name='muzzle';return g;
   },
 };
-const weapon=id=>(WEAPON_BUILDERS[id]??WEAPON_BUILDERS.chaingun)();
+export const weaponFor=id=>weapon(id);
+const weapon=id=>(mechGltf&&KIT_WEAPONS[id]?KIT_WEAPONS[id]:WEAPON_BUILDERS[id]??WEAPON_BUILDERS.chaingun)();
 
 // ---- the mech ----------------------------------------------------------------------------------------------------
 export function createMech(opts={}){return mechGltf?marcyMech(opts):proceduralMech(opts);}
@@ -233,7 +235,7 @@ export function mechArms(){
 // weapons aren't children of the bones: each frame they're put at the stump's end, pointing along the aim.
 function marcyMech({mount=false}={}){
   const root=group('mech'),model=cloneSkinned(mechGltf.scene);
-  for(const n of ['FP_ArmL','FP_ArmR'])model.getObjectByName(n)?.removeFromParent();
+  for(const o of [...model.children])if(/^(FP_Arm|KIT_)/.test(o.name))o.removeFromParent();   // first-person stumps and the weapon kit live in the same file
   model.scale.setScalar(SCALE);root.add(model);
   model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}});
   const B=n=>model.getObjectByName(n);
@@ -254,7 +256,7 @@ function marcyMech({mount=false}={}){
     a.end=a.fore.worldToLocal(root.localToWorld(e.clone().addScaledVector(d,STUMP*SCALE)));
     a.mount=group('weapon_'+side);root.add(a.mount);a.weapon=null;a.id=null;
   }
-  const seat=group('seat');seat.position.set(0,.76*SCALE,-.1*SCALE);root.add(seat);   // the pilot's hips (cockpit, under the brow)
+  const seat=group('seat');seat.position.set(0,.76*SCALE,-.1*SCALE);seat.scale.setScalar(PILOT_SCALE);root.add(seat);   // the pilot's hips (cockpit, under the brow)
   // the cockpit: a padded back panel over the model's unseen interior (opened by the build) and two control sticks
   {const M=materials();seat.add(at(box(40,50,4,M.dark,2),0,20,-15),at(box(30,5,26,M.dark,2),0,-2,-2),at(box(26,30,3,M.tube,1.5),0,22,-12.8));
     for(const x of [-11,11])seat.add(at(cyl(1.2,1.2,16,M.steel,8),x,6,15,-.35),at(box(3.2,4.5,3.2,M.dark,1),x,13,17.5));}
@@ -270,10 +272,10 @@ function marcyMech({mount=false}={}){
   }
   let phase=0,t=0;
   const v=new THREE.Vector3(),wq=new THREE.Quaternion();
-  const api={root,arms,legs,seat,seatFacing:0,
+  const api={root,arms,legs,seat,seatFacing:0,pilotScale:PILOT_SCALE,
     eye:.98*SCALE,   // the pilot's eye above the feet (first person)
     gunnerSeat:new THREE.Vector3(0,1.09*SCALE,-.33*SCALE),
-    setWeapons(left,right){for(const [side,id] of [['left',left],['right',right]]){const a=arms[side];if(a.id===id)continue;a.weapon?.removeFromParent();a.weapon=weapon(id);a.weapon.scale.setScalar(1.45);a.id=id;a.weapon.traverse(o=>{if(o.isMesh)o.castShadow=true;});a.mount.add(a.weapon);}},
+    setWeapons(left,right){for(const [side,id] of [['left',left],['right',right]]){const a=arms[side];if(a.id===id)continue;a.weapon?.removeFromParent();a.weapon=weapon(id);a.weapon.scale.setScalar(1.1);a.id=id;a.weapon.traverse(o=>{if(o.isMesh)o.castShadow=true;});a.mount.add(a.weapon);}},
     setMount(on){hard.visible=on;},
     mountGun:mg,
     recoil(side,k=1){arms[side].kick=Math.min(1.5,arms[side].kick+k);},
@@ -308,3 +310,86 @@ function marcyMech({mount=false}={}){
     }};
   return api;
 }
+
+// ---- weapons from the Marcy model's own parts (the build's KIT_* meshes, same textures as the mech) ---------------------
+// Each points down +Z from its mount with a `muzzle` node, about the size of the procedural ones (45-65 long), so the
+// first-person arms and the mech share them. kit(name, scale): a copy centred on its bounding box.
+let steelMats=null;
+function steel(){
+  return steelMats??={
+    // no environment map in the game's scenes: strong metalness renders near-black, so these stay half metallic
+    gun:new THREE.MeshStandardMaterial({color:0x4a4f4c,metalness:.45,roughness:.5}),
+    worn:new THREE.MeshStandardMaterial({color:0x837a68,metalness:.4,roughness:.55}),
+    bore:new THREE.MeshStandardMaterial({color:0x050506,metalness:.3,roughness:.9}),
+    brass:new THREE.MeshStandardMaterial({color:0x9a7842,metalness:.5,roughness:.45}),
+    olive:new THREE.MeshStandardMaterial({color:0x4b5338,metalness:.3,roughness:.65}),
+  };
+}
+function kit(name,scale,rot=[0,0,0]){
+  const src=mechGltf.scene.getObjectByName(name),g=new THREE.Group();if(!src)return g;
+  const c=src.clone();c.position.set(0,0,0);c.rotation.set(0,0,0);c.scale.setScalar(scale);
+  const b=new THREE.Box3().setFromObject(c),mid=b.getCenter(new THREE.Vector3());c.position.sub(mid);
+  const inner=new THREE.Group();inner.add(c);inner.rotation.set(...rot);g.add(inner);
+  g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.frustumCulled=false;}});return g;
+}
+// a fluted barrel along +Z: tube, bore, a few clamp rings and a muzzle brake
+function barrel(r,len,m=steel()){
+  const g=new THREE.Group();
+  g.add(at(cyl(r,r,len,m.gun,16),0,0,len/2,Math.PI/2),at(cyl(r*.55,r*.55,len+.2,m.bore,12),0,0,len/2,Math.PI/2));
+  for(const t of [.2,.55])g.add(at(cyl(r*1.25,r*1.25,len*.05,m.worn,16),0,0,len*t,Math.PI/2));
+  g.add(at(cyl(r*1.35,r*1.2,len*.12,m.gun,16),0,0,len*.97,Math.PI/2));
+  for(let i=0;i<4;i++)g.add(at(box(r*.5,r*2.7,len*.07,m.bore,.2),0,0,len*.97,0,0,i*Math.PI/4));   // brake slots
+  return g;
+}
+const muzzleAt=(g,z,y=0)=>{const m=new THREE.Object3D();m.name='muzzle';m.position.set(0,y,z);g.add(m);return g;};
+const KIT_WEAPONS={
+  chaingun(){
+    const g=group('chaingun'),m=steel();
+    g.add(at(kit('KIT_EngineCore',110,[Math.PI/2,0,0]),0,0,4));                 // breech drum
+    g.add(at(kit('KIT_Shoulder',85,[0,Math.PI/2,0]),0,9,6));                     // armour cowl over it
+    const spin=group('spin');spin.position.z=13;
+    for(let i=0;i<6;i++){const a=i/6*Math.PI*2,b=barrel(1.8,34);b.position.set(Math.cos(a)*4.6,Math.sin(a)*4.6,0);spin.add(b);}
+    spin.add(at(cyl(7,7,2.5,m.worn,18),0,0,8,Math.PI/2),at(cyl(7,7,2.5,m.worn,18),0,0,24,Math.PI/2),at(cyl(2.4,2.4,36,m.gun,10),0,0,17,Math.PI/2));
+    g.add(spin);g.add(at(box(6,10,12,m.brass,1),-10,-4,4));                      // ammo feed
+    return muzzleAt(g,48);
+  },
+  rail(){
+    const g=group('rail'),m=steel();
+    g.add(at(kit('KIT_Blade',80),0,0,26));                                        // the cut-off "DO OR DIE" blade forearm as the rail
+    g.add(at(kit('KIT_KneeCap',90,[0,0,Math.PI/2]),0,-6,2));
+    const glow=group('glow');for(const z of [8,18,28]){const r=new THREE.Mesh(new THREE.TorusGeometry(5.5,1,8,20),materials().glowBlue.clone());r.position.z=z;glow.add(r);}g.add(glow);
+    return muzzleAt(g,58);
+  },
+  salvo(){
+    const g=group('salvo'),m=steel();
+    for(const x of [-1,1])g.add(at(kit('KIT_KneeCap',120,[0,0,x*Math.PI/2]),x*11,0,6));    // armour plates either side
+    g.add(at(box(18,18,22,m.olive,2.5),0,0,6),at(kit('KIT_Shoulder',110,[0,Math.PI/2,0]),0,10,6));   // pod body, shoulder armour on top
+    for(const [x,y] of [[-4.6,-4.6],[4.6,-4.6],[-4.6,4.6],[4.6,4.6]])g.add(at(cyl(3.6,3.6,6,m.worn,14),x,y,15.5,Math.PI/2),at(cyl(2.7,2.7,6.2,m.bore,12),x,y,15.6,Math.PI/2));
+    g.add(at(kit('KIT_Booster',90,[Math.PI,0,0]),0,1,-8));                        // the booster pod at the back
+    return muzzleAt(g,19);
+  },
+  thermite(){
+    const g=group('thermite'),m=steel();
+    g.add(at(kit('KIT_Engine',120),0,0,4));                                       // the radial engine as a drum magazine
+    g.add(at(cyl(6,6.8,24,m.worn,18),0,0,20,Math.PI/2),at(cyl(4.4,4.4,24.2,m.bore,14),0,0,20,Math.PI/2),at(cyl(7.6,7.6,3,m.gun,18),0,0,31,Math.PI/2),at(cyl(7.2,7.2,2.4,m.gun,18),0,0,13,Math.PI/2));
+    for(const x of [-1,1])g.add(at(kit('KIT_KneeCap',80,[0,0,x*Math.PI/2]),x*8.5,-1,20));
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(5.8,1,8,20),materials().glowOrange);ring.position.z=33.5;ring.name='glow';g.add(ring);
+    g.add(at(kit('KIT_Shoulder',70,[0,Math.PI/2,0]),0,9,16));
+    return muzzleAt(g,35);
+  },
+  fist(){
+    const g=group('fist'),m=steel(),hand=group('hand');
+    hand.add(at(kit('KIT_Hand',150),0,0,12));                                    // the mech's own claw hand
+    hand.add(at(cyl(2.6,2.6,16,m.worn,12),-5,4,-2,Math.PI/2),at(cyl(2.6,2.6,16,m.worn,12),5,4,-2,Math.PI/2),at(cyl(4,4,6,m.gun,14),0,0,-4,Math.PI/2));   // pistons
+    g.add(hand);return muzzleAt(g,24);
+  },
+  arc(){
+    const g=group('arc'),m=steel();
+    g.add(at(kit('KIT_EngineCore',100,[Math.PI/2,0,0]),0,0,4));
+    for(let i=0;i<3;i++){const a=i/3*Math.PI*2+Math.PI/2,p=at(box(2.4,2.4,20,m.worn,.8),Math.cos(a)*6.5,Math.sin(a)*6.5,22,Math.sin(a)*.25,-Math.cos(a)*.25,0);g.add(p);   // prongs lean in towards the core
+      g.add(at(cyl(1.6,1.6,2,materials().glowBlue,8),Math.cos(a)*4,Math.sin(a)*4,31,Math.PI/2));}
+    const core=new THREE.Mesh(new THREE.SphereGeometry(4,16,12),materials().glowBlue.clone());core.position.z=20;core.name='glow';g.add(core);
+    g.add(at(kit('KIT_Shoulder',70,[0,Math.PI/2,0]),0,9,4));
+    return muzzleAt(g,32);
+  },
+};

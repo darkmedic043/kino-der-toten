@@ -125,3 +125,15 @@ Third class, **Pilot** (`classes.json` id `mech`; named Mech until the user aske
     - Mine shows only in third person; teammates' always show.
   - **Camera:** first person sits at the pilot's eyes (`eye` 171 above the feet, clamped under ceilings). Third person pulls back (`kino.thirdPersonCamera` distance 270, shoulder 60, recomputed after the lift) and is restored on eject.
   - **Heat (user request):** an overheated arm stays locked for 1.2 s (`VENT_DELAY`, HUD "OVERHEAT", then "VENTING") before venting at .4/s (was .55). Normal cooling is .28/s after 0.5 s without firing (was .38 after .35).
+- **Shorter mech, kit weapons (2026-10-05):**
+  - The Marcy mech is now scale 130 (about 1.8 players; 175 was "way too tall").
+  - The cockpit (`seat`) is scaled by 130/175 with the pilot and its panel and sticks, so the operator still fits under the brow. `eye` is now 127 above the feet.
+  - The build now also copies seven of the model's parts out as `KIT_*` meshes: hand, blade, booster, engine, engine core, knee cap, shoulder.
+  - `KIT_WEAPONS` builds the six arm weapons from them, so they share the mech's textures, plus finer procedural detail: fluted barrels with clamp rings and brakes, bores, pistons, glow.
+    - Fist: the mech's own claw hand on pistons.
+    - Rail: the cut-off "DO OR DIE" blade with coils.
+    - Chaingun: the engine-core drum under a shoulder cowl with six barrels.
+    - Rocket pod: an olive box with knee-cap armour, shoulder armour on top and a booster at the back.
+    - Thermite: the radial engine as its drum.
+    - Arc: the drum with prongs and a core.
+  - The plain steel parts are only half metallic: the game's scenes have no environment map, so strongly metallic materials rendered black.

@@ -33,6 +33,22 @@ def dominant(o, v, names, dl):
     return names[max(w.items(), key=lambda x: x[1])[0]] if w else None
 
 fp_parts = {'L': [], 'R': []}   # (mesh object, [vertex indices]) of each forearm stump
+# weapon kit: parts of the model the game builds its arm weapons from (same textures as the mech). Left-side copies,
+# each centred on its first bone's head; the blade and hand are turned so the forearm runs along -Y (game +Z).
+KIT = {'KIT_Hand': ('MechPalmL', 'MechFinger1BaseL', 'MechFinger1MiddleL', 'MechFinger1EndL', 'MechFinger2BaseL', 'MechFinger2MiddleL',
+                    'MechFinger2EndL', 'MechFinger3BaseL', 'MechFinger3MiddleL', 'MechFinger3EndL'),
+       'KIT_Blade': ('MechArmL2',), 'KIT_Booster': ('MechBoosterL', 'MechBoosterFlapL'), 'KIT_Engine': ('EngineHead',),
+       'KIT_EngineCore': ('EngineCenter', 'EngineBase'), 'KIT_KneeCap': ('KneeCapL',), 'KIT_Shoulder': ('MechArmLShoulder',)}
+KIT_ALIGN = {'KIT_Hand', 'KIT_Blade'}
+kit_parts = {k: [] for k in KIT}
+def kit_of(n, p):
+    for k, prefixes in KIT.items():
+        if any(n.startswith(x + '_') for x in prefixes):
+            if k == 'KIT_Blade' and (p - elbow['L']).length <= STUMP: return None
+            return k
+    return None
+kit_origin = {k: bone_head(next(b.name for b in arm.data.bones if b.name.startswith(KIT[k][0] + '_'))) for k in KIT}
+kit_origin['KIT_Blade'] = elbow['L'] + (palm['L'] - elbow['L']).normalized() * STUMP
 for o in list(bpy.data.objects):
     if o.type != 'MESH': continue
     if not o.vertex_groups: bpy.data.objects.remove(o); continue
@@ -50,6 +66,30 @@ for o in list(bpy.data.objects):
             continue
         if n.startswith('MechPelvis') and p.y < PELVIS_FRONT and p.z > .45: kill.append(v); continue
         if (n.startswith('MechRibcage') or n.startswith('MechSpine')) and p.y < CHEST_FRONT and p.z < CHEST_TOP: kill.append(v)
+    # weapon kit copies
+    kv = {k: set() for k in KIT}
+    for v in bm.verts:
+        n = dominant(o, v, names, dl)
+        if n:
+            k = kit_of(n, o.matrix_world @ v.co)
+            if k: kv[k].add(v.index)
+    uvl = bm.loops.layers.uv.active
+    for k, idx in kv.items():
+        faces = [f for f in bm.faces if all(v.index in idx for v in f.verts)]
+        if not faces: continue
+        sub = bmesh.new(); vmap = {}; suv = sub.loops.layers.uv.new('UVMap') if uvl else None
+        for f in faces:
+            vs = []
+            for v in f.verts:
+                if v.index not in vmap: vmap[v.index] = sub.verts.new(o.matrix_world @ v.co - kit_origin[k])
+                vs.append(vmap[v.index])
+            try:
+                nf = sub.faces.new(vs)
+                if uvl:
+                    for l, ol in zip(nf.loops, f.loops): l[suv].uv = ol[uvl].uv
+            except ValueError: pass
+        me = bpy.data.meshes.new(f'{k}_{o.name}'); sub.to_mesh(me); sub.free(); me.materials.append(o.data.materials[0])
+        kit_parts[k].append(me)
     # copy the stump faces out before deleting (first-person forearms)
     for s in 'LR':
         if not keep_fp[s]: continue
@@ -87,6 +127,23 @@ for s in 'LR':
     q = d.rotation_difference(mathutils.Vector((0, -1, 0)))
     ob.data.transform(q.to_matrix().to_4x4()); ob.data.update()
     ob.location = (0, 0, -5)   # parked out of the way; the game re-parents it
+
+# weapon kit objects (parked under the floor; the game clones them)
+for k, mes in kit_parts.items():
+    if not mes: continue
+    objs = []
+    for me in mes:
+        ob = bpy.data.objects.new(me.name, me); bpy.context.scene.collection.objects.link(ob); objs.append(ob)
+    bpy.ops.object.select_all(action='DESELECT')
+    for ob in objs: ob.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    if len(objs) > 1: bpy.ops.object.join()
+    ob = bpy.context.view_layer.objects.active; ob.name = k
+    if k in KIT_ALIGN:
+        d = (palm['L'] - elbow['L']).normalized(); q = d.rotation_difference(mathutils.Vector((0, -1, 0)))
+        ob.data.transform(q.to_matrix().to_4x4()); ob.data.update()
+    ob.location = (0, 0, -5)
+    print('KIT', k, len(ob.data.vertices), [round(x, 3) for x in ob.dimensions])
 
 # textures
 for im in bpy.data.images:
