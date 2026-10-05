@@ -259,7 +259,11 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null){
     if(volume)for(const x of [o.material].flat())if(x&&!x.isShaderMaterial)patchMaterial(x,volume.uniforms);
     const m=[o.material].flat()[0];
     const see=!m?.transparent&&!(m?.blending>1);o.castShadow=see;o.receiveShadow=true;});}
-  tagShadows(scene);let tagTimer=0;
+  // Transparent + double-sided: three draws those in two passes (back faces, then front), setting needsUpdate before
+  // each, so every one re-checked its shader program twice a frame (Kino: 55 lamp-glass materials and ~100 map decals).
+  // One pass looks the same on flat glass and decals. Swept every second: map-materials makes decals transparent later.
+  function singlePass(root){root.traverse(o=>{if(o.material)for(const x of [o.material].flat())if(x?.transparent&&x.side===THREE.DoubleSide&&!x.forceSinglePass)x.forceSinglePass=true;});}
+  tagShadows(scene);singlePass(scene);let tagTimer=0;
 
   // ---- Daytime: a physical sky and a sun whose shadows keep interiors dark, so
   // sunlight only gets in through the roof holes, windows and open doors.
@@ -467,7 +471,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null){
       l.intensity+=(target-l.intensity)*Math.min(1,dt*6);}   // never toggle .visible: that recompiles every lit shader
     // Shadows: the world is static, so refresh at 30 Hz on High and every frame on Ultra.
     if(q>=2&&frame%(q>=3?2:3)===0)for(const l of spots)l.shadow.needsUpdate=true;
-    if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);}
+    if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);singlePass(scene);}
     for(const b of beams){
       const on=q>=1?level(b.s):0,u=b.mesh.material.uniforms;u.time.value=t;u.strength.value+=(on*b.strength*.45-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
       b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible){b.dust.material.opacity=Math.min(.2,u.strength.value*1.4);const p=b.dust.geometry.attributes.position;

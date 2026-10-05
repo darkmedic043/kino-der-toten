@@ -124,3 +124,4 @@
 - **2026-10-05 (Marcy mech)**: the Pilot's mech is RainOnTheMoon's Marcy (CC-BY, git-ignored build), cut and driven by code with the weapons on its forearm stumps; the operator sits in an opened cockpit with a seated pose for any character; overheat pause and slower cooling (classes.md).
 - **2026-10-05 (Pilot passives)**: mech back to the original's height; Pilot passives reworked to be universal and conditional (Hot Barrels / Cold Open, Target Lock, Steady Aim / Momentum, Crossfire, Scorched Earth, Overshield, Deflector, Reactive Armour, Last Stand…) (classes.md).
 - **2026-10-05 (settings tabs)**: the settings form is split into tabs: Graphics, Audio, Controls, Gameplay, Dev (core.md).
+- **2026-10-05 (FPS)**: Kino frame drops traced to transparent double-sided materials re-checking shaders twice a frame; forceSinglePass gives about +20% FPS (performance.md).
