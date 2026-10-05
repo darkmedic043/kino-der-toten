@@ -5,7 +5,8 @@
 //   3. Use a bought suit's stand to put it on (one suit at a time): more health, a different walking speed, the suit's
 //      weapon on the first wear (stand-ins from the weapon list). Use the stand again to take it off. The suit returns to
 //      its stand and recharges for 20 s. Dying also takes the suit off.
-// Not ported: flight, the suit HUD, power meter, the stand and door animations, the Mk16 and the holo spinning.
+// Flight (hold Space in the air, with a power bar), the stand and door animations, the spinning holograms, the War Machine
+// cage and JARVIS lines are ported. Not ported: the JARVIS screen overlays and the Mk16 suit itself (its scanner joke is).
 import * as THREE from 'three';
 
 export function setupSuits({api,world,session,host,toast,announce,named,center,nodes,show,beep,now,board,player,triviaDone,sync,sound}){
