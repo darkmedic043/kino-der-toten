@@ -137,6 +137,13 @@ export class FirstPersonArms {
     }
     if(rt)for(const e of rt){
       if(e.kind==='back')e.d=new THREE.Vector3().setFromMatrixPosition(e.bind.clone().invert().multiply(rt[e.child].bind));
+      // the elbow's child is the hand: remember the forearm axis and both bind rotations to share the hand's roll (see solve)
+      if(e.kind==='back'&&rt[e.child].kind==='anchor'){
+        const fp=new THREE.Vector3().setFromMatrixPosition(e.bind),hp=new THREE.Vector3().setFromMatrixPosition(rt[e.child].bind);
+        e.twistAxis=hp.sub(fp).normalize();
+        e.qFb=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(e.bind)).invert();
+        e.qHb=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(rt[e.child].bind)).invert();
+      }
       if(e.parent>=0)e.local=rt[e.parent].bind.clone().invert().multiply(e.bind);
     }
     // Per-joint offsets: every mapped joint (shoulder, elbow, wrist, each finger
@@ -236,6 +243,8 @@ export class FirstPersonArms {
   retargetSkeleton(t5){
     const rt=this.rt,live=rt.map(e=>e.t5?t5.getBoneByName(e.t5):null),knLive=rt.map(e=>e.kn?e.kn.map(n=>t5.getBoneByName(n)):null);
     const q=new THREE.Quaternion(),v0=new THREE.Vector3(),v1=new THREE.Vector3(),v2=new THREE.Vector3(),v3=new THREE.Vector3(),R=new THREE.Matrix4(),Tm=new THREE.Matrix4();
+    const Rm=new THREE.Matrix4(),Qa=new THREE.Quaternion(),Qb=new THREE.Quaternion(),Qc=new THREE.Quaternion(),Qd=new THREE.Quaternion(),Qe=new THREE.Quaternion(),Qf=new THREE.Quaternion();
+    const TWIST_SHARE=.6;   // how much of the hand-against-forearm roll the forearm takes on
     const bones=rt.map(e=>{const b=new THREE.Bone();b.name=e.name;b.matrixAutoUpdate=false;b.matrixWorldAutoUpdate=false;return b;});
     const skeleton=new THREE.Skeleton(bones,rt.map(e=>e.bind.clone().invert()));
     const m=new THREE.Matrix4(),p=new THREE.Vector3();
@@ -248,6 +257,15 @@ export class FirstPersonArms {
       }
       else if(t)W.multiplyMatrices(t.matrixWorld,e.t5BindInv).multiply(e.bind);   // T5's rotation since bind
       // forearm/upper arm: rotate like T5, then hang back from their (already solved) child joint
+      if(e.kind==='back'&&e.twistAxis){
+        // The hand follows T5's palm while the forearm follows T5's elbow; where the knife swing rolls the wrist, the
+        // hand twisted against the bracer. Turn the forearm about its axis by part of that difference.
+        const qF=Qa.setFromRotationMatrix(Rm.extractRotation(W)),qH=Qb.setFromRotationMatrix(Rm.extractRotation(bones[e.child].matrixWorld));
+        const dF=Qc.copy(qF).multiply(e.qFb),dH=Qd.copy(qH).multiply(e.qHb),rel=Qe.copy(dH).multiply(Qf.copy(dF).invert());
+        const a=v0.copy(e.twistAxis).applyQuaternion(dF);
+        let tw=2*Math.atan2(rel.x*a.x+rel.y*a.y+rel.z*a.z,rel.w);tw=Math.atan2(Math.sin(tw),Math.cos(tw));
+        if(Math.abs(tw)>.01)W.premultiply(Rm.makeRotationAxis(a,tw*TWIST_SHARE));
+      }
       if(e.kind==='back'){W.setPosition(0,0,0);p.copy(e.d).applyMatrix4(W);W.setPosition(new THREE.Vector3().setFromMatrixPosition(bones[e.child].matrixWorld).sub(p));}
       else if(e.kind==='follow'&&e.parent>=0){m.multiplyMatrices(bones[e.parent].matrixWorld,e.local);if(t)W.setPosition(p.setFromMatrixPosition(m));else W.copy(m);}
     });
