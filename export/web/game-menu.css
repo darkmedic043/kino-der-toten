@@ -37,3 +37,5 @@
 .settings-form .settings-page[hidden]{display:none}
 .settings-form .settings-page{min-height:260px}
 @media(max-width:520px){.settings-form .settings-tabs button{padding:10px 8px;letter-spacing:2px}}
+.settings-form .setting[data-key="fpsCap"] .value{cursor:text;border-bottom:1px dashed #776b5280}
+.settings-form .value-edit{width:54px;background:#0b0b0b;border:1px solid #b5372c;color:#eee8dc;font:inherit;font-size:11px;text-align:right;padding:2px 4px}

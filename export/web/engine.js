@@ -382,7 +382,7 @@ try{
 renderer.info.autoReset=false;
 function renderFrame(now){
   if(document.hidden||contextLost)return;
-  const interval=settings.fpsCap?(active?1000/30:200):0;   // the 30 FPS cap setting (default on for phones)
+  const interval=settings.fpsCap>0?(active?1000/settings.fpsCap:200):0;   // the frame rate cap setting (frames a second, 0 = none; 30 by default on phones)
   if(lastRendered&&now-lastRendered<interval-1)return;
   lastRendered=now;const dt=Math.min((now-previous)/1000,.06);previous=now;frameTime+=dt;frameCount++;renderedFrames++;
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
