@@ -109,3 +109,4 @@
 - **2026-10-05 (co-op skins)**: teammates see your operator's customisation (Blessing, outfit, ...) in co-op (coop.md).
 - **2026-10-05 (jingles off)**: Cheese Cube's looping PhD/Double Dip machine jingles removed at the user's request (heard map-wide by co-op players); the perk sting on drinking stays. The map's sounds now play through the game's Web Audio master (an <audio> element's volume is ignored on iOS, and they skipped the volume setting).
 - **2026-10-05 (co-op skills)**: action skills are mirrored for co-op players; the host enforces teammates' walls/sandbags/wire (classes.md).
+- **2026-10-05 (no wall jump)**: wall jumping turned off (`WALL_JUMP` in the movement mod); it got in the way of mantling.

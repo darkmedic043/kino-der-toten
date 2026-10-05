@@ -7,7 +7,7 @@
 // - Mantle: jump at a ledge up to chest height to climb over it.
 // - First-person head bob, landing dip (real falls only) and strafe roll.
 // - Black Ops 7 omnimovement: sprint and slide in any direction, dive (hold
-//   crouch while sprinting), wall jump (jump into a wall while airborne).
+//   crouch while sprinting). (Wall jump exists but is off: WALL_JUMP.)
 //   First-person gun and hand animation for all of it is in fp.js.
 import * as THREE from 'three';
 import { Capsule } from 'three/addons/math/Capsule.js';
@@ -107,7 +107,8 @@ export default function setup(api){
     player.velocity.set(d.x*speed,250,d.z*speed);player.onFloor=player.grounded=false;
     host.emit('dive');
   }
-  // ---- Wall jump (BO7): jump while airborne next to a wall to kick off it --------------------
+  // ---- Wall jump (BO7): jump while airborne next to a wall to kick off it (disabled) ---------
+  const WALL_JUMP=false;
   const WALL={reach:20,max:3,cooldown:.28,out:290,up:.95};
   function tryWallJump(){
     if(state.wallJumps>=WALL.max||state.wallKick>0)return false;
@@ -171,7 +172,8 @@ export default function setup(api){
       // Jump from prone or crouch stands up instead; a jump mid-slide becomes a slide-jump.
       if(jumpNow&&!prevJump&&(state.prone||(controls.crouch&&!state.sliding))){if(state.prone)setProne(false);controls.crouch=false;input.jump=false;input.jumpPressed=false;}
       else if(jumpNow&&!prevJump&&(player.onFloor||state.airTime<.1)){state.jumped=true;if(state.sliding){state.sliding=false;controls.crouch=false;}}
-      else if(jumpNow&&!prevJump&&!player.onFloor&&state.airTime>.12&&!state.prone&&tryWallJump()){input.jump=false;input.jumpPressed=false;}
+      // Wall jump is off (user request, 2026-10-05: it fired when they meant to mantle); WALL_JUMP turns it back on.
+      else if(WALL_JUMP&&jumpNow&&!prevJump&&!player.onFloor&&state.airTime>.12&&!state.prone&&tryWallJump()){input.jump=false;input.jumpPressed=false;}
       if(state.sliding){
         slide.t+=dt;input.sprint=false;
         player.groundAcceleration=40;   // the slide curve drives the speed, not friction
