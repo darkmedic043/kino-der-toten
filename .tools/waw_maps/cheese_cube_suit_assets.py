@@ -24,6 +24,7 @@ SOUNDS = {   # path in the iwd -> output name
     'sound/iron_man/weapons/cloak_start.wav': 'suit_cloak_on', 'sound/iron_man/weapons/cloak_stop.wav': 'suit_cloak_off',
     'sound/iron_man/suit_up/jarvis_startup_suit_on.wav': 'suit_on', 'sound/iron_man/suit_up/jarvis_shutdown_suit_off.wav': 'suit_off',
     'sound/iron_man/suit_up/mk1_suit_on.wav': 'suit_on_mk1', 'sound/iron_man/suit_up/mk1_suit_off.wav': 'suit_off_mk1',
+    'sound/iron_man/suit_up/suitup_quick.wav': 'suit_up_quick',
     'sound/iron_man/jump_boost.wav': 'suit_boost', 'sound/iron_man/mk1_jump_boost.wav': 'suit_boost_mk1',
     **{f'sound/iron_man/jarvis/health_low_0{i}.wav': f'jarvis_health_low_{i}' for i in range(6)},
     **{f'sound/iron_man/jarvis/power_low_0{i}.wav': f'jarvis_power_low_{i}' for i in range(6)},

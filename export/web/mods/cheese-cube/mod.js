@@ -50,11 +50,15 @@ export default async function setup(api){
     tweens.push({objs,axis,from:from??current,to,t0:now(),dur:Math.max(.001,seconds)});
   }
   host.on('update',()=>{
-    for(let i=tweens.length-1;i>=0;i--){
-      const t=tweens[i],k=Math.min(1,Math.max(0,(now()-t.t0)/t.dur)),v=t.from+(t.to-t.from)*k;
+    // in start order, so a later tween on the same axis wins; one that has not started yet does nothing
+    const done=new Set();
+    for(const t of tweens){
+      if(now()<t.t0)continue;
+      const k=Math.min(1,(now()-t.t0)/t.dur),v=t.from+(t.to-t.from)*k;
       for(const o of t.objs){o.position[t.axis]=baseOf(o)[t.axis]+v;o.updateMatrix();o.updateMatrixWorld(true);}
-      if(k>=1)tweens.splice(i,1);
+      if(k>=1)done.add(t);
     }
+    for(let i=tweens.length-1;i>=0;i--)if(done.has(tweens[i])||tweens.some((u,j)=>j>i&&now()>=u.t0&&u.axis===tweens[i].axis&&u.objs[0]===tweens[i].objs[0]))tweens.splice(i,1);
   });
 
   // ---- Cheese Brothers: shoot the five targets with the cheese gun: 2000 each, 4000 for all five
@@ -189,6 +193,9 @@ export default async function setup(api){
   // ---- The ending: pay 25000 at the top ("if thou art worthy") once the puzzle is solved, then the map is won
   const ending=named('cheese_ending')[0];
   // The hammer rises with thunder, the screen goes black, then the map's closing cards (as the original: about 45 s).
+  // As hammer_end(): it rises 100 in 4 s while rolling 160 degrees over 10 s, keeps rising, and at 11 s flies off to the
+  // hammer_ending spot; thunder (the map's thor_ending fx, every 0.2 s at thor_fx) plays until then. Everyone is
+  // invulnerable from the purchase on, and suits come off.
   async function unlockCheeseCamo(){
     try{
       const {loadProfile,saveProfile}=await import('../../profile.js');
@@ -197,11 +204,48 @@ export default async function setup(api){
       setTimeout(()=>toast('Swiss Cheese camo unlocked for every gun',5),3000);
     }catch(e){console.warn('cheese camo reward failed',e);}
   }
+  // Thunder at the hammer: a few jagged bolts redrawn every 0.1 s (each segment a bright core in a soft glow; WebGL
+  // lines are one pixel wide), and a flickering blue light.
+  function thunder(at,seconds){
+    if(!at||!api.scene)return;
+    const c=new THREE.Vector3(...at.origin),group=new THREE.Group(),light=new THREE.PointLight(0x9fc8ff,0,900,1.6);
+    light.position.copy(c).y+=40;group.add(light);api.scene.add(group);
+    const unit=new THREE.CylinderGeometry(1,1,1,6,1,true).translate(0,.5,0);
+    const core=new THREE.MeshBasicMaterial({color:0xeef6ff,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false});
+    const glow=new THREE.MeshBasicMaterial({color:0x6aa8ff,transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false});
+    const up=new THREE.Vector3(0,1,0),bolts=new THREE.Group();group.add(bolts);
+    const segment=(a,b,r,mat)=>{const m=new THREE.Mesh(unit,mat),d=b.clone().sub(a);m.position.copy(a);m.scale.set(r,d.length(),r);
+      m.quaternion.setFromUnitVectors(up,d.normalize());bolts.add(m);};
+    const bolt=()=>{let p=c.clone().add(new THREE.Vector3(0,20,0));
+      const dir=new THREE.Vector3((Math.random()-.5)*1.2,1,(Math.random()-.5)*1.2).normalize(),len=180+Math.random()*320;
+      for(let i=1;i<=10;i++){const q=p.clone().addScaledVector(dir,len/10).add(new THREE.Vector3((Math.random()-.5)*36,(Math.random()-.5)*20,(Math.random()-.5)*36));
+        segment(p,q,1.2,core);segment(p,q,5,glow);p=q;}};
+    const t0=now();let next=0;
+    const step=()=>{
+      const t=now()-t0;if(t>seconds||won===null){group.removeFromParent();unit.dispose();core.dispose();glow.dispose();return;}
+      if(t>=next){next=t+.1;bolts.clear();
+        const n=Math.random()<.6?1+Math.floor(Math.random()*3):0;for(let i=0;i<n;i++)bolt();
+        light.intensity=n?6+Math.random()*10:Math.random()*1.5;}   // the thunder itself is in thor_end
+      requestAnimationFrame(step);};
+    step();
+  }
   function theEnding(){
+    window.kino.cheeseCube.suitsOff?.();
     unlockCheeseCamo();
     sound('thor_end',{volume:.85});
+    session.effects.invulnerable=1e9;
+    const hammer=nodes('ENT_thor_hammer'),to=named('hammer_ending')[0],from=named('thor_hammer')[0];
     tween('ENT_thor_hammer','y',100,4,0);
-    tweens.push({objs:nodes('ENT_thor_hammer'),axis:'y',from:100,to:170,t0:now()+4,dur:10});
+    tweens.push({objs:hammer,axis:'y',from:100,to:150,t0:now()+4,dur:7});
+    if(to&&from){const d=[0,1,2].map(i=>to.origin[i]-from.origin[i]);
+      for(const [i,axis] of ['x','y','z'].entries())tweens.push({objs:hammer,axis,from:axis==='y'?150:0,to:d[i],t0:now()+11,dur:2.05});}
+    // the roll, about the hammer's own forward axis
+    const t0=now(),q0=new Map(hammer.map(o=>[o,o.quaternion.clone()])),xAxis=new THREE.Vector3(1,0,0),qr=new THREE.Quaternion();
+    const roll=()=>{const k=Math.min(1,Math.max(0,(now()-t0-.5)/10));
+      for(const o of hammer){o.quaternion.copy(q0.get(o)).multiply(qr.setFromAxisAngle(xAxis,THREE.MathUtils.degToRad(160*k)));o.updateMatrix();o.updateMatrixWorld(true);}
+      if(k<1&&won!==null)requestAnimationFrame(roll);};
+    roll();
+    thunder(named('thor_fx')[0],11.5);
     const veil=document.createElement('div');
     veil.style.cssText='position:fixed;inset:0;z-index:60;background:#000;opacity:0;transition:opacity 2s;display:grid;place-items:center;pointer-events:none';
     const line=document.createElement('div');line.style.cssText='color:#fff;font:600 28px/1.3 Georgia,serif;letter-spacing:.06em;text-align:center;max-width:80vw;opacity:0;transition:opacity 3s';
@@ -218,7 +262,8 @@ export default async function setup(api){
   if(ending){
     const e=world.addInteraction({position:center(ending),text:()=>'Press F if thou art worthy · Tis expensive: 25000',hidden:()=>!!won,
       use(){
-        if(session.points<25000){toast('Thou art not worthy. Get some more money.',4);return false;}
+        if(session.phase==='reviving'||window.kino.coop?.anyDown?.()){toast('All players must be alive to be worthy',2);return false;}
+        if(session.points<25000){toast('Thou art not worthy',4);setTimeout(()=>toast('Get some more money you idiot',3),4000);return false;}
         session.spend(25000);beep();show('ENT_cheese_ending_clip',false);won=now()+46;
         announce('THOU ART WORTHY','THE HAMMER IS YOURS',6);theEnding();return true;
       }});

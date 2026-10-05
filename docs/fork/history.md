@@ -104,3 +104,4 @@
 - **2026-10-05 (suits)**: Cheese Cube Iron Man suits use their own weapons (repulsors, wrist rockets, Mk1 flamethrower, War Machine guns) while worn, with the JARVIS HUD from the map (waw-ports.md).
 - **2026-10-05 (fur, again)**: Blessed Bondrewd keeps his fur in first person; the knife lunge fur is handled with a near-camera cut (`fpArmsNearCut`) instead of the fur mask.
 - **2026-10-05 (Mk16)**: Cheese Cube: per-suit power with the Hall of Armors power screens; the Mark 16 Nightclub suit (earned by owning all six armors) with Stealth-Mode cloaking.
+- **2026-10-05 (Mk5, ending)**: Cheese Cube: Mark V suitcase; the hammer ending's roll, flight and thunder.

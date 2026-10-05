@@ -27,6 +27,9 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     projectileSpeed:2100,explosionRadius:500,explosionInnerDamage:20000,explosionOuterDamage:150,suitSound:'suit_missile',suitPower:5});
   clone('iron_mk6_rocket','m72_law_zm',{name:'Mk6 Wrist-Rocket',hideGun:true,damage:10000,minDamage:10000,fireType:'Full Auto',automatic:true,fireTime:.2,clipSize:10,startAmmo:30,maxAmmo:30,
     reloadTime:1.2,reloadEmptyTime:1.2,projectileSpeed:2300,explosionRadius:200,explosionInnerDamage:1200,explosionOuterDamage:75,suitSound:'suit_missile',suitPower:5});
+  // Mk5 suitcase: carried as a weapon; firing it puts the Mark V on where you stand (see the Mark V section)
+  clone('iron_mk5_suitcase','m1911_zm',{name:'Mk5 Suitcase',hideGun:true,suitcase:true,damage:0,minDamage:0,fireTime:1,fireType:'Single Shot',automatic:false,
+    clipSize:1,startAmmo:1,maxAmmo:1,reloadTime:1,reloadEmptyTime:1,suitPower:0});
   // Mk16 Stealth-Mode: firing it switches the cloak on or off (it does no damage); see the Mark 16 section
   clone('iron_mk16_cloak','m1911_zm',{name:'Mk16 Stealth-Mode',hideGun:true,cloakToggle:true,damage:0,minDamage:0,fireTime:3.5,fireType:'Single Shot',automatic:false,
     clipSize:125,startAmmo:500,maxAmmo:500,reloadTime:2,reloadEmptyTime:2,suitPower:0});
@@ -47,7 +50,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
   });
   const isIn=(o,root)=>{for(let p=o.parent;p;p=p.parent)if(p===root)return true;return false;};
   // the map's own fire sounds in place of the base guns'
-  if(audio?.weapon){const play=audio.weapon.bind(audio);audio.weapon=(kind,def)=>{if(kind==='shot'&&(def?.suitSound||def?.cloakToggle)){if(def.suitSound)sound?.(def.suitSound,{volume:.7});return;}return play(kind,def);};}
+  if(audio?.weapon){const play=audio.weapon.bind(audio);audio.weapon=(kind,def)=>{if(kind==='shot'&&(def?.suitSound||def?.cloakToggle||def?.suitcase)){if(def.suitSound)sound?.(def.suitSound,{volume:.7});return;}return play(kind,def);};}
 
 
   // ---- parts -------------------------------------------------------------------------------------
@@ -94,7 +97,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     {id:'mk3',name:'Mark III',cost:7500,trig:'give_iron',hp:285,speed:1.05,holo:'rotate_iron',door:'iron_door',stand:'iron_stand',weapons:['iron_repulsor','iron_rocket']},
     {id:'mk1',name:'Mark I',cost:5000,trig:'give_mk1',hp:350,speed:.85,noSprint:true,holo:'rotate_mk1',display:'mk1',door:'mk1_door',stand:'mk1_stand',weapons:['iron_mk1_flamer','iron_mk1_rocket']},
     {id:'mk4',name:'Mark IV',cost:10000,trig:'give_mk4',hp:285,speed:1.1,holo:'rotate_mk4',display:'mk4',door:'mk4_door',stand:'mk4_stand',weapons:['iron_repulsor','iron_rocket']},
-    {id:'mk5',name:'Mark V',cost:12500,trig:'give_mk5',hp:200,speed:1.2,holo:'rotate_mk5',display:'mk5',door:'mk5_door',stand:'mk5_stand',weapons:['iron_repulsor']},
+    {id:'mk5',name:'Mark V',cost:12500,trig:'give_mk5',hp:200,speed:1.2,holo:'rotate_mk5',display:'mk5',door:'mk5_door',stand:'mk5_stand',weapons:['iron_repulsor'],suitcase:true},
     {id:'mk6',name:'Mark VI',cost:15000,trig:'give_mk6',hp:285,speed:1.1,holo:'rotate_mk6',display:'mk6',door:'mk6_door',stand:'mk6_stand',weapons:['iron_repulsor','iron_mk6_rocket']},
     {id:'wm',name:'War Machine',cost:10000,trig:'give_wm',hp:320,speed:.95,holo:'wm_holo_red',holoOn:'wm_holo',display:'wm_model',weapons:['iron_wm_minigun','iron_wm_handgun','iron_rocket'],needsTrivia:true},
     // the bonus suit: free, behind its door and the biometric scanner (see the Mark 16 section)
@@ -187,6 +190,31 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
   });
   host.on('reset',()=>shownStep.clear());
 
+  // The Mark V travels as a suitcase (the map's _iron_man_mk5.gsc): its stand hands you the case (in place of your
+  // current gun when both slots are full), the suit sinks from its alcove, and firing the case suits you up on the spot.
+  // Bring the case back to the stand to trade it for your gun; going down loses the case back to the stand.
+  let caseOut=null;   // {suit, taken: the gun the case replaced, or null}
+  function takeCase(s){
+    session.cancelReload?.();
+    const inv=session.inventory,item={id:'iron_mk5_suitcase',mag:1,reserve:0,upgraded:false};
+    let taken=null;
+    if(inv.length>=2){taken={...inv[session.slot]};inv[session.slot]=item;}else{inv.push(item);session.slot=inv.length-1;}
+    caseOut={suit:s,taken};standDown(s);equipView?.();toast('Fire the suitcase to suit up',3);beep();
+  }
+  function dropCase(){
+    const inv=session.inventory,i=inv.findIndex(w=>w.id==='iron_mk5_suitcase');
+    if(i>=0){if(caseOut?.taken)inv[i]=caseOut.taken;else{inv.splice(i,1);session.slot=Math.min(session.slot,Math.max(0,inv.length-1));}}
+    caseOut=null;equipView?.();
+  }
+  function returnCase(){const s=caseOut.suit;dropCase();standUp(s);}
+  let caseShots=0;
+  host.on('update',()=>{
+    const shots=session.shots??0;
+    if(caseOut&&shots>caseShots&&session.def?.suitcase&&!worn){const s=caseOut.suit;dropCase();putOn(s,true);}
+    caseShots=shots;
+    if(caseOut&&['reviving','gameover'].includes(session.phase)){const s=caseOut.suit;dropCase();standUp(s);toast('The suitcase was lost',3);}
+  });
+
   // The stands, as the map does them: the alcove door slides down, the suit and its stand sink, the door closes again.
   function standDown(s){
     if(!s.door){if(s.display)lower(s.display,true);return;}
@@ -201,11 +229,11 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     setTimeout(()=>lower(s.door,false,{depth:100,dur:3}),6200);
   }
 
-  function putOn(s){
+  function putOn(s,fromCase=false){
     worn=s;session.health=session.maxHealth;
     if(!originalSpeed)originalSpeed={move:player.moveSpeed,sprint:player.sprintSpeed};
     player.moveSpeed=originalSpeed.move*s.speed;player.sprintSpeed=s.noSprint?player.moveSpeed:originalSpeed.sprint*s.speed;
-    standDown(s);
+    if(!fromCase)standDown(s);
     show('ENT_'+(s.holoOn??s.holo+'_on'),false);if(s.id==='mk3')show('ENT_rotate_iron_on',false);
     lowWarned=s.power<25;critWarned=s.power<11;lastShots=session.shots??0;
     // the suit's weapons replace yours until it comes off
@@ -214,7 +242,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
       session.cancelReload?.();saved={inventory:session.inventory.map(w=>({...w})),slot:session.slot};
       session.inventory=kit.map(id=>({id,mag:W[id].clipSize,reserve:Math.max(0,W[id].maxAmmo-W[id].clipSize),upgraded:false}));session.slot=0;equipView?.();
     }
-    hud.show(s.id);sound?.(s.id==='mk1'?'suit_on_mk1':'suit_on',{volume:.7});
+    hud.show(s.id);sound?.(fromCase?'suit_up_quick':s.id==='mk1'?'suit_on_mk1':'suit_on',{volume:.7});
     voice(wornBefore?'suit_up_0'+Math.floor(Math.random()*3):'suit_up_first');wornBefore=true;
     announce(`${s.name} armor`,'SUIT ONLINE',3);beep();
   }
@@ -245,7 +273,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     const trig=named(s.trig)[0];if(!trig)continue;
     const e=world.addInteraction({position:center(trig),
       hidden:()=>!!s.bonus&&!s.owned,
-      text:()=>!s.owned?`Buy ${s.name} armor · ${s.cost}`:worn===s?`Take off ${s.name} armor`:s.power<=READY?`${s.name} armor is charging · ${Math.floor(s.power)}%`:`Put on ${s.name} armor`,
+      text:()=>!s.owned?`Buy ${s.name} armor · ${s.cost}`:worn===s?`Take off ${s.name} armor`:s.suitcase&&caseOut?`Return the ${s.name} suitcase`:s.power<=READY?`${s.name} armor is charging · ${Math.floor(s.power)}%`:s.suitcase?`Take the ${s.name} suitcase (takes your current gun)`:`Put on ${s.name} armor`,
       use(){
         if(!s.owned){
           if(session.points<s.cost){toast('Not enough points',2);return false;}
@@ -253,8 +281,10 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
           toast(`${s.name} armor bought. Use the stand to put it on.`,4);return true;
         }
         if(worn===s){if(cloaked)setCloak(false);takeOff(s);return true;}
+        if(s.suitcase&&caseOut){returnCase();toast('Suitcase returned',2);return true;}
         if(worn){voice('dup_armor_'+Math.floor(Math.random()*5));toast('You can only wear one armor at a time',3);return false;}
         if(s.power<=READY){toast('The armor is still charging',2);return false;}
+        if(s.suitcase){takeCase(s);return true;}
         putOn(s);return true;
       }});
     e.locked=()=>!s.owned&&(!assembled||(s.needsTrivia&&!triviaDone()));
@@ -323,7 +353,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
     if(worn&&(['reviving','gameover'].includes(session.phase)))takeOff(worn,'The armor was lost');
   });
   host.on('reset',()=>{
-    hallHeard=false;wornBefore=false;cageOpen=false;carrying.clear();placed.clear();assembled=false;doorOpen=false;scanUntil=0;anims.length=0;if(cloaked)setCloak(false);
+    hallHeard=false;wornBefore=false;cageOpen=false;carrying.clear();placed.clear();assembled=false;doorOpen=false;scanUntil=0;anims.length=0;if(cloaked)setCloak(false);caseOut=null;
     for(const [o,y] of baseY){o.position.y=y;o.updateMatrix();o.updateMatrixWorld(true);}show('ENT_malibu_wall',true);show('ENT_purchase_armors',true);show('ENT_mk16_door',true);show('ENT_wm_cage',true);lower('wm_cage',true,{depth:100,dur:2,hide:false});
     if(worn){worn=null;if(originalSpeed){player.moveSpeed=originalSpeed.move;player.sprintSpeed=originalSpeed.sprint;}hud.hide();}saved=null;
     for(const s of SUITS){s.owned=false;s.power=MAX_POWER;if(s.display)show('ENT_'+s.display,true);show('ENT_'+s.holo,true);show('ENT_'+(s.holoOn??s.holo+'_on'),false);}
@@ -335,5 +365,7 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
   board?.addCollectible({id:'cc-iron-parts',label:'Iron Man armor',value:()=>`${placed.size} / 6 built`,done:()=>assembled,
     parts:()=>PARTS.map(p=>({label:p.label,short:{head:'HD',body:'BD',arml:'LA',armr:'RA',legl:'LL',legr:'RL'}[p.id],state:placed.has(p.id)?'placed':carrying.has(p.id)?'carried':'none'}))});
   board?.addCollectible({id:'cc-armors',label:'Armors',value:()=>`${SUITS.filter(s=>!s.bonus&&s.owned).length} / ${SUITS.filter(s=>!s.bonus).length}${worn?` · wearing ${worn.name}`:''}`,done:()=>SUITS.every(s=>s.bonus||s.owned)});
+  // the ending takes every suit off
+  window.kino.cheeseCube.suitsOff=()=>{if(worn){if(cloaked)setCloak(false);takeOff(worn,'The armor powers down');}};
   return {state:()=>({carrying:[...carrying],placed:[...placed],assembled,worn:worn?.id??null,owned:SUITS.filter(s=>s.owned).map(s=>s.id),maxHealth:session.maxHealth,moveSpeed:player.moveSpeed})};
 }
