@@ -28,33 +28,44 @@ addEventListener('kino-cloud-pulled',()=>{try{Object.assign(settings,DEFAULTS,JS
 addEventListener('storage',e=>{if(e.key!==KEY)return;try{Object.assign(settings,DEFAULTS,JSON.parse(e.newValue)??{});}catch{}for(const fn of listeners)fn(settings,null);});
 
 const FIELDS=[
-  {key:'sensitivity',label:'Mouse sensitivity',type:'range',min:.1,max:3,step:.05,format:v=>v.toFixed(2)+'×'},
-  {key:'adsSensitivity',label:'Aim-down-sights sensitivity',type:'range',min:.1,max:2,step:.05,format:v=>v.toFixed(2)+'×'},
-  {key:'invertY',label:'Invert look up / down',type:'toggle'},
-  {key:'headBob',label:'Head bob',type:'toggle',hint:'Camera moves with your steps and landings'},
-  {key:'fov',label:'Field of view',type:'range',min:60,max:110,step:1,format:v=>v+'°'},
-  {key:'volume',label:'Master volume',type:'range',min:0,max:1.5,step:.05,format:v=>Math.round(v*100)+'%'},
-  {key:'music',label:'Background music',type:'toggle',hint:'Ambient soundtrack; Easter-egg songs always play'},
-  {key:'renderScale',label:'Render resolution',type:'range',min:.5,max:1.5,step:.05,format:v=>Math.round(v*100)+'%',hint:'Lower it for more FPS'},
-  {key:'graphics',label:'Graphics quality',type:'range',min:0,max:3,step:1,format:v=>['Low','Medium','High','Ultra'][v]??v,hint:'Medium: bloom and light beams. High: + light shadows. Ultra: + ambient occlusion (heavy). Lower it for more FPS'},
-  {key:'daytime',label:'Daytime (Kino)',type:'toggle',hint:'Sunlight and sky; off for the original night'},
-  {key:'hdTextures',label:'HD textures',type:'toggle',hint:'AI-upscaled map textures (Kino). Uses more video memory'},
-  {key:'showFps',label:'Show FPS counter',type:'toggle'},
-  {key:'fpsCap',label:'30 FPS cap',type:'toggle',hint:'Saves battery; on by default only on phones and tablets. A steady 30 with this off is the browser\'s battery saver'},
-  // Dev section (collapsed by default).
-  {key:'devConsole',label:'Cheat console',type:'toggle',group:'dev',hint:'Press ` in a game to open it. A game where you use cheats earns no XP or stats'},
+  {key:'sensitivity',tab:'controls',label:'Mouse sensitivity',type:'range',min:.1,max:3,step:.05,format:v=>v.toFixed(2)+'×'},
+  {key:'adsSensitivity',tab:'controls',label:'Aim-down-sights sensitivity',type:'range',min:.1,max:2,step:.05,format:v=>v.toFixed(2)+'×'},
+  {key:'invertY',tab:'controls',label:'Invert look up / down',type:'toggle'},
+  {key:'headBob',tab:'gameplay',label:'Head bob',type:'toggle',hint:'Camera moves with your steps and landings'},
+  {key:'fov',tab:'gameplay',label:'Field of view',type:'range',min:60,max:110,step:1,format:v=>v+'°'},
+  {key:'volume',tab:'audio',label:'Master volume',type:'range',min:0,max:1.5,step:.05,format:v=>Math.round(v*100)+'%'},
+  {key:'music',tab:'audio',label:'Background music',type:'toggle',hint:'Ambient soundtrack; Easter-egg songs always play'},
+  {key:'renderScale',tab:'graphics',label:'Render resolution',type:'range',min:.5,max:1.5,step:.05,format:v=>Math.round(v*100)+'%',hint:'Lower it for more FPS'},
+  {key:'graphics',tab:'graphics',label:'Graphics quality',type:'range',min:0,max:3,step:1,format:v=>['Low','Medium','High','Ultra'][v]??v,hint:'Medium: bloom and light beams. High: + light shadows. Ultra: + ambient occlusion (heavy). Lower it for more FPS'},
+  {key:'daytime',tab:'graphics',label:'Daytime (Kino)',type:'toggle',hint:'Sunlight and sky; off for the original night'},
+  {key:'hdTextures',tab:'graphics',label:'HD textures',type:'toggle',hint:'AI-upscaled map textures (Kino). Uses more video memory'},
+  {key:'showFps',tab:'gameplay',label:'Show FPS counter',type:'toggle'},
+  {key:'fpsCap',tab:'graphics',label:'30 FPS cap',type:'toggle',hint:'Saves battery; on by default only on phones and tablets. A steady 30 with this off is the browser\'s battery saver'},
+  {key:'devConsole',tab:'dev',label:'Cheat console',type:'toggle',hint:'Press ` in a game to open it. A game where you use cheats earns no XP or stats'},
 ];
 
-// Builds the settings form into `container` (used by the menu and the in-game overlay).
+// Tabs of the settings form, in order. Controls also holds the key bindings.
+const TABS=[['graphics','GRAPHICS'],['audio','AUDIO'],['controls','CONTROLS'],['gameplay','GAMEPLAY'],['dev','DEV']];
+const TAB_KEY='kino.settings.tab';
+
+// Builds the settings form into `container` (used by the menu and the in-game overlay): a tab strip, one page per tab.
 export function renderSettings(container){
   container.classList.add('settings-form');
   const field=f=>`<label class="setting" data-key="${f.key}"><span class="name">${f.label}${f.hint?`<small>${f.hint}</small>`:''}</span>`+
     (f.type==='range'?`<input type="range" min="${f.min}" max="${f.max}" step="${f.step}"><b class="value"></b>`:`<input type="checkbox"><b class="value"></b>`)+'</label>';
-  container.innerHTML=FIELDS.filter(f=>!f.group).map(field).join('')+
-    '<div class="settings-sub">CONTROLS <small>Click a key, then press the new one · Esc cancels</small></div><div class="binds">'+
-    ACTIONS.map(([id,label])=>`<div class="bind" data-action="${id}"><span>${label}</span><button type="button" class="key"></button></div>`).join('')+'</div>'+
-    `<details class="settings-dev"><summary>DEV</summary>${FIELDS.filter(f=>f.group==='dev').map(field).join('')}</details>`+
+  const page=id=>FIELDS.filter(f=>f.tab===id).map(field).join('')+(id==='controls'?
+    '<div class="settings-sub">KEY BINDINGS <small>Click a key, then press the new one · Esc cancels</small></div><div class="binds">'+
+    ACTIONS.map(([id,label])=>`<div class="bind" data-action="${id}"><span>${label}</span><button type="button" class="key"></button></div>`).join('')+'</div>':'');
+  container.innerHTML=`<div class="settings-tabs" role="tablist">${TABS.map(([id,label])=>`<button type="button" role="tab" data-tab="${id}">${label}</button>`).join('')}</div>`+
+    TABS.map(([id])=>`<div class="settings-page" data-page="${id}">${page(id)}</div>`).join('')+
     '<button type="button" class="settings-reset">RESET TO DEFAULTS</button>';
+  let tab;try{tab=localStorage.getItem(TAB_KEY);}catch{}
+  const show=id=>{if(!TABS.some(([t])=>t===id))id=TABS[0][0];
+    for(const b of container.querySelectorAll('.settings-tabs button'))b.classList.toggle('active',b.dataset.tab===id);
+    for(const p of container.querySelectorAll('.settings-page'))p.hidden=p.dataset.page!==id;
+    try{localStorage.setItem(TAB_KEY,id);}catch{}};
+  show(tab);
+  container.querySelector('.settings-tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)show(b.dataset.tab);});
   const sync=()=>{for(const f of FIELDS){const row=container.querySelector(`[data-key="${f.key}"]`),input=row.querySelector('input');
     if(f.type==='range')input.value=settings[f.key];else input.checked=!!settings[f.key];
     row.querySelector('.value').textContent=f.type==='range'?f.format(+settings[f.key]):settings[f.key]?'ON':'OFF';}
