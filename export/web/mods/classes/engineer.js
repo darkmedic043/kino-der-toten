@@ -8,16 +8,37 @@ import { zombieHealth } from '../../rules.js';
 
 const up=new THREE.Vector3(0,1,0);
 
+// ---- models (module level: co-op mirrors use them too, coop.js) -----------------------------------------------
+let shared=null;
+const mats=()=>shared??={darkMat:new THREE.MeshStandardMaterial({color:0x2c3136,metalness:.6,roughness:.45}),
+  accentMat:new THREE.MeshStandardMaterial({color:0x6fc3c9,metalness:.3,roughness:.4,emissive:0x2a6f75,emissiveIntensity:.6})};
+export function droneModel(){
+  const {darkMat,accentMat}=mats();
+  const g=new THREE.Group(),body=new THREE.Mesh(new THREE.BoxGeometry(12,4,12),darkMat);g.add(body);
+  const top=new THREE.Mesh(new THREE.CylinderGeometry(4,5,3,8),accentMat);top.position.y=3;g.add(top);
+  const gun=new THREE.Mesh(new THREE.CylinderGeometry(1,1,8,6),darkMat);gun.rotation.z=Math.PI/2;gun.position.set(6,-3,0);g.add(gun);
+  const rotors=[];for(const [x,z] of [[9,9],[9,-9],[-9,9],[-9,-9]]){
+    const arm=new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(x,z),1.5,1.5),darkMat);arm.position.set(x/2,0,z/2);arm.rotation.y=-Math.atan2(z,x);g.add(arm);
+    const r=new THREE.Mesh(new THREE.CylinderGeometry(5,5,.4,12),new THREE.MeshBasicMaterial({color:0x9aa4ab,transparent:true,opacity:.35,depthWrite:false}));r.position.set(x,1.5,z);g.add(r);rotors.push(r);}
+  const led=new THREE.Mesh(new THREE.SphereGeometry(1),new THREE.MeshBasicMaterial({color:0x7ff7ff}));led.position.set(6.5,0,0);g.add(led);
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true;});g.userData.rotors=rotors;return g;
+}
+export function beaconModel(){
+  const {darkMat}=mats();
+  const g=new THREE.Group(),base=new THREE.Mesh(new THREE.CylinderGeometry(5,6,6,8),darkMat);base.position.y=3;g.add(base);
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(.6,.6,26,6),darkMat);mast.position.y=18;g.add(mast);
+  const lamp=new THREE.Mesh(new THREE.SphereGeometry(2.2,10,8),new THREE.MeshBasicMaterial({color:0xff3a1a}));lamp.position.y=32;g.add(lamp);g.userData.lamp=lamp;
+  return g;
+}
+
 export function setupEngineer(ctx){
   const {api,act,S,A,blast,hud,onHit,getCooldown,setCooldown}=ctx;
   const {host,session,data,scene,camera,player,enemies,world,audio}=api;
   const full=()=>zombieHealth(session.round,data.rules);
   const drones=[],beacons=[],marks=[],fires=[],tracers=[],arcs=[];
   const tracerMat=new THREE.LineBasicMaterial({color:0x9ff3ff,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false});
-  const darkMat=new THREE.MeshStandardMaterial({color:0x2c3136,metalness:.6,roughness:.45});
-  const accentMat=new THREE.MeshStandardMaterial({color:0x6fc3c9,metalness:.3,roughness:.4,emissive:0x2a6f75,emissiveIntensity:.6});
   const center=z=>z.root.position.clone().addScaledVector(up,z.kind==='dog'?20:40);
-  function tracer(a,b,color){const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),tracerMat.clone());if(color)l.material.color.set(color);scene.add(l);tracers.push({l,t:.06});}
+  function tracer(a,b,color){const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),tracerMat.clone());if(color)l.material.color.set(color);scene.add(l);tracers.push({l,t:.06});ctx.sync?.tracer(a,b,color);}
   function zap(a,b){
     const pts=[];for(let i=0;i<=8;i++){const p=a.clone().lerp(b,i/8);if(i&&i<8)p.add(new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).multiplyScalar(10));pts.push(p);}
     const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x9fd8ff,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));scene.add(l);arcs.push({l,t:.16});
@@ -34,16 +55,6 @@ export function setupEngineer(ctx){
   }
 
   // ---- Hunter Drone ------------------------------------------------------------------------------
-  function droneModel(){
-    const g=new THREE.Group(),body=new THREE.Mesh(new THREE.BoxGeometry(12,4,12),darkMat);g.add(body);
-    const top=new THREE.Mesh(new THREE.CylinderGeometry(4,5,3,8),accentMat);top.position.y=3;g.add(top);
-    const gun=new THREE.Mesh(new THREE.CylinderGeometry(1,1,8,6),darkMat);gun.rotation.z=Math.PI/2;gun.position.set(6,-3,0);g.add(gun);
-    const rotors=[];for(const [x,z] of [[9,9],[9,-9],[-9,9],[-9,-9]]){
-      const arm=new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(x,z),1.5,1.5),darkMat);arm.position.set(x/2,0,z/2);arm.rotation.y=-Math.atan2(z,x);g.add(arm);
-      const r=new THREE.Mesh(new THREE.CylinderGeometry(5,5,.4,12),new THREE.MeshBasicMaterial({color:0x9aa4ab,transparent:true,opacity:.35,depthWrite:false}));r.position.set(x,1.5,z);g.add(r);rotors.push(r);}
-    const led=new THREE.Mesh(new THREE.SphereGeometry(1),new THREE.MeshBasicMaterial({color:0x7ff7ff}));led.position.set(6.5,0,0);g.add(led);
-    g.traverse(o=>{if(o.isMesh)o.castShadow=true;});g.userData.rotors=rotors;return g;
-  }
   function launchDrones(){
     const a=A();
     for(let i=0;i<a.count;i++){const mesh=droneModel();mesh.position.copy(player.getFeetPosition()).addScaledVector(up,40);scene.add(mesh);
@@ -84,12 +95,6 @@ export function setupEngineer(ctx){
   const stunned=new Map();
 
   // ---- Mortar Beacon -----------------------------------------------------------------------------
-  function beaconModel(){
-    const g=new THREE.Group(),base=new THREE.Mesh(new THREE.CylinderGeometry(5,6,6,8),darkMat);base.position.y=3;g.add(base);
-    const mast=new THREE.Mesh(new THREE.CylinderGeometry(.6,.6,26,6),darkMat);mast.position.y=18;g.add(mast);
-    const lamp=new THREE.Mesh(new THREE.SphereGeometry(2.2,10,8),new THREE.MeshBasicMaterial({color:0xff3a1a}));lamp.position.y=32;g.add(lamp);g.userData.lamp=lamp;
-    return g;
-  }
   function ground(p){const hit=world.raycast(new THREE.Ray(p.clone().addScaledVector(up,80),up.clone().negate()),0,300);if(hit)p.y=hit.point?.y??hit.position?.y??p.y;return p;}
   function plantBeacons(){
     const a=A(),fwd=camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(),side=new THREE.Vector3(fwd.z,0,-fwd.x),feet=player.getFeetPosition();

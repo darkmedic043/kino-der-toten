@@ -39,60 +39,75 @@ function burlapTexture(){
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
 }
 
+// ---- models (module level: co-op mirrors of other players' fortifications use them too, coop.js) -------------
+let shared=null;
+function mats(){
+  if(shared)return shared;
+  const plateTex=plateTexture(),burlapTex=burlapTexture();
+  return shared={plateTex,plateMat:new THREE.MeshStandardMaterial({map:plateTex,metalness:.55,roughness:.55}),
+    frameMat:new THREE.MeshStandardMaterial({color:0x3a3f44,metalness:.6,roughness:.5}),
+    bagMat:new THREE.MeshStandardMaterial({map:burlapTex,roughness:.95}),
+    wireMat:new THREE.MeshStandardMaterial({color:0x8d9296,metalness:.85,roughness:.35})};
+}
+export function steelWall(width,height){
+  const {plateMat,plateTex,frameMat}=mats();
+  const g=new THREE.Group(),plate=new THREE.Mesh(new THREE.BoxGeometry(width,height,6),plateMat.clone());plate.position.y=height/2;g.add(plate);g.userData.tint=plate.material;
+  plateTex.repeat.set(width/130,1);
+  for(const x of [-width*.36,width*.36]){
+    const top=new THREE.Vector3(x,height*.8,-4),foot=new THREE.Vector3(x,0,-height*.42),dir=foot.clone().sub(top),len=dir.length();
+    const brace=new THREE.Mesh(new THREE.BoxGeometry(4,len,4),frameMat);brace.position.copy(top).addScaledVector(dir,.5);brace.quaternion.setFromUnitVectors(up,dir.normalize().negate());g.add(brace);
+    const post=new THREE.Mesh(new THREE.BoxGeometry(6,height,6),frameMat);post.position.set(x,height/2,-4);g.add(post);
+    const pad=new THREE.Mesh(new THREE.BoxGeometry(10,2,10),frameMat);pad.position.copy(foot).setY(1);g.add(pad);
+  }
+  const rail=new THREE.Mesh(new THREE.BoxGeometry(width+8,6,9),frameMat);rail.position.y=height+1;g.add(rail);
+  return g;
+}
+export function sandbags(width,height){
+  const g=new THREE.Group(),mat=mats().bagMat.clone();g.userData.tint=mat;
+  const bag=new THREE.CapsuleGeometry(6.5,14,4,8);bag.rotateZ(Math.PI/2);bag.scale(1,.75,1.25);
+  const rows=Math.round(height/10),per=Math.max(2,Math.round(width/24)),inst=new THREE.InstancedMesh(bag,mat,rows*per),m=new THREE.Matrix4(),q=new THREE.Quaternion();let k=0;
+  for(let r=0;r<rows;r++)for(let i=0;i<per;i++){
+    const x=-width/2+(i+.5+(r%2)*.5)*width/per;if(x>width/2)continue;
+    q.setFromAxisAngle(up,(Math.random()-.5)*.15);m.compose(new THREE.Vector3(x,5+r*9.5,(Math.random()-.5)*2),q,new THREE.Vector3(1,1,1));inst.setMatrixAt(k++,m);
+  }
+  inst.count=k;g.add(inst);return g;
+}
+export function wireField(radius){
+  const {wireMat,frameMat}=mats();
+  const g=new THREE.Group();
+  // loose coils of concertina wire lying in rings, on short stakes
+  // one instanced batch of overlapping coils (concertina: each a ring stood up along the run)
+  const ringR=[.3,.55,.8,1].map(k=>radius*k),per=ringR.map(r=>Math.round(r/4.5)),n=per.reduce((x,y)=>x+y,0);
+  const coil=new THREE.TorusGeometry(8,.45,4,14),inst=new THREE.InstancedMesh(coil,wireMat,n),m=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler();let k=0;
+  ringR.forEach((r,ri)=>{for(let i=0;i<per[ri];i++){const a=i/per[ri]*Math.PI*2+ri*.3;
+    e.set((Math.random()-.5)*.5,-a,(Math.random()-.5)*.3);q.setFromEuler(e);m.compose(new THREE.Vector3(Math.cos(a)*r,7+Math.random()*1.5,Math.sin(a)*r),q,new THREE.Vector3(1,.8+Math.random()*.3,1));inst.setMatrixAt(k++,m);}});
+  g.add(inst);
+  // loose strands criss-crossing the field
+  const pts=[];for(let i=0;i<26;i++){const a=Math.random()*Math.PI*2,b=a+Math.PI*(.5+Math.random()),r1=radius*(.2+Math.random()*.8),r2=radius*(.2+Math.random()*.8);
+    pts.push(new THREE.Vector3(Math.cos(a)*r1,3+Math.random()*6,Math.sin(a)*r1),new THREE.Vector3(Math.cos(b)*r2,3+Math.random()*6,Math.sin(b)*r2));}
+  g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x9aa0a4})));
+  for(const r of [radius*.55,radius])for(let i=0;i<8;i++){const a=i/8*Math.PI*2;const stake=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,18,5),frameMat);stake.position.set(Math.cos(a)*r,8,Math.sin(a)*r);g.add(stake);}
+  return g;
+}
+
+
+export function mineModel(){
+  const m=new THREE.Group(),body=new THREE.Mesh(new THREE.BoxGeometry(10,7,3),new THREE.MeshStandardMaterial({color:0x4b5a33,roughness:.8}));body.position.y=6;m.add(body);
+  for(const x of [-3,3]){const leg=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,6),mats().frameMat);leg.position.set(x,2,0);m.add(leg);}
+  const led=new THREE.Mesh(new THREE.SphereGeometry(.8),new THREE.MeshBasicMaterial({color:0xff2020}));led.position.set(0,9,1.6);m.add(led);m.userData.led=led;
+  return m;
+}
+
 export function setupFortifier(ctx){
   const {api,act,S,A,blast,hud,onHit,getCooldown,setCooldown}=ctx;
   const {host,session,data,scene,camera,player,enemies,world,audio}=api;
-  const plateTex=plateTexture(),burlapTex=burlapTexture();
-  const plateMat=new THREE.MeshStandardMaterial({map:plateTex,metalness:.55,roughness:.55});
-  const frameMat=new THREE.MeshStandardMaterial({color:0x3a3f44,metalness:.6,roughness:.5});
-  const bagMat=new THREE.MeshStandardMaterial({map:burlapTex,roughness:.95});
-  const wireMat=new THREE.MeshStandardMaterial({color:0x8d9296,metalness:.85,roughness:.35});
+  const {frameMat}=mats();
   const walls=[];      // wall and sandbag segments (both hold zombies)
   const snares=[];
   const mines=[],arcs=[];
   let deployId=0;
   const full=()=>zombieHealth(session.round,data.rules);
   const ground=p=>{const hit=world.raycast(new THREE.Ray(p.clone().addScaledVector(up,60),up.clone().negate()),0,200);if(hit)p.y=hit.point?.y??hit.position?.y??p.y;return p;};
-
-  // ---- models ----------------------------------------------------------------------------------
-  function steelWall(width,height){
-    const g=new THREE.Group(),plate=new THREE.Mesh(new THREE.BoxGeometry(width,height,6),plateMat.clone());plate.position.y=height/2;g.add(plate);g.userData.tint=plate.material;
-    plateTex.repeat.set(width/130,1);
-    for(const x of [-width*.36,width*.36]){
-      const top=new THREE.Vector3(x,height*.8,-4),foot=new THREE.Vector3(x,0,-height*.42),dir=foot.clone().sub(top),len=dir.length();
-      const brace=new THREE.Mesh(new THREE.BoxGeometry(4,len,4),frameMat);brace.position.copy(top).addScaledVector(dir,.5);brace.quaternion.setFromUnitVectors(up,dir.normalize().negate());g.add(brace);
-      const post=new THREE.Mesh(new THREE.BoxGeometry(6,height,6),frameMat);post.position.set(x,height/2,-4);g.add(post);
-      const pad=new THREE.Mesh(new THREE.BoxGeometry(10,2,10),frameMat);pad.position.copy(foot).setY(1);g.add(pad);
-    }
-    const rail=new THREE.Mesh(new THREE.BoxGeometry(width+8,6,9),frameMat);rail.position.y=height+1;g.add(rail);
-    return g;
-  }
-  function sandbags(width,height){
-    const g=new THREE.Group(),mat=bagMat.clone();g.userData.tint=mat;
-    const bag=new THREE.CapsuleGeometry(6.5,14,4,8);bag.rotateZ(Math.PI/2);bag.scale(1,.75,1.25);
-    const rows=Math.round(height/10),per=Math.max(2,Math.round(width/24)),inst=new THREE.InstancedMesh(bag,mat,rows*per),m=new THREE.Matrix4(),q=new THREE.Quaternion();let k=0;
-    for(let r=0;r<rows;r++)for(let i=0;i<per;i++){
-      const x=-width/2+(i+.5+(r%2)*.5)*width/per;if(x>width/2)continue;
-      q.setFromAxisAngle(up,(Math.random()-.5)*.15);m.compose(new THREE.Vector3(x,5+r*9.5,(Math.random()-.5)*2),q,new THREE.Vector3(1,1,1));inst.setMatrixAt(k++,m);
-    }
-    inst.count=k;g.add(inst);return g;
-  }
-  function wireField(radius){
-    const g=new THREE.Group();
-    // loose coils of concertina wire lying in rings, on short stakes
-    // one instanced batch of overlapping coils (concertina: each a ring stood up along the run)
-    const ringR=[.3,.55,.8,1].map(k=>radius*k),per=ringR.map(r=>Math.round(r/4.5)),n=per.reduce((x,y)=>x+y,0);
-    const coil=new THREE.TorusGeometry(8,.45,4,14),inst=new THREE.InstancedMesh(coil,wireMat,n),m=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler();let k=0;
-    ringR.forEach((r,ri)=>{for(let i=0;i<per[ri];i++){const a=i/per[ri]*Math.PI*2+ri*.3;
-      e.set((Math.random()-.5)*.5,-a,(Math.random()-.5)*.3);q.setFromEuler(e);m.compose(new THREE.Vector3(Math.cos(a)*r,7+Math.random()*1.5,Math.sin(a)*r),q,new THREE.Vector3(1,.8+Math.random()*.3,1));inst.setMatrixAt(k++,m);}});
-    g.add(inst);
-    // loose strands criss-crossing the field
-    const pts=[];for(let i=0;i<26;i++){const a=Math.random()*Math.PI*2,b=a+Math.PI*(.5+Math.random()),r1=radius*(.2+Math.random()*.8),r2=radius*(.2+Math.random()*.8);
-      pts.push(new THREE.Vector3(Math.cos(a)*r1,3+Math.random()*6,Math.sin(a)*r1),new THREE.Vector3(Math.cos(b)*r2,3+Math.random()*6,Math.sin(b)*r2));}
-    g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x9aa0a4})));
-    for(const r of [radius*.55,radius])for(let i=0;i<8;i++){const a=i/8*Math.PI*2;const stake=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,18,5),frameMat);stake.position.set(Math.cos(a)*r,8,Math.sin(a)*r);g.add(stake);}
-    return g;
-  }
 
   // ---- placing ---------------------------------------------------------------------------------
   // pool: sandbag segments of one nest share a pool of hits (a hit on any side drains the whole nest)
@@ -166,9 +181,7 @@ export function setupFortifier(ctx){
 
   // ---- claymores (Tripwire Line) ---------------------------------------------------------------------
   function plantMine(at){
-    const m=new THREE.Group(),body=new THREE.Mesh(new THREE.BoxGeometry(10,7,3),new THREE.MeshStandardMaterial({color:0x4b5a33,roughness:.8}));body.position.y=6;m.add(body);
-    for(const x of [-3,3]){const leg=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,6),frameMat);leg.position.set(x,2,0);m.add(leg);}
-    const led=new THREE.Mesh(new THREE.SphereGeometry(.8),new THREE.MeshBasicMaterial({color:0xff2020}));led.position.set(0,9,1.6);m.add(led);
+    const m=mineModel(),led=m.userData.led;
     ground(at);m.position.copy(at);scene.add(m);mines.push({m,at,arm:.8,led});
   }
   // ---- arcs (Live Current, Electrified) ----------------------------------------------------------------
@@ -254,7 +267,10 @@ export function setupFortifier(ctx){
       w.mesh.userData.tint?.color.setScalar(.55+.45*Math.max(0,w.hits/w.maxHits));
       if(s['fort.regen']&&w.touched<=0&&w.hits<w.maxHits&&(!w.pool||walls.find(o=>o.pool===w.pool)===w))w.hits=Math.min(w.maxHits,w.hits+2*dt);
       if(w.hits<=0){removeWall(w,true);continue;}
-      // hold zombies at the face: in the wall's frame, push anything inside the slab back to the side it came from
+      // hold zombies at the face: in the wall's frame, push anything inside the slab back to the side it came from.
+      // In co-op only the host holds (its zombies are the real ones; a guest's are copies): the host's mirror of
+      // this wall does it and reports each strike back (coop.js).
+      if(window.kino.coop?.id&&!window.kino.coop.isHost)continue;
       const half=w.width/2+14,depth=w.depth;
       for(const z of enemies.list){
         if(z.state==='dead'||z.state==='barricade'||z.state==='entering')continue;

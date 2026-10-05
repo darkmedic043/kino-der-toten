@@ -14,6 +14,7 @@ import { loadClasses, loadClassProfile, saveClassProfile, classById, grantClassX
 import { cloudReady } from '../../profile.js';
 import { setupFortifier } from './fortifier.js';
 import { setupEngineer } from './engineer.js';
+import { setupCoopSkills } from './coop.js';
 
 const up=new THREE.Vector3(0,1,0);
 
@@ -75,9 +76,11 @@ export default async function setup(api){
   const turrets=[];let cooldown=0;
   const tracerMat=new THREE.LineBasicMaterial({color:0xffe2a0,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false});
   const tracers=[];
-  function tracer(a,b){const g=new THREE.BufferGeometry().setFromPoints([a,b]);const l=new THREE.Line(g,tracerMat.clone());scene.add(l);tracers.push({l,t:.06});}
+  // co-op: coop.js replaces these to send tracers and skill explosions to the room
+  const sync={tracer(){},boom(){}};
+  function tracer(a,b){const g=new THREE.BufferGeometry().setFromPoints([a,b]);const l=new THREE.Line(g,tracerMat.clone());scene.add(l);tracers.push({l,t:.06});sync.tracer(a,b);}
   function blast(at,radius,healthFrac){
-    window.kino.fx?.explosion?.([at.x,at.y,at.z],radius/260);audio.play('explosion',.6);
+    window.kino.fx?.explosion?.([at.x,at.y,at.z],radius/260);audio.play('explosion',.6);sync.boom(at,radius);
     const dmg=zombieHealth(session.round,data.rules)*healthFrac;
     for(const z of [...enemies.list]){const d=z.root.position.distanceTo(at);if(d<radius&&world.lineClear(at.clone().addScaledVector(up,20),z.root.position.clone().addScaledVector(up,30)))enemies.hurt(z,dmg*(1-.5*d/radius),false,false,'explosion');}
   }
@@ -125,11 +128,12 @@ export default async function setup(api){
     if(!e.melee&&!['turret','explosion','fortify'].includes(e.cause)&&nearAbility())e.amount*=1+(S['player.damageNear']??0);});
   const NEAR=260;
   function nearAbility(){const f=player.getFeetPosition();return turrets.some(t=>t.at.distanceTo(f)<NEAR)||!!other?.near?.(f,NEAR);}
-  const actx={api,act,S:()=>S,A:()=>A,blast,hud:()=>hud(),onHit,getCooldown:()=>cooldown,setCooldown:v=>startCooldown(v)};
+  const actx={api,act,S:()=>S,A:()=>A,blast,hud:()=>hud(),onHit,getCooldown:()=>cooldown,setCooldown:v=>startCooldown(v),sync};
   const fort=['wall','snare','nest'].includes(act.id)?setupFortifier(actx):null;
   const eng=['drone','mortar'].includes(act.id)?setupEngineer(actx):null;
   const other=fort??eng;
   const actionUp=()=>turrets.length>0||!!other?.up();
+  setupCoopSkills({api,turrets,fort,eng,sync,A:()=>A});   // other players see (and the host enforces) what you deploy
   addEventListener('keydown',e=>{if(e.code==='KeyZ'&&!e.repeat)(other?other.deploy:deploy)();});   // game-menu re-sends a rebound key as the default KeyZ
   // Lockdown augment: zombies go for the turret for its first seconds
   const lure=enemies.lureTarget?.bind(enemies);
