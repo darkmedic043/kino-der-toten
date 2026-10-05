@@ -65,9 +65,7 @@ export class FirstPersonArms {
     template[0].skeleton.pose();ref.updateMatrixWorld(true);
     const T=n=>ref.getObjectByName(n),tp=n=>pos(T(n));
 
-    // fpArmsVariant: a variant option (morphs/surfaces/when, as in characters.json) applied on top in first person only.
-    const fpEntry=this.entry.fpArmsVariant?{...this.entry,variants:[...(this.entry.variants??[]),{id:'_fp',options:[{id:'fp',...this.entry.fpArmsVariant}]}]}:this.entry;
-    const holder=new THREE.Group(),model=clone(this.gltf.scene);applyVariants(model,fpEntry,this.entry.choice);model.rotation.y=THREE.MathUtils.degToRad(this.entry.yaw??0);
+    const holder=new THREE.Group(),model=clone(this.gltf.scene);applyVariants(model,this.entry);model.rotation.y=THREE.MathUtils.degToRad(this.entry.yaw??0);
     holder.add(model);holder.updateMatrixWorld(true);
     const sides=this.rig(model,holder);if(!sides){console.warn('[fp-arms] no arms found on',this.entry.id);return false;}
     // Size by the palm (wrist to middle knuckle) so the hands fit the guns.
@@ -219,6 +217,16 @@ export class FirstPersonArms {
       // The viewmodel lights are strong; tone the arms down to sit with the gun.
       const material=[o.material].flat()[0].clone();material.color.multiplyScalar(this.entry.fpArmsTone??.8);
       material.vertexColors=false;   // colours aren't baked; a material expecting them renders black
+      // fpArmsNearCut (view units): the arm surface is cut away where it comes closer to the camera than this (a clean
+      // near-plane cut; a dithered fade read as noise). Bondrewd's Blessed fur filled the whole screen as the knife lunge swung the forearm past the lens.
+      const near=this.entry.fpArmsNearCut;
+      if(near){
+        material.onBeforeCompile=sh=>{
+          sh.vertexShader=sh.vertexShader.replace('void main() {','varying float vFpDepth;\nvoid main() {').replace('#include <project_vertex>','#include <project_vertex>\n\tvFpDepth=-mvPosition.z;');
+          sh.fragmentShader=sh.fragmentShader.replace('void main() {',`varying float vFpDepth;\nvoid main() {\n\tif(vFpDepth<${near.toFixed(2)})discard;`);
+        };
+        material.customProgramCacheKey=()=>'fpNearCut'+near;
+      }
       parts.push({geometry:geo,material});
     });
     this.parts=parts;this.rt=rt;return parts.length>0;

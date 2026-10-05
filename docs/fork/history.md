@@ -102,3 +102,4 @@
 - **2026-10-05 (stairs)**: stair camera on `stairSmoothing` maps uses a critically damped spring (smooth climb speed instead of a pulse per step). See movement.md.
 - **2026-10-05 (knife, stairs)**: Bondrewd Premium Blessed/Fur: first-person arms keep the fur mask (`fpArmsVariant`), fixing the fur filling the screen on the knife lunge. Stairs: step-ups also allowed briefly airborne without a jump, fixing sprint snags (movement.md).
 - **2026-10-05 (suits)**: Cheese Cube Iron Man suits use their own weapons (repulsors, wrist rockets, Mk1 flamethrower, War Machine guns) while worn, with the JARVIS HUD from the map (waw-ports.md).
+- **2026-10-05 (fur, again)**: Blessed Bondrewd keeps his fur in first person; the knife lunge fur is handled with a near-camera cut (`fpArmsNearCut`) instead of the fur mask.
