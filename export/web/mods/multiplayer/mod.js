@@ -9,7 +9,7 @@ import { roundPopulation } from '../../rules.js';
 import { loadProfile, cloudReady } from '../../profile.js';
 import { loadCharacterRegistry, createCharacter, holdWeapon, applyStance } from '../../characters.js';
 
-const SNAP_RATE=12,POSE_RATE=15,STATES=['chase','attack','barricade','entering'];
+const SNAP_RATE=12,POSE_RATE=15,STATES=['chase','attack','barricade','entering','rising'];
 const BLEED_OUT=30,REVIVE_TIME=3,REVIVE_RANGE=90;
 const v3=a=>new THREE.Vector3(a[0],a[1],a[2]),r1=n=>Math.round(n*10)/10;
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -152,6 +152,11 @@ export default async function setup(api){
 
   // ---- Client role (mirror) -------------------------------------------------------------------
   const byNet=new Map(),dying=[];let snapGid=null,lastBox=null;
+  // A zombie the host has climbing out of the ground plays the same riser clip here (enemies.js picks it by speed).
+  function riseClip(z){
+    const a=enemies.anims,clip=a[z.speed>=110?'ai_zombie_traverse_ground_climbout_fast':'ai_zombie_traverse_ground_v1_run']??a.ai_zombie_traverse_ground_climbout_fast;
+    if(!clip)return false;if(!z.rig.actions?.rise)z.rig.add('rise',clip,true);z.rig.play('rise',false,(clip.duration??3)/3,0);return true;
+  }
   function becomeClient(){
     enemies.autoSpawn=false;enemies.autoRounds=false;enemies.reset();
     session.drops.tryDrop=()=>null;
@@ -200,7 +205,7 @@ export default async function setup(api){
       if(!z){z=enemies.spawn(new THREE.Vector3(x,y,zz),null,kind);z.id=id;enemies.serial=Math.max(enemies.serial,id);z.state='chase';z.speed=speed;byNet.set(id,z);}
       z.netTarget=new THREE.Vector3(x,y,zz);z.netYaw=yaw;z.health=hp;
       const state=STATES[st]??'chase';
-      if(state!==z.state){z.state=state;z.rig.play(state==='chase'||state==='entering'?'walk':'attack',state!=='attack');}
+      if(state!==z.state){z.state=state;if(state!=='rising'||!riseClip(z))z.rig.play(state==='chase'||state==='entering'||state==='rising'?'walk':'attack',state!=='attack');}
     }
     for(const [id,z] of byNet)if(!seen.has(id)){
       byNet.delete(id);const i=enemies.list.indexOf(z);if(i>=0)enemies.list.splice(i,1);
