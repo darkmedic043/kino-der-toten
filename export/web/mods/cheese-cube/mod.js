@@ -51,17 +51,32 @@ export default async function setup(api){
     }});
   }
 
+  // ---- Co-op: quest progress is shared. Each event is sent to everyone else, who apply it silently (late joiners miss earlier events).
+  const syncHandlers=new Map();let syncSub=false;
+  const sync={on:(k,fn)=>syncHandlers.set(k,fn),emit:(k,d)=>{const net=window.kino.coop;if(net?.id)net.send('all',{t:'cc',k,d});}};
+  host.on('update',()=>{const net=window.kino.coop;if(net&&!syncSub){syncSub=true;net.on('cc',m=>syncHandlers.get(m?.k)?.(m.d));}});
+
   // ---- The power switch: carry the panel, the handle and the wire to the switch and add them; then the switch works
   const PARTS=['panel','handle','wire'];
   const carrying=new Set(),placed=new Set();
   for(const id of PARTS)show(`ENT_${id}_build`,false);
+  const takePart=(id,remote)=>{
+    if(carrying.has(id)||placed.has(id))return;
+    carrying.add(id);show(`ENT_${id}_pick`,false);
+    if(!remote){beep();toast(`You took the ${id}`,3);sync.emit('pw-take',id);}else toast(`A teammate took the ${id}`,3);
+  };
+  const placePart=(id,remote)=>{
+    if(placed.has(id))return;
+    placed.add(id);carrying.delete(id);show(`ENT_${id}_pick`,false);show(`ENT_${id}_build`,true);
+    if(!remote){beep();sync.emit('pw-place',id);}
+    toast(`${placed.size} / 3 parts added`,3);
+    if(placed.size===3)announce('The switch is ready','TURN ON THE CHEESE POWER',4);
+  };
+  sync.on('pw-take',id=>takePart(id,true));sync.on('pw-place',id=>placePart(id,true));
   for(const id of PARTS){
     const pick=named(id+'_pick_trig')[0]??named(id+'_pick')[0],place=named(id+'_build_trig')[0]??named(id+'_build')[0];
-    if(pick)world.addInteraction({position:center(pick),text:()=>`Take the ${id}`,hidden:()=>carrying.has(id)||placed.has(id),
-      use(){carrying.add(id);show(`ENT_${id}_pick`,false);beep();toast(`You took the ${id}`,3);return true;}});
-    if(place)world.addInteraction({position:center(place),text:()=>`Add the ${id}`,hidden:()=>!carrying.has(id)||placed.has(id),
-      use(){placed.add(id);carrying.delete(id);show(`ENT_${id}_build`,true);beep();toast(`${placed.size} / 3 parts added`,3);
-        if(placed.size===3)announce('The switch is ready','TURN ON THE CHEESE POWER',4);return true;}});
+    if(pick)world.addInteraction({position:center(pick),text:()=>`Take the ${id}`,hidden:()=>carrying.has(id)||placed.has(id),use(){takePart(id);return true;}});
+    if(place)world.addInteraction({position:center(place),text:()=>`Add the ${id}`,hidden:()=>!carrying.has(id)||placed.has(id),use(){placePart(id);return true;}});
   }
   const powerSwitch=world.interactions.find(e=>e.kind==='power');
   if(powerSwitch){powerSwitch.locked=()=>placed.size<3;powerSwitch.lockedText='The power switch needs a panel, a handle and a wire';}
@@ -172,11 +187,12 @@ export default async function setup(api){
 
   // ---- Iron Man suits (own file)
   const {setupSuits}=await import('./suits.js');
-  window.kino.cheeseCube.suits=setupSuits({api,world,session,host,toast,announce,named,center,show,beep,now,board,player:api.player,triviaDone:()=>triviaDone}).state;
+  window.kino.cheeseCube.suits=setupSuits({api,world,session,host,toast,announce,named,center,nodes,show,beep,now,board,player:api.player,triviaDone:()=>triviaDone,sync}).state;
 
   // ---- Scoreboard collectibles
   board?.addCollectible({id:'cc-brothers',label:'Cheese Brothers',value:()=>`${captured} / 5`,done:()=>captured>=5});
-  board?.addCollectible({id:'cc-parts',label:'Power switch parts',value:()=>`${placed.size} / 3${carrying.size?` · carrying ${[...carrying].join(', ')}`:''}`,done:()=>placed.size>=3});
+  board?.addCollectible({id:'cc-parts',label:'Power switch',value:()=>`${placed.size} / 3 built`,done:()=>placed.size>=3,
+    parts:()=>PARTS.map(id=>({label:id,short:id.slice(0,2).toUpperCase(),state:placed.has(id)?'placed':carrying.has(id)?'carried':'none'}))});
   board?.addCollectible({id:'cc-trivia',label:'Trivia',value:()=>triviaDone?'Complete':`${step} / ${STEPS.length}`,done:()=>triviaDone});
   board?.addCollectible({id:'cc-puzzle',label:'Puzzle',value:()=>solved?'Solved':'Unsolved',done:()=>solved});
 

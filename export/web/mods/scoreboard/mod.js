@@ -1,7 +1,8 @@
 // Hold Tab: a Mob of the Dead (Black Ops 2) style scoreboard: every player's score, kills, downs, revives and headshots,
 // with what you have collected along the bottom
-// (perks, equipment, Easter egg progress and any collectibles a map or mod registers).
-//   kino.scoreboard.addCollectible({id, label, value(): string|number, done?(): boolean})   (re-adding an id replaces it)
+// (Easter egg progress and any collectibles or buildables a map or mod registers; no perks or equipment).
+//   kino.scoreboard.addCollectible({id, label, value(): string|number, done?(): boolean, parts?(): [{label, short?, state: 'none'|'carried'|'placed'}]})
+//   (re-adding an id replaces it; `parts` draws a buildable's parts as a row of slots, like Mob of the Dead: dark = not found, white = carried, gold = built)
 // In co-op each client shares its stats with the others about twice a second (kino.coop, a `stats` message).
 // A quick tap (touch buttons send a synthetic Tab) toggles it instead of holding.
 export default async function setup(api){
@@ -9,8 +10,6 @@ export default async function setup(api){
   const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('scoreboard.css',mod.url).href;document.head.append(css);
   const root=document.createElement('div');root.id='scoreboard';document.body.append(root);
   const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const PERKS={specialty_armorvest:['Juggernog','#b5372c'],specialty_quickrevive:['Quick Revive','#509ebc'],specialty_fastreload:['Speed Cola','#478450'],specialty_rof:['Double Tap','#c9a23a'],
-    specialty_longersprint:['Stamin-Up','#d4a017'],specialty_flakjacket:['PhD Flopper','#8a4fc9'],specialty_deadshot:['Deadshot Daiquiri','#8c5a2b'],specialty_additionalprimaryweapon:['Mule Kick','#3a8a6a']};
   const collectibles=new Map();
   window.kino.scoreboard={addCollectible(def){collectibles.set(def.id,def);return def;},removeCollectible(id){collectibles.delete(id);}};
 
@@ -34,16 +33,13 @@ export default async function setup(api){
   const clock=()=>{const t=Math.floor(session.time);return `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;};
   const row=(i,name,s,cls,tag,av)=>`<tr class="${cls}"><td class="sb-n">${i}</td><td><div class="sb-who"><i>${av}</i><div>${esc(name)}${tag?`<em>${tag}</em>`:''}</div></div></td><td class="sb-score">${s?s.p.toLocaleString():'—'}</td><td>${s?s.k:'—'}</td><td>${s?s.d:'—'}</td><td>${s?s.r??0:'—'}</td><td>${s?s.h:'—'}</td></tr>`;
   const tile=(label,value,done,cls='',style='')=>`<div class="sb-tile${done?' done':''}${cls?' '+cls:''}"${style?` style="${style}"`:''}><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
+  const build=(label,parts,value,done)=>`<div class="sb-tile sb-build${done?' done':''}"><span>${esc(label)}</span><div class="sb-parts">${parts.map(p=>`<i class="${esc(p.state)}" title="${esc(p.label)}"><b>${esc(p.short??p.label.slice(0,2))}</b><u>${esc(p.label)}</u></i>`).join('')}</div><em>${esc(value)}</em></div>`;
   function html(){
     const net=window.kino.coop,me=mine(),rows=[row(1,localName()||'You',me,'me',net?.id&&net.id===net.hostId?'HOST':'',avatar(localName()))];
     for(const p of net?.players?.values?.()??[]){if(p.id===net.id)continue;rows.push(row(rows.length+1,p.name,peers.get(p.id),'',p.id===net.hostId?'HOST':'',esc((p.name||'?')[0].toUpperCase())));}
     const tiles=[];
-    for(const id of session.perks??[]){const [name,color]=PERKS[id]??[id.replace(/^specialty_/,'').replace(/_/g,' '),'#888'];tiles.push(tile('Perk',name,false,'sb-perk','--c:'+color));}
-    if(session.grenades!=null)tiles.push(tile('Grenades',session.grenades,false));
-    if(session.claymoresOwned)tiles.push(tile('Claymores',session.claymoresOwned,false));
-    if(session.monkeysOwned)tiles.push(tile('Monkey Bombs',session.monkeysOwned,false));
     for(const g of world?.eggs?.values?.()??[]){const found=g.items.filter(i=>i.found).length;tiles.push(tile('Easter egg · '+g.name,`${found} / ${g.items.length}`,!!g.done));}
-    for(const c of collectibles.values()){let v='',done=false;try{v=c.value();done=!!c.done?.();}catch{}tiles.push(tile(c.label,v,done));}
+    for(const c of collectibles.values()){let v='',done=false,parts=null;try{v=c.value();done=!!c.done?.();parts=c.parts?.();}catch{}tiles.push(parts?build(c.label,parts,v,done):tile(c.label,v,done));}
     const objective=document.getElementById('moon-objective')?.textContent?.trim();
     return `<div class="sb-panel"><div class="sb-head"><div><small>${net?.id?'CO-OP':'SOLO'}</small><h2>${esc(mapTitle())}</h2></div>
       <div class="sb-meta"><div><b>${clock()}</b><span>TIME</span></div><div class="sb-round"><b>${session.round}</b><span>ROUND</span></div></div></div>

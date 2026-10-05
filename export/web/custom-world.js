@@ -157,7 +157,7 @@ export class CustomWorld {
         const perk=PERKS[String(m.extras.perk??m.arg.split('_')[0]).toLowerCase()];
         if(!perk){this.warn(`${rawName(m.object)}: unknown perk (use jugg, revive, speedcola or doubletap)`);continue;}
         this.interactions.push({kind:'perk',perk,position:m.position.clone().addScaledVector(up,40)});
-        tasks.push(place(PERK_MODELS[perk],m.position,m.yaw));
+        tasks.push(place(PERK_MODELS[perk],m.position,m.yaw,(entry.perkYaw??0)*Math.PI/180));
       }
       if(m.type==='CLAYMORE'){
         this.interactions.push({kind:'claymore',position:m.position.clone()});
@@ -167,7 +167,7 @@ export class CustomWorld {
         const at=new THREE.Vector3(0,38,14.5).applyAxisAngle(up,m.yaw+FACE).add(m.position);
         this.interactions.push({kind:'pap',position:at.clone()});
         this.data.entities.push({id:'custom_pap',targetname:'zombie_vending_upgrade',position:at.toArray()});
-        tasks.push(place('zombie_vending_packapunch',m.position,m.yaw));
+        tasks.push(place('zombie_vending_packapunch',m.position,m.yaw,(entry.perkYaw??0)*Math.PI/180));
       }
       if(m.type==='POWER'){
         this.hasPower=true;

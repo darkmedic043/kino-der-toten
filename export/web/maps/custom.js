@@ -58,7 +58,14 @@ export async function createMap(ctx,entry){
         if(e.hidden?.())continue;
         let d;
         if(e.kind==='door'){const door=world.doors.get(e.door);if(world.isOpen(door,s))continue;d=e.box.distanceToPoint(cam.position)+50;}
-        else d=cam.position.distanceTo(e.kind==='box'?vector(e.position):e.position);
+        else{
+          const at=e.kind==='box'?vector(e.position):e.position;d=cam.position.distanceTo(at);
+          // Machines and buys behind a closed door or wall cannot be used through it.
+          if(d<distance&&['perk','pap','wallbuy','box'].includes(e.kind)&&d>20){
+            const dir=at.clone().sub(cam.position).normalize(),hit=world.raycast(new THREE.Ray(cam.position,dir),0,d);
+            if(hit&&hit.distance<d-16)continue;
+          }
+        }
         if(e.locked?.()){if(d<lockedDistance){lockedDistance=d;lockedBest=e;}}
         else if(d<distance){distance=d;best=e;}
       }
