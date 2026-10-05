@@ -95,6 +95,15 @@ export class Enemies {
           z.root.rotation.y=Math.atan2(-delta.z,delta.x);
         }
       }
+      // On a custom map with gaps (parkour, moving platforms) a zombie that stops making progress is put back on the
+      // player's side of the gap after a few seconds instead of standing at the edge.
+      if(this.world.rescuePoint&&z.state==='chase'){
+        z.probeT=(z.probeT??0)+dt;
+        if(z.probeT>2.5){
+          z.probeT=0;const last=z.probePos??z.root.position.clone();z.probePos=z.root.position.clone();
+          if(last.distanceTo(z.root.position)<6&&dist>90){const p=this.world.rescuePoint(z.root.position,this.world.playerFeet??tp);if(p){z.root.position.copy(p);z.path=[];z.repath=0;z.probePos=null;}}
+        }
+      }
       z.stuck+=dt;
       if(z.stuck>12){const moved=z.lastPosition.distanceTo(z.root.position);z.lastPosition.copy(z.root.position);z.stuck=0;if(moved<5&&dist>100){z.path=[];z.repath=0;z.stuckCount=(z.stuckCount??0)+1;if(z.stuckCount>=3){this.remove(z);s.spawned--;}}else z.stuckCount=0;}
     }

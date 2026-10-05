@@ -131,6 +131,7 @@ export async function createMap(ctx,entry){
     update(dt){
       const s=S(),world=W(),feet=ctx.player.getFeetPosition();
       world.playerFeet=feet;
+      if(entry.doorMargin||entry.doorHeadroom){const out=world.doorEject?.(feet);if(out)ctx.player.setPosition(out);}   // stuck inside a door (mantled into it)
       for(const t of world.traps.values()){
         const on=t.activeUntil>s.time;
         for(const z of t.zones){

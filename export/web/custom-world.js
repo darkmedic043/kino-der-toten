@@ -96,7 +96,7 @@ export class CustomWorld {
       // otherwise you squeeze past the door pieces, or stand on top of them.
       const grow=this.entry.doorMargin??0,up=this.entry.doorHeadroom??0,plug=box.clone();
       if(grow||up){plug.min.x-=grow;plug.min.z-=grow;plug.max.x+=grow;plug.max.z+=grow;plug.max.y+=up;}
-      const part={object:m.object,collider:boxCollider(plug),box,enabled:true};
+      const part={object:m.object,collider:boxCollider(plug),box,plug,enabled:true};
       this.doors.set(name,{name,cost,zone,electric:!!m.extras.electric,parts:[part],box});this.dynamic.push(part);
       this.interactions.push({kind:'door',door:name,position:box.getCenter(new THREE.Vector3()),box});
     }
@@ -373,6 +373,37 @@ export class CustomWorld {
       out.push({id:'near_'+out.length,position:p,outside:p.clone(),inside:p.clone(),group:'near',boards:[],count:0,repairTime:0,rewardRound:0,reward:0});
     }
     return out;
+  }
+  // A zombie stuck on an island that cannot walk to the player (a gap, a moving platform): a walkable point 120-450 units
+  // from the player that can, preferring one out of sight. null when the zombie can walk there itself or nothing fits.
+  rescuePoint(from,pf){
+    if(!this.entry.nearbySpawns)return null;
+    const target=this.closest(pf,{x:60,y:120,z:60});if(!target)return null;
+    const reach=p=>{const path=this.path(p,pf),last=path[path.length-1];return !!last&&last.distanceTo(target)<12;};
+    const direct=this.path(from,pf),end=direct[direct.length-1];
+    if(end&&end.distanceTo(target)<12)return null;
+    let seen=null;const eye=pf.clone();eye.y+=50;
+    for(let k=0;k<24;k++){
+      const a=k*2.399+from.x,r=120+((k*97)%330),probe={x:pf.x+Math.cos(a)*r,y:pf.y,z:pf.z+Math.sin(a)*r};
+      const p=this.closest(probe,{x:70,y:200,z:70});if(!p||p.distanceTo(pf)<110||!reach(p))continue;
+      const head=p.clone();head.y+=50;
+      if(!this.lineClear(head,eye))return p;
+      seen??=p;
+    }
+    return seen;
+  }
+  // The player is inside a closed door's collision (for example after a mantle ended there): the nearest walkable spot
+  // outside it, or null when they are not inside one.
+  doorEject(feet,radius=14){
+    for(const d of this.dynamic){
+      const b=d.plug;if(!b||!d.enabled||d.window)continue;
+      if(feet.x<b.min.x+1||feet.x>b.max.x-1||feet.z<b.min.z+1||feet.z>b.max.z-1||feet.y<b.min.y-4||feet.y>b.max.y-8)continue;
+      const exits=[[b.min.x-radius-4,feet.z],[b.max.x+radius+4,feet.z],[feet.x,b.min.z-radius-4],[feet.x,b.max.z+radius+4]]
+        .map(([x,z])=>({x,z,d:Math.hypot(x-feet.x,z-feet.z)})).sort((a,c)=>a.d-c.d);
+      for(const e of exits){const p=this.closest({x:e.x,y:feet.y,z:e.z},{x:30,y:90,z:30});if(p&&Math.hypot(p.x-e.x,p.z-e.z)<30)return p;}
+      return new THREE.Vector3(exits[0].x,Math.max(feet.y,b.max.y)+2,exits[0].z);   // nothing walkable nearby: climb out over the top
+    }
+    return null;
   }
   // Advances the RISING planes to game time `time`; spawn points they have covered stop being used. Returns the highest top.
   updateRising(time){
