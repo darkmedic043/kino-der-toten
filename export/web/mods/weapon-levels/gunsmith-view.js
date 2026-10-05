@@ -65,6 +65,7 @@ const CSS=`
 #gsv .pro{color:#7fd48a}#gsv .con{color:#e46b5a}#gsv .neu{color:#a09a8d}
 #gsv .stats{position:absolute;right:40px;bottom:70px;width:330px}
 #gsv .swatch{background-size:cover;background-position:center}
+#gsv .ctabs{display:flex;gap:6px;margin:0 0 8px}#gsv .ctab{flex:1;padding:7px 6px;background:#ffffff0d;border:1px solid #ffffff22;color:#cfcab9;font:600 10px/1.2 system-ui,sans-serif;letter-spacing:.14em;cursor:pointer}#gsv .ctab small{display:block;margin-top:3px;font-weight:500;letter-spacing:.06em;color:#8d897c}#gsv .ctab.on{border-color:#d6a94a;color:#f3e3b0;background:#d6a94a1c}#gsv .ctab.on small{color:#d6a94a}
 #gsv .camo-row{display:flex;gap:10px;align-items:center}#gsv .camo-row .sw{width:44px;height:44px;flex:none;background-size:cover;border:1px solid #ffffff30}
 #gsv .camo-row>div{flex:1}#gsv .cbar{height:3px;background:#ffffff14;margin-top:6px}#gsv .cbar b{display:block;height:100%;background:#7fd48a}
 #gsv .stat{display:grid;grid-template-columns:86px 1fr 70px;align-items:center;gap:8px;margin:7px 0;font-size:10px;letter-spacing:2px;color:#a09a8d}
@@ -223,9 +224,9 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       const has=slots.includes(s),eq=on.find(a=>cat.attachments.find(x=>x.id===a)?.slot===s);
       return `<button class="slot${s===slot?' sel':''}${has?'':' na'}${eq?'':' empty'}" data-slot="${s}">
         <div class="ico">${cat.slots[s].slice(0,2).toUpperCase()}</div><div><span>${esc(cat.slots[s].toUpperCase())}</span><strong>${has?esc(eq?nameOf(eq):'None'):'—'}</strong></div></button>`;}).join('');
-    if(cats){const c=equippedCamo(cats,profile,id,weapons),done=camoUnlocked(cats,profile,id,weapons).size;
+    if(cats){const c=equippedCamo(cats,profile,id,weapons),unl=camoUnlocked(cats,profile,id,weapons),done=cats.camos.filter(k=>!k.reward&&unl.has(k.id)).length,special=cats.camos.filter(k=>k.reward&&unl.has(k.id)).length;
       $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CAMO</h3><button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
-        <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.length} UNLOCKED</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
+        <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward).length} UNLOCKED${special?` · ${special} SPECIAL`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
     $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc(cat.slots[s].toUpperCase())}</i></div>`).join('');
     renderOptions();renderStats();
     $('.stats').style.display=slot==='camo'?'none':'';   // camos don't change stats; the list needs the room
@@ -233,10 +234,18 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   const swatchCache=new Map();
   function swatch(c){if(swatchCache.has(c.id))return swatchCache.get(c.id);const img=camoTexture(c).image;let url='';
     try{if(img instanceof HTMLCanvasElement)url=img.toDataURL('image/jpeg',.7);else if(img?.src)url=img.src;}catch{}swatchCache.set(c.id,url);return url;}
+  // Two tabs: the challenge camos (kills, headshots... with Gold and Diamond) and the special ones, rewards from maps
+  let camoTab='challenge';
   function renderCamos(el){
     const done=camoUnlocked(cats,profile,id,weapons),p=camoProgress(profile,id),on=equippedCamo(cats,profile,id,weapons)?.id,base=cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward),cp=classProgress(cats,profile,id,weapons);
-    el.innerHTML='<h3>CAMO</h3>'+`<button class="opt${on?'':' on'}" data-camo=""><strong>None</strong><div class="pc"><span class="neu">Factory finish</span></div></button>`+
-      cats.camos.filter(c=>!c.classMastery||cp).map(c=>{const locked=!done.has(c.id);
+    const challenge=cats.camos.filter(c=>!c.reward&&(!c.classMastery||cp)),special=cats.camos.filter(c=>c.reward);
+    const shown=camoTab==='special'?special:challenge,count=l=>`${l.filter(c=>done.has(c.id)).length} / ${l.length}`;
+    el.innerHTML='<h3>CAMO</h3>'+
+      `<div class="ctabs"><button class="ctab${camoTab==='challenge'?' on':''}" data-ctab="challenge">CHALLENGE<small>${count(challenge)}</small></button>`+
+      (special.length?`<button class="ctab${camoTab==='special'?' on':''}" data-ctab="special">SPECIAL<small>${count(special)}</small></button>`:'')+`</div>`+
+      `<button class="opt${on?'':' on'}" data-camo=""><strong>None</strong><div class="pc"><span class="neu">Factory finish</span></div></button>`+
+      (camoTab==='special'&&!special.length?'<p class="neu">No special camos yet.</p>':'')+
+      shown.map(c=>{const locked=!done.has(c.id);
         const have=c.reward?(done.has(c.id)?1:0):c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:Math.min(c.count,p[c.challenge]??0),need=c.classMastery?cp.total:c.mastery?base.length:c.count;
         const what=c.classMastery?`Gold on every ${cp.label.toLowerCase().replace(/s$/,'')}`:c.mastery?'Complete every challenge camo':cats.challenges[c.challenge];
         return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'LOCKED':''}</span>
@@ -287,6 +296,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   // keep clicks here from reaching the game behind (the pause menu resumes on click)
   for(const ev of ['click','mousedown','mouseup','pointerdown'])root.addEventListener(ev,e=>e.stopPropagation());
   root.addEventListener('click',e=>{
+    const ct=e.target.closest('.ctab');if(ct){camoTab=ct.dataset.ctab;hover=null;renderUI();return;}
     const s=e.target.closest('.slot');if(s&&!s.classList.contains('na')){slot=slot===s.dataset.slot?null:s.dataset.slot;hover=null;renderUI();aim();return;}
     const o=e.target.closest('.opt');
     if(o&&o.dataset.camo!==undefined&&!o.classList.contains('locked')){

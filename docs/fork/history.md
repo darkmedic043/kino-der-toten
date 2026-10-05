@@ -96,3 +96,4 @@
 - **2026-10-04 (cheese gun)**: the Cheese Gun is a real weapon now (an MP40 clone sold at its two wall buys); the Cheese Brothers need it instead of the Ray Gun. Verified by buying it, firing it at a brother from a clear vantage point (+2000).
 - **2026-10-04 (cheese camo)**: the Cheese Gun wears the map's swiss cheese texture through the camo system (fixed on that gun, a locked entry elsewhere).
 - **2026-10-04 (cheese reward)**: reward camos (`reward` flag in camos.json, `profile.rewards`); buying the Cheese Cube ending unlocks Swiss Cheese for every gun. The Cheese Gun now uses that procedural camo instead of the map texture file.
+- **2026-10-04 (camo tabs)**: Gunsmith camo list split into CHALLENGE and SPECIAL tabs.
