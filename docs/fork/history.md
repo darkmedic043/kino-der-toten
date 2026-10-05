@@ -120,3 +120,4 @@
 - **2026-10-05 (Experiment FP)**: first-person arms in retarget mode (own paw shape and arm wraps), ring finger as pinky, new `fpArmsReach: false`.
 - **2026-10-05 (Mech class)**: third class: call down a Titanfall-style mech (built in code), a weapon per arm (left/right click) with its own heat, an integrity bar that hits shorten instead of hurting you, three weapon trees with a mid-tree weapon unlock and per-weapon augments, and a co-op rear gun (classes.md).
 - **2026-10-05 (Pilot)**: the Mech class is now called Pilot (display name only; id stays `mech`, so progress carries over).
+- **2026-10-05 (passive audit)**: Pilot passive texts made exact; explosive mech kills count for kill passives; Blast Radius double-applied fixed; Salvo Core uses Ordnance passives; Engineer/Fortifier skill explosions now credit kill passives and scale with ability damage (classes.md).

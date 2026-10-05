@@ -98,3 +98,9 @@ Third class, **Pilot** (`classes.json` id `mech`; named Mech until the user aske
   - Their kills send `op:'rkill'`, which feeds Covering Fire. F or Space dismounts, and the pilot ejecting (`op:'off'`) throws them off.
   - Tested with two browsers: mount, ride, rider immunity, dismount on eject.
 - Debug: `kino.mech` (`phase`, `integrity`, `arms`, `deploy`, `eject`, `trig`, `mount()`, `pilots`).
+- **Passive audit (2026-10-05):** every Pilot node's effect key was traced to the code and its text rewritten to say exactly what it touches (which weapons, "explosions and fire included", how Repair Drones interacts with the drain). Fixes:
+  - Explosions (rockets, thermite blasts, Overcharge, the landing, Ejection Charge) now go through `mblast`, which hurts each zombie via `hurt()`. Explosive kills count for Kill Feed, Demolition Pay and Berserker Core, and get Smart Core's bonus.
+  - Blast Radius was applied twice to rockets.
+  - Salvo Core's rockets now use `mechWeapon` (the Ordnance damage and radius passives).
+  - Verified in game: 6 rocket kills with Kill Feed ×3 added 2.7 s against 2.6 s of drain.
+- **Other classes, same audit:** the class `blast()` takes `credit`. Skill-made explosions (the turret's Grenade Launcher, Final Payload, Shrapnel Charge, claymores) call `onHit` (Recycler, Bounty, Nanites, Contractor, Spotter, slows…), pay the skill's 50 points per kill instead of gun points, and the Fortifier's Shrapnel Charge and claymores now scale with ability damage (Heavy Gauge, Honed Edges). Chain Reaction (a player passive) stays uncredited.

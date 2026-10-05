@@ -1437,7 +1437,7 @@
               "name": "Barrel Shroud",
               "ranks": 5,
               "icon": "crosshair",
-              "desc": "Chaingun and Rail damage +{v}%.",
+              "desc": "Chaingun and Longbow Rail damage +{v}%.",
               "effects": {
                 "mech.damage.ballistic": 0.05
               },
@@ -1448,7 +1448,7 @@
               "name": "Heat Sinks",
               "ranks": 5,
               "icon": "snow",
-              "desc": "Every mech weapon sheds heat {v}% faster.",
+              "desc": "Every mech weapon cools and vents {v}% faster.",
               "effects": {
                 "mech.cool": 0.06
               },
@@ -1459,7 +1459,7 @@
               "name": "Reinforced Frame",
               "ranks": 5,
               "icon": "clock",
-              "desc": "Mech integrity +{v}%: the bar is longer.",
+              "desc": "Mech integrity +{v}%: the bar starts longer.",
               "effects": {
                 "mech.duration": 0.06
               },
@@ -1470,7 +1470,7 @@
               "name": "Tungsten Rounds",
               "ranks": 5,
               "icon": "target",
-              "desc": "Chaingun and Rail damage +{v}%.",
+              "desc": "Chaingun and Longbow Rail damage +{v}%.",
               "effects": {
                 "mech.damage.ballistic": 0.05
               },
@@ -1601,7 +1601,7 @@
               "name": "Kill Feed",
               "ranks": 3,
               "icon": "heart",
-              "desc": "Each kill while piloting adds {v}s to the integrity bar.",
+              "desc": "Each kill by your mech adds {v}s to the integrity bar (explosions and fire included).",
               "effects": {
                 "mech.killTime": 0.15
               },
@@ -1613,7 +1613,7 @@
               "name": "Coolant Flush",
               "ranks": 5,
               "icon": "snow",
-              "desc": "Every mech weapon sheds heat {v}% faster.",
+              "desc": "Every mech weapon cools and vents {v}% faster.",
               "effects": {
                 "mech.cool": 0.05
               },
@@ -1626,7 +1626,7 @@
               "ranks": 1,
               "type": "capstone",
               "icon": "target",
-              "desc": "Capstone: for the first 10s after the mech lands, its weapons build no heat and hit 25% harder.",
+              "desc": "Capstone: for the first 10s after the mech lands, every weapon builds no heat and deals 25% more damage.",
               "effects": {
                 "cap.core.smart": 10
               }
@@ -1656,7 +1656,7 @@
               "name": "Warheads",
               "ranks": 5,
               "icon": "bomb",
-              "desc": "Rocket and Thermite damage +{v}%.",
+              "desc": "Rocket Pod and Thermite damage +{v}% (blasts, fire and Salvo Core rockets).",
               "effects": {
                 "mech.damage.ordnance": 0.05
               },
@@ -1667,7 +1667,7 @@
               "name": "Blast Radius",
               "ranks": 5,
               "icon": "target",
-              "desc": "Rocket and Thermite radius +{v}%.",
+              "desc": "Rocket and Thermite blast radius +{v}% (fire pools and bomblets too).",
               "effects": {
                 "mech.radius": 0.05
               },
@@ -1714,7 +1714,7 @@
               "type": "augment",
               "weapon": "salvo",
               "icon": "crosshair",
-              "desc": "Rockets curve onto the zombie nearest the crosshair.",
+              "desc": "Rockets curve onto zombies ahead of them.",
               "effects": {
                 "salvo.homing": 1
               }
@@ -1724,7 +1724,7 @@
               "name": "Demolition Pay",
               "ranks": 3,
               "icon": "coin",
-              "desc": "+{v} points for each kill by your mech.",
+              "desc": "+{v} points for each kill by your mech (explosions and fire included).",
               "effects": {
                 "mech.killPoints": 10
               },
@@ -1760,7 +1760,7 @@
               "name": "Napalm Mix",
               "ranks": 5,
               "icon": "flame",
-              "desc": "Mech burn damage +{v}%.",
+              "desc": "Burn damage +{v}%: Thermite fire pools and Incendiary Belt.",
               "effects": {
                 "mech.burn": 0.1
               },
@@ -1797,7 +1797,7 @@
               "name": "Ejection Charge",
               "ranks": 3,
               "icon": "bomb",
-              "desc": "When the mech goes down it explodes for {v}% of a zombie's health.",
+              "desc": "When the mech goes down or you eject, it explodes, hitting zombies nearby for {v}% of a zombie's health.",
               "effects": {
                 "mech.eject": 0.6
               },
@@ -1808,7 +1808,7 @@
               "name": "Exhaust Vents",
               "ranks": 5,
               "icon": "snow",
-              "desc": "Every mech weapon sheds heat {v}% faster.",
+              "desc": "Every mech weapon cools and vents {v}% faster.",
               "effects": {
                 "mech.cool": 0.05
               },
@@ -1832,7 +1832,7 @@
               "name": "Shaped Charges",
               "ranks": 5,
               "icon": "bomb",
-              "desc": "Rocket and Thermite damage +{v}%.",
+              "desc": "Rocket Pod and Thermite damage +{v}% (blasts, fire and Salvo Core rockets).",
               "effects": {
                 "mech.damage.ordnance": 0.06
               },
@@ -1875,7 +1875,7 @@
               "name": "Servo Strength",
               "ranks": 5,
               "icon": "fist",
-              "desc": "Fist and Arc damage +{v}%.",
+              "desc": "Hydraulic Fist and Arc Thrower damage +{v}%.",
               "effects": {
                 "mech.damage.brawl": 0.06
               },
@@ -1919,7 +1919,7 @@
               "name": "Gunner Training",
               "ranks": 3,
               "icon": "crosshair",
-              "desc": "Rear gun damage +{v}%.",
+              "desc": "Rear gun damage +{v}% for whoever rides on your mech.",
               "effects": {
                 "mech.mountDamage": 0.12
               },
@@ -1933,7 +1933,7 @@
               "type": "augment",
               "weapon": "fist",
               "icon": "bomb",
-              "desc": "Punches also slam the ground, hitting every zombie around you.",
+              "desc": "Punches also slam the ground, hitting every zombie around you for 60% damage.",
               "effects": {
                 "fist.pound": 1
               }
@@ -1943,7 +1943,7 @@
               "name": "Battery Cells",
               "ranks": 5,
               "icon": "clock",
-              "desc": "Mech integrity +{v}%: the bar is longer.",
+              "desc": "Mech integrity +{v}%: the bar starts longer.",
               "effects": {
                 "mech.duration": 0.06
               },
@@ -1968,7 +1968,7 @@
               "type": "augment",
               "weapon": "fist",
               "icon": "fist",
-              "desc": "Punching drives the mech forward into the crowd.",
+              "desc": "Each punch drives the mech forward into the crowd.",
               "effects": {
                 "fist.dash": 1
               }
@@ -2015,7 +2015,7 @@
               "name": "Repair Drones",
               "ranks": 3,
               "icon": "heart",
-              "desc": "Integrity regenerates {v}s a second after 3s without a hit.",
+              "desc": "After 3s without a hit, the mech repairs itself: the integrity bar drains {v}s a second slower.",
               "effects": {
                 "mech.regen": 0.3
               },
@@ -2052,7 +2052,7 @@
               "name": "Neural Link",
               "ranks": 5,
               "icon": "clock",
-              "desc": "Mech integrity +{v}%: the bar is longer.",
+              "desc": "Mech integrity +{v}%: the bar starts longer.",
               "effects": {
                 "mech.duration": 0.05
               },
@@ -2065,7 +2065,7 @@
               "ranks": 1,
               "type": "capstone",
               "icon": "fist",
-              "desc": "Capstone: every kill restores 0.5s of integrity.",
+              "desc": "Capstone: every kill by your mech restores 0.5s of integrity (explosions and fire included).",
               "effects": {
                 "cap.core.berserk": 0.5
               }

@@ -17,7 +17,7 @@
 // class sync (coop.js tracers and booms).
 import * as THREE from 'three';
 import { zombieHealth } from '../../rules.js';
-import { classById, loadClassProfile, mechStats } from './classes.js';
+import { mechStats, mechWeapon } from './classes.js';
 import { createMech, mechArms, WEAPON_BUILDERS } from './mech-model.js';
 
 const up=new THREE.Vector3(0,1,0);
@@ -209,6 +209,13 @@ export function setupMech(ctx){
     integrity=Math.min(maxIntegrity,integrity+(M.mech.killTime??0)+(M.mech.berserk??0));
     if(M.mech.killPoints)session.addPoints?.(Math.round(M.mech.killPoints));
   }
+  // the mech's explosions: like the class blast, but every zombie goes through hurt() so explosive kills count for the
+  // kill passives (Kill Feed, Demolition Pay, Berserker Core) and Smart Core's bonus applies
+  function mblast(at,radius,frac){
+    window.kino.fx?.explosion?.([at.x,at.y,at.z],radius/260);audio.play('explosion',.6);sync.boom(at,radius);
+    for(const z of [...enemies.list]){const d=z.root.position.distanceTo(at);
+      if(d<radius&&z.state!=='rising'&&world.lineClear(at.clone().addScaledVector(up,20),z.root.position.clone().addScaledVector(up,30)))hurt(z,frac*(1-.5*d/radius),null);}
+  }
   const burning=new Map();   // zombie -> {until, dps, tick}
   function burn(z,dps,secs=3){burning.set(z,{until:session.time+secs,dps,tick:burning.get(z)?.tick??.5});}
   const stunned=new Map();   // zombie -> {until, at}
@@ -244,10 +251,10 @@ export function setupMech(ctx){
   function explode(s,at){
     const w=s.w;
     if(s.kind==='rocket'){
-      blast(at,(s.radius??w.radius)*M.mech.radius,w.damage*w.damageMul*(s.scale??1)*(smartOn()?1.25:1));
+      mblast(at,s.radius??w.radius,w.damage*w.damageMul*(s.scale??1));   // w.radius already has Blast Radius
       if(w.cluster&&!s.bomblet)for(let i=0;i<w.cluster;i++){const d=new THREE.Vector3(Math.random()-.5,.9,Math.random()-.5).normalize();shells.push({kind:'rocket',mesh:new THREE.Mesh(shellGeo,shellMat),vel:d.multiplyScalar(420),w,life:.6,bomblet:true,scale:.4,radius:w.radius*.6,gravity:900});shells.at(-1).mesh.position.copy(at).addScaledVector(up,8);scene.add(shells.at(-1).mesh);}
     }else{
-      blast(at,w.radius*.8,w.damage*w.damageMul);
+      mblast(at,w.radius*.8,w.damage*w.damageMul);
       const n=w.split||1;for(let i=0;i<n;i++){const off=n>1?new THREE.Vector3(Math.cos(i/n*6.28)*w.radius*1.1,0,Math.sin(i/n*6.28)*w.radius*1.1):new THREE.Vector3();
         const p=at.clone().add(off),g=world.raycast(new THREE.Ray(p.clone().addScaledVector(up,60),up.clone().negate()),0,240);if(g)p.y=(g.point?.y??p.y);firePool(p,w);}
     }
@@ -286,7 +293,7 @@ export function setupMech(ctx){
           const d=f.clone().applyAxisAngle(up,yaw);const {hits,end}=along(from,d,w.range,20);
           for(const h of hits)hurt(h.z,frac,w,{head:h.head});
           line(muzzle(side),end,0x7fd8ff,.12,2.2*(.4+c));
-          if(w.blast&&c>=.99)blast(end,160,.8*w.damageMul);
+          if(w.blast&&c>=.99)mblast(end,160,.8*w.damageMul);
         }
         addHeat(a,w.heat*(.5+.5*c));recoil(side,.6+c);sfx.rail();
       }
@@ -341,7 +348,7 @@ export function setupMech(ctx){
     if(Math.abs(trig.leftAt-trig.rightAt)>.15||!trig.left||!trig.right)return;
     if(arms.left.heat>.2||arms.right.heat>.2)return;
     coreUsed=true;api.toast?.('SALVO CORE',1.5);
-    const w={...cls.mech.weapons.salvo,id:'salvo',damageMul:1+(M.stats['mech.damage.ordnance']??0)};
+    const w=mechWeapon(cls,M.stats,'salvo');   // the Ordnance passives apply (damage, radius); not the arm's augments
     for(let i=0;i<M.mech.salvoCore;i++)setTimeout(()=>{if(phase!=='piloting')return;const f=aimDir(),r=new THREE.Vector3().crossVectors(f,up).normalize();
       const d=f.clone().addScaledVector(r,(Math.random()-.5)*.35).addScaledVector(up,(Math.random()-.2)*.15).normalize();launch('rocket',muzzle(i%2?'left':'right'),d,w,{homing:true});sfx.rocket();},i*60);
   }
@@ -365,7 +372,7 @@ export function setupMech(ctx){
   }
   function land(){
     const at=drop.at;world3.root.position.copy(at);
-    sfx.land();blast(at,230,1.3);window.kino.fx?.knockback?.(at);camKick=1.4;
+    sfx.land();mblast(at,230,1.3);window.kino.fx?.knockback?.(at);camKick=1.4;
     // climb in
     phase='piloting';landedAt=session.time;coreUsed=false;lastHitT=session.time;
     maxIntegrity=integrity=M.mech.duration;
@@ -388,7 +395,7 @@ export function setupMech(ctx){
     api.announce?.(destroyed?'MECH DOWN':'EJECTED',destroyed?'THROWN CLEAR':'',1.6);
     setTimeout(()=>{
       if(phase!=='idle'&&phase!=='falling')return;
-      if(phase==='idle'){if(M.mech.eject)blast(wreck.position.clone().addScaledVector(up,40),260,M.mech.eject);else{window.kino.fx?.explosion?.([wreck.position.x,wreck.position.y+40,wreck.position.z],.6);audio.play('explosion',.5);sync.boom(wreck.position,1);}
+      if(phase==='idle'){if(M.mech.eject)mblast(wreck.position.clone().addScaledVector(up,40),260,M.mech.eject);else{window.kino.fx?.explosion?.([wreck.position.x,wreck.position.y+40,wreck.position.z],.6);audio.play('explosion',.5);sync.boom(wreck.position,1);}
         wreck.visible=false;}
     },destroyed?900:1400);
     ctx.setCooldown(M.mech.cooldown);ctx.hud();

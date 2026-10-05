@@ -80,10 +80,12 @@ export default async function setup(api){
   // co-op: coop.js replaces these to send tracers and skill explosions to the room
   const sync={tracer(){},boom(){}};
   function tracer(a,b){const g=new THREE.BufferGeometry().setFromPoints([a,b]);const l=new THREE.Line(g,tracerMat.clone());scene.add(l);tracers.push({l,t:.06});sync.tracer(a,b);}
-  function blast(at,radius,healthFrac){
+  // credit: the blast is the action skill's own (a turret grenade, Final Payload, Shrapnel Charge, a claymore), so each
+  // zombie it hits goes through onHit and its kills count for the kill passives (Recycler, Bounty, Nanites, Contractor…)
+  function blast(at,radius,healthFrac,credit=false){
     window.kino.fx?.explosion?.([at.x,at.y,at.z],radius/260);audio.play('explosion',.6);sync.boom(at,radius);
     const dmg=zombieHealth(session.round,data.rules)*healthFrac;
-    for(const z of [...enemies.list]){const d=z.root.position.distanceTo(at);if(d<radius&&world.lineClear(at.clone().addScaledVector(up,20),z.root.position.clone().addScaledVector(up,30)))enemies.hurt(z,dmg*(1-.5*d/radius),false,false,'explosion');}
+    for(const z of [...enemies.list]){const d=z.root.position.distanceTo(at);if(d<radius&&world.lineClear(at.clone().addScaledVector(up,20),z.root.position.clone().addScaledVector(up,30))){enemies.hurt(z,dmg*(1-.5*d/radius),false,false,'explosion',!credit);if(credit){const killed=!enemies.list.includes(z);onHit(z,killed);if(killed)session.addPoints?.(50);}}}
   }
   function deploy(){
     const st=api.getState();
@@ -102,7 +104,7 @@ export default async function setup(api){
     startCooldown(A.cooldown);hud();
   }
   function remove(t){
-    if(S['cap.finale'])blast(t.at.clone().addScaledVector(up,20),280,.9);   // Final Payload: the turret self-destructs
+    if(S['cap.finale'])blast(t.at.clone().addScaledVector(up,20),280,.9*A.dmgMul,true);   // Final Payload: the turret self-destructs
     t.mesh.removeFromParent();turrets.splice(turrets.indexOf(t),1);
   }
   // The Fortifier's Barricade Wall instead of the turret
@@ -175,7 +177,7 @@ export default async function setup(api){
       const wantPitch=Math.atan2(to.y-t.muzzle.y,Math.hypot(to.x-t.at.x,to.z-t.at.z));t.pitch+=(wantPitch-t.pitch)*Math.min(1,dt*8);
       aimGun(t);
       if(Math.abs(d)>.25)continue;
-      if(t.grenade&&(t.grenadeT=(t.grenadeT??t.grenade)-dt)<=0){t.grenadeT=t.grenade;blast(z.root.position.clone(),200,.6*A.dmgMul);}
+      if(t.grenade&&(t.grenadeT=(t.grenadeT??t.grenade)-dt)<=0){t.grenadeT=t.grenade;blast(z.root.position.clone(),200,.6*A.dmgMul,true);}
       if((t.fire-=dt)>0)continue;t.fire=1/A.rate;
       const base=zombieHealth(session.round,data.rules)*A.damage+20;
       const fresh=z.health>zombieHealth(session.round,data.rules)*.5?1+(S['turret.fresh']??0):1;

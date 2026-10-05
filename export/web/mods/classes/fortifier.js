@@ -166,7 +166,7 @@ export function setupFortifier(ctx){
   function removeWall(w,broken,moving=false){
     if(!moving){
       // Shrapnel Charge: a steel wall blows when destroyed (sandbags just burst)
-      if(w.kind==='steel'&&S()['fort.shrapnel'])blast(w.at.clone().addScaledVector(up,30),260,.9);
+      if(w.kind==='steel'&&S()['fort.shrapnel'])blast(w.at.clone().addScaledVector(up,30),260,.9*A().dmgMul,true);
       else if(broken){window.kino.fx?.explosion?.([w.at.x,w.at.y+20,w.at.z],.25);audio.play('explosion',.25);}
     }
     w.mesh.removeFromParent();w.mesh.traverse(o=>{if(o.isMesh&&o.geometry)o.geometry.dispose();});w.mesh.userData.tint?.dispose();
@@ -287,7 +287,7 @@ export function setupFortifier(ctx){
     }
     for(const m of [...mines]){
       m.arm-=dt;m.led.visible=m.arm>0||Math.sin(session.time*8)>0;if(m.arm>0)continue;
-      if(enemies.list.some(z=>z.root.position.distanceTo(m.at)<70)){blast(m.at.clone().addScaledVector(up,10),220,1);m.m.removeFromParent();mines.splice(mines.indexOf(m),1);}
+      if(enemies.list.some(z=>z.root.position.distanceTo(m.at)<70)){blast(m.at.clone().addScaledVector(up,10),220,1*A().dmgMul,true);m.m.removeFromParent();mines.splice(mines.indexOf(m),1);}
     }
   });
   host.on('reset',()=>{
