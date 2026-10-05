@@ -351,53 +351,114 @@ export default async function setup(api){
   if(net.isHost)becomeHost(false);else becomeClient();
   addEventListener('pagehide',()=>net.close());
 
-  // ---- Lobby: nobody starts until everyone has fully loaded -------------------------
-  // Each player reports 'ready' once their game has finished loading; the host
-  // keeps the list and broadcasts it. The host's START GAME unlocks when all are
-  // ready and starts everyone; someone joining a game in progress goes straight in.
-  const lobby={ready:new Set(),started:false,go:false};
+  // ---- Lobby: a full-screen menu; nobody starts until everyone has fully loaded -----------
+  // Left: the map, the room code, START GAME (host) / status, invite and main menu. Right: the squad, one card per
+  // player with their operator, class and level, and their loading progress (Loading N% → Ready → In game).
+  // Each player reports {t:'linfo'} to the host (loading percent while loading, then ready + operator/class); the host
+  // keeps lobby.info and broadcasts it with the ready list. START GAME starts everyone: guests enter on the host's
+  // 'lobby' started flag (the game starts at once; the mouse is captured on their first click, which browsers require).
+  // Someone joining a game in progress goes straight in.
+  const lobby={ready:new Set(),started:false,go:false,info:{}};
   const lob=document.createElement('div');lob.id='coop-lobby';
   const st=document.createElement('style');st.textContent=`
-    #coop-lobby{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(6,6,8,.72);backdrop-filter:blur(3px);font:14px/1.5 system-ui,sans-serif;color:#e8e2d6}
+    #coop-lobby{position:fixed;inset:0;z-index:50;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,440px);gap:4vw;padding:6vh 6vw;box-sizing:border-box;
+      background:linear-gradient(90deg,#070a0a 0%,#0a0c0b 55%,#080a09);font-family:Arial,Helvetica,sans-serif;color:#eee8dc;overflow:auto}
     #coop-lobby[hidden]{display:none}
-    #coop-lobby .card{width:min(420px,calc(100vw - 32px));background:#15130f;border:1px solid #4a3a2c;border-radius:10px;padding:22px 22px 18px;box-shadow:0 20px 60px #000a}
-    #coop-lobby h2{margin:0 0 2px;font:600 13px/1.4 system-ui;letter-spacing:.2em;color:#c9a46a}
-    #coop-lobby .code{font:600 30px/1.2 ui-monospace,monospace;letter-spacing:.25em;color:#fff;margin-bottom:12px}
-    #coop-lobby ul{list-style:none;margin:0 0 16px;padding:0;border-top:1px solid #2c261f}
-    #coop-lobby li{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid #2c261f}
-    #coop-lobby li em{font-style:normal;color:#8c8272}#coop-lobby li .ok{color:#7fd36a}
-    #coop-lobby .row{display:flex;gap:10px}
-    #coop-lobby button{flex:1;padding:11px;border-radius:6px;border:1px solid #6b4a2e;background:#2a1f16;color:#f0e6d6;font:600 12px system-ui;letter-spacing:.14em;cursor:pointer}
-    #coop-lobby button.go{background:#8a2f22;border-color:#c0453a}
-    #coop-lobby button:disabled{opacity:.45;cursor:default}
-    #coop-lobby .hint{margin:12px 0 0;color:#8c8272;font-size:12px;text-align:center}`;
+    #coop-lobby::before{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#ffffff02 0px,#ffffff02 1px,transparent 1px,transparent 3px)}
+    #coop-lobby .l-left{align-self:center;position:relative}
+    #coop-lobby .kicker{font-size:17px;font-weight:900;letter-spacing:1px}#coop-lobby .kicker span{font-size:11px;font-weight:400;letter-spacing:3px;margin-left:11px;color:#b82f27}
+    #coop-lobby .chapter{font-size:10px;letter-spacing:4px;color:#aeb0a1;margin:38px 0 14px}
+    #coop-lobby h1{font-family:Impact,'Arial Narrow',Arial,sans-serif;font-weight:900;font-size:clamp(54px,6.5vw,96px);letter-spacing:-2px;line-height:.88;margin:0;color:#e5e0d3;text-transform:uppercase;overflow-wrap:anywhere}
+    #coop-lobby .room{margin:26px 0 30px;display:flex;align-items:baseline;gap:16px}
+    #coop-lobby .room small{font-size:10px;letter-spacing:4px;color:#9d947e}
+    #coop-lobby .room b{font:400 38px/1 Georgia,serif;letter-spacing:.3em;color:#d9c3a0}
+    #coop-lobby .btns{display:grid;gap:10px;width:320px;max-width:100%}
+    #coop-lobby button{font:inherit;cursor:pointer}
+    #coop-lobby .go{border:1px solid #b03f31;background:#932e25;color:#eee8d9;display:flex;justify-content:space-between;padding:18px 20px;font-weight:700;font-size:11px;letter-spacing:2px;text-align:left;transition:background .2s}
+    #coop-lobby .go:hover:not(:disabled){background:#b5372c}#coop-lobby .go:disabled{opacity:.45;cursor:default}
+    #coop-lobby .sec{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    #coop-lobby .sec button{border:1px solid #776b5266;background:#05050550;padding:12px 10px;color:#ccc3ae;font-size:11px;letter-spacing:2px}
+    #coop-lobby .sec button:hover{border-color:#b5372c;color:#eee8dc}
+    #coop-lobby .status{margin-top:14px;font-size:10px;color:#9d947e;letter-spacing:1px;min-height:12px}
+    #coop-lobby .wait{border:1px solid #776b5266;padding:16px 20px;font-size:11px;letter-spacing:2px;color:#c7bca4;background:#05050550}
+    #coop-lobby .l-right{align-self:center;position:relative;border:1px solid #776b5240;background:#0b0c0bd9;padding:20px 20px 10px}
+    #coop-lobby .squad{display:flex;justify-content:space-between;align-items:baseline;font-size:10px;letter-spacing:4px;color:#c2b5a0;padding-bottom:12px;border-bottom:1px solid #776b5240}
+    #coop-lobby .squad b{font-weight:400;color:#9d947e;letter-spacing:2px}
+    #coop-lobby .pl{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #776b5226}
+    #coop-lobby .av{width:42px;height:42px;display:grid;place-items:center;background:#1a1714;border:1px solid #776b5266;font:700 18px Georgia,serif;color:#d9c3a0}
+    #coop-lobby .pl.me .av{border-color:#b5372c}
+    #coop-lobby .nm{font-size:14px;color:#eee8dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #coop-lobby .nm em{font-style:normal;font-size:9px;letter-spacing:2px;color:#b82f27;margin-left:8px}
+    #coop-lobby .sub{font-size:10px;letter-spacing:1px;color:#8c8272;margin-top:3px}
+    #coop-lobby .bar{height:2px;background:#514b4060;margin-top:7px}#coop-lobby .bar i{display:block;height:100%;background:#be4b39;transition:width .4s}
+    #coop-lobby .tag{font-size:9px;letter-spacing:2px;color:#9d947e;text-align:right}
+    #coop-lobby .tag.ok{color:#7fd36a}#coop-lobby .tag.in{color:#d9c3a0}
+    #coop-lobby .empty{padding:14px 0;font-size:10px;letter-spacing:2px;color:#575c56;border-bottom:1px dashed #776b5226}
+    @media(max-width:820px){#coop-lobby{grid-template-columns:1fr;padding:30px 20px}#coop-lobby .l-left,#coop-lobby .l-right{align-self:start}}
+    #coop-click{position:fixed;left:50%;top:60%;transform:translateX(-50%);z-index:20;padding:12px 18px;border:1px solid #b03f31;background:#0b0c0be6;color:#eee8dc;font:700 11px Arial;letter-spacing:3px;pointer-events:none}`;
   document.head.append(st);document.body.append(lob);
   const isReady=id=>lobby.ready.has(id);
+  const MAX=4;
+  // what this player shows on their card
+  function myInfo(){
+    const c=window.kino.classes,st=window.kino.debug.getState();
+    const pct=st.ready?100:Math.round(parseFloat(document.getElementById('load-progress')?.style.width)||0);
+    return {p:pct,op:window.kino.characterEntry?.name??registry.find(e=>e.id===profile.character)?.name??null,cls:c?.cls?.name??null,lvl:c?.state?.level??null,in:!!st.started};
+  }
   function renderLobby(){
     if(lobby.go){lob.hidden=true;return;}
     const all=[...net.players.values()],allReady=all.length>0&&all.every(p=>isReady(p.id));
     lob.hidden=false;
-    lob.innerHTML=`<div class="card"><h2>CO-OP LOBBY</h2><div class="code">${esc(net.code)}</div>
-      <ul>${all.map(p=>`<li><span>${esc(p.name)}${p.id===net.hostId?' <em>· host</em>':''}${p.id===net.id?' <em>· you</em>':''}</span>${isReady(p.id)?'<span class="ok">Ready</span>':'<em>Loading…</em>'}</li>`).join('')}</ul>
-      <div class="row"><button type="button" class="invite">COPY INVITE</button>${net.isHost?`<button type="button" class="go" ${allReady?'':'disabled'}>START GAME</button>`:''}</div>
-      <p class="hint">${net.isHost?(allReady?'Everyone is in. Start when ready.':'Waiting for everyone to finish loading…'):lobby.started?'The game has started: click to join in.':'Waiting for the host to start…'}</p></div>`;
+    const title=document.getElementById('map-title')?.textContent||'ZOMBIES';
+    const card=p=>{const i=lobby.info[p.id]??{},ready=isReady(p.id),pct=ready?100:i.p??0;
+      const sub=[i.op,i.cls&&(i.cls+(i.lvl?' · LV '+i.lvl:''))].filter(Boolean).join(' · ')||'Joining…';
+      const tag=i.in?'<span class="tag in">IN GAME</span>':ready?'<span class="tag ok">READY</span>':`<span class="tag">LOADING ${pct}%</span>`;
+      return `<div class="pl${p.id===net.id?' me':''}"><div class="av">${esc((p.name||'?')[0].toUpperCase())}</div>
+        <div><div class="nm">${esc(p.name)}${p.id===net.hostId?'<em>HOST</em>':''}${p.id===net.id?'<em>YOU</em>':''}</div><div class="sub">${esc(sub)}</div>${ready?'':`<div class="bar"><i style="width:${pct}%"></i></div>`}</div>${tag}</div>`;};
+    const waiting=all.filter(p=>!isReady(p.id)).length;
+    lob.innerHTML=`<div class="l-left"><div class="kicker">ZOMBIES <span>CO-OP</span></div><p class="chapter">CO-OP LOBBY</p><h1>${esc(title)}</h1>
+        <div class="room"><small>ROOM</small><b>${esc(net.code)}</b></div>
+        <div class="btns">${net.isHost?`<button type="button" class="go" ${allReady?'':'disabled'}>START GAME <span>→</span></button>`:
+          lobby.started?`<button type="button" class="go">JOIN THE GAME <span>→</span></button>`:`<div class="wait">WAITING FOR THE HOST TO START</div>`}
+          <div class="sec"><button type="button" class="invite">COPY INVITE</button><button type="button" class="leave">MAIN MENU</button></div></div>
+        <p class="status">${net.isHost?(allReady?'Everyone is loaded in. Start the game for everyone.':`Waiting for ${waiting} player${waiting===1?'':'s'} to finish loading…`):lobby.started?'The game is under way.':'The host starts the game for everyone once all players are loaded in.'}</p></div>
+      <div class="l-right"><div class="squad">SQUAD <b>${all.length} / ${MAX}</b></div>${all.map(card).join('')}${Array.from({length:Math.max(0,MAX-all.length)},()=>'<div class="empty">OPEN SLOT · SHARE THE INVITE</div>').join('')}</div>`;
     lob.querySelector('.invite').onclick=async e=>{e.stopPropagation();try{await navigator.clipboard.writeText(invite);e.target.textContent='LINK COPIED';}catch{prompt('Invite link',invite);}};
-    const go=lob.querySelector('.go');if(go)go.onclick=e=>{e.stopPropagation();startAll();};
-    if(!net.isHost&&lobby.started){lob.querySelector('.card').style.cursor='pointer';lob.onclick=()=>{enter();};}
+    lob.querySelector('.leave').onclick=e=>{e.stopPropagation();location.href='/';};
+    const go=lob.querySelector('.go');if(go)go.onclick=e=>{e.stopPropagation();if(net.isHost)startAll();else enter();};
   }
-  function enter(){lobby.go=true;lob.hidden=true;document.getElementById('start')?.click();}
+  // enter the game. From a click (host, or a guest's JOIN): capture the mouse now. From the host's start: run the game at
+  // once and capture the mouse on the first click (pointer lock needs a user gesture).
+  let clickHint=null;
+  function enter(fromGesture=true){
+    lobby.go=true;lob.hidden=true;
+    if(fromGesture){document.getElementById('start')?.click();return;}
+    window.kino.debug.resume();
+    if(!document.pointerLockElement&&!clickHint){clickHint=document.createElement('div');clickHint.id='coop-click';clickHint.textContent='THE GAME HAS STARTED · CLICK TO PLAY';document.body.append(clickHint);
+      const once=()=>{clickHint?.remove();clickHint=null;removeEventListener('pointerdown',once,true);document.getElementById('start')?.click();};addEventListener('pointerdown',once,true);}
+    sendInfo();
+  }
   function startAll(){lobby.started=true;broadcastLobby();enter();}
-  function broadcastLobby(){if(net.isHost)net.send('all',{t:'lobby',ready:[...lobby.ready],started:lobby.started});renderLobby();}
+  function broadcastLobby(){if(net.isHost)net.send('all',{t:'lobby',ready:[...lobby.ready],started:lobby.started,info:lobby.info});renderLobby();}
+  function sendInfo(){const i=myInfo();if(net.isHost){lobby.info[net.id]=i;broadcastLobby();}else net.send('host',{t:'linfo',...i});}
   // The start button stays locked until the lobby lets you in.
   document.getElementById('start')?.addEventListener('click',e=>{if(!lobby.go){e.stopImmediatePropagation();e.preventDefault();renderLobby();}},true);
   net.on('ready',(m,from)=>{if(net.isHost){lobby.ready.add(from);broadcastLobby();}});
-  net.on('lobby',m=>{lobby.ready=new Set(m.ready);if(m.started&&!lobby.started){lobby.started=true;api.toast('The host started the game: click to join',6);}renderLobby();});
+  net.on('linfo',(m,from)=>{if(net.isHost){const {t,...i}=m;lobby.info[from]=i;broadcastLobby();}});
+  net.on('lobby',m=>{lobby.ready=new Set(m.ready);lobby.info=m.info??lobby.info;
+    if(m.started&&!lobby.started){lobby.started=true;if(isReady(net.id)&&!lobby.go){enter(false);return;}}   // the host started: everyone goes in
+    renderLobby();});
   net.on('joined',()=>{if(net.isHost)broadcastLobby();else renderLobby();});
-  net.on('left',id=>{lobby.ready.delete(id);if(net.isHost)broadcastLobby();else renderLobby();});
+  net.on('left',id=>{lobby.ready.delete(id);delete lobby.info[id];if(net.isHost)broadcastLobby();else renderLobby();});
   net.on('host',()=>{if(net.isHost){lobby.ready.add(net.id);broadcastLobby();}});
-  // Report ready once this game has finished loading (and is past the loading screen).
-  (async()=>{while(!window.kino.debug.getState().ready)await new Promise(r=>setTimeout(r,250));
-    if(net.isHost){lobby.ready.add(net.id);broadcastLobby();}else net.send('host',{t:'ready'});})();
+  // Loading progress to the host each second, then ready (with operator and class) once this game has finished loading.
+  (async()=>{
+    while(!window.kino.debug.getState().ready){sendInfo();await new Promise(r=>setTimeout(r,1000));}
+    sendInfo();
+    if(net.isHost){lobby.ready.add(net.id);broadcastLobby();}else net.send('host',{t:'ready'});
+    if(lobby.started&&!lobby.go)enter(false);   // the host started while this one was still loading
+  })();
+  host.on('start',()=>sendInfo());   // "IN GAME" on the cards
   renderLobby();
   showPanel();
   api.toast(net.isHost?`Co-op room ${net.code} · invite friends from the pause menu`:`Joined ${net.players.get(net.hostId)?.name??'the host'}'s game`,5);

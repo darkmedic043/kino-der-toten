@@ -126,3 +126,4 @@
 - **2026-10-05 (settings tabs)**: the settings form is split into tabs: Graphics, Audio, Controls, Gameplay, Dev (core.md).
 - **2026-10-05 (FPS)**: Kino frame drops traced to transparent double-sided materials re-checking shaders twice a frame; forceSinglePass gives about +20% FPS (performance.md).
 - **2026-10-05 (FPS cap slider)**: the frame rate cap is a slider (15–240, Unlimited) and the number can be clicked to type any cap (core.md).
+- **2026-10-05 (co-op lobby)**: the lobby is a full-screen menu with the squad on the right (operator, class, loading %, ready/in game), and the host's START GAME starts everyone (coop.md).
