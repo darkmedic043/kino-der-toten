@@ -1,0 +1,5 @@
+{
+  "name": "Friends status",
+  "description": "Signed-in players show as In game (map, co-op room) to their friends, and get friend requests and game invites as notifications in game.",
+  "script": "mod.js"
+}

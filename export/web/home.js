@@ -4,6 +4,7 @@ import { loadModel, ViewWeapon } from './animation.js';
 import { applyGlow, tickGlow } from './mods/bo3-weapons/glow.js';
 import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
+import { startSocial, onSocial, request, accept, decline, cancel, remove, statusText } from './social.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
 import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady } from './profile.js';
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
@@ -111,6 +112,46 @@ renderAccount();
 // Discord sends players back here; ?signin=... reports a failed attempt.
 {const msg=new URLSearchParams(location.search).get('signin');
   if(msg){toast({cancelled:'Sign-in cancelled',expired:'Sign-in expired, please try again',failed:'Discord sign-in failed, please try again'}[msg]??'Sign-in failed');history.replaceState(null,'',location.pathname+location.hash);}}
+
+// ---- Social: friends, requests, status -------------------------------------------------
+// social.js keeps the friend list live (presence pushes); this tab renders it. In game, friends are invited from the
+// co-op lobby, and lobby cards have ADD FRIEND.
+startSocial({status:'menu'});
+let socMsg={text:'',cls:''};
+function renderSocial(st){
+  const root=$('social-root');if(!root)return;
+  const badge=$('social-badge'),n=st.incoming?.length??0;badge.hidden=!n;badge.textContent=n;
+  if(!st.signedIn){root.innerHTML='<div class="soc-panel"><h3>FRIENDS</h3><p class="soc-empty">Sign in with Discord (bottom left) to add friends, see when they are online and invite them to co-op games.</p></div>';return;}
+  if(!st.me){root.innerHTML='<div class="soc-panel"><p class="soc-empty">Connecting…</p></div>';return;}
+  const order={game:0,online:1,offline:2},friends=[...st.friends].sort((a,b)=>order[a.status]-order[b.status]||a.name.localeCompare(b.name));
+  const on=friends.filter(f=>f.status!=='offline').length;
+  const row=(f,act)=>`<div class="fr ${f.status??''}"><div class="pic"><img src="${esc(f.picture??'')}" alt="" referrerpolicy="no-referrer">${f.status?'<i></i>':''}</div>
+    <div><strong>${esc(f.name)}${f.username?`<small>@${esc(f.username)}</small>`:''}</strong><div class="st">${esc(act==='friend'?statusText(f):act==='in'?'Wants to be friends':'Request sent')}</div></div>
+    <div class="act">${act==='friend'?`${f.status==='game'&&f.joinable?`<button class="p" data-join="${esc(f.room)}" data-page="${esc(f.page)}">JOIN</button>`:''}<button data-remove="${esc(f.id)}" title="Remove friend">✕</button>`
+      :act==='in'?`<button class="p" data-accept="${esc(f.id)}">ACCEPT</button><button data-decline="${esc(f.id)}">DECLINE</button>`:`<button data-cancel="${esc(f.id)}">CANCEL</button>`}</div></div>`;
+  root.innerHTML=`<div class="soc"><div class="soc-panel"><h3>FRIENDS <b>${on} ONLINE · ${friends.length}</b></h3>
+      ${friends.length?friends.map(f=>row(f,'friend')).join(''):'<p class="soc-empty">No friends yet. Add one by their username on the right, or press ADD FRIEND on a player in a co-op lobby.</p>'}</div>
+    <div style="display:grid;gap:18px">
+      <div class="soc-panel"><div class="soc-me"><img src="${esc(st.me.picture??'')}" alt="" referrerpolicy="no-referrer"><div><strong>${esc(st.me.name)}</strong><small>${st.me.username?'@'+esc(st.me.username):'Sign in again to get your @username'}</small></div></div>
+        <div class="soc-id">FRIEND ID <code>${esc(st.me.id)}</code><button type="button" data-copy="${esc(st.me.username||st.me.id)}">COPY</button></div></div>
+      <div class="soc-panel"><h3>ADD FRIEND</h3><form class="soc-add" id="soc-add"><input id="soc-name" placeholder="Username, name or friend ID" autocomplete="off" spellcheck="false"><button type="submit">SEND</button></form>
+        <div class="soc-msg ${socMsg.cls}">${esc(socMsg.text)}</div></div>
+      ${st.incoming.length?`<div class="soc-panel"><h3>REQUESTS <b>${st.incoming.length}</b></h3>${st.incoming.map(f=>row(f,'in')).join('')}</div>`:''}
+      ${st.outgoing.length?`<div class="soc-panel"><h3>SENT <b>${st.outgoing.length}</b></h3>${st.outgoing.map(f=>row(f,'out')).join('')}</div>`:''}
+    </div></div>`;
+  $('soc-add').onsubmit=async e=>{e.preventDefault();const q=$('soc-name').value.trim();if(!q)return;
+    try{const r=await request(q);socMsg=r.accepted?{text:'You are now friends',cls:'ok'}:r.already?{text:'Already friends',cls:'ok'}:{text:'Request sent',cls:'ok'};}catch(err){socMsg={text:err.message,cls:'err'};}renderSocial(st);};
+}
+$('social-root')?.addEventListener('click',async e=>{
+  const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  try{
+    if(d.accept)await accept(d.accept);else if(d.decline)await decline(d.decline);else if(d.cancel)await cancel(d.cancel);
+    else if(d.remove){if(confirm('Remove this friend?'))await remove(d.remove);}
+    else if(d.join)location.href=d.page+(d.page.includes('?')?'&':'?')+'room='+d.join;
+    else if(d.copy){await navigator.clipboard.writeText(d.copy).catch(()=>prompt('Your friend name',d.copy));b.textContent='COPIED';}
+  }catch(err){toast(err.message);}
+});
+onSocial(renderSocial);
 
 // ---- Play: map browser --------------------------------------------------------
 const modesOf=m=>m.modes??[(m.mode??'explore').toLowerCase()];
@@ -472,7 +513,7 @@ function renderMods(){
 }
 
 renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();renderCredits();
-showTab(['play','armory','career','mods','settings',...Object.keys(PANES)].includes(location.hash.slice(1))?location.hash.slice(1):'play');
+showTab(['play','armory','career','social','mods','settings',...Object.keys(PANES)].includes(location.hash.slice(1))?location.hash.slice(1):'play');
 window.menu={profile:()=>profile,thumb,showTab,stage};
 
 // ---- Classes (mods/classes): skill trees; progress in its own storage key ------------------

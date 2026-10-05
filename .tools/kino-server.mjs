@@ -46,7 +46,7 @@ async function discordUser(code) {
   const me = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: 'Bearer ' + access_token } });
   if (!me.ok) throw new Error('user lookup HTTP ' + me.status);
   const u = await me.json();
-  return { sub: 'discord:' + u.id, name: u.global_name || u.username,
+  return { sub: 'discord:' + u.id, name: u.global_name || u.username, username: u.username,
     picture: u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64` : `https://cdn.discordapp.com/embed/avatars/${(BigInt(u.id) >> 22n) % 6n}.png` };
 }
 
@@ -74,7 +74,8 @@ async function api(req, res, url) {
   if (req.method !== 'GET' && req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) return send(res, 403, { error: 'cross-origin request' });
   if (url === '/api/config' && req.method === 'GET') return send(res, 200, { signIn: ENABLED ? 'discord' : null, publicUrl: PUBLIC_URL || null });
   if (url === '/api/me' && req.method === 'GET') {
-    const s = session(req); return send(res, 200, s ? { signedIn: true, name: s.name, picture: s.picture } : { signedIn: false });
+    const s = session(req); if (s) remember(s);
+    return send(res, 200, s ? { signedIn: true, name: s.name, picture: s.picture, username: s.username || null, id: pubId(s.sub) } : { signedIn: false });
   }
   // Step 1: send the player to Discord with a one-time state value.
   if (url === '/api/auth/discord' && req.method === 'GET') {
@@ -115,7 +116,111 @@ async function api(req, res, url) {
       return send(res, 200, { ok: true });
     }
   }
+  if (url.startsWith('/api/social')) return socialApi(req, res, url);
   return send(res, 404, { error: 'unknown endpoint' });
+}
+
+// ---- Friends ------------------------------------------------------------------
+// social.json: users {sub: {name, username, picture, pid, seen}}, friends {sub: [sub]}, requests {toSub: [fromSub]}.
+// Players are addressed by `pid`, a hash of their account (Discord ids stay on the server). Presence comes from the
+// social socket (/api/social/ws) that the menu and game pages keep open while signed in: online (menu) or in game
+// (map, co-op room). Changes are pushed to friends: {t:'presence'|'request'|'friends'|'invite'}.
+const SOCIAL = join(DATA, 'social.json');
+const social = readJson(SOCIAL, { users: {}, friends: {}, requests: {} });
+let socialTimer = 0; const saveSocial = () => { clearTimeout(socialTimer); socialTimer = setTimeout(() => writeJson(SOCIAL, social), 300); };
+const pubId = sub => createHash('sha256').update('kino-friend:' + sub).digest('base64url').slice(0, 12);
+function remember(s) {
+  const u = social.users[s.sub] ??= {}, before = JSON.stringify(u);
+  Object.assign(u, { name: s.name, picture: s.picture, pid: pubId(s.sub) }); if (s.username) u.username = s.username;
+  if (JSON.stringify(u) !== before) saveSocial();
+}
+const subOf = pid => Object.keys(social.users).find(k => social.users[k].pid === pid);
+const friendsOf = sub => social.friends[sub] ??= [];
+const presence = new Map();   // sub -> Set of {sock, status}
+function statusOf(sub) {
+  const conns = [...(presence.get(sub) ?? [])];
+  if (!conns.length) return { status: 'offline', seen: social.users[sub]?.seen ?? null };
+  const g = conns.map(c => c.status).find(x => x.status === 'game');
+  if (!g) return { status: 'online' };
+  const room = g.room && rooms.get(g.room);
+  return { status: 'game', map: g.mapName || g.map || null, room: room ? room.code : null, page: room ? room.page : null,
+    players: room ? room.players.size : null, joinable: !!room && room.players.size < MAX_PLAYERS };
+}
+const view = sub => { const u = social.users[sub] ?? {}; return { id: u.pid, name: u.name, username: u.username ?? null, picture: u.picture, ...statusOf(sub) }; };
+const push = (sub, msg) => { for (const c of presence.get(sub) ?? []) wsSend(c.sock, msg); };
+const notifyFriends = sub => { const v = view(sub); for (const f of friendsOf(sub)) push(f, { t: 'presence', friend: v }); };
+function socialState(sub) {
+  return { me: view(sub), friends: friendsOf(sub).map(view), incoming: (social.requests[sub] ?? []).map(view),
+    outgoing: Object.entries(social.requests).filter(([, from]) => from.includes(sub)).map(([to]) => view(to)) };
+}
+function findUser(q, self) {
+  q = String(q || '').trim().replace(/^@/, '').toLowerCase(); if (!q) return null;
+  const all = Object.entries(social.users).filter(([k]) => k !== self);
+  const by = f => all.filter(([, u]) => f(u));
+  for (const list of [by(u => u.pid?.toLowerCase() === q), by(u => u.username?.toLowerCase() === q), by(u => u.name?.toLowerCase() === q)])
+    if (list.length === 1) return list[0][0]; else if (list.length > 1) return 'many';
+  return null;
+}
+function befriend(a, b) {
+  if (!friendsOf(a).includes(b)) friendsOf(a).push(b); if (!friendsOf(b).includes(a)) friendsOf(b).push(a);
+  for (const [x, y] of [[a, b], [b, a]]) social.requests[x] = (social.requests[x] ?? []).filter(f => f !== y);
+  saveSocial(); push(a, { t: 'friends' }); push(b, { t: 'friends' });
+}
+async function socialApi(req, res, url) {
+  const s = session(req); if (!s) return send(res, 401, { error: 'Sign in to use friends' });
+  remember(s); const me = s.sub;
+  if (url === '/api/social' && req.method === 'GET') return send(res, 200, socialState(me));
+  if (req.method !== 'POST') return send(res, 405, { error: 'method' });
+  let b; try { b = await body(req); } catch (e) { return send(res, 400, { error: e.message }); }
+  const other = b.id ? subOf(String(b.id)) : null;
+  if (url === '/api/social/request') {
+    const to = b.id ? other : findUser(b.name, me);
+    if (to === 'many') return send(res, 409, { error: 'Several players have that name: use their username' });
+    if (!to || to === me) return send(res, 404, { error: 'No player with that name has signed in here' });
+    if (friendsOf(me).includes(to)) return send(res, 200, { ok: true, already: true, ...socialState(me) });
+    if ((social.requests[me] ?? []).includes(to)) { befriend(me, to); return send(res, 200, { ok: true, accepted: true, ...socialState(me) }); }   // they asked first
+    const list = social.requests[to] ??= []; if (!list.includes(me)) list.push(me);
+    saveSocial(); push(to, { t: 'request', from: view(me) });
+    return send(res, 200, { ok: true, ...socialState(me) });
+  }
+  if (!other) return send(res, 404, { error: 'Unknown player' });
+  if (url === '/api/social/accept') { if (!(social.requests[me] ?? []).includes(other)) return send(res, 404, { error: 'No request from them' }); befriend(me, other); return send(res, 200, socialState(me)); }
+  if (url === '/api/social/decline') { social.requests[me] = (social.requests[me] ?? []).filter(f => f !== other); saveSocial(); return send(res, 200, socialState(me)); }
+  if (url === '/api/social/cancel') { social.requests[other] = (social.requests[other] ?? []).filter(f => f !== me); saveSocial(); push(other, { t: 'friends' }); return send(res, 200, socialState(me)); }
+  if (url === '/api/social/remove') {
+    social.friends[me] = friendsOf(me).filter(f => f !== other); social.friends[other] = friendsOf(other).filter(f => f !== me);
+    saveSocial(); push(other, { t: 'friends' }); return send(res, 200, socialState(me));
+  }
+  if (url === '/api/social/invite') {
+    if (!friendsOf(me).includes(other)) return send(res, 403, { error: 'Only friends can be invited' });
+    const room = rooms.get(String(b.room || '').toUpperCase()); if (!room) return send(res, 404, { error: 'Start or join a co-op game first' });
+    if (!presence.get(other)?.size) return send(res, 409, { error: 'They are offline' });
+    push(other, { t: 'invite', from: view(me), room: room.code, page: room.page, map: String(b.map || room.map || '').slice(0, 64) });
+    return send(res, 200, { ok: true });
+  }
+  return send(res, 404, { error: 'unknown endpoint' });
+}
+function onSocialSocket(req, sock) {
+  const s = session(req); if (!s) { sock.destroy(); return; }
+  remember(s);
+  const conn = { sock, status: { status: 'menu' } }, sub = s.sub;
+  if (!presence.has(sub)) presence.set(sub, new Set());
+  const wasOffline = !presence.get(sub).size; presence.get(sub).add(conn);
+  sock.setNoDelay(true);
+  const ping = setInterval(() => { if (!sock.destroyed) sock.write(Buffer.from([0x89, 0])); }, 25000);
+  wsSend(sock, { t: 'state', ...socialState(sub) });
+  if (wasOffline) notifyFriends(sub);
+  sock.on('close', () => {
+    clearInterval(ping); const set = presence.get(sub); set?.delete(conn);
+    if (!set?.size) { presence.delete(sub); (social.users[sub] ??= {}).seen = Date.now(); saveSocial(); }
+    notifyFriends(sub);
+  });
+  sock.on('error', () => {});
+  wsFrames(sock, msg => {
+    if (msg.t !== 'status') return;
+    conn.status = { status: msg.status === 'game' ? 'game' : 'menu', map: String(msg.map || '').slice(0, 64), mapName: String(msg.mapName || '').slice(0, 64), room: String(msg.room || '').slice(0, 8).toUpperCase() };
+    notifyFriends(sub);
+  });
 }
 
 // Code and data must never go stale (Cloudflare rewrites "no-cache" into a
@@ -176,12 +281,13 @@ function wsFrames(sock, onText) {
 function leave(client) {
   const room = client.room; if (!room) return; client.room = null;
   room.players.delete(client.id);
-  if (!room.players.size) { rooms.delete(room.code); return; }
+  if (!room.players.size) { rooms.delete(room.code); if (client.sub) notifyFriends(client.sub); return; }
+  for (const p of [client, ...room.players.values()]) if (p.sub) notifyFriends(p.sub);
   // The host runs the game; if it leaves, the longest-connected player takes over.
   if (room.host === client.id) room.host = room.players.keys().next().value;
   for (const p of room.players.values()) wsSend(p.sock, { t: 'left', id: client.id, host: room.host });
 }
-const publicPlayer = p => ({ id: p.id, name: p.name, character: p.character, variants: p.variants });
+const publicPlayer = p => ({ id: p.id, name: p.name, character: p.character, variants: p.variants, uid: p.uid ?? null });   // uid: the account's friend id (signed in)
 // A player's customisation picks for their character ({group: option id}, characters.json `variants`), kept small.
 const cleanVariants = v => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
@@ -191,7 +297,8 @@ const cleanVariants = v => {
 };
 let clientSerial = 0;
 function onSocket(req, sock) {
-  const s = session(req), client = { id: 'p' + (++clientSerial), sock, room: null, name: s?.name || 'Guest ' + (clientSerial % 1000), character: 'mannequin' };
+  const s = session(req), client = { id: 'p' + (++clientSerial), sock, room: null, name: s?.name || 'Guest ' + (clientSerial % 1000), character: 'mannequin', uid: s ? pubId(s.sub) : null, sub: s?.sub ?? null };
+  if (s) remember(s);
   sock.setNoDelay(true);
   const ping = setInterval(() => { if (!sock.destroyed) sock.write(Buffer.from([0x89, 0])); }, 25000);
   sock.on('close', () => { clearInterval(ping); leave(client); });
@@ -211,6 +318,7 @@ function onSocket(req, sock) {
         if (room.players.size >= MAX_PLAYERS) return wsSend(sock, { t: 'error', error: 'That game is full' });
       }
       room.players.set(client.id, client); client.room = room;
+      for (const p of room.players.values()) if (p.sub) notifyFriends(p.sub);
       wsSend(sock, { t: 'welcome', id: client.id, code: room.code, host: room.host, page: room.page, players: [...room.players.values()].map(publicPlayer) });
       for (const p of room.players.values()) if (p !== client) wsSend(p.sock, { t: 'joined', player: publicPlayer(client) });
       return;
@@ -234,9 +342,9 @@ const server = createServer(async (req, res) => {
 });
 server.on('upgrade', (req, sock) => {
   const url = new URL(req.url, 'http://x'), key = req.headers['sec-websocket-key'];
-  if (url.pathname !== '/api/ws' || !key || (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host)) { sock.destroy(); return; }
+  if (!['/api/ws', '/api/social/ws'].includes(url.pathname) || !key || (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host)) { sock.destroy(); return; }
   const accept = createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   sock.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
-  onSocket(req, sock);
+  if (url.pathname === '/api/social/ws') onSocialSocket(req, sock); else onSocket(req, sock);
 });
 server.listen(PORT, '0.0.0.0', () => console.log(`kino: http://0.0.0.0:${PORT}/ · data ${DATA} · Discord sign-in ${ENABLED ? 'on' : 'off (set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, KINO_PUBLIC_URL)'}`));

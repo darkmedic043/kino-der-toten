@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { Net } from '../../net.js';
 import { roundPopulation } from '../../rules.js';
 import { loadProfile, cloudReady } from '../../profile.js';
+import { startSocial, onSocial, socialState, request as friendRequest, invite as friendInvite, isFriend, isPending, statusText } from '../../social.js';
 import { loadCharacterRegistry, createCharacter, holdWeapon, applyStance } from '../../characters.js';
 
 const SNAP_RATE=12,POSE_RATE=15,STATES=['chase','attack','barricade','entering','rising'];
@@ -395,10 +396,20 @@ export default async function setup(api){
     #coop-lobby .tag.ok{color:#7fd36a}#coop-lobby .tag.in{color:#d9c3a0}
     #coop-lobby .empty{padding:14px 0;font-size:10px;letter-spacing:2px;color:#575c56;border-bottom:1px dashed #776b5226}
     @media(max-width:820px){#coop-lobby{grid-template-columns:1fr;padding:30px 20px}#coop-lobby .l-left,#coop-lobby .l-right{align-self:start}}
+    #coop-lobby .add{margin-top:7px;border:1px solid #776b5266;background:#05050580;color:#ccc3ae;font:700 9px Arial;letter-spacing:2px;padding:5px 8px}
+    #coop-lobby .add:hover{border-color:#b5372c;color:#fff}#coop-lobby .fr-tag{display:inline-block;margin-top:7px;font-size:9px;letter-spacing:2px;color:#7fd36a}
+    #coop-lobby .invs{max-height:240px;overflow:auto}
+    #coop-lobby .inv{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #776b5226}
+    #coop-lobby .inv>i{width:9px;height:9px;border-radius:50%;background:#5a5650}#coop-lobby .inv.online>i{background:#5fd068}#coop-lobby .inv.game>i{background:#e0a83a}
+    #coop-lobby .inv b{display:block;font-size:13px;font-weight:400}#coop-lobby .inv small{display:block;font-size:10px;color:#8c8272;margin-top:2px}
+    #coop-lobby .inv.offline{opacity:.55}
+    #coop-lobby .invf{border:1px solid #b03f31;background:#932e25;color:#fff;font:700 9px Arial;letter-spacing:2px;padding:7px 10px}#coop-lobby .invf:disabled{opacity:.5;background:#2a1f16}
+    #coop-lobby .inv-empty{font-size:10px;letter-spacing:1px;color:#575c56;padding:10px 0;line-height:1.6}
     #coop-click{position:fixed;left:50%;top:60%;transform:translateX(-50%);z-index:20;padding:12px 18px;border:1px solid #b03f31;background:#0b0c0be6;color:#eee8dc;font:700 11px Arial;letter-spacing:3px;pointer-events:none}`;
   document.head.append(st);document.body.append(lob);
   const isReady=id=>lobby.ready.has(id);
-  const MAX=4;
+  const MAX=4,invited=new Set();
+  startSocial().then(()=>onSocial(()=>{if(!lobby.go)renderLobby();}));
   // what this player shows on their card
   function myInfo(){
     const c=window.kino.classes,st=window.kino.debug.getState();
@@ -413,8 +424,14 @@ export default async function setup(api){
     const card=p=>{const i=lobby.info[p.id]??{},ready=isReady(p.id),pct=ready?100:i.p??0;
       const sub=[i.op,i.cls&&(i.cls+(i.lvl?' · LV '+i.lvl:''))].filter(Boolean).join(' · ')||'Joining…';
       const tag=i.in?'<span class="tag in">IN GAME</span>':ready?'<span class="tag ok">READY</span>':`<span class="tag">LOADING ${pct}%</span>`;
+      // ADD FRIEND: signed-in players who aren't friends yet (and only when I'm signed in)
+      const soc=socialState(),add=p.id!==net.id&&p.uid&&soc.signedIn&&p.uid!==soc.me?.id?(isFriend(p.uid)?'<span class="fr-tag">FRIEND</span>':isPending(p.uid)?'<span class="fr-tag">REQUESTED</span>':`<button type="button" class="add" data-uid="${esc(p.uid)}">+ ADD FRIEND</button>`):'';
       return `<div class="pl${p.id===net.id?' me':''}"><div class="av">${esc((p.name||'?')[0].toUpperCase())}</div>
-        <div><div class="nm">${esc(p.name)}${p.id===net.hostId?'<em>HOST</em>':''}${p.id===net.id?'<em>YOU</em>':''}</div><div class="sub">${esc(sub)}</div>${ready?'':`<div class="bar"><i style="width:${pct}%"></i></div>`}</div>${tag}</div>`;};
+        <div><div class="nm">${esc(p.name)}${p.id===net.hostId?'<em>HOST</em>':''}${p.id===net.id?'<em>YOU</em>':''}</div><div class="sub">${esc(sub)}</div>${ready?'':`<div class="bar"><i style="width:${pct}%"></i></div>`}${add}</div>${tag}</div>`;};
+    // friends to invite: online ones not already here
+    const soc=socialState(),here=new Set(all.map(p=>p.uid).filter(Boolean));
+    const inv=soc.signedIn?soc.friends.filter(f=>!here.has(f.id)).sort((a,b)=>(a.status==='offline')-(b.status==='offline')):[];
+    const invHtml=!soc.signedIn?'<div class="inv-empty">Sign in on the main menu to invite friends.</div>':inv.length?inv.map(f=>`<div class="inv ${f.status}"><i></i><div><b>${esc(f.name)}</b><small>${esc(statusText(f))}</small></div>${f.status==='offline'?'':`<button type="button" class="invf" data-fid="${esc(f.id)}"${invited.has(f.id)?' disabled':''}>${invited.has(f.id)?'SENT':'INVITE'}</button>`}</div>`).join(''):'<div class="inv-empty">No friends to invite yet: add them from the SOCIAL tab, or with + ADD FRIEND here.</div>';
     const waiting=all.filter(p=>!isReady(p.id)).length;
     lob.innerHTML=`<div class="l-left"><div class="kicker">ZOMBIES <span>CO-OP</span></div><p class="chapter">CO-OP LOBBY</p><h1>${esc(title)}</h1>
         <div class="room"><small>ROOM</small><b>${esc(net.code)}</b></div>
@@ -422,7 +439,10 @@ export default async function setup(api){
           lobby.started?`<button type="button" class="go">JOIN THE GAME <span>→</span></button>`:`<div class="wait">WAITING FOR THE HOST TO START</div>`}
           <div class="sec"><button type="button" class="invite">COPY INVITE</button><button type="button" class="leave">MAIN MENU</button></div></div>
         <p class="status">${net.isHost?(allReady?'Everyone is loaded in. Start the game for everyone.':`Waiting for ${waiting} player${waiting===1?'':'s'} to finish loading…`):lobby.started?'The game is under way.':'The host starts the game for everyone once all players are loaded in.'}</p></div>
-      <div class="l-right"><div class="squad">SQUAD <b>${all.length} / ${MAX}</b></div>${all.map(card).join('')}${Array.from({length:Math.max(0,MAX-all.length)},()=>'<div class="empty">OPEN SLOT · SHARE THE INVITE</div>').join('')}</div>`;
+      <div class="l-right"><div class="squad">SQUAD <b>${all.length} / ${MAX}</b></div>${all.map(card).join('')}${Array.from({length:Math.max(0,MAX-all.length)},()=>'<div class="empty">OPEN SLOT · INVITE A FRIEND BELOW</div>').join('')}
+        <div class="squad" style="margin-top:22px">INVITE FRIENDS <b>${inv.filter(f=>f.status!=='offline').length} ONLINE</b></div><div class="invs">${invHtml}</div></div>`;
+    for(const b of lob.querySelectorAll('.add'))b.onclick=async e=>{e.stopPropagation();b.disabled=true;try{await friendRequest({id:b.dataset.uid});api.toast('Friend request sent',2);}catch(err){api.toast(err.message,3);}renderLobby();};
+    for(const b of lob.querySelectorAll('.invf'))b.onclick=async e=>{e.stopPropagation();b.disabled=true;try{await friendInvite(b.dataset.fid,net.code,document.getElementById('map-title')?.textContent);invited.add(b.dataset.fid);}catch(err){api.toast(err.message,3);}renderLobby();};
     lob.querySelector('.invite').onclick=async e=>{e.stopPropagation();try{await navigator.clipboard.writeText(invite);e.target.textContent='LINK COPIED';}catch{prompt('Invite link',invite);}};
     lob.querySelector('.leave').onclick=e=>{e.stopPropagation();location.href='/';};
     const go=lob.querySelector('.go');if(go)go.onclick=e=>{e.stopPropagation();if(net.isHost)startAll();else enter();};

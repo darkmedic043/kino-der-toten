@@ -127,3 +127,4 @@
 - **2026-10-05 (FPS)**: Kino frame drops traced to transparent double-sided materials re-checking shaders twice a frame; forceSinglePass gives about +20% FPS (performance.md).
 - **2026-10-05 (FPS cap slider)**: the frame rate cap is a slider (15–240, Unlimited) and the number can be clicked to type any cap (core.md).
 - **2026-10-05 (co-op lobby)**: the lobby is a full-screen menu with the squad on the right (operator, class, loading %, ready/in game), and the host's START GAME starts everyone (coop.md).
+- **2026-10-05 (friends)**: friends system: SOCIAL tab (add by username, requests, online / in game / last seen, JOIN), in-game status, ADD FRIEND and INVITE FRIENDS in the co-op lobby, notifications in the top right (coop.md).

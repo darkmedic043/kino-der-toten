@@ -11,3 +11,14 @@
   - **Messages:** players send `{t:'linfo', p, op, cls, lvl, in}` to the host each second while loading, on ready and on start. The host keeps `lobby.info` and broadcasts it in `lobby`.
   - **Start for everyone:** a guest that's loaded enters on the host's started flag via `enter(false)`. It runs `kino.debug.resume()`, so the game starts at once, and shows "THE GAME HAS STARTED · CLICK TO PLAY" until the first click, which captures the mouse (pointer lock needs a gesture). A guest still loading enters as soon as it's ready.
   - Tested with two browsers: the guest went in when the host started.
+- **Friends (2026-10-05):** a signed-in (Discord) friends system.
+  - **Server** (`.tools/kino-server.mjs`):
+    - `social.json` in the data dir holds users {name, username, picture, pid, seen}, friends, and requests {to: [from]}.
+    - Players are addressed by `pid`, a 12-character hash of their account, so Discord ids stay on the server. Sign-in now also stores the Discord `username`; older sessions get it on their next sign-in.
+    - API: `GET /api/social` gives {me, friends, incoming, outgoing}, each with a status. POST `/api/social/request` takes {name} (pid, username or display name; display names only when unique) or {id}. A request to someone who already asked you makes you friends. Also POST `accept`, `decline`, `cancel`, `remove` and `invite` {id, room, map} (friends only, online only, the room must exist).
+    - Presence: a social WebSocket `/api/social/ws` (signed-in only; menu and game pages). Clients send {t:'status', status:'menu'|'game', map, mapName, room}; the server pushes `presence`, `request`, `friends` and `invite` to friends. Status reads offline (with last seen), online, or game (map, co-op room, players, joinable); room joins and leaves update it.
+    - Room players carry `uid` (their pid) so lobbies can offer ADD FRIEND.
+  - **Client** (`social.js`): `startSocial`, `setStatus`, `onSocial`, the request/accept/… calls and `statusText`. Friend requests (ACCEPT/DECLINE) and game invites (JOIN/LATER) show as notifications in the top right on any page.
+    - Main menu: a SOCIAL tab with a request badge on the nav. It lists friends sorted in game / online / offline with a status dot, JOIN when their co-op room has space, and remove. It also shows your card (@username, friend ID, COPY), ADD FRIEND by username, name or ID, and incoming and sent requests.
+    - Game: `mods/social` reports In game with the map and co-op room every 2 s on change. The co-op lobby has + ADD FRIEND on signed-in players (or FRIEND / REQUESTED) and an INVITE FRIENDS list (online first, INVITE, then SENT).
+  - Tested with a throwaway server (`KINO_DATA` in the scratchpad, port 5199) and two made-up sessions: request by username, then the notification and ACCEPT; status online, then in game (co-op 1/4, JOIN); lobby INVITE gave a JOIN notification that opened the room.

@@ -20,6 +20,7 @@
     <button data-tab="play" class="active">PLAY</button>
     <button data-tab="armory">ARMORY</button>
     <button data-tab="career">CAREER</button>
+    <button data-tab="social">SOCIAL <b id="social-badge" hidden></b></button>
     <button data-tab="mods">MODS</button>
     <button data-tab="settings">SETTINGS</button>
   </nav>
@@ -98,6 +99,11 @@
     <header class="tab-head"><span class="eyebrow">CAREER</span><span class="muted small">Lifetime stats · overall, per map and per weapon</span></header>
     <div id="career-root" class="career"></div>
   </section>
+  <section id="tab-social" class="tab">
+    <header class="tab-head"><span class="eyebrow">SOCIAL</span><span class="muted small">Friends see when you're online or in a game · invite them from a co-op lobby</span></header>
+    <div id="social-root"></div>
+  </section>
+
   <section id="tab-settings" class="tab">
     <header class="tab-head"><span class="eyebrow">SETTINGS</span><span class="muted small">Saved in this browser · also available from the pause menu in game</span></header>
     <div class="settings-panel" id="settings-panel"></div>
