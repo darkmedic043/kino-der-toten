@@ -39,6 +39,10 @@ function draw(kind){
     for(let y=0;y<S;y+=T)for(let x=0;x<S;x+=T){for(const tri of [[[x,y],[x+T,y],[x,y+T]],[[x+T,y],[x+T,y+T],[x,y+T]]]){g.fillStyle=cols[Math.floor(r()*cols.length)];g.beginPath();tri.forEach(([a,b],k)=>k?g.lineTo(a,b):g.moveTo(a,b));g.closePath();g.fill();}}
     g.strokeStyle='rgba(255,255,255,.35)';g.lineWidth=1;for(let i=0;i<=S;i+=T){g.beginPath();g.moveTo(i,0);g.lineTo(i,S);g.moveTo(0,i);g.lineTo(S,i);g.moveTo(i,0);g.lineTo(0,i);g.moveTo(S,i);g.lineTo(i,S);g.stroke();}
     for(let i=0;i<160;i++){const x=r()*S,y=r()*S,l=2+r()*6;g.strokeStyle=`rgba(255,255,255,${.4+r()*.6})`;g.beginPath();g.moveTo(x-l,y);g.lineTo(x+l,y);g.moveTo(x,y-l);g.lineTo(x,y+l);g.stroke();}}
+  else if(kind==='cheese'){   // swiss cheese: pale yellow with soft olive holes (the Cheese Cube reward)
+    g.fillStyle='#f6e78f';g.fillRect(0,0,S,S);
+    for(let i=0;i<46;i++){const x=r()*S,y=r()*S,rad=10+r()*38;
+      wrap(()=>{g.fillStyle='#e9d977';g.beginPath();g.ellipse(x,y+2,rad*1.1,rad*.95,0,0,6.283);g.fill();g.fillStyle='#d4c566';g.beginPath();g.ellipse(x,y+3,rad,rad*.88,0,0,6.283);g.fill();});}}
   else if(kind==='gold'){const gr=g.createLinearGradient(0,0,S,S);gr.addColorStop(0,'#f7d77a');gr.addColorStop(.3,'#c9952f');gr.addColorStop(.55,'#ffe9a8');gr.addColorStop(.8,'#a8761e');gr.addColorStop(1,'#f7d77a');
     g.fillStyle=gr;g.fillRect(0,0,S,S);for(let i=0;i<900;i++){g.fillStyle=`rgba(${r()<.5?'255,240,190':'120,80,20'},${.05+r()*.08})`;g.fillRect(r()*S,r()*S,1+r()*40,1);}}
   else{g.fillStyle='#777';g.fillRect(0,0,S,S);}
@@ -115,7 +119,7 @@ export function classGuns(weapons,key){return Object.keys(weapons??{}).filter(id
 
 // ---- challenges -------------------------------------------------------------------------------
 export const camoProgress=(profile,id)=>profile.camo?.[id]?.p??{};
-const baseCamos=cats=>cats.camos.filter(c=>!c.mastery&&!c.classMastery);
+const baseCamos=cats=>cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward);   // reward camos come from a map's reward flag (profile.rewards), not a challenge
 // a gun has Gold (its mastery) when every challenge camo is done
 export function hasMastery(cats,profile,id){const p=camoProgress(profile,id);return baseCamos(cats).every(c=>(p[c.challenge]??0)>=c.count);}
 // Diamond progress for a gun's class: guns with Gold / guns in the class
@@ -128,6 +132,7 @@ export function camoUnlocked(cats,profile,id,weapons){
   if(list.every(c=>done.has(c.id)))for(const c of cats.camos)if(c.mastery)done.add(c.id);
   const cp=classProgress(cats,profile,id,weapons);
   if(cp&&cp.total&&cp.done===cp.total)for(const c of cats.camos)if(c.classMastery)done.add(c.id);
+  for(const c of cats.camos)if(c.reward&&profile.rewards?.[c.reward])done.add(c.id);
   return done;
 }
 export function equippedCamo(cats,profile,id,weapons){

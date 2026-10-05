@@ -69,3 +69,5 @@ The CoD Online mod guns (`mods/bo3-weapons`) level up like the rest. Their model
 - **Iron sights** fold with an optic on the AUG (`tag_up`, `tag_down`) and M1014 (`tag_up`) (`ironSights`).
 - **Camo class**: `weaponClass(d)` honours `d.weaponClass` (the build sets it: the DG-2 is a Wonder weapon, G18 Pistol, P90 SMG, M1014 Shotgun, MR23/AUG Rifle). The DG-2 has no attachments (wonder weapon).
 - `$black_color` diffuse (BO3 placeholder) → black base colour in `semodel_to_glb.py`.
+
+- **Reward camos (2026-10-04)**: a camo with `"reward": "<flag>"` in `camos.json` is not a challenge camo (it is left out of the Gold and Gunsmith counts) and unlocks when `profile.rewards[flag]` is set (camo.js `camoUnlocked`, Gunsmith shows it locked with the camo's `challenge` text until then). Swiss Cheese (`procedural: cheese`, flag `cheese`) is the first: Cheese Cube's mod sets it when the ending is bought, writing the shared profile (`rewards`) and the in-memory weapon-levels profile.

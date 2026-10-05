@@ -5,7 +5,8 @@
     "headshots": "Headshot kills",
     "low": "Kills while crouched or prone",
     "moving": "Kills while sliding or diving",
-    "multi": "Multi-kills (2+ within 1.5 s)"
+    "multi": "Multi-kills (2+ within 1.5 s)",
+    "cheese": "Buy the ending of Cheese Cube Unlimited"
   },
   "camos": [
     {
@@ -60,6 +61,16 @@
       "metal": true,
       "mix": 0.95,
       "scale": 1.5
+    },
+    {
+      "id": "cheese",
+      "name": "Swiss Cheese",
+      "reward": "cheese",
+      "challenge": "cheese",
+      "count": 1,
+      "procedural": "cheese",
+      "scale": 1.4,
+      "mix": 0.92
     }
   ]
 }

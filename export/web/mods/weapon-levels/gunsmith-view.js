@@ -234,10 +234,10 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   function swatch(c){if(swatchCache.has(c.id))return swatchCache.get(c.id);const img=camoTexture(c).image;let url='';
     try{if(img instanceof HTMLCanvasElement)url=img.toDataURL('image/jpeg',.7);else if(img?.src)url=img.src;}catch{}swatchCache.set(c.id,url);return url;}
   function renderCamos(el){
-    const done=camoUnlocked(cats,profile,id,weapons),p=camoProgress(profile,id),on=equippedCamo(cats,profile,id,weapons)?.id,base=cats.camos.filter(c=>!c.mastery&&!c.classMastery),cp=classProgress(cats,profile,id,weapons);
+    const done=camoUnlocked(cats,profile,id,weapons),p=camoProgress(profile,id),on=equippedCamo(cats,profile,id,weapons)?.id,base=cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward),cp=classProgress(cats,profile,id,weapons);
     el.innerHTML='<h3>CAMO</h3>'+`<button class="opt${on?'':' on'}" data-camo=""><strong>None</strong><div class="pc"><span class="neu">Factory finish</span></div></button>`+
       cats.camos.filter(c=>!c.classMastery||cp).map(c=>{const locked=!done.has(c.id);
-        const have=c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:Math.min(c.count,p[c.challenge]??0),need=c.classMastery?cp.total:c.mastery?base.length:c.count;
+        const have=c.reward?(done.has(c.id)?1:0):c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:Math.min(c.count,p[c.challenge]??0),need=c.classMastery?cp.total:c.mastery?base.length:c.count;
         const what=c.classMastery?`Gold on every ${cp.label.toLowerCase().replace(/s$/,'')}`:c.mastery?'Complete every challenge camo':cats.challenges[c.challenge];
         return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'LOCKED':''}</span>
           <div class="camo-row"><i class="sw" style="background-image:url(${swatch(c)})"></i><div><strong>${esc(c.name)}</strong>

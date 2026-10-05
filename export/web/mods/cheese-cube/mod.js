@@ -35,14 +35,9 @@ export default async function setup(api){
   if(mp40){
     api.data.weapons.cheese_gun={...mp40,id:'cheese_gun',baseId:'mp40_zm',name:'Cheese Gun',price:1000,damage:250,minDamage:250,clipSize:30,startAmmo:210,maxAmmo:210};
     for(const e of world.interactions)if(e.kind==='wallbuy'&&e.weapon==='mp40_zm')e.weapon='cheese_gun';
-    // Its own camo: the map's swiss cheese texture, always on this gun (the weapon-levels camo system paints it on the
-    // viewmodel, the held gun and the box). Added as a camo nobody can earn, so it only shows on the Cheese Gun.
-    const camos=window.kino.camo?.cats;
-    if(camos){
-      camos.challenges??={};camos.challenges.cheese='Own the Cheese Gun';
-      camos.camos.push({id:'cheese',name:'Swiss Cheese',challenge:'cheese',count:1,texture:new URL(api.map.dir.replace(/\/?$/,'/')+'camo/swiss_cheese.png',document.baseURI).href,scale:1.4,mix:.92});
-      Object.defineProperty(api.data.weapons.cheese_gun,'camo',{get:()=>'cheese',set(){},configurable:true,enumerable:true});
-    }
+    // Its own camo: Swiss Cheese (weapon-levels camos.json, a reward camo), always on this gun. Buying the ending unlocks it
+    // for every gun (see theEnding).
+    Object.defineProperty(api.data.weapons.cheese_gun,'camo',{get:()=>'cheese',set(){},configurable:true,enumerable:true});
   }
 
   // ---- tweens for the small moving pieces (the static-scene optimizer froze their transforms, so update the matrices)
@@ -192,7 +187,16 @@ export default async function setup(api){
   // ---- The ending: pay 25000 at the top ("if thou art worthy") once the puzzle is solved, then the map is won
   const ending=named('cheese_ending')[0];
   // The hammer rises with thunder, the screen goes black, then the map's closing cards (as the original: about 45 s).
+  async function unlockCheeseCamo(){
+    try{
+      const {loadProfile,saveProfile}=await import('../../profile.js');
+      const fresh=loadProfile();fresh.rewards={...fresh.rewards,cheese:true};saveProfile(fresh);
+      const wl=window.kino.weaponLevels;if(wl?.profile){wl.profile.rewards={...wl.profile.rewards,cheese:true};wl.apply?.();}
+      setTimeout(()=>toast('Swiss Cheese camo unlocked for every gun',5),3000);
+    }catch(e){console.warn('cheese camo reward failed',e);}
+  }
   function theEnding(){
+    unlockCheeseCamo();
     sound('thor_end',{volume:.85});
     tween('ENT_thor_hammer','y',100,4,0);
     tweens.push({objs:nodes('ENT_thor_hammer'),axis:'y',from:100,to:170,t0:now()+4,dur:10});
