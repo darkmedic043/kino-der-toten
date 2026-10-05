@@ -11,4 +11,4 @@ unzip -q -o "$zip" '*/BlendFile/GyroZeppeli.blend' -d "$tmp"
 mkdir -p "$out"
 blender -b "$tmp"/*/BlendFile/GyroZeppeli.blend -P "$root/.tools/build_gyro_blend.py" -- "$tmp/gyro.glb" | grep -E "wrote|Error" || true
 cp "$tmp/gyro.glb" "$out/gyro.glb"
-echo "built $out/gyro.glb"
+echo "built $out/gyro.glb (bump the ?v= on its model path in characters.json, or browsers keep the old one for a day)"

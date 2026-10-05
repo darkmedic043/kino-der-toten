@@ -1295,7 +1295,7 @@
       "name": "Gyro Zeppeli",
       "type": "gltf",
       "motion": "bo1",
-      "model": "models/gyro/gyro.glb",
+      "model": "models/gyro/gyro.glb?v=2",
       "yaw": 180,
       "height": 78,
       "color": "#4a2a78",
