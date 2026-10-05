@@ -241,7 +241,18 @@ export default async function setup(api){
     host.camera=null;host.hideViewmodel=false;showPanel();
   }
   net.on('revive',()=>{if(me.down&&!me.dead){getUp();api.announce('Revived','BACK IN THE FIGHT',3);}});
-  function respawnIfDead(){if(me.dead||me.down){getUp();player.respawn?.();api.announce('Respawned','NEW ROUND',3);}}
+  // Back at the next round, next to a teammate who is still standing (walkable ground beside them), or at the map's
+  // spawn if nobody is. The spawn alone could be cut off behind doors, or under Cheese Cube's rising cheese.
+  function respawnIfDead(){
+    if(!(me.dead||me.down))return;
+    getUp();
+    const mate=[...remotes.values()].find(r=>!r.down&&!r.dead&&r.pos);
+    let spot=null;
+    if(mate)for(const a of [0,1.6,3.1,4.7]){const p=mate.pos.clone().add(new THREE.Vector3(Math.cos(a)*45,0,Math.sin(a)*45));const c=world.closest?.(p,{x:40,y:50,z:40});if(c&&Math.abs(c.y-mate.pos.y)<40){spot=c;break;}}
+    if(!spot&&mate)spot=mate.pos.clone();
+    if(spot)player.setPosition(spot);else player.respawn?.();
+    api.announce('Respawned','NEW ROUND',3);
+  }
   function checkGameOver(){
     if(!coop())return;
     const everyone=[me,...remotes.values()];
