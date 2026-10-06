@@ -296,6 +296,9 @@ export default async function setup(api){
     at(T+105.5,()=>card(80,'Coming Soon',5,2.2));
     at(T+120.5,()=>{veil.style.opacity=0;});
     host.on('reset',()=>{veil.remove();cardStyle.remove();for(const c of document.querySelectorAll('.cc-card'))c.remove();});
+    // the game-over menu comes up at 114.5 s, while the black is still held: lift it (and any card) so the menu shows
+    host.on('gameOver',()=>{veil.style.transition='opacity 1s';veil.style.opacity=0;for(const c of document.querySelectorAll('.cc-card'))c.remove();
+      cinematic=false;document.body.classList.remove('cc-cinematic');});
   }
   // the ending's schedule (game time) and the lounge hold: no walking off, no shooting (Esc still opens the menu)
   const timeline=[];let cinematic=false,lounge=null;

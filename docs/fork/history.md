@@ -130,3 +130,4 @@
 - **2026-10-05 (friends)**: friends system: SOCIAL tab (add by username, requests, online / in game / last seen, JOIN), in-game status, ADD FRIEND and INVITE FRIENDS in the co-op lobby, notifications in the top right (coop.md).
 - 2026-10-06: Pilot chaingun and Arc Thrower buffed (classes.md).
 - 2026-10-06: Rocket Fist lunge is a smooth slide instead of a teleport (classes.md).
+- 2026-10-06: Cheese Cube ending lifts its black screen at game over (waw-ports.md).
