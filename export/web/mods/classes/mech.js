@@ -360,8 +360,21 @@ export async function setupMech(ctx){
   }
   function punch(side,a,w,f){
     a.punch=1;recoil(side,1.2);sfx.punch();addHeat(a,w.heat);
-    const feet=player.getFeetPosition(),flat=f.clone().setY(0).normalize(),cos=Math.cos(THREE.MathUtils.degToRad(w.arc/2));
-    if(w.dash){const step=flat.clone().multiplyScalar(70),to=feet.clone().add(step);if(world.lineClear(feet.clone().addScaledVector(up,30),to.clone().addScaledVector(up,30)))player.setPosition(to);}
+    const flat=f.clone().setY(0).normalize();
+    // Lunge: slide forward over LUNGE_T (eased, stopping at walls), then land the punch from where it ends
+    if(w.dash){lunge={side,w,flat,t:0,done:0};return;}
+    strike(side,w,flat);
+  }
+  const LUNGE=70,LUNGE_T=.14;let lunge=null;
+  function stepLunge(dt){
+    const L=lunge;L.t=Math.min(1,L.t+dt/LUNGE_T);
+    const want=LUNGE*(1-(1-L.t)**2),feet=player.getFeetPosition(),to=feet.clone().addScaledVector(L.flat,want-L.done);
+    const clear=world.lineClear(feet.clone().addScaledVector(up,30),to.clone().addScaledVector(L.flat,20).addScaledVector(up,30));
+    if(clear){player.setPosition(to);L.done=want;}
+    if(!clear||L.t>=1){lunge=null;strike(L.side,L.w,L.flat);}
+  }
+  function strike(side,w,flat){
+    const cos=Math.cos(THREE.MathUtils.degToRad(w.arc/2));
     const center=player.getFeetPosition();
     for(const z of [...enemies.list]){
       if(z.state==='rising')continue;
@@ -417,7 +430,7 @@ export async function setupMech(ctx){
     const at=drop.at;world3.root.position.copy(at);
     sfx.land();mblast(at,230*(1+(M.mech.landing??0)),1.3*(1+(M.mech.landing??0)));window.kino.fx?.knockback?.(at);camKick=1.4;
     // climb in
-    phase='piloting';landedAt=session.time;coreUsed=false;lastHitT=session.time;
+    phase='piloting';lunge=null;landedAt=session.time;coreUsed=false;lastHitT=session.time;
     maxIntegrity=integrity=M.mech.duration;shield=M.mech.shield??0;
     arms.left=newArm(M.left);arms.right=newArm(M.right);fp.setWeapons(M.left.id,M.right.id);
     saved={move:player.moveSpeed,sprint:player.sprintSpeed,jump:player.jumpHeight,crouch:player.crouchSpeed};
@@ -488,6 +501,7 @@ export async function setupMech(ctx){
       if(Math.random()<.6)window.kino.fx?.burn?.(world3.root.position.clone().addScaledVector(up,30));
       if(k>=1)land();
     }
+    if(phase==='piloting'&&lunge)stepLunge(dt);   // before the cockpit lift: setPosition puts the camera back at player eye height
     const feet=player.getFeetPosition();speed=lastFeet?feet.clone().sub(lastFeet).setY(0).length()/dt:0;lastFeet=feet.clone();
     if(phase==='piloting'){
       session.effects.invulnerable=Math.max(session.effects.invulnerable??0,session.time+.25);

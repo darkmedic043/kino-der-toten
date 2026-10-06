@@ -82,7 +82,7 @@ Third class, **Pilot** (`classes.json` id `mech`; named Mech until the user aske
   - **Weapons**, by `mode`:
     - `auto` (chaingun): spin-up, hitscan with spread, pierce augment.
     - `charge` (rail): hold to charge, damage scales with charge², pierces the whole line.
-    - `semi`: rocket bursts as projectiles with splash, homing and cluster augments; thermite shells under gravity that leave fire pools; the fist hits a cone with knockback, plus pound, dash and execute augments.
+    - `semi`: rocket bursts as projectiles with splash, homing and cluster augments; thermite shells under gravity that leave fire pools; the fist hits a cone with knockback, plus pound, dash and execute augments. Dash (Rocket Fist) is a 70-unit eased lunge over 0.14 s (`stepLunge`, stops at walls) and the punch lands where it ends; it runs before the cockpit eye lift, because `setPosition` resets the camera to player eye height.
     - `beam` (arc): ticks onto the zombie nearest the crosshair and chains (3 jumps at 80%). 2026-10-06 buff: chaingun 0.2 health + 45 a round (was 0.12 + 30), spin-up 0.35 s, heat 0.018; arc 0.16 a tick (was 0.085), heat 0.03.
     - Damage is a fraction of the round's zombie health (like the other classes' skills), through `enemies.hurt(..., 'mech')` (score on).
   - **Heat** per arm: firing adds it, and it cools at .38/s after 0.35 s idle. At 1 the arm overheats and vents at .55/s back to 0 before it can fire again.
