@@ -388,6 +388,15 @@ export async function setupMech(ctx){
   }
 
   // ---- call-in, piloting, eject -------------------------------------------------------------------------------------
+  // The floor under a spot on the player's level: cast down from just above the player's feet height (casting from 200 up
+  // found the floor above, or the roof, in low rooms and put the mech, and then the player, on top of the map). Nothing
+  // within a short drop, or a spot the player can't see: their own feet.
+  function groundAt(p,feet){
+    const from=new THREE.Vector3(p.x,feet.y+45,p.z);
+    if(!world.lineClear(feet.clone().addScaledVector(up,45),from))return feet.clone();
+    const h=world.raycast(new THREE.Ray(from,up.clone().negate()),0,165);
+    return h?new THREE.Vector3(p.x,from.y-h.distance,p.z):feet.clone();
+  }
   function deploy(){
     if(!pilot)return;
     const st=api.getState();
@@ -399,7 +408,7 @@ export async function setupMech(ctx){
     const feet=player.getFeetPosition(),fwd=aimDir().setY(0).normalize();
     let at=feet.clone().addScaledVector(fwd,150);
     if(!world.lineClear(feet.clone().addScaledVector(up,40),at.clone().addScaledVector(up,40)))at=feet.clone().addScaledVector(fwd,40);
-    const g=world.raycast(new THREE.Ray(at.clone().addScaledVector(up,200),up.clone().negate()),0,600);if(g)at.y=g.point?.y??at.y;
+    at=groundAt(at,feet);
     phase='falling';drop={at,t:0,yaw:Math.atan2(fwd.x,fwd.z)};
     world3.setWeapons(M.left.id,M.right.id);world3.setMount(M.mech.mount);world3.root.visible=true;world3.root.position.copy(at).addScaledVector(up,1800);world3.root.rotation.y=drop.yaw;
     sfx.whistle();api.announce?.('MECH INBOUND','STAND BY',1.2);ctx.hud();
@@ -413,7 +422,9 @@ export async function setupMech(ctx){
     arms.left=newArm(M.left);arms.right=newArm(M.right);fp.setWeapons(M.left.id,M.right.id);
     saved={move:player.moveSpeed,sprint:player.sprintSpeed,jump:player.jumpHeight,crouch:player.crouchSpeed};
     player.moveSpeed=saved.move*.82*M.mech.speed;player.sprintSpeed=saved.move*1.12*M.mech.speed;player.jumpHeight=0;player.crouchSpeed=player.moveSpeed;
-    const g=at.clone();player.setPosition(g);
+    // climb in where it landed if the player can reach it, else where the player stands now
+    const now=player.getFeetPosition(),reach=world.lineClear(now.clone().addScaledVector(up,45),at.clone().addScaledVector(up,45))&&Math.abs(at.y-now.y)<120;
+    player.setPosition(reach?at.clone():now);if(!reach)world3.root.position.copy(now);
     document.body.classList.add('mech-pilot');boot();drawHud();ctx.hud();
     const entry=window.kino.characterEntry;if(entry&&entry!==myPilotEntry){myPilotEntry=entry;myPilot?.dispose();myPilot=null;seatPilot(world3,entry).then(p=>{myPilot=p;});}
   }
@@ -426,7 +437,7 @@ export async function setupMech(ctx){
     const at=player.getFeetPosition(),wreck=world3.root;wreck.position.copy(at);wreck.visible=true;
     // thrown clear: a step back, a moment of safety
     const back=aimDir().setY(0).normalize().multiplyScalar(-60),to=at.clone().add(back);
-    if(world.lineClear(at.clone().addScaledVector(up,40),to.clone().addScaledVector(up,40)))player.setPosition(to);
+    if(world.lineClear(at.clone().addScaledVector(up,40),to.clone().addScaledVector(up,40)))player.setPosition(groundAt(to,at));
     session.effects.invulnerable=Math.max(session.effects.invulnerable??0,session.time+2);
     api.announce?.(destroyed?'MECH DOWN':'EJECTED',destroyed?'THROWN CLEAR':'',1.6);
     setTimeout(()=>{

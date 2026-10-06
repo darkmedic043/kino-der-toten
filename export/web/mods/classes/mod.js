@@ -235,5 +235,5 @@ export default async function setup(api){
   }
   let hudT=0;host.on('update',dt=>{if((hudT-=dt)<=0){hudT=.2;hud();}});
   hud();
-  window.kino.classes={get state(){return state();},cls,stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,get cooldown(){return cooldown;},gain,turrets,fort,eng};
+  window.kino.classes={get state(){return state();},cls,stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng};
 }
