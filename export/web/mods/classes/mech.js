@@ -351,7 +351,7 @@ export async function setupMech(ctx){
         if(target){
           let from2=muzzle(side),prev=target;lightning(from2,target.c);hurt(target.z,w.damage,w,{arm:side});if(w.stun)stunned.set(target.z,{until:session.time+.4,at:target.z.root.position.clone()});
           const done=new Set([target.z]);
-          for(let i=0;i<w.chain;i++){const n=enemies.list.filter(z=>!done.has(z)&&z.root.position.distanceTo(prev.z.root.position)<w.chainRange).sort((a,b)=>a.root.position.distanceTo(prev.z.root.position)-b.root.position.distanceTo(prev.z.root.position))[0];if(!n)break;done.add(n);const c=n.root.position.clone().addScaledVector(up,38);lightning(prev.c,c);hurt(n,w.damage*.7,w,{arm:side});if(w.stun)stunned.set(n,{until:session.time+.4,at:n.root.position.clone()});prev={z:n,c};}
+          for(let i=0;i<w.chain;i++){const n=enemies.list.filter(z=>!done.has(z)&&z.root.position.distanceTo(prev.z.root.position)<w.chainRange).sort((a,b)=>a.root.position.distanceTo(prev.z.root.position)-b.root.position.distanceTo(prev.z.root.position))[0];if(!n)break;done.add(n);const c=n.root.position.clone().addScaledVector(up,38);lightning(prev.c,c);hurt(n,w.damage*.8,w,{arm:side});if(w.stun)stunned.set(n,{until:session.time+.4,at:n.root.position.clone()});prev={z:n,c};}
           sfx.arc();
         }else lightning(muzzle(side),from.clone().addScaledVector(f,180).add(new THREE.Vector3((Math.random()-.5)*40,(Math.random()-.5)*40,(Math.random()-.5)*40)));
         addHeat(a,w.heat);recoil(side,.05);

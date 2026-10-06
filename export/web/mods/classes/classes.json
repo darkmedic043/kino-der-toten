@@ -1332,10 +1332,10 @@
             "mode": "auto",
             "desc": "Hold to spin up and fire a stream of heavy rounds.",
             "rate": 13,
-            "damage": 0.12,
-            "flat": 30,
-            "heat": 0.022,
-            "spin": 0.45,
+            "damage": 0.2,
+            "flat": 45,
+            "heat": 0.018,
+            "spin": 0.35,
             "spread": 0.018,
             "range": 3200
           },
@@ -1403,12 +1403,12 @@
             "kind": "brawl",
             "mode": "beam",
             "desc": "Hold to throw a lightning arc at the nearest zombie in front of you; it jumps to more nearby.",
-            "damage": 0.085,
+            "damage": 0.16,
             "tick": 0.1,
             "range": 650,
-            "chain": 2,
-            "chainRange": 230,
-            "heat": 0.035
+            "chain": 3,
+            "chainRange": 260,
+            "heat": 0.03
           }
         },
         "augmentSlots": 2
