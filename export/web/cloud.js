@@ -33,11 +33,23 @@ async function sync(){
   const remote=await r.json(),local=snapshot();
   if(remote.keys&&(remote.updatedAt??0)>local.updatedAt){
     pulling=true;
-    try{for(const [k,v] of Object.entries(remote.keys))rawSet(k,v);rawSet(STAMP,String(remote.updatedAt));}finally{pulling=false;}
+    try{for(const [k,v] of Object.entries(remote.keys))rawSet(k,v);mergeRewards(local.keys);rawSet(STAMP,String(remote.updatedAt));}finally{pulling=false;}
     dispatchEvent(new Event('kino-cloud-pulled'));
-  }else if(local.updatedAt>(remote.updatedAt??-1)||!remote.keys)await push();
+  }else if(local.updatedAt>(remote.updatedAt??-1)||!remote.keys){
+    if(remote.keys){pulling=true;try{mergeRewards(remote.keys);}finally{pulling=false;}}
+    await push();
+  }else{pulling=true;try{mergeRewards(remote.keys);}finally{pulling=false;}}
 }
 
+// Map rewards (profile.rewards) only get added, whichever copy wins: take the other copy's into the stored profile.
+function mergeRewards(keys){
+  const K='kino.mods.progression';
+  try{
+    const other=JSON.parse(keys?.[K]??'{}').rewards;if(!other)return;
+    const p=JSON.parse(store.getItem(K)??'null');if(!p||Object.keys(other).every(k=>p.rewards?.[k]))return;
+    p.rewards={...other,...p.rewards};rawSet(K,JSON.stringify(p));
+  }catch{}
+}
 async function start(){
   try{
     const me=await fetch('/api/me',{credentials:'same-origin'});if(!me.ok)return;

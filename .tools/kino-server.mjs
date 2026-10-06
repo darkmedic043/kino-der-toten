@@ -32,6 +32,15 @@ const TYPES = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charse
 // ---- Storage (small JSON files, written atomically) -------------------------
 const readJson = (file, fallback) => { try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return fallback; } };
 const writeJson = (file, value) => { const tmp = file + '.tmp'; writeFileSync(tmp, JSON.stringify(value)); renameSync(tmp, file); };
+// Map rewards (profile.rewards, e.g. the Cheese Cube camo) only ever get added: an upload from a tab with an older copy
+// keeps the ones already saved.
+function keepRewards(doc, old) {
+  const K = 'kino.mods.progression';
+  try {
+    const was = JSON.parse(old?.keys?.[K] ?? '{}').rewards; if (!was || !doc.keys?.[K]) return;
+    const p = JSON.parse(doc.keys[K]); p.rewards = { ...was, ...p.rewards }; doc.keys[K] = JSON.stringify(p);
+  } catch {}
+}
 const SESSIONS = join(DATA, 'sessions.json');
 const sessions = new Map(Object.entries(readJson(SESSIONS, {})));
 const saveSessions = () => writeJson(SESSIONS, Object.fromEntries(sessions));
@@ -112,6 +121,7 @@ async function api(req, res, url) {
     if (req.method === 'PUT') {
       let doc; try { doc = await body(req); } catch (e) { return send(res, 400, { error: e.message }); }
       if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return send(res, 400, { error: 'expected an object' });
+      keepRewards(doc, readJson(file, {}));
       writeJson(file, { ...doc, account: { name: s.name, id: s.sub }, savedAt: Date.now() });
       return send(res, 200, { ok: true });
     }
