@@ -62,7 +62,8 @@ await cloudReady;
 let profile=loadProfile();
 // Weapon XP is earned in game (maybe in another tab): keep the stored value.
 // camo progress is earned in game too: keep the stored counts, the menu only picks which camo is on
-const save=()=>{const stored=loadProfile();profile.weaponXp=stored.weaponXp;
+const save=()=>{const stored=loadProfile();profile.weaponXp=stored.weaponXp;profile.rewards={...profile.rewards,...stored.rewards};   // map rewards (Cheese Cube camo) are earned in game too
+  
   const camo={...stored.camo};for(const [id,e] of Object.entries(profile.camo??{}))camo[id]={...camo[id],on:e.on};profile.camo=camo;
   saveProfile(profile);renderProfile();};
 addEventListener('focus',()=>{profile=loadProfile();renderProfile();renderLoadout();});

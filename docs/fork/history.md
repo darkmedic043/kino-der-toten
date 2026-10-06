@@ -131,3 +131,4 @@
 - 2026-10-06: Pilot chaingun and Arc Thrower buffed (classes.md).
 - 2026-10-06: Rocket Fist lunge is a smooth slide instead of a teleport (classes.md).
 - 2026-10-06: Cheese Cube ending lifts its black screen at game over (waw-ports.md).
+- 2026-10-06: Map rewards (Cheese Cube camo) no longer wiped by the progression and menu profile savers; restored the user's cheese reward on the server.
