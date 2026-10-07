@@ -136,3 +136,4 @@
 - 2026-10-07: Rind desktop launcher (~/projects/rind, own repo): Discord sign-in through the site, friends synced via the social API; server gained the 'launcher' presence status (coop.md).
 - 2026-10-07: Site renamed Melon Zombies (titles, main-menu logo without the Black Ops kicker, share-preview site name, melon favicon).
 - 2026-10-07: Server: folder index.html (with slash redirect), no-store for .yml; serves Rind downloads and update feed from git-ignored export/web/rind/.
+- 2026-10-07: Rind can install Melon Zombies: the server lists only redistributable files (.tools/install-manifest.mjs, /api/install/melon-zombies, ~23 MB); the rest streams. kino restarted.

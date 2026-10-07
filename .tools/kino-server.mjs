@@ -12,6 +12,7 @@ import { createReadStream, statSync, mkdirSync, readFileSync, writeFileSync, ren
 import { createServer } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
 import { extname, join, resolve, sep } from 'node:path';
+import { installManifest } from './install-manifest.mjs';
 import { homedir } from 'node:os';
 
 const ROOT = resolve(import.meta.dirname, '..', 'export', 'web');
@@ -127,6 +128,8 @@ async function api(req, res, url) {
     }
   }
   if (url.startsWith('/api/social')) return socialApi(req, res, url);
+  // the Rind launcher's install list for Melon Zombies (only redistributable files: see install-manifest.mjs)
+  if (url === '/api/install/melon-zombies' && req.method === 'GET') return send(res, 200, installManifest(ROOT));
   return send(res, 404, { error: 'unknown endpoint' });
 }
 
