@@ -239,7 +239,13 @@ function onSocialSocket(req, sock) {
 // Code and data must never go stale (Cloudflare rewrites "no-cache" into a
 // 4-hour browser cache, but leaves "no-store" alone). Heavy assets such as
 // meshes, textures and audio are cached for a day.
-const cacheControl = path => /\.(html|m?js|css|json|md|txt|ya?ml)$/i.test(path) ? 'no-store' : 'public, max-age=86400';
+// stale-while-revalidate: after max-age, a cached asset is used at once and re-checked in the background (an ETag
+// match answers 304), so repeat loads don't wait on thousands of re-checks; a changed file shows up on the next load.
+// Game data JSON (animations, map data, collision/navigation: about 1,000 files per Kino load) is cached like an asset,
+// with a 1 h max-age; code and config (js/css/html, mods.json, mod.json, classes.json...) stay no-store.
+const DATA_JSON = /[\\/](animations|moon|ascension|shangri-la|coast|models|textures|audio)[\\/].*\.json$|[\\/]mods[\\/]maps[\\/][^\\/]+[\\/].*\.json$|[\\/]export[\\/]web[\\/](collision|navigation|game-data|asset-report|provenance)\.json$/i;
+const cacheControl = path => DATA_JSON.test(path) ? 'public, max-age=3600, stale-while-revalidate=2592000'
+  : /\.(html|m?js|css|json|md|txt|ya?ml)$/i.test(path) ? 'no-store' : 'public, max-age=86400, stale-while-revalidate=2592000';
 
 function serveFile(req, res, url) {
   if (url === '/favicon.ico') { res.writeHead(204).end(); return; }
@@ -249,16 +255,22 @@ function serveFile(req, res, url) {
   try { if (statSync(path).isDirectory()) { if (!url.endsWith('/')) { res.writeHead(301, { Location: url + '/', 'Cache-Control': 'no-store' }).end(); return; } path = join(path, 'index.html'); } } catch {}
   let stat; try { stat = statSync(path); if (!stat.isFile()) throw 0; } catch { res.writeHead(404).end('not found'); return; }
   const type = TYPES[extname(path).toLowerCase()] || 'application/octet-stream', range = req.headers.range;
+  // validators: a re-check of an unchanged file gets 304 (no body) instead of the whole file again
+  const etag = `"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}"`, lastModified = stat.mtime.toUTCString();
+  const inm = req.headers['if-none-match'], ims = req.headers['if-modified-since'];
+  if (inm ? inm.split(',').some(t => t.trim().replace(/^W\//, '') === etag) : ims && Date.parse(ims) >= Math.floor(stat.mtimeMs / 1000) * 1000) {
+    res.writeHead(304, { ETag: etag, 'Last-Modified': lastModified, 'Cache-Control': cacheControl(path) }).end(); return;
+  }
   if (range) {
     const m = /^bytes=(\d*)-(\d*)$/.exec(range);
     const start = m?.[1] ? Number(m[1]) : m?.[2] ? Math.max(0, stat.size - Number(m[2])) : NaN;
     const end = m?.[1] && m[2] ? Math.min(Number(m[2]), stat.size - 1) : stat.size - 1;
     if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= stat.size) { res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` }).end(); return; }
-    res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${stat.size}`, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, 'Cache-Control': cacheControl(path) });
+    res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${stat.size}`, 'Accept-Ranges': 'bytes', ETag: etag, 'Last-Modified': lastModified, 'Content-Length': end - start + 1, 'Cache-Control': cacheControl(path) });
     if (req.method === 'HEAD') res.end(); else createReadStream(path, { start, end }).on('error', () => res.destroy()).pipe(res);
     return;
   }
-  res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size, 'Accept-Ranges': 'bytes', 'Last-Modified': stat.mtime.toUTCString(), 'Cache-Control': cacheControl(path) });
+  res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size, 'Accept-Ranges': 'bytes', ETag: etag, 'Last-Modified': lastModified, 'Cache-Control': cacheControl(path) });
   if (req.method === 'HEAD') res.end(); else createReadStream(path).on('error', () => res.destroy()).pipe(res);
 }
 

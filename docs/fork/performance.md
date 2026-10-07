@@ -18,3 +18,17 @@
 Through the public tunnel each request costs about 0.17 s and home.js imported ~35 mod scripts one after another (to run their `prepare` for weapon data) before drawing anything: the map list appeared after 6-10 s (0.6 s locally). Now: mod data patches and scripts are fetched in parallel, then applied in mods.json order; the map grid and hero are painted as soon as `maps.json` arrives (a first paint the full render replaces); the Kino hero image is a 140 KB WebP (`mods/maps/thumbs/kino.webp`; the 2.4 MB PNG stays the social-share image) preloaded in home.html with three.js modulepreloaded. Measured through zombies.terminallysleepy.com: map list 0.7 s, full menu 1.9 s.
 
 - **Transparent double-sided materials (2026-10-05):** three draws a transparent DoubleSide material in two passes (back, then front) and sets `needsUpdate` before each. Kino's 55 lamp-glass materials and ~100 map decals (made transparent by map-materials) re-checked their shader programs twice a frame: `getProgram`/`getParameters` were ~16% of the frame's CPU (CDP profile). The lighting mod now sets `forceSinglePass` on every such material, sweeping each second for late ones. Kino on the 1660 Ti: 35 → 42 FPS empty, 30 → 37 FPS with 24 zombies, worst frames 50–78 → 33–43 ms. How to find it: watch `material.version` change between frames.
+
+## Load times and caching (2026-10-07)
+Kino `play.html?map=kino` until the start button enables, GTX 1660 Ti, headless Chromium or the Rind launcher:
+
+| | cold | warm |
+|---|---|---|
+| browser, local server (127.0.0.1:5190) | 24 s | 22 s |
+| browser, zombies.terminallysleepy.com | 45 s | 34 s |
+| Rind, public, all requests through `net.request` | 49 s | 30 s |
+| Rind, public, files via `ses.fetch` (current) | | 27 s |
+
+- About 22 s is main-thread processing even with no network (idle 0.7 s). A load makes about 2,700 requests (1,077 JSON, 940 WebP, 438 PNG, 225 GLB).
+- Server caching changes: ETag + 304 (there was no conditional-request support, so every re-check re-sent the whole file), `stale-while-revalidate=2592000` on assets, and game-data JSON (animations, map folders, collision/navigation/game-data) cached with `max-age=3600` instead of `no-store` (`DATA_JSON` in kino-server.mjs). Code and config stay `no-store`. Cloudflare-cached types (images) keep their old edge copy until it expires.
+- Profile of a warm local load (CPU, self time): three.core 7.4 s, native/GPU ("program") 4.1 s, three.module 3.9 s, texSubImage2D 1.6 s, getProgramInfoLog 0.7 s. Avoidable, about 3.5 s: skinned-mesh vertex work (`applyBoneTransform` per vertex) from the mystery box `warm` (frustum-culling bounding spheres of the display copies, ~1.0 s) and `display` (`Box3.setFromObject` on skinned guns, ~1.0 s), the lighting mod's `setupKino` raycasts against skinned map props (~1.0 s), and map-materials `smooth` (~0.5 s). Not fixed yet.
