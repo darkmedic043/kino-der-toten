@@ -151,7 +151,7 @@ function statusOf(sub) {
   const conns = [...(presence.get(sub) ?? [])];
   if (!conns.length) return { status: 'offline', seen: social.users[sub]?.seen ?? null };
   const g = conns.map(c => c.status).find(x => x.status === 'game');
-  if (!g) return { status: 'online' };
+  if (!g) return { status: 'online', where: conns.some(c => c.status.status === 'menu') ? 'menu' : 'launcher' };   // launcher: the Rind desktop app
   const room = g.room && rooms.get(g.room);
   return { status: 'game', map: g.mapName || g.map || null, room: room ? room.code : null, page: room ? room.page : null,
     players: room ? room.players.size : null, joinable: !!room && room.players.size < MAX_PLAYERS };
@@ -228,7 +228,7 @@ function onSocialSocket(req, sock) {
   sock.on('error', () => {});
   wsFrames(sock, msg => {
     if (msg.t !== 'status') return;
-    conn.status = { status: msg.status === 'game' ? 'game' : 'menu', map: String(msg.map || '').slice(0, 64), mapName: String(msg.mapName || '').slice(0, 64), room: String(msg.room || '').slice(0, 8).toUpperCase() };
+    conn.status = { status: ['game', 'launcher'].includes(msg.status) ? msg.status : 'menu', map: String(msg.map || '').slice(0, 64), mapName: String(msg.mapName || '').slice(0, 64), room: String(msg.room || '').slice(0, 8).toUpperCase() };
     notifyFriends(sub);
   });
 }
