@@ -137,6 +137,23 @@ async function api(req, res, url) {
     const m = folderManifest(join(ROOT, 'rind', 'games', 'melon-pinball', platform), 'melon-pinball', `/rind/games/melon-pinball/${platform}/`, platform === 'win' ? 'melon-pinball.exe' : 'melon-pinball');
     return m ? send(res, 200, m) : send(res, 404, { error: 'Melon Pinball is not published for this system yet' });
   }
+  // Melon Pinball friends leaderboard: the player and their friends, each with their best score (scores.txt) and best
+  // Harvest season (unlocks.txt) from their account saves; only people with a saved score or season
+  if (url === '/api/leaderboard/melon-pinball' && req.method === 'GET') {
+    const s = session(req); if (!s) return send(res, 401, { error: 'Sign in to see the leaderboard' });
+    remember(s);
+    const rows = [s.sub, ...friendsOf(s.sub)].map(sub => {
+      const f = readJson(userFile(sub).replace(/\.json$/, '.saves-melon-pinball.json'), null)?.files;
+      if (!f) return null;
+      const score = Math.max(0, ...String(f['scores.txt'] ?? '').split('\n').map(l => parseInt(l)).filter(Number.isFinite));
+      const season = Math.max(0, ...[...String(f['unlocks.txt'] ?? '').matchAll(/^best (\d+)$/gm)].map(m => +m[1]));
+      if (!score && !season) return null;
+      const v = view(sub);
+      return { id: v.id, name: v.name, picture: v.picture, status: v.status, map: v.map ?? null, me: sub === s.sub, score, season };
+    }).filter(Boolean).sort((a, b) => b.score - a.score || b.season - a.season);
+    rows.forEach((r, i) => { r.rank = i + 1; });
+    return send(res, 200, { rows });
+  }
   // game saves on the account (Rind syncs Melon Pinball's scores and unlocks): {files: {name: text}, updatedAt}
   if (url.startsWith('/api/saves/')) {
     const s = session(req); if (!s) return send(res, 401, { error: 'not signed in' });
