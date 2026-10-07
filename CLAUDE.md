@@ -1,6 +1,6 @@
-# Kino der Toten (local modding fork)
+# Melon Zombies (local modding fork of Kino der Toten)
 
-The user's fork of luckeyfaraday/kino-der-toten, a Three.js browser reconstruction of Black Ops Zombies. Upstream dev guide: `AGENTS.md`. Modding docs: `export/web/mods/README.md`.
+The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on the site (2026-10-07: page titles, main-menu logo, melon favicon `export/web/icon.svg`; Kino der Toten is now just its first map). It is a Three.js browser reconstruction of Black Ops Zombies. Upstream dev guide: `AGENTS.md`. Modding docs: `export/web/mods/README.md`.
 
 **Detailed notes live in `docs/fork/`. Read the relevant file before changing that system.** They hold the design, exact numbers and gotchas from earlier sessions.
 

@@ -134,3 +134,4 @@
 - 2026-10-06: Map rewards (Cheese Cube camo) no longer wiped by the progression and menu profile savers; restored the user's cheese reward on the server.
 - 2026-10-06: Map rewards are add-only in cloud sync (client mergeRewards, server keepRewards); kino restarted; cheese reward re-added for SleepyZoroark.
 - 2026-10-07: Rind desktop launcher (~/projects/rind, own repo): Discord sign-in through the site, friends synced via the social API; server gained the 'launcher' presence status (coop.md).
+- 2026-10-07: Site renamed Melon Zombies (titles, main-menu logo without the Black Ops kicker, share-preview site name, melon favicon).

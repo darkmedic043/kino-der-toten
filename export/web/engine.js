@@ -362,7 +362,7 @@ try{
   map=await (await import(`./maps/${module}.js`)).createMap(ctx,entry);
   Object.assign(globalThis.kino.debug,map.debug??{});
   $('map-kicker')&&($('map-kicker').innerHTML=entry.kicker??'ZOMBIES <span>'+(entry.dir?'CUSTOM MAP':'SOLO')+'</span>');$('map-place')&&($('map-place').textContent=entry.place??(entry.dir?'CUSTOM MAP':''));
-  document.title=(map.title??entry.title)+' — Zombies';$('map-title')&&($('map-title').textContent=entry.title);$('map-tagline')&&($('map-tagline').textContent=entry.tagline??entry.description??'Survive as long as you can.');$('top-map')&&($('top-map').textContent=entry.title.toUpperCase());
+  document.title=(map.title??entry.title)+' — Melon Zombies';$('map-title')&&($('map-title').textContent=entry.title);$('map-tagline')&&($('map-tagline').textContent=entry.tagline??entry.description??'Survive as long as you can.');$('top-map')&&($('top-map').textContent=entry.title.toUpperCase());
   progress('Loading game data',6);
   mods.mapId=entry.id;data=await mods.load(await map.loadData());session=new (map.Session??KinoSession)(data);
   world=await map.loadWorld(progress);
