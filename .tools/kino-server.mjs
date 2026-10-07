@@ -12,7 +12,7 @@ import { createReadStream, statSync, mkdirSync, readFileSync, writeFileSync, ren
 import { createServer } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
 import { extname, join, resolve, sep } from 'node:path';
-import { installManifest } from './install-manifest.mjs';
+import { installManifest, folderManifest } from './install-manifest.mjs';
 import { homedir } from 'node:os';
 
 const ROOT = resolve(import.meta.dirname, '..', 'export', 'web');
@@ -130,6 +130,31 @@ async function api(req, res, url) {
   if (url.startsWith('/api/social')) return socialApi(req, res, url);
   // the Rind launcher's install list for Melon Zombies (only redistributable files: see install-manifest.mjs)
   if (url === '/api/install/melon-zombies' && req.method === 'GET') return send(res, 200, installManifest(ROOT));
+  // native games (Melon Pinball): the published build for ?platform=linux|win
+  if (url === '/api/install/melon-pinball' && req.method === 'GET') {
+    const platform = new URL(req.url, 'http://x').searchParams.get('platform');
+    if (!['linux', 'win'].includes(platform)) return send(res, 400, { error: 'platform must be linux or win' });
+    const m = folderManifest(join(ROOT, 'rind', 'games', 'melon-pinball', platform), 'melon-pinball', `/rind/games/melon-pinball/${platform}/`, platform === 'win' ? 'melon-pinball.exe' : 'melon-pinball');
+    return m ? send(res, 200, m) : send(res, 404, { error: 'Melon Pinball is not published for this system yet' });
+  }
+  // game saves on the account (Rind syncs Melon Pinball's scores and unlocks): {files: {name: text}, updatedAt}
+  if (url.startsWith('/api/saves/')) {
+    const s = session(req); if (!s) return send(res, 401, { error: 'not signed in' });
+    const game = url.slice('/api/saves/'.length);
+    if (!/^[a-z0-9-]{1,40}$/.test(game)) return send(res, 400, { error: 'bad game id' });
+    const file = userFile(s.sub).replace(/\.json$/, `.saves-${game}.json`);
+    if (req.method === 'GET') return send(res, 200, readJson(file, { files: {}, updatedAt: 0 }));
+    if (req.method === 'PUT') {
+      let doc; try { doc = await body(req); } catch (e) { return send(res, 400, { error: e.message }); }
+      const files = doc?.files;
+      if (!files || typeof files !== 'object' || Array.isArray(files)) return send(res, 400, { error: 'expected {files}' });
+      const ok = Object.entries(files).every(([k, v]) => /^[\w.-]{1,40}$/.test(k) && typeof v === 'string') && JSON.stringify(files).length < 65536;
+      if (!ok) return send(res, 400, { error: 'bad save files' });
+      writeJson(file, { files, updatedAt: Date.now() });
+      return send(res, 200, { ok: true });
+    }
+    return send(res, 405, { error: 'method' });
+  }
   return send(res, 404, { error: 'unknown endpoint' });
 }
 

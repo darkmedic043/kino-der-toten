@@ -54,3 +54,31 @@ export function installManifest(root) {
   last = { at: Date.now(), value };
   return value;
 }
+
+// A native game's build for one platform, published as a folder (Melon Pinball: export/web/rind/games/melon-pinball/
+// <linux|win>/, from ~/projects/rind/games/melon-pinball). Everything in it is installable (the game is MIT and ships
+// only its own files, fonts and licences). `base` is where the files are served from.
+const folderCache = new Map(), folderHashes = new Map();   // dir -> {at, value}; full path -> {m, s, h}
+export function folderManifest(dir, game, base, exe) {
+  const hit = folderCache.get(dir);
+  if (hit && Date.now() - hit.at < 10000) return hit.value;
+  const files = [];
+  const walk = d => {
+    let entries; try { entries = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const full = join(d, e.name);
+      if (e.isDirectory()) { walk(full); continue; }
+      if (!e.isFile()) continue;
+      const rel = relative(dir, full).split(sep).join('/'), st = statSync(full), c = folderHashes.get(full);
+      const h = c && c.m === st.mtimeMs && c.s === st.size ? c.h : createHash('sha1').update(readFileSync(full)).digest('hex');
+      folderHashes.set(full, { m: st.mtimeMs, s: st.size, h });
+      files.push({ p: rel, s: st.size, h });
+    }
+  };
+  walk(dir);
+  files.sort((a, b) => a.p < b.p ? -1 : 1);
+  const version = createHash('sha1').update(files.map(f => f.p + ':' + f.h).join('\n')).digest('hex').slice(0, 16);
+  const value = files.length ? { game, version, size: files.reduce((n, f) => n + f.s, 0), base, exe, files } : null;
+  folderCache.set(dir, { at: Date.now(), value });
+  return value;
+}

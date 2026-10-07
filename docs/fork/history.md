@@ -139,3 +139,4 @@
 - 2026-10-07: Rind can install Melon Zombies: the server lists only redistributable files (.tools/install-manifest.mjs, /api/install/melon-zombies, ~23 MB); the rest streams. kino restarted.
 - 2026-10-07: Load-time measurements; server ETag/304, stale-while-revalidate, game-data JSON cacheable (performance.md).
 - 2026-10-07: Load ~5 s faster: fast skinned bounds for the box guns, saved map-bulb normals, normal smoothing in a worker (performance.md).
+- 2026-10-07: Server endpoints for Rind's Melon Pinball (install list per platform, account saves) (setup.md).
