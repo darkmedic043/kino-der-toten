@@ -55,25 +55,22 @@ export default async function setup(api){
   // so rounded props (columns, rails, seats, trim) showed each polygon as a
   // facet. Vertices at the same spot now share an averaged normal when their
   // faces meet at under CREASE, so curves shade smoothly and hard edges stay hard.
-  {const t0=performance.now(),CREASE=Math.cos(THREE.MathUtils.degToRad(50));let n=0;
-    const done=new WeakSet();
-    api.scene.traverse(o=>{if(!o.isMesh||o.isSkinnedMesh||done.has(o.geometry))return;const g=o.geometry;if(!g.attributes.normal||!g.attributes.position)return;done.add(g);smooth(g);n++;});
-    function smooth(g){
-      const P=g.attributes.position,N=g.attributes.normal,idx=g.index,count=idx?idx.count:P.count,vc=P.count;
-      const fn=new Float32Array(count),faceOf=new Int32Array(vc).fill(-1),a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
-      for(let t=0;t<count;t+=3){const i0=idx?idx.getX(t):t,i1=idx?idx.getX(t+1):t+1,i2=idx?idx.getX(t+2):t+2;
-        a.fromBufferAttribute(P,i0);b.fromBufferAttribute(P,i1).sub(a);c.fromBufferAttribute(P,i2).sub(a);b.cross(c);   // area-weighted face normal
-        fn[t]=b.x;fn[t+1]=b.y;fn[t+2]=b.z;for(const i of [i0,i1,i2])if(faceOf[i]<0)faceOf[i]=t;}
-      const key=i=>Math.round(P.getX(i)*20)+','+Math.round(P.getY(i)*20)+','+Math.round(P.getZ(i)*20);
-      const groups=new Map();for(let i=0;i<vc;i++){if(faceOf[i]<0)continue;const k=key(i);(groups.get(k)??groups.set(k,[]).get(k)).push(i);}
-      const own=new THREE.Vector3(),other=new THREE.Vector3(),sum=new THREE.Vector3();
-      for(const verts of groups.values()){if(verts.length<2)continue;
-        for(const i of verts){const f=faceOf[i];own.set(fn[f],fn[f+1],fn[f+2]).normalize();sum.set(0,0,0);
-          for(const j of verts){const h=faceOf[j];other.set(fn[h],fn[h+1],fn[h+2]);const len=other.length();if(len&&other.dot(own)/len>=CREASE)sum.add(other);}
-          if(sum.lengthSq()>0){sum.normalize();N.setXYZ(i,sum.x,sum.y,sum.z);}}}
-      N.needsUpdate=true;
+  // Runs in a worker (it took ~0.5 s of the main thread at every load); the normals are swapped in when it answers,
+  // well before the loading screen ends. Meshes whose attributes aren't plain arrays are done here instead.
+  {const t0=performance.now(),list=[],done=new WeakSet();
+    api.scene.traverse(o=>{if(!o.isMesh||o.isSkinnedMesh||done.has(o.geometry))return;const g=o.geometry;if(!g.attributes.normal||!g.attributes.position)return;done.add(g);list.push(g);});
+    const plain=g=>{const P=g.attributes.position,N=g.attributes.normal;return !P.isInterleavedBufferAttribute&&!N.isInterleavedBufferAttribute&&P.itemSize===3&&N.itemSize===3&&N.array instanceof Float32Array&&!P.normalized&&!(g.index&&g.index.isInterleavedBufferAttribute);};
+    const jobs=list.filter(plain),here=list.filter(g=>!plain(g));
+    for(const g of here){const P=g.attributes.position,N=g.attributes.normal,pos=new Float32Array(P.count*3),nrm=new Float32Array(N.count*3);for(let i=0;i<P.count;i++){pos[i*3]=P.getX(i);pos[i*3+1]=P.getY(i);pos[i*3+2]=P.getZ(i);}for(let i=0;i<N.count;i++){nrm[i*3]=N.getX(i);nrm[i*3+1]=N.getY(i);nrm[i*3+2]=N.getZ(i);}
+      const r=smoothNormals(pos,P.count,g.index?Array.from({length:g.index.count},(_,k)=>g.index.getX(k)):null,g.index?.count??0,nrm);for(let i=0;i<N.count;i++)N.setXYZ(i,r[i*3],r[i*3+1],r[i*3+2]);g.attributes.normal.needsUpdate=true;}
+    if(jobs.length){
+      const w=new Worker(URL.createObjectURL(new Blob([`const smoothNormals=${smoothNormals};onmessage=e=>{const out=e.data.map(j=>smoothNormals(j.p,j.p.length/3,j.i,j.i?j.i.length:0,j.n));postMessage(out,out.map(a=>a.buffer));};`],{type:'text/javascript'})));
+      w.onmessage=e=>{e.data.forEach((nrm,k)=>{const N=jobs[k].attributes.normal;if(nrm.length===N.array.length){N.array.set(nrm);N.needsUpdate=true;}});w.terminate();
+        console.info('[map-materials] smoothed',jobs.length+here.length,'meshes in',Math.round(performance.now()-t0),'ms (worker)');};
+      w.onerror=e=>{console.warn('[map-materials] smoothing worker failed',e.message);w.terminate();};
+      w.postMessage(jobs.map(g=>({p:g.attributes.position.array.slice(0,g.attributes.position.count*3),n:g.attributes.normal.array.slice(0,g.attributes.normal.count*3),i:g.index?g.index.array.slice(0,g.index.count):null})));
     }
-    console.info('[map-materials] smoothed',n,'meshes in',Math.round(performance.now()-t0),'ms');}
+  }
 
   // Sharper textures at glancing angles (floors, walls seen along a corridor).
   const aniso=api.renderer?.capabilities.getMaxAnisotropy?.()??1;
@@ -154,4 +151,24 @@ export default async function setup(api){
     // uploads) so that cost lands behind the loading screen, not on joining.
     const R=api.renderer;if(R){(api.host?.renderWorld??((sc,c)=>R.render(sc,c)))(api.scene,api.camera);if(api.viewScene)R.render(api.viewScene,api.camera);}
     console.info('[map-materials] shaders precompiled and first frame drawn in',Math.round(performance.now()-t0),'ms');}catch(e){console.warn('[map-materials] precompile',e);}
+}
+
+// Smooth shading. The map export gave every triangle its own flat normal, so rounded props (columns, rails, seats,
+// trim) showed each polygon as a facet. Vertices at the same spot get an averaged normal when their faces meet at
+// under 50 degrees, so curves shade smoothly and hard edges stay hard. Plain arrays in (positions, index, the current
+// normals), a new Float32Array of normals out; vertices with no neighbour at their spot keep their normal.
+// Self-contained: its source is also run in a worker.
+function smoothNormals(pos,vc,idx,ic,nrm){
+  const CREASE=Math.cos(50*Math.PI/180),count=idx?ic:vc,fn=new Float32Array(count),faceOf=new Int32Array(vc).fill(-1),out=Float32Array.from(nrm);
+  for(let t=0;t+2<count;t+=3){const i0=idx?idx[t]:t,i1=idx?idx[t+1]:t+1,i2=idx?idx[t+2]:t+2;
+    const ax=pos[i0*3],ay=pos[i0*3+1],az=pos[i0*3+2],bx=pos[i1*3]-ax,by=pos[i1*3+1]-ay,bz=pos[i1*3+2]-az,cx=pos[i2*3]-ax,cy=pos[i2*3+1]-ay,cz=pos[i2*3+2]-az;
+    fn[t]=by*cz-bz*cy;fn[t+1]=bz*cx-bx*cz;fn[t+2]=bx*cy-by*cx;   // area-weighted face normal
+    if(faceOf[i0]<0)faceOf[i0]=t;if(faceOf[i1]<0)faceOf[i1]=t;if(faceOf[i2]<0)faceOf[i2]=t;}
+  const groups=new Map();
+  for(let i=0;i<vc;i++){if(faceOf[i]<0)continue;const k=Math.round(pos[i*3]*20)+','+Math.round(pos[i*3+1]*20)+','+Math.round(pos[i*3+2]*20);let g=groups.get(k);if(!g)groups.set(k,g=[]);g.push(i);}
+  for(const verts of groups.values()){if(verts.length<2)continue;
+    for(const i of verts){const f=faceOf[i];let ox=fn[f],oy=fn[f+1],oz=fn[f+2];const ol=Math.hypot(ox,oy,oz)||1;ox/=ol;oy/=ol;oz/=ol;let sx=0,sy=0,sz=0;
+      for(const j of verts){const h=faceOf[j],hx=fn[h],hy=fn[h+1],hz=fn[h+2],len=Math.hypot(hx,hy,hz);if(len&&(hx*ox+hy*oy+hz*oz)/len>=CREASE){sx+=hx;sy+=hy;sz+=hz;}}
+      const sl=Math.hypot(sx,sy,sz);if(sl>0){out[i*3]=sx/sl;out[i*3+1]=sy/sl;out[i*3+2]=sz/sl;}}}
+  return out;
 }

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { loadModel } from './animation.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { poseIdle } from './mods/bo3-weapons/pose.js';
+import { objectBox, fitSkinnedBounds } from './skinned-bounds.js';
 
 const cycleTime=3.9,offerTime=12;
 export class MysteryBox {
@@ -44,7 +45,7 @@ export class MysteryBox {
     const source=this.models[id];if(!source)return null;
     const model=clone(source);
     for(const name of this.data.weapons[id]?.hideTags??[]){const bone=model.getObjectByName(name);if(bone)bone.scale.setScalar(.000001);}
-    const center=new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());model.position.sub(center);
+    const center=objectBox(model).getCenter(new THREE.Vector3());model.position.sub(center);   // fast skinned bounds (three's took ~1 s for the box guns)
     group=new THREE.Group();group.add(model);group.userData.model=model;list.push(group);return group;
   }
   // Compile shaders and upload every box weapon's textures during loading so
@@ -58,6 +59,8 @@ export class MysteryBox {
     globalThis.kino?.lighting?.tag?.(holder);
     // No shadows, and no frustum culling: a rigged model's first cull computes its bounds through every bone (a hitch per new weapon).
     holder.traverse(o=>{if(o.isMesh){o.castShadow=false;o.frustumCulled=false;}});
+    // the renderer still sorts by bounding sphere, which three computes through every bone: give them one (~1 s saved)
+    fitSkinnedBounds(holder);
     renderer.render(this.scene,camera);   // uploads every texture and settles every program now, behind the loading screen
     try{renderer.compile(this.scene,camera);holder.traverse(n=>{for(const m of [n.material].flat())if(m)for(const k of ['map','normalMap','emissiveMap','alphaMap','roughnessMap','metalnessMap'])if(m[k])renderer.initTexture(m[k]);});}
     catch(e){console.warn('[mystery-box] warm-up failed',e);}

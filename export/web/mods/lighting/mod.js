@@ -79,12 +79,15 @@ export default async function setup(api){
   const volume=kino&&!baking?await loadVolume(import.meta.url):null;
   // the caged bulbs for the box-location maps (dropped by the export)
   const cage=kino?await loadModel('models/zombie_zapper_cagelight.glb').catch(()=>null):null;
-  if(kino)setupKino(api,fixtures,volume,baking,cage);
+  // the chalkboard map bulbs' wall normals, saved once (raycasting the map for them cost ~1 s a load); ?bakeBulbs
+  // recomputes them (copy kino.lightingBulbs to mods/lighting/map-bulbs.json)
+  const bulbNormals=kino&&!/bakeBulbs/.test(location.search)?await fetch(new URL('map-bulbs.json',import.meta.url)).then(r=>r.ok?r.json():{}).catch(()=>({})):{};
+  if(kino)setupKino(api,fixtures,volume,baking,cage,bulbNormals);
   else if(api.map?.id==='moon'&&renderer)window.kino.lighting=setupMoon(api,{quality,LIGHT_CLAMP,baking,volume:baking?null:await loadVolume(import.meta.url,'moon-light')});
 }
 
 // ---- Kino lights ------------------------------------------------------------------------------
-function setupKino(api,fixtures=[],volume=null,baking=false,cage=null){
+function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormals={}){
   const {scene,camera,session,data,host,renderer,world}=api;
   const rgb=s=>{const [r,g,b]=String(s).trim().split(/\s+/).map(Number);return r+g+b>0?new THREE.Color(r,g,b):new THREE.Color('#fff4dc');};
   const sources=[];
@@ -136,16 +139,22 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null){
     // The chalkboards aren't in the collision mesh, so aim at the rendered
     // board: from the room side (toward the nearest box) back at the bulb.
     const rc=new THREE.Raycaster(),boxesAt=(world.boxLocations??[]).map(e=>new THREE.Vector3(...e.position));
-    const meshes=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&o.visible&&!o.material?.transparent)meshes.push(o);});
+    let meshes=null;const table={};
     for(const st of (api.data.entities??[]).filter(e=>e.targetname==='magic_box_loc_light'&&e.position)){
-      const p=new THREE.Vector3(...st.position);
-      const box=boxesAt.slice().sort((a,b)=>a.distanceTo(p)-b.distanceTo(p))[0]??p.clone().add(new THREE.Vector3(1,0,0));
-      const out=box.clone().sub(p);out.y=0;out.normalize();
-      const nearby=meshes.filter(m=>{if(!m.geometry.boundingSphere)m.geometry.computeBoundingSphere();const c=m.geometry.boundingSphere.center.clone().applyMatrix4(m.matrixWorld);return c.distanceTo(p)<m.geometry.boundingSphere.radius*m.matrixWorld.getMaxScaleOnAxis()+30;});
-      rc.set(p.clone().addScaledVector(out,30),out.clone().negate());rc.far=45;
-      const hit=rc.intersectObjects(nearby,false)[0];
-      let normal=out.clone();
-      if(hit?.face){normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);if(normal.dot(out)<0)normal.negate();}
+      const p=new THREE.Vector3(...st.position),key=st.position.map(v=>Math.round(v)).join(',');
+      let normal;
+      if(bulbNormals[key])normal=new THREE.Vector3(...bulbNormals[key]);
+      else{
+        meshes??=(()=>{const l=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&o.visible&&!o.material?.transparent)l.push(o);});return l;})();
+        const box=boxesAt.slice().sort((a,b)=>a.distanceTo(p)-b.distanceTo(p))[0]??p.clone().add(new THREE.Vector3(1,0,0));
+        const out=box.clone().sub(p);out.y=0;out.normalize();
+        const nearby=meshes.filter(m=>{if(!m.geometry.boundingSphere)m.geometry.computeBoundingSphere();const c=m.geometry.boundingSphere.center.clone().applyMatrix4(m.matrixWorld);return c.distanceTo(p)<m.geometry.boundingSphere.radius*m.matrixWorld.getMaxScaleOnAxis()+30;});
+        rc.set(p.clone().addScaledVector(out,30),out.clone().negate());rc.far=45;
+        const hit=rc.intersectObjects(nearby,false)[0];
+        normal=out.clone();
+        if(hit?.face){normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);if(normal.dot(out)<0)normal.negate();}
+      }
+      table[key]=normal.toArray().map(v=>+v.toFixed(5));
       const bulb={loc:st.script_noteworthy?.replace(/_loc$/,''),pos:p.clone().addScaledVector(normal,1.5),normal,mats:[]};
       if(cage){const m=cage.clone(true);m.position.copy(bulb.pos);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),normal);
         m.traverse(o=>{if(!o.isMesh)return;o.material=o.material.clone();if(/glass|filament/.test(o.material.name)){o.material.emissive?.set('#000000');bulb.mats.push(o.material);}});
@@ -158,6 +167,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null){
       bulb.halo.position.copy(bulb.pos).addScaledVector(normal,4.5);bulb.halo.scale.setScalar(11);bulb.halo.renderOrder=6;scene.add(bulb.halo);
       mapBulbs.push(bulb);
     }
+    (window.kino??={}).lightingBulbs=table;   // for ?bakeBulbs
     console.info('[lighting] box map bulbs',mapBulbs.length);window.kino.boxMapBulbs=mapBulbs;
   }
   // A green light source at the lit bulb on the map behind each box location
