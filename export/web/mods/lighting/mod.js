@@ -387,6 +387,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
         gl_FragColor=vec4(color*strength*phase*acc/max(rBot*.7,12.),1.);}`});
   const moteTexture=(()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d'),r=g.createRadialGradient(16,16,0,16,16,16);
     r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(.4,'rgba(255,255,255,.35)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,32,32);return new THREE.CanvasTexture(c);})();
+  const dustTime={value:0};   // shared by every beam's dust shader
   function makeBeam(src,top,dir,len,r,color,strength,warmth=.3,tip=.5){
     tip=Math.min(tip,r*.9);const axis=dir.clone().normalize();
     // Bounding cone, a little larger than the beam so the soft falloff fits inside.
@@ -396,13 +397,24 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
     volScene.add(mesh);
     const axisQ=mesh.quaternion.clone();
     // Dust drifting inside the beam.
-    const count=Math.round(Math.min(110,20+len/24+r/2)),pos=new Float32Array(count*3),seed=[];
-    for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,h=Math.random(),rr=Math.sqrt(Math.random())*(tip+(r-tip)*h)*.9;seed.push({a,h,rr,sp:.2+Math.random()*.5,ph:Math.random()*100,wob:1+Math.random()*4});}
-    const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    // Each mote drifts down the beam and around its axis as a function of time alone, so the vertex shader places it
+    // (moving ~1,500 motes on the CPU every frame was 5% of a frame on High): seedA = start angle, start height (0..1),
+    // radius, speed; seedB = phase, wobble.
+    const count=Math.round(Math.min(110,20+len/24+r/2)),seedA=new Float32Array(count*4),seedB=new Float32Array(count*2);
+    for(let i=0;i<count;i++){const h=Math.random();seedA.set([Math.random()*Math.PI*2,h,Math.sqrt(Math.random())*(tip+(r-tip)*h)*.9,.2+Math.random()*.5],i*4);seedB.set([Math.random()*100,1+Math.random()*4],i*2);}
+    const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(count*3),3));
+    dg.setAttribute('seedA',new THREE.BufferAttribute(seedA,4));dg.setAttribute('seedB',new THREE.BufferAttribute(seedB,2));
+    dg.boundingSphere=new THREE.Sphere(new THREE.Vector3(0,-len/2,0),len/2+r+8);   // the positions are all zero: bound the beam instead
     // Tiny soft motes (world-sized, so they shrink with distance), kept well under the bloom threshold.
-    const dust=new THREE.Points(dg,new THREE.PointsMaterial({color,size:.35,map:moteTexture,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending}));
+    const dustMat=new THREE.PointsMaterial({color,size:.35,map:moteTexture,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending});
+    dustMat.onBeforeCompile=sh=>{sh.uniforms.dustTime=dustTime;sh.uniforms.dustLen={value:len};
+      sh.vertexShader='attribute vec4 seedA;\nattribute vec2 seedB;\nuniform float dustTime;\nuniform float dustLen;\n'+sh.vertexShader.replace('#include <begin_vertex>',
+        'float dsp=seedA.w,dph=seedB.x,dwob=seedB.y;float dh=fract(seedA.y+dustTime*.01*dsp);float da=seedA.x+dustTime*.03*dsp*(dph>50.?1.:-1.);float dw=sin(dustTime*.6+dph)*dwob;'+
+        'vec3 transformed=vec3(cos(da)*seedA.z+dw,-dh*dustLen+sin(dustTime*.4+dph*2.)*dwob,sin(da)*seedA.z+cos(dustTime*.5+dph)*dwob);');};
+    dustMat.customProgramCacheKey=()=>'beam-dust';
+    const dust=new THREE.Points(dg,dustMat);
     dust.position.copy(mesh.position);dust.quaternion.copy(axisQ);dust.renderOrder=5;scene.add(dust);
-    beams.push({s:src,mesh,dust,seed,len,strength,top:top.clone(),dir:dir.clone().normalize(),r,tip});
+    beams.push({s:src,mesh,dust,len,strength,top:top.clone(),dir:dir.clone().normalize(),r,tip});
   }
   for(const s of sources){
     if(!s.spot?.beam||s.spot.length<60)continue;   // degenerate (lamp right above a surface)
@@ -484,9 +496,8 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
     if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);singlePass(scene);}
     for(const b of beams){
       const on=q>=1?level(b.s):0,u=b.mesh.material.uniforms;u.time.value=t;u.strength.value+=(on*b.strength*.45-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
-      b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible){b.dust.material.opacity=Math.min(.2,u.strength.value*1.4);const p=b.dust.geometry.attributes.position;
-        b.seed.forEach((d,i)=>{d.h=(d.h+dt*.01*d.sp)%1;d.a+=dt*.03*d.sp*(d.ph>50?1:-1);const w=Math.sin(t*.6+d.ph)*d.wob;   // drifting, not orbiting in rings
-          p.setXYZ(i,Math.cos(d.a)*d.rr+w,-d.h*b.len+Math.sin(t*.4+d.ph*2)*d.wob,Math.sin(d.a)*d.rr+Math.cos(t*.5+d.ph)*d.wob);});p.needsUpdate=true;}}
+      b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible)b.dust.material.opacity=Math.min(.2,u.strength.value*1.4);}   // the motes move in their shader (makeBeam)
+    dustTime.value=t;
     if(volume){const u=volume.uniforms.bakedPowerMix;u.value+=((session.power?1:0)-u.value)*Math.min(1,dt*1.5);}
     if(VM&&frame%3===0)lightTheGun(dt*3);
     for(const h of boxHalos){const on=level(h.src);h.sp.material.opacity+=(on*(.85+Math.sin(t*3)*.08)-h.sp.material.opacity)*Math.min(1,dt*3);h.sp.visible=h.sp.material.opacity>.01;}

@@ -36,3 +36,19 @@ Kino `play.html?map=kino` until the start button enables, GTX 1660 Ti, headless 
   - Lighting: the 81 chalkboard map bulbs' wall normals are saved in `mods/lighting/map-bulbs.json` (keyed by rounded position); a bulb missing from it falls back to the raycast. `?bakeBulbs` recomputes and leaves the table in `kino.lightingBulbs` (copy it to the file). Saved = recomputed, verified.
   - map-materials smoothing runs in a worker (`smoothNormals`, self-contained, its source is posted as a Blob worker); normals are swapped in when it answers. Output identical to the old main-thread code (all 1,002 geometries).
   - Result: local browser 24.4/22.0 s → 18.1/16.8 s (cold/warm); Rind through the public site 49/27 s → 36/21 s.
+
+## Frame rate pass (2026-10-07)
+Benchmark: Kino, uncapped (`--disable-frame-rate-limit --disable-gpu-vsync`), no zombies, 13 views (spawn x4 yaws + every box location), 2.5 s each, 1600x900, GTX 1660 Ti, headless Chromium. Average FPS (worst view):
+
+| quality | before | after |
+|---|---|---|
+| Low | 85.9 (51.9) | 83.8 (50.3) |
+| Medium | 76.1 (44.5) | 79.5 (48.6) |
+| High (default) | 62.2 (38.6) | 73.1 (43.9) |
+| Ultra | 41.0 (26.1) | 42.4 (27.6) |
+
+- Still CPU-bound (High at 50% render scale: 65.5). Profile at High: the lighting mod's `renderWorld` ~62% inclusive; three's `updateMatrixWorld` 11%, `projectObject` + `intersectsObject` (culling) 14%, beam-dust updates 5%.
+- `world.js`: after `optimizeStaticScene`, the map root computes its world matrices once and its `updateMatrixWorld` only runs when forced (three r185 walks every child even with `matrixWorldAutoUpdate=false`). Kino only (the only `World` user); moving brushes are already outside that root. High 62 → 68.5.
+- Lighting: beam dust moves in its vertex shader (`seedA`/`seedB` attributes, shared `dustTime` uniform; same closed-form motion as the old per-frame CPU loop; bounding sphere set from the beam since positions are zero). High → 73.
+- Tried, not kept: merging static map meshes (`mergeGeometries` per material within 768/1536 cells). The 1,152 opaque static meshes use 612 materials (384 distinct by properties, 349 colour textures), so only 84–170 meshes merged and draws barely moved (953 → 927–942); over 600 draws are already `optimizeStaticScene` instance batches. Real gains there need texture atlases/arrays.
+- Ultra's GTAO pass redraws the scene (1,871 draws vs 955).

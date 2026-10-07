@@ -45,6 +45,11 @@ export class World {
     gltf.scene.traverse(o=>{if(o.userData?.collisionOnly)o.visible=false;if(o.userData?.dynamicBrush){moving.push(o);this.entities.set(o.userData.entityId,o);}});
     for(const o of moving){this.scene.attach(o);if(o.userData.targetname==='theater_extracam_screen')o.visible=false;}
     this.optimization=optimizeStaticScene(gltf.scene,{cellSize:768});
+    // The map is static (moving brushes were taken out above, and optimizeStaticScene froze every local matrix), but
+    // three still walks all ~3,000 of its objects in every render's updateMatrixWorld (11% of a frame on Kino, more with
+    // shadow and effect passes). Compute the world matrices once and skip the subtree unless an update is forced.
+    gltf.scene.updateMatrixWorld(true);
+    gltf.scene.updateMatrixWorld=function(force){if(force)THREE.Object3D.prototype.updateMatrixWorld.call(this,true);};
     const nav=importNavMesh(new Uint8Array(bytes));this.nav=nav.navMesh;this.query=new NavMeshQuery(this.nav,{maxNodes:8192});this.query.defaultQueryHalfExtents={x:70,y:100,z:70};
     progress('Placing machines and barricades',65);
     const ents=this.data.entities;
