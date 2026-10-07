@@ -142,3 +142,4 @@
 - 2026-10-07: Server endpoints for Rind's Melon Pinball (install list per platform, account saves) (setup.md).
 - 2026-10-07: Melon Pinball friends leaderboard endpoint (setup.md).
 - 2026-10-07: Frame rate pass: High 62 → 73 FPS (static map matrices frozen, beam dust on the GPU); mesh merging tried and dropped (performance.md).
+- 2026-10-07: Ultra AO reuses the scene depth at half resolution (Ultra 40 → 54 FPS); chunk culling tried and dropped (performance.md).

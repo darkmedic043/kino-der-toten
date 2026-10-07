@@ -631,13 +631,17 @@ function setupPost(api){
       fragmentShader:'uniform sampler2D tDiffuse;varying vec2 vUv;void main(){vec4 c=texture2D(tDiffuse,vUv);if(any(isnan(c))||any(isinf(c)))c=vec4(0.,0.,0.,1.);gl_FragColor=vec4(min(c.rgb,vec3(48.)),c.a);}'}));
     if(q>=3){gtao=new GTAOPass(scene,camera,w,h);gtao.output=GTAOPass.OUTPUT.Default;gtao.blendIntensity=1;
       gtao.updateGtaoMaterial({radius:28,distanceExponent:1.5,thickness:12,scale:1,samples:q>=3?16:10,distanceFallOff:1});
-      gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:4,rings:2,samples:q>=3?16:8});composer.addPass(gtao);
-      // AO renders the scene's depth and normals itself; see-through things
-      // (light beams, dust, glass, decals) must not count as solid surfaces,
-      // or they get shaded as dark bars.
+      gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:4,rings:2,samples:q>=3?16:8});
+      // Cheaper AO (2026-10-07): GTAO used to redraw the whole scene for its own depth and normals (Ultra drew ~1,870
+      // calls a frame against ~955 on High). It now reads the depth the main render already wrote (normals rebuilt from
+      // depth) and works at half resolution; the denoise and the blend smooth the upscale. The composer swaps buffers an
+      // odd number of times a frame, so which target holds the scene's depth alternates: the render pass notes it.
+      gtao.setGBuffer(target.depthTexture);
+      const aoSize=gtao.setSize.bind(gtao);gtao.setSize=(w,h)=>aoSize(Math.max(1,Math.round(w/2)),Math.max(1,Math.round(h/2)));
+      let sceneTarget=null;const scenePass=renderPass.render.bind(renderPass);renderPass.render=(r,wb,rb,...a)=>{sceneTarget=rb;return scenePass(r,wb,rb,...a);};
       const aoRender=gtao.render.bind(gtao);
-      gtao.render=(...args)=>{const hidden=[];scene.traverseVisible(o=>{const m=o.material;if((o.isMesh||o.isPoints||o.isSprite)&&[m].flat().some(x=>x?.transparent||x?.blending>1)){o.visible=false;hidden.push(o);}});
-        try{aoRender(...args);}finally{for(const o of hidden)o.visible=true;}};
+      gtao.render=(...args)=>{const d=sceneTarget?.depthTexture;if(d){gtao.gtaoMaterial.uniforms.tDepth.value=d;gtao.pdMaterial.uniforms.tDepth.value=d;}aoRender(...args);};
+      composer.addPass(gtao);
     }else gtao=null;
     bloom=new UnrealBloomPass(new THREE.Vector2(w,h),.28,.32,1.05);composer.addPass(bloom);
     composer.addPass(new OutputPass());
