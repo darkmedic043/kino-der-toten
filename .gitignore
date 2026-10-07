@@ -37,3 +37,6 @@ __pycache__/
 *.pid
 .DS_Store
 Thumbs.db
+
+# Rind launcher downloads and update feed (built and copied by ~/projects/rind/scripts/release.sh)
+/export/web/rind/

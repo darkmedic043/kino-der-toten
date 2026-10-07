@@ -26,7 +26,7 @@ const SESSION_DAYS = 90, MAX_BODY = 256 * 1024;
 mkdirSync(join(DATA, 'profiles'), { recursive: true });
 
 const TYPES = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8',
-  '.css':'text/css; charset=utf-8','.glb':'model/gltf-binary','.gltf':'model/gltf+json','.webp':'image/webp','.wasm':'application/wasm','.wav':'audio/wav','.ogg':'audio/ogg',
+  '.css':'text/css; charset=utf-8','.glb':'model/gltf-binary','.gltf':'model/gltf+json','.webp':'image/webp','.wasm':'application/wasm','.yml':'text/yaml; charset=utf-8','.wav':'audio/wav','.ogg':'audio/ogg',
   '.bin':'application/octet-stream','.png':'image/png','.jpg':'image/jpeg','.md':'text/plain; charset=utf-8','.txt':'text/plain; charset=utf-8'};
 
 // ---- Storage (small JSON files, written atomically) -------------------------
@@ -236,12 +236,14 @@ function onSocialSocket(req, sock) {
 // Code and data must never go stale (Cloudflare rewrites "no-cache" into a
 // 4-hour browser cache, but leaves "no-store" alone). Heavy assets such as
 // meshes, textures and audio are cached for a day.
-const cacheControl = path => /\.(html|m?js|css|json|md|txt)$/i.test(path) ? 'no-store' : 'public, max-age=86400';
+const cacheControl = path => /\.(html|m?js|css|json|md|txt|ya?ml)$/i.test(path) ? 'no-store' : 'public, max-age=86400';
 
 function serveFile(req, res, url) {
   if (url === '/favicon.ico') { res.writeHead(204).end(); return; }
-  const path = resolve(ROOT, '.' + (url === '/' ? HOME : url).replace(/\\/g, '/'));
+  let path = resolve(ROOT, '.' + (url === '/' ? HOME : url).replace(/\\/g, '/'));
   if (!path.toLowerCase().startsWith((ROOT + sep).toLowerCase())) { res.writeHead(403).end('forbidden'); return; }
+  // a folder serves its index.html (e.g. /rind/, the launcher's download page); without the slash, redirect to it
+  try { if (statSync(path).isDirectory()) { if (!url.endsWith('/')) { res.writeHead(301, { Location: url + '/', 'Cache-Control': 'no-store' }).end(); return; } path = join(path, 'index.html'); } } catch {}
   let stat; try { stat = statSync(path); if (!stat.isFile()) throw 0; } catch { res.writeHead(404).end('not found'); return; }
   const type = TYPES[extname(path).toLowerCase()] || 'application/octet-stream', range = req.headers.range;
   if (range) {

@@ -135,3 +135,4 @@
 - 2026-10-06: Map rewards are add-only in cloud sync (client mergeRewards, server keepRewards); kino restarted; cheese reward re-added for SleepyZoroark.
 - 2026-10-07: Rind desktop launcher (~/projects/rind, own repo): Discord sign-in through the site, friends synced via the social API; server gained the 'launcher' presence status (coop.md).
 - 2026-10-07: Site renamed Melon Zombies (titles, main-menu logo without the Black Ops kicker, share-preview site name, melon favicon).
+- 2026-10-07: Server: folder index.html (with slash redirect), no-store for .yml; serves Rind downloads and update feed from git-ignored export/web/rind/.
