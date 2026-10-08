@@ -156,3 +156,4 @@
 - 2026-10-08: The Giant: CustomWorld's generic teleporter disc (floating over BO3's pads) hidden via the TELEPORT marker's new `visual: false`.
 - 2026-10-08: HUD icons for Stamin-Up and Deadshot (perks-plus; user-supplied art in git-ignored mods/perks-plus/icons/, Moon's HUD too). Mule Kick keeps its badge until it has an icon.
 - 2026-10-08: Terminal booth: F opens the MelonTerm desktop (green CRT, square icons) with a Perks app listing every perk, its price and effects; engine `mods.prompts` hook for mod-added use prompts (props.md).
+- 2026-10-08: PhD Flopper is a game-wide perk (perks-plus, `specialty_flakjacket`) done as BO1 does it: a dive that lands from a drop explodes (300 radius, 5000→1000), no self-inflicted explosive damage; Moon's machine extracted for custom maps (`PERK_phd`); Cheese Cube uses it (gameplay.md).

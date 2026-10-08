@@ -16,7 +16,8 @@ const PERKS={jugg:'specialty_armorvest',juggernog:'specialty_armorvest',armorves
   speedcola:'specialty_fastreload',speed:'specialty_fastreload',sleight:'specialty_fastreload',fastreload:'specialty_fastreload',doubletap:'specialty_rof',rof:'specialty_rof',
   // the perks-plus mod's perks
   staminup:'specialty_longersprint',stamin:'specialty_longersprint',marathon:'specialty_longersprint',longersprint:'specialty_longersprint',
-  deadshot:'specialty_deadshot',ads:'specialty_deadshot',mulekick:'specialty_additionalprimaryweapon',mule:'specialty_additionalprimaryweapon',threegun:'specialty_additionalprimaryweapon'};
+  deadshot:'specialty_deadshot',ads:'specialty_deadshot',mulekick:'specialty_additionalprimaryweapon',mule:'specialty_additionalprimaryweapon',threegun:'specialty_additionalprimaryweapon',
+  phd:'specialty_flakjacket',phdflopper:'specialty_flakjacket',flopper:'specialty_flakjacket',flakjacket:'specialty_flakjacket',divetonuke:'specialty_flakjacket',nuke:'specialty_flakjacket'};
 const PERK_MODELS={specialty_armorvest:'zombie_vending_jugg',specialty_quickrevive:'zombie_vending_revive',specialty_fastreload:'zombie_vending_sleight',specialty_rof:'zombie_vending_doubletap'};
 // BO3's machines (perks-plus, .tools/build_bo3_machines.py; git-ignored). The perks-plus perks always use them (Mule Kick
 // falls back to Moon's BO1 machine); a map entry "machines": "bo3" uses them for every perk and Pack-a-Punch.
@@ -25,7 +26,8 @@ const PERK_MODELS={specialty_armorvest:'zombie_vending_jugg',specialty_quickrevi
 const BO3_MACHINE=n=>`mods/perks-plus/models/p7_zm_vending_${n}.glb?v=2`;   // ?v: rebuilt in inches (browsers keep heavy files a day)
 const BO3_MACHINES={specialty_armorvest:'jugg',specialty_quickrevive:'revive',specialty_fastreload:'sleight',specialty_rof:'doubletap2',
   specialty_longersprint:'marathon',specialty_deadshot:'ads',specialty_additionalprimaryweapon:'three_gun',pap:'packapunch'};
-const MACHINE_FALLBACK={specialty_additionalprimaryweapon:'moon/models/zombie_vending_three_gun.glb'};
+// PhD Flopper has no BO3 machine here: Moon's, cut out of its map by .tools/extract-moon-mesh.mjs
+const MACHINE_FALLBACK={specialty_additionalprimaryweapon:'moon/models/zombie_vending_three_gun.glb',specialty_flakjacket:'moon/models/zombie_vending_nuke.glb'};
 const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE|TRAPZONE|TRAP|TELEPORT|TPDEST|EGG|RISING|MOVER)(?:_(.*))?$/i;
 const TRAP_COLORS={electric:0x8cbbff,fire:0xff7a2e};
 const COLLISION_NAME=/^(COL|UCX|collision)[_.-]/i;
@@ -138,8 +140,8 @@ export class CustomWorld {
     };
     // a perk machine (or Pack-a-Punch, perk 'pap'): BO3's when the map asks for them or the perk has no BO1 machine
     const placeMachine=async(perk,position,yaw,offset)=>{
-      if(BO3_MACHINES[perk]&&(entry.machines==='bo3'||!PERK_MODELS[perk])){
-        const o=await loadModel(BO3_MACHINE(BO3_MACHINES[perk])).catch(()=>null)??(MACHINE_FALLBACK[perk]?await loadModel(MACHINE_FALLBACK[perk]).catch(()=>null):null);
+      if((BO3_MACHINES[perk]||MACHINE_FALLBACK[perk])&&(entry.machines==='bo3'||!PERK_MODELS[perk])){
+        const o=(BO3_MACHINES[perk]?await loadModel(BO3_MACHINE(BO3_MACHINES[perk])).catch(()=>null):null)??(MACHINE_FALLBACK[perk]?await loadModel(MACHINE_FALLBACK[perk]).catch(()=>null):null);
         if(o){o.position.copy(position);o.rotation.y=yaw+FACE+offset;this.scene.add(o);return o;}   // BO3 and BO1 machine GLBs both face +Z
       }
       return PERK_MODELS[perk]||perk==='pap'?place(perk==='pap'?'zombie_vending_packapunch':PERK_MODELS[perk],position,yaw,offset):null;

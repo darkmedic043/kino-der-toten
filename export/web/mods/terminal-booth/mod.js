@@ -397,7 +397,6 @@ export default async function setup(api){
     });
     const perkIds=()=>{
       const ids=new Set();for(const e of world.interactions??[]){const id=e.perk??(e.targetname==='zombie_vending'?e.script_noteworthy:null);if(id)ids.add(id);}
-      if(world.perkInfo?.specialty_detectexplosive)ids.add('specialty_detectexplosive');   // Cheese Cube's PHD (its own interaction)
       return ids;
     };
     function open(b){

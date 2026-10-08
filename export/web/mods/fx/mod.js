@@ -128,6 +128,7 @@ export default function setup(api){
   host.on('reset',()=>{emitters.length=0;});
 
   const near=(c,r,g,b)=>{const h=typeof c==='number'?c:new THREE.Color(c).getHex(THREE.SRGBColorSpace);return Math.abs((h>>16&255)/255-r)+Math.abs((h>>8&255)/255-g)+Math.abs((h&255)/255-b)<.25;};
+  (window.kino??={}).fx={explosion};   // for mods that want a tinted blast (perks-plus: PhD Flopper)
   host.on('effect',e=>{
     const {position:at,color,count}=e;if(!at)return;
     if(near(color,1,.7,.3)&&count>=12){explosion(at,Math.min(1.4,.55+count/40));e.handled=true;}     // grenades, launchers, Gersh-less blasts

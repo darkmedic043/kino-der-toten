@@ -17,8 +17,8 @@ export default async function setup(api){
     const hits=ids.filter(id=>norm(id).includes(q)||norm(data.weapons[id].name).includes(q));
     return hits.length===1?{id:hits[0]}:{matches:hits};
   }
-  const PERKS={juggernog:'specialty_armorvest',jug:'specialty_armorvest',speedcola:'specialty_fastreload',speed:'specialty_fastreload',doubletap:'specialty_rof',double:'specialty_rof',quickrevive:'specialty_quickrevive',quick:'specialty_quickrevive',revive:'specialty_quickrevive'};
-  const PERK_NAMES={specialty_armorvest:'Juggernog',specialty_fastreload:'Speed Cola',specialty_rof:'Double Tap',specialty_quickrevive:'Quick Revive'};
+  const PERKS={juggernog:'specialty_armorvest',jug:'specialty_armorvest',speedcola:'specialty_fastreload',speed:'specialty_fastreload',doubletap:'specialty_rof',double:'specialty_rof',quickrevive:'specialty_quickrevive',quick:'specialty_quickrevive',revive:'specialty_quickrevive',phd:'specialty_flakjacket',flopper:'specialty_flakjacket'};
+  const PERK_NAMES={specialty_armorvest:'Juggernog',specialty_fastreload:'Speed Cola',specialty_rof:'Double Tap',specialty_quickrevive:'Quick Revive',specialty_flakjacket:'PhD Flopper'};
   const perkIds=()=>Object.keys(data.perkDrinks??{});
   const POWERUPS=['nuke','insta_kill','double_points','full_ammo','carpenter','fire_sale'];
   const toggles={god:false,ammo:false};
@@ -103,7 +103,7 @@ export default async function setup(api){
     const v=input.value,parts=v.split(/\s+/);
     if(parts.length<=1){const c=Object.keys(commands).filter(k=>!listed.has(k)&&k.startsWith(parts[0].toLowerCase()));if(c.length===1)input.value=c[0]+' ';else if(c.length)print(c.join('  '),'cmd');return;}
     const [cmd,...rest]=parts,q=rest.join(' ');
-    const pool=['give','spawn'].includes(cmd)?weaponIds().map(id=>id.replace(/_zm$/,'')):cmd==='powerup'?POWERUPS:cmd==='perk'?['jug','speed','doubletap','quick','all']:[];
+    const pool=['give','spawn'].includes(cmd)?weaponIds().map(id=>id.replace(/_zm$/,'')):cmd==='powerup'?POWERUPS:cmd==='perk'?['jug','speed','doubletap','quick','phd','all']:[];
     const c=pool.filter(k=>norm(k).startsWith(norm(q)));if(c.length===1)input.value=cmd+' '+c[0];else if(c.length)print(c.slice(0,40).join('  ')+(c.length>40?' …':''),'cmd');
   }
   // Keys typed here must not reach the game (movement, reload, rebinds…).

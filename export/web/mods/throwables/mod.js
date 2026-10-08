@@ -119,7 +119,7 @@ export default async function setup(api){
   function explode(at,inHandBlast){
     features.effect?.(at,0xffb347,30);audio.play('explosion');
     for(const z of [...enemies.list]){const d=z.root.position.distanceTo(at);if(d<300&&world.lineClear(at,z.root.position.clone().add(new THREE.Vector3(0,30,0))))enemies.hurt(z,Math.max(75,1500*(1-d/300)),false,false,'explosion');}
-    const d=inHandBlast?0:camera.position.distanceTo(at);if(d<160)api.damage(inHandBlast?260:180*(1-d/160));
+    const d=inHandBlast?0:camera.position.distanceTo(at);if(d<160&&!session.perks?.has('specialty_flakjacket'))api.damage(inHandBlast?260:180*(1-d/160));   // PhD Flopper: no self-inflicted explosive damage
   }
 
   host.on('reset',()=>{held=null;for(const f of frags)f.mesh.removeFromParent();frags.length=0;});
