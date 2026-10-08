@@ -271,6 +271,7 @@ All other fork files are new: `home.*`, `zombies.*`, `custom-world.js`,
 - `world.addShootTarget({position, radius | box, weapons?, hit(target, ray, point)})`: a target that `hit` fires on once when a shot passes through it (`weapons` limits it to those weapon ids; `box`, a `THREE.Box3`, is for thin targets). A shot hits only the nearest target on its path; `point` is where it crossed. Re-add a target to make it live again.
 - `world.slideMover(id, to 0..1, seconds, now)`, `world.enableMover(id, on)`: drive a `manual` `MOVER_` platform (movers.json `manual: true`); `enableMover(id,false)` hides it and removes its collision. Resets restore them.
 - `kino.scoreboard.addCollectible({id, label, value(), done?()})`: a tile in the Tab scoreboard's collectibles strip.
+- `host.prompts.push({find(camera) -> {text, distance} | null, use() -> bool})` (any map, `host` = the mod's host): a use prompt the engine shows as `F <text>` when it is the nearest; F calls `use()`. The terminal booth's desktop uses it.
 
 ## Scoreboard (`mods/scoreboard`)
 

@@ -155,3 +155,4 @@
 - 2026-10-08: The Giant: gratings/snowy props/sandbags collide, teleporter bases as convex bumps, barricades moved into the real window openings (BO3 boards are 40 units in from the zbarrier origin) and sized to them (waw-ports.md).
 - 2026-10-08: The Giant: CustomWorld's generic teleporter disc (floating over BO3's pads) hidden via the TELEPORT marker's new `visual: false`.
 - 2026-10-08: HUD icons for Stamin-Up and Deadshot (perks-plus; user-supplied art in git-ignored mods/perks-plus/icons/, Moon's HUD too). Mule Kick keeps its badge until it has an icon.
+- 2026-10-08: Terminal booth: F opens the MelonTerm desktop (green CRT, square icons) with a Perks app listing every perk, its price and effects; engine `mods.prompts` hook for mod-added use prompts (props.md).

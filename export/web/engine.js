@@ -239,10 +239,13 @@ function findPrompt(){
   const found=map.findPrompt(camera);let distance=found?.distance??Infinity;if(found){prompt=found.target;promptText=found.text??'';}
   for(const b of world.barriers){if(!map.boardCount(b))continue;const d=camera.position.distanceTo(map.barrierPoint?.(b)??b.position);if(d<100&&d<distance){prompt={barrier:b};distance=d;}}
   if(prompt?.barrier)promptText=prompt.barrier.count<map.boardCount(prompt.barrier)?'Hold F to rebuild barricade':'Barricade secured';
+  // mods.prompts: [{find(camera) -> {text, distance} | null, use() -> bool}], usable spots added by mods on any map
+  for(const m of mods.prompts??[]){const f=m.find(camera);if(f&&f.distance<distance){prompt={mod:m};promptText=f.text??'';distance=f.distance;}}
 }
 function interact(){
   if(!active||session.busy)return false;findPrompt();if(!prompt)return false;
   if(prompt.barrier)return repair(prompt.barrier);
+  if(prompt.mod)return !!prompt.mod.use();
   return !!map.interact(prompt);
 }
 function repair(b){if(b.count>=map.boardCount(b)||repairLeft>0)return false;repairLeft=.75;world.setBoards(b,b.count+1);if(b.rewardRound!==session.round){b.rewardRound=session.round;b.reward=0;}if(b.reward<50*session.round){session.addPoints(10);b.reward+=10;}audio.play('board');return true;}

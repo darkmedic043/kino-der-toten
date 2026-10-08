@@ -10,7 +10,9 @@
 // window.kino.terminalBooth exposes the booths for other mods:
 //   .booths[i].print(line)  .booths[i].setSign(text)  .booths[i].root
 //   .booths[i].tapScreen.set(lines)  (the beer tap's screen: what's on tap, e.g. the Wunderfizz's perk)
+// F at the screen opens the MelonTerm desktop (desktop.js) through the engine's mods.prompts hook.
 import * as THREE from 'three';
+import { openDesktop } from './desktop.js';
 import { loadModel } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 
@@ -30,6 +32,7 @@ export default async function setup(api){
   routeAround(booths);
   for(const b of booths)clearDebris(b);
   window.kino.terminalBooth={booths};
+  usePrompt(booths);
   window.kino.lighting?.tag?.(scene);
 
   // ------------------------------------------------------------- placement
@@ -78,7 +81,7 @@ export default async function setup(api){
       if(!o.isMesh)return;
       const n=o.name,m=o.material;
       o.castShadow=o.receiveShadow=true;
-      if(n==='crt_screen'){b.screen=screen(cfg.screen);o.material=b.screen.material;o.castShadow=false;}
+      if(n==='crt_screen'){b.screenAt=new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());b.screen=screen(cfg.screen);o.material=b.screen.material;o.castShadow=false;}
       else if(n==='tap_screen'){b.tapScreen=tapScreen();o.material=b.tapScreen.material;o.castShadow=false;}
       else if(n==='sign_glow'){b.sign=sign(cfg.sign??'MelonTerm 2.7');o.material=b.sign.material;o.castShadow=false;}
       else if(/^glass/.test(n)||/glass/.test(m.name)){o.material=m.clone();Object.assign(o.material,{transparent:true,depthWrite:false,opacity:.18,roughness:.08,metalness:0});o.material.color.set('#1a2828');o.renderOrder=2;o.castShadow=false;}
@@ -373,6 +376,46 @@ export default async function setup(api){
     world.closest=(v,ext)=>{let r=closest(v,ext);if(!r)return r;
       for(const o of obs)if(inside(o,r)){const q=pushOut(o,r);r=closest(q,ext)??q;if(inside(o,r))r=q;}
       return r;};
+  }
+
+  // ------------------------------------------------------------- desktop
+  // F at the screen (in front of the booth, looking at it) opens the desktop. The game pauses
+  // underneath, as with the cheat console, and Esc / LOG OFF goes back in.
+  function usePrompt(list){
+    const at=new THREE.Vector3(),fwd=new THREE.Vector3(),look=new THREE.Vector3();
+    const near=b=>{
+      if(!b.screenAt)return null;at.copy(b.screenAt);
+      fwd.set(0,0,1).applyQuaternion(b.root.quaternion);
+      const d=camera.position.distanceTo(at);if(d>80||camera.position.clone().sub(at).dot(fwd)<8)return null;
+      camera.getWorldDirection(look);if(look.dot(at.clone().sub(camera.position).normalize())<.75)return null;
+      return d;
+    };
+    let current=null;
+    (host.prompts??=[]).push({
+      find(){let best=null;for(const b of list){const d=near(b);if(d!==null&&(!best||d<best.distance))best={distance:d,booth:b};}current=best?.booth??null;return best&&{text:'Use the terminal',distance:best.distance};},
+      use(){if(!current)return false;open(current);return true;}
+    });
+    const perkIds=()=>{
+      const ids=new Set();for(const e of world.interactions??[]){const id=e.perk??(e.targetname==='zombie_vending'?e.script_noteworthy:null);if(id)ids.add(id);}
+      if(world.perkInfo?.specialty_detectexplosive)ids.add('specialty_detectexplosive');   // Cheese Cube's PHD (its own interaction)
+      return ids;
+    };
+    function open(b){
+      const onMap=perkIds(),wasActive=api.getState().active;
+      document.exitPointerLock?.();api.setActive(false);
+      openDesktop({
+        onMap:p=>p.ids.some(id=>onMap.has(id)),
+        owned:p=>p.ids.some(id=>session.perks?.has(id)),
+        price:p=>p.ids.map(id=>onMap.has(id)&&world.perkInfo?.[id]?.price).find(n=>n)??p.price,   // this map's price when it has the machine
+        power:()=>!!session.power,points:()=>session.points,
+        onOpen:()=>b.print('USER LOGGED IN'),
+        onApp:name=>b.print('RUN '+name.toUpperCase()+'.EXE'),
+        onClose:()=>{b.print('USER LOGGED OFF');
+          // Esc / the click counts as a user gesture, so the pointer can be recaptured (touch: just resume)
+          if(!wasActive||session.phase==='gameover')return;
+          if(api.getState().input?.touch?.mode)api.setActive(true);else api.renderer?.domElement?.requestPointerLock?.()?.catch?.(()=>{});}
+      });
+    }
   }
 
   // --------------------------------------------------------------- update
