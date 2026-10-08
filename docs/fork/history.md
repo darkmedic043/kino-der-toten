@@ -147,3 +147,4 @@
 - 2026-10-07: The Giant: doors (BO3 door models sliding open) and teleporters; CustomWorld multi-piece sliding doors (waw-ports.md).
 - 2026-10-07: The Giant: teleporter linking and the Pack-a-Punch door (the-giant mod); custom-map hooks for locked teleporters, scripted doors, papLocked (waw-ports.md).
 - 2026-10-07: The Giant looks fixed: props at the right scale (Greyhound = cm), BO3 blend overlays/decals see-through, built-in colours, night lighting with a lamp pool (waw-ports.md).
+- 2026-10-07: The Giant playtest fixes: prop collision (stairs, teleporter floors), barricade placement, no risers on the mainframe, alpha cut-out only where see-through, electric traps (waw-ports.md).

@@ -282,6 +282,7 @@ export class CustomWorld {
       if(cost!==undefined)t.cost=+cost;if(e.duration!==undefined)t.duration=+e.duration;if(e.cooldown!==undefined)t.cooldown=+e.cooldown;
       if(e.kind)t.kind=String(e.kind).toLowerCase();if(e.power!==undefined)t.power=e.power!==false&&e.power!=='false';
       this.interactions.push({kind:'trap',trap:t.name,position:m.position.clone().addScaledVector(up,10)});
+      if(e.handle===false||e.handle==='false')continue;   // the map has its own switch model (the BO3 map builder places BO3's)
       const panel=new THREE.Mesh(new THREE.BoxGeometry(22,34,6),new THREE.MeshStandardMaterial({color:0x3b3f3a,roughness:.7,metalness:.4}));
       panel.position.copy(m.position);panel.rotation.y=m.yaw+FACE;panel.translateZ(-4);this.scene.add(panel);
       tasks.push(place('zombie_zapper_handle',m.position,m.yaw).then(o=>{(t.handles??=[]).push(o);}));
