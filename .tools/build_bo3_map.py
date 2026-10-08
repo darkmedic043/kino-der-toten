@@ -154,10 +154,11 @@ def quat(R):   # rotation matrix -> (x, y, z, w)
     return q
 by_model = {}
 for m in info['models']: by_model.setdefault(m['name'], []).append(m)
-instances, skipped = 0, []
-for name, insts in sorted(by_model.items()):
+mesh_cache = {}
+def prop_mesh(name):   # a BO3 model as a glTF mesh (cached), or None if Greyhound didn't export it
+    if name in mesh_cache: return mesh_cache[name]
     path = os.path.join(GH, 'xmodels', name, name + '_LOD0.semodel')
-    if not os.path.exists(path): skipped.append(name); continue
+    if not os.path.exists(path): mesh_cache[name] = None; return None
     model = read_semodel(path)
     prims = []
     for mesh in model['meshes']:
@@ -169,8 +170,13 @@ for name, insts in sorted(by_model.items()):
         mat = material(('prop', mm['name']), mm['name'], texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX))
         prims.append({'attributes': {'POSITION': accessor(pos, 'VEC3', 34962, True), 'NORMAL': accessor(nrm.astype(np.float32), 'VEC3', 34962),
                                      'TEXCOORD_0': accessor(uv, 'VEC2', 34962)}, 'indices': accessor(faces.ravel(), 'SCALAR', 34963), 'material': mat})
-    if not prims: continue
-    gltf['meshes'].append({'name': name, 'primitives': prims}); mesh_i = len(gltf['meshes']) - 1
+    if not prims: mesh_cache[name] = None; return None
+    gltf['meshes'].append({'name': name, 'primitives': prims}); mesh_cache[name] = len(gltf['meshes']) - 1
+    return mesh_cache[name]
+instances, skipped = 0, []
+for name, insts in sorted(by_model.items()):
+    mesh_i = prop_mesh(name)
+    if mesh_i is None: skipped.append(name); continue
     cells = {}
     for it in insts:
         o = np.array(it['origin']); cells.setdefault(tuple(np.floor(o[:2] / 2048).astype(int)), []).append(it)
@@ -193,12 +199,19 @@ PERKS = {'specialty_armorvest': 'jugg', 'specialty_quickrevive': 'revive', 'spec
 WEAPONS = {'ar_longburst': 'm16_zm', 'shotgun_pump': 'ithaca_zm', 'pistol_burst': 'cz75_zm', 'ar_marksman': 'm14_zm', 'smg_fastfire': 'mpl_zm',
            'smg_versatile': 'mp5k_zm', 'ar_cqb': 'famas_zm', 'ar_standard': 'bo3_ak117', 'pistol_fullauto': 'bo3_g18_death'}
 START_ZONE = 'receiver'
+# BO3 zone (volume name without _zone) -> the door zones that activate it. A door's script_flag enter_<x> opens zone x;
+# zones without a door of their own open with the doors next to them (their spawners are placed once per listed zone).
+ZONE_GROUPS = {'receiver': ['start'], 'warehouse_bottom': ['warehouse_building'], 'warehouse_top': ['warehouse_building'],
+               'wnuen': ['wnuen_building'], 'wnuen_bridge': ['wnuen_building'], 'bridge': ['warehouse_building', 'wnuen_building'],
+               'outside_south': ['outside_east', 'outside_west']}
+zid = lambda z: z.replace('_', '')   # CustomWorld reads a marker's zone up to the first underscore
+def zone_ids(z): return [zid(x) for x in ZONE_GROUPS.get(z, [z])]
 zones = {}
 for e in ents:
     if e.get('script_noteworthy') == 'player_volume': zones.setdefault(e['targetname'].removesuffix('_zone'), []).append(vec(e['origin']))
 def zone_of_point(p):
     best = min(((z, np.linalg.norm(np.array(o) - p)) for z, os_ in zones.items() for o in os_), key=lambda x: x[1])[0]
-    return 'start' if best == START_ZONE else best
+    return zone_ids(best)[0]
 def marker(name, origin, yaw_deg=0.0, extras=None):
     r = math.radians(yaw_deg) / 2
     n = {'name': name, 'translation': g(origin).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]}
@@ -212,18 +225,17 @@ for e in ents:
     o = vec(e.get('origin')); yaw = vec(e.get('angles'))[1]
     if cls == 'info_player_start': marker('PLAYER_SPAWN', o, yaw); count('PLAYER_SPAWN')
     elif sn in ('spawn_location', 'riser_location') and tn.endswith('_spawners'):
-        z = tn.removesuffix('_spawners').removesuffix('_zone'); z = 'start' if z == START_ZONE else z
-        marker(f'ZSPAWN_{z}', o, yaw); count('ZSPAWN')
+        for z in zone_ids(tn.removesuffix('_spawners').removesuffix('_zone')): marker(f'ZSPAWN_{z}', o, yaw, {'zone': z}); count('ZSPAWN')
     elif cls.startswith('zbarrier_zmcore_basicwoodbarrier'):
-        marker(f'WINDOW_{zone_of_point(np.array(o))}', o, yaw); count('WINDOW')
+        wz = zone_of_point(np.array(o)); marker(f'WINDOW_{wz}', o, yaw, {'zone': wz}); count('WINDOW')
         # the window's own spawner (same script_string) can be far away; CustomWorld wants a ZSPAWN within 400 units
         # outside it: one on the way there, 250 units out
         sp = [x for x in ents if x.get('script_noteworthy') in ('spawn_location', 'riser_location') and x.get('script_string') == e.get('script_string')]
         if sp:
             t = np.array(vec(sp[0]['origin'])); d = t - np.array(o); d[2] = 0; dist = np.linalg.norm(d)
             if dist > 1:
-                z = sp[0]['targetname'].removesuffix('_spawners').removesuffix('_zone'); z = 'start' if z == START_ZONE else z
-                marker(f'ZSPAWN_{z}', (np.array(o) + d / dist * min(250, dist * .8)).tolist(), yaw); count('ZSPAWN_window')
+                for z in zone_ids(sp[0]['targetname'].removesuffix('_spawners').removesuffix('_zone')):
+                    marker(f'ZSPAWN_{z}', (np.array(o) + d / dist * min(250, dist * .8)).tolist(), yaw, {'zone': z}); count('ZSPAWN_window')
     elif cls == 'zbarrier_zmcore_MagicBox': marker('BOX_start' if sn.startswith('start_chest') else 'BOX', o, yaw); count('BOX')
     elif cls == 'zbarrier_zmcore_packapunch': marker('PAP', o, yaw); count('PAP')
     elif tn == 'use_power_switch': marker('POWER', o, yaw); count('POWER')
@@ -235,6 +247,39 @@ for e in ents:
         perk_spots.append(o); marker(f'PERK_{PERKS[sn]}', o, yaw); count(f'PERK_{PERKS[sn]}')
     elif tn == 'weapon_upgrade' and e.get('zombie_weapon_upgrade') in WEAPONS: marker(f'WALLBUY_{WEAPONS[e["zombie_weapon_upgrade"]]}', o, yaw); count('WALLBUY')
     elif tn == 'claymore_purchase': marker('CLAYMORE', o, yaw); count('CLAYMORE')
+# Doors: each zombie_door trigger (two can share a target) -> a DOOR_<zone>_<cost> group of its script_model pieces, each
+# with extras.move (BO3's script_vector, a world offset: slide or drop) for CustomWorld to animate when it opens.
+# BO3's electric doors (script_noteworthy electric_door) open with the power.
+by_target = {}
+for e in ents:
+    if e.get('targetname'): by_target.setdefault(e['targetname'], []).append(e)
+done = set()
+for e in ents:
+    if e.get('targetname') != 'zombie_door' or e.get('target') in done: continue
+    done.add(e.get('target'))
+    electric = e.get('script_noteworthy') == 'electric_door'
+    z = '' if electric else zid(e.get('script_flag', '').removeprefix('enter_'))
+    cost = int(float(e.get('zombie_cost', 750)))
+    kids = []
+    for part in by_target.get(e.get('target'), []):
+        if part.get('classname') != 'script_model': continue
+        mi = prop_mesh(part['model'])
+        if mi is None: print('  door piece not exported:', part['model']); continue
+        r = math.radians(vec(part.get('angles'))[1]) / 2
+        node = {'name': part['model'], 'mesh': mi, 'translation': g(vec(part['origin'])).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]}
+        if part.get('script_vector'): node['extras'] = {'move': g(vec(part['script_vector'])).tolist()}
+        gltf['nodes'].append(node); kids.append(len(gltf['nodes']) - 1)
+    if not kids: continue
+    add_node({'name': f'DOOR_{z or "power"}_{cost}', 'children': kids, 'extras': {'zone': z, 'cost': cost, 'electric': electric}})
+    count('DOOR')
+# Teleporters (Der Riese): each pad sends you to the mainframe for 1500 (one-way: TELEPORT_<pad> + TPDEST_<pad>)
+MAINFRAME, MAINFRAME_YAW = [-56, 440, 64], 270
+for e in ents:
+    m = re.fullmatch(r'telepad_(\d)', e.get('targetname', ''))
+    if m and e.get('script_sound') == 'evt_pad':
+        pad = f'pad{m[1]}'
+        marker(f'TELEPORT_{pad}', [*vec(e['origin'])[:2], vec(e['origin'])[2] - 20], vec(e.get('angles'))[1], {'cost': 1500, 'cooldown': 30, 'power': True})
+        marker(f'TPDEST_{pad}', MAINFRAME, MAINFRAME_YAW); count('TELEPORT')
 print('markers:', counts)
 
 # ---- write -----------------------------------------------------------------------------------------------------------------

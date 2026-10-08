@@ -144,7 +144,8 @@ export async function createMap(ctx,entry){
         }
         if(!on)for(const h of t.handles??[])if(h&&t.readyAt<=s.time)h.rotation.x=0;
       }
-      // Moving platforms (MOVER meshes): advance, and carry the player standing on one
+      // Moving platforms (MOVER meshes): advance, and carry the player standing on one (updateMovers also slides doors open)
+      if(!world.movers?.length)world.updateMovers?.(s.time);
       if(world.movers?.length){
         world.updateMovers(s.time);
         const pc=ctx.player.collider,fy=pc.start.y-pc.radius;

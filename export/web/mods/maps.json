@@ -102,7 +102,7 @@
         "explore"
       ],
       "dir": "mods/maps/the-giant/",
-      "model": "the-giant.glb?v=2",
+      "model": "the-giant.glb?v=3",
       "scale": 1,
       "background": "#0d0f12",
       "exposure": 1.2,

@@ -111,7 +111,10 @@ export class CustomWorld {
         const thin=Math.min(grow,6),gx=size.x>=size.z?grow:thin,gz=size.z>size.x?grow:thin;
         plug.min.x-=gx;plug.min.z-=gz;plug.max.x+=gx;plug.max.z+=gz;plug.max.y+=up;
       }
-      const part={object:m.object,collider:boxCollider(plug),box,plug,enabled:true};
+      // pieces with a `move` property [x, y, z] (scene units; the BO3 map builder writes BO3's script_vector) slide that far
+      // when the door opens, then disappear; without one the door disappears at once
+      const slides=[];m.object.traverse(o=>{const v=o.userData?.move;if(Array.isArray(v)&&v.length===3)slides.push({object:o,base:o.position.clone(),move:new THREE.Vector3(...v)});});
+      const part={object:m.object,collider:boxCollider(plug),box,plug,enabled:true,slides,anim:null};
       this.doors.set(name,{name,cost,zone,electric:!!m.extras.electric,parts:[part],box});this.dynamic.push(part);
       this.interactions.push({kind:'door',door:name,position:box.getCenter(new THREE.Vector3()),box});
     }
@@ -336,7 +339,10 @@ export class CustomWorld {
   lineClear(a,b){const v=b.clone().sub(a),dist=v.length();return !this.raycast(new THREE.Ray(a,v.normalize()),1,Math.max(1,dist-4));}
   isOpen(door,session){return session.openDoors.has(door.name)||(door.electric&&session.power);}
   setDoors(session){
-    for(const d of this.doors.values()){const open=this.isOpen(d,session);for(const p of d.parts){p.enabled=!open;p.object.visible=!open;}}
+    for(const d of this.doors.values()){const open=this.isOpen(d,session);for(const p of d.parts){
+      if(open&&p.enabled&&p.slides?.length){p.enabled=false;p.anim={t0:session.time};continue;}   // collision off now, slide in updateMovers
+      if(!open){p.anim=null;for(const sl of p.slides??[])sl.object.position.copy(sl.base);}
+      p.enabled=!open;if(!p.anim)p.object.visible=!open;}}
     for(const ref of this.navDisabled)this.nav.setPolyFlags(ref,1);this.navDisabled.clear();
     for(const d of this.dynamic){if(!d.enabled||d.window)continue;const c=d.box.getCenter(new THREE.Vector3()),h=d.box.getSize(new THREE.Vector3()).multiplyScalar(.5);h.x+=5;h.z+=5;const r=this.query.queryPolygons(c,h);for(const ref of r.polyRefs??[])this.navDisabled.add(ref);}
     for(const ref of this.navDisabled)this.nav.setPolyFlags(ref,0);
@@ -352,6 +358,11 @@ export class CustomWorld {
   }
   // Moves every platform to game time `time` (out at def.out, back at def.back, each leg def.duration long, repeating every def.cycle).
   updateMovers(time){
+    // sliding doors (setDoors): about a second, eased, then hidden
+    for(const d of this.doors.values())for(const p of d.parts){if(!p.anim)continue;
+      const k=Math.min(1,Math.max(0,(time-p.anim.t0)/1.1)),e=1-(1-k)**3;
+      for(const sl of p.slides)sl.object.position.copy(sl.base).addScaledVector(sl.move,e);
+      if(k>=1){p.anim=null;p.object.visible=false;}}
     const scale=this.entry.scale??1;
     for(const m of this.movers){
       const d=m.def,dur=d.duration??2,cycle=d.cycle??12,p=(((time-(d.delay??0))%cycle)+cycle)%cycle;
