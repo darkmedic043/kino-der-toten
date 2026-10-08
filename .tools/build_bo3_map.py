@@ -190,6 +190,20 @@ NO_COLLIDE = re.compile(r'debris|paper|trash|newspaper|wire|cable|rope|chain|lig
 BOXABLE = re.compile(r'crate|box(?!_wood_wine)|barrel|drum|cabinet|file_cab|locker|desk|table|generator|machine|sandbag|pallet|tank|chest|'
                      r'safe|bench|shelf|cart|engine|transformer|control_box|pillar|column|cinder|block|furnace|boiler|compressor|workbench', re.I)
 WALKABLE = re.compile(r'stair|step|floor|platform|catwalk(?!_support)|walkway|bridge(?!_piston|_spring)|grate|deck|ramp|teleporter_(floor|base|mf_base|pad_glass)|zm_der_teleporter$', re.I)
+# floor gratings (396 panels), planks: flat slabs, exact as boxes; teleporter bases and pads: their convex hull
+FLATBOX = re.compile(r'grating_metal|wood_plank_rustic|zm_der_plank_wood', re.I)
+CONVEX = re.compile(r'teleporter_base|zm_der_teleporter$|teleporter_pad_glass|teleporter_mf_bolted_floor', re.I)
+def convex_hull(pts):
+    import bmesh
+    bm = bmesh.new()
+    for p in np.unique(np.round(pts, 2), axis=0): bm.verts.new(p.tolist())
+    bmesh.ops.convex_hull(bm, input=bm.verts[:])
+    for v in [v for v in bm.verts if not v.link_faces]: bm.verts.remove(v)
+    bmesh.ops.triangulate(bm, faces=bm.faces[:]); bm.verts.index_update()
+    P = np.array([v.co[:] for v in bm.verts]); T = np.array([[v.index for v in f.verts] for f in bm.faces]); bm.free()
+    c = P.mean(0); n = np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]])
+    flip = (n * (P[T].mean(1) - c)).sum(1) < 0; T[flip] = T[flip][:, [0, 2, 1]]   # outward
+    return P, T
 # a box from its 8 corners (index = x*4 + y*2 + z over min/max), outward-facing triangles
 BOX_TRIS = np.array([[0, 1, 3], [0, 3, 2], [4, 6, 7], [4, 7, 5], [0, 4, 5], [0, 5, 1], [2, 3, 7], [2, 7, 6], [0, 2, 6], [0, 6, 4], [1, 5, 7], [1, 7, 3]])
 prop_geo = {}   # model -> (positions in model space, inches, glTF axes; triangles)
@@ -259,15 +273,20 @@ col_P, col_T, n0, solid_props = [], [], 0, 0
 tri = np.concatenate(solid); used, inv = np.unique(tri.ravel(), return_inverse=True)
 col_P.append(Pg[used].astype(np.float64)); col_T.append(inv.reshape(-1, 3)); n0 = len(used)
 for name, insts in by_model.items():
-    if name not in prop_geo or NO_COLLIDE.search(name) or 'stair_step' in name: continue   # steps: ramps below
+    base_ = re.sub(r'_snow(?=_|$)', '', name)   # a snowy variant collides like the plain one (NO_COLLIDE's 'snow' is for snow piles)
+    if name not in prop_geo or NO_COLLIDE.search(base_) or 'stair_step' in name: continue   # steps: ramps below
     pp, tt = prop_geo[name]
     size = pp.max(0) - pp.min(0)
-    if size.max() < 24: continue   # small stuff
+    if size.max() < 24 and 'sandbag' not in name: continue   # small stuff (sandbags pile up under the windows)
     # walkable structure keeps its shape (if it isn't too detailed); other solid props collide as their bounding box,
     # and big irregular ones are left out (a box around them could close a passage)
-    if WALKABLE.search(name):
-        if len(tt) > 6000: print('walkable prop too detailed for collision:', name, len(tt)); continue
-    elif size.max() <= 200 and BOXABLE.search(name) and not re.search(r'frame|arch|door|window|gate', name, re.I):
+    if CONVEX.search(base_): pp, tt = convex_hull(pp)   # a smooth bump, no pits to sink into
+    elif FLATBOX.search(base_) or (WALKABLE.search(base_) and len(tt) > 6000):   # flat panels and over-detailed walkables: their box
+        lo3, hi3 = pp.min(0), pp.max(0)
+        pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
+        tt = BOX_TRIS
+    elif WALKABLE.search(base_): pass
+    elif size.max() <= 200 and BOXABLE.search(base_) and not re.search(r'frame|arch|door|window|gate', name, re.I):
         lo3, hi3 = pp.min(0), pp.max(0)
         pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
         tt = BOX_TRIS
@@ -309,6 +328,31 @@ CP, CT = np.concatenate(col_P).astype(np.float32), np.concatenate(col_T).astype(
 gltf['meshes'].append({'name': 'COL_world', 'primitives': [{'attributes': {'POSITION': accessor(CP, 'VEC3', 34962, True)}, 'indices': accessor(CT.ravel(), 'SCALAR', 34963)}]})
 add_node({'name': 'COL_world', 'mesh': len(gltf['meshes']) - 1})
 print(f'collision: {len(CT)} triangles ({solid_props} solid props)')
+CTRI = CP[CT].astype(np.float64)   # (n, 3, 3) collision triangles in glTF space
+def seg_blocked(a, b, tris):   # does the segment a->b cross any triangle (Moller-Trumbore, vectorised)
+    d = b - a; e1 = tris[:, 1] - tris[:, 0]; e2 = tris[:, 2] - tris[:, 0]
+    h = np.cross(d, e2); det = (e1 * h).sum(1); ok = np.abs(det) > 1e-9; inv = np.where(ok, 1 / np.where(ok, det, 1), 0)
+    sv = a - tris[:, 0]; u = (sv * h).sum(1) * inv; q = np.cross(sv, e1); v = (q * d).sum(1) * inv; t = (q * e2).sum(1) * inv
+    return bool(np.any(ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t >= 0) & (t <= 1)))
+def window_opening(o, out):
+    """A window's clear opening, measured through the collision (walls, sandbag boxes): segments 30 units either side of
+    the barrier plane at heights over the floor. Returns (bottom, top, width) in CoD units above the origin, or None."""
+    O = g(o).astype(np.float64); n = g(np.array([out[0], out[1], 0.0])); n /= max(np.linalg.norm(n), 1e-6); side = np.array([n[2], 0, -n[0]])
+    near = CTRI[np.linalg.norm(CTRI.mean(1) - O, axis=1) < 160]
+    clear = [h for h in range(4, 161, 4) if not seg_blocked(O + [0, h, 0] - n * 30, O + [0, h, 0] + n * 30, near)]
+    runs, cur = [], []
+    for h in clear:
+        if cur and h != cur[-1] + 4: runs.append(cur); cur = []
+        cur.append(h)
+    if cur: runs.append(cur)
+    runs = [r for r in runs if len(r) >= 6]   # at least 24 units tall
+    if not runs: return None
+    r = max(runs, key=len); bottom, top = r[0] - 2, r[-1] + 2; mid = (bottom + top) / 2
+    w = 0
+    for k in range(4, 80, 4):
+        if any(seg_blocked(O + [0, mid, 0] + side * sgn * k - n * 30, O + [0, mid, 0] + side * sgn * k + n * 30, near) for sgn in (1, -1)): break
+        w = 2 * k
+    return bottom, top, max(w, 32)
 
 # ---- markers ------------------------------------------------------------------------------------------------------------
 PERKS = {'specialty_armorvest': 'jugg', 'specialty_quickrevive': 'revive', 'specialty_fastreload': 'speedcola', 'specialty_doubletap2': 'doubletap',
@@ -335,6 +379,7 @@ def marker(name, origin, yaw_deg=0.0, extras=None):
     if extras: n['extras'] = extras
     add_node(n)
 counts = {}
+openings = []
 perk_spots, SIDE, SIDE_DIR = [], 62, int(os.environ.get('SIDE_DIR', '-1'))
 def count(k): counts[k] = counts.get(k, 0) + 1
 for e in ents:
@@ -347,7 +392,18 @@ for e in ents:
         for z in zone_ids(tn.removesuffix('_spawners').removesuffix('_zone')): marker(f'ZSPAWN_{z}', o, yaw, {'zone': z}); count('ZSPAWN')
     elif cls.startswith('zbarrier_zmcore_basicwoodbarrier'):
         # zbarrier origins are at the floor; CustomWorld centres the boards on the marker
-        wz = zone_of_point(np.array(o)); marker(f'WINDOW_{wz}', [o[0], o[1], o[2] + 48], yaw, {'zone': wz}); count('WINDOW')
+        wz = zone_of_point(np.array(o))
+        goal_ = next((x for x in ents if x.get('targetname') == 'exterior_goal' and x.get('target') == e.get('targetname')), None)
+        outward = (np.array(vec(goal_['origin'])) - np.array(o)) if goal_ else np.array([math.cos(math.radians(yaw)), math.sin(math.radians(yaw)), 0])
+        # BO3's boards (and the window, its sandbags) are 40 units in from the zbarrier origin, away from the exterior goal
+        nrm = outward.astype(float); nrm[2] = 0; nrm /= max(np.linalg.norm(nrm), 1e-6); o = (np.array(o) - nrm * 40).tolist()
+        op = window_opening([o[0], o[1], o[2] - 40], outward)
+        if op:   # boards (and their clip) fill the measured opening: above the sandbags, below the lintel
+            bottom, top, width = op; bottom -= 40; top -= 40
+            marker(f'WINDOW_{wz}', [o[0], o[1], o[2] + (bottom + top) / 2], yaw, {'zone': wz, 'height': top - bottom, 'width': min(max(width, 48), 72)})
+            openings.append((round(bottom), round(top), width))
+        else: marker(f'WINDOW_{wz}', [o[0], o[1], o[2] + 48], yaw, {'zone': wz}); openings.append(None)
+        count('WINDOW')
         # the window's own spawner (same script_string) can be far away; CustomWorld wants a ZSPAWN within 400 units
         # outside it: one on the way there, 250 units out
         sp = [x for x in ents if x.get('script_noteworthy') in ('spawn_location', 'riser_location') and x.get('script_string') == e.get('script_string')]
@@ -568,6 +624,7 @@ for e in ents:
                                                                            'indices': accessor(np.array(CT_, dtype=np.uint32).ravel(), 'SCALAR', 34963)}]})
         add_node({'name': f'GIANT_BRIDGECOL_{side}', 'mesh': len(gltf['meshes']) - 1})
     count('BRIDGE')
+print('window openings (bottom, top, width):', openings)
 print('markers:', counts)
 
 # ---- write -----------------------------------------------------------------------------------------------------------------

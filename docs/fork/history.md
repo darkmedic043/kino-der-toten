@@ -152,3 +152,4 @@
 - 2026-10-07: The Giant Easter eggs: Fly Trap (Pack-a-Punched Python as the Annihilator) and the spine-jar Beauty of Annihilation song (audio extracted from BO3's sound bank); grey placeholder slab removed (waw-ports.md).
 - 2026-10-07: The Giant's drawbridges: BO3 fxanim rigs and animations exported with Greyhound (game running), lowered by the-giant mod when the power comes on, deck collision at the connect frame (waw-ports.md).
 - 2026-10-07: The Giant teleporter fixes: teleporter base (ramp) and spawn pad collision, landing spot moved in front of the mainframe (BO3's origin_teleport_player_*).
+- 2026-10-08: The Giant: gratings/snowy props/sandbags collide, teleporter bases as convex bumps, barricades moved into the real window openings (BO3 boards are 40 units in from the zbarrier origin) and sized to them (waw-ports.md).
