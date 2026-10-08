@@ -278,8 +278,19 @@ for e in ents:
     m = re.fullmatch(r'telepad_(\d)', e.get('targetname', ''))
     if m and e.get('script_sound') == 'evt_pad':
         pad = f'pad{m[1]}'
-        marker(f'TELEPORT_{pad}', [*vec(e['origin'])[:2], vec(e['origin'])[2] - 20], vec(e.get('angles'))[1], {'cost': 1500, 'cooldown': 30, 'power': True})
+        marker(f'TELEPORT_{pad}', [*vec(e['origin'])[:2], vec(e['origin'])[2] - 20], vec(e.get('angles'))[1],
+               {'cost': 1500, 'cooldown': 30, 'power': True, 'locked': True, 'lockedText': 'Link this teleporter: pull its lever, then the mainframe'})
         marker(f'TPDEST_{pad}', MAINFRAME, MAINFRAME_YAW); count('TELEPORT')
+    elif m and e.get('script_sound') == 'evt_lever_pull':
+        add_node({'name': f'GIANT_LEVER_pad{m[1]}', 'translation': g(vec(e['origin'])).tolist()}); count('LEVER')   # the-giant mod: linking
+for e in ents:
+    if e.get('targetname') == 'trigger_teleport_core': add_node({'name': 'GIANT_CORE', 'translation': g(vec(e['origin'])).tolist()})
+    if e.get('targetname') == 'pack_door' and e.get('classname') == 'script_model':
+        mi = prop_mesh(e['model'])
+        if mi is not None:   # the mainframe door: shut until the three pads are linked (the-giant mod opens it), then it rises
+            r = math.radians(vec(e.get('angles'))[1]) / 2
+            gltf['nodes'].append({'name': e['model'], 'mesh': mi, 'translation': g(vec(e['origin'])).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)], 'extras': {'move': g([0, 0, 110]).tolist()}})
+            add_node({'name': 'DOOR_pap_0', 'children': [len(gltf['nodes']) - 1], 'extras': {'zone': '', 'cost': 0, 'scripted': True}}); count('PAP_DOOR')
 print('markers:', counts)
 
 # ---- write -----------------------------------------------------------------------------------------------------------------

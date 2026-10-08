@@ -145,3 +145,4 @@
 - 2026-10-07: Ultra AO reuses the scene depth at half resolution (Ultra 40 → 54 FPS); chunk culling tried and dropped (performance.md).
 - 2026-10-07: First BO3 map, The Giant (memory dump of the running game + Greyhound; build_bo3_map.py); Stamin-Up, Deadshot, Mule Kick (perks-plus mod, BO3 machines) (waw-ports.md, gameplay.md).
 - 2026-10-07: The Giant: doors (BO3 door models sliding open) and teleporters; CustomWorld multi-piece sliding doors (waw-ports.md).
+- 2026-10-07: The Giant: teleporter linking and the Pack-a-Punch door (the-giant mod); custom-map hooks for locked teleporters, scripted doors, papLocked (waw-ports.md).

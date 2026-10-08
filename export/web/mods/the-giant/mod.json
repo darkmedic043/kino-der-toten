@@ -1,0 +1,5 @@
+{
+  "name": "The Giant extras",
+  "description": "The Giant's (BO3 port) teleporter linking: pull a pad's lever, reach the mainframe within 30 seconds to link it; all three linked open the mainframe door and Pack-a-Punch. Only active on that map.",
+  "script": "mod.js"
+}

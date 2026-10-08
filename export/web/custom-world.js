@@ -116,7 +116,8 @@ export class CustomWorld {
       const slides=[];m.object.traverse(o=>{const v=o.userData?.move;if(Array.isArray(v)&&v.length===3)slides.push({object:o,base:o.position.clone(),move:new THREE.Vector3(...v)});});
       const part={object:m.object,collider:boxCollider(plug),box,plug,enabled:true,slides,anim:null};
       this.doors.set(name,{name,cost,zone,electric:!!m.extras.electric,parts:[part],box});this.dynamic.push(part);
-      this.interactions.push({kind:'door',door:name,position:box.getCenter(new THREE.Vector3()),box});
+      // `scripted`: no buy prompt; a script opens it (session.openDoors.add(name); world.setDoors(session))
+      if(!m.extras.scripted)this.interactions.push({kind:'door',door:name,position:box.getCenter(new THREE.Vector3()),box});
     }
 
     progress('Building navigation for zombies',50);
@@ -317,7 +318,9 @@ export class CustomWorld {
       const e=pad.extras,ret=dest?.extras.return??dest?.arg.split('_').find(t=>/^\d+$/.test(t));
       const to=dest?{position:dest.position.clone(),yaw:dest.yaw,returnAfter:ret!==undefined?+ret:0,zone:dest.extras.zone?String(dest.extras.zone).toLowerCase():null}
         :{position:front(other),yaw:other.yaw,returnAfter:0,zone:other.extras.zone?String(other.extras.zone).toLowerCase():null};
-      const tp={name,from:{position:front(pad),yaw:pad.yaw},to,cost:+(e.cost??0),cooldown:+(e.cooldown??(dest?90:20)),power:e.power===undefined?true:e.power!==false&&e.power!=='false',readyAt:0};
+      const tp={name,from:{position:front(pad),yaw:pad.yaw},to,cost:+(e.cost??0),cooldown:+(e.cooldown??(dest?90:20)),power:e.power===undefined?true:e.power!==false&&e.power!=='false',readyAt:0,
+        // `locked`: unusable until a script clears tp.locked (The Giant's pad linking); lockedText is the prompt meanwhile
+        locked:e.locked===true||e.locked==='true',lockedText:e.lockedText??'This teleporter is not linked'};
       this.teleporters.push(tp);
       this.interactions.push({kind:'teleport',teleporter:this.teleporters.length-1,position:pad.position.clone().addScaledVector(up,30)});
       const base=new THREE.Mesh(new THREE.CylinderGeometry(34,38,4,32),new THREE.MeshStandardMaterial({color:0x2f3336,roughness:.5,metalness:.6}));

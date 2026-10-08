@@ -78,10 +78,10 @@ export async function createMap(ctx,entry){
       if(e.kind==='power')text='Turn on the power';
       if(e.kind==='egg')text=world.eggs.get(e.egg).items[e.item].found?'':'Inspect';
       if(e.kind==='trap'){const t=world.traps.get(e.trap),label=t.kind==='fire'?'fire':'electric';text=t.power&&!s.power?'The power must be activated':t.activeUntil>s.time?'Trap active':t.readyAt>s.time?'Trap cooling down · '+Math.ceil(t.readyAt-s.time)+'s':'Activate '+label+' trap · '+t.cost;}
-      if(e.kind==='teleport'){const tp=world.teleporters[e.teleporter];text=tp.power&&!s.power?'The power must be activated':teleportPending?'Teleporting…':returnTrip?'The teleporter will bring you back':tp.readyAt>s.time?'Teleporter cooling down · '+Math.ceil(tp.readyAt-s.time)+'s':'Teleport'+(tp.cost?' · '+tp.cost:'');}
+      if(e.kind==='teleport'){const tp=world.teleporters[e.teleporter];text=tp.power&&!s.power?'The power must be activated':tp.locked?tp.lockedText:teleportPending?'Teleporting…':returnTrip?'The teleporter will bring you back':tp.readyAt>s.time?'Teleporter cooling down · '+Math.ceil(tp.readyAt-s.time)+'s':'Teleport'+(tp.cost?' · '+tp.cost:'');}
       if(e.kind==='claymore')text=s.claymoresOwned?'Claymores equipped · 4 to place':'Claymores · 1000';
       if(e.kind==='box')text=shop.boxPrompt(e);
-      if(e.kind==='pap')text=shop.packPrompt(true);
+      if(e.kind==='pap')text=world.papLocked?world.papLockedText??'Pack-a-Punch is sealed':shop.packPrompt(true);   // papLocked: set by a map script
       if(e.kind==='custom')text=e.text?.()??'';
       if(e.locked?.())text=e.lockedText??'';
       return {target:e,text,distance};
@@ -104,13 +104,13 @@ export async function createMap(ctx,entry){
         t.activeUntil=s.time+t.duration;t.readyAt=s.time+Math.max(t.duration,t.cooldown);for(const h of t.handles??[])if(h)h.rotation.x=-1.2;ctx.toast((t.kind==='fire'?'Fire':'Electric')+' trap active · '+t.duration+'s');return true;
       }
       if(e.kind==='teleport'){
-        const tp=world.teleporters[e.teleporter];if(tp.power&&!s.power){ctx.toast('Turn on the power');return false;}
+        const tp=world.teleporters[e.teleporter];if(tp.power&&!s.power){ctx.toast('Turn on the power');return false;}if(tp.locked){ctx.toast(tp.lockedText);return false;}
         if(teleportPending||returnTrip||tp.readyAt>s.time)return false;if(tp.cost&&!shop.pay(tp.cost))return false;
         teleportPending={tp,at:s.time+1.6};tp.readyAt=s.time+tp.cooldown;ctx.toast('Teleporting…');audio.play('buy');return true;
       }
       if(e.kind==='claymore'){const ok=s.buyClaymores();if(ok){audio.play('buy');ctx.toast('Claymores · press 4 to place');}else if(!s.claymoresOwned)ctx.toast('Not enough points');return ok;}
       if(e.kind==='box')return shop.useBox(e);
-      if(e.kind==='pap')return shop.usePack();
+      if(e.kind==='pap')return world.papLocked?false:shop.usePack();
       return false;
     },
     onShot(ray,far){
