@@ -78,7 +78,8 @@ function setActive(value){
 function start(){if(!ready||contextLost)return;if(session.phase==='gameover')reset();audio.start();warmViewAudio();if(touchControls.mode){setActive(true);return;}renderer.domElement.requestPointerLock?.()?.catch(()=>toast('Click the game to capture the mouse'));}
 $('start').addEventListener('click',start);$('restart').addEventListener('click',()=>{reset();start();});
 renderer.domElement.addEventListener('click',()=>{if(!active)start();});
-document.addEventListener('pointerlockchange',()=>{if(touchControls.mode&&!document.pointerLockElement)return;setActive(document.pointerLockElement===renderer.domElement);});
+// mods.keepActive: a mod's UI (the terminal booth) frees the cursor without pausing the game
+document.addEventListener('pointerlockchange',()=>{if((touchControls.mode||mods.keepActive)&&!document.pointerLockElement)return;setActive(document.pointerLockElement===renderer.domElement);});
 function suspendRendering(){renderer.setAnimationLoop(null);if(ready){setActive(false);document.exitPointerLock?.();}audio.pause();}
 function resumeRendering(){previous=performance.now();lastRendered=0;if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendRendering();else resumeRendering();});

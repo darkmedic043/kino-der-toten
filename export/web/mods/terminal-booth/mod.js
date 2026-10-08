@@ -413,13 +413,16 @@ export default async function setup(api){
       if(session.buyPerk){ok=session.buyPerk(p.id);if(ok){api.perkDrink?.start(p.id,api.view);audio?.play?.(p.id);}}   // Moon
       else ok=api.shop?.buyPerk(p.id);
       if(!ok)return 'Transaction failed';
-      setTimeout(()=>desk?.close(),900);   // log off so the drink plays
       return true;
     }
     let desk=null;
+    host.on('update',()=>{if(desk?.isOpen()&&(session.phase==='reviving'||session.phase==='gameover'))desk.close();});   // going down logs off
+    // The game keeps running while the desktop is up: mods.keepActive (on the mods host) stops the engine pausing when the cursor is
+    // freed, the player stands still (desktop.js swallows key presses) and zombies keep coming. Going down or the
+    // game ending logs off.
     function open(b){
-      const onMap=perkIds(),wasActive=api.getState().active;
-      document.exitPointerLock?.();api.setActive(false);   // paused; desktop.js hides the pause menu while it's open
+      const onMap=perkIds();
+      host.keepActive=true;document.exitPointerLock?.();
       desk=openDesktop({
         onMap:p=>onMap.has(p.id),
         owned:p=>!!session.perks?.has(p.id),
@@ -428,13 +431,13 @@ export default async function setup(api){
         power:()=>!!session.power,points:()=>session.points,
         onOpen:()=>b.print('USER LOGGED IN'),
         onApp:name=>b.print('RUN '+name.toUpperCase()+'.EXE'),
-        onClose:()=>{b.print('USER LOGGED OFF');
-          // Esc / the click counts as a user gesture, so the pointer can be recaptured (touch: just resume).
-          // If that fails the game stays on its pause menu.
-          if(!wasActive||session.phase==='gameover')return;
+        onClose:()=>{b.print('USER LOGGED OFF');host.keepActive=false;
+          if(session.phase==='gameover')return;
+          // Esc / the click counts as a user gesture, so the pointer can be recaptured; if that fails, pause
+          // (the pause menu's resume button captures it). Touch just carries on.
           const c=api.renderer?.domElement;
-          if(api.getState().input?.touch?.mode||!c?.requestPointerLock)return api.setActive(true);
-          Promise.resolve(c.requestPointerLock()).catch(()=>{});}
+          if(api.getState().input?.touch?.mode||!c?.requestPointerLock)return;
+          Promise.resolve(c.requestPointerLock()).catch(()=>api.setActive(false));}
       });
     }
   }

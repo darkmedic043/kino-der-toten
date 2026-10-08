@@ -159,3 +159,4 @@
 - 2026-10-08: PhD Flopper is a game-wide perk (perks-plus, `specialty_flakjacket`) done as BO1 does it: a dive that lands from a drop explodes (300 radius, 5000→1000), no self-inflicted explosive damage; Moon's machine extracted for custom maps (`PERK_phd`); Cheese Cube uses it (gameplay.md).
 - 2026-10-08: Fall damage (`mods/fall-damage`, BO1's 128/300, gravity-scaled, `fall` event); PhD Flopper now cancels fall damage and explodes on dives that would have hurt (gameplay.md).
 - 2026-10-08: MelonTerm is a floating window over the paused game, and its Perks app is now a shop for all eight perks on any map (power rule, drink, user-supplied Mule Kick/PhD icons also on the HUD); engine passes `shop`/`perkInfo` to mods (props.md).
+- 2026-10-08: MelonTerm no longer pauses the game (engine `mods.keepActive`); the shop refreshes live (props.md).

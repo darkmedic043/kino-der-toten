@@ -1,5 +1,5 @@
 // MelonTerm desktop: the window the terminal booth opens (F at the screen). A green phosphor CRT
-// window floating over the paused game, with square app icons. Apps so far: Perks, a shop for every
+// window floating over the game (which keeps running: zombies still come), with square app icons. Apps so far: Perks, a shop for every
 // perk in the game, whether or not this map has its machine (perks bought here work on any map).
 // openDesktop(opts) builds it once and shows it; Esc or LOG OFF closes.
 //   opts: {owned(perk), onMap(perk), needsPower(perk), power(), price(perk), points(), buy(perk) -> true | 'reason',
@@ -40,7 +40,6 @@ const CSS = `
 #melonterm{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:radial-gradient(ellipse at center,transparent 55%,#0006 100%);
   font-family:'VT323','Courier New',ui-monospace,monospace;color:#7dffa6;user-select:none;--g:#7dffa6;--g2:#3fcf73;--dim:#2a7a48;--bg:#031208;--line:#1f6b3a;--warn:#ffd36b;--bad:#ff6b5a}
 #melonterm *{box-sizing:border-box}
-body.melonterm-open #menu{display:none!important}   /* the paused game shows around the window, not the pause menu */
 #melonterm .crt{position:relative;width:min(920px,90vw);height:min(580px,80vh);background:#031208f0;border:2px solid var(--line);border-radius:16px;overflow:hidden;
   box-shadow:0 0 0 8px #050a07,0 0 0 10px #13261a,0 18px 60px #000c,0 0 50px #1bff6a30,inset 0 0 110px #000c;display:flex;flex-direction:column;animation:mt-on .35s ease-out}
 @keyframes mt-on{0%{transform:scaleY(.01) scaleX(.6);filter:brightness(4)}60%{transform:scaleY(1) scaleX(1);filter:brightness(1.6)}100%{filter:none}}
@@ -145,11 +144,11 @@ function build() {
   document.body.append(root);
   const $ = s => root.querySelector(s);
   const win = $('[data-win=perks]'), grid = $('.grid'), detail = $('.detail'), msg = $('.msg');
-  let opts = null, shown = 0, clock = 0;
+  let opts = null, shown = 0, clock = 0, lastState = '';
 
-  // Keep the game from seeing anything typed or clicked while the desktop is up.
-  const block = e => { if (root.hidden) return; e.stopPropagation(); if (e.type === 'keydown') key(e); };
-  for (const t of ['keydown', 'keyup']) addEventListener(t, block, true);
+  // Keep the game from seeing key presses and clicks while the desktop is up. Key releases still go through, so a
+  // key held when it opened (W) doesn't stay stuck down in the game.
+  addEventListener('keydown', e => { if (root.hidden) return; e.stopPropagation(); key(e); }, true);
   for (const t of ['click', 'mousedown', 'mouseup', 'pointerdown', 'wheel', 'contextmenu']) root.addEventListener(t, e => e.stopPropagation());
 
   function key(e) {
@@ -209,15 +208,19 @@ function build() {
     $('.pwr').innerHTML = opts.power() ? 'MAINS OK' : '<span class="warn">AUX BATTERY</span>';
     $('.pts').textContent = (opts.points() ?? 0).toLocaleString() + ' PTS';
     $('.clock').textContent = new Date().toTimeString().slice(0, 5);
+    // the game runs underneath: redraw the shop when a drink finishes, the power comes on or the points change
+    const state = PERKS.map(p => blocked(p)).join() + opts.points();
+    if (!win.hidden && state !== lastState) { renderGrid(); select(shown); }
+    lastState = state;
   }
   function open(o) {
-    opts = o; root.hidden = false; document.body.classList.add('melonterm-open'); status(); clearInterval(clock); clock = setInterval(status, 1000);
+    opts = o; root.hidden = false; status(); clearInterval(clock); clock = setInterval(status, 250);
     const c = root.querySelector('.crt'); c.style.animation = 'none'; void c.offsetWidth; c.style.animation = '';
     if (!win.hidden) { say('> SELECT A PERK'); renderGrid(); select(shown); }
     opts.onOpen?.();
   }
   function close() {
-    if (root.hidden) return; root.hidden = true; document.body.classList.remove('melonterm-open'); clearInterval(clock); const o = opts; opts = null;
+    if (root.hidden) return; root.hidden = true; clearInterval(clock); const o = opts; opts = null;
     o?.onClose?.();
   }
   root.querySelector('[data-app=perks]').addEventListener('click', () => openApp('perks'));
