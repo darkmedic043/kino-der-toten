@@ -178,6 +178,9 @@ export class PlayerController {
     this.floorNormalY = Math.cos(THREE.MathUtils.degToRad(this.maxSlopeAngle));
     this.skin = Math.max(0.0001, numberOr(options.skin, 0.05));
     this.stepHeight = Math.max(0, numberOr(options.stepHeight, 18));
+    // Resolve walkable contacts straight up instead of along the slope, so standing on a ramp doesn't slide the
+    // player down it (the ground snap pushes into the floor every frame). Opt-in per map (maps.json "player").
+    this.slopeStick = !!options.slopeStick;
 
     // A fixed step keeps collision results stable across frame rates.  The
     // default 120 Hz step is inexpensive for this map and handles thin walls.
@@ -814,6 +817,14 @@ export class PlayerController {
 
       _normal.copy(result.normal).normalize();
       const depth = Math.max(0, result.depth) + this.skin;
+      if (this.slopeStick && _normal.y >= this.floorNormalY) {
+        _translation.set(0, depth / _normal.y, 0);
+        this.collider.translate(_translation);
+        this._lastCollision = result;
+        if (_normal.y > bestGroundY) { grounded = true; bestGroundY = _normal.y; this._collisionNormal.copy(_normal); }
+        if (this.velocity.y < 0) this.velocity.y = 0;
+        continue;
+      }
       _translation.copy(_normal).multiplyScalar(depth);
       this.collider.translate(_translation);
       this._lastCollision = result;

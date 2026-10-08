@@ -22,7 +22,7 @@ const PERK_MODELS={specialty_armorvest:'zombie_vending_jugg',specialty_quickrevi
 // falls back to Moon's BO1 machine); a map entry "machines": "bo3" uses them for every perk and Pack-a-Punch.
 // Like the BO1 GLBs they face +Z (the same CoD -> glTF conversion). A map whose markers carry BO3's own angles (the
 // BO3 map builder) sets perkYaw -90 to undo FACE.
-const BO3_MACHINE=n=>`mods/perks-plus/models/p7_zm_vending_${n}.glb`;
+const BO3_MACHINE=n=>`mods/perks-plus/models/p7_zm_vending_${n}.glb?v=2`;   // ?v: rebuilt in inches (browsers keep heavy files a day)
 const BO3_MACHINES={specialty_armorvest:'jugg',specialty_quickrevive:'revive',specialty_fastreload:'sleight',specialty_rof:'doubletap2',
   specialty_longersprint:'marathon',specialty_deadshot:'ads',specialty_additionalprimaryweapon:'three_gun',pap:'packapunch'};
 const MACHINE_FALLBACK={specialty_additionalprimaryweapon:'moon/models/zombie_vending_three_gun.glb'};

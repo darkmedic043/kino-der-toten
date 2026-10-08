@@ -42,6 +42,7 @@ export async function createMap(ctx,entry){
   }
   return {
     title:entry.title,
+    player:entry.player,
     async loadData(){const base=await fetch('game-data.json').then(r=>r.json());base.entities=[];base.zoneLinks=[];return base;},
     async loadWorld(progress){const world=new CustomWorld(scene,ctx.data,entry);world.perkInfo=perkInfo;await world.load(progress);return world;},
     spawn:()=>({position:W().spawn.position,yaw:W().spawn.yaw}),
