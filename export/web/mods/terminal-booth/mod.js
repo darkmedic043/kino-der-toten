@@ -399,20 +399,42 @@ export default async function setup(api){
       const ids=new Set();for(const e of world.interactions??[]){const id=e.perk??(e.targetname==='zombie_vending'?e.script_noteworthy:null);if(id)ids.add(id);}
       return ids;
     };
+    // The terminal sells every perk, machine or not, through the map's own purchase path (the engine shop, or Moon's
+    // session), so drinks, stings, prices and the power rule match the machines. Perks the map's table lacks are added.
+    const QR='specialty_quickrevive';
+    const priceOf=p=>api.perkInfo?.[p.id]?.price??p.price;
+    function buy(p){
+      if(session.drinking)return 'Finish your drink first';
+      if(session.busy||session.phase==='reviving')return 'Terminal busy';
+      if(p.id===QR&&session.revives>=3)return 'Quick Revive is depleted';
+      if(session.points<priceOf(p))return 'Not enough points';
+      if(api.perkInfo&&!api.perkInfo[p.id])api.perkInfo[p.id]={name:p.name,price:p.price,color:p.color,icon:p.badge};
+      let ok;
+      if(session.buyPerk){ok=session.buyPerk(p.id);if(ok){api.perkDrink?.start(p.id,api.view);audio?.play?.(p.id);}}   // Moon
+      else ok=api.shop?.buyPerk(p.id);
+      if(!ok)return 'Transaction failed';
+      setTimeout(()=>desk?.close(),900);   // log off so the drink plays
+      return true;
+    }
+    let desk=null;
     function open(b){
       const onMap=perkIds(),wasActive=api.getState().active;
-      document.exitPointerLock?.();api.setActive(false);
-      openDesktop({
-        onMap:p=>p.ids.some(id=>onMap.has(id)),
-        owned:p=>p.ids.some(id=>session.perks?.has(id)),
-        price:p=>p.ids.map(id=>onMap.has(id)&&world.perkInfo?.[id]?.price).find(n=>n)??p.price,   // this map's price when it has the machine
+      document.exitPointerLock?.();api.setActive(false);   // paused; desktop.js hides the pause menu while it's open
+      desk=openDesktop({
+        onMap:p=>onMap.has(p.id),
+        owned:p=>!!session.perks?.has(p.id),
+        needsPower:p=>p.id!==QR,
+        price:priceOf,buy,
         power:()=>!!session.power,points:()=>session.points,
         onOpen:()=>b.print('USER LOGGED IN'),
         onApp:name=>b.print('RUN '+name.toUpperCase()+'.EXE'),
         onClose:()=>{b.print('USER LOGGED OFF');
-          // Esc / the click counts as a user gesture, so the pointer can be recaptured (touch: just resume)
+          // Esc / the click counts as a user gesture, so the pointer can be recaptured (touch: just resume).
+          // If that fails the game stays on its pause menu.
           if(!wasActive||session.phase==='gameover')return;
-          if(api.getState().input?.touch?.mode)api.setActive(true);else api.renderer?.domElement?.requestPointerLock?.()?.catch?.(()=>{});}
+          const c=api.renderer?.domElement;
+          if(api.getState().input?.touch?.mode||!c?.requestPointerLock)return api.setActive(true);
+          Promise.resolve(c.requestPointerLock()).catch(()=>{});}
       });
     }
   }

@@ -23,7 +23,7 @@ const STINGS = { specialty_longersprint: 'moon/audio/bce4d0477d3fb5e84e5d.ogg', 
 const PHD = 'specialty_flakjacket', PHD_RADIUS = 300, PHD_MAX = 5000, PHD_MIN = 1000;
 // HUD icons (git-ignored icons/: third-party art the user supplied, so not in the repo or Rind installs): the letter badge
 // becomes the icon, as the hud mod does for Kino's four perks. Moon's HUD (same #perks, same titles) gets them too.
-const ICONS = { 'Stamin-Up': 'staminup.webp', 'Deadshot Daiquiri': 'deadshot.webp' };
+const ICONS = { 'Stamin-Up': 'staminup.webp', 'Deadshot Daiquiri': 'deadshot.webp', 'Mule Kick': 'mulekick.webp', 'PhD Flopper': 'phd.webp' };
 function addIcons(base) {
   if (document.getElementById('perks-plus-icons')) return;
   const sel = Object.keys(ICONS).map(t => `#perks span[title="${t}"]`).join(',');
@@ -33,11 +33,11 @@ function addIcons(base) {
     Object.entries(ICONS).map(([t, f]) => `#perks span[title="${t}"]{background-image:url(${new URL('icons/' + f, base).href})!important}`).join('');
   document.head.append(style);
 }
-export default function setup({ host, session, player, world, map, audio, mod, enemies, scene }) {
+export default function setup({ host, session, player, world, map, audio, mod, enemies, scene, perkInfo }) {
   addIcons(mod?.url ?? import.meta.url);
   phdFlopper({ host, session, player, world, audio, enemies, scene });
   if (map?.id === 'moon') return;
-  const table = world?.perkInfo;
+  const table = world?.perkInfo ?? perkInfo;   // custom maps' table, else the engine's (Kino), so the terminal can sell them anywhere
   if (table) for (const [id, p] of Object.entries(MORE_PERKS)) table[id] ??= p;
   if (audio?.manifest) for (const [id, url] of Object.entries(STINGS)) audio.manifest[id] ??= { url };
   const has = id => session.perks?.has(id);

@@ -179,6 +179,8 @@ It can also export `prepare(data)`, which runs before the game builds anything a
 | `map` | the `maps.json` entry (custom maps only) |
 | `toast(text, s)`, `announce(title, small, s)` | on-screen messages |
 | `equipView()` | call after changing `session.inventory` or `slot` |
+| `shop` | the engine's purchases: `shop.buyPerk(id)` (price from the perk table, power rule, drink, sting), `buyWall`, `usePack`… (not Moon, which buys through `session.buyPerk`) |
+| `perkInfo` | the perk table the HUD and shop use (`map.perkInfo` on Moon, else the engine's; custom maps' `world.perkInfo` is the same object) |
 | `getState()`, `reset()`, `damage(n)` | game helpers |
 | `host.on(event, fn)` | subscribe; returns an unsubscribe function |
 | `host.camera`, `host.hideViewmodel` | render from another camera, hide the gun (used by third person) |
