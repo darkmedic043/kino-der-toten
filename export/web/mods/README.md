@@ -55,7 +55,7 @@ when both are present.
 | `WINDOW_<zone>` | A boarded window. Put it in a wall opening, with a `ZSPAWN` just outside (within 400 units). Zombies spawn outside, tear down 6 boards, then climb in. Players can rebuild the boards for points. Optional properties: `width` (56) and `height` (64). |
 | `DOOR_<zone>_<cost>` | A **mesh** (not an empty) that blocks a doorway. Buying it removes it and activates `<zone>`. Default cost 750. The custom property `electric: true` makes it open with the power instead. |
 | `WALLBUY_<weapon id>` | Wall weapon, for example `WALLBUY_mp40_zm` or `WALLBUY_m14`. Price comes from the weapon data. Ammo costs half. |
-| `PERK_<jugg\|revive\|speedcola\|doubletap>` | Perk machine. Perks other than Quick Revive need the power on. |
+| `PERK_<jugg\|revive\|speedcola\|doubletap\|staminup\|deadshot\|mulekick>` | Perk machine. Perks other than Quick Revive need the power on. The last three come from the `perks-plus` mod and use BO3's machine models (map entry `"machines": "bo3"` uses BO3's for every perk and Pack-a-Punch). |
 | `BOX` / `BOX_start` | Mystery Box location. Add several so it can move. `BOX_start` is where it begins. |
 | `PAP` | Pack-a-Punch (needs power). |
 | `POWER` | Power switch. **Without one, the power is on from the start.** |

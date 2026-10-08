@@ -64,7 +64,7 @@ export class Session {
     this.health=Math.max(0,this.health-n);this.damageTime=this.time;
     if(this.health<=0){
       this.drinking=null;this.drinkLeft=0;
-      if(this.perks.has('specialty_quickrevive')){this.perks.clear();this.phase='reviving';this.reviveLeft=4;this.revives++;this.lastEvent='Quick Revive';}
+      if(this.perks.has('specialty_quickrevive')){this.clearPerks();this.phase='reviving';this.reviveLeft=4;this.revives++;this.lastEvent='Quick Revive';}
       else {this.phase='gameover';this.lastEvent='Game over';}
     } return true;
   }
@@ -108,11 +108,15 @@ export class Session {
     const d=this.data.perkDrinks?.[perk];if(!d||this.drinking||this.perks.has(perk)||this.phase==='gameover'||this.phase==='reviving')return false;
     this.cancelReload();this.drinking=perk;this.drinkLeft=d.raiseTime+d.dropTime;return true;
   }
+  // Mule Kick (specialty_additionalprimaryweapon, fork): a third weapon slot while the perk lasts
+  get weaponSlots(){return this.perks.has('specialty_additionalprimaryweapon')?3:2;}
+  // losing every perk (downed) also loses Mule Kick's third weapon
+  clearPerks(){this.perks.clear();if(this.inventory.length>2){this.inventory.splice(2);this.slot=Math.min(this.slot,1);this.cancelReload();}}
   giveWeapon(id){
     const owned=this.inventory.find(w=>w.id===id);
     if(owned){this.slot=this.inventory.indexOf(owned);owned.mag=this.def.clipSize;owned.reserve=this.def.maxAmmo;this.cancelReload();return;}
     const w=makeWeapon(this.data.weapons[id],true);
-    if(this.inventory.length<2){this.inventory.push(w);this.slot=this.inventory.length-1;}else this.inventory[this.slot]=w;
+    if(this.inventory.length<this.weaponSlots){this.inventory.push(w);this.slot=this.inventory.length-1;}else this.inventory[this.slot]=w;
     this.cancelReload();
   }
   scoreHit(killed=false,head=false,melee=false){

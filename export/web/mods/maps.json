@@ -25,7 +25,7 @@
       "module": "moon",
       "place": "GRIFFIN STATION",
       "kicker": "CALL OF DUTY <span>BLACK OPS</span>",
-      "tagline": "From No Man’s Land to Griffin Station."
+      "tagline": "From No Man\u2019s Land to Griffin Station."
     },
     {
       "id": "shangri-la",
@@ -92,6 +92,24 @@
       "perkYaw": 270,
       "movers": "movers.json",
       "nearbySpawns": true
+    },
+    {
+      "id": "the-giant",
+      "title": "The Giant",
+      "description": "Black Ops III's remake of Der Riese, ported from the running game: the factory, its teleporters, perks, the Mystery Box and Pack-a-Punch.",
+      "modes": [
+        "zombies",
+        "explore"
+      ],
+      "dir": "mods/maps/the-giant/",
+      "model": "the-giant.glb?v=2",
+      "scale": 1,
+      "background": "#0d0f12",
+      "exposure": 1.2,
+      "nearbySpawns": true,
+      "stairSmoothing": true,
+      "perkYaw": -90,
+      "machines": "bo3"
     }
   ]
 }

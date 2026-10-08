@@ -1,0 +1,6 @@
+{
+  "name": "Perks plus",
+  "description": "Stamin-Up, Deadshot Daiquiri and Mule Kick on every map that places them (PERK_staminup / PERK_deadshot / PERK_mulekick markers): their drinks (from Moon's assets), Stamin-Up's speed and Deadshot's accuracy and headshot bonus. Mule Kick's third weapon slot is in rules.js. BO3 machine models come from .tools/build_bo3_machines.py.",
+  "data": "data.json",
+  "script": "mod.js"
+}

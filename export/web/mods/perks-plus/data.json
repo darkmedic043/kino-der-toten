@@ -1,0 +1,88 @@
+{
+ "perkDrinks": {
+  "specialty_longersprint": {
+   "id": "zombie_perk_bottle_marathon",
+   "model": "moon/models/zombie_perk_bottle_marathon.glb",
+   "animations": {
+    "idleAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "emptyIdleAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "emptyIdleAnimLeft": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "fireAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "holdFireAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "lastShotAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "detonateAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "raiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "dropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "firstRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "altRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "altDropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "quickRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "quickDropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "emptyRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "emptyDropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json"
+   },
+   "raiseTime": 2.8,
+   "dropTime": 0.9,
+   "adsInTime": 0.2,
+   "adsOutTime": 0.2,
+   "sounds": {},
+   "notetrackSounds": {}
+  },
+  "specialty_deadshot": {
+   "id": "zombie_perk_bottle_deadshot",
+   "model": "moon/models/zombie_perk_bottle_ads.glb",
+   "animations": {
+    "idleAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "emptyIdleAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "emptyIdleAnimLeft": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "fireAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "holdFireAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "lastShotAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "detonateAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "raiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "dropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "firstRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "altRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "altDropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "quickRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "quickDropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "emptyRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "emptyDropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json"
+   },
+   "raiseTime": 2.8,
+   "dropTime": 0.9,
+   "adsInTime": 0.2,
+   "adsOutTime": 0.2,
+   "sounds": {},
+   "notetrackSounds": {}
+  },
+  "specialty_additionalprimaryweapon": {
+   "id": "zombie_perk_bottle_additionalprimaryweapon",
+   "model": "moon/models/zombie_perk_bottle_three_gun.glb",
+   "animations": {
+    "idleAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "emptyIdleAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "emptyIdleAnimLeft": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "fireAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "holdFireAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "lastShotAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "detonateAnim": "moon/animations/viewmodel_zombie_perksacola_idle.json",
+    "raiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "dropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "firstRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "altRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "altDropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "quickRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "quickDropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json",
+    "emptyRaiseAnim": "moon/animations/viewmodel_zombie_perksacola_drink.json",
+    "emptyDropAnim": "moon/animations/viewmodel_zombie_perksacola_lower.json"
+   },
+   "raiseTime": 2.8,
+   "dropTime": 0.9,
+   "adsInTime": 0.2,
+   "adsOutTime": 0.2,
+   "sounds": {},
+   "notetrackSounds": {}
+  }
+ }
+}

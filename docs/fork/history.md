@@ -143,3 +143,4 @@
 - 2026-10-07: Melon Pinball friends leaderboard endpoint (setup.md).
 - 2026-10-07: Frame rate pass: High 62 → 73 FPS (static map matrices frozen, beam dust on the GPU); mesh merging tried and dropped (performance.md).
 - 2026-10-07: Ultra AO reuses the scene depth at half resolution (Ultra 40 → 54 FPS); chunk culling tried and dropped (performance.md).
+- 2026-10-07: First BO3 map, The Giant (memory dump of the running game + Greyhound; build_bo3_map.py); Stamin-Up, Deadshot, Mule Kick (perks-plus mod, BO3 machines) (waw-ports.md, gameplay.md).

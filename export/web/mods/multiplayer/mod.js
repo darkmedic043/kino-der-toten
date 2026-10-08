@@ -267,7 +267,7 @@ export default async function setup(api){
   function forceGameOver(){
     if(session.phase==='gameover')return;
     forcingGameOver=true;me.down=me.dead=false;host.camera=null;host.hideViewmodel=false;
-    session.phase='fighting';session.perks.clear();session.effects.invulnerable=0;session.health=1;api.damage(99999);forcingGameOver=false;
+    session.phase='fighting';session.clearPerks?session.clearPerks():session.perks.clear();session.effects.invulnerable=0;session.health=1;api.damage(99999);forcingGameOver=false;
     api.announce('Everyone is down','GAME OVER',6);
   }
   net.on('gameover',()=>forceGameOver());

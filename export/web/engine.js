@@ -156,7 +156,7 @@ function shoot(){
   if(session.def.projectileSpeed>0){features.shoot(session.def,forward);return true;}
   const pellets=Math.max(1,session.def.pellets),reach=map.shotRange??8000;
   for(let i=0;i<pellets;i++){
-    const direction=forward.clone();if(pellets>1||!ads){const spread=pellets>1?(session.def.pelletSpread??.055):(session.def.hipSpread??.012);direction.x+=(Math.random()-.5)*spread;direction.y+=(Math.random()-.5)*spread;direction.z+=(Math.random()-.5)*spread;direction.normalize();}
+    const direction=forward.clone();if(pellets>1||!ads){const spread=(pellets>1?(session.def.pelletSpread??.055):(session.def.hipSpread??.012))*(session.perks.has('specialty_deadshot')?.5:1);/* Deadshot Daiquiri: half the hip-fire spread */direction.x+=(Math.random()-.5)*spread;direction.y+=(Math.random()-.5)*spread;direction.z+=(Math.random()-.5)*spread;direction.normalize();}
     const ray=new THREE.Ray(camera.position.clone(),direction),wall=world.raycast(ray,1,reach),target=enemies.rayHit(ray,wall?.distance??reach);
     map.onShot?.(ray,Math.min(wall?.distance??reach,target?.distance??reach),'bullet');
     lastShot={origin:ray.origin.toArray(),direction:direction.toArray(),wallDistance:wall?.distance??null,target:target?{id:target.z.id,head:target.head,distance:target.distance}:null};
