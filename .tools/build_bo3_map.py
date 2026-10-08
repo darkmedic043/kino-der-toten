@@ -189,7 +189,7 @@ NO_COLLIDE = re.compile(r'debris|paper|trash|newspaper|wire|cable|rope|chain|lig
 # closes the opening)
 BOXABLE = re.compile(r'crate|box(?!_wood_wine)|barrel|drum|cabinet|file_cab|locker|desk|table|generator|machine|sandbag|pallet|tank|chest|'
                      r'safe|bench|shelf|cart|engine|transformer|control_box|pillar|column|cinder|block|furnace|boiler|compressor|workbench', re.I)
-WALKABLE = re.compile(r'stair|step|floor|platform|catwalk(?!_support)|walkway|bridge(?!_piston|_spring)|grate|deck|ramp|teleporter_(floor|base|mf_base)', re.I)
+WALKABLE = re.compile(r'stair|step|floor|platform|catwalk(?!_support)|walkway|bridge(?!_piston|_spring)|grate|deck|ramp|teleporter_(floor|base|mf_base|pad_glass)|zm_der_teleporter$', re.I)
 # a box from its 8 corners (index = x*4 + y*2 + z over min/max), outward-facing triangles
 BOX_TRIS = np.array([[0, 1, 3], [0, 3, 2], [4, 6, 7], [4, 7, 5], [0, 4, 5], [0, 5, 1], [2, 3, 7], [2, 7, 6], [0, 2, 6], [0, 6, 4], [1, 5, 7], [1, 7, 3]])
 prop_geo = {}   # model -> (positions in model space, inches, glTF axes; triangles)
@@ -265,7 +265,8 @@ for name, insts in by_model.items():
     if size.max() < 24: continue   # small stuff
     # walkable structure keeps its shape (if it isn't too detailed); other solid props collide as their bounding box,
     # and big irregular ones are left out (a box around them could close a passage)
-    if WALKABLE.search(name) and len(tt) <= 3000: pass
+    if WALKABLE.search(name):
+        if len(tt) > 6000: print('walkable prop too detailed for collision:', name, len(tt)); continue
     elif size.max() <= 200 and BOXABLE.search(name) and not re.search(r'frame|arch|door|window|gate', name, re.I):
         lo3, hi3 = pp.min(0), pp.max(0)
         pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
@@ -410,7 +411,7 @@ for e in ents:
     add_node({'name': f'DOOR_{z or "power"}_{cost}', 'children': kids, 'extras': {'zone': z, 'cost': cost, 'electric': electric}})
     count('DOOR')
 # Teleporters (Der Riese): each pad sends you to the mainframe for 1500 (one-way: TELEPORT_<pad> + TPDEST_<pad>)
-MAINFRAME, MAINFRAME_YAW = [-56, 440, 64], 270
+MAINFRAME, MAINFRAME_YAW = [-56, 292, 116], 270   # between BO3's origin_teleport_player_0..3 (in front of the mainframe, not inside it)
 for e in ents:
     m = re.fullmatch(r'telepad_(\d)', e.get('targetname', ''))
     if m and e.get('script_sound') == 'evt_pad':
