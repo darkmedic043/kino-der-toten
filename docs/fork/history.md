@@ -149,3 +149,4 @@
 - 2026-10-07: The Giant looks fixed: props at the right scale (Greyhound = cm), BO3 blend overlays/decals see-through, built-in colours, night lighting with a lamp pool (waw-ports.md).
 - 2026-10-07: The Giant playtest fixes: prop collision (stairs, teleporter floors), barricade placement, no risers on the mainframe, alpha cut-out only where see-through, electric traps (waw-ports.md).
 - 2026-10-07: The Giant second playtest: doorway/archway collision, stair ramps + `slopeStick` controller option (no sliding), barricade spawns toward exterior goals, box/power facing, white tint masks (waw-ports.md).
+- 2026-10-07: The Giant Easter eggs: Fly Trap (Pack-a-Punched Python as the Annihilator) and the spine-jar Beauty of Annihilation song (audio extracted from BO3's sound bank); grey placeholder slab removed (waw-ports.md).

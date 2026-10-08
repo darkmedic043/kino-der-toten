@@ -33,7 +33,7 @@ from semodel_to_glb import read_semodel
 C = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]], dtype=np.float64)   # CoD -> glTF axes
 def g(v): return (C @ np.asarray(v, dtype=np.float64).T).T
 COLOR, NORMAL = 'a0ab1041', '59d30d0f'
-SKIP = re.compile(r'sky|caulk|clip|portal|nodraw|shadow_?caster|\$', re.I)              # not drawn
+SKIP = re.compile(r'sky|caulk|clip|portal|nodraw|shadow_?caster|^wc/core_|\$', re.I)              # not drawn (core_*: Radiant placeholder boxes, the grey slab by the stairs)
 NOT_SOLID = re.compile(r'decal|glass|water|foliage|grass|cobweb|web_|fx_|_fx|blend|vista|light_?ray|godray|smoke|fog|ivy|leaves|vine|cloth|curtain', re.I)
 
 # ---- textures ----------------------------------------------------------------------------------------------------------
@@ -452,6 +452,36 @@ for e in ents:
             node = {'name': e['model'], 'mesh': mi, 'translation': g(vec(e['origin'])).tolist()}
             q = quat(C @ euler_cod(pitch, yaw_, roll) @ C.T); node['rotation'] = q
             add_node(node)
+# Easter eggs (the-giant mod scripts them, after zm_factory.gsc flytrap() and the music egg):
+#   GIANT_FLYTRAP: the control panel to shoot with a Pack-a-Punched gun (trig_ee_flytrap)
+#   GIANT_EE_<target>: the three hide-and-seek targets (hidden until the fly trap is hit), each a group of its BO3
+#     script_models; a model Greyhound didn't export is an empty GIANT_EESUB_<model> child the mod fills with a stand-in
+#   GIANT_FLOATY: the items floating in the fly trap room (same scheme)
+#   GIANT_PRIZE (+ GIANT_PRIZE_USE): where the Annihilator spins after all three targets are shot
+#   GIANT_JAR_<n>: the music egg's three spine jars (positions from zm_factory.gsc, not in the entity string)
+def ee_group(name, models):
+    kids = []
+    for e in models:
+        pitch, yaw_, roll = vec(e.get('angles')); mi = prop_mesh(e['model'])
+        node = {'name': e['model'] if mi is not None else 'GIANT_EESUB_' + e['model'], 'translation': g(vec(e['origin'])).tolist(),
+                'rotation': quat(C @ euler_cod(pitch, yaw_, roll) @ C.T)}
+        if mi is not None: node['mesh'] = mi
+        gltf['nodes'].append(node); kids.append(len(gltf['nodes']) - 1)
+    add_node({'name': name, 'children': kids}); count('EE')
+for tn in ('ee_exp_monkey', 'ee_bowie_bear', 'ee_perk_bear', 'ee_floaty_stuff'):
+    ms = [e for e in ents if e.get('targetname') == tn and e.get('classname') == 'script_model' and e.get('model')]
+    if ms: ee_group('GIANT_FLOATY' if tn == 'ee_floaty_stuff' else 'GIANT_EE_' + tn[3:], ms)
+for e in ents:
+    tn = e.get('targetname', '')
+    if tn.startswith('trig_ee_') and tn != 'trig_ee_flytrap':
+        add_node({'name': 'GIANT_EETRIG_' + tn[8:], 'translation': g(vec(e['origin'])).tolist()})
+    elif tn == 'trig_ee_flytrap': add_node({'name': 'GIANT_FLYTRAP', 'translation': g(vec(e['origin'])).tolist()}); count('EE')
+    elif tn == 'flytrap_prize':
+        if e.get('classname') == 'script_struct':
+            r = math.radians(vec(e.get('angles'))[1]) / 2
+            add_node({'name': 'GIANT_PRIZE', 'translation': g(vec(e['origin'])).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]})
+        else: add_node({'name': 'GIANT_PRIZE_USE', 'translation': g(vec(e['origin'])).tolist()})
+for k, o in enumerate([(900, -586, 151), (987, -873, 122), (-1340, -483, 255)]): add_node({'name': f'GIANT_JAR_{k}', 'translation': g(o).tolist()}); count('JAR')
 print('markers:', counts)
 
 # ---- write -----------------------------------------------------------------------------------------------------------------

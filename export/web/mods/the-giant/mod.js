@@ -50,6 +50,136 @@ export default function setup(api) {
   });
   host.on('reset', () => { pending = null; lock(); });
   setupLook(api);
+  setupEggs(api);
+}
+
+// ---- Easter eggs, after zm_factory.gsc (BO3 source):
+//   Fly Trap: shoot the control panel (GIANT_FLYTRAP) with a Pack-a-Punched gun; 9 s later three targets appear around
+//   the map (GIANT_EE_*: a monkey bomber, a teddy bear with a Bowie knife, a teddy bear with Juggernog and an M1911);
+//   shoot all three and the Annihilator spins at GIANT_PRIZE, free to each player who takes it. The Annihilator isn't
+//   in the game: the prize is a Pack-a-Punched Python (BO1's magnum, the nearest thing).
+//   Music: use the three spine jars (GIANT_JAR_<n>) for Beauty of Annihilation (Giant Remix), git-ignored
+//   sounds/beauty-of-annihilation.ogg extracted from BO3's zm_factory sound bank.
+// Models Greyhound didn't export (GIANT_EESUB_<model> slots) get BO1 stand-ins from the Mystery Box's display copies.
+const STAND_IN = { zombie_monkey_bomber: 'zombie_cymbal_monkey', viewmodel_zombie_cymbal_monkey: 'zombie_cymbal_monkey', t6_wpn_pistol_m1911_world: 'm1911_zm' };
+const PRIZE = 'python_zm', SONG = 'giant_beauty_of_annihilation';
+function setupEggs(api) {
+  const { world, session, host, toast, announce, audio, data } = api, box = () => api.mysteryBox ?? globalThis.kino?.mods?.api?.mysteryBox;
+  const root = world.root; if (!root) return;
+  const node = name => root.getObjectByName(name), at = o => o.getWorldPosition(new THREE.Vector3());
+  const flytrap = node('GIANT_FLYTRAP'), prizeAt = node('GIANT_PRIZE'), prizeUse = node('GIANT_PRIZE_USE');
+  const targets = ['exp_monkey', 'bowie_bear', 'perk_bear'].map(id => ({ id, group: node('GIANT_EE_' + id) })).filter(t => t.group);
+  const jars = [0, 1, 2].map(k => node('GIANT_JAR_' + k)).filter(Boolean);
+  if (!flytrap || !prizeAt || targets.length < 3 || jars.length < 3) { console.warn('[the-giant] Easter egg markers missing (rebuild the map)'); return; }
+  if (audio?.manifest) audio.manifest[SONG] ??= { url: 'mods/the-giant/sounds/beauty-of-annihilation.ogg' };
+
+  // stand-ins for the unexported models (the box's models are loaded before mods run; retried once a frame until then)
+  const juggBottle = node('wpn_t7_zmb_perk_bottle_jugg_world');
+  let filled = false;
+  const fill = () => {
+    const mysteryBox = box(); if (filled || !mysteryBox?.models?.m1911_zm) return; filled = true;
+    root.traverse(o => {
+      const m = /^GIANT_EESUB_(.+?)(_\d+)?$/.exec(o.name); /* the glTF loader suffixes repeated names (_1) */ if (!m || o.children.length) return;
+      let model = null;
+      if (STAND_IN[m[1]]) model = mysteryBox.display(STAND_IN[m[1]]);
+      else if (/perk_bottle_jugg/.test(m[1]) && juggBottle) model = juggBottle.clone();
+      if (!model) return;
+      model.traverse(c => { c.frustumCulled = true; });
+      o.add(model); model.updateMatrixWorld(true); globalThis.kino?.lighting?.tag?.(model);   // the map root's matrices are frozen
+    });
+  };
+  fill();
+  const floaty = node('GIANT_FLOATY'), floatyHome = floaty ? floaty.children.map(c => c.position.clone()) : [];
+
+  // ---- Fly Trap
+  let stage = 'panel', showAt = 0, prize = null;   // panel -> seek -> prize
+  const shot = new Set();
+  const mine = t => { t.giant = true; return t; };
+  const disarm = () => { if (world.shootTargets) world.shootTargets = world.shootTargets.filter(t => !t.giant); };
+  const armPanel = () => world.addShootTarget(mine({
+    position: at(flytrap), radius: 30,
+    hit() {
+      if (stage !== 'panel') return;
+      if (!session.weapon?.upgraded) { armPanel(); return; }   // only a Pack-a-Punched gun sets it off
+      stage = 'seek'; showAt = session.time + 9;
+      audio?.play?.('explosion', .4);
+      announce?.('THE FLY TRAP', 'SOMETHING HAS BEEN SET LOOSE', 5);
+    },
+  }));
+  const armTargets = () => {
+    for (const t of targets) {
+      t.group.visible = true;
+      const box = new THREE.Box3().setFromObject(t.group), centre = box.getCenter(new THREE.Vector3());
+      world.addShootTarget(mine({
+        position: centre, radius: Math.max(12, box.getSize(new THREE.Vector3()).length() / 2),
+        hit() {
+          if (shot.has(t.id)) return;
+          shot.add(t.id); t.group.visible = false; audio?.play?.('buy');
+          if (shot.size < targets.length) { toast(`Fly Trap · ${shot.size} / ${targets.length}`, 4); return; }
+          givePrize();
+        },
+      }));
+    }
+  };
+  const givePrize = () => {
+    stage = 'prize';
+    prize = box()?.display?.(PRIZE) ?? null;
+    if (prize) { prize.position.copy(at(prizeAt)); scene().add(prize); globalThis.kino?.lighting?.tag?.(prize); }
+    announce?.('THE FLY TRAP', 'A GIFT WAITS BY THE MULE KICK MACHINE', 6);
+    host.emit?.('easterEgg', { name: 'fly trap' });
+  };
+  const scene = () => api.scene;
+  world.addInteraction({
+    position: at(prizeUse ?? prizeAt),
+    hidden: () => stage !== 'prize' || session.inventory.some(w => w.id === PRIZE && w.upgraded && !w.lost),
+    text: () => 'Take the Annihilator (Pack-a-Punched Python)',
+    use() {
+      if (stage !== 'prize' || !data.weapons[PRIZE]) return false;
+      session.giveWeapon(PRIZE);
+      const w = session.inventory.find(x => x.id === PRIZE);
+      if (w) { w.upgraded = true; w.mag = session.def.clipSize; w.reserve = session.def.maxAmmo; }
+      api.equipView?.(); audio?.play?.('buy'); toast('Reward: ' + session.def.name, 5);
+      return true;
+    },
+  });
+
+  // ---- music: the three spine jars
+  const heard = new Set();
+  jars.forEach((jar, k) => world.addInteraction({
+    position: at(jar),
+    hidden: () => heard.has(k),
+    text: () => 'Listen to the specimen jar',
+    use() {
+      if (heard.has(k)) return false;
+      heard.add(k); audio?.play?.('buy');
+      if (heard.size < jars.length) { toast(`Specimen jar ${heard.size} / ${jars.length}`, 3); return true; }
+      audio?.playMusic?.(SONG); announce?.('BEAUTY OF ANNIHILATION', 'MUSICAL EASTER EGG', 5);
+      host.emit?.('easterEgg', { name: 'song' });
+      return true;
+    },
+  }));
+
+  globalThis.kino?.scoreboard?.addCollectible?.({ id: 'giant-flytrap', label: 'Easter egg · Fly Trap',
+    value: () => stage === 'panel' ? 'not started' : stage === 'seek' ? `${shot.size} / ${targets.length}` : 'done', done: () => stage === 'prize' });
+  globalThis.kino?.scoreboard?.addCollectible?.({ id: 'giant-song', label: 'Easter egg · Song',
+    value: () => `${heard.size} / ${jars.length}`, done: () => heard.size === jars.length });
+
+  const reset = () => {
+    disarm(); stage = 'panel'; showAt = 0; shot.clear(); heard.clear();
+    for (const t of targets) t.group.visible = false;
+    prize?.removeFromParent(); prize = null;
+    armPanel();
+  };
+  reset();
+  let spin = 0;
+  host.on('update', () => {
+    fill();
+    if (stage === 'seek' && showAt && session.time >= showAt) { showAt = 0; armTargets(); toast('Find what the Fly Trap set loose', 5); }
+    spin = (spin + 1 / 60) % 1e4;
+    if (prize) prize.rotation.y = spin * Math.PI / 2 % (Math.PI * 2);
+    if (floaty) floaty.children.forEach((c, i) => { c.position.copy(floatyHome[i]); c.position.y += Math.sin(spin * 1.3 + i * 1.7) * 3; c.updateMatrix(); c.updateMatrixWorld(true); });
+  });
+  host.on('reset', reset);
 }
 
 // ---- the look: a snowy night. The engine's default lights (an even ambient + hemisphere + key + fill, tuned for Kino's

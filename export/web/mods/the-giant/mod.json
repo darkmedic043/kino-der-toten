@@ -1,5 +1,5 @@
 {
   "name": "The Giant extras",
-  "description": "The Giant's (BO3 port) teleporter linking: pull a pad's lever, reach the mainframe within 30 seconds to link it; all three linked open the mainframe door and Pack-a-Punch. Only active on that map.",
+  "description": "The Giant's (BO3 port) teleporter linking (pull a pad's lever, reach the mainframe within 30 seconds; all three open the mainframe door and Pack-a-Punch) and its Easter eggs: the Fly Trap (shoot the panel with a Pack-a-Punched gun, then the three targets, for the Annihilator stand-in) and the spine-jar song. Only active on that map.",
   "script": "mod.js"
 }
