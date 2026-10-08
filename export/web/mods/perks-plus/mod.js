@@ -6,8 +6,8 @@
 //     base value, so whatever else sets them (mech, suits) sets the base and the perk still applies on top.
 //   - Deadshot: headshots deal 25% more (bullets); the tighter hip fire (x0.5 spread) is in engine.js
 //   - Mule Kick: the third weapon slot is in rules.js (Session.giveWeapon / clearPerks)
-//   - PhD Flopper (BO1's _zombiemode_perks.gsc / _zombiemode.gsc): a dive to prone that lands from a fall sets off an
-//     explosion instead of the fall (radius 300, 5000 damage at the centre down to 1000 at the edge, MOD_GRENADE_SPLASH);
+//   - PhD Flopper (BO1's _zombiemode_perks.gsc / _zombiemode.gsc): no fall damage (the fall-damage mod), and a dive to
+//     prone that would have taken fall damage explodes instead (radius 300, 5000 at the centre down to 1000 at the edge);
 //     your own explosives can't hurt you (throwables mod, kino-features blast, the engine's grenade). Runs on Moon too
 //     (Moon's session has the perk and its gas immunity natively, but no dive explosion).
 import * as THREE from 'three';
@@ -20,9 +20,7 @@ export const MORE_PERKS = {
 // their purchase stings: Moon's (BO1) recordings, played by the engine as audio.play(<perk id>)
 const STINGS = { specialty_longersprint: 'moon/audio/bce4d0477d3fb5e84e5d.ogg', specialty_deadshot: 'moon/audio/b08fede0bf04968b7f78.ogg',
   specialty_additionalprimaryweapon: 'moon/audio/5319f7e83b450594a1f5.ogg', specialty_flakjacket: 'moon/audio/dbcd7ae5a586bd35c097.ogg' };
-// PhD Flopper: the landing must be at least this far below where the dive started (BO1 only flops on a dive that takes
-// fall damage; this game has no fall damage, and a dive's own hop is about 22 high, so a flat-ground dive doesn't count)
-const PHD = 'specialty_flakjacket', PHD_DROP = 36, PHD_RADIUS = 300, PHD_MAX = 5000, PHD_MIN = 1000;
+const PHD = 'specialty_flakjacket', PHD_RADIUS = 300, PHD_MAX = 5000, PHD_MIN = 1000;
 // HUD icons (git-ignored icons/: third-party art the user supplied, so not in the repo or Rind installs): the letter badge
 // becomes the icon, as the hud mod does for Kino's four perks. Moon's HUD (same #perks, same titles) gets them too.
 const ICONS = { 'Stamin-Up': 'staminup.webp', 'Deadshot Daiquiri': 'deadshot.webp' };
@@ -50,19 +48,17 @@ export default function setup({ host, session, player, world, map, audio, mod, e
   host.on('beforeEnemyDamage', e => { if (e.head && e.cause === 'bullet' && !e.melee && has('specialty_deadshot')) e.amount *= 1.25; });
 }
 
-// PhD Flopper's dive explosion. A dive is measured from its take-off; when it ends (diveLand, which can fire mid-air on a
-// long fall) the explosion waits for the actual landing.
+// PhD Flopper (BO1 _zombiemode.gsc player_damage_override): no fall damage, and a dive to prone that would have taken
+// fall damage (the fall-damage mod's 'fall' event, dive set) explodes instead.
 function phdFlopper({ host, session, player, world, audio, enemies, scene }) {
-  let dive = null, ring = null;
-  const feet = () => player.getFeetPosition();
-  host.on('dive', () => { dive = { y: feet().y, landed: false }; });
-  host.on('diveLand', () => { if (dive) dive.landed = true; });
-  host.on('reset', () => { dive = null; });
+  let ring = null;
+  host.on('fall', e => {
+    if (!session.perks?.has(PHD)) return;
+    e.amount = 0;
+    if (e.dive) flop(e.position);
+  });
   host.on('update', dt => {
     if (ring) { ring.t += dt; const k = ring.t / .45; ring.mesh.scale.setScalar(20 + k * PHD_RADIUS); ring.mesh.material.opacity = .8 * (1 - k); if (k >= 1) { ring.mesh.removeFromParent(); ring = null; } }
-    if (!dive?.landed || !player.onFloor) return;
-    const at = feet(), drop = dive.y - at.y; dive = null;
-    if (session.perks?.has(PHD) && drop >= PHD_DROP) flop(at);
   });
   function flop(at) {
     const up = new THREE.Vector3(0, 30, 0), from = at.clone().add(up);

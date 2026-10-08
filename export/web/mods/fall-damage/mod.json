@@ -1,0 +1,5 @@
+{
+  "name": "Fall damage",
+  "description": "BO1's fall damage (bg_fallDamageMinHeight 128, bg_fallDamageMaxHeight 300): drops over 128 hurt, 300 or more takes all your health. Emits a 'fall' event mods can change (PhD Flopper cancels it).",
+  "script": "mod.js"
+}
