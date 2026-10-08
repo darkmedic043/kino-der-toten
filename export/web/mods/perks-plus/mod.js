@@ -14,7 +14,20 @@ export const MORE_PERKS = {
 // their purchase stings: Moon's (BO1) recordings, played by the engine as audio.play(<perk id>)
 const STINGS = { specialty_longersprint: 'moon/audio/bce4d0477d3fb5e84e5d.ogg', specialty_deadshot: 'moon/audio/b08fede0bf04968b7f78.ogg',
   specialty_additionalprimaryweapon: 'moon/audio/5319f7e83b450594a1f5.ogg' };
-export default function setup({ host, session, player, world, map, audio }) {
+// HUD icons (git-ignored icons/: third-party art the user supplied, so not in the repo or Rind installs): the letter badge
+// becomes the icon, as the hud mod does for Kino's four perks. Moon's HUD (same #perks, same titles) gets them too.
+const ICONS = { 'Stamin-Up': 'staminup.webp', 'Deadshot Daiquiri': 'deadshot.webp' };
+function addIcons(base) {
+  if (document.getElementById('perks-plus-icons')) return;
+  const sel = Object.keys(ICONS).map(t => `#perks span[title="${t}"]`).join(',');
+  const style = document.createElement('style'); style.id = 'perks-plus-icons';
+  style.textContent = `:is(${sel}){border:0;border-radius:0;width:30px;height:30px;font-size:0;color:transparent;background-color:transparent!important;` +
+    `background-size:contain!important;background-repeat:no-repeat!important;background-position:center!important;filter:drop-shadow(0 1px 2px #000)}` +
+    Object.entries(ICONS).map(([t, f]) => `#perks span[title="${t}"]{background-image:url(${new URL('icons/' + f, base).href})!important}`).join('');
+  document.head.append(style);
+}
+export default function setup({ host, session, player, world, map, audio, mod }) {
+  addIcons(mod?.url ?? import.meta.url);
   if (map?.id === 'moon') return;
   const table = world?.perkInfo;
   if (table) for (const [id, p] of Object.entries(MORE_PERKS)) table[id] ??= p;
