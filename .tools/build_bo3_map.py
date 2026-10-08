@@ -482,6 +482,91 @@ for e in ents:
             add_node({'name': 'GIANT_PRIZE', 'translation': g(vec(e['origin'])).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]})
         else: add_node({'name': 'GIANT_PRIZE_USE', 'translation': g(vec(e['origin'])).tolist()})
 for k, o in enumerate([(900, -586, 151), (987, -873, 122), (-1340, -483, 255)]): add_node({'name': f'GIANT_JAR_{k}', 'translation': g(o).tolist()}); count('JAR')
+
+# The two drawbridges (fxanim scriptbundles p7_fxanim_zm_factory_bridge_<lft|rt>_bundle; zm_factory.gsc bridge_init plays
+# them when the power comes on). Greyhound exported each rig (_mod) and its 145-frame animation (_anim). Each becomes a
+# GIANT_BRIDGE_<side> node (at the bundle origin, turning CoD's Z-up into Y-up, cm -> inches) over a copy of the rig's bone
+# hierarchy in its own units: GIANT_BRIDGE_<side>_<bone> nodes with the bind (raised) pose, carrying the rigidly bound
+# vertices (each to its strongest bone) and the keys in extras (rot: absolute local quaternions, loc: offsets added to
+# the bind position; [frame, x, y, z(, w)] runs). The-giant mod plays it. GIANT_BRIDGECOL_<side>: the deck in its lowered
+# pose (last frame), in map space, for the mod's collision (switched on at the bridge_connect note).
+from semodel_to_glb import qmul, qrot, qinv
+from seanim import read_seanim
+AXQ = [-math.sqrt(.5), 0, 0, math.sqrt(.5)]   # -90 degrees about X: (x, y, z) -> (x, z, -y), as g()
+for e in ents:
+    m_ = re.fullmatch(r'p7_fxanim_zm_factory_bridge_(lft|rt)_bundle', e.get('scriptbundlename', ''))
+    if not m_: continue
+    side = m_[1]; base = f'p7_fxanim_zm_factory_bridge_{side}'
+    mpath = os.path.join(GH, 'xmodels', base + '_mod', base + '_mod_LOD0.semodel'); apath = os.path.join(GH, 'xanims', base + '_anim.seanim')
+    if not (os.path.exists(mpath) and os.path.exists(apath)): print('bridge', side, 'not exported'); continue
+    model, anim = read_semodel(mpath), read_seanim(apath)
+    bones = model['bones']; bidx = {b['name']: i for i, b in enumerate(bones)}
+    # per bone: primitives (material -> local positions/normals/uvs/faces)
+    parts = {}
+    for mesh in model['meshes']:
+        if not mesh['faces']: continue
+        dom = [max(w, key=lambda t: t[1])[0] for w in mesh['w']]
+        mm = model['materials'][mesh['mats'][0]] if mesh['mats'] else {'name': 'none'}
+        for f in mesh['faces']:
+            b = dom[f[0]]; pr = parts.setdefault(b, {}).setdefault(mm['name'], {'mm': mm, 'P': [], 'N': [], 'UV': [], 'F': [], 'map': {}})
+            idx = []
+            for v in f:
+                if v not in pr['map']:
+                    bn = bones[b]; q = qinv(bn['wrot'])
+                    p = mesh['pos'][v]; pr['map'][v] = len(pr['P'])
+                    pr['P'].append(qrot(q, (p[0] - bn['wpos'][0], p[1] - bn['wpos'][1], p[2] - bn['wpos'][2])))
+                    pr['N'].append(qrot(q, mesh['nrm'][v])); pr['UV'].append(mesh['uv'][v][0])
+                idx.append(pr['map'][v])
+            pr['F'].append([idx[0], idx[2], idx[1]])
+    mesh_of = {}
+    for b, mats in parts.items():
+        prims = []
+        for mname, pr in mats.items():
+            mm = pr['mm']; N = np.array(pr['N']); N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-6)
+            mat = material(('prop', mname), mname, texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX), fallback=builtin_color(mm.get('diffuse'), mname))
+            prims.append({'attributes': {'POSITION': accessor(np.array(pr['P'], dtype=np.float32), 'VEC3', 34962, True), 'NORMAL': accessor(N.astype(np.float32), 'VEC3', 34962),
+                                         'TEXCOORD_0': accessor(np.array(pr['UV'], dtype=np.float32), 'VEC2', 34962)},
+                          'indices': accessor(np.array(pr['F'], dtype=np.uint32).ravel(), 'SCALAR', 34963), 'material': mat})
+        gltf['meshes'].append({'name': f'bridge_{side}_{bones[b]["name"]}', 'primitives': prims}); mesh_of[b] = len(gltf['meshes']) - 1
+    # bone nodes (children before parents are fine in glTF: link after creating all)
+    first = len(gltf['nodes'])
+    for i, bn in enumerate(bones):
+        node = {'name': f'GIANT_BRIDGE_{side}_{bn["name"]}', 'translation': list(bn['lpos']), 'rotation': list(bn['lrot'])}
+        if i in mesh_of: node['mesh'] = mesh_of[i]
+        k = anim['bones'].get(bn['name'])
+        if k and (len(k.get('rot', [])) > 1 or k.get('loc')):
+            node['extras'] = {'rot': [x for f, q in k.get('rot', []) for x in (f, *q)], 'loc': [x for f, p in k.get('loc', []) for x in (f, *p)]}
+        gltf['nodes'].append(node)
+    for i, bn in enumerate(bones):
+        if bn['parent'] >= 0: gltf['nodes'][first + bn['parent']].setdefault('children', []).append(first + i)
+    roots = [first + i for i, bn in enumerate(bones) if bn['parent'] < 0]
+    connect = next((f for f, n in anim['notes'] if n == 'bridge_connect'), anim['frames'] - 1)
+    add_node({'name': f'GIANT_BRIDGE_{side}', 'translation': g(vec(e['origin'])).tolist(), 'rotation': AXQ, 'scale': [CM] * 3, 'children': roots,
+              'extras': {'fps': anim['framerate'], 'frames': anim['frames'] - 1, 'connect': connect}})
+    # lowered pose -> model space -> map space, for the deck collision (only the j_bridge part: the deck and its rails)
+    def key(track, frame):
+        return track[-1][1] if track else None
+    world = {}
+    for i, bn in enumerate(bones):
+        k = anim['bones'].get(bn['name'], {})
+        r = k.get('rot')[-1][1] if k.get('rot') else bn['lrot']
+        t = list(bn['lpos']); l = k.get('loc')
+        if l: t = [t[j] + l[-1][1][j] for j in range(3)]
+        if bn['parent'] < 0: world[i] = (tuple(t), tuple(r))
+        else:
+            pt, pq = world[bn['parent']]; d = qrot(pq, t); world[i] = ((pt[0] + d[0], pt[1] + d[1], pt[2] + d[2]), qmul(pq, r))
+    jb = bidx.get('j_bridge'); CP_, CT_ = [], []
+    for mname, pr in parts.get(jb, {}).items():
+        wt, wq = world[jb]; n = len(CP_)
+        for p in pr['P']:
+            d = qrot(wq, p); CP_.append((wt[0] + d[0], wt[1] + d[1], wt[2] + d[2]))
+        CT_ += [[a + n, b_ + n, c + n] for a, b_, c in pr['F']]
+    if CP_:
+        P_ = g(np.array(CP_) * CM) + g(vec(e['origin']))
+        gltf['meshes'].append({'name': f'bridgecol_{side}', 'primitives': [{'attributes': {'POSITION': accessor(P_.astype(np.float32), 'VEC3', 34962, True)},
+                                                                           'indices': accessor(np.array(CT_, dtype=np.uint32).ravel(), 'SCALAR', 34963)}]})
+        add_node({'name': f'GIANT_BRIDGECOL_{side}', 'mesh': len(gltf['meshes']) - 1})
+    count('BRIDGE')
 print('markers:', counts)
 
 # ---- write -----------------------------------------------------------------------------------------------------------------

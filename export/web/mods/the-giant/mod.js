@@ -5,6 +5,7 @@
 //   with the power on, pull a pad's lever, then use the mainframe switch within 30 s: the pad is linked (its
 //   teleporter works from then on). All three linked: the mainframe door rises and Pack-a-Punch opens.
 import * as THREE from 'three';
+import { CollisionWorld } from '../../collision-world.js';
 
 const LINK_TIME = 30, WHERE = { pad0: 'east', pad1: 'south', pad2: 'west' };
 export default function setup(api) {
@@ -51,6 +52,59 @@ export default function setup(api) {
   host.on('reset', () => { pending = null; lock(); });
   setupLook(api);
   setupEggs(api);
+  setupBridges(api);
+}
+
+// ---- the drawbridges: BO3's fxanim rigs (GIANT_BRIDGE_<side>, see build_bo3_map.py) lower when the power comes on, as in
+// zm_factory.gsc bridge_init. Bone nodes carry their keys in userData (rot: absolute local quaternions, loc: offsets
+// added to the bind position, both [frame, ...] runs); the deck's lowered-pose collision (GIANT_BRIDGECOL_<side>) is
+// switched on at the rig's bridge_connect frame. window: true keeps setDoors from cutting the navmesh under it.
+function setupBridges({ world, session, host, audio }) {
+  const root = world.root; if (!root) return;
+  const bridges = ['lft', 'rt'].map(side => {
+    const rig = root.getObjectByName('GIANT_BRIDGE_' + side), col = root.getObjectByName('GIANT_BRIDGECOL_' + side);
+    if (!rig) return null;
+    const bones = []; rig.traverse(o => { if (o.userData?.rot || o.userData?.loc) bones.push({ o, rot: o.userData.rot ?? [], loc: o.userData.loc ?? [], base: o.position.clone(), q0: o.quaternion.clone() }); });
+    let dyn = null;
+    if (col) {
+      col.visible = false; col.updateWorldMatrix(true, false);
+      const geo = col.geometry.clone().applyMatrix4(col.matrixWorld);
+      dyn = { collider: new CollisionWorld(geo), box: new THREE.Box3().setFromBufferAttribute(geo.attributes.position), enabled: false, window: true };
+      world.dynamic.push(dyn);
+    }
+    return { rig, bones, dyn, fps: rig.userData.fps ?? 30, frames: rig.userData.frames ?? 145, connect: rig.userData.connect ?? 100 };
+  }).filter(Boolean);
+  if (!bridges.length) { console.warn('[the-giant] bridges missing (rebuild the map)'); return; }
+  const qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
+  const sample = (run, n, f, out) => {   // run: [frame, c0..c(n-1), frame, ...]; linear between keys (quaternions slerped)
+    const stride = n + 1, count = run.length / stride; if (!count) return false;
+    let i = 0; while (i < count - 1 && run[(i + 1) * stride] <= f) i++;
+    const f0 = run[i * stride], j = Math.min(count - 1, i + 1), f1 = run[j * stride], t = f1 > f0 ? Math.min(1, Math.max(0, (f - f0) / (f1 - f0))) : 0;
+    if (n === 4) { qa.fromArray(run, i * stride + 1); qb.fromArray(run, j * stride + 1); out.slerpQuaternions(qa, qb, t); }
+    else out.set(...[0, 1, 2].map(k => run[i * stride + 1 + k] * (1 - t) + run[j * stride + 1 + k] * t));
+    return true;
+  };
+  const off = new THREE.Vector3();
+  const pose = (b, f) => {
+    for (const k of b.bones) {
+      if (!sample(k.rot, 4, f, k.o.quaternion)) k.o.quaternion.copy(k.q0);
+      k.o.position.copy(k.base); if (sample(k.loc, 3, f, off)) k.o.position.add(off);
+    }
+    b.rig.updateMatrix(); b.rig.traverse(o => o.updateMatrix()); b.rig.updateMatrixWorld(true);   // the map's matrices are frozen
+    if (b.dyn) b.dyn.enabled = f >= b.connect;
+  };
+  let startAt = null, frame = -1, hit = false;
+  const reset = () => { startAt = null; hit = false; frame = 0; for (const b of bridges) pose(b, 0); };
+  reset();
+  host.on('update', () => {
+    if (session.power && startAt == null) { startAt = session.time; audio?.play?.('round', .5); }
+    if (startAt == null) return;
+    const f = Math.min(bridges[0].frames, (session.time - startAt) * bridges[0].fps);
+    if (f === frame) return;
+    frame = f; for (const b of bridges) pose(b, f);
+    if (!hit && f >= bridges[0].connect) { hit = true; audio?.play?.('explosion', .35); }   // evt_bridge_hit
+  });
+  host.on('reset', reset);
 }
 
 // ---- Easter eggs, after zm_factory.gsc (BO3 source):
