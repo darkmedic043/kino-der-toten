@@ -473,7 +473,7 @@ for e in ents:
     if m and e.get('script_sound') == 'evt_pad':
         pad = f'pad{m[1]}'
         marker(f'TELEPORT_{pad}', [*vec(e['origin'])[:2], vec(e['origin'])[2] - 20], vec(e.get('angles'))[1],
-               {'cost': 1500, 'cooldown': 30, 'power': True, 'locked': True, 'lockedText': 'Link this teleporter: pull its lever, then the mainframe'})
+               {'cost': 1500, 'cooldown': 30, 'power': True, 'visual': False, 'locked': True, 'lockedText': 'Link this teleporter: pull its lever, then the mainframe'})
         marker(f'TPDEST_{pad}', MAINFRAME, MAINFRAME_YAW); count('TELEPORT')
     elif m and e.get('script_sound') == 'evt_lever_pull':
         add_node({'name': f'GIANT_LEVER_pad{m[1]}', 'translation': g(vec(e['origin'])).tolist()}); count('LEVER')   # the-giant mod: linking

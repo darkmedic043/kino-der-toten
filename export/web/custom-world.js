@@ -327,7 +327,7 @@ export class CustomWorld {
       const base=new THREE.Mesh(new THREE.CylinderGeometry(34,38,4,32),new THREE.MeshStandardMaterial({color:0x2f3336,roughness:.5,metalness:.6}));
       const ring=new THREE.Mesh(new THREE.TorusGeometry(30,1.6,8,48),new THREE.MeshBasicMaterial({color:0x7fd4ff}));ring.rotation.x=Math.PI/2;ring.position.y=2.4;
       const glow=new THREE.Mesh(new THREE.CylinderGeometry(30,30,90,32,1,true),new THREE.MeshBasicMaterial({color:0x7fd4ff,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));glow.position.y=47;
-      const group=new THREE.Group();group.add(base,ring,glow);group.position.copy(pad.position).addScaledVector(up,2);this.scene.add(group);
+      const group=new THREE.Group();group.add(glow);if(e.visual!==false&&e.visual!=='false')group.add(base,ring);   // visual false: the map has its own pad model (The Giant)group.position.copy(pad.position).addScaledVector(up,2);this.scene.add(group);
       tp.ring=ring;tp.glow=glow;
     }
   }
