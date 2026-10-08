@@ -3,7 +3,7 @@
 .tools/bo3_dump_map.py, with textures and props exported by Greyhound (BO3 running under Proton; see
 docs/fork/waw-ports.md, "Black Ops III maps").
 
-  blender -b -P .tools/build_bo3_map.py -- <bsp name> <map id> [--tex 512] [--prop-tex 256]
+  blender -b -P .tools/build_bo3_map.py -- <bsp name> <map id> [--tex 1024] [--normal-tex 512] [--prop-tex 512]
 
 (Blender only for its Python with numpy; no scene is built.) Output:
   <id>.glb   the level geometry split by material and 1024-unit cell, the props as EXT_mesh_gpu_instancing nodes (one
@@ -19,7 +19,8 @@ import numpy as np
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:]
 BSP, MAP_ID = argv[0], argv[1]
 opt = lambda k, d: int(argv[argv.index(k) + 1]) if k in argv else d
-TEX, PROP_TEX = opt('--tex', 512), opt('--prop-tex', 256)
+TEX, NORMAL_TEX, PROP_TEX = opt('--tex', 1024), opt('--normal-tex', 512), opt('--prop-tex', 512)
+CM = 1 / 2.54   # Greyhound writes models in centimetres; the map (and the game) is in inches
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 SRC = os.path.join(ROOT, 'export_game', 'bo3', 'maps', BSP)
 GH = '/mass_drive/SteamLibrary/steamapps/compatdata/311210/pfx/drive_c/greyhound/exported_files/black_ops_3'
@@ -46,7 +47,7 @@ def texture(name, size):
     if not os.path.exists(src): textures[key] = None; print('  missing texture', name); return None
     with open(src, 'rb') as f: head = f.read(32)
     alpha = head[25] in (4, 6)   # PNG colour type with alpha
-    uri = f'tex/{name}.webp'
+    uri = f'tex/{name}_{size}.webp'
     dst = os.path.join(OUT, uri)
     if not os.path.exists(dst) or os.path.getmtime(dst) < os.path.getmtime(src):
         subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', src, '-vf', f"scale='min({size},iw)':'min({size},ih)':force_original_aspect_ratio=decrease",
@@ -68,8 +69,9 @@ def add_buffer(arr, target=None):
     return len(gltf['bufferViews']) - 1
 def accessor(arr, typ, target=None, minmax=False):
     arr = np.ascontiguousarray(arr)
-    comp = {np.dtype('float32'): 5126, np.dtype('uint32'): 5125, np.dtype('uint16'): 5123}[arr.dtype]
+    comp = {np.dtype('float32'): 5126, np.dtype('uint32'): 5125, np.dtype('uint16'): 5123, np.dtype('uint8'): 5121}[arr.dtype]
     acc = {'bufferView': add_buffer(arr, target), 'componentType': comp, 'count': int(arr.shape[0]), 'type': typ}
+    if comp == 5121: acc['normalized'] = True
     if minmax: acc['min'] = arr.min(0).tolist(); acc['max'] = arr.max(0).tolist()
     gltf['accessors'].append(acc); return len(gltf['accessors']) - 1
 tex_index = {}
@@ -81,14 +83,30 @@ def tex_ref(t):
         tex_index[t['uri']] = len(gltf['textures']) - 1
     return tex_index[t['uri']]
 mat_index = {}
-def material(key, name, color, normal, two_sided=False):
+# BO3 materials whose colour map is a built-in constant ($white_diffuse, $gray_color...) get their colour from tint values
+# the SEModel doesn't carry: pick one from the material name instead of rendering them white
+BUILTIN = {'$black_color': [.02, .02, .02], '$gray_color': [.25, .25, .25], '$white_color': [.7, .7, .7]}
+TINTS = [(r'rust|iron|steel|metal|conduit|pipe|bracket|bolt|chain|ibeam|beam|rail|clamp|valve', [.22, .21, .2]),
+         (r'wood|plank|board|crate|pallet', [.32, .22, .14]), (r'concrete|cement|stone|brick', [.36, .34, .31]),
+         (r'paper|cloth|fabric|canvas|sack|bag', [.45, .41, .34]), (r'insulator|ceramic|porcelain|light|lamp|bulb|glass', [.72, .7, .66]),
+         (r'rubber|tire|cable|wire|black', [.05, .05, .05]), (r'snow|ice', [.8, .82, .85])]
+def builtin_color(image, name):
+    image = (image or '').split('\\')[-1].replace('.png', '')
+    if image.startswith('$color_black_'):
+        g = (1 - int(re.sub(r'\D', '', image) or 0) / 100) * .3; return [g, g, g]
+    if image in BUILTIN: return BUILTIN[image]
+    for pat, col in TINTS:
+        if re.search(pat, name, re.I): return col
+    return [.3, .3, .3]
+def material(key, name, color, normal, two_sided=False, overlay=False, fallback=None):
     if key in mat_index: return mat_index[key]
     m = {'name': name, 'pbrMetallicRoughness': {'metallicFactor': 0, 'roughnessFactor': .85}, 'doubleSided': two_sided}
     c = tex_ref(color); n = tex_ref(normal)
     if c is not None: m['pbrMetallicRoughness']['baseColorTexture'] = {'index': c}
-    else: m['pbrMetallicRoughness']['baseColorFactor'] = [.5, .5, .5, 1]
+    else: m['pbrMetallicRoughness']['baseColorFactor'] = [*(fallback or [.3, .3, .3]), 1]
     if n is not None: m['normalTexture'] = {'index': n}
-    if color and color['alpha']: m['alphaMode'] = 'MASK'; m['alphaCutoff'] = .5
+    if overlay: m['alphaMode'] = 'BLEND'   # BO3 _blend layers and decals: drawn over the surface below, faded by vertex/texture alpha
+    elif color and color['alpha']: m['alphaMode'] = 'MASK'; m['alphaCutoff'] = .5
     gltf['materials'].append(m); mat_index[key] = len(gltf['materials']) - 1
     return mat_index[key]
 def add_node(node):
@@ -133,10 +151,14 @@ for (mi, cell), parts in groups.items():
     used, inv = np.unique(tri.ravel(), return_inverse=True)
     mat = info['materials'][mi]
     imgs = {i['hash']: i['name'] for i in mat['images']}
-    m = material(('bsp', mi), mat['name'], texture(imgs.get(COLOR), TEX), texture(imgs.get(NORMAL), TEX), two_sided=bool(NOT_SOLID.search(mat['name'])))
-    prim = {'attributes': {'POSITION': accessor(Pg[used], 'VEC3', 34962, True), 'NORMAL': accessor(Ng[used], 'VEC3', 34962),
+    overlay = bool(re.search(r'_blend|decal', mat['name'], re.I))
+    m = material(('bsp', mi), mat['name'], texture(imgs.get(COLOR), TEX), texture(imgs.get(NORMAL), NORMAL_TEX), two_sided=bool(NOT_SOLID.search(mat['name'])) and not overlay,
+                 overlay=overlay, fallback=builtin_color(imgs.get(COLOR), mat['name']))
+    pos = Pg[used] + Ng[used] * (.12 if overlay else 0)   # overlays sit a hair above the surface they cover (no z-fighting)
+    prim = {'attributes': {'POSITION': accessor(pos.astype(np.float32), 'VEC3', 34962, True), 'NORMAL': accessor(Ng[used], 'VEC3', 34962),
                            'TEXCOORD_0': accessor(UV[used].astype(np.float32), 'VEC2', 34962)},
             'indices': accessor(inv.astype(np.uint32), 'SCALAR', 34963), 'material': m}
+    if overlay: prim['attributes']['COLOR_0'] = accessor(VD[used, 0:4].copy(), 'VEC4', 34962)
     gltf['meshes'].append({'name': f'bsp_{mi}_{cell[0]}_{cell[1]}', 'primitives': [prim]})
     add_node({'name': f'bsp_{mat["name"].split("/")[-1]}_{cell[0]}_{cell[1]}', 'mesh': len(gltf['meshes']) - 1})
 tri = np.concatenate(solid); used, inv = np.unique(tri.ravel(), return_inverse=True)
@@ -163,11 +185,13 @@ def prop_mesh(name):   # a BO3 model as a glTF mesh (cached), or None if Greyhou
     prims = []
     for mesh in model['meshes']:
         if not mesh['faces']: continue
-        pos = g(np.array(mesh['pos'])).astype(np.float32); nrm = g(np.array(mesh['nrm'])); nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-6)
+        pos = (g(np.array(mesh['pos'])) * CM).astype(np.float32); nrm = g(np.array(mesh['nrm'])); nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-6)
         uv = np.array([u[0] for u in mesh['uv']], dtype=np.float32)
         faces = np.array(mesh['faces'], dtype=np.uint32)[:, [0, 2, 1]]
         mm = model['materials'][mesh['mats'][0]] if mesh['mats'] else {'name': 'none'}
-        mat = material(('prop', mm['name']), mm['name'], texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX))
+        overlay = bool(re.search(r'decal', mm['name'], re.I))
+        mat = material(('prop', mm['name']), mm['name'], texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX), overlay=overlay,
+                       fallback=builtin_color(mm.get('diffuse'), mm['name']))
         prims.append({'attributes': {'POSITION': accessor(pos, 'VEC3', 34962, True), 'NORMAL': accessor(nrm.astype(np.float32), 'VEC3', 34962),
                                      'TEXCOORD_0': accessor(uv, 'VEC2', 34962)}, 'indices': accessor(faces.ravel(), 'SCALAR', 34963), 'material': mat})
     if not prims: mesh_cache[name] = None; return None
@@ -283,6 +307,14 @@ for e in ents:
         marker(f'TPDEST_{pad}', MAINFRAME, MAINFRAME_YAW); count('TELEPORT')
     elif m and e.get('script_sound') == 'evt_lever_pull':
         add_node({'name': f'GIANT_LEVER_pad{m[1]}', 'translation': g(vec(e['origin'])).tolist()}); count('LEVER')   # the-giant mod: linking
+# lamps (the-giant mod lights the nearest few): BO3's buzzing light fixtures and lanterns, merged within 120 units
+lamps = []
+for e in ents:
+    if e.get('targetname') in ('lights', 'dyn_light', 'lantern') and e.get('origin'):
+        o = vec(e['origin'])
+        if all(np.linalg.norm(np.array(o) - np.array(q)) > 120 for q in lamps): lamps.append(o)
+for k, o in enumerate(lamps): add_node({'name': f'GIANT_LAMP_{k}', 'translation': g(o).tolist()})
+counts['LAMP'] = len(lamps)
 for e in ents:
     if e.get('targetname') == 'trigger_teleport_core': add_node({'name': 'GIANT_CORE', 'translation': g(vec(e['origin'])).tolist()})
     if e.get('targetname') == 'pack_door' and e.get('classname') == 'script_model':

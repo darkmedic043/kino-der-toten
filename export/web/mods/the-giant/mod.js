@@ -49,4 +49,39 @@ export default function setup(api) {
     if (pending && session.time > pending.until) { pending = null; toast('The link failed · pull the lever again', 4); }
   });
   host.on('reset', () => { pending = null; lock(); });
+  setupLook(api);
+}
+
+// ---- the look: a snowy night. The engine's default lights (an even ambient + hemisphere + key + fill, tuned for Kino's
+// interiors) are retuned every frame (the engine sets the ambient on power and reset), and a pool of POOL warm point
+// lights follows the lamps nearest the camera (GIANT_LAMP_<n> nodes: BO3's buzzing fixtures and lanterns). The pool
+// has a fixed size: changing the number of lights recompiles every shader. Lamps are dim until the power is on.
+const POOL = 8, LAMP = { color: 0xffc58a, on: 2200, off: 700, range: 650, decay: 1.4 };
+function setupLook({ scene, world, session, host, camera }) {
+  const kids = scene.children;
+  const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
+  const dirs = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
+  const [key, fill] = dirs;
+  const lamps = []; world.root?.traverse(o => { if (/^GIANT_LAMP_/.test(o.name)) lamps.push(o.getWorldPosition(new THREE.Vector3())); });
+  const pool = Array.from({ length: Math.min(POOL, lamps.length) }, () => {
+    const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); scene.add(l); l.userData.want = 0; return l;
+  });
+  let last = performance.now(), timer = 0;
+  host.on('update', () => {
+    const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
+    const power = !!session.power;
+    if (ambient) { ambient.color.setHex(0x8b97ab); ambient.intensity = power ? .75 : .55; }
+    if (hemi) { hemi.color.setHex(0xa3b3c9); hemi.groundColor.setHex(0x3a3129); hemi.intensity = .85; }
+    if (key) { key.color.setHex(0xc9d5ff); key.intensity = 1.1; key.position.set(-.35, 1, .45); }
+    if (fill) { fill.color.setHex(0x6a82a6); fill.intensity = .25; }
+    if ((timer -= dt) <= 0 && pool.length) {
+      timer = .5;
+      const eye = camera.position, near = lamps.map(p => ({ p, d: p.distanceToSquared(eye) })).sort((a, b) => a.d - b.d).slice(0, pool.length);
+      // keep lights on lamps still in the set; move the rest (they fade in where they land)
+      const free = pool.filter(l => !near.some(n => n.p.equals(l.position)));
+      for (const n of near) if (!pool.some(l => l.position.equals(n.p))) { const l = free.shift(); if (l) { l.position.copy(n.p); l.intensity = 0; } }
+    }
+    const want = power ? LAMP.on : LAMP.off;
+    for (const l of pool) l.intensity += (want - l.intensity) * Math.min(1, dt * 2.5);
+  });
 }

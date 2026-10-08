@@ -102,14 +102,15 @@
         "explore"
       ],
       "dir": "mods/maps/the-giant/",
-      "model": "the-giant.glb?v=4",
+      "model": "the-giant.glb?v=6",
       "scale": 1,
-      "background": "#0d0f12",
-      "exposure": 1.2,
+      "background": "#141a22",
+      "exposure": 0.95,
       "nearbySpawns": true,
       "stairSmoothing": true,
       "perkYaw": -90,
-      "machines": "bo3"
+      "machines": "bo3",
+      "fog": 0.00022
     }
   ]
 }
