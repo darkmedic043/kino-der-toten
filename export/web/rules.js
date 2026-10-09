@@ -64,8 +64,8 @@ export class Session {
     this.health=Math.max(0,this.health-n);this.damageTime=this.time;
     if(this.health<=0){
       this.drinking=null;this.drinkLeft=0;
-      if(this.perks.has('specialty_quickrevive')){this.clearPerks();this.phase='reviving';this.reviveLeft=4;this.revives++;this.lastEvent='Quick Revive';}
-      else {this.phase='gameover';this.lastEvent='Game over';}
+      // Quick Revive is Cold War / BO6's (fork): no solo self-revive; it halves the regen delay (below) and co-op revives
+      this.phase='gameover';this.lastEvent='Game over';
     } return true;
   }
   update(dt){
@@ -77,7 +77,7 @@ export class Session {
     while(this.reloadLeft>0&&reloadDt>=this.reloadLeft){reloadDt-=this.reloadLeft;this.finishReloadStage();}
     if(this.reloadLeft>0)this.reloadLeft-=reloadDt;
     if(this.phase==='reviving'){this.reviveLeft-=dt;if(this.reviveLeft<=0){this.health=100;this.phase='fighting';this.effects.invulnerable=this.time+5;}return;}
-    if(this.time-this.damageTime>4) this.health=Math.min(this.maxHealth,this.health+dt*this.maxHealth*.25);
+    if(this.time-this.damageTime>(this.perks.has('specialty_quickrevive')?2:4)) this.health=Math.min(this.maxHealth,this.health+dt*this.maxHealth*.25);
     if(this.phase==='preparing'){this.countdown-=dt;if(this.countdown<=0){this.phase='fighting';this.lastEvent=this.dogRound?'Fetch their souls':'Round '+this.round;}}
   }
   fire(){

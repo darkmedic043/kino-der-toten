@@ -23,7 +23,8 @@ const STINGS = { specialty_longersprint: 'moon/audio/bce4d0477d3fb5e84e5d.ogg', 
 const PHD = 'specialty_flakjacket', PHD_RADIUS = 300, PHD_MAX = 5000, PHD_MIN = 1000;
 // HUD icons (git-ignored icons/: third-party art the user supplied, so not in the repo or Rind installs): the letter badge
 // becomes the icon, as the hud mod does for Kino's four perks. Moon's HUD (same #perks, same titles) gets them too.
-const ICONS = { 'Stamin-Up': 'staminup.webp', 'Deadshot Daiquiri': 'deadshot.webp', 'Mule Kick': 'mulekick.webp', 'PhD Flopper': 'phd.webp' };
+const ICONS = { 'Stamin-Up': 'staminup.webp', 'Deadshot Daiquiri': 'deadshot.webp', 'Mule Kick': 'mulekick.webp', 'PhD Flopper': 'phd.webp',
+  'Quick Revive': 'quickrevive.webp', Juggernog: 'juggernog.webp', 'Speed Cola': 'speedcola.webp', 'Double Tap': 'doubletap.webp' };   // the last four replace the hud mod's BO1 icons
 function addIcons(base) {
   if (document.getElementById('perks-plus-icons')) return;
   const sel = Object.keys(ICONS).map(t => `#perks span[title="${t}"]`).join(',');

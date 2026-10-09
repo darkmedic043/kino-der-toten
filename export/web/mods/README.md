@@ -272,6 +272,7 @@ All other fork files are new: `home.*`, `zombies.*`, `custom-world.js`,
 - `world.addInteraction({position, text(), use(e), hidden?(), locked?(), lockedText?})`: an extra press-F spot. Any interaction (the built-in kinds too, for example the power switch) may carry `locked()` and `lockedText`; a locked spot yields to any usable one in range.
 - `world.addShootTarget({position, radius | box, weapons?, hit(target, ray, point)})`: a target that `hit` fires on once when a shot passes through it (`weapons` limits it to those weapon ids; `box`, a `THREE.Box3`, is for thin targets). A shot hits only the nearest target on its path; `point` is where it crossed. Re-add a target to make it live again.
 - `world.slideMover(id, to 0..1, seconds, now)`, `world.enableMover(id, on)`: drive a `manual` `MOVER_` platform (movers.json `manual: true`); `enableMover(id,false)` hides it and removes its collision. Resets restore them.
+- `kino.exfil.status()` / `.start()` (mods/exfil): the exfil window and run; `kino.classes.grantXp(n)` / `kino.progression.grant(n)`: class and account XP from other mods.
 - `kino.scoreboard.addCollectible({id, label, value(), done?()})`: a tile in the Tab scoreboard's collectibles strip.
 - `host.prompts.push({find(camera) -> {text, distance} | null, use() -> bool})` (any map, `host` = the mod's host): a use prompt the engine shows as `F <text>` when it is the nearest; F calls `use()`. The terminal booth's desktop uses it.
 

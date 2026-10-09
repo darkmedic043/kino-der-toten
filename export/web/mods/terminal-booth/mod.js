@@ -406,7 +406,6 @@ export default async function setup(api){
     function buy(p){
       if(session.drinking)return 'Finish your drink first';
       if(session.busy||session.phase==='reviving')return 'Terminal busy';
-      if(p.id===QR&&session.revives>=3)return 'Quick Revive is depleted';
       if(session.points<priceOf(p))return 'Not enough points';
       if(api.perkInfo&&!api.perkInfo[p.id])api.perkInfo[p.id]={name:p.name,price:p.price,color:p.color,icon:p.badge};
       let ok;
@@ -428,6 +427,7 @@ export default async function setup(api){
         owned:p=>!!session.perks?.has(p.id),
         needsPower:p=>p.id!==QR,
         price:priceOf,buy,
+        exfil:()=>window.kino.exfil?.status(),callExfil:()=>window.kino.exfil?.start()??'Exfil is not installed',
         power:()=>!!session.power,points:()=>session.points,
         onOpen:()=>b.print('USER LOGGED IN'),
         onApp:name=>b.print('RUN '+name.toUpperCase()+'.EXE'),

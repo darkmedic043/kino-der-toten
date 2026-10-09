@@ -24,8 +24,11 @@ test('purchases cannot overdraft and damage cannot revive a dead session',()=>{
  const s=new Session(data);assert(!s.spend(750));assert.equal(s.points,500);assert(s.spend(500));assert.equal(s.points,0);
  s.damage(50);assert.equal(s.health,50);s.update(2);assert.equal(s.health,50);s.damage(50);assert.equal(s.phase,'gameover');s.update(20);assert.equal(s.health,0);
 });
-test('Quick Revive consumes perks and returns player with temporary protection',()=>{
- const s=new Session(data);s.perks.add('specialty_quickrevive');s.damage(100);assert.equal(s.phase,'reviving');assert.equal(s.perks.size,0);s.update(4.1);assert.equal(s.phase,'fighting');assert.equal(s.health,100);assert(!s.damage(100));
+// Fork: Quick Revive follows Cold War / Black Ops 6 (no solo self-revive; health regen starts after 2 s instead of 4).
+test('Quick Revive halves the regen delay and no longer self-revives',()=>{
+ const s=new Session(data);s.perks.add('specialty_quickrevive');s.damage(50);s.update(1.5);assert.equal(s.health,50);s.update(.6);assert(s.health>50);
+ const t=new Session(data);t.damage(50);t.update(2.1);assert.equal(t.health,50);
+ s.damage(500);assert.equal(s.phase,'gameover');
 });
 test('headshots, knife kills, and timed Double Points award distinct scores',()=>{
  const s=new Session(data);s.scoreHit(false);assert.equal(s.points,510);s.scoreHit(true,true);assert.equal(s.points,610);s.powerup('double_points');s.scoreHit(true,false,true);assert.equal(s.points,870);s.update(31);s.scoreHit(false);assert.equal(s.points,880);

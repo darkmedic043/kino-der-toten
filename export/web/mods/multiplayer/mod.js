@@ -234,8 +234,8 @@ export default async function setup(api){
   const hurtSession=session.damage;
   session.damage=n=>{
     if(forcingGameOver||!coop()||['reviving','gameover'].includes(session.phase)||session.effects.invulnerable>session.time)return hurtSession(n);
-    // In co-op a lethal hit (without Quick Revive) downs you instead.
-    if(n<session.health||session.perks.has('specialty_quickrevive'))return hurtSession(n);
+    // In co-op a lethal hit downs you instead (Quick Revive no longer self-revives: Cold War / BO6 rules, rules.js).
+    if(n<session.health)return hurtSession(n);
     hurtSession(Math.max(0,session.health-1));goDown();return true;
   };
   function goDown(){

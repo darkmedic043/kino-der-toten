@@ -1,0 +1,5 @@
+{
+  "name": "Exfil",
+  "description": "Cold War style exfil: at the start of round 11, 16, 21… a terminal can call it in. Reach the landing zone and survive a stronger horde until the chopper lands, then be in the zone to escape with account and class XP (more the later the round).",
+  "script": "mod.js"
+}

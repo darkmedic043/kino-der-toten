@@ -1,0 +1,10 @@
+{
+  "_doc": "Exfil landing zones per map id: {name, position} (game units; snapped to the navmesh). At call time the farthest one the player can reach is used. Maps without an entry use the player spawn.",
+  "kino": [
+    { "name": "Theater", "position": [-29, 34, -326] },
+    { "name": "Alleyway", "position": [-1317, 7, -145] },
+    { "name": "Dining Hall", "position": [1212, 117, -315] },
+    { "name": "Crematorium", "position": [-1017, 94, 612] },
+    { "name": "Lobby", "position": [-101, 107, 1256] }
+  ]
+}
