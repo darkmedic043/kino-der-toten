@@ -172,3 +172,4 @@
 - 2026-10-09: Grimhawk: rounded profiles, baked worn textures (one atlas), camos work.
 - 2026-10-09: Grimhawk attachments: Rangefinder, P.T. Expanse, Suppressor, Grip, Laser, Hawkeye 3×, Long Barrel (hip homing); iron sights stock; Gunsmith shows the laser slot.
 - 2026-10-09: Grimhawk: smaller in first person, rounds leave the muzzle, head-lock homing with PaP or its optics.
+- 2026-10-09: Ammo Mods (Cryo, Napalm, Dead Wire, Shatter, Brain Rot; tiers I–III) bought at the terminal's ARSENAL app after power; fx mod's API no longer overwrites itself (gameplay.md).

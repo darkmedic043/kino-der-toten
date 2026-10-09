@@ -4,7 +4,9 @@
 // openDesktop(opts) builds it once and shows it; Esc or LOG OFF closes.
 // EXFIL (bottom right, greyed out when no exfil window is open) shows the exfil status and calls it in.
 //   opts: {owned(perk), onMap(perk), needsPower(perk), power(), price(perk), points(), buy(perk) -> true | 'reason',
-//          exfil() -> status (mods/exfil), callExfil() -> true | 'reason', onOpen(), onClose(), onApp(name)}
+//          exfil() -> status (mods/exfil), callExfil() -> true | 'reason', arsenal() -> status (mods/ammo-mods),
+//          buyMod(id) / upgradeMod() -> true | 'reason', onOpen(), onClose(), onApp(name)}
+// ARSENAL (under PERKS) sells ammo mods for the gun in hand once the power is on.
 
 // Every perk in the game. Double-Dew (Cheese Cube) is left out for now, at the user's request.
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
@@ -56,6 +58,7 @@ const CSS = `
 #melonterm .desk{position:relative;flex:1;min-height:0;padding:20px;
   background:linear-gradient(#0c3a1c22 1px,transparent 1px) 0 0/32px 32px,linear-gradient(90deg,#0c3a1c22 1px,transparent 1px) 0 0/32px 32px}
 #melonterm .icons{display:grid;grid-template-columns:96px;grid-auto-rows:110px;gap:10px;width:96px}
+#melonterm .ars{flex:1;min-height:0;display:flex;flex-direction:column}#melonterm .ars .tile.owned::after{content:'LOADED'}#melonterm .ars>.perks{flex:1;min-height:0}
 #melonterm .app{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;background:none;border:0;color:inherit;font:inherit;font-size:19px;padding:0}
 #melonterm .app .sq{width:64px;height:64px;border:2px solid var(--g2);background:#062a14;display:grid;place-items:center;box-shadow:0 0 10px #3dff8a33,inset 0 0 12px #000a}
 #melonterm .app:hover .sq,#melonterm .app:focus-visible .sq{background:#0d4a24;box-shadow:0 0 16px #3dff8a88,inset 0 0 12px #0008}
@@ -130,6 +133,10 @@ const PERKS_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-render
   <rect x="9" y="13" width="14" height="17"/><rect x="11" y="17" width="10" height="7" fill="#031208"/><rect x="13" y="19" width="6" height="3"/>
   <rect x="10" y="14" width="2" height="5" fill="#c9ffd9"/></svg>`;
 
+const ARSENAL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
+  <rect x="6" y="4" width="4" height="18"/><rect x="14" y="4" width="4" height="18"/><rect x="22" y="4" width="4" height="18"/>
+  <rect x="6" y="2" width="4" height="2" fill="#c9ffd9"/><rect x="14" y="2" width="4" height="2" fill="#c9ffd9"/><rect x="22" y="2" width="4" height="2" fill="#c9ffd9"/>
+  <rect x="4" y="24" width="24" height="3"/><rect x="4" y="28" width="24" height="2"/><rect x="7" y="8" width="2" height="9" fill="#031208"/><rect x="23" y="8" width="2" height="9" fill="#031208"/></svg>`;
 const EXFIL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <rect x="4" y="6" width="24" height="2"/><rect x="15" y="8" width="2" height="3"/><rect x="9" y="11" width="15" height="7"/><rect x="6" y="13" width="3" height="3"/>
   <rect x="2" y="12" width="4" height="2"/><rect x="11" y="12" width="5" height="3" fill="#031208"/><rect x="11" y="19" width="2" height="3"/><rect x="20" y="19" width="2" height="3"/>
@@ -154,11 +161,16 @@ function build() {
   root.innerHTML = `<div class="crt glow">
     <div class="bar"><span>MELONTERM 2.7</span><span class="grow"></span><span class="pwr"></span><span class="pts"></span><span class="clock"></span></div>
     <div class="desk">
-      <div class="icons"><button class="app" data-app="perks"><div class="sq">${PERKS_ICON}</div><span>PERKS</span></button></div>
+      <div class="icons"><button class="app" data-app="perks"><div class="sq">${PERKS_ICON}</div><span>PERKS</span></button>
+        <button class="app" data-app="arsenal"><div class="sq">${ARSENAL_ICON}</div><span>ARSENAL</span></button></div>
       <button class="app exfil off" data-app="exfil"><div class="sq">${EXFIL_ICON}</div><span>EXFIL</span></button>
       <div class="win" data-win="perks" hidden>
         <div class="title"><span>PERKS.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="perks"><div class="left"><div class="grid"></div><div class="msg"></div></div><div class="detail"></div></div>
+      </div>
+      <div class="win" data-win="arsenal" hidden>
+        <div class="title"><span>ARSENAL.EXE · AMMO MODS</span><span class="grow"></span><button data-close title="Close">×</button></div>
+        <div class="ars"></div>
       </div>
       <div class="win" data-win="exfil" hidden>
         <div class="title"><span>EXFIL.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
@@ -170,6 +182,7 @@ function build() {
   document.body.append(root);
   const $ = s => root.querySelector(s);
   const win = $('[data-win=perks]'), exWin = $('[data-win=exfil]'), exBody = $('.exf'), exIcon = $('[data-app=exfil]');
+  const arWin = $('[data-win=arsenal]'), arBody = $('.ars'); let arState = '', arMsg = ['', ''];
   const grid = $('.grid'), detail = $('.detail'), msg = $('.msg');
   let exState = '';
   let opts = null, shown = 0, clock = 0, lastState = '';
@@ -180,7 +193,8 @@ function build() {
   for (const t of ['click', 'mousedown', 'mouseup', 'pointerdown', 'wheel', 'contextmenu']) root.addEventListener(t, e => e.stopPropagation());
 
   function key(e) {
-    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden) closeApp(); else close(); return; }
+    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden) closeApp(); else close(); return; }
+    if (!arWin.hidden) return;
     if (!exWin.hidden) { if (e.code === 'Enter') { e.preventDefault(); callExfil(); } return; }
     if (win.hidden) { if (e.code === 'Enter') { e.preventDefault(); openApp('perks'); } return; }
     if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); buy(shown); return; }
@@ -227,13 +241,64 @@ function build() {
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
   }
   function openApp(name) {
-    if (name === 'exfil') { win.hidden = true; exState = ''; drawExfil(); exWin.hidden = false; $('.open').textContent = '[EXFIL.EXE]'; opts.onApp?.(name); return; }
+    if (name === 'arsenal') { win.hidden = exWin.hidden = true; arState = ''; arMsg = ['', '']; drawArsenal(); arWin.hidden = false; $('.open').textContent = '[ARSENAL.EXE]'; opts.onApp?.(name); return; }
+    if (name === 'exfil') { win.hidden = arWin.hidden = true; exState = ''; drawExfil(); exWin.hidden = false; $('.open').textContent = '[EXFIL.EXE]'; opts.onApp?.(name); return; }
     if (name !== 'perks') return;
-    exWin.hidden = true;
+    exWin.hidden = arWin.hidden = true;
     say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
     opts.onApp?.(name); grid.querySelector(`[data-i="${shown}"]`)?.focus({ preventScroll: true });
   }
-  function closeApp() { win.hidden = exWin.hidden = true; $('.open').textContent = ''; }
+  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = true; $('.open').textContent = ''; }
+  // ---- ARSENAL.EXE: ammo mods for the gun in hand, laid out like PERKS.EXE (tiles left, details right) -------------
+  const ROMAN = ['', 'I', 'II', 'III'];
+  const MOD_GLYPH = {   // simple square-icon glyphs per mod (white, tinted by the mod's colour); unknown ids get a letter
+    cryo: '<path d="M16 3v26M5 9.5l22 13M5 22.5l22-13M12 5l4 3 4-3M12 27l4-3 4 3" stroke="currentColor" stroke-width="2.4" fill="none"/>',
+    napalm: '<path d="M16 3c1 6 8 8 8 16a8 8 0 0 1-16 0c0-4 2-6 3-8 1 3 3 4 3 4-1-5 0-9 2-12z" fill="currentColor"/>',
+    deadwire: '<path d="M18 2 7 18h7l-3 12 13-17h-8z" fill="currentColor"/>',
+    shatter: '<path d="M16 2l3 9 9-3-6 8 8 5-10 1 1 9-5-7-5 7 1-9-10-1 8-5-6-8 9 3z" fill="currentColor"/>',
+    brainrot: '<path d="M11 6a5 5 0 0 0-5 5 5 5 0 0 0-1 9 5 5 0 0 0 7 6V6zm10 0a5 5 0 0 1 5 5 5 5 0 0 1 1 9 5 5 0 0 1-7 6V6z" fill="currentColor"/>',
+  };
+  const modIcon = m => `<svg viewBox="0 0 32 32" width="58%" height="58%" style="color:${m.color};filter:drop-shadow(0 0 6px ${m.color})">${MOD_GLYPH[m.id] ?? `<text x="16" y="22" text-anchor="middle" font-size="16" fill="currentColor">${esc(m.name[0])}</text>`}</svg>`;
+  let arShown = 0;
+  function arsenalBody() {
+    if (!arBody.querySelector('.grid')) arBody.innerHTML = '<div class="perks"><div class="left"><div class="grid"></div><div class="msg"></div></div><div class="detail"></div></div>';
+    return { grid: arBody.querySelector('.grid'), detail: arBody.querySelector('.detail'), msg: arBody.querySelector('.msg') };
+  }
+  function drawArsenal() {
+    if (arWin.hidden) return;
+    const st = opts?.arsenal?.(); if (!st) { arBody.innerHTML = '<p>Ammo mods are not installed.</p>'; return; }
+    const key = JSON.stringify([st.power, st.points, st.weapon, st.mod, arMsg, arShown]); if (key === arState) return; arState = key;
+    const { grid, detail, msg } = arsenalBody(), cur = st.mod, w = st.weapon;
+    grid.innerHTML = st.mods.map((m, i) => {
+      const on = cur?.id === m.id, locked = !st.power || !w;
+      return `<button class="tile ${locked ? 'locked' : ''} ${on ? 'owned' : ''} ${i === arShown ? 'on' : ''}" data-i="${i}" title="${esc(m.name)}">${modIcon(m)}
+        <span class="tag">${!st.power ? 'NO POWER' : on ? 'TIER ' + ROMAN[cur.tier] : ''}</span></button>`;
+    }).join('');
+    for (const t of grid.children) {
+      t.addEventListener('mouseenter', () => { arShown = +t.dataset.i; drawArsenal(); });
+      t.addEventListener('click', () => arBuy(st.mods[+t.dataset.i]));
+    }
+    const m = st.mods[Math.min(arShown, st.mods.length - 1)], on = cur?.id === m.id, tier = on ? cur.tier : 0;
+    const cost = on ? st.price[tier + 1] : st.price.apply, can = st.power && w && !(on && tier >= 3) && st.points >= cost;
+    const label = !st.power ? 'NEEDS POWER' : !w ? 'NO WEAPON IN HAND' : on && tier >= 3 ? 'MAX TIER' : st.points < cost ? 'NOT ENOUGH POINTS'
+      : on ? `UPGRADE TO TIER ${ROMAN[tier + 1]} · ${cost.toLocaleString()}` : `${cur ? 'SWAP TO' : 'APPLY'} · ${cost.toLocaleString()}`;
+    detail.innerHTML = `<div class="head"><div class="big" style="border-color:${m.color}">${modIcon(m)}</div><div>
+        <h2 style="color:${m.color}">${esc(m.name.toUpperCase())}</h2><div class="blurb">${esc(m.desc)}</div>
+        <div class="price">${(on ? (st.price[tier + 1] ?? 0) : st.price.apply).toLocaleString() || '—'} PTS</div></div></div>
+      <button class="buy ${!st.power ? 'locked' : ''}" ${can ? '' : 'disabled'}>${label}</button>
+      <div class="status"><span>${esc((w?.name ?? 'No weapon').toUpperCase())} · ${cur ? esc((st.mods.find(x => x.id === cur.id)?.name ?? '').toUpperCase()) + ' ' + ROMAN[cur.tier] : 'NO AMMO MOD'}</span></div>
+      <h3>TIERS</h3><ul>${(m.tiers ?? []).map((t, k) => `<li style="${k < tier ? `color:${m.color}` : ''}">${ROMAN[k + 1]} · ${esc(t)}</li>`).join('')}</ul>
+      <div class="note">* One mod per weapon. Swapping starts again at tier I. It stays on the gun through Pack-a-Punch.</div>`;
+    detail.querySelector('.buy').addEventListener('click', () => arBuy(m));
+    msg.textContent = arMsg[0] || (st.power ? '> HOVER A MOD · CLICK TO APPLY OR UPGRADE' : '> ACCESS DENIED · RESTORE MAINS POWER');
+    msg.className = 'msg ' + (arMsg[1] || (st.power ? '' : 'bad'));
+  }
+  function arBuy(m) {
+    const st = opts?.arsenal?.(); if (!st) return;
+    const on = st.mod?.id === m.id, r = on ? opts.upgradeMod?.() : opts.buyMod?.(m.id);
+    arMsg = r === true ? [on ? `${m.name.toUpperCase()} UPGRADED` : `${m.name.toUpperCase()} LOADED`, 'ok'] : [String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad'];
+    status(); drawArsenal();
+  }
   // ---- EXFIL.EXE --------------------------------------------------------------------------------------------
   const exfilStatus = () => opts?.exfil?.() ?? { available: false, reason: 'Exfil is not installed' };
   function drawExfil() {
@@ -269,7 +334,7 @@ function build() {
     const state = PERKS.map(p => blocked(p)).join() + opts.points();
     if (!win.hidden && state !== lastState) { renderGrid(); select(shown); }
     lastState = state;
-    drawExfil();
+    drawExfil(); drawArsenal();
   }
   function open(o) {
     opts = o; root.hidden = false; status(); clearInterval(clock); clock = setInterval(status, 250);
@@ -284,6 +349,7 @@ function build() {
   }
   root.querySelector('[data-app=perks]').addEventListener('click', () => openApp('perks'));
   root.querySelector('[data-app=exfil]').addEventListener('click', () => openApp('exfil'));
+  root.querySelector('[data-app=arsenal]').addEventListener('click', () => openApp('arsenal'));
   for (const b of root.querySelectorAll('[data-close]')) b.addEventListener('click', closeApp);
   root.querySelector('[data-logoff]').addEventListener('click', close);
   return { open, close, isOpen: () => !root.hidden };

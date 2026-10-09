@@ -1,0 +1,5 @@
+{
+  "name": "Ammo Mods",
+  "description": "Cold War / BO6 / BO7 ammo mods (Cryo Freeze, Napalm Burst, Dead Wire, Shatter Blast, Brain Rot) with tiers I–III, bought for the gun in hand at a terminal's ARSENAL app once the power is on.",
+  "script": "mod.js"
+}
