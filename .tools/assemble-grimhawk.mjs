@@ -53,8 +53,19 @@ function addRaw(out, w, bytes, acc, target) {
   out.accessors.push({ ...acc, bufferView: out.bufferViews.length - 1 }); return out.accessors.length - 1;
 }
 function copyMaterials(src, out, w) {
-  // the parts use plain factor materials (no textures)
-  out.materials = src.json.materials.map(m => structuredClone(m));
+  // materials with their textures (the baked atlas: base colour, ORM, normal), images embedded
+  const j = src.json;
+  out.samplers = structuredClone(j.samplers ?? []);
+  out.images = (j.images ?? []).map(im => {
+    const bv = j.bufferViews[im.bufferView], bytes = Buffer.from(src.bin.subarray(bv.byteOffset ?? 0, (bv.byteOffset ?? 0) + bv.byteLength));
+    out.bufferViews.push({ buffer: 0, byteOffset: w.push(bytes), byteLength: bytes.length });
+    return { name: im.name, mimeType: im.mimeType, bufferView: out.bufferViews.length - 1 };
+  });
+  out.textures = structuredClone(j.textures ?? []);
+  out.materials = j.materials.map(m => structuredClone(m));
+  if (j.extensionsUsed) out.extensionsUsed = [...j.extensionsUsed];
+  if (j.extensionsRequired) out.extensionsRequired = [...j.extensionsRequired];
+  for (const k of ['samplers', 'images', 'textures']) if (!out[k].length) delete out[k];
 }
 
 const parts = readGlb(partsPath), donor = readGlb(DONOR);

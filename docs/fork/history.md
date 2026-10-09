@@ -169,3 +169,4 @@
 - 2026-10-09: Grimhawk fires with its own sound (three takes cut from BO7 footage, git-ignored) at the footage's 0.094 s rate.
 - 2026-10-09: Grimhawk in the loadout (level 33, SPECIALS tab).
 - 2026-10-09: Grimhawk: no grenade launcher when Pack-a-Punched; Gunsmith opens for camos (`gunsmith: true` defs).
+- 2026-10-09: Grimhawk: rounded profiles, baked worn textures (one atlas), camos work.
