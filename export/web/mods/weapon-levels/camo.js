@@ -111,7 +111,7 @@ export function weaponClass(d){
   if(/mp40|mp5k|mpl|pm63|ak74u|spectre|g11/.test(b))return 'Submachine gun';return 'Rifle';
 }
 export const CLASSES=[['ar','ASSAULT RIFLES',['Rifle']],['smg','SMGS',['Submachine gun']],['shotgun','SHOTGUNS',['Shotgun']],['lmg','LMGS',['Light machine gun']],
-  ['sniper','SNIPERS',['Sniper rifle']],['pistol','PISTOLS',['Pistol']],['launcher','LAUNCHERS',['Launcher']],['special','SPECIALS',['Wonder weapon','Death Machine']]];
+  ['sniper','SNIPERS',['Sniper rifle']],['pistol','PISTOLS',['Pistol']],['launcher','LAUNCHERS',['Launcher']],['special','SPECIALS',['Wonder weapon','Death Machine','Special']]];   // Special: BO7's class (the Grimhawk)
 export const classOf=(weapons,id)=>{const d=weapons?.[id];return d?CLASSES.find(c=>c[2].includes(weaponClass(d)))?.[0]??'special':'special';};
 export const classLabel=key=>CLASSES.find(c=>c[0]===key)?.[1]??key;
 // the guns of a class that count toward Diamond (no Pack-a-Punch entries)
