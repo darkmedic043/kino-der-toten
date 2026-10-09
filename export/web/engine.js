@@ -150,6 +150,7 @@ function shoot(){
   view.shoot({ads:ads&&!session.def.dualWield,empty:session.weapon.mag===0,hand:session.def.dualWield&&session.shots%2?'left':'right'});audio.weapon('shot',session.def);muzzle.position.copy(camera.position);muzzle.intensity=160;camera.rotation.x=Math.min(1.48,camera.rotation.x+(ads?.008:.015));
   const forward=camera.getWorldDirection(new THREE.Vector3()),base=session.def.baseId??session.weapon.id;
   if(map.fire?.(session.def,forward))return true;   // a map's own weapons (Moon's Wave Gun / Zap Guns)
+  for(const f of mods.fireHooks??[])if(f(session.def,forward,{ads}))return true;   // a mod's own projectiles (bo7-weapons: the Grimhawk)
   if(base==='thundergun_zm'){
     for(const z of [...enemies.list]){const d=z.root.position.clone().add(new THREE.Vector3(0,40,0)).sub(camera.position);if(d.length()<600&&d.normalize().dot(forward)>.65&&world.lineClear(camera.position,z.root.position.clone().add(new THREE.Vector3(0,40,0))))enemies.hurt(z,100000,false,false,'thunder');}
     effect(camera.position.clone().addScaledVector(forward,100),0xb9d8e5,22);return true;

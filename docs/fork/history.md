@@ -165,3 +165,4 @@
 - 2026-10-08: The Giant: terminal booth in the start courtyard (under the mainframe platform) and eight exfil zones; booth placements can set `clearDebris:false` (props.md, gameplay.md).
 - 2026-10-08: Quick Revive costs 1500.
 - 2026-10-09: Exfil class XP doubled (10·R²); Mech nerfs: Repair Drones 0.2/rank, Berserker Core 0.25 s per kill (classes.md).
+- 2026-10-09: BO7 weapons rebuilt from reference (no ripping): the Grimhawk homing flechette rifle, modelled in Blender on the M16's skeleton so BO1 animations drive it; engine `mods.fireHooks` for mod projectiles (weapons.md).

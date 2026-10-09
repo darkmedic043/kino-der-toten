@@ -15,7 +15,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Performance measurements and load-time warm-ups | `performance.md` |
 | Health, HUD/hit sounds, zombie voices, music, cheat console, perks (PhD, Quick Revive), fall damage, exfil | `gameplay.md` |
 | Movement mod (crouch/prone/slide/mantle, BO7 omnimovement, dive, wall jump), first-person motion and mantle hand IK, stairs | `movement.md` |
-| Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs, BO3 imports (Greyhound, DG-2), weapon inspect | `weapons.md` |
+| Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs, BO3 imports (Greyhound, DG-2), weapon inspect, BO7 weapons rebuilt in Blender on BO1 skeletons (Grimhawk) | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby), friends and presence; the Rind launcher (`~/projects/rind`) uses the same sign-in and friends API | `coop.md` |
 | Props: terminal booth (Blender generator, bake, placement mod, MelonTerm desktop and its apps) | `props.md` |
 | Weapon levels, attachments (incl. mounted BO3 parts), camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound | `weapon-levels.md` |

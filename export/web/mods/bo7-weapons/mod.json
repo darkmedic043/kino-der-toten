@@ -1,0 +1,5 @@
+{
+  "name": "BO7 weapons",
+  "description": "Black Ops 7 weapons rebuilt from scratch (own models skinned to BO1 skeletons, so BO1 animations drive them): the Grimhawk, a homing flechette rifle, from the Mystery Box.",
+  "script": "mod.js"
+}
