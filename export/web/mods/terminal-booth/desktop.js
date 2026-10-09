@@ -9,7 +9,7 @@
 // Every perk in the game. Double-Dew (Cheese Cube) is left out for now, at the user's request.
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
 export const PERKS = [
-  { id: 'specialty_quickrevive', name: 'Quick Revive', price: 500, color: '#509ebc', badge: 'QR', icon: OWN + 'quickrevive.webp', fallback: TEX + 'specialty_quickrevive_zombies.png',
+  { id: 'specialty_quickrevive', name: 'Quick Revive', price: 1500, color: '#509ebc', badge: 'QR', icon: OWN + 'quickrevive.webp', fallback: TEX + 'specialty_quickrevive_zombies.png',
     blurb: 'Recover faster.',
     effects: ['Health starts coming back after 2 s instead of 4', 'Revive teammates twice as fast', 'Works without the power'],
     note: 'Cold War / Black Ops 6 rules: no self-revive in solo.' },

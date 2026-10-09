@@ -46,7 +46,7 @@
 - Tested (Kino): jump and 120 fall 0; 170 → 38 of 150; 330 → down; Moon spawn 170 → 36.
 
 ## Quick Revive, Cold War / BO6 rules (2026-10-08, user decision)
-- `rules.js`: no solo self-revive any more (a lethal hit is game over; co-op still downs you, `mods/multiplayer` no longer exempts QR), and health regen starts 2 s after damage instead of 4 with the perk (BO6: "health regen delay −50%, revive time −50%"; the co-op revive time was already halved). Price stays 500. The upstream test was rewritten (`test/rules.test.mjs`). `session.revives` no longer counts, so the "Quick Revive is depleted" checks never trigger.
+- `rules.js`: no solo self-revive any more (a lethal hit is game over; co-op still downs you, `mods/multiplayer` no longer exempts QR), and health regen starts 2 s after damage instead of 4 with the perk (BO6: "health regen delay −50%, revive time −50%"; the co-op revive time was already halved). Price 1500 (user decision, 2026-10-08; engine.js, moon-session.js, the terminal). The upstream test was rewritten (`test/rules.test.mjs`). `session.revives` no longer counts, so the "Quick Revive is depleted" checks never trigger.
 
 ## Exfil (2026-10-08, `mods/exfil`, after classes in mods.json)
 - Cold War style. Windows: the start of round 11, 16, 21 … (`exfilRound`: r ≥ 11 and (r − 11) % 5 = 0), open for that whole round (preparing + fighting), so it closes when the round ends. Called from the terminal booth's EXFIL app (`kino.exfil.start()`); a toast says when a window opens (only on maps with a booth).

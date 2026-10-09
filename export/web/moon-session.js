@@ -1,7 +1,7 @@
 import { Session, roundPopulation, makeWeapon } from './rules.js';
 
 export const MOON_PERKS = {
-  specialty_quickrevive:{name:'Quick Revive',price:500,color:'#64bad7',icon:'QR'},
+  specialty_quickrevive:{name:'Quick Revive',price:1500,color:'#64bad7',icon:'QR'},
   specialty_armorvest:{name:'Juggernog',price:2500,color:'#c84343',icon:'J'},
   specialty_fastreload:{name:'Speed Cola',price:3000,color:'#65bd76',icon:'SC'},
   specialty_rof:{name:'Double Tap',price:2000,color:'#d6a647',icon:'DT'},
