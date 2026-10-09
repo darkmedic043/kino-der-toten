@@ -161,3 +161,4 @@
 - 2026-10-08: MelonTerm is a floating window over the paused game, and its Perks app is now a shop for all eight perks on any map (power rule, drink, user-supplied Mule Kick/PhD icons also on the HUD); engine passes `shop`/`perkInfo` to mods (props.md).
 - 2026-10-08: MelonTerm no longer pauses the game (engine `mods.keepActive`); the shop refreshes live (props.md).
 - 2026-10-08: New icons for all perks (user's BOCW/BO6 art, also on the HUD); Quick Revive works as in Cold War/BO6 (no solo self-revive, regen after 2 s); exfil (`mods/exfil`, rounds 11/16/21…, called from the terminal's EXFIL app, 2:00 horde, XP 20·R² account + 5·R² class) (gameplay.md).
+- 2026-10-08: Exfil works in co-op (host runs it, anyone calls it, per-player verdict and XP) (gameplay.md).
