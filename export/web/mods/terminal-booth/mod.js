@@ -30,7 +30,7 @@ export default async function setup(api){
   const booths=[];
   for(const spot of spots)booths.push(build(await loadModel(BASE+(spot.model??'terminal_booth.glb')),spot));
   routeAround(booths);
-  for(const b of booths)clearDebris(b);
+  for(const b of booths)if(b.spot.clearDebris!==false)clearDebris(b);   // clearDebris:false where the floor itself is bumpy (The Giant's snow)
   window.kino.terminalBooth={booths};
   usePrompt(booths);
   window.kino.lighting?.tag?.(scene);

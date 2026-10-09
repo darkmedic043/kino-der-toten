@@ -3,8 +3,30 @@
   "lightIntensity": 700,
   "maps": {
     "kino": [
-      { "position": [-208, 82, 880], "yaw": 90, "model": "terminal_booth_compact.glb", "scale": 0.9,
-        "note": "lobby, the wall under the west staircase next to the arch; compact + 0.9 scale because the stair stringer is ~87 above the floor" }
+      {
+        "position": [
+          -208,
+          82,
+          880
+        ],
+        "yaw": 90,
+        "model": "terminal_booth_compact.glb",
+        "scale": 0.9,
+        "note": "lobby, the wall under the west staircase next to the arch; compact + 0.9 scale because the stair stringer is ~87 above the floor"
+      }
+    ],
+    "the-giant": [
+      {
+        "position": [
+          -190,
+          3,
+          -560
+        ],
+        "yaw": -90,
+        "model": "terminal_booth_compact.glb",
+        "note": "start area, the lower courtyard: the plain concrete wall under the mainframe platform's railing (compact: the railing is above); clearDebris false: the uneven snow floor counts as debris and got holes cut in it",
+        "clearDebris": false
+      }
     ]
   }
 }

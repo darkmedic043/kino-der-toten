@@ -1,10 +1,111 @@
 {
   "_doc": "Exfil landing zones per map id: {name, position} (game units; snapped to the navmesh). At call time the farthest one the player can reach is used. Maps without an entry use the player spawn.",
   "kino": [
-    { "name": "Theater", "position": [-29, 34, -326] },
-    { "name": "Alleyway", "position": [-1317, 7, -145] },
-    { "name": "Dining Hall", "position": [1212, 117, -315] },
-    { "name": "Crematorium", "position": [-1017, 94, 612] },
-    { "name": "Lobby", "position": [-101, 107, 1256] }
+    {
+      "name": "Theater",
+      "position": [
+        -29,
+        34,
+        -326
+      ]
+    },
+    {
+      "name": "Alleyway",
+      "position": [
+        -1317,
+        7,
+        -145
+      ]
+    },
+    {
+      "name": "Dining Hall",
+      "position": [
+        1212,
+        117,
+        -315
+      ]
+    },
+    {
+      "name": "Crematorium",
+      "position": [
+        -1017,
+        94,
+        612
+      ]
+    },
+    {
+      "name": "Lobby",
+      "position": [
+        -101,
+        107,
+        1256
+      ]
+    }
+  ],
+  "the-giant": [
+    {
+      "name": "Mainframe",
+      "position": [
+        -152,
+        95,
+        -316
+      ]
+    },
+    {
+      "name": "Courtyard",
+      "position": [
+        -156,
+        0,
+        164
+      ]
+    },
+    {
+      "name": "East Yard",
+      "position": [
+        744,
+        57,
+        -496
+      ]
+    },
+    {
+      "name": "West Yard",
+      "position": [
+        -756,
+        69,
+        524
+      ]
+    },
+    {
+      "name": "Power Room",
+      "position": [
+        264,
+        52,
+        1604
+      ]
+    },
+    {
+      "name": "South Teleporter",
+      "position": [
+        324,
+        159,
+        2984
+      ]
+    },
+    {
+      "name": "West Teleporter",
+      "position": [
+        -1656,
+        212,
+        1124
+      ]
+    },
+    {
+      "name": "East Teleporter",
+      "position": [
+        1224,
+        170,
+        -1096
+      ]
+    }
   ]
 }
