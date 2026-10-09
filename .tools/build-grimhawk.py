@@ -196,10 +196,14 @@ hg = prism([(12.4, 1.25), (21.6, 1.25), (21.6, 3.45), (12.4, 3.45)], -.82, .82)
 vents = []
 for i in range(4):
     for zc, ang in ((2.85, -.6), (1.95, .6)):
-        vents.append(oval(14.2 + i * 1.55, zc, .62, .32, ang, -1, 1))
-for x0 in (19.0, 20.0):
-    vents.append(boxbm(x0, x0 + .7, -1, 1, 2.75, 2.95))
+        vents.append(oval(15.3 + i * 1.45, zc, .6, .3, ang, -1, 1))
+vents.append(boxbm(20.6, 21.2, -1, 1, 2.75, 2.95))
 solid('handguard', hg, M['dark'], cuts=vents, bw=.1, seg=3)
+for s_ in (1, -1):   # the -/+ buttons on the handguard (video)
+    for k, x in enumerate((12.85, 13.85)):
+        solid(f'hgbtn{s_}{k}', prism(rrect_xz(x, x + .8, 2.15, 2.7, .2), s_ * .8, s_ * .9), M['poly'], bw=.03)
+        solid(f'hgsym{s_}{k}', boxbm(x + .25, x + .55, s_ * .89 - .02, s_ * .89 + .02, 2.4, 2.45), M['label'], bw=0)
+        if k: solid(f'hgsymv{s_}', boxbm(x + .375, x + .425, s_ * .89 - .02, s_ * .89 + .02, 2.28, 2.57), M['label'], bw=0)
 solid('hg_liner', prism([(12.5, 1.4), (21.5, 1.4), (21.5, 3.3), (12.5, 3.3)], -.6, .6), M['steel'], bw=.02)
 solid('rail_low', boxbm(13.2, 19.4, -.42, .42, 0.98, 1.27), M['dark'], bw=.03)
 for i in range(15):
@@ -221,8 +225,8 @@ solid('brake', brake, M['steel'], cuts=bcuts, bw=.04)
 solid('rail', boxbm(-3.9, 20.2, -.43, .43, 3.5, 3.72), M['dark'], bw=.03)
 for i in range(58):
     solid(f'rt{i}', boxbm(-3.8 + i * .41, -3.62 + i * .41, -.45, .45, 3.72, 3.8), M['steel'], bw=0)
-solid('rear_sight', prism([(-3.5, 3.78), (-2.5, 3.78), (-2.7, 4.35), (-3.3, 4.35)], -.42, .42), M['dark'],
-      cuts=[boxbm(-4, -2, -.12, .12, 4.1, 4.5)], bw=.04)
+hump = prism([(-4.2, 3.5), (-0.4, 3.5), (-0.4, 3.95), (-1.0, 4.35), (-3.6, 4.35), (-4.2, 4.0)], -.62, .62)
+solid('hump', hump, M['dark'], cuts=[boxbm(x0, x0 + .14, -1, 1, 4.15, 4.5) for x0 in (-3.2, -2.85, -2.5)], bw=.12, seg=3)
 # the rangefinder optic on a riser; its tube is bored along the M16's sight line (z 5.2, found from the ADS view),
 # with tinted glass front and back and a red dot on the front glass
 SIGHT = 5.2
@@ -240,17 +244,18 @@ solid('o_btn', boxbm(3.2, 3.8, -.88, -.78, 4.55, 4.8), M['red'], bw=.02)
 text('|| ||', .22, (3.5, -.84, 5.95), side=-1, m=M['steel'])
 
 # ---- the flechette magazine (tag_clip): a wide slab raked forward, ribbed, with the amber window
-mag = prism([(2.6, 1.15), (6.75, 1.15), (6.95, -0.2), (7.75, -3.2), (8.25, -5.9), (7.8, -6.45), (4.3, -6.6), (3.9, -6.1), (3.55, -3.3), (2.75, -0.2)], -.78, .78)
+mag = prism([(2.6, 1.15), (6.85, 1.15), (7.1, -0.3), (9.35, -2.3), (9.75, -4.9), (9.3, -5.45), (4.0, -5.6), (3.35, -5.0), (2.75, -0.4)], -.7, .7)
 mcuts = []
-for z in (-1.0, -2.2, -3.4):
-    for s in (1, -1):
-        mcuts.append(prism([(3.4, z), (6.6, z + .05), (6.85 + (z + 1) * -.15, z - .55), (3.6, z - .6)], s * .66 if s > 0 else -.9, .9 if s > 0 else -.66))
-solid('mag', mag, M['poly'], part='tag_clip', cuts=mcuts, bw=.1, seg=3)
-for s in (1, -1):
-    win = prism([(6.95, -0.35), (7.2, -0.35), (8.0, -5.6), (7.75, -5.65)], s * .74, s * .8)
-    solid(f'mag_win{s}', win, M['amber'], part='tag_clip', bw=0)
-    text('^', .7, (4.9, s * .79, -5.2), part='tag_clip', side=s, m=M['label'])
-solid('mag_base', prism([(4.2, -6.5), (7.9, -6.35), (8.1, -6.85), (4.1, -7.0)], -.84, .84), M['rubber'], part='tag_clip', bw=.06)
+for s_ in (1, -1):   # two recessed panels a side, as on the video's magazine
+    y0, y1 = (.6, .9) if s_ > 0 else (-.9, -.6)
+    mcuts.append(prism([(3.6, -0.6), (6.6, -0.6), (8.1, -2.0), (8.2, -2.6), (3.75, -2.6)], y0, y1))
+    mcuts.append(prism([(3.85, -3.0), (8.5, -3.0), (8.8, -4.85), (4.0, -4.85)], y0, y1))
+solid('mag', mag, M['poly'], part='tag_clip', cuts=mcuts, bw=.08, seg=3)
+for s_ in (1, -1):
+    win = prism([(7.25, -0.45), (9.35, -2.35), (9.55, -4.6), (9.4, -4.6), (9.2, -2.45), (7.15, -0.6)], s_ * .62, s_ * .71)
+    solid(f'mag_win{s_}', win, M['amber'], part='tag_clip', bw=0)
+    text('V', .75, (7.0, s_ * .63, -3.9), part='tag_clip', side=s_, m=M['label'])
+solid('mag_base', prism([(3.9, -5.5), (9.35, -5.35), (9.45, -5.85), (3.8, -6.0)], -.76, .76), M['rubber'], part='tag_clip', bw=.06)
 
 # ---- charging handle (j_charging_handle)
 ch = prism([(-2.7, 3.5), (-1.1, 3.5), (-1.2, 3.82), (-2.5, 3.82)], -.95, .95)

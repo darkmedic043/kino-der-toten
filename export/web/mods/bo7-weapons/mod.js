@@ -19,7 +19,7 @@ const SPEED = 2600, DROP = 520, LIFE = 2.2, TURN = 3.2, CONE = Math.cos(THREE.Ma
 export function prepare(data) {
   const m16 = data.weapons.m16_zm;
   if (!m16) { console.warn('[bo7-weapons] no M16 to build the Grimhawk on'); return; }
-  const model = BASE + 'grimhawk_view.glb?v=5', world = BASE + 'grimhawk_world.glb?v=5';   // own models (not under models/: Rind installs them)
+  const model = BASE + 'grimhawk_view.glb?v=6', world = BASE + 'grimhawk_world.glb?v=6';   // own models (not under models/: Rind installs them)
   const base = structuredClone(m16);
   const gun = Object.assign(base, {
     id: ID, name: 'Grimhawk', price: 1500, clipSize: 25, startAmmo: 125, maxAmmo: 225,
