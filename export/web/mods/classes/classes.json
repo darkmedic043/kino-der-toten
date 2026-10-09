@@ -2018,7 +2018,7 @@
               "icon": "heart",
               "desc": "After 3s without a hit, the mech repairs itself: the integrity bar drains {v}s a second slower.",
               "effects": {
-                "mech.regen": 0.15
+                "mech.regen": 0.2
               },
               "fmt": "s",
               "tier": 5
