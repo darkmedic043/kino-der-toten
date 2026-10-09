@@ -163,7 +163,7 @@ export function applyAttachments(cat,weapons,profile){
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 export function renderGunsmith(el,{cat,def,id,profile,onChange,onOpen,compact=false}){
   const all=available(cat,def,id);
-  if(!all.length){el.innerHTML=compact?'':'<div class="gunsmith"><span class="eyebrow">GUNSMITH</span><p class="muted">No attachments for this weapon.</p></div>';return;}
+  if(!all.length&&def.gunsmith!==true){el.innerHTML=compact?'':'<div class="gunsmith"><span class="eyebrow">GUNSMITH</span><p class="muted">No attachments for this weapon.</p></div>';return;}   // gunsmith:true opens it for camos alone
   const p=weaponProgress(profile,id),cap=maxLevel(cat,def,id),need=xpToNext(cat,p.level),on=new Set(equipped(cat,def,id,profile));
   const unlocked=new Set(unlockedAttachments(cat,def,id,profile).map(a=>a.id));
   el.innerHTML=`<div class="gunsmith${compact?' compact':''}">
@@ -173,7 +173,7 @@ export function renderGunsmith(el,{cat,def,id,profile,onChange,onOpen,compact=fa
     <div class="gs-eq">${Object.keys(cat.slots).filter(s=>all.some(a=>a.slot===s)).map(s=>{const a=all.find(x=>x.slot===s&&on.has(x.id));
       return `<span><i>${esc(cat.slots[s].toUpperCase())}</i>${a?esc(a.name):'—'}</span>`;}).join('')}</div>
     <button class="gs-open">OPEN GUNSMITH  ›</button>
-    <small class="muted">${unlocked.size} / ${all.length} attachments unlocked</small></div>`;
+    <small class="muted">${all.length?`${unlocked.size} / ${all.length} attachments unlocked`:'Camos only'}</small></div>`;
   el.querySelector('.gs-open').addEventListener('click',e=>{e.stopPropagation();onOpen?.();});
 }
 

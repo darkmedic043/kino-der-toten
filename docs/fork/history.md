@@ -168,3 +168,4 @@
 - 2026-10-09: BO7 weapons rebuilt from reference (no ripping): the Grimhawk homing flechette rifle, modelled in Blender on the M16's skeleton so BO1 animations drive it; engine `mods.fireHooks` for mod projectiles (weapons.md).
 - 2026-10-09: Grimhawk fires with its own sound (three takes cut from BO7 footage, git-ignored) at the footage's 0.094 s rate.
 - 2026-10-09: Grimhawk in the loadout (level 33, SPECIALS tab).
+- 2026-10-09: Grimhawk: no grenade launcher when Pack-a-Punched; Gunsmith opens for camos (`gunsmith: true` defs).

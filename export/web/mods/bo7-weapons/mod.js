@@ -25,12 +25,14 @@ export function prepare(data) {
     id: ID, name: 'Grimhawk', price: 1500, clipSize: 25, startAmmo: 125, maxAmmo: 225,
     damage: 190, minDamage: 150, range: 3000, fireTime: .094,   // 0.092-0.096 s between shots in BO7 footage headMultiplier: 3.5, hipSpread: .016,
     automatic: true, fireType: 'Full Auto', pellets: 1, hideTags: [], model, worldModel: world, adsFov: 48,
-    flechette: true, soundAs: 'g11_lps_zm', weaponClass: 'Special',   // BO7's Specials class (the loadout's SPECIALS tab)
+    flechette: true, soundAs: 'g11_lps_zm', weaponClass: 'Special', gunsmith: true,   // gunsmith: camos, though it has no attachments yet   // BO7's Specials class (the loadout's SPECIALS tab)
   });
   gun.upgrade = Object.assign(structuredClone(m16.upgrade ?? {}), {
     name: 'Grim Reaper', clipSize: 35, startAmmo: 280, maxAmmo: 280, damage: 340, minDamage: 260, range: 3600, fireTime: .08,
     headMultiplier: 4, hideTags: [], model, worldModel: world, animations: structuredClone(m16.animations), automatic: true, fireType: 'Full Auto', pellets: 1,
   });
+  delete gun.upgrade.attachment;   // the M16's Pack-a-Punch carries an M203 grenade launcher (the Skullcrusher's); not the Grim Reaper's
+  for (const k of ['projectileType', 'projectileModel']) delete gun.upgrade[k];
   data.weapons[ID] = gun;
   data.boxPool = [...new Set([...(data.boxPool ?? []), ID])];
 }

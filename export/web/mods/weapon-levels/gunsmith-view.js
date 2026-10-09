@@ -101,7 +101,7 @@ const CSS=`
 export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,label}){
   if(!document.getElementById('gsv-css')){const st=document.createElement('style');st.id='gsv-css';st.textContent=CSS;document.head.append(st);}
   const cats=await loadCamos().catch(()=>null);
-  const list=(ids??Object.keys(weapons)).filter(w=>weapons[w]&&available(cat,weapons[w],w).length);
+  const list=(ids??Object.keys(weapons)).filter(w=>weapons[w]&&(weapons[w].gunsmith===true||available(cat,weapons[w],w).length));   // gunsmith:true: camos only
   if(!list.includes(id))id=list[0];
   const single=list.length<2;
   const root=document.createElement('div');root.id='gsv';
