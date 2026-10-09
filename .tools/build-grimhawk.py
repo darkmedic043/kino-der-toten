@@ -13,7 +13,11 @@ RENDER = argv[argv.index('--render') + 1] if '--render' in argv else None
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 COL = bpy.context.scene.collection
-PARTS = {'j_gun': [], 'tag_clip': [], 'j_charging_handle': []}
+# part -> bone. Attachments sit on their own bones, hidden by tag until fitted (the BO1 way: weapon-levels shows a
+# catalog entry's tags). Bones the M16 skeleton lacks are added by .tools/assemble-grimhawk.mjs (NEW_BONES there).
+PARTS = {'j_gun': [], 'tag_clip': [], 'j_charging_handle': [], 'tag_iron_sight': [], 'tag_gh_barrel': [],
+         'tag_gh_rangefinder': [], 'tag_gh_hawkeye': [], 'tag_gh_expanse': [], 'tag_suppressor': [],
+         'tag_gh_longbarrel': [], 'tag_foregrip': [], 'tag_laser_box': []}
 
 
 def srgb(h):
@@ -292,16 +296,16 @@ for i in range(15):
     solid(f'rlt{i}', boxbm(13.3 + i * .41, 13.5 + i * .41, -.44, .44, 0.95, 1.0), M['steel'], bw=0)
 front = prism(fillet([(21.5, 1.55), (25.0, 1.55), (25.0, 3.05), (24.2, 3.9), (21.5, 3.9)], 0.3), -.72, .72)
 solid('front_block', front, M['dark'], cuts=[boxbm(22.2, 23.6, -1, 1, 3.05, 3.4)], bw=.14, seg=3)
-solid('front_sight', prism(fillet([(21.7, 3.85), (22.8, 3.85), (22.6, 4.45), (22.0, 4.45)], 0.12), -.3, .3), M['dark'], bw=.04)
+solid('front_sight_base', prism(fillet([(21.7, 3.85), (22.8, 3.85), (22.6, 4.45), (22.0, 4.45)], 0.12), -.3, .3), M['dark'], bw=.04)
 solid('light', cylbm(.3, 23.6, 24.9, 1.95, y=-.62, seg=16), M['dark'], bw=.03)
 solid('light_lens', cylbm(.22, 24.88, 24.95, 1.95, y=-.62, seg=16), M['lens'], bw=0)
 for s in (1, -1):
     solid(f'knob{s}', screw(23.1, s * .76, 2.4, r=.26, depth=.16), M['steel'], bw=.02)
-solid('barrel', cylbm(.32, 24.9, 28.0, 2.4, seg=20), M['steel'], bw=.02)
-solid('gas', cylbm(.45, 24.9, 25.8, 2.4, seg=20), M['steel'], bw=.03)
+solid('barrel', cylbm(.32, 24.9, 28.0, 2.4, seg=20), M['steel'], part='tag_gh_barrel', bw=.02)
+solid('gas', cylbm(.45, 24.9, 25.8, 2.4, seg=20), M['steel'], part='tag_gh_barrel', bw=.03)
 brake = cylbm(.55, 27.6, 30.2, 2.4, seg=24)
 bcuts = [boxbm(x0, x0 + .32, -1, 1, 2.1, 2.7) for x0 in (28.1, 28.7, 29.3)] + [cylbm(.25, 30.0, 30.4, 2.4)]
-solid('brake', brake, M['steel'], cuts=bcuts, bw=.04)
+solid('brake', brake, M['steel'], part='tag_gh_barrel', cuts=bcuts, bw=.04)
 
 # ---- top rail (teeth), rear flip sight, the rangefinder optic
 solid('rail', boxbm(-3.9, 20.2, -.43, .43, 3.5, 3.72), M['dark'], bw=.03)
@@ -312,18 +316,18 @@ solid('hump', hump, M['dark'], cuts=[boxbm(x0, x0 + .14, -1, 1, 4.15, 4.5) for x
 # the rangefinder optic on a riser; its tube is bored along the M16's sight line (z 5.2, found from the ADS view),
 # with tinted glass front and back and a red dot on the front glass
 SIGHT = 5.2
-solid('riser', boxbm(2.2, 4.2, -.5, .5, 3.78, 4.35), M['dark'], bw=.04)
+solid('riser', boxbm(2.2, 4.2, -.5, .5, 3.78, 4.35), M['dark'], bw=.04, part='tag_gh_rangefinder')
 opt = prism(fillet([(2.5, 4.3), (4.6, 4.3), (4.6, 5.95), (4.25, 6.3), (2.85, 6.3), (2.5, 5.95)], 0.25), -.82, .82)
 ocuts = [cylbm(.68, -.5, 5.5, SIGHT, seg=32), cylbm(.16, 4.3, 5.0, 4.5, y=.55)]
-solid('optic', opt, M['dark'], cuts=ocuts, bw=.12, seg=3)
-solid('o_hood', cylbm(.8, 4.55, 5.2, SIGHT, seg=32), M['dark'], cuts=[cylbm(.68, 4.4, 5.4, SIGHT, seg=32)], bw=.03)
+solid('optic', opt, M['dark'], cuts=ocuts, bw=.12, seg=3, part='tag_gh_rangefinder')
+solid('o_hood', cylbm(.8, 4.55, 5.2, SIGHT, seg=32), M['dark'], cuts=[cylbm(.68, 4.4, 5.4, SIGHT, seg=32)], bw=.03, part='tag_gh_rangefinder')
 for x in (4.5, 2.62):
-    solid(f'oglass{x}', cylbm(.68, x - .01, x + .01, SIGHT, seg=32), M['glass'], bw=0)
-solid('o_dot', cylbm(.045, 4.47, 4.49, SIGHT, seg=10), M['dot'], bw=0)
-solid('o_emitter', cylbm(.13, 4.58, 4.62, 4.5, y=.55, seg=14), M['lens'], bw=0)
-solid('o_knob', screw(3.4, .86, 5.2, r=.22, depth=.16), M['steel'], bw=.02)
-solid('o_btn', boxbm(3.2, 3.8, -.88, -.78, 4.55, 4.8), M['red'], bw=.02)
-text('|| ||', .22, (3.5, -.84, 5.95), side=-1, m=M['steel'])
+    solid(f'oglass{x}', cylbm(.68, x - .01, x + .01, SIGHT, seg=32), M['glass'], bw=0, part='tag_gh_rangefinder')
+solid('o_dot', cylbm(.045, 4.47, 4.49, SIGHT, seg=10), M['dot'], bw=0, part='tag_gh_rangefinder')
+solid('o_emitter', cylbm(.13, 4.58, 4.62, 4.5, y=.55, seg=14), M['lens'], bw=0, part='tag_gh_rangefinder')
+solid('o_knob', screw(3.4, .86, 5.2, r=.22, depth=.16), M['steel'], bw=.02, part='tag_gh_rangefinder')
+solid('o_btn', boxbm(3.2, 3.8, -.88, -.78, 4.55, 4.8), M['red'], bw=.02, part='tag_gh_rangefinder')
+text('|| ||', .22, (3.5, -.84, 5.95), side=-1, m=M['steel'], part='tag_gh_rangefinder')
 
 # ---- the flechette magazine (tag_clip): a wide slab raked forward, ribbed, with the amber window
 mag = prism(fillet([(2.6, 1.15), (6.85, 1.15), (7.1, -0.3), (9.35, -2.3), (9.75, -4.9), (9.3, -5.45), (4.0, -5.6), (3.35, -5.0), (2.75, -0.4)], 0.35), -.7, .7)
@@ -338,6 +342,75 @@ for s_ in (1, -1):
     solid(f'mag_win{s_}', win, M['amber'], part='tag_clip', bw=0)
     text('V', .75, (7.0, s_ * .63, -3.9), part='tag_clip', side=s_, m=M['label'])
 solid('mag_base', prism(fillet([(3.9, -5.5), (9.35, -5.35), (9.45, -5.85), (3.8, -6.0)], 0.2), -.76, .76), M['rubber'], part='tag_clip', bw=.06)
+
+
+# ---- attachments (each on its own bone) ---------------------------------------------------------------------------
+# stock iron sights on the M16 ADS line (z SIGHT): a front post with ears on the front block, a rear aperture on the hump.
+# attachments.json ironSights folds them away when an optic is fitted.
+IS = 'tag_iron_sight'
+solid('fpost', prism(fillet([(22.15, 4.4), (22.55, 4.4), (22.45, SIGHT - .02), (22.25, SIGHT - .02)], .05), -.06, .06), M['dark'], part=IS, bw=.01)
+for s_ in (1, -1):
+    solid(f'fear{s_}', prism(fillet([(21.95, 4.4), (22.75, 4.4), (22.65, SIGHT + .25), (22.1, SIGHT + .25)], .08), s_ * .2, s_ * .32), M['dark'], part=IS, bw=.02)
+# rear: a thin ghost ring on a slim post (it sits right by the eye, so anything chunky fills the aimed view)
+solid('rear_post', prism(fillet([(-2.35, 4.25), (-2.05, 4.25), (-2.12, SIGHT - .3), (-2.28, SIGHT - .3)], .05), -.07, .07), M['dark'], part=IS, bw=.01)
+solid('rear_ring', cylbm(.34, -2.27, -2.13, SIGHT, seg=32), M['dark'], part=IS, cuts=[cylbm(.29, -2.5, -1.9, SIGHT, seg=32)], bw=.01)
+solid('rear_base', boxbm(-2.6, -1.8, -.3, .3, 4.25, 4.45), M['dark'], part=IS, bw=.04)
+
+# Hawkeye 3x scope (custom): a slim tube with bells, two rings, a turret
+HK = 'tag_gh_hawkeye'
+solid('hk_tube', cylbm(.5, 0.0, 5.0, SIGHT, seg=28), M['dark'], part=HK, cuts=[cylbm(.42, -1, 7, SIGHT, seg=28)], bw=.03)
+solid('hk_eye', cylbm(.72, -1.6, 0.2, SIGHT, seg=28, r2=.52), M['dark'], part=HK, cuts=[cylbm(.6, -2, .4, SIGHT, seg=28)], bw=.04)
+solid('hk_obj', cylbm(.6, 4.8, 6.8, SIGHT, seg=28, r2=.8), M['dark'], part=HK, cuts=[cylbm(.7, 6.3, 7.2, SIGHT, seg=28), cylbm(.45, 4.6, 7, SIGHT, seg=28)], bw=.04)
+for x in (-1.5, 6.7):
+    solid(f'hk_glass{x}', cylbm(.62 if x < 0 else .72, x - .01, x + .01, SIGHT, seg=28), M['glass'], part=HK, bw=0)
+for x in (0.6, 3.9):
+    solid(f'hk_ring{x}', cylbm(.62, x, x + .55, SIGHT, seg=28), M['steel'], part=HK, cuts=[cylbm(.5, x - .2, x + .8, SIGHT, seg=28)], bw=.02)
+    solid(f'hk_mount{x}', boxbm(x, x + .55, -.28, .28, 3.72, SIGHT - .55), M['steel'], part=HK, bw=.03)
+tur = bmesh.new(); bmesh.ops.create_cone(tur, cap_ends=True, segments=18, radius1=.3, radius2=.3, depth=.4); tur.transform(Matrix.Translation((2.3, 0, SIGHT + .62)))
+solid('hk_turret', tur, M['steel'], part=HK, bw=.03)
+solid('hk_band', cylbm(.53, 2.0, 2.6, SIGHT, seg=28), M['silver'], part=HK, bw=.02)
+
+# P.T. Expanse mag (BO7): a fan-shaped drum hung from the magwell, grid face, amber arc window
+EX = 'tag_gh_expanse'
+cx, cz, rad = 4.7, 0.6, 6.0
+fan = [(2.6, 1.15), (6.85, 1.15)] + [(cx + rad * math.cos(math.radians(a)), cz + rad * math.sin(math.radians(a))) for a in range(-35, -146, -10)]
+solid('ex_body', prism(fillet(fan, .3), -.82, .82), M['poly'], part=EX,
+      cuts=[boxbm(cx - 3.6 + i * 1.0, cx - 3.1 + i * 1.0, s_ * .7, s_ * .95, -3.9 + j * 1.0, -3.4 + j * 1.0) for i in range(7) for j in range(3) for s_ in (1, -1)
+            if math.hypot(cx - 3.35 + i * 1.0 - cx, -3.65 + j * 1.0 - cz) < rad - .9], bw=.14, seg=3)
+arc = [(cx + (rad - .25) * math.cos(math.radians(a)), cz + (rad - .25) * math.sin(math.radians(a))) for a in range(-40, -141, -10)]
+arc += [(cx + (rad - .55) * math.cos(math.radians(a)), cz + (rad - .55) * math.sin(math.radians(a))) for a in range(-140, -39, 10)]
+for s_ in (1, -1):
+    solid(f'ex_win{s_}', prism(arc, s_ * .78, s_ * .86), M['amber'], part=EX, bw=0)
+    text('P.T. EXPANSE', .3, (cx, s_ * .84, -1.3), part=EX, side=s_, m=M['label'])
+
+# suppressor: a ribbed can over the brake
+SU = 'tag_suppressor'
+solid('su_can', cylbm(.78, 27.4, 35.6, 2.4, seg=28), M['dark'], part=SU, bw=.08, seg=3)
+for x in (29.0, 30.2, 31.4, 32.6, 33.8):
+    solid(f'su_rib{x}', cylbm(.81, x, x + .22, 2.4, seg=28), M['steel'], part=SU, bw=.02)
+solid('su_cap', cylbm(.7, 35.55, 35.8, 2.4, seg=28), M['steel'], part=SU, cuts=[cylbm(.2, 35.4, 36, 2.4)], bw=.05)
+
+# Long Barrel (BO7 prestige): a longer barrel and shroud with its own brake (replaces tag_gh_barrel)
+LB = 'tag_gh_longbarrel'
+solid('lb_barrel', cylbm(.34, 24.9, 32.0, 2.4, seg=20), M['steel'], part=LB, bw=.02)
+solid('lb_gas', cylbm(.48, 24.9, 26.0, 2.4, seg=20), M['steel'], part=LB, bw=.03)
+shroud = prism(fillet([(25.0, 1.75), (30.4, 1.75), (30.8, 2.4), (30.4, 3.05), (25.0, 3.05)], .2), -.6, .6)
+solid('lb_shroud', shroud, M['dark'], part=LB, cuts=[oval(26.2 + i * 1.1, 2.4, .6, .3, 0, -1, 1) for i in range(4)], bw=.1, seg=3)
+lbrake = cylbm(.58, 31.6, 34.4, 2.4, seg=24)
+solid('lb_brake', lbrake, M['steel'], part=LB, cuts=[boxbm(x0, x0 + .34, -1, 1, 2.1, 2.7) for x0 in (32.1, 32.75, 33.4)] + [cylbm(.25, 34.2, 34.6, 2.4)], bw=.04)
+
+# foregrip: a vertical grip on the lower rail
+FG = 'tag_foregrip'
+solid('fg_clamp', boxbm(15.2, 17.2, -.5, .5, 0.6, 1.05), M['dark'], part=FG, bw=.06)
+solid('fg_grip', prism(fillet([(15.5, 0.65), (16.9, 0.65), (16.75, -2.6), (15.75, -2.75)], .35), -.5, .5), M['poly'], part=FG,
+      cuts=[boxbm(16.85, 17.4, -.6, .6, z - .06, z + .06) for z in (-0.4, -1.0, -1.6, -2.2)], bw=.2, seg=4)   # finger grooves at the front
+
+# laser: a box on the handguard's right side with a red emitter
+LS = 'tag_laser_box'
+solid('ls_mount', boxbm(18.0, 20.4, -.98, -.8, 2.05, 2.85), M['dark'], part=LS, bw=.04)
+solid('ls_box', prism(fillet([(17.8, 1.95), (20.8, 1.95), (20.8, 2.95), (17.8, 2.95)], .2), -1.55, -.95), M['dark'], part=LS, bw=.08, seg=3)
+solid('ls_lens', cylbm(.2, 20.78, 20.84, 2.45, y=-1.25, seg=16), M['red'], part=LS, bw=0)
+solid('ls_btn', boxbm(18.4, 19.0, -1.6, -1.52, 2.3, 2.6), M['red'], part=LS, bw=.02)
 
 # ---- charging handle (j_charging_handle)
 ch = prism(fillet([(-2.7, 3.5), (-1.1, 3.5), (-1.2, 3.82), (-2.5, 3.82)], 0.12), -.95, .95)

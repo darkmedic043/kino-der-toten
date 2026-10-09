@@ -14,22 +14,25 @@ import * as THREE from 'three';
 
 const BASE = new URL('./', import.meta.url).href;
 const ID = 'grimhawk_zm';
+// every attachment part, hidden until fitted (weapon-levels attachments.json: gh_rangefinder, gh_expanse, gh_hawkeye,
+// gh_longbarrel, and the shared suppressor, grip and laser)
+const ATTACHMENT_TAGS = ['tag_gh_rangefinder', 'tag_gh_hawkeye', 'tag_gh_expanse', 'tag_suppressor', 'tag_gh_longbarrel', 'tag_foregrip', 'tag_laser_box'];
 const SPEED = 2600, DROP = 520, LIFE = 2.2, TURN = 3.2, CONE = Math.cos(THREE.MathUtils.degToRad(16)), REACH = 1800, MAX = 60;
 
 export function prepare(data) {
   const m16 = data.weapons.m16_zm;
   if (!m16) { console.warn('[bo7-weapons] no M16 to build the Grimhawk on'); return; }
-  const model = BASE + 'grimhawk_view.glb?v=7', world = BASE + 'grimhawk_world.glb?v=7';   // own models (not under models/: Rind installs them)
+  const model = BASE + 'grimhawk_view.glb?v=9', world = BASE + 'grimhawk_world.glb?v=9';   // own models (not under models/: Rind installs them)
   const base = structuredClone(m16);
   const gun = Object.assign(base, {
     id: ID, name: 'Grimhawk', price: 1500, clipSize: 25, startAmmo: 125, maxAmmo: 225,
     damage: 190, minDamage: 150, range: 3000, fireTime: .094,   // 0.092-0.096 s between shots in BO7 footage headMultiplier: 3.5, hipSpread: .016,
-    automatic: true, fireType: 'Full Auto', pellets: 1, hideTags: [], model, worldModel: world, adsFov: 48,
+    automatic: true, fireType: 'Full Auto', pellets: 1, hideTags: [...ATTACHMENT_TAGS], model, worldModel: world, adsFov: 48,
     flechette: true, soundAs: 'g11_lps_zm', weaponClass: 'Special', gunsmith: true,   // gunsmith: camos, though it has no attachments yet   // BO7's Specials class (the loadout's SPECIALS tab)
   });
   gun.upgrade = Object.assign(structuredClone(m16.upgrade ?? {}), {
     name: 'Grim Reaper', clipSize: 35, startAmmo: 280, maxAmmo: 280, damage: 340, minDamage: 260, range: 3600, fireTime: .08,
-    headMultiplier: 4, hideTags: [], model, worldModel: world, animations: structuredClone(m16.animations), automatic: true, fireType: 'Full Auto', pellets: 1,
+    headMultiplier: 4, hideTags: [...ATTACHMENT_TAGS], model, worldModel: world, animations: structuredClone(m16.animations), automatic: true, fireType: 'Full Auto', pellets: 1,
   });
   delete gun.upgrade.attachment;   // the M16's Pack-a-Punch carries an M203 grenade launcher (the Skullcrusher's); not the Grim Reaper's
   for (const k of ['projectileType', 'projectileModel']) delete gun.upgrade[k];
@@ -74,7 +77,8 @@ export default function setup(api) {
   };
   function launch(def, forward, { ads }) {
     if (!isGrim(def)) return false;
-    const pap = !!def.upgraded, dir = forward.clone();
+    // homing: aimed shots; the Long Barrel moves it to the hip (BO7's prestige barrel); Pack-a-Punched: both
+    const pap = !!def.upgraded, dir = forward.clone(), longBarrel = String(def.attachments ?? '').split('+').includes('gh_longbarrel');
     if (!ads) { const s = (def.hipSpread ?? .016) * (session.perks.has('specialty_deadshot') ? .5 : 1); dir.x += (Math.random() - .5) * s; dir.y += (Math.random() - .5) * s; dir.z += (Math.random() - .5) * s; dir.normalize(); }
     // start at the eye so close shots still land where the crosshair is; drawn from the muzzle
     const mesh = new THREE.Mesh(needleGeo, needleMat); mesh.frustumCulled = false;
@@ -82,7 +86,7 @@ export default function setup(api) {
     const trailGeo = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 6 }, () => muzzle()));
     const trail = new THREE.Line(trailGeo, trailMat); trail.frustumCulled = false;
     scene.add(mesh, trail);
-    const p = { pos: camera.position.clone(), vel: dir.multiplyScalar(pap ? SPEED * 1.35 : SPEED), life: LIFE, mesh, trail, homes: ads || pap, pap, def,
+    const p = { pos: camera.position.clone(), vel: dir.multiplyScalar(pap ? SPEED * 1.35 : SPEED), life: LIFE, mesh, trail, homes: pap || (longBarrel ? !ads : ads), pap, def,
       drawFrom: muzzle(), blend: 0, target: null, scan: 0, hist: [] };
     if (live.length >= MAX) kill(live.shift());
     live.push(p); return true;

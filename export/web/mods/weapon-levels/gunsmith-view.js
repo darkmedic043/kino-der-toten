@@ -12,7 +12,7 @@ import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress } from './camo.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef } from './gunsmith.js';
 
-const SLOT_ORDER=['optic','muzzle','mag','under'];
+const SLOT_ORDER=['optic','muzzle','mag','under','laser'];
 const ANCHORS={optic:['tag_scope_rail','tag_flatrail','tag_iron_sights','tag_iron_sight','tag_elbit','tag_aimpoint','tag_scope_colt'],
   muzzle:['tag_suppressor','tag_silencer','tag_flash'],mag:['tag_clip','tag_ext_clip','tag_extended_clip'],
   under:['tag_foregrip','tag_grenade_launcher','tag_m203','tag_flame_unit','tag_masterkey','tag_grip']};
@@ -134,7 +134,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   const attachmentTags=new Set(Object.values(weapons).flatMap(d=>d?.hideTags??[]));
 
   function tagsFor(ids){const d=previewDef(cat,def,id,ids);return new Set(d.hideTags??[]);}
-  const MAG_TAGS=['tag_ext_clip','tag_extended_clip','tag_clip_extended','tag_dual_clip','tag_double_clip','tag_duel_clip','tag_drum','tag_ammo_expander'];
+  const MAG_TAGS=['tag_ext_clip','tag_extended_clip','tag_clip_extended','tag_dual_clip','tag_double_clip','tag_duel_clip','tag_drum','tag_ammo_expander','tag_gh_expanse'];   // tag_gh_expanse: the Grimhawk's P.T. Expanse
   function domBone(o){const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight;if(!o.isSkinnedMesh||!si||!sw)return null;
     const i=g.index?g.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}return o.skeleton.bones[best];}
   function showParts(ids){

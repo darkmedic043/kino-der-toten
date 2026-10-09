@@ -28,6 +28,32 @@
   ],
   "attachments": [
     {
+      "id": "gh_rangefinder",
+      "name": "Rangefinder Optic",
+      "slot": "optic",
+      "tags": [
+        "tag_gh_rangefinder"
+      ],
+      "scope": "reflex",
+      "desc": "The Grimhawk's boxy rangefinder: a red dot in a short tube. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.9
+      }
+    },
+    {
+      "id": "gh_expanse",
+      "name": "P.T. Expanse Mag",
+      "slot": "mag",
+      "tags": [
+        "tag_gh_expanse"
+      ],
+      "desc": "A fan-shaped flechette drum: 35 rounds, a little slower to reload.",
+      "stats": {
+        "clipMul": 1.4,
+        "reloadMul": 1.1
+      }
+    },
+    {
       "id": "reflex",
       "name": "Reflex Sight",
       "slot": "optic",
@@ -269,6 +295,35 @@
       "stats": {
         "hipSpreadMul": 0.65
       }
+    },
+    {
+      "id": "gh_hawkeye",
+      "name": "Hawkeye 3× Scope",
+      "slot": "optic",
+      "tags": [
+        "tag_gh_hawkeye"
+      ],
+      "scope": "acog",
+      "desc": "A long-eye scope for picking out targets for the flechettes. +20% headshot damage.",
+      "stats": {
+        "adsFov": 32,
+        "headMul": 1.2
+      }
+    },
+    {
+      "id": "gh_longbarrel",
+      "name": "Long Barrel",
+      "slot": "muzzle",
+      "tags": [
+        "tag_gh_longbarrel"
+      ],
+      "replaces": [
+        "tag_gh_barrel"
+      ],
+      "desc": "BO7's prestige barrel: rounds home from the hip instead of when aiming. +25% range.",
+      "stats": {
+        "rangeMul": 1.25
+      }
     }
   ],
   "ironSights": {
@@ -316,6 +371,9 @@
     ],
     "bo3_m1014_jellyfish": [
       "tag_up"
+    ],
+    "grimhawk_zm": [
+      "tag_iron_sight"
     ]
   },
   "_ironSightsNote": "Iron sights (front and rear) removed when an optic is fitted, so the front post doesn't show through the sight window. On the M16/Commando the bone is the carry handle with the front post; on the FAMAS it's the handle."

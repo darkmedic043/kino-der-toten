@@ -11,6 +11,10 @@ const [partsPath, viewOut, worldOut] = process.argv.slice(2);
 const WEB = path.resolve(import.meta.dirname, '../export/web');
 const DONOR = path.join(WEB, 'models/t5_weapon_viewmodel_m16a1.glb');
 const MUZZLE = [30.45, 0, 2.4];          // tag_flash at the Grimhawk's brake (CoD units, j_gun space)
+// Attachment bones the M16 lacks: children of j_gun at these j_gun-space (CoD) positions. tag_gh_expanse sits where
+// tag_clip does, so weapon-levels' fitted-mag follow keeps it with the reload.
+const NEW_BONES = { tag_gh_barrel: [26, 0, 2.4], tag_gh_rangefinder: [3.5, 0, 4.5], tag_gh_hawkeye: [2.5, 0, 5.2],
+  tag_gh_expanse: [4.29, -0.01, 1.29], tag_gh_longbarrel: [28, 0, 2.4], tag_foregrip: [16, 0, 0.5], tag_laser_box: [19.3, -1.2, 2.45] };
 const WORLD_SHIFT = [-10.5, -2.55, 0];   // viewmodel gun space -> the M16 world model's (CoD (-10.5, 0, -2.55), in glTF axes)
 
 function readGlb(file) {
@@ -86,7 +90,22 @@ for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith
     out.nodes.push(n);
   }
   const sk = donor.json.skins[0];
-  out.skins.push({ joints: sk.joints.map(j => map.get(j)), inverseBindMatrices: fromDonor(sk.inverseBindMatrices), ...(sk.skeleton !== undefined ? { skeleton: map.get(sk.skeleton) } : {}) });
+  // inverse bind matrices: the donor's, plus one per new bone = T(-t) · IBM(j_gun) (a child of j_gun, no rotation)
+  const ibmAcc = donor.json.accessors[sk.inverseBindMatrices], ibmBv = donor.json.bufferViews[ibmAcc.bufferView];
+  const ibmStart = (ibmBv.byteOffset ?? 0) + (ibmAcc.byteOffset ?? 0);
+  const ibms = Array.from({ length: ibmAcc.count }, (_, k) => Array.from({ length: 16 }, (_, e) => donor.bin.readFloatLE(ibmStart + (k * 16 + e) * 4)));
+  const joints = sk.joints.map(j => map.get(j));
+  const jgun = out.nodes.findIndex(n => n.name === 'j_gun'), jgunIbm = ibms[joints.indexOf(jgun)];
+  const mul = (a, b) => { const o = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]; return o; };
+  for (const [name, t] of Object.entries(NEW_BONES)) {
+    if (!partMeshes.has(name)) continue;
+    out.nodes.push({ name, translation: t }); const ni = out.nodes.length - 1;
+    (out.nodes[jgun].children ??= []).push(ni); joints.push(ni);
+    ibms.push(mul([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -t[0], -t[1], -t[2], 1], jgunIbm));
+  }
+  const ibmBuf = Buffer.alloc(ibms.length * 64); ibms.flat().forEach((v, i) => ibmBuf.writeFloatLE(v, i * 4));
+  const ibmIdx = addRaw(out, w, ibmBuf, { componentType: 5126, count: ibms.length, type: 'MAT4' });
+  out.skins.push({ joints, inverseBindMatrices: ibmIdx, ...(sk.skeleton !== undefined ? { skeleton: map.get(sk.skeleton) } : {}) });
   const rootIdx = map.get(donor.json.scenes[donor.json.scene ?? 0].nodes.find(r => map.has(r)));
   const jointOf = name => { const ni = out.nodes.findIndex(n => n.name === name); const j = out.skins[0].joints.indexOf(ni); if (j < 0) throw new Error('no joint ' + name); return j; };
   for (const [bone, mi] of partMeshes) {
@@ -115,7 +134,8 @@ for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith
   const w = writer(), fromParts = copier(parts, out, w);
   copyMaterials(parts, out, w);
   const prims = [];
-  for (const [bone, mi] of partMeshes) for (const p of parts.json.meshes[mi].primitives)
+  const WORLD_PARTS = ['j_gun', 'tag_clip', 'j_charging_handle', 'tag_iron_sight', 'tag_gh_barrel'];   // the bare gun: a static mesh can't hide attachments
+  for (const [bone, mi] of partMeshes) if (WORLD_PARTS.includes(bone)) for (const p of parts.json.meshes[mi].primitives)
     prims.push({ attributes: Object.fromEntries(Object.entries(p.attributes).map(([k, v]) => [k, fromParts(v)])), indices: fromParts(p.indices), material: p.material, mode: 4 });
   out.meshes.push({ name: 'grimhawk_world', primitives: prims });
   // the M16 world model's root: tag_weapon turned -90° about X (CoD Z-up); the mesh sits beside it, shifted
