@@ -9,7 +9,7 @@
 //   - aimed shots home: a round steers (TURN rad/s) toward the zombie nearest its flight line inside a CONE ahead
 //     of it; BO7's base Grimhawk only homes when aimed down sights (its Long Barrel moves that to hip fire)
 //   - Pack-a-Punched (the Grim Reaper): faster rounds that home from the hip as well, and harder hits
-// Shots sound like the G11 (caseless, close to a flechette's crack).
+// Shots: the Grimhawk's own (see the sound section); the G11's as a fallback.
 import * as THREE from 'three';
 
 const BASE = new URL('./', import.meta.url).href;
@@ -23,7 +23,7 @@ export function prepare(data) {
   const base = structuredClone(m16);
   const gun = Object.assign(base, {
     id: ID, name: 'Grimhawk', price: 1500, clipSize: 25, startAmmo: 125, maxAmmo: 225,
-    damage: 190, minDamage: 150, range: 3000, fireTime: .088, headMultiplier: 3.5, hipSpread: .016,
+    damage: 190, minDamage: 150, range: 3000, fireTime: .094,   // 0.092-0.096 s between shots in BO7 footage headMultiplier: 3.5, hipSpread: .016,
     automatic: true, fireType: 'Full Auto', pellets: 1, hideTags: [], model, worldModel: world, adsFov: 48,
     flechette: true, soundAs: 'g11_lps_zm',
   });
@@ -40,9 +40,22 @@ export default function setup(api) {
   if (!data.weapons[ID]) return;
   const isGrim = def => (def?.baseId ?? def?.id) === ID;
 
-  // ---- sound: the G11's shot and dry fire under the Grimhawk ---------------------------------------------------
-  const weaponSound = audio.weapon.bind(audio);
-  audio.weapon = (kind, def, ...rest) => weaponSound(kind, isGrim(def) ? { ...def, id: def.soundAs ?? 'g11_lps_zm', baseId: def.soundAs ?? 'g11_lps_zm' } : def, ...rest);
+  // ---- sound: the Grimhawk's own shot (three takes cut from BO7 gameplay footage into audio/, git-ignored: not
+  // ours to redistribute), one at random with a little pitch spread, each fading the last one's tail; without them,
+  // and for the dry fire, the G11's.
+  const weaponSound = audio.weapon.bind(audio), g11 = def => ({ ...def, id: def.soundAs ?? 'g11_lps_zm', baseId: def.soundAs ?? 'g11_lps_zm' });
+  const SHOTS = [1, 2, 3].map(i => BASE + `audio/grimhawk_shot_${i}.ogg`), buffers = new Map();
+  const load = url => { if (!audio.ctx) return Promise.resolve(null); if (!buffers.has(url)) buffers.set(url, fetch(url).then(r => r.ok ? r.arrayBuffer() : null).then(b => b && audio.ctx?.decodeAudioData(b)).catch(() => null)); return buffers.get(url); };
+  let prev = null;
+  async function shot(def) {
+    const ctx = audio.ctx, out = audio.master; if (!ctx || !out) return weaponSound('shot', g11(def));
+    const b = await load(SHOTS[Math.floor(Math.random() * SHOTS.length)]); if (!b) return weaponSound('shot', g11(def));
+    if (prev) { const g = prev.g.gain; g.cancelScheduledValues(ctx.currentTime); g.setValueAtTime(g.value, ctx.currentTime); g.linearRampToValueAtTime(0, ctx.currentTime + .06); }
+    const src = ctx.createBufferSource(), g = ctx.createGain(); src.buffer = b; src.playbackRate.value = (def.upgraded ? .92 : 1) * (.97 + Math.random() * .06);
+    g.gain.value = .5 * (.9 + Math.random() * .15); src.connect(g).connect(out); src.start(); prev = { src, g };
+  }
+  audio.weapon = (kind, def, ...rest) => !isGrim(def) ? weaponSound(kind, def, ...rest) : kind === 'shot' ? shot(def) : weaponSound(kind, g11(def), ...rest);
+  host.on('start', () => { for (const url of SHOTS) load(url); });   // decode before the first shot (the audio context exists once the game starts)
 
   // ---- flechettes ----------------------------------------------------------------------------------------------
   const needleGeo = new THREE.CylinderGeometry(.16, .05, 7, 6).rotateX(Math.PI / 2);   // along +z
