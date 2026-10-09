@@ -2018,7 +2018,7 @@
               "icon": "heart",
               "desc": "After 3s without a hit, the mech repairs itself: the integrity bar drains {v}s a second slower.",
               "effects": {
-                "mech.regen": 0.3
+                "mech.regen": 0.25
               },
               "fmt": "s",
               "tier": 5
@@ -2066,9 +2066,9 @@
               "ranks": 1,
               "type": "capstone",
               "icon": "fist",
-              "desc": "Capstone: every kill by your mech restores 0.5s of integrity (explosions and fire included).",
+              "desc": "Capstone: every kill by your mech restores 0.35s of integrity (explosions and fire included).",
               "effects": {
-                "cap.core.berserk": 0.5
+                "cap.core.berserk": 0.35
               }
             }
           ]

@@ -164,3 +164,4 @@
 - 2026-10-08: Exfil works in co-op (host runs it, anyone calls it, per-player verdict and XP) (gameplay.md).
 - 2026-10-08: The Giant: terminal booth in the start courtyard (under the mainframe platform) and eight exfil zones; booth placements can set `clearDebris:false` (props.md, gameplay.md).
 - 2026-10-08: Quick Revive costs 1500.
+- 2026-10-09: Exfil class XP doubled (10·R²); Mech nerfs: Repair Drones 0.25/rank, Berserker Core 0.35 s per kill (classes.md).

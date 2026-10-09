@@ -6,8 +6,8 @@
 //   - for the last LAND seconds the chopper is landing; at 0 a player must be standing (not downed or dead) inside
 //     the zone (RADIUS)
 //   - in the zone: EXFIL SUCCESSFUL, the game ends and pays account XP (kino.progression.grant) and class XP
-//     (kino.classes.grantXp), both growing with the rounds survived (R = round − 1): account 20·R², class 5·R²
-//     (R 10: 2000 / 500, R 15: 4500 / 1125, R 20: 8000 / 2000). A game with cheats earns nothing.
+//     (kino.classes.grantXp), both growing with the rounds survived (R = round − 1): account 20·R², class 10·R²
+//     (R 10: 2000 / 1000, R 15: 4500 / 2250, R 20: 8000 / 4000). A game with cheats earns nothing.
 //   - outside it: left behind, game over.
 // Co-op (mods/multiplayer, host-authoritative): anyone can call it (a guest's call goes to the host as
 // {t:'exfil',a:'call'}). The host runs the timer and the horde (spawned zombies mirror to everyone like any other),
@@ -20,7 +20,7 @@ import * as THREE from 'three';
 
 const FIRST = 11, EVERY = 5, DURATION = 120, LAND = 25, RADIUS = 160, MAX_ALIVE = 28, PER_PLAYER = 6, SPAWN_EVERY = .55, BOOST = 5;
 export const exfilRound = r => r >= FIRST && (r - FIRST) % EVERY === 0;
-export const exfilRewards = rounds => ({ account: 20 * rounds * rounds, cls: 5 * rounds * rounds });
+export const exfilRewards = rounds => ({ account: 20 * rounds * rounds, cls: 10 * rounds * rounds });   // class XP doubled 2026-10-09
 
 export default async function setup(api) {
   const { host, session, world, enemies, player, scene, audio } = api;
