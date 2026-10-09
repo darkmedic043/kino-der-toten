@@ -171,3 +171,4 @@
 - 2026-10-09: Grimhawk: no grenade launcher when Pack-a-Punched; Gunsmith opens for camos (`gunsmith: true` defs).
 - 2026-10-09: Grimhawk: rounded profiles, baked worn textures (one atlas), camos work.
 - 2026-10-09: Grimhawk attachments: Rangefinder, P.T. Expanse, Suppressor, Grip, Laser, Hawkeye 3×, Long Barrel (hip homing); iron sights stock; Gunsmith shows the laser slot.
+- 2026-10-09: Grimhawk: smaller in first person, rounds leave the muzzle, head-lock homing with PaP or its optics.

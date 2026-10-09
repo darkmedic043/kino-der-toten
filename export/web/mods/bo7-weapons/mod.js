@@ -17,6 +17,11 @@ const ID = 'grimhawk_zm';
 // every attachment part, hidden until fitted (weapon-levels attachments.json: gh_rangefinder, gh_expanse, gh_hawkeye,
 // gh_longbarrel, and the shared suppressor, grip and laser)
 const ATTACHMENT_TAGS = ['tag_gh_rangefinder', 'tag_gh_hawkeye', 'tag_gh_expanse', 'tag_suppressor', 'tag_gh_longbarrel', 'tag_foregrip', 'tag_laser_box'];
+// At the hip it sat as close as the BO1 M16 and read as huge (a long, bulky gun): pushed 3 units away from the eye
+// along the view camera's axis (-z), nudged right and down (ViewWeapon's def.viewOffset; gone in ADS).
+const VIEW_OFFSET = [.6, -.4, -3];
+// Optics that make homing lock onto the head (precision); Pack-a-Punched always does.
+const HEAD_LOCK = ['gh_rangefinder', 'gh_hawkeye'];
 const SPEED = 2600, DROP = 520, LIFE = 2.2, TURN = 3.2, CONE = Math.cos(THREE.MathUtils.degToRad(16)), REACH = 1800, MAX = 60;
 
 export function prepare(data) {
@@ -28,11 +33,11 @@ export function prepare(data) {
     id: ID, name: 'Grimhawk', price: 1500, clipSize: 25, startAmmo: 125, maxAmmo: 225,
     damage: 190, minDamage: 150, range: 3000, fireTime: .094,   // 0.092-0.096 s between shots in BO7 footage headMultiplier: 3.5, hipSpread: .016,
     automatic: true, fireType: 'Full Auto', pellets: 1, hideTags: [...ATTACHMENT_TAGS], model, worldModel: world, adsFov: 48,
-    flechette: true, soundAs: 'g11_lps_zm', weaponClass: 'Special', gunsmith: true,   // gunsmith: camos, though it has no attachments yet   // BO7's Specials class (the loadout's SPECIALS tab)
+    flechette: true, soundAs: 'g11_lps_zm', weaponClass: 'Special', gunsmith: true, viewOffset: VIEW_OFFSET,   // gunsmith: camos, though it has no attachments yet   // BO7's Specials class (the loadout's SPECIALS tab)
   });
   gun.upgrade = Object.assign(structuredClone(m16.upgrade ?? {}), {
     name: 'Grim Reaper', clipSize: 35, startAmmo: 280, maxAmmo: 280, damage: 340, minDamage: 260, range: 3600, fireTime: .08,
-    headMultiplier: 4, hideTags: [...ATTACHMENT_TAGS], model, worldModel: world, animations: structuredClone(m16.animations), automatic: true, fireType: 'Full Auto', pellets: 1,
+    headMultiplier: 4, hideTags: [...ATTACHMENT_TAGS], model, worldModel: world, viewOffset: VIEW_OFFSET, animations: structuredClone(m16.animations), automatic: true, fireType: 'Full Auto', pellets: 1,
   });
   delete gun.upgrade.attachment;   // the M16's Pack-a-Punch carries an M203 grenade launcher (the Skullcrusher's); not the Grim Reaper's
   for (const k of ['projectileType', 'projectileModel']) delete gun.upgrade[k];
@@ -41,7 +46,7 @@ export function prepare(data) {
 }
 
 export default function setup(api) {
-  const { host, session, camera, scene, world, enemies, audio, data } = api;
+  const { host, session, camera, scene, world, enemies, audio, data, view, viewCamera } = api;
   if (!data.weapons[ID]) return;
   const isGrim = def => (def?.baseId ?? def?.id) === ID;
 
@@ -71,33 +76,50 @@ export default function setup(api) {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
   const glowMat = new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
   const live = [], stuck = [], tmp = new THREE.Vector3(), aimAt = new THREE.Vector3();
-  const muzzle = () => {   // a little right and below the eye, where the barrel is on screen
+  // Where the barrel is on screen: the gun is drawn by its own camera (the view scene), so its muzzle (tag_flash, pushed
+  // out past a fitted Long Barrel or suppressor) is projected to the screen and back out into the world, 30 ahead.
+  const MUZZLE_EXTRA = { gh_longbarrel: 4, suppressor: 5.4 };
+  const muzzle = def => {
+    const flash = view?.gun?.getObjectByName('tag_flash');
+    if (flash && viewCamera) {
+      const extra = Math.max(0, ...String(def?.attachments ?? '').split('+').map(a => MUZZLE_EXTRA[a] ?? 0));
+      flash.updateWorldMatrix(true, false); const ndc = flash.localToWorld(new THREE.Vector3(extra, 0, 0)).project(viewCamera);
+      const dir = new THREE.Vector3(ndc.x, ndc.y, .5).unproject(camera).sub(camera.position).normalize();
+      return camera.position.clone().addScaledVector(dir, 30);
+    }
     const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0), down = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).negate();
     return camera.position.clone().addScaledVector(right, 3.2).addScaledVector(down, 2.6);
   };
   function launch(def, forward, { ads }) {
     if (!isGrim(def)) return false;
     // homing: aimed shots; the Long Barrel moves it to the hip (BO7's prestige barrel); Pack-a-Punched: both
-    const pap = !!def.upgraded, dir = forward.clone(), longBarrel = String(def.attachments ?? '').split('+').includes('gh_longbarrel');
+    const atts = String(def.attachments ?? '').split('+'), pap = !!def.upgraded, dir = forward.clone(), longBarrel = atts.includes('gh_longbarrel');
+    const headLock = pap || HEAD_LOCK.some(a => atts.includes(a));
     if (!ads) { const s = (def.hipSpread ?? .016) * (session.perks.has('specialty_deadshot') ? .5 : 1); dir.x += (Math.random() - .5) * s; dir.y += (Math.random() - .5) * s; dir.z += (Math.random() - .5) * s; dir.normalize(); }
     // start at the eye so close shots still land where the crosshair is; drawn from the muzzle
     const mesh = new THREE.Mesh(needleGeo, needleMat); mesh.frustumCulled = false;
     const glow = new THREE.Sprite(glowMat); glow.scale.setScalar(5); glow.position.z = 3.5; mesh.add(glow);   // a hot tip, so rounds read in flight
-    const trailGeo = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 6 }, () => muzzle()));
+    const from = muzzle(def), trailGeo = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 6 }, () => from.clone()));
     const trail = new THREE.Line(trailGeo, trailMat); trail.frustumCulled = false;
     scene.add(mesh, trail);
-    const p = { pos: camera.position.clone(), vel: dir.multiplyScalar(pap ? SPEED * 1.35 : SPEED), life: LIFE, mesh, trail, homes: pap || (longBarrel ? !ads : ads), pap, def,
-      drawFrom: muzzle(), blend: 0, target: null, scan: 0, hist: [] };
+    const p = { pos: camera.position.clone(), vel: dir.multiplyScalar(pap ? SPEED * 1.35 : SPEED), life: LIFE, mesh, trail, homes: pap || (longBarrel ? !ads : ads), headLock, pap, def,
+      drawFrom: from.clone(), blend: 0, target: null, scan: 0, hist: [] };
     if (live.length >= MAX) kill(live.shift());
     live.push(p); return true;
   }
   (host.fireHooks ??= []).push(launch);
 
+  // where homing steers: the head bone when locked (PaP, or a HEAD_LOCK optic), else the chest so the plain gun doesn't
+  // hand out headshots
+  function aimPoint(z, head, out) {
+    if (head) return out.copy(enemies.headPosition?.(z) ?? z.root.position.clone().add(new THREE.Vector3(0, z.kind === 'dog' ? 28 : 63, 0)));
+    out.copy(z.root.position); out.y += z.kind === 'dog' ? 18 : 40; return out;
+  }
   function pickTarget(p) {
     const dir = tmp.copy(p.vel).normalize(); let best = null, bestScore = -Infinity;
     for (const z of enemies.list) {
       if (z.dead || z.state === 'dead' || z.health <= 0) continue;
-      aimAt.copy(z.root.position); aimAt.y += z.kind === 'dog' ? 18 : 40;
+      aimPoint(z, p.headLock, aimAt);
       const to = aimAt.clone().sub(p.pos), d = to.length(); if (d > REACH || d < 1) continue;
       const c = to.divideScalar(d).dot(dir); if (c < CONE) continue;
       const score = c * 2 - d / REACH; if (score > bestScore && world.lineClear(p.pos, aimAt)) { bestScore = score; best = z; }
@@ -120,10 +142,10 @@ export default function setup(api) {
       if (p.homes && (p.scan -= dt) <= 0) { p.scan = .12; p.target = pickTarget(p); }
       const speed = p.vel.length();
       if (p.target && !(p.target.dead || p.target.health <= 0)) {
-        aimAt.copy(p.target.root.position); aimAt.y += p.target.kind === 'dog' ? 18 : 40;   // the chest: homing shouldn't hand out headshots
+        aimPoint(p.target, p.headLock, aimAt);
         const want = aimAt.sub(p.pos).normalize(), now = p.vel.clone().normalize(), ang = now.angleTo(want);
         if (ang > 1e-4) { const k = Math.min(1, (TURN * (p.pap ? 1.4 : 1) * dt) / ang); now.lerp(want, k).normalize(); p.vel.copy(now.multiplyScalar(speed)); }
-      } else p.vel.y -= DROP * dt;   // unguided rounds drop fast
+      } else p.vel.y -= DROP * (p.pap ? .5 : 1) * dt;   // unguided rounds drop fast (Pack-a-Punched: half as much)
       const step = p.vel.clone().multiplyScalar(dt), len = step.length(), ray = new THREE.Ray(p.pos.clone(), step.clone().divideScalar(len || 1));
       const wall = world.raycast(ray, 0, len);
       if (hit(p, ray, wall?.distance ?? len)) { kill(p); live.splice(live.indexOf(p), 1); continue; }
@@ -134,7 +156,7 @@ export default function setup(api) {
       p.pos.add(step);
       if (p.life <= 0) { kill(p); live.splice(live.indexOf(p), 1); continue; }
       // drawn: eased from the muzzle onto the real path over the first few metres
-      p.blend = Math.min(1, p.blend + dt * 6);
+      p.blend = Math.min(1, p.blend + dt * 4);
       const drawn = p.drawFrom.clone().lerp(p.pos, p.blend); p.drawFrom.addScaledVector(p.vel, dt);
       p.mesh.position.copy(drawn); p.mesh.lookAt(drawn.clone().add(p.vel));
       p.hist.unshift(drawn.clone()); if (p.hist.length > 6) p.hist.pop();
