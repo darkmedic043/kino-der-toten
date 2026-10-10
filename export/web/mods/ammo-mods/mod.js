@@ -1,4 +1,4 @@
-// Ammo Mods (Black Ops 7's six, plus Cold War / BO6's Shatter Blast; fork). One per weapon, bought for the gun in hand at a
+// Ammo Mods (Black Ops 7's six, plus Black Ops 6's Light Mend and Cold War's Shatter Blast; fork). One per weapon, bought for the gun in hand at a
 // terminal's ARSENAL app once the power is on (terminal-booth): apply PRICE.apply (tier I), then upgrade to II and III;
 // swapping to a different mod costs the apply price again and starts at tier I. BO7's mods have no tiers (they grow through
 // augments); the tiers here are the fork's. The mod lives on the weapon object (session.weapon.ammoMod {id, tier}), so it
@@ -17,7 +17,10 @@
 //   Shadow Rift    a black hole on the zombie (radius 120/160/200) pulls in everything nearby; when it closes each caught
 //                  zombie is dropped from the sky to its death (50/70/100%) or warped to a far spawn point (BO7: "warping
 //                  away those nearby and dropping some from the air at lethal speed")
-//   Shatter Blast  an explosion at the zombie: radius 110/150/190, 60/80/100% of a round's zombie health at the centre
+//   Light Mend     (BO6) the zombie's health becomes light: a normal zombie dies, a dog/special loses half its health, and
+//                  a healing glyph rises from it; it drifts to the player whenever they're hurt and within 400/600/800, and
+//                  heals 25/35/50% of max health on contact (III: then +10% a second for 3 s); it fades after 8/10/12 s
+//   Shatter Blast  (Cold War) an explosion at the zombie: radius 110/150/190, 60/80/100% of a round's zombie health at the centre
 //   Brain Rot      the zombie turns for 6/9/12 s: it goes for the nearest zombie and bites it (25% of its max health a
 //                  second) and leaves the player alone; II+: zombies within 300 go for it; III: explodes when it ends
 // Status effects (slow, stun, pulls, Brain Rot) steer zombies (enemies.speed / lureTarget / positions), which only the host
@@ -37,14 +40,16 @@ export const MODS = [
     tiers: ['3 fireworks', '5 fireworks with bigger bursts', '7 fireworks with large bursts'] },
   { id: 'shadowrift', name: 'Shadow Rift', color: '#a46bff', desc: 'Shadow rounds: a black hole pulls zombies in, then drops some from the sky and warps the rest away.',
     tiers: ['Small rift: half of those caught are dropped to their death', 'Bigger rift: 70% are dropped', 'Large rift: everything caught is dropped'] },
-  { id: 'shatter', name: 'Shatter Blast', color: '#ffb347', desc: 'Detonates the zombie in an explosion that hurts everything around it. (Cold War / BO6)',
+  { id: 'lightmend', name: 'Light Mend', color: '#fff3b0', desc: 'Light rounds: the zombie\'s health becomes a healing glyph that drifts to you when you\'re hurt. (Black Ops 6)',
+    tiers: ['Glyph heals 25%, reaches you from 400, lasts 8 s', 'Heals 35%, from 600, lasts 10 s', 'Heals 50% then regenerates you for 3 s, from 800, lasts 12 s'] },
+  { id: 'shatter', name: 'Shatter Blast', color: '#ffb347', desc: 'Detonates the zombie in an explosion that hurts everything around it. (Cold War)',
     tiers: ['A small blast', 'A bigger, stronger blast', 'A large blast that kills most of a round\'s zombies'] },
   { id: 'brainrot', name: 'Brain Rot', color: '#8cff5a', desc: 'Toxic rounds: the zombie turns and fights for you, leaving you alone.',
     tiers: ['Turns for 6 s', 'Turns for 9 s; zombies nearby attack it', 'Turns for 12 s, then explodes'] },
 ];
 export const PRICE = { apply: 2500, 2: 4000, 3: 6000 };
 const PROC = { 1: .07, 2: .1, 3: .14 };
-const COOLDOWN = { cryo: 1, napalm: 1, deadwire: 1.5, fireworks: 2, shadowrift: 4, shatter: 1.5, brainrot: 6 };
+const COOLDOWN = { cryo: 1, napalm: 1, deadwire: 1.5, fireworks: 2, shadowrift: 4, lightmend: 2, shatter: 1.5, brainrot: 6 };
 // per-tier numbers (index = tier − 1); tune() copies one and lets 'ammoModTune' listeners adjust it
 export const TUNE = {
   cryo: [{ slow: .4, dur: 4, brittle: 0, freeze: 0 }, { slow: .55, dur: 5, brittle: .15, freeze: 0 }, { slow: .5, dur: 6, brittle: .25, freeze: 3 }],
@@ -52,6 +57,7 @@ export const TUNE = {
   deadwire: [{ stun: 1.2, field: 70, fieldDmg: .15, arcs: 2, arcDmg: .2 }, { stun: 1.6, field: 90, fieldDmg: .2, arcs: 4, arcDmg: .25 }, { stun: 2, field: 110, fieldDmg: .25, arcs: 6, arcDmg: .3 }],
   fireworks: [{ rockets: 3, dmg: .45, radius: 70 }, { rockets: 5, dmg: .55, radius: 80 }, { rockets: 7, dmg: .7, radius: 95 }],
   shadowrift: [{ radius: 120, lethal: .5, dur: 1.4 }, { radius: 160, lethal: .7, dur: 1.4 }, { radius: 200, lethal: 1, dur: 1.4 }],
+  lightmend: [{ heal: .25, range: 400, life: 8, regen: 0 }, { heal: .35, range: 600, life: 10, regen: 0 }, { heal: .5, range: 800, life: 12, regen: .1 }],
   shatter: [{ radius: 110, dmg: .6 }, { radius: 150, dmg: .8 }, { radius: 190, dmg: 1 }],
   brainrot: [{ dur: 6, lure: 0, explode: false }, { dur: 9, lure: 300, explode: false }, { dur: 12, lure: 300, explode: true }],
 };
@@ -121,7 +127,8 @@ export default function setup(api) {
   host.on('beforeEnemyDamage', e => { const a = e.enemy?.amod; if (a?.brittleUntil > now()) e.amount *= 1 + a.brittle; });
 
   // ---- the effects -------------------------------------------------------------------------------------------------
-  const rockets = [], rifts = [];
+  const rockets = [], rifts = [], glyphs = [];
+  let regenUntil = 0, regenRate = 0;
   const EFFECT = {
     cryo(z, tier) {
       const P = tune('cryo', tier), a = st(z);
@@ -170,6 +177,12 @@ export default function setup(api) {
       const halo = glow('#a46bff', P.radius * .9, .5); halo.position.copy(at); scene.add(halo);
       rifts.push({ at, P, t: 0, hole, halo, caught: new Set() });
       audio?.play?.('explosion', .2);
+    },
+    lightmend(z, tier) {
+      const P = tune('lightmend', tier), at = chest(z);
+      hurt(z, z.kind === 'zombie' ? z.health + 1 : z.maxHealth * .5);   // its health becomes the glyph
+      const s = glow('#fff3b0', 22, .95), core = glow('#ffffff', 9, 1); s.add(core); s.position.copy(at); scene.add(s);
+      glyphs.push({ s, pos: at.clone(), base: at.y, t: 0, P }); audio?.play?.('buy', .4);
     },
     shatter(z, tier, at = chest(z)) {
       const P = tune('shatter', tier), peak = roundHealth() * P.dmg;
@@ -247,6 +260,21 @@ export default function setup(api) {
       r.hist.unshift(r.pos.clone()); if (r.hist.length > 8) r.hist.pop();
       const at = r.trail.geometry.attributes.position; for (let i = 0; i < 8; i++) { const q = r.hist[Math.min(i, r.hist.length - 1)]; at.setXYZ(i, q.x, q.y, q.z); } at.needsUpdate = true;
     }
+    // Light Mend: glyphs bob in place, drift to the player while they're hurt and in range, heal on contact
+    const me = api.player?.getFeetPosition?.()?.add(new THREE.Vector3(0, 40, 0));
+    for (const g of [...glyphs]) {
+      g.t += dt; const hurtP = session.health < session.maxHealth && session.phase !== 'gameover', d = me ? g.pos.distanceTo(me) : Infinity;
+      if (me && hurtP && d < g.P.range) g.pos.add(me.clone().sub(g.pos).normalize().multiplyScalar(Math.min(d, dt * 260)));
+      g.s.position.copy(g.pos).add(new THREE.Vector3(0, Math.sin(g.t * 3) * 3, 0)); g.s.material.rotation += dt;
+      const fade = Math.min(1, (g.P.life - g.t) / 1.5); g.s.material.opacity = .95 * Math.max(0, fade);
+      if (me && hurtP && d < 30) {
+        session.health = Math.min(session.maxHealth, session.health + session.maxHealth * g.P.heal);
+        if (g.P.regen) { regenUntil = t + 3; regenRate = g.P.regen; }
+        api.toast?.('Healed', 1); audio?.play?.('buy', .5);
+      } else if (g.t < g.P.life) continue;
+      g.s.removeFromParent(); g.s.material.dispose(); glyphs.splice(glyphs.indexOf(g), 1);
+    }
+    if (regenUntil > t && session.phase === 'fighting') session.health = Math.min(session.maxHealth, session.health + session.maxHealth * regenRate * dt);
     // Shadow Rift: pull everything in range toward the hole, then drop or warp what was caught
     for (const r of [...rifts]) {
       r.t += dt; const k = Math.min(1, r.t / r.P.dur), grow = Math.sin(Math.min(1, r.t / .25) * Math.PI / 2) * (k < .85 ? 1 : 1 - (k - .85) / .15);
@@ -273,6 +301,7 @@ export default function setup(api) {
     for (const b of bolts) b.line.removeFromParent(); bolts.length = 0;
     for (const r of rockets) { r.s.removeFromParent(); r.trail.removeFromParent(); } rockets.length = 0;
     for (const r of rifts) { r.hole.removeFromParent(); r.halo.removeFromParent(); } rifts.length = 0;
+    for (const g of glyphs) g.s.removeFromParent(); glyphs.length = 0; regenUntil = 0;
   });
 
   // ---- HUD: the mod under the weapon name ----------------------------------------------------------------------------

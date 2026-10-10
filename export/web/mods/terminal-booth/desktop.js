@@ -258,6 +258,7 @@ function build() {
     shatter: '<path d="M16 2l3 9 9-3-6 8 8 5-10 1 1 9-5-7-5 7 1-9-10-1 8-5-6-8 9 3z" fill="currentColor"/>',
     fireworks: '<path d="M16 16 6 6M16 16l10-10M16 16 4 18M16 16l12 2M16 16l-6 12M16 16l6 12" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="16" cy="16" r="3" fill="currentColor"/><circle cx="6" cy="6" r="2" fill="currentColor"/><circle cx="26" cy="6" r="2" fill="currentColor"/><circle cx="4" cy="18" r="1.6" fill="currentColor"/><circle cx="28" cy="18" r="1.6" fill="currentColor"/>',
     shadowrift: '<circle cx="16" cy="16" r="5" fill="currentColor"/><path d="M16 4a12 12 0 0 1 12 12M28 16a12 12 0 0 1-12 12M16 28A12 12 0 0 1 4 16M4 16A12 12 0 0 1 16 4" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="5 4"/>',
+    lightmend: '<path d="M13 4h6v9h9v6h-9v9h-6v-9H4v-6h9z" fill="currentColor"/>',
     brainrot: '<path d="M11 6a5 5 0 0 0-5 5 5 5 0 0 0-1 9 5 5 0 0 0 7 6V6zm10 0a5 5 0 0 1 5 5 5 5 0 0 1 1 9 5 5 0 0 1-7 6V6z" fill="currentColor"/>',
   };
   const modIcon = m => `<svg viewBox="0 0 32 32" width="58%" height="58%" style="color:${m.color};filter:drop-shadow(0 0 6px ${m.color})">${MOD_GLYPH[m.id] ?? `<text x="16" y="22" text-anchor="middle" font-size="16" fill="currentColor">${esc(m.name[0])}</text>`}</svg>`;
