@@ -23,6 +23,8 @@
 //   Shatter Blast  (Cold War) an explosion at the zombie: radius 110/150/190, 60/80/100% of a round's zombie health at the centre
 //   Brain Rot      the zombie turns for 6/9/12 s: it goes for the nearest zombie and bites it (25% of its max health a
 //                  second) and leaves the player alone; II+: zombies within 300 go for it; III: explodes when it ends
+// Each proc plays its mod's own sting (BO7 style), synthesized in Web Audio (SFX): Dead Wire zap, Cryo freeze, Napalm
+// ignition, Fire Works whistle and crackles, Shadow Rift warp, Shatter crack, Brain Rot gurgle, Light Mend chime.
 // Status effects (slow, stun, pulls, Brain Rot) steer zombies (enemies.speed / lureTarget / positions), which only the host
 // simulates in co-op; a guest's procs still deal their damage.
 // window.kino.ammoMods: {MODS, PRICE, TUNE, status(), buy(id), upgrade(), trigger(id, zombie, tier)}; the terminal reads it.
@@ -196,6 +198,67 @@ export default function setup(api) {
     },
   };
 
+  // ---- proc sounds (BO7 style: each mod has its own signature sting when it triggers), synthesized in Web Audio so
+  // they're the fork's own; quieter with distance from the camera ---------------------------------------------------
+  const SFX = (() => {
+    const ctx = () => audio?.ctx, out = () => audio?.master;
+    let noiseBuf = null;
+    const noise = c => { if (!noiseBuf) { noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+      const n = c.createBufferSource(); n.buffer = noiseBuf; n.loop = true; return n; };
+    // an envelope gain: attack a, then exponential decay over d (seconds), peak v
+    const env = (c, t, v, a, d) => { const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); return g; };
+    const osc = (c, type, f0, f1, t, dur) => { const o = c.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur); return o; };
+    const filt = (c, type, f, q = 1, f1 = null, t = 0, dur = 0) => { const b = c.createBiquadFilter(); b.type = type; b.frequency.setValueAtTime(f, t); b.Q.value = q; if (f1) b.frequency.exponentialRampToValueAtTime(f1, t + dur); return b; };
+    const play = (src, ...chain) => { let n = src; for (const x of chain) { n.connect(x); n = x; } return n; };
+    const voices = {
+      deadwire(c, t, o) {   // a sharp electric zap: a falling square chirp, buzzing saw and crackling noise
+        const z = osc(c, 'square', 2200, 260, t, .14); play(z, env(c, t, .5, .003, .16), o); z.start(t); z.stop(t + .2);
+        const b = osc(c, 'sawtooth', 110, 90, t, .45); play(b, filt(c, 'lowpass', 1800), env(c, t, .25, .01, .45), o); b.start(t); b.stop(t + .5);
+        const n = noise(c), gate = c.createGain(); for (let k = 0; k < 14; k++) gate.gain.setValueAtTime(Math.random() < .55 ? 1 : 0, t + k * .03);
+        play(n, filt(c, 'bandpass', 3200, 1.2), gate, env(c, t, .8, .002, .45), o); n.start(t); n.stop(t + .5);
+      },
+      cryo(c, t, o) {   // a crystalline freeze: glassy partials, an icy hiss and a crack
+        for (const [f, v] of [[2350, .14], [3140, .1], [4210, .08], [5600, .05]]) { const g = osc(c, 'sine', f, f * .98, t, .9); play(g, env(c, t, v, .005, .9), o); g.start(t); g.stop(t + 1); }
+        const n = noise(c); play(n, filt(c, 'highpass', 5000, .7), env(c, t, .3, .01, .6), o); n.start(t); n.stop(t + .7);
+        const k = noise(c); play(k, filt(c, 'bandpass', 900, 3), env(c, t, .6, .001, .07), o); k.start(t); k.stop(t + .1);
+      },
+      napalm(c, t, o) {   // ignition: a rising fiery whoosh over a low thump
+        const n = noise(c); play(n, filt(c, 'lowpass', 300, .8, 2600, t, .35), env(c, t, .55, .05, .7), o); n.start(t); n.stop(t + .8);
+        const th = osc(c, 'sine', 90, 45, t, .3); play(th, env(c, t, .5, .005, .3), o); th.start(t); th.stop(t + .35);
+      },
+      fireworks(c, t, o) {   // a whistling launch, then a burst of crackles
+        const w = osc(c, 'sine', 800, 2600, t, .4); play(w, env(c, t, .18, .02, .4), o); w.start(t); w.stop(t + .45);
+        for (let k = 0; k < 9; k++) { const at = t + .42 + Math.random() * .45, n = noise(c); play(n, filt(c, 'bandpass', 2500 + Math.random() * 3000, 2), env(c, at, .45, .001, .05 + Math.random() * .05), o); n.start(at); n.stop(at + .12); }
+        const pop = noise(c); play(pop, filt(c, 'lowpass', 1200), env(c, t + .4, .5, .002, .2), o); pop.start(t + .4); pop.stop(t + .65);
+      },
+      shadowrift(c, t, o) {   // a deep warp: a falling sub sweep and an inhaling rush that cuts off
+        const s1 = osc(c, 'sine', 180, 38, t, .9); play(s1, env(c, t, .6, .02, .9), o); s1.start(t); s1.stop(t + 1);
+        const s2 = osc(c, 'triangle', 270, 57, t, .9); play(s2, env(c, t, .2, .02, .8), o); s2.start(t); s2.stop(t + 1);
+        const n = noise(c), g = c.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.4, t + .55); g.gain.linearRampToValueAtTime(0, t + .62);
+        play(n, filt(c, 'bandpass', 400, 1, 1800, t, .55), g, o); n.start(t); n.stop(t + .7);
+      },
+      shatter(c, t, o) {   // a hard crack with a glassy ring (the explosion itself plays separately)
+        const k = noise(c); play(k, filt(c, 'highpass', 2000), env(c, t, .6, .001, .12), o); k.start(t); k.stop(t + .15);
+        for (const f of [1800, 2700]) { const g = osc(c, 'triangle', f, f * .9, t, .3); play(g, env(c, t, .1, .002, .3), o); g.start(t); g.stop(t + .35); }
+      },
+      brainrot(c, t, o) {   // a sickly gurgle: a wobbling tone and a squelch
+        const g = osc(c, 'sine', 260, 120, t, .7), lfo = osc(c, 'square', 18, 11, t, .7), depth = c.createGain(); depth.gain.value = 90;
+        lfo.connect(depth).connect(g.frequency); play(g, filt(c, 'lowpass', 900), env(c, t, .45, .01, .7), o); g.start(t); lfo.start(t); g.stop(t + .75); lfo.stop(t + .75);
+        const n = noise(c); play(n, filt(c, 'bandpass', 600, 4, 250, t, .25), env(c, t, .35, .005, .25), o); n.start(t); n.stop(t + .3);
+      },
+      lightmend(c, t, o) {   // a bright chime arpeggio
+        [1047, 1319, 1568, 2093].forEach((f, k) => { const at = t + k * .06, g = osc(c, 'sine', f, f, at, .7); play(g, env(c, at, .16, .004, .7), o); g.start(at); g.stop(at + .75); });
+      },
+    };
+    return (id, at) => {
+      const c = ctx(), dest = out(); if (!c || !dest || !voices[id]) return;
+      const d = at && api.camera ? api.camera.position.distanceTo(at) : 0; if (d > 1600) return;
+      const g = c.createGain(); g.gain.value = .9 * (1 - d / 1600) ** 2; g.connect(dest);
+      try { voices[id](c, c.currentTime + .005, g); } catch (e) { console.warn('[ammo-mods] sfx', e); }
+      setTimeout(() => g.disconnect(), 2000);
+    };
+  })();
+
   // ---- procs -------------------------------------------------------------------------------------------------------
   host.on('beforeEnemyDamage', e => {
     if (host.remoteDamage || e.melee || !['bullet', 'projectile'].includes(e.cause)) return;
@@ -205,7 +268,7 @@ export default function setup(api) {
     if (Math.random() > roll.chance) return;
     if (z.amod && (z.amod.rotUntil > now() || (mod.id === 'cryo' && z.amod.slowUntil > now()) || (mod.id === 'napalm' && z.amod.burnUntil > now()))) return;
     ready = now() + COOLDOWN[mod.id];
-    queueMicrotask(() => alive(z) && EFFECT[mod.id](z, mod.tier));   // after the hit itself lands
+    queueMicrotask(() => { if (!alive(z)) return; SFX(mod.id, chest(z)); EFFECT[mod.id](z, mod.tier); });   // after the hit itself lands
   });
 
   // ---- per frame ---------------------------------------------------------------------------------------------------
@@ -340,5 +403,5 @@ export default function setup(api) {
     if (!session.spend(PRICE[m.tier + 1])) return 'Not enough points';
     m.tier++; audio?.play?.('buy'); return true;
   }
-  window.kino.ammoMods = { MODS, PRICE, TUNE, status, buy, upgrade, trigger: (id, z, tier = 1) => EFFECT[id]?.(z, tier) };   // trigger: for tests
+  window.kino.ammoMods = { MODS, PRICE, TUNE, status, buy, upgrade, trigger: (id, z, tier = 1) => { SFX(id, chest(z)); return EFFECT[id]?.(z, tier); }, sfx: (id, at) => SFX(id, at) };   // trigger: for tests
 }

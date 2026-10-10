@@ -181,3 +181,4 @@
 - 2026-10-10: Cheese Cube trivia answered with A–D keys on the desk (look + F) instead of shooting the screen (waw-ports.md).
 - 2026-10-10: STARK.EXE: Iron Man armors on every map (unlocked on Cheese Cube; cores + uplink quest per game, then buy and deploy from the terminal); shared armor core (gameplay.md).
 - 2026-10-10: Iron Man armors rigged as characters (.tools/build-armor-characters.py, git-ignored output); wearing a suit swaps your third-person body, teammates see it (characters.md).
+- 2026-10-10: Ammo mods play their own synthesized sting when they proc (gameplay.md).
