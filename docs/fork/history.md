@@ -182,3 +182,4 @@
 - 2026-10-10: STARK.EXE: Iron Man armors on every map (unlocked on Cheese Cube; cores + uplink quest per game, then buy and deploy from the terminal); shared armor core (gameplay.md).
 - 2026-10-10: Iron Man armors rigged as characters (.tools/build-armor-characters.py, git-ignored output); wearing a suit swaps your third-person body, teammates see it (characters.md).
 - 2026-10-10: Ammo mods play their own synthesized sting when they proc (gameplay.md).
+- 2026-10-10: JARVIS HUD and voices are global (mods/stark/jarvis, suit-hud.js in mods/stark), no longer read from Cheese Cube's map folder.

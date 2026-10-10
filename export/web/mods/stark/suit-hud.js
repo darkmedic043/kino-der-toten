@@ -1,7 +1,7 @@
 // The Iron Man suits' JARVIS HUD, after the map's _iron_man_mk*.gsc: the suit's interface image over the screen, the
 // faceplate sliding down on suit-up, live stats (kills, headshots, gibs, zombies left, downs, revives) in the interface's
 // own boxes, the suit power, and the POWER LEVELS LOW / CRITICAL warnings. The images come from the map's .iwd
-// (.tools/waw_maps/cheese_cube_suit_assets.py, in the map folder's hud/, git-ignored); without them only the numbers show.
+// (.tools/waw_maps/cheese_cube_suit_assets.py, in mods/stark/jarvis/hud/, git-ignored; shared by every map); without them only the numbers show.
 //
 // The original draws the interface 1000x600 on WaW's 480-unit-high HUD, centred, so its edges fall off the screen (the
 // War Machine's stat box is cut at the top). Here it keeps that 5:3 shape but fits the screen height, so all of it shows

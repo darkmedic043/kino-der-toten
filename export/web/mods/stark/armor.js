@@ -17,6 +17,10 @@ export const SUITS = [
   { id: 'mk16', name: 'Mark XVI Nightclub', cost: 0, hp: 200, speed: 1.1, weapons: ['iron_repulsor', 'iron_mk16_cloak'] },
 ];
 export const MAX_POWER = 100, READY = 98, RECHARGE = 2;
+// The JARVIS HUD art (hud/) and the voices and suit sounds (sounds/), shared by every map (git-ignored; built by
+// .tools/waw_maps/cheese_cube_suit_assets.py from the Cheese Cube mod's .iwd)
+export const JARVIS_DIR = 'mods/stark/jarvis/';
+export const jarvisBase = () => new URL(JARVIS_DIR, document.baseURI).href;
 const FLY_DRAIN = 6, THRUST = 1500, RISE_CAP = 260;
 
 export function addSuitWeapons(W) {
@@ -44,8 +48,7 @@ export function addSuitWeapons(W) {
     reloadTime: 2, reloadEmptyTime: 2, suitPower: .2 });
 }
 
-// Cheese Cube's sounds (mods/maps/<cheese cube>/sounds), played through the game's mixer. On other maps the files are
-// fetched from that folder; without the map built they're silent.
+// Sounds (e.g. jarvisBase() + 'sounds/') played through the game's mixer.
 export function soundPlayer(audio, base) {
   const LEVEL = 1 / .42, playing = new Set();
   const play = (name, { volume = .7, loop = false } = {}) => {

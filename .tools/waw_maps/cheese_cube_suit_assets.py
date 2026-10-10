@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Cheese Cube Iron Man suit HUD images and sounds, from the map's .iwd, into the map folder (git-ignored).
+"""Cheese Cube Iron Man suit HUD images and sounds (the JARVIS HUD and voices), from the map's .iwd, into the shared
+folder every map reads (git-ignored): export/web/mods/stark/jarvis (hud/, sounds/).
 
-usage: cheese_cube_suit_assets.py <path to nazi_zombie_ccube_u.iwd> <export/web/mods/maps/cheese-cube>
+usage: cheese_cube_suit_assets.py <path to nazi_zombie_ccube_u.iwd> <export/web/mods/stark/jarvis>
 
 Images are WaW IWI v6 (DXT1/3/5 with mips, smallest first): the full-size level is wrapped in a DDS header and converted
-with ffmpeg to webp in hud/. Sounds are converted to ogg in sounds/ next to the map's other sounds.
+with ffmpeg to webp in hud/. Sounds are converted to ogg in sounds/.
 """
 import os, struct, subprocess, sys, tempfile, zipfile
 

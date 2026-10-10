@@ -9,16 +9,14 @@
 //      beam where you stand 2.5 s later and you're wearing it. Wearing works as on Cheese Cube (mods/stark/armor.js): health,
 //      speed, its weapons, power (it flies back when it runs out), flight (hold Space). RECALL takes it off; it recharges
 //      while off and can be deployed again above 98%.
-// Solo progress (each player runs their own uplink). The JARVIS HUD art and voices come from Cheese Cube's map folder
-// (mods/maps/cheese-cube/hud, sounds); without that map built the HUD shows numbers only and the voices are silent.
+// Solo progress (each player runs their own uplink). The JARVIS HUD art and voices come from the shared mods/stark/jarvis.
 // window.kino.stark: {status(), act(action, id)}; the terminal booth's STARK.EXE reads it.
 import * as THREE from 'three';
-import { SUITS, addSuitWeapons, createArmor, soundPlayer, MAX_POWER, READY } from './armor.js';
+import { SUITS, addSuitWeapons, createArmor, soundPlayer, jarvisBase, MAX_POWER, READY } from './armor.js';
 import { rewards, WINS_FOR_MK16 } from './unlocks.js';
-import { createSuitHud } from '../cheese-cube/suit-hud.js';
+import { createSuitHud } from './suit-hud.js';
 
 const CORES = 4, CORE_CHANCE = .1, CORE_LIFE = 30, UPLINK = 60, UPLINK_RANGE = 450, DELIVERY = 2.5;
-const CC_DIR = 'mods/maps/cheese-cube/';
 const PRICE = { mk16: 20000 };
 const need = id => id === 'wm' ? 'stark_wm' : id === 'mk16' ? 'stark_mk16' : 'stark';
 
@@ -26,7 +24,7 @@ export default function setup(api) {
   const { host, session, player, scene, audio, data } = api;
   if (api.map?.id === 'cheese-cube' || !api.enemies) return;
   addSuitWeapons(data.weapons);
-  const base = new URL(CC_DIR, document.baseURI).href, snd = soundPlayer(audio, base + 'sounds/'), sound = snd.play;
+  const base = jarvisBase(), snd = soundPlayer(audio, base + 'sounds/'), sound = snd.play;
   const suits = SUITS.map(s => ({ ...s, cost: PRICE[s.id] ?? s.cost, owned: false, power: MAX_POWER }));
   const suitOf = id => suits.find(s => s.id === id);
   const hud = createSuitHud({ base });

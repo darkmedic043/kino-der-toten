@@ -12,9 +12,9 @@
 // The weapons reuse BO1 guns' viewmodels (Ray Gun, LAW, HK21, CZ75, RPK) with the map's stats and fire sounds.
 // Not ported: the Mk16 suit itself (its scanner joke is), the Mk5 suitcase and Mk6 laser.
 import * as THREE from 'three';
-import { createSuitHud } from './suit-hud.js';
+import { createSuitHud } from '../stark/suit-hud.js';
 import { grant } from '../stark/unlocks.js';
-import { SUITS as ARMORS, addSuitWeapons, createArmor, MAX_POWER, READY } from '../stark/armor.js';
+import { SUITS as ARMORS, addSuitWeapons, createArmor, soundPlayer, jarvisBase, MAX_POWER, READY } from '../stark/armor.js';
 
 export function setupSuits({api,world,session,host,toast,announce,named,center,nodes,show,beep,now,board,player,triviaDone,sync,sound}){
   const {equipView,data,audio}=api;
@@ -77,9 +77,10 @@ export function setupSuits({api,world,session,host,toast,announce,named,center,n
   const suitOf=id=>SUITS.find(s=>s.id===id);
   let hallHeard=false;
 
-  const hud=createSuitHud({base:api.map.dir.replace(/\/?$/,'/')});
+  const hud=createSuitHud({base:jarvisBase()});   // the JARVIS HUD and voices: shared with every map (mods/stark/jarvis)
+  const jarvis=soundPlayer(audio,jarvisBase()+'sounds/').play;
   // wearing (health, speed, weapons, power, flight, JARVIS, cloak): shared; coming off puts the suit back on its stand
-  const armor=createArmor({api,host,session,player,sound,toast,announce,beep,hud,suits:SUITS,
+  const armor=createArmor({api,host,session,player,sound:jarvis,toast,announce,beep,hud,suits:SUITS,
     onOff:s=>{standUp(s);show('ENT_'+(s.holoOn??s.holo+'_on'),true);if(s.id==='mk3')show('ENT_rotate_iron_on',true);}});
   const voice=armor.voice,wornSuit=()=>armor.worn();
 
