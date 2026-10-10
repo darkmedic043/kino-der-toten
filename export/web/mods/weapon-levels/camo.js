@@ -67,7 +67,8 @@ const matCache=new Map();   // original material uuid + camo id → camo materia
 function camoMaterial(orig,camo){
   const key=orig.uuid+'|'+camo.id;if(matCache.has(key))return matCache.get(key);
   const m=orig.clone();m.userData={...orig.userData,camoOf:orig,camo:camo.id};
-  const uniforms={camoMap:{value:camoTexture(camo)},camoScale:{value:camo.scale??2.5},camoMix:{value:camo.mix??.92}};
+  // a model may ask for denser tiling (glTF material extras camoScale, e.g. the Grimhawk's single texture atlas)
+  const uniforms={camoMap:{value:camoTexture(camo)},camoScale:{value:(camo.scale??2.5)*(orig.userData?.camoScale??1)},camoMix:{value:camo.mix??.92}};
   if(camo.glow)Object.assign(uniforms,{camoGlow:{value:camoTexture({texture:camo.glow})},camoTime});
   if(camo.metal){m.metalness=Math.max(m.metalness??0,.85);m.roughness=Math.min(m.roughness??1,.35);}
   const prev=orig.onBeforeCompile;

@@ -15,7 +15,8 @@ const MUZZLE = [30.45, 0, 2.4];          // tag_flash at the Grimhawk's brake (C
 // tag_clip does, so weapon-levels' fitted-mag follow keeps it with the reload.
 const NEW_BONES = { tag_gh_barrel: [26, 0, 2.4], tag_gh_rangefinder: [3.5, 0, 4.5], tag_gh_hawkeye: [2.5, 0, 5.2],
   tag_gh_expanse: [4.29, -0.01, 1.29], tag_gh_longbarrel: [28, 0, 2.4], tag_foregrip: [16, 0, 0.5], tag_laser_box: [19.3, -1.2, 2.45] };
-const WORLD_SHIFT = [-10.5, -2.55, 0];   // viewmodel gun space -> the M16 world model's (CoD (-10.5, 0, -2.55), in glTF axes)
+const WORLD_SHIFT = [-10.5, -2.55, 0];
+const CAMO_SCALE = 9;   // viewmodel gun space -> the M16 world model's (CoD (-10.5, 0, -2.55), in glTF axes)
 
 function readGlb(file) {
   const b = fs.readFileSync(file), n = b.readUInt32LE(12), json = JSON.parse(b.subarray(20, 20 + n));
@@ -67,6 +68,8 @@ function copyMaterials(src, out, w) {
   });
   out.textures = structuredClone(j.textures ?? []);
   out.materials = j.materials.map(m => structuredClone(m));
+  // the whole gun shares one atlas, so camos (tiled by UV) need denser tiling than BO1's per-part UVs (camo.js reads it)
+  for (const m of out.materials) if (m.name === 'gh_body') m.extras = { ...(m.extras ?? {}), camoScale: CAMO_SCALE };
   if (j.extensionsUsed) out.extensionsUsed = [...j.extensionsUsed];
   if (j.extensionsRequired) out.extensionsRequired = [...j.extensionsRequired];
   for (const k of ['samplers', 'images', 'textures']) if (!out[k].length) delete out[k];

@@ -175,3 +175,4 @@
 - 2026-10-09: Ammo Mods (Cryo, Napalm, Dead Wire, Shatter, Brain Rot; tiers I–III) bought at the terminal's ARSENAL app after power; fx mod's API no longer overwrites itself (gameplay.md).
 - 2026-10-09: Ammo mods: BO7's Fire Works and Shadow Rift added, Dead Wire gets BO7's damage field; per-tier TUNE table and ammoModTune/ammoModProc events for future augments (gameplay.md).
 - 2026-10-09: Ammo mods: BO6's Light Mend (healing glyph); Shatter Blast relabelled Cold War (gameplay.md).
+- 2026-10-09: Grimhawk camos tile at the right size (per-material camoScale in camo.js).
