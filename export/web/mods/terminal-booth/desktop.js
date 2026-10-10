@@ -7,6 +7,7 @@
 //          exfil() -> status (mods/exfil), callExfil() -> true | 'reason', arsenal() -> status (mods/ammo-mods),
 //          buyMod(id) / upgradeMod() -> true | 'reason', onOpen(), onClose(), onApp(name)}
 // ARSENAL (under PERKS) sells ammo mods for the gun in hand once the power is on.
+// STARK.EXE (mods/stark): the Iron Man armors; opts.stark() -> status, opts.starkAct(action, id) -> true | 'reason'.
 
 // Every perk in the game. Double-Dew (Cheese Cube) is left out for now, at the user's request.
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
@@ -58,6 +59,13 @@ const CSS = `
 #melonterm .desk{position:relative;flex:1;min-height:0;padding:20px;
   background:linear-gradient(#0c3a1c22 1px,transparent 1px) 0 0/32px 32px,linear-gradient(90deg,#0c3a1c22 1px,transparent 1px) 0 0/32px 32px}
 #melonterm .icons{display:grid;grid-template-columns:96px;grid-auto-rows:110px;gap:10px;width:96px}
+#melonterm .stk{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}#melonterm .stk>.perks{flex:1;min-height:0}
+#melonterm .stk .panel{padding:20px 26px;display:flex;flex-direction:column;gap:10px;font-size:22px}
+#melonterm .stk .panel h2{margin:0;font:inherit;font-size:38px;color:#ffd36b;letter-spacing:2px}
+#melonterm .stk .panel ul{margin:0;padding:0;list-style:none}#melonterm .stk .panel li{padding-left:28px;position:relative}
+#melonterm .stk .panel li::before{content:'[ ]';position:absolute;left:0;color:var(--dim)}#melonterm .stk .panel li.ok::before{content:'[X]';color:var(--g)}
+#melonterm .stk .bar2{height:14px;border:2px solid var(--g2);max-width:420px}#melonterm .stk .bar2 i{display:block;height:100%;background:var(--g)}
+#melonterm .stk .suit{font:bold 22px 'Arial Black',Arial,sans-serif;color:#ffd36b;text-shadow:0 0 8px #ff9f2a}
 #melonterm .ars{flex:1;min-height:0;display:flex;flex-direction:column}#melonterm .ars .tile.owned::after{content:'LOADED'}#melonterm .ars>.perks{flex:1;min-height:0}
 #melonterm .app{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;background:none;border:0;color:inherit;font:inherit;font-size:19px;padding:0}
 #melonterm .app .sq{width:64px;height:64px;border:2px solid var(--g2);background:#062a14;display:grid;place-items:center;box-shadow:0 0 10px #3dff8a33,inset 0 0 12px #000a}
@@ -137,6 +145,9 @@ const ARSENAL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rend
   <rect x="6" y="4" width="4" height="18"/><rect x="14" y="4" width="4" height="18"/><rect x="22" y="4" width="4" height="18"/>
   <rect x="6" y="2" width="4" height="2" fill="#c9ffd9"/><rect x="14" y="2" width="4" height="2" fill="#c9ffd9"/><rect x="22" y="2" width="4" height="2" fill="#c9ffd9"/>
   <rect x="4" y="24" width="24" height="3"/><rect x="4" y="28" width="24" height="2"/><rect x="7" y="8" width="2" height="9" fill="#031208"/><rect x="23" y="8" width="2" height="9" fill="#031208"/></svg>`;
+const STARK_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
+  <path d="M9 4h14l3 5v9l-4 8-6 3-6-3-4-8V9z" fill="none" stroke="#7dffa6" stroke-width="2"/><rect x="10" y="12" width="5" height="2"/><rect x="17" y="12" width="5" height="2"/>
+  <rect x="13" y="20" width="6" height="1.5"/><rect x="15" y="5" width="2" height="5"/></svg>`;
 const EXFIL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <rect x="4" y="6" width="24" height="2"/><rect x="15" y="8" width="2" height="3"/><rect x="9" y="11" width="15" height="7"/><rect x="6" y="13" width="3" height="3"/>
   <rect x="2" y="12" width="4" height="2"/><rect x="11" y="12" width="5" height="3" fill="#031208"/><rect x="11" y="19" width="2" height="3"/><rect x="20" y="19" width="2" height="3"/>
@@ -162,7 +173,8 @@ function build() {
     <div class="bar"><span>MELONTERM 2.7</span><span class="grow"></span><span class="pwr"></span><span class="pts"></span><span class="clock"></span></div>
     <div class="desk">
       <div class="icons"><button class="app" data-app="perks"><div class="sq">${PERKS_ICON}</div><span>PERKS</span></button>
-        <button class="app" data-app="arsenal"><div class="sq">${ARSENAL_ICON}</div><span>ARSENAL</span></button></div>
+        <button class="app" data-app="arsenal"><div class="sq">${ARSENAL_ICON}</div><span>ARSENAL</span></button>
+        <button class="app" data-app="stark"><div class="sq">${STARK_ICON}</div><span>STARK</span></button></div>
       <button class="app exfil off" data-app="exfil"><div class="sq">${EXFIL_ICON}</div><span>EXFIL</span></button>
       <div class="win" data-win="perks" hidden>
         <div class="title"><span>PERKS.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
@@ -171,6 +183,10 @@ function build() {
       <div class="win" data-win="arsenal" hidden>
         <div class="title"><span>ARSENAL.EXE · AMMO MODS</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="ars"></div>
+      </div>
+      <div class="win" data-win="stark" hidden>
+        <div class="title"><span>STARK.EXE · ARMORY</span><span class="grow"></span><button data-close title="Close">×</button></div>
+        <div class="stk"></div>
       </div>
       <div class="win" data-win="exfil" hidden>
         <div class="title"><span>EXFIL.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
@@ -182,6 +198,7 @@ function build() {
   document.body.append(root);
   const $ = s => root.querySelector(s);
   const win = $('[data-win=perks]'), exWin = $('[data-win=exfil]'), exBody = $('.exf'), exIcon = $('[data-app=exfil]');
+  const stWin = $('[data-win=stark]'), stBody = $('.stk'); let stState = '', stMsg = ['', ''], stShown = 0;
   const arWin = $('[data-win=arsenal]'), arBody = $('.ars'); let arState = '', arMsg = ['', ''];
   const grid = $('.grid'), detail = $('.detail'), msg = $('.msg');
   let exState = '';
@@ -193,8 +210,8 @@ function build() {
   for (const t of ['click', 'mousedown', 'mouseup', 'pointerdown', 'wheel', 'contextmenu']) root.addEventListener(t, e => e.stopPropagation());
 
   function key(e) {
-    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden) closeApp(); else close(); return; }
-    if (!arWin.hidden) return;
+    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden) closeApp(); else close(); return; }
+    if (!arWin.hidden || !stWin.hidden) return;
     if (!exWin.hidden) { if (e.code === 'Enter') { e.preventDefault(); callExfil(); } return; }
     if (win.hidden) { if (e.code === 'Enter') { e.preventDefault(); openApp('perks'); } return; }
     if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); buy(shown); return; }
@@ -241,14 +258,61 @@ function build() {
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
   }
   function openApp(name) {
-    if (name === 'arsenal') { win.hidden = exWin.hidden = true; arState = ''; arMsg = ['', '']; drawArsenal(); arWin.hidden = false; $('.open').textContent = '[ARSENAL.EXE]'; opts.onApp?.(name); return; }
-    if (name === 'exfil') { win.hidden = arWin.hidden = true; exState = ''; drawExfil(); exWin.hidden = false; $('.open').textContent = '[EXFIL.EXE]'; opts.onApp?.(name); return; }
+    if (name === 'stark') { win.hidden = exWin.hidden = arWin.hidden = true; stState = ''; stMsg = ['', '']; stWin.hidden = false; drawStark(); $('.open').textContent = '[STARK.EXE]'; opts.onApp?.(name); return; }
+    if (name === 'arsenal') { win.hidden = exWin.hidden = stWin.hidden = true; arState = ''; arMsg = ['', '']; drawArsenal(); arWin.hidden = false; $('.open').textContent = '[ARSENAL.EXE]'; opts.onApp?.(name); return; }
+    if (name === 'exfil') { win.hidden = arWin.hidden = stWin.hidden = true; exState = ''; drawExfil(); exWin.hidden = false; $('.open').textContent = '[EXFIL.EXE]'; opts.onApp?.(name); return; }
     if (name !== 'perks') return;
-    exWin.hidden = arWin.hidden = true;
+    exWin.hidden = arWin.hidden = stWin.hidden = true;
     say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
     opts.onApp?.(name); grid.querySelector(`[data-i="${shown}"]`)?.focus({ preventScroll: true });
   }
-  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = true; $('.open').textContent = ''; }
+  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = true; $('.open').textContent = ''; }
+  // ---- STARK.EXE: the Iron Man armors (mods/stark) ---------------------------------------------------------------
+  const MARK = { mk1: 'I', mk3: 'III', mk4: 'IV', mk5: 'V', mk6: 'VI', wm: 'WM', mk16: 'XVI' };
+  function starkDo(action, id) {
+    const r = opts.starkAct?.(action, id) ?? 'STARK.EXE is not installed';
+    stMsg = r === true ? [{ start: 'UPLINK INITIATED · RECOVER THE CORES', upload: 'UPLOADING · HOLD THE TERMINAL', buy: 'ARMOR PURCHASED', deploy: 'ARMOR INBOUND', recall: 'ARMOR RECALLED' }[action] ?? 'OK', 'ok'] : [String(r).toUpperCase(), 'bad'];
+    status(); drawStark(); if (r === true && action === 'deploy') setTimeout(close, 500);
+  }
+  function drawStark() {
+    if (stWin.hidden) return;
+    const st = opts?.stark?.(); if (!st) { stBody.innerHTML = '<div class="panel"><p>STARK.EXE is not installed.</p></div>'; return; }
+    const key = JSON.stringify([st, stMsg, stShown]); if (key === stState) return; stState = key;
+    const msgHtml = `<div class="msg ${stMsg[1]}">${esc(stMsg[0] || '')}</div>`;
+    if (!st.unlocked || !st.power || st.phase !== 'online') {
+      let body;
+      if (!st.unlocked) body = `<h2>ACCESS DENIED</h2><p>STARK INDUSTRIES CREDENTIALS REQUIRED. EARN THEM ON CHEESE CUBE:</p>
+        <ul><li class="${st.req.stark ? 'ok' : ''}">Build the six Iron Man armor parts in the Hall of Armors (Iron Man armors)</li>
+        <li class="${st.req.stark_wm ? 'ok' : ''}">Complete the trivia (War Machine)</li>
+        <li class="${st.req.stark_mk16 ? 'ok' : ''}">Beat the map ${st.winsNeeded} times · ${Math.min(st.wins, st.winsNeeded)} / ${st.winsNeeded} (Mark XVI)</li></ul>`;
+      else if (!st.power) body = `<h2>ARMORY OFFLINE</h2><p>RESTORE MAINS POWER TO REACH THE STARK SATELLITE.</p>`;
+      else if (st.phase === 'offline') body = `<h2>ARMOR UPLINK</h2><p>THE ARMORS NEED POWER CORES BEFORE THEY CAN BE DEPLOYED HERE.</p>
+        <ul><li>Recover ${st.coresNeeded} armor cores: the undead drop them (hellhounds always). They glow blue.</li><li>Upload them here, then hold the terminal for ${st.uplink} s.</li></ul>
+        <button class="buy" data-act="start">START ARMOR UPLINK</button>`;
+      else if (st.phase === 'cores') body = `<h2>RECOVERING CORES</h2><p>${st.cores} / ${st.coresNeeded} ARMOR CORES</p><div class="bar2"><i style="width:${100 * st.cores / st.coresNeeded}%"></i></div><p>KILL ZOMBIES AND PICK UP THE GLOWING CORES.</p>`;
+      else if (st.phase === 'upload') body = `<h2>CORES RECOVERED</h2><p>UPLOAD THEM, THEN HOLD THIS TERMINAL FOR ${st.uplink} S.</p><button class="buy" data-act="upload">UPLOAD CORES</button>`;
+      else body = `<h2>UPLINK ${st.uplinkLeft} S</h2><div class="bar2"><i style="width:${100 * (1 - st.uplinkLeft / st.uplink)}%"></i></div><p>STAY NEAR A TERMINAL UNTIL IT COMPLETES.</p>`;
+      stBody.innerHTML = `<div class="panel">${body}${msgHtml}</div>`;
+      for (const b of stBody.querySelectorAll('[data-act]')) b.addEventListener('click', () => starkDo(b.dataset.act));
+      return;
+    }
+    // online: the armors, laid out like PERKS.EXE
+    if (!stBody.querySelector('.grid')) stBody.innerHTML = '<div class="perks"><div class="left"><div class="grid"></div><div class="msg"></div></div><div class="detail"></div></div>';
+    const grid = stBody.querySelector('.grid'), detail = stBody.querySelector('.detail'), msg = stBody.querySelector('.msg');
+    grid.innerHTML = st.suits.map((s, i) => `<button class="tile ${s.unlocked ? '' : 'locked'} ${s.owned ? 'owned' : ''} ${i === stShown ? 'on' : ''}" data-i="${i}" title="${esc(s.name)}">
+      <span class="suit">${MARK[s.id] ?? s.id}</span><span class="tag">${!s.unlocked ? 'LOCKED' : s.worn ? 'WORN' : s.owned ? s.power + '%' : ''}</span></button>`).join('');
+    for (const t of grid.children) { t.addEventListener('mouseenter', () => { stShown = +t.dataset.i; drawStark(); }); t.addEventListener('click', () => { const s = st.suits[+t.dataset.i]; starkDo(s.worn ? 'recall' : s.owned ? 'deploy' : 'buy', s.id); }); }
+    const s = st.suits[Math.min(stShown, st.suits.length - 1)];
+    const label = !s.unlocked ? 'LOCKED · EARN IT ON CHEESE CUBE' : s.worn ? 'RECALL ARMOR' : s.owned ? (st.delivering ? 'ARMOR INBOUND' : s.ready ? 'DEPLOY ARMOR' : `CHARGING · ${s.power}%`) : st.points < s.cost ? 'NOT ENOUGH POINTS' : `BUY · ${s.cost.toLocaleString()}`;
+    const can = s.unlocked && (s.worn || (s.owned ? s.ready && !st.delivering : st.points >= s.cost));
+    detail.innerHTML = `<div class="head"><div class="big"><span class="suit" style="font-size:40px">${MARK[s.id] ?? ''}</span></div><div>
+        <h2>${esc(s.name.toUpperCase())}</h2><div class="blurb">${s.owned ? `POWER ${s.power}%` : 'STARK INDUSTRIES ARMOR'}</div><div class="price">${s.cost.toLocaleString()} PTS</div></div></div>
+      <button class="buy ${s.unlocked ? '' : 'locked'}" ${can ? '' : 'disabled'}>${label}</button>
+      <h3>SPECS</h3><ul><li>Health ${s.hp}</li><li>Speed ×${s.speed}</li><li>${s.weapons.map(esc).join(' · ')}</li><li>Hold Space in the air to fly; shots and flight use power</li></ul>
+      <div class="note">* Deployed where you stand. When its power runs out it flies home and recharges.</div>`;
+    detail.querySelector('.buy').addEventListener('click', () => starkDo(s.worn ? 'recall' : s.owned ? 'deploy' : 'buy', s.id));
+    msg.textContent = stMsg[0] || '> HOVER AN ARMOR · CLICK TO BUY OR DEPLOY'; msg.className = 'msg ' + stMsg[1];
+  }
   // ---- ARSENAL.EXE: ammo mods for the gun in hand, laid out like PERKS.EXE (tiles left, details right) -------------
   const ROMAN = ['', 'I', 'II', 'III'];
   const MOD_GLYPH = {   // simple square-icon glyphs per mod (white, tinted by the mod's colour); unknown ids get a letter
@@ -337,7 +401,8 @@ function build() {
     const state = PERKS.map(p => blocked(p)).join() + opts.points();
     if (!win.hidden && state !== lastState) { renderGrid(); select(shown); }
     lastState = state;
-    drawExfil(); drawArsenal();
+    drawExfil(); drawArsenal(); drawStark();
+    $('[data-app=stark]').classList.toggle('off', !opts.stark?.()?.unlocked);
   }
   function open(o) {
     opts = o; root.hidden = false; status(); clearInterval(clock); clock = setInterval(status, 250);
@@ -353,6 +418,7 @@ function build() {
   root.querySelector('[data-app=perks]').addEventListener('click', () => openApp('perks'));
   root.querySelector('[data-app=exfil]').addEventListener('click', () => openApp('exfil'));
   root.querySelector('[data-app=arsenal]').addEventListener('click', () => openApp('arsenal'));
+  root.querySelector('[data-app=stark]').addEventListener('click', () => openApp('stark'));
   for (const b of root.querySelectorAll('[data-close]')) b.addEventListener('click', closeApp);
   root.querySelector('[data-logoff]').addEventListener('click', close);
   return { open, close, isOpen: () => !root.hidden };

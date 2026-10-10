@@ -1,0 +1,5 @@
+{
+  "name": "STARK.EXE",
+  "description": "The Iron Man armors on every map with a terminal: unlocked on Cheese Cube, brought online each game by recovering armor cores and holding an uplink, then bought and deployed from the terminal.",
+  "script": "mod.js"
+}

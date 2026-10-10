@@ -428,6 +428,7 @@ export default async function setup(api){
         needsPower:p=>p.id!==QR,
         price:priceOf,buy,
         exfil:()=>window.kino.exfil?.status(),callExfil:()=>window.kino.exfil?.start()??'Exfil is not installed',
+        stark:()=>window.kino.stark?.status(),starkAct:(a,id)=>window.kino.stark?.act(a,id)??'STARK.EXE is not installed',
         arsenal:()=>window.kino.ammoMods?.status(),buyMod:id=>window.kino.ammoMods?.buy(id)??'Ammo mods are not installed',upgradeMod:()=>window.kino.ammoMods?.upgrade()??'Ammo mods are not installed',
         power:()=>!!session.power,points:()=>session.points,
         onOpen:()=>b.print('USER LOGGED IN'),
