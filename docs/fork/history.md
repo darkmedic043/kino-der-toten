@@ -177,3 +177,4 @@
 - 2026-10-09: Ammo mods: BO6's Light Mend (healing glyph); Shatter Blast relabelled Cold War (gameplay.md).
 - 2026-10-09: Grimhawk camos tile at the right size (per-material camoScale in camo.js).
 - 2026-10-10: Grimhawk: the fan-drum P.T. Expanse is back with its own procedural reload (left-arm IK, canted gun); fixed the drum following a spare M16 mag bone (weapons.md).
+- 2026-10-10: Grimhawk: head-lock only when Pack-a-Punched and aimed; the drum reload rips, throws the old drum away and slams a new one in.

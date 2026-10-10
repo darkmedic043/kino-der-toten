@@ -23,8 +23,6 @@ const SPARE_TAGS = ['tag_ext_clip', 'tag_double_clip'];
 // At the hip it sat as close as the BO1 M16 and read as huge (a long, bulky gun): pushed 3 units away from the eye
 // along the view camera's axis (-z), nudged right and down (ViewWeapon's def.viewOffset; gone in ADS).
 const VIEW_OFFSET = [.6, -.4, -3];
-// Optics that make homing lock onto the head (precision); Pack-a-Punched always does.
-const HEAD_LOCK = ['gh_rangefinder', 'gh_hawkeye'];
 const SPEED = 2600, DROP = 520, LIFE = 2.2, TURN = 3.2, CONE = Math.cos(THREE.MathUtils.degToRad(16)), REACH = 1800, MAX = 60;
 
 export function prepare(data) {
@@ -92,34 +90,60 @@ export default function setup(api) {
       drum = { t: 0, dur: Math.max(.6, duration), empty, clip, arm, rest: clip ? { p: clip.position.clone(), q: clip.quaternion.clone() } : null, played: new Set() };
     };
   }
-  const tmpQ = new THREE.Quaternion(), yAxis = new THREE.Vector3(0, 1, 0), xAxis = new THREE.Vector3(1, 0, 0);
-  // the gun lifts toward the centre and rolls its underside to the camera so the drum swap is in view (view-space pivot)
-  const CANT = { 'rotation.x': .4, 'rotation.z': -.25 };   // muzzle up, rolled right: the drum and the left hand in view
-  const DROP = 9;   // how far the drum comes out (gun space, down)
+  // the gun lifts muzzle-up and rolls right so the swap is in view (view-space pivot), with a little overshoot going in
+  const CANT = { 'rotation.x': .4, 'rotation.z': -.25 };
   const GRIP = new THREE.Vector3(3.2, 2.6, -6.4);   // where the left wrist goes, in tag_clip space (CoD: x fwd, y left, z up): under the drum, on its left
+  // the drum's path as offsets from its seat (gun space, CoD axes; r = x/y/z rotation): ripped out, flicked away, a fresh
+  // one fetched from below, brought up and slammed in. The hand holds `hand` poses; the drum flies free while thrown.
+  const POSE = { seat: [0, 0, 0, 0, 0, 0], rip: [1.5, 2.5, -8, .35, -.55, 0], release: [0, 6, -10, .6, -.7, 0], flick: [-.5, 9, -11, .7, -.8, 0],
+    pick: [0, 4, -17, .5, -.5, 0], ready: [.5, .8, -1.6, .1, -.15, 0] };
+  const T = { reach: [.08, .22], rip: [.22, .34], fly: [.34, .52], flick: [.34, .4], fetch: [.4, .54], up: [.54, .72], seat: [.72, .78], back: [.82, .95] };
+  const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+  const easeOut = x => 1 - (1 - x) ** 3, backOut = x => { const c = 1.7; return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2; };
+  const span = (u, [a, b]) => Math.max(0, Math.min(1, (u - a) / (b - a)));
+  const bump = (u, [a, b]) => { const k = span(u, [a, b]); return k > 0 && k < 1 ? Math.sin(k * Math.PI) : 0; };
+  function handPose(u) {   // where the hand carries the drum (or would)
+    if (u < T.rip[0]) return POSE.seat;
+    if (u < T.rip[1]) return mix(POSE.seat, POSE.rip, ease(span(u, T.rip)));
+    if (u < T.flick[1]) return mix(POSE.rip, POSE.flick, easeOut(span(u, T.flick)));
+    if (u < T.fetch[1]) return mix(POSE.flick, POSE.pick, ease(span(u, T.fetch)));
+    if (u < T.up[1]) return mix(POSE.pick, POSE.ready, easeOut(span(u, T.up)));
+    return mix(POSE.ready, POSE.seat, ease(span(u, T.seat)));
+  }
+  function drumPose(u) {   // the drum itself: with the hand, except while the old one is thrown
+    if (u < T.fly[0] + .04 || u >= T.fly[1]) return handPose(u);
+    const k = (u - T.fly[0] - .04) / (T.fly[1] - T.fly[0] - .04), r = POSE.release.concat();   // let go just after the rip
+    return [r[0] - 2 * k, r[1] + 18 * k, r[2] + 10 * k - 34 * k * k, r[3] + 7 * k, r[4] - 2 * k, r[5] + 3 * k];   // tossed up and out, tumbling, then it drops
+  }
+  const tmpE = new THREE.Euler();
+  function setClip(d, pose) {
+    d.clip.position.copy(d.rest.p).add(new THREE.Vector3(pose[0], pose[1], pose[2]));
+    d.clip.quaternion.copy(d.rest.q).multiply(new THREE.Quaternion().setFromEuler(tmpE.set(pose[3], pose[4], pose[5])));
+  }
   function endDrum() { if (drum?.clip && drum.rest) { drum.clip.position.copy(drum.rest.p); drum.clip.quaternion.copy(drum.rest.q); } for (const a of drum?.arm ?? []) a.b.quaternion.copy(a.q); drum = null; }
   host.on('update', dt => {
     if (!drum) return;
     if (!view?.ready || !drumFitted() || (session.reloadLeft <= 0 && drum.t > .2) || session.weapon?.id !== ID) { endDrum(); return; }
     drum.t += dt; const u = Math.min(1, drum.t / drum.dur), d = drum;
     if (u >= 1) { endDrum(); return; }
-    // the gun cants right and lifts a little to show the drum
-    const cant = seg(u, 0, .14) * (1 - seg(u, .84, 1));
+    // the gun: cants in (overshooting a touch) and out; kicks when the drum is ripped out, leans as it's thrown, jolts
+    // down when the new one is slammed home
+    const cant = backOut(span(u, [0, .16])) * (1 - ease(span(u, [.84, 1])));
     for (const [k, v] of Object.entries(CANT)) { const [o, ax] = k.split('.'); view.pivot[o][ax] += v * cant; }
-    // the drum: seated → out and down (front first) → fresh one back up → seated (a small slap)
-    const out = seg(u, .26, .48) * (1 - seg(u, .58, .78)), slap = Math.sin(Math.min(1, Math.max(0, (u - .78) / .06)) * Math.PI) * .35;
-    if (d.clip && d.rest) {
-      d.clip.position.copy(d.rest.p).add(new THREE.Vector3(1.5 * out, 2.5 * out, -DROP * out + slap));
-      d.clip.quaternion.copy(d.rest.q).multiply(tmpQ.setFromAxisAngle(yAxis, -.55 * out)).multiply(new THREE.Quaternion().setFromAxisAngle(xAxis, .35 * out));
-    }
+    view.pivot.rotation.x += .1 * bump(u, [.22, .36]) - .14 * bump(u, [.73, .84]);
+    view.pivot.rotation.z -= .08 * bump(u, [.34, .5]); view.pivot.position.y -= .7 * bump(u, [.73, .84]);
     // sounds at the beats
     const beat = (k, at, name) => { if (u >= at && !d.played.has(k)) { d.played.add(k); view.onSound?.(name, session.def); } };
-    beat('out', .3, 'sndnt#wpn_m16_mag_out'); beat('in', .78, 'sndnt#wpn_m16_mag_in');
+    beat('out', .28, 'sndnt#wpn_m16_mag_out'); beat('in', .75, 'sndnt#wpn_m16_mag_in');
     if (d.empty) beat('ch', .9, 'sndnt#wpn_m16_button');
-    // the left hand: reaches the drum, rides with it, lets go
-    const w = seg(u, .1, .26) * (1 - seg(u, .82, .96)), reach = window.kino.fpMotion?.reachLeft;
     for (const a of d.arm) a.b.quaternion.copy(a.q);
-    if (reach && d.clip && w > 0) { view.root.updateMatrixWorld(true); reach(d.clip.localToWorld(GRIP.clone()), w, false); }
+    if (!d.clip || !d.rest) return;
+    // the left hand: reaches the drum, rips and flicks it, fetches the new one, lets go after the seat
+    const w = ease(span(u, T.reach)) * (1 - ease(span(u, T.back))), reach = window.kino.fpMotion?.reachLeft;
+    setClip(d, handPose(u)); view.root.updateMatrixWorld(true);
+    const target = d.clip.localToWorld(GRIP.clone());
+    setClip(d, drumPose(u)); view.root.updateMatrixWorld(true);
+    if (reach && w > 0) reach(target, w, false);
   });
   host.on('reset', endDrum);
 
@@ -150,7 +174,7 @@ export default function setup(api) {
     if (!isGrim(def)) return false;
     // homing: aimed shots; the Long Barrel moves it to the hip (BO7's prestige barrel); Pack-a-Punched: both
     const atts = String(def.attachments ?? '').split('+'), pap = !!def.upgraded, dir = forward.clone(), longBarrel = atts.includes('gh_longbarrel');
-    const headLock = pap || HEAD_LOCK.some(a => atts.includes(a));
+    const headLock = pap && ads;   // homing goes for the head only when Pack-a-Punched and aimed (user decision); else the chest
     if (!ads) { const s = (def.hipSpread ?? .016) * (session.perks.has('specialty_deadshot') ? .5 : 1); dir.x += (Math.random() - .5) * s; dir.y += (Math.random() - .5) * s; dir.z += (Math.random() - .5) * s; dir.normalize(); }
     // start at the eye so close shots still land where the crosshair is; drawn from the muzzle
     const mesh = new THREE.Mesh(needleGeo, needleMat); mesh.frustumCulled = false;
@@ -165,8 +189,7 @@ export default function setup(api) {
   }
   (host.fireHooks ??= []).push(launch);
 
-  // where homing steers: the head bone when locked (PaP, or a HEAD_LOCK optic), else the chest so the plain gun doesn't
-  // hand out headshots
+  // where homing steers: the head bone when locked (Pack-a-Punched and aimed), else the chest so it doesn't hand out headshots
   function aimPoint(z, head, out) {
     if (head) return out.copy(enemies.headPosition?.(z) ?? z.root.position.clone().add(new THREE.Vector3(0, z.kind === 'dog' ? 28 : 63, 0)));
     out.copy(z.root.position); out.y += z.kind === 'dog' ? 18 : 40; return out;
