@@ -1,2069 +1,2164 @@
 {
-  "characters": [
-    {
-      "id": "mannequin",
-      "name": "Test Subject",
-      "type": "mannequin",
-      "description": "Placeholder figure until a real model is added.",
-      "color": "#8d8a80",
-      "accent": "#932e25",
-      "hands": "usmc",
-      "handsTint": {
-        "glovesleeve": "#932e25",
-        "glove": "#6b6960"
-      },
-      "handsFlat": true
-    },
-    {
-      "id": "mannequin_blue",
-      "name": "Test Subject (Blue)",
-      "type": "mannequin",
-      "description": "The placeholder in blue.",
-      "color": "#8d8a80",
-      "accent": "#2f5e8c",
-      "hands": "usmc",
-      "handsTint": {
-        "glovesleeve": "#2f5e8c",
-        "glove": "#6b6960"
-      },
-      "handsFlat": true
-    },
-    {
-      "id": "honorguard",
-      "name": "Undead Honor Guard",
-      "type": "t5",
-      "description": "Play as a Kino zombie. Uses the game's zombie animations, so it shambles.",
-      "body": "c_ger_honorguard_body1",
-      "head": "c_ger_zombie_head2",
-      "walk": "ai_zombie_walk_fast_v1",
-      "run": "ai_zombie_sprint_v1",
-      "idle": "ai_zombie_walk_v1",
-      "hands": "pow",
-      "handsTint": {
-        "*": "#a4ab96"
-      }
-    },
-    {
-      "id": "female_protogen",
-      "name": "Protogen",
-      "type": "gltf",
-      "motion": "bo1",
-      "model": "models/female_protogen/scene.gltf",
-      "height": 74,
-      "description": "Female Protogen by Jakermates, animated with Black Ops' own player animations.",
-      "color": "#767e8c",
-      "accent": "#c8cde2",
-      "credit": {
-        "title": "Female_Protogen",
-        "author": "Jakermates",
-        "authorUrl": "https://sketchfab.com/jaydidleedoo",
-        "source": "https://sketchfab.com/3d-models/female-protogen-839042536637493b9b7bd983d2a36e5c",
-        "license": "CC-BY-4.0",
-        "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
-      },
-      "fpArms": true
-    },
-    {
-      "id": "zoroark",
-      "name": "Zoroark",
-      "type": "gltf",
-      "model": "models/zoroark/zoroark.glb",
-      "height": 70,
-      "description": "Zoroark from Cobblemon, with its own idle and walk animations (converted from Blockbench).",
-      "color": "#3b3a46",
-      "accent": "#b0263a",
-      "handBone": "locator_hand_primary",
-      "optional": true,
-      "credit": {
-        "title": "Zoroark (Cobblemon)",
-        "author": "The Cobblemon team",
-        "authorUrl": "https://cobblemon.com",
-        "source": "https://gitlab.com/cable-mc/cobblemon-assets/-/tree/master/blockbench/pokemon/gen5/0571_zoroark",
-        "license": "CC-BY-NC-3.0",
-        "licenseUrl": "https://creativecommons.org/licenses/by-nc/3.0/",
-        "note": "Converted from Blockbench to glTF (animations baked). Pokémon and Zoroark are trademarks of Nintendo / Game Freak / The Pokémon Company."
-      },
-      "yaw": 180,
-      "fpArms": true,
-      "fpArmsArm": "^arm_(left|right)1$",
-      "fpArmsFingers": {
-        "index": "^claw_front",
-        "mid": "^claw_middle",
-        "pinky": "^claw_back"
-      },
-      "fpArmsFit": "arm",
-      "fpArmsScale": 0.8,
-      "fpArmsExclude": "fluff"
-    },
-    {
-      "id": "bondrewd",
-      "name": "Bondrewd",
-      "type": "gltf",
-      "motion": "bo1",
-      "model": "models/bondrewd/bondrewd.glb",
-      "height": 80,
-      "description": "Bondrewd the Novel, Lord of Dawn. Bunny Squad's VRChat model, animated with Black Ops' own player animations.",
-      "color": "#2b2d33",
-      "accent": "#c43c3c",
-      "fpArms": true,
-      "optional": true,
-      "credit": {
-        "title": "Bunny Squad Bondrewd",
-        "author": "Malganis Lefay (Bunny Squad)",
-        "authorUrl": "https://vrc.group/BUNNY.5164",
-        "source": "Bunny Squad VRChat model (Unity package)",
-        "license": "Free to use, edit and share (author's readme)",
-        "note": "Fan model. Bondrewd is from Made in Abyss by Akihito Tsukushi."
-      },
-      "fpArmsRetarget": true,
-      "springBones": {
-        "chains": [
-          "Coat_Back_L_0",
-          "Coat_Back_R_0",
-          "Coat_Front_L_0",
-          "Coat_Front_R_0",
-          "Coat_Split_L_1",
-          "Coat_Split_R_1",
-          "z_Coat_Side_L_0",
-          "z_Coat_Side_R_0"
-        ],
-        "childMatch": "Coat",
-        "stiffness": 0.025,
-        "drag": 0.16,
-        "gravity": 2,
-        "maxAngle": 25,
-        "follow": 0.6,
-        "radius": 0.04,
-        "colliders": [
-          {
-            "bone": "Hips",
-            "to": "Spine",
-            "radius": 0.22
-          },
-          {
-            "bone": "Spine",
-            "to": "Chest",
-            "radius": 0.22
-          },
-          {
-            "bone": "Left leg",
-            "to": "Left knee",
-            "radius": 0.12
-          },
-          {
-            "bone": "Left knee",
-            "to": "Left ankle",
-            "radius": 0.1
-          },
-          {
-            "bone": "Right leg",
-            "to": "Right knee",
-            "radius": 0.12
-          },
-          {
-            "bone": "Right knee",
-            "to": "Right ankle",
-            "radius": 0.1
-          }
-        ],
-        "_doc": "Coat: legs and torso push it (capped at each joint's rest distance), it rests on the ground; tuned for a coat that trails without flipping up",
-        "followY": 1,
-        "floor": true,
-        "drive": {
-          "legs": [
-            "Left leg",
-            "Right leg"
-          ],
-          "weights": {
-            "Coat_Front": 0.7,
-            "z_Coat_Side": 0.45,
-            "Coat_Split": 0.35,
-            "Coat_Back": 0.25
-          }
-        }
-      },
-      "variants": [
-        {
-          "id": "gauntlets",
-          "label": "Gauntlets",
-          "options": [
-            {
-              "id": "base",
-              "label": "Base",
-              "morphs": {
-                "Gauntlet_Off": 1
-              }
-            },
-            {
-              "id": "brick",
-              "label": "Brick",
-              "morphs": {}
-            }
-          ]
-        },
-        {
-          "id": "paper",
-          "label": "Paper eyes",
-          "options": [
-            {
-              "id": "off",
-              "label": "Off"
-            },
-            {
-              "id": "on",
-              "label": "On",
-              "morphs": {
-                "Eye_Paper_L": 1,
-                "Eye_Paper_R": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "face",
-          "label": "Paper eye face",
-          "note": "Shows with paper eyes on",
-          "options": [
-            {
-              "id": "neutral",
-              "label": "Neutral"
-            },
-            {
-              "id": "happy",
-              "label": "Happy",
-              "morphs": {
-                "Eye_Happy_L": 1,
-                "Eye_Happy_R": 1,
-                "Eye_Angry_L": 0.5,
-                "Eye_Angry_R": 0.5
-              }
-            },
-            {
-              "id": "angry",
-              "label": "Angry",
-              "morphs": {
-                "Eye_Angry_L": 1,
-                "Eye_Angry_R": 1,
-                "Eye_Annoyed_L": 1,
-                "Eye_Annoyed_R": 1
-              }
-            },
-            {
-              "id": "sad",
-              "label": "Sad",
-              "morphs": {
-                "Eye_Sad_L": 1,
-                "Eye_Sad_R": 1
-              }
-            },
-            {
-              "id": "surprise",
-              "label": "Surprise",
-              "morphs": {
-                "Eye_Suprise_L": 1,
-                "Eye_Suprise_R": 1
-              }
-            },
-            {
-              "id": "smort",
-              "label": "Smort",
-              "morphs": {
-                "Eye_Smort_L": 1,
-                "Eye_Smort_R": 1
-              }
-            },
-            {
-              "id": "bored",
-              "label": "Bored",
-              "morphs": {
-                "Blink_L": 1,
-                "Blink_R": 1
-              }
-            },
-            {
-              "id": "squint",
-              "label": "Squint",
-              "morphs": {
-                "Eye_Squint_L": 1,
-                "Eye_Squint_R": 1
-              }
-            },
-            {
-              "id": "dead",
-              "label": "Dead",
-              "morphs": {
-                "Eye_Dead_L": 1,
-                "Eye_Dead_R": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "pockets",
-          "label": "Science pockets",
-          "options": [
-            {
-              "id": "anime",
-              "label": "Anime",
-              "morphs": {
-                "Anime_Pocket": 1
-              }
-            },
-            {
-              "id": "manga",
-              "label": "Manga",
-              "morphs": {
-                "Manga_Pocket": 1
-              }
-            },
-            {
-              "id": "none",
-              "label": "None"
-            }
-          ]
-        },
-        {
-          "id": "boots",
-          "label": "Boots",
-          "options": [
-            {
-              "id": "anime",
-              "label": "Anime"
-            },
-            {
-              "id": "manga",
-              "label": "Manga",
-              "morphs": {
-                "Boots_Manga": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "coat",
-          "label": "Coat",
-          "options": [
-            {
-              "id": "standard",
-              "label": "Standard"
-            },
-            {
-              "id": "long",
-              "label": "Long",
-              "morphs": {
-                "Jacket_Long": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "build",
-          "label": "Build",
-          "options": [
-            {
-              "id": "standard",
-              "label": "Standard"
-            },
-            {
-              "id": "bulky",
-              "label": "Bulky",
-              "morphs": {
-                "Bulky": 1
-              }
-            }
-          ]
-        }
-      ],
-      "skinName": "Base"
-    },
-    {
-      "id": "bondrewd_premium",
-      "skinOf": "bondrewd",
-      "skinName": "Premium",
-      "name": "Bondrewd",
-      "type": "gltf",
-      "motion": "bo1",
-      "description": "Bondrewd the Novel, Lord of Dawn: Bunny Squad's Premium model, with the combat suit, Sparagmos gauntlets, cartridge tank and Blessing of the Abyss.",
-      "model": "models/bondrewd_premium/bondrewd_premium.glb",
-      "height": 80,
-      "optional": true,
-      "credit": {
-        "title": "Bunny Squad Bondrewd Premium",
-        "author": "Malganis Lefay (Bunny Squad)",
-        "authorUrl": "https://vrc.group/BUNNY.5164",
-        "source": "Bunny Squad VRChat model (Unity package)",
-        "license": "Free to use, edit and share (author's readme)",
-        "note": "Fan model. Bondrewd is from Made in Abyss by Akihito Tsukushi."
-      },
-      "fpArms": true,
-      "fpArmsRetarget": true,
-      "fpArmsNearCut": 5,
-      "springBones": [
-        {
-          "chains": [
-            "Coat_Back_L_0",
-            "Coat_Back_R_0",
-            "Coat_Front_L_0",
-            "Coat_Front_R_0",
-            "Coat_Split_L_1",
-            "Coat_Split_R_1",
-            "z_Coat_Side_L_0",
-            "z_Coat_Side_R_0"
-          ],
-          "childMatch": "Coat",
-          "stiffness": 0.025,
-          "drag": 0.16,
-          "gravity": 2,
-          "maxAngle": 25,
-          "follow": 0.6,
-          "radius": 0.04,
-          "colliders": [
-            {
-              "bone": "Hips",
-              "to": "Spine",
-              "radius": 0.22
-            },
-            {
-              "bone": "Spine",
-              "to": "Chest",
-              "radius": 0.22
-            },
-            {
-              "bone": "Left leg",
-              "to": "Left knee",
-              "radius": 0.12
-            },
-            {
-              "bone": "Left knee",
-              "to": "Left ankle",
-              "radius": 0.1
-            },
-            {
-              "bone": "Right leg",
-              "to": "Right knee",
-              "radius": 0.12
-            },
-            {
-              "bone": "Right knee",
-              "to": "Right ankle",
-              "radius": 0.1
-            }
-          ],
-          "_doc": "Coat: legs and torso push it (capped at each joint's rest distance), it rests on the ground; tuned for a coat that trails without flipping up",
-          "followY": 1,
-          "floor": true,
-          "drive": {
-            "legs": [
-              "Left leg",
-              "Right leg"
-            ],
-            "weights": {
-              "Coat_Front": 0.7,
-              "z_Coat_Side": 0.45,
-              "Coat_Split": 0.35,
-              "Coat_Back": 0.25
-            }
-          }
-        },
-        {
-          "chains": [
-            "PB_Tail_0_scale10"
-          ],
-          "mode": "drag",
-          "sag": 2,
-          "floor": true,
-          "radius": 0.05,
-          "_doc": "Bondrewd's tail drags on the floor like a heavy rope (no spring, so it can't flail)"
-        }
-      ],
-      "_variantsDoc": "Mirrors the avatar's VRChat menus (Equipment, Misc, Mutant). Shape keys plus Poiyomi effects rebuilt as texture swaps/clip masks; bone values from its toggle animations (deltas from rest).",
-      "variantBase": {
-        "morphs": {
-          "ScienceSuit": 1,
-          "ClawShrinkL": 1,
-          "ClawShrinkR": 1
-        },
-        "meshes": {
-          "Tank": false
-        },
-        "bones": {
-          "PB_Tail_0_scale10": {
-            "scale": 0.1
-          }
-        },
-        "surfaces": {
-          "Gauntlets": {
-            "alphaMap": "metal_alpha.webp",
-            "alphaTest": 0.475
-          },
-          "Tank": {
-            "alphaMap": "metal_alpha.webp",
-            "alphaTest": 0.475
-          },
-          "Transform": {
-            "alphaMap": "fur_mask_inv.webp",
-            "alphaTest": 0.5
-          }
-        }
-      },
-      "variants": [
-        {
-          "id": "outfit",
-          "label": "Outfit",
-          "options": [
-            {
-              "id": "science",
-              "label": "Science"
-            },
-            {
-              "id": "combat",
-              "label": "Combat",
-              "morphs": {
-                "ScienceSuit": 0,
-                "Boots_Combat": 1
-              },
-              "surfaces": {
-                "Body": {
-                  "map": "combat_dif.webp",
-                  "normalMap": "combat_norm.webp"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "gauntlets",
-          "label": "Gauntlets",
-          "options": [
-            {
-              "id": "base",
-              "label": "Base",
-              "morphs": {
-                "Gauntlet_Off": 1
-              }
-            },
-            {
-              "id": "brick",
-              "label": "Brick",
-              "surfaces": {
-                "Gauntlets": {
-                  "alphaMap": "metal_alpha_inv.webp",
-                  "alphaTest": 0.475
-                }
-              }
-            },
-            {
-              "id": "combat",
-              "label": "Combat",
-              "morphs": {
-                "Curse_Dart_Launcher": 1,
-                "unHide_Sparagmus": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "tank",
-          "label": "Cartridge tank",
-          "options": [
-            {
-              "id": "off",
-              "label": "Off"
-            },
-            {
-              "id": "on",
-              "label": "On",
-              "meshes": {
-                "Tank": true
-              }
-            }
-          ]
-        },
-        {
-          "id": "boots",
-          "label": "Boots",
-          "options": [
-            {
-              "id": "anime",
-              "label": "Anime"
-            },
-            {
-              "id": "manga",
-              "label": "Manga",
-              "morphs": {
-                "Boots_Manga": 1
-              },
-              "when": {
-                "outfit:combat": {
-                  "morphs": {
-                    "Boots_Manga": 0,
-                    "Boots_Combat_Manga": 1
-                  }
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "pockets",
-          "label": "Science pockets",
-          "options": [
-            {
-              "id": "anime",
-              "label": "Anime",
-              "morphs": {
-                "Anime_Pocket": 1
-              }
-            },
-            {
-              "id": "manga",
-              "label": "Manga",
-              "morphs": {
-                "Manga_Pocket": 1
-              }
-            },
-            {
-              "id": "none",
-              "label": "None"
-            }
-          ]
-        },
-        {
-          "id": "paper",
-          "label": "Paper eyes",
-          "options": [
-            {
-              "id": "off",
-              "label": "Off"
-            },
-            {
-              "id": "on",
-              "label": "On",
-              "morphs": {
-                "Eye_Paper_L": 1,
-                "Eye_Paper_R": 1
-              }
-            },
-            {
-              "id": "damaged",
-              "label": "Damaged",
-              "morphs": {
-                "Eye_Paper_R": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "face",
-          "label": "Paper eye face",
-          "note": "Shows with paper eyes on",
-          "options": [
-            {
-              "id": "neutral",
-              "label": "Neutral"
-            },
-            {
-              "id": "happy",
-              "label": "Happy",
-              "morphs": {
-                "Eye_Happy_L": 1,
-                "Eye_Happy_R": 1,
-                "Eye_Angry_L": 0.5,
-                "Eye_Angry_R": 0.5
-              }
-            },
-            {
-              "id": "angry",
-              "label": "Angry",
-              "morphs": {
-                "Eye_Angry_L": 1,
-                "Eye_Angry_R": 1,
-                "Eye_Annoyed_L": 1,
-                "Eye_Annoyed_R": 1
-              }
-            },
-            {
-              "id": "sad",
-              "label": "Sad",
-              "morphs": {
-                "Eye_Sad_L": 1,
-                "Eye_Sad_R": 1
-              }
-            },
-            {
-              "id": "surprise",
-              "label": "Surprise",
-              "morphs": {
-                "Eye_Suprise_L": 1,
-                "Eye_Suprise_R": 1
-              }
-            },
-            {
-              "id": "smort",
-              "label": "Smort",
-              "morphs": {
-                "Eye_Smort_L": 1,
-                "Eye_Smort_R": 1
-              }
-            },
-            {
-              "id": "bored",
-              "label": "Bored",
-              "morphs": {
-                "Blink_L": 1,
-                "Blink_R": 1
-              }
-            },
-            {
-              "id": "squint",
-              "label": "Squint",
-              "morphs": {
-                "Eye_Squint_L": 1,
-                "Eye_Squint_R": 1
-              }
-            },
-            {
-              "id": "dead",
-              "label": "Dead",
-              "morphs": {
-                "Eye_Dead_L": 1,
-                "Eye_Dead_R": 1
-              }
-            },
-            {
-              "id": "noodles",
-              "label": "Noodles",
-              "morphs": {
-                "Eye_Noodles_Out": 1,
-                "Eye_Noodles_Bend1": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "mask",
-          "label": "Mask",
-          "options": [
-            {
-              "id": "intact",
-              "label": "Intact"
-            },
-            {
-              "id": "damaged",
-              "label": "Damaged",
-              "morphs": {
-                "Mask_Damage1": 1,
-                "Gangway_Ripped": 1
-              }
-            },
-            {
-              "id": "hollow",
-              "label": "Hollow",
-              "morphs": {
-                "Mask_Damage1": 1,
-                "Mask_Damage2": 1,
-                "Gangway_Ripped": 1,
-                "Horn_out": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "eye",
-          "label": "Relic eye",
-          "options": [
-            {
-              "id": "closed",
-              "label": "Closed"
-            },
-            {
-              "id": "split",
-              "label": "Split",
-              "bones": {
-                "Relicteye_Split_Down": {
-                  "rot": [
-                    -0.0,
-                    -0.0,
-                    63.6
-                  ]
-                },
-                "Relicteye_Split_Up": {
-                  "rot": [
-                    -0.0,
-                    -0.0,
-                    -71.6
-                  ]
-                },
-                "Relicteye_Open": {
-                  "rot": [
-                    -22.0,
-                    -36.3,
-                    87.8
-                  ]
-                }
-              }
-            },
-            {
-              "id": "anime",
-              "label": "Anime",
-              "surfaces": {
-                "Transform": {
-                  "map": "anime_eye.webp",
-                  "emissiveMap": "anime_eye_emis.webp"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "blessing",
-          "label": "Blessing",
-          "options": [
-            {
-              "id": "none",
-              "label": "None"
-            },
-            {
-              "id": "fur",
-              "label": "Fur",
-              "morphs": {
-                "Puff": 1
-              },
-              "surfaces": {
-                "Transform": {
-                  "alphaMap": null,
-                  "alphaTest": 0.5
-                }
-              }
-            },
-            {
-              "id": "blessed",
-              "label": "Blessed",
-              "morphs": {
-                "Puff": 1,
-                "ClawFoot2": 1,
-                "ClawGrowth2L": 1,
-                "ClawGrowth2R": 1,
-                "Fluff_Out": 1,
-                "Transform/ClawShrinkL": 0,
-                "Transform/ClawShrinkR": 0
-              },
-              "surfaces": {
-                "Transform": {
-                  "alphaMap": null,
-                  "alphaTest": 0.5
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "tail",
-          "label": "Tail",
-          "options": [
-            {
-              "id": "off",
-              "label": "Hidden"
-            },
-            {
-              "id": "on",
-              "label": "Tail",
-              "bones": {
-                "PB_Tail_0_scale10": {
-                  "scale": 1,
-                  "rot": [
-                    -70,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_1": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_2": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_3": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_4": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_5": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_6": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_7": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_8": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_9": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_10": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_11": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_12": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_13": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_14": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_15": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_16": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_17": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_18": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_19": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_20": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_21": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_22": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_23": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_24": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_25": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                }
-              }
-            },
-            {
-              "id": "cut",
-              "label": "Cut",
-              "bones": {
-                "PB_Tail_0_scale10": {
-                  "scale": 1,
-                  "rot": [
-                    -70,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_1": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_2": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_3": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_4": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_5": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_6": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_7": {
-                  "rot": [
-                    10,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_8": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_9": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_10": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_11": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_12": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_13": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_14": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_15": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_16": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_17": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_18": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_19": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_20": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_21": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_22": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_23": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_24": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                },
-                "Tail_25": {
-                  "rot": [
-                    0,
-                    0,
-                    0
-                  ]
-                }
-              },
-              "morphs": {
-                "TailCut": 1
-              },
-              "surfaces": {
-                "Body": {
-                  "alphaMap": "tail_alpha_inv.webp",
-                  "alphaTest": 0.4
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "coat",
-          "label": "Coat",
-          "options": [
-            {
-              "id": "standard",
-              "label": "Standard"
-            },
-            {
-              "id": "long",
-              "label": "Long",
-              "morphs": {
-                "Jacket_Long": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "build",
-          "label": "Build",
-          "options": [
-            {
-              "id": "standard",
-              "label": "Standard"
-            },
-            {
-              "id": "bulky",
-              "label": "Bulky",
-              "morphs": {
-                "Bulky": 1
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "gyro",
-      "name": "Gyro Zeppeli",
-      "type": "gltf",
-      "motion": "bo1",
-      "model": "models/gyro/gyro.glb?v=2",
-      "yaw": 180,
-      "height": 78,
-      "color": "#4a2a78",
-      "accent": "#d8a628",
-      "fpArms": true,
-      "fpArmsRetarget": false,
-      "springBones": {
-        "_doc": "Cape (the rip's mant bones, three strips under mant00): swings with movement; hips, spine and legs push it out. Sizes in model units (he is 2.87 tall).",
-        "chains": [
-          "7jir01t0 mant10",
-          "7jir01t0 mant20",
-          "7jir01t0 mant30"
-        ],
-        "childMatch": "mant",
-        "stiffness": 0.03,
-        "drag": 0.18,
-        "gravity": 2.5,
-        "maxAngle": 22,
-        "follow": 0.6,
-        "radius": 0.06,
-        "colliders": [
-          {
-            "bone": "Hips",
-            "to": "bip_spine_1",
-            "radius": 0.3
-          },
-          {
-            "bone": "bip_spine_1",
-            "to": "bip_spine_2",
-            "radius": 0.3
-          },
-          {
-            "bone": "Thigh_L",
-            "to": "bip_knee_L",
-            "radius": 0.17
-          },
-          {
-            "bone": "bip_knee_L",
-            "to": "bip_foot_L",
-            "radius": 0.14
-          },
-          {
-            "bone": "Thigh_R",
-            "to": "bip_knee_R",
-            "radius": 0.17
-          },
-          {
-            "bone": "bip_knee_R",
-            "to": "bip_foot_R",
-            "radius": 0.14
-          }
-        ]
-      },
-      "optional": true,
-      "description": "Gyro Zeppeli of Steel Ball Run: Neapolitan executioner, master of the Spin. GO! GO! ZEPPELI!",
-      "credit": {
-        "title": "Gyro Zeppeli (JoJo's Bizarre Adventure: Steel Ball Run)",
-        "author": "Steam Workshop model, reworked in Blender by its uploader",
-        "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=1862915551",
-        "license": "Ripped fan model; the uploader claims no rights",
-        "note": "Gyro Zeppeli is from JoJo's Bizarre Adventure by Hirohiko Araki (Shueisha); the model is from Bandai Namco's game. Built locally with .tools/build_gyro.sh, not published."
-      }
-    },
-    {
-      "id": "experiment",
-      "name": "Experiment",
-      "type": "gltf",
-      "motion": "bo1",
-      "model": "models/experiment/experiment.glb?v=3",
-      "height": 64,
-      "description": "Akittu's Stylized Experiment: a dark-furred alien experiment with big ears, a long tail and a scarf, animated with Black Ops' own player animations. Fur, eyes, scarf and gear are customisable.",
-      "color": "#2c5aa0",
-      "accent": "#e2557a",
-      "fpArms": true,
-      "fpArmsRetarget": true,
-      "optional": true,
-      "springBones": [
-        {
-          "_doc": "Scarf tails (front and back): hang and swing; the body pushes them out.",
-          "chains": [
-            "scarfb",
-            "scarff"
-          ],
-          "childMatch": "scarf",
-          "stiffness": 0.02,
-          "drag": 0.16,
-          "gravity": 2,
-          "maxAngle": 80,
-          "follow": 0.6,
-          "followY": 1,
-          "radius": 0.03,
-          "colliders": [
-            {
-              "bone": "Hips",
-              "to": "Spine",
-              "radius": 0.13
-            },
-            {
-              "bone": "Spine",
-              "to": "Chest",
-              "radius": 0.15
-            },
-            {
-              "bone": "Chest",
-              "to": "Neck",
-              "radius": 0.15
-            },
-            {
-              "bone": "Left_leg",
-              "to": "Left_knee",
-              "radius": 0.09
-            },
-            {
-              "bone": "Left_knee",
-              "to": "Left_ankle",
-              "radius": 0.07
-            },
-            {
-              "bone": "Right_leg",
-              "to": "Right_knee",
-              "radius": 0.09
-            },
-            {
-              "bone": "Right_knee",
-              "to": "Right_ankle",
-              "radius": 0.07
-            }
-          ]
-        },
-        {
-          "_doc": "Tail: keeps its shape (no gravity), lags and sways with movement.",
-          "chains": [
-            "tail01"
-          ],
-          "childMatch": "tail",
-          "stiffness": 0.08,
-          "drag": 0.2,
-          "gravity": 0.2,
-          "maxAngle": 30,
-          "follow": 0.7,
-          "followY": 1,
-          "radius": 0.04,
-          "colliders": [
-            {
-              "bone": "Left_leg",
-              "to": "Left_knee",
-              "radius": 0.09
-            },
-            {
-              "bone": "Left_knee",
-              "to": "Left_ankle",
-              "radius": 0.07
-            },
-            {
-              "bone": "Right_leg",
-              "to": "Right_knee",
-              "radius": 0.09
-            },
-            {
-              "bone": "Right_knee",
-              "to": "Right_ankle",
-              "radius": 0.07
-            }
-          ]
-        }
-      ],
-      "variants": [
-        {
-          "id": "fur",
-          "label": "Fur",
-          "options": [
-            {
-              "id": "default",
-              "label": "Midnight",
-              "default": true
-            },
-            {
-              "id": "albino",
-              "label": "Albino",
-              "surfaces": {
-                "Experiment": {
-                  "map": "fur_albino.webp"
-                },
-                "FurNeck": {
-                  "map": "fur_albino.webp"
-                },
-                "FurArms": {
-                  "map": "fur_albino.webp"
-                },
-                "FurLegs": {
-                  "map": "fur_albino.webp"
-                },
-                "FurMuzzle": {
-                  "map": "fur_albino.webp"
-                }
-              }
-            },
-            {
-              "id": "gold",
-              "label": "Gold flecks",
-              "surfaces": {
-                "Experiment": {
-                  "map": "fur_gold.webp"
-                },
-                "FurNeck": {
-                  "map": "fur_gold.webp"
-                },
-                "FurArms": {
-                  "map": "fur_gold.webp"
-                },
-                "FurLegs": {
-                  "map": "fur_gold.webp"
-                },
-                "FurMuzzle": {
-                  "map": "fur_gold.webp"
-                }
-              }
-            },
-            {
-              "id": "striped",
-              "label": "Striped",
-              "surfaces": {
-                "Experiment": {
-                  "map": "fur_striped.webp"
-                },
-                "FurNeck": {
-                  "map": "fur_striped.webp"
-                },
-                "FurArms": {
-                  "map": "fur_striped.webp"
-                },
-                "FurLegs": {
-                  "map": "fur_striped.webp"
-                },
-                "FurMuzzle": {
-                  "map": "fur_striped.webp"
-                }
-              }
-            },
-            {
-              "id": "piebald",
-              "label": "Piebald",
-              "surfaces": {
-                "Experiment": {
-                  "map": "fur_piebald.webp"
-                },
-                "FurNeck": {
-                  "map": "fur_piebald.webp"
-                },
-                "FurArms": {
-                  "map": "fur_piebald.webp"
-                },
-                "FurLegs": {
-                  "map": "fur_piebald.webp"
-                },
-                "FurMuzzle": {
-                  "map": "fur_piebald.webp"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "eyes",
-          "label": "Eyes",
-          "options": [
-            {
-              "id": "round",
-              "label": "Round",
-              "default": true
-            },
-            {
-              "id": "small",
-              "label": "Pinprick",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "uvOffset": [
-                    0,
-                    0.25
-                  ]
-                }
-              }
-            },
-            {
-              "id": "sparkle",
-              "label": "Sparkle",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "uvOffset": [
-                    0,
-                    0.5
-                  ]
-                }
-              }
-            },
-            {
-              "id": "slit",
-              "label": "Slit",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "uvOffset": [
-                    0,
-                    0.75
-                  ]
-                }
-              }
-            },
-            {
-              "id": "thin",
-              "label": "Thin slit",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "uvOffset": [
-                    0.5,
-                    0
-                  ]
-                }
-              }
-            },
-            {
-              "id": "glow",
-              "label": "Glow",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "uvOffset": [
-                    0.5,
-                    0.5
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "eyeColour",
-          "label": "Eye colour",
-          "options": [
-            {
-              "id": "amber",
-              "label": "Amber",
-              "default": true
-            },
-            {
-              "id": "red",
-              "label": "Red",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "map": "eyes_red.webp",
-                  "emissiveMap": "eyes_red.webp"
-                }
-              }
-            },
-            {
-              "id": "pink",
-              "label": "Pink",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "map": "eyes_pink.webp",
-                  "emissiveMap": "eyes_pink.webp"
-                }
-              }
-            },
-            {
-              "id": "purple",
-              "label": "Purple",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "map": "eyes_purple.webp",
-                  "emissiveMap": "eyes_purple.webp"
-                }
-              }
-            },
-            {
-              "id": "blue",
-              "label": "Blue",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "map": "eyes_blue.webp",
-                  "emissiveMap": "eyes_blue.webp"
-                }
-              }
-            },
-            {
-              "id": "cyan",
-              "label": "Cyan",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "map": "eyes_cyan.webp",
-                  "emissiveMap": "eyes_cyan.webp"
-                }
-              }
-            },
-            {
-              "id": "green",
-              "label": "Green",
-              "surfaces": {
-                "ExperimentEyes": {
-                  "map": "eyes_green.webp",
-                  "emissiveMap": "eyes_green.webp"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "scarf",
-          "label": "Scarf",
-          "options": [
-            {
-              "id": "red",
-              "label": "Red",
-              "default": true,
-              "surfaces": {
-                "FurNeck": {
-                  "visible": false
-                }
-              }
-            },
-            {
-              "id": "blue",
-              "label": "Blue",
-              "surfaces": {
-                "FurNeck": {
-                  "visible": false
-                },
-                "ClothScarf": {
-                  "map": "scarf_blue.webp"
-                }
-              }
-            },
-            {
-              "id": "green",
-              "label": "Green",
-              "surfaces": {
-                "FurNeck": {
-                  "visible": false
-                },
-                "ClothScarf": {
-                  "map": "scarf_green.webp"
-                }
-              }
-            },
-            {
-              "id": "purple",
-              "label": "Purple",
-              "surfaces": {
-                "FurNeck": {
-                  "visible": false
-                },
-                "ClothScarf": {
-                  "map": "scarf_purple.webp"
-                }
-              }
-            },
-            {
-              "id": "gold",
-              "label": "Gold",
-              "surfaces": {
-                "FurNeck": {
-                  "visible": false
-                },
-                "ClothScarf": {
-                  "map": "scarf_gold.webp"
-                }
-              }
-            },
-            {
-              "id": "black",
-              "label": "Black",
-              "surfaces": {
-                "FurNeck": {
-                  "visible": false
-                },
-                "ClothScarf": {
-                  "map": "scarf_black.webp"
-                }
-              }
-            },
-            {
-              "id": "white",
-              "label": "White",
-              "surfaces": {
-                "FurNeck": {
-                  "visible": false
-                },
-                "ClothScarf": {
-                  "map": "scarf_white.webp"
-                }
-              }
-            },
-            {
-              "id": "off",
-              "label": "Off",
-              "surfaces": {
-                "ClothScarf": {
-                  "visible": false
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "armWraps",
-          "label": "Arm wraps",
-          "options": [
-            {
-              "id": "on",
-              "label": "On",
-              "default": true,
-              "surfaces": {
-                "FurArms": {
-                  "visible": false
-                }
-              }
-            },
-            {
-              "id": "off",
-              "label": "Off",
-              "surfaces": {
-                "ClothArmWraps": {
-                  "visible": false
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "legWraps",
-          "label": "Leg wraps",
-          "options": [
-            {
-              "id": "on",
-              "label": "On",
-              "default": true,
-              "surfaces": {
-                "FurLegs": {
-                  "visible": false
-                }
-              }
-            },
-            {
-              "id": "off",
-              "label": "Off",
-              "surfaces": {
-                "ClothLegWraps": {
-                  "visible": false
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "kevlar",
-          "label": "Kevlar",
-          "options": [
-            {
-              "id": "off",
-              "label": "Off",
-              "default": true,
-              "surfaces": {
-                "ClothKevlar": {
-                  "visible": false
-                }
-              }
-            },
-            {
-              "id": "on",
-              "label": "With mags"
-            },
-            {
-              "id": "nomags",
-              "label": "No mags",
-              "morphs": {
-                "Clothing - Kevlar - No Mags": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "pouch",
-          "label": "Leg pouch",
-          "options": [
-            {
-              "id": "on",
-              "label": "On"
-            },
-            {
-              "id": "off",
-              "label": "Off",
-              "default": true,
-              "surfaces": {
-                "ClothPouch": {
-                  "visible": false
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "balaclava",
-          "label": "Balaclava",
-          "options": [
-            {
-              "id": "on",
-              "label": "On",
-              "surfaces": {
-                "FurMuzzle": {
-                  "visible": false
-                },
-                "ExperimentMouthMuzzle": {
-                  "visible": false
-                }
-              }
-            },
-            {
-              "id": "off",
-              "label": "Off",
-              "default": true,
-              "surfaces": {
-                "ClothBalaclava": {
-                  "visible": false
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "build",
-          "label": "Build",
-          "options": [
-            {
-              "id": "standard",
-              "label": "Standard",
-              "default": true
-            },
-            {
-              "id": "lore",
-              "label": "Lore accurate",
-              "morphs": {
-                "Body - LORE ACCURATE": 1
-              }
-            },
-            {
-              "id": "male",
-              "label": "Male",
-              "morphs": {
-                "Body - Male Style": 1
-              }
-            },
-            {
-              "id": "slim",
-              "label": "Slim",
-              "morphs": {
-                "Body - Emaciated": 1
-              }
-            },
-            {
-              "id": "chunky",
-              "label": "Chunky",
-              "morphs": {
-                "Body - Obese": 1
-              }
-            }
-          ]
-        },
-        {
-          "id": "face",
-          "label": "Face",
-          "options": [
-            {
-              "id": "neutral",
-              "label": "Neutral",
-              "default": true
-            },
-            {
-              "id": "happy",
-              "label": "Happy",
-              "morphs": {
-                "MouthSmileLeft": 1,
-                "MouthSmileRight": 1,
-                "Eye - Eyelid Glee": 1
-              }
-            },
-            {
-              "id": "angry",
-              "label": "Angry",
-              "morphs": {
-                "Angry": 1,
-                "EyebrowAngledInL": 1,
-                "EyebrowAngledInR": 1
-              }
-            },
-            {
-              "id": "sad",
-              "label": "Sad",
-              "morphs": {
-                "MouthSadLeft": 1,
-                "MouthSadRight": 1
-              }
-            },
-            {
-              "id": "blep",
-              "label": "Blep",
-              "morphs": {
-                "TongueOut": 1,
-                "MouthSmileLeft": 0.5,
-                "MouthSmileRight": 0.5
-              }
-            },
-            {
-              "id": "surprise",
-              "label": "Surprised",
-              "morphs": {
-                "JawOpen": 0.6,
-                "WideEyeL": 1,
-                "WideEyeR": 1
-              }
-            },
-            {
-              "id": "sleepy",
-              "label": "Sleepy",
-              "morphs": {
-                "Eye - Eyelid Closed": 1
-              }
-            }
-          ]
-        }
-      ],
-      "credit": {
-        "title": "Stylized Experiment V3",
-        "author": "Akittu",
-        "source": "Purchased VRChat/Resonite avatar (user's own copy)",
-        "license": "Paid avatar; personal use",
-        "note": "Built locally with .tools/build_experiment.sh, not published."
-      },
-      "fpArmsExclude": "bandage",
-      "fpArmsScale": 0.65,
-      "variantBase": {
-        "_doc": "The scarf tails are modelled straight out front and back (the avatar's physbones drop them): hang them down so the menu and portraits show them hanging; the springs start from there.",
-        "bones": {
-          "scarfb": {
-            "rot": [
-              -75,
-              0,
-              0
-            ]
-          },
-          "scarff": {
-            "rot": [
-              -45,
-              0,
-              0
-            ]
-          }
-        }
-      },
-      "fpArmsTone": [
-        0.78,
-        0.68,
-        0.56
-      ],
-      "fpArmsReach": false,
-      "fpArmsFingers": {
-        "thumb": "^Thumb",
-        "index": "^IndexFinger",
-        "mid": "^MiddleFinger",
-        "pinky": "^RingFinger"
-      }
+ "characters": [
+  {
+   "id": "mannequin",
+   "name": "Test Subject",
+   "type": "mannequin",
+   "description": "Placeholder figure until a real model is added.",
+   "color": "#8d8a80",
+   "accent": "#932e25",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#932e25",
+    "glove": "#6b6960"
+   },
+   "handsFlat": true
+  },
+  {
+   "id": "mannequin_blue",
+   "name": "Test Subject (Blue)",
+   "type": "mannequin",
+   "description": "The placeholder in blue.",
+   "color": "#8d8a80",
+   "accent": "#2f5e8c",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#2f5e8c",
+    "glove": "#6b6960"
+   },
+   "handsFlat": true
+  },
+  {
+   "id": "honorguard",
+   "name": "Undead Honor Guard",
+   "type": "t5",
+   "description": "Play as a Kino zombie. Uses the game's zombie animations, so it shambles.",
+   "body": "c_ger_honorguard_body1",
+   "head": "c_ger_zombie_head2",
+   "walk": "ai_zombie_walk_fast_v1",
+   "run": "ai_zombie_sprint_v1",
+   "idle": "ai_zombie_walk_v1",
+   "hands": "pow",
+   "handsTint": {
+    "*": "#a4ab96"
+   }
+  },
+  {
+   "id": "female_protogen",
+   "name": "Protogen",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/female_protogen/scene.gltf",
+   "height": 74,
+   "description": "Female Protogen by Jakermates, animated with Black Ops' own player animations.",
+   "color": "#767e8c",
+   "accent": "#c8cde2",
+   "credit": {
+    "title": "Female_Protogen",
+    "author": "Jakermates",
+    "authorUrl": "https://sketchfab.com/jaydidleedoo",
+    "source": "https://sketchfab.com/3d-models/female-protogen-839042536637493b9b7bd983d2a36e5c",
+    "license": "CC-BY-4.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by/4.0/"
+   },
+   "fpArms": true
+  },
+  {
+   "id": "zoroark",
+   "name": "Zoroark",
+   "type": "gltf",
+   "model": "models/zoroark/zoroark.glb",
+   "height": 70,
+   "description": "Zoroark from Cobblemon, with its own idle and walk animations (converted from Blockbench).",
+   "color": "#3b3a46",
+   "accent": "#b0263a",
+   "handBone": "locator_hand_primary",
+   "optional": true,
+   "credit": {
+    "title": "Zoroark (Cobblemon)",
+    "author": "The Cobblemon team",
+    "authorUrl": "https://cobblemon.com",
+    "source": "https://gitlab.com/cable-mc/cobblemon-assets/-/tree/master/blockbench/pokemon/gen5/0571_zoroark",
+    "license": "CC-BY-NC-3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-nc/3.0/",
+    "note": "Converted from Blockbench to glTF (animations baked). Pokémon and Zoroark are trademarks of Nintendo / Game Freak / The Pokémon Company."
+   },
+   "yaw": 180,
+   "fpArms": true,
+   "fpArmsArm": "^arm_(left|right)1$",
+   "fpArmsFingers": {
+    "index": "^claw_front",
+    "mid": "^claw_middle",
+    "pinky": "^claw_back"
+   },
+   "fpArmsFit": "arm",
+   "fpArmsScale": 0.8,
+   "fpArmsExclude": "fluff"
+  },
+  {
+   "id": "bondrewd",
+   "name": "Bondrewd",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/bondrewd/bondrewd.glb",
+   "height": 80,
+   "description": "Bondrewd the Novel, Lord of Dawn. Bunny Squad's VRChat model, animated with Black Ops' own player animations.",
+   "color": "#2b2d33",
+   "accent": "#c43c3c",
+   "fpArms": true,
+   "optional": true,
+   "credit": {
+    "title": "Bunny Squad Bondrewd",
+    "author": "Malganis Lefay (Bunny Squad)",
+    "authorUrl": "https://vrc.group/BUNNY.5164",
+    "source": "Bunny Squad VRChat model (Unity package)",
+    "license": "Free to use, edit and share (author's readme)",
+    "note": "Fan model. Bondrewd is from Made in Abyss by Akihito Tsukushi."
+   },
+   "fpArmsRetarget": true,
+   "springBones": {
+    "chains": [
+     "Coat_Back_L_0",
+     "Coat_Back_R_0",
+     "Coat_Front_L_0",
+     "Coat_Front_R_0",
+     "Coat_Split_L_1",
+     "Coat_Split_R_1",
+     "z_Coat_Side_L_0",
+     "z_Coat_Side_R_0"
+    ],
+    "childMatch": "Coat",
+    "stiffness": 0.025,
+    "drag": 0.16,
+    "gravity": 2,
+    "maxAngle": 25,
+    "follow": 0.6,
+    "radius": 0.04,
+    "colliders": [
+     {
+      "bone": "Hips",
+      "to": "Spine",
+      "radius": 0.22
+     },
+     {
+      "bone": "Spine",
+      "to": "Chest",
+      "radius": 0.22
+     },
+     {
+      "bone": "Left leg",
+      "to": "Left knee",
+      "radius": 0.12
+     },
+     {
+      "bone": "Left knee",
+      "to": "Left ankle",
+      "radius": 0.1
+     },
+     {
+      "bone": "Right leg",
+      "to": "Right knee",
+      "radius": 0.12
+     },
+     {
+      "bone": "Right knee",
+      "to": "Right ankle",
+      "radius": 0.1
+     }
+    ],
+    "_doc": "Coat: legs and torso push it (capped at each joint's rest distance), it rests on the ground; tuned for a coat that trails without flipping up",
+    "followY": 1,
+    "floor": true,
+    "drive": {
+     "legs": [
+      "Left leg",
+      "Right leg"
+     ],
+     "weights": {
+      "Coat_Front": 0.7,
+      "z_Coat_Side": 0.45,
+      "Coat_Split": 0.35,
+      "Coat_Back": 0.25
+     }
     }
-  ]
+   },
+   "variants": [
+    {
+     "id": "gauntlets",
+     "label": "Gauntlets",
+     "options": [
+      {
+       "id": "base",
+       "label": "Base",
+       "morphs": {
+        "Gauntlet_Off": 1
+       }
+      },
+      {
+       "id": "brick",
+       "label": "Brick",
+       "morphs": {}
+      }
+     ]
+    },
+    {
+     "id": "paper",
+     "label": "Paper eyes",
+     "options": [
+      {
+       "id": "off",
+       "label": "Off"
+      },
+      {
+       "id": "on",
+       "label": "On",
+       "morphs": {
+        "Eye_Paper_L": 1,
+        "Eye_Paper_R": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "face",
+     "label": "Paper eye face",
+     "note": "Shows with paper eyes on",
+     "options": [
+      {
+       "id": "neutral",
+       "label": "Neutral"
+      },
+      {
+       "id": "happy",
+       "label": "Happy",
+       "morphs": {
+        "Eye_Happy_L": 1,
+        "Eye_Happy_R": 1,
+        "Eye_Angry_L": 0.5,
+        "Eye_Angry_R": 0.5
+       }
+      },
+      {
+       "id": "angry",
+       "label": "Angry",
+       "morphs": {
+        "Eye_Angry_L": 1,
+        "Eye_Angry_R": 1,
+        "Eye_Annoyed_L": 1,
+        "Eye_Annoyed_R": 1
+       }
+      },
+      {
+       "id": "sad",
+       "label": "Sad",
+       "morphs": {
+        "Eye_Sad_L": 1,
+        "Eye_Sad_R": 1
+       }
+      },
+      {
+       "id": "surprise",
+       "label": "Surprise",
+       "morphs": {
+        "Eye_Suprise_L": 1,
+        "Eye_Suprise_R": 1
+       }
+      },
+      {
+       "id": "smort",
+       "label": "Smort",
+       "morphs": {
+        "Eye_Smort_L": 1,
+        "Eye_Smort_R": 1
+       }
+      },
+      {
+       "id": "bored",
+       "label": "Bored",
+       "morphs": {
+        "Blink_L": 1,
+        "Blink_R": 1
+       }
+      },
+      {
+       "id": "squint",
+       "label": "Squint",
+       "morphs": {
+        "Eye_Squint_L": 1,
+        "Eye_Squint_R": 1
+       }
+      },
+      {
+       "id": "dead",
+       "label": "Dead",
+       "morphs": {
+        "Eye_Dead_L": 1,
+        "Eye_Dead_R": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "pockets",
+     "label": "Science pockets",
+     "options": [
+      {
+       "id": "anime",
+       "label": "Anime",
+       "morphs": {
+        "Anime_Pocket": 1
+       }
+      },
+      {
+       "id": "manga",
+       "label": "Manga",
+       "morphs": {
+        "Manga_Pocket": 1
+       }
+      },
+      {
+       "id": "none",
+       "label": "None"
+      }
+     ]
+    },
+    {
+     "id": "boots",
+     "label": "Boots",
+     "options": [
+      {
+       "id": "anime",
+       "label": "Anime"
+      },
+      {
+       "id": "manga",
+       "label": "Manga",
+       "morphs": {
+        "Boots_Manga": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "coat",
+     "label": "Coat",
+     "options": [
+      {
+       "id": "standard",
+       "label": "Standard"
+      },
+      {
+       "id": "long",
+       "label": "Long",
+       "morphs": {
+        "Jacket_Long": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "build",
+     "label": "Build",
+     "options": [
+      {
+       "id": "standard",
+       "label": "Standard"
+      },
+      {
+       "id": "bulky",
+       "label": "Bulky",
+       "morphs": {
+        "Bulky": 1
+       }
+      }
+     ]
+    }
+   ],
+   "skinName": "Base"
+  },
+  {
+   "id": "bondrewd_premium",
+   "skinOf": "bondrewd",
+   "skinName": "Premium",
+   "name": "Bondrewd",
+   "type": "gltf",
+   "motion": "bo1",
+   "description": "Bondrewd the Novel, Lord of Dawn: Bunny Squad's Premium model, with the combat suit, Sparagmos gauntlets, cartridge tank and Blessing of the Abyss.",
+   "model": "models/bondrewd_premium/bondrewd_premium.glb",
+   "height": 80,
+   "optional": true,
+   "credit": {
+    "title": "Bunny Squad Bondrewd Premium",
+    "author": "Malganis Lefay (Bunny Squad)",
+    "authorUrl": "https://vrc.group/BUNNY.5164",
+    "source": "Bunny Squad VRChat model (Unity package)",
+    "license": "Free to use, edit and share (author's readme)",
+    "note": "Fan model. Bondrewd is from Made in Abyss by Akihito Tsukushi."
+   },
+   "fpArms": true,
+   "fpArmsRetarget": true,
+   "fpArmsNearCut": 5,
+   "springBones": [
+    {
+     "chains": [
+      "Coat_Back_L_0",
+      "Coat_Back_R_0",
+      "Coat_Front_L_0",
+      "Coat_Front_R_0",
+      "Coat_Split_L_1",
+      "Coat_Split_R_1",
+      "z_Coat_Side_L_0",
+      "z_Coat_Side_R_0"
+     ],
+     "childMatch": "Coat",
+     "stiffness": 0.025,
+     "drag": 0.16,
+     "gravity": 2,
+     "maxAngle": 25,
+     "follow": 0.6,
+     "radius": 0.04,
+     "colliders": [
+      {
+       "bone": "Hips",
+       "to": "Spine",
+       "radius": 0.22
+      },
+      {
+       "bone": "Spine",
+       "to": "Chest",
+       "radius": 0.22
+      },
+      {
+       "bone": "Left leg",
+       "to": "Left knee",
+       "radius": 0.12
+      },
+      {
+       "bone": "Left knee",
+       "to": "Left ankle",
+       "radius": 0.1
+      },
+      {
+       "bone": "Right leg",
+       "to": "Right knee",
+       "radius": 0.12
+      },
+      {
+       "bone": "Right knee",
+       "to": "Right ankle",
+       "radius": 0.1
+      }
+     ],
+     "_doc": "Coat: legs and torso push it (capped at each joint's rest distance), it rests on the ground; tuned for a coat that trails without flipping up",
+     "followY": 1,
+     "floor": true,
+     "drive": {
+      "legs": [
+       "Left leg",
+       "Right leg"
+      ],
+      "weights": {
+       "Coat_Front": 0.7,
+       "z_Coat_Side": 0.45,
+       "Coat_Split": 0.35,
+       "Coat_Back": 0.25
+      }
+     }
+    },
+    {
+     "chains": [
+      "PB_Tail_0_scale10"
+     ],
+     "mode": "drag",
+     "sag": 2,
+     "floor": true,
+     "radius": 0.05,
+     "_doc": "Bondrewd's tail drags on the floor like a heavy rope (no spring, so it can't flail)"
+    }
+   ],
+   "_variantsDoc": "Mirrors the avatar's VRChat menus (Equipment, Misc, Mutant). Shape keys plus Poiyomi effects rebuilt as texture swaps/clip masks; bone values from its toggle animations (deltas from rest).",
+   "variantBase": {
+    "morphs": {
+     "ScienceSuit": 1,
+     "ClawShrinkL": 1,
+     "ClawShrinkR": 1
+    },
+    "meshes": {
+     "Tank": false
+    },
+    "bones": {
+     "PB_Tail_0_scale10": {
+      "scale": 0.1
+     }
+    },
+    "surfaces": {
+     "Gauntlets": {
+      "alphaMap": "metal_alpha.webp",
+      "alphaTest": 0.475
+     },
+     "Tank": {
+      "alphaMap": "metal_alpha.webp",
+      "alphaTest": 0.475
+     },
+     "Transform": {
+      "alphaMap": "fur_mask_inv.webp",
+      "alphaTest": 0.5
+     }
+    }
+   },
+   "variants": [
+    {
+     "id": "outfit",
+     "label": "Outfit",
+     "options": [
+      {
+       "id": "science",
+       "label": "Science"
+      },
+      {
+       "id": "combat",
+       "label": "Combat",
+       "morphs": {
+        "ScienceSuit": 0,
+        "Boots_Combat": 1
+       },
+       "surfaces": {
+        "Body": {
+         "map": "combat_dif.webp",
+         "normalMap": "combat_norm.webp"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "gauntlets",
+     "label": "Gauntlets",
+     "options": [
+      {
+       "id": "base",
+       "label": "Base",
+       "morphs": {
+        "Gauntlet_Off": 1
+       }
+      },
+      {
+       "id": "brick",
+       "label": "Brick",
+       "surfaces": {
+        "Gauntlets": {
+         "alphaMap": "metal_alpha_inv.webp",
+         "alphaTest": 0.475
+        }
+       }
+      },
+      {
+       "id": "combat",
+       "label": "Combat",
+       "morphs": {
+        "Curse_Dart_Launcher": 1,
+        "unHide_Sparagmus": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "tank",
+     "label": "Cartridge tank",
+     "options": [
+      {
+       "id": "off",
+       "label": "Off"
+      },
+      {
+       "id": "on",
+       "label": "On",
+       "meshes": {
+        "Tank": true
+       }
+      }
+     ]
+    },
+    {
+     "id": "boots",
+     "label": "Boots",
+     "options": [
+      {
+       "id": "anime",
+       "label": "Anime"
+      },
+      {
+       "id": "manga",
+       "label": "Manga",
+       "morphs": {
+        "Boots_Manga": 1
+       },
+       "when": {
+        "outfit:combat": {
+         "morphs": {
+          "Boots_Manga": 0,
+          "Boots_Combat_Manga": 1
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "pockets",
+     "label": "Science pockets",
+     "options": [
+      {
+       "id": "anime",
+       "label": "Anime",
+       "morphs": {
+        "Anime_Pocket": 1
+       }
+      },
+      {
+       "id": "manga",
+       "label": "Manga",
+       "morphs": {
+        "Manga_Pocket": 1
+       }
+      },
+      {
+       "id": "none",
+       "label": "None"
+      }
+     ]
+    },
+    {
+     "id": "paper",
+     "label": "Paper eyes",
+     "options": [
+      {
+       "id": "off",
+       "label": "Off"
+      },
+      {
+       "id": "on",
+       "label": "On",
+       "morphs": {
+        "Eye_Paper_L": 1,
+        "Eye_Paper_R": 1
+       }
+      },
+      {
+       "id": "damaged",
+       "label": "Damaged",
+       "morphs": {
+        "Eye_Paper_R": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "face",
+     "label": "Paper eye face",
+     "note": "Shows with paper eyes on",
+     "options": [
+      {
+       "id": "neutral",
+       "label": "Neutral"
+      },
+      {
+       "id": "happy",
+       "label": "Happy",
+       "morphs": {
+        "Eye_Happy_L": 1,
+        "Eye_Happy_R": 1,
+        "Eye_Angry_L": 0.5,
+        "Eye_Angry_R": 0.5
+       }
+      },
+      {
+       "id": "angry",
+       "label": "Angry",
+       "morphs": {
+        "Eye_Angry_L": 1,
+        "Eye_Angry_R": 1,
+        "Eye_Annoyed_L": 1,
+        "Eye_Annoyed_R": 1
+       }
+      },
+      {
+       "id": "sad",
+       "label": "Sad",
+       "morphs": {
+        "Eye_Sad_L": 1,
+        "Eye_Sad_R": 1
+       }
+      },
+      {
+       "id": "surprise",
+       "label": "Surprise",
+       "morphs": {
+        "Eye_Suprise_L": 1,
+        "Eye_Suprise_R": 1
+       }
+      },
+      {
+       "id": "smort",
+       "label": "Smort",
+       "morphs": {
+        "Eye_Smort_L": 1,
+        "Eye_Smort_R": 1
+       }
+      },
+      {
+       "id": "bored",
+       "label": "Bored",
+       "morphs": {
+        "Blink_L": 1,
+        "Blink_R": 1
+       }
+      },
+      {
+       "id": "squint",
+       "label": "Squint",
+       "morphs": {
+        "Eye_Squint_L": 1,
+        "Eye_Squint_R": 1
+       }
+      },
+      {
+       "id": "dead",
+       "label": "Dead",
+       "morphs": {
+        "Eye_Dead_L": 1,
+        "Eye_Dead_R": 1
+       }
+      },
+      {
+       "id": "noodles",
+       "label": "Noodles",
+       "morphs": {
+        "Eye_Noodles_Out": 1,
+        "Eye_Noodles_Bend1": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "mask",
+     "label": "Mask",
+     "options": [
+      {
+       "id": "intact",
+       "label": "Intact"
+      },
+      {
+       "id": "damaged",
+       "label": "Damaged",
+       "morphs": {
+        "Mask_Damage1": 1,
+        "Gangway_Ripped": 1
+       }
+      },
+      {
+       "id": "hollow",
+       "label": "Hollow",
+       "morphs": {
+        "Mask_Damage1": 1,
+        "Mask_Damage2": 1,
+        "Gangway_Ripped": 1,
+        "Horn_out": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "eye",
+     "label": "Relic eye",
+     "options": [
+      {
+       "id": "closed",
+       "label": "Closed"
+      },
+      {
+       "id": "split",
+       "label": "Split",
+       "bones": {
+        "Relicteye_Split_Down": {
+         "rot": [
+          -0.0,
+          -0.0,
+          63.6
+         ]
+        },
+        "Relicteye_Split_Up": {
+         "rot": [
+          -0.0,
+          -0.0,
+          -71.6
+         ]
+        },
+        "Relicteye_Open": {
+         "rot": [
+          -22.0,
+          -36.3,
+          87.8
+         ]
+        }
+       }
+      },
+      {
+       "id": "anime",
+       "label": "Anime",
+       "surfaces": {
+        "Transform": {
+         "map": "anime_eye.webp",
+         "emissiveMap": "anime_eye_emis.webp"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "blessing",
+     "label": "Blessing",
+     "options": [
+      {
+       "id": "none",
+       "label": "None"
+      },
+      {
+       "id": "fur",
+       "label": "Fur",
+       "morphs": {
+        "Puff": 1
+       },
+       "surfaces": {
+        "Transform": {
+         "alphaMap": null,
+         "alphaTest": 0.5
+        }
+       }
+      },
+      {
+       "id": "blessed",
+       "label": "Blessed",
+       "morphs": {
+        "Puff": 1,
+        "ClawFoot2": 1,
+        "ClawGrowth2L": 1,
+        "ClawGrowth2R": 1,
+        "Fluff_Out": 1,
+        "Transform/ClawShrinkL": 0,
+        "Transform/ClawShrinkR": 0
+       },
+       "surfaces": {
+        "Transform": {
+         "alphaMap": null,
+         "alphaTest": 0.5
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "tail",
+     "label": "Tail",
+     "options": [
+      {
+       "id": "off",
+       "label": "Hidden"
+      },
+      {
+       "id": "on",
+       "label": "Tail",
+       "bones": {
+        "PB_Tail_0_scale10": {
+         "scale": 1,
+         "rot": [
+          -70,
+          0,
+          0
+         ]
+        },
+        "Tail_1": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_2": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_3": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_4": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_5": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_6": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_7": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_8": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_9": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_10": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_11": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_12": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_13": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_14": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_15": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_16": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_17": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_18": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_19": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_20": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_21": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_22": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_23": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_24": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_25": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        }
+       }
+      },
+      {
+       "id": "cut",
+       "label": "Cut",
+       "bones": {
+        "PB_Tail_0_scale10": {
+         "scale": 1,
+         "rot": [
+          -70,
+          0,
+          0
+         ]
+        },
+        "Tail_1": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_2": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_3": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_4": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_5": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_6": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_7": {
+         "rot": [
+          10,
+          0,
+          0
+         ]
+        },
+        "Tail_8": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_9": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_10": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_11": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_12": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_13": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_14": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_15": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_16": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_17": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_18": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_19": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_20": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_21": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_22": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_23": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_24": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        },
+        "Tail_25": {
+         "rot": [
+          0,
+          0,
+          0
+         ]
+        }
+       },
+       "morphs": {
+        "TailCut": 1
+       },
+       "surfaces": {
+        "Body": {
+         "alphaMap": "tail_alpha_inv.webp",
+         "alphaTest": 0.4
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "coat",
+     "label": "Coat",
+     "options": [
+      {
+       "id": "standard",
+       "label": "Standard"
+      },
+      {
+       "id": "long",
+       "label": "Long",
+       "morphs": {
+        "Jacket_Long": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "build",
+     "label": "Build",
+     "options": [
+      {
+       "id": "standard",
+       "label": "Standard"
+      },
+      {
+       "id": "bulky",
+       "label": "Bulky",
+       "morphs": {
+        "Bulky": 1
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "gyro",
+   "name": "Gyro Zeppeli",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/gyro/gyro.glb?v=2",
+   "yaw": 180,
+   "height": 78,
+   "color": "#4a2a78",
+   "accent": "#d8a628",
+   "fpArms": true,
+   "fpArmsRetarget": false,
+   "springBones": {
+    "_doc": "Cape (the rip's mant bones, three strips under mant00): swings with movement; hips, spine and legs push it out. Sizes in model units (he is 2.87 tall).",
+    "chains": [
+     "7jir01t0 mant10",
+     "7jir01t0 mant20",
+     "7jir01t0 mant30"
+    ],
+    "childMatch": "mant",
+    "stiffness": 0.03,
+    "drag": 0.18,
+    "gravity": 2.5,
+    "maxAngle": 22,
+    "follow": 0.6,
+    "radius": 0.06,
+    "colliders": [
+     {
+      "bone": "Hips",
+      "to": "bip_spine_1",
+      "radius": 0.3
+     },
+     {
+      "bone": "bip_spine_1",
+      "to": "bip_spine_2",
+      "radius": 0.3
+     },
+     {
+      "bone": "Thigh_L",
+      "to": "bip_knee_L",
+      "radius": 0.17
+     },
+     {
+      "bone": "bip_knee_L",
+      "to": "bip_foot_L",
+      "radius": 0.14
+     },
+     {
+      "bone": "Thigh_R",
+      "to": "bip_knee_R",
+      "radius": 0.17
+     },
+     {
+      "bone": "bip_knee_R",
+      "to": "bip_foot_R",
+      "radius": 0.14
+     }
+    ]
+   },
+   "optional": true,
+   "description": "Gyro Zeppeli of Steel Ball Run: Neapolitan executioner, master of the Spin. GO! GO! ZEPPELI!",
+   "credit": {
+    "title": "Gyro Zeppeli (JoJo's Bizarre Adventure: Steel Ball Run)",
+    "author": "Steam Workshop model, reworked in Blender by its uploader",
+    "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=1862915551",
+    "license": "Ripped fan model; the uploader claims no rights",
+    "note": "Gyro Zeppeli is from JoJo's Bizarre Adventure by Hirohiko Araki (Shueisha); the model is from Bandai Namco's game. Built locally with .tools/build_gyro.sh, not published."
+   }
+  },
+  {
+   "id": "experiment",
+   "name": "Experiment",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/experiment/experiment.glb?v=3",
+   "height": 64,
+   "description": "Akittu's Stylized Experiment: a dark-furred alien experiment with big ears, a long tail and a scarf, animated with Black Ops' own player animations. Fur, eyes, scarf and gear are customisable.",
+   "color": "#2c5aa0",
+   "accent": "#e2557a",
+   "fpArms": true,
+   "fpArmsRetarget": true,
+   "optional": true,
+   "springBones": [
+    {
+     "_doc": "Scarf tails (front and back): hang and swing; the body pushes them out.",
+     "chains": [
+      "scarfb",
+      "scarff"
+     ],
+     "childMatch": "scarf",
+     "stiffness": 0.02,
+     "drag": 0.16,
+     "gravity": 2,
+     "maxAngle": 80,
+     "follow": 0.6,
+     "followY": 1,
+     "radius": 0.03,
+     "colliders": [
+      {
+       "bone": "Hips",
+       "to": "Spine",
+       "radius": 0.13
+      },
+      {
+       "bone": "Spine",
+       "to": "Chest",
+       "radius": 0.15
+      },
+      {
+       "bone": "Chest",
+       "to": "Neck",
+       "radius": 0.15
+      },
+      {
+       "bone": "Left_leg",
+       "to": "Left_knee",
+       "radius": 0.09
+      },
+      {
+       "bone": "Left_knee",
+       "to": "Left_ankle",
+       "radius": 0.07
+      },
+      {
+       "bone": "Right_leg",
+       "to": "Right_knee",
+       "radius": 0.09
+      },
+      {
+       "bone": "Right_knee",
+       "to": "Right_ankle",
+       "radius": 0.07
+      }
+     ]
+    },
+    {
+     "_doc": "Tail: keeps its shape (no gravity), lags and sways with movement.",
+     "chains": [
+      "tail01"
+     ],
+     "childMatch": "tail",
+     "stiffness": 0.08,
+     "drag": 0.2,
+     "gravity": 0.2,
+     "maxAngle": 30,
+     "follow": 0.7,
+     "followY": 1,
+     "radius": 0.04,
+     "colliders": [
+      {
+       "bone": "Left_leg",
+       "to": "Left_knee",
+       "radius": 0.09
+      },
+      {
+       "bone": "Left_knee",
+       "to": "Left_ankle",
+       "radius": 0.07
+      },
+      {
+       "bone": "Right_leg",
+       "to": "Right_knee",
+       "radius": 0.09
+      },
+      {
+       "bone": "Right_knee",
+       "to": "Right_ankle",
+       "radius": 0.07
+      }
+     ]
+    }
+   ],
+   "variants": [
+    {
+     "id": "fur",
+     "label": "Fur",
+     "options": [
+      {
+       "id": "default",
+       "label": "Midnight",
+       "default": true
+      },
+      {
+       "id": "albino",
+       "label": "Albino",
+       "surfaces": {
+        "Experiment": {
+         "map": "fur_albino.webp"
+        },
+        "FurNeck": {
+         "map": "fur_albino.webp"
+        },
+        "FurArms": {
+         "map": "fur_albino.webp"
+        },
+        "FurLegs": {
+         "map": "fur_albino.webp"
+        },
+        "FurMuzzle": {
+         "map": "fur_albino.webp"
+        }
+       }
+      },
+      {
+       "id": "gold",
+       "label": "Gold flecks",
+       "surfaces": {
+        "Experiment": {
+         "map": "fur_gold.webp"
+        },
+        "FurNeck": {
+         "map": "fur_gold.webp"
+        },
+        "FurArms": {
+         "map": "fur_gold.webp"
+        },
+        "FurLegs": {
+         "map": "fur_gold.webp"
+        },
+        "FurMuzzle": {
+         "map": "fur_gold.webp"
+        }
+       }
+      },
+      {
+       "id": "striped",
+       "label": "Striped",
+       "surfaces": {
+        "Experiment": {
+         "map": "fur_striped.webp"
+        },
+        "FurNeck": {
+         "map": "fur_striped.webp"
+        },
+        "FurArms": {
+         "map": "fur_striped.webp"
+        },
+        "FurLegs": {
+         "map": "fur_striped.webp"
+        },
+        "FurMuzzle": {
+         "map": "fur_striped.webp"
+        }
+       }
+      },
+      {
+       "id": "piebald",
+       "label": "Piebald",
+       "surfaces": {
+        "Experiment": {
+         "map": "fur_piebald.webp"
+        },
+        "FurNeck": {
+         "map": "fur_piebald.webp"
+        },
+        "FurArms": {
+         "map": "fur_piebald.webp"
+        },
+        "FurLegs": {
+         "map": "fur_piebald.webp"
+        },
+        "FurMuzzle": {
+         "map": "fur_piebald.webp"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "eyes",
+     "label": "Eyes",
+     "options": [
+      {
+       "id": "round",
+       "label": "Round",
+       "default": true
+      },
+      {
+       "id": "small",
+       "label": "Pinprick",
+       "surfaces": {
+        "ExperimentEyes": {
+         "uvOffset": [
+          0,
+          0.25
+         ]
+        }
+       }
+      },
+      {
+       "id": "sparkle",
+       "label": "Sparkle",
+       "surfaces": {
+        "ExperimentEyes": {
+         "uvOffset": [
+          0,
+          0.5
+         ]
+        }
+       }
+      },
+      {
+       "id": "slit",
+       "label": "Slit",
+       "surfaces": {
+        "ExperimentEyes": {
+         "uvOffset": [
+          0,
+          0.75
+         ]
+        }
+       }
+      },
+      {
+       "id": "thin",
+       "label": "Thin slit",
+       "surfaces": {
+        "ExperimentEyes": {
+         "uvOffset": [
+          0.5,
+          0
+         ]
+        }
+       }
+      },
+      {
+       "id": "glow",
+       "label": "Glow",
+       "surfaces": {
+        "ExperimentEyes": {
+         "uvOffset": [
+          0.5,
+          0.5
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "eyeColour",
+     "label": "Eye colour",
+     "options": [
+      {
+       "id": "amber",
+       "label": "Amber",
+       "default": true
+      },
+      {
+       "id": "red",
+       "label": "Red",
+       "surfaces": {
+        "ExperimentEyes": {
+         "map": "eyes_red.webp",
+         "emissiveMap": "eyes_red.webp"
+        }
+       }
+      },
+      {
+       "id": "pink",
+       "label": "Pink",
+       "surfaces": {
+        "ExperimentEyes": {
+         "map": "eyes_pink.webp",
+         "emissiveMap": "eyes_pink.webp"
+        }
+       }
+      },
+      {
+       "id": "purple",
+       "label": "Purple",
+       "surfaces": {
+        "ExperimentEyes": {
+         "map": "eyes_purple.webp",
+         "emissiveMap": "eyes_purple.webp"
+        }
+       }
+      },
+      {
+       "id": "blue",
+       "label": "Blue",
+       "surfaces": {
+        "ExperimentEyes": {
+         "map": "eyes_blue.webp",
+         "emissiveMap": "eyes_blue.webp"
+        }
+       }
+      },
+      {
+       "id": "cyan",
+       "label": "Cyan",
+       "surfaces": {
+        "ExperimentEyes": {
+         "map": "eyes_cyan.webp",
+         "emissiveMap": "eyes_cyan.webp"
+        }
+       }
+      },
+      {
+       "id": "green",
+       "label": "Green",
+       "surfaces": {
+        "ExperimentEyes": {
+         "map": "eyes_green.webp",
+         "emissiveMap": "eyes_green.webp"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "scarf",
+     "label": "Scarf",
+     "options": [
+      {
+       "id": "red",
+       "label": "Red",
+       "default": true,
+       "surfaces": {
+        "FurNeck": {
+         "visible": false
+        }
+       }
+      },
+      {
+       "id": "blue",
+       "label": "Blue",
+       "surfaces": {
+        "FurNeck": {
+         "visible": false
+        },
+        "ClothScarf": {
+         "map": "scarf_blue.webp"
+        }
+       }
+      },
+      {
+       "id": "green",
+       "label": "Green",
+       "surfaces": {
+        "FurNeck": {
+         "visible": false
+        },
+        "ClothScarf": {
+         "map": "scarf_green.webp"
+        }
+       }
+      },
+      {
+       "id": "purple",
+       "label": "Purple",
+       "surfaces": {
+        "FurNeck": {
+         "visible": false
+        },
+        "ClothScarf": {
+         "map": "scarf_purple.webp"
+        }
+       }
+      },
+      {
+       "id": "gold",
+       "label": "Gold",
+       "surfaces": {
+        "FurNeck": {
+         "visible": false
+        },
+        "ClothScarf": {
+         "map": "scarf_gold.webp"
+        }
+       }
+      },
+      {
+       "id": "black",
+       "label": "Black",
+       "surfaces": {
+        "FurNeck": {
+         "visible": false
+        },
+        "ClothScarf": {
+         "map": "scarf_black.webp"
+        }
+       }
+      },
+      {
+       "id": "white",
+       "label": "White",
+       "surfaces": {
+        "FurNeck": {
+         "visible": false
+        },
+        "ClothScarf": {
+         "map": "scarf_white.webp"
+        }
+       }
+      },
+      {
+       "id": "off",
+       "label": "Off",
+       "surfaces": {
+        "ClothScarf": {
+         "visible": false
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "armWraps",
+     "label": "Arm wraps",
+     "options": [
+      {
+       "id": "on",
+       "label": "On",
+       "default": true,
+       "surfaces": {
+        "FurArms": {
+         "visible": false
+        }
+       }
+      },
+      {
+       "id": "off",
+       "label": "Off",
+       "surfaces": {
+        "ClothArmWraps": {
+         "visible": false
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "legWraps",
+     "label": "Leg wraps",
+     "options": [
+      {
+       "id": "on",
+       "label": "On",
+       "default": true,
+       "surfaces": {
+        "FurLegs": {
+         "visible": false
+        }
+       }
+      },
+      {
+       "id": "off",
+       "label": "Off",
+       "surfaces": {
+        "ClothLegWraps": {
+         "visible": false
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "kevlar",
+     "label": "Kevlar",
+     "options": [
+      {
+       "id": "off",
+       "label": "Off",
+       "default": true,
+       "surfaces": {
+        "ClothKevlar": {
+         "visible": false
+        }
+       }
+      },
+      {
+       "id": "on",
+       "label": "With mags"
+      },
+      {
+       "id": "nomags",
+       "label": "No mags",
+       "morphs": {
+        "Clothing - Kevlar - No Mags": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "pouch",
+     "label": "Leg pouch",
+     "options": [
+      {
+       "id": "on",
+       "label": "On"
+      },
+      {
+       "id": "off",
+       "label": "Off",
+       "default": true,
+       "surfaces": {
+        "ClothPouch": {
+         "visible": false
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "balaclava",
+     "label": "Balaclava",
+     "options": [
+      {
+       "id": "on",
+       "label": "On",
+       "surfaces": {
+        "FurMuzzle": {
+         "visible": false
+        },
+        "ExperimentMouthMuzzle": {
+         "visible": false
+        }
+       }
+      },
+      {
+       "id": "off",
+       "label": "Off",
+       "default": true,
+       "surfaces": {
+        "ClothBalaclava": {
+         "visible": false
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "build",
+     "label": "Build",
+     "options": [
+      {
+       "id": "standard",
+       "label": "Standard",
+       "default": true
+      },
+      {
+       "id": "lore",
+       "label": "Lore accurate",
+       "morphs": {
+        "Body - LORE ACCURATE": 1
+       }
+      },
+      {
+       "id": "male",
+       "label": "Male",
+       "morphs": {
+        "Body - Male Style": 1
+       }
+      },
+      {
+       "id": "slim",
+       "label": "Slim",
+       "morphs": {
+        "Body - Emaciated": 1
+       }
+      },
+      {
+       "id": "chunky",
+       "label": "Chunky",
+       "morphs": {
+        "Body - Obese": 1
+       }
+      }
+     ]
+    },
+    {
+     "id": "face",
+     "label": "Face",
+     "options": [
+      {
+       "id": "neutral",
+       "label": "Neutral",
+       "default": true
+      },
+      {
+       "id": "happy",
+       "label": "Happy",
+       "morphs": {
+        "MouthSmileLeft": 1,
+        "MouthSmileRight": 1,
+        "Eye - Eyelid Glee": 1
+       }
+      },
+      {
+       "id": "angry",
+       "label": "Angry",
+       "morphs": {
+        "Angry": 1,
+        "EyebrowAngledInL": 1,
+        "EyebrowAngledInR": 1
+       }
+      },
+      {
+       "id": "sad",
+       "label": "Sad",
+       "morphs": {
+        "MouthSadLeft": 1,
+        "MouthSadRight": 1
+       }
+      },
+      {
+       "id": "blep",
+       "label": "Blep",
+       "morphs": {
+        "TongueOut": 1,
+        "MouthSmileLeft": 0.5,
+        "MouthSmileRight": 0.5
+       }
+      },
+      {
+       "id": "surprise",
+       "label": "Surprised",
+       "morphs": {
+        "JawOpen": 0.6,
+        "WideEyeL": 1,
+        "WideEyeR": 1
+       }
+      },
+      {
+       "id": "sleepy",
+       "label": "Sleepy",
+       "morphs": {
+        "Eye - Eyelid Closed": 1
+       }
+      }
+     ]
+    }
+   ],
+   "credit": {
+    "title": "Stylized Experiment V3",
+    "author": "Akittu",
+    "source": "Purchased VRChat/Resonite avatar (user's own copy)",
+    "license": "Paid avatar; personal use",
+    "note": "Built locally with .tools/build_experiment.sh, not published."
+   },
+   "fpArmsExclude": "bandage",
+   "fpArmsScale": 0.65,
+   "variantBase": {
+    "_doc": "The scarf tails are modelled straight out front and back (the avatar's physbones drop them): hang them down so the menu and portraits show them hanging; the springs start from there.",
+    "bones": {
+     "scarfb": {
+      "rot": [
+       -75,
+       0,
+       0
+      ]
+     },
+     "scarff": {
+      "rot": [
+       -45,
+       0,
+       0
+      ]
+     }
+    }
+   },
+   "fpArmsTone": [
+    0.78,
+    0.68,
+    0.56
+   ],
+   "fpArmsReach": false,
+   "fpArmsFingers": {
+    "thumb": "^Thumb",
+    "index": "^IndexFinger",
+    "mid": "^MiddleFinger",
+    "pinky": "^RingFinger"
+   }
+  },
+  {
+   "id": "armor_mk1",
+   "name": "Mark I",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/armor/armor_mk1.glb",
+   "yaw": 0,
+   "height": 74,
+   "color": "#4a4a4a",
+   "accent": "#9fb3c8",
+   "optional": true,
+   "hidden": true,
+   "description": "Stark Industries Mark I armor (worn through STARK.EXE or Cheese Cube's Hall of Armors).",
+   "credit": {
+    "title": "Mark I armor (Cheese Cube)",
+    "author": "the Cheese Cube map's makers",
+    "note": "Rigged in Blender by .tools/build-armor-characters.py from the map's suit model; local only."
+   }
+  },
+  {
+   "id": "armor_mk4",
+   "name": "Mark IV",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/armor/armor_mk4.glb",
+   "yaw": 0,
+   "height": 74,
+   "color": "#8f1d15",
+   "accent": "#d8a628",
+   "optional": true,
+   "hidden": true,
+   "description": "Stark Industries Mark IV armor (worn through STARK.EXE or Cheese Cube's Hall of Armors).",
+   "credit": {
+    "title": "Mark IV armor (Cheese Cube)",
+    "author": "the Cheese Cube map's makers",
+    "note": "Rigged in Blender by .tools/build-armor-characters.py from the map's suit model; local only."
+   }
+  },
+  {
+   "id": "armor_mk5",
+   "name": "Mark V",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/armor/armor_mk5.glb",
+   "yaw": 0,
+   "height": 74,
+   "color": "#8f1d15",
+   "accent": "#c0c4c8",
+   "optional": true,
+   "hidden": true,
+   "description": "Stark Industries Mark V armor (worn through STARK.EXE or Cheese Cube's Hall of Armors).",
+   "credit": {
+    "title": "Mark V armor (Cheese Cube)",
+    "author": "the Cheese Cube map's makers",
+    "note": "Rigged in Blender by .tools/build-armor-characters.py from the map's suit model; local only."
+   }
+  },
+  {
+   "id": "armor_mk6",
+   "name": "Mark VI",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/armor/armor_mk6.glb",
+   "yaw": 0,
+   "height": 74,
+   "color": "#8f1d15",
+   "accent": "#d8a628",
+   "optional": true,
+   "hidden": true,
+   "description": "Stark Industries Mark VI armor (worn through STARK.EXE or Cheese Cube's Hall of Armors).",
+   "credit": {
+    "title": "Mark VI armor (Cheese Cube)",
+    "author": "the Cheese Cube map's makers",
+    "note": "Rigged in Blender by .tools/build-armor-characters.py from the map's suit model; local only."
+   }
+  },
+  {
+   "id": "armor_wm",
+   "name": "War Machine",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/armor/armor_wm.glb",
+   "yaw": 0,
+   "height": 74,
+   "color": "#3a3d40",
+   "accent": "#c0c4c8",
+   "optional": true,
+   "hidden": true,
+   "description": "Stark Industries War Machine armor (worn through STARK.EXE or Cheese Cube's Hall of Armors).",
+   "credit": {
+    "title": "War Machine armor (Cheese Cube)",
+    "author": "the Cheese Cube map's makers",
+    "note": "Rigged in Blender by .tools/build-armor-characters.py from the map's suit model; local only."
+   }
+  }
+ ]
 }

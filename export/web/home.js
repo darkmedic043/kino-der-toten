@@ -459,7 +459,7 @@ function card(c,label,sub,active,onClick,cls){
 function renderCharacters(){
   const list=$('char-list');list.innerHTML='';
   const current=characters.find(c=>c.id===profile.character)??characters[0],currentOp=operatorOf(current);
-  for(const op of characters.filter(c=>!c.skinOf)){
+  for(const op of characters.filter(c=>!c.skinOf&&!c.hidden)){   // hidden: armor bodies worn in game, not picked here
     const skins=skinsOf(op),shown=skins.find(s=>s.id===(op===currentOp?current.id:profile.skins?.[op.id]))??op;
     const sub=`${op.type==='mannequin'?'PLACEHOLDER':op.type==='t5'?'GAME MODEL':'CUSTOM MODEL'}${skins.length>1?' · '+skins.length+' SKINS':''}`;
     list.append(card(shown,op.name,sub,op===currentOp,()=>{if(op!==currentOp)equip(shown);},'char-card'));

@@ -67,6 +67,15 @@ export default async function setup(api){
     remotes.set(p.id,r);
     r.character=await createCharacter(entry,data);r.root=r.character.root;r.root.visible=false;scene.add(r.root);setTag(r);showPanel();
   }
+  // an Iron Man armor on or off (mods/stark/armor.js): teammates swap your body to the armor's character and back
+  async function setRemoteBody(r,next){
+    const nc=await createCharacter(next,data),vis=r.root?.visible;
+    r.held?.removeFromParent();r.held=null;r.character?.dispose();r.root?.removeFromParent();
+    r.entry=next;r.character=nc;r.root=nc.root;r.root.visible=!!vis;scene.add(r.root);r.weapon='';setTag(r);
+  }
+  host.on('suitChange',({suit,on})=>net.send('all',{t:'suit',suit,on}));
+  net.on('suit',(m,from)=>{const r=remotes.get(from);if(!r)return;r.ownEntry??=r.entry;
+    const next=m.on?registry.find(e=>e.id==='armor_'+m.suit):r.ownEntry;if(next&&next!==r.entry)setRemoteBody(r,next).catch(e=>console.warn('[coop] suit body',e));});
   function removeRemote(id){const r=remotes.get(id);if(!r)return;r.character?.dispose();r.root?.removeFromParent();remotes.delete(id);showPanel();}
   for(const p of net.players.values())addRemote(p);
   net.on('joined',p=>{addRemote(p);api.toast(`${p.name} joined`,3);});

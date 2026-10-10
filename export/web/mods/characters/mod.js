@@ -24,7 +24,7 @@ export async function prepare(data){
 export default async function setup(api){
   (window.kino??={}).view=api.view;   // debug: the first-person viewmodel
   const {host,scene,camera,player}=api;
-  const entry=await selected();await tintArms(entry);
+  let entry=await selected();await tintArms(entry);const ownEntry=entry;
 
   // HUD portrait: who you're playing as (3/4 view of the character's head).
   const portrait=document.createElement('div');portrait.id='hud-portrait';
@@ -38,11 +38,26 @@ export default async function setup(api){
     @media(max-width:700px){#hud-portrait{left:20px;bottom:180px}#hud-portrait img{width:48px;height:48px}}`;document.head.append(style);
   renderPortrait(entry,api.data).then(url=>{portrait.querySelector('img').src=url;}).catch(e=>console.warn('portrait',e));
   let hurtTimer=0;host.on('beforeDamage',()=>{portrait.classList.add('hurt');clearTimeout(hurtTimer);hurtTimer=setTimeout(()=>portrait.classList.remove('hurt'),350);});
-  const character=await createCharacter(entry,api.data);
+  let character=await createCharacter(entry,api.data);
   character.root.visible=false;scene.add(character.root);
+  // Swapping the body mid-game (an Iron Man armor: STARK.EXE / Cheese Cube emit host 'suitChange'): the armor's character
+  // (armor_<suit>, hidden from the picker) replaces yours in third person, and yours comes back when it's off.
+  const registryP=loadCharacterRegistry();
+  let swapToken=0;
+  async function swapTo(next){
+    const token=++swapToken,nc=await createCharacter(next,api.data);if(token!==swapToken){nc.dispose?.();return;}
+    const vis=character.root.visible;character.root.removeFromParent();character.dispose?.();
+    character=nc;entry=next;character.root.visible=vis;scene.add(character.root);groundSprings(character);
+    window.kino.character=character;window.kino.characterEntry=entry;heldKey='x';
+  }
+  host.on('suitChange',async({suit,on})=>{
+    const want=on?(await registryP).find(e=>e.id==='armor_'+suit):ownEntry;
+    if(want&&want!==entry)swapTo(want).catch(e=>console.warn('[characters] suit swap',e));
+  });
   // Spring chains (coat, tail) rest on the level itself: stairs, ledges, slopes.
-  {const down=new THREE.Vector3(0,-1,0),from=new THREE.Vector3(),ray=new THREE.Ray(from,down);
-    for(const sp of character.springs??[])sp.ground=(x,y,z)=>{from.set(x,y+40,z);const h=api.world?.raycast(ray,0,400);return h?from.y-h.distance:null;};}window.kino.character=character;window.kino.characterEntry=entry;   // debug handle (the Pilot class seats a copy of the operator in its mech)
+  function groundSprings(ch){const down=new THREE.Vector3(0,-1,0),from=new THREE.Vector3(),ray=new THREE.Ray(from,down);
+    for(const sp of ch.springs??[])sp.ground=(x,y,z)=>{from.set(x,y+40,z);const h=api.world?.raycast(ray,0,400);return h?from.y-h.distance:null;};}
+  groundSprings(character);window.kino.character=character;window.kino.characterEntry=entry;   // debug handle (the Pilot class seats a copy of the operator in its mech)
   const view=new ThirdPersonCamera(camera);window.kino.thirdPersonCamera=view;   // the Pilot class pulls it back while in its mech
   let third=false,last=null,lastYaw=null,airT=0;
   const apply=()=>{host.camera=third?view.update(api.world):null;host.hideViewmodel=third;character.root.visible=third;};
