@@ -32,7 +32,8 @@ export function setupFirstPerson(api,state){
     bone.parent.getWorldQuaternion(tmp.pq);bone.quaternion.copy(tmp.pq.invert().multiply(world));
     bone.updateMatrixWorld(true);
   }
-  function reachLeft(target,weight){
+  // open: ease the hand to its relaxed bind pose (a ledge); false keeps the animation's grip (holding a part)
+  function reachLeft(target,weight,open=true){
     const root=view.root;if(!root||weight<=0)return;
     const sh=root.getObjectByName('j_shoulder_le'),el=root.getObjectByName('j_elbow_le'),wr=root.getObjectByName('j_wrist_le');
     if(!sh||!el||!wr)return;
@@ -52,7 +53,7 @@ export function setupFirstPerson(api,state){
     el.getWorldPosition(tmp.e);wr.getWorldPosition(tmp.w);
     aimBone(el,tmp.e,null,tmp.w.clone(),tmp.s.clone().addScaledVector(dir,d));
     // open the hand: wrist and fingers ease toward the model's relaxed bind pose
-    for(const b of handBones(root)){const bind=bindLocal(b);if(bind)b.quaternion.slerp(bind,weight);}
+    if(open)for(const b of handBones(root)){const bind=bindLocal(b);if(bind)b.quaternion.slerp(bind,weight);}
     root.updateMatrixWorld(true);
   }
   // The rig's animations don't key every arm bone every frame, so IK edits would

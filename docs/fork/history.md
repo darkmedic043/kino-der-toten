@@ -176,3 +176,4 @@
 - 2026-10-09: Ammo mods: BO7's Fire Works and Shadow Rift added, Dead Wire gets BO7's damage field; per-tier TUNE table and ammoModTune/ammoModProc events for future augments (gameplay.md).
 - 2026-10-09: Ammo mods: BO6's Light Mend (healing glyph); Shatter Blast relabelled Cold War (gameplay.md).
 - 2026-10-09: Grimhawk camos tile at the right size (per-material camoScale in camo.js).
+- 2026-10-10: Grimhawk: the fan-drum P.T. Expanse is back with its own procedural reload (left-arm IK, canted gun); fixed the drum following a spare M16 mag bone (weapons.md).

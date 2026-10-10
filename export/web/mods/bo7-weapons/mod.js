@@ -17,6 +17,9 @@ const ID = 'grimhawk_zm';
 // every attachment part, hidden until fitted (weapon-levels attachments.json: gh_rangefinder, gh_expanse, gh_hawkeye,
 // gh_longbarrel, and the shared suppressor, grip and laser)
 const ATTACHMENT_TAGS = ['tag_gh_rangefinder', 'tag_gh_hawkeye', 'tag_gh_expanse', 'tag_suppressor', 'tag_gh_longbarrel', 'tag_foregrip', 'tag_laser_box'];
+// The M16 skeleton's own extended / dual mag bones (no Grimhawk meshes on them) must be hidden too: weapon-levels' mag
+// follow takes a visible one for a built-in mag and drove the Expanse drum from it (a bone the reload never moves).
+const SPARE_TAGS = ['tag_ext_clip', 'tag_double_clip'];
 // At the hip it sat as close as the BO1 M16 and read as huge (a long, bulky gun): pushed 3 units away from the eye
 // along the view camera's axis (-z), nudged right and down (ViewWeapon's def.viewOffset; gone in ADS).
 const VIEW_OFFSET = [.6, -.4, -3];
@@ -27,17 +30,17 @@ const SPEED = 2600, DROP = 520, LIFE = 2.2, TURN = 3.2, CONE = Math.cos(THREE.Ma
 export function prepare(data) {
   const m16 = data.weapons.m16_zm;
   if (!m16) { console.warn('[bo7-weapons] no M16 to build the Grimhawk on'); return; }
-  const model = BASE + 'grimhawk_view.glb?v=12', world = BASE + 'grimhawk_world.glb?v=12';   // own models (not under models/: Rind installs them)
+  const model = BASE + 'grimhawk_view.glb?v=13', world = BASE + 'grimhawk_world.glb?v=13';   // own models (not under models/: Rind installs them)
   const base = structuredClone(m16);
   const gun = Object.assign(base, {
     id: ID, name: 'Grimhawk', price: 1500, clipSize: 25, startAmmo: 125, maxAmmo: 225,
     damage: 190, minDamage: 150, range: 3000, fireTime: .094,   // 0.092-0.096 s between shots in BO7 footage headMultiplier: 3.5, hipSpread: .016,
-    automatic: true, fireType: 'Full Auto', pellets: 1, hideTags: [...ATTACHMENT_TAGS], model, worldModel: world, adsFov: 48,
+    automatic: true, fireType: 'Full Auto', pellets: 1, hideTags: [...ATTACHMENT_TAGS, ...SPARE_TAGS], model, worldModel: world, adsFov: 48,
     flechette: true, soundAs: 'g11_lps_zm', weaponClass: 'Special', gunsmith: true, viewOffset: VIEW_OFFSET,   // gunsmith: camos, though it has no attachments yet   // BO7's Specials class (the loadout's SPECIALS tab)
   });
   gun.upgrade = Object.assign(structuredClone(m16.upgrade ?? {}), {
     name: 'Grim Reaper', clipSize: 35, startAmmo: 280, maxAmmo: 280, damage: 340, minDamage: 260, range: 3600, fireTime: .08,
-    headMultiplier: 4, hideTags: [...ATTACHMENT_TAGS], model, worldModel: world, viewOffset: VIEW_OFFSET, animations: structuredClone(m16.animations), automatic: true, fireType: 'Full Auto', pellets: 1,
+    headMultiplier: 4, hideTags: [...ATTACHMENT_TAGS, ...SPARE_TAGS], model, worldModel: world, viewOffset: VIEW_OFFSET, animations: structuredClone(m16.animations), automatic: true, fireType: 'Full Auto', pellets: 1,
   });
   delete gun.upgrade.attachment;   // the M16's Pack-a-Punch carries an M203 grenade launcher (the Skullcrusher's); not the Grim Reaper's
   for (const k of ['projectileType', 'projectileModel']) delete gun.upgrade[k];
@@ -66,6 +69,59 @@ export default function setup(api) {
   }
   audio.weapon = (kind, def, ...rest) => !isGrim(def) ? weaponSound(kind, def, ...rest) : kind === 'shot' ? shot(def) : weaponSound(kind, g11(def), ...rest);
   host.on('start', () => { for (const url of SHOTS) load(url); });   // decode before the first shot (the audio context exists once the game starts)
+
+  // ---- the P.T. Expanse drum's own reload --------------------------------------------------------------------------
+  // The M16 reload's left hand grips a straight mag and goes through the fan drum, so with the Expanse fitted the reload
+  // is procedural: the viewmodel plays idle, the gun cants, the left hand (movement mod's arm IK, grip kept) reaches under
+  // and takes the drum's rim, the drum (tag_clip; weapon-levels drives the fitted drum from it) swings down out of view
+  // with the hand, a fresh one comes back up and is seated with a slap, and the hand returns to the handguard. Timed to
+  // the reload's duration; the M16's mag out / in (and chamber, on an empty reload) sounds play at their beats.
+  const drumFitted = () => session.weapon?.id === ID && String(session.def?.attachments ?? '').split('+').includes('gh_expanse');
+  const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+  const seg = (u, a, b) => ease((u - a) / (b - a));
+  let drum = null;
+  if (view) {
+    const reloadView = view.reload.bind(view);
+    view.reload = (empty, duration, stage = 'magazine') => {
+      if (!drumFitted() || stage !== 'magazine' || !view.ready) { drum = null; return reloadView(empty, duration, stage); }
+      view.mode = 'reload'; view.aim = 0; view.rig.play('idleAnim', true, 1, .12);
+      const clip = view.gun?.getObjectByName('tag_clip');
+      // the arm's idle pose: the mixer doesn't rewrite these bones every frame, so the IK starts from it each frame and
+      // it's put back at the end (otherwise the hand stays where the IK left it)
+      const arm = ['j_shoulder_le', 'j_elbow_le'].map(n => view.root.getObjectByName(n)).filter(Boolean).map(b => ({ b, q: b.quaternion.clone() }));
+      drum = { t: 0, dur: Math.max(.6, duration), empty, clip, arm, rest: clip ? { p: clip.position.clone(), q: clip.quaternion.clone() } : null, played: new Set() };
+    };
+  }
+  const tmpQ = new THREE.Quaternion(), yAxis = new THREE.Vector3(0, 1, 0), xAxis = new THREE.Vector3(1, 0, 0);
+  // the gun lifts toward the centre and rolls its underside to the camera so the drum swap is in view (view-space pivot)
+  const CANT = { 'rotation.x': .4, 'rotation.z': -.25 };   // muzzle up, rolled right: the drum and the left hand in view
+  const DROP = 9;   // how far the drum comes out (gun space, down)
+  const GRIP = new THREE.Vector3(3.2, 2.6, -6.4);   // where the left wrist goes, in tag_clip space (CoD: x fwd, y left, z up): under the drum, on its left
+  function endDrum() { if (drum?.clip && drum.rest) { drum.clip.position.copy(drum.rest.p); drum.clip.quaternion.copy(drum.rest.q); } for (const a of drum?.arm ?? []) a.b.quaternion.copy(a.q); drum = null; }
+  host.on('update', dt => {
+    if (!drum) return;
+    if (!view?.ready || !drumFitted() || (session.reloadLeft <= 0 && drum.t > .2) || session.weapon?.id !== ID) { endDrum(); return; }
+    drum.t += dt; const u = Math.min(1, drum.t / drum.dur), d = drum;
+    if (u >= 1) { endDrum(); return; }
+    // the gun cants right and lifts a little to show the drum
+    const cant = seg(u, 0, .14) * (1 - seg(u, .84, 1));
+    for (const [k, v] of Object.entries(CANT)) { const [o, ax] = k.split('.'); view.pivot[o][ax] += v * cant; }
+    // the drum: seated → out and down (front first) → fresh one back up → seated (a small slap)
+    const out = seg(u, .26, .48) * (1 - seg(u, .58, .78)), slap = Math.sin(Math.min(1, Math.max(0, (u - .78) / .06)) * Math.PI) * .35;
+    if (d.clip && d.rest) {
+      d.clip.position.copy(d.rest.p).add(new THREE.Vector3(1.5 * out, 2.5 * out, -DROP * out + slap));
+      d.clip.quaternion.copy(d.rest.q).multiply(tmpQ.setFromAxisAngle(yAxis, -.55 * out)).multiply(new THREE.Quaternion().setFromAxisAngle(xAxis, .35 * out));
+    }
+    // sounds at the beats
+    const beat = (k, at, name) => { if (u >= at && !d.played.has(k)) { d.played.add(k); view.onSound?.(name, session.def); } };
+    beat('out', .3, 'sndnt#wpn_m16_mag_out'); beat('in', .78, 'sndnt#wpn_m16_mag_in');
+    if (d.empty) beat('ch', .9, 'sndnt#wpn_m16_button');
+    // the left hand: reaches the drum, rides with it, lets go
+    const w = seg(u, .1, .26) * (1 - seg(u, .82, .96)), reach = window.kino.fpMotion?.reachLeft;
+    for (const a of d.arm) a.b.quaternion.copy(a.q);
+    if (reach && d.clip && w > 0) { view.root.updateMatrixWorld(true); reach(d.clip.localToWorld(GRIP.clone()), w, false); }
+  });
+  host.on('reset', endDrum);
 
   // ---- flechettes ----------------------------------------------------------------------------------------------
   const needleGeo = new THREE.CylinderGeometry(.16, .05, 7, 6).rotateX(Math.PI / 2);   // along +z
@@ -165,5 +221,5 @@ export default function setup(api) {
     for (const s of [...stuck]) { s.t -= dt; if (s.t <= 0) { s.mesh.removeFromParent(); stuck.splice(stuck.indexOf(s), 1); } }
   });
   host.on('reset', () => { for (const p of live) kill(p); live.length = 0; for (const s of stuck) s.mesh.removeFromParent(); stuck.length = 0; });
-  window.kino.bo7 = { live, stuck };
+  window.kino.bo7 = { live, stuck, get drum() { return drum; }, CANT, GRIP };   // drum / CANT / GRIP: for tuning tests
 }

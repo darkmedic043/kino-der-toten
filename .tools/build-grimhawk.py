@@ -370,23 +370,19 @@ tur = bmesh.new(); bmesh.ops.create_cone(tur, cap_ends=True, segments=18, radius
 solid('hk_turret', tur, M['steel'], part=HK, bw=.03)
 solid('hk_band', cylbm(.53, 2.0, 2.6, SIGHT, seg=28), M['silver'], part=HK, bw=.02)
 
-# P.T. Expanse mag (BO7's extended flechette mag): the stock mag's profile, same width and rake, ~3 in longer, with a
-# grid face and the amber window, so the M16 reload's hands grip it like the stock one (a wide fan reached back over the
-# trigger guard and the hands clipped through it)
+# P.T. Expanse mag (BO7): a fan-shaped drum hung from the magwell, grid face, amber arc window. It has its own
+# reload (mods/bo7-weapons drumReload: the M16 reload's hands would clip through it)
 EX = 'tag_gh_expanse'
-ext = [(2.6, 1.15), (6.85, 1.15), (7.1, -0.3), (9.35, -2.3), (11.25, -7.5), (10.8, -8.05), (5.5, -8.2), (4.85, -7.6), (2.75, -0.4)]
-grid = []
-for i in range(4):
-    for j in range(5):
-        x0, z0 = 4.2 + i * 1.05 + (j * .55), -1.6 - j * 1.15   # follows the rake
-        for s_ in (1, -1):
-            grid.append(boxbm(x0, x0 + .7, s_ * .6 if s_ > 0 else -.9, .9 if s_ > 0 else -.6, z0 - .8, z0))
-solid('ex_body', prism(fillet(ext, .35), -.7, .7), M['poly'], part=EX, cuts=grid, bw=.14, seg=3)
+cx, cz, rad = 5.4, 0.6, 5.6   # nudged forward so the back edge clears the trigger hand
+fan = [(2.6, 1.15), (6.85, 1.15)] + [(cx + rad * math.cos(math.radians(a)), cz + rad * math.sin(math.radians(a))) for a in range(-35, -146, -10)]
+solid('ex_body', prism(fillet(fan, .3), -.82, .82), M['poly'], part=EX,
+      cuts=[boxbm(cx - 3.6 + i * 1.0, cx - 3.1 + i * 1.0, s_ * .7, s_ * .95, -3.9 + j * 1.0, -3.4 + j * 1.0) for i in range(7) for j in range(3) for s_ in (1, -1)
+            if math.hypot(cx - 3.35 + i * 1.0 - cx, -3.65 + j * 1.0 - cz) < rad - .9], bw=.14, seg=3)
+arc = [(cx + (rad - .25) * math.cos(math.radians(a)), cz + (rad - .25) * math.sin(math.radians(a))) for a in range(-40, -141, -10)]
+arc += [(cx + (rad - .55) * math.cos(math.radians(a)), cz + (rad - .55) * math.sin(math.radians(a))) for a in range(-140, -39, 10)]
 for s_ in (1, -1):
-    win = prism([(7.25, -0.45), (9.35, -2.35), (11.05, -7.2), (10.9, -7.2), (9.2, -2.45), (7.15, -0.6)], s_ * .62, s_ * .71)
-    solid(f'ex_win{s_}', win, M['amber'], part=EX, bw=0)
-    text('P.T. EXPANSE', .26, (5.9, s_ * .71, -0.6), part=EX, side=s_, m=M['label'])
-solid('ex_base', prism(fillet([(5.4, -8.1), (10.85, -7.95), (10.95, -8.45), (5.3, -8.6)], .2), -.76, .76), M['rubber'], part=EX, bw=.06)
+    solid(f'ex_win{s_}', prism(arc, s_ * .78, s_ * .86), M['amber'], part=EX, bw=0)
+    text('P.T. EXPANSE', .3, (cx, s_ * .84, -1.3), part=EX, side=s_, m=M['label'])
 
 # suppressor: a ribbed can over the brake
 SU = 'tag_suppressor'
