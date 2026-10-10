@@ -181,6 +181,7 @@ export default async function setup(api){
         const gun=api.data?.weapons?.bo3_rpg_dragon?'bo3_rpg_dragon':'m72_law_zm';
         if(api.data?.weapons?.[gun]){session.giveWeapon(gun);equipView?.();}
         announce('WAR MACHINE UNLOCKED','TRIVIA COMPLETE',6);beep();
+        import('../stark/unlocks.js').then(m=>{if(m.grant({stark_wm:true}).length)setTimeout(()=>toast('War Machine added to STARK.EXE on other maps',6),6500);}).catch(()=>{});
       }
     }else{
       toast('Incorrect. You are a failure',3);disarmPlates();retryAt=now()+120;
@@ -342,7 +343,9 @@ export default async function setup(api){
     function startEnding(){if(won!==null)return;show('ENT_cheese_ending_clip',false);won=now()+114.5;announce('THOU ART WORTHY','THE HAMMER IS YOURS',6);theEnding();}
     sync.on('ending',()=>startEnding());
     host.on('update',()=>{
-      if(won!==null&&now()>=won&&session.phase!=='gameover'){won=null;session.phase='gameover';session.lastEvent='You conquered the Cheese Cube';host.emit('gameOver',{round:session.round,kills:session.kills});}
+      if(won!==null&&now()>=won&&session.phase!=='gameover'){won=null;
+        import('../stark/unlocks.js').then(m=>{const r=m.addWin();if(r.news.includes('stark_mk16'))setTimeout(()=>toast('Mark XVI Nightclub added to STARK.EXE',6),2000);}).catch(()=>{});   // win count (5 = Mk XVI)
+        session.phase='gameover';session.lastEvent='You conquered the Cheese Cube';host.emit('gameOver',{round:session.round,kills:session.kills});}
     });
   }
 
