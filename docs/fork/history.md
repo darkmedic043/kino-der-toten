@@ -178,3 +178,4 @@
 - 2026-10-09: Grimhawk camos tile at the right size (per-material camoScale in camo.js).
 - 2026-10-10: Grimhawk: the fan-drum P.T. Expanse is back with its own procedural reload (left-arm IK, canted gun); fixed the drum following a spare M16 mag bone (weapons.md).
 - 2026-10-10: Grimhawk: head-lock only when Pack-a-Punched and aimed; the drum reload rips, throws the old drum away and slams a new one in.
+- 2026-10-10: Cheese Cube trivia answered with A–D keys on the desk (look + F) instead of shooting the screen (waw-ports.md).

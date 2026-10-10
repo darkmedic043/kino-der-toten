@@ -3,7 +3,7 @@
 // (positions and bounds of every named entity) and `ENT_<targetname>` meshes. Does nothing on other maps.
 //   power switch: carry the panel, handle and wire to the switch (the perks need the power)
 //   Cheese Brothers: five targets, shot with the Cheese Gun (an MP40 clone sold at the two wall buys)
-//   trivia: shoot the answer to each question on the screen; a wrong answer locks it for two minutes
+//   trivia: press the A–D key for each question on the screen; a wrong answer locks it for two minutes
 //   puzzle: set three dials to the combination; it opens the door to the ending
 //   ending: 25000 at the top, once the puzzle is solved
 //   Iron Man suits: six parts to build, then buyable armors (suits.js)
@@ -119,35 +119,55 @@ export default async function setup(api){
   if(powerSwitch){powerSwitch.locked=()=>placed.size<3;powerSwitch.lockedText='The power switch needs a panel, a handle and a wire';}
   host.on('update',()=>{if(session.power&&nodes('ENT_spawn_part_cage').some(o=>o.visible))show('ENT_spawn_part_cage',false);});
 
-  // ---- Trivia: shoot the answer plate (A to D) under the question. Seven questions, one screen peels away per answer.
+  // ---- Trivia: answer each question with the A–D keys on the desk. Seven questions, one screen peels away per answer.
   const STEPS=[
     {want:2,hide:['trivia1']},{want:2,hide:['trivia2']},{want:3,hide:['trivia3']},{want:4,hide:['trivia4']},
     {want:2,hide:['trivia5','trivia6'],onlyD:true},                       // then only D is live
     {want:4,hide:['trivia7'],silent:true,reopenAfter:4},                  // D again, then A to C come back
     {want:1,hide:['trivia8'],final:true},
   ];
-  const plates=['a','b','c','d'].map((letter,i)=>({letter,n:i+1,ent:named('answer_'+letter)[0],on:true,target:null}));
+  const plates=['a','b','c','d'].map((letter,i)=>({letter,n:i+1,on:true}));
   let step=0,retryAt=0,reopenAt=0,triviaDone=false,lastAnswer=0;
-  // The plates are thin slits stacked A (top) to D (bottom): give each one a hit band that runs to halfway between it and its
-  // neighbour, so a shot anywhere across the stack lands on exactly one plate.
-  const bands=(()=>{
-    const live=plates.filter(p=>p.ent).sort((a,b)=>center(b.ent).y-center(a.ent).y),map=new Map();
-    live.forEach((p,i)=>{
-      const c=center(p.ent).y,above=live[i-1]?(c+center(live[i-1].ent).y)/2:c+1,below=live[i+1]?(c+center(live[i+1].ent).y)/2:c-1;
-      const b=boxOf(p.ent);b.min.y=below;b.max.y=above;b.min.x-=.4;b.max.x+=.4;b.min.z-=1.2;b.max.z+=1.2;map.set(p,b);
+  // Answers are given with four A–D keys on the desk in front of the monitor (look at one, press F). The map's own answer
+  // plates are thin slits 1.7 apart on a 12-unit screen and shooting them misfired. Keys glow while their answer is live,
+  // go dark when it isn't (the D-only questions) and red during the two-minute lockout.
+  const keys=(()=>{
+    const scr=nodes('ENT_trivia1')[0];if(!scr)return [];
+    const sb=new THREE.Box3().setFromObject(scr),sc=sb.getCenter(new THREE.Vector3());
+    const front=new THREE.Vector3(1,0,0),across=new THREE.Vector3(0,0,1);   // the screen faces +x; its width runs along z
+    // the desk top, a little in front of the monitor
+    const probe=sc.clone().addScaledVector(front,11);probe.y=sb.max.y;
+    const hit=world.raycast?.(new THREE.Ray(probe,new THREE.Vector3(0,-1,0)),0,60);
+    const top=hit?probe.y-hit.distance:sb.min.y-6;
+    const tex=(letter,bg,fg)=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');g.fillStyle=bg;g.fillRect(0,0,64,64);
+      g.strokeStyle=fg;g.lineWidth=4;g.strokeRect(4,4,56,56);g.fillStyle=fg;g.font='bold 44px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText(letter,32,35);
+      const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;};
+    return plates.map((p,i)=>{
+      const at=probe.clone().setY(top+.6).addScaledVector(across,(1.5-i)*4.4);   // A on the left as you face the screen
+      const mats={live:tex(p.letter.toUpperCase(),'#3a1a00','#ffb347'),off:tex(p.letter.toUpperCase(),'#141414','#4a4a4a'),lock:tex(p.letter.toUpperCase(),'#2a0000','#ff4a3a')};
+      const top_=new THREE.MeshBasicMaterial({map:mats.live}),side=new THREE.MeshStandardMaterial({color:0x2a2a2a,roughness:.6});
+      const m=new THREE.Mesh(new THREE.BoxGeometry(3.6,1.2,3.6),[side,side,top_,side,side,side]);m.position.copy(at);m.rotation.y=Math.PI/2;
+      api.scene.add(m);return {p,m,top:top_,mats,at:at.clone().add(new THREE.Vector3(0,.6,0))};
     });
-    return map;
   })();
-  function armPlates(){
-    if(triviaDone||now()<retryAt)return;
-    for(const p of plates){
-      if(!p.ent||p.target||!p.on)continue;
-      p.target=world.addShootTarget({position:center(p.ent),box:bands.get(p),radius:4,hit(_t,ray,point){p.target=null;answer(p.n,point);}});
-    }
+  function armPlates(){   // refresh the keys' look
+    const locked=retryAt&&now()<retryAt;
+    for(const k of keys){const st=triviaDone||!k.p.on?'off':locked?'lock':'live';if(k.state===st)continue;k.state=st;k.top.map=k.mats[st];k.top.needsUpdate=true;}
   }
-  function disarmPlates(){
-    for(const p of plates){if(p.target){const list=world.shootTargets??[],i=list.indexOf(p.target);if(i>=0)list.splice(i,1);p.target=null;}}
-  }
+  function disarmPlates(){}
+  // the F prompt: the key nearest the crosshair (within 12°) when standing at the desk
+  let aimed=null;
+  (host.prompts??=[]).push({
+    find(cam){
+      aimed=null;if(triviaDone||!keys.length)return null;
+      const dir=cam.getWorldDirection(new THREE.Vector3());let best=null,bestDot=Math.cos(THREE.MathUtils.degToRad(12));
+      for(const k of keys){const to=k.at.clone().sub(cam.position),d=to.length();if(d>95)continue;const dot=to.normalize().dot(dir);if(dot>bestDot){bestDot=dot;best={k,d};}}
+      if(!best)return null;aimed=best.k;
+      const locked=!!retryAt&&now()<retryAt;
+      return {text:locked?`Trivia locked · ${Math.ceil(retryAt-now())}s`:!best.k.p.on?'Not an option':`Answer ${best.k.p.letter.toUpperCase()}`,distance:best.d};
+    },
+    use(){if(!aimed||triviaDone||(retryAt&&now()<retryAt)||!aimed.p.on)return false;const k=aimed;k.m.position.y-=.4;setTimeout(()=>{k.m.position.y+=.4;},150);beep();answer(k.p.n,k.at);return true;}
+  });
   function answer(n,point){
     const s=STEPS[step];if(!s||triviaDone)return;lastAnswer=n;(window.kino.cheeseCube.log??=[]).push(`t${now().toFixed(2)} plate${n} step${step} want${s.want} hitY=${point?.y?.toFixed(2)}`);
     if(n===s.want){
