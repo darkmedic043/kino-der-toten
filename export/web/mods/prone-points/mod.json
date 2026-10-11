@@ -1,0 +1,5 @@
+{
+  "name": "Prone under perk machines",
+  "description": "The BO1 easter egg: go prone at a perk machine for 100 points. Each machine pays once per game, to the first player who does it.",
+  "script": "mod.js"
+}

@@ -149,7 +149,8 @@ export async function createMap(ctx,entry){
   class MoonMapFeatures extends MapFeatures {
     async load(){await super.load();await features.load();presentation=new MoonPresentation(scene,camera,features);await presentation.load();}
     placeClaymore(){return false;}
-    packMachine(){return features.one('zombie_vending_upgrade');}   // the gun shown in the machine sits in Moon's machine
+    packMachine(){return features.one('zombie_vending_upgrade');}
+    perkMachines(){return features.targets.filter(t=>t.kind==='perk').map(t=>({perk:t.perk,position:t.e.position}));}   // for mods (prone-points)   // the gun shown in the machine sits in Moon's machine
     throwMonkey(){   // X: the Gersh Device / QED
       const s=S();if(!s.canAct||!s.equipment||s.equipmentAmmo<=0)return false;
       s.equipmentAmmo--;const mesh=clone(equipmentModels[s.equipment]);mesh.position.copy(camera.position);scene.add(mesh);

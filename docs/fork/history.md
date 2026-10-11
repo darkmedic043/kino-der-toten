@@ -185,3 +185,4 @@
 - 2026-10-10: JARVIS HUD and voices are global (mods/stark/jarvis, suit-hud.js in mods/stark), no longer read from Cheese Cube's map folder.
 - 2026-10-11: Perk prices follow Cold War / BO6 / BO7: 500, 1500, 2500, 3500, then 5000, by perks held, on every map and the terminal (gameplay.md).
 - 2026-10-11: Perk prices changed to 2500 for the first perk, +500 per perk held, no cap (gameplay.md).
+- 2026-10-11: Prone at a perk machine for 100 points, once per machine per game, first player only (mods/prone-points; gameplay.md).
