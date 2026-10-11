@@ -183,3 +183,4 @@
 - 2026-10-10: Iron Man armors rigged as characters (.tools/build-armor-characters.py, git-ignored output); wearing a suit swaps your third-person body, teammates see it (characters.md).
 - 2026-10-10: Ammo mods play their own synthesized sting when they proc (gameplay.md).
 - 2026-10-10: JARVIS HUD and voices are global (mods/stark/jarvis, suit-hud.js in mods/stark), no longer read from Cheese Cube's map folder.
+- 2026-10-11: Perk prices follow Cold War / BO6 / BO7: 500, 1500, 2500, 3500, then 5000, by perks held, on every map and the terminal (gameplay.md).

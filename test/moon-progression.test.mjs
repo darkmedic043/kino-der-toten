@@ -11,7 +11,7 @@ const simon=q=>{let safety=1000;while(['simon','final_simon'].includes(q.stage)&
 test('Moon perk purchases require power, respect four slots, and charge once',()=>{
   const {s}=setup();s.enterArea(true);s.points=50000;
   assert.equal(s.buyPerk('specialty_armorvest'),false);s.power=true;
-  for(const id of Object.keys(MOON_PERKS).slice(0,4)){const before=s.points;assert.equal(s.buyPerk(id),true);assert.equal(s.buyPerk(id),false);s.update(10);assert.equal(s.points,before-MOON_PERKS[id].price);}
+  for(const [i,id] of Object.keys(MOON_PERKS).slice(0,4).entries()){const before=s.points;assert.equal(s.buyPerk(id),true);assert.equal(s.buyPerk(id),false);s.update(10);assert.equal(s.points,before-[500,1500,2500,3500][i]);}
   assert.equal(s.perks.size,4);assert.equal(s.maxHealth,250);assert.equal(s.buyPerk('specialty_flakjacket'),false);
 });
 test('Mule Kick grants a third slot and losing it removes only the third weapon',()=>{

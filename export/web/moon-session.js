@@ -45,9 +45,9 @@ export class MoonSession extends Session {
     const p=MOON_PERKS[id];
     if(!p||!this.canAct||this.perks.has(id)||(!free&&this.perks.size>=4)||
        (!free&&id==='specialty_quickrevive'&&this.revives>=3)||
-       (!free&&!this.power&&this.area!=='earth'&&id!=='specialty_quickrevive')||(!free&&this.points<p.price))return false;
-    if(!this.drink(id))return false;
-    if(!free)this.spend(p.price);return true;
+       (!free&&!this.power&&this.area!=='earth'&&id!=='specialty_quickrevive')||(!free&&this.points<this.perkPrice))return false;
+    const price=this.perkPrice;if(!this.drink(id))return false;
+    if(!free)this.spend(price);return true;
   }
   losePerk(id){
     if(this.permanentPerks)return;

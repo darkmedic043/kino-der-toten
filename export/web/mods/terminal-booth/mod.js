@@ -402,7 +402,7 @@ export default async function setup(api){
     // The terminal sells every perk, machine or not, through the map's own purchase path (the engine shop, or Moon's
     // session), so drinks, stings, prices and the power rule match the machines. Perks the map's table lacks are added.
     const QR='specialty_quickrevive';
-    const priceOf=p=>api.perkInfo?.[p.id]?.price??p.price;
+    const priceOf=()=>session.perkPrice;   // Cold War ladder (rules.js), the same for every perk
     function buy(p){
       if(session.drinking)return 'Finish your drink first';
       if(session.busy||session.phase==='reviving')return 'Terminal busy';

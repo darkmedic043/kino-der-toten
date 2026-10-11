@@ -216,11 +216,11 @@ const shop={
     if(owned)owned.reserve=owned.upgraded?d.upgrade?.maxAmmo??d.maxAmmo:d.maxAmmo;
     else {session.giveWeapon(d.id);equipView();}toast(owned?'Ammo replenished':d.name);return true;
   },
-  perkPrompt(id){const p=perkInfo[id];if(!p)return '';return session.perks.has(id)?p.name+' equipped':!session.power&&id!=='specialty_quickrevive'?'The power must be activated':p.name+' · '+p.price;},
+  perkPrompt(id){const p=perkInfo[id];if(!p)return '';return session.perks.has(id)?p.name+' equipped':!session.power&&id!=='specialty_quickrevive'?'The power must be activated':p.name+' · '+session.perkPrice;},
   buyPerk(id){
     const p=perkInfo[id];if(!p||session.perks.has(id)||(!session.power&&id!=='specialty_quickrevive'))return false;
-    if(id==='specialty_quickrevive'&&session.revives>=3){toast('Quick Revive is depleted');return false;}if(!pay(p.price))return false;
-    if(!session.drink(id))return false;primary=false;primaryPressed=false;ads=false;burstLeft=0;reloadShot=false;perkDrink.start(id,view);toast(p.name);audio.play(id);return true;
+    if(id==='specialty_quickrevive'&&session.revives>=3){toast('Quick Revive is depleted');return false;}const price=session.perkPrice;if(session.points<price){toast('Not enough points');return false;}
+    if(!session.drink(id)||!pay(price))return false;primary=false;primaryPressed=false;ads=false;burstLeft=0;reloadShot=false;perkDrink.start(id,view);toast(p.name);audio.play(id);return true;
   },
   boxPrompt(e){const roll=mysteryBox.at(e);return roll?(roll.ready?(roll.teddy?'The Mystery Box is moving…':'Take '+(data.weapons[roll.weapon]??data.equipment[roll.weapon]).name):'Choosing your weapon…'):'Mystery Box · '+(session.effects.fire_sale>session.time?10:950);},
   useBox(e){

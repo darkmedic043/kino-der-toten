@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {Session,zombieHealth,roundPopulation} from '../export/web/rules.js';
+import {Session,zombieHealth,roundPopulation,perkPrice} from '../export/web/rules.js';
 const data=JSON.parse(fs.readFileSync(new URL('../export/web/game-data.json',import.meta.url)));
 test('weapon reserve extraction respects absolute versus clip-relative counts',()=>{
  assert.equal(data.weapons.m1911_zm.startAmmo,32);assert.equal(data.weapons.mp40_zm.maxAmmo,192);
@@ -59,4 +59,11 @@ test('Speed Cola speeds each shotgun reload stage; switching cancels its transfe
  assert.equal(s.reloadDuration,s.def.reloadStartTime/2);s.update(s.reloadDuration+.001);
  assert.equal(s.reloadDuration,s.def.reloadTime/2);const loaded=s.weapon.mag;s.switchWeapon(0);s.update(10);
  assert.equal(s.inventory[1].mag,loaded);assert.equal(s.reloadStage,null);assert.equal(s.weapon.mag,8);
+});
+
+test('perks cost the Cold War ladder by how many you hold',()=>{
+  assert.deepEqual([0,1,2,3,4,5,9].map(perkPrice),[500,1500,2500,3500,5000,5000,5000]);
+  const s=new Session(data);assert.equal(s.perkPrice,500);
+  s.perks.add('specialty_armorvest');s.perks.add('specialty_rof');assert.equal(s.perkPrice,2500);
+  s.drinking='specialty_fastreload';assert.equal(s.perkPrice,3500);
 });

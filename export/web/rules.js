@@ -42,6 +42,11 @@ export function powerupVisible(age){
   const frame=age<22.5?Math.floor((age-15)/.5):age<25?15+Math.floor((age-22.5)/.25):25+Math.floor((age-25)/.1);
   return frame%2===0;
 }
+// Cold War / BO6 / BO7 perk pricing: every perk costs the same, set by how many you already hold (a drink in progress
+// counts): 500, 1500, 2500, 3500, then 5000 for each one after. Every purchase path (machines, the terminal, Moon,
+// Cheese Cube) charges `session.perkPrice`; the tables' own `price` fields are no longer read for buying.
+export const PERK_PRICES=[500,1500,2500,3500,5000];
+export function perkPrice(owned){return PERK_PRICES[Math.min(Math.max(0,owned),PERK_PRICES.length-1)];}
 export class Session {
   constructor(data, random=Math.random) {this.data=data;this.random=random;this.reset();}
   reset() {
@@ -57,6 +62,7 @@ export class Session {
   get weapon(){return this.inventory[this.slot];}
   get def(){const d=this.data.weapons[this.weapon.id];return this.weapon.upgraded?{...d,...d.upgrade,upgraded:true,name:d.name+' • Pack-a-Punch'}:d;}
   get maxHealth(){return this.perks.has('specialty_armorvest')?250:100;}
+  get perkPrice(){return perkPrice(this.perks.size+(this.drinking&&!this.perks.has(this.drinking)?1:0));}
   addPoints(n){const value=n*(this.effects.double_points>this.time?2:1);this.points+=value;this.totalScore+=value;}
   spend(n){if(this.points<n)return false;this.points-=n;return true;}
   damage(n){

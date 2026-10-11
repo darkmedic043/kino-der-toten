@@ -5,6 +5,7 @@ import { MysteryBox } from './mystery-box.js';
 import { MoonProgression, DIGGERS } from './moon-progression.js';
 import { MOON_PERKS } from './moon-session.js';
 import { contains } from './moon-rules.js';
+import { perkPrice } from './rules.js';
 
 const V=a=>new THREE.Vector3(...a), colors=[0xe74a49,0x4ecc78,0x4b8cff,0xffdb55],colorNames=['RED','GREEN','BLUE','YELLOW'];
 export class MoonFeatures {
@@ -100,7 +101,7 @@ export class MoonFeatures {
       if(s.perks.has(t.perk))return p.name+' equipped'+(s.hacker&&!s.permanentPerks?' · Hold F to refund':'');
       if(t.perk==='specialty_quickrevive'&&s.revives>=3&&!s.permanentPerks)return 'Quick Revive exhausted';
       if(!s.power&&s.area!=='earth'&&t.perk!=='specialty_quickrevive')return p.name+' · Requires power';
-      return p.name+' · '+p.price+(s.perks.size>=4?' · Four-perk limit':'');
+      return p.name+' · '+s.perkPrice+(s.perks.size>=4?' · Four-perk limit':'');
     }
     if(t.kind==='box'){
       if(!this.box.available(t.e))return '';
@@ -137,7 +138,7 @@ export class MoonFeatures {
     if(!t||!this.s.canAct&&!(t.kind==='pack'&&this.s.pack))return false;
     const s=this.s,q=this.quest,a=this.combat.audio;let ok=false;
     if(t.kind==='perk'){
-      if(s.hacker&&s.perks.has(t.perk)&&!s.permanentPerks)return this.startHack(t,5,()=>{s.losePerk(t.perk);s.points+=MOON_PERKS[t.perk].price;this.combat.equip().catch(console.error);});
+      if(s.hacker&&s.perks.has(t.perk)&&!s.permanentPerks)return this.startHack(t,5,()=>{const refund=perkPrice(s.perks.size-1);s.losePerk(t.perk);s.points+=refund;this.combat.equip().catch(console.error);});
       ok=s.buyPerk(t.perk);if(ok){this.combat.clearInput();this.combat.perkDrink.start(t.perk,this.combat.view);this.notice(MOON_PERKS[t.perk].name);a.play(t.perk);}
       else this.notice(s.perks.size>=4?'You can buy four perks. Complete the quest to earn all eight.':'Cannot purchase: check points, power, and owned perks.');
     }
