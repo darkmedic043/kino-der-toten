@@ -42,11 +42,12 @@ export function powerupVisible(age){
   const frame=age<22.5?Math.floor((age-15)/.5):age<25?15+Math.floor((age-22.5)/.25):25+Math.floor((age-25)/.1);
   return frame%2===0;
 }
-// Cold War / BO6 / BO7 perk pricing: every perk costs the same, set by how many you already hold (a drink in progress
-// counts): 500, 1500, 2500, 3500, then 5000 for each one after. Every purchase path (machines, the terminal, Moon,
-// Cheese Cube) charges `session.perkPrice`; the tables' own `price` fields are no longer read for buying.
-export const PERK_PRICES=[500,1500,2500,3500,5000];
-export function perkPrice(owned){return PERK_PRICES[Math.min(Math.max(0,owned),PERK_PRICES.length-1)];}
+// Cold War / BO6 / BO7-style perk pricing: every perk costs the same, set by how many you already hold (a drink in
+// progress counts): 2500 for the first, +500 for each one after, no cap (user decision, 2026-10-11). Every purchase
+// path (machines, the terminal, Moon, Cheese Cube) charges `session.perkPrice`; the tables' own `price` fields are no
+// longer read for buying.
+export const PERK_BASE_PRICE=2500,PERK_PRICE_STEP=500;
+export function perkPrice(owned){return PERK_BASE_PRICE+PERK_PRICE_STEP*Math.max(0,owned);}
 export class Session {
   constructor(data, random=Math.random) {this.data=data;this.random=random;this.reset();}
   reset() {

@@ -61,9 +61,9 @@ test('Speed Cola speeds each shotgun reload stage; switching cancels its transfe
  assert.equal(s.inventory[1].mag,loaded);assert.equal(s.reloadStage,null);assert.equal(s.weapon.mag,8);
 });
 
-test('perks cost the Cold War ladder by how many you hold',()=>{
-  assert.deepEqual([0,1,2,3,4,5,9].map(perkPrice),[500,1500,2500,3500,5000,5000,5000]);
-  const s=new Session(data);assert.equal(s.perkPrice,500);
-  s.perks.add('specialty_armorvest');s.perks.add('specialty_rof');assert.equal(s.perkPrice,2500);
-  s.drinking='specialty_fastreload';assert.equal(s.perkPrice,3500);
+test('perks cost 2500 plus 500 per perk held',()=>{
+  assert.deepEqual([0,1,2,3,4,5,9].map(perkPrice),[2500,3000,3500,4000,4500,5000,7000]);
+  const s=new Session(data);assert.equal(s.perkPrice,2500);
+  s.perks.add('specialty_armorvest');s.perks.add('specialty_rof');assert.equal(s.perkPrice,3500);
+  s.drinking='specialty_fastreload';assert.equal(s.perkPrice,4000);
 });
