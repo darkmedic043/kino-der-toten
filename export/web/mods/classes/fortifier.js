@@ -158,7 +158,7 @@ export function setupFortifier(ctx){
       keptS.forEach((k,i)=>{const s=snares[i];if(s)s.wear=Math.max(1,s.maxWear*k);});
       moveT=3;api.toast?.(act.name+' moved',1);audio.play('buy',.4);hud();return;
     }
-    if(getCooldown()>0){api.toast?.(`${act.name} ready in ${Math.ceil(getCooldown())}s`,1.2);return;}
+    if(getCooldown()>0){ctx.notReady();return;}
     lastStandUsed=false;
     raise(true);audio.play('buy',.6);window.kino.fx?.knockback?.(player.getFeetPosition());hud();
   }

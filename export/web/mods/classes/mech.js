@@ -416,7 +416,7 @@ export async function setupMech(ctx){
     if(riding){api.toast?.('Climb off the mech first (F)',1.5);return;}
     if(phase==='piloting'){eject(false);return;}
     if(phase==='falling'||!st.active||session.phase==='reviving'||session.busy)return;
-    const cd=ctx.getCooldown();if(cd>0){api.toast?.(`Mech ready in ${Math.ceil(cd)}s`,1.2);return;}
+    const cd=ctx.getCooldown();if(cd>0){ctx.notReady();return;}
     M=mechStats(cls,ctx.state());
     const feet=player.getFeetPosition(),fwd=aimDir().setY(0).normalize();
     let at=feet.clone().addScaledVector(fwd,150);

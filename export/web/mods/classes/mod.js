@@ -74,7 +74,7 @@ export default async function setup(api){
 
   // ---- the Sentry Turret --------------------------------------------------------------------
   const model=await loadModel('models/weapon_zombie_auto_turret.glb').catch(()=>null);
-  const turrets=[];let cooldown=0;
+  const turrets=[];let cooldown=A.cooldown;   // the meter starts empty each game
   const tracerMat=new THREE.LineBasicMaterial({color:0xffe2a0,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false});
   const tracers=[];
   // co-op: coop.js replaces these to send tracers and skill explosions to the room
@@ -89,7 +89,7 @@ export default async function setup(api){
   }
   function deploy(){
     const st=api.getState();
-    if(!st.active||cooldown>0||session.busy||session.phase==='reviving'||!model){if(cooldown>0)api.toast?.(`${act.name} ready in ${Math.ceil(cooldown)}s`,1.2);return;}
+    if(!st.active||cooldown>0||session.busy||session.phase==='reviving'||!model){if(cooldown>0)notReady();return;}
     const fwd=camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(),side=new THREE.Vector3(-fwd.z,0,fwd.x),feet=player.getFeetPosition();
     const spots=A.count>1?[side.clone().multiplyScalar(-45),side.clone().multiplyScalar(45)]:[new THREE.Vector3()];
     for(const off of spots){
@@ -114,6 +114,28 @@ export default async function setup(api){
   // for skills whose cooldown only starts when they end.
   let banked=0;
   function startCooldown(v){cooldown=Math.max(0,v*(1-Math.min(.6,S['ability.salvage']??0))-banked);banked=0;}
+  // ---- charging, BO6/BO7 field-upgrade style (Phase 3) ------------------------------------------------
+  // `cooldown` is the time left on the meter: it drains with time, and your own kills knock a share of the
+  // full charge off it (cfg.charge: kill, +headshot, +melee). Kills by the action skill itself don't charge it
+  // (Recycler does that on purpose). The skill is locked until the power is on; the meter fills meanwhile and
+  // starts empty each game.
+  const CH={kill:.025,headshot:.015,melee:.02,...cfg.charge};
+  const charge=()=>A.cooldown>0?Math.max(0,Math.min(1,1-cooldown/A.cooldown)):1;
+  const powered=()=>!!session.power;
+  function notReady(){api.toast?.(powered()?`${act.name} charging · ${Math.floor(charge()*100)}%`:`${act.name} needs the power on`,1.2);}
+  const PLAYER_CAUSES=new Set(['bullet','melee']);
+  host.on('beforeEnemyDamage',e=>{if(e.enemy)e.enemy.lastCause=e.cause;});
+  host.on('kill',e=>{
+    if(e.remote||cooldown<=0||actionUp()||!PLAYER_CAUSES.has(e.enemy?.lastCause))return;
+    cooldown=Math.max(0,cooldown-A.cooldown*(CH.kill+(e.head?CH.headshot:0)+(e.melee?CH.melee:0)));
+    if(cooldown===0)ready();
+  });
+  let wasPowered=powered();
+  function ready(){if(!powered())return;audio.play('buy',.35);api.toast?.(act.name+' ready',1.2);hud();}
+  function use(){
+    if(!powered()&&!actionUp()){notReady();return;}
+    (other?other.deploy:deploy)();
+  }
   // Every skill reports each zombie it damages here: slow, mark, toll points, kill cooldown cuts.
   function onHit(z,killed){
     if(S['ability.toll'])session.addPoints?.(Math.round(S['ability.toll']));
@@ -131,7 +153,7 @@ export default async function setup(api){
     if(!e.melee&&!['turret','explosion','fortify'].includes(e.cause)&&nearAbility())e.amount*=1+(S['player.damageNear']??0);});
   const NEAR=260;
   function nearAbility(){const f=player.getFeetPosition();return turrets.some(t=>t.at.distanceTo(f)<NEAR)||!!other?.near?.(f,NEAR);}
-  const actx={api,act,S:()=>S,A:()=>A,blast,hud:()=>hud(),onHit,getCooldown:()=>cooldown,setCooldown:v=>startCooldown(v),sync,cfg,cls,state};
+  const actx={api,act,S:()=>S,A:()=>A,blast,hud:()=>hud(),onHit,getCooldown:()=>cooldown,setCooldown:v=>startCooldown(v),notReady:()=>notReady(),sync,cfg,cls,state};
   const fort=['wall','snare','nest'].includes(act.id)?setupFortifier(actx):null;
   const eng=['drone','mortar'].includes(act.id)?setupEngineer(actx):null;
   // the Pilot class: one action skill, weapons on its arms. Every class runs it for co-op (riding a teammate's mech).
@@ -139,7 +161,7 @@ export default async function setup(api){
   const other=fort??eng??mech;
   const actionUp=()=>turrets.length>0||!!other?.up();
   setupCoopSkills({api,turrets,fort,eng,sync,A:()=>A});   // other players see (and the host enforces) what you deploy
-  addEventListener('keydown',e=>{if(e.code==='KeyZ'&&!e.repeat)(other?other.deploy:deploy)();});   // game-menu re-sends a rebound key as the default KeyZ
+  addEventListener('keydown',e=>{if(e.code==='KeyZ'&&!e.repeat)use();});   // game-menu re-sends a rebound key as the default KeyZ
   // Lockdown augment: zombies go for the turret for its first seconds
   const lure=enemies.lureTarget?.bind(enemies);
   enemies.lureTarget=z=>{const t=turrets.find(t=>t.age<(S['turret.lure']??0));if(t&&z.kind!=='dog'&&z.root.position.distanceTo(t.at)<1536)return t.at;return lure?lure(z):null;};
@@ -147,7 +169,8 @@ export default async function setup(api){
   const slowed=new Set(),staggered=new Map();   // staggered zombies are pinned in place for 0.6 s
   host.on('update',dt=>{
     if(!dt)return;
-    if(cooldown>0&&!actionUp()){cooldown=Math.max(0,cooldown-dt);if(cooldown===0){audio.play('buy',.35);api.toast?.(act.name+' ready',1.2);}}
+    if(cooldown>0&&!actionUp()){cooldown=Math.max(0,cooldown-dt);if(cooldown===0)ready();}
+    if(powered()!==wasPowered){wasPowered=powered();if(wasPowered){api.announce?.(act.name.toUpperCase(),'ABILITY ONLINE',2.5);audio.play('buy',.5);}hud();}
     for(let i=tracers.length-1;i>=0;i--){const t=tracers[i];t.t-=dt;t.l.material.opacity=Math.max(0,t.t/.06);if(t.t<=0){t.l.removeFromParent();t.l.geometry.dispose();t.l.material.dispose();tracers.splice(i,1);}}
     for(const [z,s] of staggered){if(!enemies.list.includes(z)||session.time>s.until){staggered.delete(z);continue;}z.root.position.x=s.at.x;z.root.position.z=s.at.z;z.stuck=0;}
     for(const z of [...slowed]){if(!enemies.list.includes(z)||session.time>z.turretSlowUntil){if(enemies.list.includes(z))z.speed/=z.turretSlowK;slowed.delete(z);}}
@@ -195,7 +218,7 @@ export default async function setup(api){
     const killed=alive&&!enemies.list.includes(z);if(alive)onHit(z,killed);
     if(killed){session.addPoints?.(50);if(t&&S['cap.killExtend'])t.life+=S['cap.killExtend'];}
   }
-  host.on('reset',()=>{for(const t of [...turrets])t.mesh.removeFromParent();turrets.length=0;cooldown=0;banked=0;slowed.clear();staggered.clear();lastRound=session.round;hud();});
+  host.on('reset',()=>{for(const t of [...turrets])t.mesh.removeFromParent();turrets.length=0;cooldown=A.cooldown;banked=0;wasPowered=powered();slowed.clear();staggered.clear();lastRound=session.round;hud();});
 
   // ---- HUD: the action skill icon, its cooldown and the class level ------------------------
   const ICON_PATHS={"mech": "M9 3h6l2 4H7zM7 7h10v7H7zM10 9.5h4M4 8h3v6H4zM17 8h3v6h-3zM8 14l-1 7M16 14l1 7M6 21h3M15 21h3", "turret": "M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4", "wall": "M3 6h18v12H3zM3 10h18M3 14h18M9 6v4M15 10v4M9 14v4", "drone": "M9 10h6v4H9zM4 6h4M16 6h4M4 18h4M16 18h4M6 6l3 4M18 6l-3 4M6 18l3-4M18 18l-3-4", "mortar": "M5 20h14M8 20l3-10h2l3 10M10 7l2-4 2 4M12 3v-1", "snare": "M3 15c2-3 4 3 6 0s4 3 6 0 4 3 6 0M3 10c2-3 4 3 6 0s4 3 6 0 4 3 6 0M6 6v12M18 6v12", "nest": "M4 19V11a8 8 0 0 1 16 0v8M4 15h4M16 15h4M4 11h4M16 11h4M8 7l2 3M16 7l-2 3"};
@@ -206,6 +229,8 @@ export default async function setup(api){
     #class-skill .hex::after{content:'';position:absolute;inset:2px;clip-path:inherit;background:#0d0d0de6}
     #class-skill .cd{position:absolute;inset:2px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:conic-gradient(#000c var(--p),transparent 0)}
     #class-skill svg{position:absolute;left:13px;top:15px;width:26px;height:26px}
+    #class-skill b{font-size:12px!important}
+    #class-skill.locked .hex{background:#3a3833}#class-skill.locked small{color:#e0503a}
     #class-skill.cooling{color:#8b857a}#class-skill.cooling .hex{background:#5b574f}
     #class-skill.active .hex{box-shadow:0 0 14px ${cls.color};background:#fff}
     #class-skill b{position:absolute;left:0;right:0;top:18px;text-align:center;font:700 14px/1 Arial,sans-serif;color:#eee;text-shadow:0 1px 3px #000}
@@ -221,14 +246,15 @@ export default async function setup(api){
   const place=()=>{const cluster=document.getElementById('equip-hud');if(cluster){cluster.prepend(el);el.classList.remove('free');}else{document.body.append(el);el.classList.add('free');}};
   place();setTimeout(place,500);
   function hud(){
-    const cool=cooldown>0&&!actionUp();
+    const cool=cooldown>0&&!actionUp(),locked=!powered()&&!actionUp();
+    el.classList.toggle('locked',locked);
     el.classList.toggle('cooling',cool);el.classList.toggle('active',actionUp());
     el.style.setProperty('--p',cool?Math.round(cooldown/A.cooldown*100)+'%':'0%');
     el.querySelector('.cd').style.background=cool?`conic-gradient(#000c ${Math.round(cooldown/A.cooldown*360)}deg,transparent 0)`:'none';
-    const num=cool?Math.ceil(cooldown):other?.up()?other.left():turrets.length?Math.ceil(Math.max(...turrets.map(t=>t.life))):'';
+    const num=cool?Math.floor(charge()*100)+'%':other?.up()?other.left():turrets.length?Math.ceil(Math.max(...turrets.map(t=>t.life))):'';
     el.querySelector('b').textContent=num;el.querySelector('svg').style.opacity=num===''?1:.18;
     el.querySelector('kbd').textContent=(binds().ability??'KeyZ').replace(/^Key/,'');
-    el.querySelector('small').textContent=`${cls.name.toUpperCase()} ${state().level}`;
+    el.querySelector('small').textContent=locked?'NO POWER':`${cls.name.toUpperCase()} ${state().level}`;
     // a fortification's health (the wall, the whole nest, the wire's wear)
     const hp=el.querySelector('.hp'),f=other?.health&&other.up()?other.health():null;hp.style.display=f==null?'none':'block';
     if(f!=null){hp.firstChild.style.width=Math.round(Math.max(0,Math.min(1,f))*100)+'%';hp.classList.toggle('low',f<.3);}
@@ -236,5 +262,5 @@ export default async function setup(api){
   let hudT=0;host.on('update',dt=>{if((hudT-=dt)<=0){hudT=.2;hud();}});
   hud();
   window.kino.classes={get state(){return state();},cls,grantXp:n=>gain(n),   // grantXp: class XP from other mods (exfil)
-    stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng};
+    stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,use,get charge(){return charge();},get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng};
 }

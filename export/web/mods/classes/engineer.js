@@ -149,7 +149,7 @@ export function setupEngineer(ctx){
     if(act.id==='drone'&&drones.length){   // Kamikaze: Z again sends them in
       if(S()['drone.kamikaze'])for(const d of [...drones])endDrone(d);else api.toast?.(act.name+' is up',1);return;}
     if(act.id==='mortar'&&beacons.length){api.toast?.('Barrage in progress',1);return;}
-    if(getCooldown()>0){api.toast?.(`${act.name} ready in ${Math.ceil(getCooldown())}s`,1.2);return;}
+    if(getCooldown()>0){ctx.notReady();return;}
     if(act.id==='drone')launchDrones();else plantBeacons();
     audio.play('buy',.6);hud();
   }

@@ -1,5 +1,6 @@
 {
   "_doc": "Classes (BL4 style): each tree has its own action skill; you equip one (loadout.action = tree id). Passives (points, ranks) are generic ability.* / player.* stats and work with whichever skill is equipped. Augments are free: a tree's augment unlocks when the tree reaches its tier; up to augmentSlots are equipped, from the equipped skill's tree. One capstone (a point, any tree) works with whichever skill is equipped. Tiers open every `tierPoints` points spent in that tree.",
+  "charge": { "note": "Action skills charge like BO6/BO7 field upgrades: the meter fills over the skill's cooldown, and each of your own kills (bullets, melee) adds this share of a full charge (headshot and melee add more). Locked until the power is on; starts empty each game.", "kill": 0.025, "headshot": 0.015, "melee": 0.02 },
   "xp": {
     "kill": 12,
     "headshot": 6,
