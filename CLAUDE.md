@@ -13,7 +13,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Lighting mod, baked irradiance volume, beams, sun, viewmodel light, mystery box map bulbs, Moon lighting | `lighting.md` |
 | Map materials, normal maps, HD textures (map + weapons) | `materials.md` |
 | Performance measurements and load-time warm-ups | `performance.md` |
-| Health, HUD/hit sounds, zombie voices, music, cheat console, perks (PhD, Quick Revive), fall damage, exfil | `gameplay.md` |
+| Health, HUD/hit sounds, BO7 HUD layout (`hud-bo7`), zombie voices, music, cheat console, perks (PhD, Quick Revive), fall damage, exfil | `gameplay.md` |
 | Movement mod (crouch/prone/slide/mantle, BO7 omnimovement, dive, wall jump), first-person motion and mantle hand IK, stairs | `movement.md` |
 | Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs, BO3 imports (Greyhound, DG-2), weapon inspect, BO7 weapons rebuilt in Blender on BO1 skeletons (Grimhawk) | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby), friends and presence; the Rind launcher (`~/projects/rind`) uses the same sign-in and friends API | `coop.md` |

@@ -1,0 +1,107 @@
+/* BO7-style HUD layout (mods/hud-bo7). Everything is scoped to body.bo7-hud, which the mod sets on desktop only. */
+body.bo7-hud{--bo7-font:'Barlow Condensed','Arial Narrow',Arial,sans-serif;--bo7-text:#ece8de;--bo7-dim:#a9a397;--bo7-ess:#f2c443;--bo7-hp:#e9e5da;--bo7-line:#ffffff2e}
+body.bo7-hud :is(#player-panel,#weapon-panel,#round-panel){display:none}
+body.bo7-hud :is(#bo7-left,#bo7-right,#bo7-perks,#bo7-round){position:fixed;z-index:3;pointer-events:none;font-family:var(--bo7-font);color:var(--bo7-text);text-shadow:0 1px 3px #000c}
+body.menu-open :is(#bo7-left,#bo7-right,#bo7-perks,#bo7-round){visibility:hidden}
+body.mech-pilot #bo7-right{display:none}
+body.bo7-hud #controls-hint{top:118px;bottom:auto}
+body.bo7-hud :is(#coop-panel,#cheat-badge){top:150px}
+body.bo7-hud #moon-hud #equipment{right:420px;bottom:40px}
+
+/* ---- bottom left: the player card ---------------------------------------------------------------------- */
+#bo7-left{left:28px;bottom:26px;display:flex;align-items:flex-end;gap:14px}
+#bo7-left .pf{width:78px;height:86px;position:relative;background:linear-gradient(160deg,#2a2c2e,#0c0d0e);border:1px solid #ffffff40;
+  clip-path:polygon(0 0,100% 0,100% 88%,88% 100%,0 100%);box-shadow:inset 0 0 0 1px #000}
+#bo7-left #hud-portrait{position:absolute;inset:0;display:block}
+#bo7-left #hud-portrait img{width:100%;height:100%;border:0;border-radius:0;box-shadow:none;background:none;object-fit:cover;transform:scale(1.15);transform-origin:50% 35%}
+#bo7-left #hud-portrait span{display:none}
+#bo7-left #hud-portrait.hurt{box-shadow:inset 0 0 18px #ff2a1a}
+#bo7-left .info{width:232px;display:flex;flex-direction:column;padding-bottom:2px}
+#bo7-left .who{display:flex;align-items:center;gap:7px;font:500 17px/1 var(--bo7-font);letter-spacing:.5px}
+#bo7-left .lv{min-width:18px;height:18px;padding:0 3px;border-radius:9px;display:grid;place-items:center;background:#2f9a4a;border:1px solid #9df0b0;
+  font:700 11px/1 var(--bo7-font);color:#fff;text-shadow:none;box-shadow:0 0 6px #3fcf6a66}
+#bo7-left .lv:empty{display:none}
+#bo7-left .nm{text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bo7-left .hp{align-self:flex-end;margin-top:-2px;font:600 15px/1 var(--bo7-font);letter-spacing:1px;color:var(--bo7-dim)}
+#bo7-left .hp b{font-weight:700;font-size:19px;color:var(--bo7-text)}
+#bo7-left .bar .health-track{width:100%;height:9px;margin:4px 0 0;background:#0007;border:1px solid #ffffff26;
+  -webkit-mask:repeating-linear-gradient(90deg,#000 0 3px,transparent 3px 4px);mask:repeating-linear-gradient(90deg,#000 0 3px,transparent 3px 4px)}
+#bo7-left .bar .health-track i{background:linear-gradient(#fff,var(--bo7-hp));box-shadow:none}
+#bo7-left.low .bar .health-track i{background:linear-gradient(#ff8a7a,#d8382a)}
+#bo7-left.low .hp b{color:#ff6a5a}
+#bo7-left .xp #progression-hud{position:static;margin-top:4px;gap:0}
+#bo7-left .xp #progression-hud .lvl{display:none}
+#bo7-left .xp #progression-hud .bar{width:100%;height:2px;background:#ffffff18}
+#bo7-left .xp #progression-hud i{background:#2f9a4a}
+#bo7-left .pts{display:flex;align-items:center;gap:6px;margin-top:6px}
+#bo7-left .pts .points{display:flex;align-items:center;font:italic 700 25px/1 var(--bo7-font);color:var(--bo7-ess);letter-spacing:1px}
+#bo7-left .pts .points>span{display:none}
+#bo7-left .ess{width:20px;height:20px;fill:var(--bo7-ess);filter:drop-shadow(0 1px 2px #000)}
+#bo7-left .extra{display:flex;gap:8px;align-self:flex-end}   /* reserved: self-revives and other slots later */
+
+/* ---- bottom right: ammo · weapon dial · ability ---------------------------------------------------------- */
+#bo7-right{right:26px;bottom:22px;display:flex;align-items:flex-end;gap:12px}
+#bo7-right .ammo{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:34px;min-width:110px}
+#bo7-right .wname{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+#bo7-right #weapon-name{font:600 15px/1 var(--bo7-font);letter-spacing:1.5px;text-transform:uppercase;color:#d8d3c8}
+#bo7-right.pap #weapon-name{color:#c79bff}
+#bo7-right #weapon-level{position:static;font:600 11px/1 var(--bo7-font);letter-spacing:1.5px}
+#bo7-right #ammo-mod-tag{font:600 11px/1 var(--bo7-font);margin:0}
+#bo7-right #ammo{display:grid;grid-template-columns:auto auto;align-items:end;gap:0 6px;margin-top:6px;position:relative;padding-right:18px}
+#bo7-right #ammo::after{content:'';position:absolute;right:2px;bottom:4px;width:2px;height:56px;background:linear-gradient(transparent,#ffffffaa);transform:skewX(-18deg)}
+#bo7-right #mag{grid-row:1/3;font:italic 600 66px/.86 var(--bo7-font);color:#f4f1ea;letter-spacing:-1px}
+#bo7-right #ammo>span:first-of-type{display:none}
+#bo7-right #reserve{grid-column:2;grid-row:2;align-self:end;font:600 21px/1 var(--bo7-font);color:var(--bo7-dim)}
+#bo7-right.empty #mag{color:#ff5a48}
+#bo7-right #reload-label{height:auto;min-height:14px;margin-top:4px;font:600 12px/1 var(--bo7-font);letter-spacing:2px;color:#e7c46a}
+
+#bo7-right .dial{position:relative;width:164px;height:164px}
+#bo7-right .dial .ring{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+#bo7-right .dial .track{fill:none;stroke:#ffffff1f;stroke-width:1.5}
+#bo7-right .dial .inner{fill:radial-gradient(#0000,#0006);fill:#00000038;stroke:#ffffff14;stroke-width:1}
+#bo7-right .dial .mag-track{fill:none;stroke:#ffffff22;stroke-width:5}
+#bo7-right .dial .mag{fill:none;stroke:#f08a24;stroke-width:5;filter:drop-shadow(0 0 4px #f08a2488);transition:d .08s}
+#bo7-right.pap .dial .mag{stroke:#b06bff;filter:drop-shadow(0 0 4px #b06bff99)}
+#bo7-right .dial .gun{position:absolute;left:50%;top:55%;width:136px;transform:translate(-50%,-50%);opacity:0;transition:opacity .15s;filter:drop-shadow(0 1px 3px #000c)}
+/* lethal / tactical / mine sit on the dial's top edge */
+#bo7-right .dial .eq{position:absolute;left:0;right:0;top:-6px;display:flex;justify-content:center}
+#bo7-right #equip-hud{position:static;display:flex;gap:30px;right:auto;bottom:auto}
+#bo7-right #equip-hud .slot{width:30px;height:30px}
+#bo7-right #equip-hud .slot[hidden]{display:none}
+#bo7-right #equip-hud i{filter:grayscale(1) brightness(1.6);opacity:.85}
+#bo7-right #equip-hud .empty i{opacity:.25}
+#bo7-right #equip-hud b{font:700 13px/1 var(--bo7-font);right:-6px;bottom:-4px}
+#bo7-right #equip-hud kbd{top:-14px;padding:1px 3px;border:1px solid #ffffffaa;border-radius:2px;background:#000a;font:700 9px/1 var(--bo7-font);color:#fff}
+/* gobblegums: a vertical stack above the dial */
+/* hugging the right edge, well above the weapon cluster (user, 2026-10-14) */
+#bo7-right .dial .gums{position:fixed;right:30px;bottom:330px;display:flex;justify-content:flex-end}
+#bo7-right #gum-hud{position:static;align-items:flex-end;text-align:right;gap:5px;font-family:var(--bo7-font);font-size:12px;letter-spacing:1px}
+#bo7-right #gum-hud .slots{flex-direction:column-reverse;align-items:flex-end;gap:7px}
+#bo7-right #gum-hud .s{width:30px;height:30px}
+#bo7-right #gum-hud .s.on{width:38px;height:38px;outline-offset:3px}
+#bo7-right #gum-hud .name{font-weight:600;font-size:14px;white-space:nowrap}
+#bo7-right #gum-hud .keys{font-size:11px;white-space:nowrap}
+#bo7-right #gum-hud .act{align-items:flex-end;white-space:nowrap;order:-1;margin-bottom:4px}
+/* the class ability in its own ring, right of the dial */
+#bo7-right .ability{position:relative;width:96px;height:96px;margin-bottom:6px;display:grid;place-items:center}
+#bo7-right .ability:empty,#bo7-right .ability:not(:has(#class-skill)){display:none}
+#bo7-right .ability .ring{position:absolute;inset:0;width:100%;height:100%}
+#bo7-right .ability .ring circle{fill:#00000040;stroke:#ffffff30;stroke-width:1.5}
+#bo7-right #class-skill{position:relative;right:auto;bottom:auto;margin:0;transform:scale(1.05)}
+#bo7-right #class-skill kbd{top:auto;bottom:-27px;padding:1px 4px;border:1px solid #ffffffaa;border-radius:2px;background:#000a;font:700 10px/1 var(--bo7-font);color:#fff}
+#bo7-right #class-skill small{bottom:auto;top:-22px;font:600 10px/1 var(--bo7-font)}
+
+/* ---- bottom centre: perks, power-up timers above them ------------------------------------------------------ */
+#bo7-perks{left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px}
+#bo7-perks #effects{position:static;transform:none}
+#bo7-perks #perks{margin:0;gap:8px}
+#bo7-perks #perks .perk{width:36px;height:36px}
+#bo7-perks #perks .perk:is([title="Juggernog"],[title="Double Tap"],[title="Speed Cola"],[title="Quick Revive"]){width:38px;height:38px}
+
+/* ---- top right: the round ----------------------------------------------------------------------------------- */
+#bo7-round{top:18px;right:30px;display:flex;flex-direction:column;align-items:flex-end}
+#bo7-round .lbl{font:600 12px/1 var(--bo7-font);letter-spacing:4px;color:var(--bo7-dim)}
+#bo7-round .n{font:italic 700 64px/1 var(--bo7-font);color:#d8352a;letter-spacing:1px;text-shadow:0 2px 2px #2a0000,0 0 18px #c0201866}
+#bo7-round #remaining{font:600 12px/1 var(--bo7-font);letter-spacing:2px;color:var(--bo7-dim)}
+#bo7-round.text .lbl{display:none}
+#bo7-round.text .n{font:600 13px/1.3 var(--bo7-font);letter-spacing:2px;color:var(--bo7-text);text-shadow:0 1px 3px #000c}

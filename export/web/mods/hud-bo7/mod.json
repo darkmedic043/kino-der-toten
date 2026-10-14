@@ -1,0 +1,5 @@
+{
+  "name": "BO7 HUD",
+  "description": "Black Ops 7-style HUD layout: player card bottom left, weapon dial with equipment and the class ability bottom right, gobblegums stacked above the weapon, perks bottom centre, round top right. Desktop only (touch keeps the classic layout).",
+  "script": "mod.js"
+}

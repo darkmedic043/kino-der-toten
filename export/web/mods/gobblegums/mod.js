@@ -14,8 +14,8 @@ export default async function setup(api){
   const pack=()=>activePack(cfg,loadProfile().level??1,loadGumProfile().pack);
 
   // ---- state: the hand, rolls this round, what's active ------------------------------------------
-  const st={hand:[],sel:0,rolls:0,timed:{},armed:new Set()};
-  const reset=()=>{st.hand=[];st.sel=0;st.rolls=0;st.timed={};st.armed.clear();hud();};
+  const st={hand:[],sel:0,rolls:0,timed:{},armed:new Set(),charges:{}};
+  const reset=()=>{endEnhance();st.hand=[];st.sel=0;st.rolls=0;st.timed={};st.armed.clear();st.charges={};hud();};
   host.on('reset',reset);
   host.on('roundEnd',()=>{st.rolls=0;});
   const live=id=>(st.timed[id]??0)>session.time;
@@ -41,8 +41,21 @@ export default async function setup(api){
   }
 
   // ---- chewing ----------------------------------------------------------------------------------------
+  // Power-up gums drop the power-up in front of you (outside the 64-unit pickup radius) so you choose when to
+  // grab it: along the look direction, pulled in short of walls, then dropped onto the floor below.
   const feet=()=>new THREE.Vector3().copy(player.feetPosition??api.camera.position);
-  const drop=(type,offset=new THREE.Vector3())=>powerups?.spawn(type,feet().add(offset));
+  const DROP_AHEAD=110;
+  function dropPoint(angle=0){
+    const f=feet(),dir=api.camera.getWorldDirection(new THREE.Vector3());dir.y=0;
+    if(dir.lengthSq()<1e-6)dir.set(0,0,-1);dir.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),angle);
+    const eye=f.clone().add(new THREE.Vector3(0,40,0)),world=api.world;
+    const wall=world?.raycast?.(new THREE.Ray(eye.clone(),dir),0,DROP_AHEAD+30);
+    const p=eye.clone().addScaledVector(dir,wall?Math.max(0,wall.distance-30):DROP_AHEAD);
+    const top=p.y+30,floor=world?.raycast?.(new THREE.Ray(new THREE.Vector3(p.x,top,p.z),new THREE.Vector3(0,-1,0)),0,200);
+    p.y=floor&&top-floor.distance>f.y-120?top-floor.distance:f.y;
+    return p;
+  }
+  const drop=(type,angle=0)=>powerups?.spawn(type,dropPoint(angle));
   const perkList=()=>PERKS.filter(p=>!session.perks?.has(p.id));
   function givePerk(p){
     if(api.perkInfo&&!api.perkInfo[p.id])api.perkInfo[p.id]={name:p.name,price:p.price,color:p.color,icon:p.badge};
@@ -51,13 +64,18 @@ export default async function setup(api){
   function chew(){
     const id=st.hand[st.sel];if(!id)return;
     const g=by[id],st0=api.getState?.();if(st0&&(!st0.active||session.phase==='reviving'||session.phase==='gameover'))return;
+    if(id==='ephemeral_enhancement'&&!canEnhance()){api.toast('Ephemeral Enhancement · the gun in hand can\'t be upgraded',3);return;}
     st.hand.splice(st.sel,1);st.sel=Math.min(st.sel,Math.max(0,st.hand.length-1));
     if(g.powerup)drop(g.powerup);
-    if(g.powerups)g.powerups.forEach((t,i)=>{const a=i/g.powerups.length*Math.PI*2;drop(t,new THREE.Vector3(Math.cos(a)*70,0,Math.sin(a)*70));});
+    // several power-ups fan out in an arc ahead of you
+    if(g.powerups)g.powerups.forEach((t,i,a)=>drop(t,(i-(a.length-1)/2)*.42));
     if(g.points)session.points+=g.points;
     if(id==='perkaholic')for(const p of perkList())givePerk(p);
     if(g.type==='timed')st.timed[id]=session.time+g.duration;
-    if(g.type==='conditional')st.armed.add(id);
+    if(g.type==='conditional'){st.armed.add(id);if(g.charges)st.charges[id]=g.charges;}
+    if(id==='on_the_house'){const rest=perkList();if(rest.length){const p=rest[Math.floor(Math.random()*rest.length)];givePerk(p);api.toast(`On the House · ${p.name}`,3);}}
+    if(id==='equip_mint'){session.grenades=4;if(session.claymoresOwned)session.claymores=2;if(session.monkeysOwned)session.monkeys=3;}
+    if(id==='ephemeral_enhancement')startEnhance();
     api.announce?.(g.name,rarity[g.rarity]?.name.toUpperCase()+' GOBBLEGUM',2.5);
     gumSound(g.rarity);hud();
   }
@@ -68,6 +86,30 @@ export default async function setup(api){
   });
 
   // ---- the effects -------------------------------------------------------------------------------------
+  // a conditional gum with charges (Pop Shocks, Burned Out) spends one; it disarms at zero
+  function spendCharge(id){if(--st.charges[id]<=0){st.armed.delete(id);delete st.charges[id];}hud();}
+  // kill the zombies within r of p (deferred: these run inside enemies.hurt / session.damage)
+  const blast=(p,r,cause,skip)=>setTimeout(()=>{for(const z of [...enemies.list])if(z!==skip&&z.health>0&&z.root.position.distanceTo(p)<r)enemies.hurt(z,100000,false,false,cause);},0);
+  host.on('beforeEnemyDamage',e=>{
+    if(e.cause==='melee'&&st.armed.has('pop_shocks')&&e.enemy){blast(e.enemy.root.position.clone(),by.pop_shocks.radius,'shock',e.enemy);spendCharge('pop_shocks');}
+  });
+  host.on('beforeDamage',e=>{
+    if(e.amount>0&&st.armed.has('burned_out')){blast(feet(),by.burned_out.radius,'fire');spendCharge('burned_out');}
+  });
+  // Power Vacuum: a far higher power-up drop chance (the per-round cap still applies)
+  const drops=session.drops,tryDrop=drops?.tryDrop?.bind(drops);
+  if(tryDrop)drops.tryDrop=(s,o)=>{let r=tryDrop(s,o);if(!r&&live('power_vacuum')&&Math.random()<by.power_vacuum.chance){drops.pending=true;r=tryDrop(s,o);}return r;};
+  // Ephemeral Enhancement: Pack-a-Punch the gun in hand, put it back when the gum runs out
+  let enhanced=null;
+  const canEnhance=()=>{const w=session.weapon;return !!(w&&!w.upgraded&&api.data.weapons[w.id]?.upgrade);};
+  function startEnhance(){
+    const w=session.weapon,d=api.data.weapons[w.id];
+    enhanced=w;w.upgraded=true;w.mag=d.upgrade.clipSize??d.clipSize;w.reserve=d.upgrade.maxAmmo??d.maxAmmo;api.equipView?.();
+  }
+  function endEnhance(){
+    const w=enhanced;enhanced=null;if(!w||!w.upgraded)return;const d=api.data.weapons[w.id];
+    w.upgraded=false;w.mag=Math.min(w.mag,d.clipSize);w.reserve=Math.min(w.reserve,d.maxAmmo);if(!w.lost&&session.inventory.includes(w))api.equipView?.();
+  }
   host.on('beforeEnemyDamage',e=>{if(live('sword_flay')&&e.cause==='melee')e.amount*=by.sword_flay.meleeMul;});
   // Temporal Gift: picked-up timed power-ups last longer
   const powerup=session.powerup?.bind(session);
@@ -87,6 +129,9 @@ export default async function setup(api){
       if(rest.length){const p=rest[Math.floor(Math.random()*rest.length)];givePerk(p);api.toast(`Soda Fountain · ${p.name}`,3);}hud();
     }
     perksBefore=new Set(now);
+    if(enhanced&&!live('ephemeral_enhancement'))endEnhance();
+    // Free Fire: the magazine in hand stays full
+    if(live('free_fire')){const w=session.weapon,d=w&&api.data.weapons[w.id];if(d){const clip=w.upgraded?d.upgrade?.clipSize??d.clipSize:d.clipSize;if(clip&&w.mag<clip)w.mag=clip;}}
     if(Object.values(st.timed).some(t=>t>session.time-1))hud();
   });
   // Crate Power / Wall Power: the next box gun / wall gun comes Pack-a-Punched
@@ -124,7 +169,7 @@ export default async function setup(api){
   document.head.append(css);
   function hud(){
     const sel=by[st.hand[st.sel]],act=[...Object.entries(st.timed).filter(([,t])=>t>session.time).map(([id,t])=>`<span style="--c:${rarity[by[id].rarity].color}">${by[id].name} ${Math.ceil(t-session.time)}s</span>`),
-      ...[...st.armed].map(id=>`<span style="--c:${rarity[by[id].rarity].color}">${by[id].name} · ARMED</span>`)];
+      ...[...st.armed].map(id=>`<span style="--c:${rarity[by[id].rarity].color}">${by[id].name} · ARMED${st.charges[id]?` ×${st.charges[id]}`:''}</span>`)];
     if(!st.hand.length&&!act.length){el.innerHTML='';return;}
     el.innerHTML=`${act.length?`<div class="act">${act.join('')}</div>`:''}
       ${st.hand.length?`<div class="slots">${Array.from({length:cfg.handSize},(_,i)=>{const g=by[st.hand[i]];return `<div class="s ${g?'g':''} ${g&&i===st.sel?'on':''}" style="--c:${g?rarity[g.rarity].color:'#555'}"></div>`;}).join('')}</div>

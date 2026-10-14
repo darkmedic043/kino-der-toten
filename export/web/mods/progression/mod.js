@@ -50,7 +50,7 @@ export default async function setup(api){
     if(id==='claymore_zm'){session.claymoresOwned=true;session.claymores=2;return true;}
     return giveWeapon(id,...rest);
   };
-  if(api.mysteryBox)for(const id of ['frag_grenade_zm','claymore_zm'])if(data.equipment?.[id]?.worldModel&&!api.mysteryBox.models[id])
+  if(api.mysteryBox?.models)for(const id of ['frag_grenade_zm','claymore_zm'])if(data.equipment?.[id]?.worldModel&&!api.mysteryBox.models[id])
     loadModel(data.equipment[id].worldModel).then(m=>{api.mysteryBox.models[id]=m;}).catch(e=>console.warn('[progression] box model',id,e));
 
   host.on('beforeDamage',e=>{if(active.bonuses.has('iron_skin'))e.amount*=1-bonuses.iron_skin.value;});
