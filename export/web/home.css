@@ -298,3 +298,9 @@ main{position:relative;overflow-y:auto;padding:40px 48px 60px}
 .pr-slot{margin-top:12px;padding:10px 12px;border:1px solid #f0c06040;background:#f0c06008}
 .pr-slot .pr-line{font-size:12px;margin:4px 0 2px;color:#e8dcc0}
 .b.pr{border-color:#f0c060!important;color:#f0c060!important}
+/* six Armory panes (Research, 2026-10-14) no longer fit narrow screens: the bar scrolls sideways instead of widening the page */
+.armory-nav{overflow-x:auto;scrollbar-width:none;min-width:0;max-width:100%}
+.armory-nav::-webkit-scrollbar{display:none}
+.armory-nav button{flex:none;white-space:nowrap}
+@media (max-width:1100px){.armory-nav button{font-size:15px;letter-spacing:3px;padding-right:18px;margin-right:14px}}
+body>main{min-width:0}   /* grid item: let wide children (the Armory tab bar) scroll instead of widening the page */

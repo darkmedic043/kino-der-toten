@@ -1,0 +1,783 @@
+{
+ "_note": "Phase 5 research (BO6 style): perk and ammo mod augments. One research at a time; it earns research XP from kills (kill, headshot) and rounds survived (round x roundPerRound), times activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor per item in the Armory's Research pane; they're locked in at match start. Ammo mod augment effects edit that mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), spread the proc to neighbours (spread n within r) or refill the magazine (refill).",
+ "unlockLevel": 11,
+ "cost": {
+  "minor": 1000,
+  "major": 2000
+ },
+ "xp": {
+  "kill": 10,
+  "headshot": 5,
+  "roundPerRound": 25
+ },
+ "activeMul": 1.5,
+ "items": [
+  {
+   "id": "specialty_quickrevive",
+   "name": "Quick Revive",
+   "kind": "perk",
+   "color": "#509ebc",
+   "augments": [
+    {
+     "id": "p.quickrevive.dyingwish",
+     "name": "Dying Wish",
+     "kind": "major",
+     "desc": "Once a round, a hit that would down you leaves you on 1 health and untouchable for 3s.",
+     "effects": {
+      "qr.dyingWish": 3
+     }
+    },
+    {
+     "id": "p.quickrevive.durableheal",
+     "name": "Durable Heal",
+     "kind": "major",
+     "desc": "Health comes back twice as fast.",
+     "effects": {
+      "qr.regenMul": 1
+     }
+    },
+    {
+     "id": "p.quickrevive.quickrecovery",
+     "name": "Quick Recovery",
+     "kind": "minor",
+     "desc": "Health starts coming back after 1s.",
+     "effects": {
+      "qr.delay": 1
+     }
+    },
+    {
+     "id": "p.quickrevive.karmicreturn",
+     "name": "Karmic Return",
+     "kind": "minor",
+     "desc": "Every kill heals you 3.",
+     "effects": {
+      "qr.killHeal": 3
+     }
+    }
+   ]
+  },
+  {
+   "id": "specialty_armorvest",
+   "name": "Juggernog",
+   "kind": "perk",
+   "color": "#a53835",
+   "augments": [
+    {
+     "id": "p.armorvest.thickskin",
+     "name": "Thick Skin",
+     "kind": "major",
+     "desc": "The first hit you take each round deals half damage.",
+     "effects": {
+      "jug.thickSkin": 0.5
+     }
+    },
+    {
+     "id": "p.armorvest.probiotic",
+     "name": "Probiotic",
+     "kind": "major",
+     "desc": "+50 max health.",
+     "effects": {
+      "jug.health": 50
+     }
+    },
+    {
+     "id": "p.armorvest.reinforced",
+     "name": "Reinforced",
+     "kind": "minor",
+     "desc": "+15 max health.",
+     "effects": {
+      "jug.health": 15
+     }
+    },
+    {
+     "id": "p.armorvest.hardtarget",
+     "name": "Hard Target",
+     "kind": "minor",
+     "desc": "Take 5% less damage.",
+     "effects": {
+      "jug.armor": 0.05
+     }
+    }
+   ]
+  },
+  {
+   "id": "specialty_fastreload",
+   "name": "Speed Cola",
+   "kind": "perk",
+   "color": "#478450",
+   "augments": [
+    {
+     "id": "p.fastreload.supercharged",
+     "name": "Supercharged",
+     "kind": "major",
+     "desc": "Your class action skill charges 25% faster.",
+     "effects": {
+      "sc.charge": 0.25
+     }
+    },
+    {
+     "id": "p.fastreload.phantomreload",
+     "name": "Phantom Reload",
+     "kind": "major",
+     "desc": "Guns you aren't holding reload themselves after 3s stowed.",
+     "effects": {
+      "sc.phantom": 3
+     }
+    },
+    {
+     "id": "p.fastreload.quickmag",
+     "name": "Quick Mag",
+     "kind": "minor",
+     "desc": "A kill while reloading cuts the rest of the reload by 25%.",
+     "effects": {
+      "sc.quickMag": 0.25
+     }
+    },
+    {
+     "id": "p.fastreload.fasthands",
+     "name": "Fast Hands",
+     "kind": "minor",
+     "desc": "Reload 10% faster.",
+     "effects": {
+      "sc.reload": 0.1
+     }
+    }
+   ]
+  },
+  {
+   "id": "specialty_rof",
+   "name": "Double Tap",
+   "kind": "perk",
+   "color": "#b37528",
+   "augments": [
+    {
+     "id": "p.rof.hollowpoints",
+     "name": "Hollow Points",
+     "kind": "major",
+     "desc": "Headshots deal 25% more.",
+     "effects": {
+      "dt.head": 0.25
+     }
+    },
+    {
+     "id": "p.rof.doubleimpact",
+     "name": "Double Impact",
+     "kind": "major",
+     "desc": "10% of your bullets hit twice.",
+     "effects": {
+      "dt.double": 0.1
+     }
+    },
+    {
+     "id": "p.rof.hardenedrounds",
+     "name": "Hardened Rounds",
+     "kind": "minor",
+     "desc": "Bullets deal 5% more.",
+     "effects": {
+      "dt.dmg": 0.05
+     }
+    },
+    {
+     "id": "p.rof.bounty",
+     "name": "Bounty",
+     "kind": "minor",
+     "desc": "+5 points for every headshot hit.",
+     "effects": {
+      "dt.headPoints": 5
+     }
+    }
+   ]
+  },
+  {
+   "id": "specialty_longersprint",
+   "name": "Stamin-Up",
+   "kind": "perk",
+   "color": "#ebbd4b",
+   "augments": [
+    {
+     "id": "p.longersprint.hotfoot",
+     "name": "Hot Foot",
+     "kind": "major",
+     "desc": "Sprinting scorches zombies you brush past for 15% of their health a second.",
+     "effects": {
+      "su.hotFoot": 0.15
+     }
+    },
+    {
+     "id": "p.longersprint.freefaller",
+     "name": "Free Faller",
+     "kind": "major",
+     "desc": "No fall damage, and landing from a fall gives +20% speed for 3s.",
+     "effects": {
+      "su.freeFaller": 0.2
+     }
+    },
+    {
+     "id": "p.longersprint.runner",
+     "name": "Runner",
+     "kind": "minor",
+     "desc": "Walk 5% faster.",
+     "effects": {
+      "su.walk": 0.05
+     }
+    },
+    {
+     "id": "p.longersprint.lightstep",
+     "name": "Light Step",
+     "kind": "minor",
+     "desc": "Sprint 5% faster.",
+     "effects": {
+      "su.sprint": 0.05
+     }
+    }
+   ]
+  },
+  {
+   "id": "specialty_flakjacket",
+   "name": "PhD Flopper",
+   "kind": "perk",
+   "color": "#be83da",
+   "augments": [
+    {
+     "id": "p.flakjacket.flashpoint",
+     "name": "Flash Point",
+     "kind": "major",
+     "desc": "Using your class action skill sets off a PhD blast where you stand.",
+     "effects": {
+      "phd.flash": 1
+     }
+    },
+    {
+     "id": "p.flakjacket.phdslider",
+     "name": "PhD Slider",
+     "kind": "major",
+     "desc": "Sliding into zombies blows them up, once per slide.",
+     "effects": {
+      "phd.slider": 1
+     }
+    },
+    {
+     "id": "p.flakjacket.biggerbang",
+     "name": "Bigger Bang",
+     "kind": "minor",
+     "desc": "PhD blasts are 30% wider.",
+     "effects": {
+      "phd.radius": 0.3
+     }
+    },
+    {
+     "id": "p.flakjacket.delayedreaction",
+     "name": "Delayed Reaction",
+     "kind": "minor",
+     "desc": "A second, half-strength PhD blast follows 1s later.",
+     "effects": {
+      "phd.echo": 0.5
+     }
+    }
+   ]
+  },
+  {
+   "id": "specialty_deadshot",
+   "name": "Deadshot Daiquiri",
+   "kind": "perk",
+   "color": "#9da8ac",
+   "augments": [
+    {
+     "id": "p.deadshot.deadhead",
+     "name": "Dead Head",
+     "kind": "major",
+     "desc": "Headshot kills burst, hurting zombies within 110 for 30% of their health.",
+     "effects": {
+      "ds.deadHead": 0.3
+     }
+    },
+    {
+     "id": "p.deadshot.criticalmass",
+     "name": "Critical Mass",
+     "kind": "major",
+     "desc": "Every 5th headshot deals triple damage.",
+     "effects": {
+      "ds.crit": 5
+     }
+    },
+    {
+     "id": "p.deadshot.sharpshooter",
+     "name": "Sharpshooter",
+     "kind": "minor",
+     "desc": "Headshots deal 10% more.",
+     "effects": {
+      "ds.head": 0.1
+     }
+    },
+    {
+     "id": "p.deadshot.marked",
+     "name": "Marked",
+     "kind": "minor",
+     "desc": "A headshot marks the zombie: it takes 10% more from you for 3s.",
+     "effects": {
+      "ds.mark": 0.1
+     }
+    }
+   ]
+  },
+  {
+   "id": "specialty_additionalprimaryweapon",
+   "name": "Mule Kick",
+   "kind": "perk",
+   "color": "#6a8f3a",
+   "augments": [
+    {
+     "id": "p.additionalprimaryweapon.ammomule",
+     "name": "Ammo Mule",
+     "kind": "major",
+     "desc": "Every 10s each of your guns gets 5% of its reserve back.",
+     "effects": {
+      "mk.ammo": 0.05
+     }
+    },
+    {
+     "id": "p.additionalprimaryweapon.thirdwheel",
+     "name": "Third Wheel",
+     "kind": "major",
+     "desc": "The gun in your third slot deals 15% more.",
+     "effects": {
+      "mk.third": 0.15
+     }
+    },
+    {
+     "id": "p.additionalprimaryweapon.lightload",
+     "name": "Light Load",
+     "kind": "minor",
+     "desc": "Move 5% faster while carrying three guns.",
+     "effects": {
+      "mk.speed": 0.05
+     }
+    },
+    {
+     "id": "p.additionalprimaryweapon.scavenger",
+     "name": "Scavenger",
+     "kind": "minor",
+     "desc": "Kills have a 5% chance to refill a tenth of the gun's reserve.",
+     "effects": {
+      "mk.scav": 0.05
+     }
+    }
+   ]
+  },
+  {
+   "id": "cryo",
+   "name": "Cryo Freeze",
+   "kind": "ammo",
+   "color": "#7fd8ff",
+   "augments": [
+    {
+     "id": "a.cryo.icecloud",
+     "name": "Ice Cloud",
+     "kind": "major",
+     "desc": "A proc also chills up to 3 zombies within 140.",
+     "effects": {
+      "spread": {
+       "n": 3,
+       "r": 140
+      }
+     }
+    },
+    {
+     "id": "a.cryo.liquidnitrogen",
+     "name": "Liquid Nitrogen",
+     "kind": "major",
+     "desc": "Slows last 40% longer, zombies are 15% more brittle, and they freeze for 1s more.",
+     "effects": {
+      "mul": {
+       "dur": 1.4
+      },
+      "add": {
+       "brittle": 0.15,
+       "freeze": 1
+      }
+     }
+    },
+    {
+     "id": "a.cryo.deepfreeze",
+     "name": "Deep Freeze",
+     "kind": "minor",
+     "desc": "Slows are 10% stronger.",
+     "effects": {
+      "add": {
+       "slow": 0.1
+      }
+     }
+    },
+    {
+     "id": "a.cryo.frostbite",
+     "name": "Frostbite",
+     "kind": "minor",
+     "desc": "Procs 30% more often.",
+     "effects": {
+      "chance": 1.3
+     }
+    }
+   ]
+  },
+  {
+   "id": "napalm",
+   "name": "Napalm Burst",
+   "kind": "ammo",
+   "color": "#ff7a2a",
+   "augments": [
+    {
+     "id": "a.napalm.wildfire",
+     "name": "Wildfire",
+     "kind": "major",
+     "desc": "A proc also ignites up to 2 zombies within 150.",
+     "effects": {
+      "spread": {
+       "n": 2,
+       "r": 150
+      }
+     }
+    },
+    {
+     "id": "a.napalm.contactburn",
+     "name": "Contact Burn",
+     "kind": "major",
+     "desc": "Burning zombies set their neighbours alight at any tier.",
+     "effects": {
+      "set": {
+       "spread": true
+      }
+     }
+    },
+    {
+     "id": "a.napalm.slowburn",
+     "name": "Slow Burn",
+     "kind": "minor",
+     "desc": "Burns last 50% longer.",
+     "effects": {
+      "mul": {
+       "dur": 1.5
+      }
+     }
+    },
+    {
+     "id": "a.napalm.hotter",
+     "name": "Hotter",
+     "kind": "minor",
+     "desc": "Burns deal 15% of max health more.",
+     "effects": {
+      "add": {
+       "dmg": 0.15
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "deadwire",
+   "name": "Dead Wire",
+   "kind": "ammo",
+   "color": "#5fe8ff",
+   "augments": [
+    {
+     "id": "a.deadwire.balllightning",
+     "name": "Ball Lightning",
+     "kind": "major",
+     "desc": "The stunned zombie's field is 50% wider and hurts 10% more.",
+     "effects": {
+      "mul": {
+       "field": 1.5
+      },
+      "add": {
+       "fieldDmg": 0.1
+      }
+     }
+    },
+    {
+     "id": "a.deadwire.highvoltage",
+     "name": "High Voltage",
+     "kind": "major",
+     "desc": "Arcs jump to 3 more zombies and hit 10% harder.",
+     "effects": {
+      "add": {
+       "arcs": 3,
+       "arcDmg": 0.1
+      }
+     }
+    },
+    {
+     "id": "a.deadwire.longarc",
+     "name": "Long Stun",
+     "kind": "minor",
+     "desc": "Stuns last 40% longer.",
+     "effects": {
+      "mul": {
+       "stun": 1.4
+      }
+     }
+    },
+    {
+     "id": "a.deadwire.conductor",
+     "name": "Conductor",
+     "kind": "minor",
+     "desc": "Procs 30% more often.",
+     "effects": {
+      "chance": 1.3
+     }
+    }
+   ]
+  },
+  {
+   "id": "fireworks",
+   "name": "Fire Works",
+   "kind": "ammo",
+   "color": "#ff5fd7",
+   "augments": [
+    {
+     "id": "a.fireworks.starburst",
+     "name": "Starburst",
+     "kind": "major",
+     "desc": "3 more rockets.",
+     "effects": {
+      "add": {
+       "rockets": 3
+      }
+     }
+    },
+    {
+     "id": "a.fireworks.highyield",
+     "name": "High Yield",
+     "kind": "major",
+     "desc": "Rockets burst 40% wider and 20% harder.",
+     "effects": {
+      "mul": {
+       "radius": 1.4
+      },
+      "add": {
+       "dmg": 0.2
+      }
+     }
+    },
+    {
+     "id": "a.fireworks.grandfinale",
+     "name": "Grand Finale",
+     "kind": "minor",
+     "desc": "Rockets deal 10% more.",
+     "effects": {
+      "add": {
+       "dmg": 0.1
+      }
+     }
+    },
+    {
+     "id": "a.fireworks.showtime",
+     "name": "Showtime",
+     "kind": "minor",
+     "desc": "Procs 30% more often.",
+     "effects": {
+      "chance": 1.3
+     }
+    }
+   ]
+  },
+  {
+   "id": "shadowrift",
+   "name": "Shadow Rift",
+   "kind": "ammo",
+   "color": "#a46bff",
+   "augments": [
+    {
+     "id": "a.shadowrift.gravitywell",
+     "name": "Gravity Well",
+     "kind": "major",
+     "desc": "The rift is 40% wider and stays open 50% longer.",
+     "effects": {
+      "mul": {
+       "radius": 1.4,
+       "dur": 1.5
+      }
+     }
+    },
+    {
+     "id": "a.shadowrift.ammotheorem",
+     "name": "Ammo Theorem",
+     "kind": "major",
+     "desc": "Each rift refills a fifth of your magazine.",
+     "effects": {
+      "refill": 0.2
+     }
+    },
+    {
+     "id": "a.shadowrift.eventhorizon",
+     "name": "Event Horizon",
+     "kind": "minor",
+     "desc": "Dropped zombies take 15% more.",
+     "effects": {
+      "add": {
+       "lethal": 0.15
+      }
+     }
+    },
+    {
+     "id": "a.shadowrift.darkmatter",
+     "name": "Dark Matter",
+     "kind": "minor",
+     "desc": "Procs 30% more often.",
+     "effects": {
+      "chance": 1.3
+     }
+    }
+   ]
+  },
+  {
+   "id": "lightmend",
+   "name": "Light Mend",
+   "kind": "ammo",
+   "color": "#fff3b0",
+   "augments": [
+    {
+     "id": "a.lightmend.dualaction",
+     "name": "Dual Action",
+     "kind": "major",
+     "desc": "After a glyph heals you, you regenerate 10% a second for 3s.",
+     "effects": {
+      "add": {
+       "regen": 0.1
+      }
+     }
+    },
+    {
+     "id": "a.lightmend.expressremedy",
+     "name": "Express Remedy",
+     "kind": "major",
+     "desc": "Glyphs reach 50% farther and last 50% longer.",
+     "effects": {
+      "mul": {
+       "range": 1.5,
+       "life": 1.5
+      }
+     }
+    },
+    {
+     "id": "a.lightmend.extrastrength",
+     "name": "Extra Strength",
+     "kind": "minor",
+     "desc": "Glyphs heal 10% more.",
+     "effects": {
+      "add": {
+       "heal": 0.1
+      }
+     }
+    },
+    {
+     "id": "a.lightmend.antibiotic",
+     "name": "Antibiotic",
+     "kind": "minor",
+     "desc": "Procs 30% more often.",
+     "effects": {
+      "chance": 1.3
+     }
+    }
+   ]
+  },
+  {
+   "id": "shatter",
+   "name": "Shatter Blast",
+   "kind": "ammo",
+   "color": "#ffb347",
+   "augments": [
+    {
+     "id": "a.shatter.seismic",
+     "name": "Seismic",
+     "kind": "major",
+     "desc": "The blast is 40% wider.",
+     "effects": {
+      "mul": {
+       "radius": 1.4
+      }
+     }
+    },
+    {
+     "id": "a.shatter.fragmentation",
+     "name": "Fragmentation",
+     "kind": "major",
+     "desc": "The blast hits 30% harder.",
+     "effects": {
+      "add": {
+       "dmg": 0.3
+      }
+     }
+    },
+    {
+     "id": "a.shatter.shrapnel",
+     "name": "Shrapnel",
+     "kind": "minor",
+     "desc": "The blast hits 10% harder.",
+     "effects": {
+      "add": {
+       "dmg": 0.1
+      }
+     }
+    },
+    {
+     "id": "a.shatter.hairtrigger",
+     "name": "Hair Trigger",
+     "kind": "minor",
+     "desc": "Procs 30% more often.",
+     "effects": {
+      "chance": 1.3
+     }
+    }
+   ]
+  },
+  {
+   "id": "brainrot",
+   "name": "Brain Rot",
+   "kind": "ammo",
+   "color": "#8cff5a",
+   "augments": [
+    {
+     "id": "a.brainrot.pheromone",
+     "name": "Pheromone",
+     "kind": "major",
+     "desc": "Zombies within 400 go for the turned zombie at any tier.",
+     "effects": {
+      "max": {
+       "lure": 400
+      }
+     }
+    },
+    {
+     "id": "a.brainrot.toxicburst",
+     "name": "Toxic Burst",
+     "kind": "major",
+     "desc": "The turned zombie explodes when it ends, at any tier.",
+     "effects": {
+      "set": {
+       "explode": true
+      }
+     }
+    },
+    {
+     "id": "a.brainrot.extension",
+     "name": "Extension",
+     "kind": "minor",
+     "desc": "Turned zombies stay turned 40% longer.",
+     "effects": {
+      "mul": {
+       "dur": 1.4
+      }
+     }
+    },
+    {
+     "id": "a.brainrot.contagion",
+     "name": "Contagion",
+     "kind": "minor",
+     "desc": "Procs 30% more often.",
+     "effects": {
+      "chance": 1.3
+     }
+    }
+   ]
+  }
+ ]
+}

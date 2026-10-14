@@ -13,6 +13,11 @@ import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } f
 import { weaponProgress, maxLevel } from './mods/weapon-levels/gunsmith.js';
 import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, canPrestigeWeapon, prestigeWeapon, canPrestigePlayer, prestigePlayer, prestigeBadge, roman, RULES as PRESTIGE, TIER_NAMES, PRESTIGE_COLORS } from './mods/prestige/prestige.js';
 import { camoById } from './mods/weapon-levels/camo.js';
+import { loadResearchConfig } from './mods/research/research.js';
+import { renderResearch } from './mods/research/pane.js';
+let researchCfg=null;
+loadResearchConfig(new URL('mods/research/',document.baseURI)).then(c=>{researchCfg=c;drawResearch();}).catch(e=>console.warn('[research]',e));
+function drawResearch(){const el=document.getElementById('research-root');if(el&&researchCfg)renderResearch(el,{cfg:researchCfg,level:unlockLvl(loadProfile()),toast});}
 import { getAccount, onAccountChange, renderSignInButton, signOut } from './cloud.js';
 import { renderCareer } from './career-view.js';
 import { loadGums, loadGumProfile, saveGumProfile, activePack, packTiers, canAdd, canRemove, gumById } from './mods/gobblegums/gums.js';
@@ -77,7 +82,7 @@ addEventListener('focus',()=>{profile=loadProfile();renderProfile();renderLoadou
 const tabs=[...document.querySelectorAll('#tabs button')],panes=[...document.querySelectorAll('#armory-nav button')];
 // Armory holds Loadout, Classes and Operator as panes. Old links (#loadout, #classes,
 // #character) open the matching pane.
-const PANES={loadout:'loadout',weapons:'weapons',gums:'gums',classes:'classes',operator:'operator',character:'operator'};
+const PANES={loadout:'loadout',weapons:'weapons',gums:'gums',research:'research',classes:'classes',operator:'operator',character:'operator'};
 let pane=PANES[location.hash.slice(1)]??'loadout';
 function showTab(name){
   if(PANES[name]){pane=PANES[name];name='armory';}
@@ -87,6 +92,7 @@ function showTab(name){
   for(const s of document.querySelectorAll('.pane'))s.classList.toggle('active',s.id==='pane-'+pane);
   const hash=name==='armory'?pane:name;if(location.hash!=='#'+hash)history.replaceState(null,'','#'+hash);
   stage.active=name==='armory'&&pane==='operator';if(stage.active)stage.start();
+  if(name==='armory'&&pane==='research')drawResearch();
   if(name==='career')renderCareer($('career-root'),{mapList,weapons:baseData?.weapons??{}});
 }
 for(const b of tabs)b.addEventListener('click',()=>showTab(b.dataset.tab));

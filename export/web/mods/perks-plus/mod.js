@@ -59,13 +59,17 @@ function phdFlopper({ host, session, player, world, audio, enemies, scene }) {
     if (e.dive) flop(e.position);
   });
   host.on('update', dt => {
-    if (ring) { ring.t += dt; const k = ring.t / .45; ring.mesh.scale.setScalar(20 + k * PHD_RADIUS); ring.mesh.material.opacity = .8 * (1 - k); if (k >= 1) { ring.mesh.removeFromParent(); ring = null; } }
+    if (ring) { ring.t += dt; const k = ring.t / .45; ring.mesh.scale.setScalar(20 + k * PHD_RADIUS * (ring.scale ?? 1)); ring.mesh.material.opacity = .8 * (1 - k); if (k >= 1) { ring.mesh.removeFromParent(); ring = null; } }
   });
-  function flop(at) {
+  // research augments (mods/research) use it too: opts {power (damage ×), echo}; window.kino.phdScale() widens every blast,
+  // and each blast emits host 'phdBlast' {at, echo}
+  (window.kino ??= {}).phd = { flop: (at, opts) => flop(at, opts) };
+  function flop(at, { power = 1, echo = false } = {}) {
+    const R = PHD_RADIUS * (window.kino?.phdScale?.() ?? 1);
     const up = new THREE.Vector3(0, 30, 0), from = at.clone().add(up);
     for (const z of [...(enemies?.list ?? [])]) {
       const p = z.root.position.clone().add(up), d = p.distanceTo(from);
-      if (d < PHD_RADIUS && (world.lineClear?.(from, p) ?? true)) enemies.hurt(z, THREE.MathUtils.lerp(PHD_MAX, PHD_MIN, d / PHD_RADIUS), false, false, 'explosion');
+      if (d < R && (world.lineClear?.(from, p) ?? true)) enemies.hurt(z, power * THREE.MathUtils.lerp(PHD_MAX, PHD_MIN, d / R), false, false, 'explosion');
     }
     audio?.play?.('explosion');
     if (window.kino?.fx?.explosion) window.kino.fx.explosion(at.clone().add(new THREE.Vector3(0, 8, 0)), 1.2, 0xb36cff);
@@ -74,10 +78,11 @@ function phdFlopper({ host, session, player, world, audio, enemies, scene }) {
     if (scene) {
       ring?.mesh.removeFromParent();
       const mesh = new THREE.Mesh(new THREE.RingGeometry(.82, 1, 48), new THREE.MeshBasicMaterial({ color: 0xc58cff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-      mesh.rotation.x = -Math.PI / 2; mesh.position.copy(at).y += 2; scene.add(mesh); ring = { mesh, t: 0 };
+      mesh.rotation.x = -Math.PI / 2; mesh.position.copy(at).y += 2; scene.add(mesh); ring = { mesh, t: 0, scale: R / PHD_RADIUS };
     }
     const veil = document.getElementById('phd-flash') ?? document.body.appendChild(Object.assign(document.createElement('div'), { id: 'phd-flash' }));
     veil.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse,#c58cff33 20%,#7a2fd0aa);opacity:1;transition:none';
     void veil.offsetWidth; veil.style.transition = 'opacity .6s ease-out'; veil.style.opacity = 0;
+    host.emit('phdBlast', { at: at.clone(), echo });
   }
 }

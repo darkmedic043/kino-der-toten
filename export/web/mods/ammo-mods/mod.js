@@ -268,7 +268,7 @@ export default function setup(api) {
     if (Math.random() > roll.chance) return;
     if (z.amod && (z.amod.rotUntil > now() || (mod.id === 'cryo' && z.amod.slowUntil > now()) || (mod.id === 'napalm' && z.amod.burnUntil > now()))) return;
     ready = now() + COOLDOWN[mod.id];
-    queueMicrotask(() => { if (!alive(z)) return; SFX(mod.id, chest(z)); EFFECT[mod.id](z, mod.tier); });   // after the hit itself lands
+    queueMicrotask(() => { if (!alive(z)) return; SFX(mod.id, chest(z)); EFFECT[mod.id](z, mod.tier); host.emit('ammoModFired', { id: mod.id, tier: mod.tier, enemy: z }); });   // after the hit itself lands ('ammoModFired': research augments)
   });
 
   // ---- per frame ---------------------------------------------------------------------------------------------------

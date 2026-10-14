@@ -1,0 +1,5 @@
+{
+  "name": "Research (perk and ammo mod augments)",
+  "description": "Black Ops 6-style research: every perk and ammo mod has Major and Minor augments, researched one at a time with XP from play (faster while the item is active) and equipped one Major + one Minor per item in Armory → Research.",
+  "script": "mod.js"
+}

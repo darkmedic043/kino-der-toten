@@ -132,14 +132,15 @@ export default async function setup(api){
   host.on('beforeEnemyDamage',e=>{if(e.enemy)e.enemy.lastCause=e.cause;});
   host.on('kill',e=>{
     if(e.remote||cooldown<=0||actionUp()||!PLAYER_CAUSES.has(e.enemy?.lastCause))return;
-    cooldown=Math.max(0,cooldown-A.cooldown*(CH.kill+(e.head?CH.headshot:0)+(e.melee?CH.melee:0))*Math.min(1,(CH.ref??60)/A.cooldown)*(skills?.killChargeMul()??1));   // a kill is worth at most ref seconds' share: long meters (mech) don't refill from kills alone
+    cooldown=Math.max(0,cooldown-A.cooldown*(CH.kill+(e.head?CH.headshot:0)+(e.melee?CH.melee:0))*Math.min(1,(CH.ref??60)/A.cooldown)*(skills?.killChargeMul()??1)*(window.kino.chargeMul?.()??1));   // a kill is worth at most ref seconds' share: long meters (mech) don't refill from kills alone
     if(cooldown===0)ready();
   });
   let wasPowered=powered();
   function ready(){if(!powered())return;audio.play('buy',.35);api.toast?.(act.name+' ready',1.2);hud();}
   function use(){
     if(!powered()&&!actionUp()){notReady();return;}
-    (other?other.deploy:deploy)();
+    const was=actionUp();(other?other.deploy:deploy)();
+    if(!was&&actionUp())host.emit('abilityUsed',{act:act.id});   // research: PhD Flash Point
   }
   // Every skill reports each zombie it damages here: slow, mark, toll points, kill cooldown cuts.
   function onHit(z,killed){
@@ -181,7 +182,7 @@ export default async function setup(api){
   host.on('update',dt=>{
     if(!dt)return;
     {const k=skills?.rateMul()??1;if(k!==rateK){rateK=k;applyDyn();}}
-    if(cooldown>0&&!actionUp()){cooldown=Math.max(0,cooldown-dt);if(cooldown===0)ready();}
+    if(cooldown>0&&!actionUp()){cooldown=Math.max(0,cooldown-dt*(window.kino.chargeMul?.()??1));if(cooldown===0)ready();}   // chargeMul: research Supercharged
     if(powered()!==wasPowered){wasPowered=powered();if(wasPowered){api.announce?.(act.name.toUpperCase(),'ABILITY ONLINE',2.5);audio.play('buy',.5);}hud();}
     for(let i=tracers.length-1;i>=0;i--){const t=tracers[i];t.t-=dt;t.l.material.opacity=Math.max(0,t.t/.06);if(t.t<=0){t.l.removeFromParent();t.l.geometry.dispose();t.l.material.dispose();tracers.splice(i,1);}}
     for(const [z,s] of staggered){if(!enemies.list.includes(z)||session.time>s.until){staggered.delete(z);continue;}z.root.position.x=s.at.x;z.root.position.z=s.at.z;z.stuck=0;}
