@@ -6,7 +6,8 @@
     "low": "Kills while crouched or prone",
     "moving": "Kills while sliding or diving",
     "multi": "Multi-kills (2+ within 1.5 s)",
-    "cheese": "Buy the ending of Cheese Cube Unlimited"
+    "cheese": "Buy the ending of Cheese Cube Unlimited",
+    "shop": "Buy it in the Shop"
   },
   "camos": [
     {
@@ -71,6 +72,128 @@
       "procedural": "cheese",
       "scale": 1.4,
       "mix": 0.92
+    },
+    {
+      "id": "shop.ember",
+      "name": "Ember",
+      "shop": "camo.ember",
+      "challenge": "shop",
+      "procedural": "ember",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "shop.aurora",
+      "name": "Aurora",
+      "shop": "camo.aurora",
+      "challenge": "shop",
+      "procedural": "aurora",
+      "scale": 1.4,
+      "mix": 0.95
+    },
+    {
+      "id": "shop.frostbite",
+      "name": "Frostbite",
+      "shop": "camo.frostbite",
+      "challenge": "shop",
+      "procedural": "frostbite",
+      "scale": 2,
+      "mix": 0.94
+    },
+    {
+      "id": "shop.circuit",
+      "name": "Circuit",
+      "shop": "camo.circuit",
+      "challenge": "shop",
+      "procedural": "circuit",
+      "scale": 2.4,
+      "mix": 0.95
+    },
+    {
+      "id": "shop.digitalrain",
+      "name": "Digital Rain",
+      "shop": "camo.digitalrain",
+      "challenge": "shop",
+      "procedural": "digitalrain",
+      "scale": 2.2,
+      "mix": 0.95
+    },
+    {
+      "id": "shop.chrome",
+      "name": "Chrome",
+      "shop": "camo.chrome",
+      "challenge": "shop",
+      "procedural": "chrome",
+      "scale": 1.2,
+      "mix": 0.9,
+      "metal": true
+    },
+    {
+      "id": "shop.brushed",
+      "name": "Brushed Steel",
+      "shop": "camo.brushed",
+      "challenge": "shop",
+      "procedural": "brushed",
+      "scale": 3,
+      "mix": 0.9,
+      "metal": true
+    },
+    {
+      "id": "shop.hazard",
+      "name": "Hazard",
+      "shop": "camo.hazard",
+      "challenge": "shop",
+      "procedural": "hazard",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "shop.spectrum",
+      "name": "Spectrum",
+      "shop": "camo.spectrum",
+      "challenge": "shop",
+      "procedural": "spectrum",
+      "scale": 1.4,
+      "mix": 0.95,
+      "anim": {
+        "c1": [
+          1.0,
+          0.22745098039215686,
+          0.35294117647058826
+        ],
+        "c2": [
+          0.22745098039215686,
+          0.5490196078431373,
+          1.0
+        ]
+      },
+      "glow": {
+        "procedural": "stripes-glow"
+      }
+    },
+    {
+      "id": "shop.pulse",
+      "name": "Pulse",
+      "shop": "camo.pulse",
+      "challenge": "shop",
+      "procedural": "circuit",
+      "scale": 2.4,
+      "mix": 0.95,
+      "anim": {
+        "c1": [
+          0.22745098039215686,
+          1.0,
+          0.8470588235294118
+        ],
+        "c2": [
+          1.0,
+          0.30980392156862746,
+          0.8470588235294118
+        ]
+      },
+      "glow": {
+        "procedural": "circuit-glow"
+      }
     }
   ]
 }

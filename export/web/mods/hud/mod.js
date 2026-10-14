@@ -19,6 +19,8 @@ export default function setup(api){
   function env(c,t,peak,attack,decay){const g=c.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+attack);g.gain.exponentialRampToValueAtTime(.0001,t+attack+decay);g.connect(output(c));return g;}
   // A thump: a sine punch dropping fast in pitch, plus a muffled noise knock.
   function thump(c,t,{from,to,length,body,knock,knockCut}){
+    // a shop hit-sound set (window.kino.hitSoundSet {pitch, knock, cut}) reshapes every thump
+    const hs=window.kino?.hitSoundSet;if(hs){from*=hs.pitch??1;to*=hs.pitch??1;knock*=hs.knock??1;knockCut*=hs.cut??1;}
     const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(from,t);o.frequency.exponentialRampToValueAtTime(to,t+length*.6);
     o.connect(env(c,t,body,.003,length));o.start(t);o.stop(t+length+.05);
     const n=noise(c,.08),lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=knockCut;

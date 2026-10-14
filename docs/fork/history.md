@@ -197,3 +197,4 @@
 - 2026-10-14: Gobblegums: a full hand can roll and swap the result for a held gum, or keep the hand (gobblegums.md).
 - 2026-10-14: Phase 5 research: 64 perk and ammo mod augments (8 perks + 8 ammo mods, 2 Major + 2 Minor each), research XP from play, Armory → Research pane, pause-menu line; Armory tab bar scrolls on narrow screens (research.md).
 - 2026-10-14: Research reworked BO7-style: 8 augments per item (4 Major, 4 Minor; BO7 names) on a linear track with rising costs, mastery opens a second Minor slot (research.md).
+- 2026-10-14: Phase 6: credits (match payout, daily/weekly challenges, milestones, prestige; none in cheat games) and a cosmetic-only Shop page (50 items in 7 categories, daily/weekly rotation, reward registry) (shop.md).

@@ -46,6 +46,7 @@ function draw(kind){
       wrap(()=>{g.fillStyle='#e9d977';g.beginPath();g.ellipse(x,y+2,rad*1.1,rad*.95,0,0,6.283);g.fill();g.fillStyle='#d4c566';g.beginPath();g.ellipse(x,y+3,rad,rad*.88,0,0,6.283);g.fill();});}}
   else if(kind==='gold'){const gr=g.createLinearGradient(0,0,S,S);gr.addColorStop(0,'#f7d77a');gr.addColorStop(.3,'#c9952f');gr.addColorStop(.55,'#ffe9a8');gr.addColorStop(.8,'#a8761e');gr.addColorStop(1,'#f7d77a');
     g.fillStyle=gr;g.fillRect(0,0,S,S);for(let i=0;i<900;i++){g.fillStyle=`rgba(${r()<.5?'255,240,190':'120,80,20'},${.05+r()*.08})`;g.fillRect(r()*S,r()*S,1+r()*40,1);}}
+  else if(SHOP_DRAW[kind])SHOP_DRAW[kind](g,S,r,wrap);
   else{g.fillStyle='#777';g.fillRect(0,0,S,S);}
   return c;
 }
@@ -100,6 +101,29 @@ export function prestigeCamo(id){
   prestigeCache.set(id,c);return c;
 }
 export const camoById=(cats,id)=>cats?.camos.find(c=>c.id===id)??prestigeCamo(id);
+// ---- shop camos (Phase 6; camos.json entries with "shop": <catalog item id>) ------------------------------------
+const SHOP_DRAW={
+  ember(g,S,r,wrap){g.fillStyle='#120806';g.fillRect(0,0,S,S);for(let i=0;i<220;i++){const x=r()*S,y=r()*S,rad=4+r()*26,h=10+r()*35,l=25+r()*35;
+    wrap(()=>{const gr=g.createRadialGradient(x,y,0,x,y,rad);gr.addColorStop(0,`hsla(${h},100%,${l+20}%,.95)`);gr.addColorStop(1,'hsla(10,100%,10%,0)');g.fillStyle=gr;g.beginPath();g.arc(x,y,rad,0,6.283);g.fill();});}},
+  aurora(g,S,r){const gr=g.createLinearGradient(0,0,0,S);gr.addColorStop(0,'#04101a');gr.addColorStop(1,'#0a0420');g.fillStyle=gr;g.fillRect(0,0,S,S);g.globalCompositeOperation='lighter';
+    for(let b=0;b<7;b++){const y0=r()*S,amp=20+r()*60,fr=1+Math.floor(r()*3),col=b%2?'rgba(80,255,170,.22)':'rgba(170,90,255,.2)';g.strokeStyle=col;g.lineWidth=18+r()*30;g.beginPath();
+      for(let x=0;x<=S;x+=8){const y=y0+Math.sin(x/S*6.283*fr+b)*amp;x?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();}g.globalCompositeOperation='source-over';},
+  frostbite(g,S,r){g.fillStyle='#bfe6f7';g.fillRect(0,0,S,S);g.strokeStyle='#4f8fc2';for(let i=0;i<90;i++){let x=r()*S,y=r()*S;g.lineWidth=.6+r()*2;g.beginPath();g.moveTo(x,y);
+    for(let k=0;k<5;k++){x+=(r()-.5)*70;y+=(r()-.5)*70;g.lineTo(x,y);}g.stroke();}g.fillStyle='rgba(255,255,255,.35)';for(let i=0;i<300;i++)g.fillRect(r()*S,r()*S,2,2);},
+  circuit(g,S,r){g.fillStyle='#0d1712';g.fillRect(0,0,S,S);g.strokeStyle='#c8873a';g.lineWidth=3;const G=32;for(let i=0;i<70;i++){let x=Math.floor(r()*S/G)*G,y=Math.floor(r()*S/G)*G;g.beginPath();g.moveTo(x,y);
+    for(let k=0;k<4;k++){if(r()<.5)x+=(r()<.5?-1:1)*G*(1+Math.floor(r()*3));else y+=(r()<.5?-1:1)*G*(1+Math.floor(r()*3));g.lineTo(x,y);}g.stroke();g.fillStyle='#e8b060';g.beginPath();g.arc(x,y,5,0,6.283);g.fill();}},
+  'circuit-glow'(g,S,r){g.fillStyle='#000';g.fillRect(0,0,S,S);g.strokeStyle='#fff';g.lineWidth=3;const G=32;for(let i=0;i<70;i++){let x=Math.floor(r()*S/G)*G,y=Math.floor(r()*S/G)*G;g.beginPath();g.moveTo(x,y);
+    for(let k=0;k<4;k++){if(r()<.5)x+=(r()<.5?-1:1)*G*(1+Math.floor(r()*3));else y+=(r()<.5?-1:1)*G*(1+Math.floor(r()*3));g.lineTo(x,y);}g.stroke();}},
+  digitalrain(g,S,r){g.fillStyle='#020a04';g.fillRect(0,0,S,S);g.font='bold 14px monospace';for(let x=0;x<S;x+=14){const len=8+Math.floor(r()*30),y0=r()*S;
+    for(let k=0;k<len;k++){const y=(y0+k*15)%S;g.fillStyle=`rgba(80,255,120,${(k/len)*.9+.05})`;g.fillText(String.fromCharCode(0x30A0+Math.floor(r()*96)),x,y);}}},
+  chrome(g,S){const gr=g.createLinearGradient(0,0,S,S);for(const [o,c] of [[0,'#f4f6f8'],[.25,'#8a9096'],[.45,'#ffffff'],[.6,'#5a6066'],[.8,'#d8dde2'],[1,'#f4f6f8']])gr.addColorStop(o,c);g.fillStyle=gr;g.fillRect(0,0,S,S);},
+  brushed(g,S,r){g.fillStyle='#9aa0a6';g.fillRect(0,0,S,S);for(let i=0;i<2400;i++){const y=r()*S,v=140+r()*90;g.fillStyle=`rgba(${v},${v},${v+6},.18)`;g.fillRect(0,y,S,1);}},
+  hazard(g,S){g.fillStyle='#f2c230';g.fillRect(0,0,S,S);g.fillStyle='#141414';for(let i=-S;i<S*2;i+=64){g.beginPath();g.moveTo(i,0);g.lineTo(i+32,0);g.lineTo(i+32-S,S);g.lineTo(i-S,S);g.fill();}},
+  spectrum(g,S){for(let x=0;x<S;x++){g.fillStyle=`hsl(${x/S*360},70%,22%)`;g.fillRect(x,0,1,S);}},
+  'stripes-glow'(g,S){g.fillStyle='#000';g.fillRect(0,0,S,S);g.fillStyle='#fff';for(let i=-S;i<S*2;i+=48){g.beginPath();g.moveTo(i,0);g.lineTo(i+10,0);g.lineTo(i+10-S,S);g.lineTo(i-S,S);g.fill();}},
+};
+// shop camos the player owns (kino.mods.shop, read directly: camo.js is shared by every page)
+const shopOwned=()=>{try{return new Set(JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]);}catch{return new Set();}};
 const texCache=new Map();
 export function camoTexture(camo,base=import.meta.url){
   const key=camo.texture??('proc:'+camo.procedural+(camo.seed!=null?':'+camo.seed+':'+(camo.prestige??camo.tier):''));
@@ -184,7 +208,7 @@ export function classGuns(weapons,key){return Object.keys(weapons??{}).filter(id
 
 // ---- challenges -------------------------------------------------------------------------------
 export const camoProgress=(profile,id)=>profile.camo?.[id]?.p??{};
-const baseCamos=cats=>cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward);   // reward camos come from a map's reward flag (profile.rewards), not a challenge
+const baseCamos=cats=>cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward&&!c.shop);   // shop camos are bought (Phase 6)   // reward camos come from a map's reward flag (profile.rewards), not a challenge
 // a gun has Gold (its mastery) when every challenge camo is done
 export function hasMastery(cats,profile,id){const p=camoProgress(profile,id);return baseCamos(cats).every(c=>(p[c.challenge]??0)>=c.count);}
 // Diamond progress for a gun's class: guns with Gold / guns in the class
@@ -199,6 +223,7 @@ export function camoUnlocked(cats,profile,id,weapons){
   if(cp&&cp.total&&cp.done===cp.total)for(const c of cats.camos)if(c.classMastery)done.add(c.id);
   for(const c of cats.camos)if(c.reward&&profile.rewards?.[c.reward])done.add(c.id);
   for(const c of loadPrestige().camos)done.add(c);   // prestige camos: earned on one gun, worn on any
+  const owned=shopOwned();for(const c of cats.camos)if(c.shop&&owned.has(c.shop))done.add(c.id);   // shop camos: bought once, worn on any
   return done;
 }
 export function equippedCamo(cats,profile,id,weapons){

@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { Net } from '../../net.js';
 import { roundPopulation } from '../../rules.js';
 import { loadProfile, cloudReady } from '../../profile.js';
+import { cardSvg } from '../shop/card.js';
 import { startSocial, onSocial, socialState, request as friendRequest, invite as friendInvite, isFriend, isPending, statusText } from '../../social.js';
 import { loadCharacterRegistry, createCharacter, holdWeapon, applyStance } from '../../characters.js';
 
@@ -374,6 +375,7 @@ export default async function setup(api){
     #coop-lobby{position:fixed;inset:0;z-index:50;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,440px);gap:4vw;padding:6vh 6vw;box-sizing:border-box;
       background:linear-gradient(90deg,#070a0a 0%,#0a0c0b 55%,#080a09);font-family:Arial,Helvetica,sans-serif;color:#eee8dc;overflow:auto}
     #coop-lobby[hidden]{display:none}
+    #coop-lobby .pl.carded{position:relative;overflow:hidden}#coop-lobby .pl .cc{position:absolute;inset:0;opacity:.5;pointer-events:none;z-index:0}#coop-lobby .pl .cc svg{width:100%;height:100%;display:block}#coop-lobby .pl.carded>*:not(.cc){position:relative;z-index:1}
     #coop-lobby::before{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#ffffff02 0px,#ffffff02 1px,transparent 1px,transparent 3px)}
     #coop-lobby .l-left{align-self:center;position:relative}
     #coop-lobby .kicker{font-size:17px;font-weight:900;letter-spacing:1px}#coop-lobby .kicker span{font-size:11px;font-weight:400;letter-spacing:3px;margin-left:11px;color:#b82f27}
@@ -424,7 +426,7 @@ export default async function setup(api){
   function myInfo(){
     const c=window.kino.classes,st=window.kino.debug.getState();
     const pct=st.ready?100:Math.round(parseFloat(document.getElementById('load-progress')?.style.width)||0);
-    return {p:pct,op:window.kino.characterEntry?.name??registry.find(e=>e.id===profile.character)?.name??null,cls:c?.cls?.name??null,lvl:c?.state?.level??null,in:!!st.started};
+    return {p:pct,op:window.kino.characterEntry?.name??registry.find(e=>e.id===profile.character)?.name??null,cls:c?.cls?.name??null,lvl:c?.state?.level??null,in:!!st.started,cd:(({c1,c2,pattern})=>c1?{c1,c2,pattern}:null)(window.kino.cosmetics?.equipped?.card??{})};   // cd: the calling card (shop)
   }
   function renderLobby(){
     if(lobby.go){lob.hidden=true;return;}
@@ -436,7 +438,7 @@ export default async function setup(api){
       const tag=i.in?'<span class="tag in">IN GAME</span>':ready?'<span class="tag ok">READY</span>':`<span class="tag">LOADING ${pct}%</span>`;
       // ADD FRIEND: signed-in players who aren't friends yet (and only when I'm signed in)
       const soc=socialState(),add=p.id!==net.id&&p.uid&&soc.signedIn&&p.uid!==soc.me?.id?(isFriend(p.uid)?'<span class="fr-tag">FRIEND</span>':isPending(p.uid)?'<span class="fr-tag">REQUESTED</span>':`<button type="button" class="add" data-uid="${esc(p.uid)}">+ ADD FRIEND</button>`):'';
-      return `<div class="pl${p.id===net.id?' me':''}"><div class="av">${p.picture?`<img src="${esc(p.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${esc((p.name||'?')[0].toUpperCase())}'))">`:esc((p.name||'?')[0].toUpperCase())}</div>
+      return `<div class="pl${p.id===net.id?' me':''}${i.cd?' carded':''}">${i.cd?`<div class="cc">${cardSvg(i.cd,'','')}</div>`:''}<div class="av">${p.picture?`<img src="${esc(p.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${esc((p.name||'?')[0].toUpperCase())}'))">`:esc((p.name||'?')[0].toUpperCase())}</div>
         <div><div class="nm">${esc(p.name)}${p.id===net.hostId?'<em>HOST</em>':''}${p.id===net.id?'<em>YOU</em>':''}</div><div class="sub">${esc(sub)}</div>${ready?'':`<div class="bar"><i style="width:${pct}%"></i></div>`}${add}</div>${tag}</div>`;};
     // friends to invite: online ones not already here
     const soc=socialState(),here=new Set(all.map(p=>p.uid).filter(Boolean));

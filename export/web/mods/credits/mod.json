@@ -1,0 +1,5 @@
+{
+  "name": "Credits",
+  "description": "The Shop's currency (roadmap Phase 6): an end-of-match payout, daily and weekly challenges, first-time round milestones. Nothing is earned in a cheat game.",
+  "script": "mod.js"
+}

@@ -161,7 +161,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
         scene.add(m);bulb.model=m;}
       // its own small glow, shown while lit
       const hc=document.createElement('canvas');hc.width=hc.height=64;const hg=hc.getContext('2d'),hr=hg.createRadialGradient(32,32,0,32,32,32);
-      hr.addColorStop(0,'rgba(220,255,225,1)');hr.addColorStop(.2,'rgba(90,255,120,.8)');hr.addColorStop(.55,'rgba(40,220,80,.18)');hr.addColorStop(1,'rgba(20,200,60,0)');hg.fillStyle=hr;hg.fillRect(0,0,64,64);
+      hr.addColorStop(0,'rgba(255,255,255,1)');hr.addColorStop(.2,'rgba(235,255,240,.8)');hr.addColorStop(.55,'rgba(220,255,230,.18)');hr.addColorStop(1,'rgba(200,255,210,0)');   // white: tinted by the box glow colourhg.fillStyle=hr;hg.fillRect(0,0,64,64);
       const ht=new THREE.CanvasTexture(hc);ht.colorSpace=THREE.SRGBColorSpace;
       bulb.halo=new THREE.Sprite(new THREE.SpriteMaterial({map:ht,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0}));
       bulb.halo.position.copy(bulb.pos).addScaledVector(normal,4.5);bulb.halo.scale.setScalar(11);bulb.halo.renderOrder=6;scene.add(bulb.halo);
@@ -173,6 +173,9 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
   // A green light source at the lit bulb on the map behind each box location
   // (so the glow comes from the map, not mid-air), on while the box is there.
   const boxLamps=[];
+  // the box glow colour: green, or a shop map-glow (window.kino.boxGlow, Phase 6), applied at runtime (no rebake)
+  const BOX_GREEN=new THREE.Color(.25,1,.4),glowC=new THREE.Color();let glowKey=null;
+  const glowCol=()=>{const k=window.kino?.boxGlow??null;if(k!==glowKey){glowKey=k;glowC.copy(k?new THREE.Color(k):BOX_GREEN);for(const l of boxLamps)l.color.set(k??'#44ff6a');}return glowC;};
   for(const e of world.boxLocations??[]){
     const p=new THREE.Vector3(...e.position),own=mapBulbs.filter(b=>b.loc===e.script_noteworthy).sort((a,b)=>a.pos.distanceTo(p)-b.pos.distanceTo(p))[0];
     if(!own||own.pos.distanceTo(p)>400)continue;
@@ -506,8 +509,8 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
     {const moving=[...(api.mysteryBox?.boxes?.values()??[])].some(b=>b.roll?.teddy&&b.roll.ready);
      const here=world.activeBox?.script_noteworthy,power=session.power?1:.45;
      for(const b of mapBulbs){const on=moving?(Math.sin(t*23+b.pos.x)>.2?1:0):(world.fireSale||b.loc===here)?1:0;
-       for(const m of b.mats){m.emissive?.setRGB(.25*on*power,1*on*power,.4*on*power);if(m.emissive)m.emissiveIntensity=2.2;}
-       if(b.halo){b.halo.material.opacity=on*power*(.8+Math.sin(t*3)*.08);b.halo.visible=on>0;}}}
+       const gc=glowCol();for(const m of b.mats){m.emissive?.setRGB(gc.r*on*power,gc.g*on*power,gc.b*on*power);if(m.emissive)m.emissiveIntensity=2.2;}
+       if(b.halo){b.halo.material.color.copy(gc);b.halo.material.opacity=on*power*(.8+Math.sin(t*3)*.08);b.halo.visible=on>0;}}}
     if(boxBeam){
       // Beam upward from the box: the column is brightest at the box, fading into the air above.
       const p=world.boxBeam.position,key=p.x+','+p.z;

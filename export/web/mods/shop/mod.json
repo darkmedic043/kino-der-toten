@@ -1,0 +1,5 @@
+{
+  "name": "Shop cosmetics",
+  "description": "Applies the cosmetics bought in the Shop (roadmap Phase 6): reticles, hitmarkers, kill colours, HUD themes and portrait frames, hit-sound sets, the Mystery Box glow and your calling card in the pause menu. Looks and sounds only.",
+  "script": "mod.js"
+}

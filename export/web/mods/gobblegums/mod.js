@@ -82,7 +82,7 @@ export default async function setup(api){
     if(id==='equip_mint'){session.grenades=4;if(session.claymoresOwned)session.claymores=2;if(session.monkeysOwned)session.monkeys=3;}
     if(id==='ephemeral_enhancement')startEnhance();
     api.announce?.(g.name,rarity[g.rarity]?.name.toUpperCase()+' GOBBLEGUM',2.5);
-    gumSound(g.rarity);hud();
+    gumSound(g.rarity);hud();host.emit('gumChewed',{id});   // credits: challenges
   }
   addEventListener('keydown',e=>{
     if(e.repeat||!api.getState?.().active)return;

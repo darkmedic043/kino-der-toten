@@ -2159,6 +2159,81 @@
     "author": "the Cheese Cube map's makers",
     "note": "Rigged in Blender by .tools/build-armor-characters.py from the map's suit model; local only."
    }
+  },
+  {
+   "id": "outfit_crimson",
+   "name": "Test Subject (Crimson)",
+   "type": "mannequin",
+   "description": "The Test Subject in a crimson outfit (Shop).",
+   "color": "#5a1e1e",
+   "accent": "#c8302a",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#c8302a",
+    "glove": "#3a1414"
+   },
+   "handsFlat": true,
+   "shop": "outfit.crimson"
+  },
+  {
+   "id": "outfit_arctic",
+   "name": "Test Subject (Arctic)",
+   "type": "mannequin",
+   "description": "The Test Subject in a arctic outfit (Shop).",
+   "color": "#d8e2e8",
+   "accent": "#5fb8ff",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#5fb8ff",
+    "glove": "#a8b8c4"
+   },
+   "handsFlat": true,
+   "shop": "outfit.arctic"
+  },
+  {
+   "id": "outfit_toxic",
+   "name": "Test Subject (Toxic)",
+   "type": "mannequin",
+   "description": "The Test Subject in a toxic outfit (Shop).",
+   "color": "#2a3320",
+   "accent": "#8cff3a",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#8cff3a",
+    "glove": "#1e2618"
+   },
+   "handsFlat": true,
+   "shop": "outfit.toxic"
+  },
+  {
+   "id": "outfit_gilded",
+   "name": "Test Subject (Gilded)",
+   "type": "mannequin",
+   "description": "The Test Subject in a gilded outfit (Shop).",
+   "color": "#3a2e18",
+   "accent": "#f0c060",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#f0c060",
+    "glove": "#6a5428"
+   },
+   "handsFlat": true,
+   "shop": "outfit.gilded"
+  },
+  {
+   "id": "outfit_midnight",
+   "name": "Test Subject (Midnight)",
+   "type": "mannequin",
+   "description": "The Test Subject in a midnight outfit (Shop).",
+   "color": "#14161e",
+   "accent": "#5a5cff",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#5a5cff",
+    "glove": "#0c0d12"
+   },
+   "handsFlat": true,
+   "shop": "outfit.midnight"
   }
  ]
 }

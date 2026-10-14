@@ -13,6 +13,16 @@ import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } f
 import { weaponProgress, maxLevel } from './mods/weapon-levels/gunsmith.js';
 import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, canPrestigeWeapon, prestigeWeapon, canPrestigePlayer, prestigePlayer, prestigeBadge, roman, RULES as PRESTIGE, TIER_NAMES, PRESTIGE_COLORS } from './mods/prestige/prestige.js';
 import { camoById } from './mods/weapon-levels/camo.js';
+import { loadCredits, grantCredits, loadCreditsConfig } from './mods/credits/credits.js';
+import { loadCatalog as loadShopCatalog, cosmetics as shopCosmetics, installRewards } from './mods/shop/shop.js';
+import { cardSvg } from './mods/shop/card.js';
+installRewards();
+let creditsCfg=null,shopCat=null;
+loadCreditsConfig(new URL('mods/credits/',document.baseURI)).then(c=>{creditsCfg=c;}).catch(()=>{});
+loadShopCatalog(new URL('mods/shop/',document.baseURI)).then(c=>{shopCat=c;applyMenuTheme();try{renderProfile();}catch{}}).catch(e=>console.warn('[shop]',e));
+// a shop menu theme recolours the main menu's accent
+function applyMenuTheme(){if(!shopCat)return;const m=shopCosmetics(shopCat).menu?.menu;document.documentElement.style.setProperty('--red-hi',m||'');if(!m)document.documentElement.style.removeProperty('--red-hi');}
+addEventListener('kino-credits',()=>{try{renderProfile();}catch{}});
 import { loadResearchConfig } from './mods/research/research.js';
 import { renderResearch } from './mods/research/pane.js';
 let researchCfg=null;
@@ -106,6 +116,9 @@ function renderProfile(){
   $('p-xp').textContent=`${profile.xp.toLocaleString()} / ${need.toLocaleString()} XP`;$('p-char').textContent=c?.name??'';
   $('p-stats').textContent=`${profile.kills.toLocaleString()} kills · best round ${profile.bestRound||'—'} · ${profile.games} games`;
   // Phase 4: player prestige (badge, tokens, the button from PRESTIGE.playerLevel)
+  applyMenuTheme();
+  const chip=document.getElementById('credits-chip');if(chip)chip.textContent=loadCredits().balance.toLocaleString()+' CR';
+  {const cardEl=document.getElementById('p-card'),cd=shopCat&&shopCosmetics(shopCat).card;if(cardEl)cardEl.innerHTML=cd?cardSvg(cd,$('p-char')?.textContent||'Survivor','LEVEL '+profile.level):'';}
   const pr=loadPrestige(),n=pr.player.prestige,el=$('p-prestige');
   if(el){const can=canPrestigePlayer(pr,profile.level);
     $('p-level').innerHTML=(n?prestigeBadge(n,18)+`<span class="pr-n" style="color:${PRESTIGE_COLORS[Math.min(n,10)]}">P${roman(n)}</span> `:'')+'LEVEL '+profile.level;
@@ -118,10 +131,12 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-prestige]');if(!b)return;
   if(b.dataset.prestige==='player'){const pr=loadPrestige();if(!canPrestigePlayer(pr,profile.level)||!armed(b))return;
     prestigePlayer(pr,profile.level);savePrestige(pr);const st=loadProfile();st.level=1;st.xp=0;saveProfile(st);profile.level=1;profile.xp=0;
-    renderProfile();toast(`Prestige ${roman(pr.player.prestige)} · +1 prestige token · everything you unlocked stays`);return;}
+    const bonus=creditsCfg?.prestige?.player??0;if(bonus)grantCredits(bonus,`player prestige ${pr.player.prestige}`);
+    renderProfile();toast(`Prestige ${roman(pr.player.prestige)} · +1 prestige token${bonus?` · +${bonus} credits`:''} · everything you unlocked stays`);return;}
   const id=b.dataset.prestige,d=weapons[id];if(!d||!gunsmith)return;
   const pr=loadPrestige(),p=weaponProgress(loadProfile(),id),cap=maxLevel(gunsmith,d,id);if(!canPrestigeWeapon(pr,id,p.level,cap)||!armed(b))return;
   const r=prestigeWeapon(pr,id);savePrestige(pr);
+  {const bonus=creditsCfg?.prestige?.[r.tier]??0;if(bonus)grantCredits(bonus,`${d.name} ${TIER_NAMES[r.tier].toLowerCase()}`);}
   if(r.reset){const st=loadProfile();st.weaponXp={...st.weaponXp,[id]:{level:1,xp:0}};st.attachments={...st.attachments,[id]:[]};saveProfile(st);profile.weaponXp=st.weaponXp;profile.attachments=st.attachments;}
   toast(r.camo?`${d.name} · ${TIER_NAMES[r.tier]} · ${camoById(camoCats,r.camo)?.name} camo unlocked for every gun`:`${d.name} · PRESTIGE MASTER · earn Master levels for its animated camo`);
   b.closest('[data-prestige-for]')?.dispatchEvent(new CustomEvent('prestiged',{bubbles:true}));
@@ -478,7 +493,7 @@ function weaponBadges(id){
   const d=weapons[id],out=[],r=rarityById[rarityOf(config,id)];
   if(r)out.push(`<span class="b rar" style="--r:${r.color}">${esc(r.name.toUpperCase())}</span>`);
   if(gunsmith&&gunsmithHas(id)){const p=weaponProgress(profile,id),cap=maxLevel(gunsmith,d,id);out.push(`<span class="b lv">LV ${p.level}${p.level>=cap?' MAX':''}</span>`);}
-  if(camoCats){const u=camoUnlocked(camoCats,profile,id,weapons),n=camoCats.camos.filter(c=>u.has(c.id)).length;if(n)out.push(`<span class="b camo">CAMO ${n}/${camoCats.camos.length}</span>`);}
+  if(camoCats){const u=camoUnlocked(camoCats,profile,id,weapons),base=camoCats.camos.filter(c=>!c.shop&&!c.reward),n=base.filter(c=>u.has(c.id)).length;if(n)out.push(`<span class="b camo">CAMO ${n}/${base.length}</span>`);}
   const pt=weaponTier(loadPrestige(),id);if(pt)out.push(`<span class="b pr">${pt>=3?'MASTER '+(loadPrestige().weapons[id].mlevel??1):'P'+roman(pt)}</span>`);
   return out.join('');
 }

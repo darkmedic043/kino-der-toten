@@ -1,0 +1,661 @@
+{
+ "_note": "Phase 6 shop catalogue (prices are placeholders on the roadmap's scale: common 100-300, rare 400-700, epic 800-1,400, legendary 1,500-2,500). Cosmetic only. Items with rotating:true only show in the daily slots or the weekly bundle until owned; the rest are always listed. Camos are defined in mods/weapon-levels/camos.json (shop: <item id>) and outfits in mods/characters/characters.json (shop: <item id>). Music packs need the user's own music files, so none ship yet.",
+ "rarities": {
+  "common": "#9a9a9a",
+  "rare": "#4aa3ff",
+  "epic": "#b46bff",
+  "legendary": "#ff9a2e"
+ },
+ "categories": [
+  {
+   "id": "camo",
+   "name": "Weapon camos"
+  },
+  {
+   "id": "outfit",
+   "name": "Outfits"
+  },
+  {
+   "id": "reticle",
+   "name": "Reticles & hits"
+  },
+  {
+   "id": "theme",
+   "name": "HUD & menu themes"
+  },
+  {
+   "id": "sound",
+   "name": "Sound sets"
+  },
+  {
+   "id": "glow",
+   "name": "Map glow"
+  },
+  {
+   "id": "card",
+   "name": "Calling cards"
+  }
+ ],
+ "daily": 3,
+ "bundle": {
+  "size": 3,
+  "discount": 0.3
+ },
+ "items": [
+  {
+   "id": "camo.ember",
+   "cat": "camo",
+   "name": "Ember",
+   "price": 600,
+   "rarity": "rare",
+   "desc": "Glowing coals under black char.",
+   "data": {
+    "camo": "shop.ember"
+   }
+  },
+  {
+   "id": "camo.aurora",
+   "cat": "camo",
+   "name": "Aurora",
+   "price": 900,
+   "rarity": "epic",
+   "desc": "Northern-lights ribbons in green and violet.",
+   "data": {
+    "camo": "shop.aurora"
+   },
+   "rotating": true
+  },
+  {
+   "id": "camo.frostbite",
+   "cat": "camo",
+   "name": "Frostbite",
+   "price": 600,
+   "rarity": "rare",
+   "desc": "Cracked blue ice.",
+   "data": {
+    "camo": "shop.frostbite"
+   }
+  },
+  {
+   "id": "camo.circuit",
+   "cat": "camo",
+   "name": "Circuit",
+   "price": 700,
+   "rarity": "rare",
+   "desc": "Copper traces on a dark board.",
+   "data": {
+    "camo": "shop.circuit"
+   },
+   "rotating": true
+  },
+  {
+   "id": "camo.digitalrain",
+   "cat": "camo",
+   "name": "Digital Rain",
+   "price": 800,
+   "rarity": "epic",
+   "desc": "Falling green glyphs.",
+   "data": {
+    "camo": "shop.digitalrain"
+   },
+   "rotating": true
+  },
+  {
+   "id": "camo.chrome",
+   "cat": "camo",
+   "name": "Chrome",
+   "price": 1400,
+   "rarity": "epic",
+   "desc": "Mirror-polished metal.",
+   "data": {
+    "camo": "shop.chrome"
+   }
+  },
+  {
+   "id": "camo.brushed",
+   "cat": "camo",
+   "name": "Brushed Steel",
+   "price": 500,
+   "rarity": "rare",
+   "desc": "Fine directional grain.",
+   "data": {
+    "camo": "shop.brushed"
+   }
+  },
+  {
+   "id": "camo.spectrum",
+   "cat": "camo",
+   "name": "Spectrum",
+   "price": 2000,
+   "rarity": "legendary",
+   "desc": "Animated: a hue that slowly cycles across the gun.",
+   "data": {
+    "camo": "shop.spectrum"
+   },
+   "rotating": true
+  },
+  {
+   "id": "camo.pulse",
+   "cat": "camo",
+   "name": "Pulse",
+   "price": 1800,
+   "rarity": "legendary",
+   "desc": "Animated: light pulses through circuit traces.",
+   "data": {
+    "camo": "shop.pulse"
+   }
+  },
+  {
+   "id": "camo.hazard",
+   "cat": "camo",
+   "name": "Hazard",
+   "price": 300,
+   "rarity": "common",
+   "desc": "Yellow and black warning stripes.",
+   "data": {
+    "camo": "shop.hazard"
+   }
+  },
+  {
+   "id": "outfit.crimson",
+   "cat": "outfit",
+   "name": "Test Subject: Crimson",
+   "price": 600,
+   "rarity": "rare",
+   "desc": "A crimson outfit for the Test Subject: body, accent and first-person sleeves.",
+   "data": {
+    "character": "outfit_crimson"
+   }
+  },
+  {
+   "id": "outfit.arctic",
+   "cat": "outfit",
+   "name": "Test Subject: Arctic",
+   "price": 600,
+   "rarity": "rare",
+   "desc": "A arctic outfit for the Test Subject: body, accent and first-person sleeves.",
+   "data": {
+    "character": "outfit_arctic"
+   },
+   "rotating": true
+  },
+  {
+   "id": "outfit.toxic",
+   "cat": "outfit",
+   "name": "Test Subject: Toxic",
+   "price": 700,
+   "rarity": "rare",
+   "desc": "A toxic outfit for the Test Subject: body, accent and first-person sleeves.",
+   "data": {
+    "character": "outfit_toxic"
+   }
+  },
+  {
+   "id": "outfit.gilded",
+   "cat": "outfit",
+   "name": "Test Subject: Gilded",
+   "price": 900,
+   "rarity": "epic",
+   "desc": "A gilded outfit for the Test Subject: body, accent and first-person sleeves.",
+   "data": {
+    "character": "outfit_gilded"
+   },
+   "rotating": true
+  },
+  {
+   "id": "outfit.midnight",
+   "cat": "outfit",
+   "name": "Test Subject: Midnight",
+   "price": 800,
+   "rarity": "epic",
+   "desc": "A midnight outfit for the Test Subject: body, accent and first-person sleeves.",
+   "data": {
+    "character": "outfit_midnight"
+   }
+  },
+  {
+   "id": "reticle.dot",
+   "cat": "reticle",
+   "name": "Dot",
+   "price": 100,
+   "rarity": "common",
+   "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
+   "data": {
+    "char": "\u2022",
+    "color": "#ffffff"
+   }
+  },
+  {
+   "id": "reticle.circle",
+   "cat": "reticle",
+   "name": "Circle",
+   "price": 200,
+   "rarity": "common",
+   "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
+   "data": {
+    "char": "\u25ef",
+    "color": "#e8e4d8"
+   }
+  },
+  {
+   "id": "reticle.chevron",
+   "cat": "reticle",
+   "name": "Chevron",
+   "price": 300,
+   "rarity": "rare",
+   "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
+   "data": {
+    "char": "\u2303",
+    "color": "#7fd8ff"
+   },
+   "rotating": true
+  },
+  {
+   "id": "reticle.cross_red",
+   "cat": "reticle",
+   "name": "Red Cross",
+   "price": 150,
+   "rarity": "common",
+   "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
+   "data": {
+    "char": "\uff0b",
+    "color": "#ff5a48"
+   }
+  },
+  {
+   "id": "reticle.cross_green",
+   "cat": "reticle",
+   "name": "Green Cross",
+   "price": 150,
+   "rarity": "common",
+   "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
+   "data": {
+    "char": "\uff0b",
+    "color": "#6dff8a"
+   },
+   "rotating": true
+  },
+  {
+   "id": "reticle.diamond",
+   "cat": "reticle",
+   "name": "Diamond",
+   "price": 400,
+   "rarity": "rare",
+   "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
+   "data": {
+    "char": "\u25c7",
+    "color": "#f0c060"
+   }
+  },
+  {
+   "id": "hitmarker.gold",
+   "cat": "reticle",
+   "name": "Gold Hitmarker",
+   "price": 200,
+   "rarity": "common",
+   "desc": "Hitmarker shape and colour.",
+   "data": {
+    "hitmarker": "\u00d7",
+    "color": "#f0c060"
+   }
+  },
+  {
+   "id": "hitmarker.skull",
+   "cat": "reticle",
+   "name": "Skull Hitmarker",
+   "price": 400,
+   "rarity": "rare",
+   "desc": "Hitmarker shape and colour.",
+   "data": {
+    "hitmarker": "\u2620",
+    "color": "#ffffff"
+   }
+  },
+  {
+   "id": "hitmarker.crimson",
+   "cat": "reticle",
+   "name": "Crimson Hitmarker",
+   "price": 200,
+   "rarity": "common",
+   "desc": "Hitmarker shape and colour.",
+   "data": {
+    "hitmarker": "\u2715",
+    "color": "#ff4a3a"
+   }
+  },
+  {
+   "id": "kill.ectoplasm",
+   "cat": "reticle",
+   "name": "Ectoplasm Kills",
+   "price": 500,
+   "rarity": "rare",
+   "desc": "The colour zombies burst in when you hit and kill them.",
+   "data": {
+    "blood": "#5fff8a"
+   }
+  },
+  {
+   "id": "kill.void",
+   "cat": "reticle",
+   "name": "Void Kills",
+   "price": 700,
+   "rarity": "epic",
+   "desc": "The colour zombies burst in when you hit and kill them.",
+   "data": {
+    "blood": "#8a5cff"
+   }
+  },
+  {
+   "id": "kill.gold",
+   "cat": "reticle",
+   "name": "Golden Kills",
+   "price": 600,
+   "rarity": "rare",
+   "desc": "The colour zombies burst in when you hit and kill them.",
+   "data": {
+    "blood": "#f0c060"
+   }
+  },
+  {
+   "id": "hud.ember",
+   "cat": "theme",
+   "name": "Ember HUD",
+   "price": 500,
+   "rarity": "rare",
+   "desc": "Colours for the points, round counter and ammo ring.",
+   "data": {
+    "hud": {
+     "points": "#ff9a3d",
+     "round": "#ff5a1f",
+     "ring": "#ffb347"
+    }
+   }
+  },
+  {
+   "id": "hud.ice",
+   "cat": "theme",
+   "name": "Ice HUD",
+   "price": 500,
+   "rarity": "rare",
+   "desc": "Colours for the points, round counter and ammo ring.",
+   "data": {
+    "hud": {
+     "points": "#8fe3ff",
+     "round": "#5fb8ff",
+     "ring": "#bff0ff"
+    }
+   },
+   "rotating": true
+  },
+  {
+   "id": "hud.toxic",
+   "cat": "theme",
+   "name": "Toxic HUD",
+   "price": 600,
+   "rarity": "rare",
+   "desc": "Colours for the points, round counter and ammo ring.",
+   "data": {
+    "hud": {
+     "points": "#a8ff5a",
+     "round": "#5fd13a",
+     "ring": "#c8ff8a"
+    }
+   }
+  },
+  {
+   "id": "hud.royal",
+   "cat": "theme",
+   "name": "Royal HUD",
+   "price": 900,
+   "rarity": "epic",
+   "desc": "Colours for the points, round counter and ammo ring.",
+   "data": {
+    "hud": {
+     "points": "#c79bff",
+     "round": "#9b5cff",
+     "ring": "#e0c0ff"
+    }
+   }
+  },
+  {
+   "id": "theme.menu_teal",
+   "cat": "theme",
+   "name": "Teal Menu",
+   "price": 400,
+   "rarity": "common",
+   "desc": "Accent colour for the main menu.",
+   "data": {
+    "menu": "#3fd1c0"
+   }
+  },
+  {
+   "id": "theme.menu_gold",
+   "cat": "theme",
+   "name": "Gold Menu",
+   "price": 600,
+   "rarity": "rare",
+   "desc": "Accent colour for the main menu.",
+   "data": {
+    "menu": "#f0c060"
+   }
+  },
+  {
+   "id": "frame.frame_gold",
+   "cat": "theme",
+   "name": "Gold Frame",
+   "price": 400,
+   "rarity": "rare",
+   "desc": "A frame round your portrait on the HUD.",
+   "data": {
+    "frame": "#f0c060"
+   }
+  },
+  {
+   "id": "frame.frame_neon",
+   "cat": "theme",
+   "name": "Neon Frame",
+   "price": 600,
+   "rarity": "rare",
+   "desc": "A frame round your portrait on the HUD.",
+   "data": {
+    "frame": "#ff5fd7"
+   }
+  },
+  {
+   "id": "frame.frame_bone",
+   "cat": "theme",
+   "name": "Bone Frame",
+   "price": 300,
+   "rarity": "common",
+   "desc": "A frame round your portrait on the HUD.",
+   "data": {
+    "frame": "#e8dcc0"
+   }
+  },
+  {
+   "id": "sound.crunch",
+   "cat": "sound",
+   "name": "Crunch Hits",
+   "price": 300,
+   "rarity": "common",
+   "desc": "A different synthesised hit and kill thump.",
+   "data": {
+    "hits": {
+     "pitch": 0.8,
+     "knock": 1.3,
+     "cut": 1.2
+    }
+   }
+  },
+  {
+   "id": "sound.thock",
+   "cat": "sound",
+   "name": "Thock Hits",
+   "price": 400,
+   "rarity": "rare",
+   "desc": "A different synthesised hit and kill thump.",
+   "data": {
+    "hits": {
+     "pitch": 1.35,
+     "knock": 0.6,
+     "cut": 0.8
+    }
+   }
+  },
+  {
+   "id": "sound.ping",
+   "cat": "sound",
+   "name": "Ping Hits",
+   "price": 500,
+   "rarity": "rare",
+   "desc": "A different synthesised hit and kill thump.",
+   "data": {
+    "hits": {
+     "pitch": 2.4,
+     "knock": 0.3,
+     "cut": 2.2
+    }
+   }
+  },
+  {
+   "id": "sound.heavy",
+   "cat": "sound",
+   "name": "Heavy Hits",
+   "price": 600,
+   "rarity": "rare",
+   "desc": "A different synthesised hit and kill thump.",
+   "data": {
+    "hits": {
+     "pitch": 0.6,
+     "knock": 1.6,
+     "cut": 0.6
+    }
+   }
+  },
+  {
+   "id": "glow.crimson",
+   "cat": "glow",
+   "name": "Crimson Box Glow",
+   "price": 400,
+   "rarity": "rare",
+   "desc": "The colour of the Mystery Box's map bulb and light.",
+   "data": {
+    "box": "#ff3a2a"
+   }
+  },
+  {
+   "id": "glow.violet",
+   "cat": "glow",
+   "name": "Violet Box Glow",
+   "price": 500,
+   "rarity": "rare",
+   "desc": "The colour of the Mystery Box's map bulb and light.",
+   "data": {
+    "box": "#a46bff"
+   },
+   "rotating": true
+  },
+  {
+   "id": "glow.gold",
+   "cat": "glow",
+   "name": "Gold Box Glow",
+   "price": 700,
+   "rarity": "epic",
+   "desc": "The colour of the Mystery Box's map bulb and light.",
+   "data": {
+    "box": "#ffc23a"
+   }
+  },
+  {
+   "id": "glow.ice",
+   "cat": "glow",
+   "name": "Ice Box Glow",
+   "price": 400,
+   "rarity": "rare",
+   "desc": "The colour of the Mystery Box's map bulb and light.",
+   "data": {
+    "box": "#7fd8ff"
+   }
+  },
+  {
+   "id": "card.dusk",
+   "cat": "card",
+   "name": "Dusk",
+   "price": 150,
+   "rarity": "common",
+   "desc": "A calling card shown on your profile, in the pause menu and in the co-op lobby.",
+   "data": {
+    "c1": "#2a1a3a",
+    "c2": "#ff7a3d",
+    "pattern": "stripes"
+   }
+  },
+  {
+   "id": "card.abyss",
+   "cat": "card",
+   "name": "Abyss",
+   "price": 300,
+   "rarity": "rare",
+   "desc": "A calling card shown on your profile, in the pause menu and in the co-op lobby.",
+   "data": {
+    "c1": "#05101c",
+    "c2": "#2f8cff",
+    "pattern": "rings"
+   }
+  },
+  {
+   "id": "card.melon",
+   "cat": "card",
+   "name": "Melon",
+   "price": 400,
+   "rarity": "rare",
+   "desc": "A calling card shown on your profile, in the pause menu and in the co-op lobby.",
+   "data": {
+    "c1": "#1d3a14",
+    "c2": "#ff4f6a",
+    "pattern": "seeds"
+   }
+  },
+  {
+   "id": "card.static",
+   "cat": "card",
+   "name": "Static",
+   "price": 250,
+   "rarity": "common",
+   "desc": "A calling card shown on your profile, in the pause menu and in the co-op lobby.",
+   "data": {
+    "c1": "#1a1a1a",
+    "c2": "#9a9a9a",
+    "pattern": "noise"
+   },
+   "rotating": true
+  },
+  {
+   "id": "card.nebula",
+   "cat": "card",
+   "name": "Nebula",
+   "price": 500,
+   "rarity": "epic",
+   "desc": "A calling card shown on your profile, in the pause menu and in the co-op lobby.",
+   "data": {
+    "c1": "#140826",
+    "c2": "#c45bff",
+    "pattern": "stars"
+   },
+   "rotating": true
+  },
+  {
+   "id": "card.blood_moon",
+   "cat": "card",
+   "name": "Blood Moon",
+   "price": 500,
+   "rarity": "epic",
+   "desc": "A calling card shown on your profile, in the pause menu and in the co-op lobby.",
+   "data": {
+    "c1": "#1a0505",
+    "c2": "#ff2a2a",
+    "pattern": "moon"
+   }
+  }
+ ]
+}

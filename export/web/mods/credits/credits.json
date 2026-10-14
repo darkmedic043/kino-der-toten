@@ -1,0 +1,113 @@
+{
+  "_note": "Phase 6 credits (placeholders to tune). payout: end-of-match credits = perRoundOver5 x (rounds past 5) + perKill x kills, capped at cap; nothing in a cheat game or on noPayoutMaps. milestones: the first time you reach each round on a map. prestige: weapon Prestige I / II / Master and each player prestige. Challenges: 3 daily (reset at local midnight) and 3 weekly (reset Monday), drawn from the pool with the date as the seed; `stat` is what counts, `n` the goal (weekly goals are weeklyMul times the daily ones).",
+  "payout": {
+    "perRoundOver5": 15,
+    "perKill": 0.5,
+    "cap": 400
+  },
+  "noPayoutMaps": [
+    "sandbox"
+  ],
+  "milestones": {
+    "10": 100,
+    "20": 250,
+    "30": 500,
+    "50": 1000
+  },
+  "prestige": {
+    "1": 300,
+    "2": 500,
+    "3": 1000,
+    "player": 1000
+  },
+  "daily": 75,
+  "weekly": 200,
+  "weeklyMul": 4,
+  "challenges": [
+    {
+      "id": "kills",
+      "stat": "kills",
+      "n": 150,
+      "text": "Kill {n} zombies"
+    },
+    {
+      "id": "headshots",
+      "stat": "headshots",
+      "n": 50,
+      "text": "Get {n} headshot kills"
+    },
+    {
+      "id": "pistolHeads",
+      "stat": "pistolHeadshots",
+      "n": 15,
+      "text": "Get {n} headshot kills with a pistol"
+    },
+    {
+      "id": "melee",
+      "stat": "melee",
+      "n": 15,
+      "text": "Get {n} melee kills"
+    },
+    {
+      "id": "round",
+      "stat": "bestRound",
+      "n": 12,
+      "max": true,
+      "text": "Reach round {n}"
+    },
+    {
+      "id": "rounds",
+      "stat": "rounds",
+      "n": 10,
+      "text": "Survive {n} rounds"
+    },
+    {
+      "id": "gums",
+      "stat": "gums",
+      "n": 5,
+      "text": "Chew {n} gobblegums"
+    },
+    {
+      "id": "ability",
+      "stat": "ability",
+      "n": 6,
+      "text": "Use your class action skill {n} times"
+    },
+    {
+      "id": "procs",
+      "stat": "ammoProcs",
+      "n": 40,
+      "text": "Trigger your ammo mod {n} times"
+    },
+    {
+      "id": "perks",
+      "stat": "perks",
+      "n": 6,
+      "text": "Drink {n} perks"
+    },
+    {
+      "id": "box",
+      "stat": "box",
+      "n": 4,
+      "text": "Take {n} guns from the Mystery Box"
+    },
+    {
+      "id": "pap",
+      "stat": "pap",
+      "n": 2,
+      "text": "Pack-a-Punch {n} guns"
+    },
+    {
+      "id": "explosive",
+      "stat": "explosive",
+      "n": 30,
+      "text": "Get {n} explosive kills"
+    },
+    {
+      "id": "points",
+      "stat": "points",
+      "n": 25000,
+      "text": "Earn {n} points"
+    }
+  ]
+}

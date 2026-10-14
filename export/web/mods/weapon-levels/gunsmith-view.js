@@ -225,9 +225,9 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       const has=slots.includes(s),eq=on.find(a=>cat.attachments.find(x=>x.id===a)?.slot===s);
       return `<button class="slot${s===slot?' sel':''}${has?'':' na'}${eq?'':' empty'}" data-slot="${s}">
         <div class="ico">${cat.slots[s].slice(0,2).toUpperCase()}</div><div><span>${esc(cat.slots[s].toUpperCase())}</span><strong>${has?esc(eq?nameOf(eq):'None'):'—'}</strong></div></button>`;}).join('');
-    if(cats){const c=equippedCamo(cats,profile,id,weapons),unl=camoUnlocked(cats,profile,id,weapons),done=cats.camos.filter(k=>!k.reward&&unl.has(k.id)).length,special=cats.camos.filter(k=>k.reward&&unl.has(k.id)).length;
+    if(cats){const c=equippedCamo(cats,profile,id,weapons),unl=camoUnlocked(cats,profile,id,weapons),done=cats.camos.filter(k=>!k.reward&&!k.shop&&unl.has(k.id)).length,special=cats.camos.filter(k=>k.reward&&unl.has(k.id)).length;
       $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CAMO</h3><button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
-        <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward).length} UNLOCKED${special?` · ${special} SPECIAL`:''}${loadPrestige().camos.length?` · ${loadPrestige().camos.length} PRESTIGE`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
+        <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward&&!k.shop).length} UNLOCKED${special?` · ${special} SPECIAL`:''}${loadPrestige().camos.length?` · ${loadPrestige().camos.length} PRESTIGE`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
     $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc(cat.slots[s].toUpperCase())}</i></div>`).join('');
     renderOptions();renderStats();
     $('.stats').style.display=slot==='camo'?'none':'';   // camos don't change stats; the list needs the room
@@ -239,19 +239,25 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   let camoTab='challenge';
   function renderCamos(el){
     const done=camoUnlocked(cats,profile,id,weapons),p=camoProgress(profile,id),on=equippedCamo(cats,profile,id,weapons)?.id,base=cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward),cp=classProgress(cats,profile,id,weapons);
-    const challenge=cats.camos.filter(c=>!c.reward&&(!c.classMastery||cp)),special=cats.camos.filter(c=>c.reward);
+    const challenge=cats.camos.filter(c=>!c.reward&&!c.shop&&(!c.classMastery||cp)),special=cats.camos.filter(c=>c.reward),shop=cats.camos.filter(c=>c.shop);
     // Phase 4: this gun's three prestige camos, then every prestige camo earned on other guns
     const pr=loadPrestige(),mine=[1,2,3].map(t=>camoById(cats,prestigeCamoId(t,id))),others=pr.camos.filter(c=>!c.endsWith(':'+id)).map(c=>camoById(cats,c)).filter(Boolean);
     const prestige=[...mine,...others];
-    const shown=camoTab==='special'?special:camoTab==='prestige'?prestige:challenge,count=l=>`${l.filter(c=>done.has(c.id)).length} / ${l.length}`;
+    const shown=camoTab==='special'?special:camoTab==='prestige'?prestige:camoTab==='shop'?shop:challenge,count=l=>`${l.filter(c=>done.has(c.id)).length} / ${l.length}`;
     el.innerHTML='<h3>CAMO</h3>'+
       `<div class="ctabs"><button class="ctab${camoTab==='challenge'?' on':''}" data-ctab="challenge">CHALLENGE<small>${count(challenge)}</small></button>`+
       (special.length?`<button class="ctab${camoTab==='special'?' on':''}" data-ctab="special">SPECIAL<small>${count(special)}</small></button>`:'')+
-      `<button class="ctab${camoTab==='prestige'?' on':''}" data-ctab="prestige">PRESTIGE<small>${prestige.filter(c=>done.has(c.id)).length}</small></button>`+`</div>`+
+      `<button class="ctab${camoTab==='prestige'?' on':''}" data-ctab="prestige">PRESTIGE<small>${prestige.filter(c=>done.has(c.id)).length}</small></button>`+
+      (shop.length?`<button class="ctab${camoTab==='shop'?' on':''}" data-ctab="shop">SHOP<small>${shop.filter(c=>done.has(c.id)).length}</small></button>`:'')+`</div>`+
+      (camoTab==='shop'?'<p class="neu">Bought in the Shop (main menu). Every shop camo works on every gun.</p>':'')+
       (camoTab==='prestige'?`<p class="neu">Prestige this gun in the Armory to earn its camos. Earned prestige camos work on every gun.${pr.player.tokens?` You have ${pr.player.tokens} prestige token${pr.player.tokens>1?'s':''}: a token unlocks a Prestige I or II camo.`:''}</p>`:'')+
       `<button class="opt${on?'':' on'}" data-camo=""><strong>None</strong><div class="pc"><span class="neu">Factory finish</span></div></button>`+
       (camoTab==='special'&&!special.length?'<p class="neu">No special camos yet.</p>':'')+
       shown.map(c=>{const locked=!done.has(c.id);
+        if(c.shop){   // shop camos (Phase 6): owned or not
+          return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}${c.anim?' anim':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'SHOP':''}</span>
+            <div class="camo-row"><i class="sw" style="background-image:url(${swatch(c)})${c.anim?`;--a:rgb(${c.anim.c1.map(v=>Math.round(v*255))});--b:rgb(${c.anim.c2.map(v=>Math.round(v*255))})`:''}"></i><div><strong>${esc(c.name)}</strong>
+            <div class="pc"><span class="${locked?'neu':'pro'}">${locked?'Buy it in the Shop':'Owned'}</span></div></div></div></button>`;}
         if(c.prestige){   // prestige camos: earned by prestiging the gun (or a token), Master by Master levels
           const own=c.owner===id,w=pr.weapons[c.owner]??{},tier=w.tier??0,mlv=w.mlevel??0,gun=weapons[c.owner]?.name??c.owner;
           const have=c.prestige===3?Math.min(PRESTIGE.masterCamoAt,tier>=3?mlv:0):tier>=c.prestige?1:0,need=c.prestige===3?PRESTIGE.masterCamoAt:1;

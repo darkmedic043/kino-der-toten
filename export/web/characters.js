@@ -22,7 +22,9 @@ export async function loadCharacterRegistry(){
   // rebuilt model must not be served stale.
   const present=await Promise.all(all.map(c=>c.optional&&c.url?fetch(c.url,{method:'HEAD',cache:'no-store'}).then(r=>{
     if(!r.ok)return false;const m=r.headers.get('last-modified');if(m)c.url+=(c.url.includes('?')?'&':'?')+'v='+Date.parse(m);return true;}).catch(()=>false):true));
-  return all.filter((c,i)=>present[i]);
+  // Shop outfits (Phase 6, entries with "shop": <catalog item id>) are listed once owned (kino.mods.shop)
+  let owned=new Set();try{owned=new Set(JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]);}catch{}
+  return all.filter((c,i)=>present[i]&&(!c.shop||owned.has(c.shop)));
 }
 
 // First-person arms. They must be rigged to the T5 viewmodel skeleton, so a
