@@ -2,7 +2,8 @@
 // starting weapons and passive bonuses. Tuning lives in progression.json; the
 // profile (shared with the main menu) is in ../../profile.js.
 import { makeWeapon } from '../../rules.js';
-import { loadProfile, saveProfile, xpToNext as curve, unlocks as unlocksFor, validLoadout, cloudReady } from '../../profile.js';
+import { loadProfile, saveProfile, xpToNext as curve, unlocks as unlocksFor, validLoadout, boxFilter, cloudReady } from '../../profile.js';
+import { loadModel } from '../../animation.js';
 
 export default async function setup(api){
   const {data,session,host,mod}=api;
@@ -25,11 +26,11 @@ export default async function setup(api){
   addEventListener('pagehide',()=>save(true));
 
   // ---- Applying the loadout to each new game -------------------------------
-  let active={primary:'m1911_zm',secondary:'',bonuses:new Set()};
+  let active={primary:'m1911_zm',bonuses:new Set()};
   function applyLoadout(){
     const l=validLoadout(config,profile,data.weapons);active={...l,bonuses:new Set(l.bonuses)};
     const full=active.bonuses.has('bandolier');
-    session.inventory=[active.primary,active.secondary].filter(Boolean).map(id=>makeWeapon(data.weapons[id],full));
+    session.inventory=[makeWeapon(data.weapons[active.primary],full)];   // one starting slot, a pistol
     session.slot=0;
     if(active.bonuses.has('deep_pockets'))session.points+=bonuses.deep_pockets.value;
     // the loadout's tactical (Monkey Bombs, or the Gersh/QED from the moon-equipment mod)
@@ -37,6 +38,20 @@ export default async function setup(api){
   }
   host.on('reset',applyLoadout);
   applyLoadout();await api.equipView();
+
+  // ---- The Mystery Box list (edited in the main menu's Loadout pane) -----------------
+  // mystery-box.js reads window.kino.boxList on every roll: what this player switched on,
+  // weighted by rarity. Lethals aren't guns: the box hands them out through giveWeapon.
+  const owned=id=>id==='frag_grenade_zm'?session.grenades>=4:id==='claymore_zm'?!!session.claymoresOwned:false;
+  Object.defineProperty(window.kino,'boxList',{configurable:true,get:()=>({...boxFilter(config,profile,data),owned})});
+  const giveWeapon=session.giveWeapon.bind(session);
+  session.giveWeapon=(id,...rest)=>{
+    if(id==='frag_grenade_zm'){session.grenades=4;return true;}
+    if(id==='claymore_zm'){session.claymoresOwned=true;session.claymores=2;return true;}
+    return giveWeapon(id,...rest);
+  };
+  if(api.mysteryBox)for(const id of ['frag_grenade_zm','claymore_zm'])if(data.equipment?.[id]?.worldModel&&!api.mysteryBox.models[id])
+    loadModel(data.equipment[id].worldModel).then(m=>{api.mysteryBox.models[id]=m;}).catch(e=>console.warn('[progression] box model',id,e));
 
   host.on('beforeDamage',e=>{if(active.bonuses.has('iron_skin'))e.amount*=1-bonuses.iron_skin.value;});
   host.on('beforePoints',e=>{if(active.bonuses.has('scavenger')&&e.amount>0)e.amount=Math.round(e.amount*(1+bonuses.scavenger.value));});
@@ -56,7 +71,6 @@ export default async function setup(api){
       const now=unlocked(profile.level);
       const news=[...now.weapons.filter(id=>!before.weapons.includes(id)).map(id=>data.weapons[id].name),
         ...now.bonuses.filter(id=>!before.bonuses.includes(id)).map(id=>bonuses[id].name),
-        ...(now.secondary&&!before.secondary?['Second loadout weapon']:[]),
         ...(now.bonusSlots>before.bonusSlots?['Second bonus slot']:[])];
       api.announce('Level '+profile.level,'RANK UP',4);
       if(news.length)api.toast('Unlocked: '+news.join(', '),5);
@@ -91,7 +105,7 @@ export default async function setup(api){
   document.querySelector('#menu .menu-controls')?.before(panel);
   function renderMenu(){
     const l=validLoadout(config,profile,data.weapons),need=xpToNext(profile.level);
-    const names=[l.primary,l.secondary].filter(Boolean).map(id=>data.weapons[id].name).join(' + ');
+    const names=data.weapons[l.primary].name;
     const perks=l.bonuses.map(id=>bonuses[id].name).join(', ')||'No bonus';
     panel.innerHTML=`
       <div class="head"><span class="eyebrow">LOADOUT</span><strong>LEVEL ${profile.level}</strong><span class="xp">${profile.xp} / ${need} XP</span></div>

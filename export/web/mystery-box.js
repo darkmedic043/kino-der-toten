@@ -28,12 +28,18 @@ export class MysteryBox {
   start(e){
     const b=this.boxes.get(e.id);if(!b||b.roll||b.closing)return false;
     const sale=this.session.effects.fire_sale>this.session.time;
-    const pool=(this.data.boxPool??Object.keys(this.models)).filter(k=>k!=='teddy'&&this.models[k]&&!this.session.inventory.some(w=>w.id===k&&!w.lost)&&!(k==='zombie_cymbal_monkey'&&this.session.monkeysOwned));
+    const full=(this.data.boxPool??Object.keys(this.models)).filter(k=>k!=='teddy'&&this.models[k]&&!this.session.inventory.some(w=>w.id===k&&!w.lost)&&!(k==='zombie_cymbal_monkey'&&this.session.monkeysOwned));
+    // the player's own box list and rarity weights (fork: progression mod, globalThis.kino.boxList); an empty list falls back to the full pool
+    const list=globalThis.kino?.boxList,owned=k=>this.session.inventory.some(w=>w.id===k&&!w.lost)||list?.owned?.(k);
+    const mine=list?[...new Set([...full,...(list.extra??[])])].filter(k=>this.models[k]&&list.allowed(k)&&!owned(k)):full;
+    const pool=mine.length?mine:full;
     if(!pool.length)return false;
     if(!sale)this.uses++;
     const chance=this.uses<4?0:this.uses<8?.15:!this.moves?1:this.uses<13?.3:.5;
     const teddy=!sale&&this.session.random()<chance;
-    b.roll={weapon:pool[Math.floor(this.session.random()*pool.length)],ready:false,time:this.session.time+cycleTime,expires:this.session.time+cycleTime+offerTime,started:this.session.time,sale,teddy,pool};
+    const weights=pool.map(k=>list?.weight?.(k)??1);let pick=this.session.random()*weights.reduce((a,b)=>a+b,0),weapon=pool.at(-1);
+    for(let i=0;i<pool.length;i++){pick-=weights[i];if(pick<0){weapon=pool[i];break;}}
+    b.roll={weapon,ready:false,time:this.session.time+cycleTime,expires:this.session.time+cycleTime+offerTime,started:this.session.time,sale,teddy,pool};
     b.opening=0;this.world.openBoxes.add(b.id);this.world.updateBox();this.audio.event('box/open/open_00');this.audio.event('box/music_box/music_box_00',.7);return true;
   }
   take(e){const b=this.boxes.get(e.id);if(!b?.roll?.ready||b.roll.teddy)return null;const weapon=b.roll.weapon;this.close(b);return weapon;}

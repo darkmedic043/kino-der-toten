@@ -5,7 +5,7 @@ import { mountParts as mountGunParts } from './mounts.js';
 // IR, and working underbarrels on key 5). Equip them in the main menu's
 // Loadout → Gunsmith, or in the pause menu for the gun in hand. Rules and
 // the UI are in gunsmith.js; tuning in attachments.json.
-import { loadProfile, saveProfile, cloudReady } from '../../profile.js';
+import { loadProfile, saveProfile, cloudReady, loadProgression, gunsmithLevel } from '../../profile.js';
 import { setupFlamer } from './flamer.js';
 import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress, camoTime, PAP_CAMO } from './camo.js';
 import { openGunsmith } from './gunsmith-view.js';
@@ -20,7 +20,8 @@ export default async function setup(api){
   const style=document.createElement('style');style.textContent=GUNSMITH_CSS+`
     #weapon-level{position:fixed;right:40px;bottom:112px;display:flex;align-items:center;gap:8px;font:600 9px/1 system-ui,sans-serif;letter-spacing:2px;color:#d6a94a;pointer-events:none;z-index:3}
     #weapon-level i{display:block;width:70px;height:3px;background:#ffffff1f}#weapon-level i b{display:block;height:100%;background:#d6a94a}
-    #gunsmith-panel{margin:10px 0}`;
+    #gunsmith-panel{margin:10px 0}
+    #gunsmith-panel .gs-locked{margin:0;font-size:11px;font-weight:600;letter-spacing:.08em;color:#9a9a9a}`;
   document.head.append(style);
 
   let profile=loadProfile();
@@ -155,6 +156,8 @@ export default async function setup(api){
   renderHud();
 
   // ---- pause menu: gunsmith for the gun in hand -------------------------------------
+  // Levelling up opens guns in the Gunsmith (progression.json: a kit gun's `gunsmith` level, else its unlock level)
+  const unlockCfg=await loadProgression().catch(()=>null),smithAt=id=>unlockCfg?gunsmithLevel(unlockCfg,id):1;
   const panel=document.createElement('div');panel.id='gunsmith-panel';
   (document.getElementById('loadout-panel')??document.querySelector('#menu .menu-controls'))?.after(panel);
   panel.addEventListener('click',e=>e.stopPropagation());
@@ -163,6 +166,7 @@ export default async function setup(api){
     const lp=document.getElementById('loadout-panel');if(lp&&lp.nextElementSibling!==panel)lp.after(panel);
     const id=session.weapon?.id,def=data.weapons[id];
     if(!def||session.attachmentMode){panel.innerHTML='';return;}
+    if((profile.level??1)<smithAt(id)){panel.innerHTML=`<p class="gs-locked">GUNSMITH · ${def.name} opens at level ${smithAt(id)}</p>`;return;}
     renderGunsmith(panel,{cat,def,id,profile,compact:true,onOpen:()=>openGunsmith({cat,weapons:data.weapons,profile,id,ids:[id],
       onChange:()=>{save();apply();api.equipView?.();renderHud();},onClose:renderPanel})});
   }

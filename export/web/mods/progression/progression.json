@@ -10,232 +10,397 @@
     "base": 100,
     "exponent": 1.15
   },
-  "secondaryLevel": 5,
   "secondBonusLevel": 25,
+  "rarities": [
+    {
+      "id": "common",
+      "name": "Common",
+      "color": "#c9c9c9",
+      "weight": 1.3
+    },
+    {
+      "id": "uncommon",
+      "name": "Uncommon",
+      "color": "#5fd068",
+      "weight": 1.2
+    },
+    {
+      "id": "rare",
+      "name": "Rare",
+      "color": "#4aa3ff",
+      "weight": 1
+    },
+    {
+      "id": "epic",
+      "name": "Epic",
+      "color": "#b46bff",
+      "weight": 0.85
+    },
+    {
+      "id": "legendary",
+      "name": "Legendary",
+      "color": "#ff9a2e",
+      "weight": 0.7
+    },
+    {
+      "id": "wonder",
+      "name": "Wonder Weapon",
+      "color": "#ff3d6e",
+      "weight": 0.55
+    }
+  ],
   "weapons": [
     {
       "id": "m1911_zm",
-      "level": 1
+      "rarity": "common",
+      "kit": true,
+      "gunsmith": 1
     },
     {
       "id": "rottweil72_zm",
-      "level": 2
+      "rarity": "common",
+      "kit": true,
+      "gunsmith": 2
     },
     {
       "id": "m14_zm",
-      "level": 3
+      "rarity": "common",
+      "kit": true,
+      "gunsmith": 3
     },
     {
       "id": "mp5k_zm",
-      "level": 4
+      "rarity": "common",
+      "kit": true,
+      "gunsmith": 4
     },
     {
       "id": "mp40_zm",
-      "level": 6
-    },
-    {
-      "id": "bo3_ak117",
-      "level": 6
+      "rarity": "common",
+      "kit": true,
+      "gunsmith": 6
     },
     {
       "id": "ak74u_zm",
-      "level": 8
+      "rarity": "uncommon",
+      "kit": true,
+      "gunsmith": 8
     },
     {
-      "id": "bo3_sa80",
-      "level": 8
+      "id": "cz75_zm",
+      "rarity": "uncommon",
+      "kit": true,
+      "gunsmith": 9
     },
     {
       "id": "spectre_zm",
-      "level": 10
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 10
+    },
+    {
+      "id": "m16_zm",
+      "rarity": "uncommon",
+      "kit": true,
+      "gunsmith": 12
+    },
+    {
+      "id": "mpl_zm",
+      "rarity": "uncommon",
+      "kit": true,
+      "gunsmith": 13
+    },
+    {
+      "id": "pm63_zm",
+      "rarity": "uncommon",
+      "kit": true,
+      "gunsmith": 14
+    },
+    {
+      "id": "famas_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 16
+    },
+    {
+      "id": "ithaca_zm",
+      "rarity": "uncommon",
+      "kit": true,
+      "gunsmith": 18
+    },
+    {
+      "id": "fnfal_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 20
+    },
+    {
+      "id": "galil_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 21
+    },
+    {
+      "id": "commando_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 23
+    },
+    {
+      "id": "aug_acog_zm",
+      "rarity": "epic",
+      "kit": true,
+      "gunsmith": 24
+    },
+    {
+      "id": "g11_lps_zm",
+      "rarity": "epic",
+      "kit": true,
+      "gunsmith": 25
+    },
+    {
+      "id": "spas_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 26
+    },
+    {
+      "id": "hs10_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 28
+    },
+    {
+      "id": "cz75dw_zm",
+      "rarity": "epic",
+      "kit": true,
+      "gunsmith": 29
+    },
+    {
+      "id": "python_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 30
+    },
+    {
+      "id": "dragunov_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 32
+    },
+    {
+      "id": "rpk_zm",
+      "rarity": "epic",
+      "kit": true,
+      "gunsmith": 34
+    },
+    {
+      "id": "l96a1_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 35
+    },
+    {
+      "id": "hk21_zm",
+      "rarity": "epic",
+      "kit": true,
+      "gunsmith": 36
+    },
+    {
+      "id": "m72_law_zm",
+      "rarity": "rare",
+      "kit": true,
+      "gunsmith": 37
+    },
+    {
+      "id": "china_lake_zm",
+      "rarity": "epic",
+      "kit": true,
+      "gunsmith": 38
+    },
+    {
+      "id": "knife_ballistic_zm",
+      "rarity": "uncommon",
+      "kit": true,
+      "gunsmith": 39
+    },
+    {
+      "id": "crossbow_explosive_zm",
+      "rarity": "epic",
+      "kit": true,
+      "gunsmith": 41
+    },
+    {
+      "id": "ray_gun_zm",
+      "rarity": "wonder",
+      "kit": true,
+      "gunsmith": 45
+    },
+    {
+      "id": "thundergun_zm",
+      "rarity": "wonder",
+      "kit": true,
+      "gunsmith": 50
+    },
+    {
+      "id": "bo3_ak117",
+      "rarity": "rare",
+      "level": 6
+    },
+    {
+      "id": "bo3_sa80",
+      "rarity": "rare",
+      "level": 8
     },
     {
       "id": "bo3_mp7_flanker",
+      "rarity": "rare",
       "level": 10
     },
     {
       "id": "bo3_smg5_tool",
+      "rarity": "rare",
       "level": 11
     },
     {
-      "id": "m16_zm",
-      "level": 12
-    },
-    {
       "id": "bo3_g18_death",
+      "rarity": "epic",
       "level": 12
-    },
-    {
-      "id": "mpl_zm",
-      "level": 13
-    },
-    {
-      "id": "pm63_zm",
-      "level": 14
     },
     {
       "id": "bo3_umg_dmz",
+      "rarity": "rare",
       "level": 14
     },
     {
       "id": "bo3_93r_dystopic",
+      "rarity": "rare",
       "level": 15
     },
     {
-      "id": "famas_zm",
-      "level": 16
-    },
-    {
       "id": "bo3_spas12_irradiated",
+      "rarity": "epic",
       "level": 17
     },
     {
-      "id": "ithaca_zm",
-      "level": 18
-    },
-    {
       "id": "bo3_p90_orbit",
+      "rarity": "epic",
       "level": 18
     },
     {
       "id": "bo3_f2000_tech",
+      "rarity": "epic",
       "level": 19
     },
     {
       "id": "bo3_uzi_irradiated",
+      "rarity": "rare",
       "level": 20
     },
     {
-      "id": "galil_zm",
-      "level": 21
-    },
-    {
       "id": "bo3_m1014_jellyfish",
+      "rarity": "rare",
       "level": 22
     },
     {
-      "id": "commando_zm",
-      "level": 23
-    },
-    {
       "id": "bo3_k9_heaven",
+      "rarity": "epic",
       "level": 23
-    },
-    {
-      "id": "aug_acog_zm",
-      "level": 24
     },
     {
       "id": "bo3_aa12_btf",
+      "rarity": "epic",
       "level": 25
     },
     {
-      "id": "spas_zm",
-      "level": 26
-    },
-    {
       "id": "bo3_tommy_modern",
+      "rarity": "rare",
       "level": 26
     },
     {
       "id": "bo3_g37h_water",
+      "rarity": "epic",
       "level": 27
     },
     {
-      "id": "hs10_zm",
-      "level": 28
-    },
-    {
       "id": "bo3_aug_octopus",
+      "rarity": "epic",
       "level": 28
-    },
-    {
-      "id": "python_zm",
-      "level": 30
     },
     {
       "id": "bo3_rpd_ornate",
+      "rarity": "epic",
       "level": 30
     },
     {
       "id": "bo3_m1887",
+      "rarity": "rare",
       "level": 31
     },
     {
-      "id": "dragunov_zm",
-      "level": 32
-    },
-    {
       "id": "bo3_mr23_tesla",
+      "rarity": "legendary",
       "level": 33
     },
     {
       "id": "grimhawk_zm",
+      "rarity": "legendary",
       "level": 33
     },
     {
-      "id": "rpk_zm",
-      "level": 34
-    },
-    {
       "id": "bo3_striker",
+      "rarity": "epic",
       "level": 34
-    },
-    {
-      "id": "hk21_zm",
-      "level": 36
     },
     {
       "id": "bo3_m240_ice",
+      "rarity": "legendary",
       "level": 36
     },
     {
-      "id": "china_lake_zm",
-      "level": 38
-    },
-    {
       "id": "bo3_rpg_dragon",
+      "rarity": "legendary",
       "level": 38
     },
     {
       "id": "bo3_as50_rare",
+      "rarity": "legendary",
       "level": 40
     },
     {
-      "id": "crossbow_explosive_zm",
-      "level": 41
-    },
-    {
       "id": "bo3_mg4_heaven",
+      "rarity": "legendary",
       "level": 42
     },
     {
       "id": "microwavegundw_zm",
+      "rarity": "wonder",
+      "level": 43
+    },
+    {
+      "id": "microwavegun_zm",
+      "rarity": "wonder",
       "level": 43
     },
     {
       "id": "bo3_bow",
+      "rarity": "wonder",
       "level": 44
     },
     {
-      "id": "ray_gun_zm",
-      "level": 45
-    },
-    {
       "id": "minigun_zm",
+      "rarity": "legendary",
       "level": 47
     },
     {
       "id": "tesla_gun_zm",
+      "rarity": "wonder",
       "level": 47
     },
     {
       "id": "freezegun_zm",
+      "rarity": "wonder",
       "level": 49
-    },
-    {
-      "id": "thundergun_zm",
-      "level": 50
     }
   ],
   "bonuses": [
@@ -280,19 +445,42 @@
       "id": "zombie_cymbal_monkey",
       "name": "Monkey Bombs",
       "description": "Lures zombies to it, then explodes",
-      "level": 6
+      "level": 6,
+      "rarity": "rare"
     },
     {
       "id": "zombie_black_hole_bomb",
       "name": "Gersh Device",
       "description": "A black hole that drags zombies in; walk in to teleport",
-      "level": 22
+      "level": 22,
+      "rarity": "epic"
     },
     {
       "id": "zombie_quantum_bomb",
       "name": "QED",
       "description": "Something random happens, good or bad",
-      "level": 33
+      "level": 33,
+      "rarity": "epic"
     }
-  ]
+  ],
+  "lethal": [
+    {
+      "id": "frag_grenade_zm",
+      "name": "Frag Grenade",
+      "description": "Refills your grenades to 4",
+      "level": 1,
+      "rarity": "common"
+    },
+    {
+      "id": "claymore_zm",
+      "name": "Claymores",
+      "description": "2 claymores, refilled each round",
+      "level": 1,
+      "rarity": "uncommon"
+    }
+  ],
+  "box": {
+    "min": 3,
+    "note": "The Mystery Box list: unlocked weapons, tacticals and lethals. Items in the game data boxPool start switched on; the player toggles any item (profile.loadout.boxOn / boxOff)."
+  }
 }

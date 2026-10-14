@@ -224,7 +224,7 @@ const shop={
   },
   boxPrompt(e){const roll=mysteryBox.at(e);return roll?(roll.ready?(roll.teddy?'The Mystery Box is moving…':'Take '+(data.weapons[roll.weapon]??data.equipment[roll.weapon]).name):'Choosing your weapon…'):'Mystery Box · '+(session.effects.fire_sale>session.time?10:950);},
   useBox(e){
-    if(mysteryBox.at(e)){if(session.pack?.weapon===session.weapon)return false;const weapon=mysteryBox.take(e);if(!weapon)return false;if(weapon==='zombie_cymbal_monkey'){session.giveMonkeys();toast('Monkey Bombs · X to throw');}else{session.giveWeapon(weapon);equipView();toast(data.weapons[weapon].name);}return true;}
+    if(mysteryBox.at(e)){if(session.pack?.weapon===session.weapon)return false;const weapon=mysteryBox.take(e);if(!weapon)return false;if(weapon==='zombie_cymbal_monkey'){session.giveMonkeys();toast('Monkey Bombs · X to throw');}else{session.giveWeapon(weapon);if(data.weapons[weapon])equipView();toast((data.weapons[weapon]??data.equipment?.[weapon])?.name??weapon);}return true;}
     const cost=session.effects.fire_sale>session.time?10:950;
     if(session.points<cost){toast('Not enough points');return false;}
     if(!mysteryBox.start(e))return false;session.spend(cost);return true;
