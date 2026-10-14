@@ -134,7 +134,7 @@ export default async function setup(api){
     if(camos.length){const dia=camos.find(c=>c.classMastery),cls=window.kino.camoClass?.(id);
       api.toast(dia?`Diamond camo unlocked for every ${cls??'gun in this class'} · equip it in the Gunsmith`:`${def.name} · ${camos.map(c=>c.name).join(', ')} camo unlocked · equip it in the Gunsmith`,6);}
     if(!available(cat,def,id).length){save();return;}
-    const xp=cat.xp.kill+(head?cat.xp.headshot:0),cap=maxLevel(cat,def,id),wasMax=weaponProgress(profile,id).level>=cap;
+    const xp=(cat.xp.kill+(head?cat.xp.headshot:0))*(window.kino.boost?.weaponXp??1),cap=maxLevel(cat,def,id),wasMax=weaponProgress(profile,id).level>=cap;
     const lvBefore=weaponProgress(profile,id).level,news=grantWeaponXp(cat,def,id,profile,xp);
     save();
     // a filler level: no attachment, but say so and what's next

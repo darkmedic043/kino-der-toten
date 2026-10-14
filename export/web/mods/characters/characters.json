@@ -2234,6 +2234,54 @@
    },
    "handsFlat": true,
    "shop": "outfit.midnight"
+  },
+  {
+   "id": "outfit_s1_scarecrow",
+   "name": "Test Subject (Scarecrow)",
+   "type": "mannequin",
+   "description": "Season 1 outfit: Scarecrow.",
+   "color": "#5a4a2a",
+   "accent": "#c8892a",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#c8892a",
+    "glove": "#3a2e18"
+   },
+   "handsFlat": true,
+   "shop": "pass.s1.outfit.scarecrow",
+   "pass": "s1"
+  },
+  {
+   "id": "outfit_s1_knight",
+   "name": "Test Subject (Melon Knight)",
+   "type": "mannequin",
+   "description": "Season 1 outfit: Melon Knight.",
+   "color": "#2a4a1a",
+   "accent": "#ff4f6a",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#ff4f6a",
+    "glove": "#1a2e10"
+   },
+   "handsFlat": true,
+   "shop": "pass.s1.outfit.knight",
+   "pass": "s1"
+  },
+  {
+   "id": "outfit_s1_harvestlord",
+   "name": "Test Subject (Harvest Lord)",
+   "type": "mannequin",
+   "description": "Season 1 outfit: Harvest Lord.",
+   "color": "#3a2a0a",
+   "accent": "#f0c060",
+   "hands": "usmc",
+   "handsTint": {
+    "glovesleeve": "#f0c060",
+    "glove": "#2a1e08"
+   },
+   "handsFlat": true,
+   "shop": "pass.s1.outfit.harvestlord",
+   "pass": "s1"
   }
  ]
 }

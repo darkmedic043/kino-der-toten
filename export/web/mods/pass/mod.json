@@ -1,0 +1,5 @@
+{
+  "name": "Melon Pass",
+  "description": "The season pass (roadmap Phase 7, BO6/BO7 style): pass XP from matches and challenges earns tier tokens, spent on pages of rewards (auto-progress or by hand) in the main menu's PASS tab. Double-XP tokens start at match start.",
+  "script": "mod.js"
+}

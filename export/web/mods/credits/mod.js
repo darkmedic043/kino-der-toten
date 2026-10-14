@@ -14,7 +14,7 @@ export default async function setup(api){
     clearTimeout(flushT);if(!Object.keys(stats).length)return;
     const s=stats;stats={};if(!paid())return;
     const c=loadCredits(),done=countChallenges(cfg,c,s);saveCredits(c);
-    for(const ch of done)api.toast?.(`${ch.kind.toUpperCase()} CHALLENGE · +${ch.reward} credits`,4);
+    for(const ch of done){api.toast?.(`${ch.kind.toUpperCase()} CHALLENGE · +${ch.reward} credits`,4);const sx=window.kino.pass?.season?.xp;if(sx)window.kino.pass.addXp(sx[ch.kind]??0,'challenge');}   // challenges also feed the pass
   }
   host.on('start',()=>{stats={};kills=0;});host.on('reset',()=>{kills=0;});
   host.on('kill',e=>{

@@ -221,7 +221,7 @@
    "rarity": "common",
    "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
    "data": {
-    "char": "\u2022",
+    "char": "•",
     "color": "#ffffff"
    }
   },
@@ -233,7 +233,7 @@
    "rarity": "common",
    "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
    "data": {
-    "char": "\u25ef",
+    "char": "◯",
     "color": "#e8e4d8"
    }
   },
@@ -245,7 +245,7 @@
    "rarity": "rare",
    "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
    "data": {
-    "char": "\u2303",
+    "char": "⌃",
     "color": "#7fd8ff"
    },
    "rotating": true
@@ -258,7 +258,7 @@
    "rarity": "common",
    "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
    "data": {
-    "char": "\uff0b",
+    "char": "＋",
     "color": "#ff5a48"
    }
   },
@@ -270,7 +270,7 @@
    "rarity": "common",
    "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
    "data": {
-    "char": "\uff0b",
+    "char": "＋",
     "color": "#6dff8a"
    },
    "rotating": true
@@ -283,7 +283,7 @@
    "rarity": "rare",
    "desc": "Crosshair shape and colour; the red dot sight takes the colour too.",
    "data": {
-    "char": "\u25c7",
+    "char": "◇",
     "color": "#f0c060"
    }
   },
@@ -295,7 +295,7 @@
    "rarity": "common",
    "desc": "Hitmarker shape and colour.",
    "data": {
-    "hitmarker": "\u00d7",
+    "hitmarker": "×",
     "color": "#f0c060"
    }
   },
@@ -307,7 +307,7 @@
    "rarity": "rare",
    "desc": "Hitmarker shape and colour.",
    "data": {
-    "hitmarker": "\u2620",
+    "hitmarker": "☠",
     "color": "#ffffff"
    }
   },
@@ -319,7 +319,7 @@
    "rarity": "common",
    "desc": "Hitmarker shape and colour.",
    "data": {
-    "hitmarker": "\u2715",
+    "hitmarker": "✕",
     "color": "#ff4a3a"
    }
   },
@@ -656,6 +656,964 @@
     "c2": "#ff2a2a",
     "pattern": "moon"
    }
+  },
+  {
+   "id": "pass.s1.card.seedling",
+   "cat": "card",
+   "name": "Seedling",
+   "price": 0,
+   "rarity": "common",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#1d2a12",
+    "c2": "#7cd65a",
+    "pattern": "seeds"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.sprout",
+   "cat": "reticle",
+   "name": "Sprout",
+   "price": 0,
+   "rarity": "common",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "✚",
+    "color": "#7cd65a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.vinepatch",
+   "cat": "camo",
+   "name": "Vine Patch",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.vinepatch"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.kill.sap",
+   "cat": "reticle",
+   "name": "Sap Kills",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 kill colour.",
+   "data": {
+    "blood": "#9cff6a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.menu.harvest",
+   "cat": "theme",
+   "name": "Harvest Menu",
+   "price": 0,
+   "rarity": "common",
+   "desc": "Season 1 menu accent.",
+   "data": {
+    "menu": "#ff9a3d"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.frame.vine",
+   "cat": "theme",
+   "name": "Vine Frame",
+   "price": 0,
+   "rarity": "common",
+   "desc": "Season 1 portrait frame.",
+   "data": {
+    "frame": "#7cd65a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hit.leaf",
+   "cat": "reticle",
+   "name": "Leaf Hitmarker",
+   "price": 0,
+   "rarity": "common",
+   "desc": "Season 1 hitmarker.",
+   "data": {
+    "hitmarker": "❦",
+    "color": "#9cff6a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.harvestgold",
+   "cat": "camo",
+   "name": "Harvest Gold",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Major reward: a gilded harvest camo for every gun.",
+   "data": {
+    "camo": "season.harvestgold"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.rows",
+   "cat": "card",
+   "name": "Crop Rows",
+   "price": 0,
+   "rarity": "common",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#2a1d0c",
+    "c2": "#e8b04a",
+    "pattern": "stripes"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.melon",
+   "cat": "reticle",
+   "name": "Melon Dot",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "●",
+    "color": "#ff4f6a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hud.sprout",
+   "cat": "theme",
+   "name": "Sprout HUD",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 HUD colours.",
+   "data": {
+    "hud": {
+     "points": "#9cff6a",
+     "round": "#4fd13a",
+     "ring": "#c8ff8a"
+    }
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.cornfield",
+   "cat": "camo",
+   "name": "Cornfield",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.cornfield"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.sound.thump",
+   "cat": "sound",
+   "name": "Melon Thumps",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hit sounds.",
+   "data": {
+    "hits": {
+     "pitch": 0.7,
+     "knock": 1.4,
+     "cut": 0.8
+    }
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.dew",
+   "cat": "card",
+   "name": "Morning Dew",
+   "price": 0,
+   "rarity": "common",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#06141c",
+    "c2": "#7fd8ff",
+    "pattern": "rings"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.outfit.scarecrow",
+   "cat": "outfit",
+   "name": "Test Subject: Scarecrow",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "A Season 1 outfit for the Test Subject.",
+   "data": {
+    "character": "outfit_s1_scarecrow"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.vine",
+   "cat": "card",
+   "name": "Vinework",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#13200c",
+    "c2": "#c8ff8a",
+    "pattern": "noise"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.seedx",
+   "cat": "reticle",
+   "name": "Seed Cross",
+   "price": 0,
+   "rarity": "common",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "✛",
+    "color": "#ffd65a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.glow.ember",
+   "cat": "glow",
+   "name": "Ember Glow",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 Mystery Box glow.",
+   "data": {
+    "box": "#ff6a1a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.pumpkin",
+   "cat": "camo",
+   "name": "Pumpkin Rind",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.pumpkin"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hit.seed",
+   "cat": "reticle",
+   "name": "Seed Hitmarker",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hitmarker.",
+   "data": {
+    "hitmarker": "✦",
+    "color": "#ffd65a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.frame.ember",
+   "cat": "theme",
+   "name": "Ember Frame",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 portrait frame.",
+   "data": {
+    "frame": "#ff6a1a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.kill.juice",
+   "cat": "reticle",
+   "name": "Juice Kills",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 kill colour.",
+   "data": {
+    "blood": "#ff4f6a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.witchfire",
+   "cat": "camo",
+   "name": "Witchfire",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Major reward: animated: witch-green flames crawl over the gun.",
+   "data": {
+    "camo": "season.witchfire"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.scythe",
+   "cat": "card",
+   "name": "Scythe",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#1a1410",
+    "c2": "#e8dcc0",
+    "pattern": "moon"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.harvest",
+   "cat": "reticle",
+   "name": "Harvest Ring",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "◎",
+    "color": "#ff9a3d"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.menu.dusk",
+   "cat": "theme",
+   "name": "Dusk Menu",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 menu accent.",
+   "data": {
+    "menu": "#c45bff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.fog",
+   "cat": "camo",
+   "name": "Graveyard Fog",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.fog"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hud.dusk",
+   "cat": "theme",
+   "name": "Dusk HUD",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 HUD colours.",
+   "data": {
+    "hud": {
+     "points": "#ff9a3d",
+     "round": "#c45bff",
+     "ring": "#ffc23a"
+    }
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.barn",
+   "cat": "card",
+   "name": "Red Barn",
+   "price": 0,
+   "rarity": "common",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#2a0808",
+    "c2": "#ff4a3a",
+    "pattern": "stripes"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.melonking",
+   "cat": "card",
+   "name": "Melon King",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Major reward: the Melon King calling card.",
+   "data": {
+    "c1": "#0d2a0a",
+    "c2": "#ff4f6a",
+    "pattern": "seeds"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.nightfield",
+   "cat": "card",
+   "name": "Night Field",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#05081a",
+    "c2": "#5a5cff",
+    "pattern": "stars"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.moon",
+   "cat": "reticle",
+   "name": "Crescent",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "☽",
+    "color": "#bfe6ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.sound.crack",
+   "cat": "sound",
+   "name": "Rind Crack",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hit sounds.",
+   "data": {
+    "hits": {
+     "pitch": 1.6,
+     "knock": 0.7,
+     "cut": 1.6
+    }
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.bloodmoon",
+   "cat": "camo",
+   "name": "Blood Moon",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.bloodmoon"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hit.moon",
+   "cat": "reticle",
+   "name": "Moon Hitmarker",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hitmarker.",
+   "data": {
+    "hitmarker": "☾",
+    "color": "#bfe6ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.frame.moon",
+   "cat": "theme",
+   "name": "Moon Frame",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 portrait frame.",
+   "data": {
+    "frame": "#bfe6ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.kill.night",
+   "cat": "reticle",
+   "name": "Night Kills",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 kill colour.",
+   "data": {
+    "blood": "#5a5cff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.outfit.knight",
+   "cat": "outfit",
+   "name": "Test Subject: Melon Knight",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "A Season 1 outfit for the Test Subject.",
+   "data": {
+    "character": "outfit_s1_knight"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.lantern",
+   "cat": "card",
+   "name": "Lantern",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#1a0e04",
+    "c2": "#ffb347",
+    "pattern": "rings"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.lantern",
+   "cat": "reticle",
+   "name": "Lantern",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "✺",
+    "color": "#ffb347"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.glow.moon",
+   "cat": "glow",
+   "name": "Moonlight Glow",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 Mystery Box glow.",
+   "data": {
+    "box": "#bfe6ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.harvest",
+   "cat": "camo",
+   "name": "Harvest Leaves",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.harvest"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.menu.moonlit",
+   "cat": "theme",
+   "name": "Moonlit Menu",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 menu accent.",
+   "data": {
+    "menu": "#5fb8ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.crows",
+   "cat": "card",
+   "name": "Crows",
+   "price": 0,
+   "rarity": "common",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#0a0a0a",
+    "c2": "#5a5a5a",
+    "pattern": "noise"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.moonlit",
+   "cat": "camo",
+   "name": "Moonlit",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Major reward: animated: stars glitter and drift across a night-blue gun.",
+   "data": {
+    "camo": "season.moonlit"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.frost",
+   "cat": "card",
+   "name": "First Frost",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#0c1a24",
+    "c2": "#bff0ff",
+    "pattern": "noise"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.frost",
+   "cat": "reticle",
+   "name": "Frost Star",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "✳",
+    "color": "#bff0ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hud.frost",
+   "cat": "theme",
+   "name": "Frost HUD",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 HUD colours.",
+   "data": {
+    "hud": {
+     "points": "#bff0ff",
+     "round": "#5fb8ff",
+     "ring": "#e0f8ff"
+    }
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hit.frost",
+   "cat": "reticle",
+   "name": "Frost Hitmarker",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hitmarker.",
+   "data": {
+    "hitmarker": "❄",
+    "color": "#bff0ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.frame.frost",
+   "cat": "theme",
+   "name": "Frost Frame",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 portrait frame.",
+   "data": {
+    "frame": "#bff0ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.kill.frost",
+   "cat": "reticle",
+   "name": "Frost Kills",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 kill colour.",
+   "data": {
+    "blood": "#bff0ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.sound.smash",
+   "cat": "sound",
+   "name": "Pumpkin Smash",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Major reward: the heaviest, wettest hit sounds.",
+   "data": {
+    "hits": {
+     "pitch": 0.5,
+     "knock": 1.9,
+     "cut": 0.5
+    }
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.bonfire",
+   "cat": "card",
+   "name": "Bonfire",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#1a0804",
+    "c2": "#ff6a1a",
+    "pattern": "rings"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.ember",
+   "cat": "reticle",
+   "name": "Ember",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "✷",
+    "color": "#ff6a1a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.glow.witch",
+   "cat": "glow",
+   "name": "Witch Glow",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 Mystery Box glow.",
+   "data": {
+    "box": "#3dff8a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.sound.crunch",
+   "cat": "sound",
+   "name": "Leaf Crunch",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hit sounds.",
+   "data": {
+    "hits": {
+     "pitch": 1.1,
+     "knock": 1.1,
+     "cut": 1.4
+    }
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.smoke",
+   "cat": "card",
+   "name": "Smoke",
+   "price": 0,
+   "rarity": "common",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#141414",
+    "c2": "#8a8a8a",
+    "pattern": "stars"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.menu.ember",
+   "cat": "theme",
+   "name": "Ember Menu",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 menu accent.",
+   "data": {
+    "menu": "#ff6a1a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hit.ember",
+   "cat": "reticle",
+   "name": "Ember Hitmarker",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hitmarker.",
+   "data": {
+    "hitmarker": "✶",
+    "color": "#ff6a1a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.glow.harvestmoon",
+   "cat": "glow",
+   "name": "Harvest Moon Glow",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 Mystery Box glow.",
+   "data": {
+    "box": "#ff9a1a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.reaper",
+   "cat": "card",
+   "name": "Reaper",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#0a0a0a",
+    "c2": "#c8302a",
+    "pattern": "moon"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.skull",
+   "cat": "reticle",
+   "name": "Skull Dot",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "☠",
+    "color": "#e8dcc0"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hud.blood",
+   "cat": "theme",
+   "name": "Blood Moon HUD",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 HUD colours.",
+   "data": {
+    "hud": {
+     "points": "#ff4a3a",
+     "round": "#c8302a",
+     "ring": "#ff8a6a"
+    }
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.frame.blood",
+   "cat": "theme",
+   "name": "Blood Frame",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 portrait frame.",
+   "data": {
+    "frame": "#c8302a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.kill.ash",
+   "cat": "reticle",
+   "name": "Ash Kills",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 kill colour.",
+   "data": {
+    "blood": "#9a9a9a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.pyre",
+   "cat": "card",
+   "name": "Pyre",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#1a0500",
+    "c2": "#ffb347",
+    "pattern": "stripes"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.dawn",
+   "cat": "card",
+   "name": "Dawn",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#1a0e1a",
+    "c2": "#ffd0a0",
+    "pattern": "stars"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.dawn",
+   "cat": "reticle",
+   "name": "Dawn Ring",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "⊕",
+    "color": "#ffd0a0"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.glow.dawn",
+   "cat": "glow",
+   "name": "Dawn Glow",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 Mystery Box glow.",
+   "data": {
+    "box": "#ffd0a0"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.frame.gold",
+   "cat": "theme",
+   "name": "Harvest Gold Frame",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 portrait frame.",
+   "data": {
+    "frame": "#f0c060"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.hit.dawn",
+   "cat": "reticle",
+   "name": "Dawn Hitmarker",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 hitmarker.",
+   "data": {
+    "hitmarker": "✧",
+    "color": "#ffd0a0"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.melonlord",
+   "cat": "card",
+   "name": "Melon Lord",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#0a1a06",
+    "c2": "#f0c060",
+    "pattern": "seeds"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.outfit.harvestlord",
+   "cat": "outfit",
+   "name": "Test Subject: Harvest Lord",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "A Season 1 outfit for the Test Subject.",
+   "data": {
+    "character": "outfit_s1_harvestlord"
+   },
+   "pass": "s1"
   }
  ]
 }

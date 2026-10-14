@@ -194,6 +194,127 @@
       "glow": {
         "procedural": "circuit-glow"
       }
+    },
+    {
+      "id": "season.vinepatch",
+      "name": "Vine Patch",
+      "shop": "pass.s1.camo.vinepatch",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "vinepatch",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "season.harvestgold",
+      "name": "Harvest Gold",
+      "shop": "pass.s1.camo.harvestgold",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "harvestgold",
+      "scale": 2,
+      "mix": 0.95,
+      "metal": true
+    },
+    {
+      "id": "season.cornfield",
+      "name": "Cornfield",
+      "shop": "pass.s1.camo.cornfield",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "cornfield",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "season.pumpkin",
+      "name": "Pumpkin Rind",
+      "shop": "pass.s1.camo.pumpkin",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "pumpkin",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "season.witchfire",
+      "name": "Witchfire",
+      "shop": "pass.s1.camo.witchfire",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "witchfire",
+      "scale": 1.6,
+      "mix": 0.95,
+      "anim": {
+        "c1": [
+          0.5411764705882353,
+          0.23921568627450981,
+          1.0
+        ],
+        "c2": [
+          0.23921568627450981,
+          1.0,
+          0.5411764705882353
+        ]
+      },
+      "glow": {
+        "procedural": "flame-glow"
+      }
+    },
+    {
+      "id": "season.fog",
+      "name": "Graveyard Fog",
+      "shop": "pass.s1.camo.fog",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "fog",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "season.bloodmoon",
+      "name": "Blood Moon",
+      "shop": "pass.s1.camo.bloodmoon",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "bloodmoon",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "season.harvest",
+      "name": "Harvest Leaves",
+      "shop": "pass.s1.camo.harvest",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "harvest",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "season.moonlit",
+      "name": "Moonlit",
+      "shop": "pass.s1.camo.moonlit",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "moonlit",
+      "scale": 1.6,
+      "mix": 0.95,
+      "anim": {
+        "c1": [
+          0.7490196078431373,
+          0.9019607843137255,
+          1.0
+        ],
+        "c2": [
+          0.35294117647058826,
+          0.3607843137254902,
+          1.0
+        ]
+      },
+      "glow": {
+        "procedural": "star-glow"
+      }
     }
   ]
 }

@@ -10,7 +10,9 @@ export function saveGumProfile(p){try{localStorage.setItem(GUM_KEY,JSON.stringif
 
 export const gumById=cfg=>Object.fromEntries(cfg.gums.map(g=>[g.id,g]));
 export const tierIndex=(cfg,rarity)=>cfg.rarities.findIndex(r=>r.id===rarity);
-export const unlockedGums=(cfg,level)=>cfg.gums.filter(g=>g.level<=level).map(g=>g.id);
+// gums the Melon Pass unlocked early (kino.mods.pass gums) count as unlocked at any level
+export const passGums=()=>{try{return JSON.parse(localStorage.getItem('kino.mods.pass'))?.gums??[];}catch{return [];}};
+export const unlockedGums=(cfg,level)=>{const extra=new Set(passGums());return cfg.gums.filter(g=>g.level<=level||extra.has(g.id)).map(g=>g.id);};
 
 // The ladder: the k-th gum of a tier needs base + step*(k-1) gums of lower tiers in the pack.
 export function tierNeed(cfg,rarity,count){const r=cfg.rarities.find(r=>r.id===rarity);return count>0&&r?.base!=null?r.base+(r.step??0)*(count-1):0;}

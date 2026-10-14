@@ -8,7 +8,9 @@ export const GLOBAL_CAMO_TABS=[
   {id:'prestige',label:'PRESTIGE',hint:'Prestige camos earned on any gun. Every gun has its own three; once one is earned, every gun can wear it.',
     list:()=>loadPrestige().camos.map(id=>prestigeCamo(id)).filter(Boolean)},
   {id:'shop',label:'SHOP',hint:'Bought in the Shop (main menu). Every shop camo works on every gun.',
-    list:({cats})=>cats.camos.filter(c=>c.shop)},
+    list:({cats})=>cats.camos.filter(c=>c.shop&&!c.pass)},
+  {id:'season',label:'SEASON',hint:'Melon Pass rewards. Every season camo works on every gun.',
+    list:({cats})=>cats.camos.filter(c=>c.pass)},
   {id:'special',label:'SPECIAL',hint:'Rewards from maps and events.',
     list:({cats})=>cats.camos.filter(c=>c.reward)},
 ];

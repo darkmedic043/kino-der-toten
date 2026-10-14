@@ -8,6 +8,7 @@ import { loadCamos, camoSwatch, fillSwatches } from '../weapon-levels/camo.js';
 import { gunPreview } from '../weapon-levels/gun-preview.js';
 import { renderPortrait } from '../../characters.js';
 import { cardSvg } from './card.js';
+import { makeThumb } from './thumbs.js';
 
 const MARKUP=`<header class="sp-top"><h1>SHOP</h1><div class="sp-bal"><b id="sp-balance">0</b><span>CREDITS</span></div><div class="sp-timers"><span id="sp-daily"></span><span id="sp-weekly"></span></div></header>
 <div class="sp-main"><nav class="sp-cats" id="sp-cats"></nav><select class="sp-cats-select" id="sp-cats-select" aria-label="Category"></select><section class="sp-body" id="sp-body"></section><aside class="sp-drawer" id="sp-drawer"></aside></div>`;
@@ -28,19 +29,7 @@ const charOf=item=>chars.characters.find(c=>c.id===item.data?.character);
 let view='featured',sel=null;
 
 // ---- small previews ---------------------------------------------------------------------------------------------
-function thumb(item){
-  const d=item.data??{};
-  if(item.cat==='camo'){const c=camoOf(item);return `<div class="pv" data-swatch="${c?.id}" style="background-image:url(${camoSwatch(c)})"></div>`;}
-  if(item.cat==='card')return `<div class="pv">${cardSvg(d,'SURVIVOR','LEVEL 1')}</div>`;
-  if(item.cat==='outfit'){const ch=charOf(item);return `<div class="pv" style="background:linear-gradient(135deg,${ch?.color} 0 55%,${ch?.accent} 55%)"></div>`;}
-  if(d.char||d.hitmarker)return `<div class="pv" style="color:${d.color};font-size:46px">${esc(d.char??d.hitmarker)}</div>`;
-  if(d.blood)return `<div class="pv" style="background:radial-gradient(circle,${d.blood} 0 18%,${d.blood}55 30%,transparent 55%),#111"></div>`;
-  if(d.hud)return `<div class="pv" style="background:linear-gradient(90deg,${d.hud.points} 0 33%,${d.hud.round} 33% 66%,${d.hud.ring} 66%)"></div>`;
-  if(d.menu||d.frame)return `<div class="pv" style="box-shadow:inset 0 0 0 6px ${d.menu??d.frame};background:#111"></div>`;
-  if(d.box)return `<div class="pv" style="background:radial-gradient(circle,#fff 0 6%,${d.box} 12%,${d.box}33 35%,transparent 60%),#0a0a0a"></div>`;
-  if(d.hits)return `<div class="pv" style="font-size:40px;color:#f0c060">♪</div>`;
-  return '<div class="pv"></div>';
-}
+const thumb=makeThumb({camos,chars});
 // a hit-sound sample: the hud mod's thump with the set's numbers
 let actx=null;
 function playHits(hs){

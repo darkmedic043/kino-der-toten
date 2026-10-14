@@ -26,12 +26,17 @@ addEventListener('kino-credits',()=>{try{renderProfile();}catch{}});
 import { loadResearchConfig } from './mods/research/research.js';
 import { renderResearch } from './mods/research/pane.js';
 import { mountShop } from './mods/shop/shop-tab.js';
+import { mountPass, PASS_CSS } from './mods/pass/pass-tab.js';
+import { loadPass, loadSeason, tokens as passTokens } from './mods/pass/pass.js';
+{const st=document.createElement('style');st.textContent=PASS_CSS;document.head.append(st);}
+let seasonCfg=null;loadSeason(new URL('mods/pass/',document.baseURI)).then(s=>{seasonCfg=s;try{renderProfile();}catch{}}).catch(()=>{});
+addEventListener('kino-pass',()=>{try{renderProfile();}catch{}});
 let researchCfg=null;
 loadResearchConfig(new URL('mods/research/',document.baseURI)).then(c=>{researchCfg=c;drawResearch();}).catch(e=>console.warn('[research]',e));
 function drawResearch(){const el=document.getElementById('research-root');if(el&&researchCfg)renderResearch(el,{cfg:researchCfg,level:unlockLvl(loadProfile()),toast});}
 import { getAccount, onAccountChange, renderSignInButton, signOut } from './cloud.js';
 import { renderCareer } from './career-view.js';
-import { loadGums, loadGumProfile, saveGumProfile, activePack, packTiers, canAdd, canRemove, gumById } from './mods/gobblegums/gums.js';
+import { loadGums, loadGumProfile, saveGumProfile, activePack, packTiers, canAdd, canRemove, gumById, passGums } from './mods/gobblegums/gums.js';
 import { loadCharacterRegistry, createCharacter, armsUrl, tintArms, loadCharacterGltf, applyVariants, renderPortrait } from './characters.js';
 import { FirstPersonArms } from './fp-arms.js';
 import { loadClasses, loadClassProfile, saveClassProfile } from './mods/classes/classes.js';
@@ -105,6 +110,7 @@ function showTab(name){
   stage.active=name==='armory'&&pane==='operator';if(stage.active)stage.start();
   if(name==='armory'&&pane==='research')drawResearch();
   if(name==='shop')mountShop($('shop-root'),{toast,data}).catch(e=>console.warn('[shop]',e));
+  if(name==='pass')mountPass($('pass-root'),{toast,data}).catch(e=>console.warn('[pass]',e));
   if(name==='career')renderCareer($('career-root'),{mapList,weapons:baseData?.weapons??{}});
 }
 for(const b of tabs)b.addEventListener('click',()=>showTab(b.dataset.tab));
@@ -120,6 +126,7 @@ function renderProfile(){
   // Phase 4: player prestige (badge, tokens, the button from PRESTIGE.playerLevel)
   applyMenuTheme();
   const chip=document.getElementById('credits-chip');if(chip)chip.textContent=loadCredits().balance.toLocaleString()+' CR';
+  {const pc=document.getElementById('pass-chip');if(pc&&seasonCfg){const n=passTokens(seasonCfg,loadPass());pc.textContent=n>0?n+' TOKEN'+(n>1?'S':''):'';}}
   {const cardEl=document.getElementById('p-card'),cd=shopCat&&shopCosmetics(shopCat).card;if(cardEl)cardEl.innerHTML=cd?cardSvg(cd,$('p-char')?.textContent||'Survivor','LEVEL '+profile.level):'';}
   const pr=loadPrestige(),n=pr.player.prestige,el=$('p-prestige');
   if(el){const can=canPrestigePlayer(pr,profile.level);
@@ -363,7 +370,7 @@ function renderGums(){
     grid.append(head);
     const row=document.createElement('div');row.className='picker-grid gum-row';grid.append(row);
     for(const g of gums){
-      const open=g.level<=unlockLvl(profile),on=inPack.has(g.id),el=document.createElement('button');
+      const open=g.level<=unlockLvl(profile)||passGums().includes(g.id),on=inPack.has(g.id),el=document.createElement('button');   // pass gums: early unlocks
       el.className='opt gum-opt'+(on?' selected':'')+(open?'':' locked');el.style.setProperty('--r',r.color);
       el.innerHTML=`<div class="gum-ball"></div><strong>${esc(g.name)}</strong><small>${esc(g.type.toUpperCase())}</small>${open?`<span class="box-check">${on?'IN PACK':'OFF'}</span>`:`<span class="lock">LV ${g.level}</span>`}`;
       el.addEventListener('mouseenter',()=>{gumFocus=g.id;gumDetail(cfg,pack,tiers);});
@@ -733,7 +740,7 @@ function renderMods(){
 }
 
 renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();renderCredits();
-showTab(['play','armory','shop','career','social','mods','settings',...Object.keys(PANES)].includes(location.hash.slice(1))?location.hash.slice(1):'play');
+showTab(['play','armory','shop','pass','career','social','mods','settings',...Object.keys(PANES)].includes(location.hash.slice(1))?location.hash.slice(1):'play');
 window.menu={profile:()=>profile,thumb,showTab,stage};
 
 // ---- Classes (mods/classes): skill trees; progress in its own storage key ------------------

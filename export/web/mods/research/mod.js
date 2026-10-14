@@ -42,7 +42,7 @@ export default async function setup(api){
   host.on('start',()=>{R=loadResearch();});
   function earn(xp){
     if(!R.active||!researchOpen(cfg,unlockLvl(loadProfile())))return;
-    const done=grantResearchXp(cfg,R,xp,isActive);
+    const done=grantResearchXp(cfg,R,xp*(window.kino.boost?.researchXp??1),isActive);   // double research XP token (pass)
     clearTimeout(saveT);
     if(done){saveResearch(R);
       api.announce?.(done.name,done.mastery?`${done.itemName.toUpperCase()} MASTERED · SECOND MINOR SLOT`:`${done.kind.toUpperCase()} AUGMENT RESEARCHED · ${done.itemName.toUpperCase()}`,3);
