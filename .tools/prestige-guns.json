@@ -1,0 +1,344 @@
+[
+ {
+  "id": "m1911_zm",
+  "name": "M1911",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "m14_zm",
+  "name": "M14",
+  "cls": "ar",
+  "max": 10
+ },
+ {
+  "id": "ithaca_zm",
+  "name": "Stakeout",
+  "cls": "shotgun",
+  "max": 2
+ },
+ {
+  "id": "mp40_zm",
+  "name": "MP40",
+  "cls": "smg",
+  "max": 3
+ },
+ {
+  "id": "mp5k_zm",
+  "name": "MP5K",
+  "cls": "smg",
+  "max": 6
+ },
+ {
+  "id": "mpl_zm",
+  "name": "MPL",
+  "cls": "smg",
+  "max": 6
+ },
+ {
+  "id": "pm63_zm",
+  "name": "PM63",
+  "cls": "smg",
+  "max": 2
+ },
+ {
+  "id": "ak74u_zm",
+  "name": "AK-74u",
+  "cls": "smg",
+  "max": 8
+ },
+ {
+  "id": "m16_zm",
+  "name": "M16",
+  "cls": "ar",
+  "max": 11
+ },
+ {
+  "id": "galil_zm",
+  "name": "Galil",
+  "cls": "ar",
+  "max": 11
+ },
+ {
+  "id": "commando_zm",
+  "name": "Commando",
+  "cls": "ar",
+  "max": 11
+ },
+ {
+  "id": "hk21_zm",
+  "name": "HK21",
+  "cls": "lmg",
+  "max": 6
+ },
+ {
+  "id": "rpk_zm",
+  "name": "RPK",
+  "cls": "lmg",
+  "max": 6
+ },
+ {
+  "id": "python_zm",
+  "name": "Python",
+  "cls": "pistol",
+  "max": 2
+ },
+ {
+  "id": "spas_zm",
+  "name": "SPAS-12",
+  "cls": "shotgun",
+  "max": 2
+ },
+ {
+  "id": "cz75_zm",
+  "name": "CZ75",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "cz75dw_zm",
+  "name": "CZ75 Dual Wield",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "g11_lps_zm",
+  "name": "G11",
+  "cls": "smg",
+  "max": 2
+ },
+ {
+  "id": "famas_zm",
+  "name": "FAMAS",
+  "cls": "ar",
+  "max": 11
+ },
+ {
+  "id": "spectre_zm",
+  "name": "Spectre",
+  "cls": "smg",
+  "max": 5
+ },
+ {
+  "id": "aug_acog_zm",
+  "name": "AUG",
+  "cls": "ar",
+  "max": 5
+ },
+ {
+  "id": "fnfal_zm",
+  "name": "FN FAL",
+  "cls": "ar",
+  "max": 11
+ },
+ {
+  "id": "dragunov_zm",
+  "name": "Dragunov",
+  "cls": "sniper",
+  "max": 4
+ },
+ {
+  "id": "l96a1_zm",
+  "name": "L96A1",
+  "cls": "sniper",
+  "max": 4
+ },
+ {
+  "id": "crossbow_explosive_zm",
+  "name": "Crossbow",
+  "cls": "launcher",
+  "max": 1
+ },
+ {
+  "id": "bo3_mr23_tesla",
+  "name": "MR23 Tesla",
+  "cls": "ar",
+  "max": 8
+ },
+ {
+  "id": "bo3_aug_octopus",
+  "name": "AUG Octopus",
+  "cls": "ar",
+  "max": 6
+ },
+ {
+  "id": "bo3_m1014_jellyfish",
+  "name": "M1014 Jellyfish",
+  "cls": "shotgun",
+  "max": 7
+ },
+ {
+  "id": "bo3_p90_orbit",
+  "name": "P90 Orbit",
+  "cls": "smg",
+  "max": 7
+ },
+ {
+  "id": "bo3_g18_death",
+  "name": "G18 Death",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "bo3_m240_ice",
+  "name": "M240 Ice",
+  "cls": "lmg",
+  "max": 7
+ },
+ {
+  "id": "bo3_as50_rare",
+  "name": "AS50 Overgrowth",
+  "cls": "sniper",
+  "max": 3
+ },
+ {
+  "id": "bo3_uzi_irradiated",
+  "name": "Uzi Irradiated",
+  "cls": "smg",
+  "max": 8
+ },
+ {
+  "id": "bo3_93r_dystopic",
+  "name": "93R Dystopic",
+  "cls": "pistol",
+  "max": 6
+ },
+ {
+  "id": "bo3_aa12_btf",
+  "name": "AA-12 Breach",
+  "cls": "shotgun",
+  "max": 7
+ },
+ {
+  "id": "bo3_rpd_ornate",
+  "name": "RPD Ornate",
+  "cls": "lmg",
+  "max": 6
+ },
+ {
+  "id": "bo3_spas12_irradiated",
+  "name": "SPAS-12 Irradiated",
+  "cls": "shotgun",
+  "max": 7
+ },
+ {
+  "id": "bo3_mp7_flanker",
+  "name": "MP7 Flanker",
+  "cls": "smg",
+  "max": 6
+ },
+ {
+  "id": "bo3_tommy_modern",
+  "name": "Tommy Modern",
+  "cls": "smg",
+  "max": 2
+ },
+ {
+  "id": "bo3_bow",
+  "name": "Heloderma Bow",
+  "cls": "special",
+  "max": 2
+ },
+ {
+  "id": "bo3_rpg_dragon",
+  "name": "RPG Dragon",
+  "cls": "launcher",
+  "max": 2
+ },
+ {
+  "id": "bo3_ak117",
+  "name": "AK117",
+  "cls": "ar",
+  "max": 7
+ },
+ {
+  "id": "bo3_f2000_tech",
+  "name": "F2000 Tech",
+  "cls": "ar",
+  "max": 7
+ },
+ {
+  "id": "bo3_g37h_water",
+  "name": "G37H Tidal",
+  "cls": "ar",
+  "max": 8
+ },
+ {
+  "id": "bo3_sa80",
+  "name": "SA80",
+  "cls": "ar",
+  "max": 7
+ },
+ {
+  "id": "bo3_k9_heaven",
+  "name": "K9 Heaven",
+  "cls": "smg",
+  "max": 6
+ },
+ {
+  "id": "bo3_smg5_tool",
+  "name": "SMG5 Tool",
+  "cls": "smg",
+  "max": 7
+ },
+ {
+  "id": "bo3_umg_dmz",
+  "name": "UMG DMZ",
+  "cls": "smg",
+  "max": 8
+ },
+ {
+  "id": "bo3_m1887",
+  "name": "M1887",
+  "cls": "shotgun",
+  "max": 8
+ },
+ {
+  "id": "bo3_striker",
+  "name": "Striker",
+  "cls": "shotgun",
+  "max": 6
+ },
+ {
+  "id": "bo3_mg4_heaven",
+  "name": "MG4 Heaven",
+  "cls": "lmg",
+  "max": 8
+ },
+ {
+  "id": "grimhawk_zm",
+  "name": "Grimhawk",
+  "cls": "special",
+  "max": 10
+ },
+ {
+  "id": "iron_mk5_suitcase",
+  "name": "Mk5 Suitcase",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "iron_mk16_cloak",
+  "name": "Mk16 Stealth-Mode",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "iron_mk1_flamer",
+  "name": "Mk1 Flamethrower",
+  "cls": "lmg",
+  "max": 6
+ },
+ {
+  "id": "iron_wm_minigun",
+  "name": "War Machine Minigun",
+  "cls": "lmg",
+  "max": 6
+ },
+ {
+  "id": "iron_wm_handgun",
+  "name": "War Machine Handgun",
+  "cls": "pistol",
+  "max": 3
+ }
+]
