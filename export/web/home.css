@@ -270,3 +270,18 @@ main{position:relative;overflow-y:auto;padding:40px 48px 60px}
 .wp-actions button.on{border-color:#e8d27a88;color:#e8d27a}
 .wp-actions button[disabled]{opacity:.55;cursor:default}
 @media (max-width:1180px){.weapons-pane{grid-template-columns:1fr}}
+
+/* Armory → Gobblegums (2026-10-14) */
+.gum-head{display:flex;align-items:baseline;gap:12px;margin:14px 0 8px;padding-bottom:6px;border-bottom:1px solid color-mix(in srgb,var(--r) 40%,transparent)}
+.gum-head:first-child{margin-top:0}.gum-head b{color:var(--r);font-size:11px;letter-spacing:3px}.gum-head small{color:var(--muted);font-size:10px}
+.gum-row{max-height:none;overflow:visible}
+.opt.gum-opt{align-items:center;text-align:center;border-left:3px solid color-mix(in srgb,var(--r) 70%,transparent)}
+.opt.gum-opt:not(.selected):not(.locked)>*:not(.box-check){opacity:.5}
+.opt.gum-opt.selected{border-color:var(--r);background:color-mix(in srgb,var(--r) 9%,#0a0c0b)}
+.opt.gum-opt.selected .box-check{border-color:var(--r);color:var(--r)}
+.gum-ball{width:46px;height:46px;border-radius:50%;margin:8px auto 2px;background:radial-gradient(circle at 35% 30%,#fffb,var(--r) 45%,#000 125%);box-shadow:0 0 14px color-mix(in srgb,var(--r) 50%,transparent)}
+.gum-ladder{display:grid;gap:4px;margin:10px 0}
+.gum-ladder div{display:grid;grid-template-columns:80px 28px 1fr;align-items:baseline;gap:8px;font-size:11px}
+.gum-ladder b{color:var(--r);letter-spacing:1px}.gum-ladder span{font-weight:600}.gum-ladder small{color:var(--muted)}
+.detail .ok-line{color:#7fd48a}
+.detail hr{border:0;border-top:1px solid var(--line);margin:14px 0}

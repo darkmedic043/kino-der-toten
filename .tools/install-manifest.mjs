@@ -19,7 +19,7 @@ const OWN = [
   /^vendor\/.+\.(m?js|txt)$/,                                       // three.js, three-mesh-bvh and their licences
   /^mods\/(mods|maps)\.json$/, /^mods\/README\.md$/,
   /^mods\/[^/]+\/mod\.json$/,                                       // every mod's manifest
-  /^mods\/(classes\/classes|characters\/characters|progression\/progression|weapon-levels\/(attachments|camos)|movement\/data|player-health\/data|terminal-booth\/placements|hd-weapons\/hd|map-materials\/(hd|hd-materials|normals)|(gun|event|zombie)-sounds\/sounds|_template\/data|lighting\/fixtures)\.json$/,
+  /^mods\/(classes\/classes|characters\/characters|progression\/progression|gobblegums\/gums|weapon-levels\/(attachments|camos)|movement\/data|player-health\/data|terminal-booth\/placements|hd-weapons\/hd|map-materials\/(hd|hd-materials|normals)|(gun|event|zombie)-sounds\/sounds|_template\/data|lighting\/fixtures)\.json$/,
   /^mods\/terminal-booth\/terminal_booth(_compact)?\.glb$/,        // built in Blender for this fork (.tools/build-terminal-booth.py)
   /^mods\/bo7-weapons\/[^/]+\.glb$/,                               // rebuilt from reference in Blender for this fork (.tools/build-grimhawk.py etc.)
 ];

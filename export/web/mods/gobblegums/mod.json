@@ -1,0 +1,5 @@
+{
+  "name": "Gobblegums",
+  "description": "BO-style gobblegums: build a pack of 10+ in the Armory (rarity ladder), roll them at a terminal's GUMS app during a match, hold three, N to chew, J for the next.",
+  "script": "mod.js"
+}

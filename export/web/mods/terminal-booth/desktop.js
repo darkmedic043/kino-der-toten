@@ -8,6 +8,8 @@
 //          buyMod(id) / upgradeMod() -> true | 'reason', onOpen(), onClose(), onApp(name)}
 // ARSENAL (under PERKS) sells ammo mods for the gun in hand once the power is on.
 // STARK.EXE (mods/stark): the Iron Man armors; opts.stark() -> status, opts.starkAct(action, id) -> true | 'reason'.
+// GOBBLE.EXE (mods/gobblegums): rolls a gobblegum from your pack on a slot-machine reel; opts.gums() -> status,
+//   opts.gumRoll() -> {id, commit()} | 'reason' (commit puts it in your hand once the reel stops).
 
 // Every perk in the game. Double-Dew (Cheese Cube) is left out for now, at the user's request.
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
@@ -131,6 +133,20 @@ const CSS = `
 #melonterm .task button{font:inherit;font-size:19px;color:var(--g);background:#062a14;border:2px solid var(--g2);padding:0 10px;cursor:pointer}
 #melonterm .task button:hover{background:var(--g);color:var(--bg)}
 #melonterm .task .hint{color:var(--dim)}
+#melonterm .gum{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+#melonterm .reelbox{position:relative;display:grid;place-items:center;border-right:2px dashed var(--line);padding:16px}
+#melonterm .reel{position:relative;width:min(300px,100%);height:210px;overflow:hidden;border:2px solid var(--g2);background:#020a05;box-shadow:inset 0 0 30px #000,0 0 16px #3dff8a33}
+#melonterm .reel::before,#melonterm .reel::after{content:'';position:absolute;left:0;right:0;height:70px;z-index:2;pointer-events:none}
+#melonterm .reel::before{top:0;background:linear-gradient(#020a05,#020a0500)}#melonterm .reel::after{bottom:0;background:linear-gradient(#020a0500,#020a05)}
+#melonterm .reel .line{position:absolute;left:-2px;right:-2px;top:70px;height:70px;border:2px solid var(--warn);z-index:3;pointer-events:none;box-shadow:0 0 12px #ffd36b66}
+#melonterm .strip{position:absolute;left:0;right:0;top:0;will-change:transform}
+#melonterm .strip .it{height:70px;display:flex;align-items:center;gap:14px;padding:0 16px;font-size:24px;white-space:nowrap;overflow:hidden}
+#melonterm .ball{flex:none;width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fffa,var(--c) 45%,#000 125%);box-shadow:0 0 10px var(--c)}
+#melonterm .gum .side{padding:20px 24px;display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0;font-size:22px}
+#melonterm .gum .side h2{margin:0;font:inherit;font-size:36px;color:#b6ffcb;letter-spacing:1px}
+#melonterm .gum .won{font-size:30px;text-shadow:0 0 10px var(--c)}
+#melonterm .gum .hand{display:flex;gap:8px}#melonterm .gum .hand .ball{width:34px;height:34px}#melonterm .gum .hand .empty{width:34px;height:34px;border-radius:50%;border:2px dashed var(--dim)}
+@media(max-width:760px){#melonterm .gum{grid-template-columns:1fr;grid-template-rows:auto 1fr}#melonterm .reelbox{border-right:0;border-bottom:2px dashed var(--line)}}
 @media(max-width:760px){#melonterm .crt{width:96vw;height:92vh}#melonterm .win{inset:8px 8px 120px}#melonterm .perks{grid-template-columns:1fr;grid-template-rows:auto 1fr}#melonterm .left{border-right:0;border-bottom:2px dashed var(--line)}
   #melonterm .grid{grid-template-columns:repeat(4,minmax(0,1fr));padding:10px;gap:8px}#melonterm .tile{padding:6px}#melonterm .tile .tag{display:none}
   #melonterm .bar{gap:10px;font-size:17px}#melonterm .bar .clock{display:none}#melonterm .detail{padding:14px}#melonterm .detail .big{width:90px;height:90px}#melonterm .detail h2{font-size:30px}}
@@ -148,6 +164,9 @@ const ARSENAL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rend
 const STARK_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <path d="M9 4h14l3 5v9l-4 8-6 3-6-3-4-8V9z" fill="none" stroke="#7dffa6" stroke-width="2"/><rect x="10" y="12" width="5" height="2"/><rect x="17" y="12" width="5" height="2"/>
   <rect x="13" y="20" width="6" height="1.5"/><rect x="15" y="5" width="2" height="5"/></svg>`;
+const GUMS_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
+  <circle cx="16" cy="11" r="9" fill="none" stroke="#7dffa6" stroke-width="2"/><circle cx="12" cy="9" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="15" cy="13" r="2"/><circle cx="20" cy="13" r="2" fill="#c9ffd9"/>
+  <rect x="9" y="20" width="14" height="9"/><rect x="14" y="23" width="4" height="3" fill="#031208"/><rect x="7" y="29" width="18" height="2"/></svg>`;
 const EXFIL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <rect x="4" y="6" width="24" height="2"/><rect x="15" y="8" width="2" height="3"/><rect x="9" y="11" width="15" height="7"/><rect x="6" y="13" width="3" height="3"/>
   <rect x="2" y="12" width="4" height="2"/><rect x="11" y="12" width="5" height="3" fill="#031208"/><rect x="11" y="19" width="2" height="3"/><rect x="20" y="19" width="2" height="3"/>
@@ -174,7 +193,8 @@ function build() {
     <div class="desk">
       <div class="icons"><button class="app" data-app="perks"><div class="sq">${PERKS_ICON}</div><span>PERKS</span></button>
         <button class="app" data-app="arsenal"><div class="sq">${ARSENAL_ICON}</div><span>ARSENAL</span></button>
-        <button class="app" data-app="stark"><div class="sq">${STARK_ICON}</div><span>STARK</span></button></div>
+        <button class="app" data-app="stark"><div class="sq">${STARK_ICON}</div><span>STARK</span></button>
+        <button class="app" data-app="gums"><div class="sq">${GUMS_ICON}</div><span>GUMS</span></button></div>
       <button class="app exfil off" data-app="exfil"><div class="sq">${EXFIL_ICON}</div><span>EXFIL</span></button>
       <div class="win" data-win="perks" hidden>
         <div class="title"><span>PERKS.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
@@ -188,6 +208,10 @@ function build() {
         <div class="title"><span>STARK.EXE · ARMORY</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="stk"></div>
       </div>
+      <div class="win" data-win="gums" hidden>
+        <div class="title"><span>GOBBLE.EXE · GOBBLEGUMS</span><span class="grow"></span><button data-close title="Close">×</button></div>
+        <div class="gum"><div class="reelbox"><div class="reel"><div class="strip"></div><div class="line"></div></div></div><div class="side"></div></div>
+      </div>
       <div class="win" data-win="exfil" hidden>
         <div class="title"><span>EXFIL.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="exf"></div>
@@ -200,6 +224,7 @@ function build() {
   const win = $('[data-win=perks]'), exWin = $('[data-win=exfil]'), exBody = $('.exf'), exIcon = $('[data-app=exfil]');
   const stWin = $('[data-win=stark]'), stBody = $('.stk'); let stState = '', stMsg = ['', ''], stShown = 0;
   const arWin = $('[data-win=arsenal]'), arBody = $('.ars'); let arState = '', arMsg = ['', ''];
+  const gmWin = $('[data-win=gums]'), gmStrip = $('.strip'), gmSide = $('.gum .side'); let gmState = '', gmMsg = ['', ''], gmSpin = false, gmWon = null;
   const grid = $('.grid'), detail = $('.detail'), msg = $('.msg');
   let exState = '';
   let opts = null, shown = 0, clock = 0, lastState = '';
@@ -210,7 +235,8 @@ function build() {
   for (const t of ['click', 'mousedown', 'mouseup', 'pointerdown', 'wheel', 'contextmenu']) root.addEventListener(t, e => e.stopPropagation());
 
   function key(e) {
-    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden) closeApp(); else close(); return; }
+    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden) closeApp(); else close(); return; }
+    if (!gmWin.hidden) { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); gumRoll(); } return; }
     if (!arWin.hidden || !stWin.hidden) return;
     if (!exWin.hidden) { if (e.code === 'Enter') { e.preventDefault(); callExfil(); } return; }
     if (win.hidden) { if (e.code === 'Enter') { e.preventDefault(); openApp('perks'); } return; }
@@ -258,6 +284,8 @@ function build() {
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
   }
   function openApp(name) {
+    if (name === 'gums') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = true; gmState = ''; if (!gmSpin) { gmMsg = ['', '']; gmWon = null; idleReel(); } gmWin.hidden = false; drawGums(); $('.open').textContent = '[GOBBLE.EXE]'; opts.onApp?.('gobble'); return; }
+    gmWin.hidden = true;
     if (name === 'stark') { win.hidden = exWin.hidden = arWin.hidden = true; stState = ''; stMsg = ['', '']; stWin.hidden = false; drawStark(); $('.open').textContent = '[STARK.EXE]'; opts.onApp?.(name); return; }
     if (name === 'arsenal') { win.hidden = exWin.hidden = stWin.hidden = true; arState = ''; arMsg = ['', '']; drawArsenal(); arWin.hidden = false; $('.open').textContent = '[ARSENAL.EXE]'; opts.onApp?.(name); return; }
     if (name === 'exfil') { win.hidden = arWin.hidden = stWin.hidden = true; exState = ''; drawExfil(); exWin.hidden = false; $('.open').textContent = '[EXFIL.EXE]'; opts.onApp?.(name); return; }
@@ -266,7 +294,7 @@ function build() {
     say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
     opts.onApp?.(name); grid.querySelector(`[data-i="${shown}"]`)?.focus({ preventScroll: true });
   }
-  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = true; $('.open').textContent = ''; }
+  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; $('.open').textContent = ''; }
   // ---- STARK.EXE: the Iron Man armors (mods/stark) ---------------------------------------------------------------
   const MARK = { mk1: 'I', mk3: 'III', mk4: 'IV', mk5: 'V', mk6: 'VI', wm: 'WM', mk16: 'XVI' };
   function starkDo(action, id) {
@@ -366,6 +394,44 @@ function build() {
     arMsg = r === true ? [on ? `${m.name.toUpperCase()} UPGRADED` : `${m.name.toUpperCase()} LOADED`, 'ok'] : [String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad'];
     status(); drawArsenal();
   }
+  // ---- GOBBLE.EXE: a slot-machine reel over your pack (mods/gobblegums) ------------------------------------------
+  const ITEM = 70;
+  const gumRow = g => `<div class="it" style="--c:${g.color}"><div class="ball"></div><span>${esc(g.name.toUpperCase())}</span></div>`;
+  function idleReel() {
+    const st = opts?.gums?.(); const list = st?.pack?.length ? st.pack : [{ name: '- - -', color: '#2a7a48' }];
+    gmStrip.style.transition = 'none'; gmStrip.innerHTML = [0, 1, 2].map(i => gumRow(list[i % list.length])).join(''); gmStrip.style.transform = 'translateY(0)';
+  }
+  function gumRoll() {
+    if (gmSpin) return;
+    const r = opts?.gumRoll?.() ?? 'Gobblegums are not installed';
+    if (typeof r !== 'object') { gmMsg = [String(r).toUpperCase(), 'bad']; gmState = ''; drawGums(); return; }
+    const st = opts.gums(), by = Object.fromEntries(st.pack.map(g => [g.id, g])), n = 46, win = n - 4;
+    // a long random strip with the prize on the pay line (the middle row) when it stops
+    const rows = Array.from({ length: n }, (_, i) => i === win ? by[r.id] : st.pack[Math.floor(Math.random() * st.pack.length)]);
+    gmStrip.style.transition = 'none'; gmStrip.innerHTML = rows.map(gumRow).join(''); gmStrip.style.transform = 'translateY(0)'; void gmStrip.offsetWidth;
+    gmSpin = true; gmWon = null; gmMsg = ['ROLLING ...', '']; gmState = ''; drawGums(); status();
+    gmStrip.style.transition = 'transform 2.6s cubic-bezier(.12,.62,.18,1)'; gmStrip.style.transform = `translateY(${-(win - 1) * ITEM}px)`;
+    const ticks = setInterval(() => tick(), 90); setTimeout(() => clearInterval(ticks), 1900);
+    setTimeout(() => { gmSpin = false; r.commit(); gmWon = by[r.id]; gmMsg = [`${by[r.id].name.toUpperCase()} · ${by[r.id].rarity.toUpperCase()} · N TO CHEW`, 'ok']; gmState = ''; status(); drawGums(); }, 2700);
+  }
+  let tickCtx = null;
+  function tick() { try { tickCtx ??= new AudioContext(); const t = tickCtx.currentTime, o = tickCtx.createOscillator(), g = tickCtx.createGain(); o.type = 'square'; o.frequency.value = 1400; g.gain.setValueAtTime(.04, t); g.gain.exponentialRampToValueAtTime(.0001, t + .03); o.connect(g).connect(tickCtx.destination); o.start(t); o.stop(t + .04); } catch {} }
+  function drawGums() {
+    if (gmWin.hidden) return;
+    const st = opts?.gums?.(); if (!st) { gmSide.innerHTML = '<p>Gobblegums are not installed.</p>'; return; }
+    const key = JSON.stringify([st, gmMsg, gmSpin, gmWon?.id]); if (key === gmState) return; gmState = key;
+    const left = st.rollsPerRound - st.rolls, can = st.ok && !st.full && left > 0 && st.pool > 0 && st.points >= st.price && !gmSpin;
+    const label = gmSpin ? 'ROLLING ...' : !st.ok ? 'NO PACK' : st.full ? 'HAND FULL' : left <= 0 ? 'COME BACK NEXT ROUND' : st.points < st.price ? 'NOT ENOUGH POINTS' : `ROLL · ${st.price.toLocaleString()}`;
+    const hand = Array.from({ length: st.handSize }, (_, i) => { const g = st.pack.find(g => g.name === st.hand[i]); return g ? `<div class="ball" style="--c:${g.color}" title="${esc(g.name)}"></div>` : '<div class="empty"></div>'; }).join('');
+    gmSide.innerHTML = `<h2>GOBBLEGUMS</h2>
+      ${gmWon ? `<div class="won" style="--c:${gmWon.color};color:${gmWon.color}">${esc(gmWon.name.toUpperCase())}</div><div class="note">${esc(gmWon.desc)}</div>` : ''}
+      ${st.ok ? `<div>PACK · ${st.pack.length} GUMS${st.auto ? ' (AUTO)' : ''}</div>` : `<div class="warn">NO USABLE PACK</div><div class="note">${esc(st.problems[0] ?? '')} · BUILD IT IN THE ARMORY</div>`}
+      <div class="status"><span>ROLLS THIS ROUND ${st.rolls} / ${st.rollsPerRound}</span><span>NEXT ${st.price.toLocaleString()} PTS</span></div>
+      <div>HAND</div><div class="hand">${hand}</div>
+      <button class="buy" ${can ? '' : 'disabled'}>${label}</button>
+      <div class="msg ${gmMsg[1]}">${esc(gmMsg[0] || '> ROLL A GUM FROM YOUR PACK · N CHEWS IN GAME')}</div>`;
+    gmSide.querySelector('.buy').addEventListener('click', gumRoll);
+  }
   // ---- EXFIL.EXE --------------------------------------------------------------------------------------------
   const exfilStatus = () => opts?.exfil?.() ?? { available: false, reason: 'Exfil is not installed' };
   function drawExfil() {
@@ -401,7 +467,7 @@ function build() {
     const state = PERKS.map(p => blocked(p)).join() + opts.points();
     if (!win.hidden && state !== lastState) { renderGrid(); select(shown); }
     lastState = state;
-    drawExfil(); drawArsenal(); drawStark();
+    drawExfil(); drawArsenal(); drawStark(); drawGums();
     $('[data-app=stark]').classList.toggle('off', !opts.stark?.()?.unlocked);
   }
   function open(o) {
@@ -419,6 +485,7 @@ function build() {
   root.querySelector('[data-app=exfil]').addEventListener('click', () => openApp('exfil'));
   root.querySelector('[data-app=arsenal]').addEventListener('click', () => openApp('arsenal'));
   root.querySelector('[data-app=stark]').addEventListener('click', () => openApp('stark'));
+  root.querySelector('[data-app=gums]').addEventListener('click', () => openApp('gums'));
   for (const b of root.querySelectorAll('[data-close]')) b.addEventListener('click', closeApp);
   root.querySelector('[data-logoff]').addEventListener('click', close);
   return { open, close, isOpen: () => !root.hidden };
