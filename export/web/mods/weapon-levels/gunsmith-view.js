@@ -122,7 +122,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   // ---- 3D stage ------------------------------------------------------------------
   const canvas=$('canvas.stage');
   const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;
+  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));   // 2× on a high-DPI screen quadrupled the fill cost of heavy BO3 modelsrenderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;
   const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(28,1,.1,2000);
   scene.add(new THREE.HemisphereLight(0xdfe6ee,0x1a1410,1.3));
@@ -205,10 +205,13 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(!gun||!ANCHORS[s])return null;   // the camo row has no part to point at
     const part=partCentre(s);if(part)return part;
     if(home.has(s))return gun.localToWorld(home.get(s).clone());
-    const own=available(cat,def,id).filter(a=>a.slot===s).flatMap(a=>a.tags);
-    for(const n of [...own,...ANCHORS[s]]){const b=gun.getObjectByName(n);if(b)return b.getWorldPosition(new THREE.Vector3());}
-    return null;
+    // the named fallback (a tag or anchor bone), looked up once per gun: BO3 guns land here every frame, and a name search
+    // through their hierarchy per slot per frame was most of the Gunsmith's lag on them
+    const key=gun.uuid+'|'+s;let b=anchorObj.get(key);
+    if(b===undefined){b=null;const own=available(cat,def,id).filter(a=>a.slot===s).flatMap(a=>a.tags);for(const n of [...own,...ANCHORS[s]]){b=gun.getObjectByName(n);if(b)break;}anchorObj.set(key,b??null);}
+    return b?b.getWorldPosition(new THREE.Vector3()):null;
   };
+  const anchorObj=new Map();
 
   // ---- UI -----------------------------------------------------------------------------
   const slotsOf=()=>SLOT_ORDER.filter(s=>available(cat,def,id).some(a=>a.slot===s));
@@ -365,6 +368,8 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
 
   // ---- frame: camera, leader lines, pulse ---------------------------------------------------
   const svg=$('svg.lines'),v=new THREE.Vector3();let t=0,last=performance.now();
+  let emissiveFor=null,emissiveMeshes=[],pulsedSlot,lastPaths='',skip=false,lastCam=new THREE.Vector3(),lastKey='';
+  const PULSE=new THREE.Color('#f3a33a');
   function frame(now){
     if(!alive)return;requestAnimationFrame(frame);
     const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;camoTime.value+=dt;   // animated camos (Pack-a-Punch, Prestige Master)
@@ -376,9 +381,15 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     // keep the gun off-centre toward the free middle of the screen
     camera.lookAt(focus);camera.setViewOffset(w,h,-w*.03,0,w,h);
     // pulse the parts of the selected slot
-    if(gun){const pulse=.12+.1*Math.sin(t*5);gun.traverse(o=>{if(!o.isMesh||!o.visible)return;const m=o.material;if(!m?.emissive)return;
-      const hot=slot&&partOf(o)===slot;m.emissive.copy(hot?new THREE.Color('#f3a33a').multiplyScalar(pulse):m.userData.emissive0??new THREE.Color(0));});}
+    if(gun){
+      if(emissiveFor!==gun){emissiveFor=gun;emissiveMeshes=[];gun.traverse(o=>{if(o.isMesh&&o.material?.emissive)emissiveMeshes.push(o);});pulsedSlot=undefined;}
+      if(slot||pulsedSlot!==slot){const pulse=.12+.1*Math.sin(t*5);pulsedSlot=slot;
+        for(const o of emissiveMeshes){if(!o.visible)continue;const m=o.material;if(!m?.emissive)continue;const hot=slot&&partOf(o)===slot;
+          if(hot)m.emissive.copy(PULSE).multiplyScalar(pulse);else if(m.userData.emissive0)m.emissive.copy(m.userData.emissive0);else m.emissive.setRGB(0,0,0);}}}
     tickGlow(glow,t);
+    // the idle spin alone renders at 30 fps; the camera easing, a drag, a hover or slot change, a pulsing slot render every frame
+    const key=String(hover)+'|'+slot+'|'+id;const busy=dragging||slot||key!==lastKey||camera.position.distanceTo(lastCam)>dist*.01||focus.distanceTo(focusGoal)>.5||Math.abs(distGoal-dist)>.5;
+    lastKey=key;lastCam.copy(camera.position);skip=!busy&&!skip;if(skip)return;
     renderer.render(scene,camera);
     // markers and leader lines from each slot row to its part on the gun
     let paths='';const rootBox=root.getBoundingClientRect();
@@ -395,7 +406,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       paths+=`<path d="M${sx},${sy} H${mx} L${x-10},${y}" fill="none" stroke="${sel?'#f3a33a':'#ffffff40'}" stroke-width="${sel?1.6:1}" ${sel?'':'stroke-dasharray="3 4"'}/>`;
       paths+=`<circle cx="${sx}" cy="${sy}" r="2.5" fill="${sel?'#f3a33a':'#ffffff60'}"/>`;
     }
-    svg.innerHTML=paths;
+    if(paths!==lastPaths){lastPaths=paths;svg.innerHTML=paths;}
   }
   // Only tags the gun hides by default are attachment parts (the M16's stock
   // handguard is skinned to tag_heat_guard, which the flamer also lists).
@@ -417,9 +428,14 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     partCache.set(o,res);return res;
   }
   function close(){if(!alive)return;alive=false;
+    if(host){host.renderWorld=prevWorld;host.hideViewmodel=prevHide;}
     // materials are shared with the game's copies of this model: put them back
     gun?.traverse(o=>{const m=o.material;if(o.isMesh&&m?.emissive&&m.userData.emissive0)m.emissive.copy(m.userData.emissive0);});removeEventListener('keydown',onKey,true);renderer.dispose();root.remove();onClose?.();}
 
+  // In a match the Gunsmith covers the screen: stop drawing the world and the viewmodel behind it while it's open
+  // (the engine's mods.renderWorld hook; restored as it was on close)
+  const host=window.kino?.mods,prevWorld=host?.renderWorld,prevHide=host?.hideViewmodel;
+  if(host){host.renderWorld=()=>{};host.hideViewmodel=true;}
   requestAnimationFrame(frame);
   await loadGun();
   return {close};

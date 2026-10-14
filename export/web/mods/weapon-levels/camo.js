@@ -67,10 +67,10 @@ export function prestigeCamo(id){
   const m=/^pr([123]):(.+)$/.exec(id??'');if(!m)return null;
   const tier=+m[1],owner=m[2],seed=hashStr(owner),T=PRESTIGE_TABLE[owner];
   const e=T??(()=>{const r=rng(seed),[a,b]=WORDS[tier-1],h=seed%360;return {cls:'special',h,h2:(h+150)%360,styles:[1,2,3].map(t=>PRESTIGE_STYLES[t][Math.floor(r()*6)]),names:[1,2,3].map(t=>WORDS[t-1][0][Math.floor(r()*WORDS[t-1][0].length)]+' '+WORDS[t-1][1][Math.floor(r()*WORDS[t-1][1].length)])};})();
-  const style=e.styles[tier-1],spec={tier,style,seed,h:e.h,h2:e.h2,cls:e.cls};
+  const [h,h2,tone=0]=e.pal?.[tier-1]??[e.h,e.h2],style=e.styles[tier-1],spec={tier,style,seed,h,h2,tone,cls:e.cls};   // pal: per-tier colours, spread within each design
   const c={id,name:e.names[tier-1],prestige:tier,owner,seed,style,cls:e.cls,procedural:'prestige',spec,scale:tier===3?1.6:2.2,mix:.94,
     ...(tier===2&&!['mosaic','carbon'].includes(style)?{metal:true}:{}),
-    ...(tier===3?{anim:{c1:artRgb(e.h,1,.55),c2:artRgb(e.h2,1,.6)},glow:{procedural:'prestige-glow',spec,seed,tier}}:{})};
+    ...(tier===3?{anim:{c1:artRgb(h,1,.55),c2:artRgb(h2,1,.6)},glow:{procedural:'prestige-glow',spec,seed,tier}}:{})};
   prestigeCache.set(id,c);return c;
 }
 export const camoById=(cats,id)=>cats?.camos.find(c=>c.id===id)??prestigeCamo(id);
@@ -122,7 +122,7 @@ export function fillSwatches(root,lookup){
 const shopOwned=()=>{try{return new Set(JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]);}catch{return new Set();}};
 const texCache=new Map();
 export function camoTexture(camo,base=import.meta.url){
-  const key=camo.texture??('proc:'+camo.procedural+(camo.spec?':'+camo.spec.seed+':'+camo.spec.tier+':'+camo.spec.style:''));
+  const key=camo.texture??('proc:'+camo.procedural+(camo.spec?':'+camo.spec.seed+':'+camo.spec.tier+':'+camo.spec.style+':'+camo.spec.h+':'+(camo.spec.tone??0):''));
   if(texCache.has(key))return texCache.get(key);
   let t;
   if(camo.texture){t=new THREE.TextureLoader().load(new URL(camo.texture,base).href);}

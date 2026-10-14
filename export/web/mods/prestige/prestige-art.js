@@ -109,6 +109,9 @@ export function drawPrestigeArt(spec,glow=false){
   // the base and its glow must line up: the Master's generator runs from the same seed for both
   const rr=spec.tier===3?rng(spec.seed*31+21):r;
   fn(g,S,rr,spec,w,glow);
+  // tone: within a design, neighbouring guns alternate normal / darker / lighter so close hues still read differently
+  if(!glow&&spec.tone===1){g.globalCompositeOperation='multiply';g.fillStyle='rgba(70,70,80,.55)';g.fillRect(0,0,S,S);g.globalCompositeOperation='source-over';}
+  if(!glow&&spec.tone===2){g.globalCompositeOperation='screen';g.fillStyle='rgba(255,250,235,.22)';g.fillRect(0,0,S,S);g.globalCompositeOperation='source-over';}
   if(!glow&&MOTIF[spec.cls])MOTIF[spec.cls](g,S,rng(spec.seed*13+spec.tier),spec,w);
   return c;
 }
