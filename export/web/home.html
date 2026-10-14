@@ -52,6 +52,7 @@
   <section id="tab-armory" class="tab">
     <nav class="armory-nav" id="armory-nav">
       <button data-pane="loadout" class="active">LOADOUT</button>
+      <button data-pane="weapons">WEAPONS</button>
       <button data-pane="classes">CLASSES</button>
       <button data-pane="operator">OPERATOR</button>
     </nav>
@@ -65,6 +66,17 @@
           <div id="picker-grid" class="picker-grid"></div>
         </div>
         <div class="detail" id="detail"></div>
+      </div>
+    </section>
+
+    <section id="pane-weapons" class="pane">
+      <header class="tab-head"><span class="eyebrow">WEAPONS</span><span class="muted small" id="wp-hint">Every gun by class · Gunsmith, camos and Mystery Box</span></header>
+      <div class="weapons-pane">
+        <div class="picker">
+          <div id="wp-cats" class="picker-cats"></div>
+          <div id="wp-grid" class="picker-grid"></div>
+        </div>
+        <div class="detail" id="wp-detail"></div>
       </div>
     </section>
 

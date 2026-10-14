@@ -73,7 +73,7 @@ addEventListener('focus',()=>{profile=loadProfile();renderProfile();renderLoadou
 const tabs=[...document.querySelectorAll('#tabs button')],panes=[...document.querySelectorAll('#armory-nav button')];
 // Armory holds Loadout, Classes and Operator as panes. Old links (#loadout, #classes,
 // #character) open the matching pane.
-const PANES={loadout:'loadout',classes:'classes',operator:'operator',character:'operator'};
+const PANES={loadout:'loadout',weapons:'weapons',classes:'classes',operator:'operator',character:'operator'};
 let pane=PANES[location.hash.slice(1)]??'loadout';
 function showTab(name){
   if(PANES[name]){pane=PANES[name];name='armory';}
@@ -246,11 +246,11 @@ const gunsmithHas=id=>gunsmith&&weapons[id]&&(weapons[id].gunsmith===true||Objec
 // Opened from the loadout: the arrows go through every gun with attachments,
 // loadout guns first, so box and wall guns can be set up before you find them
 // (attachments are saved per gun and apply however you get it).
-function openLoadoutGunsmith(id){
+function openLoadoutGunsmith(id,onClose){
   const l=validLoadout(config,profile,weapons),own=[l.primary].filter(w=>w&&gunsmithHas(w)&&smithOpen(w));
   const ids=[...own,...Object.keys(weapons).filter(w=>!own.includes(w)&&!w.includes('upgraded')&&gunsmithHas(w)&&smithOpen(w))];
   openGunsmith({cat:gunsmith,weapons,profile,id,ids:ids.includes(id)?ids:[id],label:w=>w===l.primary?'STARTING PISTOL':'BOX / WALL GUN',
-    onChange:()=>save(),onClose:()=>{focus={id,isWeapon:true};renderLoadout();}});
+    onChange:()=>save(),onClose:onClose??(()=>{focus={id,isWeapon:true};renderLoadout();})});
 }
 loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
 // One starting slot, pistols only; the Mystery Box card edits what the box can give you.
@@ -286,6 +286,7 @@ function renderLoadout(){
     $('slots').append(el);
   }
   renderPicker(u,l);
+  renderWeapons();
 }
 function renderPicker(u,l){
   const grid=$('picker-grid');grid.innerHTML='';
@@ -399,8 +400,9 @@ function weaponBadges(id){
   return out.join('');
 }
 const bar=(label,value,max,shown)=>`<div class="stat"><span>${label}</span><span class="track"><i style="width:${Math.max(3,Math.min(100,100*value/max)).toFixed(0)}%"></i></span><b>${shown}</b></div>`;
-function renderDetail(id,isWeapon,unlocked,level){
-  const el=$('detail');
+// opts.el: where to draw (the Weapons pane has its own); opts.smith: show the Gunsmith whatever the slot
+function renderDetail(id,isWeapon,unlocked,level,opts={}){
+  const el=opts.el??$('detail');
   if(!id){el.innerHTML=`<h2>None</h2><p class="muted">${isWeapon?'Leave this slot empty.':'No bonus in this slot.'}</p>`;return;}
   if(!isWeapon){const b=bonusById[id];el.innerHTML=`<span class="eyebrow">BONUS</span><h2>${esc(b.name)}</h2><p>${esc(b.description)}</p><p class="muted">Unlocks at level ${b.level}${unlocked?'':' · locked'}</p>`;return;}
   const d=weapons[id],rpm=Math.round(60/Math.max(.02,d.fireTime)),pellets=Math.max(1,d.pellets);
@@ -414,7 +416,56 @@ function renderDetail(id,isWeapon,unlocked,level){
   // Weapon levels and attachments (mods/weapon-levels).
   // Attachments are edited for the weapon in the selected slot only, not whatever is hovered.
   const inSlot=slotState(activeSlot,unlocks(config,profile.level,weapons),validLoadout(config,profile,weapons)).value;
-  if(gunsmith&&id===inSlot&&smithOpen(id))renderGunsmith(el.querySelector('.gunsmith-slot'),{cat:gunsmith,def:d,id,profile,onOpen:()=>openLoadoutGunsmith(id)});
+  if(gunsmith&&(opts.smith||id===inSlot)&&unlocked&&smithOpen(id)&&gunsmithHas(id))renderGunsmith(el.querySelector('.gunsmith-slot'),{cat:gunsmith,def:d,id,profile,onOpen:()=>openLoadoutGunsmith(id,opts.onClose)});
+}
+
+// ---- Weapons pane: every gun in its class, with the Gunsmith, camos and its Mystery Box toggle ----
+let wpClass=null,wpFocus=null;
+// switch one item in or out of the box, keeping the tier minimums; returns an error message or ''
+function toggleBoxItem(id){
+  const items=boxItems(config,profile,data),it=items.find(i=>i.id===id);if(!it)return 'Locked';
+  if(it.on&&it.kind==='weapon'&&items.filter(i=>i.kind==='weapon'&&i.rarity===it.rarity&&i.on).length<=boxMin(config,items,it.rarity)){
+    const n=boxMin(config,items,it.rarity),r=rarityById[it.rarity]?.name??'';return it.rarity==='wonder'?`The box needs at least ${n} Wonder Weapon${n===1?'':'s'}`:`The box needs at least ${n} ${r} gun${n===1?'':'s'}`;}
+  for(const i of items)if(i.forced)setBoxItem(profile,data,i.id,true);
+  setBoxItem(profile,data,id,!it.on);save();return '';
+}
+function renderWeapons(){
+  const grid=$('wp-grid');if(!grid)return;
+  const u=unlocks(config,profile.level,weapons),list=weaponList(),box=Object.fromEntries(boxItems(config,profile,data).map(i=>[i.id,i]));
+  const present=CLASSES.filter(c=>list.some(w=>classOf(w.id)===c[0]));
+  if(!present.some(c=>c[0]===wpClass))wpClass=present[0]?.[0];
+  $('wp-hint').textContent=`${u.weapons.length} / ${list.length} unlocked · level up to open guns in the Gunsmith`;
+  const cats=$('wp-cats');cats.innerHTML='';
+  for(const [key,label] of present){const all=list.filter(w=>classOf(w.id)===key),open=all.filter(w=>u.weapons.includes(w.id)).length;
+    const b=document.createElement('button');b.className='cat'+(key===wpClass?' on':'');b.innerHTML=`${label}<small>${open}/${all.length}</small>`;
+    b.addEventListener('click',()=>{wpClass=key;wpFocus=null;renderWeapons();});cats.append(b);}
+  grid.innerHTML='';
+  const shown=list.filter(w=>classOf(w.id)===wpClass);
+  if(!shown.some(w=>w.id===wpFocus))wpFocus=shown.find(w=>u.weapons.includes(w.id))?.id??shown[0]?.id;
+  for(const w of shown){
+    const unlocked=u.weapons.includes(w.id),r=rarityById[rarityOf(config,w.id)],el=document.createElement('button');
+    el.className='opt wp-opt'+(w.id===wpFocus?' selected':'')+(unlocked?'':' locked');if(r)el.style.setProperty('--r',r.color);
+    el.innerHTML=`<div class="thumb"></div><strong>${esc(weapons[w.id].name)}</strong><div class="badges">${unlocked?weaponBadges(w.id):`<span class="b rar" style="--r:${r?.color}">${esc((r?.name??'').toUpperCase())}</span>`}${box[w.id]?.on?'<span class="b inbox">IN BOX</span>':''}</div>`;
+    fillThumb(el.querySelector('.thumb'),w.id);
+    if(!unlocked)el.insertAdjacentHTML('beforeend',`<span class="lock">LV ${w.level}</span>`);
+    el.addEventListener('click',()=>{wpFocus=w.id;renderWeapons();});
+    grid.append(el);
+  }
+  renderWeaponCard();
+}
+function renderWeaponCard(){
+  const el=$('wp-detail'),id=wpFocus;if(!id){el.innerHTML='';return;}
+  const unlocked=unlocks(config,profile.level,weapons).weapons.includes(id),it=boxItems(config,profile,data).find(i=>i.id===id);
+  renderDetail(id,true,unlocked,weaponLevel[id],{el,smith:true,onClose:()=>{wpFocus=id;renderWeapons();}});
+  const actions=document.createElement('div');actions.className='wp-actions';
+  const loadout=validLoadout(config,profile,weapons).primary===id;
+  if(unlocked&&isPistol(weapons[id]))actions.insertAdjacentHTML('beforeend',`<button data-act="start" ${loadout?'disabled':''}>${loadout?'STARTING PISTOL':'SET AS STARTING PISTOL'}</button>`);
+  if(it)actions.insertAdjacentHTML('beforeend',`<button data-act="box" class="${it.on?'on':''}">${it.on?'IN MYSTERY BOX · REMOVE':'ADD TO MYSTERY BOX'}</button>`);
+  actions.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
+    if(b.dataset.act==='start'){profile.loadout.primary=id;save();toast(weapons[id].name+' is your starting pistol');}
+    if(b.dataset.act==='box'){const err=toggleBoxItem(id);if(err)toast(err);}
+    renderLoadout();});
+  if(actions.children.length)el.querySelector('h2')?.after(actions);
 }
 
 // ---- Operator (character) --------------------------------------------------------------

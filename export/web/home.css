@@ -190,10 +190,10 @@ main{position:relative;overflow-y:auto;padding:40px 48px 60px}
 /* Career */
 .career .career-nav{margin-bottom:16px}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
-.stat{border:1px solid var(--line);background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:4px}
-.stat span{font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
-.stat strong{font-family:Impact,'Arial Narrow',sans-serif;font-size:30px;letter-spacing:.5px;font-weight:400}
-.stat small{font-size:10px;color:#9d947e;letter-spacing:1px}
+.stat-grid .stat{border:1px solid var(--line);background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.stat-grid .stat span{font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+.stat-grid .stat strong{font-family:Impact,'Arial Narrow',sans-serif;font-size:30px;letter-spacing:.5px;font-weight:400}
+.stat-grid .stat small{font-size:10px;color:#9d947e;letter-spacing:1px}
 .fav-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:14px}
 .fav{display:flex;flex-direction:column;gap:4px;text-align:left;padding:16px;border:1px solid var(--line);background:linear-gradient(135deg,#2a1d17,var(--panel))}
 .fav:hover{border-color:var(--gold)}.fav span{font-size:10px;letter-spacing:3px;color:var(--gold)}.fav strong{font-size:20px;text-transform:uppercase;letter-spacing:1px}.fav small{color:var(--muted);font-size:11px}
@@ -259,3 +259,14 @@ main{position:relative;overflow-y:auto;padding:40px 48px 60px}
 .slot .box-tiers{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
 .slot .box-tiers i{font-style:normal;font-size:9px;font-weight:600;min-width:20px;text-align:center;padding:2px 5px;border:1px solid color-mix(in srgb,var(--r) 60%,transparent);color:var(--r)}
 .detail .gs-locked{color:#f3c27a}
+
+/* Armory → Weapons pane (2026-10-14) */
+.weapons-pane{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.opt.wp-opt{border-left:3px solid color-mix(in srgb,var(--r) 70%,transparent)}
+.opt .badges .inbox{border-color:#e8d27a55;color:#e8d27a}
+.wp-actions{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}
+.wp-actions button{padding:6px 10px;border:1px solid var(--line-strong);background:var(--panel);color:var(--text);font:inherit;font-size:9px;letter-spacing:2px;cursor:pointer}
+.wp-actions button:hover:not([disabled]){border-color:var(--gold)}
+.wp-actions button.on{border-color:#e8d27a88;color:#e8d27a}
+.wp-actions button[disabled]{opacity:.55;cursor:default}
+@media (max-width:1180px){.weapons-pane{grid-template-columns:1fr}}
