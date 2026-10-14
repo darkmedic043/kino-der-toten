@@ -61,9 +61,19 @@ export function boxItems(config,profile,data){
   const u=unlocks(config,profile.level,data.weapons),pool=new Set(data.boxPool??[]),l=profile.loadout;
   const on=new Set(l.boxOn??[]),off=new Set(l.boxOff??[]);
   const item=(id,kind)=>({id,kind,rarity:rarityOf(config,id),on:!off.has(id)&&(pool.has(id)||on.has(id))});
-  return [...u.weapons.filter(id=>!/upgraded/.test(id)).map(id=>item(id,'weapon')),
+  const items=[...u.weapons.filter(id=>!/upgraded/.test(id)).map(id=>item(id,'weapon')),
     ...u.tactical.filter(id=>data.equipment?.[id]).map(id=>item(id,'tactical')),
     ...u.lethal.filter(id=>data.equipment?.[id]).map(id=>item(id,'lethal'))];
+  // each weapon tier keeps its minimum switched on: a short tier is topped up in list order (`forced`)
+  for(const r of Object.keys(config.box?.minPerTier??{})){
+    const tier=items.filter(i=>i.kind==='weapon'&&i.rarity===r);let need=boxMin(config,items,r)-tier.filter(i=>i.on).length;
+    for(const i of tier)if(need>0&&!i.on){i.on=i.forced=true;need--;}
+  }
+  return items;
+}
+// How many guns of a tier must be on: progression.json box.minPerTier, or every unlocked one if there are fewer.
+export function boxMin(config,items,rarity){
+  return Math.min(config.box?.minPerTier?.[rarity]??0,items.filter(i=>i.kind==='weapon'&&i.rarity===rarity).length);
 }
 // Turn one item on or off (returns the new loadout fields).
 export function setBoxItem(profile,data,id,on){

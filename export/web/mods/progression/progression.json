@@ -480,7 +480,14 @@
     }
   ],
   "box": {
-    "min": 3,
-    "note": "The Mystery Box list: unlocked weapons, tacticals and lethals. Items in the game data boxPool start switched on; the player toggles any item (profile.loadout.boxOn / boxOff)."
+    "minPerTier": {
+      "wonder": 1,
+      "legendary": 1,
+      "epic": 3,
+      "rare": 3,
+      "uncommon": 4,
+      "common": 4
+    },
+    "note": "The Mystery Box list: unlocked weapons, tacticals and lethals. Items in the game data boxPool start switched on; the player toggles any item (profile.loadout.boxOn / boxOff). Each weapon tier needs minPerTier switched on (or every unlocked gun of that tier, if fewer); short tiers are topped up in list order."
   }
 }

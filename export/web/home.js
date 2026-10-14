@@ -6,7 +6,7 @@ import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
 import { startSocial, onSocial, request, accept, decline, cancel, remove, statusText } from './social.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
-import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady, unlockLevel, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem } from './profile.js';
+import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady, unlockLevel, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
@@ -333,7 +333,7 @@ const rarityLine=id=>{const r=rarityById[rarityOf(config,id)];return r?`<b class
 
 // ---- Mystery Box list -------------------------------------------------------------------
 // Tabs are the rarity tiers (Wonder Weapon at the top, in its own tier), then
-// tacticals and lethals. No tier has a cap; the box needs at least `box.min`
+// tacticals and lethals. No tier has a cap; each weapon tier needs `box.minPerTier`
 // weapons switched on. Locked items show with their unlock level.
 const lethalById=Object.fromEntries((config.lethal??[]).map(t=>[t.id,t]));
 let boxTab=null;
@@ -343,10 +343,13 @@ function boxTabs(){
 }
 function renderBoxPicker(u){
   const grid=$('picker-grid'),items=boxItems(config,profile,data),byId=Object.fromEntries(items.map(i=>[i.id,i]));
-  const min=config.box?.min??3,onWeapons=items.filter(i=>i.kind==='weapon'&&i.on).length;
   const tabs=boxTabs();if(!tabs.some(t=>t.key===boxTab))boxTab=tabs[0]?.key;const tab=tabs.find(t=>t.key===boxTab);
+  // the tier minimums: topped-up (forced) items are written to the profile on the first change, so they stay put
+  const min=tab?.kind==='weapon'?boxMin(config,items,tab.key):0,onTier=tab?tab.all.filter(w=>byId[w.id]?.on).length:0;
+  const keep=()=>{for(const i of items)if(i.forced)setBoxItem(profile,data,i.id,true);};
+  const tierName=rarityById[tab?.key]?.name??'',need=tab?.key==='wonder'?`at least ${min} Wonder Weapon${min===1?'':'s'}`:`at least ${min} ${tierName} gun${min===1?'':'s'}`;
   $('picker-title').textContent='MYSTERY BOX';
-  $('picker-hint').textContent=`${items.filter(i=>i.on).length} items on · no limit per tier · at least ${min} weapons`;
+  $('picker-hint').textContent=`${items.filter(i=>i.on).length} items on · no limit per tier${min?' · this tier needs '+min:''}`;
   const cats=$('picker-cats');cats.innerHTML='';cats.hidden=false;
   for(const t of tabs){const on=t.all.filter(w=>byId[w.id]?.on).length;
     const b=document.createElement('button');b.className='cat'+(t.key===boxTab?' on':'');if(t.color)b.style.setProperty('--r',t.color);
@@ -357,9 +360,9 @@ function renderBoxPicker(u){
   const open=tab.all.filter(w=>byId[w.id]),bar=document.createElement('div');bar.className='box-bar';
   bar.innerHTML='<button data-on="1">ALL ON</button><button data-on="">ALL OFF</button>';
   bar.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const on=!!b.dataset.on;
-    let left=onWeapons,blocked=false;
-    for(const w of open){if(byId[w.id].on===on)continue;if(!on&&tab.kind==='weapon'){if(left<=min){blocked=true;continue;}left--;}setBoxItem(profile,data,w.id,on);}
-    if(blocked)toast(`The box needs at least ${min} weapons`);
+    keep();let left=onTier,blocked=false;
+    for(const w of open){if(byId[w.id].on===on)continue;if(!on&&left<=min){blocked=true;continue;}if(!on)left--;setBoxItem(profile,data,w.id,on);}
+    if(blocked)toast(`The box needs ${need}`);
     save();renderLoadout();});
   grid.append(bar);
   for(const w of tab.all){
@@ -372,15 +375,15 @@ function renderBoxPicker(u){
     el.addEventListener('mouseenter',()=>tab.kind==='weapon'?renderDetail(w.id,true,unlocked,w.level):tab.kind==='tactical'?renderTactical(w.id,unlocked):renderLethal(w.id));
     el.addEventListener('click',()=>{
       if(!unlocked){toast(`Reach level ${w.level} to unlock`);return;}
-      if(it.on&&tab.kind==='weapon'&&onWeapons<=min){toast(`The box needs at least ${min} weapons`);return;}
-      setBoxItem(profile,data,w.id,!it.on);focus={id:w.id,isWeapon:tab.kind==='weapon'};save();renderLoadout();
+      if(it.on&&onTier<=min){toast(`The box needs ${need}`);return;}
+      keep();setBoxItem(profile,data,w.id,!it.on);focus={id:w.id,isWeapon:tab.kind==='weapon'};save();renderLoadout();
     });
     grid.append(el);
   }
   const f=focus?.id&&tab.all.some(w=>w.id===focus.id)?focus.id:null;
   const d=$('detail');
   if(f)tab.kind==='weapon'?renderDetail(f,true,!!byId[f],1):tab.kind==='tactical'?renderTactical(f,!!byId[f]):renderLethal(f);
-  else d.innerHTML=`<span class="eyebrow">MYSTERY BOX</span><h2>Your box</h2><p>Pick which weapons, tacticals and lethals the Mystery Box can give you. Every unlocked item can go in, with no limit per tier.</p><p>Rarer tiers come up a little less often: ${(config.rarities??[]).map(r=>`<b class="rar-text" style="--r:${r.color}">${esc(r.name)}</b>`).join(' · ')}.</p><p class="muted">Guns you already hold are skipped. If nothing on your list is left, the box rolls from the full pool.</p>`;
+  else d.innerHTML=`<span class="eyebrow">MYSTERY BOX</span><h2>Your box</h2><p>Pick which weapons, tacticals and lethals the Mystery Box can give you. Every unlocked item can go in, with no limit per tier.</p><p>Each tier needs a minimum: ${[...(config.rarities??[])].reverse().filter(r=>config.box?.minPerTier?.[r.id]).map(r=>`<b class="rar-text" style="--r:${r.color}">${config.box.minPerTier[r.id]} ${esc(r.name)}</b>`).join(' · ')} (or all you have unlocked, if fewer).</p><p>Rarer tiers come up a little less often: ${(config.rarities??[]).map(r=>`<b class="rar-text" style="--r:${r.color}">${esc(r.name)}</b>`).join(' · ')}.</p><p class="muted">Guns you already hold are skipped. If nothing on your list is left, the box rolls from the full pool.</p>`;
 }
 function renderLethal(id){
   const t=lethalById[id];$('detail').innerHTML=`<div class="thumb"></div><span class="eyebrow">LETHAL</span><h2>${esc(t.name)}</h2><p>${esc(t.description)}</p><p class="muted">${rarityLine(id)}From the Mystery Box</p>`;
