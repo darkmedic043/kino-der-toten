@@ -10,6 +10,7 @@
 <link rel="modulepreload" href="vendor/three.core.js">
 <link rel="stylesheet" href="game-menu.css">
 <link rel="stylesheet" href="home.css">
+<link rel="stylesheet" href="shop.css">
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/jsm/","three-mesh-bvh":"./vendor/bvh.js"}}</script>
 </head>
 <body>
@@ -19,7 +20,8 @@
   <nav id="tabs">
     <button data-tab="play" class="active">PLAY</button>
     <button data-tab="armory">ARMORY</button>
-    <a class="nav-shop" href="shop.html">SHOP <b id="credits-chip"></b></a>
+    <button data-tab="camos">CAMOS</button>
+    <button data-tab="shop" class="nav-shop">SHOP <b id="credits-chip"></b></button>
     <button data-tab="career">CAREER</button>
     <button data-tab="social">SOCIAL <b id="social-badge" hidden></b></button>
     <button data-tab="mods">MODS</button>
@@ -52,6 +54,11 @@
     <div id="map-grid" class="map-grid"></div>
   </section>
 
+  <section id="tab-shop" class="tab"><div id="shop-root"></div></section>
+  <section id="tab-camos" class="tab">
+    <header class="tab-head"><span class="eyebrow">CAMOS</span><span class="muted small">Every camo that works on any gun · put one on a gun, or on all of them</span></header>
+    <div id="camos-root"></div>
+  </section>
   <section id="tab-armory" class="tab">
     <nav class="armory-nav" id="armory-nav">
       <button data-pane="loadout" class="active">LOADOUT</button>

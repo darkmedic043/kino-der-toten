@@ -25,6 +25,8 @@ function applyMenuTheme(){if(!shopCat)return;const m=shopCosmetics(shopCat).menu
 addEventListener('kino-credits',()=>{try{renderProfile();}catch{}});
 import { loadResearchConfig } from './mods/research/research.js';
 import { renderResearch } from './mods/research/pane.js';
+import { mountShop } from './mods/shop/shop-tab.js';
+import { renderCamos, CAMO_CSS } from './mods/weapon-levels/camo-collection.js';
 let researchCfg=null;
 loadResearchConfig(new URL('mods/research/',document.baseURI)).then(c=>{researchCfg=c;drawResearch();}).catch(e=>console.warn('[research]',e));
 function drawResearch(){const el=document.getElementById('research-root');if(el&&researchCfg)renderResearch(el,{cfg:researchCfg,level:unlockLvl(loadProfile()),toast});}
@@ -103,6 +105,8 @@ function showTab(name){
   const hash=name==='armory'?pane:name;if(location.hash!=='#'+hash)history.replaceState(null,'','#'+hash);
   stage.active=name==='armory'&&pane==='operator';if(stage.active)stage.start();
   if(name==='armory'&&pane==='research')drawResearch();
+  if(name==='shop')mountShop($('shop-root'),{toast,data}).catch(e=>console.warn('[shop]',e));
+  if(name==='camos')drawCamos();
   if(name==='career')renderCareer($('career-root'),{mapList,weapons:baseData?.weapons??{}});
 }
 for(const b of tabs)b.addEventListener('click',()=>showTab(b.dataset.tab));
@@ -289,7 +293,7 @@ function fillThumb(el,id){if(!id){el.style.backgroundImage='';return;}thumb(id).
 
 // ---- Loadout ----------------------------------------------------------------------
 let gunsmith=null,camoCats=null;
-loadCamos(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{camoCats=c;renderLoadout();}).catch(()=>{});
+loadCamos(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{camoCats=c;renderLoadout();drawCamos();}).catch(()=>{});
 // Weapon classes, Black Ops style: the picker shows one class at a time.
 const classOf=id=>classOfIn(weapons,id);
 const activeClass={};
@@ -298,6 +302,14 @@ const smithOpen=id=>unlockLvl(profile)>=gunsmithLevel(config,id);
 const gunsmithHas=id=>gunsmith&&weapons[id]&&(weapons[id].gunsmith===true||Object.keys(weapons[id].mounts??{}).length>0   // gunsmith:true = camos only (the Grimhawk)
   ||weapons[id].statAttachments?.length>0   // imported guns: mounted / stat-only attachments
   ||gunsmith.attachments.some(a=>a.tags.some(t=>(weapons[id].hideTags??[]).includes(t))));
+// ---- Camos tab: every global camo (prestige, shop, special) for any gun (mods/weapon-levels/camo-collection.js) ----
+{const st=document.createElement('style');st.textContent=CAMO_CSS;document.head.append(st);}
+function drawCamos(){
+  const el=$('camos-root');if(!el||!camoCats||!gunsmith)return;
+  const guns=Object.keys(weapons).filter(id=>!/upgraded/.test(id)&&weapons[id]?.model&&gunsmithHas(id));
+  renderCamos(el,{cats:camoCats,weapons,guns,profile:()=>profile,toast,
+    setCamo:(g,c)=>{profile.camo??={};const e=profile.camo[g]??={p:{}};if(c)e.on=c;else delete e.on;save();}});
+}
 // Opened from the loadout: the arrows go through every gun with attachments,
 // loadout guns first, so box and wall guns can be set up before you find them
 // (attachments are saved per gun and apply however you get it).
@@ -308,7 +320,7 @@ function openLoadoutGunsmith(id,onClose){
     onChange:()=>save(),onClose:onClose??(()=>{focus={id,isWeapon:true};renderLoadout();})});
 }
 loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;{const st=loadProfile();if(migrateWeaponLevels(c,weapons,st)){saveProfile(st);profile.weaponXp=st.weaponXp;}}   // 30-level track: old saves keep their attachments
-  const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
+  const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();drawCamos();}).catch(e=>console.warn('[gunsmith]',e));
 // One starting slot, pistols only; the Mystery Box card edits what the box can give you.
 const slots=[{key:'primary',label:'STARTING PISTOL'},{key:'box',label:'MYSTERY BOX'},{key:'tactical',label:'TACTICAL'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
 let activeSlot='primary',focus=null;
@@ -731,7 +743,7 @@ function renderMods(){
 }
 
 renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();renderCredits();
-showTab(['play','armory','career','social','mods','settings',...Object.keys(PANES)].includes(location.hash.slice(1))?location.hash.slice(1):'play');
+showTab(['play','armory','camos','shop','career','social','mods','settings',...Object.keys(PANES)].includes(location.hash.slice(1))?location.hash.slice(1):'play');
 window.menu={profile:()=>profile,thumb,showTab,stage};
 
 // ---- Classes (mods/classes): skill trees; progress in its own storage key ------------------

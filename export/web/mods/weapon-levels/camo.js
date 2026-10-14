@@ -95,6 +95,29 @@ const SHOP_DRAW={
   spectrum(g,S){for(let x=0;x<S;x++){g.fillStyle=`hsl(${x/S*360},70%,22%)`;g.fillRect(x,0,1,S);}},
   'stripes-glow'(g,S){g.fillStyle='#000';g.fillRect(0,0,S,S);g.fillStyle='#fff';for(let i=-S;i<S*2;i+=48){g.beginPath();g.moveTo(i,0);g.lineTo(i+10,0);g.lineTo(i+10-S,S);g.lineTo(i-S,S);g.fill();}},
 };
+// ---- swatches: small thumbnails for menus, shared by every page and generated one per frame -----------------------
+// camoSwatch(camo) → the cached data URL or '' (and queues it); fillSwatches(root) fills [data-swatch] elements as they're ready.
+const swatches=new Map(),swatchQueue=[];let swatchBusy=false;
+export function camoSwatch(c){
+  if(!c)return '';const k=c.id;if(swatches.has(k))return swatches.get(k)??'';
+  swatches.set(k,null);swatchQueue.push(c);pumpSwatches();return '';
+}
+function pumpSwatches(){
+  if(swatchBusy||!swatchQueue.length)return;swatchBusy=true;
+  requestAnimationFrame(()=>{
+    const c=swatchQueue.shift();
+    try{const img=camoTexture(c).image;let url='';
+      if(img instanceof HTMLCanvasElement){const s=document.createElement('canvas');s.width=s.height=96;s.getContext('2d').drawImage(img,0,0,96,96);url=s.toDataURL('image/jpeg',.8);}
+      else url=img?.src??'';
+      swatches.set(c.id,url);for(const f of swatchWaiters.splice(0))f();}catch(e){swatches.set(c.id,'');}
+    swatchBusy=false;pumpSwatches();});
+}
+const swatchWaiters=[];
+export function fillSwatches(root,lookup){
+  const todo=[...root.querySelectorAll('[data-swatch]')].filter(e=>!e.dataset.filled);if(!todo.length)return;
+  for(const el of todo){const c=lookup(el.dataset.swatch);const url=camoSwatch(c);if(url){el.style.backgroundImage=`url(${url})`;el.dataset.filled='1';}}
+  if(todo.some(e=>!e.dataset.filled))swatchWaiters.push(()=>fillSwatches(root,lookup));
+}
 // shop camos the player owns (kino.mods.shop, read directly: camo.js is shared by every page)
 const shopOwned=()=>{try{return new Set(JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]);}catch{return new Set();}};
 const texCache=new Map();

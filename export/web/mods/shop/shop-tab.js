@@ -1,33 +1,36 @@
-// The Shop page (roadmap Phase 6, shop.html): spend credits on cosmetics. Featured (3 daily slots + the weekly bundle),
-// seven categories, and Credits (challenges and the ledger). Select an item to preview it in the drawer, buy it (two
-// clicks), equip it here or in the Armory (camos in the Gunsmith, outfits in the Operator pane). Rules: mods/shop/shop.js.
-import * as THREE from 'three';
-import { cloudReady } from './cloud.js';
-import { loadModel } from './animation.js';
-import { loadCatalog, loadShop, saveShop, itemById, slotOf, rotation, listed, buy, toggleEquip, installRewards } from './mods/shop/shop.js';
-import { loadCredits, saveCredits, loadCreditsConfig, currentChallenges, challengeText, nextReset } from './mods/credits/credits.js';
-import { loadCamos, camoTexture, applyCamo, camoTime } from './mods/weapon-levels/camo.js';
-import { renderPortrait } from './characters.js';
-import { cardSvg } from './mods/shop/card.js';
+// The Shop (roadmap Phase 6): a main-menu tab (home.js mounts it into #shop-root; the sidebar stays). Spend credits on
+// cosmetics: Featured (3 daily slots + the weekly bundle), seven categories, and Credits (challenges and the ledger).
+// Select an item to preview it in the drawer, buy it (two clicks), equip it here or where it lives (camos in the Gunsmith
+// or the Camos tab, outfits in the Operator pane). Rules: shop.js.
+import { loadCatalog, loadShop, saveShop, itemById, slotOf, rotation, listed, buy, toggleEquip, installRewards } from './shop.js';
+import { loadCredits, saveCredits, loadCreditsConfig, currentChallenges, challengeText, nextReset } from '../credits/credits.js';
+import { loadCamos, camoSwatch, fillSwatches } from '../weapon-levels/camo.js';
+import { gunPreview } from '../weapon-levels/gun-preview.js';
+import { renderPortrait } from '../../characters.js';
+import { cardSvg } from './card.js';
 
-const $=id=>document.getElementById(id);
+const MARKUP=`<header class="sp-top"><h1>SHOP</h1><div class="sp-bal"><b id="sp-balance">0</b><span>CREDITS</span></div><div class="sp-timers"><span id="sp-daily"></span><span id="sp-weekly"></span></div></header>
+<div class="sp-main"><nav class="sp-cats" id="sp-cats"></nav><select class="sp-cats-select" id="sp-cats-select" aria-label="Category"></select><section class="sp-body" id="sp-body"></section><aside class="sp-drawer" id="sp-drawer"></aside></div>`;
+let mounted=null;
+// mount once; later calls just refresh (the tab was shown again)
+export async function mountShop(root,{toast,data}){
+  if(mounted){mounted.render();return;}
+  root.innerHTML=MARKUP;root.classList.add('shop-tab');
+  const $=id=>root.querySelector('#'+id);
+  const base=new URL('mods/',document.baseURI);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let toastT=0;function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2600);}
-
-await cloudReady;installRewards();
-const [cat,ccfg,camos,data,chars]=await Promise.all([loadCatalog(new URL('mods/shop/',location.href)),loadCreditsConfig(new URL('mods/credits/',location.href)),
-  loadCamos(new URL('mods/weapon-levels/',location.href)),fetch('game-data.json').then(r=>r.json()),fetch('mods/characters/characters.json').then(r=>r.json())]);
+installRewards();
+const [cat,ccfg,camos,chars]=await Promise.all([loadCatalog(new URL('shop/',base)),loadCreditsConfig(new URL('credits/',base)),
+  loadCamos(new URL('weapon-levels/',base)),fetch(new URL('characters/characters.json',base)).then(r=>r.json())]);
 const by=itemById(cat),rar=cat.rarities;
 const camoOf=item=>camos.camos.find(c=>c.id===item.data?.camo);
 const charOf=item=>chars.characters.find(c=>c.id===item.data?.character);
-let view=location.hash.slice(1)||'featured',sel=null;
+let view='featured',sel=null;
 
 // ---- small previews ---------------------------------------------------------------------------------------------
-const swatchCache=new Map();
-function camoSwatch(c){if(!c)return '';if(swatchCache.has(c.id))return swatchCache.get(c.id);let url='';try{const img=camoTexture(c,new URL('mods/weapon-levels/camo.js',location.href)).image;url=img instanceof HTMLCanvasElement?img.toDataURL('image/jpeg',.75):img?.src??'';}catch{}swatchCache.set(c.id,url);return url;}
 function thumb(item){
   const d=item.data??{};
-  if(item.cat==='camo'){const c=camoOf(item);return `<div class="pv" style="background-image:url(${camoSwatch(c)})"></div>`;}
+  if(item.cat==='camo'){const c=camoOf(item);return `<div class="pv" data-swatch="${c?.id}" style="background-image:url(${camoSwatch(c)})"></div>`;}
   if(item.cat==='card')return `<div class="pv">${cardSvg(d,'SURVIVOR','LEVEL 1')}</div>`;
   if(item.cat==='outfit'){const ch=charOf(item);return `<div class="pv" style="background:linear-gradient(135deg,${ch?.color} 0 55%,${ch?.accent} 55%)"></div>`;}
   if(d.char||d.hitmarker)return `<div class="pv" style="color:${d.color};font-size:46px">${esc(d.char??d.hitmarker)}</div>`;
@@ -49,23 +52,8 @@ function playHits(hs){
   thump(t0,{from:170,to:65,length:.13,body:.95,knock:.55,knockCut:1500});thump(t0+.25,{from:230,to:90,length:.12,body:1,knock:.7,knockCut:2600});
   thump(t0+.5,{from:170,to:65,length:.13,body:.95,knock:.55,knockCut:1500});thump(t0+.55,{from:120,to:42,length:.22,body:1,knock:.35,knockCut:700});
 }
-// the camo drawer: a gun turning on a small renderer (one, reused)
-let gl=null,gun=null,gunReady=null,spin=0;
-async function gunPreview(el,camo){
-  gl??=(()=>{const r=new THREE.WebGLRenderer({antialias:true,alpha:true});r.outputColorSpace=THREE.SRGBColorSpace;const scene=new THREE.Scene();
-    scene.add(new THREE.HemisphereLight(0xffffff,0x332211,2.2));const k=new THREE.DirectionalLight(0xffffff,2.4);k.position.set(1,2,2);scene.add(k);
-    const cam=new THREE.PerspectiveCamera(28,2,.1,5000);return {r,scene,cam};})();
-  el.innerHTML='';el.append(gl.r.domElement);
-  gunReady??=loadModel(data.weapons.m16_zm?.model??Object.values(data.weapons)[0].model).then(m=>{const box=new THREE.Box3().setFromObject(m),s=box.getSize(new THREE.Vector3());
-    if(s.z>s.x)m.rotation.y=Math.PI/2;m.updateMatrixWorld(true);const b2=new THREE.Box3().setFromObject(m);m.position.sub(b2.getCenter(new THREE.Vector3()));
-    gun=new THREE.Group();gun.add(m);gl.scene.add(gun);const sz=b2.getSize(new THREE.Vector3()).length();gl.cam.position.set(0,sz*.14,sz*1.55);gl.cam.lookAt(0,0,0);return gun;});
-  await gunReady;applyCamo(gun,camo);
-}
-let lastT=performance.now();
-(function frame(now){requestAnimationFrame(frame);const dt=Math.min(.05,(now-lastT)/1000);lastT=now;camoTime.value+=dt;
-  if(gl&&gun&&gl.r.domElement.isConnected){const el=gl.r.domElement.parentElement,w=el.clientWidth,h=el.clientHeight;if(gl.r.domElement.width!==Math.floor(w*devicePixelRatio)){gl.r.setPixelRatio(devicePixelRatio);gl.r.setSize(w,h,false);gl.cam.aspect=w/h;gl.cam.updateProjectionMatrix();}
-    spin+=dt*.5;gun.rotation.y=Math.sin(spin)*.6;gl.r.render(gl.scene,gl.cam);}
-  if(Math.floor(now/1000)!==Math.floor((now-dt*1000)/1000))header();})(lastT);
+const preview=gunPreview();
+setInterval(()=>{if(root.offsetParent)header();},1000);
 
 // ---- page ---------------------------------------------------------------------------------------------------------
 const CATS=[{id:'featured',name:'Featured'},...cat.categories,{id:'credits',name:'Credits'}];
@@ -102,7 +90,7 @@ function render(){
     body.innerHTML=`<h2>${esc(CATS.find(c=>c.id===view)?.name.toUpperCase())}</h2><div class="sp-grid">${[...today.map(i=>card(i,{tag:'TODAY'})),...items.map(i=>card(i))].join('')}</div>
       ${view==='sound'?'<p class="muted small">Music packs need your own music files; none ship yet.</p>':''}`;
   }
-  drawer();header();
+  drawer();header();fillSwatches(root,cid=>camos.camos.find(c=>c.id===cid));
 }
 async function drawer(){
   const el=$('sp-drawer'),item=by[sel];
@@ -116,14 +104,14 @@ async function drawer(){
       :onSale?`<button class="buy" data-buy="${esc(item.id)}"${bal<item.price?' disabled':''}>BUY · ${item.price.toLocaleString()}</button>${bal<item.price?`<span class="hint">You need ${(item.price-bal).toLocaleString()} more credits.</span>`:''}`:'<span class="hint">Not in the shop today.</span>'}
       ${item.data?.hits?'<button class="buy" data-play="1">PLAY</button>':''}</div>${!owned&&where?`<span class="hint">${where}</span>`:''}`;
   const pv=$('sp-pv'),d=item.data??{};
-  if(item.cat==='camo')gunPreview(pv,camoOf(item));
+  if(item.cat==='camo')preview.show(pv,data.weapons.m16_zm??Object.values(data.weapons)[0],camoOf(item));
   else if(item.cat==='card')pv.innerHTML=cardSvg(d,'SURVIVOR','LEVEL 20 · PRESTIGE 2');
   else if(item.cat==='outfit'){const ch=charOf(item);pv.innerHTML='<span class="hint">Rendering…</span>';renderPortrait({...ch,type:'mannequin'},data).then(u=>{if(sel===item.id)pv.innerHTML=`<img src="${u}" alt="" style="height:100%">`;}).catch(()=>{pv.innerHTML='';});}
   else if(d.char||d.hitmarker)pv.innerHTML=`<div class="mock-hud" style="background:radial-gradient(#2a2620,#0a0a0a)"><span style="color:${d.color};font-size:${d.char?42:56}px">${esc(d.char??d.hitmarker)}</span></div>`;
   else pv.innerHTML=thumb(item).replace('class="pv"','class="pv" style="height:100%"');
 }
-document.addEventListener('click',e=>{
-  const c=e.target.closest('[data-cat]');if(c){view=c.dataset.cat;history.replaceState(null,'','#'+view);render();return;}
+root.addEventListener('click',e=>{
+  const c=e.target.closest('[data-cat]');if(c){view=c.dataset.cat;render();return;}
   const i=e.target.closest('.sp-item');if(i){sel=i.dataset.id;render();return;}
   const p=e.target.closest('[data-play]');if(p){playHits(by[sel].data.hits);return;}
   const q=e.target.closest('[data-equip]');if(q){const why=toggleEquip(cat,q.dataset.equip);if(why)toast(why);render();return;}
@@ -133,6 +121,7 @@ document.addEventListener('click',e=>{
     toast(id==='bundle'?'Bundle bought':`${by[id].name} bought${slotOf(by[id])?' and equipped':''}`);render();return;}
   if(e.target.closest('#sp-drawer')===null&&innerWidth<=760&&!e.target.closest('.sp-item'))$('sp-drawer').classList.remove('open');
 });
-$('sp-cats-select').addEventListener('change',e=>{view=e.target.value;history.replaceState(null,'','#'+view);render();});
-addEventListener('focus',render);
+$('sp-cats-select').addEventListener('change',e=>{view=e.target.value;render();});
+mounted={render};
 render();
+}

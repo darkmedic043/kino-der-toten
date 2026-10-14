@@ -200,3 +200,4 @@
 - 2026-10-14: Phase 6: credits (match payout, daily/weekly challenges, milestones, prestige; none in cheat games) and a cosmetic-only Shop page (50 items in 7 categories, daily/weekly rotation, reward registry) (shop.md).
 - 2026-10-14: Prestige camos unique per gun: 57 guns with camos, 6 styles per tier, class motifs, golden-angle colours, unique names (generated table, weapon-levels.md).
 - 2026-10-14: Weapons: 30 levels with filler levels, stat-only attachments (barrel/grip/stock/ammo) for guns with fewer than 8; old saves keep their attachments. Credits halved (sparser).
+- 2026-10-14: Shop moved into a main-menu tab (sidebar stays); new CAMOS tab (prestige/shop/special global camos, equip on any or every gun); Gunsmith camo swatches made lazy and cached (no more hitches).

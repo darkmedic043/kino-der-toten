@@ -26,11 +26,12 @@ const P1={
     g.fillStyle=(i+j)%3?hsl(p.h,55,34+r()*10):hsl(p.h2,65,48);poly(g,[[x,y],[x+st/2,y+st*.45],[x+st,y],[x+st,y+st*.35],[x+st/2,y+st*.8],[x,y+st*.35]]);g.fill();}},
   splinter(g,S,r,p){const P=8;g.fillStyle=hsl(p.h,35,22);g.fillRect(0,0,S,S);const cols=[hsl(p.h,50,34),hsl(p.h,45,14),hsl(p.h2,55,42),hsl(p.h,25,52)];
     for(let i=0;i<420;i++){const x=Math.floor(r()*S/P)*P,y=Math.floor(r()*S/P)*P,wd=P*(2+Math.floor(r()*9)),ht=P*(1+Math.floor(r()*2));g.fillStyle=cols[i%4];g.fillRect(x,y,wd,ht);if(x+wd>S)g.fillRect(x-S,y,wd,ht);}},
-  contour(g,S,r,p){g.fillStyle=hsl(p.h,35,18);g.fillRect(0,0,S,S);const c=[...Array(5)].map(()=>[r()*S,r()*S,40+r()*90]);
-    const img=g.getImageData(0,0,S,S),d=img.data;for(let y=0;y<S;y++)for(let x=0;x<S;x++){let v=0;for(const [cx,cy,rad] of c){let dx=Math.abs(x-cx),dy=Math.abs(y-cy);if(dx>S/2)dx=S-dx;if(dy>S/2)dy=S-dy;v+=Math.exp(-(dx*dx+dy*dy)/(2*rad*rad));}
+  contour(g,S0,r,p){const S=S0/2,g0=g;const c0=document.createElement('canvas');c0.width=c0.height=S;g=c0.getContext('2d');   // per pixel: drawn at half size, scaled up
+    const c=[...Array(5)].map(()=>[r()*S,r()*S,20+r()*45]);
+    const img=g.createImageData(S,S),d=img.data;for(let y=0;y<S;y++)for(let x=0;x<S;x++){let v=0;for(const [cx,cy,rad] of c){let dx=Math.abs(x-cx),dy=Math.abs(y-cy);if(dx>S/2)dx=S-dx;if(dy>S/2)dy=S-dy;v+=Math.exp(-(dx*dx+dy*dy)/(2*rad*rad));}
       const band=Math.min(6,Math.floor(v*7)),line=Math.abs((v*7)%1-.5)>.42,l=(line?62:18+band*6)/100,s=.5,hh=((p.h+(line?p.h2-p.h:0))%360)/360;
       const q=l<.5?l*(1+s):l+s-l*s,pp=2*l-q,f=t=>{t=(t+1)%1;return t<1/6?pp+(q-pp)*6*t:t<.5?q:t<2/3?pp+(q-pp)*(2/3-t)*6:pp;};
-      const i=(y*S+x)*4;d[i]=f(hh+1/3)*255;d[i+1]=f(hh)*255;d[i+2]=f(hh-1/3)*255;d[i+3]=255;}g.putImageData(img,0,0);},
+      const i=(y*S+x)*4;d[i]=f(hh+1/3)*255;d[i+1]=f(hh)*255;d[i+2]=f(hh-1/3)*255;d[i+3]=255;}g.putImageData(img,0,0);g0.drawImage(c0,0,0,S0,S0);},
   scales(g,S,r,p){g.fillStyle=hsl(p.h,40,12);g.fillRect(0,0,S,S);const R=26;for(let row=-1;row*R*.75<S+R;row++)for(let col=-1;col*R*2<S+R*2;col++){const cx=col*R*2+(row%2?R:0),cy=row*R*.75,l=30+r()*18;
     const gr=g.createRadialGradient(cx,cy-R*.4,2,cx,cy,R*1.1);gr.addColorStop(0,hsl(p.h,60,l+22));gr.addColorStop(1,hsl(p.h,55,l-14));g.fillStyle=gr;g.beginPath();g.arc(cx,cy,R,0,Math.PI);g.closePath();g.fill();g.strokeStyle=hsl(p.h2,70,55);g.lineWidth=1.5;g.stroke();}},
   brush(g,S,r,p,w){g.fillStyle=hsl(p.h,25,24);g.fillRect(0,0,S,S);for(let i=0;i<40;i++){const x=r()*S,y=r()*S,len=120+r()*240,a=(r()-.5)*.8,wd=12+r()*30,col=i%3?hsl(p.h,55,12+r()*14):hsl(p.h2,70,45);
@@ -44,9 +45,10 @@ const P2={
   filigree(g,S,r,p,w){g.fillStyle=hsl(p.h,45,14);g.fillRect(0,0,S,S);g.lineCap='round';for(let i=0;i<34;i++){const x=r()*S,y=r()*S,rad=20+r()*40,turns=1.5+r()*1.5,dir=r()<.5?1:-1;
     w(()=>{g.strokeStyle=gold(g,x-rad,y-rad,x+rad,y+rad);g.lineWidth=2.2;g.beginPath();for(let t=0;t<=1;t+=.01){const a=dir*t*turns*6.283,rr=rad*(1-t);g.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr);}g.stroke();
       g.fillStyle=hsl(p.h2,70,55);g.beginPath();g.arc(x,y,3,0,6.283);g.fill();});}},
-  damascus(g,S,r,p){const img=g.createImageData(S,S),d=img.data,k=[r()*6,r()*6,r()*6];for(let y=0;y<S;y++)for(let x=0;x<S;x++){const u=x/S*6.283,v=y/S*6.283;
+  damascus(g,S0,r,p){const S=S0/2,img=g.createImageData(S,S),d=img.data,k=[r()*6,r()*6,r()*6];   // half size, scaled up
+    for(let y=0;y<S;y++)for(let x=0;x<S;x++){const u=x/S*6.283,v=y/S*6.283;
     const f=Math.sin(u*3+Math.sin(v*2+k[0])*2.2+Math.sin(u+v+k[1])*1.4)*.5+.5,band=Math.pow(Math.abs(Math.sin(f*Math.PI*6+k[2])),.4);
-    const base=60+band*150,i=(y*S+x)*4;d[i]=base*(.8+.2*Math.cos(p.h/57.3));d[i+1]=base*(.8+.2*Math.cos((p.h-120)/57.3));d[i+2]=base*(.85+.15*Math.cos((p.h-240)/57.3));d[i+3]=255;}g.putImageData(img,0,0);},
+    const base=60+band*150,i=(y*S+x)*4;d[i]=base*(.8+.2*Math.cos(p.h/57.3));d[i+1]=base*(.8+.2*Math.cos((p.h-120)/57.3));d[i+2]=base*(.85+.15*Math.cos((p.h-240)/57.3));d[i+3]=255;}blit(g,img,S,S0);},
   mosaic(g,S,r,p){const v=voronoi(S/2,40,r),T=S/2,img=g.createImageData(T,T),cols=[...Array(40)].map(()=>[p.h+(r()-.5)*60,50+r()*30,30+r()*30]);
     for(let i=0;i<T*T;i++){const e=v.edge[i],[h,s,l]=cols[v.cell[i]],lead=e<2.2;const c=lead?[200,170,90]:hslRgb(h,s/100,l/100).map(x=>x*255);d4(img.data,i,c);}
     const c2=document.createElement('canvas');c2.width=c2.height=T;c2.getContext('2d').putImageData(img,0,0);g.imageSmoothingEnabled=false;g.drawImage(c2,0,0,S,S);},
@@ -70,14 +72,14 @@ const PM={
     for(let i=0;i<80;i++){let x=Math.floor(r()*S/G)*G,y=Math.floor(r()*S/G)*G;const pts=[[x,y]];for(let k=0;k<4;k++){if(r()<.5)x+=(r()<.5?-1:1)*G*(1+Math.floor(r()*3));else y+=(r()<.5?-1:1)*G*(1+Math.floor(r()*3));pts.push([x,y]);}
       w(()=>{g.beginPath();pts.forEach(([a,b],k)=>k?g.lineTo(a,b):g.moveTo(a,b));g.stroke();g.fillStyle=glow?'#fff':hsl(p.h,40,30);g.beginPath();g.arc(x,y,5,0,6.283);g.fill();});}},
   runes(g,S,r,p,w,glow){g.fillStyle=glow?'#000':hsl(p.h,35,7);g.fillRect(0,0,S,S);const glyphs='ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
-    for(let i=0;i<18;i++){const cx=r()*S,cy=r()*S,R=26+r()*34;w(()=>{g.strokeStyle=glow?'#fff':hsl(p.h,30,18);g.lineWidth=2;g.beginPath();g.arc(cx,cy,R,0,6.283);g.stroke();g.beginPath();g.arc(cx,cy,R-14,0,6.283);g.stroke();
+    for(let i=0;i<13;i++){const cx=r()*S,cy=r()*S,R=28+r()*34;w(()=>{g.strokeStyle=glow?'#fff':hsl(p.h,30,18);g.lineWidth=2;g.beginPath();g.arc(cx,cy,R,0,6.283);g.stroke();g.beginPath();g.arc(cx,cy,R-14,0,6.283);g.stroke();
       g.fillStyle=glow?'#fff':hsl(p.h,30,22);g.font='bold 13px serif';g.textAlign='center';g.textBaseline='middle';const n=10;for(let k=0;k<n;k++){const a=k/n*6.283;g.save();g.translate(cx+Math.cos(a)*(R-7),cy+Math.sin(a)*(R-7));g.rotate(a+Math.PI/2);g.fillText(glyphs[Math.floor(r()*glyphs.length)],0,0);g.restore();}});}},
   lightning(g,S,r,p,w,glow){g.fillStyle=glow?'#000':hsl(p.h,40,8);g.fillRect(0,0,S,S);if(!glow){for(let i=0;i<500;i++){g.fillStyle=hsl(p.h,30,10+r()*10);g.fillRect(r()*S,r()*S,2,2);}}
     const bolt=(x,y,a,len,wd,depth)=>{const pts=[[x,y]];for(let k=0;k<8;k++){a+=(r()-.5)*.9;x+=Math.cos(a)*len/8;y+=Math.sin(a)*len/8;pts.push([x,y]);}
       w(()=>{g.strokeStyle=glow?'#fff':hsl(p.h,35,20);g.lineWidth=wd;g.beginPath();pts.forEach(([a1,b1],k)=>k?g.lineTo(a1,b1):g.moveTo(a1,b1));g.stroke();});
       if(depth<2)for(let k=0;k<2;k++){const [bx,by]=pts[2+Math.floor(r()*5)];bolt(bx,by,a+(r()-.5)*1.6,len*.55,wd*.6,depth+1);}};
     for(let i=0;i<7;i++)bolt(r()*S,r()*S,r()*6.283,180+r()*140,3,0);},
-  magma(g,S,r,p,w,glow){const T=256,c=[...Array(6)].map(()=>[r()*T,r()*T,25+r()*45]),img=g.createImageData(T,T);
+  magma(g,S,r,p,w,glow){const T=160,c=[...Array(6)].map(()=>[r()*T,r()*T,25+r()*45]),img=g.createImageData(T,T);
     for(let y=0;y<T;y++)for(let x=0;x<T;x++){let v=0;for(const [cx,cy,rad] of c){let dx=Math.abs(x-cx),dy=Math.abs(y-cy);if(dx>T/2)dx=T-dx;if(dy>T/2)dy=T-dy;v+=Math.exp(-(dx*dx+dy*dy)/(2*rad*rad));}
       const f=Math.abs((v*6)%1-.5),line=Math.max(0,1-f*9);const i=y*T+x;if(glow){const k=line*255;d4(img.data,i,[k,k,k]);}else{const col=hslRgb(p.h+10,.5,.06+v*.05);d4(img.data,i,col.map(q=>q*255));}}
     blit(g,img,T,S);},

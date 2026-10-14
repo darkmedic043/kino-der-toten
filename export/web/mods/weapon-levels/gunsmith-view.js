@@ -9,7 +9,7 @@ import { loadModel } from '../../animation.js';
 import { applyGlow, tickGlow } from '../bo3-weapons/glow.js';
 import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
-import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress, camoById, camoTime } from './camo.js';
+import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
 
@@ -229,12 +229,11 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CAMO</h3><button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
         <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward&&!k.shop).length} UNLOCKED${special?` · ${special} SPECIAL`:''}${loadPrestige().camos.length?` · ${loadPrestige().camos.length} PRESTIGE`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
     $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc(cat.slots[s].toUpperCase())}</i></div>`).join('');
-    renderOptions();renderStats();
+    renderOptions();renderStats();if(cats)fillSwatches(root,cid=>camoById(cats,cid));
     $('.stats').style.display=slot==='camo'?'none':'';   // camos don't change stats; the list needs the room
   }
-  const swatchCache=new Map();
-  function swatch(c){if(swatchCache.has(c.id))return swatchCache.get(c.id);const img=camoTexture(c).image;let url='';
-    try{if(img instanceof HTMLCanvasElement)url=img.toDataURL('image/jpeg',.7);else if(img?.src)url=img.src;}catch{}swatchCache.set(c.id,url);return url;}
+  // swatches come from camo.js's shared cache, generated one per frame (fillSwatches after each render)
+  const swatch=c=>camoSwatch(c);
   // Two tabs: the challenge camos (kills, headshots... with Gold and Diamond) and the special ones, rewards from maps
   let camoTab='challenge';
   function renderCamos(el){
@@ -256,20 +255,20 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       shown.map(c=>{const locked=!done.has(c.id);
         if(c.shop){   // shop camos (Phase 6): owned or not
           return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}${c.anim?' anim':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'SHOP':''}</span>
-            <div class="camo-row"><i class="sw" style="background-image:url(${swatch(c)})${c.anim?`;--a:rgb(${c.anim.c1.map(v=>Math.round(v*255))});--b:rgb(${c.anim.c2.map(v=>Math.round(v*255))})`:''}"></i><div><strong>${esc(c.name)}</strong>
+            <div class="camo-row"><i class="sw" data-swatch="${c.id}" style="background-image:url(${swatch(c)})${c.anim?`;--a:rgb(${c.anim.c1.map(v=>Math.round(v*255))});--b:rgb(${c.anim.c2.map(v=>Math.round(v*255))})`:''}"></i><div><strong>${esc(c.name)}</strong>
             <div class="pc"><span class="${locked?'neu':'pro'}">${locked?'Buy it in the Shop':'Owned'}</span></div></div></div></button>`;}
         if(c.prestige){   // prestige camos: earned by prestiging the gun (or a token), Master by Master levels
           const own=c.owner===id,w=pr.weapons[c.owner]??{},tier=w.tier??0,mlv=w.mlevel??0,gun=weapons[c.owner]?.name??c.owner;
           const have=c.prestige===3?Math.min(PRESTIGE.masterCamoAt,tier>=3?mlv:0):tier>=c.prestige?1:0,need=c.prestige===3?PRESTIGE.masterCamoAt:1;
           const what=!own?`Earned on the ${gun}`:c.prestige===3?`Prestige Master level ${PRESTIGE.masterCamoAt}${tier<3?' (prestige this gun three times)':''}`:`Reach ${TIER_NAMES[c.prestige].toLowerCase().replace('prestige','Prestige')} with this gun`;
           return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}${c.anim?' anim':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'LOCKED':TIER_NAMES[c.prestige]}</span>
-            <div class="camo-row"><i class="sw" style="background-image:url(${swatch(c)})${c.anim?`;--a:rgb(${c.anim.c1.map(v=>Math.round(v*255))});--b:rgb(${c.anim.c2.map(v=>Math.round(v*255))})`:''}"></i><div><strong>${esc(c.name)}</strong>
+            <div class="camo-row"><i class="sw" data-swatch="${c.id}" style="background-image:url(${swatch(c)})${c.anim?`;--a:rgb(${c.anim.c1.map(v=>Math.round(v*255))});--b:rgb(${c.anim.c2.map(v=>Math.round(v*255))})`:''}"></i><div><strong>${esc(c.name)}</strong>
             <div class="pc"><span class="${locked?'neu':'pro'}">${esc(what)}${need>1?` · ${have} / ${need}`:''}</span>${locked&&own&&c.prestige<3&&pr.player.tokens?` <span class="tok" data-token="${c.id}">USE TOKEN</span>`:''}</div>
             ${need>1?`<div class="cbar"><b style="width:${(100*have/need).toFixed(1)}%"></b></div>`:''}</div></div></button>`;}
         const have=c.reward?(done.has(c.id)?1:0):c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:Math.min(c.count,p[c.challenge]??0),need=c.classMastery?cp.total:c.mastery?base.length:c.count;
         const what=c.classMastery?`Gold on every ${cp.label.toLowerCase().replace(/s$/,'')}`:c.mastery?'Complete every challenge camo':cats.challenges[c.challenge];
         return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'LOCKED':''}</span>
-          <div class="camo-row"><i class="sw" style="background-image:url(${swatch(c)})"></i><div><strong>${esc(c.name)}</strong>
+          <div class="camo-row"><i class="sw" data-swatch="${c.id}" style="background-image:url(${swatch(c)})"></i><div><strong>${esc(c.name)}</strong>
           <div class="pc"><span class="${locked?'neu':'pro'}">${esc(what)} · ${have} / ${need}</span></div>
           <div class="cbar"><b style="width:${(100*have/need).toFixed(1)}%"></b></div></div></div></button>`;}).join('');
   }
