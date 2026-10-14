@@ -194,3 +194,4 @@
 - 2026-10-14: Phase 3 class rework (BL3/BL4 style): class resources Uplink/Grit/Combat Data, kill skills, sidearm and conditional passives, either-or nodes, augment synergies; Engineer and Fortifier trees rewritten, Pilot light pass (classes.md).
 - 2026-10-14: Phase 3 Sandbox balance pass: Recycler bank cap, kill charge scaled for long meters, Ground Crew/Dynamo nerfs, Perpetual Motion cap (classes.md).
 - 2026-10-14: Phase 4 prestige: weapon prestige I/II/Master with three generated camos per gun (Master animated) usable on every gun, player prestige from level 55 with badge and tokens that re-locks nothing (weapon-levels.md).
+- 2026-10-14: Gobblegums: a full hand can roll and swap the result for a held gum, or keep the hand (gobblegums.md).

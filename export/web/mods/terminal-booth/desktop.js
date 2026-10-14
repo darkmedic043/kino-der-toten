@@ -144,6 +144,7 @@ const CSS = `
 #melonterm .ball{flex:none;width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fffa,var(--c) 45%,#000 125%);box-shadow:0 0 10px var(--c)}
 #melonterm .gum .side{padding:20px 24px;display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0;font-size:22px}
 #melonterm .gum .side h2{margin:0;font:inherit;font-size:36px;color:#b6ffcb;letter-spacing:1px}
+#melonterm .gum .swap{display:flex;flex-direction:column;gap:6px}#melonterm .gum .swap button{display:flex;align-items:center;gap:10px;padding:6px 10px;background:none;border:2px solid var(--c,var(--line));color:inherit;font:inherit;font-size:20px;text-align:left;cursor:pointer}#melonterm .gum .swap button:hover{background:#ffffff14}#melonterm .gum .swap .ball{width:24px;height:24px;flex:none}
 #melonterm .gum .won{font-size:30px;text-shadow:0 0 10px var(--c)}
 #melonterm .gum .hand{display:flex;gap:8px}#melonterm .gum .hand .ball{width:34px;height:34px}#melonterm .gum .hand .empty{width:34px;height:34px;border-radius:50%;border:2px dashed var(--dim)}
 @media(max-width:760px){#melonterm .gum{grid-template-columns:1fr;grid-template-rows:auto 1fr}#melonterm .reelbox{border-right:0;border-bottom:2px dashed var(--line)}}
@@ -224,7 +225,7 @@ function build() {
   const win = $('[data-win=perks]'), exWin = $('[data-win=exfil]'), exBody = $('.exf'), exIcon = $('[data-app=exfil]');
   const stWin = $('[data-win=stark]'), stBody = $('.stk'); let stState = '', stMsg = ['', ''], stShown = 0;
   const arWin = $('[data-win=arsenal]'), arBody = $('.ars'); let arState = '', arMsg = ['', ''];
-  const gmWin = $('[data-win=gums]'), gmStrip = $('.strip'), gmSide = $('.gum .side'); let gmState = '', gmMsg = ['', ''], gmSpin = false, gmWon = null;
+  const gmWin = $('[data-win=gums]'), gmStrip = $('.strip'), gmSide = $('.gum .side'); let gmState = '', gmMsg = ['', ''], gmSpin = false, gmWon = null, gmPending = null;   // gmPending: a gum rolled into a full hand, waiting for swap or keep
   const grid = $('.grid'), detail = $('.detail'), msg = $('.msg');
   let exState = '';
   let opts = null, shown = 0, clock = 0, lastState = '';
@@ -284,7 +285,7 @@ function build() {
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
   }
   function openApp(name) {
-    if (name === 'gums') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = true; gmState = ''; if (!gmSpin) { gmMsg = ['', '']; gmWon = null; idleReel(); } gmWin.hidden = false; drawGums(); $('.open').textContent = '[GOBBLE.EXE]'; opts.onApp?.('gobble'); return; }
+    if (name === 'gums') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = true; gmState = ''; if (!gmSpin && !gmPending) { gmMsg = ['', '']; gmWon = null; idleReel(); } gmWin.hidden = false; drawGums(); $('.open').textContent = '[GOBBLE.EXE]'; opts.onApp?.('gobble'); return; }
     gmWin.hidden = true;
     if (name === 'stark') { win.hidden = exWin.hidden = arWin.hidden = true; stState = ''; stMsg = ['', '']; stWin.hidden = false; drawStark(); $('.open').textContent = '[STARK.EXE]'; opts.onApp?.(name); return; }
     if (name === 'arsenal') { win.hidden = exWin.hidden = stWin.hidden = true; arState = ''; arMsg = ['', '']; drawArsenal(); arWin.hidden = false; $('.open').textContent = '[ARSENAL.EXE]'; opts.onApp?.(name); return; }
@@ -402,7 +403,7 @@ function build() {
     gmStrip.style.transition = 'none'; gmStrip.innerHTML = [0, 1, 2].map(i => gumRow(list[i % list.length])).join(''); gmStrip.style.transform = 'translateY(0)';
   }
   function gumRoll() {
-    if (gmSpin) return;
+    if (gmSpin || gmPending) return;
     const r = opts?.gumRoll?.() ?? 'Gobblegums are not installed';
     if (typeof r !== 'object') { gmMsg = [String(r).toUpperCase(), 'bad']; gmState = ''; drawGums(); return; }
     const st = opts.gums(), by = Object.fromEntries(st.pack.map(g => [g.id, g])), n = 46, win = n - 4;
@@ -412,25 +413,36 @@ function build() {
     gmSpin = true; gmWon = null; gmMsg = ['ROLLING ...', '']; gmState = ''; drawGums(); status();
     gmStrip.style.transition = 'transform 2.6s cubic-bezier(.12,.62,.18,1)'; gmStrip.style.transform = `translateY(${-(win - 1) * ITEM}px)`;
     const ticks = setInterval(() => tick(), 90); setTimeout(() => clearInterval(ticks), 1900);
-    setTimeout(() => { gmSpin = false; r.commit(); gmWon = by[r.id]; gmMsg = [`${by[r.id].name.toUpperCase()} · ${by[r.id].rarity.toUpperCase()} · N TO CHEW`, 'ok']; gmState = ''; status(); drawGums(); }, 2700);
+    setTimeout(() => { gmSpin = false; gmWon = by[r.id]; gmState = '';
+      if (r.full) { gmPending = r; gmMsg = [`HAND FULL · SWAP ONE OUT FOR ${by[r.id].name.toUpperCase()}, OR KEEP YOUR HAND`, '']; }
+      else { r.commit(); gmMsg = [`${by[r.id].name.toUpperCase()} · ${by[r.id].rarity.toUpperCase()} · N TO CHEW`, 'ok']; }
+      status(); drawGums(); }, 2700);
+  }
+  // full hand: swap the rolled gum into slot i, or keep the hand (i = null drops the rolled gum)
+  function gumResolve(i) {
+    const r = gmPending; if (!r || !gmWon) return; gmPending = null; r.commit(i); gmState = '';
+    gmMsg = i == null ? ['KEPT YOUR HAND', ''] : [`${gmWon.name.toUpperCase()} · N TO CHEW`, 'ok']; if (i == null) gmWon = null;
+    status(); drawGums();
   }
   let tickCtx = null;
   function tick() { try { tickCtx ??= new AudioContext(); const t = tickCtx.currentTime, o = tickCtx.createOscillator(), g = tickCtx.createGain(); o.type = 'square'; o.frequency.value = 1400; g.gain.setValueAtTime(.04, t); g.gain.exponentialRampToValueAtTime(.0001, t + .03); o.connect(g).connect(tickCtx.destination); o.start(t); o.stop(t + .04); } catch {} }
   function drawGums() {
     if (gmWin.hidden) return;
     const st = opts?.gums?.(); if (!st) { gmSide.innerHTML = '<p>Gobblegums are not installed.</p>'; return; }
-    const key = JSON.stringify([st, gmMsg, gmSpin, gmWon?.id]); if (key === gmState) return; gmState = key;
-    const left = st.rollsPerRound - st.rolls, can = st.ok && !st.full && left > 0 && st.pool > 0 && st.points >= st.price && !gmSpin;
-    const label = gmSpin ? 'ROLLING ...' : !st.ok ? 'NO PACK' : st.full ? 'HAND FULL' : left <= 0 ? 'COME BACK NEXT ROUND' : st.points < st.price ? 'NOT ENOUGH POINTS' : `ROLL · ${st.price.toLocaleString()}`;
+    const key = JSON.stringify([st, gmMsg, gmSpin, gmWon?.id, !!gmPending]); if (key === gmState) return; gmState = key;
+    const left = st.rollsPerRound - st.rolls, can = st.ok && left > 0 && st.pool > 0 && st.points >= st.price && !gmSpin && !gmPending;
+    const label = gmSpin ? 'ROLLING ...' : gmPending ? 'CHOOSE ABOVE' : !st.ok ? 'NO PACK' : left <= 0 ? 'COME BACK NEXT ROUND' : st.points < st.price ? 'NOT ENOUGH POINTS' : `ROLL · ${st.price.toLocaleString()}`;
     const hand = Array.from({ length: st.handSize }, (_, i) => { const g = st.pack.find(g => g.name === st.hand[i]); return g ? `<div class="ball" style="--c:${g.color}" title="${esc(g.name)}"></div>` : '<div class="empty"></div>'; }).join('');
+    const swap = gmPending ? `<div class="swap">${st.hand.map((name, i) => { const g = st.pack.find(g => g.name === name); return `<button data-swap="${i}" style="--c:${g?.color ?? '#888'}"><div class="ball"></div>SWAP OUT ${esc(name.toUpperCase())}</button>`; }).join('')}<button data-swap="keep">KEEP MY HAND</button></div>` : '';
     gmSide.innerHTML = `<h2>GOBBLEGUMS</h2>
-      ${gmWon ? `<div class="won" style="--c:${gmWon.color};color:${gmWon.color}">${esc(gmWon.name.toUpperCase())}</div><div class="note">${esc(gmWon.desc)}</div>` : ''}
+      ${gmWon ? `<div class="won" style="--c:${gmWon.color};color:${gmWon.color}">${esc(gmWon.name.toUpperCase())}</div><div class="note">${esc(gmWon.desc)}</div>` : ''}${swap}
       ${st.ok ? `<div>PACK · ${st.pack.length} GUMS${st.auto ? ' (AUTO)' : ''}</div>` : `<div class="warn">NO USABLE PACK</div><div class="note">${esc(st.problems[0] ?? '')} · BUILD IT IN THE ARMORY</div>`}
       <div class="status"><span>ROLLS THIS ROUND ${st.rolls} / ${st.rollsPerRound}</span><span>NEXT ${st.price.toLocaleString()} PTS</span></div>
       <div>HAND</div><div class="hand">${hand}</div>
       <button class="buy" ${can ? '' : 'disabled'}>${label}</button>
       <div class="msg ${gmMsg[1]}">${esc(gmMsg[0] || '> ROLL A GUM FROM YOUR PACK · N CHEWS IN GAME')}</div>`;
     gmSide.querySelector('.buy').addEventListener('click', gumRoll);
+    for (const b of gmSide.querySelectorAll('[data-swap]')) b.addEventListener('click', () => gumResolve(b.dataset.swap === 'keep' ? null : +b.dataset.swap));
   }
   // ---- EXFIL.EXE --------------------------------------------------------------------------------------------
   const exfilStatus = () => opts?.exfil?.() ?? { available: false, reason: 'Exfil is not installed' };

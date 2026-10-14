@@ -32,12 +32,17 @@ export default async function setup(api){
   function roll(){
     const s=status();
     if(!s.ok)return s.problems[0]??'No usable pack';
-    if(s.full)return 'Your hand is full · chew a gum first (N)';
     if(st.rolls>=cfg.rollsPerRound)return `${cfg.rollsPerRound} gums a round · wait for the next round`;
     const pool=pack().ids.filter(id=>!st.hand.includes(id));if(!pool.length)return 'Nothing left in your pack to roll';
     if(!session.spend(s.price))return 'Not enough points';
     st.rolls++;const id=pool[Math.floor(Math.random()*pool.length)];
-    return {id,commit:()=>{st.hand.push(id);st.sel=st.hand.length-1;hud();api.toast(`${by[id].name} · N to chew`,3);}};
+    // a full hand rolls too (user, 2026-10-14): the terminal then asks which held gum to swap out, or to keep the hand
+    const full=st.hand.length>=cfg.handSize;
+    return {id,full,commit:(slot)=>{
+      if(!full){st.hand.push(id);st.sel=st.hand.length-1;}
+      else if(slot!=null&&st.hand[slot]){const old=st.hand[slot];st.hand[slot]=id;st.sel=slot;api.toast(`${by[old].name} swapped for ${by[id].name}`,3);}
+      else return;   // kept the hand: the rolled gum is dropped
+      hud();api.toast(`${by[id].name} · N to chew`,3);}};
   }
 
   // ---- chewing ----------------------------------------------------------------------------------------
