@@ -11,7 +11,7 @@ import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress, camoT
 import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, grantMasterXp, canPrestigeWeapon, RULES as PRESTIGE } from '../prestige/prestige.js';
 import { openGunsmith } from './gunsmith-view.js';
 import { previewDef } from './gunsmith.js';
-import { loadCatalog, applyAttachments, grantWeaponXp, weaponProgress, xpToNext, maxLevel, available, renderGunsmith, GUNSMITH_CSS } from './gunsmith.js';
+import { loadCatalog, applyAttachments, grantWeaponXp, weaponProgress, xpToNext, maxLevel, available, renderGunsmith, GUNSMITH_CSS, migrateWeaponLevels, nextUnlock } from './gunsmith.js';
 
 export default async function setup(api){
   const {data,session,host,view,audio}=api;
@@ -26,6 +26,8 @@ export default async function setup(api){
   document.head.append(style);
 
   let profile=loadProfile();
+  // saves from before the 30-level track keep the attachments they had (gunsmith.js migrateWeaponLevels)
+  {const st=loadProfile();if(migrateWeaponLevels(cat,data.weapons,st)){saveProfile(st);profile=st;}}
   const save=()=>{const fresh=loadProfile();fresh.weaponXp=profile.weaponXp;fresh.attachments=profile.attachments;fresh.camo=profile.camo;saveProfile(fresh);};
   // Every tag some weapon hides by default: the attachment parts.
   const attachmentTags=new Set(Object.values(data.weapons).flatMap(d=>d?.hideTags??[]));
@@ -133,8 +135,10 @@ export default async function setup(api){
       api.toast(dia?`Diamond camo unlocked for every ${cls??'gun in this class'} · equip it in the Gunsmith`:`${def.name} · ${camos.map(c=>c.name).join(', ')} camo unlocked · equip it in the Gunsmith`,6);}
     if(!available(cat,def,id).length){save();return;}
     const xp=cat.xp.kill+(head?cat.xp.headshot:0),cap=maxLevel(cat,def,id),wasMax=weaponProgress(profile,id).level>=cap;
-    const news=grantWeaponXp(cat,def,id,profile,xp);
+    const lvBefore=weaponProgress(profile,id).level,news=grantWeaponXp(cat,def,id,profile,xp);
     save();
+    // a filler level: no attachment, but say so and what's next
+    {const lv=weaponProgress(profile,id).level;if(lv>lvBefore&&!news.length){const nx=nextUnlock(cat,def,id,lv);api.toast(`${def.name} level ${lv}${nx?` · ${nx.att.name} at level ${nx.level}`:lv>=cap?' · MAX · prestige it in the Armory':''}`,3);renderHud();}}
     // Phase 4 prestige: XP at the max level fills Prestige Master levels; reaching the max says a prestige is waiting
     if(wasMax){const pr=loadPrestige();if(weaponTier(pr,id)>=3){const camo=grantMasterXp(pr,id,xp);savePrestige(pr);
       if(camo)api.toast(`${def.name} · ${camoById(camo)?.name} · PRESTIGE MASTER CAMO unlocked for every gun`,7);}}

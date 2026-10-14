@@ -1,27 +1,27 @@
 {
-  "_note": "Phase 6 credits (placeholders to tune). payout: end-of-match credits = perRoundOver5 x (rounds past 5) + perKill x kills, capped at cap; nothing in a cheat game or on noPayoutMaps. milestones: the first time you reach each round on a map. prestige: weapon Prestige I / II / Master and each player prestige. Challenges: 3 daily (reset at local midnight) and 3 weekly (reset Monday), drawn from the pool with the date as the seed; `stat` is what counts, `n` the goal (weekly goals are weeklyMul times the daily ones).",
+  "_note": "Phase 6 credits (placeholders to tune). payout: end-of-match credits = perRoundOver5 x (rounds past 5) + perKill x kills, capped at cap; nothing in a cheat game or on noPayoutMaps. milestones: the first time you reach each round on a map. prestige: weapon Prestige I / II / Master and each player prestige. Challenges: 3 daily (reset at local midnight) and 3 weekly (reset Monday), drawn from the pool with the date as the seed; `stat` is what counts, `n` the goal (weekly goals are weeklyMul times the daily ones). Made sparser 2026-10-14 (user: 'a bit harder to get'): roughly half the first numbers.",
   "payout": {
-    "perRoundOver5": 15,
-    "perKill": 0.5,
-    "cap": 400
+    "perRoundOver5": 8,
+    "perKill": 0.25,
+    "cap": 200
   },
   "noPayoutMaps": [
     "sandbox"
   ],
   "milestones": {
-    "10": 100,
-    "20": 250,
-    "30": 500,
-    "50": 1000
+    "10": 50,
+    "20": 125,
+    "30": 250,
+    "50": 500
   },
   "prestige": {
-    "1": 300,
-    "2": 500,
-    "3": 1000,
-    "player": 1000
+    "1": 150,
+    "2": 250,
+    "3": 500,
+    "player": 500
   },
-  "daily": 75,
-  "weekly": 200,
+  "daily": 40,
+  "weekly": 120,
   "weeklyMul": 4,
   "challenges": [
     {

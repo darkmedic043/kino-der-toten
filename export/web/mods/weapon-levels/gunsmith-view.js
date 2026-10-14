@@ -11,9 +11,9 @@ import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress, camoById, camoTime } from './camo.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
-import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef } from './gunsmith.js';
+import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
 
-const SLOT_ORDER=['optic','muzzle','mag','under','laser'];
+const SLOT_ORDER=['optic','muzzle','barrel','mag','under','grip','stock','laser','ammo'];
 const ANCHORS={optic:['tag_scope_rail','tag_flatrail','tag_iron_sights','tag_iron_sight','tag_elbit','tag_aimpoint','tag_scope_colt'],
   muzzle:['tag_suppressor','tag_silencer','tag_flash'],mag:['tag_clip','tag_ext_clip','tag_extended_clip'],
   under:['tag_foregrip','tag_grenade_launcher','tag_m203','tag_flame_unit','tag_masterkey','tag_grip']};
@@ -38,7 +38,7 @@ const CSS=`
 #gsv .lvl b{font-size:12px;letter-spacing:3px}
 #gsv .lvl .bar{height:4px;background:#ffffff18;margin-top:6px}#gsv .lvl .bar i{display:block;height:100%;background:#f3a33a}
 #gsv .lvl small{display:block;color:#a09a8d;margin-top:4px;font-size:11px}
-#gsv .slots{position:absolute;left:40px;top:130px;width:250px;display:flex;flex-direction:column;gap:8px}
+#gsv .slots{position:absolute;left:40px;top:130px;bottom:64px;width:250px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;scrollbar-width:thin;padding-right:4px}#gsv .slots .slot{padding:7px 12px;flex:none}#gsv .slots h3{flex:none}
 #gsv .slots h3,#gsv .opts h3,#gsv .stats h3{margin:0 0 6px;font-size:10px;letter-spacing:4px;color:#a09a8d;font-weight:600}
 #gsv .slot{position:relative;display:grid;grid-template-columns:34px 1fr;align-items:center;gap:10px;padding:10px 12px;text-align:left;
   border:1px solid #ffffff1c;background:linear-gradient(90deg,#0b0d10f2,#0b0d10d9);transition:border-color .12s,background .12s}
@@ -218,7 +218,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     $('h1').textContent=def.name;$('.crumb').textContent='LOADOUT  ›  GUNSMITH'+(label?.(id)?'  ·  '+label(id):'');
     $('.lvl b').textContent=`WEAPON LEVEL ${p.level}${p.level>=cap?'  ·  MAX':''}`;
     $('.lvl i').style.width=(p.level>=cap?100:100*p.xp/need).toFixed(1)+'%';
-    $('.lvl small').textContent=p.level>=cap?'Every attachment unlocked':`${p.xp} / ${need} XP to the next unlock · earn XP with kills using this gun`;
+    {const nx=nextUnlock(cat,def,id,p.level);$('.lvl small').textContent=p.level>=cap?'Max level · prestige it in the Armory':`${p.xp} / ${need} XP to level ${p.level+1}${nx?` · next unlock: ${nx.att.name} at level ${nx.level}`:''} · earn XP with kills using this gun`;}
     const slots=slotsOf();if(slot!=='camo'&&!slots.includes(slot))slot=null;
     const on=equipped(cat,def,id,profile);
     $('.slots').innerHTML='<h3>ATTACHMENTS</h3>'+SLOT_ORDER.map(s=>{
@@ -281,14 +281,14 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const opts=all.filter(a=>a.slot===slot);
     el.innerHTML=`<h3>${esc(cat.slots[slot].toUpperCase())}</h3>`+
       `<button class="opt${opts.some(a=>on.has(a.id))?'':' on'}" data-att=""><strong>None</strong><div class="pc"><span class="neu">Stock ${esc(cat.slots[slot].toLowerCase())}</span></div></button>`+
-      opts.map(a=>{const lv=all.indexOf(a)+2,locked=!unlocked.has(a.id);
+      opts.map(a=>{const lv=unlockLevelOf(cat,def,id,a.id),locked=!unlocked.has(a.id);
         return `<button class="opt${on.has(a.id)?' on':''}${locked?' locked':''}" data-att="${a.id}"><span class="tag">${on.has(a.id)?'EQUIPPED':locked?'WEAPON LV '+lv:''}</span>
           <strong>${esc(a.name)}</strong><div class="pc">${prosCons(a)}</div></button>`;}).join('');
   }
   function prosCons(a){
     const s=a.stats??{},out=[];
-    if(s.damageMul)out.push(['con',`Damage ${Math.round((s.damageMul-1)*100)}%`]);
-    if(s.rangeMul)out.push(['con',`Range ${Math.round((s.rangeMul-1)*100)}%`]);
+    const pct=(k,label,m)=>{if(!m)return;const v=Math.round((m-1)*100);out.push([v>=0?'pro':'con',`${label} ${v>=0?'+':'−'}${Math.abs(v)}%`]);};
+    pct(0,'Damage',s.damageMul);pct(0,'Range',s.rangeMul);pct(0,'Fire rate',s.fireMul);
     if(s.suppressed)out.push(['pro','Quiet shots']);
     if(s.clipMul)out.push(['pro',`Magazine +${Math.round((s.clipMul-1)*100)}%`]);
     if(s.reloadMul)out.push([s.reloadMul<1?'pro':'con',`Reload ${s.reloadMul<1?'−':'+'}${Math.round(Math.abs(1-s.reloadMul)*100)}%`]);

@@ -10,7 +10,7 @@ import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoad
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
-import { weaponProgress, maxLevel } from './mods/weapon-levels/gunsmith.js';
+import { weaponProgress, maxLevel, migrateWeaponLevels } from './mods/weapon-levels/gunsmith.js';
 import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, canPrestigeWeapon, prestigeWeapon, canPrestigePlayer, prestigePlayer, prestigeBadge, roman, RULES as PRESTIGE, TIER_NAMES, PRESTIGE_COLORS } from './mods/prestige/prestige.js';
 import { camoById } from './mods/weapon-levels/camo.js';
 import { loadCredits, grantCredits, loadCreditsConfig } from './mods/credits/credits.js';
@@ -137,7 +137,7 @@ document.addEventListener('click',e=>{
   const pr=loadPrestige(),p=weaponProgress(loadProfile(),id),cap=maxLevel(gunsmith,d,id);if(!canPrestigeWeapon(pr,id,p.level,cap)||!armed(b))return;
   const r=prestigeWeapon(pr,id);savePrestige(pr);
   {const bonus=creditsCfg?.prestige?.[r.tier]??0;if(bonus)grantCredits(bonus,`${d.name} ${TIER_NAMES[r.tier].toLowerCase()}`);}
-  if(r.reset){const st=loadProfile();st.weaponXp={...st.weaponXp,[id]:{level:1,xp:0}};st.attachments={...st.attachments,[id]:[]};saveProfile(st);profile.weaponXp=st.weaponXp;profile.attachments=st.attachments;}
+  if(r.reset){const st=loadProfile();st.weaponXp={...st.weaponXp,[id]:{level:1,xp:0,v:2}};st.attachments={...st.attachments,[id]:[]};saveProfile(st);profile.weaponXp=st.weaponXp;profile.attachments=st.attachments;}
   toast(r.camo?`${d.name} · ${TIER_NAMES[r.tier]} · ${camoById(camoCats,r.camo)?.name} camo unlocked for every gun`:`${d.name} · PRESTIGE MASTER · earn Master levels for its animated camo`);
   b.closest('[data-prestige-for]')?.dispatchEvent(new CustomEvent('prestiged',{bubbles:true}));
   renderPrestigeSlots();
@@ -307,7 +307,8 @@ function openLoadoutGunsmith(id,onClose){
   openGunsmith({cat:gunsmith,weapons,profile,id,ids:ids.includes(id)?ids:[id],label:w=>w===l.primary?'STARTING PISTOL':'BOX / WALL GUN',
     onChange:()=>save(),onClose:onClose??(()=>{focus={id,isWeapon:true};renderLoadout();})});
 }
-loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
+loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;{const st=loadProfile();if(migrateWeaponLevels(c,weapons,st)){saveProfile(st);profile.weaponXp=st.weaponXp;}}   // 30-level track: old saves keep their attachments
+  const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
 // One starting slot, pistols only; the Mystery Box card edits what the box can give you.
 const slots=[{key:'primary',label:'STARTING PISTOL'},{key:'box',label:'MYSTERY BOX'},{key:'tactical',label:'TACTICAL'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
 let activeSlot='primary',focus=null;

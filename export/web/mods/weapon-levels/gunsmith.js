@@ -21,8 +21,20 @@ const pristine=new WeakMap();   // def → its fields before any attachment was 
 
 export const xpToNext=(cat,level)=>Math.round(cat.curve.base*level**cat.curve.exponent);
 
-// Attachments this weapon's model carries, in unlock order.
+// Attachments this weapon can take, in unlock order: the ones its model carries, then (for guns with fewer than
+// cat.padTo) stat-only generic ones in the barrel / stock / grip / ammo slots. Guns with none of their own and no
+// Gunsmith flag (wonder weapons) get nothing.
 export function available(cat,def,id){
+  const own=ownAttachments(cat,def,id);
+  // pad only guns that have a Gunsmith: their own parts, the flag, imported mounts/stat unlocks, or attachment tags at all
+  // (the crossbow carries a scope tag its built-in optic rules out)
+  const hidden=new Set((pristine.get(def)?.hideTags)??def?.hideTags??[]);
+  const smith=own.length||def?.gunsmith===true||Object.keys(def?.mounts??{}).length||def?.statAttachments?.length||cat.attachments.some(a=>!a.generic&&a.tags.some(t=>hidden.has(t)));
+  if(!smith)return own;
+  const pad=Math.max(0,(cat.padTo??0)-own.length);
+  return pad?[...own,...cat.attachments.filter(a=>a.generic).slice(0,pad)]:own;
+}
+function ownAttachments(cat,def,id){
   if(!def)return [];
   // the gun's own attachment parts: its original hidden tags (applying attachments un-hides some)
   const hidden=new Set((pristine.get(def)?.hideTags)??def.hideTags??[]);
@@ -31,16 +43,43 @@ export function available(cat,def,id){
     if(a.slot==='optic'&&cat.builtInOptic.includes(id)!==!!a.builtIn)return false;
     // imported guns (mods/bo3-weapons): attachment models mounted on the gun's tags, and stat-only unlocks
     if(def.mounts?.[a.id]||def.statAttachments?.includes(a.id))return true;
+    if(a.generic)return false;
     return a.tags.some(t=>hidden.has(t));
   });
 }
+// The level track (2026-10-14): cat.levels levels; the attachments are spread from level 2 to levels-2 and every other
+// level is filler. Returns [{level, att}] in order. Guns with nothing to unlock have one level.
+const trackCache=new WeakMap();
+export function track(cat,def,id){
+  const all=available(cat,def,id),key=all.map(a=>a.id).join(),L=cat.levels??all.length+1;
+  const cached=def&&trackCache.get(def);if(cached?.key===key&&cached.L===L)return cached.t;
+  const n=all.length,t=[];let last=1;
+  all.forEach((a,i)=>{let lv=n===1?2:Math.round(2+i*(Math.max(2,L-4))/(n-1));lv=Math.max(lv,last+1);last=lv;t.push({level:lv,att:a});});
+  if(def)trackCache.set(def,{key,L,t});return t;
+}
+export const unlockLevelOf=(cat,def,id,attId)=>track(cat,def,id).find(x=>x.att.id===attId)?.level??null;
+// the next attachment on the track after `level` (null when everything is unlocked)
+export const nextUnlock=(cat,def,id,level)=>track(cat,def,id).find(x=>x.level>level)??null;
 
 export function weaponProgress(profile,id){return profile.weaponXp?.[id]??{level:1,xp:0};}
 export function unlockedAttachments(cat,def,id,profile){
   const lv=weaponProgress(profile,id).level;
-  return available(cat,def,id).slice(0,Math.max(0,lv-1));
+  return track(cat,def,id).filter(x=>x.level<=lv).map(x=>x.att);
 }
-export const maxLevel=(cat,def,id)=>available(cat,def,id).length+1;
+export const maxLevel=(cat,def,id)=>available(cat,def,id).length?Math.max(cat.levels??0,available(cat,def,id).length+1):1;
+// Saves from before the level track (version 1: level n = n-1 attachments unlocked, no generics): keep exactly the
+// attachments a gun had, at the level that unlocks them on the new track. Runs once per profile (weaponXpVersion 2).
+// Each entry is marked v:2 once it's on the new track (grantWeaponXp marks new ones), so a copy of the profile saved by
+// another page can never make an entry migrate twice.
+export function migrateWeaponLevels(cat,weapons,profile){
+  let changed=false;
+  for(const [id,p] of Object.entries(profile.weaponXp??{})){
+    if(!p||typeof p!=='object'||p.v>=2)continue;const def=weapons?.[id];if(!def)continue;
+    if(p.level>1){const had=Math.min(p.level-1,ownAttachments(cat,def,id).length),t=track(cat,def,id);p.level=had>0?t[had-1]?.level??p.level:1;p.xp=0;}
+    p.v=2;changed=true;
+  }
+  return changed;
+}
 
 // Equipped attachment ids, minus any the gun no longer qualifies for.
 export function equipped(cat,def,id,profile){
@@ -61,7 +100,7 @@ export function toggle(cat,def,id,profile,attId){
 // Grant XP to one weapon. Returns the attachments newly unlocked (may be []).
 export function grantWeaponXp(cat,def,id,profile,amount){
   profile.weaponXp??={};
-  const p=profile.weaponXp[id]??={level:1,xp:0},cap=maxLevel(cat,def,id),before=unlockedAttachments(cat,def,id,profile).length;
+  const p=profile.weaponXp[id]??={level:1,xp:0,v:2},cap=maxLevel(cat,def,id),before=unlockedAttachments(cat,def,id,profile).length;
   if(p.level>=cap)return [];
   p.xp+=amount;
   while(p.level<cap&&p.xp>=xpToNext(cat,p.level)){p.xp-=xpToNext(cat,p.level);p.level++;}
@@ -69,7 +108,7 @@ export function grantWeaponXp(cat,def,id,profile,amount){
   return unlockedAttachments(cat,def,id,profile).slice(before);
 }
 
-const STAT_FIELDS=['damage','minDamage','range','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','suppressed','attachments','attachment','mounted'];
+const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','suppressed','attachments','attachment','mounted'];
 function snapshot(obj){if(!pristine.has(obj)){const s={};for(const k of STAT_FIELDS)s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);pristine.set(obj,s);}return pristine.get(obj);}
 function restore(obj){const s=snapshot(obj);for(const k of STAT_FIELDS){if(s[k]===undefined)delete obj[k];else obj[k]=structuredClone(s[k]);}}
 
@@ -98,6 +137,7 @@ function applyStats(obj,list,cat,show){
     if(s.headMul&&obj.headMultiplier)obj.headMultiplier=+(obj.headMultiplier*s.headMul).toFixed(2);
     if(s.hipSpreadMul)obj.hipSpread=+(.012*s.hipSpreadMul).toFixed(4);
     if(s.suppressed)obj.suppressed=true;
+    if(s.fireMul&&obj.fireTime)obj.fireTime=+(obj.fireTime/s.fireMul).toFixed(4);
     if(a.scope)obj.scope=a.scope;
   }
   if(obj.hideTags)obj.hideTags=obj.hideTags.filter(t=>!show.has(t));
@@ -169,7 +209,7 @@ export function renderGunsmith(el,{cat,def,id,profile,onChange,onOpen,compact=fa
   el.innerHTML=`<div class="gunsmith${compact?' compact':''}">
     <div class="gs-head"><span class="eyebrow">GUNSMITH${compact?' · '+esc(def.name.toUpperCase()):''}</span><b>WEAPON LV ${p.level}${p.level>=cap?' · MAX':''}</b></div>
     <div class="gs-bar"><i style="width:${p.level>=cap?100:(100*p.xp/need).toFixed(1)}%"></i></div>
-    <small class="muted">${p.level>=cap?'Every attachment unlocked':`${p.xp} / ${need} weapon XP · kills with this gun`}</small>
+    <small class="muted">${p.level>=cap?'Max level · prestige it in the Armory':`${p.xp} / ${need} weapon XP · kills with this gun${(n=>n?` · next: ${esc(n.att.name)} at LV ${n.level}`:'')(nextUnlock(cat,def,id,p.level))}`}</small>
     <div class="gs-eq">${Object.keys(cat.slots).filter(s=>all.some(a=>a.slot===s)).map(s=>{const a=all.find(x=>x.slot===s&&on.has(x.id));
       return `<span><i>${esc(cat.slots[s].toUpperCase())}</i>${a?esc(a.name):'—'}</span>`;}).join('')}</div>
     <button class="gs-open">OPEN GUNSMITH  ›</button>

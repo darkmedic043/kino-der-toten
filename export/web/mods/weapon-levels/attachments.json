@@ -4,15 +4,19 @@
     "headshot": 5
   },
   "curve": {
-    "base": 120,
-    "exponent": 1.25
+    "base": 60,
+    "exponent": 1.05
   },
   "slots": {
     "optic": "Optic",
     "muzzle": "Muzzle",
     "mag": "Magazine",
     "under": "Underbarrel",
-    "laser": "Laser"
+    "laser": "Laser",
+    "barrel": "Barrel",
+    "stock": "Stock",
+    "grip": "Rear Grip",
+    "ammo": "Ammo"
   },
   "mountTags": [
     "tag_scope_rail",
@@ -324,6 +328,121 @@
       "stats": {
         "rangeMul": 1.25
       }
+    },
+    {
+      "id": "hollowpoint",
+      "name": "Hollow Points",
+      "slot": "ammo",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "damageMul": 1.1,
+        "rangeMul": 0.9
+      },
+      "desc": "More damage up close, less range."
+    },
+    {
+      "id": "longbarrel_g",
+      "name": "Long Barrel",
+      "slot": "barrel",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "rangeMul": 1.25,
+        "damageMul": 1.04
+      },
+      "desc": "Reaches further and hits a little harder."
+    },
+    {
+      "id": "rubbergrip",
+      "name": "Rubber Grip",
+      "slot": "grip",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "hipSpreadMul": 0.85
+      },
+      "desc": "Tighter hip fire."
+    },
+    {
+      "id": "tacstock",
+      "name": "Tactical Stock",
+      "slot": "stock",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "hipSpreadMul": 0.8
+      },
+      "desc": "Steadier hip fire."
+    },
+    {
+      "id": "fmj",
+      "name": "FMJ Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "rangeMul": 1.2,
+        "headMul": 1.05
+      },
+      "desc": "Longer range and a little more headshot damage."
+    },
+    {
+      "id": "quickgrip",
+      "name": "Quickdraw Grip",
+      "slot": "grip",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "reloadMul": 0.9
+      },
+      "desc": "Faster reloads."
+    },
+    {
+      "id": "rapidfire",
+      "name": "Rapid Fire",
+      "slot": "ammo",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "fireMul": 1.15,
+        "damageMul": 0.95
+      },
+      "desc": "Fires 15% faster, each shot a little weaker."
+    },
+    {
+      "id": "shortbarrel",
+      "name": "Short Barrel",
+      "slot": "barrel",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "hipSpreadMul": 0.8,
+        "rangeMul": 0.85
+      },
+      "desc": "Better hip fire, less range."
+    },
+    {
+      "id": "lightstock",
+      "name": "Light Stock",
+      "slot": "stock",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "reloadMul": 0.92
+      },
+      "desc": "Quicker handling and reloads."
+    },
+    {
+      "id": "hotload",
+      "name": "Hot Loads",
+      "slot": "ammo",
+      "tags": [],
+      "generic": true,
+      "stats": {
+        "damageMul": 1.06
+      },
+      "desc": "Every shot hits a little harder."
     }
   ],
   "ironSights": {
@@ -376,5 +495,8 @@
       "tag_iron_sight"
     ]
   },
-  "_ironSightsNote": "Iron sights (front and rear) removed when an optic is fitted, so the front post doesn't show through the sight window. On the M16/Commando the bone is the carry handle with the front post; on the FAMAS it's the handle."
+  "_ironSightsNote": "Iron sights (front and rear) removed when an optic is fitted, so the front post doesn't show through the sight window. On the M16/Commando the bone is the carry handle with the front post; on the FAMAS it's the handle.",
+  "levels": 30,
+  "padTo": 8,
+  "_levelsNote": "levels: every gun with a Gunsmith has this many levels; its attachments are spread over them (first at level 2, last at levels-2) and the levels between are filler (no unlock: progression and prestige). padTo: guns with fewer attachments than this get stat-only generic ones (generic: true, no model) in the barrel / stock / grip / ammo slots, in catalogue order, until they have padTo. curve: XP to the next level = base * level^exponent."
 }
