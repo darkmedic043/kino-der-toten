@@ -6,11 +6,13 @@ import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
 import { startSocial, onSocial, request, accept, decline, cancel, remove, statusText } from './social.js';
 import { mergePatch, resolveWeapons } from './mod-loader.js';
-import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady, unlockLevel, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
+import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
 import { weaponProgress, maxLevel } from './mods/weapon-levels/gunsmith.js';
+import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, canPrestigeWeapon, prestigeWeapon, canPrestigePlayer, prestigePlayer, prestigeBadge, roman, RULES as PRESTIGE, TIER_NAMES, PRESTIGE_COLORS } from './mods/prestige/prestige.js';
+import { camoById } from './mods/weapon-levels/camo.js';
 import { getAccount, onAccountChange, renderSignInButton, signOut } from './cloud.js';
 import { renderCareer } from './career-view.js';
 import { loadGums, loadGumProfile, saveGumProfile, activePack, packTiers, canAdd, canRemove, gumById } from './mods/gobblegums/gums.js';
@@ -61,6 +63,7 @@ const weapons=data.weapons,bonusById=Object.fromEntries(config.bonuses.map(b=>[b
 const weaponLevel=Object.fromEntries(config.weapons.map(w=>[w.id,unlockLevel(w)]));
 const rarityById=Object.fromEntries((config.rarities??[]).map(r=>[r.id,r]));
 await cloudReady;
+await loadPrestigeRules();
 let profile=loadProfile();
 // Weapon XP is earned in game (maybe in another tab): keep the stored value.
 // camo progress is earned in game too: keep the stored counts, the menu only picks which camo is on
@@ -96,7 +99,37 @@ function renderProfile(){
   $('p-level').textContent='LEVEL '+profile.level;$('p-bar').style.width=(100*profile.xp/need).toFixed(1)+'%';
   $('p-xp').textContent=`${profile.xp.toLocaleString()} / ${need.toLocaleString()} XP`;$('p-char').textContent=c?.name??'';
   $('p-stats').textContent=`${profile.kills.toLocaleString()} kills · best round ${profile.bestRound||'—'} · ${profile.games} games`;
+  // Phase 4: player prestige (badge, tokens, the button from PRESTIGE.playerLevel)
+  const pr=loadPrestige(),n=pr.player.prestige,el=$('p-prestige');
+  if(el){const can=canPrestigePlayer(pr,profile.level);
+    $('p-level').innerHTML=(n?prestigeBadge(n,18)+`<span class="pr-n" style="color:${PRESTIGE_COLORS[Math.min(n,10)]}">P${roman(n)}</span> `:'')+'LEVEL '+profile.level;
+    el.innerHTML=(pr.player.tokens?`<span class="pr-tok">${pr.player.tokens} PRESTIGE TOKEN${pr.player.tokens>1?'S':''}</span>`:'')+
+      (can?`<button class="pr-btn" data-prestige="player">PRESTIGE ${roman(n+1)}</button>`:n<PRESTIGE.playerMax?`<span class="pr-next">Prestige at level ${PRESTIGE.playerLevel}</span>`:'');}
 }
+// two clicks: the first arms the button, the second does it
+function armed(btn){if(btn.dataset.armed){return true;}btn.dataset.armed='1';const t=btn.textContent;btn.textContent='CONFIRM · '+t;setTimeout(()=>{if(btn.isConnected){delete btn.dataset.armed;btn.textContent=t;}},4000);return false;}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-prestige]');if(!b)return;
+  if(b.dataset.prestige==='player'){const pr=loadPrestige();if(!canPrestigePlayer(pr,profile.level)||!armed(b))return;
+    prestigePlayer(pr,profile.level);savePrestige(pr);const st=loadProfile();st.level=1;st.xp=0;saveProfile(st);profile.level=1;profile.xp=0;
+    renderProfile();toast(`Prestige ${roman(pr.player.prestige)} · +1 prestige token · everything you unlocked stays`);return;}
+  const id=b.dataset.prestige,d=weapons[id];if(!d||!gunsmith)return;
+  const pr=loadPrestige(),p=weaponProgress(loadProfile(),id),cap=maxLevel(gunsmith,d,id);if(!canPrestigeWeapon(pr,id,p.level,cap)||!armed(b))return;
+  const r=prestigeWeapon(pr,id);savePrestige(pr);
+  if(r.reset){const st=loadProfile();st.weaponXp={...st.weaponXp,[id]:{level:1,xp:0}};st.attachments={...st.attachments,[id]:[]};saveProfile(st);profile.weaponXp=st.weaponXp;profile.attachments=st.attachments;}
+  toast(r.camo?`${d.name} · ${TIER_NAMES[r.tier]} · ${camoById(camoCats,r.camo)?.name} camo unlocked for every gun`:`${d.name} · PRESTIGE MASTER · earn Master levels for its animated camo`);
+  b.closest('[data-prestige-for]')?.dispatchEvent(new CustomEvent('prestiged',{bubbles:true}));
+  renderPrestigeSlots();
+});
+// the prestige panel under a weapon's detail
+function prestigeSlot(id){
+  const d=weapons[id];if(!gunsmith||!d||!gunsmithHas(id))return '';const cap=maxLevel(gunsmith,d,id);if(cap<=1)return '';
+  const pr=loadPrestige(),w=pr.weapons[id]??{},tier=w.tier??0,p=weaponProgress(profile,id),can=canPrestigeWeapon(pr,id,p.level,cap);
+  const line=tier>=3?`MASTER LEVEL ${w.mlevel} / ${PRESTIGE.masterMax} · animated camo at ${PRESTIGE.masterCamoAt}${w.mlevel>=PRESTIGE.masterCamoAt?' ✓':''}`:`${tier?TIER_NAMES[tier]+' · ':''}${p.level>=cap?'max level: ready to prestige':`level ${p.level} / ${cap} to prestige`}`;
+  return `<div class="pr-slot" data-prestige-for="${id}"><span class="eyebrow">WEAPON PRESTIGE</span><div class="pr-line">${esc(line)}</div>
+    ${can?`<button class="pr-btn" data-prestige="${id}">${tier<2?'PRESTIGE '+roman(tier+1)+' · RESETS LEVEL AND ATTACHMENTS':'ENTER PRESTIGE MASTER'}</button>`:''}</div>`;
+}
+function renderPrestigeSlots(){for(const el of document.querySelectorAll('[data-prestige-host]'))el.innerHTML=prestigeSlot(el.dataset.prestigeHost);}
 
 // ---- Account ------------------------------------------------------------------
 let wasSignedIn=getAccount().signedIn;
@@ -240,7 +273,7 @@ loadCamos(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{camoCats=c;r
 const classOf=id=>classOfIn(weapons,id);
 const activeClass={};
 // Levelling up opens guns in the Gunsmith (a kit gun's `gunsmith` level, else its unlock level).
-const smithOpen=id=>profile.level>=gunsmithLevel(config,id);
+const smithOpen=id=>unlockLvl(profile)>=gunsmithLevel(config,id);
 const gunsmithHas=id=>gunsmith&&weapons[id]&&(weapons[id].gunsmith===true||Object.keys(weapons[id].mounts??{}).length>0   // gunsmith:true = camos only (the Grimhawk)
   ||weapons[id].statAttachments?.length>0   // imported guns: mounted / stat-only attachments
   ||gunsmith.attachments.some(a=>a.tags.some(t=>(weapons[id].hideTags??[]).includes(t))));
@@ -266,7 +299,7 @@ function slotState(key,u,l){
   const i=+key.slice(5);return i<u.bonusSlots?{value:l.bonuses[i]??''}:{locked:`Unlocks at level ${config.secondBonusLevel}`};
 }
 function renderLoadout(){
-  const u=unlocks(config,profile.level,weapons),l=validLoadout(config,profile,weapons);
+  const u=unlocks(config,unlockLvl(profile),weapons),l=validLoadout(config,profile,weapons);
   if(slotState(activeSlot,u,l).locked)activeSlot='primary';
   $('slots').innerHTML='';
   for(const s of slots){
@@ -296,7 +329,7 @@ let gumCfg=null,gumFocus=null;
 loadGums(new URL('mods/gobblegums/',document.baseURI)).then(c=>{gumCfg=c;renderGums();}).catch(e=>console.warn('[gobblegums]',e));
 function renderGums(){
   const grid=$('gum-grid');if(!grid||!gumCfg)return;
-  const cfg=gumCfg,by=gumById(cfg),gp=loadGumProfile(),pack=activePack(cfg,profile.level,gp.pack),inPack=new Set(pack.ids),tiers=packTiers(cfg,pack.ids);
+  const cfg=gumCfg,by=gumById(cfg),gp=loadGumProfile(),pack=activePack(cfg,unlockLvl(profile),gp.pack),inPack=new Set(pack.ids),tiers=packTiers(cfg,pack.ids);
   const setPack=ids=>{saveGumProfile({...loadGumProfile(),pack:ids});renderGums();};
   grid.innerHTML='';
   for(const r of [...cfg.rarities].reverse()){
@@ -306,7 +339,7 @@ function renderGums(){
     grid.append(head);
     const row=document.createElement('div');row.className='picker-grid gum-row';grid.append(row);
     for(const g of gums){
-      const open=g.level<=profile.level,on=inPack.has(g.id),el=document.createElement('button');
+      const open=g.level<=unlockLvl(profile),on=inPack.has(g.id),el=document.createElement('button');
       el.className='opt gum-opt'+(on?' selected':'')+(open?'':' locked');el.style.setProperty('--r',r.color);
       el.innerHTML=`<div class="gum-ball"></div><strong>${esc(g.name)}</strong><small>${esc(g.type.toUpperCase())}</small>${open?`<span class="box-check">${on?'IN PACK':'OFF'}</span>`:`<span class="lock">LV ${g.level}</span>`}`;
       el.addEventListener('mouseenter',()=>{gumFocus=g.id;gumDetail(cfg,pack,tiers);});
@@ -351,7 +384,7 @@ function renderPicker(u,l){
     if(!unlocked)el.insertAdjacentHTML('beforeend',`<span class="lock">LV ${o.level}</span>`);
     el.addEventListener('mouseenter',()=>isTac?renderTactical(o.id,unlocked):renderDetail(o.id,isWeapon,unlocked,o.level));
     // hovering previews; leaving goes back to the weapon actually in the slot (with its Gunsmith)
-    el.addEventListener('mouseleave',()=>{const now=slotState(activeSlot,unlocks(config,profile.level,weapons),validLoadout(config,profile,weapons)).value??'';isTac?renderTactical(now,true):renderDetail(now,isWeapon,true,1);});
+    el.addEventListener('mouseleave',()=>{const now=slotState(activeSlot,unlocks(config,unlockLvl(profile),weapons),validLoadout(config,profile,weapons)).value??'';isTac?renderTactical(now,true):renderDetail(now,isWeapon,true,1);});
     el.addEventListener('click',()=>{
       if(!unlocked){toast(`Reach level ${o.level} to unlock`);return;}
       if(o.id&&o.id===other){toast('Already in your other slot');return;}
@@ -439,7 +472,8 @@ function weaponBadges(id){
   const d=weapons[id],out=[],r=rarityById[rarityOf(config,id)];
   if(r)out.push(`<span class="b rar" style="--r:${r.color}">${esc(r.name.toUpperCase())}</span>`);
   if(gunsmith&&gunsmithHas(id)){const p=weaponProgress(profile,id),cap=maxLevel(gunsmith,d,id);out.push(`<span class="b lv">LV ${p.level}${p.level>=cap?' MAX':''}</span>`);}
-  if(camoCats){const n=camoUnlocked(camoCats,profile,id,weapons).size;if(n)out.push(`<span class="b camo">CAMO ${n}/${camoCats.camos.length}</span>`);}
+  if(camoCats){const u=camoUnlocked(camoCats,profile,id,weapons),n=camoCats.camos.filter(c=>u.has(c.id)).length;if(n)out.push(`<span class="b camo">CAMO ${n}/${camoCats.camos.length}</span>`);}
+  const pt=weaponTier(loadPrestige(),id);if(pt)out.push(`<span class="b pr">${pt>=3?'MASTER '+(loadPrestige().weapons[id].mlevel??1):'P'+roman(pt)}</span>`);
   return out.join('');
 }
 const bar=(label,value,max,shown)=>`<div class="stat"><span>${label}</span><span class="track"><i style="width:${Math.max(3,Math.min(100,100*value/max)).toFixed(0)}%"></i></span><b>${shown}</b></div>`;
@@ -454,11 +488,11 @@ function renderDetail(id,isWeapon,unlocked,level,opts={}){
     ${bar('FIRE RATE',rpm,1000,rpm)}${bar('MAGAZINE',d.clipSize,100,d.clipSize)}${bar('RESERVE',d.maxAmmo,600,d.maxAmmo)}${bar('RELOAD',1/Math.max(.3,d.reloadTime),1/.8,(d.reloadTime??0).toFixed(1)+'s')}
     <p>${d.upgrade?`Pack-a-Punch: <b>${esc(d.upgrade.name)}</b>`:'Cannot be upgraded'} · ${esc(d.fireType??'')}</p>
     <p class="muted">${rarityLine(id)}${unlocked?'Unlocked':'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}${config.weapons.find(w=>w.id===id)?.kit?' · first kit':''}</p>
-    ${gunsmith&&gunsmithHas(id)&&!smithOpen(id)?`<p class="muted gs-locked">Gunsmith opens at level ${gunsmithLevel(config,id)}</p>`:''}<div class="gunsmith-slot"></div>`;
+    ${gunsmith&&gunsmithHas(id)&&!smithOpen(id)?`<p class="muted gs-locked">Gunsmith opens at level ${gunsmithLevel(config,id)}</p>`:''}<div class="gunsmith-slot"></div>${unlocked?`<div data-prestige-host="${id}">${prestigeSlot(id)}</div>`:''}`;
   fillThumb(el.querySelector('.thumb'),id);
   // Weapon levels and attachments (mods/weapon-levels).
   // Attachments are edited for the weapon in the selected slot only, not whatever is hovered.
-  const inSlot=slotState(activeSlot,unlocks(config,profile.level,weapons),validLoadout(config,profile,weapons)).value;
+  const inSlot=slotState(activeSlot,unlocks(config,unlockLvl(profile),weapons),validLoadout(config,profile,weapons)).value;
   if(gunsmith&&(opts.smith||id===inSlot)&&unlocked&&smithOpen(id)&&gunsmithHas(id))renderGunsmith(el.querySelector('.gunsmith-slot'),{cat:gunsmith,def:d,id,profile,onOpen:()=>openLoadoutGunsmith(id,opts.onClose)});
 }
 
@@ -474,7 +508,7 @@ function toggleBoxItem(id){
 }
 function renderWeapons(){
   const grid=$('wp-grid');if(!grid)return;
-  const u=unlocks(config,profile.level,weapons),list=weaponList(),box=Object.fromEntries(boxItems(config,profile,data).map(i=>[i.id,i]));
+  const u=unlocks(config,unlockLvl(profile),weapons),list=weaponList(),box=Object.fromEntries(boxItems(config,profile,data).map(i=>[i.id,i]));
   const present=CLASSES.filter(c=>list.some(w=>classOf(w.id)===c[0]));
   if(!present.some(c=>c[0]===wpClass))wpClass=present[0]?.[0];
   $('wp-hint').textContent=`${u.weapons.length} / ${list.length} unlocked · level up to open guns in the Gunsmith`;
@@ -498,7 +532,7 @@ function renderWeapons(){
 }
 function renderWeaponCard(){
   const el=$('wp-detail'),id=wpFocus;if(!id){el.innerHTML='';return;}
-  const unlocked=unlocks(config,profile.level,weapons).weapons.includes(id),it=boxItems(config,profile,data).find(i=>i.id===id);
+  const unlocked=unlocks(config,unlockLvl(profile),weapons).weapons.includes(id),it=boxItems(config,profile,data).find(i=>i.id===id);
   renderDetail(id,true,unlocked,weaponLevel[id],{el,smith:true,onClose:()=>{wpFocus=id;renderWeapons();}});
   const actions=document.createElement('div');actions.className='wp-actions';
   const loadout=validLoadout(config,profile,weapons).primary===id;

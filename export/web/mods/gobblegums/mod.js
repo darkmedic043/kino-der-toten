@@ -4,14 +4,14 @@
 // menu (Armory → Gobblegums) and is not used up. window.kino.gobblegums is what the terminal talks to.
 import * as THREE from 'three';
 import { loadGums, loadGumProfile, gumById, activePack } from './gums.js';
-import { loadProfile, cloudReady } from '../../profile.js';
+import { loadProfile, cloudReady, unlockLvl } from '../../profile.js';
 import { PERKS } from '../terminal-booth/desktop.js';
 
 export default async function setup(api){
   const {session,host,powerups,enemies,player,mod}=api;
   await cloudReady;
   const cfg=await loadGums(mod.url),by=gumById(cfg),rarity=Object.fromEntries(cfg.rarities.map(r=>[r.id,r]));
-  const pack=()=>activePack(cfg,loadProfile().level??1,loadGumProfile().pack);
+  const pack=()=>activePack(cfg,unlockLvl(loadProfile()),loadGumProfile().pack);
 
   // ---- state: the hand, rolls this round, what's active ------------------------------------------
   const st={hand:[],sel:0,rolls:0,timed:{},armed:new Set(),charges:{}};

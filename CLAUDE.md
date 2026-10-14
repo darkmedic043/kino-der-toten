@@ -18,7 +18,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs, BO3 imports (Greyhound, DG-2), weapon inspect, BO7 weapons rebuilt in Blender on BO1 skeletons (Grimhawk) | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby), friends and presence; the Rind launcher (`~/projects/rind`) uses the same sign-in and friends API | `coop.md` |
 | Props: terminal booth (Blender generator, bake, placement mod, MelonTerm desktop and its apps) | `props.md` |
-| Weapon levels, attachments (incl. mounted BO3 parts), camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound | `weapon-levels.md` |
+| Weapon levels, attachments (incl. mounted BO3 parts), camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound, Phase 4 prestige (weapon + player, prestige camos) | `weapon-levels.md` |
 | Classes (BL4 loadouts), skill trees, all six action skills, the Mech class, Phase 3 charging, resources, synergies, either-or nodes (`skills.js`) | `classes.md` |
 | Gobblegums (pack ladder, GUMS terminal app, effects) | `gobblegums.md` |
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |

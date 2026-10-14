@@ -4,6 +4,7 @@
 
 export { cloudReady } from './cloud.js';
 import { weaponClass } from './mods/weapon-levels/camo.js';
+import { loadPrestige } from './mods/prestige/prestige.js';
 export const PROFILE_KEY='kino.mods.progression';
 
 export function loadProfile(){
@@ -24,6 +25,8 @@ export const xpToNext=(config,level)=>Math.round(config.levelCurve.base*level**c
 // unlock kit, owned from level 1; their `gunsmith` level opens them in the
 // Gunsmith. Every other gun unlocks at its `level`, Gunsmith included.
 export const unlockLevel=w=>w.kit?1:w.level;
+// The level unlocks are checked against: the highest ever reached, so a player prestige (level back to 1) re-locks nothing.
+export const unlockLvl=profile=>Math.max(profile?.level??1,loadPrestige().player.peak??0);
 export const gunsmithLevel=(config,id)=>{const w=config.weapons.find(w=>w.id===id);return w?w.gunsmith??w.level:1;};
 export const rarityOf=(config,id)=>[...config.weapons,...config.tactical??[],...config.lethal??[]].find(w=>w.id===id)?.rarity??'common';
 // the one starting slot takes pistols only
@@ -45,7 +48,7 @@ export function unlocks(config,level,weapons){
 // There is one weapon slot (`primary`), pistols only: a saved SMG or a level-locked
 // pistol falls back to the M1911. `secondary` is always empty (kept for old readers).
 export function validLoadout(config,profile,weapons){
-  const u=unlocks(config,profile.level,weapons),l=profile.loadout;
+  const u=unlocks(config,unlockLvl(profile),weapons),l=profile.loadout;
   const primary=u.weapons.includes(l.primary)&&(!weapons||isPistol(weapons[l.primary]))?l.primary:'m1911_zm';
   const bonuses=[...new Set(l.bonuses)].filter(id=>u.bonuses.includes(id)).slice(0,u.bonusSlots);
   const tactical=u.tacticalSlot&&u.tactical.includes(l.tactical)?l.tactical:'';
@@ -58,7 +61,7 @@ export function validLoadout(config,profile,weapons){
 // are kept as overrides (loadout.boxOn / boxOff) so newly unlocked box guns join by
 // default. data: the merged game data (weapons, equipment, boxPool).
 export function boxItems(config,profile,data){
-  const u=unlocks(config,profile.level,data.weapons),pool=new Set(data.boxPool??[]),l=profile.loadout;
+  const u=unlocks(config,unlockLvl(profile),data.weapons),pool=new Set(data.boxPool??[]),l=profile.loadout;
   const on=new Set(l.boxOn??[]),off=new Set(l.boxOff??[]);
   const item=(id,kind)=>({id,kind,rarity:rarityOf(config,id),on:!off.has(id)&&(pool.has(id)||on.has(id))});
   const items=[...u.weapons.filter(id=>!/upgraded/.test(id)).map(id=>item(id,'weapon')),

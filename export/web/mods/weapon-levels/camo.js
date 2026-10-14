@@ -4,6 +4,7 @@
 // sights, lenses, suppressors, underbarrels, straps, mags or hands), keeping
 // the gun's own shading and wear: camo colour × the base texture's brightness.
 import * as THREE from 'three';
+import { loadPrestige } from '../prestige/prestige.js';
 
 export async function loadCamos(base=import.meta.url){
   const r=await fetch(new URL('camos.json',base));
@@ -48,12 +49,65 @@ function draw(kind){
   else{g.fillStyle='#777';g.fillRect(0,0,S,S);}
   return c;
 }
+// ---- prestige camos (Phase 4): three per gun, drawn from a per-gun seed --------------------------------------
+// pr1:<gun> Prestige I (angular shards), pr2:<gun> Prestige II (a metallic hex lattice), pr3:<gun> Prestige Master
+// (dark voronoi plates whose cracks glow, pulse and shift colour, and the pattern drifts: animated in the shader).
+const hashStr=str=>{let h=2166136261;for(const ch of str){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;};
+const hsl=(h,s,l)=>`hsl(${((h%360)+360)%360},${s}%,${l}%)`;
+function hslRgb(h,s,l){h=((h%360)+360)%360/360;const f=n=>{const k=(n+h*12)%12,a=s*Math.min(l,1-l);return l-a*Math.max(-1,Math.min(k-3,9-k,1));};return [f(0),f(8),f(4)];}
+// toroidal voronoi: per pixel the nearest cell and the gap to the second nearest (cracks where it's small)
+function voronoi(S,n,r){
+  const pts=[...Array(n)].map(()=>[r()*S,r()*S]),cell=new Int16Array(S*S),edge=new Float32Array(S*S);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){let d1=1e9,d2=1e9,c=0;
+    for(let i=0;i<n;i++){let dx=Math.abs(x-pts[i][0]),dy=Math.abs(y-pts[i][1]);if(dx>S/2)dx=S-dx;if(dy>S/2)dy=S-dy;const d=dx*dx+dy*dy;if(d<d1){d2=d1;d1=d;c=i;}else if(d<d2)d2=d;}
+    cell[y*S+x]=c;edge[y*S+x]=Math.sqrt(d2)-Math.sqrt(d1);}
+  return {cell,edge};
+}
+function drawPrestige(seed,tier,glow=false){
+  const S=tier===3?256:512,c=document.createElement('canvas');c.width=c.height=S;const g=c.getContext('2d'),r=rng(seed*31+tier),h=seed%360;
+  const wrap=(fn)=>{for(const dx of [-S,0,S])for(const dy of [-S,0,S]){g.save();g.translate(dx,dy);fn();g.restore();}};
+  if(tier===1){   // shards: overlapping angular slivers in the gun's hue, bright edges
+    g.fillStyle=hsl(h,30,18);g.fillRect(0,0,S,S);
+    for(let i=0;i<90;i++){const x=r()*S,y=r()*S,len=40+r()*150,w=8+r()*30,a=r()*Math.PI,l=28+r()*34,sh=(r()-.5)*40;
+      const pts=[[0,-w*.2],[len*.55,-w],[len,0],[len*.4,w]].map(([u,v])=>[x+u*Math.cos(a)-v*Math.sin(a),y+u*Math.sin(a)+v*Math.cos(a)]);
+      wrap(()=>{g.fillStyle=hsl(h+sh,55,l);g.beginPath();pts.forEach(([px,py],k)=>k?g.lineTo(px,py):g.moveTo(px,py));g.closePath();g.fill();g.strokeStyle=hsl(h+sh,80,l+25);g.lineWidth=1.2;g.stroke();});}
+  }else if(tier===2){   // hex lattice, gradient cells, gilded rims
+    const h2=h+140,R=30,W=Math.sqrt(3)*R;g.fillStyle=hsl(h2,40,15);g.fillRect(0,0,S,S);
+    for(let row=-1;row*R*1.5<S+R;row++)for(let col=-1;col*W<S+W;col++){const cx=col*W+(row%2?W/2:0),cy=row*R*1.5,l=30+r()*30;
+      const gr=g.createLinearGradient(cx-R,cy-R,cx+R,cy+R);gr.addColorStop(0,hsl(h2,65,l+15));gr.addColorStop(1,hsl(h2,60,l-12));
+      g.beginPath();for(let k=0;k<6;k++){const a=Math.PI/6+k*Math.PI/3;g.lineTo(cx+Math.cos(a)*(R-2),cy+Math.sin(a)*(R-2));}g.closePath();g.fillStyle=gr;g.fill();g.strokeStyle=hsl(45,80,62);g.lineWidth=2.5;g.stroke();}
+  }else{   // Master: dark plates (base) or their glowing cracks (glow mask)
+    const v=voronoi(S,34,r),img=g.createImageData(S,S),shade=[...Array(34)].map(()=>.6+r()*.8);
+    for(let i=0;i<S*S;i++){const e=v.edge[i];let R,G,B;
+      if(glow){const k=Math.max(0,1-e/3.2)**1.5*255;R=G=B=k;}
+      else{const [cr,cg,cb]=hslRgb(h+200,.35,.09*shade[v.cell[i]]);const rim=Math.max(0,1-e/6)*.25;R=(cr+rim)*255;G=(cg+rim)*255;B=(cb+rim)*255;}
+      img.data[i*4]=R;img.data[i*4+1]=G;img.data[i*4+2]=B;img.data[i*4+3]=255;}
+    g.putImageData(img,0,0);
+  }
+  return c;
+}
+const WORDS=[[['Ashen','Cobalt','Feral','Hollow','Jagged','Molten','Phantom','Shattered','Venom','Wraith','Scarlet','Iron'],['Fang','Shard','Rift','Talon','Scale','Husk','Ember','Spine']],
+  [['Gilded','Regal','Sovereign','Obsidian','Crowned','Imperial','Royal','Burnished'],['Lattice','Hive','Mosaic','Plate','Crest','Aegis']],
+  [['Eternal','Undying','Ascendant','Abyssal','Celestial','Infernal','Astral','Void'],['Pulse','Nova','Current','Wake','Flux','Storm','Requiem']]];
+const prestigeCache=new Map();
+// pr<tier>:<gun id> → a camo entry like camos.json's (with `prestige`, `owner`, and `anim` colours for Master)
+export function prestigeCamo(id){
+  if(prestigeCache.has(id))return prestigeCache.get(id);
+  const m=/^pr([123]):(.+)$/.exec(id??'');if(!m)return null;
+  const tier=+m[1],owner=m[2],seed=hashStr(owner),r=rng(seed+tier*977),[a,b]=WORDS[tier-1],h=seed%360;
+  const c={id,name:a[Math.floor(r()*a.length)]+' '+b[Math.floor(r()*b.length)],prestige:tier,owner,seed,procedural:'prestige',scale:tier===3?1.6:2.2,mix:.94,
+    ...(tier===2?{metal:true}:{}),...(tier===3?{anim:{c1:hslRgb(h,1,.55),c2:hslRgb(h+70,1,.6)},glow:{procedural:'prestige-glow',seed,tier}}:{})};
+  prestigeCache.set(id,c);return c;
+}
+export const camoById=(cats,id)=>cats?.camos.find(c=>c.id===id)??prestigeCamo(id);
 const texCache=new Map();
 export function camoTexture(camo,base=import.meta.url){
-  const key=camo.texture??('proc:'+camo.procedural);
+  const key=camo.texture??('proc:'+camo.procedural+(camo.seed!=null?':'+camo.seed+':'+(camo.prestige??camo.tier):''));
   if(texCache.has(key))return texCache.get(key);
   let t;
   if(camo.texture){t=new THREE.TextureLoader().load(new URL(camo.texture,base).href);}
+  else if(camo.procedural==='prestige')t=new THREE.CanvasTexture(drawPrestige(camo.seed,camo.prestige));
+  else if(camo.procedural==='prestige-glow')t=new THREE.CanvasTexture(drawPrestige(camo.seed,camo.tier,true));
   else t=new THREE.CanvasTexture(draw(camo.procedural));
   t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;
   texCache.set(key,t);return t;
@@ -69,19 +123,29 @@ function camoMaterial(orig,camo){
   const m=orig.clone();m.userData={...orig.userData,camoOf:orig,camo:camo.id};
   // a model may ask for denser tiling (glTF material extras camoScale, e.g. the Grimhawk's single texture atlas)
   const uniforms={camoMap:{value:camoTexture(camo)},camoScale:{value:(camo.scale??2.5)*(orig.userData?.camoScale??1)},camoMix:{value:camo.mix??.92}};
-  if(camo.glow)Object.assign(uniforms,{camoGlow:{value:camoTexture({texture:camo.glow})},camoTime});
+  if(camo.glow)Object.assign(uniforms,{camoGlow:{value:camoTexture(typeof camo.glow==='string'?{texture:camo.glow}:camo.glow)},camoTime});
+  if(camo.anim)Object.assign(uniforms,{camoC1:{value:new THREE.Vector3(...camo.anim.c1)},camoC2:{value:new THREE.Vector3(...camo.anim.c2)}});
   if(camo.metal){m.metalness=Math.max(m.metalness??0,.85);m.roughness=Math.min(m.roughness??1,.35);}
   const prev=orig.onBeforeCompile;
   m.onBeforeCompile=(shader,renderer)=>{prev?.call(m,shader,renderer);Object.assign(shader.uniforms,uniforms);
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D camoMap;uniform float camoScale;uniform float camoMix;')
       .replace('#include <map_fragment>',`#include <map_fragment>
 #ifdef USE_MAP
-{ vec3 camoC=texture2D(camoMap,vMapUv*camoScale).rgb;
+{ vec3 camoC=texture2D(camoMap,vMapUv*camoScale${camo.anim?'+vec2(camoTime*.025,camoTime*.01)':''}).rgb;
   float camoL=dot(diffuseColor.rgb,vec3(.299,.587,.114));
   diffuseColor.rgb=mix(diffuseColor.rgb,camoC*(.3+camoL*1.9),camoMix); }
 #endif`);
     // Pack-a-Punch: the circuit traces glow, a colour wave running through them
-    if(camo.glow)shader.fragmentShader=shader.fragmentShader.replace('uniform sampler2D camoMap;','uniform sampler2D camoMap;uniform sampler2D camoGlow;uniform float camoTime;')
+    // Prestige Master: the cracks glow in the gun's two colours, a pulse running along them, drifting with the pattern
+    if(camo.anim)shader.fragmentShader=shader.fragmentShader.replace('uniform sampler2D camoMap;','uniform sampler2D camoMap;uniform sampler2D camoGlow;uniform float camoTime;uniform vec3 camoC1;uniform vec3 camoC2;')
+      .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+#ifdef USE_MAP
+{ vec2 cu=vMapUv*camoScale+vec2(camoTime*.025,camoTime*.01);float crack=texture2D(camoGlow,cu).r;
+  float w=.5+.5*sin(camoTime*3.2-(cu.x*1.3+cu.y)*8.);
+  vec3 col=mix(camoC1,camoC2,.5+.5*sin(camoTime*.8+cu.x*4.+cu.y*2.));
+  totalEmissiveRadiance+=col*crack*(.35+2.6*w*w); }
+#endif`);
+    else if(camo.glow)shader.fragmentShader=shader.fragmentShader.replace('uniform sampler2D camoMap;','uniform sampler2D camoMap;uniform sampler2D camoGlow;uniform float camoTime;')
       .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
 #ifdef USE_MAP
 { vec2 cu=vMapUv*camoScale;float trace=smoothstep(.36,.62,texture2D(camoGlow,cu).r);
@@ -89,7 +153,7 @@ function camoMaterial(orig,camo){
   vec3 col=mix(vec3(.55,.18,1.),vec3(.1,.55,1.),.5+.5*sin(camoTime*.7+cu.y*2.));
   totalEmissiveRadiance+=col*trace*(.6+2.2*w*w); }
 #endif`);};
-  m.customProgramCacheKey=()=>(orig.customProgramCacheKey?.()??'')+(camo.glow?'|camo-pap':'|camo');
+  m.customProgramCacheKey=()=>(orig.customProgramCacheKey?.()??'')+(camo.anim?'|camo-anim':camo.glow?'|camo-pap':'|camo');
   m.needsUpdate=true;matCache.set(key,m);return m;
 }
 export const isBody=m=>!!m&&!SKIP.test(m.name??'')&&!!m.map;
@@ -134,11 +198,12 @@ export function camoUnlocked(cats,profile,id,weapons){
   const cp=classProgress(cats,profile,id,weapons);
   if(cp&&cp.total&&cp.done===cp.total)for(const c of cats.camos)if(c.classMastery)done.add(c.id);
   for(const c of cats.camos)if(c.reward&&profile.rewards?.[c.reward])done.add(c.id);
+  for(const c of loadPrestige().camos)done.add(c);   // prestige camos: earned on one gun, worn on any
   return done;
 }
 export function equippedCamo(cats,profile,id,weapons){
   const on=profile.camo?.[id]?.on;if(!on)return null;
-  return camoUnlocked(cats,profile,id,weapons).has(on)?cats.camos.find(c=>c.id===on)??null:null;
+  return camoUnlocked(cats,profile,id,weapons).has(on)?camoById(cats,on)??null:null;
 }
 // Count one kill. flags: {head, low, moving, multi}. Returns camos newly unlocked.
 export function countCamoKill(cats,profile,id,flags,weapons){

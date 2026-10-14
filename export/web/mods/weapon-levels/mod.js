@@ -5,9 +5,10 @@ import { mountParts as mountGunParts } from './mounts.js';
 // IR, and working underbarrels on key 5). Equip them in the main menu's
 // Loadout → Gunsmith, or in the pause menu for the gun in hand. Rules and
 // the UI are in gunsmith.js; tuning in attachments.json.
-import { loadProfile, saveProfile, cloudReady, loadProgression, gunsmithLevel } from '../../profile.js';
+import { loadProfile, saveProfile, cloudReady, loadProgression, gunsmithLevel, unlockLvl } from '../../profile.js';
 import { setupFlamer } from './flamer.js';
-import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress, camoTime, PAP_CAMO } from './camo.js';
+import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress, camoTime, PAP_CAMO, camoById as camoLookup } from './camo.js';
+import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, grantMasterXp, canPrestigeWeapon, RULES as PRESTIGE } from '../prestige/prestige.js';
 import { openGunsmith } from './gunsmith-view.js';
 import { previewDef } from './gunsmith.js';
 import { loadCatalog, applyAttachments, grantWeaponXp, weaponProgress, xpToNext, maxLevel, available, renderGunsmith, GUNSMITH_CSS } from './gunsmith.js';
@@ -32,7 +33,8 @@ export default async function setup(api){
   const stockHidden=new Map(Object.entries(data.weapons).map(([id,d])=>[id,{base:new Set(d?.hideTags??[]),up:new Set(d?.upgrade?.hideTags??[])}]));
   // attachments, plus each gun's equipped camo id on its definition (read by third person, co-op and the box)
   const apply=()=>{applyAttachments(cat,data.weapons,profile);for(const [id,d] of Object.entries(data.weapons))if(d&&typeof d==='object')d.camo=equippedCamo(cats,profile,id,data.weapons)?.id;};
-  const camoById=id=>cats.camos.find(c=>c.id===id)??null;
+  const camoById=id=>id?camoLookup(cats,id)??null:null;   // camos.json, or a prestige camo (pr1/pr2/pr3:<gun>)
+  await loadPrestigeRules();
   apply();
 
   // Show the equipped attachment parts on the viewmodel. Viewmodels are cached
@@ -130,8 +132,13 @@ export default async function setup(api){
     if(camos.length){const dia=camos.find(c=>c.classMastery),cls=window.kino.camoClass?.(id);
       api.toast(dia?`Diamond camo unlocked for every ${cls??'gun in this class'} · equip it in the Gunsmith`:`${def.name} · ${camos.map(c=>c.name).join(', ')} camo unlocked · equip it in the Gunsmith`,6);}
     if(!available(cat,def,id).length){save();return;}
-    const news=grantWeaponXp(cat,def,id,profile,cat.xp.kill+(head?cat.xp.headshot:0));
+    const xp=cat.xp.kill+(head?cat.xp.headshot:0),cap=maxLevel(cat,def,id),wasMax=weaponProgress(profile,id).level>=cap;
+    const news=grantWeaponXp(cat,def,id,profile,xp);
     save();
+    // Phase 4 prestige: XP at the max level fills Prestige Master levels; reaching the max says a prestige is waiting
+    if(wasMax){const pr=loadPrestige();if(weaponTier(pr,id)>=3){const camo=grantMasterXp(pr,id,xp);savePrestige(pr);
+      if(camo)api.toast(`${def.name} · ${camoById(camo)?.name} · PRESTIGE MASTER CAMO unlocked for every gun`,7);}}
+    else if(weaponProgress(profile,id).level>=cap&&canPrestigeWeapon(loadPrestige(),id,cap,cap))api.toast(`${def.name} is max level · prestige it in the Armory`,5);
     if(news.length){
       const lv=weaponProgress(profile,id).level;
       // unlocked only: equipping is the player's choice, in the Gunsmith
@@ -166,7 +173,7 @@ export default async function setup(api){
     const lp=document.getElementById('loadout-panel');if(lp&&lp.nextElementSibling!==panel)lp.after(panel);
     const id=session.weapon?.id,def=data.weapons[id];
     if(!def||session.attachmentMode){panel.innerHTML='';return;}
-    if((profile.level??1)<smithAt(id)){panel.innerHTML=`<p class="gs-locked">GUNSMITH · ${def.name} opens at level ${smithAt(id)}</p>`;return;}
+    if(unlockLvl(profile)<smithAt(id)){panel.innerHTML=`<p class="gs-locked">GUNSMITH · ${def.name} opens at level ${smithAt(id)}</p>`;return;}
     renderGunsmith(panel,{cat,def,id,profile,compact:true,onOpen:()=>openGunsmith({cat,weapons:data.weapons,profile,id,ids:[id],
       onChange:()=>{save();apply();api.equipView?.();renderHud();},onClose:renderPanel})});
   }

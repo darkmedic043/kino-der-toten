@@ -9,7 +9,8 @@ import { loadModel } from '../../animation.js';
 import { applyGlow, tickGlow } from '../bo3-weapons/glow.js';
 import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
-import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress } from './camo.js';
+import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress, camoById, camoTime } from './camo.js';
+import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef } from './gunsmith.js';
 
 const SLOT_ORDER=['optic','muzzle','mag','under','laser'];
@@ -66,7 +67,7 @@ const CSS=`
 #gsv .stats{position:absolute;right:40px;bottom:70px;width:330px}
 #gsv .swatch{background-size:cover;background-position:center}
 #gsv .ctabs{display:flex;gap:6px;margin:0 0 8px}#gsv .ctab{flex:1;padding:7px 6px;background:#ffffff0d;border:1px solid #ffffff22;color:#cfcab9;font:600 10px/1.2 system-ui,sans-serif;letter-spacing:.14em;cursor:pointer}#gsv .ctab small{display:block;margin-top:3px;font-weight:500;letter-spacing:.06em;color:#8d897c}#gsv .ctab.on{border-color:#d6a94a;color:#f3e3b0;background:#d6a94a1c}#gsv .ctab.on small{color:#d6a94a}
-#gsv .camo-row{display:flex;gap:10px;align-items:center}#gsv .camo-row .sw{width:44px;height:44px;flex:none;background-size:cover;border:1px solid #ffffff30}
+#gsv .camo-row{display:flex;gap:10px;align-items:center}#gsv .camo-opt.anim .sw{position:relative;overflow:hidden}#gsv .camo-opt.anim .sw::after{content:'';position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,var(--a) 45%,var(--b) 55%,transparent 70%);background-size:300% 100%;mix-blend-mode:screen;animation:gsv-pm 2.4s linear infinite}@keyframes gsv-pm{from{background-position:120% 0}to{background-position:-120% 0}}#gsv .tok{display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid #f0c060;color:#f0c060;font-size:10px;letter-spacing:1px;cursor:pointer;pointer-events:auto}#gsv .tok:hover{background:#f0c06022}#gsv .camo-row .sw{width:44px;height:44px;flex:none;background-size:cover;border:1px solid #ffffff30}
 #gsv .camo-row>div{flex:1}#gsv .cbar{height:3px;background:#ffffff14;margin-top:6px}#gsv .cbar b{display:block;height:100%;background:#7fd48a}
 #gsv .stat{display:grid;grid-template-columns:86px 1fr 70px;align-items:center;gap:8px;margin:7px 0;font-size:10px;letter-spacing:2px;color:#a09a8d}
 #gsv .stat .tr{position:relative;height:5px;background:#ffffff14}
@@ -226,7 +227,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
         <div class="ico">${cat.slots[s].slice(0,2).toUpperCase()}</div><div><span>${esc(cat.slots[s].toUpperCase())}</span><strong>${has?esc(eq?nameOf(eq):'None'):'—'}</strong></div></button>`;}).join('');
     if(cats){const c=equippedCamo(cats,profile,id,weapons),unl=camoUnlocked(cats,profile,id,weapons),done=cats.camos.filter(k=>!k.reward&&unl.has(k.id)).length,special=cats.camos.filter(k=>k.reward&&unl.has(k.id)).length;
       $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CAMO</h3><button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
-        <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward).length} UNLOCKED${special?` · ${special} SPECIAL`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
+        <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward).length} UNLOCKED${special?` · ${special} SPECIAL`:''}${loadPrestige().camos.length?` · ${loadPrestige().camos.length} PRESTIGE`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
     $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc(cat.slots[s].toUpperCase())}</i></div>`).join('');
     renderOptions();renderStats();
     $('.stats').style.display=slot==='camo'?'none':'';   // camos don't change stats; the list needs the room
@@ -239,13 +240,26 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   function renderCamos(el){
     const done=camoUnlocked(cats,profile,id,weapons),p=camoProgress(profile,id),on=equippedCamo(cats,profile,id,weapons)?.id,base=cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward),cp=classProgress(cats,profile,id,weapons);
     const challenge=cats.camos.filter(c=>!c.reward&&(!c.classMastery||cp)),special=cats.camos.filter(c=>c.reward);
-    const shown=camoTab==='special'?special:challenge,count=l=>`${l.filter(c=>done.has(c.id)).length} / ${l.length}`;
+    // Phase 4: this gun's three prestige camos, then every prestige camo earned on other guns
+    const pr=loadPrestige(),mine=[1,2,3].map(t=>camoById(cats,prestigeCamoId(t,id))),others=pr.camos.filter(c=>!c.endsWith(':'+id)).map(c=>camoById(cats,c)).filter(Boolean);
+    const prestige=[...mine,...others];
+    const shown=camoTab==='special'?special:camoTab==='prestige'?prestige:challenge,count=l=>`${l.filter(c=>done.has(c.id)).length} / ${l.length}`;
     el.innerHTML='<h3>CAMO</h3>'+
       `<div class="ctabs"><button class="ctab${camoTab==='challenge'?' on':''}" data-ctab="challenge">CHALLENGE<small>${count(challenge)}</small></button>`+
-      (special.length?`<button class="ctab${camoTab==='special'?' on':''}" data-ctab="special">SPECIAL<small>${count(special)}</small></button>`:'')+`</div>`+
+      (special.length?`<button class="ctab${camoTab==='special'?' on':''}" data-ctab="special">SPECIAL<small>${count(special)}</small></button>`:'')+
+      `<button class="ctab${camoTab==='prestige'?' on':''}" data-ctab="prestige">PRESTIGE<small>${prestige.filter(c=>done.has(c.id)).length}</small></button>`+`</div>`+
+      (camoTab==='prestige'?`<p class="neu">Prestige this gun in the Armory to earn its camos. Earned prestige camos work on every gun.${pr.player.tokens?` You have ${pr.player.tokens} prestige token${pr.player.tokens>1?'s':''}: a token unlocks a Prestige I or II camo.`:''}</p>`:'')+
       `<button class="opt${on?'':' on'}" data-camo=""><strong>None</strong><div class="pc"><span class="neu">Factory finish</span></div></button>`+
       (camoTab==='special'&&!special.length?'<p class="neu">No special camos yet.</p>':'')+
       shown.map(c=>{const locked=!done.has(c.id);
+        if(c.prestige){   // prestige camos: earned by prestiging the gun (or a token), Master by Master levels
+          const own=c.owner===id,w=pr.weapons[c.owner]??{},tier=w.tier??0,mlv=w.mlevel??0,gun=weapons[c.owner]?.name??c.owner;
+          const have=c.prestige===3?Math.min(PRESTIGE.masterCamoAt,tier>=3?mlv:0):tier>=c.prestige?1:0,need=c.prestige===3?PRESTIGE.masterCamoAt:1;
+          const what=!own?`Earned on the ${gun}`:c.prestige===3?`Prestige Master level ${PRESTIGE.masterCamoAt}${tier<3?' (prestige this gun three times)':''}`:`Reach ${TIER_NAMES[c.prestige].toLowerCase().replace('prestige','Prestige')} with this gun`;
+          return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}${c.anim?' anim':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'LOCKED':TIER_NAMES[c.prestige]}</span>
+            <div class="camo-row"><i class="sw" style="background-image:url(${swatch(c)})${c.anim?`;--a:rgb(${c.anim.c1.map(v=>Math.round(v*255))});--b:rgb(${c.anim.c2.map(v=>Math.round(v*255))})`:''}"></i><div><strong>${esc(c.name)}</strong>
+            <div class="pc"><span class="${locked?'neu':'pro'}">${esc(what)}${need>1?` · ${have} / ${need}`:''}</span>${locked&&own&&c.prestige<3&&pr.player.tokens?` <span class="tok" data-token="${c.id}">USE TOKEN</span>`:''}</div>
+            ${need>1?`<div class="cbar"><b style="width:${(100*have/need).toFixed(1)}%"></b></div>`:''}</div></div></button>`;}
         const have=c.reward?(done.has(c.id)?1:0):c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:Math.min(c.count,p[c.challenge]??0),need=c.classMastery?cp.total:c.mastery?base.length:c.count;
         const what=c.classMastery?`Gold on every ${cp.label.toLowerCase().replace(/s$/,'')}`:c.mastery?'Complete every challenge camo':cats.challenges[c.challenge];
         return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'LOCKED':''}</span>
@@ -297,6 +311,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   for(const ev of ['click','mousedown','mouseup','pointerdown'])root.addEventListener(ev,e=>e.stopPropagation());
   root.addEventListener('click',e=>{
     const ct=e.target.closest('.ctab');if(ct){camoTab=ct.dataset.ctab;hover=null;renderUI();return;}
+    const tk=e.target.closest('[data-token]');if(tk){const pr=loadPrestige();if(spendToken(pr,tk.dataset.token)){savePrestige(pr);onChange?.(id);}renderUI();return;}
     const s=e.target.closest('.slot');if(s&&!s.classList.contains('na')){slot=slot===s.dataset.slot?null:s.dataset.slot;hover=null;renderUI();aim();return;}
     const o=e.target.closest('.opt');
     if(o&&o.dataset.camo!==undefined&&!o.classList.contains('locked')){
@@ -313,7 +328,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   root.addEventListener('mouseover',e=>{
     const o=e.target.closest('.opt');
     if(slot==='camo'&&cats){const cid=o&&!o.classList.contains('locked')?o.dataset.camo:undefined;
-      applyCamo(gun,cid===undefined?equippedCamo(cats,profile,id,weapons):cats.camos.find(c=>c.id===cid)??null);return;}
+      applyCamo(gun,cid===undefined?equippedCamo(cats,profile,id,weapons):camoById(cats,cid)??null);return;}
     const h=o&&!o.classList.contains('locked')?o.dataset.att:null;
     if(h!==hover){hover=h;
       const cur=equipped(cat,def,id,profile);
@@ -344,7 +359,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   const svg=$('svg.lines'),v=new THREE.Vector3();let t=0,last=performance.now();
   function frame(now){
     if(!alive)return;requestAnimationFrame(frame);
-    const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;
+    const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;camoTime.value+=dt;   // animated camos (Pack-a-Punch, Prestige Master)
     const w=root.clientWidth,h=root.clientHeight;
     if(canvas.width!==Math.floor(w*renderer.getPixelRatio())||canvas.height!==Math.floor(h*renderer.getPixelRatio())){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
     focus.lerp(focusGoal,1-Math.exp(-dt*6));dist+=(distGoal-dist)*(1-Math.exp(-dt*6));

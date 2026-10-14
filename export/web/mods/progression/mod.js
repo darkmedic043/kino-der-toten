@@ -2,7 +2,7 @@
 // starting weapons and passive bonuses. Tuning lives in progression.json; the
 // profile (shared with the main menu) is in ../../profile.js.
 import { makeWeapon } from '../../rules.js';
-import { loadProfile, saveProfile, xpToNext as curve, unlocks as unlocksFor, validLoadout, boxFilter, cloudReady } from '../../profile.js';
+import { loadProfile, saveProfile, xpToNext as curve, unlocks as unlocksFor, validLoadout, boxFilter, cloudReady, unlockLvl } from '../../profile.js';
 import { loadModel } from '../../animation.js';
 
 export default async function setup(api){
@@ -13,7 +13,7 @@ export default async function setup(api){
 
   const bonuses=Object.fromEntries(config.bonuses.map(b=>[b.id,b]));
   const xpToNext=level=>curve(config,level);
-  const unlocked=level=>unlocksFor(config,level,data.weapons);
+  const unlocked=level=>unlocksFor(config,Math.max(level,unlockLvl(profile)),data.weapons);   // after a player prestige, re-reaching a level announces nothing new
 
   // The menu may have changed the profile in another tab; re-read on focus.
   let profile=loadProfile();
