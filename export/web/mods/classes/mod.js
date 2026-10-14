@@ -16,6 +16,7 @@ import { setupFortifier } from './fortifier.js';
 import { setupEngineer } from './engineer.js';
 import { setupCoopSkills } from './coop.js';
 import { setupMech } from './mech.js';
+import { setupSkills } from './skills.js';
 
 const up=new THREE.Vector3(0,1,0);
 
@@ -27,8 +28,10 @@ export default async function setup(api){
   const cls=classById(cfg,prof.selected)??cfg.classes[0];if(!cls)return;
   const state=()=>prof.classes[cls.id];
   const act=actionOf(cls,state());   // the equipped action skill (its tree's), fixed for this game
-  let S=treeStats(cls,state()),A=actionStats(cls,state());
-  const refresh=()=>{S=treeStats(cls,state());A=actionStats(cls,state());};
+  let S=treeStats(cls,state()),A=actionStats(cls,state()),baseA=A,rateK=1;
+  // A is the equipped skill's numbers; kill skills (Afterburner) scale its rate on top of baseA
+  const applyDyn=()=>{A=rateK===1?baseA:{...baseA,...(baseA.rate?{rate:baseA.rate*rateK}:{}),...(baseA.interval?{interval:baseA.interval/rateK}:{})};};
+  const refresh=()=>{S=treeStats(cls,state());baseA=actionStats(cls,state());applyDyn();};
   // the menu may have changed points in another tab
   // xp/level are earned here; points are spent in the menu: merge the two
   const merged=()=>{const fresh=loadClassProfile(cfg),mine=state(),theirs=fresh.classes[cls.id];
@@ -65,7 +68,9 @@ export default async function setup(api){
       if(e.enemy&&e.amount>=e.enemy.health&&Math.random()<(S['player.chainBlast']??0)){const at=e.enemy.root.position.clone();setTimeout(()=>blast(at,160,.5),120);}}
   });
   const reload=session.reload.bind(session);
-  session.reload=(...a)=>{const r=reload(...a);const m=(1-Math.min(.6,S['player.reload']??0))*(nearAbility()?1-Math.min(.5,S['player.reloadNear']??0):1);if(r&&m<1){session.reloadLeft*=m;session.reloadDuration*=m;}return r;};
+  session.reload=(...a)=>{const r=reload(...a);const m=(1-Math.min(.6,S['player.reload']??0))*(nearAbility()?1-Math.min(.5,S['player.reloadNear']??0):1)*(skills?.reloadMul()??1);if(r&&m<1){session.reloadLeft*=m;session.reloadDuration*=m;}
+    if(r&&S['eng.hotswap']&&actionUp()&&nearAbility())extend(S['eng.hotswap']);   // Hot Swap
+    return r;};
   function onRound(){
     const n=Math.round(S['player.grenades']??0);if(n)session.grenades=Math.min(4+n,session.grenades+n);
     // Field Repairs: hits back on a standing fortification, otherwise seconds off the cooldown
@@ -127,7 +132,7 @@ export default async function setup(api){
   host.on('beforeEnemyDamage',e=>{if(e.enemy)e.enemy.lastCause=e.cause;});
   host.on('kill',e=>{
     if(e.remote||cooldown<=0||actionUp()||!PLAYER_CAUSES.has(e.enemy?.lastCause))return;
-    cooldown=Math.max(0,cooldown-A.cooldown*(CH.kill+(e.head?CH.headshot:0)+(e.melee?CH.melee:0)));
+    cooldown=Math.max(0,cooldown-A.cooldown*(CH.kill+(e.head?CH.headshot:0)+(e.melee?CH.melee:0))*(skills?.killChargeMul()??1));
     if(cooldown===0)ready();
   });
   let wasPowered=powered();
@@ -138,6 +143,7 @@ export default async function setup(api){
   }
   // Every skill reports each zombie it damages here: slow, mark, toll points, kill cooldown cuts.
   function onHit(z,killed){
+    skills?.onHit(z,killed);
     if(S['ability.toll'])session.addPoints?.(Math.round(S['ability.toll']));
     if(killed){const c=S['ability.killCdr']??0;if(c){if(actionUp())banked+=c;else cooldown=Math.max(0,cooldown-c);}
       if(S['ability.killHeal'])session.health=Math.min(session.maxHealth??150,session.health+S['ability.killHeal']);
@@ -160,7 +166,12 @@ export default async function setup(api){
   const mechSkill=await setupMech(actx),mech=act.id==='mech'?mechSkill:null;
   const other=fort??eng??mech;
   const actionUp=()=>turrets.length>0||!!other?.up();
-  setupCoopSkills({api,turrets,fort,eng,sync,A:()=>A});   // other players see (and the host enforces) what you deploy
+  setupCoopSkills({api,turrets,fort,eng,sync,A:()=>A});
+  // Phase 3 class skills: resource, kill skills, conditional passives (skills.js)
+  function stagger(z,d){staggered.set(z,{until:session.time+d,at:z.root.position.clone()});}
+  function extend(sec){for(const t of turrets)t.life+=sec;eng?.extend?.(sec);}
+  var skills=setupSkills({api,cls,S:()=>S,A:()=>A,act,actionUp,nearAbility,blast});
+  Object.assign(actx,{stagger,focus:()=>skills.focus,gainRes:n=>skills.gain(n),mechLand:()=>skills.spendData()});   // other players see (and the host enforces) what you deploy
   addEventListener('keydown',e=>{if(e.code==='KeyZ'&&!e.repeat)use();});   // game-menu re-sends a rebound key as the default KeyZ
   // Lockdown augment: zombies go for the turret for its first seconds
   const lure=enemies.lureTarget?.bind(enemies);
@@ -169,6 +180,7 @@ export default async function setup(api){
   const slowed=new Set(),staggered=new Map();   // staggered zombies are pinned in place for 0.6 s
   host.on('update',dt=>{
     if(!dt)return;
+    {const k=skills?.rateMul()??1;if(k!==rateK){rateK=k;applyDyn();}}
     if(cooldown>0&&!actionUp()){cooldown=Math.max(0,cooldown-dt);if(cooldown===0)ready();}
     if(powered()!==wasPowered){wasPowered=powered();if(wasPowered){api.announce?.(act.name.toUpperCase(),'ABILITY ONLINE',2.5);audio.play('buy',.5);}hud();}
     for(let i=tracers.length-1;i>=0;i--){const t=tracers[i];t.t-=dt;t.l.material.opacity=Math.max(0,t.t/.06);if(t.t<=0){t.l.removeFromParent();t.l.geometry.dispose();t.l.material.dispose();tracers.splice(i,1);}}
@@ -200,7 +212,8 @@ export default async function setup(api){
       const wantPitch=Math.atan2(to.y-t.muzzle.y,Math.hypot(to.x-t.at.x,to.z-t.at.z));t.pitch+=(wantPitch-t.pitch)*Math.min(1,dt*8);
       aimGun(t);
       if(Math.abs(d)>.25)continue;
-      if(t.grenade&&(t.grenadeT=(t.grenadeT??t.grenade)-dt)<=0){t.grenadeT=t.grenade;blast(z.root.position.clone(),200,.6*A.dmgMul,true);}
+      if(t.grenade&&(t.grenadeT=(t.grenadeT??t.grenade)-dt*(S['syn.killbox']&&t.age<(S['turret.lure']??0)?2:1))<=0){t.grenadeT=t.grenade;   // Killbox: twice as often while Lockdown holds
+        blast(z.root.position.clone(),200,.6*A.dmgMul,true);}
       if((t.fire-=dt)>0)continue;t.fire=1/A.rate;
       const base=zombieHealth(session.round,data.rules)*A.damage+20;
       const fresh=z.health>zombieHealth(session.round,data.rules)*.5?1+(S['turret.fresh']??0):1;
@@ -209,7 +222,7 @@ export default async function setup(api){
       const muzzle=t.flash?t.flash.getWorldPosition(new THREE.Vector3()):t.muzzle.clone();
       tracer(muzzle,to);audio.weapon('shot',data.weapons.hk21_zm);window.kino.fx?.muzzle?.(muzzle);
       hit(z,base*fresh,t);
-      if(S['turret.chain']){let from=to;for(const n of targets.filter(o=>o!==z&&o.root.position.distanceTo(z.root.position)<240).slice(0,S['turret.chain'])){const c=n.root.position.clone().addScaledVector(up,35);tracer(from,c);from=c;hit(n,base*.5,t);}}   // Arc Welder
+      if(S['turret.chain']){let from=to;for(const n of targets.filter(o=>o!==z&&o.root.position.distanceTo(z.root.position)<240).slice(0,S['turret.chain'])){const c=n.root.position.clone().addScaledVector(up,35);tracer(from,c);from=c;hit(n,base*(S['syn.teslaFire']?1:.5),t);}}   // Arc Welder (Tesla Fire: full damage)
     }
   });
   function hit(z,dmg,t){
@@ -262,5 +275,5 @@ export default async function setup(api){
   let hudT=0;host.on('update',dt=>{if((hudT-=dt)<=0){hudT=.2;hud();}});
   hud();
   window.kino.classes={get state(){return state();},cls,grantXp:n=>gain(n),   // grantXp: class XP from other mods (exfil)
-    stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,use,get charge(){return charge();},get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng};
+    stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,use,get charge(){return charge();},get skills(){return skills;},get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng};
 }

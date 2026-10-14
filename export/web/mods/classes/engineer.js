@@ -74,21 +74,22 @@ export function setupEngineer(ctx){
     for(const d of [...drones]){
       for(const r of d.mesh.userData.rotors)r.rotation.y+=dt*40;
       if(d.dive){d.dive.t+=dt/.6;d.mesh.position.lerpVectors(d.dive.from,d.dive.to,Math.min(1,d.dive.t));
-        if(d.dive.t>=1){boom(d.dive.to,240,1.2,null);d.mesh.removeFromParent();drones.splice(drones.indexOf(d),1);if(!drones.length&&!beacons.length)setCooldown(a.cooldown);hud();}continue;}
+        if(d.dive.t>=1){const sq=s['syn.squadron']?1.5:1;boom(d.dive.to,240*sq,1.2*sq,null);d.mesh.removeFromParent();drones.splice(drones.indexOf(d),1);if(!drones.length&&!beacons.length)setCooldown(a.cooldown);hud();}continue;}
       d.life-=dt;if(d.life<=0){endDrone(d);continue;}
       d.phase+=dt*1.1;
       const goal=feet.clone().add(new THREE.Vector3(Math.cos(d.phase)*55,72+Math.sin(d.phase*2.3)*5,Math.sin(d.phase)*55));
       d.mesh.position.lerp(goal,Math.min(1,dt*4));
       if(s['drone.heal']&&session.health<(session.maxHealth??150))session.health=Math.min(session.maxHealth??150,session.health+s['drone.heal']*dt/drones.length);
       const p=d.mesh.position,targets=enemies.list.filter(z=>z.root.position.distanceTo(p)<a.range&&world.lineClear(p,center(z))).sort((x,y)=>x.root.position.distanceToSquared(p)-y.root.position.distanceToSquared(p));
-      const z=targets[0];if(!z){d.mesh.rotation.y+=dt;continue;}
+      const mine=s['drone.follow']?ctx.focus?.():null;   // Pack Tactics: what you shot last
+      const z=mine&&mine.root.position.distanceTo(p)<a.range*1.3&&world.lineClear(p,center(mine))?mine:targets[0];if(!z){d.mesh.rotation.y+=dt;continue;}
       const to=center(z);d.mesh.rotation.y=Math.atan2(-(to.z-p.z),to.x-p.x);
       if((d.fire-=dt)>0)continue;d.fire=1/a.rate;
       tracer(p.clone(),to);audio.weapon('shot',data.weapons.m1911_zm??Object.values(data.weapons)[0]);
       const dmg=full()*a.damage+15;
       hurt(z,dmg,d);
       if(s['drone.chain']){let from=to;for(const n of targets.filter(o=>o!==z&&o.root.position.distanceTo(z.root.position)<240).slice(0,s['drone.chain'])){const c=center(n);zap(from,c);from=c;
-        n.droneStun=session.time+.4;hurt(n,dmg*.6,d);}z.droneStun=session.time+.4;}
+        n.droneStun=session.time+.4;hurt(n,dmg*.6,d);if(s['syn.defib'])session.health=Math.min(session.maxHealth??150,session.health+s['syn.defib']);}z.droneStun=session.time+.4;}
     }
   }
   // Shock Rounds stun: hold the zombie in place briefly
@@ -133,12 +134,15 @@ export function setupEngineer(ctx){
       m.t-=dt;m.ring.material.opacity=Math.min(.8,(1-m.t/m.delay)*1.2);m.ring.scale.setScalar(1+Math.sin(session.time*20)*.03);
       if(m.t>0)continue;m.ring.removeFromParent();m.ring.geometry.dispose();m.ring.material.dispose();marks.splice(marks.indexOf(m),1);
       boom(m.at.clone().addScaledVector(up,10),m.radius,m.frac,m.owner);
-      if(S()['mortar.napalm']){const disc=new THREE.Mesh(new THREE.CircleGeometry(110,24),new THREE.MeshBasicMaterial({color:0xff6a1a,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}));
-        disc.rotation.x=-Math.PI/2;disc.position.copy(m.at).addScaledVector(up,1.5);scene.add(disc);fires.push({disc,at:m.at.clone(),t:4,tick:.5});}
+      // Close Shave: a shell landing near you feeds Uplink
+      if(S()['syn.closeShave']&&m.at.distanceTo(player.getFeetPosition())<200)ctx.gainRes?.(S()['syn.closeShave']);
+      const sc=S()['syn.scorch']?1.4:1;   // Scorched Earth
+      if(S()['mortar.napalm']){const disc=new THREE.Mesh(new THREE.CircleGeometry(110*sc,24),new THREE.MeshBasicMaterial({color:0xff6a1a,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}));
+        disc.rotation.x=-Math.PI/2;disc.position.copy(m.at).addScaledVector(up,1.5);scene.add(disc);fires.push({disc,at:m.at.clone(),t:sc>1?8:4,tick:.5,r:110*sc});}
     }
     for(const f of [...fires]){
       f.t-=dt;f.disc.material.opacity=Math.min(.35,f.t*.2)*(.8+Math.random()*.3);
-      if((f.tick-=dt)<=0){f.tick=.5;for(const z of [...enemies.list])if(z.root.position.distanceTo(f.at)<110){hurt(z,full()*.08*A().dmgMul,null);window.kino.fx?.burn?.(center(z));}}
+      if((f.tick-=dt)<=0){f.tick=.5;for(const z of [...enemies.list])if(z.root.position.distanceTo(f.at)<(f.r??110)){hurt(z,full()*.08*A().dmgMul,null);window.kino.fx?.burn?.(center(z));}}
       if(f.t<=0){f.disc.removeFromParent();f.disc.geometry.dispose();f.disc.material.dispose();fires.splice(fires.indexOf(f),1);}
     }
   }
@@ -164,6 +168,7 @@ export function setupEngineer(ctx){
   host.on('reset',()=>{for(const d of drones)d.mesh.removeFromParent();drones.length=0;for(const b of beacons)b.mesh.removeFromParent();beacons.length=0;
     for(const m of marks)m.ring.removeFromParent();marks.length=0;for(const f of fires)f.disc.removeFromParent();fires.length=0;stunned.clear();});
   return {deploy,drones,beacons,
+    extend:sec=>{for(const d of drones)if(!d.dive)d.life+=sec;for(const b of beacons)b.life+=sec;},
     near:(f,r)=>drones.length>0||beacons.some(b=>b.at.distanceTo(f)<r),
     up:()=>drones.length>0||beacons.length>0,
     left:()=>Math.ceil(Math.max(0,...drones.map(d=>d.life),...beacons.map(b=>b.life)))};

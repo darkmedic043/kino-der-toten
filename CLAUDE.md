@@ -19,7 +19,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby), friends and presence; the Rind launcher (`~/projects/rind`) uses the same sign-in and friends API | `coop.md` |
 | Props: terminal booth (Blender generator, bake, placement mod, MelonTerm desktop and its apps) | `props.md` |
 | Weapon levels, attachments (incl. mounted BO3 parts), camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound | `weapon-levels.md` |
-| Classes (BL4 loadouts), skill trees, all six action skills, the Mech class | `classes.md` |
+| Classes (BL4 loadouts), skill trees, all six action skills, the Mech class, Phase 3 charging, resources, synergies, either-or nodes (`skills.js`) | `classes.md` |
 | Gobblegums (pack ladder, GUMS terminal app, effects) | `gobblegums.md` |
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
 | Phone/touch support (touch-extras mod, mobile textures, defaults) | `mobile.md` |

@@ -28,6 +28,11 @@ export function loadClassProfile(cfg){
       s.loadout={action:best.id,augments:best.nodes.filter(n=>n.type==='augment'&&unlocked(cfg,c,s,{...n,tree:best.id})).slice(0,cfg.augmentSlots??2).map(n=>n.id)};
     }
     if(c.mech){const w=mechWeapons(c,s);if(!w.includes(s.loadout.left))s.loadout.left=c.trees[0].weapon;if(!w.includes(s.loadout.right)||s.loadout.right===s.loadout.left)s.loadout.right=c.trees[1].weapon;}
+    // Phase 3: either-or nodes (node.excl) keep only one of a pair (the lower tier wins), then anything a refund
+    // left stranded above a tier it no longer reaches is refunded too
+    for(const t of c.trees)for(const n of [...t.nodes].sort((a,b)=>a.tier-b.tier))if(n.excl&&s.points[n.id])
+      for(const o of t.nodes)if(o!==n&&o.excl===n.excl&&s.points[o.id])delete s.points[o.id];
+    refundStranded(cfg,c,s);
     if(s.loadout.capstone&&!s.points[s.loadout.capstone])s.loadout.capstone=null;
     s.loadout.capstone??=nodes(c).find(n=>n.type==='capstone'&&s.points[n.id])?.id??null;
     pruneLoadout(cfg,c,s);
@@ -63,11 +68,27 @@ export function pruneLoadout(cfg,cls,state){
   if(L.capstone&&!state.points[L.capstone])L.capstone=null;
 }
 
+// Points in a tier the tree no longer reaches (a node was removed or refunded below it) go back, highest tier first.
+export function refundStranded(cfg,cls,state){
+  for(const t of cls.trees)for(let changed=true;changed;){changed=false;
+    for(const n of [...t.nodes].sort((a,b)=>b.tier-a.tier)){
+      if(!(state.points?.[n.id]>0)||n.tier<=1)continue;
+      const below=t.nodes.filter(m=>m.tier<n.tier).reduce((a,m)=>a+(state.points[m.id]??0),0);
+      if(below<tierNeed(cfg,n.tier)){delete state.points[n.id];changed=true;break;}
+    }}
+}
+// Either-or: the other node of `node`'s pair that already has points (or null).
+export function exclBlocker(cls,state,node){
+  if(!node.excl)return null;const t=cls.trees.find(t=>t.id===node.tree);
+  return t?.nodes.find(o=>o.id!==node.id&&o.excl===node.excl&&state.points?.[o.id]>0)??null;
+}
+// Synergies: two named augments equipped together light a link and add their effects.
+export const activeSynergies=(cls,state)=>(cls.synergies??[]).filter(y=>[y.a,y.b].every(id=>state.loadout?.augments?.includes(id)));
 // Can one more point go into `node`?
 export function canAdd(cfg,cls,state,node){
   if(node.type==='augment')return false;   // free: unlocked by the tier
   const rank=state.points?.[node.id]??0;
-  return available(state)>0&&rank<node.ranks&&treeSpent(cls,state,node.tree)>=tierNeed(cfg,node.tier);
+  return available(state)>0&&rank<node.ranks&&treeSpent(cls,state,node.tree)>=tierNeed(cfg,node.tier)&&!exclBlocker(cls,state,node);
 }
 // Can a point come out of `node` without stranding points in higher tiers?
 export function canRemove(cfg,cls,state,node){
@@ -118,6 +139,7 @@ export function grantClassXp(cfg,state,amount){
 export function stats(cls,state){
   const out={};
   for(const n of nodes(cls)){const r=n.type==='augment'?1:state.points?.[n.id]??0;if(!r||!isEquipped(state,n))continue;for(const [k,v] of Object.entries(n.effects??{}))out[k]=(out[k]??0)+v*r;}
+  for(const y of activeSynergies(cls,state))for(const [k,v] of Object.entries(y.effects??{}))out[k]=(out[k]??0)+v;
   return out;
 }
 // The equipped action skill's numbers with the trees applied. Passives are generic
@@ -156,7 +178,7 @@ export function actionRows(cls,state,a){
 export function describe(node,rank){
   const k=Object.keys(node.effects??{})[0],per=node.effects?.[k]??0,v=per*Math.max(1,rank);
   const txt=node.fmt==='s'?+v.toFixed(1):node.fmt==='n'?Math.round(v):Math.round(v*100);
-  return node.desc.replace('{v}',txt);
+  return node.desc.replaceAll('{v}',txt);
 }
 
 // ---- the Pilot class (its mech) ------------------------------------------------------------------------
@@ -197,7 +219,7 @@ export function mechWeapon(cls,s,id){
   const aug=key=>k(id+'.'+key),rate=1+k('mech.rate');
   const out={...w,id,damageMul:1};
   if(id==='chaingun')Object.assign(out,{rate:w.rate*rate,spin:aug('nospin')?0:w.spin/rate,pierce:aug('pierce'),burn:!!aug('burn')});
-  if(id==='rail')Object.assign(out,{charge:w.charge/rate,refire:w.refire/rate,blast:!!aug('blast'),split:aug('split')||1});
+  if(id==='rail')Object.assign(out,{charge:w.charge/rate,refire:w.refire/rate,blast:!!aug('blast'),split:aug('split')||1,prism:!!aug('prism')});
   if(id==='salvo')Object.assign(out,{count:w.count+aug('count'),refire:w.refire/rate,homing:!!aug('homing'),cluster:aug('cluster')});
   if(id==='thermite')Object.assign(out,{refire:w.refire/rate,pool:w.pool*(1+aug('long')),split:aug('split')||1});
   if(id==='fist')Object.assign(out,{refire:w.refire/rate,pound:!!aug('pound'),dash:!!aug('dash'),execute:aug('execute')});

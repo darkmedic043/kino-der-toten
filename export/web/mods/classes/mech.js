@@ -41,7 +41,7 @@ export async function setupMech(ctx){
   // ---- state -----------------------------------------------------------------------------------------------------
   let phase='idle';        // idle | falling | piloting
   let shield=0,reactiveT=-9,stompT=0;   // Overshield (seconds of integrity), Reactive Armour and Crushing Stride timers
-  let integrity=0,maxIntegrity=1,lastHitT=-9,landedAt=0,coreUsed=false;
+  let integrity=0,maxIntegrity=1,lastHitT=-9,landedAt=0,coreUsed=false,dataBonus=0;   // dataBonus: Combat Data spent on landing
   let drop=null;           // {mech, at, t}
   const arms={left:null,right:null};   // per-arm weapon state
   const trig={left:false,right:false,leftAt:-9,rightAt:-9};
@@ -222,7 +222,7 @@ export async function setupMech(ctx){
     if(P.burnVuln&&burning.has(z))k+=P.burnVuln;                                  // Scorched Earth
     if(P.cross&&other?.over)k+=P.cross;                                           // Crossfire
     if(P.lastStand&&integrity<maxIntegrity*.25)k+=P.lastStand;                    // Last Stand
-    return (1+k)*(smartOn()?1.25:1);
+    return (1+k+dataBonus)*(smartOn()?1.25:1);
   }
   function hurt(z,frac,w,{head=false,flat=0,cause='mech',arm=null}={}){
     if(!enemies.list.includes(z))return false;
@@ -327,7 +327,7 @@ export async function setupMech(ctx){
           const d=f.clone().applyAxisAngle(up,yaw);const {hits,end}=along(from,d,w.range,20);
           for(const h of hits)hurt(h.z,frac,w,{head:h.head,arm:side});
           line(muzzle(side),end,0x7fd8ff,.12,2.2*(.4+c));
-          if(w.blast&&c>=.99)mblast(end,160,.8*w.damageMul,side);
+          if(w.blast&&(c>=.99||w.prism&&dirs.length>1&&c>=.6))mblast(end,160,.8*w.damageMul,side);   // Prism: split beams blow from 60%
         }
         addHeat(a,w.heat*(.5+.5*c));recoil(side,.6+c);sfx.rail();
       }
@@ -431,7 +431,8 @@ export async function setupMech(ctx){
     sfx.land();mblast(at,230*(1+(M.mech.landing??0)),1.3*(1+(M.mech.landing??0)));window.kino.fx?.knockback?.(at);camKick=1.4;
     // climb in
     phase='piloting';lunge=null;landedAt=session.time;coreUsed=false;lastHitT=session.time;
-    maxIntegrity=integrity=M.mech.duration;shield=M.mech.shield??0;
+    const cd=ctx.mechLand?.()??{damage:0,time:0};dataBonus=cd.damage;if(cd.n)api.toast?.(`Combat Data ×${cd.n} · +${Math.round(cd.damage*100)}% damage, +${cd.time.toFixed(1)}s integrity`,2.5);
+    maxIntegrity=integrity=M.mech.duration+cd.time;shield=M.mech.shield??0;
     arms.left=newArm(M.left);arms.right=newArm(M.right);fp.setWeapons(M.left.id,M.right.id);
     saved={move:player.moveSpeed,sprint:player.sprintSpeed,jump:player.jumpHeight,crouch:player.crouchSpeed};
     player.moveSpeed=saved.move*.82*M.mech.speed;player.sprintSpeed=saved.move*1.12*M.mech.speed;player.jumpHeight=0;player.crouchSpeed=player.moveSpeed;

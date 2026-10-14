@@ -141,7 +141,9 @@ export function setupFortifier(ctx){
       for(const p of spots){ground(p);const mesh=wireField(a.radius);mesh.position.copy(p);mesh.scale.setScalar(.01);scene.add(mesh);
         snares.push({mesh,at:p.clone(),radius:a.radius,wear:a.durability,maxWear:a.durability,age:0,group:++deployId,inside:new Set(),shockT:.5,tickT:a.tick});}
     }
-    if(fresh&&S()['fort.claymore'])for(const w of placed)plantMine(w.at.clone().addScaledVector(w.az,55));
+    if(fresh&&S()['fort.claymore'])for(const w of placed){
+      if(S()['syn.minefield']&&w.kind==='sandbag')for(const o of [-1,1])plantMine(w.at.clone().addScaledVector(w.az,55).addScaledVector(w.ax,o*w.width*.3));   // Minefield: two each
+      else plantMine(w.at.clone().addScaledVector(w.az,55));}
     return placed;
   }
 
@@ -150,13 +152,14 @@ export function setupFortifier(ctx){
     const st=api.getState();if(!st.active||session.busy||session.phase==='reviving')return;
     // already up: pick everything up and put it down here, keeping its damage
     if(walls.length||snares.length){
+      if(S()['fort.anchored']){api.toast?.('Bastion: it stays where it is',1);return;}
       if(moveT>0){api.toast?.(`Moving in ${Math.ceil(moveT)}s`,1);return;}
       const keptW=walls.map(w=>w.hits/w.maxHits),keptS=snares.map(s=>s.wear/s.maxWear);
       for(const w of [...walls])removeWall(w,false,true);for(const s of [...snares])removeSnare(s,true);
       raise(false);
       keptW.forEach((k,i)=>{const w=walls[i];if(w)w.hits=Math.max(1,w.maxHits*k);});
       keptS.forEach((k,i)=>{const s=snares[i];if(s)s.wear=Math.max(1,s.maxWear*k);});
-      moveT=3;api.toast?.(act.name+' moved',1);audio.play('buy',.4);hud();return;
+      moveT=S()['fort.mobile']?0:3;api.toast?.(act.name+' moved',1);audio.play('buy',.4);hud();return;
     }
     if(getCooldown()>0){ctx.notReady();return;}
     lastStandUsed=false;
@@ -202,15 +205,15 @@ export function setupFortifier(ctx){
     for(const o of w.pool?walls.filter(o=>o.pool===w.pool):[w]){o.shake=.25;o.touched=1.5;}   // the whole nest feels it
     if(execute(z))return;
     const face=z.root.position.clone().addScaledVector(up,40);
-    if(s['fort.shock']){zap(w.at.clone().addScaledVector(up,w.height*.8),face);hurt(z,full()*.15);
+    if(s['fort.shock']){zap(w.at.clone().addScaledVector(up,w.height*.8),face);hurt(z,full()*.15);if(s['syn.dynamo'])w.hits=Math.min(w.maxHits,w.hits+1);   // Dynamo
       const n=enemies.list.find(o=>o!==z&&o.root.position.distanceTo(z.root.position)<220);if(n){zap(face,n.root.position.clone().addScaledVector(up,40));hurt(n,full()*.15);}}
-    if(s['fort.knock']&&enemies.list.includes(z))z.root.position.addScaledVector(w.az,Math.sign(w.az.dot(z.root.position.clone().sub(w.at)))*60);
+    if(s['fort.knock']&&enemies.list.includes(z)){z.root.position.addScaledVector(w.az,Math.sign(w.az.dot(z.root.position.clone().sub(w.at)))*60);if(s['syn.recoil'])ctx.stagger?.(z,1);}   // Galvanic Recoil
   }
 
   // ---- the wire ------------------------------------------------------------------------------------
   function release(z,s){
     s.inside.delete(z);if(z.snareK){z.speed/=z.snareK;z.snareK=0;}
-    if(S()['snare.bleed']&&enemies.list.includes(z))z.snareBleed={until:session.time+4,dps:full()*S()['snare.bleed'],tick:.5};
+    if(S()['snare.bleed']&&enemies.list.includes(z))z.snareBleed={until:session.time+4,dps:full()*S()['snare.bleed']*(S()['syn.hamstring']?2:1),tick:.5};   // Hamstring: double
   }
   function updateSnare(s,dt){
     const a=A(),st=S();
@@ -222,7 +225,8 @@ export function setupFortifier(ctx){
       if(inside&&!s.inside.has(z)){s.inside.add(z);z.snareK=1-a.slow;z.speed*=z.snareK;if(st['snare.root'])z.snareRoot={until:session.time+st['snare.root'],at:z.root.position.clone()};}
       else if(!inside&&s.inside.has(z))release(z,s);
       // Reel In: drag zombies near the wire toward it
-      if(!inside&&st['snare.pull']&&d<300){const to=s.at.clone().sub(z.root.position).setY(0).normalize();z.root.position.addScaledVector(to,40*dt);}
+      if(!inside&&st['snare.pull']&&d<300){const to=s.at.clone().sub(z.root.position).setY(0).normalize();z.root.position.addScaledVector(to,40*dt);
+        if(st['syn.coil']&&(z.coilT=(z.coilT??.5)-dt)<=0){z.coilT=.5;zap(s.at.clone().addScaledVector(up,8),z.root.position.clone().addScaledVector(up,40));hurt(z,full()*st['syn.coil']*.5);}}   // Tesla Coil
     }
     for(const z of [...s.inside])if(!enemies.list.includes(z))s.inside.delete(z);
     for(const z of s.inside)if(z.snareRoot&&session.time<z.snareRoot.until){z.root.position.x=z.snareRoot.at.x;z.root.position.z=z.snareRoot.at.z;z.stuck=0;}
@@ -249,7 +253,7 @@ export function setupFortifier(ctx){
   const unique=()=>walls.filter((w,i)=>!w.pool||walls.findIndex(o=>o.pool===w.pool)===i);
 
   // ---- per frame ---------------------------------------------------------------------------------
-  const L=new THREE.Vector3();let ammoT=0;
+  const L=new THREE.Vector3();let ammoT=0,depotT=20;
   host.on('update',dt=>{
     if(!dt)return;const s=S();moveT=Math.max(0,moveT-dt);
     for(let i=arcs.length-1;i>=0;i--){const a=arcs[i];a.t-=dt;a.l.material.opacity=Math.max(0,a.t/.18)*(.6+Math.random()*.4);if(a.t<=0){a.l.removeFromParent();a.l.geometry.dispose();a.l.material.dispose();arcs.splice(i,1);}}
@@ -258,6 +262,7 @@ export function setupFortifier(ctx){
     if(s['nest.heal']&&inNest()&&session.health<(session.maxHealth??150))session.health=Math.min(session.maxHealth??150,session.health+s['nest.heal']*dt);
     if(s['fort.ammo']&&walls.length&&(act.id==='nest'?inNest():nearAny())&&(ammoT-=dt)<=0){ammoT=2;const wpn=session.weapon,def=session.def;
       if(wpn&&def&&!session.weaponUnavailable){const max=wpn.upgraded?(def.upgrade?.maxAmmo??def.maxAmmo):def.maxAmmo;if(max&&wpn.reserve<max)wpn.reserve=Math.min(max,wpn.reserve+Math.ceil(max*.05));}}
+    if(s['syn.depot']&&inNest()&&(depotT-=dt)<=0){depotT=20;if(session.grenades<4){session.grenades++;api.toast?.('Supply Depot · +1 grenade',1);}}   // Supply Depot
     for(const sn of [...snares])updateSnare(sn,dt);
     for(const w of [...walls]){
       w.age+=dt;w.touched-=dt;
