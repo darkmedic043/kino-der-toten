@@ -132,7 +132,7 @@ export default async function setup(api){
   host.on('beforeEnemyDamage',e=>{if(e.enemy)e.enemy.lastCause=e.cause;});
   host.on('kill',e=>{
     if(e.remote||cooldown<=0||actionUp()||!PLAYER_CAUSES.has(e.enemy?.lastCause))return;
-    cooldown=Math.max(0,cooldown-A.cooldown*(CH.kill+(e.head?CH.headshot:0)+(e.melee?CH.melee:0))*(skills?.killChargeMul()??1));
+    cooldown=Math.max(0,cooldown-A.cooldown*(CH.kill+(e.head?CH.headshot:0)+(e.melee?CH.melee:0))*Math.min(1,(CH.ref??60)/A.cooldown)*(skills?.killChargeMul()??1));   // a kill is worth at most ref seconds' share: long meters (mech) don't refill from kills alone
     if(cooldown===0)ready();
   });
   let wasPowered=powered();
@@ -145,7 +145,7 @@ export default async function setup(api){
   function onHit(z,killed){
     skills?.onHit(z,killed);
     if(S['ability.toll'])session.addPoints?.(Math.round(S['ability.toll']));
-    if(killed){const c=S['ability.killCdr']??0;if(c){if(actionUp())banked+=c;else cooldown=Math.max(0,cooldown-c);}
+    if(killed){const c=S['ability.killCdr']??0;if(c){if(actionUp())banked=Math.min(banked+c,A.cooldown*(CH.bankCap??.4));else cooldown=Math.max(0,cooldown-c);}   // balance pass: the bank is capped
       if(S['ability.killHeal'])session.health=Math.min(session.maxHealth??150,session.health+S['ability.killHeal']);
       if(S['ability.killPoints'])session.addPoints?.(Math.round(S['ability.killPoints']));
       return;}
@@ -229,7 +229,7 @@ export default async function setup(api){
     if(S['turret.burn'])z.turretBurn={until:session.time+3,dps:dmg*.6,tick:z.turretBurn?.tick??.5};
     const alive=enemies.list.includes(z);enemies.hurt(z,dmg,false,false,'turret',false);
     const killed=alive&&!enemies.list.includes(z);if(alive)onHit(z,killed);
-    if(killed){session.addPoints?.(50);if(t&&S['cap.killExtend'])t.life+=S['cap.killExtend'];}
+    if(killed){session.addPoints?.(50);if(t&&S['cap.killExtend']&&(t.ext??0)<A.duration){t.ext=(t.ext??0)+S['cap.killExtend'];t.life+=S['cap.killExtend'];}}   // Perpetual Motion: at most +100% duration
   }
   host.on('reset',()=>{for(const t of [...turrets])t.mesh.removeFromParent();turrets.length=0;cooldown=A.cooldown;banked=0;wasPowered=powered();slowed.clear();staggered.clear();lastRound=session.round;hud();});
 
@@ -275,5 +275,5 @@ export default async function setup(api){
   let hudT=0;host.on('update',dt=>{if((hudT-=dt)<=0){hudT=.2;hud();}});
   hud();
   window.kino.classes={get state(){return state();},cls,grantXp:n=>gain(n),   // grantXp: class XP from other mods (exfil)
-    stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,use,get charge(){return charge();},get skills(){return skills;},get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng};
+    stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,use,get charge(){return charge();},get skills(){return skills;},get up(){return actionUp();},get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng};
 }

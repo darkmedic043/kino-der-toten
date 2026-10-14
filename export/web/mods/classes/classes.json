@@ -1,10 +1,12 @@
 {
   "_doc": "Classes (BL4 style): each tree has its own action skill; you equip one (loadout.action = tree id). Passives (points, ranks) are generic ability.* / player.* stats and work with whichever skill is equipped. Augments are free: a tree's augment unlocks when the tree reaches its tier; up to augmentSlots are equipped, from the equipped skill's tree. One capstone (a point, any tree) works with whichever skill is equipped. Tiers open every `tierPoints` points spent in that tree.",
   "charge": {
-    "note": "Action skills charge like BO6/BO7 field upgrades: the meter fills over the skill's cooldown, and each of your own kills (bullets, melee) adds this share of a full charge (headshot and melee add more). Locked until the power is on; starts empty each game.",
+    "note": "Action skills charge like BO6/BO7 field upgrades: the meter fills over the skill's cooldown, and each of your own kills (bullets, melee) adds this share of a full charge (headshot and melee add more). Locked until the power is on; starts empty each game. Balance pass: a kill's share is scaled by min(1, ref/cooldown), and Recycler's bank covers at most bankCap of the meter.",
     "kill": 0.025,
     "headshot": 0.015,
-    "melee": 0.02
+    "melee": 0.02,
+    "ref": 60,
+    "bankCap": 0.4
   },
   "xp": {
     "kill": 12,
@@ -453,7 +455,7 @@
               "ranks": 1,
               "type": "capstone",
               "icon": "recycle",
-              "desc": "Capstone: every kill by your action skill adds 1.5s to it.",
+              "desc": "Capstone: every kill by your action skill adds 1.5s to it (up to double its duration).",
               "effects": {
                 "cap.killExtend": 1.5
               }
@@ -1436,9 +1438,9 @@
           "a": "selfseal",
           "b": "current",
           "name": "Dynamo",
-          "desc": "Every Live Current shock repairs the wall by a hit.",
+          "desc": "Every Live Current shock repairs the wall by half a hit.",
           "effects": {
-            "syn.dynamo": 1
+            "syn.dynamo": 0.5
           }
         },
         {
@@ -1859,7 +1861,7 @@
               "icon": "wrench",
               "desc": "Your kills on foot charge the mech {v}% more (twice that with a pistol in hand).",
               "effects": {
-                "pilot.groundCrew": 0.15
+                "pilot.groundCrew": 0.1
               },
               "tier": 1
             },

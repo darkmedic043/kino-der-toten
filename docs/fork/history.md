@@ -192,3 +192,4 @@
 - 2026-10-14: Pit stop before Phase 3: power-up gums drop in front of you, 7 more gums (25), BO7-style HUD layout mod `hud-bo7` (gameplay.md, gobblegums.md). Fixed the progression mod failing on Moon (its Mystery Box has no `models`, so Moon gave no XP).
 - 2026-10-14: Phase 3 started: action skills charge BO6/BO7-style (time + your kills) and are locked until the power is on (classes.md).
 - 2026-10-14: Phase 3 class rework (BL3/BL4 style): class resources Uplink/Grit/Combat Data, kill skills, sidearm and conditional passives, either-or nodes, augment synergies; Engineer and Fortifier trees rewritten, Pilot light pass (classes.md).
+- 2026-10-14: Phase 3 Sandbox balance pass: Recycler bank cap, kill charge scaled for long meters, Ground Crew/Dynamo nerfs, Perpetual Motion cap (classes.md).

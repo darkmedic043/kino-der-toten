@@ -205,7 +205,7 @@ export function setupFortifier(ctx){
     for(const o of w.pool?walls.filter(o=>o.pool===w.pool):[w]){o.shake=.25;o.touched=1.5;}   // the whole nest feels it
     if(execute(z))return;
     const face=z.root.position.clone().addScaledVector(up,40);
-    if(s['fort.shock']){zap(w.at.clone().addScaledVector(up,w.height*.8),face);hurt(z,full()*.15);if(s['syn.dynamo'])w.hits=Math.min(w.maxHits,w.hits+1);   // Dynamo
+    if(s['fort.shock']){zap(w.at.clone().addScaledVector(up,w.height*.8),face);hurt(z,full()*.15);if(s['syn.dynamo'])w.hits=Math.min(w.maxHits,w.hits+s['syn.dynamo']);   // Dynamo
       const n=enemies.list.find(o=>o!==z&&o.root.position.distanceTo(z.root.position)<220);if(n){zap(face,n.root.position.clone().addScaledVector(up,40));hurt(n,full()*.15);}}
     if(s['fort.knock']&&enemies.list.includes(z)){z.root.position.addScaledVector(w.az,Math.sign(w.az.dot(z.root.position.clone().sub(w.at)))*60);if(s['syn.recoil'])ctx.stagger?.(z,1);}   // Galvanic Recoil
   }

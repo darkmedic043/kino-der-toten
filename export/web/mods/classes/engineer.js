@@ -47,11 +47,11 @@ export function setupEngineer(ctx){
   function hurt(z,dmg,owner){
     if(!enemies.list.includes(z))return false;enemies.hurt(z,dmg,false,false,'turret',false);
     const killed=!enemies.list.includes(z);onHit(z,killed);if(!killed)return false;
-    session.addPoints?.(50);const ext=S()['cap.killExtend'];if(ext&&owner)owner.life+=ext;return true;
+    session.addPoints?.(50);const ext=S()['cap.killExtend'];if(ext&&owner&&(owner.ext??0)<A().duration){owner.ext=(owner.ext??0)+ext;owner.life+=ext;}return true;   // Perpetual Motion: at most +100%
   }
   function boom(at,radius,frac,owner){   // blast() and credit its kills to the owner
     const hitz=enemies.list.filter(z=>z.root.position.distanceTo(at)<radius);blast(at,radius,frac*A().dmgMul);
-    const ext=S()['cap.killExtend'];for(const z of hitz){const killed=!enemies.list.includes(z);onHit(z,killed);if(killed&&ext&&owner)owner.life+=ext;}
+    const ext=S()['cap.killExtend'];for(const z of hitz){const killed=!enemies.list.includes(z);onHit(z,killed);if(killed&&ext&&owner&&(owner.ext??0)<A().duration){owner.ext=(owner.ext??0)+ext;owner.life+=ext;}}
   }
 
   // ---- Hunter Drone ------------------------------------------------------------------------------
