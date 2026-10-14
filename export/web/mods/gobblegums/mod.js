@@ -3,6 +3,7 @@
 // The pack, the rarity ladder and the unlocks live in gums.js / gums.json; the pack is built in the main
 // menu (Armory → Gobblegums) and is not used up. window.kino.gobblegums is what the terminal talks to.
 import * as THREE from 'three';
+import { zombieHealth } from '../../rules.js';
 import { loadGums, loadGumProfile, gumById, activePack } from './gums.js';
 import { loadProfile, cloudReady, unlockLvl } from '../../profile.js';
 import { PERKS } from '../terminal-booth/desktop.js';
@@ -81,6 +82,14 @@ export default async function setup(api){
     if(id==='on_the_house'){const rest=perkList();if(rest.length){const p=rest[Math.floor(Math.random()*rest.length)];givePerk(p);api.toast(`On the House · ${p.name}`,3);}}
     if(id==='equip_mint'){session.grenades=4;if(session.claymoresOwned)session.claymores=2;if(session.monkeysOwned)session.monkeys=3;}
     if(id==='ephemeral_enhancement')startEnhance();
+    // Melon Pass Season 1 gums (pass-exclusive)
+    if(id==='vine_snare'){const f=feet();for(const z of enemies.list)if(z.root.position.distanceTo(f)<g.radius)rooted.set(z,{until:session.time+g.root,at:z.root.position.clone()});window.kino.fx?.explosion?.(f.clone().add(new THREE.Vector3(0,5,0)),.5,0x5fd13a);}
+    if(id==='pumpkin_bomb'){const eye=api.camera.position.clone(),dir=api.camera.getWorldDirection(new THREE.Vector3()),hit=api.world?.raycast?.(new THREE.Ray(eye.clone(),dir),0,600);
+      const at=eye.addScaledVector(dir,hit?Math.max(40,hit.distance-10):600);setTimeout(()=>{const full=zombieHealth(session.round,api.data.rules)*2;
+        for(const z of [...enemies.list]){const d=z.root.position.distanceTo(at);if(d<g.radius)enemies.hurt(z,full*(1-.5*d/g.radius),false,false,'explosion');}
+        window.kino.fx?.explosion?.(at,1.3,0xff8a1a);api.audio?.play?.('explosion');},1000);}
+    if(id==='cornucopia'){const pool=(api.data.boxPool??[]).filter(w=>api.data.weapons[w]?.upgrade&&!session.inventory.some(x=>x.id===w&&!x.lost));
+      const w=pool[Math.floor(Math.random()*pool.length)];if(w){upgradeNext=w;session.giveWeapon(w);api.equipView?.();}}
     api.announce?.(g.name,rarity[g.rarity]?.name.toUpperCase()+' GOBBLEGUM',2.5);
     gumSound(g.rarity);hud();host.emit('gumChewed',{id});   // credits: challenges
   }
@@ -91,6 +100,22 @@ export default async function setup(api){
   });
 
   // ---- the effects -------------------------------------------------------------------------------------
+  // Melon Pass gums: kills (Bountiful Harvest, Harvest Moon, Reaper's Toll, Melon Smash), Root Rot slows, Vine Snare roots
+  const rooted=new Map(),rotting=new Map();let moonKills=0;
+  host.on('kill',e=>{
+    if(e.remote)return;const z=e.enemy;
+    if(live('bountiful_harvest'))session.points+=by.bountiful_harvest.killPoints;
+    if(live('reapers_toll')){const g=by.reapers_toll,w=session.weapon,d=w&&api.data.weapons[w.id];session.health=Math.min(session.maxHealth,session.health+g.heal);
+      if(d){const clip=w.upgraded?d.upgrade?.clipSize??d.clipSize:d.clipSize;w.mag=Math.min(clip,w.mag+g.bullets);}}
+    if(live('harvest_moon')&&++moonKills%by.harvest_moon.every===0&&z){const types=['nuke','insta_kill','double_points','full_ammo','carpenter'];powerups?.spawn(types[Math.floor(Math.random()*types.length)],z.root.position.clone());}
+    if(st.armed.has('melon_smash')&&(e.melee||z?.lastCause==='melee')&&z){const at=z.root.position.clone(),hp=zombieHealth(session.round,api.data.rules)*.6;
+      setTimeout(()=>{for(const o of [...enemies.list])if(o.root.position.distanceTo(at)<by.melon_smash.radius)enemies.hurt(o,hp,false,false,'explosion',false);window.kino.fx?.explosion?.(at.clone().add(new THREE.Vector3(0,30,0)),.5,0x3fd16a);},0);spendCharge('melon_smash');}
+  });
+  host.on('beforeEnemyDamage',e=>{if(live('root_rot')&&e.cause==='bullet'&&e.enemy&&!rotting.has(e.enemy)){const k=1-by.root_rot.slow;e.enemy.speed*=k;rotting.set(e.enemy,{until:session.time+2,k});}else if(rotting.has(e.enemy))rotting.get(e.enemy).until=session.time+2;});
+  host.on('update',()=>{const t=session.time;
+    for(const [z,r] of rooted){if(!enemies.list.includes(z)||t>r.until){rooted.delete(z);continue;}z.root.position.x=r.at.x;z.root.position.z=r.at.z;z.stuck=0;}
+    for(const [z,r] of rotting)if(!enemies.list.includes(z)||t>r.until){if(enemies.list.includes(z))z.speed/=r.k;rotting.delete(z);}});
+  host.on('reset',()=>{rooted.clear();rotting.clear();moonKills=0;});
   // a conditional gum with charges (Pop Shocks, Burned Out) spends one; it disarms at zero
   function spendCharge(id){if(--st.charges[id]<=0){st.armed.delete(id);delete st.charges[id];}hud();}
   // kill the zombies within r of p (deferred: these run inside enemies.hurt / session.damage)
@@ -118,10 +143,13 @@ export default async function setup(api){
   host.on('beforeEnemyDamage',e=>{if(live('sword_flay')&&e.cause==='melee')e.amount*=by.sword_flay.meleeMul;});
   // Temporal Gift: picked-up timed power-ups last longer
   const powerup=session.powerup?.bind(session);
-  if(powerup)session.powerup=(type,...rest)=>{const r=powerup(type,...rest);if(live('temporal_gift')&&session.effects[type]>session.time)session.effects[type]+=by.temporal_gift.extend;return r;};
+  if(powerup)session.powerup=(type,...rest)=>{if(st.armed.has('second_helping')){st.armed.delete('second_helping');hud();powerup(type,...rest);if(session.effects[type]>session.time)session.effects[type]+=30;api.toast('Second Helping · '+type.replace('_',' '),2);}const r=powerup(type,...rest);if(live('temporal_gift')&&session.effects[type]>session.time)session.effects[type]+=by.temporal_gift.extend;return r;};
   // Idle Eyes / In Plain Sight: zombies hold still (their goal becomes where they stand)
   const lure=enemies.lureTarget?.bind(enemies);
-  enemies.lureTarget=z=>live('idle_eyes')||live('in_plain_sight')?z.root.position:lure?lure(z):null;
+  enemies.lureTarget=z=>{
+    if(live('idle_eyes')||live('in_plain_sight'))return z.root.position;
+    if(live('scarecrow')){const f=feet(),d=z.root.position.clone().sub(f).setY(0);if(d.length()<by.scarecrow.radius)return z.root.position.clone().addScaledVector(d.normalize(),400);}
+    return lure?lure(z):null;};
   // Shopping Free: purchases succeed without taking points
   const spend=session.spend.bind(session);
   session.spend=n=>live('shopping_free')&&n>0?true:spend(n);

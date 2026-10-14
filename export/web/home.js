@@ -370,13 +370,13 @@ function renderGums(){
     grid.append(head);
     const row=document.createElement('div');row.className='picker-grid gum-row';grid.append(row);
     for(const g of gums){
-      const open=g.level<=unlockLvl(profile)||passGums().includes(g.id),on=inPack.has(g.id),el=document.createElement('button');   // pass gums: early unlocks
+      const open=g.pass?passGums().includes(g.id):g.level<=unlockLvl(profile),on=inPack.has(g.id),el=document.createElement('button');   // pass gums: only from the Melon Pass
       el.className='opt gum-opt'+(on?' selected':'')+(open?'':' locked');el.style.setProperty('--r',r.color);
-      el.innerHTML=`<div class="gum-ball"></div><strong>${esc(g.name)}</strong><small>${esc(g.type.toUpperCase())}</small>${open?`<span class="box-check">${on?'IN PACK':'OFF'}</span>`:`<span class="lock">LV ${g.level}</span>`}`;
+      el.innerHTML=`<div class="gum-ball"></div><strong>${esc(g.name)}</strong><small>${esc(g.type.toUpperCase())}</small>${open?`<span class="box-check">${on?'IN PACK':'OFF'}</span>`:`<span class="lock">${g.pass?'PASS':'LV '+g.level}</span>`}`;
       el.addEventListener('mouseenter',()=>{gumFocus=g.id;gumDetail(cfg,pack,tiers);});
       el.addEventListener('click',()=>{
         gumFocus=g.id;
-        if(!open){toast(`Reach level ${g.level} to unlock`);return;}
+        if(!open){toast(g.pass?'A Melon Pass reward: get it in the PASS tab':`Reach level ${g.level} to unlock`);return;}
         const why=on?canRemove(cfg,pack.ids,g.id):canAdd(cfg,pack.ids,g.id);if(why){toast(why);gumDetail(cfg,pack,tiers);return;}
         setPack(on?pack.ids.filter(x=>x!==g.id):[...pack.ids,g.id]);
       });
@@ -392,7 +392,7 @@ function gumDetail(cfg,pack,tiers){
     <div class="gum-ladder">${tiers.map(t=>`<div style="--r:${t.color}"><b>${esc(t.name)}</b><span>${t.count}</span><small>${t.base!=null?(t.count?`need ${t.need} below · have ${t.below}`:'—'):'base tier'}</small></div>`).join('')}</div>
     <p class="muted">Not used up: the pack is the same every match. In a game you start with no gums: roll them at a terminal's GUMS app (${cfg.rollPrices.map(n=>n.toLocaleString()).join(' / ')} points, ${cfg.rollsPerRound} a round, a hand of ${cfg.handSize}). Rarer gums need more lower-tier gums in the pack, rising with each one.</p>
     <div class="wp-actions"><button data-auto ${pack.auto?'disabled':''}>${pack.auto?'AUTOMATIC PACK':'RESET TO AUTOMATIC'}</button></div>
-    ${g?`<hr><span class="eyebrow" style="color:${r.color}">${esc(r.name.toUpperCase())} · ${esc(g.type.toUpperCase())}${g.duration?' · '+(g.duration>=60?Math.floor(g.duration/60)+':'+String(g.duration%60).padStart(2,'0'):g.duration+' s'):''}</span><h2>${esc(g.name)}</h2><p>${esc(g.desc)}</p><p class="muted">${g.level<=profile.level?'Unlocked':'Unlocks at level '+g.level}</p>`:''}`;
+    ${g?`<hr><span class="eyebrow" style="color:${r.color}">${esc(r.name.toUpperCase())} · ${esc(g.type.toUpperCase())}${g.duration?' · '+(g.duration>=60?Math.floor(g.duration/60)+':'+String(g.duration%60).padStart(2,'0'):g.duration+' s'):''}</span><h2>${esc(g.name)}</h2><p>${esc(g.desc)}</p><p class="muted">${g.pass?(passGums().includes(g.id)?'Unlocked (Melon Pass)':'A Melon Pass Season 1 reward'):g.level<=profile.level?'Unlocked':'Unlocks at level '+g.level}</p>`:''}`;
   el.querySelector('[data-auto]').addEventListener('click',()=>{saveGumProfile({...loadGumProfile(),pack:null});renderGums();});
 }
 function renderPicker(u,l){
