@@ -1,9 +1,11 @@
-// Research (roadmap Phase 5, Black Ops 6 Zombies style), shared by the main menu (Armory → Research) and the game.
-// Every perk and ammo mod has Major and Minor augments (research.json). You research one augment at a time: it earns
-// research XP from kills and rounds (×activeMul while its item is active in the match). Finished augments are
-// equipped one Major + one Minor per item; the game reads the equipped set once, at match start.
-// Store: kino.mods.research = {active: augId | null, progress: {augId: xp}, done: [augId], equip: {itemId: {major, minor}}},
-// cloud-synced (cloud.js TRACKED); never part of the progression profile, so its savers can't touch it.
+// Research (roadmap Phase 5, Black Ops 7 Zombies style), shared by the main menu (Armory → Research) and the game.
+// Every perk and ammo mod has a linear track of 8 augments (4 Major, 4 Minor; research.json, in track order). You research
+// the next augment on a track, one research at a time across all tracks; switching keeps progress. Research XP comes from
+// kills and rounds (×activeMul while its item is active). The i-th augment costs trackCost[i]. Finishing a track
+// (mastery) opens a second Minor slot for that item. Equip one Major and one Minor (two once mastered) per item; the
+// game reads the equipped set at match start.
+// Store: kino.mods.research = {active: augId | null, progress: {augId: xp}, done: [augId],
+//   equip: {itemId: {major, minor, minor2}}}, cloud-synced (cloud.js TRACKED), its own key (progression saves can't touch it).
 export const RESEARCH_KEY='kino.mods.research';
 
 export async function loadResearchConfig(base=import.meta.url){
@@ -16,32 +18,46 @@ export function loadResearch(){
 }
 export function saveResearch(r){try{localStorage.setItem(RESEARCH_KEY,JSON.stringify(r));}catch{}}
 
-export const augById=cfg=>Object.fromEntries(cfg.items.flatMap(it=>it.augments.map(a=>[a.id,{...a,item:it.id,itemName:it.name,itemKind:it.kind,color:it.color}])));
-export const costOf=(cfg,aug)=>cfg.cost[aug.kind]??1000;
+export const augById=cfg=>Object.fromEntries(cfg.items.flatMap(it=>it.augments.map((a,i)=>[a.id,{...a,index:i,item:it.id,itemName:it.name,itemKind:it.kind,color:it.color}])));
+export const costOf=(cfg,aug)=>cfg.trackCost?.[aug.index??0]??1000;
 export const researchOpen=(cfg,level)=>level>=(cfg.unlockLevel??1);
+// The next augment to research on an item's track (null when the track is done).
+export const nextOnTrack=(cfg,r,itemId)=>cfg.items.find(i=>i.id===itemId)?.augments.find(a=>!r.done.includes(a.id))??null;
+export const mastered=(cfg,r,itemId)=>!nextOnTrack(cfg,r,itemId);
 
-// Start (or switch to) researching an augment. Progress on the previous one is kept. Returns a reason when it can't.
+// Start (or switch to) researching an augment: only the next one on its track. Returns a reason when it can't.
 export function startResearch(cfg,r,augId){
   const a=augById(cfg)[augId];if(!a)return 'Unknown augment';if(r.done.includes(augId))return 'Already researched';
+  if(nextOnTrack(cfg,r,a.item)?.id!==augId)return 'Research the augments before it on this track first';
   r.active=augId;return null;
 }
-// Grant research XP to the active research. `isActive(itemId)` says whether the item is active in the match (×activeMul).
-// Returns the augment finished by this XP, or null.
+// Grant research XP to the active research. `isActive(itemId)` says whether its item is active in the match (×activeMul).
+// Returns the augment finished by this XP (with `mastery: true` when it completed the track), or null.
 export function grantResearchXp(cfg,r,amount,isActive){
   const id=r.active;if(!id||amount<=0)return null;const a=augById(cfg)[id];if(!a){r.active=null;return null;}
-  const xp=amount*(isActive?.(a.item)?cfg.activeMul??1:1);
-  r.progress[id]=(r.progress[id]??0)+xp;
-  if(r.progress[id]>=costOf(cfg,a)){delete r.progress[id];if(!r.done.includes(id))r.done.push(id);r.active=null;return a;}
-  return null;
+  r.progress[id]=(r.progress[id]??0)+amount*(isActive?.(a.item)?cfg.activeMul??1:1);
+  if(r.progress[id]<costOf(cfg,a))return null;
+  delete r.progress[id];if(!r.done.includes(id))r.done.push(id);
+  // carry on down the same track automatically, as BO7 does
+  r.active=nextOnTrack(cfg,r,a.item)?.id??null;
+  return {...a,mastery:!r.active};
 }
-// Equip a researched augment in its item's Major or Minor slot (same id again unequips it).
+// Equip / unequip a researched augment. A Minor goes in the first free Minor slot (the second only once mastered);
+// clicking an equipped one takes it out.
 export function toggleEquip(cfg,r,augId){
   const a=augById(cfg)[augId];if(!a||!r.done.includes(augId))return 'Research it first';
-  const e=r.equip[a.item]??={};e[a.kind]=e[a.kind]===augId?null:augId;return null;
+  const by=augById(cfg),e=r.equip[a.item]??={};
+  for(const k of ['major','minor','minor2'])if(e[k]&&(!by[e[k]]||!r.done.includes(e[k])))e[k]=null;   // slots holding augments that no longer exist (older saves)
+  for(const k of ['major','minor','minor2'])if(e[k]===augId){e[k]=null;return null;}
+  if(a.kind==='major'){e.major=augId;return null;}
+  if(!e.minor)e.minor=augId;else if(mastered(cfg,r,a.item)&&!e.minor2)e.minor2=augId;else if(mastered(cfg,r,a.item))e.minor2=augId;else e.minor=augId;
+  return null;
 }
-// The equipped augments as one effects list per item: [{item, aug, effects}]
+// The equipped augments (researched, and a second Minor only on a mastered track).
 export function equippedAugments(cfg,r){
   const by=augById(cfg),out=[];
-  for(const [item,e] of Object.entries(r.equip??{}))for(const k of ['major','minor']){const a=by[e?.[k]];if(a&&r.done.includes(a.id)&&a.item===item)out.push(a);}
+  for(const [item,e] of Object.entries(r.equip??{}))for(const k of ['major','minor','minor2']){
+    const a=by[e?.[k]];if(!a||!r.done.includes(a.id)||a.item!==item)continue;if(k==='minor2'&&!mastered(cfg,r,item))continue;
+    if(!out.some(x=>x.id===a.id))out.push(a);}
   return out;
 }

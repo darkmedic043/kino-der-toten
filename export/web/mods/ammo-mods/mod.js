@@ -61,7 +61,7 @@ export const TUNE = {
   shadowrift: [{ radius: 120, lethal: .5, dur: 1.4 }, { radius: 160, lethal: .7, dur: 1.4 }, { radius: 200, lethal: 1, dur: 1.4 }],
   lightmend: [{ heal: .25, range: 400, life: 8, regen: 0 }, { heal: .35, range: 600, life: 10, regen: 0 }, { heal: .5, range: 800, life: 12, regen: .1 }],
   shatter: [{ radius: 110, dmg: .6 }, { radius: 150, dmg: .8 }, { radius: 190, dmg: 1 }],
-  brainrot: [{ dur: 6, lure: 0, explode: false }, { dur: 9, lure: 300, explode: false }, { dur: 12, lure: 300, explode: true }],
+  brainrot: [{ dur: 6, lure: 0, explode: false, bite: .25, fumes: 0 }, { dur: 9, lure: 300, explode: false, bite: .25, fumes: 0 }, { dur: 12, lure: 300, explode: true, bite: .25, fumes: 0 }],   // bite: share of the victim's max health; fumes: a second to zombies within 100 (research augments)
 };
 const TIER = ['', 'I', 'II', 'III'];
 
@@ -193,7 +193,7 @@ export default function setup(api) {
     },
     brainrot(z, tier) {
       if (z.kind !== 'zombie') return EFFECT.shatter(z, 1);   // dogs and specials don't turn: a small blast instead
-      const P = tune('brainrot', tier), a = st(z); a.rotUntil = now() + P.dur; a.rotLure = P.lure; a.rotExplode = P.explode; a.victim = null; a.biteAt = 0;
+      const P = tune('brainrot', tier), a = st(z); a.rotUntil = now() + P.dur; a.rotLure = P.lure; a.rotExplode = P.explode; a.rotBite = P.bite ?? .25; a.rotFumes = P.fumes ?? 0; a.fumeAt = 0; a.victim = null; a.biteAt = 0;
       rotted.add(z); mark(z, '#8cff5a', 70, 36); a.markUntil = a.rotUntil;
     },
   };
@@ -296,8 +296,9 @@ export default function setup(api) {
       if (a.rotUntil > t && alive(z)) {   // Brain Rot: hunt the nearest zombie and bite it
         if (!alive(a.victim)) { let best = null, bd = 800; for (const o of enemies.list) { if (o === z || !alive(o) || o.amod?.rotUntil > t) continue; const d = o.root.position.distanceTo(z.root.position); if (d < bd) { bd = d; best = o; } } a.victim = best; }
         if (a.victim && a.victim.root.position.distanceTo(z.root.position) < 70 && t >= a.biteAt) {
-          a.biteAt = t + 1; z.rig.play?.('attack', false); hurt(a.victim, a.victim.maxHealth * .25 + 1);
+          a.biteAt = t + 1; z.rig.play?.('attack', false); hurt(a.victim, a.victim.maxHealth * (a.rotBite ?? .25) + 1);
         }
+        if (a.rotFumes && t >= a.fumeAt) { a.fumeAt = t + 1; for (const o of [...enemies.list]) if (o !== z && alive(o) && o.root.position.distanceTo(z.root.position) < 100) hurt(o, o.maxHealth * a.rotFumes); }   // Caustic Fumes
       }
     }
     for (const z of [...rotted]) {   // Brain Rot ends: back to normal, or it blows up; corpses drop out
