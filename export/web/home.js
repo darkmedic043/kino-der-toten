@@ -5,7 +5,7 @@ import { applyGlow, tickGlow } from './mods/bo3-weapons/glow.js';
 import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
 import { startSocial, onSocial, request, accept, decline, cancel, remove, statusText } from './social.js';
-import { mergePatch, resolveWeapons } from './mod-loader.js';
+import { mergePatch, resolveWeapons, withCore, isCoreMod } from './mod-loader.js';
 import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
@@ -64,7 +64,7 @@ mapsReady.then(list=>{
 });
 const [mapList,modList,config,characters,baseData]=await Promise.all([
   mapsReady,
-  fetchJson('mods/mods.json').then(d=>d.enabled??[]).catch(()=>[]),
+  fetchJson('mods/mods.json').then(d=>withCore(d.enabled??[])).catch(()=>withCore([])),
   loadProgression(),loadCharacterRegistry(),fetchJson('game-data.json'),
 ]);
 // Mod data patches are applied so custom weapons show up in the loadout.
@@ -734,7 +734,10 @@ function renderCredits(){
 
 // ---- Mods ---------------------------------------------------------------------------
 function renderMods(){
-  $('mod-list').innerHTML=mods.map(m=>m.error?`<div class="mod error"><strong>${esc(m.id)}</strong><p>${esc(m.error)}</p></div>`
+  // core systems (mod-loader.js CORE_MODS) are part of the game now: one compact line, then the real mods
+  const core=mods.filter(m=>isCoreMod(m.id)&&!m.error);
+  $('mod-list').innerHTML=(core.length?`<div class="mod core"><strong>Built in · ${core.length} core systems</strong><p>${core.map(m=>esc(m.manifest.name??m.id)).join(' · ')}</p><code>always loaded (mod-loader.js CORE_MODS)</code></div>`:'')+
+    mods.filter(m=>!isCoreMod(m.id)||m.error).map(m=>m.error?`<div class="mod error"><strong>${esc(m.id)}</strong><p>${esc(m.error)}</p></div>`
     :`<div class="mod"><strong>${esc(m.manifest.name??m.id)}</strong><p>${esc(m.manifest.description??'')}</p><code>mods/${esc(m.id)}/ · ${[m.manifest.data&&'data',m.manifest.script&&'script'].filter(Boolean).join(' + ')||'empty'}</code></div>`).join('')
     ||'<p class="muted">No mods enabled.</p>';
 }

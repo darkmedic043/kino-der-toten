@@ -6,6 +6,22 @@
 // export receives the ModHost API once the game has loaded). A manifest may list
 // "maps" (only these map ids) or "skipMaps" (not these); the engine sets mapId.
 
+// Core systems (2026-10-15): these used to be optional mods and are now part of the game. The engine and the main
+// menu always load them, whatever mods.json says, at their usual place in the load order (mods.json keeps listing them
+// so the order with the other mods stays exact: lighting first, weapon-levels before progression, hud-bo7 after every
+// HUD it restyles). Their folders stay under mods/ because tools, the Rind installer and other mods use those paths.
+// The MODS tab lists them as built in. In load order:
+export const CORE_MODS=['lighting','fx','map-materials','ammo-counters','player-health','movement','fall-damage','double-tap',
+  'perks-plus','weapon-levels','progression','characters','hud','scoreboard','hud-bo7'];
+export const isCoreMod=id=>CORE_MODS.includes(id);
+// mods.json's list with any missing core system put back after the core system before it (or first).
+export function withCore(enabled){
+  const out=[...enabled];
+  CORE_MODS.forEach((id,i)=>{if(out.includes(id))return;const prev=CORE_MODS.slice(0,i).reverse().find(c=>out.includes(c));
+    out.splice(prev?out.indexOf(prev)+1:0,0,id);console.warn(`[mods] core system ${id} missing from mods.json: loaded anyway`);});
+  return out;
+}
+
 const isObject=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 
 // Objects merge recursively, arrays and scalars replace, null deletes a key.
@@ -55,13 +71,14 @@ export class ModHost {
   async load(data){
     let list;
     try{list=(await this.fetchJson(new URL('mods.json',this.base))).enabled??[];}
-    catch(error){this.report('mods.json',error);return data;}
+    catch(error){this.report('mods.json',error);list=[];}
+    list=withCore(list);
     for(const id of list){
       const url=new URL(id+'/',this.base);
       try{
         const manifest=await this.fetchJson(new URL('mod.json',url));
         if(this.mapId&&(manifest.maps&&!manifest.maps.includes(this.mapId)||manifest.skipMaps?.includes(this.mapId)))continue;   // not for this map
-        const mod={id,url,manifest,name:manifest.name??id};
+        const mod={id,url,manifest,name:manifest.name??id,core:isCoreMod(id)};
         for(const file of [manifest.data??[]].flat())data=mergePatch(data,await this.fetchJson(new URL(file,url)));
         // A script may export prepare(data) to adjust data before the game builds anything.
         if(manifest.script){mod.module=await import(new URL(manifest.script,url).href);if(mod.module.prepare)data=(await mod.module.prepare(data,mod))??data;}
