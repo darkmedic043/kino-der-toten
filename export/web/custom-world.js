@@ -29,6 +29,7 @@ const BO3_MACHINES={specialty_armorvest:'jugg',specialty_quickrevive:'revive',sp
 // PhD Flopper has no BO3 machine here: Moon's, cut out of its map by .tools/extract-moon-mesh.mjs
 const MACHINE_FALLBACK={specialty_additionalprimaryweapon:'moon/models/zombie_vending_three_gun.glb',specialty_flakjacket:'moon/models/zombie_vending_nuke.glb'};
 const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PAP|PACKAPUNCH|POWER|CLAYMORE|TRAPZONE|TRAP|TELEPORT|TPDEST|EGG|RISING|MOVER)(?:_(.*))?$/i;
+const TRAP_LIGHTS=2;   // real lights shared by every trap zone (see zone.light)
 const TRAP_COLORS={electric:0x8cbbff,fire:0xff7a2e};
 const COLLISION_NAME=/^(COL|UCX|collision)[_.-]/i;
 // Machine models face their local +Z; markers face their local +X (Blender's red axis).
@@ -297,8 +298,12 @@ export class CustomWorld {
       else{const radius=+(m.extras.radius??100),height=+(m.extras.height??120);
         const mesh=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,height,16,1,true),null);mesh.position.copy(m.position).addScaledVector(up,height/2);zone={center:m.position.clone(),radius,height,mesh};}
       zone.mesh.visible=false;this.scene.add(zone.mesh);t.zones.push(zone);
-      zone.light=new THREE.PointLight(0xffffff,0,420,1.4);zone.light.position.copy(zone.mesh.position);this.scene.add(zone.light);
+      // not a real light: three evaluates every point light for every pixel even at intensity 0 (The Giant had 14 idle
+      // zone lights out of 23); maps/custom.js puts the shared TRAP_LIGHTS pool on the active zones nearest the player
+      zone.light={intensity:0,color:new THREE.Color(0xffffff),position:zone.mesh.position.clone()};
     }
+    // the pool (a constant light count, so starting a trap recompiles nothing)
+    this.trapLights=this.traps.size?[...Array(TRAP_LIGHTS)].map(()=>{const l=new THREE.PointLight(0xffffff,0,420,1.4);this.scene.add(l);return l;}):[];
     for(const [name,t] of this.traps){
       if(!t.zones.length){this.warn(`trap "${name}" has a switch but no TRAPZONE_${name}`);}
       const material=new THREE.MeshBasicMaterial({color:TRAP_COLORS[t.kind]??TRAP_COLORS.electric,transparent:true,opacity:.24,wireframe:t.kind!=='fire',depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});
@@ -485,7 +490,7 @@ export class CustomWorld {
   }
   setBoards(barrier,count){if(!barrier.boards.length){barrier.count=0;return;}barrier.count=Math.max(0,Math.min(barrier.boards.length,count));barrier.boards.forEach((o,i)=>o.visible=i<barrier.count);}
   reset(session){
-    for(const t of this.traps.values()){t.activeUntil=0;t.readyAt=0;for(const z of t.zones){z.mesh.visible=false;z.light.intensity=0;}}
+    for(const t of this.traps.values()){t.activeUntil=0;t.readyAt=0;for(const z of t.zones){z.mesh.visible=false;z.light.intensity=0;}}for(const l of this.trapLights??[])l.intensity=0;
     for(const tp of this.teleporters)tp.readyAt=0;
     for(const g of this.eggs.values()){g.done=false;for(const i of g.items){i.found=false;i.object.visible=true;}}
     this.setPower(session.power);

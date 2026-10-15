@@ -44,7 +44,7 @@ export class World {
     const moving=[];
     gltf.scene.traverse(o=>{if(o.userData?.collisionOnly)o.visible=false;if(o.userData?.dynamicBrush){moving.push(o);this.entities.set(o.userData.entityId,o);}});
     for(const o of moving){this.scene.attach(o);if(o.userData.targetname==='theater_extracam_screen')o.visible=false;}
-    this.optimization=optimizeStaticScene(gltf.scene,{cellSize:768});
+    this.optimization=optimizeStaticScene(gltf.scene,{cellSize:768});this.mapRoot=gltf.scene;   // the engine's prop batching (instance-cull.js) works on this
     // The map is static (moving brushes were taken out above, and optimizeStaticScene froze every local matrix), but
     // three still walks all ~3,000 of its objects in every render's updateMatrixWorld (11% of a frame on Kino, more with
     // shadow and effect passes). Compute the world matrices once and skip the subtree unless an update is forced.

@@ -145,6 +145,12 @@ export async function createMap(ctx,entry){
         }
         if(!on)for(const h of t.handles??[])if(h&&t.readyAt<=s.time)h.rotation.x=0;
       }
+      // the shared trap lights go to the lit zones nearest the player (custom-world.js TRAP_LIGHTS)
+      if(world.trapLights?.length){
+        const lit=[];for(const t of world.traps.values())for(const z of t.zones)if(z.light.intensity>0)lit.push(z);
+        lit.sort((a,b)=>a.light.position.distanceToSquared(feet)-b.light.position.distanceToSquared(feet));
+        world.trapLights.forEach((l,i)=>{const z=lit[i];l.intensity=z?z.light.intensity:0;if(z){l.position.copy(z.light.position);l.color.copy(z.light.color);}});
+      }
       // Moving platforms (MOVER meshes): advance, and carry the player standing on one (updateMovers also slides doors open)
       if(!world.movers?.length)world.updateMovers?.(s.time);
       if(world.movers?.length){

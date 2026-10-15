@@ -111,7 +111,9 @@
       "player": { "slopeStick": true },
       "perkYaw": -90,
       "machines": "bo3",
-      "fog": 0.00022
+      "fog": 0.00022,
+      "mergeStatic": true,
+      "mergeExclude": "^GIANT_"
     }
   ]
 }

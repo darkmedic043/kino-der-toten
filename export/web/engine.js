@@ -14,6 +14,9 @@ import { GameAudio } from './audio.js';
 import { Powerups } from './powerups.js';
 import { PerkDrink } from './perk-drink.js';
 import { MysteryBox } from './mystery-box.js';
+import { createInstanceCuller } from './instance-cull.js';
+import { createStaticFreeze } from './static-freeze.js';
+import { mergeStaticMeshes } from './scene-merge.js';
 import { createZombieTouch } from './zombies-touch.js';
 import { configureKinoAssets, assetDiagnostics } from './runtime-assets.js';
 import { ModHost } from './mod-loader.js';
@@ -29,6 +32,13 @@ const profile=configureKinoAssets();
 audio.maxBufferBytes=profile.mobile?16*1024*1024:Infinity;audio.preload=!profile.mobile;
 const renderer=new THREE.WebGLRenderer({antialias:!profile.mobile,powerPreference:profile.mobile?'default':'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,profile.mobile?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
+// smallest instanced prop drawn, in screen pixels, by graphics quality (Low..Ultra; instance-cull.js)
+const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null;
+// three draws a transparent double-sided material in two passes and flags it needsUpdate before each, which re-checks
+// its program twice a draw (on The Giant, a glass material and the viewmodel's decals: ~10% of a frame). One pass
+// looks the same here. Swept once a second over both scenes for materials that appear later (was lighting-mod only).
+let singlePassTimer=0;
+const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
 let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.6;renderer.autoClear=false;
 document.body.prepend(renderer.domElement);
@@ -381,6 +391,20 @@ try{
   await Promise.all([enemies.load(),equipView(),audio.load(),powerups.load(),perkDrink.load(),mysteryBox.load(),features.load()]);player.update(.05,{});
   await map.ready?.();
   progress('Loading mods',95);await mods.start({renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});if(!profile.mobile)mysteryBox.warm(renderer,camera);
+  // Performance for big ported maps (docs/fork/performance.md). A/B switches for benchmarks: ?noMerge ?noBatch ?noFreeze
+  const perfOff=new URLSearchParams(location.search);
+  // opt-in per map: static level meshes merged per material (scene-merge.js)
+  if(entry.mergeStatic&&world.root&&!perfOff.has('noMerge')){const t=performance.now(),r=mergeStaticMeshes(world.root,{exclude:entry.mergeExclude?new RegExp(entry.mergeExclude):null});globalThis.kino.sceneMerge=r;
+    console.info('[scene-merge]',r.merged,'meshes into',r.meshes,'in',Math.round(performance.now()-t),'ms');}
+  // static instanced props: batched per material, culled per instance (instance-cull.js)
+  if(!perfOff.has('noBatch')){
+    // the map's own props only (mods' instanced effects, e.g. the lighting beams, have their own shaders)
+    instanceCull=await createInstanceCuller(world.root??world.mapRoot??scene,{target:scene});globalThis.kino.instanceCull=instanceCull;
+    if(instanceCull.meshes){console.info('[instance-cull]',instanceCull.sources,'meshes into',instanceCull.meshes,'batches,',instanceCull.instances,'instances in',instanceCull.buildMs,'ms');
+      await renderer.compileAsync(scene,camera).catch(()=>{});}   // batched props need their own shader variants: compile them behind the loading screen
+  }
+  // a custom map's static objects stop recomputing their matrices every frame (Kino's world.js freezes its own root)
+  if(!perfOff.has('noFreeze')&&world.root&&world.root.updateMatrixWorld===THREE.Object3D.prototype.updateMatrixWorld){staticFreeze=createStaticFreeze(world.root);globalThis.kino.staticFreeze=staticFreeze;}
   ready=true;
   progress('Ready',100);$('loading').hidden=true;$('start').disabled=contextLost;$('menu-status').textContent=contextLost?'Graphics paused. Waiting for the browser to restore the game…':touchControls.mode?'Tap to start':'Click to capture the mouse · Esc to pause';
 }catch(error){console.error(error);errors.push(String(error));$('load-label').textContent='Unable to start: '+error.message;$('menu-status').textContent='See the browser console for details';}
@@ -391,6 +415,7 @@ function renderFrame(now){
   if(lastRendered&&now-lastRendered<interval-1)return;
   lastRendered=now;const dt=Math.min((now-previous)/1000,.06);previous=now;frameTime+=dt;frameCount++;renderedFrames++;
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
-  update(dt);renderer.info.reset();renderer.clear();if(mods.renderWorld)mods.renderWorld(scene,mods.camera??camera);else renderer.render(scene,mods.camera??camera);if(ready&&started&&!mods.hideViewmodel){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
+  if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);}
+  update(dt);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();if(mods.renderWorld)mods.renderWorld(scene,mods.camera??camera);else renderer.render(scene,mods.camera??camera);if(ready&&started&&!mods.hideViewmodel){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
 }
 resumeRendering();
