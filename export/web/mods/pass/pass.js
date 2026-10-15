@@ -65,7 +65,7 @@ export function addXp(season,p,n){const before=tiersEarned(season,p);p.xp+=Math.
 
 // what a reward is, for the UI: {title, sub, kind}
 export function describe(r,{catalog,gums}={}){
-  if(r.type==='item'){const i=catalog?.items.find(x=>x.id===r.id);return {title:i?.name??r.id,sub:{camo:'CAMO',outfit:'OUTFIT',reticle:'RETICLE & HITS',theme:'THEME',sound:'SOUND SET',glow:'MAP GLOW',card:'CALLING CARD'}[i?.cat]??'ITEM',item:i};}
+  if(r.type==='item'){const i=catalog?.items.find(x=>x.id===r.id);if(i?.data?.label)return {title:i.name,sub:i.data.label,item:i,desc:i.desc};return {title:i?.name??r.id,sub:{camo:'CAMO',outfit:'OUTFIT',reticle:'RETICLE & HITS',theme:'THEME',sound:'SOUND SET',glow:'MAP GLOW',card:'CALLING CARD'}[i?.cat]??'ITEM',item:i};}
   if(r.type==='credits')return {title:`${r.amount} Credits`,sub:'CREDITS'};
   if(r.type==='token')return {title:`Double ${{passXp:'Pass',weaponXp:'Weapon',researchXp:'Research'}[r.kind]} XP`,sub:`NEXT ${r.matches} MATCH${r.matches>1?'ES':''}`};
   if(r.type==='gum'){const g=gums?.gums.find(x=>x.id===r.id);return {title:g?.name??r.id,sub:`GOBBLEGUM · ${(g?.rarity??'').toUpperCase()} · SEASON EXCLUSIVE`,desc:g?.desc};}

@@ -3,6 +3,7 @@
 import { camoSwatch } from '../weapon-levels/camo.js';
 import { cardSvg } from './card.js';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+export const iconUrl=ch=>new URL('../characters/'+ch.icon,import.meta.url).href;
 export function makeThumb({camos,chars}){
   const camoOf=item=>camos.camos.find(c=>c.id===item.data?.camo);
   const charOf=item=>chars.characters.find(c=>c.id===item.data?.character);
@@ -10,7 +11,9 @@ export function makeThumb({camos,chars}){
   const d=item.data??{};
   if(item.cat==='camo'){const c=camoOf(item);return `<div class="pv" data-swatch="${c?.id}" style="background-image:url(${camoSwatch(c)})"></div>`;}
   if(item.cat==='card')return `<div class="pv">${cardSvg(d,'SURVIVOR','LEVEL 1')}</div>`;
-  if(item.cat==='outfit'){const ch=charOf(item);return `<div class="pv" style="background:linear-gradient(135deg,${ch?.color} 0 55%,${ch?.accent} 55%)"></div>`;}
+  if(item.cat==='outfit'){const ch=charOf(item);   // operators with a rendered icon (characters.json "icon", next to the models) show it
+    const bg=`linear-gradient(135deg,${ch?.color} 0 55%,${ch?.accent} 55%)`;
+    return ch?.icon?`<div class="pv" style="background:url(${iconUrl(ch)}) center/contain no-repeat,${bg}"></div>`:`<div class="pv" style="background:${bg}"></div>`;}
   if(d.char||d.hitmarker)return `<div class="pv" style="color:${d.color};font-size:46px">${esc(d.char??d.hitmarker)}</div>`;
   if(d.blood)return `<div class="pv" style="background:radial-gradient(circle,${d.blood} 0 18%,${d.blood}55 30%,transparent 55%),#111"></div>`;
   if(d.hud)return `<div class="pv" style="background:linear-gradient(90deg,${d.hud.points} 0 33%,${d.hud.round} 33% 66%,${d.hud.ring} 66%)"></div>`;

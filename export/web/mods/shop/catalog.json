@@ -895,14 +895,16 @@
    "pass": "s1"
   },
   {
-   "id": "pass.s1.outfit.scarecrow",
+   "id": "pass.s1.operator.scp_ntf",
    "cat": "outfit",
-   "name": "Test Subject: Scarecrow",
+   "name": "Nine-Tailed Fox",
    "price": 0,
    "rarity": "epic",
-   "desc": "A Season 1 outfit for the Test Subject.",
+   "desc": "Mobile Task Force Epsilon-11 \"Nine-Tailed Fox\": the Foundation's containment breach response. Operator.",
    "data": {
-    "character": "outfit_s1_scarecrow"
+    "character": "scp_ntf",
+    "label": "OPERATOR",
+    "skin": false
    },
    "pass": "s1"
   },
@@ -1258,14 +1260,16 @@
    "pass": "s1"
   },
   {
-   "id": "pass.s1.outfit.knight",
+   "id": "pass.s1.operator.scp_chaos",
    "cat": "outfit",
-   "name": "Test Subject: Melon Knight",
+   "name": "Chaos Insurgent",
    "price": 0,
    "rarity": "epic",
-   "desc": "A Season 1 outfit for the Test Subject.",
+   "desc": "The Chaos Insurgency: a Foundation splinter group that raids sites for anomalies. Operator.",
    "data": {
-    "character": "outfit_s1_knight"
+    "character": "scp_chaos",
+    "label": "OPERATOR",
+    "skin": false
    },
    "pass": "s1"
   },
@@ -1578,16 +1582,14 @@
    "pass": "s1"
   },
   {
-   "id": "pass.s1.card.smoke",
-   "cat": "card",
-   "name": "Smoke",
+   "id": "pass.s1.glow.harvestmoon",
+   "cat": "glow",
+   "name": "Harvest Moon Glow",
    "price": 0,
-   "rarity": "common",
-   "desc": "A Season 1 calling card.",
+   "rarity": "legendary",
+   "desc": "Season 1 Mystery Box glow.",
    "data": {
-    "c1": "#141414",
-    "c2": "#8a8a8a",
-    "pattern": "stars"
+    "box": "#ff9a1a"
    },
    "pass": "s1"
   },
@@ -1617,14 +1619,16 @@
    "pass": "s1"
   },
   {
-   "id": "pass.s1.glow.harvestmoon",
-   "cat": "glow",
-   "name": "Harvest Moon Glow",
+   "id": "pass.s1.operator.scp_ntf_captain",
+   "cat": "outfit",
+   "name": "Nine-Tailed Fox: Captain",
    "price": 0,
    "rarity": "legendary",
-   "desc": "Season 1 Mystery Box glow.",
+   "desc": "The NTF Captain in heavy armour. A Nine-Tailed Fox skin.",
    "data": {
-    "box": "#ff9a1a"
+    "character": "scp_ntf_captain",
+    "label": "OPERATOR SKIN",
+    "skin": true
    },
    "pass": "s1"
   },
@@ -1826,14 +1830,16 @@
    "pass": "s1"
   },
   {
-   "id": "pass.s1.outfit.harvestlord",
+   "id": "pass.s1.operator.scp_chaos_juggernaut",
    "cat": "outfit",
-   "name": "Test Subject: Harvest Lord",
+   "name": "Chaos Insurgent: Juggernaut",
    "price": 0,
    "rarity": "legendary",
-   "desc": "A Season 1 outfit for the Test Subject.",
+   "desc": "The Chaos heavy: visored helmet, shoulder plates, heavy armour. A Chaos Insurgent skin.",
    "data": {
-    "character": "outfit_s1_harvestlord"
+    "character": "scp_chaos_juggernaut",
+    "label": "OPERATOR SKIN",
+    "skin": true
    },
    "pass": "s1"
   }

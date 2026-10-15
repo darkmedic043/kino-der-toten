@@ -2236,52 +2236,163 @@
    "shop": "outfit.midnight"
   },
   {
-   "id": "outfit_s1_scarecrow",
-   "name": "Test Subject (Scarecrow)",
-   "type": "mannequin",
-   "description": "Season 1 outfit: Scarecrow.",
-   "color": "#5a4a2a",
-   "accent": "#c8892a",
-   "hands": "usmc",
-   "handsTint": {
-    "glovesleeve": "#c8892a",
-    "glove": "#3a2e18"
+   "id": "scp_ntf",
+   "name": "Nine-Tailed Fox",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/scpsl/scp_ntf.glb?v=1",
+   "icon": "models/scpsl/scp_ntf_icon.webp",
+   "height": 72,
+   "yaw": 180,
+   "color": "#1d3a7a",
+   "accent": "#f0c040",
+   "fpArms": true,
+   "skinName": "Sergeant",
+   "description": "Mobile Task Force Epsilon-11 \"Nine-Tailed Fox\": the Foundation's containment breach response. Operator.",
+   "optional": true,
+   "shop": "pass.s1.operator.scp_ntf",
+   "pass": "s1",
+   "credit": {
+    "title": "Nine-Tailed Fox (Sergeant)",
+    "author": "PurpleGoop (SCP: Secret Laboratory)",
+    "source": "https://drive.google.com/drive/folders/1N01MC6WoUMRHohX9AV-E1kDfzDYiEtm3 (Northwood marketing assets, Human Models)",
+    "license": "CC BY-SA 4.0",
+    "note": "Models by PurpleGoop for SCP: Secret Laboratory (Northwood Studios), rigged by DrPri. Adapted for Melon Zombies: re-rigged onto the game skeleton, textures resized, armour pieces made toggleable."
    },
-   "handsFlat": true,
-   "shop": "pass.s1.outfit.scarecrow",
-   "pass": "s1"
+   "variants": [
+    {
+     "id": "gear",
+     "label": "Gear",
+     "options": [
+      {
+       "id": "full",
+       "label": "Full kit",
+       "default": true
+      },
+      {
+       "id": "nopack",
+       "label": "No backpack",
+       "meshes": {
+        "Backpack": false
+       }
+      },
+      {
+       "id": "light",
+       "label": "Light",
+       "meshes": {
+        "Backpack": false,
+        "Pouches": false
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "id": "outfit_s1_knight",
-   "name": "Test Subject (Melon Knight)",
-   "type": "mannequin",
-   "description": "Season 1 outfit: Melon Knight.",
-   "color": "#2a4a1a",
-   "accent": "#ff4f6a",
-   "hands": "usmc",
-   "handsTint": {
-    "glovesleeve": "#ff4f6a",
-    "glove": "#1a2e10"
+   "id": "scp_chaos",
+   "name": "Chaos Insurgent",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/scpsl/scp_chaos.glb?v=1",
+   "icon": "models/scpsl/scp_chaos_icon.webp",
+   "height": 72,
+   "yaw": 180,
+   "color": "#3a4a1e",
+   "accent": "#c8a060",
+   "fpArms": true,
+   "skinName": "Rifleman",
+   "description": "The Chaos Insurgency: a Foundation splinter group that raids sites for anomalies. Operator.",
+   "optional": true,
+   "shop": "pass.s1.operator.scp_chaos",
+   "pass": "s1",
+   "credit": {
+    "title": "Chaos Insurgent (Rifleman)",
+    "author": "PurpleGoop (SCP: Secret Laboratory)",
+    "source": "https://drive.google.com/drive/folders/1N01MC6WoUMRHohX9AV-E1kDfzDYiEtm3 (Northwood marketing assets, Human Models)",
+    "license": "CC BY-SA 4.0",
+    "note": "Models by PurpleGoop for SCP: Secret Laboratory (Northwood Studios), rigged by DrPri. Adapted for Melon Zombies: re-rigged onto the game skeleton, textures resized, armour pieces made toggleable."
    },
-   "handsFlat": true,
-   "shop": "pass.s1.outfit.knight",
-   "pass": "s1"
+   "variants": [
+    {
+     "id": "armor",
+     "label": "Armor",
+     "options": [
+      {
+       "id": "combat",
+       "label": "Combat",
+       "default": true
+      },
+      {
+       "id": "light",
+       "label": "Light",
+       "meshes": {
+        "Helmet": false
+       }
+      },
+      {
+       "id": "none",
+       "label": "No armor",
+       "meshes": {
+        "Helmet": false,
+        "Backpack": false,
+        "Pouches": false
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "id": "outfit_s1_harvestlord",
-   "name": "Test Subject (Harvest Lord)",
-   "type": "mannequin",
-   "description": "Season 1 outfit: Harvest Lord.",
-   "color": "#3a2a0a",
-   "accent": "#f0c060",
-   "hands": "usmc",
-   "handsTint": {
-    "glovesleeve": "#f0c060",
-    "glove": "#2a1e08"
+   "id": "scp_ntf_captain",
+   "name": "Nine-Tailed Fox",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/scpsl/scp_ntf_captain.glb?v=1",
+   "icon": "models/scpsl/scp_ntf_captain_icon.webp",
+   "height": 74,
+   "yaw": 180,
+   "color": "#122a5a",
+   "accent": "#f0c040",
+   "fpArms": true,
+   "skinName": "Captain",
+   "description": "The NTF Captain in heavy armour. A Nine-Tailed Fox skin.",
+   "optional": true,
+   "shop": "pass.s1.operator.scp_ntf_captain",
+   "pass": "s1",
+   "credit": {
+    "title": "Nine-Tailed Fox (Captain)",
+    "author": "PurpleGoop (SCP: Secret Laboratory)",
+    "source": "https://sketchfab.com/3d-models/nine-tailed-fox-captian-e0a87ea5fe2e47bc9b720a6441520d08",
+    "license": "CC BY-SA (SCP: Secret Laboratory); the upload is marked CC BY 4.0",
+    "note": "Models by PurpleGoop for SCP: Secret Laboratory (Northwood Studios), rigged by DrPri. \"Nine- Tailed Fox Captian\" (the game's heavy-armour version) uploaded to Sketchfab by sigma eat dog. Adapted for Melon Zombies: control bones removed, armour pieces skinned, materials made opaque."
    },
-   "handsFlat": true,
-   "shop": "pass.s1.outfit.harvestlord",
-   "pass": "s1"
+   "skinOf": "scp_ntf"
+  },
+  {
+   "id": "scp_chaos_juggernaut",
+   "name": "Chaos Insurgent",
+   "type": "gltf",
+   "motion": "bo1",
+   "model": "models/scpsl/scp_chaos_juggernaut.glb?v=1",
+   "icon": "models/scpsl/scp_chaos_juggernaut_icon.webp",
+   "height": 74,
+   "yaw": 180,
+   "color": "#2a3614",
+   "accent": "#c8a060",
+   "fpArms": true,
+   "skinName": "Juggernaut",
+   "description": "The Chaos heavy: visored helmet, shoulder plates, heavy armour. A Chaos Insurgent skin.",
+   "optional": true,
+   "shop": "pass.s1.operator.scp_chaos_juggernaut",
+   "pass": "s1",
+   "credit": {
+    "title": "Chaos Insurgent (Juggernaut)",
+    "author": "PurpleGoop (SCP: Secret Laboratory)",
+    "source": "https://sketchfab.com/3d-models/chaos-insurgent-juggernaut-75a2a6259d9242e1aed5335b97a8bf7e",
+    "license": "CC BY-SA (SCP: Secret Laboratory); the upload is marked CC BY 4.0",
+    "note": "Models by PurpleGoop for SCP: Secret Laboratory (Northwood Studios), rigged by DrPri. \"Chaos Insurgent juggernaut\" (the game's heavy-armour version) uploaded to Sketchfab by sigma eat dog. Adapted for Melon Zombies: control bones removed, armour pieces skinned, materials made opaque, untextured boots given the body texture."
+   },
+   "skinOf": "scp_chaos"
   }
  ]
 }

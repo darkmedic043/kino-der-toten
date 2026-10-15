@@ -183,7 +183,7 @@
     "id": "p2.major",
     "reward": {
      "type": "item",
-     "id": "pass.s1.outfit.scarecrow"
+     "id": "pass.s1.operator.scp_ntf"
     }
    }
   },
@@ -438,7 +438,7 @@
     "id": "p5.major",
     "reward": {
      "type": "item",
-     "id": "pass.s1.outfit.knight"
+     "id": "pass.s1.operator.scp_chaos"
     }
    }
   },
@@ -668,7 +668,7 @@
      "id": "p8.7",
      "reward": {
       "type": "item",
-      "id": "pass.s1.card.smoke"
+      "id": "pass.s1.glow.harvestmoon"
      },
      "premium": false
     },
@@ -693,7 +693,7 @@
     "id": "p8.major",
     "reward": {
      "type": "item",
-     "id": "pass.s1.glow.harvestmoon"
+     "id": "pass.s1.operator.scp_ntf_captain"
     }
    }
   },
@@ -863,7 +863,7 @@
     "id": "p10.major",
     "reward": {
      "type": "item",
-     "id": "pass.s1.outfit.harvestlord"
+     "id": "pass.s1.operator.scp_chaos_juggernaut"
     }
    }
   }

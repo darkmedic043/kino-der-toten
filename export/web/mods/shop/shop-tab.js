@@ -8,7 +8,7 @@ import { loadCamos, camoSwatch, fillSwatches } from '../weapon-levels/camo.js';
 import { gunPreview } from '../weapon-levels/gun-preview.js';
 import { renderPortrait } from '../../characters.js';
 import { cardSvg } from './card.js';
-import { makeThumb } from './thumbs.js';
+import { makeThumb, iconUrl } from './thumbs.js';
 
 const MARKUP=`<header class="sp-top"><h1>SHOP</h1><div class="sp-bal"><b id="sp-balance">0</b><span>CREDITS</span></div><div class="sp-timers"><span id="sp-daily"></span><span id="sp-weekly"></span></div></header>
 <div class="sp-main"><nav class="sp-cats" id="sp-cats"></nav><select class="sp-cats-select" id="sp-cats-select" aria-label="Category"></select><section class="sp-body" id="sp-body"></section><aside class="sp-drawer" id="sp-drawer"></aside></div>`;
@@ -95,6 +95,7 @@ async function drawer(){
   const pv=$('sp-pv'),d=item.data??{};
   if(item.cat==='camo')preview.show(pv,data.weapons.m16_zm??Object.values(data.weapons)[0],camoOf(item));
   else if(item.cat==='card')pv.innerHTML=cardSvg(d,'SURVIVOR','LEVEL 20 · PRESTIGE 2');
+  else if(item.cat==='outfit'&&charOf(item)?.icon){const ch=charOf(item);pv.innerHTML=`<img src="${iconUrl(ch)}" alt="" style="height:100%;background:linear-gradient(135deg,${ch.color} 0 55%,${ch.accent} 55%)">`;}
   else if(item.cat==='outfit'){const ch=charOf(item);pv.innerHTML='<span class="hint">Rendering…</span>';renderPortrait({...ch,type:'mannequin'},data).then(u=>{if(sel===item.id)pv.innerHTML=`<img src="${u}" alt="" style="height:100%">`;}).catch(()=>{pv.innerHTML='';});}
   else if(d.char||d.hitmarker)pv.innerHTML=`<div class="mock-hud" style="background:radial-gradient(#2a2620,#0a0a0a)"><span style="color:${d.color};font-size:${d.char?42:56}px">${esc(d.char??d.hitmarker)}</span></div>`;
   else pv.innerHTML=thumb(item).replace('class="pv"','class="pv" style="height:100%"');

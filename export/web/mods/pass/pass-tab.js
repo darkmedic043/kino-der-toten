@@ -6,7 +6,7 @@ import { loadCatalog } from '../shop/shop.js';
 import { loadCredits } from '../credits/credits.js';
 import { loadCamos, fillSwatches } from '../weapon-levels/camo.js';
 import { gunPreview } from '../weapon-levels/gun-preview.js';
-import { makeThumb } from '../shop/thumbs.js';
+import { makeThumb, iconUrl } from '../shop/thumbs.js';
 import { loadGums } from '../gobblegums/gums.js';
 import { renderPortrait } from '../../characters.js';
 
@@ -57,10 +57,11 @@ export async function mountPass(root,{toast,data}){
     const major=entry===pg.major,d=describe(entry.reward,{catalog,gums}),open=pageOpen(season,p,page),tk=tokens(season,p),unlocked=!!p.unlocked[entry.id];
     el.innerHTML=`<div class="ps-pv" id="ps-pv"></div><h3>${esc(d.title)}</h3><span class="muted small">${esc(d.sub)}${entry.premium?' · PREMIUM':''}</span>${d.item?`<p>${esc(d.item.desc)}</p>`:d.desc?`<p>${esc(d.desc)}</p>`:''}
       ${major?`<p class="muted small">${p.granted[entry.id]?'Claimed.':'Unlock all 9 rewards on this page to get it.'}</p>`
-        :unlocked?`<p class="muted small">${entry.premium&&!p.premium?'Unlocked · handed over when you buy the premium pass.':'Unlocked and yours.'}${d.item&&['camo','outfit'].includes(d.item.cat)?` ${d.item.cat==='camo'?'Equip it in the Gunsmith (GLOBAL · SEASON).':'Pick it in Armory → Operator.'}`:d.item?' Equip it in the Shop tab.':''}</p>`
+        :unlocked?`<p class="muted small">${entry.premium&&!p.premium?'Unlocked · handed over when you buy the premium pass.':'Unlocked and yours.'}${d.item&&['camo','outfit'].includes(d.item.cat)?` ${d.item.cat==='camo'?'Equip it in the Gunsmith (GLOBAL · SEASON).':d.item.data?.skin?'Pick it under SKINS in Armory → Operator.':'Pick it in Armory → Operator.'}`:d.item?' Equip it in the Shop tab.':''}</p>`
         :`<button class="ps-unlock" data-unlock="${esc(entry.id)}"${!open||tk<=0?' disabled':''}>UNLOCK · 1 TOKEN</button><p class="muted small">${!open?'Finish the page before it first.':tk<=0?'No tokens: earn pass tiers by playing, or buy one.':''}</p>`}`;
     const pv=el.querySelector('#ps-pv'),it=d.item;
     if(it?.cat==='camo')preview.show(pv,data.weapons.m16_zm??Object.values(data.weapons)[0],camos.camos.find(c=>c.id===it.data.camo));
+    else if(it?.cat==='outfit'&&chars.characters.find(c=>c.id===it.data.character)?.icon){const ch=chars.characters.find(c=>c.id===it.data.character);pv.innerHTML=`<img src="${iconUrl(ch)}" alt="" style="height:100%;background:linear-gradient(135deg,${ch.color} 0 55%,${ch.accent} 55%)">`;}
     else if(it?.cat==='outfit'){const ch=chars.characters.find(c=>c.id===it.data.character);pv.innerHTML='';renderPortrait({...ch,type:'mannequin'},data).then(u=>{if(sel===entry.id)pv.innerHTML=`<img src="${u}" alt="" style="height:100%">`;}).catch(()=>{});}
     else pv.innerHTML=rewardThumb(entry.reward).replace('class="pv','class="pv big');
     fillSwatches(el,cid=>camos.camos.find(c=>c.id===cid));
