@@ -35,6 +35,26 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
     r.addColorStop(0, '#fff'); r.addColorStop(.35, 'rgba(255,255,255,.6)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
   const sprite = (color, size, opacity = 1) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending })); s.scale.setScalar(size); return s; };
+  // a spider web drawn on a canvas (radial strands + rings), used by Widow's Wine for the blast and the webbing
+  const webTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), C = 128, N = 14;
+    g.strokeStyle = 'rgba(245,242,255,.95)'; g.lineCap = 'round';
+    const ang = [...Array(N)].map((_, i) => i / N * Math.PI * 2 + (Math.random() - .5) * .25);
+    g.lineWidth = 2.2; for (const a of ang) { g.beginPath(); g.moveTo(C, C); g.lineTo(C + Math.cos(a) * 124, C + Math.sin(a) * 124); g.stroke(); }
+    g.lineWidth = 1.4; for (let r = 14; r < 124; r += 11 + r * .06) { g.beginPath(); ang.forEach((a, i) => { const rr = r * (.92 + Math.random() * .12), x = C + Math.cos(a) * rr, y = C + Math.sin(a) * rr; i ? g.quadraticCurveTo(C + Math.cos(a - Math.PI / N) * rr * .9, C + Math.sin(a - Math.PI / N) * rr * .9, x, y) : g.moveTo(x, y); });
+      g.closePath(); g.stroke(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const webSprite = (size, opacity) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: webTex, transparent: true, opacity, depthWrite: false })); s.scale.setScalar(size); s.material.rotation = Math.random() * Math.PI * 2; return s; };
+  const webs = [];   // blast visuals: {mesh, t, life, from, to}
+  function webBurst(at, R) {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: webTex, transparent: true, opacity: .9, depthWrite: false, side: THREE.DoubleSide }));
+    floor.rotation.x = -Math.PI / 2; floor.rotation.z = Math.random() * 6; floor.position.copy(at).y += 3; scene.add(floor); webs.push({ mesh: floor, t: 0, life: 1.6, from: 10, to: R });
+    // silk strands flung outward
+    const pos = []; for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2 + Math.random() * .2, r = R * (.6 + Math.random() * .4), h = 10 + Math.random() * 60;
+      pos.push(at.x, at.y + 40, at.z, at.x + Math.cos(a) * r, at.y + h, at.z + Math.sin(a) * r); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xf2eeff, transparent: true, opacity: .8, depthWrite: false })); lines.frustumCulled = false; lines.scale.setScalar(.05);
+    lines.position.copy(at); g.translate(-at.x, -at.y, -at.z); scene.add(lines); webs.push({ mesh: lines, t: 0, life: 1, from: .05, to: 1, lines: true });
+  }
   const bolts = [];
   function bolt(a, b, color) {
     const pts = [], n = Math.max(3, Math.round(a.distanceTo(b) / 20));
@@ -46,10 +66,13 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
   // ---- holding zombies (webs, stuns): every frame a held zombie is pulled back toward where it stood by its slow
   // fraction (1 = frozen), so it works with whatever else sets its speed; frozen ones can't attack (lureTarget)
   const held = new Map();   // z -> {until, slow, frozenUntil, prev, cocoon}
-  function hold(z, dur, slow, frozen = 0, cocoon = false) {
+  function hold(z, dur, slow, frozen = 0, cocoon = false, web = true) {   // web false: a stun (Electric Cherry), no silk
     const h = held.get(z) ?? { prev: z.root.position.clone() };
     h.until = Math.max(h.until ?? 0, now() + dur); h.slow = Math.max(h.slow ?? 0, slow); h.frozenUntil = Math.max(h.frozenUntil ?? 0, now() + frozen);
-    if (cocoon && !h.cocoon) { h.cocoon = sprite(0xf4f0ff, 70, .55); h.cocoon.position.y = 40; z.root.add(h.cocoon); }
+    if (web && !h.web) {   // webbing on the body: a few web sheets at legs, chest and head (more of them when cocooned)
+      h.web = new THREE.Group(); for (const [y, size] of [[16, 24], [40, 28]]) { const w = webSprite(size, .45); w.position.y = y; h.web.add(w); } z.root.add(h.web);
+    }
+    if (cocoon && !h.cocoon) { h.cocoon = new THREE.Group(); for (const [y, size] of [[12, 28], [32, 34], [52, 32], [66, 22]]) { const w = webSprite(size, .6); w.position.set((Math.random() - .5) * 6, y, (Math.random() - .5) * 6); h.cocoon.add(w); } z.root.add(h.cocoon); }
     held.set(z, h);
   }
   const lure = enemies.lureTarget?.bind(enemies);
@@ -95,7 +118,7 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
       const close = d < R * .45 || (tangled && !special(z));
       hold(z, dur, close ? 1 : .6, close ? dur * .5 : 0, close);
     }
-    fx(at.clone().add(new THREE.Vector3(0, 10, 0)), 1.1, 0xf4f0ff); audio?.play?.('explosion', .25);
+    webBurst(at, R); audio?.play?.('melee', .4);   // a web blast, not a fireball (user, 2026-10-15)
     if (stat('ww.spinner')) spinner = { until: now() + 10, r: 130 };
     if (stat('ww.hatchling')) { const s = sprite(0x2a0a12, 26); s.position.copy(at).y += 12; scene.add(s); const eye = sprite(0xff2a3a, 8); s.add(eye); hatchlings.push({ s, until: now() + 12, next: 0 }); }
     return true;
@@ -117,14 +140,14 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
   // ======================================== Wisp Tea ========================================
   // Kills summon a Wisp that hunts zombies near you for 30 s; then it rests 2 minutes and needs more kills. It spares
   // the round's last zombie so you can keep the round going. The masks (Major augments) change what it does.
-  const WISP_KILLS = 30;
+  // BO7-like: a small blue wisp that helps rather than clears the room (user, 2026-10-15: was far too strong and big)
+  const WISP_KILLS = 40, WISP_LIFE = 20, WISP_RANGE = 320, WISP_EVERY = 1.8;
   let wisp = null, wispCharge = 0, wispRest = 0, salvations = 3;
   function summonWisp() {
-    const s = sprite(0x9fe8ff, 46), core = sprite(0xffffff, 16); s.add(core);
+    const s = sprite(0x1f6bff, 5, .85), core = sprite(0x9fd4ff, 1.8); s.add(core);
     const mask = stat('wt.wrath') ? 'wrath' : stat('wt.salvation') ? 'salvation' : stat('wt.distraction') ? 'distraction' : stat('wt.benevolence') ? 'benevolence' : null;
-    if (mask === 'wrath') s.material.color.setHex(0xff5a3a); if (mask === 'benevolence') s.material.color.setHex(0xffe3a8); if (mask === 'distraction') s.material.color.setHex(0xffb84f);
     scene.add(s); s.position.copy(feet()).add(new THREE.Vector3(0, 70, 0));
-    wisp = { s, mask, until: now() + 30 * (1 + stat('wt.extension')), next: 0, a: 0 };
+    wisp = { s, mask, until: now() + WISP_LIFE * (1 + stat('wt.extension')), next: 0, a: 0 };
     announce?.('WISP TEA', mask ? `THE ${{ wrath: 'DEMON', salvation: 'FOX', distraction: 'MONKEY', benevolence: 'MAIDEN' }[mask]} IS WITH YOU` : 'THE WISP IS WITH YOU', 2.5);
   }
   const lastZombie = () => (session.total ?? 0) - (session.killed ?? 0) <= 1 && enemies.list.length <= 1;
@@ -138,8 +161,27 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
   // ======================================== Death Perception ========================================
   // Zombies near you are keylined orange through walls: each zombie mesh gets a twin sharing its skeleton, drawn only
   // where something is in front of it (depthFunc GreaterDepth).
-  const keyMat = new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: .55, depthFunc: THREE.GreaterDepth, depthWrite: false, fog: false });
-  const gemMat = new THREE.MeshBasicMaterial({ color: 0xffd34f, transparent: true, opacity: .6, depthFunc: THREE.GreaterDepth, depthWrite: false, fog: false });
+  // An outline, not a fill (user, 2026-10-15): the twin draws only its silhouette rim (where the surface turns away from
+  // the camera), and only where something hides it (GreaterDepth). polygonOffset pulls the twin a hair toward the camera,
+  // so a zombie in plain sight never passes against its own depth (it had orange specks).
+  const outline = color => new THREE.ShaderMaterial({ uniforms: { color: { value: new THREE.Color(color) } }, transparent: true, depthWrite: false,
+    depthFunc: THREE.GreaterDepth, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8, fog: false,
+    vertexShader: `#include <common>
+#include <skinning_pars_vertex>
+varying vec3 vN; varying vec3 vV;
+void main(){
+#include <beginnormal_vertex>
+#include <skinbase_vertex>
+#include <skinnormal_vertex>
+#include <defaultnormal_vertex>
+#include <begin_vertex>
+#include <skinning_vertex>
+#include <project_vertex>
+vN = normalize(transformedNormal); vV = normalize(-mvPosition.xyz);
+}`,
+    fragmentShader: `uniform vec3 color; varying vec3 vN; varying vec3 vV;
+void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a = smoothstep(.42, .7, rim); if (a < .03) discard; gl_FragColor = vec4(color * 1.25, min(1.0, a * 1.3)); }` });
+  const keyMat = outline(0xff7a1a), gemMat = outline(0xffd34f);
   function keyline(root, mat) {
     const out = [];
     root.traverse(m => {
@@ -219,6 +261,7 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
     if (has(EP) && stat('ep.rainbow') && !popping && enemy && Math.random() < stat('ep.rainbow')) queueMicrotask(() => popOn(enemy, true));   // Rainbow Pop
   });
   host.on('kill', e => {
+    for (const o of keyed.get(e.enemy?.root) ?? []) o.visible = false;   // corpses lose their outline
     if (e.remote) return; const z = e.enemy, at = z?.root?.position?.clone(); if (!at) return;
     if (has(VA)) {
       const r = Math.random();
@@ -246,9 +289,13 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
   host.on('update', dt => {
     const t = now(), f = feet();
     for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i]; b.t -= dt; b.line.material.opacity = Math.max(0, b.t / .22); if (b.t <= 0) { b.line.removeFromParent(); b.line.geometry.dispose(); b.line.material.dispose(); bolts.splice(i, 1); } }
+    for (let i = webs.length - 1; i >= 0; i--) { const w = webs[i]; w.t += dt; const k = Math.min(1, w.t / .3), e = 1 - (1 - k) ** 3;
+      if (w.lines) w.mesh.scale.setScalar(w.from + (w.to - w.from) * e); else w.mesh.scale.setScalar(w.from + (w.to - w.from) * e);
+      w.mesh.material.opacity = (w.lines ? .8 : .9) * Math.min(1, (w.life - w.t) / .5);
+      if (w.t >= w.life) { w.mesh.removeFromParent(); w.mesh.geometry.dispose(); w.mesh.material.dispose(); webs.splice(i, 1); } }
     // held zombies
     for (const [z, h] of held) {
-      if (!alive(z) || t > h.until) { if (h.cocoon) h.cocoon.removeFromParent(); held.delete(z); continue; }
+      if (!alive(z) || t > h.until) { h.cocoon?.removeFromParent(); h.web?.removeFromParent(); held.delete(z); continue; }
       const k = h.frozenUntil > t ? 1 : h.slow, p = z.root.position;
       p.x = h.prev.x + (p.x - h.prev.x) * (1 - k); p.z = h.prev.z + (p.z - h.prev.z) * (1 - k); h.prev.copy(p);
       if (h.cocoon && h.frozenUntil <= t) { h.cocoon.removeFromParent(); h.cocoon = null; }
@@ -279,16 +326,19 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
     if (wisp) {
       if (t > wisp.until || !has(WT)) { wisp.s.removeFromParent(); wisp = null; wispRest = t + 120 * (1 - stat('wt.haste')); }
       else {
-        wisp.a += dt * 1.6; const home = f.clone().add(new THREE.Vector3(Math.cos(wisp.a) * 60, 75 + Math.sin(t * 3) * 6, Math.sin(wisp.a) * 60));
+        // floats off your right shoulder, in view, with a slow lazy loop (BO7's wisp keeps near you)
+        wisp.a += dt * 1.2; const cam = camera.getWorldPosition(new THREE.Vector3()), fw = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(), rt = new THREE.Vector3(-fw.z, 0, fw.x);
+        const home = cam.clone().addScaledVector(fw, 70).addScaledVector(rt, 30 + Math.cos(wisp.a) * 6).add(new THREE.Vector3(0, 6 + Math.sin(wisp.a * 1.7) * 4, 0));
         if (wisp.mask === 'distraction') { wisp.s.position.lerp(f.clone().add(camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize().multiplyScalar(260)).setY(f.y + 60), dt * 1.5); }
         else wisp.s.position.lerp(home, Math.min(1, dt * 4));
         if (t > wisp.next) {
           if (wisp.mask === 'benevolence') { wisp.next = t + 2; heal(10); }
-          else if (wisp.mask === 'distraction') { wisp.next = t + 1; for (const z of [...enemies.list]) if (z.root.position.distanceTo(wisp.s.position) < 160 && !lastZombie()) enemies.hurt(z, 300 + (session.round ?? 1) * 50, false, false, 'wisp'); fx(wisp.s.position.clone(), .5, 0xffb84f); }
+          else if (wisp.mask === 'distraction') { wisp.next = t + 1.5; for (const z of [...enemies.list]) if (z.root.position.distanceTo(wisp.s.position) < 140 && !lastZombie()) enemies.hurt(z, (z.maxHealth ?? 300) * .12, false, false, 'wisp'); }
           else {
-            const z = nearest(f, 450);
-            if (z && !lastZombie()) { wisp.next = t + (wisp.mask === 'wrath' ? .55 : .9); bolt(wisp.s.position.clone(), chest(z), wisp.mask === 'wrath' ? 0xff5a3a : 0x9fe8ff);
-              enemies.hurt(z, (1500 + (session.round ?? 1) * 150) * (1 + stat('wt.wrath')), false, false, 'wisp'); }
+            const z = nearest(f, WISP_RANGE);
+            // a third of a zombie's health a strike (half with Mask of Wrath): it softens what reaches you, it doesn't clear rounds
+            if (z && !lastZombie()) { wisp.next = t + WISP_EVERY * (wisp.mask === 'wrath' ? .8 : 1); bolt(wisp.s.position.clone(), chest(z), 0x5fb0ff);
+              enemies.hurt(z, (z.maxHealth ?? 300) * (.34 + .16 * stat('wt.wrath')), false, false, 'wisp'); }
             else wisp.next = t + .3;
           }
         }
@@ -299,7 +349,12 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
     const range = 750 + stat('dp.insight');
     for (const z of enemies.list) {
       let k = keyed.get(z.root); if (!k && has(DP)) { k = keyline(z.root, keyMat); keyed.set(z.root, k); }
-      if (k) { const on = has(DP) && z.root.position.distanceTo(f) < range; for (const o of k) o.visible = on && o.userData.of.visible; }
+      if (k) {
+        // only zombies the map hides from you: a clear line from your eye to the chest or head means no outline (its own
+        // arm in front of its body counted as "hidden" and drew orange on zombies in plain sight); checked 6x a second
+        if (has(DP) && (t >= (z.dpNext ?? 0))) { z.dpNext = t + .16; const eye = camera.getWorldPosition(new THREE.Vector3()), c = chest(z), hd = c.clone().add(new THREE.Vector3(0, 22, 0));
+          z.dpHidden = !(world?.lineClear?.(eye, c) ?? false) && !(world?.lineClear?.(eye, hd) ?? false); }
+        const on = has(DP) && z.dpHidden && z.root.position.distanceTo(f) < range; for (const o of k) o.visible = on && o.userData.of.visible; }
     }
     if (has(DP) && stat('dp.gems')) for (const p of powerups?.items ?? []) if (!keyed.has(p.root)) keyed.set(p.root, keyline(p.model, gemMat));
     if (has(DP) && stat('dp.birds')) drawArrows(); else if (arrows) arrows.getContext('2d').clearRect(0, 0, arrows.width, arrows.height);
@@ -307,7 +362,7 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
     const rl = session.reloadLeft ?? 0;
     if (has(EP) && stat('ep.cherry') && rl > 0 && lastReload <= 0 && t >= cherryReady && session.def) {
       cherryReady = t + 1.5; const empty = 1 - (session.weapon?.mag ?? 0) / Math.max(1, session.def.clipSize ?? 1), R = 120 + 80 * empty;
-      for (const z of [...enemies.list]) if (z.root.position.distanceTo(f) < R) { bolt(f.clone().add(new THREE.Vector3(0, 40, 0)), chest(z), 0x7fd8ff); enemies.hurt(z, (150 + (session.round ?? 1) * 60) * (.3 + empty), false, false, 'electric'); if (alive(z) && !special(z)) hold(z, 1.5, 1, 1.5); }
+      for (const z of [...enemies.list]) if (z.root.position.distanceTo(f) < R) { bolt(f.clone().add(new THREE.Vector3(0, 40, 0)), chest(z), 0x7fd8ff); enemies.hurt(z, (150 + (session.round ?? 1) * 60) * (.3 + empty), false, false, 'electric'); if (alive(z) && !special(z)) hold(z, 1.5, 1, 1.5, false, false); }
       fx(f.clone().add(new THREE.Vector3(0, 30, 0)), .4 + .5 * empty, 0x7fd8ff);
     }
     lastReload = rl;
@@ -316,7 +371,7 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
   });
   host.on('reset', () => {
     for (const d of drops) d.s.removeFromParent(); drops.length = 0; for (const c of clouds) c.s.removeFromParent(); clouds.length = 0;
-    for (const [, h] of held) h.cocoon?.removeFromParent(); held.clear(); for (const h of hatchlings) h.s.removeFromParent(); hatchlings.length = 0;
+    for (const [, h] of held) { h.cocoon?.removeFromParent(); h.web?.removeFromParent(); } held.clear(); for (const w of webs) w.mesh.removeFromParent(); webs.length = 0; for (const h of hatchlings) h.s.removeFromParent(); hatchlings.length = 0;
     if (wisp) wisp.s.removeFromParent(); wisp = null; wispCharge = 0; wispRest = 0; salvations = 3; widowReady = 0; popReady = 0; spinner = null;
   });
 }

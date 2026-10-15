@@ -49,7 +49,7 @@ export const PERKS = [
     effects: ['Getting hit sets off a web explosion: zombies next to you are cocooned, the rest slowed, for 8 s (40 s cooldown)', 'Your melee sometimes webs what it hits'] },
   { id: 'specialty_wisptea', name: 'Wisp Tea', price: 3500, color: '#62c6e8', badge: 'WT', icon: OWN + 'wisptea.webp',
     blurb: 'A friend from the Dark Aether.',
-    effects: ['Every 30 kills summon a Wisp that hunts zombies near you for 30 s', 'It rests 2 minutes before it can come back', 'It spares the round\'s last zombie'] },
+    effects: ['Every 40 kills summon a small Wisp that stays by you for 20 s', 'Every 1.8 s it strikes a zombie close to you for a third of its health', 'It rests 2 minutes before it can come back, and spares the round\'s last zombie'] },
   { id: 'specialty_deathperception', name: 'Death Perception', price: 3000, color: '#e07a1f', badge: 'DP', icon: OWN + 'deathperception.webp',
     blurb: 'Nothing hides from you.',
     effects: ['Zombies within 750 are outlined in orange through walls'] },

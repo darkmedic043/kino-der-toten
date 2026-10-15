@@ -16,7 +16,7 @@ export const SUITS = [
   { id: 'wm', name: 'War Machine', cost: 10000, hp: 320, speed: .95, weapons: ['iron_wm_minigun', 'iron_wm_handgun', 'iron_rocket'] },
   { id: 'mk16', name: 'Mark XVI Nightclub', cost: 0, hp: 200, speed: 1.1, weapons: ['iron_repulsor', 'iron_mk16_cloak'] },
 ];
-export const MAX_POWER = 100, READY = 98, RECHARGE = 2;
+export const MAX_POWER = 100, READY = 98, RECHARGE = .8;   // %/s while off: 0 -> ready in ~2 min (was 2, ~50 s; user 2026-10-15: more downtime)
 // The JARVIS HUD art (hud/) and the voices and suit sounds (sounds/), shared by every map (git-ignored; built by
 // .tools/waw_maps/cheese_cube_suit_assets.py from the Cheese Cube mod's .iwd)
 export const JARVIS_DIR = 'mods/stark/jarvis/';

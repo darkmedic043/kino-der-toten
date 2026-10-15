@@ -827,7 +827,7 @@
     {
      "name": "Extension",
      "kind": "minor",
-     "desc": "The Wisp stays 50% longer (30 s -> 45 s).",
+     "desc": "The Wisp stays 50% longer (20 s -> 30 s).",
      "effects": {
       "wt.extension": 0.5
      },
@@ -836,7 +836,7 @@
     {
      "name": "Mask of Wrath",
      "kind": "major",
-     "desc": "The Demon: the Wisp strikes twice as hard and faster.",
+     "desc": "The Demon: the Wisp strikes harder (half a zombie's health) and 25% more often.",
      "effects": {
       "wt.wrath": 1
      },
