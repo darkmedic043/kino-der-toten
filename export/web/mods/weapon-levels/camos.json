@@ -196,6 +196,16 @@
       }
     },
     {
+      "id": "season.scarecrowburlap",
+      "name": "Scarecrow Burlap",
+      "shop": "pass.s1.camo.scarecrowburlap",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "scarecrowburlap",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
       "id": "season.vinepatch",
       "name": "Vine Patch",
       "shop": "pass.s1.camo.vinepatch",
@@ -262,6 +272,16 @@
       }
     },
     {
+      "id": "season.melonrind",
+      "name": "Melon Rind",
+      "shop": "pass.s1.camo.melonrind",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "melonrind",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
       "id": "season.fog",
       "name": "Graveyard Fog",
       "shop": "pass.s1.camo.fog",
@@ -278,6 +298,16 @@
       "pass": "s1",
       "challenge": "pass",
       "procedural": "bloodmoon",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "season.frostharvest",
+      "name": "Frost Harvest",
+      "shop": "pass.s1.camo.frostharvest",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "frostharvest",
       "scale": 2,
       "mix": 0.95
     },
@@ -315,6 +345,26 @@
       "glow": {
         "procedural": "star-glow"
       }
+    },
+    {
+      "id": "season.lanternlight",
+      "name": "Lantern Light",
+      "shop": "pass.s1.camo.lanternlight",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "lanternlight",
+      "scale": 2,
+      "mix": 0.95
+    },
+    {
+      "id": "season.cropcircle",
+      "name": "Crop Circle",
+      "shop": "pass.s1.camo.cropcircle",
+      "pass": "s1",
+      "challenge": "pass",
+      "procedural": "cropcircle",
+      "scale": 2,
+      "mix": 0.95
     }
   ]
 }

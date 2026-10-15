@@ -24,8 +24,8 @@
     {
      "id": "p1.1",
      "reward": {
-      "type": "credits",
-      "amount": 25
+      "type": "item",
+      "id": "pass.s1.camo.scarecrowburlap"
      },
      "premium": false
     },
@@ -48,9 +48,8 @@
     {
      "id": "p1.4",
      "reward": {
-      "type": "token",
-      "kind": "passXp",
-      "matches": 1
+      "type": "item",
+      "id": "pass.s1.glow.pumpkin"
      },
      "premium": false
     },
@@ -110,8 +109,8 @@
     {
      "id": "p2.1",
      "reward": {
-      "type": "credits",
-      "amount": 30
+      "type": "item",
+      "id": "pass.s1.card.patch"
      },
      "premium": false
     },
@@ -134,9 +133,8 @@
     {
      "id": "p2.4",
      "reward": {
-      "type": "token",
-      "kind": "weaponXp",
-      "matches": 1
+      "type": "item",
+      "id": "pass.s1.card.harvestmoon"
      },
      "premium": false
     },
@@ -160,7 +158,7 @@
      "id": "p2.7",
      "reward": {
       "type": "gum",
-      "id": "idle_eyes"
+      "id": "bountiful_harvest"
      },
      "premium": false
     },
@@ -196,8 +194,8 @@
     {
      "id": "p3.1",
      "reward": {
-      "type": "credits",
-      "amount": 35
+      "type": "item",
+      "id": "pass.s1.reticle.vine"
      },
      "premium": false
     },
@@ -220,9 +218,8 @@
     {
      "id": "p3.4",
      "reward": {
-      "type": "token",
-      "kind": "researchXp",
-      "matches": 1
+      "type": "item",
+      "id": "pass.s1.reticle.pumpkin"
      },
      "premium": false
     },
@@ -282,8 +279,8 @@
     {
      "id": "p4.1",
      "reward": {
-      "type": "credits",
-      "amount": 40
+      "type": "item",
+      "id": "pass.s1.camo.melonrind"
      },
      "premium": false
     },
@@ -306,9 +303,8 @@
     {
      "id": "p4.4",
      "reward": {
-      "type": "token",
-      "kind": "passXp",
-      "matches": 2
+      "type": "item",
+      "id": "pass.s1.kill.ember"
      },
      "premium": false
     },
@@ -332,7 +328,7 @@
      "id": "p4.7",
      "reward": {
       "type": "gum",
-      "id": "crate_power"
+      "id": "root_rot"
      },
      "premium": false
     },
@@ -368,8 +364,8 @@
     {
      "id": "p5.1",
      "reward": {
-      "type": "credits",
-      "amount": 45
+      "type": "item",
+      "id": "pass.s1.card.owl"
      },
      "premium": false
     },
@@ -392,9 +388,8 @@
     {
      "id": "p5.4",
      "reward": {
-      "type": "token",
-      "kind": "weaponXp",
-      "matches": 2
+      "type": "gum",
+      "id": "second_helping"
      },
      "premium": false
     },
@@ -454,8 +449,8 @@
     {
      "id": "p6.1",
      "reward": {
-      "type": "credits",
-      "amount": 50
+      "type": "item",
+      "id": "pass.s1.kill.rot"
      },
      "premium": false
     },
@@ -478,9 +473,8 @@
     {
      "id": "p6.4",
      "reward": {
-      "type": "token",
-      "kind": "researchXp",
-      "matches": 2
+      "type": "item",
+      "id": "pass.s1.camo.frostharvest"
      },
      "premium": false
     },
@@ -504,7 +498,7 @@
      "id": "p6.7",
      "reward": {
       "type": "gum",
-      "id": "wall_power"
+      "id": "melon_smash"
      },
      "premium": false
     },
@@ -540,8 +534,8 @@
     {
      "id": "p7.1",
      "reward": {
-      "type": "credits",
-      "amount": 55
+      "type": "item",
+      "id": "pass.s1.camo.lanternlight"
      },
      "premium": false
     },
@@ -564,9 +558,8 @@
     {
      "id": "p7.4",
      "reward": {
-      "type": "token",
-      "kind": "passXp",
-      "matches": 3
+      "type": "item",
+      "id": "pass.s1.sound.gourd"
      },
      "premium": false
     },
@@ -590,7 +583,7 @@
      "id": "p7.7",
      "reward": {
       "type": "gum",
-      "id": "on_the_house"
+      "id": "vine_snare"
      },
      "premium": false
     },
@@ -626,8 +619,8 @@
     {
      "id": "p8.1",
      "reward": {
-      "type": "credits",
-      "amount": 60
+      "type": "item",
+      "id": "pass.s1.sound.husk"
      },
      "premium": false
     },
@@ -650,9 +643,8 @@
     {
      "id": "p8.4",
      "reward": {
-      "type": "token",
-      "kind": "weaponXp",
-      "matches": 3
+      "type": "gum",
+      "id": "harvest_moon"
      },
      "premium": false
     },
@@ -712,8 +704,8 @@
     {
      "id": "p9.1",
      "reward": {
-      "type": "credits",
-      "amount": 75
+      "type": "item",
+      "id": "pass.s1.card.hayride"
      },
      "premium": false
     },
@@ -736,9 +728,8 @@
     {
      "id": "p9.4",
      "reward": {
-      "type": "token",
-      "kind": "researchXp",
-      "matches": 3
+      "type": "item",
+      "id": "pass.s1.glow.bonfire"
      },
      "premium": false
     },
@@ -762,7 +753,7 @@
      "id": "p9.7",
      "reward": {
       "type": "gum",
-      "id": "free_fire"
+      "id": "scarecrow"
      },
      "premium": false
     },
@@ -787,7 +778,7 @@
     "id": "p9.major",
     "reward": {
      "type": "gum",
-     "id": "perkaholic"
+     "id": "cornucopia"
     }
    }
   },
@@ -798,8 +789,8 @@
     {
      "id": "p10.1",
      "reward": {
-      "type": "credits",
-      "amount": 100
+      "type": "item",
+      "id": "pass.s1.camo.cropcircle"
      },
      "premium": false
     },
@@ -822,9 +813,8 @@
     {
      "id": "p10.4",
      "reward": {
-      "type": "token",
-      "kind": "passXp",
-      "matches": 4
+      "type": "gum",
+      "id": "reapers_toll"
      },
      "premium": false
     },
@@ -848,7 +838,7 @@
      "id": "p10.7",
      "reward": {
       "type": "gum",
-      "id": "reign_drops"
+      "id": "pumpkin_bomb"
      },
      "premium": false
     },

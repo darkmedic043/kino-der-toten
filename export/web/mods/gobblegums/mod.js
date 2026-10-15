@@ -143,7 +143,8 @@ export default async function setup(api){
   host.on('beforeEnemyDamage',e=>{if(live('sword_flay')&&e.cause==='melee')e.amount*=by.sword_flay.meleeMul;});
   // Temporal Gift: picked-up timed power-ups last longer
   const powerup=session.powerup?.bind(session);
-  if(powerup)session.powerup=(type,...rest)=>{if(st.armed.has('second_helping')){st.armed.delete('second_helping');hud();powerup(type,...rest);if(session.effects[type]>session.time)session.effects[type]+=30;api.toast('Second Helping · '+type.replace('_',' '),2);}const r=powerup(type,...rest);if(live('temporal_gift')&&session.effects[type]>session.time)session.effects[type]+=by.temporal_gift.extend;return r;};
+  if(powerup)session.powerup=(type,...rest)=>{const twice=st.armed.has('second_helping');if(twice){st.armed.delete('second_helping');hud();powerup(type,...rest);api.toast('Second Helping · '+type.replace('_',' '),2);}const r=powerup(type,...rest);if(twice&&session.effects[type]>session.time)session.effects[type]+=30;   // the second activation doubles a timed power-up
+    if(live('temporal_gift')&&session.effects[type]>session.time)session.effects[type]+=by.temporal_gift.extend;return r;};
   // Idle Eyes / In Plain Sight: zombies hold still (their goal becomes where they stand)
   const lure=enemies.lureTarget?.bind(enemies);
   enemies.lureTarget=z=>{

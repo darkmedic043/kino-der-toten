@@ -55,7 +55,7 @@ export async function mountPass(root,{toast,data}){
     const el=root.querySelector('#ps-drawer'),pg=season.pages[page],entry=[...pg.items,pg.major].find(x=>x.id===sel);
     if(!entry){el.innerHTML='<p class="muted small">Pick a reward to preview it.</p>';return;}
     const major=entry===pg.major,d=describe(entry.reward,{catalog,gums}),open=pageOpen(season,p,page),tk=tokens(season,p),unlocked=!!p.unlocked[entry.id];
-    el.innerHTML=`<div class="ps-pv" id="ps-pv"></div><h3>${esc(d.title)}</h3><span class="muted small">${esc(d.sub)}${entry.premium?' · PREMIUM':''}</span>${d.item?`<p>${esc(d.item.desc)}</p>`:''}
+    el.innerHTML=`<div class="ps-pv" id="ps-pv"></div><h3>${esc(d.title)}</h3><span class="muted small">${esc(d.sub)}${entry.premium?' · PREMIUM':''}</span>${d.item?`<p>${esc(d.item.desc)}</p>`:d.desc?`<p>${esc(d.desc)}</p>`:''}
       ${major?`<p class="muted small">${p.granted[entry.id]?'Claimed.':'Unlock all 9 rewards on this page to get it.'}</p>`
         :unlocked?`<p class="muted small">${entry.premium&&!p.premium?'Unlocked · handed over when you buy the premium pass.':'Unlocked and yours.'}${d.item&&['camo','outfit'].includes(d.item.cat)?` ${d.item.cat==='camo'?'Equip it in the Gunsmith (GLOBAL · SEASON).':'Pick it in Armory → Operator.'}`:d.item?' Equip it in the Shop tab.':''}</p>`
         :`<button class="ps-unlock" data-unlock="${esc(entry.id)}"${!open||tk<=0?' disabled':''}>UNLOCK · 1 TOKEN</button><p class="muted small">${!open?'Finish the page before it first.':tk<=0?'No tokens: earn pass tiers by playing, or buy one.':''}</p>`}`;

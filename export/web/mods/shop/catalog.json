@@ -658,6 +658,18 @@
    }
   },
   {
+   "id": "pass.s1.camo.scarecrowburlap",
+   "cat": "camo",
+   "name": "Scarecrow Burlap",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.scarecrowburlap"
+   },
+   "pass": "s1"
+  },
+  {
    "id": "pass.s1.card.seedling",
    "cat": "card",
    "name": "Seedling",
@@ -681,6 +693,18 @@
    "data": {
     "char": "✚",
     "color": "#7cd65a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.glow.pumpkin",
+   "cat": "glow",
+   "name": "Pumpkin Glow",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 Mystery Box glow.",
+   "data": {
+    "box": "#ff7a1a"
    },
    "pass": "s1"
   },
@@ -758,6 +782,20 @@
    "pass": "s1"
   },
   {
+   "id": "pass.s1.card.patch",
+   "cat": "card",
+   "name": "Pumpkin Patch",
+   "price": 0,
+   "rarity": "common",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#2a1404",
+    "c2": "#ff8a1a",
+    "pattern": "seeds"
+   },
+   "pass": "s1"
+  },
+  {
    "id": "pass.s1.card.rows",
    "cat": "card",
    "name": "Crop Rows",
@@ -781,6 +819,20 @@
    "data": {
     "char": "●",
     "color": "#ff4f6a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.harvestmoon",
+   "cat": "card",
+   "name": "Harvest Moon",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#120804",
+    "c2": "#ff9a3d",
+    "pattern": "moon"
    },
    "pass": "s1"
   },
@@ -855,6 +907,19 @@
    "pass": "s1"
   },
   {
+   "id": "pass.s1.reticle.vine",
+   "cat": "reticle",
+   "name": "Vine Ring",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "❂",
+    "color": "#7cd65a"
+   },
+   "pass": "s1"
+  },
+  {
    "id": "pass.s1.card.vine",
    "cat": "card",
    "name": "Vinework",
@@ -878,6 +943,19 @@
    "data": {
     "char": "✛",
     "color": "#ffd65a"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.reticle.pumpkin",
+   "cat": "reticle",
+   "name": "Jack Sight",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 crosshair.",
+   "data": {
+    "char": "⚇",
+    "color": "#ff8a1a"
    },
    "pass": "s1"
   },
@@ -955,6 +1033,18 @@
    "pass": "s1"
   },
   {
+   "id": "pass.s1.camo.melonrind",
+   "cat": "camo",
+   "name": "Melon Rind",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.melonrind"
+   },
+   "pass": "s1"
+  },
+  {
    "id": "pass.s1.card.scythe",
    "cat": "card",
    "name": "Scythe",
@@ -978,6 +1068,18 @@
    "data": {
     "char": "◎",
     "color": "#ff9a3d"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.kill.ember",
+   "cat": "reticle",
+   "name": "Cinder Kills",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 kill colour.",
+   "data": {
+    "blood": "#ff7a3a"
    },
    "pass": "s1"
   },
@@ -1046,6 +1148,20 @@
     "c1": "#0d2a0a",
     "c2": "#ff4f6a",
     "pattern": "seeds"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.card.owl",
+   "cat": "card",
+   "name": "Night Owl",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#080a14",
+    "c2": "#ffd65a",
+    "pattern": "moon"
    },
    "pass": "s1"
   },
@@ -1154,6 +1270,18 @@
    "pass": "s1"
   },
   {
+   "id": "pass.s1.kill.rot",
+   "cat": "reticle",
+   "name": "Rot Kills",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 kill colour.",
+   "data": {
+    "blood": "#8a9a2a"
+   },
+   "pass": "s1"
+  },
+  {
    "id": "pass.s1.card.lantern",
    "cat": "card",
    "name": "Lantern",
@@ -1177,6 +1305,18 @@
    "data": {
     "char": "✺",
     "color": "#ffb347"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.frostharvest",
+   "cat": "camo",
+   "name": "Frost Harvest",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.frostharvest"
    },
    "pass": "s1"
   },
@@ -1243,6 +1383,18 @@
    "pass": "s1"
   },
   {
+   "id": "pass.s1.camo.lanternlight",
+   "cat": "camo",
+   "name": "Lantern Light",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.lanternlight"
+   },
+   "pass": "s1"
+  },
+  {
    "id": "pass.s1.card.frost",
    "cat": "card",
    "name": "First Frost",
@@ -1266,6 +1418,22 @@
    "data": {
     "char": "✳",
     "color": "#bff0ff"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.sound.gourd",
+   "cat": "sound",
+   "name": "Hollow Gourd",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hit sounds.",
+   "data": {
+    "hits": {
+     "pitch": 0.9,
+     "knock": 0.5,
+     "cut": 0.7
+    }
    },
    "pass": "s1"
   },
@@ -1334,6 +1502,22 @@
      "pitch": 0.5,
      "knock": 1.9,
      "cut": 0.5
+    }
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.sound.husk",
+   "cat": "sound",
+   "name": "Corn Husk",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hit sounds.",
+   "data": {
+    "hits": {
+     "pitch": 1.3,
+     "knock": 0.9,
+     "cut": 1.8
     }
    },
    "pass": "s1"
@@ -1445,6 +1629,20 @@
    "pass": "s1"
   },
   {
+   "id": "pass.s1.card.hayride",
+   "cat": "card",
+   "name": "Hayride",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#2a1e08",
+    "c2": "#f0c060",
+    "pattern": "stripes"
+   },
+   "pass": "s1"
+  },
+  {
    "id": "pass.s1.card.reaper",
    "cat": "card",
    "name": "Reaper",
@@ -1468,6 +1666,18 @@
    "data": {
     "char": "☠",
     "color": "#e8dcc0"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.glow.bonfire",
+   "cat": "glow",
+   "name": "Bonfire Glow",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 Mystery Box glow.",
+   "data": {
+    "box": "#ff4a1a"
    },
    "pass": "s1"
   },
@@ -1522,6 +1732,18 @@
     "c1": "#1a0500",
     "c2": "#ffb347",
     "pattern": "stripes"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.camo.cropcircle",
+   "cat": "camo",
+   "name": "Crop Circle",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 camo: works on every gun.",
+   "data": {
+    "camo": "season.cropcircle"
    },
    "pass": "s1"
   },
