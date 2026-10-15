@@ -393,15 +393,19 @@ try{
   progress('Loading mods',95);await mods.start({renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});if(!profile.mobile)mysteryBox.warm(renderer,camera);
   // Performance for big ported maps (docs/fork/performance.md). A/B switches for benchmarks: ?noMerge ?noBatch ?noFreeze
   const perfOff=new URLSearchParams(location.search);
+  // this runs 1-3 s of main-thread work: show it, and let the page paint between steps (a frozen page showed a black
+  // screen before the game finished loading)
+  const paint=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
+  progress('Optimizing the map',97);await paint();
   // opt-in per map: static level meshes merged per material (scene-merge.js)
   if(entry.mergeStatic&&world.root&&!perfOff.has('noMerge')){const t=performance.now(),r=mergeStaticMeshes(world.root,{exclude:entry.mergeExclude?new RegExp(entry.mergeExclude):null});globalThis.kino.sceneMerge=r;
-    console.info('[scene-merge]',r.merged,'meshes into',r.meshes,'in',Math.round(performance.now()-t),'ms');}
+    console.info('[scene-merge]',r.merged,'meshes into',r.meshes,'in',Math.round(performance.now()-t),'ms');await paint();}
   // static instanced props: batched per material, culled per instance (instance-cull.js)
   if(!perfOff.has('noBatch')){
     // the map's own props only (mods' instanced effects, e.g. the lighting beams, have their own shaders)
     instanceCull=await createInstanceCuller(world.root??world.mapRoot??scene,{target:scene});globalThis.kino.instanceCull=instanceCull;
     if(instanceCull.meshes){console.info('[instance-cull]',instanceCull.sources,'meshes into',instanceCull.meshes,'batches,',instanceCull.instances,'instances in',instanceCull.buildMs,'ms');
-      await renderer.compileAsync(scene,camera).catch(()=>{});}   // batched props need their own shader variants: compile them behind the loading screen
+      await paint();await renderer.compileAsync(scene,camera).catch(()=>{});}   // batched props need their own shader variants: compile them behind the loading screen
   }
   // a custom map's static objects stop recomputing their matrices every frame (Kino's world.js freezes its own root)
   if(!perfOff.has('noFreeze')&&world.root&&world.root.updateMatrixWorld===THREE.Object3D.prototype.updateMatrixWorld){staticFreeze=createStaticFreeze(world.root);globalThis.kino.staticFreeze=staticFreeze;}

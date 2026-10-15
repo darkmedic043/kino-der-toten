@@ -61,7 +61,9 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
   // (getProgram/getParameters ~14% of a frame), so such batches get their own copy (textures shared).
   const plain=new Set();root.traverse(o=>{if(o.isMesh&&!o.isInstancedMesh)for(const m of [o.material].flat())plain.add(m);});
   const list=[],detached=[];
+  let lastYield=performance.now();
   for(const e of groups.values()){
+    if(performance.now()-lastYield>40){await new Promise(r=>setTimeout(r,0));lastYield=performance.now();}   // keep the page painting
     const lods=new Map();for(const g of e.geos.keys())lods.set(g,lodsOf(g));
     let verts=0,index=0;for(const g of e.geos.keys())for(const x of [g,...lods.get(g)]){verts+=x.attributes.position.count;index+=x.index?x.index.count:0;}
     const first=e.sources[0],mat=plain.has(first.material)?first.material.clone():first.material;if(mat!==first.material)mat.userData={...first.material.userData,batchCopyOf:first.material};
@@ -91,6 +93,9 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
   }
   // empty per-cell group nodes left behind go too
   for(const [,parent] of [...detached]){let q=parent;while(q&&q!==root&&!q.children.length&&q.parent&&!q.isMesh&&!q.userData.keep){const up=q.parent;up.remove(q);detached.push([q,up]);q=up;}}
+  // the batches hold their own copies: free the originals' GPU buffers unless something left in the scene still uses them
+  {const used=new Set();target.traverse(o=>{if(o.isMesh&&!o.isBatchedMesh)used.add(o.geometry);});
+    for(const [o] of detached)if(o.isInstancedMesh&&!used.has(o.geometry)){o.geometry.dispose();used.add(o.geometry);}}
   const buildMs=Math.round(performance.now()-t0);
   const instances=list.reduce((a,e)=>a+e.n,0),sources=[...groups.values()].reduce((a,g)=>a+g.sources.length,0);
   let lastPos=null,lastKey='',drawn=instances;

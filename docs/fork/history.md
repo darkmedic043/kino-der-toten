@@ -216,3 +216,4 @@
 - 2026-10-15: terminal booth in Sandbox's spawn room (props.md).
 - 2026-10-15: the six missing BO7 perks (Vulture Aid, Widow's Wine, Wisp Tea, Death Perception, Elemental Pop, Melee Macchiato) with their BO7 augments as research tracks, sold at the terminal (gameplay.md, research.md).
 - 2026-10-15: terminal PERKS / ARSENAL / STARK show 4 a row; suits in Mark order (props.md).
+- 2026-10-15: no frozen/black screen at the end of loading: map optimization paints between steps and frees batched originals (performance.md).
