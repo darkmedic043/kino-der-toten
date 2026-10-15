@@ -1061,15 +1061,16 @@
    "pass": "s1"
   },
   {
-   "id": "pass.s1.reticle.harvest",
-   "cat": "reticle",
-   "name": "Harvest Ring",
+   "id": "pass.s1.perk.widowswine",
+   "cat": "perk",
+   "name": "Widow's Wine",
    "price": 0,
-   "rarity": "rare",
-   "desc": "Season 1 crosshair.",
+   "rarity": "legendary",
+   "desc": "Unlocks Widow's Wine at the terminal's PERKS app (user, 2026-10-15: replaced the Harvest Ring reticle).",
    "data": {
-    "char": "◎",
-    "color": "#ff9a3d"
+    "perk": "specialty_widowswine",
+    "label": "PERK UNLOCK",
+    "icon": "widowswine.webp"
    },
    "pass": "s1"
   },

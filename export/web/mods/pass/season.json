@@ -296,9 +296,9 @@
      "id": "p4.3",
      "reward": {
       "type": "item",
-      "id": "pass.s1.reticle.harvest"
+      "id": "pass.s1.perk.widowswine"
      },
-     "premium": true
+     "premium": false
     },
     {
      "id": "p4.4",

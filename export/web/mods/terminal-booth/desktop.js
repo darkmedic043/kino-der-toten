@@ -44,7 +44,7 @@ export const PERKS = [
   { id: 'specialty_vultureaid', name: 'Vulture Aid', price: 3000, color: '#c0392b', badge: 'VA', icon: OWN + 'vultureaid.webp',
     blurb: 'Pick the bones clean.',
     effects: ['Kills sometimes drop vulture loot only you can see: ammo for the gun in hand or a few points', 'Walk near a drop to collect it'] },
-  { id: 'specialty_widowswine', name: "Widow's Wine", price: 4000, color: '#7a1830', badge: 'WW', icon: OWN + 'widowswine.webp',
+  { id: 'specialty_widowswine', name: "Widow's Wine", price: 4000, color: '#7a1830', badge: 'WW', icon: OWN + 'widowswine.webp', unlock: 'pass.s1.perk.widowswine',
     blurb: 'Get caught, and catch them back.',
     effects: ['Getting hit sets off a web explosion: zombies next to you are cocooned, the rest slowed, for 8 s (40 s cooldown)', 'Your melee sometimes webs what it hits'] },
   { id: 'specialty_wisptea', name: 'Wisp Tea', price: 3500, color: '#62c6e8', badge: 'WT', icon: OWN + 'wisptea.webp',
@@ -271,12 +271,14 @@ function build() {
     ? `<img class="art" src="${p.icon}" alt="" draggable="false" data-fallback="${p.fallback ?? ''}" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else this.replaceWith(Object.assign(document.createElement('div'),{className:'badge',style:'background:${p.color}',textContent:'${p.badge}'}))">`
     : `<div class="badge" style="background:${p.color}">${p.badge}</div>`;
   // why a perk can't be bought right now ('' when it can)
-  const blocked = p => opts.owned(p) ? 'owned' : opts.needsPower(p) && !opts.power() ? 'power' : '';
+  // perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine: a Melon Pass reward)
+  const unlocked = p => { if (!p.unlock) return true; try { return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned ?? []).includes(p.unlock); } catch { return false; } };
+  const blocked = p => opts.owned(p) ? 'owned' : !unlocked(p) ? 'pass' : opts.needsPower(p) && !opts.power() ? 'power' : '';
 
   function renderGrid() {
     grid.innerHTML = PERKS.map((p, i) => {
       const why = blocked(p);
-      return `<button class="tile ${why === 'power' ? 'locked' : ''} ${why === 'owned' ? 'owned' : ''}" data-i="${i}" title="${esc(p.name)}">${art(p)}<span class="tag">${why === 'power' ? 'NO POWER' : ''}</span></button>`;
+      return `<button class="tile ${why === 'power' || why === 'pass' ? 'locked' : ''} ${why === 'owned' ? 'owned' : ''}" data-i="${i}" title="${esc(p.name)}">${art(p)}<span class="tag">${why === 'power' ? 'NO POWER' : why === 'pass' ? 'MELON PASS' : ''}</span></button>`;
     }).join('');
     for (const t of grid.children) {
       t.addEventListener('mouseenter', () => select(+t.dataset.i)); t.addEventListener('focus', () => select(+t.dataset.i));
@@ -286,10 +288,10 @@ function build() {
   function select(i) {
     shown = i; const p = PERKS[i], why = blocked(p), price = opts.price(p), short = !why && opts.points() < price;
     for (const t of grid.children) t.classList.toggle('on', +t.dataset.i === i);
-    const label = why === 'owned' ? 'OWNED' : why === 'power' ? 'NEEDS POWER' : short ? 'NOT ENOUGH POINTS' : `BUY · ${price.toLocaleString()}`;
+    const label = why === 'owned' ? 'OWNED' : why === 'pass' ? 'LOCKED · MELON PASS REWARD' : why === 'power' ? 'NEEDS POWER' : short ? 'NOT ENOUGH POINTS' : `BUY · ${price.toLocaleString()}`;
     detail.innerHTML = `<div class="head"><div class="big">${art(p)}</div><div>
         <h2>${esc(p.name.toUpperCase())}</h2><div class="blurb">${esc(p.blurb)}</div><div class="price">${price.toLocaleString()} PTS</div></div></div>
-      <button class="buy ${why === 'power' ? 'locked' : ''}" ${why || short ? 'disabled' : ''}>${label}</button>
+      <button class="buy ${why === 'power' || why === 'pass' ? 'locked' : ''}" ${why || short ? 'disabled' : ''}>${label}</button>
       <div class="status"><span>${opts.onMap(p) ? 'MACHINE ON THIS MAP' : 'NO MACHINE ON THIS MAP · TERMINAL ONLY'}</span></div>
       <h3>WHAT IT DOES</h3><ul>${p.effects.map(e => `<li>${esc(e)}</li>`).join('')}</ul>
       ${p.note ? `<div class="note">* ${esc(p.note)}</div>` : ''}`;
@@ -300,6 +302,7 @@ function build() {
     const p = PERKS[i], why = blocked(p);
     if (why === 'owned') return say(`${p.name.toUpperCase()} ALREADY INSTALLED`, 'bad');
     if (why === 'power') return say('ACCESS DENIED · RESTORE MAINS POWER', 'bad');
+    if (why === 'pass') return say('LOCKED · UNLOCK IT IN THE MELON PASS (PASS TAB)', 'bad');
     const r = opts.buy(p);
     if (r === true) { say(`DISPENSING ${p.name.toUpperCase()} ...`, 'ok'); status(); renderGrid(); select(i); return; }
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');

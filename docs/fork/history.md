@@ -218,3 +218,4 @@
 - 2026-10-15: terminal PERKS / ARSENAL / STARK show 4 a row; suits in Mark order (props.md).
 - 2026-10-15: no frozen/black screen at the end of loading: map optimization paints between steps and frees batched originals (performance.md).
 - 2026-10-15: load diagnostics → ~/.local/share/kino/client-log.jsonl (black Rind window investigation; performance.md).
+- 2026-10-15: Widow's Wine is a Melon Pass unlock (page 4, replaces the Harvest Ring reticle); locked at the terminal until owned (pass.md).
