@@ -209,3 +209,4 @@
 - 2026-10-15: Gunsmith: locked attachments preview on hover, FIRE RATE and HIP FIRE stat rows, hip spread stacks, Python ACOG shows its scope, stock sights fold under optics on five more BO3 guns (weapon-levels.md).
 - 2026-10-15: Mystery Box odds: rarer tiers weighted up (Legendary ~15%, Wonder ~14% of spins) (core.md).
 - 2026-10-15: Melon Pass tiers cost 2,500 XP (was 1,500); research carries on past mastery to the next item, with overflow XP (pass.md, research.md).
+- 2026-10-15: research costs ×4 (50,000 XP to master an item) (research.md).
