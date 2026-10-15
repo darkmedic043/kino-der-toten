@@ -40,6 +40,25 @@ export const PERKS = [
   { id: 'specialty_additionalprimaryweapon', name: 'Mule Kick', price: 4000, color: '#82a86c', badge: 'MK', icon: OWN + 'mulekick.webp',
     blurb: 'Carry one more gun.',
     effects: ['A third weapon slot'], note: 'Go down and you lose the third weapon with the perk.' },
+  // Black Ops 7 perks (mods/perks-plus/bo7-perks.js); their augments are research tracks (Armory -> Research)
+  { id: 'specialty_vultureaid', name: 'Vulture Aid', price: 3000, color: '#c0392b', badge: 'VA', icon: OWN + 'vultureaid.webp',
+    blurb: 'Pick the bones clean.',
+    effects: ['Kills sometimes drop vulture loot only you can see: ammo for the gun in hand or a few points', 'Walk near a drop to collect it'] },
+  { id: 'specialty_widowswine', name: "Widow's Wine", price: 4000, color: '#7a1830', badge: 'WW', icon: OWN + 'widowswine.webp',
+    blurb: 'Get caught, and catch them back.',
+    effects: ['Getting hit sets off a web explosion: zombies next to you are cocooned, the rest slowed, for 8 s (40 s cooldown)', 'Your melee sometimes webs what it hits'] },
+  { id: 'specialty_wisptea', name: 'Wisp Tea', price: 3500, color: '#62c6e8', badge: 'WT', icon: OWN + 'wisptea.webp',
+    blurb: 'A friend from the Dark Aether.',
+    effects: ['Every 30 kills summon a Wisp that hunts zombies near you for 30 s', 'It rests 2 minutes before it can come back', 'It spares the round\'s last zombie'] },
+  { id: 'specialty_deathperception', name: 'Death Perception', price: 3000, color: '#e07a1f', badge: 'DP', icon: OWN + 'deathperception.webp',
+    blurb: 'Nothing hides from you.',
+    effects: ['Zombies within 750 are outlined in orange through walls'] },
+  { id: 'specialty_elementalpop', name: 'Elemental Pop', price: 3000, color: '#d65fc4', badge: 'EP', icon: OWN + 'elementalpop.webp',
+    blurb: 'Every flavour at once.',
+    effects: ['Bullet hits have a 6% chance to set off a random ammo mod (Cryo, Napalm, Dead Wire…)', '5 s cooldown between pops'] },
+  { id: 'specialty_meleemacchiato', name: 'Melee Macchiato', price: 3000, color: '#8b5a2b', badge: 'MM', icon: OWN + 'meleemacchiato.webp',
+    blurb: 'One punch.',
+    effects: ['Your melee one-shots zombies through round 20 (2,700 damage after)', 'Punched zombies are thrown back'] },
 ];
 
 const CSS = `

@@ -214,3 +214,4 @@
 - 2026-10-15: box odds tuned again: Legendary ~11.5%, Wonder ~9.3% (core.md).
 - 2026-10-15: 15 always-on mods became core systems (CORE_MODS in mod-loader.js: always loaded in order, shown as built in) (core.md).
 - 2026-10-15: terminal booth in Sandbox's spawn room (props.md).
+- 2026-10-15: the six missing BO7 perks (Vulture Aid, Widow's Wine, Wisp Tea, Death Perception, Elemental Pop, Melee Macchiato) with their BO7 augments as research tracks, sold at the terminal (gameplay.md, research.md).

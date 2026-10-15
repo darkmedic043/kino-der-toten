@@ -659,6 +659,486 @@
    ]
   },
   {
+   "id": "specialty_vultureaid",
+   "name": "Vulture Aid",
+   "kind": "perk",
+   "color": "#c0392b",
+   "augments": [
+    {
+     "name": "Condor's Reach",
+     "kind": "minor",
+     "desc": "Collect Vulture drops from much farther away (60 -> 160).",
+     "effects": {
+      "va.reach": 100
+     },
+     "id": "p.vultureaid.condorsreach"
+    },
+    {
+     "name": "Fetid Upgr-aid",
+     "kind": "major",
+     "desc": "8% of kills leave a gas cloud for 8 s; standing in it charges your class action skill.",
+     "effects": {
+      "va.fetid": 0.08
+     },
+     "id": "p.vultureaid.fetidupgraid"
+    },
+    {
+     "name": "Carrion Luggage",
+     "kind": "minor",
+     "desc": "Headshot kills have a 25% chance to drop an extra 50 points.",
+     "effects": {
+      "va.luggage": 0.25
+     },
+     "id": "p.vultureaid.carrionluggage"
+    },
+    {
+     "name": "Smell of Death",
+     "kind": "major",
+     "desc": "8% of kills leave a gas cloud for 8 s; zombies can't find you while you stand in it.",
+     "effects": {
+      "va.smell": 0.08
+     },
+     "id": "p.vultureaid.smellofdeath"
+    },
+    {
+     "name": "Picky Eater",
+     "kind": "minor",
+     "desc": "Kills have a 4% chance to drop a grenade.",
+     "effects": {
+      "va.picky": 0.04
+     },
+     "id": "p.vultureaid.pickyeater"
+    },
+    {
+     "name": "Parting Gift",
+     "kind": "major",
+     "desc": "Ammo drops give three times as much to wonder weapons.",
+     "effects": {
+      "va.gift": 2
+     },
+     "id": "p.vultureaid.partinggift"
+    },
+    {
+     "name": "Extra Serving",
+     "kind": "minor",
+     "desc": "Special enemies you kill have a 50% chance to drop a large 250-point vial.",
+     "effects": {
+      "va.serving": 0.5
+     },
+     "id": "p.vultureaid.extraserving"
+    },
+    {
+     "name": "Armor-matic",
+     "kind": "major",
+     "desc": "Every Vulture drop you pick up also heals 15 (there are no armor plates here).",
+     "effects": {
+      "va.plates": 15
+     },
+     "id": "p.vultureaid.armormatic"
+    }
+   ]
+  },
+  {
+   "id": "specialty_widowswine",
+   "name": "Widow's Wine",
+   "kind": "perk",
+   "color": "#7a1830",
+   "augments": [
+    {
+     "name": "Haste",
+     "kind": "minor",
+     "desc": "Web explosion cooldown -35% (40 s -> 26 s).",
+     "effects": {
+      "ww.haste": 0.35
+     },
+     "id": "p.widowswine.haste"
+    },
+    {
+     "name": "Widow's Bite",
+     "kind": "major",
+     "desc": "Melee hits have a 15% chance to set off a free web explosion.",
+     "effects": {
+      "ww.bite": 0.15
+     },
+     "id": "p.widowswine.widowsbite"
+    },
+    {
+     "name": "The Wide Web",
+     "kind": "minor",
+     "desc": "Web explosion radius +50%.",
+     "effects": {
+      "ww.wide": 0.5
+     },
+     "id": "p.widowswine.thewideweb"
+    },
+    {
+     "name": "Web Spinner",
+     "kind": "major",
+     "desc": "A web explosion leaves a slowing field around you for 10 s.",
+     "effects": {
+      "ww.spinner": 1
+     },
+     "id": "p.widowswine.webspinner"
+    },
+    {
+     "name": "Golden Orb Silk",
+     "kind": "minor",
+     "desc": "Webs last 50% longer.",
+     "effects": {
+      "ww.silk": 0.5
+     },
+     "id": "p.widowswine.goldenorbsilk"
+    },
+    {
+     "name": "Hatchling",
+     "kind": "major",
+     "desc": "Web explosions summon a friendly Deathspinner that bites and webs zombies for 12 s.",
+     "effects": {
+      "ww.hatchling": 1
+     },
+     "id": "p.widowswine.hatchling"
+    },
+    {
+     "name": "Sticky Grenade",
+     "kind": "minor",
+     "desc": "Your explosives also web the zombies they don't kill.",
+     "effects": {
+      "ww.sticky": 1
+     },
+     "id": "p.widowswine.stickygrenade"
+    },
+    {
+     "name": "Tangled Web",
+     "kind": "major",
+     "desc": "Every normal zombie in a web explosion is cocooned; special enemies are slowed.",
+     "effects": {
+      "ww.tangled": 1
+     },
+     "id": "p.widowswine.tangledweb"
+    }
+   ]
+  },
+  {
+   "id": "specialty_wisptea",
+   "name": "Wisp Tea",
+   "kind": "perk",
+   "color": "#62c6e8",
+   "augments": [
+    {
+     "name": "Extension",
+     "kind": "minor",
+     "desc": "The Wisp stays 50% longer (30 s -> 45 s).",
+     "effects": {
+      "wt.extension": 0.5
+     },
+     "id": "p.wisptea.extension"
+    },
+    {
+     "name": "Mask of Wrath",
+     "kind": "major",
+     "desc": "The Demon: the Wisp strikes twice as hard and faster.",
+     "effects": {
+      "wt.wrath": 1
+     },
+     "id": "p.wisptea.maskofwrath"
+    },
+    {
+     "name": "Haste",
+     "kind": "minor",
+     "desc": "The Wisp rests 40% less between summons (120 s -> 72 s).",
+     "effects": {
+      "wt.haste": 0.4
+     },
+     "id": "p.wisptea.haste"
+    },
+    {
+     "name": "Mask of Salvation",
+     "kind": "major",
+     "desc": "The Fox: while it's out, a hit that would take you down leaves you standing, healed (3 times a game).",
+     "effects": {
+      "wt.salvation": 1
+     },
+     "id": "p.wisptea.maskofsalvation"
+    },
+    {
+     "name": "Zombie Sitter",
+     "kind": "minor",
+     "desc": "The Wisp draws the round's last zombie to it and keeps it alive.",
+     "effects": {
+      "wt.sitter": 1
+     },
+     "id": "p.wisptea.zombiesitter"
+    },
+    {
+     "name": "Mask of Distraction",
+     "kind": "major",
+     "desc": "The Monkey: zombies are drawn to the Wisp, and it damages everything around it.",
+     "effects": {
+      "wt.distraction": 1
+     },
+     "id": "p.wisptea.maskofdistraction"
+    },
+    {
+     "name": "Fetcher",
+     "kind": "minor",
+     "desc": "The Wisp brings power-ups to you.",
+     "effects": {
+      "wt.fetcher": 1
+     },
+     "id": "p.wisptea.fetcher"
+    },
+    {
+     "name": "Mask of Benevolence",
+     "kind": "major",
+     "desc": "The Maiden: the Wisp doesn't attack, it heals you 10 every 2 s.",
+     "effects": {
+      "wt.benevolence": 1
+     },
+     "id": "p.wisptea.maskofbenevolence"
+    }
+   ]
+  },
+  {
+   "id": "specialty_deathperception",
+   "name": "Death Perception",
+   "kind": "perk",
+   "color": "#e07a1f",
+   "augments": [
+    {
+     "name": "Further Insight",
+     "kind": "minor",
+     "desc": "See zombies through walls from twice as far (750 -> 1500).",
+     "effects": {
+      "dp.insight": 750
+     },
+     "id": "p.deathperception.furtherinsight"
+    },
+    {
+     "name": "Treasure Hunter",
+     "kind": "major",
+     "desc": "Special enemies you kill have a 25% chance to drop a power-up.",
+     "effects": {
+      "dp.treasure": 0.25
+     },
+     "id": "p.deathperception.treasurehunter"
+    },
+    {
+     "name": "Bird's Eye View",
+     "kind": "minor",
+     "desc": "Arrows around the crosshair point to zombies close by that you can't see.",
+     "effects": {
+      "dp.birds": 1
+     },
+     "id": "p.deathperception.birdseyeview"
+    },
+    {
+     "name": "Death Stare",
+     "kind": "major",
+     "desc": "An ammo mod proc on a zombie under 25% health has a 50% chance to kill it outright.",
+     "effects": {
+      "dp.stare": 0.5
+     },
+     "id": "p.deathperception.deathstare"
+    },
+    {
+     "name": "Extra Change",
+     "kind": "minor",
+     "desc": "Every kill gives 10 more points.",
+     "effects": {
+      "dp.change": 10
+     },
+     "id": "p.deathperception.extrachange"
+    },
+    {
+     "name": "Critical Eye",
+     "kind": "major",
+     "desc": "Bullet body shots have a 10% chance to hit like headshots.",
+     "effects": {
+      "dp.crit": 0.1
+     },
+     "id": "p.deathperception.criticaleye"
+    },
+    {
+     "name": "Hidden Gems",
+     "kind": "minor",
+     "desc": "Power-ups are outlined through walls too.",
+     "effects": {
+      "dp.gems": 1
+     },
+     "id": "p.deathperception.hiddengems"
+    },
+    {
+     "name": "Sixth Sense",
+     "kind": "major",
+     "desc": "Take 25% less damage from zombies behind you.",
+     "effects": {
+      "dp.sixth": 0.25
+     },
+     "id": "p.deathperception.sixthsense"
+    }
+   ]
+  },
+  {
+   "id": "specialty_elementalpop",
+   "name": "Elemental Pop",
+   "kind": "perk",
+   "color": "#d65fc4",
+   "augments": [
+    {
+     "name": "Chill Berry",
+     "kind": "minor",
+     "desc": "Elemental Pop cooldown -30% (5 s -> 3.5 s).",
+     "effects": {
+      "ep.chill": 0.3
+     },
+     "id": "p.elementalpop.chillberry"
+    },
+    {
+     "name": "Citrus Focus",
+     "kind": "major",
+     "desc": "If your gun has an ammo mod, Elemental Pop only sets off that one.",
+     "effects": {
+      "ep.citrus": 1
+     },
+     "id": "p.elementalpop.citrusfocus"
+    },
+    {
+     "name": "Vulnera Bean",
+     "kind": "minor",
+     "desc": "Zombies under any ammo mod effect take 15% more damage.",
+     "effects": {
+      "ep.bean": 0.15
+     },
+     "id": "p.elementalpop.vulnerabean"
+    },
+    {
+     "name": "Imperil Peach",
+     "kind": "major",
+     "desc": "Zombies that hit you have a 30% chance to get a random ammo mod.",
+     "effects": {
+      "ep.peach": 0.3
+     },
+     "id": "p.elementalpop.imperilpeach"
+    },
+    {
+     "name": "Pineapple Blast",
+     "kind": "minor",
+     "desc": "Your explosives can set off a random ammo mod too (15%).",
+     "effects": {
+      "ep.pineapple": 1
+     },
+     "id": "p.elementalpop.pineappleblast"
+    },
+    {
+     "name": "Electric Cherry",
+     "kind": "major",
+     "desc": "Starting a reload shocks and stuns zombies around you; the emptier the magazine, the stronger.",
+     "effects": {
+      "ep.cherry": 1
+     },
+     "id": "p.elementalpop.electriccherry"
+    },
+    {
+     "name": "Refresh Mint",
+     "kind": "minor",
+     "desc": "Killing a zombie under an ammo mod effect resets the Elemental Pop cooldown.",
+     "effects": {
+      "ep.mint": 1
+     },
+     "id": "p.elementalpop.refreshmint"
+    },
+    {
+     "name": "Rainbow Pop",
+     "kind": "major",
+     "desc": "Every ammo mod proc has a 15% chance to set off a second, random one.",
+     "effects": {
+      "ep.rainbow": 0.15
+     },
+     "id": "p.elementalpop.rainbowpop"
+    }
+   ]
+  },
+  {
+   "id": "specialty_meleemacchiato",
+   "name": "Melee Macchiato",
+   "kind": "perk",
+   "color": "#8b5a2b",
+   "augments": [
+    {
+     "name": "Stick 'n Move",
+     "kind": "minor",
+     "desc": "Move 25% faster for 2 s after a melee hit.",
+     "effects": {
+      "mm.stick": 0.25
+     },
+     "id": "p.meleemacchiato.sticknmove"
+    },
+    {
+     "name": "Expresso",
+     "kind": "major",
+     "desc": "Melee attacks recover 25% faster.",
+     "effects": {
+      "mm.expresso": 0.25
+     },
+     "id": "p.meleemacchiato.expresso"
+    },
+    {
+     "name": "Strength Training",
+     "kind": "minor",
+     "desc": "The punch one-shots zombies for 10 more rounds (through round 30).",
+     "effects": {
+      "mm.strength": 10
+     },
+     "id": "p.meleemacchiato.strengthtraining"
+    },
+    {
+     "name": "Vampiric Extraction",
+     "kind": "major",
+     "desc": "Melee hits heal 8.",
+     "effects": {
+      "mm.vampire": 8
+     },
+     "id": "p.meleemacchiato.vampiricextraction"
+    },
+    {
+     "name": "Mugging",
+     "kind": "minor",
+     "desc": "Melee kills reload 25% of a magazine from your reserve.",
+     "effects": {
+      "mm.mugging": 0.25
+     },
+     "id": "p.meleemacchiato.mugging"
+    },
+    {
+     "name": "Triple Shot",
+     "kind": "major",
+     "desc": "The punch also hits up to two more zombies in front of you.",
+     "effects": {
+      "mm.triple": 1
+     },
+     "id": "p.meleemacchiato.tripleshot"
+    },
+    {
+     "name": "Barista Brawl",
+     "kind": "minor",
+     "desc": "Melee kills give 30 more points.",
+     "effects": {
+      "mm.barista": 30
+     },
+     "id": "p.meleemacchiato.baristabrawl"
+    },
+    {
+     "name": "Mocha Maul",
+     "kind": "major",
+     "desc": "Melee kills send out a shockwave: zombies within 130 take heavy damage and are thrown back.",
+     "effects": {
+      "mm.maul": 1
+     },
+     "id": "p.meleemacchiato.mochamaul"
+    }
+   ]
+  },
+  {
    "id": "cryo",
    "name": "Cryo Freeze",
    "kind": "ammo",
