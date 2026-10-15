@@ -16,13 +16,13 @@
       "id": "common",
       "name": "Common",
       "color": "#c9c9c9",
-      "weight": 1.3
+      "weight": 0.8
     },
     {
       "id": "uncommon",
       "name": "Uncommon",
       "color": "#5fd068",
-      "weight": 1.2
+      "weight": 0.9
     },
     {
       "id": "rare",
@@ -34,19 +34,19 @@
       "id": "epic",
       "name": "Epic",
       "color": "#b46bff",
-      "weight": 0.85
+      "weight": 1.15
     },
     {
       "id": "legendary",
       "name": "Legendary",
       "color": "#ff9a2e",
-      "weight": 0.7
+      "weight": 1.5
     },
     {
       "id": "wonder",
       "name": "Wonder Weapon",
       "color": "#ff3d6e",
-      "weight": 0.55
+      "weight": 1.4
     }
   ],
   "weapons": [
