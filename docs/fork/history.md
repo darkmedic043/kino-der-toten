@@ -211,3 +211,4 @@
 - 2026-10-15: Melon Pass tiers cost 2,500 XP (was 1,500); research carries on past mastery to the next item, with overflow XP (pass.md, research.md).
 - 2026-10-15: research costs ×4 (50,000 XP to master an item) (research.md).
 - 2026-10-15: The Giant 40.8 → 70.9 FPS (High, GTX 1660 Ti): props batched per material with LODs and per-instance culling, level meshes merged, static matrices frozen, idle trap lights pooled, a three r185 BatchedMesh bug patched; Kino 63 → 70 (performance.md).
+- 2026-10-15: box odds tuned again: Legendary ~11.5%, Wonder ~9.3% (core.md).

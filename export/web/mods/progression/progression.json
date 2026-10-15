@@ -40,13 +40,13 @@
       "id": "legendary",
       "name": "Legendary",
       "color": "#ff9a2e",
-      "weight": 1.5
+      "weight": 1.05
     },
     {
       "id": "wonder",
       "name": "Wonder Weapon",
       "color": "#ff3d6e",
-      "weight": 1.4
+      "weight": 0.85
     }
   ],
   "weapons": [
