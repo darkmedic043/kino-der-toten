@@ -206,3 +206,4 @@
 - 2026-10-14: Phase 7: the Melon Pass (BO6/BO7 pages): Season 1 with 10 pages × 9 rewards + page rewards (100 unique, pass-exclusive), tokens per tier, auto-progress toggle, premium with held rewards, tier skips, double-XP tokens, PASS menu tab; portrait phones no longer overflow (pass.md).
 - 2026-10-14: Melon Pass Season 1 rewards made unique: 10 new pass-exclusive gums and 17 new cosmetics replace the early unlocks, credits and XP tokens (pass.md, gobblegums.md).
 - 2026-10-15: SCP: Secret Laboratory operators (Nine-Tailed Fox + Captain, Chaos Insurgent + Juggernaut; CC BY-SA, PurpleGoop/Northwood) replace the Melon Pass outfit placeholders, with rendered icons in the pass and shop (characters.md, pass.md).
+- 2026-10-15: Gunsmith: locked attachments preview on hover, FIRE RATE and HIP FIRE stat rows, hip spread stacks, Python ACOG shows its scope, stock sights fold under optics on five more BO3 guns (weapon-levels.md).

@@ -304,15 +304,20 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(!out.length)out.push(['neu',a.desc??'']);
     return out.map(([k,t])=>`<span class="${k}">${k==='pro'?'▲ ':k==='con'?'▼ ':''}${esc(t)}</span>`).join('');
   }
-  const STATS=[['DAMAGE',d=>d.damage,300,v=>Math.round(v)],['RANGE',d=>d.range,4000,v=>Math.round(v)],['MAGAZINE',d=>d.clipSize,100,v=>Math.round(v)],
-    ['RELOAD',d=>1/Math.max(.3,d.reloadTime??1),1/.8,(v,d)=>(d.reloadTime??0).toFixed(2)+'s'],['ZOOM',d=>80-(d.adsFov??60),70,(v,d)=>((80-(d.adsFov??60))/30+1).toFixed(1)+'×'],
-    ['HEADSHOT',d=>d.headMultiplier??1,6,v=>'×'+(+v).toFixed(2)]];
+  // Bars fill against `max`, or the larger of the two values when a gun goes past it (snipers: damage 1000, range
+  // 999999), so a change always shows. FIRE RATE (Rapid Fire) and HIP FIRE (grips, stocks, laser, short barrel) were
+  // missing, so those attachments showed no change at all.
+  const STATS=[['DAMAGE',d=>d.damage,300,v=>Math.round(v)],['RANGE',d=>d.range,4000,v=>v>=1e5?'∞':Math.round(v)],['FIRE RATE',d=>60/Math.max(.01,d.fireTime??.1),900,v=>Math.round(v)+' rpm'],
+    ['MAGAZINE',d=>d.clipSize,100,v=>Math.round(v)],
+    ['RELOAD',d=>1/Math.max(.3,d.reloadTime??1),1/.8,(v,d)=>(d.reloadTime??0).toFixed(2)+'s'],['HIP FIRE',d=>.012/Math.max(.001,d.hipSpread??.012),2.5,v=>Math.round(v*100)+'%'],
+    ['ZOOM',d=>80-(d.adsFov??60),70,(v,d)=>((80-(d.adsFov??60))/30+1).toFixed(1)+'×'],['HEADSHOT',d=>d.headMultiplier??1,6,v=>'×'+(+v).toFixed(2)]];
   function renderStats(){
     const cur=equipped(cat,def,id,profile);
     let next=cur;
     if(hover!==null&&slot){const others=cur.filter(a=>cat.attachments.find(x=>x.id===a)?.slot!==slot);next=hover?[...others,hover]:others;}
     const a=previewDef(cat,def,id,cur),b=previewDef(cat,def,id,next);
     $('.stats').innerHTML='<h3>STATS'+(next!==cur?' · PREVIEW':'')+'</h3>'+STATS.map(([label,f,max,fmt])=>{
+      max=Math.max(max,f(a)*1.1,f(b)*1.1);
       const va=Math.max(0,Math.min(1,f(a)/max)),vb=Math.max(0,Math.min(1,f(b)/max)),lo=Math.min(va,vb),hi=Math.max(va,vb),up=vb>va+1e-4,down=vb<va-1e-4;
       return `<div class="stat"><span>${label}</span><span class="tr"><i style="width:${(lo*100).toFixed(1)}%"></i>${up||down?`<u style="left:${(lo*100).toFixed(1)}%;width:${((hi-lo)*100).toFixed(1)}%;background:${up?'#7fd48a':'#e46b5a'}"></u>`:''}</span><b class="${up?'pro':down?'con':''}">${fmt(f(b),b)}</b></div>`;}).join('');
   }
@@ -340,7 +345,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const o=e.target.closest('.opt');
     if(slot==='camo'&&cats){const cid=o&&!o.classList.contains('locked')?o.dataset.camo:undefined;
       applyCamo(gun,cid===undefined?equippedCamo(cats,profile,id,weapons):camoById(cats,cid)??null);return;}
-    const h=o&&!o.classList.contains('locked')?o.dataset.att:null;
+    const h=o?o.dataset.att??null:null;   // locked ones preview too (stats and parts), as in BO; only equipping needs the level
     if(h!==hover){hover=h;
       const cur=equipped(cat,def,id,profile);
       if(hover!==null&&slot){const others=cur.filter(a=>cat.attachments.find(x=>x.id===a)?.slot!==slot);showParts(hover?[...others,hover]:others);}

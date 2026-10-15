@@ -164,6 +164,7 @@
       "name": "ACOG Scope",
       "slot": "optic",
       "tags": [
+        "tag_scope_hunter_scope",
         "tag_scope_colt"
       ],
       "scope": "acog",
@@ -493,9 +494,24 @@
     ],
     "grimhawk_zm": [
       "tag_iron_sight"
+    ],
+    "bo3_smg5_tool": [
+      "tag_ironsight"
+    ],
+    "bo3_93r_dystopic": [
+      "tag_ironsight"
+    ],
+    "bo3_rpd_ornate": [
+      "tag_frontsight_up"
+    ],
+    "bo3_mg4_heaven": [
+      "tag_frontsight_up"
+    ],
+    "bo3_mr23_tesla": [
+      "j_rearsight"
     ]
   },
-  "_ironSightsNote": "Iron sights (front and rear) removed when an optic is fitted, so the front post doesn't show through the sight window. On the M16/Commando the bone is the carry handle with the front post; on the FAMAS it's the handle.",
+  "_ironSightsNote": "Iron sights (front and rear) removed when an optic is fitted, so the front post doesn't show through the sight window. On the M16/Commando the bone is the carry handle with the front post; on the FAMAS it's the handle. 2026-10-15: the BO3 imports whose stock sight is its own bone: SMG5, 93R tag_ironsight; RPD, MG4 tag_frontsight_up; MR23 j_rearsight (the 93R's tag_handle is its fold-down grip). MP7, AA12 and P90 sights are part of the receiver mesh (no bone), so they stay.",
   "levels": 30,
   "padTo": 8,
   "_levelsNote": "levels: every gun with a Gunsmith has this many levels; its attachments are spread over them (first at level 2, last at levels-2) and the levels between are filler (no unlock: progression and prestige). padTo: guns with fewer attachments than this get stat-only generic ones (generic: true, no model) in the barrel / stock / grip / ammo slots, in catalogue order, until they have padTo. curve: XP to the next level = base * level^exponent."

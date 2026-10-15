@@ -135,7 +135,7 @@ function applyStats(obj,list,cat,show){
     if(s.reloadMul){if(obj.reloadTime)obj.reloadTime=+(obj.reloadTime*s.reloadMul).toFixed(2);if(obj.reloadEmptyTime)obj.reloadEmptyTime=+(obj.reloadEmptyTime*s.reloadMul).toFixed(2);}
     if(s.adsFov)obj.adsFov=s.adsFov;else if(s.adsFovMul&&obj.adsFov)obj.adsFov=Math.round(obj.adsFov*s.adsFovMul);
     if(s.headMul&&obj.headMultiplier)obj.headMultiplier=+(obj.headMultiplier*s.headMul).toFixed(2);
-    if(s.hipSpreadMul)obj.hipSpread=+(.012*s.hipSpreadMul).toFixed(4);
+    if(s.hipSpreadMul)obj.hipSpread=+((obj.hipSpread??.012)*s.hipSpreadMul).toFixed(4);   // stacks (grip + stock); .012 is the engine's default
     if(s.suppressed)obj.suppressed=true;
     if(s.fireMul&&obj.fireTime)obj.fireTime=+(obj.fireTime/s.fireMul).toFixed(4);
     if(a.scope)obj.scope=a.scope;
