@@ -101,7 +101,8 @@ export default function setup(api) {
     return { unlocked: !!r.stark, power: !!session.power, phase, cores, coresNeeded: CORES, uplinkLeft: Math.ceil(uplinkLeft), uplink: UPLINK, points: session.points,
       wins: r.ccWins ?? 0, winsNeeded: WINS_FOR_MK16, delivering: !!delivery,
       req: { stark: !!r.stark, stark_wm: !!r.stark_wm, stark_mk16: !!r.stark_mk16 },
-      suits: suits.map(s => ({ id: s.id, name: s.name, cost: s.cost, hp: s.hp, speed: s.speed, weapons: s.weapons.map(w => data.weapons[w]?.name ?? w),
+      // by Mark number (I, III, IV, V, VI, XVI), War Machine last: SUITS lists them in unlock order, which read as random
+      suits: [...suits].sort((a, b) => (+a.id.slice(2) || 99) - (+b.id.slice(2) || 99)).map(s => ({ id: s.id, name: s.name, cost: s.cost, hp: s.hp, speed: s.speed, weapons: s.weapons.map(w => data.weapons[w]?.name ?? w),
         unlocked: !!r[need(s.id)], owned: s.owned, worn: worn === s, power: Math.floor(s.power), ready: s.power > READY })) };
   }
   function act(action, id) {

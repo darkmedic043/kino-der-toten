@@ -101,6 +101,7 @@ const CSS = `
 #melonterm .perks{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
 #melonterm .left{display:flex;flex-direction:column;min-height:0;border-right:2px dashed var(--line)}
 #melonterm .grid{flex:1;align-content:start;display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;padding:14px;overflow:auto}
+#melonterm :is([data-win=perks],[data-win=arsenal],[data-win=stark]) .grid{grid-template-columns:repeat(4,minmax(0,1fr))}   /* 4 a row: perks, ammo mods, suits (user, 2026-10-15) */
 #melonterm .msg{padding:6px 16px;border-top:2px solid var(--line);font-size:20px;min-height:36px;background:#04180c}
 #melonterm .msg.bad{color:var(--bad);text-shadow:0 0 6px #ff3a2288}
 #melonterm .msg.ok{color:#b6ffcb}
