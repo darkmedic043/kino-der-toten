@@ -27,6 +27,14 @@
         "note": "start area, the lower courtyard: the plain concrete wall under the mainframe platform's railing (compact: the railing is above); clearDebris false: the uneven snow floor counts as debris and got holes cut in it",
         "clearDebris": false
       }
-    ]
+    ],
+  "sandbox": [
+   {
+    "position": [-20, 0, 197],
+    "yaw": -90,
+    "model": "terminal_booth_compact.glb",
+    "note": "spawn room (lobby): the dividing wall's south half, facing the player spawn (the box and the trap switch are on its north half); map units are metres x 39.37"
+   }
+  ]
   }
 }
