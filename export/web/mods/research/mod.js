@@ -46,7 +46,8 @@ export default async function setup(api){
     clearTimeout(saveT);
     if(done){saveResearch(R);
       api.announce?.(done.name,done.mastery?`${done.itemName.toUpperCase()} MASTERED · SECOND MINOR SLOT`:`${done.kind.toUpperCase()} AUGMENT RESEARCHED · ${done.itemName.toUpperCase()}`,3);
-      api.toast?.(done.mastery?'Equip a second Minor augment in Armory → Research':'Equip it in Armory → Research · the next one on the track has started',4);}
+      const nx=done.next?cfg.items.flatMap(i=>i.augments.map(x=>({...x,itemName:i.name}))).find(x=>x.id===done.next.id):null;
+      api.toast?.((done.mastery?'Second Minor slot unlocked':'Equip it in Armory → Research')+(nx?` · now researching ${nx.name}${done.mastery?' ('+nx.itemName+')':''}`:' · everything researched'),4);}
     else saveT=setTimeout(()=>saveResearch(R),1500);
   }
   addEventListener('beforeunload',()=>{clearTimeout(saveT);saveResearch(R);});

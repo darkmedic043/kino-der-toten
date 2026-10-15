@@ -27,7 +27,8 @@ export function ensureSeason(season,p){
 export const seasonEnd=season=>new Date(season.end+'T23:59:59');
 export const allItems=season=>season.pages.flatMap((pg,pi)=>pg.items.map(it=>({...it,page:pi})));
 export const tiersEarned=(season,p)=>Math.min(allItems(season).length,Math.floor(p.xp/season.tierXp));
-export const tokens=(season,p)=>tiersEarned(season,p)+p.bought-season.pages.reduce((a,pg)=>a+pg.items.filter(it=>p.unlocked[it.id]).length,0);
+// never below 0: tierXp rose (1,500 -> 2,500), so a save could have unlocked more than it now earns; it earns back first
+export const tokens=(season,p)=>Math.max(0,tiersEarned(season,p)+p.bought-season.pages.reduce((a,pg)=>a+pg.items.filter(it=>p.unlocked[it.id]).length,0));
 export const pageDone=(season,p,pi)=>season.pages[pi].items.every(it=>p.unlocked[it.id]);
 export const pageOpen=(season,p,pi)=>pi===0||pageDone(season,p,pi-1);
 const itemOf=(season,id)=>{for(const [pi,pg] of season.pages.entries()){const it=pg.items.find(x=>x.id===id);if(it)return {...it,page:pi};if(pg.major.id===id)return {...pg.major,page:pi,major:true};}return null;};

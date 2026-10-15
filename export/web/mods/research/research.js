@@ -37,10 +37,14 @@ export function grantResearchXp(cfg,r,amount,isActive){
   const id=r.active;if(!id||amount<=0)return null;const a=augById(cfg)[id];if(!a){r.active=null;return null;}
   r.progress[id]=(r.progress[id]??0)+amount*(isActive?.(a.item)?cfg.activeMul??1:1);
   if(r.progress[id]<costOf(cfg,a))return null;
-  delete r.progress[id];if(!r.done.includes(id))r.done.push(id);
-  // carry on down the same track automatically, as BO7 does
-  r.active=nextOnTrack(cfg,r,a.item)?.id??null;
-  return {...a,mastery:!r.active};
+  const over=r.progress[id]-costOf(cfg,a);delete r.progress[id];if(!r.done.includes(id))r.done.push(id);
+  // carry on down the same track automatically, as BO7 does; a mastered track moves on to the next item that isn't
+  // (same kind first: perk or ammo mod), so research never stalls mid-match. The XP past the cost carries over.
+  const next=nextOnTrack(cfg,r,a.item),item=cfg.items.find(i=>i.id===a.item);
+  const order=[...cfg.items.filter(i=>i.kind===item?.kind),...cfg.items.filter(i=>i.kind!==item?.kind)];
+  const after=next??order.map(i=>nextOnTrack(cfg,r,i.id)).find(Boolean)??null;
+  r.active=after?.id??null;if(after&&over>0)r.progress[after.id]=(r.progress[after.id]??0)+over;
+  return {...a,mastery:!next,next:after};
 }
 // Equip / unequip a researched augment. A Minor goes in the first free Minor slot (the second only once mastered);
 // clicking an equipped one takes it out.
