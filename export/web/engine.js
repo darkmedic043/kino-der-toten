@@ -75,7 +75,20 @@ const touchControls=createZombieTouch({
   onPause:()=>{setActive(false);document.exitPointerLock?.();},
 });
 addEventListener('error',e=>errors.push(e.message));addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
-function progress(text,percent){$('load-label').textContent=text;$('load-progress').style.width=percent+'%';}
+function progress(text,percent){$('load-label').textContent=text;$('load-progress').style.width=percent+'%';diag('stage',{stage:text});}
+// Load diagnostics (2026-10-15, a black Rind window while loading on the user's Windows PC): stages, a 2 s heartbeat until
+// 20 s after ready, WebGL context loss and errors go to /api/client-log (kino-server writes client-log.jsonl), so the
+// last line before a crash says where it died.
+const diagT0=performance.now();let diagSent=0,diagGpu='';
+function diag(ev,extra={}){
+  if(diagSent++>120)return;
+  try{if(!diagGpu){const gl=renderer.getContext(),d=gl.getExtension('WEBGL_debug_renderer_info');diagGpu=d?gl.getParameter(d.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);}}catch{}
+  try{navigator.sendBeacon('/api/client-log',JSON.stringify({ev,page:location.pathname+location.search,t:+((performance.now()-diagT0)/1000).toFixed(1),gpu:diagGpu,ua:navigator.userAgent,
+    heap:performance.memory?Math.round(performance.memory.usedJSHeapSize/1e6):null,frames:renderedFrames,calls:renderer.info?.render?.calls,ready,...extra}));}catch{}
+}
+{const beat=setInterval(()=>{diag('beat',{label:$('load-label')?.textContent});if(ready&&performance.now()-diagT0>0&&(diag.readyAt??=performance.now())&&performance.now()-diag.readyAt>20000)clearInterval(beat);},2000);}
+addEventListener('error',e=>diag('error',{message:String(e.message).slice(0,300),src:e.filename?.split('/').pop(),line:e.lineno}));
+addEventListener('unhandledrejection',e=>diag('rejection',{message:String(e.reason?.message??e.reason).slice(0,300)}));
 function toast(text,duration=2.5){$('toast').textContent=text;toastUntil=(session?.time??0)+duration;}
 function announce(title,small=(map?.announceTitle??entry?.title??'Zombies').toUpperCase(),duration=4){$('announcement-title').textContent=title;$('announcement-small').textContent=small;$('announcement').style.opacity=1;announcementUntil=session.time+duration;}
 function setActive(value){
@@ -94,8 +107,8 @@ function suspendRendering(){renderer.setAnimationLoop(null);if(ready){setActive(
 function resumeRendering(){previous=performance.now();lastRendered=0;if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendRendering();else resumeRendering();});
 addEventListener('pagehide',suspendRendering);addEventListener('pageshow',resumeRendering);
-renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;suspendRendering();$('start').disabled=true;$('menu-status').textContent='Graphics paused. Waiting for the browser to restore the game…';});
-renderer.domElement.addEventListener('webglcontextrestored',()=>{contextLost=false;$('start').disabled=!ready;$('menu-status').textContent='Graphics restored · click to resume';resumeRendering();});
+renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();diag('contextlost');contextLost=true;suspendRendering();$('start').disabled=true;$('menu-status').textContent='Graphics paused. Waiting for the browser to restore the game…';});
+renderer.domElement.addEventListener('webglcontextrestored',()=>{diag('contextrestored');contextLost=false;$('start').disabled=!ready;$('menu-status').textContent='Graphics restored · click to resume';resumeRendering();});
 addEventListener('blur',()=>{keys.clear();primary=false;ads=false;if(started&&active){setActive(false);document.exitPointerLock?.();}});
 addEventListener('mousemove',e=>{if(!active||document.pointerLockElement!==renderer.domElement)return;const sensitivity=(ads?.0012*settings.adsSensitivity:.002)*settings.sensitivity;camera.rotation.y-=e.movementX*sensitivity;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-e.movementY*sensitivity*(settings.invertY?-1:1),-1.5,1.5);});
 addEventListener('mousedown',e=>{if(!active||e.sourceCapabilities?.firesTouchEvents||e.target.closest?.('#touch-controls'))return;if(e.button===0){mousePrimary=primary=true;primaryPressed=true;}if(e.button===2)mouseAim=ads=true;});

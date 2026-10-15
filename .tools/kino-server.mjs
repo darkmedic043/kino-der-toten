@@ -8,7 +8,7 @@
 //   DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET  from the Discord developer portal;
 //                     sign-in is disabled without them (keep the secret out of git)
 //   KINO_PUBLIC_URL   public https address, used for the OAuth redirect
-import { createReadStream, statSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
+import { createReadStream, statSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, appendFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
 import { extname, join, resolve, sep } from 'node:path';
@@ -126,6 +126,15 @@ async function api(req, res, url) {
       writeJson(file, { ...doc, account: { name: s.name, id: s.sub }, savedAt: Date.now() });
       return send(res, 200, { ok: true });
     }
+  }
+  // Load diagnostics from game pages (engine.js diag): stages, a heartbeat, WebGL context loss, errors, GPU name. One JSON
+  // line each in KINO_DATA/client-log.jsonl (rotated past 5 MB). Added 2026-10-15 for a black window while loading in Rind.
+  if (url === '/api/client-log' && req.method === 'POST') {
+    let doc; try { doc = await body(req); } catch { return send(res, 400, { error: 'bad body' }); }
+    const s = session(req), file = join(DATA, 'client-log.jsonl');
+    try { if (existsSync(file) && statSync(file).size > 5e6) renameSync(file, file + '.1'); } catch {}
+    appendFileSync(file, JSON.stringify({ at: new Date().toISOString(), who: s?.name ?? null, ...doc }).slice(0, 4000) + '\n');
+    return send(res, 204, null);
   }
   if (url.startsWith('/api/social')) return socialApi(req, res, url);
   // the Rind launcher's install list for Melon Zombies (only redistributable files: see install-manifest.mjs)
