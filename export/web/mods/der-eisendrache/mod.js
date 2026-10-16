@@ -43,12 +43,14 @@ export default function setup(api) {
       const ref = new Map(); for (const r of [refB, refH]) r?.traverse(o => { if (o.isBone && !ref.has(o.name)) ref.set(o.name, o.quaternion.clone()); });
       const ok = bodies.filter(Boolean), okH = heads.filter(Boolean);
       if (!ok.length || !okH.length || !ref.size) return;
+      // the body's j_spine4 bind matrix before re-binding: the heads are modelled in that joint's own space
+      const j4 = new Map(ok.map(m => { m.updateMatrixWorld(true); return [m, m.getObjectByName('j_spine4').matrixWorld.clone()]; }));
       for (const m of ok) rebindTo(m, ref);
       // the heads' root joint (j_spine4) takes the re-bound body's world orientation there, so the head lines up when
       // enemies.js mounts it on the body's j_spine4 (same local rotation alone left them turned ~90°, user)
       ok[0].updateMatrixWorld(true);
       const rootWorld = new Map([['j_spine4', ok[0].getObjectByName('j_spine4').getWorldQuaternion(new THREE.Quaternion())]]);
-      for (const m of okH) rebindTo(m, ref, rootWorld);
+      // (heads aren't re-bound: they take the body's bind matrices below)
       // each head's meshes bound to its body's own bones (a separate head rig mounted on j_spine4 drifted off the neck
       // under animation, user): one template per body x head; the head's face joints follow the body's j_head
       const combos = [];
@@ -56,10 +58,18 @@ export default function setup(api) {
         for (const head of okH) {
           const t = cloneSkinned(body); t.userData.gibSet = 'castle' + (i + 1);
           const bones = new Map(); t.traverse(o => { if (o.isBone && !bones.has(o.name)) bones.set(o.name, o); });
-          const h = cloneSkinned(head), meshes = []; h.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
+          // the body's own inverse bind matrices for each bone (heads and bodies share BO3's bind space, so the head's
+          // vertices sit right with them; the head rig's own re-bound frames left the face turned backwards, user)
+          let bodySkin = null; const inv = new Map();
+          t.traverse(o => { if (!o.isSkinnedMesh) return; bodySkin ??= o; o.skeleton.bones.forEach((b, k) => { if (!inv.has(b)) inv.set(b, o.skeleton.boneInverses[k]); }); });
+          const h = cloneSkinned(head), meshes = []; h.updateMatrixWorld(true); h.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
+          // head space (its j_spine4 at the origin) -> the body's bind space: body j4 x inverse(head j4)
+          const toBody = j4.get(body).clone().multiply(h.getObjectByName('j_spine4').matrixWorld.clone().invert());
           for (const m of meshes) {
+            m.geometry = m.geometry.clone().applyMatrix4(toBody.clone().multiply(m.matrixWorld));
+            m.position.set(0, 0, 0); m.quaternion.identity(); m.scale.set(1, 1, 1);
             const mapped = m.skeleton.bones.map(b => bones.get(b.name) ?? bones.get('j_head'));
-            m.bind(new THREE.Skeleton(mapped, m.skeleton.boneInverses.map(x => x.clone())), m.bindMatrix);
+            m.bind(new THREE.Skeleton(mapped, mapped.map(b => (inv.get(b) ?? new THREE.Matrix4().copy(b.matrixWorld).invert()).clone())), bodySkin.bindMatrix);
             m.userData.headMesh = true; m.removeFromParent(); t.add(m);   // dismemberment: kept when the body splits, hidden when beheaded
           }
           combos.push(t);
@@ -220,39 +230,50 @@ function setupGondola(api) {
     return out;
   }).filter(Boolean);
   reset();   // back to the starting poses
-  carBox = () => { const c = carCol.find(c => c.ref.name.startsWith('CASTLE_TRAM02')) ?? carCol[1]; return c ? c.m.box.clone().expandByScalar(12) : null; /* the docked pose (the collider was built there) */ };
   const v = new THREE.Vector3();
   host.on('update', () => { for (const c of carCol) c.m.move(c.ref.getWorldPosition(v).sub(c.base)); });
-  // the car's own panels are single-sided (from inside the collision pushed you out through them): its meshes only give
-  // the docked box; solid boxes do the work while docked: the floor, both ends and the sides except the door gaps
-  for (const c of carCol) c.m.disabled = true;
-  // BO3's tram_clip: the gate models are low; an invisible wall closes each gate gap while the car is away, and while
-  // it's docked a slab bridges the car and the platform (there were gaps to fall through into the shaft)
+  // Each station (car 2's on the left, car 1's on the right) as zm_castle_tram.gsc: its gates slide to their open structs
+  // while its car is docked (1.5 s; 0.5 s back). BO3's tram_clip: the gate models are low, so an invisible wall closes
+  // each gate gap while the car is away; docked, a slab bridges car and platform and solid boxes stand in for the car
+  // (its own panels are single-sided: from inside the collision pushed you out through them): floor, both ends, both
+  // sides open only at the doors. A gate side with no floor beyond it keeps its wall. Car 1 is docked for the first 12 s.
   const box = (min, max) => { const b = new THREE.Box3(min, max), size = b.getSize(new THREE.Vector3()), geo = new THREE.BoxGeometry(size.x, size.y, size.z); geo.translate(...b.getCenter(new THREE.Vector3()).toArray()); const d = { collider: new CollisionWorld(geo), box: b, enabled: false, window: true }; world.dynamic.push(d); return d; };
-  const pairs = []; for (const g of gates) { const pr = pairs.find(p => p[0].shut.distanceTo(g.shut) < 140); if (pr) pr.push(g); else pairs.push([g]); }
-  const floorY = Math.min(...gates.map(g => g.shut.y));
-  const walls = pairs.map(pr => { const a = pr[0].shut, b = (pr[1] ?? pr[0]).shut, lo = a.clone().min(b), hi = a.clone().max(b); lo.x -= 12; lo.z -= 12; hi.x += 12; hi.z += 12; lo.y = floorY; hi.y = floorY + 110; return box(lo, hi); });
-  const span = new THREE.Box3(); for (const g of gates) span.expandByPoint(g.shut);
-  const slab = gates.length ? box(new THREE.Vector3(span.min.x - 10, floorY - 16, span.min.z - 30), new THREE.Vector3(span.max.x + 10, floorY - 6.5, span.max.z + 30)) : null;
-  // a gate side with no floor beyond it (BO3 walks you onto a clip floor the dump doesn't have) keeps its wall even docked
-  const carC = inside ?? span.getCenter(new THREE.Vector3());
-  for (const [i, pr] of pairs.entries()) {
-    const mid = pr[0].shut.clone().add((pr[1] ?? pr[0]).shut).multiplyScalar(.5), out = mid.clone().sub(carC).setY(0).normalize();
-    const probe = mid.clone().addScaledVector(out, 60); probe.y = floorY + 20;
-    walls[i].noFloor = !world.raycast(new THREE.Ray(probe, new THREE.Vector3(0, -1, 0)), 0, 80);
-  }
-  const cb = carBox?.(), carBoxes = [];
-  if (cb && gates.length) {
-    cb.expandByScalar(-12);   // carBox adds 12
-    const T = 8, H = 110, top = floorY - 6.5, door = [span.min.z - 4, span.max.z + 4];
-    carBoxes.push(box(new THREE.Vector3(cb.min.x, top - 12, cb.min.z), new THREE.Vector3(cb.max.x, top, cb.max.z)));   // floor
-    for (const z of [cb.min.z, cb.max.z]) carBoxes.push(box(new THREE.Vector3(cb.min.x, top, z - T / 2), new THREE.Vector3(cb.max.x, top + H, z + T / 2)));   // ends
-    for (const x of [cb.min.x, cb.max.x]) {   // sides, open at the door
-      carBoxes.push(box(new THREE.Vector3(x - T / 2, top, cb.min.z), new THREE.Vector3(x + T / 2, top + H, door[0])));
-      carBoxes.push(box(new THREE.Vector3(x - T / 2, top, door[1]), new THREE.Vector3(x + T / 2, top + H, cb.max.z)));
+  for (const c of carCol) c.m.disabled = true;
+  const pGates = []; root.traverse(o => { if (/^CASTLE_PTRAMGATE(_\d+)?$/.test(o.name) && o.userData.open) pGates.push({ o, shut: o.getWorldPosition(new THREE.Vector3()), open: new THREE.Vector3(...o.userData.open) }); });
+  for (const g of pGates) { const meshes = []; g.o.updateMatrixWorld(true); g.o.traverse(c => { if (c.isMesh) meshes.push(c); }); g.col = world.addScriptedMover?.(meshes, { exact: true }); }
+  const carOf = name => carCol.find(c => c.ref.name.startsWith(name));
+  function station(gs, car, docked, gateK) {
+    if (!gs.length || !car) return () => {};
+    const pairs = []; for (const g of gs) { const pr = pairs.find(p => p[0].shut.distanceTo(g.shut) < 140); if (pr) pr.push(g); else pairs.push([g]); }
+    const floorY = Math.min(...gs.map(g => g.shut.y)), cb = car.m.box.clone(), carC = cb.getCenter(new THREE.Vector3());
+    const walls = pairs.map(pr => { const a = pr[0].shut, b = (pr[1] ?? pr[0]).shut, lo = a.clone().min(b), hi = a.clone().max(b); lo.x -= 12; lo.z -= 12; hi.x += 12; hi.z += 12; lo.y = floorY; hi.y = floorY + 110; return box(lo, hi); });
+    for (const [i, pr] of pairs.entries()) {
+      const mid = pr[0].shut.clone().add((pr[1] ?? pr[0]).shut).multiplyScalar(.5), out = mid.clone().sub(carC).setY(0).normalize();
+      const probe = mid.clone().addScaledVector(out, 60); probe.y = floorY + 20;
+      walls[i].noFloor = !world.raycast(new THREE.Ray(probe, new THREE.Vector3(0, -1, 0)), 0, 80);
     }
+    const span = new THREE.Box3(); for (const g of gs) span.expandByPoint(g.shut);
+    const T = 8, H = 110, top = floorY - 6.5, door = [span.min.z - 4, span.max.z + 4], boxes = [];
+    boxes.push(box(new THREE.Vector3(span.min.x - 10, floorY - 16, span.min.z - 30), new THREE.Vector3(span.max.x + 10, top, span.max.z + 30)));   // slab
+    boxes.push(box(new THREE.Vector3(cb.min.x, top - 12, cb.min.z), new THREE.Vector3(cb.max.x, top, cb.max.z)));   // floor
+    for (const z of [cb.min.z, cb.max.z]) boxes.push(box(new THREE.Vector3(cb.min.x, top, z - T / 2), new THREE.Vector3(cb.max.x, top + H, z + T / 2)));
+    for (const x of [cb.min.x, cb.max.x]) {
+      boxes.push(box(new THREE.Vector3(x - T / 2, top, cb.min.z), new THREE.Vector3(x + T / 2, top + H, door[0])));
+      boxes.push(box(new THREE.Vector3(x - T / 2, top, door[1]), new THREE.Vector3(x + T / 2, top + H, cb.max.z)));
+    }
+    return () => { const d = docked(), k = gateK(); for (const w of walls) w.enabled = w.noFloor || !d || k < .5; for (const b of boxes) b.enabled = d; };
   }
-  host.on('update', () => { const docked = st.phase === 'docked'; for (const w of walls) w.enabled = w.noFloor || !docked || st.gate < .5; if (slab) slab.enabled = docked; for (const b of carBoxes) b.enabled = docked; });
+  let pK = 1, lastT = performance.now();
+  const car1Docked = () => st.phase === 'intro' && (!st.started || session.time - st.t0 < 12);
+  const upd = [station(gates, carOf('CASTLE_TRAM02') ?? carCol[1], () => st.phase === 'docked', () => st.gate), station(pGates, carOf('CASTLE_TRAM01') ?? carCol[0], car1Docked, () => pK)];
+  host.on('update', () => {
+    const now = performance.now(), dt = Math.min(.1, (now - lastT) / 1000); lastT = now;
+    const want = car1Docked() ? 1 : 0; pK = want > pK ? Math.min(1, pK + dt / 1.5) : Math.max(0, pK - dt / .5);
+    for (const g of pGates) { const p = g.shut.clone().lerp(g.open, pK); moveNode(g.o, p); g.col?.move(p.sub(g.shut)); }
+    for (const u of upd) u();
+  });
+  host.on('reset', () => { pK = 1; });
+  carBox = () => { const c = carOf('CASTLE_TRAM02') ?? carCol[1]; return c ? c.m.box.clone().expandByScalar(12) : null; };
   return { state: () => ({ ...st, item: !!st.item }), giveFuse: () => { st.held = true; } };
 }
 

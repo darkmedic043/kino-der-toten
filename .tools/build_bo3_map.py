@@ -806,7 +806,9 @@ if BSP == 'zm_castle':
     for e in by_tn.get('tram_gates', []):   # the station gates slide to their target struct while car 2 is docked
         t = one(e.get('target'))
         place_model('CASTLE_TRAMGATE', e['model'], e['origin'], e.get('angles'), {'open': g(vec(t['origin'])).tolist() if t else None})
-    for e in by_tn.get('player_tram_gates', []): place_model('CASTLE_PTRAMGATE', e['model'], e['origin'], e.get('angles'))
+    for e in by_tn.get('player_tram_gates', []):   # car 1's station (right side): open while car 1 is docked
+        t = one(e.get('target'))
+        place_model('CASTLE_PTRAMGATE', e['model'], e['origin'], e.get('angles'), {'open': g(vec(t['origin'])).tolist() if t else None})
     lv = one('tram_call_lever_2')
     if lv: place_model('CASTLE_TRAMLEVER', lv['model'], lv['origin'], lv.get('angles'))
     for tn, nm in (('tram_object_spawn_pos', 'CASTLE_TRAMDROP'), ('tram_token_spawn_pos', 'CASTLE_TRAMTOKEN'), ('docked_tram_car_interior', 'CASTLE_TRAMINSIDE')):
