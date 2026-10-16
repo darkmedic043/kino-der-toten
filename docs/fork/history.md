@@ -230,3 +230,4 @@
 - 2026-10-16: Der Eisendrache playtest fixes: blend ground solid (navmesh holes -> ground spawns), structural prop collision, walk-in spawns, daylight + lamp pool (waw-ports.md).
 - 2026-10-16: Der Eisendrache teleporter to the rocket pad, Pack-a-Punch quest (world.movePap), dog round timing (waw-ports.md).
 - 2026-10-16: black textures from shared images fixed (texture-memory re-uploads, main renderer only); SCP operators yaw 0 (were twisted); viewmodel light scaled by exposure off Kino; Der Eisendrache player-only collision, glass, own zombies, no T-posed corpses.
+- 2026-10-16 (night): Der Eisendrache polish: no stuck spots (player-only collision narrowed), gondola floors collide, sky dome, micro detail textures tinted, lamp pool 6; own zombies off until real models (waw-ports.md).
