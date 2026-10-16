@@ -227,3 +227,4 @@
 - 2026-10-16: Der Eisendrache (BO3) port started: dumped from the running game, Greyhound exports, builder per-map config, zone logic mod; WIP (waw-ports.md).
 - 2026-10-16: Der Eisendrache playable as a WIP: texture-array prop batching (22 -> 42-94 FPS), empty batches hidden, materials shared, measured debris stand-ins (waw-ports.md, performance.md).
 - 2026-10-16: Der Eisendrache gondola (fuse -> car docks with a power-up) and landing pads (500-point flights along BO3's paths); custom-map prePlayer hook (waw-ports.md).
+- 2026-10-16: Der Eisendrache playtest fixes: blend ground solid (navmesh holes -> ground spawns), structural prop collision, walk-in spawns, daylight + lamp pool (waw-ports.md).

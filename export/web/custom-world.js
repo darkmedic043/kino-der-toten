@@ -152,7 +152,8 @@ export class CustomWorld {
     this.spawn=spawn?{position:spawn.position.clone(),yaw:spawn.yaw}:{position:new THREE.Vector3(bounds.getCenter(new THREE.Vector3()).x,bounds.max.y+10,bounds.getCenter(new THREE.Vector3()).z),yaw:0};
 
     const zoneOf=m=>String(m.extras.zone??m.arg.split('_')[0]??'').toLowerCase()||'start';
-    const zspawns=markers.filter(m=>m.type==='ZSPAWN'),paired=new Set();
+    // ZSPAWN extras.walk (Der Eisendrache's BO3 spawn_location points): never paired with a window; zombies walk out of it
+    const zspawns=markers.filter(m=>m.type==='ZSPAWN'),paired=new Set(zspawns.filter(z=>z.extras.walk));
     for(const [i,m] of markers.filter(m=>m.type==='WINDOW').entries()){
       const near=zspawns.filter(z=>!paired.has(z)).sort((a,b)=>a.position.distanceTo(m.position)-b.position.distanceTo(m.position))[0];
       if(!near||near.position.distanceTo(m.position)>400){this.warn(`${rawName(m.object)} has no ZSPAWN within 400 units; skipped`);continue;}
@@ -167,10 +168,10 @@ export class CustomWorld {
       this.dynamic.push({collider:new CollisionWorld(clip),box:new THREE.Box3().setFromBufferAttribute(clip.attributes.position),enabled:true,window:true});
       this.barriers.push({id:'window_'+i,position:m.position.clone(),outside,inside,group:zoneOf(m),boards,count:6,repairTime:0,rewardRound:0,reward:0});
     }
-    for(const [i,m] of zspawns.filter(z=>!paired.has(z)).entries()){
-      const inside=this.closest(m.position,{x:120,y:200,z:120});
-      if(!inside){this.warn(`${rawName(m.object)} is not near walkable ground; skipped`);continue;}
-      this.barriers.push({id:'spawn_'+i,position:inside.clone(),outside:m.position.clone(),inside,group:zoneOf(m),boards:[],count:0,repairTime:0,rewardRound:0,reward:0});
+    for(const [i,m] of zspawns.filter(z=>!paired.has(z)||z.extras.walk).entries()){
+      const walk=!!m.extras.walk,inside=this.closest(m.position,walk?{x:48,y:80,z:48}:{x:120,y:200,z:120});
+      if(!inside){if(!walk)this.warn(`${rawName(m.object)} is not near walkable ground; skipped`);continue;}
+      this.barriers.push({id:'spawn_'+i,position:inside.clone(),outside:walk?inside.clone():m.position.clone(),inside,group:zoneOf(m),boards:[],count:0,repairTime:0,rewardRound:0,reward:0,walk});
     }
     if(!this.barriers.length)throw new Error('The map has no zombie spawns (ZSPAWN markers)');
 

@@ -27,6 +27,7 @@ export default function setup(api) {
     for (const x of s.flags) if (x.startsWith('zone:')) zones.add(x.slice(5));
     return zones;
   };
+  setupLook(api);
   const gondola = setupGondola(api), pads = setupPads(api);
   window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads };
 }
@@ -213,4 +214,32 @@ function setupPads(api) {
   host.on('reset', () => { flight = null; if (api.features) api.features.flight = false; for (const p of pads) p.readyAt = 0; show(); });
   show();
   return { pads: () => pads.map(p => ({ flag: p.flag, active: active(p), length: Math.round(p.length), ready: session.time >= p.readyAt })), flying: () => !!flight };
+}
+
+// ---- Look: a bright overcast Alpine day (the engine's default lights are retuned every frame, as for The Giant) and a
+// pool of warm point lights on the lit fixtures nearest the camera (CASTLE_LAMP_<n>: candles, torches, sconces, lamp
+// cages... from the static models), so the castle's halls and the undercroft aren't black. More with the power on.
+const POOL = 10, LAMP = { color: 0xffb877, on: 2600, off: 1700, range: 600, decay: 1.4 };
+function setupLook({ scene, world, session, host, camera }) {
+  const kids = scene.children;
+  const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
+  const [key, fill] = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
+  const lamps = []; world.root?.traverse(o => { if (/^CASTLE_LAMP_/.test(o.name)) lamps.push(o.getWorldPosition(new THREE.Vector3())); });
+  const pool = Array.from({ length: Math.min(POOL, lamps.length) }, () => { const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); scene.add(l); return l; });
+  let last = performance.now(), timer = 0;
+  host.on('update', () => {
+    const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
+    if (ambient) { ambient.color.setHex(0xa4afc0); ambient.intensity = .95; }
+    if (hemi) { hemi.color.setHex(0xe2e9f3); hemi.groundColor.setHex(0x625a50); hemi.intensity = 1.15; }
+    if (key) { key.color.setHex(0xfff2e0); key.intensity = 1.5; key.position.set(.45, 1, .3); }
+    if (fill) { fill.color.setHex(0x8da2c2); fill.intensity = .45; }
+    if ((timer -= dt) <= 0 && pool.length) {
+      timer = .5;
+      const eye = camera.position, near = lamps.map(p => ({ p, d: p.distanceToSquared(eye) })).sort((a, b) => a.d - b.d).slice(0, pool.length);
+      const free = pool.filter(l => !near.some(n => n.p.equals(l.position)));
+      for (const n of near) if (!pool.some(l => l.position.equals(n.p))) { const l = free.shift(); if (l) { l.position.copy(n.p); l.intensity = 0; } }
+    }
+    const want = session.power ? LAMP.on : LAMP.off;
+    for (const l of pool) l.intensity += (want - l.intensity) * Math.min(1, dt * 2.5);
+  });
 }

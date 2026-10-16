@@ -38,7 +38,7 @@ export class Enemies {
     rig.play('walk');rig.update(.01);
     // A spawn point without boards (custom maps): climb out of the ground (BO1's riser clips, mods/zombie-rise) instead
     // of appearing in place. Fast zombies use the quicker clip; both play sped up to about 3 s.
-    const riseHere=kind==='zombie'&&barrier&&!barrier.boards?.length&&this.riseClip(speed);
+    const riseHere=kind==='zombie'&&barrier&&!barrier.boards?.length&&!barrier.walk&&this.riseClip(speed);   // walk: a walk-in spawn point (Der Eisendrache)
     root.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});
     const z={id,kind,root,rig,speed,health:kind==='dog'?([400,900,1300,1600][Math.min(3,Math.max(0,this.session.dogRounds-1))]):zombieHealth(round,this.data.rules),state:barrier?'barricade':'chase',barrier,path:[],pathIndex:0,repath:0,attackLeft:0,attackDealt:false,tearLeft:1.1,stuck:0,lastPosition:root.position.clone(),growl:3+id%7};
     if(kind==='nova')z.health=Math.trunc(z.health*.75);

@@ -35,6 +35,9 @@ def g(v): return (C @ np.asarray(v, dtype=np.float64).T).T
 COLOR, NORMAL = 'a0ab1041', '59d30d0f'
 SKIP = re.compile(r'sky|caulk|clip|portal|nodraw|shadow_?caster|^wc/core_|\$', re.I)              # not drawn (core_*: Radiant placeholder boxes, the grey slab by the stairs)
 NOT_SOLID = re.compile(r'decal|glass|water|foliage|grass|cobweb|web_|fx_|_fx|blend|vista|light_?ray|godray|smoke|fog|ivy|leaves|vine|cloth|curtain', re.I)
+if BSP == 'zm_castle':   # Der Eisendrache's snowy ground is often only a _blend surface (two layers mixed by vertex alpha, nothing
+    # under it): without it the navmesh had holes across the courtyard and zombies couldn't cross. Decals stay non-solid.
+    NOT_SOLID = re.compile(r'decal|glass|water|foliage|cobweb|web_|fx_|_fx|vista|light_?ray|godray|smoke|fog|ivy|leaves|vine|cloth|curtain', re.I)
 
 # ---- textures ----------------------------------------------------------------------------------------------------------
 textures = {}   # image name -> {uri, alpha}
@@ -274,6 +277,10 @@ for name, insts in sorted(by_model.items()):
             'SCALE': accessor(np.array(S, dtype=np.float32), 'VEC3')}}}})
         instances += len(group)
 print(f'props: {len(by_model) - len(skipped)} models, {instances} instances' + (f', {len(skipped)} not exported' if skipped else ''))
+# Der Eisendrache builds much of the castle from big props (stone walls, columns, arches, rock faces, roofs): they
+# collide as their own mesh (up to 1,500 triangles; boxes around them, or railings and furniture, cut the navmesh into
+# islands the zombies couldn't leave). The Giant: unchanged.
+STRUCTURAL = re.compile(r'wall|column|pillar|arch(?!ive)|fireplace|stone_|rock|cliff|tower|roof|balcony|statue|buttress|parapet|battlement|chimney|bookcase|throne|altar', re.I) if BSP == 'zm_castle' else None
 col_P, col_T, n0, solid_props = [], [], 0, 0
 tri = np.concatenate(solid); used, inv = np.unique(tri.ravel(), return_inverse=True)
 col_P.append(Pg[used].astype(np.float64)); col_T.append(inv.reshape(-1, 3)); n0 = len(used)
@@ -295,6 +302,7 @@ for name, insts in by_model.items():
         lo3, hi3 = pp.min(0), pp.max(0)
         pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
         tt = BOX_TRIS
+    elif STRUCTURAL and STRUCTURAL.search(base_) and len(tt) <= 1500: pass   # Der Eisendrache: walls, columns, arches... as they are
     else: continue
     for it in insts:
         o = np.array(it['origin'])
@@ -339,6 +347,9 @@ def seg_blocked(a, b, tris):   # does the segment a->b cross any triangle (Molle
     h = np.cross(d, e2); det = (e1 * h).sum(1); ok = np.abs(det) > 1e-9; inv = np.where(ok, 1 / np.where(ok, det, 1), 0)
     sv = a - tris[:, 0]; u = (sv * h).sum(1) * inv; q = np.cross(sv, e1); v = (q * d).sum(1) * inv; t = (q * e2).sum(1) * inv
     return bool(np.any(ok & (u >= 0) & (v >= 0) & (u + v <= 1) & (t >= 0) & (t <= 1)))
+def floor_below(o):   # collision floor within 48 units under a CoD point, and nothing solid in the 60 above it
+    O = g(o).astype(np.float64); near = CTRI[np.linalg.norm(CTRI.mean(1) - O, axis=1) < 200]
+    return seg_blocked(O + [0, 8, 0], O - [0, 48, 0], near) and not seg_blocked(O + [0, 10, 0], O + [0, 60, 0], near)
 def window_opening(o, out):
     """A window's clear opening, measured through the collision (walls, sandbag boxes): segments 30 units either side of
     the barrier plane at heights over the floor. Returns (bottom, top, width) in CoD units above the origin, or None."""
@@ -404,6 +415,10 @@ for e in ents:
         # BO3's spawn_location structs are behind the walls (zombies walk from there to a window): CustomWorld would snap
         # them to the nearest walkable spot (the mainframe platform...), so only the windows' spawns and the ground risers
         for z in zone_ids(zname(tn)): marker(f'ZSPAWN_{z}', o, yaw, {'zone': z}); count('ZSPAWN')
+    elif BSP == 'zm_castle' and sn == 'spawn_location' and tn.endswith('_spawners') and floor_below(o):
+        # Der Eisendrache: most zones have no windows; BO3's zombies appear at these points and climb in. Those with
+        # floor under them become walk-in spawns (CustomWorld uses only the ones with a navmesh path to the player)
+        for z in zone_ids(zname(tn)): marker(f'ZSPAWN_{z}', o, yaw, {'zone': z, 'walk': True}); count('ZSPAWN_walk')
     elif cls.startswith('zbarrier_zmcore_basicwoodbarrier'):
         # zbarrier origins are at the floor; CustomWorld centres the boards on the marker
         wz = zone_of_point(np.array(o))
@@ -775,6 +790,13 @@ if BSP == 'zm_castle':
         spots = [g(vec(x['origin'])).tolist() for x in sorted(by_tn.get(m.get('target'), []), key=lambda x: int(x.get('script_int', 0)))]
         place_model('CASTLE_LANDING_' + e['script_noteworthy'], m['model'], m['origin'], m.get('angles'), {'flag': e['script_noteworthy'], 'spots': spots})
         place_model('CASTLE_LANDINGON_' + e['script_noteworthy'], m['model'] + '_blue', m['origin'], m.get('angles'), hidden=True)
+    # lamps for the der-eisendrache mod's light pool: lit fixtures among the static models, merged within 150 units
+    LIT = re.compile(r'candle_.*_on|torch_wall|light_sconce|light_cage|light_spot_hanging$|light_industrial|hurricane_lamp|light_chandelier(?!_chain)|light_lamp_vintage|light_bulb_edison|camp_fire_pit|light_hanging_ball_01$', re.I)
+    lamps = []
+    for m in info['models']:
+        if LIT.search(m['name']) and all(np.linalg.norm(np.array(m['origin']) - np.array(q)) > 150 for q in lamps): lamps.append(m['origin'])
+    for k, o in enumerate(lamps): add_node({'name': f'CASTLE_LAMP_{k}', 'translation': g(o).tolist()})
+    counts['CASTLE_LAMP'] = len(lamps)
     for e in by_tn.get('115_flinger_pad_aimer', []):
         m = one(e.get('target'))
         if not m: continue
