@@ -34,9 +34,12 @@ export default async function setup(api){
       o.material=[].concat(o.material).map(m=>own.get(m.name)??(m.map?m:gore));if(o.material.length===1)o.material=o.material[0];});
   }
 
+  // A map can give its zombie bodies their own gib models: window.kino.gibSets[body.userData.gibSet] = {key: model}
+  // with the same keys (Der Eisendrache's BO3 bodies). A body whose set lacks a half isn't dismembered (blood only).
+  const partsOf=z=>{const key=z.root.children[0]?.userData?.gibSet;return key?window.kino?.gibSets?.[key]??null:parts;};
   // ---- body halves bound to the zombie's own skeleton --------------------------------------
   function bindPiece(z,key){
-    const src=parts[key];if(!src)return null;
+    const src=partsOf(z)?.[key];if(!src)return null;
     const piece=cloneSkinned(src),bones=new Map();dressPiece(piece,z);
     z.body.traverse(o=>{if(o.isBone&&!bones.has(o.name))bones.set(o.name,o);});
     const meshes=[];piece.traverse(o=>{if(o.isSkinnedMesh)meshes.push(o);});
@@ -56,7 +59,7 @@ export default async function setup(api){
     return z.gib;
   }
   function swap(z,half,key){
-    const g=split(z);if(!parts[key])return false;
+    const g=split(z);if(!partsOf(z)?.[key])return false;
     for(const m of g.meshes[half]??[])m.removeFromParent();
     g.meshes[half]=bindPiece(z,key);g[half]=key;return true;
   }
@@ -64,7 +67,7 @@ export default async function setup(api){
   // ---- flying pieces -----------------------------------------------------------------------
   const flying=[];
   function launch(z,key,boneName,push){
-    const src=parts[key];const at=new THREE.Vector3();
+    const src=partsOf(z)?.[key];const at=new THREE.Vector3();
     const bone=z.root.getObjectByName(boneName);(bone??z.root).getWorldPosition(at);
     blood(at);if(!src)return;
     const piece=cloneSkinned(src);dressPiece(piece,z);piece.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});
@@ -149,7 +152,9 @@ export default async function setup(api){
   });
 
   let gibCount=0;   // limbs and heads taken off this game (Cheese Cube's JARVIS HUD shows it)
+  const canGib=z=>{const p=partsOf(z);return !!(p?.upclean&&p?.lowclean);};
   function cut(z,limb,toward){
+    if(!canGib(z)){blood(enemies.headPosition?.(z)??z.root.position);return;}
     const g=split(z);if(g.lost.has(limb))return;g.lost.add(limb);gibCount++;
     if(limb==='rarm'||limb==='larm'){
       const both=g.lost.has('rarm')&&g.lost.has('larm');
@@ -163,6 +168,7 @@ export default async function setup(api){
     }
   }
   function behead(z,toward){
+    if(!canGib(z)){popHead(z,toward);return;}
     const g=split(z);if(g.lost.has('head'))return;g.lost.add('head');gibCount++;
     // BO1 attaches the neck stump as an extra piece; it doesn't replace the torso
     g.meshes.stump=bindPiece(z,'behead');

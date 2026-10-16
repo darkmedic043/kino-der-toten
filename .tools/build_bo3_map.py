@@ -890,7 +890,10 @@ if BSP == 'zm_castle':
         Nrm = np.tile([0, 1, 0], (n + 1, 1)).astype(np.float32)
         gltf['meshes'].append({'name': 'flagstones_standin', 'primitives': [{'attributes': {'POSITION': accessor(G_, 'VEC3', 34962, True), 'NORMAL': accessor(Nrm, 'VEC3', 34962), 'TEXCOORD_0': accessor(UV, 'VEC2', 34962)},
                                                                             'indices': accessor(F.ravel(), 'SCALAR', 34963), 'material': mat}]})
-        add_node({'name': 'CASTLE_FLAGSTONES', 'mesh': len(gltf['meshes']) - 1})
+        # the real flagstones (exported 2026-10-16; bind pose = the floor intact) replace the disc; it stays as collision
+        if prop_mesh('p7_fxanim_zm_castle_quest_demongate_flagstones_mod') is not None:
+            place_model('CASTLE_FLAGSTONES_REAL', 'p7_fxanim_zm_castle_quest_demongate_flagstones_mod', fs['origin'], fs.get('angles'))
+        else: add_node({'name': 'CASTLE_FLAGSTONES', 'mesh': len(gltf['meshes']) - 1})
         F2 = np.vstack([F, F[:, [0, 2, 1]]])
         gltf['meshes'].append({'name': 'COL_flagstones', 'primitives': [{'attributes': {'POSITION': accessor(G_, 'VEC3', 34962, True)}, 'indices': accessor(F2.ravel(), 'SCALAR', 34963)}]})
         add_node({'name': 'COL_flagstones', 'mesh': len(gltf['meshes']) - 1})

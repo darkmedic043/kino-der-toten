@@ -30,16 +30,30 @@ export default function setup(api) {
     return zones;
   };
   setupLook(api);
-  // Der Eisendrache's own zombies are off for now: the only exported bodies are BO3's corpse variants (gibbed: limbs
-  // already missing), BO1's clips turned their feet backwards (different ankle/ball bind orientation) and the engine's
-  // gibbing doesn't know their parts (user, 2026-10-16). Needs the living models (c_zom_der_zombie_body*, heads)
-  // exported from a running game and a bind-pose retarget; .tools/build_castle_zombies.py and this block are kept.
-  const USE_CASTLE_ZOMBIES = new URLSearchParams(location.search).has('castleZombies');
-  const ZB = ['c_zom_der_body1_corpse2_fb', 'c_zom_der_body1_corpse3_fb', 'c_zom_der_body2_corpse1_fb', 'c_zom_der_body2_corpse2_fb'];
-  if (USE_CASTLE_ZOMBIES) Promise.all(ZB.map(n => loadModel(new URL(`zombies/${n}.glb`, import.meta.url).href).catch(() => null))).then(list => {
-    const ok = list.filter(Boolean); if (!ok.length || !api.enemies) return;
-    api.enemies.templates = ok; api.enemies.heads = [];
-  });
+  // Der Eisendrache's own zombies (BO3's c_zom_der_zombie_body1-3 + head1-3, .tools/build_castle_zombies.py; git-ignored,
+  // ripped), driven by BO1's zombie clips. The clips set each joint's local rotation in BO1's joint frames; BO3's joints
+  // sit in other frames (the ankles and balls most: feet turned backwards, user), so every skeleton is re-bound first:
+  // each joint takes BO1's rest rotation, keeps its own position, and the skin is re-bound to that pose (rebindTo).
+  // ?bo1Zombies keeps the BO1 ones.
+  if (!new URLSearchParams(location.search).has('bo1Zombies') && api.enemies) {
+    const Z = n => loadModel(new URL(`zombies/${n}.glb`, import.meta.url).href).catch(() => null);
+    Promise.all([Promise.all([1, 2, 3].map(k => Z('c_zom_der_zombie_body' + k))), Promise.all([1, 2, 3].map(k => Z('c_zom_der_zombie_head' + k)))]).then(([bodies, heads]) => {
+      const e = api.enemies, refB = e.templates[0], refH = e.heads?.[0];
+      const ref = new Map(); for (const r of [refB, refH]) r?.traverse(o => { if (o.isBone && !ref.has(o.name)) ref.set(o.name, o.quaternion.clone()); });
+      const ok = bodies.filter(Boolean), okH = heads.filter(Boolean);
+      if (!ok.length || !okH.length || !ref.size) return;
+      for (const m of [...ok, ...okH]) rebindTo(m, ref);
+      bodies.forEach((m, i) => { if (m) m.userData.gibSet = 'castle' + (i + 1); });
+      e.templates = ok; e.heads = okH;
+      // their own gib pieces for the dismemberment mod (same keys as BO1's), re-bound the same way
+      const KEYS = { upclean: 'upclean', lowclean: 'lowclean', behead: 'behead', larmoff_1: 'larmoff', rarmoff_1: 'rarmoff', llegoff_1: 'llegoff', rlegoff_1: 'rlegoff', legsoff_1: 'blegsoff' };
+      const sets = (window.kino.gibSets ??= {});
+      [1, 2, 3].forEach(k => Promise.all(Object.entries(KEYS).map(async ([key, g]) => [key, await Z(`c_zom_der_zombie_body${k}_g_${g}`)])).then(list => {
+        const set = {}; for (const [key, m] of list) if (m) { rebindTo(m, ref); set[key] = m; }
+        sets['castle' + k] = set;
+      }));
+    });
+  }
   const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api);
   setupRocketPad(api); setupDogRounds(api);
   window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap };
@@ -291,12 +305,26 @@ function setupLook({ scene, world, session, host, camera }) {
       }`,
   }));
   sky.frustumCulled = false; sky.renderOrder = -1000; sky.scale.setScalar(1000); scene.add(sky);
+  // BO3's own skybox (skybox_zm_castle: the moonlit Alps; sky/ in the map folder, git-ignored, exported with Greyhound):
+  // its panorama is stored dim (BO3 brightens it in game), so it's drawn at SKY_GAIN; the procedural dome stays as the
+  // fallback. The fog then takes a colour from the panorama's horizon.
+  const SKY_GAIN = 3.2, dir = world.entry?.dir ?? 'mods/maps/der-eisendrache/';
+  Promise.all([loadModel(dir + 'sky/skybox.glb').catch(() => null), new THREE.TextureLoader().loadAsync(dir + 'sky/skybox.webp').catch(() => null)]).then(([box, tex]) => {
+    if (!box || !tex) return;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(SKY_GAIN, SKY_GAIN, SKY_GAIN), fog: false, depthWrite: false, side: THREE.DoubleSide });
+    box.traverse(o => { if (o.isMesh) { o.material = mat; o.frustumCulled = false; o.renderOrder = -999; } });
+    const size = new THREE.Box3().setFromObject(box).getSize(new THREE.Vector3()).length();
+    box.scale.setScalar(20000 / Math.max(size, 1)); sky.visible = false; skyModel = box; scene.add(box);
+    const fogCol = new THREE.Color(0x5d6f8c); if (scene.fog) scene.fog.color.copy(fogCol); scene.background = fogCol.clone();
+  });
+  let skyModel = null;
   if (scene.fog) scene.fog.color.copy(HORIZON);
   scene.background = HORIZON.clone();
   let last = performance.now(), timer = 0;
   host.on('update', () => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
-    sky.position.copy(camera.position); sky.material.uniforms.time.value += dt;
+    sky.position.copy(camera.position); sky.material.uniforms.time.value += dt; skyModel?.position.copy(camera.position);
     if (ambient) { ambient.color.setHex(0xa4afc0); ambient.intensity = .95; }
     if (hemi) { hemi.color.setHex(0xe2e9f3); hemi.groundColor.setHex(0x625a50); hemi.intensity = 1.15; }
     if (key) { key.color.setHex(0xfff2e0); key.intensity = 1.5; key.position.set(.45, 1, .3); }
@@ -386,4 +414,20 @@ function setupDogRounds({ session, host }) {
   const first = () => { session.nextDogRound = 1 + 4 + Math.floor(Math.random() * 2); seen = 0; };
   host.on('reset', first); first();
   host.on('update', () => { if (session.dogRound && session.round !== seen) { seen = session.round; session.nextDogRound = session.round + 7 + Math.floor(Math.random() * 7); } });
+}
+
+// Re-binds a skinned model so each named joint's rest local rotation is `ref`'s (BO1's), every joint staying where it
+// is: positions are re-expressed in the new parent frames, and each skin's inverse bind matrices are recomputed from the
+// new pose, so the mesh doesn't move but animation clips authored for `ref`'s joint frames now pose it correctly.
+function rebindTo(model, ref) {
+  model.updateMatrixWorld(true);
+  const bones = []; model.traverse(o => { if (o.isBone) bones.push(o); });
+  const world = new Map(bones.map(b => [b, b.getWorldPosition(new THREE.Vector3())]));
+  for (const b of bones) {   // traverse order: parents before children
+    if (ref.has(b.name)) b.quaternion.copy(ref.get(b.name));
+    b.parent.updateWorldMatrix(true, false);
+    b.position.copy(b.parent.worldToLocal(world.get(b).clone()));
+    b.updateMatrixWorld(true);
+  }
+  model.traverse(o => { if (o.isSkinnedMesh) { o.skeleton.calculateInverses(); o.bindMatrix.copy(o.matrixWorld); o.bindMatrixInverse.copy(o.matrixWorld).invert(); } });
 }

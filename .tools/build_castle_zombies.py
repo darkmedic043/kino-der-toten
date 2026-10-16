@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Der Eisendrache's own zombies for the der-eisendrache mod: BO3's full-body zombie models (c_zom_der_body*_fb, exported
-with Greyhound from the running game) as skinned GLBs the engine's BO1 zombie animations can drive.
+"""Der Eisendrache's own zombies for the der-eisendrache mod: BO3's zombie bodies and heads (c_zom_der_zombie_body1-3,
+head1-3, exported with Greyhound from the running game) as skinned GLBs the engine's BO1 zombie animations can drive.
 
   python3 .tools/build_castle_zombies.py
 
@@ -16,7 +16,11 @@ GH = pathlib.Path('/mass_drive/SteamLibrary/steamapps/compatdata/311210/pfx/driv
 OUT = ROOT/'export/web/mods/der-eisendrache/zombies'
 _spec = importlib.util.spec_from_file_location('semodel_to_glb', pathlib.Path(__file__).parent/'semodel_to_glb.py')
 SEM = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(SEM)
-MODELS = ['c_zom_der_body1_corpse2_fb', 'c_zom_der_body1_corpse3_fb', 'c_zom_der_body2_corpse1_fb', 'c_zom_der_body2_corpse2_fb']
+MODELS = ['c_zom_der_zombie_body1', 'c_zom_der_zombie_body2', 'c_zom_der_zombie_body3', 'c_zom_der_zombie_head1', 'c_zom_der_zombie_head2', 'c_zom_der_zombie_head3']   # living bodies + separate heads (exported 2026-10-16)
+# their gib pieces (body halves with a limb off, the neck stump): the dismemberment mod swaps these in (body3 has only
+# the arm ones and the upper half, so it isn't dismembered)
+GIBS = ['upclean', 'lowclean', 'behead', 'larmoff', 'rarmoff', 'llegoff', 'rlegoff', 'blegsoff']
+MODELS += [f'c_zom_der_zombie_body{k}_g_{g}' for k in (1, 2, 3) for g in GIBS if (GH/'xmodels'/f'c_zom_der_zombie_body{k}_g_{g}').exists()]
 CM = 1 / 2.54
 RENAME = {f'j_{f}_{s}_{k}': f'j_{f}_{s}_{k-1}' for f in ['index', 'mid', 'ring', 'pinky', 'thumb'] for s in ['le', 'ri'] for k in (1, 2, 3)}
 
