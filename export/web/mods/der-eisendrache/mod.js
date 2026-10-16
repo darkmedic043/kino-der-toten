@@ -168,12 +168,15 @@ function setupGondola(api) {
   // out: they open while docked), moved each frame by their tag_origin bone's offset (the swing isn't followed)
   const carCol = [car1, car2].map(c => {
     if (!world.addScriptedMover) return null;
-    c.node.updateMatrixWorld(true);
-    const meshes = []; c.node.traverse(o => { if (!o.isMesh) return; for (let p = o; p && p !== c.node; p = p.parent) if (/door/i.test(p.name)) return; meshes.push(o); });
+    c.pose('called_a', 99);   // built in the docked pose (the cars tilt on the cable elsewhere; only docked do players get in)
+    // only its floor (tread plate, grating): the whole car as collision wedged the player inside it
+    const meshes = []; c.node.traverse(o => { if (!o.isMesh || !/floor|treadplate|grate/i.test([o.material].flat()[0]?.name ?? '')) return; for (let p = o; p && p !== c.node; p = p.parent) if (/door/i.test(p.name)) return; meshes.push(o); });
     const ref = c.node.getObjectByName(c.node.name + '_tag_origin') ?? c.node.children[0];
     const m = world.addScriptedMover(meshes, { exact: true });
-    return m && ref ? { m, ref, base: ref.getWorldPosition(new THREE.Vector3()) } : null;
+    const out = m && ref ? { m, ref, base: ref.getWorldPosition(new THREE.Vector3()) } : null;
+    return out;
   }).filter(Boolean);
+  reset();   // back to the starting poses
   const v = new THREE.Vector3();
   host.on('update', () => { for (const c of carCol) c.m.move(c.ref.getWorldPosition(v).sub(c.base)); });
   return { state: () => ({ ...st, item: !!st.item }), giveFuse: () => { st.held = true; } };
