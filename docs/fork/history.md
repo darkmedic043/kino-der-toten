@@ -222,3 +222,4 @@
 - 2026-10-15: Death Perception outlines only hidden zombies; Widow's Wine web blast and webbing; Wisp Tea small, blue and weaker; Iron Man suits recharge in ~2 min (gameplay.md).
 - 2026-10-16: decoded textures freed from RAM after GPU upload: ~2 GB less per map (performance.md).
 - 2026-10-16: free perks no longer raise the perk price (gameplay.md).
+- 2026-10-16: Sandbox matches now pay credits and count for challenges (`noPayoutMaps` emptied).

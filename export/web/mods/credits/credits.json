@@ -1,13 +1,11 @@
 {
-  "_note": "Phase 6 credits (placeholders to tune). payout: end-of-match credits = perRoundOver5 x (rounds past 5) + perKill x kills, capped at cap; nothing in a cheat game or on noPayoutMaps. milestones: the first time you reach each round on a map. prestige: weapon Prestige I / II / Master and each player prestige. Challenges: 3 daily (reset at local midnight) and 3 weekly (reset Monday), drawn from the pool with the date as the seed; `stat` is what counts, `n` the goal (weekly goals are weeklyMul times the daily ones). Made sparser 2026-10-14 (user: 'a bit harder to get'): roughly half the first numbers.",
+  "_note": "Phase 6 credits (placeholders to tune). payout: end-of-match credits = perRoundOver5 x (rounds past 5) + perKill x kills, capped at cap; nothing in a cheat game or on noPayoutMaps. milestones: the first time you reach each round on a map. prestige: weapon Prestige I / II / Master and each player prestige. Challenges: 3 daily (reset at local midnight) and 3 weekly (reset Monday), drawn from the pool with the date as the seed; `stat` is what counts, `n` the goal (weekly goals are weeklyMul times the daily ones). Sandbox pays out since 2026-10-16 (user request; it used to be listed here). Made sparser 2026-10-14 (user: 'a bit harder to get'): roughly half the first numbers.",
   "payout": {
     "perRoundOver5": 8,
     "perKill": 0.25,
     "cap": 200
   },
-  "noPayoutMaps": [
-    "sandbox"
-  ],
+  "noPayoutMaps": [],
   "milestones": {
     "10": 50,
     "20": 125,
