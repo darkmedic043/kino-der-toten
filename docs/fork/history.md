@@ -235,3 +235,4 @@
 - 2026-10-16: Der Eisendrache's own zombies (re-bound to BO1's joint frames) with their own gibs, BO3's skybox, the real trophy room floor (waw-ports.md).
 - 2026-10-16: Der Eisendrache gondola collision (deepest-hit physics, docked boxes), waits while occupied; per-pixel sky; zombie heads bound to their bodies (waw-ports.md).
 - 2026-10-16: overlay layers draw in a fixed order with a polygon offset (flicker), duplicate props dropped, _snow variants tinted (waw-ports.md).
+- 2026-10-16: Der Eisendrache: Wrath of the Ancients (BO3's bow) and its dragon-feeding quest; right gondola station; heads facing forward (waw-ports.md).

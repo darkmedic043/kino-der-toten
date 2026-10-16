@@ -905,6 +905,17 @@ if BSP == 'zm_castle':
         gltf['meshes'].append({'name': 'COL_flagstones', 'primitives': [{'attributes': {'POSITION': accessor(G_, 'VEC3', 34962, True)}, 'indices': accessor(F2.ravel(), 'SCALAR', 34963)}]})
         add_node({'name': 'COL_flagstones', 'mesh': len(gltf['meshes']) - 1})
         print(f'  flagstones stand-in: radius {radius}')
+    # The bow quest (zm_castle_weap_quest.gsc): three dragon heads (dragon_position structs + their c_zom_dragonhead
+    # script_models, placed static) each eat 8 zombies killed in their volume (an info_volume brush, not in the dump: its
+    # origin is the centre of a 220-unit sphere here); then the bow waits at base_bow_pickup_struct.
+    for e in by_tn.get('dragon_position', []):
+        vol = one(e.get('target')); k = e.get('script_label', 'dragonhead_x')
+        head = one(k)
+        if head: place_model('CASTLE_DRAGON_' + k, head['model'], head['origin'], head.get('angles'))
+        add_node({'name': 'CASTLE_DRAGONZONE_' + k, 'translation': g(vec(vol['origin'] if vol else e['origin'])).tolist(), 'extras': {'radius': 220, 'mouth': g(vec(e['origin'])).tolist()}})
+        count('DRAGON')
+    bp = one('base_bow_pickup_struct')
+    if bp: add_node({'name': 'CASTLE_BOWPICKUP', 'translation': g(vec(bp['origin'])).tolist(), 'extras': {'yaw': math.radians(vec(bp.get('angles'))[1])}})
     # lamps for the der-eisendrache mod's light pool: lit fixtures among the static models, merged within 150 units
     LIT = re.compile(r'candle_.*_on|torch_wall|light_sconce|light_cage|light_spot_hanging$|light_industrial|hurricane_lamp|light_chandelier(?!_chain)|light_lamp_vintage|light_bulb_edison|camp_fire_pit|light_hanging_ball_01$', re.I)
     lamps = []

@@ -14,7 +14,7 @@ renamed tag_weapon here, which is what the engine's ViewWeapon attaches to.
 import hashlib, json, pathlib, subprocess, sys, tempfile
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from seanim import read_seanim
-import importlib.util
+import importlib.util, re
 _spec = importlib.util.spec_from_file_location('semodel_to_glb', pathlib.Path(__file__).parent/'semodel_to_glb.py')
 SEM = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(SEM)
 
@@ -52,8 +52,10 @@ def webp_small(stem, kind):
         subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', str(src), '-vf', "scale='min(256,iw)':-2", '-c:v', 'libwebp', '-quality', '80', out.name], check=True)
         return pathlib.Path(out.name).read_bytes(), 'image/webp'
 
-def model(name, out_name=None, rename=None, glow=None, glow_maps=None, light=False):
+def model(name, out_name=None, rename=None, glow=None, glow_maps=None, light=False, drop=None):
     sem = SEM.read_semodel(SRC/'xmodels'/name/(name+'_LOD0.semodel'))
+    if drop:   # meshes whose material matches `drop` left out (Der Eisendrache's bow carries every variant's arrow)
+        sem['meshes'] = [m for m in sem['meshes'] if not (m['mats'] and re.search(drop, sem['materials'][m['mats'][0]]['name'], re.I))]
     out = MOD/'models'/((out_name or name)+'.glb')
     SEM.to_glb(sem, out, texture_loader=webp_small if light else webp, rename=rename, glow=glow, glow_maps=glow_maps)
     print('model', out.name, f'{out.stat().st_size/1e6:.1f} MB')
@@ -310,6 +312,15 @@ MODW = [
        stats=dict(clipSize=100, maxAmmo=400, startAmmo=400, damage=135, minDamage=90, fireTime=.07, price=2200),
        roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', rais='pullout', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
        ads=('vm_mag43_adsup', 'vm_mag43_adsdown'), shots=['weap_mg4_hvn_fire_plr'], glow='#ff3a3a'),
+  # Der Eisendrache's Wrath of the Ancients (BO3's own bow, wpn_t7_zmb_bow_base_*, exported from zm_castle; the
+  # vm_bow_launcher_* clips): a quest weapon (mods/der-eisendrache), not in the Mystery Box. Fire looses the arrow,
+  # the draw plays as the reload (one arrow a draw); the arrow explodes on impact like the crossbow.
+  dict(cls='Wonder weapon', id='bo3_wrath_ancients', name='Wrath of the Ancients', up="Wrath of the Ancients", model='wpn_t7_zmb_bow_base_view', world='wpn_t7_zmb_bow_base_world',
+       pre='vm_bow_launcher', tpl='crossbow_explosive_zm', drop=r'rune|storm|demon|wolf', noBox=True,
+       stats=dict(clipSize=1, maxAmmo=60, startAmmo=60, damage=1100, minDamage=0, explosionRadius=180, explosionInnerDamage=1100, explosionOuterDamage=250, price=0),
+       roles=dict(idle='idle', fire='fire', reload='draw', rais='pullout', firstRaise='first_raise', drop='putaway', sprintIn='sprint_in', sprintLoop='sprint_loop', sprintOut='sprint_out'),
+       ads=('vm_bow_launcher_ads_base_up', 'vm_bow_launcher_ads_base_down'), shots=['wpn_bowss_fire_quick', 'wpn_bowss_fire_med', 'wpn_bowss_fire_long'], glow='#ff6a1a',
+       projectile='wpn_t7_zmb_bow_base_projectile', offset=[0, -2, 0]),
 ]
 # the mod's attachment models, mounted on the guns' tags by the weapon-levels mod (def.mounts)
 MOUNTS = {}
@@ -327,8 +338,8 @@ PARTS = {'bo3_mr23_tesla': ['tag_sra', 'tag_foregrip', 'j_frontsight'], 'bo3_p90
 modsounds = {}
 for w in MODW:
     if not (SRC/'xmodels'/w['model']).exists(): print('skip', w['id']); continue
-    view, gm = model(w['model'], rename=w.get('rename'), glow=w['glow'], glow_maps={k: (png(v[0]), v[1], v[2]) for k, v in GLOW_MAPS.items() if png(v[0])})
-    world_url = model(w['model'], w['model']+'_world', rename=w.get('rename'), glow=w['glow'], light=True)[0]
+    view, gm = model(w['model'], rename=w.get('rename'), glow=w['glow'], glow_maps={k: (png(v[0]), v[1], v[2]) for k, v in GLOW_MAPS.items() if png(v[0])}, drop=w.get('drop'))
+    world_url = model(w.get('world', w['model']), (w.get('world') or w['model'])+'_world', rename=w.get('rename'), glow=w['glow'], light=True, drop=w.get('drop'))[0]
     gb = {b['name']: b['lpos'] for b in gm['bones'] if 'lpos' in b and b['parent'] >= 0}
     A2, T2, notes = {}, {}, set()
     for role, suffix in w['roles'].items():
@@ -356,7 +367,7 @@ for w in MODW:
     # tag_red_dot inside the built-in holo, so a mounted sight floated off the gun)
     mounts = {k: v for k, v in MOUNTS.items() if v['tag'] in {b['name'] for b in gm['bones']} and not (w['id'] in BUILT_IN_SIGHT and k in ('reddot', 'holo', 'reflex2x'))}
     common2 = {**t, 'hideTags': PARTS.get(w['id'], []), 'mounts': mounts, 'statAttachments': ['extmag'], 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands, 'animations': A2, 'model': view, 'worldModel': world_url, 'lazyWorld': True,
-               'bo3': True, 'modWeapon': True, **({'scope': 'reflex'} if w['id'] in BUILT_IN_SIGHT else {}), 'glow': w['glow'], 'arc': w.get('arc', False), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls'],
+               'bo3': True, 'modWeapon': True, **({'noBox': True} if w.get('noBox') else {}), **({'scope': 'reflex'} if w['id'] in BUILT_IN_SIGHT else {}), 'glow': w['glow'], 'arc': w.get('arc', False), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls'],
                # parts that are always on (the AS50's scope is its own model): mounted like attachments (mods/weapon-levels/mounts.js)
                'fixedParts': [{'model': model(mdl, 'part_'+mdl)[0], 'tag': tag} for mdl, tag in w.get('fixed', []) if (SRC/'xmodels'/mdl).exists()]}
     if w.get('projectile'): common2['projectileModel'] = model(w['projectile'], 'part_'+w['projectile'])[0]   # fired as the rocket

@@ -26,7 +26,7 @@ export async function prepare(data){
   if(!r?.ok){console.info('[bo3-weapons] not built: run .tools/build_bo3_weapons.py');return;}
   built=await r.json();
   Object.assign(data.weapons,built.weapons);
-  data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons)])];
+  data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons).filter(id=>!built.weapons[id].noBox)])];   // noBox: quest weapons (Der Eisendrache's bow)
 }
 
 export default async function setup(api){

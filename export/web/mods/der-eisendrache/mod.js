@@ -85,9 +85,9 @@ export default function setup(api) {
       }));
     });
   }
-  const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api);
+  const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api);
   setupRocketPad(api); setupDogRounds(api);
-  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap };
+  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow };
 }
 
 // ---- BO3 fxanim rigs (CASTLE_<name> from the builder's fxanim_rig): bones carry extras.anims[key] = {rot, loc} runs,
@@ -505,4 +505,51 @@ function rebindTo(model, ref, rootWorld = null) {
     b.updateMatrixWorld(true);
   }
   model.traverse(o => { if (o.isSkinnedMesh) { o.skeleton.calculateInverses(); o.bindMatrix.copy(o.matrixWorld); o.bindMatrixInverse.copy(o.matrixWorld).invert(); } });
+}
+
+// ---- Wrath of the Ancients (zm_castle_weap_quest.gsc). Three dragon heads (undercroft, lower courtyard, great hall)
+// each eat 8 zombies killed in front of them (CASTLE_DRAGONZONE_<head>: a sphere where BO3 has a volume); a fed zombie
+// is pulled into the mouth. With all three fed the bow waits at the pedestal behind the castle (CASTLE_BOWPICKUP), free
+// to each player once. The bow: bo3_wrath_ancients (.tools/build_bo3_weapons.py, from BO3's wpn_t7_zmb_bow_base_*).
+const SOULS = 8, BOW = 'bo3_wrath_ancients';
+function setupBow(api) {
+  const { world, session, host, toast, announce, audio, scene } = api, root = world.root;
+  const heads = [];
+  root.traverse(o => { const m = /^CASTLE_DRAGONZONE_(.+)$/.exec(o.name); if (m) heads.push({ id: m[1], c: o.getWorldPosition(new THREE.Vector3()), r: o.userData.radius ?? 220, mouth: new THREE.Vector3(...(o.userData.mouth ?? o.position.toArray())), n: 0, model: root.getObjectByName('CASTLE_DRAGON_' + m[1]) }); });
+  const pick = root.getObjectByName('CASTLE_BOWPICKUP');
+  if (heads.length < 3 || !pick) { console.warn('[der-eisendrache] bow quest markers missing (rebuild the map)'); return null; }
+  const spot = pick.getWorldPosition(new THREE.Vector3());
+  // the bow on the pedestal: its world model, slowly turning in a red glow
+  const shown = new THREE.Group(); shown.position.copy(spot).add(new THREE.Vector3(0, 45, 0)); shown.visible = false; scene.add(shown);
+  const glow = new THREE.PointLight(0xff5a1a, 0, 220, 1.6); shown.add(glow);
+  const def = api.data?.weapons?.[BOW];
+  if (def?.worldModel) import('../../animation.js').then(({ loadModel }) => loadModel(def.worldModel)).then(m => { if (m) { m.rotation.z = Math.PI / 2; shown.add(m); } }).catch(() => {});
+  const taken = () => session.flags.has('castle:bow:taken'), charged = () => heads.every(h => h.n >= SOULS);
+  const flying = [];
+  host.on('kill', ({ enemy }) => {
+    if (!enemy?.root) return;
+    const p = enemy.root.position;
+    const h = heads.find(h => h.n < SOULS && p.distanceTo(h.c) < h.r);
+    if (!h) return;
+    h.n++;
+    // the soul: a glowing orb from the body into the mouth
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(4, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff7a3a })); orb.position.copy(p).add(new THREE.Vector3(0, 40, 0)); scene.add(orb);
+    flying.push({ orb, to: h.mouth.clone(), t: 0, from: orb.position.clone() });
+    audio?.play?.('powerup', .5);
+    if (h.n === SOULS) {
+      const left = heads.filter(x => x.n < SOULS).length;
+      announce?.('A DRAGON IS FED', left ? `${left} TO GO` : 'THE BOW AWAITS BEHIND THE CASTLE', 4);
+      if (!left) shown.visible = true;
+    }
+  });
+  world.addInteraction({ position: spot.clone().add(new THREE.Vector3(0, 30, 0)), hidden: () => !charged() || taken(), text: () => 'Take Wrath of the Ancients',
+    use() { if (!def) return false; session.flags.add('castle:bow:taken'); session.giveWeapon(BOW); api.equipView?.(); shown.visible = false; announce?.('WRATH OF THE ANCIENTS', '', 3); audio?.play?.('box'); return true; } });
+  let t = 0;
+  host.on('update', dt => {
+    dt = dt || 1 / 60; t += dt;
+    for (const f of [...flying]) { f.t = Math.min(1, f.t + dt * 1.4); f.orb.position.lerpVectors(f.from, f.to, f.t).y += Math.sin(f.t * Math.PI) * 60; if (f.t >= 1) { f.orb.removeFromParent(); flying.splice(flying.indexOf(f), 1); } }
+    if (shown.visible) { shown.rotation.y += dt * .6; shown.position.y = spot.y + 45 + Math.sin(t * 1.5) * 3; glow.intensity = 900 + Math.sin(t * 3) * 200; }
+  });
+  host.on('reset', () => { for (const h of heads) h.n = 0; shown.visible = false; for (const f of flying) f.orb.removeFromParent(); flying.length = 0; });
+  return { state: () => ({ souls: heads.map(h => [h.id, h.n]), charged: charged(), taken: taken() }), feed: (k = 0) => { for (const h of heads) h.n = SOULS; shown.visible = true; } };
 }
