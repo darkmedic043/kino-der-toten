@@ -47,6 +47,8 @@ export async function createMap(ctx,entry){
     async loadWorld(progress){const world=new CustomWorld(scene,ctx.data,entry);world.perkInfo=perkInfo;await world.load(progress);return world;},
     spawn:()=>({position:W().spawn.position,yaw:W().spawn.yaw}),
     createFeatures:opts=>new MapFeatures(opts),
+    // a map mod can take the player over for a frame (world.prePlayer(dt) returns true: Der Eisendrache's landing pad flights)
+    prePlayer:dt=>!!W()?.prePlayer?.(dt),
     async ready(){resetPower();
       const world=W();if(world.warnings.length){const w=document.createElement('ul');w.id='map-warnings';w.innerHTML='<li>Map warnings:</li>'+world.warnings.map(m=>`<li>${m.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</li>`).join('');document.getElementById('menu-status').after(w);}},
     boardCount:b=>b.boards.length,

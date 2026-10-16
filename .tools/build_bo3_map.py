@@ -676,6 +676,117 @@ for e in ents:
                                                                            'indices': accessor(np.array(CT_, dtype=np.uint32).ravel(), 'SCALAR', 34963)}]})
         add_node({'name': f'GIANT_BRIDGECOL_{side}', 'mesh': len(gltf['meshes']) - 1})
     count('BRIDGE')
+
+# ---- Der Eisendrache scripted pieces (the der-eisendrache mod runs them) ------------------------------------------------
+def fxanim_rig(name, model_name, origin, anims):
+    """A BO3 fxanim rig with several animations: a CASTLE_<name> node (bundle origin, Z-up -> Y-up, cm -> inches) over the
+    rig's bone nodes (bind pose, each carrying the vertices rigidly bound to it); extras.anims[key] = {frames, fps, notes}
+    and per bone extras.anims[key] = {rot, loc} runs as for The Giant's bridges (rot: absolute local quaternions, loc:
+    offsets added to the bind position, [frame, ...])."""
+    mpath = os.path.join(GH, 'xmodels', model_name, model_name + '_LOD0.semodel')
+    if not os.path.exists(mpath): print('  rig not exported:', model_name); return
+    model = read_semodel(mpath); bones = model['bones']
+    loaded = {}
+    for key, an in anims.items():
+        ap = os.path.join(GH, 'xanims', an + '.seanim')
+        if os.path.exists(ap): loaded[key] = read_seanim(ap)
+        else: print('  anim not exported:', an)
+    parts = {}
+    for mesh in model['meshes']:
+        if not mesh['faces']: continue
+        dom = [max(w, key=lambda t: t[1])[0] for w in mesh['w']]
+        mm = model['materials'][mesh['mats'][0]] if mesh['mats'] else {'name': 'none'}
+        for f in mesh['faces']:
+            b = dom[f[0]]; pr = parts.setdefault(b, {}).setdefault(mm['name'], {'mm': mm, 'P': [], 'N': [], 'UV': [], 'F': [], 'map': {}})
+            idx = []
+            for v in f:
+                if v not in pr['map']:
+                    bn = bones[b]; q = qinv(bn['wrot']); p = mesh['pos'][v]; pr['map'][v] = len(pr['P'])
+                    pr['P'].append(qrot(q, (p[0] - bn['wpos'][0], p[1] - bn['wpos'][1], p[2] - bn['wpos'][2])))
+                    pr['N'].append(qrot(q, mesh['nrm'][v])); pr['UV'].append(mesh['uv'][v][0])
+                idx.append(pr['map'][v])
+            pr['F'].append([idx[0], idx[2], idx[1]])
+    mesh_of = {}
+    for b, mats in parts.items():
+        prims = []
+        for mname, pr in mats.items():
+            mm = pr['mm']; N = np.array(pr['N']); N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-6)
+            mat = material(('prop', mname), mname, texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX), fallback=builtin_color(mm.get('diffuse'), mname))
+            prims.append({'attributes': {'POSITION': accessor(np.array(pr['P'], dtype=np.float32), 'VEC3', 34962, True), 'NORMAL': accessor(N.astype(np.float32), 'VEC3', 34962),
+                                         'TEXCOORD_0': accessor(np.array(pr['UV'], dtype=np.float32), 'VEC2', 34962)},
+                          'indices': accessor(np.array(pr['F'], dtype=np.uint32).ravel(), 'SCALAR', 34963), 'material': mat})
+        gltf['meshes'].append({'name': f'{name}_{bones[b]["name"]}', 'primitives': prims}); mesh_of[b] = len(gltf['meshes']) - 1
+    first = len(gltf['nodes'])
+    for i, bn in enumerate(bones):
+        node = {'name': f'CASTLE_{name}_{bn["name"]}', 'translation': list(bn['lpos']), 'rotation': list(bn['lrot'])}
+        if i in mesh_of: node['mesh'] = mesh_of[i]
+        ka = {}
+        for key, an in loaded.items():
+            k = an['bones'].get(bn['name'])
+            if k and (len(k.get('rot', [])) > 1 or k.get('loc')):
+                ka[key] = {'rot': [x for f, q in k.get('rot', []) for x in (f, *q)], 'loc': [x for f, p in k.get('loc', []) for x in (f, *p)]}
+        if ka: node['extras'] = {'anims': ka}
+        gltf['nodes'].append(node)
+    for i, bn in enumerate(bones):
+        if bn['parent'] >= 0: gltf['nodes'][first + bn['parent']].setdefault('children', []).append(first + i)
+    roots = [first + i for i, bn in enumerate(bones) if bn['parent'] < 0]
+    add_node({'name': f'CASTLE_{name}', 'translation': g(origin).tolist(), 'rotation': AXQ, 'scale': [CM] * 3, 'children': roots,
+              'extras': {'anims': {k: {'frames': a['frames'] - 1, 'fps': a['framerate'], 'notes': [[f, n] for f, n in a['notes'] if not n.startswith('dlc1/')]} for k, a in loaded.items()}}})
+    count('CASTLE_RIG')
+def place_model(name, model_name, origin, angles, extras=None, hidden=False):
+    mi = prop_mesh(model_name)
+    if mi is None: print('  not exported:', model_name); return
+    pitch, yaw_, roll = vec(angles)
+    node = {'name': name, 'mesh': mi, 'translation': g(vec(origin)).tolist(), 'rotation': quat(C @ euler_cod(pitch, yaw_, roll) @ C.T)}
+    ex = dict(extras or {}); ex['model'] = model_name
+    if hidden: ex['hidden'] = True
+    node['extras'] = ex; add_node(node)
+if BSP == 'zm_castle':
+    from semodel_to_glb import qmul, qrot, qinv
+    from seanim import read_seanim
+    AXQ = [-math.sqrt(.5), 0, 0, math.sqrt(.5)]
+    by_tn = {}
+    for e in ents:
+        if e.get('targetname'): by_tn.setdefault(e['targetname'], []).append(e)
+    one = lambda tn: (by_tn.get(tn) or [None])[0]
+    # The gondola (zm_castle_tram.gsc): two counterweighted cable cars on one bundle origin. car 2 brings a power-up
+    # when a fuse is put in the console: called_a (mid-air -> docked at the station, doors open at 225) with car 1's
+    # called_b (mid -> bottom); then return_a with car 1's return_b. car 1 starts docked and leaves (its return_a) 12 s in,
+    # while car 2 comes up from the bottom (start).
+    TRAM = [420, 420, 0]
+    for car in ('01', '02'):
+        base = f'p7_fxanim_zm_castle_tram_car_{car}'
+        fxanim_rig(f'TRAM{car}', base + '_mod', TRAM, {k: f'{base}_{k}_anim' for k in ('called_a', 'called_b', 'return_a', 'return_b', 'start', 'idle_mid')})
+    for e in by_tn.get('tram_gates', []):   # the station gates slide to their target struct while car 2 is docked
+        t = one(e.get('target'))
+        place_model('CASTLE_TRAMGATE', e['model'], e['origin'], e.get('angles'), {'open': g(vec(t['origin'])).tolist() if t else None})
+    for e in by_tn.get('player_tram_gates', []): place_model('CASTLE_PTRAMGATE', e['model'], e['origin'], e.get('angles'))
+    lv = one('tram_call_lever_2')
+    if lv: place_model('CASTLE_TRAMLEVER', lv['model'], lv['origin'], lv.get('angles'))
+    for tn, nm in (('tram_object_spawn_pos', 'CASTLE_TRAMDROP'), ('tram_token_spawn_pos', 'CASTLE_TRAMTOKEN'), ('docked_tram_car_interior', 'CASTLE_TRAMINSIDE')):
+        x = one(tn)
+        if x: add_node({'name': nm, 'translation': g(vec(x['origin'])).tolist()})
+    # Landing pads (zm_castle_flingers.gsc): a launch pad (115_flinger_pad_aimer -> its jump sphere model -> the fling
+    # volume) works once its landing pad (115_flinger_landing_pad, same flag) has been switched on; 500 points flings
+    # whoever stands on it along the vehicle spline <base target>_spline (node speeds in mph) to the landing pad.
+    for e in by_tn.get('115_flinger_landing_pad', []):
+        m = one(e.get('target'))
+        if not m: continue
+        spots = [g(vec(x['origin'])).tolist() for x in sorted(by_tn.get(m.get('target'), []), key=lambda x: int(x.get('script_int', 0)))]
+        place_model('CASTLE_LANDING_' + e['script_noteworthy'], m['model'], m['origin'], m.get('angles'), {'flag': e['script_noteworthy'], 'spots': spots})
+        place_model('CASTLE_LANDINGON_' + e['script_noteworthy'], m['model'] + '_blue', m['origin'], m.get('angles'), hidden=True)
+    for e in by_tn.get('115_flinger_pad_aimer', []):
+        m = one(e.get('target'))
+        if not m: continue
+        vol = one(m.get('target')); n = one(m['target'] + '_spline'); path, speeds = [], []
+        while n and len(path) < 40:
+            path.append(g(vec(n['origin'])).tolist()); speeds.append(float(n.get('speed', 90)) * 17.6); n = one(n.get('target'))
+        flag = e['script_noteworthy']
+        place_model('CASTLE_FLINGER_' + flag, m['model'], m['origin'], m.get('angles'),
+                    {'flag': flag, 'path': path, 'speeds': speeds, 'volume': g(vec(vol['origin'])).tolist() if vol else g(vec(m['origin'])).tolist()})
+        place_model('CASTLE_FLINGERON_' + flag, m['model'] + '_blue', m['origin'], m.get('angles'), hidden=True)
+        count('FLINGER')
+
 print('window openings (bottom, top, width):', openings)
 print('markers:', counts)
 
