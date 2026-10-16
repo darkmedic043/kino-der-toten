@@ -28,8 +28,9 @@ export default function setup(api) {
     return zones;
   };
   setupLook(api);
-  const gondola = setupGondola(api), pads = setupPads(api);
-  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads };
+  const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api);
+  setupRocketPad(api); setupDogRounds(api);
+  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap };
 }
 
 // ---- BO3 fxanim rigs (CASTLE_<name> from the builder's fxanim_rig): bones carry extras.anims[key] = {rot, loc} runs,
@@ -242,4 +243,80 @@ function setupLook({ scene, world, session, host, camera }) {
     const want = session.power ? LAMP.on : LAMP.off;
     for (const l of pool) l.intensity += (want - l.intensity) * Math.min(1, dt * 2.5);
   });
+}
+
+// ---- Pack-a-Punch (zm_castle_pap_quest.gsc). The machine starts hidden (the PAP marker is BO3's storage spot under the
+// map). Activate two of its three spots (undercroft, rocket pad, roof: CASTLE_PAPTP_<spot>; their scattered parts,
+// CASTLE_PAPPART_<spot>, fly off); it re-forms at the third (CASTLE_PAPLOC_<spot>) once you look at it from within 400.
+// After its first use it moves on to the next spot every 2-3 rounds (at the end of a round, never mid-upgrade).
+const PAP_ORDER = ['under', 'rocket', 'roof'], PAP_NAME = { under: 'the undercroft', rocket: 'the rocket pad', roof: 'the rooftop' };
+function setupPap(api) {
+  const { world, session, host, player, camera, toast, announce, audio } = api, root = world.root;
+  const locs = {}, tps = {}, parts = {};
+  for (const k of PAP_ORDER) {
+    const l = root.getObjectByName('CASTLE_PAPLOC_' + k), t = root.getObjectByName('CASTLE_PAPTP_' + k);
+    if (l) locs[k] = { pos: l.getWorldPosition(new THREE.Vector3()), yaw: l.userData.yaw ?? 0 };
+    if (t) tps[k] = t.getWorldPosition(new THREE.Vector3());
+    parts[k] = []; root.traverse(o => { if (o.name === 'CASTLE_PAPPART_' + k) parts[k].push(o); });
+  }
+  if (Object.keys(locs).length < 3 || !world.movePap) { console.warn('[der-eisendrache] Pack-a-Punch spots missing (rebuild the map)'); return null; }
+  const st = { active: new Set(), reformAt: null, reformed: false, at: null, used: false, nextMove: 0 };
+  const showParts = (k, v) => { for (const o of parts[k]) o.visible = v; };
+  const machineVisible = v => { if (world.papMachine) world.papMachine.visible = v; };
+  const reset = () => {
+    Object.assign(st, { active: new Set(), reformAt: null, reformed: false, at: null, used: false, nextMove: 0 });
+    for (const k of PAP_ORDER) showParts(k, true);
+    world.papLocked = true; world.papLockedText = 'Pack-a-Punch hasn\'t re-formed';
+  };
+  const place = k => { st.at = k; world.movePap(locs[k].pos, locs[k].yaw); machineVisible(true); };
+  for (const k of PAP_ORDER) if (tps[k]) world.addInteraction({
+    position: tps[k],
+    hidden: () => st.active.has(k) || st.reformAt != null,
+    text: () => 'Activate the Pack-a-Punch',
+    use() {
+      st.active.add(k); showParts(k, false); audio?.play?.('teleport', .6);
+      if (st.active.size >= 2) {
+        st.reformAt = PAP_ORDER.find(x => !st.active.has(x));
+        announce?.('PACK-A-PUNCH', `RE-FORMING AT ${PAP_NAME[st.reformAt].toUpperCase()}`, 4);
+      } else toast?.('Pack-a-Punch part sent away · one more', 3);
+      return true;
+    },
+  });
+  const look = new THREE.Vector3(), to = new THREE.Vector3();
+  host.on('update', () => {
+    if (!st.reformed) machineVisible(false);
+    if (st.reformAt && !st.reformed) {
+      const l = locs[st.reformAt], feet = player.getFeetPosition();
+      camera.getWorldDirection(look); to.copy(l.pos).add(new THREE.Vector3(0, 50, 0)).sub(camera.position).normalize();
+      if (feet.distanceTo(l.pos) < 400 && look.dot(to) > Math.cos(Math.PI / 4)) {
+        st.reformed = true; showParts(st.reformAt, false); place(st.reformAt); world.papLocked = false;
+        audio?.play?.('teleport'); announce?.('PACK-A-PUNCH', 'RE-FORMED', 3);
+      }
+    }
+    if (st.reformed && !st.used && session.pack) { st.used = true; st.nextMove = (session.round ?? 1) + 2 + Math.floor(Math.random() * 2); }
+  });
+  host.on('roundEnd', () => {
+    if (!st.used || session.pack || (session.round ?? 0) < st.nextMove) return;
+    const next = PAP_ORDER[(PAP_ORDER.indexOf(st.at) + 1) % 3];
+    place(next); st.nextMove = (session.round ?? 1) + 2 + Math.floor(Math.random() * 2);
+    toast?.(`Pack-a-Punch moved to ${PAP_NAME[next]}`, 4);
+  });
+  host.on('reset', reset);
+  reset();
+  return { state: () => ({ active: [...st.active], reformAt: st.reformAt, reformed: st.reformed, at: st.at, nextMove: st.nextMove }) };
+}
+
+// ---- The rocket pad: its zones open once someone has taken the teleporter (castle_teleporter_used)
+function setupRocketPad({ world, session, host, player }) {
+  const tp = world.teleporters?.find(t => t.name === 'rocketpad'), dest = tp?.to?.position;
+  if (!dest) { console.warn('[der-eisendrache] rocket pad teleporter missing (rebuild the map)'); return; }
+  host.on('update', () => { if (!session.flags.has('castle:flag:castleteleporterused') && player.getFeetPosition().distanceTo(dest) < 900) session.flags.add('castle:flag:castleteleporterused'); });
+}
+
+// ---- Dog rounds as zm_castle_dogs.gsc: the first 4-5 rounds in, then every 7-13 rounds
+function setupDogRounds({ session, host }) {
+  let seen = 0;
+  const first = () => { session.nextDogRound = 1 + 4 + Math.floor(Math.random() * 2); seen = 0; };
+  host.on('reset', first); first();
+  host.on('update', () => { if (session.dogRound && session.round !== seen) { seen = session.round; session.nextDogRound = session.round + 7 + Math.floor(Math.random() * 7); } });
 }

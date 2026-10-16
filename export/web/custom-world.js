@@ -196,9 +196,13 @@ export class CustomWorld {
       }
       if(m.type==='PAP'){
         const at=new THREE.Vector3(0,38,14.5).applyAxisAngle(up,m.yaw+FACE).add(m.position);
-        this.interactions.push({kind:'pap',position:at.clone()});
-        this.data.entities.push({id:'custom_pap',targetname:'zombie_vending_upgrade',position:at.toArray()});
-        tasks.push(placeMachine('pap',m.position,m.yaw,(entry.perkYaw??0)*Math.PI/180));
+        const it={kind:'pap',position:at.clone()},ent={id:'custom_pap',targetname:'zombie_vending_upgrade',position:at.toArray()},offset=(entry.perkYaw??0)*Math.PI/180;
+        this.interactions.push(it);this.data.entities.push(ent);
+        tasks.push(placeMachine('pap',m.position,m.yaw,offset).then(o=>{this.papMachine=o;return o;}));
+        // a map script can move the machine (Der Eisendrache's Pack-a-Punch re-forms at one of three places and moves on):
+        // the model, its prompt and where the gun sits while it's upgraded follow
+        this.movePap=(position,yaw)=>{const p=at.clone().sub(m.position).applyAxisAngle(up,yaw-m.yaw).add(position);it.position.copy(p);ent.position=p.toArray();
+          const o=this.papMachine;if(o){o.position.copy(position);o.rotation.y=yaw+FACE+offset;o.updateMatrixWorld(true);}};
       }
       if(m.type==='POWER'){
         this.hasPower=true;

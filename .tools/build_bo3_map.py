@@ -790,6 +790,28 @@ if BSP == 'zm_castle':
         spots = [g(vec(x['origin'])).tolist() for x in sorted(by_tn.get(m.get('target'), []), key=lambda x: int(x.get('script_int', 0)))]
         place_model('CASTLE_LANDING_' + e['script_noteworthy'], m['model'], m['origin'], m.get('angles'), {'flag': e['script_noteworthy'], 'spots': spots})
         place_model('CASTLE_LANDINGON_' + e['script_noteworthy'], m['model'] + '_blue', m['origin'], m.get('angles'), hidden=True)
+    # The teleporter (zm_castle_teleporter.gsc): trigger_teleport_pad 0 in the castle -> the V-10 rocket pad for 500 (power,
+    # 45 s cooldown), pad 1 (script_noteworthy nocost) -> back for free. Destinations: each pad's target structs.
+    for e in by_tn.get('trigger_teleport_pad', []):
+        dst = sorted(by_tn.get(e.get('target'), []), key=lambda x: int(x.get('script_int', 0)))
+        if not dst: continue
+        nm = 'castlereturn' if e.get('script_noteworthy') == 'nocost' else 'rocketpad'
+        o = vec(e['origin']); d = dst[0]
+        marker(f'TELEPORT_{nm}', [o[0], o[1], o[2] - 56], 0, {'cost': 0 if nm == 'castlereturn' else 500, 'cooldown': 45, 'power': True, 'visual': False})
+        marker(f'TPDEST_{nm}', vec(d['origin']), vec(d.get('angles'))[1]); count('TELEPORT')
+    # Pack-a-Punch quest (zm_castle_pap_quest.gsc): the machine (the PAP marker, BO3's storage spot under the map) is
+    # hidden until two of the three s_pap_tp spots (under/rocket/roof) are activated; it re-forms at the third
+    # (s_pap_location, its machine origin 16 lower) once a player looks at it from within 400, then moves to the next
+    # location 2-3 rounds after each first use. Their scattered parts are BO3 script_models.
+    for e in by_tn.get('s_pap_location', []):
+        o = vec(e['origin'])
+        add_node({'name': f'CASTLE_PAPLOC_{e["script_noteworthy"]}', 'translation': g([o[0], o[1], o[2] - 16]).tolist(),
+                  'extras': {'yaw': math.radians(vec(e.get('angles'))[1]), 'index': int(e.get('script_int', 0))}})
+    for e in by_tn.get('s_pap_tp', []):
+        add_node({'name': f'CASTLE_PAPTP_{e["script_noteworthy"]}', 'translation': g(vec(e['origin'])).tolist()})
+        for part in by_tn.get(e.get('target'), []):
+            place_model(f'CASTLE_PAPPART_{e["script_noteworthy"]}', part['model'], part['origin'], part.get('angles'))
+        count('PAP_SPOT')
     # lamps for the der-eisendrache mod's light pool: lit fixtures among the static models, merged within 150 units
     LIT = re.compile(r'candle_.*_on|torch_wall|light_sconce|light_cage|light_spot_hanging$|light_industrial|hurricane_lamp|light_chandelier(?!_chain)|light_lamp_vintage|light_bulb_edison|camp_fire_pit|light_hanging_ball_01$', re.I)
     lamps = []

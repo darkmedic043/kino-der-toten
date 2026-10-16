@@ -121,7 +121,7 @@
       "description": "Black Ops III's castle in the Austrian Alps, ported from the running game: the castle, its doors and debris, perks, the Mystery Box and Pack-a-Punch. Work in progress.",
       "modes": ["zombies", "explore"],
       "dir": "mods/maps/der-eisendrache/",
-      "model": "der-eisendrache.glb?v=5",
+      "model": "der-eisendrache.glb?v=6",
       "scale": 1,
       "background": "#8a96a6",
       "exposure": 1,
