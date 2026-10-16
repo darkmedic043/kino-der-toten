@@ -11,8 +11,11 @@
 // GOBBLE.EXE (mods/gobblegums): rolls a gobblegum from your pack on a slot-machine reel; opts.gums() -> status,
 //   opts.gumRoll() -> {id, commit()} | 'reason' (commit puts it in your hand once the reel stops).
 
-// Every perk in the game. Double-Dew (Cheese Cube) is left out for now, at the user's request.
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
+// perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine: a Melon Pass reward);
+// the terminal and the free-perk gums both check this
+export const perkUnlocked = p => { if (!p.unlock) return true; try { return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned ?? []).includes(p.unlock); } catch { return false; } };
+// Every perk in the game. Double-Dew (Cheese Cube) is left out for now, at the user's request.
 export const PERKS = [
   { id: 'specialty_quickrevive', name: 'Quick Revive', price: 1500, color: '#509ebc', badge: 'QR', icon: OWN + 'quickrevive.webp', fallback: TEX + 'specialty_quickrevive_zombies.png',
     blurb: 'Recover faster.',
@@ -271,9 +274,7 @@ function build() {
     ? `<img class="art" src="${p.icon}" alt="" draggable="false" data-fallback="${p.fallback ?? ''}" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else this.replaceWith(Object.assign(document.createElement('div'),{className:'badge',style:'background:${p.color}',textContent:'${p.badge}'}))">`
     : `<div class="badge" style="background:${p.color}">${p.badge}</div>`;
   // why a perk can't be bought right now ('' when it can)
-  // perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine: a Melon Pass reward)
-  const unlocked = p => { if (!p.unlock) return true; try { return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned ?? []).includes(p.unlock); } catch { return false; } };
-  const blocked = p => opts.owned(p) ? 'owned' : !unlocked(p) ? 'pass' : opts.needsPower(p) && !opts.power() ? 'power' : '';
+  const blocked = p => opts.owned(p) ? 'owned' : !perkUnlocked(p) ? 'pass' : opts.needsPower(p) && !opts.power() ? 'power' : '';
 
   function renderGrid() {
     grid.innerHTML = PERKS.map((p, i) => {

@@ -223,3 +223,4 @@
 - 2026-10-16: decoded textures freed from RAM after GPU upload: ~2 GB less per map (performance.md).
 - 2026-10-16: free perks no longer raise the perk price (gameplay.md).
 - 2026-10-16: Sandbox matches now pay credits and count for challenges (`noPayoutMaps` emptied).
+- 2026-10-16: free-perk gums (Perkaholic, On the House, Soda Fountain) skip Widow's Wine until it's unlocked in the pass.

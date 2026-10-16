@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { zombieHealth } from '../../rules.js';
 import { loadGums, loadGumProfile, gumById, activePack } from './gums.js';
 import { loadProfile, cloudReady, unlockLvl } from '../../profile.js';
-import { PERKS } from '../terminal-booth/desktop.js';
+import { PERKS, perkUnlocked } from '../terminal-booth/desktop.js';
 
 export default async function setup(api){
   const {session,host,powerups,enemies,player,mod}=api;
@@ -62,7 +62,7 @@ export default async function setup(api){
     return p;
   }
   const drop=(type,angle=0)=>powerups?.spawn(type,dropPoint(angle));
-  const perkList=()=>PERKS.filter(p=>!session.perks?.has(p.id));
+  const perkList=()=>PERKS.filter(p=>!session.perks?.has(p.id)&&perkUnlocked(p));   // pass-locked perks (Widow's Wine) only once owned
   function givePerk(p){
     if(api.perkInfo&&!api.perkInfo[p.id])api.perkInfo[p.id]={name:p.name,price:p.price,color:p.color,icon:p.badge};
     session.perks.add(p.id);session.health=session.maxHealth;
