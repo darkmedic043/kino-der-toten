@@ -220,3 +220,4 @@
 - 2026-10-15: load diagnostics → ~/.local/share/kino/client-log.jsonl (black Rind window investigation; performance.md).
 - 2026-10-15: Widow's Wine is a Melon Pass unlock (page 4, replaces the Harvest Ring reticle); locked at the terminal until owned (pass.md).
 - 2026-10-15: Death Perception outlines only hidden zombies; Widow's Wine web blast and webbing; Wisp Tea small, blue and weaker; Iron Man suits recharge in ~2 min (gameplay.md).
+- 2026-10-16: decoded textures freed from RAM after GPU upload: ~2 GB less per map (performance.md).

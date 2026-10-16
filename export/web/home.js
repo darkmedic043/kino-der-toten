@@ -1,4 +1,5 @@
 // Main menu (not part of upstream): map browser, loadout, character and mods.
+import './texture-memory.js';   // first: frees decoded texture images once uploaded (menu previews, portraits, Gunsmith)
 import * as THREE from 'three';
 import { loadModel, ViewWeapon } from './animation.js';
 import { applyGlow, tickGlow } from './mods/bo3-weapons/glow.js';
