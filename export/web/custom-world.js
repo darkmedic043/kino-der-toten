@@ -78,6 +78,13 @@ export class CustomWorld {
     const meshes=[];root.traverse(o=>{if(o.isMesh&&!o.userData.marker)meshes.push(o);});
     const dedicated=meshes.filter(o=>COLLISION_NAME.test(rawName(o))),playerOnly=meshes.filter(o=>PLAYER_COLLISION_NAME.test(rawName(o)));
     for(const o of [...dedicated,...playerOnly])o.visible=false;
+    // Overlay layers (BO3 ports' _blend surfaces and decals: see-through, drawn over the surface below): a fixed draw
+    // order per material (sorted by distance, stacked layers swapped as the camera moved and flickered) and a polygon
+    // offset (their small push off the surface lost to depth precision at range: z-fighting)
+    {const layer=new Map();
+      for(const o of meshes){const m=[o.material].flat()[0];if(!m?.transparent||!/_blend|decal/i.test(m.name??''))continue;
+        if(!layer.has(m)){layer.set(m,layer.size);m.polygonOffset=true;m.polygonOffsetFactor=-1;m.polygonOffsetUnits=/decal/i.test(m.name)?-8:-4;}
+        o.renderOrder=(/decal/i.test(m.name)?2000:1000)+layer.get(m);}}
     progress('Building collision',35);
     const solid=positionsOf(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)));
     if(!solid)throw new Error('The map has no meshes to stand on');

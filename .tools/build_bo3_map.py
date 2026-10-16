@@ -99,7 +99,7 @@ TINTS = [(r'rust|iron|steel|metal|conduit|pipe|bracket|bolt|chain|ibeam|beam|rai
          (r'paper|cloth|fabric|canvas|sack|bag', [.45, .41, .34]), (r'insulator|ceramic|porcelain|light|lamp|bulb|glass', [.72, .7, .66]),
          (r'rubber|tire|cable|wire|black', [.05, .05, .05]), (r'snow|ice', [.8, .82, .85])]
 PAINT = [(r'blood', [.32, .03, .03]), (r'grey_?drk|grey_?dk|gray_?dark|dark_?grey|drk|_dk\b', [.13, .13, .13]), (r'black', [.05, .05, .05]),
-         (r'grey|gray', [.35, .35, .35]), (r'white', [.78, .78, .76]), (r'red', [.4, .07, .06]), (r'green', [.16, .26, .13]),
+         (r'grey|gray|_gry', [.35, .35, .35]), (r'white', [.78, .78, .76]), (r'red', [.4, .07, .06]), (r'green', [.16, .26, .13]),
          (r'blue', [.1, .16, .3]), (r'yellow|caution', [.62, .5, .1]), (r'orange', [.6, .3, .08]), (r'rust|brown', [.36, .2, .1])]
 def name_tint(name):
     for pat, col in PAINT:
@@ -125,7 +125,8 @@ def material(key, name, color, normal, two_sided=False, overlay=False, fallback=
         m['pbrMetallicRoughness']['baseColorTexture'] = {'index': c}
         # a tint mask (see texture()), or a BO3 "micro" detail map (i_t7_micro_*: near-white detail the game multiplies by a
         # colour constant the export lacks; untinted, lockers, gondola trim and machines came out white)
-        if (color['bright'] > .85 or '_micro_' in color['uri']) and not re.search(r'snow|ice|paper|glass|light|bulb|lamp', name, re.I):
+        # (a '_snow' variant of another material is still that material: only real snow, ice, paper... stay untinted)
+        if (color['bright'] > .85 or '_micro_' in color['uri']) and not re.search(r'snow|ice|paper|glass|light|bulb|lamp', re.sub(r'_snow(?=_|$)', '', name), re.I):
             t = name_tint(name)
             if '_micro_' in color['uri'] and color['bright'] <= .85: t = [min(1, v / max(color['bright'], .3)) for v in t]   # tint x detail ~ the tint
             m['pbrMetallicRoughness']['baseColorFactor'] = [*t, 1]
@@ -242,7 +243,11 @@ def quat(R):   # rotation matrix -> (x, y, z, w)
     q = [0, 0, 0, 0]; q[i] = s / 4; q[j] = (R[j, i] + R[i, j]) / s; q[k] = (R[k, i] + R[i, k]) / s; q[3] = (R[k, j] - R[j, k]) / s
     return q
 by_model = {}
-for m in info['models']: by_model.setdefault(m['name'], []).append(m)
+_seen = set()
+for m in info['models']:   # exact duplicates (same model, place and axes: 413 on Der Eisendrache) z-fight with themselves
+    k = (m['name'], tuple(round(x, 1) for x in m['origin']), tuple(round(x, 3) for x in m['axes']))
+    if k in _seen: continue
+    _seen.add(k); by_model.setdefault(m['name'], []).append(m)
 mesh_cache = {}
 def prop_mesh(name):   # a BO3 model as a glTF mesh (cached), or None if Greyhound didn't export it
     if name in mesh_cache: return mesh_cache[name]
