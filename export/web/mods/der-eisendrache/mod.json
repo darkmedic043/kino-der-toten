@@ -1,0 +1,5 @@
+{
+  "name": "Der Eisendrache extras",
+  "description": "Der Eisendrache's (BO3 port) zone logic, as zm_castle_zones.gsc: zones switch on when a door, debris or the power sets the flag that links them. Only active on that map.",
+  "script": "mod.js"
+}

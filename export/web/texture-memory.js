@@ -17,6 +17,7 @@ const released = new WeakMap();  // Source -> {blob, args, pending}
 const stats = { released: 0, bytes: 0, restored: 0 };
 const kept = new WeakSet();   // sources whose pixels had to come back once: they stay (no free/decode loop)
 let native = null;
+const IMAGE_FETCHES = 48;
 
 export function installTextureMemory() {
   if (globalThis.__kinoTextureMemory || typeof createImageBitmap !== 'function' || /[?&]keepTextures/.test(globalThis.location?.search ?? '')) return stats;   // ?keepTextures: off (A/B)
@@ -27,6 +28,18 @@ export function installTextureMemory() {
     if (src instanceof Blob) origins.set(bmp, { blob: src, args });
     return bmp;
   };
+  // At most IMAGE_FETCHES image downloads at once: GLTFLoader asks for every texture of a map together, and Chromium
+  // fails the excess with ERR_INSUFFICIENT_RESOURCES (Der Eisendrache has ~2,400), leaving those materials untextured
+  const nativeFetch = globalThis.fetch?.bind(globalThis);
+  if (nativeFetch) {
+    let running = 0; const queue = [];
+    const next = () => { if (running < IMAGE_FETCHES && queue.length) { running++; queue.shift()(); } };
+    globalThis.fetch = function (input, init) {
+      const url = typeof input === 'string' ? input : input?.url ?? String(input);
+      if (!/\.(webp|png|jpe?g|ktx2)(\?|$)/i.test(url)) return nativeFetch(input, init);
+      return new Promise(go => { queue.push(go); next(); }).then(() => nativeFetch(input, init)).finally(() => { running--; next(); });
+    };
+  }
   const proto = THREE.Texture.prototype;
   // three's constructor assigns `this.onUpdate = null`, which lands in this setter; the getter always hands three a
   // callback that runs the texture's own (if any) and then frees the image

@@ -13,7 +13,11 @@ ap.add_argument('--pid', type=int); ap.add_argument('--pools', default='0x93883F
 ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'export_game', 'bo3', 'maps'))
 a = ap.parse_args()
 BASE = 0x140000000
-pid = a.pid or next(int(p) for p in os.listdir('/proc') if p.isdigit() and 'BlackOps3.exe' in open(f'/proc/{p}/cmdline', 'rb').read().decode('latin1') and 'reaper' not in open(f'/proc/{p}/cmdline', 'rb').read().decode('latin1') and 'proton' not in open(f'/proc/{p}/cmdline', 'rb').read().decode('latin1') and 'sh' != open(f'/proc/{p}/comm').read().strip())
+def _proc(p, f):
+    try: return open(f'/proc/{p}/{f}', 'rb').read().decode('latin1')
+    except OSError: return ''
+# the game itself (comm `Main`); Steam's launcher processes also carry BlackOps3.exe on their command lines
+pid = a.pid or next(int(p) for p in os.listdir('/proc') if p.isdigit() and _proc(p, 'comm').strip() == 'Main' and 'BlackOps3.exe' in _proc(p, 'cmdline'))
 mem = open(f'/proc/{pid}/mem', 'rb', buffering=0)
 def rd(addr, n): mem.seek(addr); return mem.read(n)
 def q(addr): return struct.unpack('<Q', rd(addr, 8))[0]
@@ -89,4 +93,8 @@ for k in range(smodel_n):
     models.append({'name': name, 'origin': [x, y, z], 'axes': list(m), 'scale': scale})
 json.dump({'gfx': gfx_name, 'map': map_name, 'units': 'inches', 'vertices': vert_n, 'indices': idx_n,
            'surfaces': surfaces, 'materials': materials, 'models': models}, open(os.path.join(out, f'{map_name}.json'), 'w'))
-print(f'wrote {out}: {len(materials)} materials, {len(models)} static models', file=sys.stderr)
+# the entity string (MapEnts pool, +0x1E0: name, entityString @+8, length @+0x10) -> <map>.ents
+e = q(pools + 0x1E0)
+ents = rd(q(e + 8), struct.unpack('<i', rd(e + 0x10, 4))[0]).split(b'\0')[0]
+open(os.path.join(out, f'{map_name}.ents'), 'wb').write(ents)
+print(f'wrote {out}: {len(materials)} materials, {len(models)} static models, {ents.count(b"{")} entities', file=sys.stderr)

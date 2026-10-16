@@ -144,7 +144,7 @@ print(f'{BSP}: {len(P)} vertices, {len(info["surfaces"])} surfaces')
 
 # entities and the playable area (union of the zone volumes and spawn points, grown by 900)
 ents = [dict(re.findall(r'"([^"]*)" "([^"]*)"', b)) for b in re.findall(r'\{(.*?)\}', open(os.path.join(SRC, BSP + '.ents'), encoding='latin1').read(), re.S)]
-vec = lambda s: [float(x) for x in (s or '0 0 0').split()][:3]
+vec = lambda s: [float(x) for x in s][:3] if isinstance(s, (list, tuple)) else [float(x) for x in (s or '0 0 0').split()][:3]
 playable = np.array([vec(e['origin']) for e in ents if e.get('script_noteworthy') in ('player_volume', 'spawn_location', 'riser_location') or e.get('classname') == 'info_player_start'])
 lo, hi = playable.min(0) - 900, playable.max(0) + 900
 print('playable area (CoD):', lo.round(), hi.round())
@@ -358,18 +358,27 @@ def window_opening(o, out):
 PERKS = {'specialty_armorvest': 'jugg', 'specialty_quickrevive': 'revive', 'specialty_fastreload': 'speedcola', 'specialty_doubletap2': 'doubletap',
          'specialty_staminup': 'staminup', 'specialty_deadshot': 'deadshot', 'specialty_additionalprimaryweapon': 'mulekick'}   # the last three: perks-plus mod
 WEAPONS = {'ar_longburst': 'm16_zm', 'shotgun_pump': 'ithaca_zm', 'pistol_burst': 'cz75_zm', 'ar_marksman': 'm14_zm', 'smg_fastfire': 'mpl_zm',
-           'smg_versatile': 'mp5k_zm', 'ar_cqb': 'famas_zm', 'ar_standard': 'bo3_ak117', 'pistol_fullauto': 'bo3_g18_death'}
-START_ZONE = 'receiver'
-# BO3 zone (volume name without _zone) -> the door zones that activate it. A door's script_flag enter_<x> opens zone x;
-# zones without a door of their own open with the doors next to them (their spawners are placed once per listed zone).
-ZONE_GROUPS = {'receiver': ['start'], 'warehouse_bottom': ['warehouse_building'], 'warehouse_top': ['warehouse_building'],
-               'wnuen': ['wnuen_building'], 'wnuen_bridge': ['wnuen_building'], 'bridge': ['warehouse_building', 'wnuen_building'],
-               'outside_south': ['outside_east', 'outside_west']}
+           'smg_versatile': 'mp5k_zm', 'ar_cqb': 'famas_zm', 'ar_standard': 'bo3_ak117', 'pistol_fullauto': 'bo3_g18_death',
+           'lmg_light': 'rpk_zm', 'smg_standard': 'ak74u_zm'}   # the last two: Der Eisendrache's Dingo and Kuda
+# Per map: the start zone, BO3 zone -> the door zones that activate it, and the Mystery Box that starts out.
+# The Giant: a door's script_flag enter_<x> opens zone x; zones without a door of their own open with the doors next to
+# them (their spawners are placed once per listed zone). Der Eisendrache: every zone keeps its own id and the
+# der-eisendrache mod switches them on as zm_castle_zones.gsc does (adjacent zones linked by door flags); a door's zone
+# is its whole flag (connect_start_to_subclocktower -> connectstarttosubclocktower).
+MAPCFG = {
+    'zm_factory': {'start': 'receiver', 'box': 'start_chest', 'groups': {
+        'receiver': ['start'], 'warehouse_bottom': ['warehouse_building'], 'warehouse_top': ['warehouse_building'],
+        'wnuen': ['wnuen_building'], 'wnuen_bridge': ['wnuen_building'], 'bridge': ['warehouse_building', 'wnuen_building'],
+        'outside_south': ['outside_east', 'outside_west']}},
+    'zm_castle': {'start': 'start', 'box': 'behind_tram_station_chest', 'groups': {'start': ['start'], 'tram_high': ['start']}},
+}[BSP]
+START_ZONE, ZONE_GROUPS = MAPCFG['start'], MAPCFG['groups']
+zname = lambda t: t.removeprefix('zone_').removesuffix('_spawners').removesuffix('_zone')   # receiver_zone / zone_start -> receiver / start
 zid = lambda z: z.replace('_', '')   # CustomWorld reads a marker's zone up to the first underscore
 def zone_ids(z): return [zid(x) for x in ZONE_GROUPS.get(z, [z])]
 zones = {}
 for e in ents:
-    if e.get('script_noteworthy') == 'player_volume': zones.setdefault(e['targetname'].removesuffix('_zone'), []).append(vec(e['origin']))
+    if e.get('script_noteworthy') == 'player_volume': zones.setdefault(zname(e['targetname']), []).append(vec(e['origin']))
 def zone_of_point(p):
     best = min(((z, np.linalg.norm(np.array(o) - p)) for z, os_ in zones.items() for o in os_), key=lambda x: x[1])[0]
     return zone_ids(best)[0]
@@ -389,7 +398,7 @@ for e in ents:
     elif sn == 'riser_location' and tn.endswith('_spawners'):
         # BO3's spawn_location structs are behind the walls (zombies walk from there to a window): CustomWorld would snap
         # them to the nearest walkable spot (the mainframe platform...), so only the windows' spawns and the ground risers
-        for z in zone_ids(tn.removesuffix('_spawners').removesuffix('_zone')): marker(f'ZSPAWN_{z}', o, yaw, {'zone': z}); count('ZSPAWN')
+        for z in zone_ids(zname(tn)): marker(f'ZSPAWN_{z}', o, yaw, {'zone': z}); count('ZSPAWN')
     elif cls.startswith('zbarrier_zmcore_basicwoodbarrier'):
         # zbarrier origins are at the floor; CustomWorld centres the boards on the marker
         wz = zone_of_point(np.array(o))
@@ -413,11 +422,11 @@ for e in ents:
             if goal:   # the exterior goal (a few units outside the boards) gives the true outward direction
                 d = np.array(vec(goal['origin'])) - np.array(o); d[2] = 0; dist = max(np.linalg.norm(d), 1e-6); d = d / dist * 100; dist = 100
             if dist > 1:
-                for z in zone_ids(sp[0]['targetname'].removesuffix('_spawners').removesuffix('_zone')):
+                for z in zone_ids(zname(sp[0]['targetname'])):
                     # 80 units out: the nearest unpaired ZSPAWN is the one CustomWorld pairs (and aims the boards at)
                     marker(f'ZSPAWN_{z}', (np.array(o) + d / dist * min(80, dist * .8)).tolist(), yaw, {'zone': z}); count('ZSPAWN_window')
-    elif cls == 'zbarrier_zmcore_MagicBox': marker('BOX_start' if sn.startswith('start_chest') else 'BOX', o, yaw - 90); count('BOX')   # -90: undo CustomWorld's FACE
-    elif cls == 'zbarrier_zmcore_packapunch': marker('PAP', o, yaw); count('PAP')
+    elif cls.lower() == 'zbarrier_zmcore_magicbox': marker('BOX_start' if sn.startswith(MAPCFG['box']) else 'BOX', o, yaw - 90); count('BOX')   # -90: undo CustomWorld's FACE
+    elif cls.startswith('zbarrier_') and cls.endswith('packapunch'): marker('PAP', o, yaw); count('PAP')
     elif tn == 'use_power_switch':
         # no angle on the trigger: face out of the nearest wall (level triangles within 60 units, near-vertical, the one
         # closest to the switch); the lever turns yaw + FACE + perkYaw(-90) = yaw, and its front is +Z
@@ -448,22 +457,37 @@ by_target = {}
 for e in ents:
     if e.get('targetname'): by_target.setdefault(e['targetname'], []).append(e)
 done = set()
+# Der Eisendrache also has zombie_debris (same idea) and zbarrier gates as door pieces: the scissor gate and the drop-down
+# buy gates (BO3 animates them; here they rise). Debris whose only pieces are brush models (their geometry isn't in the
+# dump) get a stand-in: a pile of BO3 rubble at the clip brush.
+GATE_MODELS = {'zbarrier_zm_castle_gate_dropdown_snow': 'p7_fxanim_zm_castle_drop_down_buy_gate_mod'}
+RUBBLE = 'p7_debris_concrete_rubble_lg_01'
+def door_piece(model, origin, angles, move):
+    mi = prop_mesh(model)
+    if mi is None: print('  door piece not exported:', model); return None
+    r = math.radians(vec(angles)[1]) / 2
+    node = {'name': model, 'mesh': mi, 'translation': g(vec(origin)).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]}
+    if move: node['extras'] = {'move': g(move).tolist()}
+    gltf['nodes'].append(node); return len(gltf['nodes']) - 1
 for e in ents:
-    if e.get('targetname') != 'zombie_door' or e.get('target') in done: continue
-    done.add(e.get('target'))
+    if e.get('targetname') not in ('zombie_door', 'zombie_debris') or (e.get('target'), e.get('script_flag')) in done: continue
+    done.add((e.get('target'), e.get('script_flag')))
     electric = e.get('script_noteworthy') == 'electric_door'
-    z = '' if electric else zid(e.get('script_flag', '').removeprefix('enter_'))
+    z = '' if electric and BSP == 'zm_factory' else zid(e.get('script_flag', '').removeprefix('enter_'))
     cost = int(float(e.get('zombie_cost', 750)))
-    kids = []
+    kids, brushes = [], []
     for part in by_target.get(e.get('target'), []):
-        if part.get('classname') != 'script_model': continue
-        mi = prop_mesh(part['model'])
-        if mi is None: print('  door piece not exported:', part['model']); continue
-        r = math.radians(vec(part.get('angles'))[1]) / 2
-        node = {'name': part['model'], 'mesh': mi, 'translation': g(vec(part['origin'])).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]}
-        if part.get('script_vector'): node['extras'] = {'move': g(vec(part['script_vector'])).tolist()}
-        gltf['nodes'].append(node); kids.append(len(gltf['nodes']) - 1)
-    if not kids: continue
+        pc = part.get('classname', '')
+        if pc == 'script_model': k = door_piece(part['model'], part['origin'], part.get('angles'), vec(part['script_vector']) if part.get('script_vector') else None)
+        elif pc.startswith('zbarrier_'): k = door_piece(GATE_MODELS.get(pc, part.get('model')), part['origin'], part.get('angles'), [0, 0, 110])
+        elif pc == 'script_brushmodel': brushes.append(vec(part['origin'])); k = None
+        else: k = None
+        if k is not None: kids.append(k)
+    if not kids and brushes and e.get('targetname') == 'zombie_debris':
+        for o_ in brushes[:2]:
+            k = door_piece(RUBBLE, [o_[0], o_[1], o_[2] - 60], e.get('angles'), [0, 0, -140])
+            if k is not None: kids.append(k)
+    if not kids: print('  door without pieces:', e.get('script_flag')); continue
     add_node({'name': f'DOOR_{z or "power"}_{cost}', 'children': kids, 'extras': {'zone': z, 'cost': cost, 'electric': electric}})
     count('DOOR')
 # Teleporters (Der Riese): each pad sends you to the mainframe for 1500 (one-way: TELEPORT_<pad> + TPDEST_<pad>)
@@ -497,7 +521,7 @@ for e in ents:
 # CustomWorld's BO1 handle and panel are skipped: handle false), TRAPZONE cylinders along the row of fire_med points
 for e in ents:
     tn = e.get('targetname', '')
-    if not re.fullmatch(r'trap_[abc]', tn): continue
+    if BSP != 'zm_factory' or not re.fullmatch(r'trap_[abc]', tn): continue   # The Giant's (Der Eisendrache's trap_b is something else)
     if e.get('classname') == 'trigger_use':
         marker(f'TRAP_{tn.replace("_", "")}_1000', vec(e['origin']), 0, {'kind': 'electric', 'handle': False, 'power': True}); count('TRAP')
     elif e.get('script_sound') == 'fire_med':
@@ -538,7 +562,7 @@ for e in ents:
             r = math.radians(vec(e.get('angles'))[1]) / 2
             add_node({'name': 'GIANT_PRIZE', 'translation': g(vec(e['origin'])).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]})
         else: add_node({'name': 'GIANT_PRIZE_USE', 'translation': g(vec(e['origin'])).tolist()})
-for k, o in enumerate([(900, -586, 151), (987, -873, 122), (-1340, -483, 255)]): add_node({'name': f'GIANT_JAR_{k}', 'translation': g(o).tolist()}); count('JAR')
+for k, o in enumerate([(900, -586, 151), (987, -873, 122), (-1340, -483, 255)] if BSP == 'zm_factory' else []): add_node({'name': f'GIANT_JAR_{k}', 'translation': g(o).tolist()}); count('JAR')
 
 # The two drawbridges (fxanim scriptbundles p7_fxanim_zm_factory_bridge_<lft|rt>_bundle; zm_factory.gsc bridge_init plays
 # them when the power comes on). Greyhound exported each rig (_mod) and its 145-frame animation (_anim). Each becomes a

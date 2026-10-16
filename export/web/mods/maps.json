@@ -114,6 +114,25 @@
       "fog": 0.00022,
       "mergeStatic": true,
       "mergeExclude": "^GIANT_"
+    },
+    {
+      "id": "der-eisendrache",
+      "title": "Der Eisendrache",
+      "description": "Black Ops III's castle in the Austrian Alps, ported from the running game: the castle, its doors and debris, perks, the Mystery Box and Pack-a-Punch. Work in progress.",
+      "modes": ["zombies", "explore"],
+      "dir": "mods/maps/der-eisendrache/",
+      "model": "der-eisendrache.glb?v=1",
+      "scale": 1,
+      "background": "#8a96a6",
+      "exposure": 1,
+      "nearbySpawns": true,
+      "stairSmoothing": true,
+      "player": { "slopeStick": true },
+      "perkYaw": -90,
+      "machines": "bo3",
+      "fog": 0.00018,
+      "mergeStatic": true,
+      "mergeExclude": "^CASTLE_"
     }
   ]
 }

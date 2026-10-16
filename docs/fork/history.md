@@ -224,3 +224,4 @@
 - 2026-10-16: free perks no longer raise the perk price (gameplay.md).
 - 2026-10-16: Sandbox matches now pay credits and count for challenges (`noPayoutMaps` emptied).
 - 2026-10-16: free-perk gums (Perkaholic, On the House, Soda Fountain) skip Widow's Wine until it's unlocked in the pass.
+- 2026-10-16: Der Eisendrache (BO3) port started: dumped from the running game, Greyhound exports, builder per-map config, zone logic mod; WIP (waw-ports.md).
