@@ -1,6 +1,7 @@
 // Der Eisendrache (a BO3 map ported by .tools/build_bo3_map.py; see docs/fork/waw-ports.md). Does nothing elsewhere.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { CollisionWorld } from '../../collision-world.js';
 // Zones: BO3's zone manager links pairs of zones by a flag (zm_castle_zones.gsc add_adjacent_zone) and some flags set
 // others (add_zone_flags). The build gives every door and debris pile its whole flag as its zone
 // (connect_start_to_subclocktower -> connectstarttosubclocktower) and every spawner its BO3 zone without underscores;
@@ -87,7 +88,10 @@ function setupGondola(api) {
   const car1 = rig(root, 'TRAM01'), car2 = rig(root, 'TRAM02');
   const drop = at(root, 'CASTLE_TRAMDROP'), tokenAt = at(root, 'CASTLE_TRAMTOKEN'), inside = at(root, 'CASTLE_TRAMINSIDE'), lever = at(root, 'CASTLE_TRAMLEVER');
   if (!car1 || !car2 || !drop || !lever) { console.warn('[der-eisendrache] gondola pieces missing (rebuild the map)'); return null; }
-  const gates = []; root.traverse(o => { if (o.name === 'CASTLE_TRAMGATE' && o.userData.open) gates.push({ o, shut: o.getWorldPosition(new THREE.Vector3()), open: new THREE.Vector3(...o.userData.open) }); });
+  // GLTFLoader makes repeated node names unique (CASTLE_TRAMGATE, CASTLE_TRAMGATE_1...): match by prefix. Each gate also
+  // collides (a scripted mover following it: shut it blocks the platform edge, as BO3's tram_clip; open it's out of the way)
+  const gates = []; root.traverse(o => { if (/^CASTLE_TRAMGATE(_\d+)?$/.test(o.name) && o.userData.open) gates.push({ o, shut: o.getWorldPosition(new THREE.Vector3()), open: new THREE.Vector3(...o.userData.open) }); });
+  for (const g of gates) { const meshes = []; g.o.updateMatrixWorld(true); g.o.traverse(c => { if (c.isMesh) meshes.push(c); }); g.col = world.addScriptedMover?.(meshes, { exact: true }); }
   // the fuse: a glowing cylinder (BO3's fuse model wasn't exported)
   const fuseMesh = new THREE.Group();
   fuseMesh.add(new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 14, 12), new THREE.MeshStandardMaterial({ color: 0x8a6a3a, metalness: .6, roughness: .4 })));
@@ -100,7 +104,7 @@ function setupGondola(api) {
     Object.assign(st, { phase: 'intro', t0: 0, fuseOnGround: false, held: false, item: null, gate: 0, started: false });
     fuseMesh.visible = false; car1.pose('called_a', 99); car2.pose('start', 0); setGates(0);
   };
-  const setGates = k => { st.gate = k; for (const g of gates) moveNode(g.o, g.shut.clone().lerp(g.open, k)); };
+  const setGates = k => { st.gate = k; for (const g of gates) { const p = g.shut.clone().lerp(g.open, k); moveNode(g.o, p); g.col?.move(p.sub(g.shut)); } };
   function reward() {
     const r = Math.floor(Math.random() * 100), round = session.round ?? 1;
     if (r === 1 && round >= 5) { session.giveWeapon?.('ray_gun_zm'); announce?.('THE GONDOLA', 'RAY GUN', 3); return null; }
@@ -169,8 +173,9 @@ function setupGondola(api) {
   const carCol = [car1, car2].map(c => {
     if (!world.addScriptedMover) return null;
     c.pose('called_a', 99);   // built in the docked pose (the cars tilt on the cable elsewhere; only docked do players get in)
-    // only its floor (tread plate, grating): the whole car as collision wedged the player inside it
-    const meshes = []; c.node.traverse(o => { if (!o.isMesh || !/floor|treadplate|grate/i.test([o.material].flat()[0]?.name ?? '')) return; for (let p = o; p && p !== c.node; p = p.parent) if (/door/i.test(p.name)) return; meshes.push(o); });
+    // floor, walls and windows; not the doors (they open while docked) nor the bits that wedged the player (decals,
+    // snow, icicles, lights, the roof's cable gear above the cabin)
+    const meshes = []; c.node.traverse(o => { if (!o.isMesh || /decal|snow|icicle|ice|light|bulb|roller|rubber|wheel|cable/i.test([o.material].flat()[0]?.name ?? '')) return; for (let p = o; p && p !== c.node; p = p.parent) if (/door|wheel/i.test(p.name)) return; meshes.push(o); });
     const ref = c.node.getObjectByName(c.node.name + '_tag_origin') ?? c.node.children[0];
     const m = world.addScriptedMover(meshes, { exact: true });
     const out = m && ref ? { m, ref, base: ref.getWorldPosition(new THREE.Vector3()) } : null;
@@ -179,6 +184,15 @@ function setupGondola(api) {
   reset();   // back to the starting poses
   const v = new THREE.Vector3();
   host.on('update', () => { for (const c of carCol) c.m.move(c.ref.getWorldPosition(v).sub(c.base)); });
+  // BO3's tram_clip: the gate models are low; an invisible wall closes each gate gap while the car is away, and while
+  // it's docked a slab bridges the car and the platform (there were gaps to fall through into the shaft)
+  const box = (min, max) => { const b = new THREE.Box3(min, max), size = b.getSize(new THREE.Vector3()), geo = new THREE.BoxGeometry(size.x, size.y, size.z); geo.translate(...b.getCenter(new THREE.Vector3()).toArray()); const d = { collider: new CollisionWorld(geo), box: b, enabled: false, window: true }; world.dynamic.push(d); return d; };
+  const pairs = []; for (const g of gates) { const pr = pairs.find(p => p[0].shut.distanceTo(g.shut) < 140); if (pr) pr.push(g); else pairs.push([g]); }
+  const floorY = Math.min(...gates.map(g => g.shut.y));
+  const walls = pairs.map(pr => { const a = pr[0].shut, b = (pr[1] ?? pr[0]).shut, lo = a.clone().min(b), hi = a.clone().max(b); lo.x -= 12; lo.z -= 12; hi.x += 12; hi.z += 12; lo.y = floorY; hi.y = floorY + 110; return box(lo, hi); });
+  const span = new THREE.Box3(); for (const g of gates) span.expandByPoint(g.shut);
+  const slab = gates.length ? box(new THREE.Vector3(span.min.x - 10, floorY - 16, span.min.z - 30), new THREE.Vector3(span.max.x + 10, floorY - 6.5, span.max.z + 30)) : null;
+  host.on('update', () => { const docked = st.phase === 'docked'; for (const w of walls) w.enabled = !docked || st.gate < .5; if (slab) slab.enabled = docked; });
   return { state: () => ({ ...st, item: !!st.item }), giveFuse: () => { st.held = true; } };
 }
 
@@ -310,7 +324,7 @@ function setupPap(api) {
     const l = root.getObjectByName('CASTLE_PAPLOC_' + k), t = root.getObjectByName('CASTLE_PAPTP_' + k);
     if (l) locs[k] = { pos: l.getWorldPosition(new THREE.Vector3()), yaw: l.userData.yaw ?? 0 };
     if (t) tps[k] = t.getWorldPosition(new THREE.Vector3());
-    parts[k] = []; root.traverse(o => { if (o.name === 'CASTLE_PAPPART_' + k) parts[k].push(o); });
+    parts[k] = []; root.traverse(o => { if (new RegExp('^CASTLE_PAPPART_' + k + '(_\\d+)?$').test(o.name)) parts[k].push(o); });
   }
   if (Object.keys(locs).length < 3 || !world.movePap) { console.warn('[der-eisendrache] Pack-a-Punch spots missing (rebuild the map)'); return null; }
   const st = { active: new Set(), reformAt: null, reformed: false, at: null, used: false, nextMove: 0 };

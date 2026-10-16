@@ -843,6 +843,58 @@ if BSP == 'zm_castle':
         for part in by_tn.get(e.get('target'), []):
             place_model(f'CASTLE_PAPPART_{e["script_noteworthy"]}', part['model'], part['origin'], part.get('angles'))
         count('PAP_SPOT')
+    # Every other script_model BO3 shows at the start (the subclocktower's demon-gate flagstone seal: without it a round
+    # hole in the floor, user; the undercroft pyramid, consoles, safes, gramophones, astroglobe, obelisk, clock, the
+    # halftrack...). Left out: Easter egg end states (_after, damaged), glow/outline/symbol markers, skinned characters
+    # (c_*), empty tags, the gravity spike pickup. Solid ones also collide (COL_scriptmodels: navmesh too).
+    PLACED = {'tram_gates', 'player_tram_gates', 'tram_call_lever_2'}
+    for e in ents:
+        if e.get('targetname') in ('zombie_door', 'zombie_debris', '115_flinger_pad_aimer', '115_flinger_landing_pad', 's_pap_tp'): PLACED.add(e.get('target'))
+    for tn in ('115_flinger_pad_aimer', '115_flinger_landing_pad'):
+        for e in by_tn.get(tn, []):
+            m_ = one(e.get('target'))
+            if m_: PLACED.add(m_.get('targetname'))
+    SKIP_SM = re.compile(r'_after$|dmg_door|outline|_glow|glow_|emissive|symbol|gravityspike|lowgrav|^cs_glow', re.I)
+    sm_P, sm_T, sn0 = [], [], 0
+    for e in ents:
+        if e.get('classname') != 'script_model' or e.get('targetname') in PLACED: continue
+        mdl, tn = e.get('model', ''), e.get('targetname') or 'unnamed'
+        if not mdl or mdl == 'tag_origin' or mdl.startswith('c_') or SKIP_SM.search(tn) or SKIP_SM.search(mdl): continue
+        place_model('CASTLE_SM_' + tn, mdl, e['origin'], e.get('angles'))
+        if mdl in prop_geo and not NO_COLLIDE.search(mdl):
+            pp, tt = prop_geo[mdl]
+            if (pp.max(0) - pp.min(0)).max() >= 24:
+                pitch, yaw_, roll = vec(e.get('angles')); R = C @ euler_cod(pitch, yaw_, roll) @ C.T
+                sm_P.append(pp @ R.T + g(vec(e['origin']))); sm_T.append(tt + sn0); sn0 += len(pp)
+        count('SCRIPT_MODEL')
+    if sm_P:
+        SP, ST = np.concatenate(sm_P).astype(np.float32), np.concatenate(sm_T).astype(np.uint32)
+        gltf['meshes'].append({'name': 'COL_scriptmodels', 'primitives': [{'attributes': {'POSITION': accessor(SP, 'VEC3', 34962, True)}, 'indices': accessor(ST.ravel(), 'SCALAR', 34963)}]})
+        add_node({'name': 'COL_scriptmodels', 'mesh': len(gltf['meshes']) - 1})
+    # The trophy room's round floor is the demon-gate flagstones fxanim (p7_fxanim_zm_castle_quest_demongate_flagstones_*,
+    # spawned by its scene; not exported yet): a stone disc stands in, sized to the hole through the collision, with the
+    # floor's own material, solid (COL_: navmesh too). The flagstone seal above is only its 42-unit centre stone.
+    fs = next((e for e in ents if e.get('scriptbundlename') == 'p7_fxanim_zm_castle_quest_demongate_flagstones_bundle'), None)
+    if fs:
+        cx, cy, _ = vec(fs['origin']); top = 504.0
+        O = g([cx, cy, top]).astype(np.float64); near = CTRI[np.linalg.norm(CTRI.mean(1) - O, axis=1) < 700]
+        radius = next((r for r in range(16, 600, 8) if all(seg_blocked(g([cx + r * math.cos(a_), cy + r * math.sin(a_), top + 12]), g([cx + r * math.cos(a_), cy + r * math.sin(a_), top - 12]), near) for a_ in (0, 1.57, 3.14, 4.71))), 200) + 6
+        mat_i = next((i for i, m in enumerate(info['materials']) if m['name'] == 'wc/t7_zm_ctl_stone_floor_varied_01'), None)
+        imgs = {im['hash']: im['name'] for im in info['materials'][mat_i]['images']} if mat_i is not None else {}
+        mat = material(('disc', 'flagstones'), 'flagstones_standin', texture(imgs.get(COLOR), TEX), texture(imgs.get(NORMAL), NORMAL_TEX), two_sided=True)
+        n = 48; ang = np.linspace(0, 2 * math.pi, n, endpoint=False)
+        ring = np.stack([cx + radius * np.cos(ang), cy + radius * np.sin(ang), np.full(n, top)], 1)
+        P_ = np.vstack([[cx, cy, top], ring]); G_ = g(P_).astype(np.float32)
+        F = np.array([[0, 1 + i, 1 + (i + 1) % n] for i in range(n)], dtype=np.uint32)[:, [0, 2, 1]]
+        UV = ((P_[:, :2] - [cx, cy]) / 128.0).astype(np.float32)
+        Nrm = np.tile([0, 1, 0], (n + 1, 1)).astype(np.float32)
+        gltf['meshes'].append({'name': 'flagstones_standin', 'primitives': [{'attributes': {'POSITION': accessor(G_, 'VEC3', 34962, True), 'NORMAL': accessor(Nrm, 'VEC3', 34962), 'TEXCOORD_0': accessor(UV, 'VEC2', 34962)},
+                                                                            'indices': accessor(F.ravel(), 'SCALAR', 34963), 'material': mat}]})
+        add_node({'name': 'CASTLE_FLAGSTONES', 'mesh': len(gltf['meshes']) - 1})
+        F2 = np.vstack([F, F[:, [0, 2, 1]]])
+        gltf['meshes'].append({'name': 'COL_flagstones', 'primitives': [{'attributes': {'POSITION': accessor(G_, 'VEC3', 34962, True)}, 'indices': accessor(F2.ravel(), 'SCALAR', 34963)}]})
+        add_node({'name': 'COL_flagstones', 'mesh': len(gltf['meshes']) - 1})
+        print(f'  flagstones stand-in: radius {radius}')
     # lamps for the der-eisendrache mod's light pool: lit fixtures among the static models, merged within 150 units
     LIT = re.compile(r'candle_.*_on|torch_wall|light_sconce|light_cage|light_spot_hanging$|light_industrial|hurricane_lamp|light_chandelier(?!_chain)|light_lamp_vintage|light_bulb_edison|camp_fire_pit|light_hanging_ball_01$', re.I)
     lamps = []
