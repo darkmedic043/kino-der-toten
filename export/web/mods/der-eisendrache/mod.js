@@ -1,6 +1,6 @@
 // Der Eisendrache (a BO3 map ported by .tools/build_bo3_map.py; see docs/fork/waw-ports.md). Does nothing elsewhere.
 import * as THREE from 'three';
-import { loadModel } from '../../animation.js';
+import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 // Zones: BO3's zone manager links pairs of zones by a flag (zm_castle_zones.gsc add_adjacent_zone) and some flags set
@@ -85,9 +85,9 @@ export default function setup(api) {
       }));
     });
   }
-  const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api);
+  const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api);
   setupRocketPad(api); setupDogRounds(api);
-  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow };
+  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer };
 }
 
 // ---- BO3 fxanim rigs (CASTLE_<name> from the builder's fxanim_rig): bones carry extras.anims[key] = {rot, loc} runs,
@@ -552,4 +552,169 @@ function setupBow(api) {
   });
   host.on('reset', () => { for (const h of heads) h.n = 0; shown.visible = false; for (const f of flying) f.orb.removeFromParent(); flying.length = 0; });
   return { state: () => ({ souls: heads.map(h => [h.id, h.n]), charged: charged(), taken: taken() }), feed: (k = 0) => { for (const h of heads) h.n = SOULS; shown.visible = true; } };
+}
+
+// ---- The Panzersoldat (zm_castle_mechz.gsc + BO3's mechz behaviour). Assets: .tools/build_castle_panzer.py (BO3's
+// c_zom_mech_body and its ai_zm_dlc1_soldat_* clips; panzer/, git-ignored). It joins enemies.list (every weapon,
+// explosion, insta-kill, kill event and the round count work on it) with z.ai: this script drives it.
+//   Rounds: the first on round 12, then every 5-6 rounds (one in solo), 5 s into the round, at a random CASTLE_MECHZ_
+//   spawn point in an active zone; it drops in on its jetpack. Health 3500 + 500 a round (max 17,500).
+//   Attacks: flamethrower sweep within 260 (a cone, ~70 damage/s), the arm cannon from 300 to 1,100 (bursts),
+//   a claw melee within 95. Armour: body hits do a quarter; head hits go to the faceplate first; when it breaks it
+//   flies off, the Panzer is stunned, then goes berserk (sprints) and takes double damage to the head. Hits on its
+//   back go to the power-supply cap; when it breaks the Panzer reels and its core takes double damage.
+const PZ_DIR = new URL('panzer/', import.meta.url).href;
+function setupPanzer(api) {
+  const { world, session, host, scene, enemies, player, announce, audio, damage } = api, root = world.root;
+  const spots = []; root.traverse(o => { if (/^CASTLE_MECHZ_\d+$/.test(o.name)) spots.push({ p: o.getWorldPosition(new THREE.Vector3()), zone: o.userData.zone, yaw: o.userData.yaw ?? 0 }); });
+  const A = {};
+  let assets = null;
+  const ready = (async () => {
+    const [body, barrel, face, cap, index] = await Promise.all(['c_zom_mech_body', 'c_zom_mech_gun_barrel', 'c_zom_mech_faceplate', 'c_zom_mech_powersupply_cap'].map(n => loadModel(PZ_DIR + n + '.glb').catch(() => null)).concat(fetch(PZ_DIR + 'anims.json').then(r => r.json()).catch(() => null)));
+    if (!body || !index) return null;
+    await Promise.all(Object.keys(index).map(async k => { A[k] = await loadAnimation(PZ_DIR + 'anims/' + k + '.json').catch(() => null); }));
+    assets = { body, barrel, face, cap, index }; return assets;
+  })();
+  const st = { next: 12, list: [] };
+  const V = () => new THREE.Vector3();
+  // a part model (built around its own root joint) skinned onto the body's bones, in the body's bind space
+  function attachPart(body, part, rootName) {
+    body.updateMatrixWorld(true); part.updateMatrixWorld(true);
+    const bones = new Map(); body.traverse(o => { if (o.isBone && !bones.has(o.name)) bones.set(o.name, o); });
+    let bodySkin = null; const inv = new Map(); body.traverse(o => { if (!o.isSkinnedMesh) return; bodySkin ??= o; o.skeleton.bones.forEach((b, k) => { if (!inv.has(b)) inv.set(b, o.skeleton.boneInverses[k]); }); });
+    const pr = part.getObjectByName(rootName), br = bones.get(rootName); if (!pr || !br || !bodySkin) return [];
+    const toBody = br.matrixWorld.clone().multiply(pr.matrixWorld.clone().invert()), meshes = [];
+    part.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
+    for (const m of meshes) {
+      m.geometry = m.geometry.clone().applyMatrix4(toBody.clone().multiply(m.matrixWorld));
+      const mapped = m.skeleton.bones.map(b => bones.get(b.name) ?? br);
+      m.bind(new THREE.Skeleton(mapped, mapped.map(b => (inv.get(b) ?? b.matrixWorld.clone().invert()).clone())), bodySkin.bindMatrix);
+      m.position.set(0, 0, 0); m.quaternion.identity(); m.scale.set(1, 1, 1); m.frustumCulled = false; body.add(m);
+    }
+    return meshes;
+  }
+  function spawn(at = null) {
+    if (!assets) return null;
+    const zones = world.activeZones(session), pool = spots.filter(s => zones.has(s.zone));
+    const sp = at ? { p: at, yaw: 0 } : (pool.length ? pool[Math.floor(Math.random() * pool.length)] : spots[0]);
+    if (!sp) return null;
+    const ground = world.closest(sp.p, { x: 200, y: 300, z: 200 }) ?? sp.p;
+    const rootG = new THREE.Group(), body = cloneSkinned(assets.body); rootG.add(body);
+    body.traverse(o => { if (o.isBone) o.userData.bindPosition = o.position.clone(); if (o.isMesh) o.frustumCulled = false; });
+    if (assets.barrel) attachPart(body, cloneSkinned(assets.barrel), 'j_elbow_le');
+    const faceMeshes = []; body.traverse(o => { if (o.isMesh && /faceplate/i.test([o.material].flat()[0]?.name ?? '')) faceMeshes.push(o); });
+    const rig = new Rig(rootG);
+    for (const [k, d] of Object.entries(A)) if (d) rig.add(k, d);
+    if (A.death) rig.add('death', A.death);
+    rig.add('walk', A.walk_basic); rig.add('attack', A.melee_a);
+    const round = session.round ?? 1, health = Math.min(17500, 3500 + 500 * round);
+    const z = { id: ++enemies.serial, kind: 'panzer', root: rootG, rig, speed: 0, health, maxHealth: health, state: 'arrive', path: [], pathIndex: 0, repath: 0,
+      hit: { r: 26, h: 92, head: 15 }, face: Math.round(health * .6), cap: Math.round(health * .3), berserk: false, capOff: false,
+      t: 0, act: 'hover', cool: { ft: 2, gun: 4, melee: 0 }, faceMeshes, ground: ground.clone(), lastPosition: V() };
+    rootG.position.copy(ground).add(new THREE.Vector3(0, 700, 0)); rootG.rotation.y = sp.yaw ?? 0;
+    z.lastPosition.copy(rootG.position);
+    scene.add(rootG); rig.play('hover_loop'); z.ai = (dt, pl) => think(z, dt, pl);
+    enemies.list.push(z); session.total = (session.total ?? 0) + 1; session.spawned = (session.spawned ?? 0) + 1;
+    st.list.push(z); audio?.play?.('dog_round', .8); announce?.('PANZERSOLDAT', '', 3);
+    return z;
+  }
+  const face = (z, to) => { z.root.rotation.y = Math.atan2(-(to.z - z.root.position.z), to.x - z.root.position.x); };   // CoD models face +X
+  const fwd = z => new THREE.Vector3(1, 0, 0).applyQuaternion(z.root.quaternion).setY(0).normalize();
+  function play(z, k, loop = true) { if (z.act === k) return; z.act = k; z.rig.play(k, loop); }
+  function think(z, dt, pl) {
+    z.t += dt; for (const k in z.cool) z.cool[k] -= dt;
+    const pos = z.root.position, tp = pl, dist = pos.distanceTo(tp);
+    if (z.state === 'arrive') {   // drop in on the jetpack
+      const k = Math.min(1, z.t / 2.2); pos.lerpVectors(z.ground.clone().add(new THREE.Vector3(0, 700, 0)), z.ground, 1 - (1 - k) ** 2); face(z, tp);
+      if (k >= 1 && z.act !== 'hover_land') { play(z, 'hover_land', false); z.landAt = z.t; }
+      if (z.act === 'hover_land' && z.t - z.landAt > (assets.index.hover_land?.duration ?? 1.3)) { z.state = 'chase'; z.repath = 0; }
+      return;
+    }
+    if (z.state === 'busy') { if (z.t >= z.busyUntil) { z.state = 'chase'; z.repath = 0; } else { z.busy?.(dt); return; } }
+    const eye = tp.clone().add(new THREE.Vector3(0, 40, 0)), from = pos.clone().add(new THREE.Vector3(0, 70, 0)), seen = world.lineClear(from, eye);
+    face(z, tp);
+    // attacks
+    if (seen && dist < 95 && z.cool.melee <= 0) return busy(z, Math.random() < .5 ? 'melee_a' : 'melee_b', null, { at: .55, hit: () => { if (pos.distanceTo(tp) < 110) damage(70); } }, 1.8);
+    if (seen && dist < 260 && z.cool.ft <= 0) return busy(z, 'ft_sweep', dt2 => { const to = tp.clone().sub(pos).setY(0).normalize(); if (pos.distanceTo(tp) < 300 && to.dot(fwd(z)) > .7) damage(70 * dt2); flame(z); }, null, 4.5);
+    if (seen && dist > 300 && dist < 1100 && z.cool.gun <= 0) return busy(z, 'chaingun_fire', dt2 => { z.gunT = (z.gunT ?? 0) - dt2; if (z.gunT <= 0) { z.gunT = .12; tracer(z, eye); if (Math.random() < .3) damage(6); } }, null, 7, 2.2);
+    // move along the navmesh
+    z.repath -= dt;
+    if (z.repath <= 0) { z.repath = .5; z.path = world.path(pos, tp) ?? []; z.pathIndex = 1; }
+    const goal = z.path[z.pathIndex] ?? tp, d = goal.clone().sub(pos); d.y = 0;
+    if (d.length() < 12 && z.pathIndex < z.path.length - 1) z.pathIndex++;
+    const k = z.berserk ? 'sprint' : dist > 700 ? 'run' : 'walk_basic';
+    play(z, k); const speed = (assets.index[k]?.speed || 40) * (z.berserk ? 1 : 1);
+    if (d.length() > 1) { d.normalize(); pos.addScaledVector(d, Math.min(speed * dt, goal.distanceTo(pos))); face(z, goal); }
+    const y = world.surfaceY?.(pos.x, pos.y + 40, pos.z); if (y != null && Math.abs(y - pos.y) < 60) pos.y += (y - pos.y) * Math.min(1, dt * 10);
+  }
+  function busy(z, k, each, note, cool, len) {
+    z.state = 'busy'; play(z, k, !!len); const dur = len ?? assets.index[k]?.duration ?? 2; z.busyUntil = z.t + dur;
+    const t0 = z.t; let fired = false;
+    z.busy = dt => { each?.(dt); if (note && !fired && z.t - t0 >= note.at * dur) { fired = true; note.hit(); } };
+    const key = k.startsWith('ft') ? 'ft' : k.startsWith('chain') ? 'gun' : 'melee'; z.cool[key] = cool + dur;
+    z.act = k;
+  }
+  // effects: flame particles from the right arm, tracers from the arm cannon
+  const flameMat = new THREE.SpriteMaterial({ color: 0xff7a2a, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false });
+  const fx = [];
+  function flame(z) {
+    const tag = z.root.getObjectByName('tag_flamethrower_fx') ?? z.root.getObjectByName('j_wrist_ri'); if (!tag) return;
+    const p = tag.getWorldPosition(V()), dir = fwd(z);
+    for (let i = 0; i < 2; i++) { const sp = new THREE.Sprite(flameMat); sp.position.copy(p); sp.scale.setScalar(14); scene.add(sp); fx.push({ o: sp, v: dir.clone().multiplyScalar(420 + Math.random() * 120).add(new THREE.Vector3((Math.random() - .5) * 90, (Math.random() - .3) * 50, (Math.random() - .5) * 90)), life: .55, grow: 90 }); }
+  }
+  const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: .9 });
+  function tracer(z, to) {
+    const tag = z.root.getObjectByName('tag_gun_barrel1') ?? z.root.getObjectByName('j_wrist_le'); if (!tag) return;
+    const a = tag.getWorldPosition(V()), b = to.clone().add(new THREE.Vector3((Math.random() - .5) * 40, (Math.random() - .5) * 30, (Math.random() - .5) * 40));
+    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), tracerMat); scene.add(l); fx.push({ o: l, life: .06 });
+    audio?.play?.('shot', .25);
+    const spin = z.root.getObjectByName('tag_gun_spin'); if (spin) spin.rotateX(.9);
+  }
+  // debris: the faceplate or the power-supply cap flying off
+  function launch(z, model, boneName) {
+    if (!model) return;
+    const bone = z.root.getObjectByName(boneName), p = bone ? bone.getWorldPosition(V()) : z.root.position.clone().add(new THREE.Vector3(0, 80, 0));
+    const o = cloneSkinned(model); o.position.copy(p); scene.add(o); fx.push({ o, v: fwd(z).multiplyScalar(160).add(new THREE.Vector3(0, 260, 0)), spin: 6, life: 5, gravity: 900 });
+  }
+  host.on('update', dt => {
+    dt = dt || 1 / 60;
+    for (const f of [...fx]) {
+      f.life -= dt;
+      if (f.v) { if (f.gravity) f.v.y -= f.gravity * dt; f.o.position.addScaledVector(f.v, dt); }
+      if (f.spin) f.o.rotation.x += f.spin * dt;
+      if (f.grow) { f.o.scale.setScalar(f.o.scale.x + f.grow * dt); f.o.material.opacity = Math.max(0, f.life / .55) * .8; }
+      if (f.life <= 0) { f.o.removeFromParent(); fx.splice(fx.indexOf(f), 1); }
+    }
+    for (const z of [...st.list]) if (!enemies.list.includes(z)) st.list.splice(st.list.indexOf(z), 1);
+  });
+  // armour
+  host.on('beforeEnemyDamage', e => {
+    const z = e.enemy; if (z?.kind !== 'panzer') return;
+    if (z.state === 'arrive') { e.amount = 0; return; }
+    let amount = e.amount * (e.cause === 'explosion' ? .5 : 1);
+    if (e.head && z.face > 0) {
+      z.face -= amount; e.amount = 0;
+      if (z.face <= 0) {   // faceplate off: stunned, then berserk
+        for (const m of z.faceMeshes) m.visible = false; launch(z, assets.face, 'j_faceplate'); audio?.play?.('explosion', .5);
+        z.state = 'busy'; play(z, 'head_stun_intro', false); z.busyUntil = z.t + 4; z.busy = () => { if (z.t > z.busyUntil - 2.6 && z.act === 'head_stun_intro') play(z, 'head_stun_loop'); };
+        z.berserk = true;
+      }
+      return;
+    }
+    if (e.head) { e.amount = amount * 2; return; }
+    // back: the power-supply cap
+    const back = !e.melee && e.cause === 'bullet' && player?.getFeetPosition && fwd(z).dot(player.getFeetPosition().clone().sub(z.root.position).setY(0).normalize()) < -.3;
+    if (back && !z.capOff) { z.cap -= amount; e.amount = amount * .25; if (z.cap <= 0) { z.capOff = true; launch(z, assets.cap, 'tag_powersupply'); z.state = 'busy'; play(z, 'powercore_pain', false); z.busyUntil = z.t + (assets.index.powercore_pain?.duration ?? 2); z.busy = null; } return; }
+    e.amount = amount * (back && z.capOff ? 2 : .25);
+  });
+  // rounds
+  let lastRound = 0;
+  host.on('update', () => {
+    if (!assets || !spots.length || session.phase !== 'fighting') return;
+    if (session.round !== lastRound) { lastRound = session.round; st.due = null;
+      if (session.round >= st.next && !session.dogRound) { st.due = session.time + 5; st.next = session.round + 5 + Math.floor(Math.random() * 2); } }
+    if (st.due != null && session.time >= st.due) { st.due = null; spawn(); }
+  });
+  host.on('reset', () => { st.next = 12; st.due = null; lastRound = 0; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
+  return { spawn: p => spawn(p), state: () => ({ next: st.next, alive: st.list.map(z => ({ hp: Math.round(z.health), face: Math.round(z.face), cap: Math.round(z.cap), state: z.state, act: z.act })) }), ready };
 }

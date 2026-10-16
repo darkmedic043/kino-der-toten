@@ -916,6 +916,12 @@ if BSP == 'zm_castle':
         count('DRAGON')
     bp = one('base_bow_pickup_struct')
     if bp: add_node({'name': 'CASTLE_BOWPICKUP', 'translation': g(vec(bp['origin'])).tolist(), 'extras': {'yaw': math.radians(vec(bp.get('angles'))[1])}})
+    # Panzersoldat spawn points (zm_castle_mechz.gsc: a random mechz_location in an active zone)
+    k = 0
+    for e in ents:
+        if e.get('script_noteworthy') == 'mechz_location' and e.get('targetname', '').endswith('_spawners'):
+            add_node({'name': f'CASTLE_MECHZ_{k}', 'translation': g(vec(e['origin'])).tolist(), 'extras': {'zone': zid(zname(e['targetname'])), 'yaw': math.radians(vec(e.get('angles'))[1])}}); k += 1
+    count('MECHZ')
     # lamps for the der-eisendrache mod's light pool: lit fixtures among the static models, merged within 150 units
     LIT = re.compile(r'candle_.*_on|torch_wall|light_sconce|light_cage|light_spot_hanging$|light_industrial|hurricane_lamp|light_chandelier(?!_chain)|light_lamp_vintage|light_bulb_edison|camp_fire_pit|light_hanging_ball_01$', re.I)
     lamps = []

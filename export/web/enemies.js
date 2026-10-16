@@ -74,7 +74,9 @@ export class Enemies {
     this.freeClock=(this.freeClock??0)-dt;
     if(this.freeClock<=0){this.freeClock=.3;this.freeMode=!!(this.world.offMesh&&this.world.playerFeet&&this.world.entry?.nearbySpawns&&this.world.offMesh(this.world.playerFeet));}
     for(const z of [...this.list]){
-      z.rig.update(dt);z.growl-=dt;
+      z.rig.update(dt);
+      if(z.ai){z.ai(dt,player);continue;}   // a map script drives this one (Der Eisendrache's Panzersoldat)
+      z.growl-=dt;
       if(z.growl<0){this.onSound?.('growl',z.root.position);z.growl=6+s.random()*7;}
       if(z.state==='rising'){   // up out of the ground over the clip's first three quarters, facing the player
         z.riseT+=dt;const k=Math.min(1,z.riseT/z.rise.dur),e=1-(1-Math.min(1,k/.75))**2;z.root.position.y=z.rise.y-50*(1-e);
@@ -192,8 +194,9 @@ export class Enemies {
     let best=null;
     for(const z of this.list){
       const base=z.root.position,headPos=this.headPosition(z);
-      const headPoint=ray.intersectSphere(new THREE.Sphere(headPos,z.kind==='dog'?12:10),new THREE.Vector3());
-      const bodyPoint=ray.intersectBox(new THREE.Box3(base.clone().add(new THREE.Vector3(-18,4,-18)),base.clone().add(new THREE.Vector3(18,z.kind==='zombie'?58:36,18))),new THREE.Vector3());
+      // z.hit {r, h, head}: a bigger enemy's body box half-width, height and head radius (the Panzersoldat)
+      const headPoint=ray.intersectSphere(new THREE.Sphere(headPos,z.hit?.head??(z.kind==='dog'?12:10)),new THREE.Vector3()),hr=z.hit?.r??18;
+      const bodyPoint=ray.intersectBox(new THREE.Box3(base.clone().add(new THREE.Vector3(-hr,4,-hr)),base.clone().add(new THREE.Vector3(hr,z.hit?.h??(z.kind==='zombie'?58:36),hr))),new THREE.Vector3());
       let head=!!headPoint;let point=headPoint??bodyPoint;if(!point)continue;
       if(headPoint&&bodyPoint&&bodyPoint.distanceTo(ray.origin)+12<headPoint.distanceTo(ray.origin)){point=bodyPoint;head=false;}
       const distance=point.distanceTo(ray.origin);if(distance>far||best&&best.distance<distance)continue;best={z,head,point,distance};
