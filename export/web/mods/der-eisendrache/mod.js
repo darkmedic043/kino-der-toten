@@ -14,7 +14,7 @@ const ADJ = [["v10pad","v10paddoor","castleteleporterused"],["v10paddoor","v10pa
 const DERIVED = {"activatecourtyard":["connectsubclocktowertocourtyard","connectcourtyardtogreathallupper","connectcourtyardtorooftop","connectgreathalltocourtyard","connectarmorytorooftop"],"activatetramtosubclocktower":["connectstarttosubclocktower","connectsubclocktowertocourtyard"],"connectgatehousearea":["connectstarttotram2gatehouse","connectgatehousetolowercourtyard","buyabledropdowngatehousetolowercourtyard"],"connectlowercourtyard":["connectgatehousetolowercourtyard","connectlowercourtyardtolivingquarters","connectlowercoutryardtorooftop","connectlowercourtyardtoundercroft"],"activategreathall":["connectgreathalltoarmory","connectgreathalltoundercroft","connectcourtyardtogreathallupper"],"activatearmory":["connectarmorytolivingquarters","connectgreathalltoarmory"],"activateundercroft":["connectlowercourtyardtoundercroft","connectgreathalltoundercroft"]};
 const POWER_FLAGS = ['poweron', 'connectstarttoundercroft'];
 
-export default function setup(api) {
+export default async function setup(api) {
   if (api.map?.id !== 'der-eisendrache') return;
   const { world, session } = api;
   const flags = s => {
@@ -88,6 +88,7 @@ export default function setup(api) {
   }
   const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api);
   setupRocketPad(api); setupDogRounds(api);
+  await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
   window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz };
 }
 
@@ -526,16 +527,39 @@ function setupBow(api) {
   const def = api.data?.weapons?.[BOW];
   if (def?.worldModel) import('../../animation.js').then(({ loadModel }) => loadModel(def.worldModel)).then(m => { if (m) { m.rotation.z = Math.PI / 2; shown.add(m); } }).catch(() => {});
   const taken = () => session.flags.has('castle:bow:taken'), charged = () => heads.every(h => h.n >= SOULS);
-  const flying = [];
+  // animated heads (BO3's c_zom_dragonhead and its o_zm_dlc1_dragonhead_* clips, .tools/build_castle_panzer.py; dragon/,
+  // git-ignored) replace the static props: idle (now and then a roar), an eating clip from the side a soul came from,
+  // and the outro once full
+  const DR = new URL('dragon/', import.meta.url).href;
+  const dragonsReady = /[?&]noDragons/.test(location.search) ? null : Promise.all([loadModel(DR + 'c_zom_dragonhead.glb').catch(() => null), fetch(DR + 'anims.json').then(r => r.json()).catch(() => null)]).then(async ([model, index]) => {
+    if (!model || !index) return;
+    const clips = {}; await Promise.all(Object.keys(index).map(async k => { clips[k] = await loadAnimation(DR + 'anims/' + k + '.json').catch(() => null); }));
+    for (const h of heads) {
+      if (!h.model) continue;
+      h.model.updateWorldMatrix(true, false);
+      const m = cloneSkinned(model); h.model.matrixWorld.decompose(m.position, m.quaternion, m.scale); m.scale.setScalar(1);
+      m.traverse(o => { if (o.isBone) o.userData.bindPosition = o.position.clone(); if (o.isMesh) { o.frustumCulled = false; o.castShadow = o.receiveShadow = false; } });
+      const rig = new Rig(m); for (const [k, d] of Object.entries(clips)) if (d) rig.add(k, d);
+      scene.add(m); h.model.visible = false; h.anim = { m, rig, index, until: 0, next: 'idle' }; rig.play('idle');
+    }
+  });
+  const dragonPlay = (h, k, then = 'idle') => { const a = h.anim; if (!a || !a.rig.actions[k]) return; a.rig.play(k, false, 1, .2); a.until = t + (a.index[k]?.duration ?? 2); a.next = then; };
+  const flying = [], corpses = [];
   host.on('kill', ({ enemy }) => {
     if (!enemy?.root) return;
     const p = enemy.root.position;
     const h = heads.find(h => h.n < SOULS && p.distanceTo(h.c) < h.r);
     if (!h) return;
     h.n++;
+    { const side = new THREE.Vector3().subVectors(p, h.mouth).setY(0), m = h.anim?.m; let k = 'f';
+      if (m) { const right = new THREE.Vector3(0, 0, 1).applyQuaternion(m.quaternion); const d = side.normalize().dot(right); k = d > .35 ? 'r' : d < -.35 ? 'l' : 'f'; }
+      if (h.anim) { dragonPlay(h, 'consume_pre_eat_' + k, 'consume_align_' + k); h.anim.after = h.n >= SOULS ? 'outtro' : 'idle'; } }
     // the soul: a glowing orb from the body into the mouth
     const orb = new THREE.Mesh(new THREE.SphereGeometry(4, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff7a3a })); orb.position.copy(p).add(new THREE.Vector3(0, 40, 0)); scene.add(orb);
     flying.push({ orb, to: h.mouth.clone(), t: 0, from: orb.position.clone() });
+    // the corpse is dragged up into the mouth while the head lunges (BO3's consume clips), then gone
+    const body = enemy.root; enemy.life = Math.max(enemy.life ?? 0, 4);
+    corpses.push({ o: body, from: body.position.clone(), to: h.mouth.clone().add(new THREE.Vector3(0, -10, 0)), t: -.6, s0: body.scale.x });
     audio?.play?.('powerup', .5);
     if (h.n === SOULS) {
       const left = heads.filter(x => x.n < SOULS).length;
@@ -549,10 +573,17 @@ function setupBow(api) {
   host.on('update', dt => {
     dt = dt || 1 / 60; t += dt;
     for (const f of [...flying]) { f.t = Math.min(1, f.t + dt * 1.4); f.orb.position.lerpVectors(f.from, f.to, f.t).y += Math.sin(f.t * Math.PI) * 60; if (f.t >= 1) { f.orb.removeFromParent(); flying.splice(flying.indexOf(f), 1); } }
+    for (const c of [...corpses]) { c.t += dt / 1.3; const k = Math.max(0, Math.min(1, c.t)), e = k * k;
+      c.o.position.lerpVectors(c.from, c.to, e); c.o.position.y += Math.sin(k * Math.PI) * 25; c.o.scale.setScalar(c.s0 * (1 - .85 * Math.max(0, k - .6) / .4));
+      if (k >= 1) { c.o.visible = false; corpses.splice(corpses.indexOf(c), 1); } }
+    for (const h of heads) { const a = h.anim; if (!a) continue; a.rig.update(dt);
+      if (a.until && t >= a.until) { const k = a.next; a.until = 0;
+        if (k === 'idle') { a.rig.play('idle', true, 1, .3); } else if (k === 'outtro') dragonPlay(h, 'outtro', 'done'); else if (k === 'done') {} else dragonPlay(h, k, a.after ?? 'idle'); }
+      else if (!a.until && a.rig.current === 'idle' && Math.random() < dt / 25) dragonPlay(h, 'idle_twitch_roar'); }
     if (shown.visible) { shown.rotation.y += dt * .6; shown.position.y = spot.y + 45 + Math.sin(t * 1.5) * 3; glow.intensity = 900 + Math.sin(t * 3) * 200; }
   });
-  host.on('reset', () => { for (const h of heads) h.n = 0; shown.visible = false; for (const f of flying) f.orb.removeFromParent(); flying.length = 0; });
-  return { state: () => ({ souls: heads.map(h => [h.id, h.n]), charged: charged(), taken: taken() }), feed: (k = 0) => { for (const h of heads) h.n = SOULS; shown.visible = true; } };
+  host.on('reset', () => { for (const h of heads) { h.n = 0; if (h.anim) { h.anim.until = 0; h.anim.rig.play('idle'); } } shown.visible = false; for (const f of flying) f.orb.removeFromParent(); flying.length = 0; });
+  return { ready: dragonsReady, state: () => ({ souls: heads.map(h => [h.id, h.n]), charged: charged(), taken: taken() }), feed: (k = 0) => { for (const h of heads) h.n = SOULS; shown.visible = true; } };
 }
 
 // ---- The Panzersoldat (zm_castle_mechz.gsc + BO3's mechz behaviour). Assets: .tools/build_castle_panzer.py (BO3's

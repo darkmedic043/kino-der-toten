@@ -43,8 +43,8 @@ def scaled(sem):
 
 def r(v, n): return [round(x, n) for x in v]
 
-def anim(name):
-    a = read_seanim(GH/'xanims'/(f'ai_zm_dlc1_soldat_{name}.seanim'))
+def anim(name, src=None, dest=None):
+    a = read_seanim(GH/'xanims'/((src or f'ai_zm_dlc1_soldat_{name}') + '.seanim'))
     fps = a['framerate'] or 30; frames = max(a['frames'] - 1, 1)
     bones = []
     for bone, k in a['bones'].items():
@@ -57,7 +57,7 @@ def anim(name):
     travel = sum(((o[i][1][0] - o[i - 1][1][0]) ** 2 + (o[i][1][1] - o[i - 1][1][1]) ** 2) ** .5 for i in range(1, len(o))) * CM if len(o) > 1 else 0
     clip = {'name': name, 'fps': fps, 'duration': round(frames / fps, 4), 'speed': round(travel / (frames / fps), 1),
             'notifies': [{'name': n, 'time': round(f / fps, 4)} for f, n in a['notes']], 'bones': bones}
-    (OUT/'anims'/(name + '.json')).write_text(json.dumps(clip, separators=(',', ':')))
+    ((dest or OUT)/'anims'/(name + '.json')).write_text(json.dumps(clip, separators=(',', ':')))
     return clip
 
 (OUT/'anims').mkdir(parents=True, exist_ok=True); (OUT/'.gitignore').write_text('*\n')
@@ -72,3 +72,15 @@ for n in ANIMS:
     c = anim(n); index[n] = {'duration': c['duration'], 'speed': c['speed'], 'notes': [x['name'] for x in c['notifies']]}
 (OUT/'anims.json').write_text(json.dumps(index, indent=1))
 print(json.dumps({k: (v['duration'], v['speed']) for k, v in index.items()}))
+
+# ---- the dragon heads (zm_castle_weap_quest.gsc's soul catchers): c_zom_dragonhead and its o_zm_dlc1_dragonhead_* clips
+DOUT = ROOT/'export/web/mods/der-eisendrache/dragon'
+(DOUT/'anims').mkdir(parents=True, exist_ok=True); (DOUT/'.gitignore').write_text('*\n')
+SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/'c_zom_dragonhead'/'c_zom_dragonhead_LOD0.semodel')), DOUT/'c_zom_dragonhead.glb', texture_loader=webp)
+dindex = {}
+for n in ['idle', 'idle_b', 'idle_twitch_roar', 'intro', 'outtro', 'static', 'consume_pre_eat_f', 'consume_pre_eat_l', 'consume_pre_eat_r', 'consume_align_f', 'consume_align_l', 'consume_align_r']:
+    src = f'o_zm_dlc1_dragonhead_{n}'
+    if not (GH/'xanims'/(src + '.seanim')).exists(): print('no anim', src); continue
+    c = anim(n, src, DOUT); dindex[n] = {'duration': c['duration']}
+(DOUT/'anims.json').write_text(json.dumps(dindex, indent=1))
+print('dragon', json.dumps(dindex))
