@@ -54,7 +54,7 @@ export class Session {
     this.time=0;this.round=1;this.countdown=6;this.phase='preparing';this.health=100;
     this.points=this.data.rules.zombie_score_start_1p??500;this.kills=0;this.headshots=0;this.shots=0;this.hits=0;
     this.inventory=[makeWeapon(this.data.weapons.m1911_zm)];this.slot=0;this.reloadLeft=0;this.reloadStage=null;this.reloadSerial=0;this.reloadDuration=0;this.fireLeft=0;
-    this.perks=new Set();this.flags=new Set(['always_on']);this.openDoors=new Set();this.power=false;this.revives=0;
+    this.perks=new Set();this.boughtPerks=new Set();this.flags=new Set(['always_on']);this.openDoors=new Set();this.power=false;this.revives=0;
     this.effects={};this.damageTime=-100;this.grenades=4;this.meleeLeft=0;this.spawned=0;this.killed=0;
     this.bowie=false;this.totalScore=this.points;this.drops=new PowerupDirector(this);this.drinking=null;this.drinkLeft=0;
     this.nextDogRound=5+Math.floor(this.random()*3);this.dogRound=false;this.dogRounds=0;this.total=roundPopulation(1,this.data.rules);
@@ -63,7 +63,11 @@ export class Session {
   get weapon(){return this.inventory[this.slot];}
   get def(){const d=this.data.weapons[this.weapon.id];return this.weapon.upgraded?{...d,...d.upgrade,upgraded:true,name:d.name+' • Pack-a-Punch'}:d;}
   get maxHealth(){return this.perks.has('specialty_armorvest')?250:100;}
-  get perkPrice(){return perkPrice(this.perks.size+(this.drinking&&!this.perks.has(this.drinking)?1:0));}
+  // Only perks you paid for raise the price (user, 2026-10-16): free ones (gobblegums, Easter eggs, Moon's random perk,
+  // cheats) don't. boughtPerks is marked by the paid paths (engine buyPerk, Moon buyPerk, Cheese Cube's machines);
+  // a perk lost on going down forgets it was bought.
+  get perkPrice(){const b=this.boughtPerks??=new Set();let n=0;for(const p of this.perks)if(b.has(p))n++;if(this.drinking&&!this.perks.has(this.drinking)&&b.has(this.drinking))n++;return perkPrice(n);}
+  markBought(id){(this.boughtPerks??=new Set()).add(id);}
   addPoints(n){const value=n*(this.effects.double_points>this.time?2:1);this.points+=value;this.totalScore+=value;}
   spend(n){if(this.points<n)return false;this.points-=n;return true;}
   damage(n){
@@ -118,7 +122,7 @@ export class Session {
   // Mule Kick (specialty_additionalprimaryweapon, fork): a third weapon slot while the perk lasts
   get weaponSlots(){return this.perks.has('specialty_additionalprimaryweapon')?3:2;}
   // losing every perk (downed) also loses Mule Kick's third weapon
-  clearPerks(){this.perks.clear();if(this.inventory.length>2){this.inventory.splice(2);this.slot=Math.min(this.slot,1);this.cancelReload();}}
+  clearPerks(){this.perks.clear();this.boughtPerks?.clear();if(this.inventory.length>2){this.inventory.splice(2);this.slot=Math.min(this.slot,1);this.cancelReload();}}
   giveWeapon(id){
     const owned=this.inventory.find(w=>w.id===id);
     if(owned){this.slot=this.inventory.indexOf(owned);owned.mag=this.def.clipSize;owned.reserve=this.def.maxAmmo;this.cancelReload();return;}

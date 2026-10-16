@@ -61,9 +61,11 @@ test('Speed Cola speeds each shotgun reload stage; switching cancels its transfe
  assert.equal(s.inventory[1].mag,loaded);assert.equal(s.reloadStage,null);assert.equal(s.weapon.mag,8);
 });
 
-test('perks cost 2500 plus 500 per perk held',()=>{
+test('perks cost 2500 plus 500 per bought perk held; free perks do not count',()=>{
   assert.deepEqual([0,1,2,3,4,5,9].map(perkPrice),[2500,3000,3500,4000,4500,5000,7000]);
   const s=new Session(data);assert.equal(s.perkPrice,2500);
-  s.perks.add('specialty_armorvest');s.perks.add('specialty_rof');assert.equal(s.perkPrice,3500);
-  s.drinking='specialty_fastreload';assert.equal(s.perkPrice,4000);
+  for(const id of ['specialty_armorvest','specialty_rof']){s.markBought(id);s.perks.add(id);}assert.equal(s.perkPrice,3500);
+  s.markBought('specialty_fastreload');s.drinking='specialty_fastreload';assert.equal(s.perkPrice,4000);
+  s.drinking=null;s.perks.add('specialty_quickrevive');assert.equal(s.perkPrice,3500);   // a free perk (gobblegum, Easter egg) leaves the price alone
+  s.clearPerks();s.perks.add('specialty_armorvest');assert.equal(s.perkPrice,2500);       // lost on going down, then given free: not bought any more
 });

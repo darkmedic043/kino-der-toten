@@ -47,11 +47,11 @@ export class MoonSession extends Session {
        (!free&&id==='specialty_quickrevive'&&this.revives>=3)||
        (!free&&!this.power&&this.area!=='earth'&&id!=='specialty_quickrevive')||(!free&&this.points<this.perkPrice))return false;
     const price=this.perkPrice;if(!this.drink(id))return false;
-    if(!free)this.spend(price);return true;
+    if(!free){this.spend(price);this.markBought?.(id);}return true;
   }
   losePerk(id){
     if(this.permanentPerks)return;
-    this.perks.delete(id);this.health=Math.min(this.health,this.maxHealth);
+    this.perks.delete(id);this.boughtPerks?.delete(id);this.health=Math.min(this.health,this.maxHealth);
     if(id==='specialty_additionalprimaryweapon'&&this.inventory.length>2){this.inventory.splice(2);this.slot=Math.min(1,this.slot);this.cancelReload();}
   }
   damage(n){

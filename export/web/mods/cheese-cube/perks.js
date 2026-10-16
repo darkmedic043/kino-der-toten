@@ -19,7 +19,7 @@ export async function setupPerks({api,world,session,host,toast,named,center,beep
       use(){
         if(session.perks.has(p.id))return false;
         const cost=session.perkPrice;if(session.points<cost){toast('Not enough points',2);return false;}
-        session.spend(cost);session.perks.add(p.id);beep();sound?.(p.sting,{volume:.8});toast(`${p.name}!`,3);return true;
+        session.spend(cost);session.markBought?.(p.id);session.perks.add(p.id);beep();sound?.(p.sting,{volume:.8});toast(`${p.name}!`,3);return true;
       }});
     e.locked=()=>!session.power&&!session.perks.has(p.id);e.lockedText='The power must be activated';
   }
