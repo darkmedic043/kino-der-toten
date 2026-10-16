@@ -375,6 +375,16 @@ export class CustomWorld {
     this.movers.push({def,objects,base:objects.map(o=>o.position.clone()),collider:new CollisionWorld(g),box,near:new THREE.Box3(),delta:new THREE.Vector3(...def.delta),offset:new THREE.Vector3(),prev:new THREE.Vector3()});
     this.updateMovers(0);
   }
+  // A platform a map script moves itself (Der Eisendrache's gondola cars): collision from `objects`' meshes as they are
+  // now; call move(offset) every frame with the world offset from that pose. It carries the player like the timed ones.
+  addScriptedMover(objects,{exact=false}={}){   // exact: `objects` are the meshes themselves (not their subtrees)
+    const meshes=[];if(exact)meshes.push(...objects.filter(o=>o.isMesh));else for(const o of objects)o.traverse(c=>{if(c.isMesh)meshes.push(c);});
+    const g=positionsOf(meshes);if(!g)return null;
+    const box=new THREE.Box3().setFromBufferAttribute(g.attributes.position);
+    const m={def:{id:'scripted',scripted:true},objects:[],base:[],collider:new CollisionWorld(g),box,near:box.clone().expandByScalar(40),delta:new THREE.Vector3(),offset:new THREE.Vector3(),prev:new THREE.Vector3(),
+      move(v){m.prev.copy(m.offset);m.offset.copy(v);m.near.copy(m.box).translate(m.offset).expandByScalar(40);}};
+    this.movers.push(m);return m;
+  }
   // Moves every platform to game time `time` (out at def.out, back at def.back, each leg def.duration long, repeating every def.cycle).
   updateMovers(time){
     // sliding doors (setDoors): about a second, eased, then hidden
@@ -384,6 +394,7 @@ export class CustomWorld {
       if(k>=1){p.anim=null;p.object.visible=false;}}
     const scale=this.entry.scale??1;
     for(const m of this.movers){
+      if(m.def.scripted)continue;
       const d=m.def,dur=d.duration??2,cycle=d.cycle??12,p=(((time-(d.delay??0))%cycle)+cycle)%cycle;
       let f=0;
       if(d.manual){const a=m.slide;f=a?a.from+(a.to-a.from)*Math.min(1,Math.max(0,(time-a.t0)/Math.max(.001,a.dur))):(m.f??0);m.f=f;}   // a mod drives it with slideMover

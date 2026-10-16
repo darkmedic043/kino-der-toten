@@ -296,6 +296,7 @@ col_P, col_T, n0, solid_props = [], [], 0, 0
 # Der Eisendrache: props that would cut the navmesh into islands (railings, crates, furniture, machines...) still stop the
 # player and bullets: they go to PCOL_props, which CustomWorld adds to collision but leaves out of the navmesh.
 pcol_P, pcol_T, pn0, pcol_props = [], [], 0, 0
+CLUTTER = re.compile(r'debris|rubble|brick|rock_|stone_pile|plank|board|crate|box|barrel|bucket|basket|sack|bag|pile|hay|log|branch|bone|skull|helmet|ammo|shell|tool|pot|pan|chair_.*broken|broken|scrap|junk|tire|ladder|cart_wheel|wheel', re.I)
 tri = np.concatenate(solid); used, inv = np.unique(tri.ravel(), return_inverse=True)
 col_P.append(Pg[used].astype(np.float64)); col_T.append(inv.reshape(-1, 3)); n0 = len(used)
 for name, insts in by_model.items():
@@ -318,12 +319,11 @@ for name, insts in by_model.items():
         pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
         tt = BOX_TRIS
     elif STRUCTURAL and STRUCTURAL.search(base_) and len(tt) <= 1500: pass   # Der Eisendrache: walls, columns, arches... as they are
-    elif BSP == 'zm_castle':   # everything else solid: the player-only layer (PCOL_props), as its mesh or, if detailed, its box
+    elif BSP == 'zm_castle' and len(tt) <= 1500 and size[1] >= 40 and size.max() <= 360 and not CLUTTER.search(base_):
+        # everything else that stands at least 40 high (railings, furniture, machines...): the player-only layer
+        # (PCOL_props), as its own mesh. Lower things you could only snag on (crates, rubble, clutter: there was so
+        # much of it you got stuck everywhere, user), bigger irregular ones and detailed ones (a box would close gaps) don't
         player_only = True
-        if len(tt) > 1500:
-            lo3, hi3 = pp.min(0), pp.max(0)
-            pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
-            tt = BOX_TRIS
     else: continue
     for it in insts:
         o = np.array(it['origin'])

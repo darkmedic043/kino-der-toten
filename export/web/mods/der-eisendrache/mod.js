@@ -29,10 +29,13 @@ export default function setup(api) {
     return zones;
   };
   setupLook(api);
-  // Der Eisendrache's own zombies (BO3 full-body models, .tools/build_castle_zombies.py; git-ignored, ripped) driven by
-  // BO1's zombie clips (same CoD skeleton). Their heads are part of the body, so BO1's separate heads are dropped.
+  // Der Eisendrache's own zombies are off for now: the only exported bodies are BO3's corpse variants (gibbed: limbs
+  // already missing), BO1's clips turned their feet backwards (different ankle/ball bind orientation) and the engine's
+  // gibbing doesn't know their parts (user, 2026-10-16). Needs the living models (c_zom_der_zombie_body*, heads)
+  // exported from a running game and a bind-pose retarget; .tools/build_castle_zombies.py and this block are kept.
+  const USE_CASTLE_ZOMBIES = new URLSearchParams(location.search).has('castleZombies');
   const ZB = ['c_zom_der_body1_corpse2_fb', 'c_zom_der_body1_corpse3_fb', 'c_zom_der_body2_corpse1_fb', 'c_zom_der_body2_corpse2_fb'];
-  Promise.all(ZB.map(n => loadModel(new URL(`zombies/${n}.glb`, import.meta.url).href).catch(() => null))).then(list => {
+  if (USE_CASTLE_ZOMBIES) Promise.all(ZB.map(n => loadModel(new URL(`zombies/${n}.glb`, import.meta.url).href).catch(() => null))).then(list => {
     const ok = list.filter(Boolean); if (!ok.length || !api.enemies) return;
     api.enemies.templates = ok; api.enemies.heads = [];
   });
@@ -161,6 +164,18 @@ function setupGondola(api) {
   });
   host.on('reset', reset);
   reset();
+  // Collision for the cars (user: players should be able to stand in them): their meshes as posed now (the doors left
+  // out: they open while docked), moved each frame by their tag_origin bone's offset (the swing isn't followed)
+  const carCol = [car1, car2].map(c => {
+    if (!world.addScriptedMover) return null;
+    c.node.updateMatrixWorld(true);
+    const meshes = []; c.node.traverse(o => { if (!o.isMesh) return; for (let p = o; p && p !== c.node; p = p.parent) if (/door/i.test(p.name)) return; meshes.push(o); });
+    const ref = c.node.getObjectByName(c.node.name + '_tag_origin') ?? c.node.children[0];
+    const m = world.addScriptedMover(meshes, { exact: true });
+    return m && ref ? { m, ref, base: ref.getWorldPosition(new THREE.Vector3()) } : null;
+  }).filter(Boolean);
+  const v = new THREE.Vector3();
+  host.on('update', () => { for (const c of carCol) c.m.move(c.ref.getWorldPosition(v).sub(c.base)); });
   return { state: () => ({ ...st, item: !!st.item }), giveFuse: () => { st.held = true; } };
 }
 
