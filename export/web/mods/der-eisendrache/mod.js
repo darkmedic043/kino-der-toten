@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { PERKS, perkUnlocked } from '../terminal-booth/desktop.js';
 // Zones: BO3's zone manager links pairs of zones by a flag (zm_castle_zones.gsc add_adjacent_zone) and some flags set
 // others (add_zone_flags). The build gives every door and debris pile its whole flag as its zone
 // (connect_start_to_subclocktower -> connectstarttosubclocktower) and every spawner its BO3 zone without underscores;
@@ -85,9 +86,9 @@ export default function setup(api) {
       }));
     });
   }
-  const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api);
+  const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api);
   setupRocketPad(api); setupDogRounds(api);
-  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer };
+  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz };
 }
 
 // ---- BO3 fxanim rigs (CASTLE_<name> from the builder's fxanim_rig): bones carry extras.anims[key] = {rot, loc} runs,
@@ -717,4 +718,44 @@ function setupPanzer(api) {
   });
   host.on('reset', () => { st.next = 12; st.due = null; lastRound = 0; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
   return { spawn: p => spawn(p), state: () => ({ next: st.next, alive: st.list.map(z => ({ hp: Math.round(z.health), face: Math.round(z.face), cap: Math.round(z.cap), state: z.state, act: z.act })) }), ready };
+}
+
+// ---- Der Wunderfizz (BO3's random perk machine, zm_perk_random). Five machines (CASTLE_FIZZ_<n>); one is lit at a
+// time, starting at one of the two start spots, with the power on. 1500 points: the ball spins (3 s) and lands on a
+// random perk you don't have (pass-locked ones only once owned), which you take within 10 s. After 3-6 uses it moves
+// on (another machine lights up).
+const FIZZ_COST = 1500;
+function setupFizz(api) {
+  const { world, session, host, scene, toast, announce, audio } = api, root = world.root;
+  const machines = []; root.traverse(o => { if (/^CASTLE_FIZZ_\d+$/.test(o.name)) machines.push({ o, p: o.getWorldPosition(new THREE.Vector3()), start: !!o.userData.start }); });
+  if (!machines.length) { console.warn('[der-eisendrache] Wunderfizz missing (rebuild the map)'); return null; }
+  const light = new THREE.PointLight(0x7ab8ff, 0, 260, 1.6); scene.add(light);
+  const st = { at: 0, uses: 0, left: 4, spin: null };
+  const pickStart = () => { const s = machines.filter(m => m.start); st.at = machines.indexOf(s.length ? s[Math.floor(Math.random() * s.length)] : machines[0]); st.uses = 0; st.left = 3 + Math.floor(Math.random() * 4); st.spin = null; };
+  pickStart();
+  const pool = () => PERKS.filter(p => !session.perks?.has(p.id) && perkUnlocked(p));
+  const give = p => { if (api.perkInfo && !api.perkInfo[p.id]) api.perkInfo[p.id] = { name: p.name, price: p.price, color: p.color, icon: p.badge }; session.perks.add(p.id); session.markBought?.(p.id); session.health = session.maxHealth; };
+  for (const [i, m] of machines.entries()) world.addInteraction({
+    position: m.p.clone().add(new THREE.Vector3(0, 45, 0)),
+    hidden: () => i !== st.at,
+    text: () => !session.power ? 'The power must be activated' : st.spin ? (st.spin.ready ? `Take ${st.spin.perk.name}` : 'Der Wunderfizz is spinning…') : pool().length ? `Der Wunderfizz · ${FIZZ_COST}` : 'You have every perk',
+    use() {
+      if (!session.power) return false;
+      if (st.spin) { if (!st.spin.ready) return false; give(st.spin.perk); audio?.play?.('perk', .8); toast?.(st.spin.perk.name, 3); st.spin = null; if (++st.uses >= st.left) move(); return true; }
+      const list = pool(); if (!list.length) return false;
+      if (session.points < FIZZ_COST) { toast?.('Not enough points', 2); return false; }
+      session.points -= FIZZ_COST; audio?.play?.('box', .7);
+      st.spin = { perk: list[Math.floor(Math.random() * list.length)], t: session.time, ready: false };
+      return true;
+    },
+  });
+  function move() { let n = st.at; while (machines.length > 1 && n === st.at) n = Math.floor(Math.random() * machines.length); st.at = n; st.uses = 0; st.left = 3 + Math.floor(Math.random() * 4); announce?.('DER WUNDERFIZZ', 'HAS MOVED', 3); }
+  host.on('update', () => {
+    const m = machines[st.at]; light.position.copy(m.p).add(new THREE.Vector3(0, 80, 0));
+    light.intensity = session.power ? (st.spin && !st.spin.ready ? 2600 + Math.sin(session.time * 20) * 900 : 1400) : 0;
+    if (st.spin && !st.spin.ready && session.time - st.spin.t > 3) { st.spin.ready = true; toast?.(`Der Wunderfizz · ${st.spin.perk.name}`, 3); }
+    if (st.spin?.ready && session.time - st.spin.t > 13) { st.spin = null; if (++st.uses >= st.left) move(); }   // not taken in time
+  });
+  host.on('reset', pickStart);
+  return { state: () => ({ at: st.at, uses: st.uses, left: st.left, spin: st.spin ? { perk: st.spin.perk.id, ready: st.spin.ready } : null, machines: machines.length }) };
 }

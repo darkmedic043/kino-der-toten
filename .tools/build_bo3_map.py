@@ -916,6 +916,12 @@ if BSP == 'zm_castle':
         count('DRAGON')
     bp = one('base_bow_pickup_struct')
     if bp: add_node({'name': 'CASTLE_BOWPICKUP', 'translation': g(vec(bp['origin'])).tolist(), 'extras': {'yaw': math.radians(vec(bp.get('angles'))[1])}})
+    # Der Wunderfizz (zbarrier_zmcore_perk_random_machine x5, two marked start_perk_random_machine): the machine at each
+    k = 0
+    for e in ents:
+        if e.get('classname') == 'zbarrier_zmcore_perk_random_machine':
+            place_model(f'CASTLE_FIZZ_{k}', 'p7_zm_vending_wonder', e['origin'], e.get('angles'), {'start': e.get('script_noteworthy') == 'start_perk_random_machine', 'yaw': math.radians(vec(e.get('angles'))[1])}); k += 1
+    count('FIZZ')
     # Panzersoldat spawn points (zm_castle_mechz.gsc: a random mechz_location in an active zone)
     k = 0
     for e in ents:

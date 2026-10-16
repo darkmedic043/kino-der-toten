@@ -237,3 +237,4 @@
 - 2026-10-16: overlay layers draw in a fixed order with a polygon offset (flicker), duplicate props dropped, _snow variants tinted (waw-ports.md).
 - 2026-10-16: Der Eisendrache: Wrath of the Ancients (BO3's bow) and its dragon-feeding quest; right gondola station; heads facing forward (waw-ports.md).
 - 2026-10-16: Der Eisendrache Panzersoldat (BO3 model and animations; enemies.js z.ai and z.hit hooks) (waw-ports.md).
+- 2026-10-16: Der Eisendrache: Der Wunderfizz (waw-ports.md).
