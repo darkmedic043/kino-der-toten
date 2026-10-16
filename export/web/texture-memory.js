@@ -17,6 +17,11 @@ const released = new WeakMap();  // Source -> {blob, args, pending}
 const stats = { released: 0, bytes: 0, restored: 0 };
 const kept = new WeakSet();   // sources whose pixels had to come back once: they stay (no free/decode loop)
 let native = null;
+// Only the main renderer's uploads free an image. Other renderers (the HUD portrait, gun icons, the Gunsmith preview,
+// menu thumbnails) have their own WebGL contexts and upload the same textures: freeing after theirs left the main one to
+// upload a closed 0x0 bitmap (Bondrewd Premium's first-person arm rendered black). `active` is the renderer drawing now.
+let primary = null, active = null;
+export function setPrimaryRenderer(r) { primary = r; }
 const IMAGE_FETCHES = 48;
 
 export function installTextureMemory() {
@@ -40,12 +45,19 @@ export function installTextureMemory() {
       return new Promise(go => { queue.push(go); next(); }).then(() => nativeFetch(input, init)).finally(() => { running--; next(); });
     };
   }
+  const RP = THREE.WebGLRenderer.prototype;
+  for (const k of ['render', 'compile', 'initTexture', 'copyTextureToTexture']) {
+    const f = RP[k]; if (typeof f !== 'function') continue;
+    RP[k] = function (...a) { const prev = active; active = this; try { return f.apply(this, a); } finally { active = prev; } };
+  }
   const proto = THREE.Texture.prototype;
   // three's constructor assigns `this.onUpdate = null`, which lands in this setter; the getter always hands three a
   // callback that runs the texture's own (if any) and then frees the image
   Object.defineProperty(proto, 'onUpdate', {
     configurable: true,
-    get() { return this.__onUpdateWrap ??= t => { this.__userOnUpdate?.(t); release(t); }; },
+    // an upload that found the image already freed (another Texture sharing the source, with other settings, uploaded
+    // and freed it first: three gives each its own GPU copy) made a 0x0 copy: decode again and re-upload this one too
+    get() { return this.__onUpdateWrap ??= t => { this.__userOnUpdate?.(t); const r = released.get(t.source); if (r && !t.source.data?.width) touch(t, r); else release(t); }; },
     set(fn) { this.__userOnUpdate = fn; },
   });
   const clone = proto.clone;
@@ -65,6 +77,7 @@ export function installTextureMemory() {
 function release(tex) {
   const s = tex.source, img = s?.data;
   if (!(img instanceof ImageBitmap) || tex.userData?.keepImage || !img.width || kept.has(s)) return;
+  if (!primary || (active && active !== primary)) return;   // a secondary renderer's upload (or none registered yet)
   const o = origins.get(img); if (!o) return;   // not decoded from a file we can get back
   released.set(s, { ...o, pending: null, texs: [new WeakRef(tex)] });
   stats.released++; stats.bytes += img.width * img.height * 4;

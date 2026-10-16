@@ -229,3 +229,4 @@
 - 2026-10-16: Der Eisendrache gondola (fuse -> car docks with a power-up) and landing pads (500-point flights along BO3's paths); custom-map prePlayer hook (waw-ports.md).
 - 2026-10-16: Der Eisendrache playtest fixes: blend ground solid (navmesh holes -> ground spawns), structural prop collision, walk-in spawns, daylight + lamp pool (waw-ports.md).
 - 2026-10-16: Der Eisendrache teleporter to the rocket pad, Pack-a-Punch quest (world.movePap), dog round timing (waw-ports.md).
+- 2026-10-16: black textures from shared images fixed (texture-memory re-uploads, main renderer only); SCP operators yaw 0 (were twisted); viewmodel light scaled by exposure off Kino; Der Eisendrache player-only collision, glass, own zombies, no T-posed corpses.

@@ -83,6 +83,13 @@ export default async function setup(api){
   // recomputes them (copy kino.lightingBulbs to mods/lighting/map-bulbs.json)
   const bulbNormals=kino&&!/bakeBulbs/.test(location.search)?await fetch(new URL('map-bulbs.json',import.meta.url)).then(r=>r.ok?r.json():{}).catch(()=>({})):{};
   if(kino)setupKino(api,fixtures,volume,baking,cage,bulbNormals);
+  // The viewmodel lights above are set for Kino's exposure (1.7, setupKino). Other maps keep their own (Sandbox, The
+  // Giant 0.95), which left guns and first-person arms near black there (user: "the lack of a global light"): scale
+  // them by the exposure difference, every frame (maps set theirs after the mods load).
+  else if(VM&&renderer&&api.map?.id!=='moon'){
+    const base={amb:VM.amb.intensity,key:VM.key.intensity,fill:VM.fill.intensity,rim:VM.rim.intensity};
+    host.on('update',()=>{const k=1.7/Math.max(.3,renderer.toneMappingExposure||1);for(const n in base)VM[n].intensity=base[n]*k;});
+  }
   else if(api.map?.id==='moon'&&renderer)window.kino.lighting=setupMoon(api,{quality,LIGHT_CLAMP,baking,volume:baking?null:await loadVolume(import.meta.url,'moon-light')});
 }
 

@@ -115,6 +115,7 @@ def builtin_color(image, name):
     return [.3, .3, .3]
 CUTOUT = re.compile(r'leaf|leaves|foliage|grass|fence|chainlink|chain_link|grate|grill|mesh|cobweb|web_|ivy|vine|plant|tree|bush|branch|'
                     r'wire|barbed|paper|newspaper|poster|cloth|curtain|flag|net_|netting|tarp|hair|feather|lattice|cutout|alpha', re.I)
+GLASS = re.compile(r'glass|window_pane|windowpane', re.I)
 mat_sig = {}
 def material(key, name, color, normal, two_sided=False, overlay=False, fallback=None):
     if key in mat_index: return mat_index[key]
@@ -126,7 +127,13 @@ def material(key, name, color, normal, two_sided=False, overlay=False, fallback=
             m['pbrMetallicRoughness']['baseColorFactor'] = [*name_tint(name), 1]
     else: m['pbrMetallicRoughness']['baseColorFactor'] = [*(fallback or [.3, .3, .3]), 1]
     if n is not None: m['normalTexture'] = {'index': n}
-    if overlay: m['alphaMode'] = 'BLEND'   # BO3 _blend layers and decals: drawn over the surface below, faded by vertex/texture alpha
+    if GLASS.search(name) and not re.search(r'decal|bottle|jar|beaker|glasses', name, re.I):   # see-through panes (the gondola's windows...)
+        m['alphaMode'] = 'BLEND'; m['doubleSided'] = True
+        m['pbrMetallicRoughness']['baseColorFactor'] = [*(m['pbrMetallicRoughness'].get('baseColorFactor', [.75, .8, .85, 1])[:3]), .28]
+        m['pbrMetallicRoughness']['roughnessFactor'] = .15
+    elif overlay:
+        m['alphaMode'] = 'BLEND'   # BO3 _blend layers and decals: drawn over the surface below, faded by vertex/texture alpha
+        if c is None: m['pbrMetallicRoughness']['baseColorFactor'] = [1, 1, 1, 0]   # its image wasn't exported: a flat quad otherwise
     # BO3 colour maps often keep other data in their alpha: only materials that are see-through by nature cut it out
     elif color and color['alpha'] and CUTOUT.search(name): m['alphaMode'] = 'MASK'; m['alphaCutoff'] = .5
     # materials that differ only by name (BO3 has many per-model copies of one texture set) are shared: each distinct
@@ -259,7 +266,11 @@ def prop_mesh(name):   # a BO3 model as a glTF mesh (cached), or None if Greyhou
     gltf['meshes'].append({'name': name, 'primitives': prims}); mesh_cache[name] = len(gltf['meshes']) - 1
     return mesh_cache[name]
 instances, skipped = 0, []
+# skinned characters placed as static props (Der Eisendrache's zombie corpses, soldier and gib parts): a static model
+# can't be posed, so they stood in their bind pose (user: "T-posing messes"); left out
+POSED_CHARACTER = re.compile(r'^c_(zom_.*corpse|zom_zod_zombie_fem_body|54i_.*spawn|ger_winter_soldier)', re.I)
 for name, insts in sorted(by_model.items()):
+    if POSED_CHARACTER.search(name): continue
     mesh_i = prop_mesh(name)
     if mesh_i is None: skipped.append(name); continue
     cells = {}
@@ -282,9 +293,13 @@ print(f'props: {len(by_model) - len(skipped)} models, {instances} instances' + (
 # islands the zombies couldn't leave). The Giant: unchanged.
 STRUCTURAL = re.compile(r'wall|column|pillar|arch(?!ive)|fireplace|stone_|rock|cliff|tower|roof|balcony|statue|buttress|parapet|battlement|chimney|bookcase|throne|altar', re.I) if BSP == 'zm_castle' else None
 col_P, col_T, n0, solid_props = [], [], 0, 0
+# Der Eisendrache: props that would cut the navmesh into islands (railings, crates, furniture, machines...) still stop the
+# player and bullets: they go to PCOL_props, which CustomWorld adds to collision but leaves out of the navmesh.
+pcol_P, pcol_T, pn0, pcol_props = [], [], 0, 0
 tri = np.concatenate(solid); used, inv = np.unique(tri.ravel(), return_inverse=True)
 col_P.append(Pg[used].astype(np.float64)); col_T.append(inv.reshape(-1, 3)); n0 = len(used)
 for name, insts in by_model.items():
+    player_only = False
     base_ = re.sub(r'_snow(?=_|$)', '', name)   # a snowy variant collides like the plain one (NO_COLLIDE's 'snow' is for snow piles)
     if name not in prop_geo or NO_COLLIDE.search(base_) or 'stair_step' in name: continue   # steps: ramps below
     pp, tt = prop_geo[name]
@@ -303,13 +318,20 @@ for name, insts in by_model.items():
         pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
         tt = BOX_TRIS
     elif STRUCTURAL and STRUCTURAL.search(base_) and len(tt) <= 1500: pass   # Der Eisendrache: walls, columns, arches... as they are
+    elif BSP == 'zm_castle':   # everything else solid: the player-only layer (PCOL_props), as its mesh or, if detailed, its box
+        player_only = True
+        if len(tt) > 1500:
+            lo3, hi3 = pp.min(0), pp.max(0)
+            pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
+            tt = BOX_TRIS
     else: continue
     for it in insts:
         o = np.array(it['origin'])
         if not np.all((o >= lo) & (o <= hi)): continue
         A = np.array(it['axes'], dtype=np.float64).reshape(3, 3); M = A.T; sc = np.linalg.norm(M, axis=0); M = M / np.where(sc > 1e-6, sc, 1)
         R = C @ M @ C.T
-        col_P.append(pp @ R.T * (it['scale'] * sc.mean()) + g(o)); col_T.append(tt + n0); n0 += len(pp); solid_props += 1
+        if player_only: pcol_P.append(pp @ R.T * (it['scale'] * sc.mean()) + g(o)); pcol_T.append(tt + pn0); pn0 += len(pp); pcol_props += 1
+        else: col_P.append(pp @ R.T * (it['scale'] * sc.mean()) + g(o)); col_T.append(tt + n0); n0 += len(pp); solid_props += 1
 # Stairs: BO3's steps are separate 2-inch treads (8 up, 10-12 along) with gaps, and the game walks players on an
 # invisible clip ramp that isn't in the data. Chain the treads into flights and collide with a ramp from the bottom
 # tread to the top one instead (the treads stay visual).
@@ -341,6 +363,11 @@ CP, CT = np.concatenate(col_P).astype(np.float32), np.concatenate(col_T).astype(
 gltf['meshes'].append({'name': 'COL_world', 'primitives': [{'attributes': {'POSITION': accessor(CP, 'VEC3', 34962, True)}, 'indices': accessor(CT.ravel(), 'SCALAR', 34963)}]})
 add_node({'name': 'COL_world', 'mesh': len(gltf['meshes']) - 1})
 print(f'collision: {len(CT)} triangles ({solid_props} solid props)')
+if pcol_P:
+    PP, PT = np.concatenate(pcol_P).astype(np.float32), np.concatenate(pcol_T).astype(np.uint32)
+    gltf['meshes'].append({'name': 'PCOL_props', 'primitives': [{'attributes': {'POSITION': accessor(PP, 'VEC3', 34962, True)}, 'indices': accessor(PT.ravel(), 'SCALAR', 34963)}]})
+    add_node({'name': 'PCOL_props', 'mesh': len(gltf['meshes']) - 1})
+    print(f'player-only collision: {len(PT)} triangles ({pcol_props} props)')
 CTRI = CP[CT].astype(np.float64)   # (n, 3, 3) collision triangles in glTF space
 def seg_blocked(a, b, tris):   # does the segment a->b cross any triangle (Moller-Trumbore, vectorised)
     d = b - a; e1 = tris[:, 1] - tris[:, 0]; e2 = tris[:, 2] - tris[:, 0]
@@ -647,7 +674,7 @@ for e in ents:
         prims = []
         for mname, pr in mats.items():
             mm = pr['mm']; N = np.array(pr['N']); N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-6)
-            mat = material(('prop', mname), mname, texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX), fallback=builtin_color(mm.get('diffuse'), mname))
+            mat = material(('prop', mname), mname, texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX), overlay=bool(re.search(r'decal', mname, re.I)), fallback=builtin_color(mm.get('diffuse'), mname))
             prims.append({'attributes': {'POSITION': accessor(np.array(pr['P'], dtype=np.float32), 'VEC3', 34962, True), 'NORMAL': accessor(N.astype(np.float32), 'VEC3', 34962),
                                          'TEXCOORD_0': accessor(np.array(pr['UV'], dtype=np.float32), 'VEC2', 34962)},
                           'indices': accessor(np.array(pr['F'], dtype=np.uint32).ravel(), 'SCALAR', 34963), 'material': mat})
@@ -726,7 +753,7 @@ def fxanim_rig(name, model_name, origin, anims):
         prims = []
         for mname, pr in mats.items():
             mm = pr['mm']; N = np.array(pr['N']); N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-6)
-            mat = material(('prop', mname), mname, texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX), fallback=builtin_color(mm.get('diffuse'), mname))
+            mat = material(('prop', mname), mname, texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX), overlay=bool(re.search(r'decal', mname, re.I)), fallback=builtin_color(mm.get('diffuse'), mname))
             prims.append({'attributes': {'POSITION': accessor(np.array(pr['P'], dtype=np.float32), 'VEC3', 34962, True), 'NORMAL': accessor(N.astype(np.float32), 'VEC3', 34962),
                                          'TEXCOORD_0': accessor(np.array(pr['UV'], dtype=np.float32), 'VEC2', 34962)},
                           'indices': accessor(np.array(pr['F'], dtype=np.uint32).ravel(), 'SCALAR', 34963), 'material': mat})

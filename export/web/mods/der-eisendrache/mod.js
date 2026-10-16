@@ -1,5 +1,6 @@
 // Der Eisendrache (a BO3 map ported by .tools/build_bo3_map.py; see docs/fork/waw-ports.md). Does nothing elsewhere.
 import * as THREE from 'three';
+import { loadModel } from '../../animation.js';
 // Zones: BO3's zone manager links pairs of zones by a flag (zm_castle_zones.gsc add_adjacent_zone) and some flags set
 // others (add_zone_flags). The build gives every door and debris pile its whole flag as its zone
 // (connect_start_to_subclocktower -> connectstarttosubclocktower) and every spawner its BO3 zone without underscores;
@@ -28,6 +29,13 @@ export default function setup(api) {
     return zones;
   };
   setupLook(api);
+  // Der Eisendrache's own zombies (BO3 full-body models, .tools/build_castle_zombies.py; git-ignored, ripped) driven by
+  // BO1's zombie clips (same CoD skeleton). Their heads are part of the body, so BO1's separate heads are dropped.
+  const ZB = ['c_zom_der_body1_corpse2_fb', 'c_zom_der_body1_corpse3_fb', 'c_zom_der_body2_corpse1_fb', 'c_zom_der_body2_corpse2_fb'];
+  Promise.all(ZB.map(n => loadModel(new URL(`zombies/${n}.glb`, import.meta.url).href).catch(() => null))).then(list => {
+    const ok = list.filter(Boolean); if (!ok.length || !api.enemies) return;
+    api.enemies.templates = ok; api.enemies.heads = [];
+  });
   const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api);
   setupRocketPad(api); setupDogRounds(api);
   window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap };

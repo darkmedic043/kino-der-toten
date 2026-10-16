@@ -21,3 +21,6 @@ BO1 baked Moon's lighting into lightmaps we don't have, so Moon was lit only by 
 - **Fill**: ambient ×0.3 and hemi ×0.28 of the map's values on the Moon (×0.45 / ×0.42 on Earth). Power raises fixtures from 55% to 100% and the fill by 25%.
 - **Glow**: lamp materials (`GLOWING`) take their diffuse map as an emissive map, so bloom picks them up.
 - **Map state**: read through `api.getState().moon` four times a second (the snapshot is too heavy to read every frame).
+
+- **Viewmodel light on other maps (2026-10-16)**: the lighting mod sets the first-person lights for Kino's exposure (1.7). Other maps keep their own exposure (Sandbox, The Giant 0.95), which left guns and arms near black (user: "lack of a global light"); on every map but Kino and Moon the viewmodel lights are scaled by 1.7 / exposure each frame.
+

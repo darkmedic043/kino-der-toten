@@ -6,7 +6,7 @@
 // teleporter and traps, a custom map's Easter eggs...). Built from upstream's game.js and the
 // fork's zombies.js, which were two copies of this loop.
 import * as THREE from 'three';
-import { textureMemoryStats } from './texture-memory.js';   // first: frees decoded texture images once uploaded
+import { textureMemoryStats, setPrimaryRenderer } from './texture-memory.js';   // first: frees decoded texture images once uploaded
 import { PlayerController } from './player-controller.js';
 import { ViewWeapon } from './animation.js';
 import { Enemies } from './enemies.js';
@@ -31,7 +31,7 @@ const powerupNames={nuke:'Nuke',insta_kill:'Insta-Kill',double_points:'Double Po
 const $=id=>document.getElementById(id), keys=new Set(),audio=new GameAudio(),mods=new ModHost();
 const profile=configureKinoAssets();
 audio.maxBufferBytes=profile.mobile?16*1024*1024:Infinity;audio.preload=!profile.mobile;
-const renderer=new THREE.WebGLRenderer({antialias:!profile.mobile,powerPreference:profile.mobile?'default':'high-performance'});
+const renderer=new THREE.WebGLRenderer({antialias:!profile.mobile,powerPreference:profile.mobile?'default':'high-performance'});setPrimaryRenderer(renderer);   // only its uploads free images (texture-memory.js)
 renderer.setPixelRatio(Math.min(devicePixelRatio,profile.mobile?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
 // smallest instanced prop drawn, in screen pixels, by graphics quality (Low..Ultra; instance-cull.js)
 const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null;

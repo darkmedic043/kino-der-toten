@@ -27,7 +27,7 @@ def credit_sketchfab(title,url):
   return {'author':NW,'source':url,'license':'CC BY-SA (SCP: Secret Laboratory); the upload is marked CC BY 4.0',
     'note':f'Models by PurpleGoop for SCP: Secret Laboratory (Northwood Studios), rigged by DrPri. "{title}" (the game\'s heavy-armour version) uploaded to Sketchfab by sigma eat dog. Adapted for Melon Zombies: control bones removed, armour pieces skinned, materials made opaque'+(', untextured boots given the body texture' if 'juggernaut' in url else '')+'.'}
 def operator(id,name,skin_name,rarity,desc,col,acc,model,height,skin_of=None,variants=None,credit=None):
-  e={'id':id,'name':name,'type':'gltf','motion':'bo1','model':f'models/scpsl/{model}.glb?v=1','icon':f'models/scpsl/{model}_icon.webp','height':height,'yaw':180,
+  e={'id':id,'name':name,'type':'gltf','motion':'bo1','model':f'models/scpsl/{model}.glb?v=1','icon':f'models/scpsl/{model}_icon.webp','height':height,'yaw':0,
      'color':col,'accent':acc,'fpArms':True,'skinName':skin_name,'description':desc,'optional':True,'shop':f'pass.{SEASON}.operator.{id}','pass':SEASON,
      'credit':{'title':f'{name} ({skin_name})',**credit}}
   if skin_of:e['skinOf']=skin_of

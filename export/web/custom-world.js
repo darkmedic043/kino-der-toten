@@ -32,6 +32,9 @@ const MARKER=/^(PLAYER_SPAWN|SPAWN_PLAYER|ZSPAWN|WINDOW|DOOR|WALLBUY|PERK|BOX|PA
 const TRAP_LIGHTS=2;   // real lights shared by every trap zone (see zone.light)
 const TRAP_COLORS={electric:0x8cbbff,fire:0xff7a2e};
 const COLLISION_NAME=/^(COL|UCX|collision)[_.-]/i;
+// PCOL_ meshes: collision for the player and bullets only, left out of the navmesh (props such as railings and furniture
+// that would cut it into islands zombies can't leave; Der Eisendrache)
+const PLAYER_COLLISION_NAME=/^PCOL[_.-]/i;
 // Machine models face their local +Z; markers face their local +X (Blender's red axis).
 const FACE=Math.PI/2;
 const up=new THREE.Vector3(0,1,0),_negOffset=new THREE.Vector3();
@@ -73,12 +76,12 @@ export class CustomWorld {
         position:o.getWorldPosition(new THREE.Vector3()),yaw:worldYaw(o)});
     });
     const meshes=[];root.traverse(o=>{if(o.isMesh&&!o.userData.marker)meshes.push(o);});
-    const dedicated=meshes.filter(o=>COLLISION_NAME.test(rawName(o)));
-    for(const o of dedicated)o.visible=false;
+    const dedicated=meshes.filter(o=>COLLISION_NAME.test(rawName(o))),playerOnly=meshes.filter(o=>PLAYER_COLLISION_NAME.test(rawName(o)));
+    for(const o of [...dedicated,...playerOnly])o.visible=false;
     progress('Building collision',35);
-    const solid=positionsOf(dedicated.length?dedicated:meshes);
+    const solid=positionsOf(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)));
     if(!solid)throw new Error('The map has no meshes to stand on');
-    this.collision=new CollisionWorld(solid);
+    this.collision=new CollisionWorld(playerOnly.length?positionsOf([...(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o))),...playerOnly]):solid);
 
     // RISING_<delay>_<speed>: a mesh (a death plane such as rising lava or cheese) that starts rising after <delay>
     // seconds of game time at <speed> units/s and kills whatever it reaches. Render-only: no collision or navigation.

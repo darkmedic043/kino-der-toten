@@ -1,5 +1,5 @@
 // Main menu (not part of upstream): map browser, loadout, character and mods.
-import './texture-memory.js';   // first: frees decoded texture images once uploaded (menu previews, portraits, Gunsmith)
+import { setPrimaryRenderer } from './texture-memory.js';   // first: frees decoded texture images once uploaded (menu previews, portraits, Gunsmith)
 import * as THREE from 'three';
 import { loadModel, ViewWeapon } from './animation.js';
 import { applyGlow, tickGlow } from './mods/bo3-weapons/glow.js';
@@ -598,7 +598,7 @@ const stage={active:false,running:false,speed:0,character:null,loading:0,yaw:.5,
     requestAnimationFrame(t=>this.frame(t));
   },
 };
-stage.renderer=new THREE.WebGLRenderer({canvas:$('char-canvas'),antialias:true,alpha:true});
+stage.renderer=new THREE.WebGLRenderer({canvas:$('char-canvas'),antialias:true,alpha:true});setPrimaryRenderer(stage.renderer);
 stage.renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));stage.renderer.outputColorSpace=THREE.SRGBColorSpace;stage.renderer.toneMapping=THREE.ACESFilmicToneMapping;stage.renderer.toneMappingExposure=1.3;
 stage.scene=new THREE.Scene();stage.camera=new THREE.PerspectiveCamera(30,1,1,4000);stage.camera.position.set(0,52,190);stage.camera.lookAt(0,36,0);
 stage.scene.add(new THREE.HemisphereLight(0xd8d2c4,0x2a1d17,1.6));
