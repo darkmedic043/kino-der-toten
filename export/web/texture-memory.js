@@ -84,3 +84,21 @@ function restore(s) {
 
 export const textureMemoryStats = () => ({ ...stats, mb: Math.round(stats.bytes / 1e6) });
 installTextureMemory();   // on import: the engine and the menu import this first
+
+// For code that copies a texture's pixels elsewhere (instance-cull.js texture arrays): the source's image, decoded again
+// from its file if it was released (the source itself is left as it is), or null if it can't be had.
+export async function imageOf(source) {
+  const img = source?.data;
+  if (img && !(img instanceof ImageBitmap && !img.width)) return img;
+  const r = released.get(source);
+  return r && native ? native(r.blob, ...r.args).catch(() => null) : null;
+}
+// ...and drop a source's decoded image once nothing will draw it again (its file stays, as for a released texture)
+export function dropImage(source) {
+  const img = source?.data;
+  if (!(img instanceof ImageBitmap) || !img.width || kept.has(source)) return;
+  const o = origins.get(img); if (!o) return;
+  released.set(source, { ...o, pending: null, texs: [] });
+  stats.released++; stats.bytes += img.width * img.height * 4;
+  img.close();
+}

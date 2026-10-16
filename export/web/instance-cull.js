@@ -9,6 +9,7 @@
 // collision and bullets use the world's own colliders.
 import * as THREE from 'three';
 import { MeshoptSimplifier } from './vendor/meshopt_simplifier.js';
+import { imageOf, dropImage } from './texture-memory.js';
 
 // three r185 bug: WebGLRenderer.setProgram tests `object.colorTexture` on a BatchedMesh, but the class keeps it in
 // `_colorsTexture`; for a batch without colours `undefined !== null` held, so every batched draw looked its program up
@@ -43,30 +44,91 @@ function lodsOf(g){
   return out;
 }
 
-export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,target=root}={}){
+// Texture arrays (map entry `textureArrays`: the layer size in px, e.g. 256; Der Eisendrache). Batching per material
+// leaves one draw per material, and a ported BO3 map has thousands (Der Eisendrache: ~2,200 batches, 28 FPS looking
+// over the castle; each draw costs ~10 µs of three.js work whatever its size). With arrays, opaque and cut-out
+// MeshStandardMaterials that differ only by their colour/normal maps and colour share one batch: their maps become
+// layers of two DataArrayTextures (filled on the GPU from the decoded images, resized to the layer size), and each
+// instance carries its layers (a float texture read through gl_DrawID, as three reads its matrices) and its colour
+// (the material's colour x the instance's, BatchedMesh colours).
+const NO_ARRAY_MAPS=['lightMap','aoMap','emissiveMap','roughnessMap','metalnessMap','alphaMap','bumpMap','displacementMap','envMap','specularMap'];
+const plainUv=t=>!t||(t.offset.x===0&&t.offset.y===0&&t.repeat.x===1&&t.repeat.y===1&&t.rotation===0&&t.channel===0&&t.wrapS===THREE.RepeatWrapping&&t.wrapT===THREE.RepeatWrapping);
+const arrayable=m=>m.isMeshStandardMaterial&&!m.isMeshPhysicalMaterial&&!m.transparent&&m.map?.source?.data&&!NO_ARRAY_MAPS.some(k=>m[k])&&plainUv(m.map)&&plainUv(m.normalMap);
+const arrayKey=m=>[m.side,m.alphaTest,!!m.normalMap,m.normalMap?m.normalScale.toArray().join():'',m.roughness,m.metalness,m.emissive.getHex(),m.emissiveIntensity,m.flatShading,m.vertexColors,m.fog,m.map.colorSpace,m.customProgramCacheKey()].join(',');
+function arrayMaterial(base,mapArray,normalArray,layerTex){
+  const m=base.clone();m.name='array_'+base.name;m.color.set(1,1,1);
+  const dummy=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);dummy.needsUpdate=true;dummy.colorSpace=base.map.colorSpace;m.map=dummy;
+  if(normalArray){const dn=new THREE.DataTexture(new Uint8Array([128,128,255,255]),1,1);dn.needsUpdate=true;m.normalMap=dn;}
+  const prev=base.onBeforeCompile,prevKey=base.customProgramCacheKey.bind(base);
+  m.onBeforeCompile=(sh,r)=>{prev?.call(m,sh,r);
+    sh.uniforms.layerTex={value:layerTex};sh.uniforms.mapArray={value:mapArray};if(normalArray)sh.uniforms.normalArray={value:normalArray};
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nuniform highp sampler2D layerTex;\nflat varying vec2 vLayer;')
+      .replace('#include <batching_vertex>','#include <batching_vertex>\n{ int li = int( getIndirectIndex( gl_DrawID ) ), ls = textureSize( layerTex, 0 ).x; vLayer = texelFetch( layerTex, ivec2( li % ls, li / ls ), 0 ).rg; }');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform highp sampler2DArray mapArray;'+(normalArray?'\nuniform highp sampler2DArray normalArray;':'')+'\nflat varying vec2 vLayer;')
+      .replace('#include <map_fragment>',THREE.ShaderChunk.map_fragment.replace('texture2D( map, vMapUv )','texture( mapArray, vec3( vMapUv, vLayer.x ) )'))
+      .replace('#include <normal_fragment_maps>',THREE.ShaderChunk.normal_fragment_maps.replace('texture2D( normalMap, vNormalMapUv )','texture( normalArray, vec3( vNormalMapUv, vLayer.y ) )'));
+  };
+  m.customProgramCacheKey=()=>prevKey()+'|texture-array';
+  return m;
+}
+// a DataArrayTexture with one layer per source, filled on the GPU (no copy of the pixels in RAM)
+async function fillArray(renderer,sources,size,colorSpace){
+  const t=new THREE.DataArrayTexture(null,size,size,sources.length);t.source.dataReady=false;
+  Object.assign(t,{format:THREE.RGBAFormat,type:THREE.UnsignedByteType,colorSpace,generateMipmaps:false,minFilter:THREE.LinearMipmapLinearFilter,magFilter:THREE.LinearFilter,wrapS:THREE.RepeatWrapping,wrapT:THREE.RepeatWrapping,anisotropy:4});
+  t.mipmaps=[];t.needsUpdate=true;renderer.initTexture(t);
+  const gl=renderer.getContext(),wt=renderer.properties.get(t).__webglTexture;
+  // decoded (a released image comes back from its file) and resized 32 at a time: one by one took ~175 ms each
+  let next=0;
+  await Promise.all(Array.from({length:Math.min(32,sources.length)},async()=>{
+    while(next<sources.length){
+      const i=next++,img=await imageOf(sources[i]);if(!img)continue;
+      const fit=img.width===size&&img.height===size?img:await createImageBitmap(img,{resizeWidth:size,resizeHeight:size,resizeQuality:'high'});
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY,wt);gl.texSubImage3D(gl.TEXTURE_2D_ARRAY,0,0,0,i,size,size,1,gl.RGBA,gl.UNSIGNED_BYTE,fit);
+      if(fit!==img)fit.close();if(img!==sources[i].data)img.close?.();
+    }
+  }));
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY,wt);gl.generateMipmap(gl.TEXTURE_2D_ARRAY);renderer.resetState();
+  return t;
+}
+
+export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,target=root,renderer=null,arrays=0}={}){
   await MeshoptSimplifier.ready;const t0=performance.now();
   const groups=new Map();
+  const maxLayers=renderer&&arrays?renderer.getContext().getParameter(renderer.getContext().MAX_ARRAY_TEXTURE_LAYERS):0,chunks=new Map();   // array groups split when they'd pass the layer limit
   root.updateMatrixWorld(true);
   root.traverse(o=>{
     if(!o.isInstancedMesh||o.count<1||!o.visible||exclude(o)||Array.isArray(o.material)||o.morphTargetInfluences?.length)return;
     for(let p=o.parent;p;p=p.parent)if(!p.visible)return;
     const g=o.geometry;if(Object.values(g.attributes).some(a=>a.isInterleavedBufferAttribute)||Object.keys(g.morphAttributes).length)return;
     const layout=Object.keys(g.attributes).sort().map(k=>`${k}:${g.attributes[k].itemSize}${g.attributes[k].normalized?'n':''}:${g.attributes[k].array.constructor.name}`).join(',');
-    const key=[o.material.uuid,layout,!!g.index,o.castShadow,o.receiveShadow,o.renderOrder,o.layers.mask].join('|');
-    let e=groups.get(key);if(!e)groups.set(key,e={sources:[],n:0,color:false,geos:new Map()});
+    const arr=maxLayers&&arrayable(o.material),rest=[layout,!!g.index,o.castShadow,o.receiveShadow,o.renderOrder,o.layers.mask].join('|');
+    let key=[o.material.uuid,rest].join('|');
+    if(arr){const base='arr|'+arrayKey(o.material)+'|'+rest;let c=chunks.get(base);
+      if(!c)chunks.set(base,c={k:0,maps:new Set(),normals:new Set()});
+      const m=o.material,grow=(c.maps.has(m.map.source)?0:1),growN=(m.normalMap&&!c.normals.has(m.normalMap.source)?1:0);
+      if(c.maps.size+grow>maxLayers||c.normals.size+growN>maxLayers){c.k++;c.maps=new Set();c.normals=new Set();}
+      c.maps.add(m.map.source);if(m.normalMap)c.normals.add(m.normalMap.source);key=base+'|'+c.k;}
+    let e=groups.get(key);if(!e)groups.set(key,e={sources:[],n:0,color:false,geos:new Map(),arr});
     e.sources.push(o);e.n+=o.count;if(o.instanceColor)e.color=true;
     if(!e.geos.has(g)){g.boundingSphere||g.computeBoundingSphere();e.geos.set(g,null);}
   });
   // A material drawn both by a batch (USE_BATCHING) and by a plain mesh flips three's program on every draw
   // (getProgram/getParameters ~14% of a frame), so such batches get their own copy (textures shared).
   const plain=new Set();root.traverse(o=>{if(o.isMesh&&!o.isInstancedMesh)for(const m of [o.material].flat())plain.add(m);});
-  const list=[],detached=[];
+  const list=[],detached=[],arraySources=[];
   let lastYield=performance.now();
   for(const e of groups.values()){
     if(performance.now()-lastYield>40){await new Promise(r=>setTimeout(r,0));lastYield=performance.now();}   // keep the page painting
     const lods=new Map();for(const g of e.geos.keys())lods.set(g,lodsOf(g));
     let verts=0,index=0;for(const g of e.geos.keys())for(const x of [g,...lods.get(g)]){verts+=x.attributes.position.count;index+=x.index?x.index.count:0;}
-    const first=e.sources[0],mat=plain.has(first.material)?first.material.clone():first.material;if(mat!==first.material)mat.userData={...first.material.userData,batchCopyOf:first.material};
+    const first=e.sources[0];let mat,layerOf=null,layerTex=null;
+    if(e.arr){   // texture-array batch: layers per map source, a layer pair per instance
+      const maps=new Map(),normals=new Map();for(const o of e.sources){const m=o.material;if(!maps.has(m.map.source))maps.set(m.map.source,maps.size);if(m.normalMap&&!normals.has(m.normalMap.source))normals.set(m.normalMap.source,normals.size);}
+      const mapArray=await fillArray(renderer,[...maps.keys()],arrays,first.material.map.colorSpace),normalArray=normals.size?await fillArray(renderer,[...normals.keys()],arrays,THREE.NoColorSpace):null;
+      const ls=Math.ceil(Math.sqrt(e.n));layerTex=new THREE.DataTexture(new Float32Array(ls*ls*2),ls,ls,THREE.RGFormat,THREE.FloatType);
+      mat=arrayMaterial(first.material,mapArray,normalArray,layerTex);mat.userData={...first.material.userData,textureArray:{maps:maps.size,normals:normals.size}};
+      layerOf=m=>[maps.get(m.map.source),m.normalMap?normals.get(m.normalMap.source):0];e.color=true;arraySources.push(...maps.keys(),...normals.keys());
+    }else{mat=plain.has(first.material)?first.material.clone():first.material;if(mat!==first.material)mat.userData={...first.material.userData,batchCopyOf:first.material};}
     const batch=new THREE.BatchedMesh(e.n,verts,index||undefined,mat);
     batch.name='batch_'+(first.material.name||first.name);// three's own per-instance culling and sorting run on every render over every instance (~40,000: slower than the
     // draws they save); culling is done here instead, only when the camera has moved or turned enough
@@ -79,12 +141,14 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
       for(let i=0;i<o.count;i++,k++){
         M.fromArray(o.instanceMatrix.array,i*16);W.multiplyMatrices(o.matrixWorld,M);
         const id=batch.addInstance(gid);batch.setMatrixAt(id,W);ids[k]=id;geo[k]=gids;
-        if(e.color){if(o.instanceColor)COL.fromArray(o.instanceColor.array,i*3);else COL.setRGB(1,1,1);batch.setColorAt(id,COL);}
+        if(e.color){if(o.instanceColor)COL.fromArray(o.instanceColor.array,i*3);else COL.setRGB(1,1,1);if(e.arr)COL.multiply(o.material.color);batch.setColorAt(id,COL);}
+        if(layerTex){const [lc,ln]=layerOf(o.material);layerTex.image.data[id*2]=lc;layerTex.image.data[id*2+1]=ln;}
         C.copy(bs.center).applyMatrix4(W);pos[k*3]=C.x;pos[k*3+1]=C.y;pos[k*3+2]=C.z;
         W.decompose(C,Q,S);rad[k]=bs.radius*Math.max(Math.abs(S.x),Math.abs(S.y),Math.abs(S.z));
       }
       detached.push([o,o.parent]);o.parent.remove(o);o.userData.batchedInto=batch;
     }
+    if(layerTex)layerTex.needsUpdate=true;
     batch.matrixAutoUpdate=false;target.add(batch);
     if(!target.matrixWorld.equals(new THREE.Matrix4())){   // matrices above are world space: undo the target's transform
       const inv=new THREE.Matrix4().copy(target.matrixWorld).invert();for(let i=0;i<n;i++){batch.getMatrixAt(ids[i],M);batch.setMatrixAt(ids[i],M.premultiply(inv));}}
@@ -96,6 +160,9 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
   // the batches hold their own copies: free the originals' GPU buffers unless something left in the scene still uses them
   {const used=new Set();target.traverse(o=>{if(o.isMesh&&!o.isBatchedMesh)used.add(o.geometry);});
     for(const [o] of detached)if(o.isInstancedMesh&&!used.has(o.geometry)){o.geometry.dispose();used.add(o.geometry);}}
+  // maps now held in arrays: their decoded images go unless something still in the scene draws them
+  if(arraySources.length){const used=new Set();target.traverse(o=>{if(!o.material||o.material.userData?.textureArray)return;for(const m of [o.material].flat())for(const k in m)if(m[k]?.isTexture)used.add(m[k].source);});
+    for(const s of new Set(arraySources))if(!used.has(s))dropImage(s);}
   const buildMs=Math.round(performance.now()-t0);
   const instances=list.reduce((a,e)=>a+e.n,0),sources=[...groups.values()].reduce((a,g)=>a+g.sources.length,0);
   let lastPos=null,lastKey='',drawn=instances;
@@ -124,11 +191,11 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
             if(l!==lod[i]){lod[i]=l;mesh.setGeometryIdAt(ids[i],geo[i][l]);}}
           kept+=on;
         }
-        e.kept=kept;drawn+=kept;
+        e.kept=kept;drawn+=kept;mesh.visible=kept>0;   // an empty batch still costs a trip through the renderer (~10 µs; Der Eisendrache has ~2,900)
       }
       return true;
     },
     // every instance back on (e.g. before a bake that renders the whole map)
-    restore(){for(const e of list){for(let i=0;i<e.n;i++)if(!e.mask[i]){e.mask[i]=1;e.mesh.setVisibleAt(e.ids[i],true);}e.kept=e.n;}lastPos=null;drawn=instances;},
+    restore(){for(const e of list){for(let i=0;i<e.n;i++)if(!e.mask[i]){e.mask[i]=1;e.mesh.setVisibleAt(e.ids[i],true);}e.kept=e.n;e.mesh.visible=true;}lastPos=null;drawn=instances;},
   };
 }

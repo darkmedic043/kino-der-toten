@@ -417,7 +417,7 @@ try{
   // static instanced props: batched per material, culled per instance (instance-cull.js)
   if(!perfOff.has('noBatch')){
     // the map's own props only (mods' instanced effects, e.g. the lighting beams, have their own shaders)
-    instanceCull=await createInstanceCuller(world.root??world.mapRoot??scene,{target:scene});globalThis.kino.instanceCull=instanceCull;
+    instanceCull=await createInstanceCuller(world.root??world.mapRoot??scene,{target:scene,renderer,arrays:perfOff.has('noArrays')?0:entry.textureArrays??0});globalThis.kino.instanceCull=instanceCull;
     if(instanceCull.meshes){console.info('[instance-cull]',instanceCull.sources,'meshes into',instanceCull.meshes,'batches,',instanceCull.instances,'instances in',instanceCull.buildMs,'ms');
       await paint();await renderer.compileAsync(scene,camera).catch(()=>{});}   // batched props need their own shader variants: compile them behind the loading screen
   }

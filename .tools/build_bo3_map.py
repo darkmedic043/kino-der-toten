@@ -112,6 +112,7 @@ def builtin_color(image, name):
     return [.3, .3, .3]
 CUTOUT = re.compile(r'leaf|leaves|foliage|grass|fence|chainlink|chain_link|grate|grill|mesh|cobweb|web_|ivy|vine|plant|tree|bush|branch|'
                     r'wire|barbed|paper|newspaper|poster|cloth|curtain|flag|net_|netting|tarp|hair|feather|lattice|cutout|alpha', re.I)
+mat_sig = {}
 def material(key, name, color, normal, two_sided=False, overlay=False, fallback=None):
     if key in mat_index: return mat_index[key]
     m = {'name': name, 'pbrMetallicRoughness': {'metallicFactor': 0, 'roughnessFactor': .85}, 'doubleSided': two_sided}
@@ -125,7 +126,11 @@ def material(key, name, color, normal, two_sided=False, overlay=False, fallback=
     if overlay: m['alphaMode'] = 'BLEND'   # BO3 _blend layers and decals: drawn over the surface below, faded by vertex/texture alpha
     # BO3 colour maps often keep other data in their alpha: only materials that are see-through by nature cut it out
     elif color and color['alpha'] and CUTOUT.search(name): m['alphaMode'] = 'MASK'; m['alphaCutoff'] = .5
-    gltf['materials'].append(m); mat_index[key] = len(gltf['materials']) - 1
+    # materials that differ only by name (BO3 has many per-model copies of one texture set) are shared: each distinct
+    # material is its own prop batch at run time (instance-cull.js), and Der Eisendrache had 3,267 of them
+    sig = json.dumps({k: v for k, v in m.items() if k != 'name'}, sort_keys=True)
+    if sig in mat_sig: mat_index[key] = mat_sig[sig]; return mat_index[key]
+    gltf['materials'].append(m); mat_index[key] = mat_sig[sig] = len(gltf['materials']) - 1
     return mat_index[key]
 def add_node(node):
     gltf['nodes'].append(node); gltf['scenes'][0]['nodes'].append(len(gltf['nodes']) - 1); return len(gltf['nodes']) - 1
@@ -461,7 +466,30 @@ done = set()
 # buy gates (BO3 animates them; here they rise). Debris whose only pieces are brush models (their geometry isn't in the
 # dump) get a stand-in: a pile of BO3 rubble at the clip brush.
 GATE_MODELS = {'zbarrier_zm_castle_gate_dropdown_snow': 'p7_fxanim_zm_castle_drop_down_buy_gate_mod'}
-RUBBLE = 'p7_debris_concrete_rubble_lg_01'
+BARRICADE, BARRICADE_W, BARRICADE_H = 'p7_zm_der_barricade_wall_main', 138.6, 92.5   # BO3 plank wall, model X = width, Z = height
+def debris_standin(o):
+    """A plank wall filling the passage at a debris clip brush (CoD origin o), measured through the collision: the
+    floor below, the narrower of the two horizontal axes (walls both sides), and the clear height. Sinks when bought."""
+    O = g(o).astype(np.float64); near = CTRI[np.linalg.norm(CTRI.mean(1) - O, axis=1) < 320]
+    down = next((h for h in range(4, 300, 4) if seg_blocked(O, O - [0, h, 0], near)), 60)
+    F = O - [0, down - 2, 0]
+    best = None
+    for axis in ((1.0, 0.0), (0.0, 1.0)):
+        side = g(np.array([-axis[1], axis[0], 0.0])); C = F + [0, 40, 0]
+        ext = [next((k for k in range(4, 220, 4) if seg_blocked(C, C + side * sg * k, near)), None) for sg in (1, -1)]
+        open_ = ext.count(None); ext = [x if x is not None else 110 for x in ext]   # no wall within 220: an open side, 110 out
+        if best is None or (open_, sum(ext)) < (best[4], best[0]): best = (sum(ext), side, ext, axis, open_)
+    width, side, (l, r), axis, _ = best
+    F = F + side * (l - r) / 2
+    up = next((h for h in range(8, 240, 4) if seg_blocked(F + [0, 2, 0], F + [0, h, 0], near)), 120)
+    height = min(up, 130)
+    mi = prop_mesh(BARRICADE)
+    if mi is None: return None
+    yaw = math.atan2(axis[0], -axis[1])   # CoD yaw putting the model's X (its width) along the side direction (-ay, ax)
+    r_ = yaw / 2
+    node = {'name': BARRICADE, 'mesh': mi, 'translation': F.tolist(), 'rotation': [0, math.sin(r_), 0, math.cos(r_)],
+            'scale': [width / BARRICADE_W, height / BARRICADE_H, 1], 'extras': {'move': g([0, 0, -(height + 10)]).tolist()}}
+    gltf['nodes'].append(node); count('DEBRIS_STANDIN'); return len(gltf['nodes']) - 1
 def door_piece(model, origin, angles, move):
     mi = prop_mesh(model)
     if mi is None: print('  door piece not exported:', model); return None
@@ -485,7 +513,7 @@ for e in ents:
         if k is not None: kids.append(k)
     if not kids and brushes and e.get('targetname') == 'zombie_debris':
         for o_ in brushes[:2]:
-            k = door_piece(RUBBLE, [o_[0], o_[1], o_[2] - 60], e.get('angles'), [0, 0, -140])
+            k = debris_standin(o_)
             if k is not None: kids.append(k)
     if not kids: print('  door without pieces:', e.get('script_flag')); continue
     add_node({'name': f'DOOR_{z or "power"}_{cost}', 'children': kids, 'extras': {'zone': z, 'cost': cost, 'electric': electric}})
