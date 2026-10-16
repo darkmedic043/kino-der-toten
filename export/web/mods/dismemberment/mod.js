@@ -53,7 +53,7 @@ export default async function setup(api){
   function split(z){
     if(z.gib)return z.gib;
     z.body=z.root.children[0];
-    const original=[];z.body.traverse(o=>{if(o.isSkinnedMesh)original.push(o);});
+    const original=[];z.body.traverse(o=>{if(o.isSkinnedMesh&&!o.userData.headMesh)original.push(o);});   // headMesh: a head bound to the body (Der Eisendrache)
     for(const m of original)m.visible=false;
     z.gib={upper:'upclean',lower:'lowclean',meshes:{upper:bindPiece(z,'upclean'),lower:bindPiece(z,'lowclean')},lost:new Set()};
     return z.gib;
@@ -84,7 +84,7 @@ export default async function setup(api){
     let headObj=null;   // the head model hangs off j_spine4 with a fixed matrix (see enemies.spawn)
     z.body?.traverse(o=>{if(!headObj&&o.isObject3D&&o!==z.body&&o.matrixAutoUpdate===false&&o.children.length)headObj=o;});
     const at=enemies.headPosition(z);blood(at);blood(at);
-    if(!headObj)return;
+    if(!headObj){z.body?.traverse(o=>{if(o.userData?.headMesh)o.visible=false;});return;}
     headObj.updateMatrixWorld(true);const world=headObj.matrixWorld.clone();
     headObj.removeFromParent();scene.add(headObj);headObj.matrixAutoUpdate=false;headObj.matrix.copy(world);
     const p=new THREE.Vector3(),q=new THREE.Quaternion(),s=new THREE.Vector3();world.decompose(p,q,s);

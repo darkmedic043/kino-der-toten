@@ -241,9 +241,12 @@ export class CustomWorld {
     this.optimization=optimizeStaticScene(root,{cellSize:640,verticalCellSize:384});
 
     this.physics={capsuleIntersect:c=>{
-      const hit=this.collision.capsuleIntersect(c);if(hit)return hit;
-      for(const d of this.dynamic)if(d.enabled&&d.collider){const h=d.collider.capsuleIntersect(c);if(h)return h;}
-      for(const m of this.movers){if(m.disabled)continue;if(!m.near.containsPoint(c.start)&&!m.near.containsPoint(c.end))continue;const t=c.clone();t.translate(_negOffset.copy(m.offset).negate());const h=m.collider.capsuleIntersect(t);if(h)return h;}
+      // the deepest contact of all: returning the level's first meant a capsule resting on the level never felt doors,
+      // clips or platforms (walked through Der Eisendrache's gondola walls while standing on the station)
+      let best=this.collision.capsuleIntersect(c)||null;const keep=h=>{if(h&&(!best||h.depth>best.depth))best=h;};
+      for(const d of this.dynamic)if(d.enabled&&d.collider)keep(d.collider.capsuleIntersect(c));
+      for(const m of this.movers){if(m.disabled)continue;if(!m.near.containsPoint(c.start)&&!m.near.containsPoint(c.end))continue;const t=c.clone();t.translate(_negOffset.copy(m.offset).negate());keep(m.collider.capsuleIntersect(t));}
+      if(best)return best;
       for(const z of this.actors?.()??[]){
         if(z.state==='barricade'||z.state==='entering')continue;
         const p=z.root.position,feet=c.start.y-c.radius,top=c.end.y+c.radius;

@@ -233,3 +233,4 @@
 - 2026-10-16 (night): Der Eisendrache polish: no stuck spots (player-only collision narrowed), gondola floors collide, sky dome, micro detail textures tinted, lamp pool 6; own zombies off until real models (waw-ports.md).
 - 2026-10-16: Der Eisendrache gondola gates move and collide, car walls, docked slab; 78 more script models placed; flagstone hole covered; list of what to export next BO3 session (waw-ports.md).
 - 2026-10-16: Der Eisendrache's own zombies (re-bound to BO1's joint frames) with their own gibs, BO3's skybox, the real trophy room floor (waw-ports.md).
+- 2026-10-16: Der Eisendrache gondola collision (deepest-hit physics, docked boxes), waits while occupied; per-pixel sky; zombie heads bound to their bodies (waw-ports.md).

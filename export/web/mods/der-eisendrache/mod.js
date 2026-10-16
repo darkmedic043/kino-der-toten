@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 // Zones: BO3's zone manager links pairs of zones by a flag (zm_castle_zones.gsc add_adjacent_zone) and some flags set
 // others (add_zone_flags). The build gives every door and debris pile its whole flag as its zone
 // (connect_start_to_subclocktower -> connectstarttosubclocktower) and every spawner its BO3 zone without underscores;
@@ -37,18 +38,38 @@ export default function setup(api) {
   // ?bo1Zombies keeps the BO1 ones.
   if (!new URLSearchParams(location.search).has('bo1Zombies') && api.enemies) {
     const Z = n => loadModel(new URL(`zombies/${n}.glb`, import.meta.url).href).catch(() => null);
-    Promise.all([Promise.all([1, 2, 3].map(k => Z('c_zom_der_zombie_body' + k))), Promise.all([1, 2, 3].map(k => Z('c_zom_der_zombie_head' + k)))]).then(([bodies, heads]) => {
+    Promise.all([Promise.all([1, 2].map(k => Z('c_zom_der_zombie_body' + k)))   /* body3's tank top and arms are Shadows of Evil textures, not in this map */, Promise.all([1, 2, 3].map(k => Z('c_zom_der_zombie_head' + k)))]).then(([bodies, heads]) => {
       const e = api.enemies, refB = e.templates[0], refH = e.heads?.[0];
       const ref = new Map(); for (const r of [refB, refH]) r?.traverse(o => { if (o.isBone && !ref.has(o.name)) ref.set(o.name, o.quaternion.clone()); });
       const ok = bodies.filter(Boolean), okH = heads.filter(Boolean);
       if (!ok.length || !okH.length || !ref.size) return;
-      for (const m of [...ok, ...okH]) rebindTo(m, ref);
-      bodies.forEach((m, i) => { if (m) m.userData.gibSet = 'castle' + (i + 1); });
-      e.templates = ok; e.heads = okH;
+      for (const m of ok) rebindTo(m, ref);
+      // the heads' root joint (j_spine4) takes the re-bound body's world orientation there, so the head lines up when
+      // enemies.js mounts it on the body's j_spine4 (same local rotation alone left them turned ~90°, user)
+      ok[0].updateMatrixWorld(true);
+      const rootWorld = new Map([['j_spine4', ok[0].getObjectByName('j_spine4').getWorldQuaternion(new THREE.Quaternion())]]);
+      for (const m of okH) rebindTo(m, ref, rootWorld);
+      // each head's meshes bound to its body's own bones (a separate head rig mounted on j_spine4 drifted off the neck
+      // under animation, user): one template per body x head; the head's face joints follow the body's j_head
+      const combos = [];
+      bodies.forEach((body, i) => { if (!body) return;
+        for (const head of okH) {
+          const t = cloneSkinned(body); t.userData.gibSet = 'castle' + (i + 1);
+          const bones = new Map(); t.traverse(o => { if (o.isBone && !bones.has(o.name)) bones.set(o.name, o); });
+          const h = cloneSkinned(head), meshes = []; h.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
+          for (const m of meshes) {
+            const mapped = m.skeleton.bones.map(b => bones.get(b.name) ?? bones.get('j_head'));
+            m.bind(new THREE.Skeleton(mapped, m.skeleton.boneInverses.map(x => x.clone())), m.bindMatrix);
+            m.userData.headMesh = true; m.removeFromParent(); t.add(m);   // dismemberment: kept when the body splits, hidden when beheaded
+          }
+          combos.push(t);
+        }
+      });
+      e.templates = combos; e.heads = [];
       // their own gib pieces for the dismemberment mod (same keys as BO1's), re-bound the same way
       const KEYS = { upclean: 'upclean', lowclean: 'lowclean', behead: 'behead', larmoff_1: 'larmoff', rarmoff_1: 'rarmoff', llegoff_1: 'llegoff', rlegoff_1: 'rlegoff', legsoff_1: 'blegsoff' };
       const sets = (window.kino.gibSets ??= {});
-      [1, 2, 3].forEach(k => Promise.all(Object.entries(KEYS).map(async ([key, g]) => [key, await Z(`c_zom_der_zombie_body${k}_g_${g}`)])).then(list => {
+      [1, 2].forEach(k => Promise.all(Object.entries(KEYS).map(async ([key, g]) => [key, await Z(`c_zom_der_zombie_body${k}_g_${g}`)])).then(list => {
         const set = {}; for (const [key, m] of list) if (m) { rebindTo(m, ref); set[key] = m; }
         sets['castle' + k] = set;
       }));
@@ -111,6 +132,7 @@ function setupGondola(api) {
   fuseMesh.add(new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 14, 12), new THREE.MeshStandardMaterial({ color: 0x8a6a3a, metalness: .6, roughness: .4 })));
   const glow = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 10, 12), new THREE.MeshBasicMaterial({ color: 0x66ccff })); glow.scale.set(1.05, 1, 1.05); fuseMesh.add(glow);
   fuseMesh.rotation.z = Math.PI / 2; fuseMesh.visible = false; api.scene.add(fuseMesh);
+  let carBox = null;
   const st = { phase: 'intro', t0: 0, fuseOnGround: false, held: false, item: null, gate: 0, ray: false };
   const phase = (p) => { st.phase = p; st.t0 = session.time; };
   const placeFuse = p => { fuseMesh.position.copy(p).y += 30; fuseMesh.visible = true; st.fuseOnGround = true; };
@@ -166,7 +188,9 @@ function setupGondola(api) {
       case 'docked': {
         if (st.gate < 1) setGates(Math.min(1, t / 1.5));
         const items = api.powerups?.items ?? [], feet = player.getFeetPosition();
-        const away = !inside || feet.distanceTo(inside) > 90;
+        // nobody in the car (its whole docked box, as BO3's docked_tram_car_interior volume; zombies too)
+        const box = carBox?.(), occupied = p => box ? box.containsPoint(p) : p.distanceTo(inside) < 90;
+        const away = !inside || (!occupied(feet.clone().setY(feet.y + 30)) && !(api.enemies?.list ?? []).some(z => occupied(z.root.position.clone().setY(z.root.position.y + 30))));
         if (t > 2 && (!st.item || !items.includes(st.item)) && away) phase('leaving');
         return;
       }
@@ -196,8 +220,12 @@ function setupGondola(api) {
     return out;
   }).filter(Boolean);
   reset();   // back to the starting poses
+  carBox = () => { const c = carCol.find(c => c.ref.name.startsWith('CASTLE_TRAM02')) ?? carCol[1]; return c ? c.m.box.clone().expandByScalar(12) : null; /* the docked pose (the collider was built there) */ };
   const v = new THREE.Vector3();
   host.on('update', () => { for (const c of carCol) c.m.move(c.ref.getWorldPosition(v).sub(c.base)); });
+  // the car's own panels are single-sided (from inside the collision pushed you out through them): its meshes only give
+  // the docked box; solid boxes do the work while docked: the floor, both ends and the sides except the door gaps
+  for (const c of carCol) c.m.disabled = true;
   // BO3's tram_clip: the gate models are low; an invisible wall closes each gate gap while the car is away, and while
   // it's docked a slab bridges the car and the platform (there were gaps to fall through into the shaft)
   const box = (min, max) => { const b = new THREE.Box3(min, max), size = b.getSize(new THREE.Vector3()), geo = new THREE.BoxGeometry(size.x, size.y, size.z); geo.translate(...b.getCenter(new THREE.Vector3()).toArray()); const d = { collider: new CollisionWorld(geo), box: b, enabled: false, window: true }; world.dynamic.push(d); return d; };
@@ -206,7 +234,25 @@ function setupGondola(api) {
   const walls = pairs.map(pr => { const a = pr[0].shut, b = (pr[1] ?? pr[0]).shut, lo = a.clone().min(b), hi = a.clone().max(b); lo.x -= 12; lo.z -= 12; hi.x += 12; hi.z += 12; lo.y = floorY; hi.y = floorY + 110; return box(lo, hi); });
   const span = new THREE.Box3(); for (const g of gates) span.expandByPoint(g.shut);
   const slab = gates.length ? box(new THREE.Vector3(span.min.x - 10, floorY - 16, span.min.z - 30), new THREE.Vector3(span.max.x + 10, floorY - 6.5, span.max.z + 30)) : null;
-  host.on('update', () => { const docked = st.phase === 'docked'; for (const w of walls) w.enabled = !docked || st.gate < .5; if (slab) slab.enabled = docked; });
+  // a gate side with no floor beyond it (BO3 walks you onto a clip floor the dump doesn't have) keeps its wall even docked
+  const carC = inside ?? span.getCenter(new THREE.Vector3());
+  for (const [i, pr] of pairs.entries()) {
+    const mid = pr[0].shut.clone().add((pr[1] ?? pr[0]).shut).multiplyScalar(.5), out = mid.clone().sub(carC).setY(0).normalize();
+    const probe = mid.clone().addScaledVector(out, 60); probe.y = floorY + 20;
+    walls[i].noFloor = !world.raycast(new THREE.Ray(probe, new THREE.Vector3(0, -1, 0)), 0, 80);
+  }
+  const cb = carBox?.(), carBoxes = [];
+  if (cb && gates.length) {
+    cb.expandByScalar(-12);   // carBox adds 12
+    const T = 8, H = 110, top = floorY - 6.5, door = [span.min.z - 4, span.max.z + 4];
+    carBoxes.push(box(new THREE.Vector3(cb.min.x, top - 12, cb.min.z), new THREE.Vector3(cb.max.x, top, cb.max.z)));   // floor
+    for (const z of [cb.min.z, cb.max.z]) carBoxes.push(box(new THREE.Vector3(cb.min.x, top, z - T / 2), new THREE.Vector3(cb.max.x, top + H, z + T / 2)));   // ends
+    for (const x of [cb.min.x, cb.max.x]) {   // sides, open at the door
+      carBoxes.push(box(new THREE.Vector3(x - T / 2, top, cb.min.z), new THREE.Vector3(x + T / 2, top + H, door[0])));
+      carBoxes.push(box(new THREE.Vector3(x - T / 2, top, door[1]), new THREE.Vector3(x + T / 2, top + H, cb.max.z)));
+    }
+  }
+  host.on('update', () => { const docked = st.phase === 'docked'; for (const w of walls) w.enabled = w.noFloor || !docked || st.gate < .5; if (slab) slab.enabled = docked; for (const b of carBoxes) b.enabled = docked; });
   return { state: () => ({ ...st, item: !!st.item }), giveFuse: () => { st.held = true; } };
 }
 
@@ -309,22 +355,29 @@ function setupLook({ scene, world, session, host, camera }) {
   // its panorama is stored dim (BO3 brightens it in game), so it's drawn at SKY_GAIN; the procedural dome stays as the
   // fallback. The fog then takes a colour from the panorama's horizon.
   const SKY_GAIN = 3.2, dir = world.entry?.dir ?? 'mods/maps/der-eisendrache/';
-  Promise.all([loadModel(dir + 'sky/skybox.glb').catch(() => null), new THREE.TextureLoader().loadAsync(dir + 'sky/skybox.webp').catch(() => null)]).then(([box, tex]) => {
-    if (!box || !tex) return;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(SKY_GAIN, SKY_GAIN, SKY_GAIN), fog: false, depthWrite: false, side: THREE.DoubleSide });
-    box.traverse(o => { if (o.isMesh) { o.material = mat; o.frustumCulled = false; o.renderOrder = -999; } });
-    const size = new THREE.Box3().setFromObject(box).getSize(new THREE.Vector3()).length();
-    box.scale.setScalar(20000 / Math.max(size, 1)); sky.visible = false; skyModel = box; scene.add(box);
-    const fogCol = new THREE.Color(0x5d6f8c); if (scene.fog) scene.fog.color.copy(fogCol); scene.background = fogCol.clone();
-  });
+  // sampled per pixel by view direction on the sky sphere (BO3's 96-vertex box interpolated its UVs linearly and warped
+  // it, user; an equirectangular scene.background turned every map material white here)
+  if (!/[?&]noSky/.test(location.search)) new THREE.TextureLoader().loadAsync(dir + 'sky/skybox.webp').then(tex => {
+    tex.colorSpace = THREE.SRGBColorSpace; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.wrapS = THREE.RepeatWrapping;
+    sky.material = new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { map: { value: tex }, gain: { value: SKY_GAIN } },
+      vertexShader: sky.material.vertexShader,
+      fragmentShader: `uniform sampler2D map; uniform float gain; varying vec3 vDir;
+        void main(){ vec3 d = normalize(vDir); vec2 uv = vec2(atan(d.x, -d.z) / 6.2831853 + 0.5, 1.0 - acos(clamp(d.y, -1.0, 1.0)) / 3.1415927);
+          gl_FragColor = vec4(texture2D(map, uv).rgb * gain, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    });
+    if (scene.fog) scene.fog.color.set(0x5d6f8c); scene.background = new THREE.Color(0x5d6f8c);
+  }).catch(() => {});
   let skyModel = null;
   if (scene.fog) scene.fog.color.copy(HORIZON);
   scene.background = HORIZON.clone();
   let last = performance.now(), timer = 0;
   host.on('update', () => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
-    sky.position.copy(camera.position); sky.material.uniforms.time.value += dt; skyModel?.position.copy(camera.position);
+    sky.position.copy(camera.position); if (sky.material.uniforms.time) sky.material.uniforms.time.value += dt; skyModel?.position.copy(camera.position);
     if (ambient) { ambient.color.setHex(0xa4afc0); ambient.intensity = .95; }
     if (hemi) { hemi.color.setHex(0xe2e9f3); hemi.groundColor.setHex(0x625a50); hemi.intensity = 1.15; }
     if (key) { key.color.setHex(0xfff2e0); key.intensity = 1.5; key.position.set(.45, 1, .3); }
@@ -419,12 +472,13 @@ function setupDogRounds({ session, host }) {
 // Re-binds a skinned model so each named joint's rest local rotation is `ref`'s (BO1's), every joint staying where it
 // is: positions are re-expressed in the new parent frames, and each skin's inverse bind matrices are recomputed from the
 // new pose, so the mesh doesn't move but animation clips authored for `ref`'s joint frames now pose it correctly.
-function rebindTo(model, ref) {
+function rebindTo(model, ref, rootWorld = null) {
   model.updateMatrixWorld(true);
   const bones = []; model.traverse(o => { if (o.isBone) bones.push(o); });
   const world = new Map(bones.map(b => [b, b.getWorldPosition(new THREE.Vector3())]));
   for (const b of bones) {   // traverse order: parents before children
-    if (ref.has(b.name)) b.quaternion.copy(ref.get(b.name));
+    if (rootWorld?.has(b.name) && !b.parent.isBone) b.quaternion.copy(b.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(rootWorld.get(b.name)));
+    else b.quaternion.copy(ref.get(b.name) ?? new THREE.Quaternion());   // joints BO1 lacks (j_neck2...): parent's orientation, else BO1's head rotation lands off by theirs
     b.parent.updateWorldMatrix(true, false);
     b.position.copy(b.parent.worldToLocal(world.get(b).clone()));
     b.updateMatrixWorld(true);
