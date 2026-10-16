@@ -123,8 +123,12 @@ def material(key, name, color, normal, two_sided=False, overlay=False, fallback=
     c = tex_ref(color); n = tex_ref(normal)
     if c is not None:
         m['pbrMetallicRoughness']['baseColorTexture'] = {'index': c}
-        if color['bright'] > .85 and not re.search(r'snow|ice|paper|glass|light|bulb|lamp', name, re.I):   # a tint mask (see texture())
-            m['pbrMetallicRoughness']['baseColorFactor'] = [*name_tint(name), 1]
+        # a tint mask (see texture()), or a BO3 "micro" detail map (i_t7_micro_*: near-white detail the game multiplies by a
+        # colour constant the export lacks; untinted, lockers, gondola trim and machines came out white)
+        if (color['bright'] > .85 or '_micro_' in color['uri']) and not re.search(r'snow|ice|paper|glass|light|bulb|lamp', name, re.I):
+            t = name_tint(name)
+            if '_micro_' in color['uri'] and color['bright'] <= .85: t = [min(1, v / max(color['bright'], .3)) for v in t]   # tint x detail ~ the tint
+            m['pbrMetallicRoughness']['baseColorFactor'] = [*t, 1]
     else: m['pbrMetallicRoughness']['baseColorFactor'] = [*(fallback or [.3, .3, .3]), 1]
     if n is not None: m['normalTexture'] = {'index': n}
     if GLASS.search(name) and not re.search(r'decal|bottle|jar|beaker|glasses', name, re.I):   # see-through panes (the gondola's windows...)
