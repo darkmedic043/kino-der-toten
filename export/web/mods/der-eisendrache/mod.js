@@ -246,7 +246,7 @@ function setupPads(api) {
 // ---- Look: a bright overcast Alpine day (the engine's default lights are retuned every frame, as for The Giant) and a
 // pool of warm point lights on the lit fixtures nearest the camera (CASTLE_LAMP_<n>: candles, torches, sconces, lamp
 // cages... from the static models), so the castle's halls and the undercroft aren't black. More with the power on.
-const POOL = 10, LAMP = { color: 0xffb877, on: 2600, off: 1700, range: 600, decay: 1.4 };
+const POOL = 6, LAMP = { color: 0xffb877, on: 2600, off: 1700, range: 600, decay: 1.4 };   // 6: each point light is paid per pixel on every material (10 cost ~5 FPS)
 function setupLook({ scene, world, session, host, camera }) {
   const kids = scene.children;
   const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
