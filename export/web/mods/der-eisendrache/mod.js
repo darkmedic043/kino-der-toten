@@ -253,9 +253,36 @@ function setupLook({ scene, world, session, host, camera }) {
   const [key, fill] = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
   const lamps = []; world.root?.traverse(o => { if (/^CASTLE_LAMP_/.test(o.name)) lamps.push(o.getWorldPosition(new THREE.Vector3())); });
   const pool = Array.from({ length: Math.min(POOL, lamps.length) }, () => { const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); scene.add(l); return l; });
+  // the sky: BO3's skybox model isn't exported (a flat grey background showed through the castle's breaches): a dome at
+  // the far plane with an overcast gradient, a soft sun glow and drifting cloud bands; the fog takes its horizon colour
+  const HORIZON = new THREE.Color(0xd9dfe6);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: new THREE.Color(0x6f86a6) }, horizon: { value: HORIZON }, bottom: { value: new THREE.Color(0xaeb6bf) }, sunDir: { value: new THREE.Vector3(.45, .55, .3).normalize() }, time: { value: 0 } },
+    vertexShader: 'varying vec3 vDir;\nvoid main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
+    fragmentShader: `uniform vec3 top, horizon, bottom, sunDir; uniform float time; varying vec3 vDir;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+      float fbm(vec2 p){ float v = 0.0, a = 0.5; mat2 m = mat2(1.6, 1.2, -1.2, 1.6); for (int k = 0; k < 5; k++) { v += a * n(p); p = m * p; a *= 0.5; } return v; }   // rotated octaves: no grid-aligned blocks
+      void main(){
+        vec3 d = normalize(vDir); float y = d.y;
+        vec3 c = y > 0.0 ? mix(horizon, top, pow(min(1.0, y * 1.6), 0.7)) : mix(horizon, bottom, min(1.0, -y * 4.0));
+        float s = max(0.0, dot(d, sunDir)); c += vec3(1.0, 0.94, 0.82) * (pow(s, 48.0) * 0.6 + pow(s, 6.0) * 0.12);
+        if (y > 0.0) { vec2 uv = d.xz / (y + 0.35) * 1.2 + vec2(time * 0.004, time * 0.002);
+          float cl = smoothstep(0.42, 0.78, fbm(uv)) * smoothstep(0.02, 0.3, y);
+          c = mix(c, vec3(0.92, 0.93, 0.95), cl * 0.45); }
+        gl_FragColor = vec4(c, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  }));
+  sky.frustumCulled = false; sky.renderOrder = -1000; sky.scale.setScalar(1000); scene.add(sky);
+  if (scene.fog) scene.fog.color.copy(HORIZON);
+  scene.background = HORIZON.clone();
   let last = performance.now(), timer = 0;
   host.on('update', () => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
+    sky.position.copy(camera.position); sky.material.uniforms.time.value += dt;
     if (ambient) { ambient.color.setHex(0xa4afc0); ambient.intensity = .95; }
     if (hemi) { hemi.color.setHex(0xe2e9f3); hemi.groundColor.setHex(0x625a50); hemi.intensity = 1.15; }
     if (key) { key.color.setHex(0xfff2e0); key.intensity = 1.5; key.position.set(.45, 1, .3); }
