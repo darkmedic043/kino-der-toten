@@ -258,3 +258,4 @@
 - 2026-10-17: No Extended Mag on the bows (one-round weapons) (weapon-levels.md).
 - 2026-10-17: MelonTerm JOURNAL.EXE: every map's Easter eggs and quests step by step (Der Eisendrache, Moon, Kino, Cheese Cube, The Giant); a step's instructions are recorded for good once done; tracking shows the current step and on-screen markers (journal.md).
 - 2026-10-17: Pilot mech jitter fix: the walk speed comes from the player velocity, not the per-frame feet move (fixed 120 Hz physics made it flicker at 144 Hz) (classes.md).
+- 2026-10-17: Der Eisendrache's eight terminal booths moved from the BO3 gum machine spots to the nearest flat walls, square to them (props.md).

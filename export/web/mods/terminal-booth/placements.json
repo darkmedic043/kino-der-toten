@@ -43,91 +43,91 @@
   "der-eisendrache": [
    {
     "position": [
-     144,
+     -71.5,
      760,
-     -3677.5
+     -3816.2
     ],
-    "yaw": -90.0,
+    "yaw": 90,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "BO3 gobblegum machine: great hall"
+    "note": "great hall: the wall between the two staircases; 2026-10-17: moved from the BO3 gum machine spot to the nearest flat wall, square to it"
    },
    {
     "position": [
-     5316.1,
+     5169.2,
      -2292,
-     2408.2
+     2363.8
     ],
-    "yaw": 122.8,
+    "yaw": -105,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "BO3 gobblegum machine: rocket pad"
+    "note": "rocket pad: the round wall by the tracks; 2026-10-17: moved from the BO3 gum machine spot to the nearest flat wall, square to it"
    },
    {
     "position": [
-     1533,
-     281.1,
-     -1686
+     1602.8,
+     288,
+     -1663.5
     ],
-    "yaw": -3.6,
+    "yaw": 0,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "BO3 gobblegum machine: gatehouse (start machine)"
+    "note": "gatehouse: the arched alcove between the two doorways (start machine); 2026-10-17: moved from the BO3 gum machine spot to the nearest flat wall, square to it"
    },
    {
     "position": [
-     -500,
-     505,
-     -1277.8
+     -470.5,
+     504,
+     -1522.5
     ],
-    "yaw": -6.3,
+    "yaw": -62.8,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "BO3 gobblegum machine: trophy room / subclocktower; slid 37 along the wall, clear of the armchair"
+    "note": "trophy room: the wooden wall beside the desk, next to the boarded doorway; 2026-10-17: moved from the BO3 gum machine spot to the nearest flat wall, square to it"
    },
    {
     "position": [
-     -9,
+     -22.1,
      128,
-     -2012
+     -2002.8
     ],
-    "yaw": -135.0,
+    "yaw": 135,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "BO3 gobblegum machine: undercroft"
+    "note": "undercroft: the rock wall beside the crates; 2026-10-17: moved from the BO3 gum machine spot to the nearest flat wall, square to it"
    },
    {
     "position": [
-     709.5,
-     -8,
-     -991.3
+     729.6,
+     32,
+     -1141.8
     ],
-    "yaw": 68.2,
+    "yaw": 10,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "BO3 gobblegum machine: start, by the gondola (start machine)"
+    "note": "start, by the gondola: the concrete wall by the stairs, beside the poster (start machine); 2026-10-17: moved from the BO3 gum machine spot to the nearest flat wall, square to it"
    },
    {
     "position": [
-     1475.0,
+     1531.8,
      528,
-     -3179.1
+     -3193
     ],
-    "yaw": 100.0,
+    "yaw": 82.2,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "BO3 gobblegum machine: living quarters"
+    "note": "living quarters: the wall beside the doorway with the dragon head; 2026-10-17: moved from the BO3 gum machine spot to the nearest flat wall, square to it"
    },
    {
     "position": [
-     -1326.1,
+     -1267.4,
      824,
-     -2618.1
+     -2853.1
     ],
-    "yaw": -20.2,
+    "yaw": -21.2,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "BO3 gobblegum machine: courtyard / armory"
+    "note": "courtyard / armory: the wall beside the stone pillar; 2026-10-17: moved from the BO3 gum machine spot to the nearest flat wall, square to it"
    }
   ]
  }
