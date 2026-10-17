@@ -26,6 +26,7 @@ import { settings } from './settings.js';
 import { installGameMenu } from './game-menu.js';
 import { createPerfDiag } from './perf-diag.js';
 import { setupKtx2, ktx2Stats } from './ktx2.js';
+import { stillSkeletons } from './still-skeletons.js';
 
 export const vector=a=>new THREE.Vector3().fromArray(a);
 export const perkInfo={specialty_quickrevive:{name:'Quick Revive',price:1500,color:'#509ebc',icon:'QR'},specialty_fastreload:{name:'Speed Cola',price:3000,color:'#478450',icon:'SC'},specialty_rof:{name:'Double Tap',price:2000,color:'#b37528',icon:'DT'},specialty_armorvest:{name:'Juggernog',price:2500,color:'#a53835',icon:'J'}};
@@ -43,6 +44,7 @@ const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null;
 // its program twice a draw (on The Giant, a glass material and the viewmodel's decals: ~10% of a frame). One pass
 // looks the same here. Swept once a second over both scenes for materials that appear later (was lighting-mod only).
 let singlePassTimer=0,programCount=0;
+const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
 const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
 let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.6;renderer.autoClear=false;
@@ -444,6 +446,9 @@ try{
     // already built are reused)
     for(const delay of [1500,4000])setTimeout(()=>{if(!started&&!contextLost&&!document.hidden)warmShaders();},delay);}
   // a custom map's static objects stop recomputing their matrices every frame (Kino's world.js freezes its own root)
+  // rigged props that never move keep their bone textures instead of re-uploading them every frame (still-skeletons.js;
+  // the whole scene: Der Eisendrache's 461 still props sit outside world.root). Late arrivals join on the 1 s sweep.
+  if(!NO_STILL)stillSkeletons(scene);
   if(!perfOff.has('noFreeze')&&world.root&&world.root.updateMatrixWorld===THREE.Object3D.prototype.updateMatrixWorld){staticFreeze=createStaticFreeze(world.root);globalThis.kino.staticFreeze=staticFreeze;}
   ready=true;
   progress('Ready',100);$('loading').hidden=true;$('start').disabled=contextLost;$('menu-status').textContent=contextLost?'Graphics paused. Waiting for the browser to restore the game…':touchControls.mode?'Tap to start':'Click to capture the mouse · Esc to pause';
@@ -497,7 +502,7 @@ function renderFrame(now){
   if(lastRendered&&now-lastRendered<interval-1)return;
   lastRendered=now;const dt=Math.min((now-previous)/1000,.06);previous=now;frameTime+=dt;frameCount++;renderedFrames++;
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
-  if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);}
+  if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);if(ready&&!NO_STILL)stillSkeletons(scene);}
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
   update(dt);const t1=performance.now();staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();if(mods.renderWorld)mods.renderWorld(scene,mods.camera??camera);else renderer.render(scene,mods.camera??camera);if(ready&&started&&!mods.hideViewmodel){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
   if(playing){const n=renderer.info.programs.length;if(n>programCount)perf.programs(renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1);}else{programCount=renderer.info.programs.length;perf.pause();}

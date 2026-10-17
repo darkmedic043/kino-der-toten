@@ -97,7 +97,9 @@ const RUNE = { ulla: 'Ulla', zor: 'Zor', oth: 'Oth', mar: 'Mar', uja: 'Uja', lor
 export function setupBows(api, { lowgrav, pads, traps } = {}) {
   const { world, session, host, player, camera, enemies, scene, audio, toast, announce, data, sync } = api;
   const kino = window.kino, root = world.root;
-  const node = n => root.getObjectByName(n);
+  // cached: getObjectByName walks the whole castle, and the per-frame update looked names up every frame (15% of the
+  // CPU on Der Eisendrache, 2026-10-17). A miss is retried after 5 s; a node that left the scene is looked up again.
+  const nodes = new Map(), node = n => { const c = nodes.get(n), now = performance.now(); if (c && (c.o ? c.o.parent : now < c.retry)) return c.o; const o = root.getObjectByName(n) ?? null; nodes.set(n, { o, retry: now + 5000 }); return o; };
   const showNode = (n, on = true) => { const o = typeof n === 'string' ? node(n) : n; if (o && o.visible !== on) { o.visible = on; o.updateMatrixWorld(true); } };
   const moveNode = (o, p) => { if (!o) return; o.parent.updateMatrixWorld(true); o.position.copy(o.parent.worldToLocal(p.clone())); o.updateMatrixWorld(true); };
   const me = () => sync.me, feet = () => player.getFeetPosition();

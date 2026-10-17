@@ -5,29 +5,13 @@ import { loadCollisionWorld, CollisionWorld } from './collision-world.js';
 import { optimizeStaticScene } from './scene-optimizer.js';
 import { loadModel } from './animation.js';
 import { censorFlags } from './flag-censorship.js';
+import { stillSkeletons } from './still-skeletons.js';
 import { assetManager, runtimeProfile } from './runtime-assets.js';
 
 export const vector=a=>new THREE.Vector3().fromArray(a);
 export const zoneNames={foyer_zone:'Lobby',foyer2_zone:'Lobby',vip_zone:'Upper hall',crematorium_zone:'Lower hall',alleyway_zone:'Alley',dining_zone:'Speed Cola room',dressing_zone:'Dressing room',stage_zone:'Stage',theater_zone:'Theater',west_balcony_zone:'Back room'};
 function boxCollider(bounds){const box=new THREE.Box3(vector(bounds[0]),vector(bounds[1]));const size=box.getSize(new THREE.Vector3());if(size.x<.01||size.y<.01||size.z<.01)return null;const g=new THREE.BoxGeometry(size.x,size.y,size.z);g.translate(...box.getCenter(new THREE.Vector3()).toArray());return new CollisionWorld(g);}
 
-// Map props (wall guns, turrets) are rigged but never animate their bones, yet three re-uploads every bone
-// texture each frame (about 140 uploads a frame). Keep the update (a moving door root still needs it) but
-// undo the texture version bump when the matrices came out the same, so nothing is re-uploaded.
-function stillSkeletons(root){
-  root.traverse(o=>{
-    const sk=o.isSkinnedMesh&&o.skeleton;if(!sk||sk.userData?.still)return;
-    sk.userData={...sk.userData,still:true};
-    const update=sk.update;let last=null;
-    sk.update=function(){
-      const texture=this.boneTexture,version=texture?.version;
-      update.call(this);
-      const m=this.boneMatrices;let same=!!last&&last.length===m.length;
-      for(let i=0;same&&i<m.length;i++)if(m[i]!==last[i])same=false;
-      if(same&&texture)texture.version=version;else last=m.slice();
-    };
-  });
-}
 
 export class World {
   constructor(scene,data){this.scene=scene;this.data=data;this.doors=new Map();this.entities=new Map();this.barriers=[];this.dynamic=[];this.markers=[];this.navDisabled=new Set();}
