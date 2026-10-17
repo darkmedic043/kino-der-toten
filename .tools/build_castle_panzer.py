@@ -84,3 +84,24 @@ for n in ['idle', 'idle_b', 'idle_twitch_roar', 'intro', 'outtro', 'static', 'co
     c = anim(n, src, DOUT); dindex[n] = {'duration': c['duration']}
 (DOUT/'anims.json').write_text(json.dumps(dindex, indent=1))
 print('dragon', json.dumps(dindex))
+
+# ---- the Keeper (the Easter egg's protector at the channeling stones, and the boss: zm_castle_ee*.gsc): BO3's
+# c_zom_dlc1_keeper_archon_fb and its float / spell / stun clips -> keeper/
+KOUT = ROOT/'export/web/mods/der-eisendrache/keeper'
+(KOUT/'anims').mkdir(parents=True, exist_ok=True); (KOUT/'.gitignore').write_text('*\n')
+SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/'c_zom_dlc1_keeper_archon_fb'/'c_zom_dlc1_keeper_archon_fb_LOD0.semodel')), KOUT/'keeper.glb', texture_loader=webp)
+print('keeper', round((KOUT/'keeper.glb').stat().st_size / 1e6, 1), 'MB')
+kindex = {}
+KANIMS = {'idle': 'ai_zm_dlc1_archon_float_idle', 'roar': 'ai_zm_dlc1_archon_float_roar', 'ending': 'ai_zm_dlc1_archon_float_cleanse_ending',
+          'stun': 'ai_zm_dlc1_archon_float_spell_elemental_pain_hitspike', 'stunIdle': 'ai_zm_dlc1_archon_float_spell_elemental_pain_hitspike_idle',
+          'stunOut': 'ai_zm_dlc1_archon_float_spell_elemental_pain_hitspike_2_float',
+          'emerge': 'ai_zm_dlc1_corrupted_keeper_float_emerge', 'keeperIdle': 'ai_zm_dlc1_corrupted_keeper_float_idle',
+          'stoneIn': 'ai_zm_dlc1_corrupted_keeper_charge_stone_intro', 'stoneLoop': 'ai_zm_dlc1_corrupted_keeper_charge_stone_loop', 'stoneOut': 'ai_zm_dlc1_corrupted_keeper_charge_stone_outro'}
+for spell in ('demongate', 'elemental', 'runeprison', 'wolfhowl'):
+    for part, sfx in (('In', 'charge_intro'), ('Loop', 'charge_loop'), ('Deploy', 'deploy' if spell != 'elemental' else 'charge_outro')):
+        KANIMS[spell + part] = f'ai_zm_dlc1_archon_float_spell_{spell}_{sfx}'
+for key, src in KANIMS.items():
+    if not (GH/'xanims'/(src + '.seanim')).exists(): print('no anim', src); continue
+    c = anim(key, src, KOUT); kindex[key] = {'duration': c['duration']}
+(KOUT/'anims.json').write_text(json.dumps(kindex, indent=1))
+print('keeper', len(kindex), 'anims')

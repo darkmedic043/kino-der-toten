@@ -946,6 +946,19 @@ if BSP == 'zm_castle':
         add_node({'name': f'CASTLE_BENCH_open_{k}', 'translation': g(vec(x['origin'])).tolist(), 'extras': {'yaw': math.radians(vec(x.get('angles'))[1])}}); count('BENCH')
     for k, x in enumerate(by_tn.get('castle_shield_charge', [])):
         place_model(f'CASTLE_SHIELDCHARGE_{k}', x['model'], x['origin'], x.get('angles'), hidden=True)
+    # Easter egg (zm_castle_ee.gsc): the props its steps spawn or move, hidden at every spot they appear
+    # (CASTLE_EE_<what>_<k>); its other spots (targets, pads, the boss arena) are coordinates in mods/der-eisendrache/ee.js
+    for tn, nm in (('ee_gold_key', 'key_safe'), ('golden_key_slot_past', 'key_past'), ('golden_key_slot', 'key_slot'), ('cs_replacement', 'stone_past'),
+                   ('mpd_canister', 'canister_past'), ('canister_2', 'canister_slot'), ('vril_generator', 'vril'), ('vril_generator_family', 'vril_family'),
+                   ('ee_lab_fuse', 'fuse'), ('tesla_connector', 'tc_lab'), ('tc_lower_tower', 'tc_lower'), ('tc_launch_platform', 'tc_launch'),
+                   ('terminal_summoning_key', 'key_terminal'), ('ee_mpd_summoning_key', 'key_mpd')):
+        for k, x in enumerate(by_tn.get(tn, [])):
+            if x.get('model'): place_model(f'CASTLE_EE_{nm}_{k}', x['model'], x['origin'], x.get('angles'), hidden=True); count('EE')
+    for n in range(1, 5):
+        x = one(f'cs_glow_{n}')
+        if x: place_model(f'CASTLE_EE_csglow_{n}', x['model'], x['origin'], x.get('angles'), hidden=True)
+    x = one('fuse_box')
+    if x: place_model('CASTLE_EE_fuse_slot_0', 'p7_zm_ctl_console_deathray_relay_2x', x['origin'], x.get('angles'), hidden=True)
     # Panzersoldat spawn points (zm_castle_mechz.gsc: a random mechz_location in an active zone)
     k = 0
     for e in ents:

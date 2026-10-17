@@ -34,13 +34,14 @@ const Q = {
       { kind: 'kills', need: 10, r: 350, pts: [W(5006, -1829, -2157)], hint: 'Kill zombies around the obelisk to fill it with magma' },
       { kind: 'kills', need: 8, r: 170, pts: [W(1397, 1063, 187), W(-600, 1428, 829), W(209, 1915, 901)], hint: 'Charge the three runic circles with kills: road, rampart, roof' },
       { kind: 'use', pts: [W(-1060, 1662, 1073)], text: 'Turn the clock', hint: 'Turn the clock in the clock tower' },
+      { kind: 'golf', pts: [W(1164, 3012, 708), W(1624, 3298, 562), W(-856, 4008, 708)], hint: 'Shoot the magma ball into each of the three fireplaces' },
     ] },
   wolf: { name: 'Wolf Bow', color: 0x9fd8ff, start: W(-1364, 2128, 190), startText: 'the wolf skull in the undercroft', arrow: W(-1225, 2984, 328), reforge: W(486, 2327, 400), pedestal: W(-1362, 2090, 218),
     steps: [
       { kind: 'shoot', r: 110, pts: [W(-504, 3005, 885), W(846, 4102, 748), W(-899, 1397, 882), W(-914, 1198, 576)], hint: 'Shoot the four wolf paintings' },
       { kind: 'kills', need: 6, r: 200, pts: [W(-1040, 2041, 699), W(1413, 1137, 253), W(-90, 2527, 204)], hint: 'Dig up the bones with kills: courtyard, road, undercroft' },
       { kind: 'shoot', r: 140, pts: [W(5374, -1663, -1200)], hint: 'Shoot the skull shrine by the rocket pad' },
-      { kind: 'kills', need: 15, r: 420, pts: [W(471, 2328, 439)], hint: 'Defend the burial chamber' },
+      { kind: 'escort', from: W(-1556, 1986, 200), to: W(471, 2328, 439), pts: [W(471, 2328, 439)], hint: 'Escort the wolf spirit from the undercroft to the burial chamber' },
     ] },
   demon: { name: 'Void Bow', color: 0xb06bff, start: W(-660, 1295, 632), startText: 'the urn above the trophy room', arrow: W(-659, 1296, 540), reforge: W(-659, 1296, 540), pedestal: W(-1025, 2088, 218),
     steps: [
@@ -48,6 +49,7 @@ const Q = {
       { kind: 'kills', need: 10, r: 170, pts: [W(-658, 1296, 552)], hint: 'Fill the demonic circle with kills' },
       { kind: 'shoot', r: 110, pts: [W(1431, 1766, 533)], hint: 'Shoot the symbol in the gatehouse' },
       { kind: 'shoot', r: 110, pts: [W(442, 2837, 693), W(128, 3403, 188), W(-923, 207, 368), W(-520, 2849, 861), W(3941, -2861, -2240), W(1776, 1411, 340)], hint: 'Shoot the six chomper fossils around the castle' },
+      { kind: 'sequence', len: 4, pts: [W(-578, 1251, 512), W(-668, 1204, 512), W(-741, 1254, 513), W(-739, 1342, 512), W(-647, 1389, 512), W(-576, 1339, 512)], hint: 'Watch the runes around the trophy room circle light up, then shoot them in that order' },
     ] },
 };
 
@@ -86,19 +88,94 @@ export function setupBows(api, { lowgrav }) {
   function clearArrow(el) { arrows[el]?.removeFromParent(); arrows[el] = null; unglow(st[el].mark); st[el].mark = null; }
   function stepStart(el) {
     const s = st[el], q = Q[el], step = q.steps[s.step]; s.done = new Set(); s.kills = new Map();
-    for (const m of s.targets ?? []) unglow(m); s.targets = step.kind === 'kills' || step.kind === 'touch' || step.kind === 'shoot' ? step.pts.map(p => glow(p.clone().add(new THREE.Vector3(0, step.kind === 'kills' ? 20 : 0, 0)), q.color, step.kind === 'shoot' ? 60 : 45)) : [];
+    for (const m of s.targets ?? []) unglow(m); s.targets = ['kills', 'touch', 'shoot', 'golf', 'sequence'].includes(step.kind) ? step.pts.map(p => glow(p.clone().add(new THREE.Vector3(0, step.kind === 'kills' ? 20 : 0, 0)), q.color, step.kind === 'shoot' ? 60 : step.kind === 'sequence' ? 30 : 45)) : [];
+    if (step.kind === 'golf') golfBall(el, 0);
+    if (step.kind === 'escort') escortStart(el);
+    if (step.kind === 'sequence') { s.seq = Array.from({ length: step.len }, () => Math.floor(Math.random() * step.pts.length)); s.at = 0; s.showT = 0; }
     toast?.(`${q.name} · ${step.hint}`, 5);
   }
   function stepCheck(el) {
     const s = st[el], q = Q[el], step = q.steps[s.step];
-    const need = step.kind === 'use' ? 1 : step.pts.length;
+    const need = ['use', 'escort', 'sequence'].includes(step.kind) ? 1 : step.pts.length;
     if (s.done.size < need) return;
     for (const m of s.targets ?? []) unglow(m); s.targets = [];
+    if (s.ball) { unglow(s.ball.m); s.ball = null; } if (s.wolf) { unglow(s.wolf.m); s.wolf = null; }
     audio?.play?.('buy', .5); s.step++;
     if (s.step >= q.steps.length) { s.stage = 'reforge'; toast?.(`${q.name} · take the arrow to be reforged`, 4); s.mark = glow(q.reforge.clone().add(new THREE.Vector3(0, 20, 0)), q.color, 55); return; }
     stepStart(el);
   }
   function markDone(el, k) { const s = st[el]; if (s.done.has(k)) return; s.done.add(k); const m = s.targets?.[k]; if (m) { m.material.opacity = .25; m.scale.multiplyScalar(.5); } audio?.play?.('buy', .35); stepCheck(el); }
+
+  // ---- charged shots (BO3: hold fire to draw further) -------------------------------------------------------------
+  // With a bow in hand the left mouse button is taken over: holding it charges (up to 1.6 s, a ring round the
+  // crosshair), releasing fires through the engine (kino.debug.shoot: ammo, reload and the arrow as usual). Released
+  // past 0.3 s the arrow is charged: the next impact plays the element's charged form (`charged`) instead of the tap's.
+  const CHARGE = 1.6, ring = document.createElement('div'); ring.id = 'bow-charge';
+  ring.style.cssText = 'position:fixed;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;z-index:3;pointer-events:none;display:none';
+  document.body.append(ring);
+  let drawing = null, charged = null, lastImpact = null;
+  const bowInHand = () => isBow(session.weapon?.id) && !session.weaponUnavailable && !api.host?.gunBlocked;
+  addEventListener('mousedown', e => {
+    if (e.button !== 0 || !api.getState().active || !bowInHand() || window.kino.operator?.active) return;
+    e.stopImmediatePropagation(); if (session.weapon.mag > 0) drawing = { t: 0 };
+  }, true);
+  addEventListener('mouseup', e => {
+    if (e.button !== 0 || !drawing) return; e.stopImmediatePropagation();
+    const t = drawing.t; drawing = null; ring.style.display = 'none';
+    const el = /^bo3_bow_(\w+)$/.exec(session.weapon?.id ?? '')?.[1] ?? 'base';
+    charged = t > .3 ? { el, k: Math.min(1, t / CHARGE), at: performance.now() } : null;
+    window.kino.debug?.shoot?.();
+  }, true);
+  host.on('update', dt => {
+    if (!drawing) return; if (!bowInHand()) { drawing = null; ring.style.display = 'none'; return; }
+    drawing.t += dt; const k = Math.min(1, drawing.t / CHARGE), col = '#' + (Q[/^bo3_bow_(\w+)$/.exec(session.weapon.id)?.[1]]?.color ?? 0xffa040).toString(16).padStart(6, '0');
+    ring.style.display = drawing.t > .15 ? 'block' : 'none'; ring.style.background = `conic-gradient(${col} ${k * 360}deg, #ffffff22 0)`; ring.style.webkitMask = ring.style.mask = 'radial-gradient(circle, transparent 17px, #000 18px)';
+    if (k >= 1 && !drawing.full) { drawing.full = true; audio?.play?.('buy', .3); }
+  });
+
+  // ---- the longer steps: magma golf (Fire), the wolf's escort (Wolf), the rune sequence (Void) ---------------------
+  const DOWN = new THREE.Vector3(0, -1, 0), UP = new THREE.Vector3(0, 1, 0);
+  function golfStart(fp) {   // a spot ~620 from the fireplace with a clear line to it and floor under it
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, c = world.closest?.(fp.clone().add(new THREE.Vector3(Math.cos(a) * 620, 0, Math.sin(a) * 620)), { x: 90, y: 160, z: 90 });
+      if (c && Math.abs(c.y - fp.y) < 140 && world.lineClear(c.clone().add(new THREE.Vector3(0, 25, 0)), fp.clone().add(new THREE.Vector3(0, 25, 0)))) return c.clone().add(new THREE.Vector3(0, 12, 0)); }
+    return fp.clone().add(new THREE.Vector3(200, 12, 0));
+  }
+  function golfBall(el, i) {
+    const s = st[el], step = Q[el].steps[s.step]; while (i < step.pts.length && s.done.has(i)) i++; if (i >= step.pts.length) return;
+    if (s.ball) unglow(s.ball.m); const p = golfStart(step.pts[i]); s.ball = { i, p, m: glow(p, 0xff5a10, 50), v: null };
+  }
+  function golfHit(el, step) {
+    const s = st[el], b = s.ball, d = b.p.clone().sub(camera.position).setY(0).normalize();
+    let to = b.p.clone().addScaledVector(d, 280); if (!world.lineClear(b.p.clone().add(new THREE.Vector3(0, 10, 0)), to.clone().add(new THREE.Vector3(0, 10, 0)))) to = b.p.clone().addScaledVector(d, 120);
+    const hit = world.raycast(new THREE.Ray(to.clone().add(new THREE.Vector3(0, 80, 0)), DOWN), 0, 600); if (hit) to.y = hit.position.y + 12;
+    b.from = b.p.clone(); b.to = to; b.t = 0; audio?.play?.('hit', .5);
+  }
+  function escortStart(el) {
+    const s = st[el], step = Q[el].steps[s.step], path = world.path?.(step.from, step.to) ?? [];
+    s.wolf = { path: path.length > 1 ? path.map(p => p.clone()) : [step.from.clone(), step.to.clone()], i: 0, p: step.from.clone(), hp: 100, m: glow(step.from.clone().add(new THREE.Vector3(0, 35, 0)), 0xbfe6ff, 70) };
+  }
+  function pulse(m) { if (!m) return; m.scale.multiplyScalar(1.8); m.material.opacity = 1; setTimeout(() => { m.scale.multiplyScalar(1 / 1.8); }, 300); }
+  function longTick(dt) {
+    const f = player.getFeetPosition();
+    for (const [el, q] of Object.entries(Q)) {
+      const s = st[el]; if (s.stage !== 'steps') continue; const step = q.steps[s.step];
+      if (step.kind === 'golf' && s.ball) {
+        const b = s.ball; if (b.to) { b.t += dt / .5; b.p.lerpVectors(b.from, b.to, Math.min(1, b.t)); b.p.y += Math.sin(Math.min(1, b.t) * Math.PI) * 40; if (b.t >= 1) { b.p.copy(b.to); b.to = null; if (b.p.distanceTo(step.pts[b.i]) < 140) { const done = b.i; markDone(el, done); if (st[el].stage === 'steps' && q.steps[st[el].step] === step) golfBall(el, done + 1); } } }
+        if (s.ball) s.ball.m.position.copy(s.ball.p);
+      }
+      if (step.kind === 'escort' && s.wolf) {
+        const w = s.wolf, near = enemies.list.filter(e => e.root.position.distanceTo(w.p) < 90).length;
+        if (near) w.hp -= near * 7 * dt; else if (f.distanceTo(w.p) < 700 && w.i < w.path.length) { const t = w.path[w.i], d = t.clone().sub(w.p); if (d.length() < 12) w.i++; else w.p.addScaledVector(d.normalize(), Math.min(d.length(), 115 * dt)); }
+        w.m.position.copy(w.p).y += 35 + Math.sin(performance.now() / 200) * 4; w.m.material.opacity = .4 + .6 * Math.max(0, w.hp) / 100;
+        if (w.hp <= 0) { unglow(w.m); s.wolf = null; toast?.('The wolf spirit fell · it returns to the undercroft', 3); escortStart(el); }
+        else if (w.i >= w.path.length || w.p.distanceTo(step.to) < 60) markDone(el, 0);
+      }
+      if (step.kind === 'sequence') {   // the runes light up in order, then a pause, over and over
+        s.showT += dt; const cyc = s.seq.length * .8 + 2, t = s.showT % cyc, k = Math.floor(t / .8);
+        s.targets.forEach((m, j) => { const lit = k < s.seq.length && s.seq[k] === j && t % .8 < .6; m.material.opacity = lit ? 1 : .2; m.scale.setScalar(lit ? 55 : 30); });
+      }
+    }
+  }
 
   // ---- arrow impacts: quest shots, element effects ---------------------------------------------------------------
   // the bows' arrows explode through kino-features blast() -> effect(position, 0xffb347, 25)
@@ -108,10 +185,15 @@ export function setupBows(api, { lowgrav }) {
     for (const [el, q] of Object.entries(Q)) {
       const s = st[el];
       if (s.stage === 'idle' && p.distanceTo(q.start) < 140) { s.stage = 'arrow'; dropArrow(el); }
-      if (s.stage === 'steps') { const step = q.steps[s.step]; if (step.kind === 'shoot') step.pts.forEach((t, k) => { if (p.distanceTo(t) < step.r) markDone(el, k); }); }
+      if (s.stage === 'steps') { const step = q.steps[s.step]; if (step.kind === 'shoot') step.pts.forEach((t, k) => { if (p.distanceTo(t) < step.r) markDone(el, k); });
+        if (step.kind === 'golf' && s.ball && p.distanceTo(s.ball.p) < 110) golfHit(el, step);
+        if (step.kind === 'sequence') { const k = step.pts.findIndex(t => p.distanceTo(t) < 55); if (k >= 0) { if (k === s.seq[s.at]) { s.at++; pulse(s.targets[k]); audio?.play?.('buy', .35); if (s.at >= s.seq.length) markDone(el, 0); } else { s.at = 0; s.showT = 0; toast?.('Wrong rune · watch again', 2); audio?.play?.('hit', .5); } } } }
     }
     const el = /^bo3_bow_(\w+)$/.exec(session.weapon.id)?.[1];
-    if (el && ELEMENT[el]) ELEMENT[el](p.clone());
+    const ch = charged && performance.now() - charged.at < 6000 ? charged : null; charged = null;
+    lastImpact = { p: p.toArray().map(Math.round), charged: ch ? { el: ch.el, k: +ch.k.toFixed(2) } : null };
+    if (ch) CHARGED[ch.el]?.(p.clone(), ch.k);
+    else if (el && ELEMENT[el]) ELEMENT[el](p.clone());
   });
   async function dropArrow(el) {
     const q = Q[el]; toast?.(`Something fell near ${q.startText}`, 3); audio?.play?.('buy', .5);
@@ -153,8 +235,20 @@ export function setupBows(api, { lowgrav }) {
     },
     demon(p) { flash(p, 0xb06bff, 5, 500, 1.5); zones.push({ kind: 'void', p, t: 1.5, held: new Set() }); const m = glow(p.clone().add(new THREE.Vector3(0, 30, 0)), 0xb06bff, 120); fx.push({ sprite: m, life: 1.5 }); },
   };
+  // charged forms (k: how far the bow was drawn, 0.2..1)
+  const CHARGED = {
+    base(p, k) { flash(p, 0xff8a3a, 5, 600, .6); for (const z of [...enemies.list]) if (!z.boss && z.root.position.distanceTo(p) < 220 + 120 * k) enemies.hurt(z, z.kind === 'panzer' ? 1500 * k : 1e9, false, false, 'explosion'); },
+    storm(p, k) { flash(p, 0x9fd8ff, 6, 800, 6); zones.push({ kind: 'storm', p, t: 3 + 3 * k, tick: 0, r: 300 + 100 * k, rate: .2 }); },
+    rune(p, k) { flash(p, 0xff7a2a, 6, 600, 2); for (const z of [...enemies.list]) { if (z.boss || z.root.position.distanceTo(p) > 220 + 80 * k) continue; zones.push({ kind: 'prison', z, at: z.root.position.clone(), t: 2 }); for (let i = 0; i < 3; i++) { const m = glow(z.root.position.clone().add(new THREE.Vector3(0, 25 + i * 30, 0)), 0xff7a2a, 55); fx.push({ sprite: m, life: 2 }); } } },
+    wolf(p, k) {
+      const a = camera.position.clone(), d0 = p.clone().sub(a).setY(0).normalize(); flash(p, 0xbfe6ff, 5, 600, 1.5);
+      for (const ang of [-.4, 0, .4]) { const d = d0.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), ang); zones.push({ kind: 'wolf', at: p.clone(), d, t: 1.2 + k, sprite: glow(p.clone().add(new THREE.Vector3(0, 30, 0)), 0xbfe6ff, 70), hit: new Set() }); }
+    },
+    demon(p, k) { flash(p, 0xb06bff, 6, 700, 5); zones.push({ kind: 'void', p, t: 3 + 2 * k, held: new Set(), r: 400 }); const m = glow(p.clone().add(new THREE.Vector3(0, 40, 0)), 0xb06bff, 200); fx.push({ sprite: m, life: 3 + 2 * k }); zones.push({ kind: 'chompers', p, t: 3 + 2 * k, tick: 0 }); },
+  };
   host.on('update', dt => {
     if (!dt) return;
+    longTick(dt);
     // touch steps (the storm runes: reached by wall-running while gravity is low)
     const feet = player.getFeetPosition().add(new THREE.Vector3(0, 35, 0));
     for (const [el, q] of Object.entries(Q)) { const s = st[el]; if (s.stage !== 'steps') continue; const step = q.steps[s.step];
@@ -165,10 +259,13 @@ export function setupBows(api, { lowgrav }) {
       if (f.sprite) f.sprite.material.opacity = Math.max(0, Math.min(1, f.life * 3));
       if (f.life <= 0) { if (f.o) { f.o.removeFromParent(); f.o.geometry.dispose(); f.o.material.dispose(); } if (f.sprite) unglow(f.sprite); if (f.light) { const pool = kino.lighting?.sources, j = pool?.indexOf(f.light) ?? -1; if (j >= 0) pool.splice(j, 1); } fx.splice(i, 1); } }
     for (let i = zones.length - 1; i >= 0; i--) { const z = zones[i]; z.t -= dt;
-      if (z.kind === 'storm' && (z.tick -= dt) <= 0) { z.tick = .3; const top = z.p.clone().add(new THREE.Vector3(0, 60, 0)); const near = enemies.list.filter(e => e.root.position.distanceTo(z.p) < 240).sort((a, b) => a.root.position.distanceTo(z.p) - b.root.position.distanceTo(z.p))[0];
+      if (z.kind === 'prison') { if (enemies.list.includes(z.z)) { z.z.root.position.x = z.at.x; z.z.root.position.z = z.at.z; z.z.stuck = 0; if (z.t <= 0) kill(z.z, 2500); } }
+      if (z.kind === 'wolf') { z.at.addScaledVector(z.d, 650 * dt); const g = world.closest?.(z.at, { x: 40, y: 120, z: 40 }); if (g) z.at.y = g.y; z.sprite.position.copy(z.at).y += 30; for (const e of [...enemies.list]) if (!e.boss && !z.hit.has(e) && e.root.position.distanceTo(z.at) < 90) { z.hit.add(e); kill(e, 1500); } if (z.t <= 0) unglow(z.sprite); }
+      if (z.kind === 'chompers' && (z.tick -= dt) <= 0) { z.tick = .3; const t = enemies.list.filter(e => !e.boss && e.root.position.distanceTo(z.p) < 650).sort((a, b) => a.root.position.distanceTo(z.p) - b.root.position.distanceTo(z.p))[0]; if (t) { const m = glow(t.root.position.clone().add(new THREE.Vector3(0, 40, 0)), 0xb06bff, 40); fx.push({ sprite: m, life: .4 }); kill(t, 600); } }
+      if (z.kind === 'storm' && (z.tick -= dt) <= 0) { z.tick = z.rate ?? .3; const top = z.p.clone().add(new THREE.Vector3(0, 60, 0)); const near = enemies.list.filter(e => !e.boss && e.root.position.distanceTo(z.p) < (z.r ?? 240)).sort((a, b) => a.root.position.distanceTo(z.p) - b.root.position.distanceTo(z.p))[0];
         if (near) { bolt(top, near.root.position.clone().add(new THREE.Vector3(0, 45, 0)), 0xbfe6ff); kill(near, 800); } else bolt(top, z.p.clone().add(new THREE.Vector3((Math.random() - .5) * 120, 0, (Math.random() - .5) * 120)), 0xbfe6ff); }
       if (z.kind === 'burn' && z.t <= 0 && enemies.list.includes(z.z)) kill(z.z, 600);
-      if (z.kind === 'void') for (const e of [...enemies.list]) { const d = e.root.position.distanceTo(z.p); if (d > 220) continue; if (e.kind === 'panzer') { if (!z.held.has(e)) { z.held.add(e); enemies.hurt(e, 1200, false, false, 'explosion'); } continue; } e.root.position.lerp(z.p, Math.min(1, dt * 2.5)); e.stuck = 0; if (d < 40) kill(e, 0); }
+      if (z.kind === 'void') for (const e of [...enemies.list]) { const d = e.root.position.distanceTo(z.p); if (d > (z.r ?? 220) || e.boss) continue; if (e.kind === 'panzer') { if (!z.held.has(e)) { z.held.add(e); enemies.hurt(e, 1200, false, false, 'explosion'); } continue; } e.root.position.lerp(z.p, Math.min(1, dt * 2.5)); e.stuck = 0; if (d < 40) kill(e, 0); }
       if (z.t <= 0) zones.splice(i, 1); }
   });
   host.on('reset', () => {
@@ -178,6 +275,7 @@ export function setupBows(api, { lowgrav }) {
   return {
     state: () => Object.fromEntries(Object.entries(st).map(([el, s]) => [el, { stage: s.stage, step: s.step, done: [...s.done], kills: Object.fromEntries(s.kills), souls: s.souls }])),
     advance(el) { const s = st[el], q = Q[el]; if (s.stage === 'idle') { s.stage = 'arrow'; dropArrow(el); } else if (s.stage === 'arrow') { s.stage = 'steps'; s.step = 0; clearArrow(el); stepStart(el); } else if (s.stage === 'steps') { q.steps[s.step].pts.forEach((_, k) => s.done.add(k)); stepCheck(el); } else if (s.stage === 'reforge') { s.stage = 'souls'; s.souls = SOULS - 1; } },
-    give, sites: Q,
+    give, sites: Q, last: () => lastImpact,
+    ball: el => st[el].ball ? { i: st[el].ball.i, p: st[el].ball.p.clone() } : null, seq: el => st[el].seq ?? null, wolf: el => st[el].wolf?.p.clone() ?? null,   // testing
   };
 }

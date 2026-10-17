@@ -168,7 +168,7 @@ export function setupRagnarok(api,operator){
       if(planted){
         const p=planted;p.t+=dt;ctx.drain(.1*dt);
         p.col.rotation.y+=dt*.8;p.col.material.map.offset.y=(p.t*.6)%1;p.col.material.opacity=.3+Math.sin(p.t*5)*.06;
-        for(const z of enemies.list){if(p.lifted.has(z)||z.kind==='panzer'||z.state==='rising')continue;const q=z.root.position;if(Math.hypot(q.x-p.at.x,q.z-p.at.z)<FIELD&&Math.abs(q.y-p.at.y)<120)lift(z);}
+        for(const z of enemies.list){if(p.lifted.has(z)||z.kind==='panzer'||z.boss||z.state==='rising')continue;const q=z.root.position;if(Math.hypot(q.x-p.at.x,q.z-p.at.z)<FIELD&&Math.abs(q.y-p.at.y)<120)lift(z);}
         for(const z of [...p.lifted.keys()])if(!enemies.list.includes(z)){z.ai=p.lifted.get(z).prev;p.lifted.delete(z);}
       }
       for(let i=fx.length-1;i>=0;i--){const f=fx[i];f.t+=dt;const k=f.t/.45;f.m.scale.setScalar(Math.max(1,f.r*Math.min(1,k*1.3)));f.m.material.opacity=Math.max(0,.9*(1-k));if(f.l)f.l.weight=Math.max(0,1-k*2);
@@ -183,6 +183,6 @@ export function setupRagnarok(api,operator){
       metal.dispose();glow.dispose();
     }
     return {update,fire,aim,end,
-      get planted(){return !!planted;},get lifted(){return planted?planted.lifted.size:0;}};
+      get planted(){return !!planted;},get plantedAt(){return planted?.at?.clone()??null;},get lifted(){return planted?planted.lifted.size:0;}};
   }
 }

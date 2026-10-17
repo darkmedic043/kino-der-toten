@@ -246,3 +246,4 @@
 - 2026-10-16: Der Eisendrache craftables (Ragnarok DG-4 parts from the Panzer, the Death Ray and the A10 switches; rocket shield parts) and BO3's rocket shield (block, bash, rocket dash, nitrous charges) (waw-ports.md).
 - 2026-10-16: Der Eisendrache low gravity in the undercroft: double jump, wall-running, floaters (waw-ports.md).
 - 2026-10-16: Der Eisendrache elemental bow upgrades: four quests on BO3's locations, Storm/Fire/Wolf/Void bows with their element effects (waw-ports.md).
+- 2026-10-17: Der Eisendrache main Easter egg (time travel, Keeper protector, Simon says, rockets, the Keeper boss), charged bow shots, the longer bow quests (magma golf, wolf escort, rune sequence) (waw-ports.md).
