@@ -352,7 +352,16 @@ function hud(){
   if(debugVisible)$('debug').textContent=`${fps} FPS · ${renderer.info.render.calls} calls\n${camera.position.toArray().map(v=>v.toFixed(1)).join(', ')}\n${enemies.list.length} enemies · ${world.navDisabled?.size??0} blocked polygons`;
 }
 
-function getState(){return {map:entry?.id,ready,active,started,input:{touch:touchControls.getState(),primary,ads},...(session?session.snapshot():{}),player:player?{...player.state,rotation:camera.rotation.toArray().slice(0,3),position:camera.position.toArray(),feet:player.getFeetPosition().toArray()}:null,enemies:enemies?.snapshot()??[],prompt:promptText,
+// getState: mods call it every frame (some several times a physics step) mostly for .active/.ready/.started/.input, and
+// the full snapshot (every zombie, barrier, door, egg) was ~10 MB/s of garbage on Cheese Cube (2026-10-17). The cheap
+// fields are read directly; any other field builds the full snapshot once for that call. Spreading or serialising it
+// (tests, kino.debug) still sees every field.
+function getState(){
+  const cheap={map:entry?.id,ready,active,started,input:{touch:touchControls.getState(),primary,ads}};let full=null;const all=()=>full??=fullState();
+  return new Proxy(cheap,{get:(t,k)=>k in t?t[k]:all()[k],has:(t,k)=>k in t||k in all(),ownKeys:()=>Reflect.ownKeys(all()),
+    getOwnPropertyDescriptor:(t,k)=>k in t?Reflect.getOwnPropertyDescriptor(t,k):k in all()?{value:all()[k],writable:true,enumerable:true,configurable:true}:undefined});
+}
+function fullState(){return {map:entry?.id,ready,active,started,input:{touch:touchControls.getState(),primary,ads},...(session?session.snapshot():{}),player:player?{...player.state,rotation:camera.rotation.toArray().slice(0,3),position:camera.position.toArray(),feet:player.getFeetPosition().toArray()}:null,enemies:enemies?.snapshot()??[],prompt:promptText,
   barriers:world?.barriers?.map(b=>({id:b.id,count:b.count,boards:map.boardCount(b),position:b.position.toArray(),inside:b.inside.toArray(),group:b.group}))??[],
   performance:{fps,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},viewmodelReady:view?.ready??false,...(map?.state?.()??{}),errors:[...errors,...mods.errors]};}
 globalThis.kino={mods,debug:{textureMemory:textureMemoryStats,getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,
