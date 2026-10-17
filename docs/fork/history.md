@@ -257,3 +257,4 @@
 - 2026-10-17: Der Eisendrache: terminal booths at the eight gobblegum spots, Tab collectible tiles, the bow drawn as in BO3 (draw clips, no reload, charged shots cost arrows), animated spirit wolves and Skadi (waw-ports.md, props.md).
 - 2026-10-17: No Extended Mag on the bows (one-round weapons) (weapon-levels.md).
 - 2026-10-17: MelonTerm JOURNAL.EXE: every map's Easter eggs and quests step by step (Der Eisendrache, Moon, Kino, Cheese Cube, The Giant); a step's instructions are recorded for good once done; tracking shows the current step and on-screen markers (journal.md).
+- 2026-10-17: Pilot mech jitter fix: the walk speed comes from the player velocity, not the per-frame feet move (fixed 120 Hz physics made it flicker at 144 Hz) (classes.md).

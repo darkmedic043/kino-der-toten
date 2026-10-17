@@ -503,7 +503,12 @@ export async function setupMech(ctx){
       if(k>=1)land();
     }
     if(phase==='piloting'&&lunge)stepLunge(dt);   // before the cockpit lift: setPosition puts the camera back at player eye height
-    const feet=player.getFeetPosition();speed=lastFeet?feet.clone().sub(lastFeet).setY(0).length()/dt:0;lastFeet=feet.clone();
+    // the walking speed drives every stride and sway: read it from the player's velocity, not the feet's move this frame
+    // (physics steps at a fixed 120 Hz, so at 144 Hz or an uneven 60 a frame moves the feet 0, 1 or 2 steps and the
+    // measured speed flickered between 0 and double: the whole mech jittered); the lunge moves the feet by hand
+    const feet=player.getFeetPosition(),v=player.velocity;
+    const raw=lunge&&lastFeet?feet.clone().sub(lastFeet).setY(0).length()/dt:v?Math.hypot(v.x,v.z):0;lastFeet=feet.clone();
+    speed+=(raw-speed)*(1-Math.exp(-dt*12));
     if(phase==='piloting'){
       session.effects.invulnerable=Math.max(session.effects.invulnerable??0,session.time+.25);
       integrity-=dt;
