@@ -933,6 +933,19 @@ if BSP == 'zm_castle':
     for k, x in enumerate(by_tn.get('s_masher_button', [])): add_node({'name': f'CASTLE_MASHBTN_{k}', 'translation': g(vec(x['origin'])).tolist()})
     for k, x in enumerate(by_tn.get('rocket_trap_side_blast', [])): add_node({'name': f'CASTLE_ROCKETFLAME_{k}', 'translation': g(vec(x['origin'])).tolist(), 'extras': {'yaw': math.radians(vec(x.get('angles'))[1])}})
     count('TRAPS')
+    # Craftables (zm_castle_craftables.gsc): every candidate spot of each part (BO3 picks one at random), hidden until
+    # the mod shows it (CASTLE_PART_<craftable>_<part>_<k>); the Ragnarok's workbench (gravityspike_zm_craftable_trigger)
+    # and the three open workbenches the rocket shield builds at (CASTLE_BENCH_*); the shield's nitrous tank recharges
+    for tn, cr, part in (('gravityspike_part_body', 'spike', 'body'), ('gravityspike_part_guards', 'spike', 'guards'), ('gravityspike_part_handle', 'spike', 'handle'),
+                         ('craft_shield_zm_dolly', 'shield', 'dolly'), ('craft_shield_zm_clamp', 'shield', 'clamp'), ('craft_shield_zm_door', 'shield', 'door')):
+        for k, x in enumerate(by_tn.get(tn, [])):
+            place_model(f'CASTLE_PART_{cr}_{part}_{k}', x['model'], x['origin'], x.get('angles'), hidden=True); count('PART')
+    x = one('gravityspike_zm_craftable_trigger')
+    if x: add_node({'name': 'CASTLE_BENCH_spike', 'translation': g(vec(x['origin'])).tolist()})
+    for k, x in enumerate(by_tn.get('open_craftable_trigger', [])):
+        add_node({'name': f'CASTLE_BENCH_open_{k}', 'translation': g(vec(x['origin'])).tolist(), 'extras': {'yaw': math.radians(vec(x.get('angles'))[1])}}); count('BENCH')
+    for k, x in enumerate(by_tn.get('castle_shield_charge', [])):
+        place_model(f'CASTLE_SHIELDCHARGE_{k}', x['model'], x['origin'], x.get('angles'), hidden=True)
     # Panzersoldat spawn points (zm_castle_mechz.gsc: a random mechz_location in an active zone)
     k = 0
     for e in ents:

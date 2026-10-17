@@ -83,7 +83,7 @@ export default async function setup(api){
   let t=0,last='';
   host.on('update',dt=>{
     if((t-=dt)<=0){t=.5;place();}
-    const op=!!window.kino.operator?.active,w=session.weapon,def=w&&!session.weaponUnavailable&&!op?session.def:null;   // operator weapon out: no gun
+    const op=!!(window.kino.operator?.active||host.gunBlocked),w=session.weapon,def=w&&!session.weaponUnavailable&&!op?session.def:null;   // an operator weapon or the rocket shield in hand: no gun
     showGun(def?w.id:null);
     const frac=def?.clipSize?Math.max(0,Math.min(1,w.mag/def.clipSize)):0;
     const lv=($('progression-hud')?.querySelector('.lvl')?.textContent??'').replace(/\D+/g,''),nm=$('hud-portrait')?.querySelector('span')?.textContent??'';

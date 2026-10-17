@@ -47,7 +47,7 @@ export default async function setup(api){
     if(st.active){putAway();return;}
     if(!st.def){api.toast?.('No operator weapon',1.2);return;}
     if(st.charge<st.def.minCharge){api.toast?.(`${st.def.name} charging · ${Math.floor(st.charge*100)}%`,1.2);return;}
-    if(session.busy||session.pack){return;}
+    if(session.busy||session.pack||host.gunBlocked){return;}   // gunBlocked: something else (the rocket shield) is in hand
     st.power=st.charge;st.active=st.def.activate(ctx)??{};host.gunBlocked=true;padFire=!!view?.input?.fire;padAim=!!view?.input?.ads;   // a button already held doesn't count
     host.emit('operatorWeapon',{id:st.def.id,on:true});hud();
   }

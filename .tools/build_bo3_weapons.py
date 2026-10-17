@@ -396,5 +396,22 @@ if (SRC/'xmodels'/'wpn_zmb_dlc1_talon_spikes_view').exists():
                             'sprintLoopTime': RT.get('sprintLoopAnim', .6), 'sprintOutTime': RT.get('sprintOutAnim', .2), 'adsInTime': .25, 'adsOutTime': .25,
                             'viewOffset': [3, -4, 0], 'sprintOffset': [0, 0, 0], 'sprintRotation': [0, 0, 0], 'hideTags': []}
     print('ragnarok anims', len(RA))
+# Der Eisendrache's rocket shield (wpn_t7_zmb_dlc1_rocket_shield_*, the vm_riotshield_zm_* clips): its own ViewWeapon in
+# the der-eisendrache mod; dmg1/dmg2 are the worn looks
+if (SRC/'xmodels'/'wpn_t7_zmb_dlc1_rocket_shield_view').exists():
+    sv, sm = model('wpn_t7_zmb_dlc1_rocket_shield_view', 'rocket_shield_view', RENAME)
+    worn = [model(f'wpn_t7_zmb_dlc1_rocket_shield_dmg{k}_view', f'rocket_shield_dmg{k}_view', RENAME)[0] for k in (1, 2)]
+    sb = {b['name']: b['lpos'] for b in sm['bones'] if 'lpos' in b and b['parent'] >= 0}
+    SA, ST = {}, {}
+    for key, name, loop in [('idleAnim', 'idle', True), ('raiseAnim', 'raise', False), ('dropAnim', 'putaway', False), ('meleeAnim', 'melee', False),
+                            ('boostInAnim', 'rocket_boost_in', False), ('boostOutAnim', 'rocket_boost_out', False), ('sprintInAnim', 'sprint_in', False),
+                            ('sprintLoopAnim', 'sprint_loop', True), ('sprintOutAnim', 'sprint_out', False), ('adsUpAnim', 'ads_up', False)]:
+        n = 'vm_riotshield_zm_' + name
+        if (SRC/'xanims'/(n+'.seanim')).exists(): SA[key], ST[key] = animation(n, sb, loop)
+    operator['rocketShield'] = {'id': 'rocket_shield', 'model': sv, 'worn': worn, 'handsModel': hands, 'animations': SA, 'durations': ST,
+                                'raiseTime': ST.get('raiseAnim', .5), 'dropTime': ST.get('dropAnim', .5), 'sprintInTime': ST.get('sprintInAnim', .2),
+                                'sprintLoopTime': ST.get('sprintLoopAnim', .6), 'sprintOutTime': ST.get('sprintOutAnim', .2), 'adsInTime': .25, 'adsOutTime': .25,
+                                'viewOffset': [0, 0, 0], 'sprintOffset': [0, 0, 0], 'sprintRotation': [0, 0, 0], 'hideTags': []}
+    print('rocket shield anims', len(SA))
 (MOD/'weapons.json').write_text(json.dumps({'weapons': weapons, 'sounds': {'dg2': sounds, 'mod': modsounds, 'audio': audio_keys}, 'fx': fx, 'operator': operator}, indent=1))
 print('wrote', MOD/'weapons.json')
