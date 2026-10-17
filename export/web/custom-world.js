@@ -78,6 +78,7 @@ export class CustomWorld {
     const meshes=[];root.traverse(o=>{if(o.isMesh&&!o.userData.marker)meshes.push(o);});
     const dedicated=meshes.filter(o=>COLLISION_NAME.test(rawName(o))),playerOnly=meshes.filter(o=>PLAYER_COLLISION_NAME.test(rawName(o)));
     for(const o of [...dedicated,...playerOnly])o.visible=false;
+    root.traverse(o=>{if(o.userData.hidden)o.visible=false;});   // builder props hidden until a mod shows them (kept out of the batching, which would drop their names)
     // Overlay layers (BO3 ports' _blend surfaces and decals: see-through, drawn over the surface below): a fixed draw
     // order per material (sorted by distance, stacked layers swapped as the camera moved and flickered) and a polygon
     // offset (their small push off the surface lost to depth precision at range: z-fighting)

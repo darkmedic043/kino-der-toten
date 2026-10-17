@@ -153,7 +153,7 @@ export default async function setup(api){
   net.on('dmg',(m,from)=>{
     if(!net.isHost)return;
     const z=enemies.list.find(z=>z.id===m.id);if(!z)return;
-    host.remoteDamage=true;try{enemies.hurt(z,m.amount,m.head,m.melee,m.cause,false);}finally{host.remoteDamage=false;}
+    host.remoteDamage=true;host.remoteBy=from;try{enemies.hurt(z,m.amount,m.head,m.melee,m.cause,false);}finally{host.remoteDamage=false;host.remoteBy=null;}
     net.send(from,{t:'res',killed:!enemies.list.includes(z),head:!!m.head,melee:!!m.melee,kind:z.kind});
   });
   net.on('world',m=>{if(net.isHost)applyWorld(m);});

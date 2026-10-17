@@ -22,6 +22,10 @@
 //   (or hit it with an upgraded bow) to stun it; only stunned does it take damage (headshots double). Unstunned, the
 //   storm hits everyone outside the five safe circles. Three phases (8,000 / 10,000 / 12,000); zombies rise all along,
 //   Panzersoldats join in phases 2 and 3. Beaten: back to the undercroft, the rockets reach the moon.
+// Co-op (sync.js): every step is a team event (anyone's shot, use or kill counts; the items are the team's); the
+// random parts (the safe's combination, the lit targets, the runes) come from the host's seeded stream; each player
+// takes the pads through time themselves. The boss runs on the host: it hunts every player, its spells are events
+// each client draws and checks against its own player; guests get a copy of it from the host's snapshot.
 // Testing: kino.castle.ee.state(), .skip(n) (complete steps up to n), .boss().
 import * as THREE from 'three';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
@@ -51,7 +55,10 @@ const RUNES = ['ᚠ', 'ᚢ', 'ᚦ', 'ᚨ'];
 const PHASE_HP = [8000, 10000, 12000];
 
 export function setupEE(api, { bows, traps }) {
-  const { world, session, host, player, camera, enemies, scene, audio, toast, announce, damage, data } = api;
+  const { world, session, host, player, camera, enemies, scene, audio, toast, announce, damage, data, sync } = api;
+  // events: R is the event's seeded random while its handler runs (the same on every client)
+  let R = Math.random;
+  const ev = (type, fn) => sync.on(type, (d, ctx) => { R = ctx.rand; try { fn(d, ctx); } finally { R = Math.random; } });
   const root = world.root, kino = window.kino;
   const node = n => root.getObjectByName(n);
   const showNode = (n, on = true) => { const o = node(n); if (o) { o.visible = on; o.updateMatrixWorld(true); } return o; };
@@ -70,22 +77,24 @@ export function setupEE(api, { bows, traps }) {
   const anyBowUpgraded = () => Object.values(bows?.state() ?? {}).some(s => s.stage === 'taken');
   // ---- 2. time travel ------------------------------------------------------------------------------------------------
   const travelGlow = glow(new THREE.Vector3(), 0x9fd8ff, 70); travelGlow.visible = false;
-  function lightNext() { const t = st.travel, options = TRAVEL.map((_, k) => k).filter(k => k !== t.lit); t.lit = options[Math.floor(Math.random() * options.length)]; travelGlow.position.copy(TRAVEL[t.lit]); travelGlow.visible = true; }
+  function lightNext() { const t = st.travel, options = TRAVEL.map((_, k) => k).filter(k => k !== t.lit); t.lit = options[Math.floor(R() * options.length)]; travelGlow.position.copy(TRAVEL[t.lit]); travelGlow.visible = true; }
   function travelReset(msg) { const t = st.travel; t.hits = 0; t.ready = false; if (st.step >= 2) lightNext(); if (msg) toast?.(msg, 2); }
   const padGlows = { present: glow(PAD.present.clone().add(new THREE.Vector3(0, 10, 0)), 0x9fd8ff, 120), past: glow(PAD.past.clone().add(new THREE.Vector3(0, 10, 0)), 0x9fd8ff, 120) };
   padGlows.present.visible = padGlows.past.visible = false;
 
   // shots: bow arrows land through blast() -> effect(p, 0xffb347, 25)
-  host.on('effect', e => {
-    if (e.count !== 25 || !isBow(session.weapon?.id)) return; const p = e.position, up = isUpgraded(session.weapon.id);
+  host.on('effect', e => { if (e.count === 25 && isBow(session.weapon?.id)) sync.act('eeShot', { p: sync.a(e.position), up: isUpgraded(session.weapon.id) }); });
+  ev('eeShot', d => {
+    const p = sync.v(d.p), up = d.up;
     if (st.step === 1) SUMMON.forEach((t, k) => { if (!st.summon.has(k) && p.distanceTo(t) < 80) { st.summon.add(k); summonGlows[k].visible = true; audio?.play?.('buy', .4); if (st.summon.size === 6) advance(2); } });
     if (st.step >= 2 && !st.travel.ready && st.travel.lit != null) {
       const k = TRAVEL.findIndex(t => p.distanceTo(t) < 110);
       if (k >= 0) { if (k === st.travel.lit && up) { st.travel.hits++; audio?.play?.('buy', .4); if (st.travel.hits >= 4) { st.travel.ready = true; st.travel.round = session.round; travelGlow.visible = false; padGlows.present.visible = padGlows.past.visible = true; announce?.('THE TELEPORTER', 'PRIMED UNTIL THE ROUND ENDS', 3); } else lightNext(); } else travelReset('The targets went dark'); }
     }
-    if (st.boss?.state === 'center' && up && p.distanceTo(st.boss.z.root.position) < 220) stunBoss();
+    if (sync.isHost && st.boss?.z && st.boss.state === 'center' && up && p.distanceTo(st.boss.z.root.position) < 220) stunBoss();
   });
-  host.on('roundEnd', () => { if (st.step >= 2 && (st.travel.ready || st.travel.hits)) { padGlows.present.visible = padGlows.past.visible = false; travelReset(st.travel.ready ? 'The teleporter powered down' : null); } });
+  host.on('roundEnd', () => { if (sync.isHost && st.step >= 2 && (st.travel.ready || st.travel.hits)) sync.act('eeTravelReset', { ready: st.travel.ready }); });
+  ev('eeTravelReset', d => { padGlows.present.visible = padGlows.past.visible = false; travelReset(d.ready ? 'The teleporter powered down' : null); });
   let padHold = 0;
   function padTick(dt) {
     if (!st.travel.ready) { padHold = 0; return; }
@@ -97,7 +106,12 @@ export function setupEE(api, { bows, traps }) {
   // ---- 3. the past and the present: items ---------------------------------------------------------------------------
   const take = (item, msg) => { st.have.add(item); audio?.play?.('buy', .5); toast?.(msg, 2.5); hud(); };
   const place = (item, flag, msg) => { st.have.delete(item); st.done.add(flag); audio?.play?.('buy', .7); toast?.(msg, 2.5); hud(); check(); };
-  const I = (position, text, use, hidden) => world.addInteraction({ position, text, use, hidden });
+  // every interaction is a team event: its effect runs on every client, in the host's order (ids follow creation order,
+  // the same everywhere); `data` sends what only the user's client knows (Simon's shown rune)
+  const uses = new Map();
+  const I = (position, text, use, hidden, data) => { const id = uses.size + 1; uses.set(id, use);
+    world.addInteraction({ position, text, hidden, use() { if (hidden?.()) return false; sync.act('eeUse', { id, d: data?.() }); return true; } }); };
+  ev('eeUse', (d, ctx) => uses.get(d.id)?.(d.d ?? {}, ctx));
   I(SPOT.safePast, () => 'Read the combination', () => { st.done.add('code'); toast?.(`The combination: ${CODE.join(' ')}`, 4); audio?.play?.('buy', .4); return true; }, () => st.step < 2 || st.done.has('code'));
   I(SPOT.canisterPast, () => 'Take the MPD canister', () => { showNode('CASTLE_EE_canister_past_0', false); take('canister', 'MPD canister'); return true; }, () => st.step < 2 || st.have.has('canister') || st.done.has('canister'));
   I(W(-704, 5058, 174), () => 'Take the fuse', () => { showNode('CASTLE_EE_fuse_0', false); take('fuse', 'Lab fuse'); return true; }, () => st.step < 2 || st.have.has('fuse') || st.done.has('fuse'));
@@ -113,7 +127,10 @@ export function setupEE(api, { bows, traps }) {
   I(SPOT.stoneSlot, () => 'Replace the cracked channeling stone', () => { showNode('CASTLE_SM_cs_stone_2', false); showNode('CASTLE_EE_csglow_2', false); place('stone', 'stonePlaced', 'The channeling stone is in place'); stoneMesh(); return true; }, () => !st.have.has('stone'));
   function lid() { const o = node('CASTLE_SM_lid_crate_stone'); if (o) { o.rotation.x -= Math.PI / 2; o.updateMatrixWorld(true); } }
   function stoneMesh() { const s = node('CASTLE_EE_stone_past_0'); if (!s) return; s.parent.updateMatrixWorld(true); s.position.copy(s.parent.worldToLocal(SPOT.stoneSlot.clone().add(new THREE.Vector3(0, -6, 0)))); s.visible = true; s.updateMatrixWorld(true); }
-  const CODE = Array.from({ length: 3 }, () => RUNES[Math.floor(Math.random() * 4)]);
+  let CODE = ['?', '?', '?'];   // the host's (an event: the same safe for everyone)
+  ev('eeCode', d => { CODE = d.code; });
+  const newCode = () => { if (sync.isHost) sync.act('eeCode', { code: Array.from({ length: 3 }, () => RUNES[Math.floor(Math.random() * 4)]) }); };
+  newCode();
 
   // ---- 4. the Keeper protector and the channeling stones -------------------------------------------------------------------
   let K = null;   // {body, rig}
@@ -150,8 +167,8 @@ export function setupEE(api, { bows, traps }) {
       if (k >= 1) { P.move = null; if (P.stone >= STONES.length) { P.a.root.removeFromParent(); P = null; st.done.add('stones'); announce?.('THE KEEPER', 'SEEN AT THE MPD', 3); check(); return; } P.a.rig.play(KA.stoneIn ? 'stoneIn' : 'keeperIdle', false); P.loopAt = P.t + (K.index.stoneIn?.duration ?? 1); P.kills = 0; toast?.(`Channeling stone ${P.stone + 1} of 4 · kill zombies around it`, 3); }
     } else if (P.loopAt && P.t > P.loopAt) { P.loopAt = 0; P.a.rig.play(KA.stoneLoop ? 'stoneLoop' : 'keeperIdle', true); }
   }
-  host.on('kill', ({ enemy }) => {
-    const p = enemy?.root?.position; if (!p || !P || P.move) return; const s = STONES[P.stone];
+  sync.on('kill', d => {
+    const p = sync.v(d.p); if (!P || P.move) return; const s = STONES[P.stone];
     if (p.distanceTo(s.zone) > 420) return; P.kills++; const g = glow(p.clone().add(new THREE.Vector3(0, 40, 0)), 0x9fd8ff, 20); souls.push({ m: g, from: g.position.clone(), to: P.a.root.position.clone().add(new THREE.Vector3(0, 80, 0)), t: 0 });
     if (P.kills >= 12) { showNode('CASTLE_EE_csglow_' + s.n); audio?.play?.('buy', .7); P.a.rig.play(KA.stoneOut ? 'stoneOut' : 'keeperIdle', false); P.stone++; const to = P.stone < STONES.length ? STONES[P.stone].keeper.clone() : W(-1192, 2256, 164); P.move = { from: P.a.root.position.clone(), to, t: -((K.index.stoneOut?.duration) ?? 1) }; }
   });
@@ -161,22 +178,22 @@ export function setupEE(api, { bows, traps }) {
   const overlay = document.createElement('div'); overlay.id = 'ee-simon'; overlay.hidden = true;
   overlay.style.cssText = 'position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:4;pointer-events:none;font:700 64px/1 serif;color:#ffd27a;text-shadow:0 0 18px #ff9a3a,0 2px 4px #000;text-align:center';
   document.body.append(overlay);
-  SPOT.consoles.forEach((p, ci) => I(p, () => { const s = st.simon[ci]; return !s ? 'Use the console' : s.phase === 'input' ? `Press use on ${s.seq[s.at]} · showing ${RUNES[s.cycle]}` : s.phase === 'done' ? '' : 'Watch the runes'; }, () => {
+  SPOT.consoles.forEach((p, ci) => I(p, () => { const s = st.simon[ci]; return !s ? 'Use the console' : s.phase === 'input' ? `Press use on ${s.seq[s.at]} · showing ${RUNES[s.cycle]}` : s.phase === 'done' ? '' : 'Watch the runes'; }, (d) => {
     const s = st.simon[ci];
     if (!s) { st.simon[ci] = { round: 0, phase: 'show', seq: [], at: 0, t: 0, cycle: 0 }; simonRound(ci); return true; }
     if (s.phase !== 'input') return false;
-    if (RUNES[s.cycle] === s.seq[s.at]) { s.at++; audio?.play?.('buy', .3); if (s.at >= s.seq.length) { s.round++; if (s.round >= 3) { s.phase = 'done'; overlay.hidden = true; toast?.('The console accepts the sequence', 2.5); audio?.play?.('box'); if (st.simon.every(x => x?.phase === 'done')) { st.done.add('simon'); check(); } } else simonRound(ci); } }
+    if ((d.rune ?? RUNES[s.cycle]) === s.seq[s.at]) { s.at++; audio?.play?.('buy', .3); if (s.at >= s.seq.length) { s.round++; if (s.round >= 3) { s.phase = 'done'; overlay.hidden = true; toast?.('The console accepts the sequence', 2.5); audio?.play?.('box'); if (st.simon.every(x => x?.phase === 'done')) { st.done.add('simon'); check(); } } else simonRound(ci); } }
     else { st.simon[ci] = null; overlay.hidden = true; toast?.('Wrong rune · the console resets', 2); audio?.play?.('hit', .5); }
     return true;
-  }, () => st.step < 4 || st.simon[ci]?.phase === 'done'));
-  function simonRound(ci) { const s = st.simon[ci]; s.seq = Array.from({ length: 3 + s.round }, () => RUNES[Math.floor(Math.random() * 4)]); s.phase = 'show'; s.at = 0; s.t = 0; }
+  }, () => st.step < 4 || st.simon[ci]?.phase === 'done', () => ({ rune: RUNES[st.simon[ci]?.cycle ?? 0] })));
+  function simonRound(ci) { const s = st.simon[ci]; s.seq = Array.from({ length: 3 + s.round }, () => RUNES[Math.floor(R() * 4)]); s.phase = 'show'; s.at = 0; s.t = 0; }
   function simonTick(dt) {
     for (const [ci, s] of st.simon.entries()) {
       if (!s || s.phase === 'done') continue;
-      if (feet().distanceTo(SPOT.consoles[ci]) > 260) { overlay.hidden = true; continue; }
-      s.t += dt; overlay.hidden = false;
-      if (s.phase === 'show') { const k = Math.floor(s.t / .9); overlay.textContent = k < s.seq.length ? (s.t % .9 < .7 ? s.seq[k] : '') : ''; if (k >= s.seq.length + 1) { s.phase = 'input'; s.t = 0; } }
-      else { s.cycle = Math.floor(s.t / .75) % 4; overlay.textContent = RUNES[s.cycle]; overlay.style.opacity = .55 + .45 * Math.abs(Math.sin(s.t * 4)); }
+      s.t += dt;   // the timing runs everywhere (the same phase on every client); only nearby players see it
+      const near = feet().distanceTo(SPOT.consoles[ci]) < 260; overlay.hidden = !near;
+      if (s.phase === 'show') { const k = Math.floor(s.t / .9); if (near) overlay.textContent = k < s.seq.length ? (s.t % .9 < .7 ? s.seq[k] : '') : ''; if (k >= s.seq.length + 1) { s.phase = 'input'; s.t = 0; } }
+      else { s.cycle = Math.floor(s.t / .75) % 4; if (near) { overlay.textContent = RUNES[s.cycle]; overlay.style.opacity = .55 + .45 * Math.abs(Math.sin(s.t * 4)); } }
     }
   }
 
@@ -215,22 +232,42 @@ export function setupEE(api, { bows, traps }) {
 
   // ---- the boss ------------------------------------------------------------------------------------------------------------
   const restore = { auto: true };
-  function startBoss() {
-    if (st.boss || st.step !== 7 || !K) return;
-    st.step = 8; restore.auto = enemies.autoSpawn !== false; enemies.autoSpawn = false;
+  const startBoss = () => { if (!st.boss && st.step === 7 && !st.bossAsked) { st.bossAsked = true; sync.act('bossGo'); } };
+  // every client: into the arena (each player at their own start point); the host raises the Keeper
+  ev('bossGo', () => {
+    if (st.boss || st.step !== 7) return;
+    st.step = 8; const ids = [sync.me, ...sync.players().filter(q => !q.me).map(q => q.id)].sort(), slot = Math.max(0, ids.indexOf(sync.me));
+    const start = [ARENA.start, W(-2368, 6976, -251), W(-2460, 6816, -249), W(-2460, 6912, -255)][slot % 4];
+    kino.debug.teleportPlayer([start.x, start.y + 4, start.z]); flash(start, 0x9fd8ff, 8, 700, 1);
+    st.boss = { z: null, phase: 0, hp: PHASE_HP[0], state: 'intro', t: 0, casts: 0, spawnT: 2, spell: null, bar: bossBar() };
+    announce?.('THE KEEPER', 'DESTROY IT', 3.5); music('boss_fight', { loop: true, vol: .7 });
+    if (!sync.isHost) { st.boss.z = enemies.list.find(z => z.boss) ?? null; return; }
+    if (!K) return;
+    restore.auto = enemies.autoSpawn !== false; enemies.autoSpawn = false;
     for (const z of [...enemies.list]) enemies.hurt(z, 1e9, false, false, 'explosion', false);
-    kino.debug.teleportPlayer([ARENA.start.x, ARENA.start.y + 4, ARENA.start.z]); flash(ARENA.start, 0x9fd8ff, 8, 700, 1);
     const a = keeperActor(ARENA.keeper.clone()); face(a.root, ARENA.start);
     const z = { id: ++enemies.serial, kind: 'keeper', boss: true, root: a.root, rig: a.rig, speed: 0, health: 1e9, maxHealth: 1e9, state: 'boss', path: [], pathIndex: 0, repath: 0, hit: { r: 60, h: 300, head: 45 }, stuck: 0 };
     z.ai = dt => bossTick(dt);
     enemies.list.push(z); session.total = (session.total ?? 0) + 1; session.spawned = (session.spawned ?? 0) + 1;
-    st.boss = { z, phase: 0, hp: PHASE_HP[0], state: 'intro', t: 0, casts: 0, spawnT: 2, spell: null, bar: bossBar() };
-    a.rig.play(KA.roar ? 'roar' : 'idle', false); announce?.('THE KEEPER', 'DESTROY IT', 3.5); music('boss_fight', { loop: true, vol: .7 });
-  }
-  // only the stunned Keeper takes damage; insta-kill and the Nuke don't touch it
+    st.boss.z = z; a.rig.play(KA.roar ? 'roar' : 'idle', false);
+  });
+  // guests: the host's Keeper as a copy (the snapshot names a 'keeper'), its clips standing in for walk / attack / death
+  const spawnOther = enemies.spawn.bind(enemies);
+  enemies.spawn = (p, b, kind, ...rest) => {
+    if (kind !== 'keeper' || sync.isHost) return spawnOther(p, b, kind, ...rest);
+    const a = keeperActor(p.clone()); if (!a) return spawnOther(p, b, 'zombie', ...rest);
+    for (const [k, src] of [['walk', 'idle'], ['attack', 'idle'], ['death', 'ending']]) if (KA[src]) a.rig.add(k, KA[src]);
+    const z = { id: 0, kind: 'keeper', boss: true, root: a.root, rig: a.rig, speed: 0, health: 1e9, maxHealth: 1e9, state: 'chase', path: [], pathIndex: 0, repath: 0, hit: { r: 60, h: 300, head: 45 }, stuck: 0 };
+    a.rig.play('walk'); enemies.list.push(z); if (st.boss) st.boss.z = z; return z;
+  };
+  // the host's fight for everyone's bar
+  sync.shared('boss', () => st.boss ? { phase: st.boss.phase, hp: st.boss.hp, state: st.boss.state } : null, s => {
+    if (!s || !st.boss) return; const b = st.boss, was = b.state; Object.assign(b, s); if (b.state !== was) { b.t = 0; if (b.state === 'stunned') announce?.('THE KEEPER', 'STUNNED', 1.5); } b.bar.update();
+  });
+  // only the stunned Keeper takes damage; insta-kill and the Nuke don't touch it (on the host; a guest's hits go there)
   const hurt = enemies.hurt.bind(enemies);
   enemies.hurt = (z, amount, head = false, melee = false, cause = 'bullet', score = true) => {
-    if (!z?.boss) return hurt(z, amount, head, melee, cause, score);
+    if (!z?.boss || !sync.isHost) return hurt(z, amount, head, melee, cause, score);
     const b = st.boss; if (!b || b.state === 'dying') return;
     if (b.state !== 'stunned') { if (Math.random() < .2) audio?.play?.('hit', .2); return; }
     b.hp -= Math.min(2000, amount) * (head ? 2 : 1); b.bar.update(); if (b.hp <= 0) nextPhase();
@@ -252,9 +289,10 @@ export function setupEE(api, { bows, traps }) {
     for (let i = 0; i < b.phase; i++) kino.castle.panzer?.spawn?.(ARENA.mechz[i % ARENA.mechz.length].clone());
   }
   const bossFx = [];
-  function bossTick(dt) {
-    const b = st.boss; if (!b) return; const z = b.z, pos = z.root.position; b.t += dt; z.stuck = 0;
-    const me = feet();
+  function bossTick(dt) {   // the host
+    const b = st.boss; if (!b?.z) return; const z = b.z, pos = z.root.position; b.t += dt; z.stuck = 0;
+    // it faces and hunts the nearest player; each spell picks one of them
+    const me = (sync.nearest(pos) ?? { pos: feet() }).pos;
     if (b.state !== 'dying') face(z.root, me);
     // adds: zombies rising around the arena
     if ((b.spawnT -= dt) <= 0 && b.state !== 'dying') { b.spawnT = 3 - b.phase * .6; if (enemies.list.filter(e => e.kind === 'zombie').length < 8 + b.phase * 3) { const p = ARENA.zombies[Math.floor(Math.random() * ARENA.zombies.length)]; const q = world.closest(p, { x: 80, y: 120, z: 80 }) ?? p; const nz = enemies.spawn(q, null, 'zombie'); if (nz) { session.total++; session.spawned++; } } }
@@ -265,22 +303,20 @@ export function setupEE(api, { bows, traps }) {
         flash(pos, 0xb06bff, 4, 500, .5); pos.copy(to); flash(pos, 0xb06bff, 4, 500, .5);
         const kind = ['storm', 'rune', 'wolf', 'demon'][Math.floor(Math.random() * 4)];
         const key = { storm: 'elemental', rune: 'runeprison', wolf: 'wolfhowl', demon: 'demongate' }[kind];
-        b.spell = { kind, key, t: 0, fired: false }; z.rig.play(KA[key + 'In'] ? key + 'In' : 'idle', false);
+        const pl = sync.players().filter(q => !q.down), tg = pl[Math.floor(Math.random() * pl.length)] ?? { id: sync.me, pos: feet() };
+        b.spell = { kind, key, t: 0, fired: false, target: tg.id }; z.rig.play(KA[key + 'In'] ? key + 'In' : 'idle', false);
       }
       if (b.spell) {
         const s = b.spell; s.t += dt; const charge = Math.min(3, K.index[s.key + 'In']?.duration ?? 1);   // the storm's charge clip runs 10 s
-        if (!s.fired && s.t > charge) { s.fired = true; z.rig.play(KA[s.key + 'Deploy'] ? s.key + 'Deploy' : 'idle', false); cast(s.kind); }
+        if (!s.fired && s.t > charge) { s.fired = true; z.rig.play(KA[s.key + 'Deploy'] ? s.key + 'Deploy' : 'idle', false);
+          const tp = sync.players().find(q => q.id === s.target)?.pos ?? me;
+          sync.act('bossCast', { kind: s.kind, target: s.target, at: sync.a(tp), from: sync.a(pos), offs: Array.from({ length: 8 }, () => [(Math.random() - .5) * 260, (Math.random() - .5) * 260]) }); }
         if (s.t > charge + 2.5) { b.spell = null; b.t = 0; b.casts++; z.rig.play('idle', true); if (b.casts >= 3) { b.state = 'center'; b.t = 0; flash(pos, 0xb06bff, 4, 500, .5); pos.copy(ARENA.keeper); z.rig.play(KA.elementalLoop ? 'elementalLoop' : 'idle', true); b.bar.update(); toast?.('The Keeper is charging · plant the Ragnarok beneath it', 3); } }
       }
     } else if (b.state === 'center') {
-      const h = kino.operator?.handle, at = h?.plantedAt;
-      if (at && Math.hypot(at.x - ARENA.center.x, at.z - ARENA.center.z) < 280) stunBoss();
-      else if (b.t > 10) {   // the storm: everyone outside the safe circles
-        const safe = ARENA.safe.some(p => Math.hypot(me.x - p.x, me.z - p.z) < 150);
-        flash(ARENA.keeper, 0xbfe6ff, 10, 2500, 1.2); audio?.play?.('explosion', .9);
-        for (let i = 0; i < 10; i++) bolt(pos.clone().add(new THREE.Vector3(0, 200, 0)), ARENA.center.clone().add(new THREE.Vector3((Math.random() - .5) * 1200, 0, (Math.random() - .5) * 1200)), 0xbfe6ff);
-        if (!safe) damage(80); b.state = 'cast'; b.t = 0; b.casts = 0; z.rig.play('idle', true); b.bar.update();
-      } else if (b.t > 6 && Math.floor(b.t * 2) !== Math.floor((b.t - dt) * 2)) toast?.('The storm is coming · get into a safe circle', 1);
+      if (b.t > 10) {   // the storm: everyone outside the safe circles (each client checks its own player)
+        sync.act('bossStorm'); b.state = 'cast'; b.t = 0; b.casts = 0; z.rig.play('idle', true); b.bar.update();
+      }
     } else if (b.state === 'stunned') {
       pos.y = THREE.MathUtils.damp(pos.y, ARENA.keeper.y - 60, 3, dt);
       if (b.stunLoop && b.t > b.stunLoop) { b.stunLoop = 0; z.rig.play(KA.stunIdle ? 'stunIdle' : 'idle', true); }
@@ -293,13 +329,22 @@ export function setupEE(api, { bows, traps }) {
   // the spells
   const lineMat = c => new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: .95, blending: THREE.AdditiveBlending });
   function bolt(a, c, color) { const pts = [a.clone()]; for (let i = 1; i < 8; i++) pts.push(a.clone().lerp(c, i / 8).add(new THREE.Vector3((Math.random() - .5) * 40, (Math.random() - .5) * 40, (Math.random() - .5) * 40))); pts.push(c.clone()); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat(color)); scene.add(l); bossFx.push({ line: l, life: .15 }); }
-  function cast(kind) {
-    const me = feet(), pos = st.boss.z.root.position;
-    if (kind === 'storm') for (let i = 0; i < 8; i++) bossFx.push({ strike: me.clone().add(new THREE.Vector3((Math.random() - .5) * 260, 0, (Math.random() - .5) * 260)), at: .4 + i * .35, life: .6 + i * .35, warn: null });
+  // a spell aimed at one player (`target`, standing at `at` when cast), drawn on every client; each client's own player
+  // takes the hits that reach it (the chomper skulls chase the target)
+  ev('bossCast', d => {
+    const me = sync.v(d.at), pos = sync.v(d.from), kind = d.kind, o = d.offs ?? [];
+    if (kind === 'storm') for (let i = 0; i < 8; i++) bossFx.push({ strike: me.clone().add(new THREE.Vector3(o[i]?.[0] ?? 0, 0, o[i]?.[1] ?? 0)), at: .4 + i * .35, life: .6 + i * .35, warn: null });
     if (kind === 'rune') bossFx.push({ pillar: me.clone(), at: 1.3, life: 2.2, warn: null });
-    if (kind === 'wolf') for (let i = 0; i < 3; i++) { const d = me.clone().sub(pos).setY(0).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), (i - 1) * .35); bossFx.push({ wolf: glow(pos.clone().setY(me.y + 40), 0xbfe6ff, 60), v: d.multiplyScalar(520), life: 2.5, hit: false }); }
-    if (kind === 'demon') for (let i = 0; i < 4; i++) bossFx.push({ chomper: glow(pos.clone().add(new THREE.Vector3((Math.random() - .5) * 80, 60, (Math.random() - .5) * 80)), 0xb06bff, 45), life: 6, hit: 0 });
-  }
+    if (kind === 'wolf') for (let i = 0; i < 3; i++) { const v = me.clone().sub(pos).setY(0).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), (i - 1) * .35); bossFx.push({ wolf: glow(pos.clone().setY(me.y + 40), 0xbfe6ff, 60), v: v.multiplyScalar(520), life: 2.5, hit: false }); }
+    if (kind === 'demon') for (let i = 0; i < 4; i++) bossFx.push({ chomper: glow(pos.clone().add(new THREE.Vector3((o[i]?.[0] ?? 0) * .3, 60, (o[i]?.[1] ?? 0) * .3)), 0xb06bff, 45), life: 6, hit: 0, target: d.target });
+  });
+  ev('bossStorm', () => {
+    const me = feet(), pos = ARENA.keeper, safe = ARENA.safe.some(p => Math.hypot(me.x - p.x, me.z - p.z) < 150);
+    flash(ARENA.keeper, 0xbfe6ff, 10, 2500, 1.2); audio?.play?.('explosion', .9);
+    for (let i = 0; i < 10; i++) bolt(pos.clone().add(new THREE.Vector3(0, 200, 0)), ARENA.center.clone().add(new THREE.Vector3((R() - .5) * 1200, 0, (R() - .5) * 1200)), 0xbfe6ff);
+    if (!safe && st.step === 8) damage(80);
+  });
+  ev('bossPlant', () => { if (sync.isHost) stunBoss(); });
   function fxTick(dt) {
     const me = feet(), chest = me.clone().add(new THREE.Vector3(0, 40, 0));
     for (let i = bossFx.length - 1; i >= 0; i--) {
@@ -308,29 +353,34 @@ export function setupEE(api, { bows, traps }) {
       if (f.strike) { if (!f.warn && f.age > f.at - .5) f.warn = glow(f.strike.clone().add(new THREE.Vector3(0, 4, 0)), 0x9fd8ff, 90); if (!f.done && f.age > f.at) { f.done = true; bolt(f.strike.clone().add(new THREE.Vector3(0, 500, 0)), f.strike, 0xbfe6ff); flash(f.strike, 0xbfe6ff, 4, 400, .3); if (me.distanceTo(f.strike) < 85) damage(35); } }
       if (f.pillar) { if (!f.warn) f.warn = glow(f.pillar.clone().add(new THREE.Vector3(0, 4, 0)), 0xff6a1a, 160); if (!f.done && f.age > f.at) { f.done = true; flash(f.pillar, 0xff7a2a, 6, 500, .8); for (let k = 0; k < 6; k++) bossFx.push({ ember: glow(f.pillar.clone().add(new THREE.Vector3(0, k * 40, 0)), 0xff7a2a, 90), life: .8 }); if (Math.hypot(me.x - f.pillar.x, me.z - f.pillar.z) < 95) damage(70); } }
       if (f.wolf) { f.wolf.position.addScaledVector(f.v, dt); if (!f.hit && f.wolf.position.distanceTo(chest) < 70) { f.hit = true; damage(50); } }
-      if (f.chomper) { const d = chest.clone().sub(f.chomper.position); if (d.length() > 1) f.chomper.position.addScaledVector(d.normalize(), Math.min(d.length(), 230 * dt)); if (f.chomper.position.distanceTo(chest) < 45 && (f.hit -= dt) <= 0) { f.hit = .8; damage(25); } }
+      if (f.chomper) { const tq = f.target && f.target !== sync.me ? sync.players().find(q => q.id === f.target)?.pos : null, aim = tq ? tq.clone().add(new THREE.Vector3(0, 40, 0)) : chest, d = aim.clone().sub(f.chomper.position); if (d.length() > 1) f.chomper.position.addScaledVector(d.normalize(), Math.min(d.length(), 230 * dt)); if (f.chomper.position.distanceTo(chest) < 45 && (f.hit -= dt) <= 0) { f.hit = .8; damage(25); } }
       if (f.life <= 0) { if (f.line) { f.line.removeFromParent(); f.line.geometry.dispose(); f.line.material.dispose(); } for (const k of ['warn', 'wolf', 'chomper', 'ember']) drop(f[k]); bossFx.splice(i, 1); }
     }
   }
-  function winBoss() {
-    const b = st.boss; st.boss = null; b.bar.remove();
-    const i = enemies.list.indexOf(b.z); if (i >= 0) { enemies.list.splice(i, 1); session.kills++; session.killed++; } b.z.root.removeFromParent();
+  const winBoss = () => { if (!st.bossWon) { st.bossWon = true; sync.act('bossWin'); } };
+  ev('bossWin', () => {
+    const b = st.boss; if (!b) return; st.boss = null; b.bar.remove();
+    if (sync.isHost && b.z) { const i = enemies.list.indexOf(b.z); if (i >= 0) { enemies.list.splice(i, 1); session.kills++; session.killed++; } b.z.root.removeFromParent();
+      // the arena's zombies go after this frame: the win can land inside enemies.update's loop, which would still play a dead one
+      setTimeout(() => { for (const z of [...enemies.list]) hurt(z, 1e9, false, false, 'explosion', false); }, 0);
+      enemies.autoSpawn = restore.auto; }
     for (const f of bossFx.splice(0)) { if (f.line) f.line.removeFromParent(); for (const k of ['warn', 'wolf', 'chomper', 'ember']) drop(f[k]); }
-    // the arena's zombies go after this frame: winBoss runs inside enemies.update's loop, which would still play a dead one
-    setTimeout(() => { for (const z of [...enemies.list]) hurt(z, 1e9, false, false, 'explosion', false); }, 0);
-    kino.debug.teleportPlayer([ARENA.back.x, ARENA.back.y + 4, ARENA.back.z]); flash(ARENA.back, 0x9fd8ff, 8, 800, 1.2);
-    enemies.autoSpawn = restore.auto; st.step = 9; session.flags.add('castle:ee:done'); session.addPoints?.(10000);
+    const ids = [sync.me, ...sync.players().filter(q => !q.me).map(q => q.id)].sort(), slot = Math.max(0, ids.indexOf(sync.me)), back = [ARENA.back, W(-1476, 2256, 216), W(-1192, 2540, 216), W(-909, 2256, 216)][slot % 4];
+    kino.debug.teleportPlayer([back.x, back.y + 4, back.z]); flash(back, 0x9fd8ff, 8, 800, 1.2);
+    st.step = 9; session.flags.add('castle:ee:done'); session.addPoints?.(10000);
     try { const prof = loadProfile(); prof.rewards = { ...prof.rewards, castle: true }; saveProfile(prof); const wl = kino.weaponLevels; if (wl?.profile) { wl.profile.rewards = { ...wl.profile.rewards, castle: true }; wl.apply?.(); } } catch {}
     stopMusic(1); sfx('moon_shockwave', 1); setTimeout(() => { const parts = ['castle_outro_part_1_mas', 'castle_outro_part_2_mas', 'castle_outro_part_3_mas']; let i = 0; const next = () => { if (i < parts.length) { const a = music(parts[i++], { vol: .8 }); a.onended = next; } }; next(); }, 1500);
     announce?.('BAD MOON RISING', 'THE ROCKETS STRIKE THE MOON', 6); flash(W(4236, -2261, -1000), 0xffe0b0, 12, 6000, 5); audio?.play?.('box'); hud();
-  }
+  });
 
   // ---- the step that starts the boss: the Ragnarok planted on a plate --------------------------------------------------
   host.on('update', dt => {
     if (!dt) return;
     if (st.step === 0 && anyBowUpgraded()) advance(1);
     padTick(dt); protectorTick(dt); simonTick(dt); fxTick(dt);
-    if (st.step === 7) { const at = kino.operator?.handle?.plantedAt; if (at && SPOT.plates.some(p => Math.hypot(at.x - p.x, at.z - p.z) < 130)) startBoss(); }
+    const planted = kino.operator?.handle?.plantedAt;   // my Ragnarok: on a plate (the way in), under the charging Keeper (its stun)
+    if (st.step === 7 && planted && SPOT.plates.some(p => Math.hypot(planted.x - p.x, planted.z - p.z) < 130)) startBoss();
+    if (st.boss?.state === 'center' && planted && Math.hypot(planted.x - ARENA.center.x, planted.z - ARENA.center.z) < 280) { if (!st.plantAsked) { st.plantAsked = true; sync.act('bossPlant'); } } else st.plantAsked = false;
     for (let i = souls.length - 1; i >= 0; i--) { const s = souls[i]; s.t += dt / .6; s.m.position.lerpVectors(s.from, s.to, Math.min(1, s.t)); if (s.t >= 1) { drop(s.m); souls.splice(i, 1); } }
     for (let i = flashes.length - 1; i >= 0; i--) { const f = flashes[i]; f.life -= dt; f.src.weight = Math.max(0, f.life / f.max); if (f.life <= 0) { const pool = kino.lighting?.sources, j = pool?.indexOf(f.src) ?? -1; if (j >= 0) pool.splice(j, 1); flashes.splice(i, 1); } }
     const ev = travelGlow.visible ? 1 + Math.sin(performance.now() / 150) * .25 : 1; travelGlow.scale.setScalar(70 * ev);
@@ -349,7 +399,8 @@ export function setupEE(api, { bows, traps }) {
   // a new game: everything back as the map started
   const lidRest = node('CASTLE_SM_lid_crate_stone')?.rotation.x, leverRest = node('CASTLE_SM_ee_death_ray_switch')?.rotation.z;
   host.on('reset', () => {
-    if (st.boss) { st.boss.bar.remove(); st.boss.z.root.removeFromParent(); enemies.autoSpawn = restore.auto; stopMusic(.5); }
+    if (st.boss) { st.boss.bar.remove(); st.boss.z?.root.removeFromParent(); if (sync.isHost) enemies.autoSpawn = restore.auto; stopMusic(.5); }
+    st.bossAsked = st.bossWon = st.plantAsked = false;
     if (P) { P.a.root.removeFromParent(); P = null; }
     for (const f of bossFx.splice(0)) { if (f.line) f.line.removeFromParent(); for (const k of ['warn', 'wolf', 'chomper', 'ember']) drop(f[k]); }
     root.traverse(o => { if (/^CASTLE_EE_/.test(o.name)) { o.visible = false; o.updateMatrixWorld(true); } });
@@ -357,6 +408,7 @@ export function setupEE(api, { bows, traps }) {
     const l = node('CASTLE_SM_lid_crate_stone'); if (l && lidRest != null) { l.rotation.x = lidRest; l.updateMatrixWorld(true); }
     const v = node('CASTLE_SM_ee_death_ray_switch'); if (v && leverRest != null) { v.rotation.z = leverRest; v.updateMatrixWorld(true); }
     Object.assign(st, { step: 0, summon: new Set(), travel: { lit: null, hits: 0, ready: false, round: -1 }, have: new Set(), done: new Set(), stone: 0, simon: [null, null], boss: null, tcLeft: 0 });
+    newCode();
     for (const g of summonGlows) g.visible = false; travelGlow.visible = padGlows.present.visible = padGlows.past.visible = false; overlay.hidden = true; hud();
   });
 

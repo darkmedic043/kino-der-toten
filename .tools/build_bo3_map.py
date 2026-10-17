@@ -857,6 +857,7 @@ if BSP == 'zm_castle':
     PLACED = {'tram_gates', 'player_tram_gates', 'tram_call_lever_2'}
     for e in ents:
         if e.get('targetname') in ('zombie_door', 'zombie_debris', '115_flinger_pad_aimer', '115_flinger_landing_pad', 's_pap_tp'): PLACED.add(e.get('target'))
+        if e.get('script_noteworthy') == 'aq_dg_circle_rune' or e.get('targetname', '').startswith('aq_wh_bones_'): PLACED.add(e.get('targetname'))   # the bow quests' (hidden)
     for tn in ('115_flinger_pad_aimer', '115_flinger_landing_pad'):
         for e in by_tn.get(tn, []):
             m_ = one(e.get('target'))
@@ -974,6 +975,32 @@ if BSP == 'zm_castle':
             if x: place_model(f'CASTLE_EE_{nm}_{k}', x['model'], x['origin'], x.get('angles'), hidden=hid); count('EE')
     x = one('fuse_box')
     if x: place_model('CASTLE_EE_fuse_slot_0', 'p7_zm_ctl_console_deathray_relay_2x', x['origin'], x.get('angles'), hidden=True)
+    # The bow upgrade quests (zm_castle_weap_quest_upgrade.gsc), as CASTLE_BQ_<what>: the four king paintings at each of
+    # the four spots they're dealt to (hidden), the chomper fossils (shown) and where they return in the trophy room
+    # (hidden), the demonic circle's six rune icons, the runic circles and their symbols, the dug-up bones, the skull at
+    # the bottom of the shrine, the burial chamber's ledge and king skeleton, Skadi (static) and the four pedestals
+    BQ = [('painting', f'p7_zm_ctl_kings_painting_0{i + 1}', s, f'{i}_{s.get("targetname", "")[15:-7]}', True) for i in range(4) for s in by_tn.get('aq_wh_painting_struct', []) or [e for e in ents if e.get('script_noteworthy') == 'aq_wh_painting_struct']]
+    for e in ents:
+        sn, tn = e.get('script_noteworthy', ''), e.get('targetname', '')
+        if sn == 'aq_dg_fossil': BQ.append(('fossil', 'c_zom_chomper_demongate', e, tn[12:], False))
+        if sn == 'aq_dg_fossil_align': BQ.append(('fossilhome', 'c_zom_chomper_demongate', e, tn[-2:], True))
+        if sn == 'aq_dg_circle_rune': BQ.append(('drune', e['model'], e, tn[17:], True))
+        if sn == 'aq_rp_runic_circle': BQ.append(('rcircle', e['model'], e, e.get('script_label', ''), True))
+        if sn == 'aq_rp_runic_circle_symbol': BQ.append(('rsymbol', e['model'], e, f'{e.get("script_label", "")}_{tn[-1]}', True))
+        if tn.startswith('aq_wh_bones_'): BQ.append(('bones', e['model'], e, tn[12:], True))
+    for tn, nm, mdl, hid in (('aq_wh_skull_pickup_struct', 'skull', 'p7_zm_ctl_wolf_skull', True), ('sp_skadi', 'skadi', 'c_gen_direwolf_ghost', True)):
+        x = one(tn)
+        if x: BQ.append((nm, mdl, x, '0', hid))
+    for e in ents:
+        b = e.get('scriptbundlename', '')
+        if b.startswith('p7_fxanim_zm_castle_quest_pedestal_bundle_'):
+            el = b[len('p7_fxanim_zm_castle_quest_pedestal_bundle_'):]
+            BQ.append(('pedestal', 'p7_fxanim_zm_castle_quest_pedestal_' + {'wolf_howl': 'wolf', 'demon_gate': 'demon', 'rune_prison': 'rune', 'elemental_storm': 'storm'}[el] + '_bow_mod', e, el, False))
+        if b == 'p7_fxanim_zm_castle_quest_wolf_platform_rebuild_bundle': BQ.append(('ledge', 'p7_fxanim_zm_castle_quest_wolf_platform_mod', e, '0', True))
+        if b == 'p7_fxanim_zm_castle_quest_wolf_king_skeleton_bundle': BQ.append(('king', 'p7_fxanim_zm_castle_quest_wolf_king_skeleton_mod', e, '0', True))
+        if b == 'p7_fxanim_zm_castle_quest_demongate_urn_bundle': BQ.append(('urn', 'p7_fxanim_zm_castle_quest_demongate_urn_mod', e, '0', False))
+    for nm, mdl, e, k, hid in BQ:
+        place_model(f'CASTLE_BQ_{nm}_{k}', mdl, e['origin'], e.get('angles'), hidden=hid); count('BOWQUEST')
     # Panzersoldat spawn points (zm_castle_mechz.gsc: a random mechz_location in an active zone)
     k = 0
     for e in ents:

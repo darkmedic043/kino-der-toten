@@ -12,6 +12,9 @@
 //                     gumball: a free gobblegum from your pack.
 //   Disco Inferno     the astroglobe in the trophy room (ee_disco_*): turn its moon arm (use) until it lines up with the
 //                     rocket's: 30 s of disco: coloured lights, the globe spinning, the zombies around it dancing.
+// Co-op (sync.js): plates, the plant and the disco are the team's (events); the trip through time is the wall-runner's,
+// the plunger each player's own, its blast an event the host carries out; the host drops the power-ups and makes
+// the zombies dance.
 // Testing: kino.castle.side.state(), .plunger() (the trip), .disco().
 import * as THREE from 'three';
 import { sfx, music, stopMusic } from './castle-audio.js';
@@ -24,7 +27,7 @@ const SPOT = { powerup: W(-1596, 2264, 392), plungerTo: W(-211, 5086, 168), plun
 const PLUNGER_URL = new URL('./plunger/plunger.glb', import.meta.url).href;
 
 export function setupSide(api, { lowgrav, side2 }) {
-  const { world, session, host, player, enemies, scene, audio, toast, announce, data, view, powerups } = api;
+  const { world, session, host, player, enemies, scene, audio, toast, announce, data, view, powerups, sync } = api;
   const root = world.root, kino = window.kino, feet = () => player.getFeetPosition();
   const node = n => root.getObjectByName(n);
   const show = (n, on = true) => { const o = node(n); if (o) { o.visible = on; o.updateMatrixWorld(true); } return o; };
@@ -45,15 +48,18 @@ export function setupSide(api, { lowgrav, side2 }) {
     session.bowie = true; if (view) view.currentId = null; api.equipView?.(); show('CASTLE_EE_plunger_0', false);
     announce?.('THE PLUNGER', '', 2.5); audio?.play?.('box');
   }
-  let blasting = false;
-  host.on('kill', ({ enemy, melee }) => {   // a plunger kill blows up its neighbours (once: their deaths don't chain)
-    if (!st.plunger || !melee || !enemy?.root || blasting) return; const p = enemy.root.position;
-    kino.fx?.burn?.(p.clone().add(new THREE.Vector3(0, 40, 0))); blasting = true; sfx('plunger_hit_0' + Math.floor(Math.random() * 4), .8);
-    try { for (const z of [...enemies.list]) if (!z.boss && z.kind !== 'panzer' && z.root.position.distanceTo(p) < 90) enemies.hurt(z, 1e9, false, false, 'explosion'); } finally { blasting = false; }
+  // a plunger kill blows up its neighbours (once: their deaths don't chain). The host sees its own kills; a guest spots
+  // a killing plunger hit on its copy of the zombie (its hits go to the host, the kill message has no position)
+  host.on('kill', ({ enemy, melee }) => { if (st.plunger && melee && enemy?.root && sync.isHost) sync.act('plungerBlast', { p: sync.a(enemy.root.position) }); });
+  host.on('beforeEnemyDamage', e => { if (!sync.isHost && st.plunger && e.melee && e.enemy?.root && e.amount >= e.enemy.health) sync.act('plungerBlast', { p: sync.a(e.enemy.root.position) }); });
+  sync.on('plungerBlast', (d, ctx) => {
+    const p = sync.v(d.p); kino.fx?.burn?.(p.clone().add(new THREE.Vector3(0, 40, 0))); sfx('plunger_hit_0' + Math.floor(ctx.rand() * 4), .8);
+    if (sync.isHost) for (const z of [...enemies.list]) if (!z.boss && z.kind !== 'panzer' && z.root.position.distanceTo(p) < 90) sync.hurt(z, 1e9, ctx);
   });
   world.addInteraction({ position: SPOT.plunger.clone(), text: () => 'Take the plunger', use() { givePlunger(); return true; }, hidden: () => !st.trip || st.plunger });
+  sync.on('plungerTrip', (d, ctx) => { side2?.useWallrun(); if (ctx.mine) trip(); });   // the clock's charge is spent for everyone
   function trip() {
-    st.trip = { t: 10 }; st.runs = []; for (const g of runGlows) g.visible = false; side2?.useWallrun();
+    st.trip = { t: 10 }; st.runs = []; for (const g of runGlows) g.visible = false;
     if (!st.plunger) show('CASTLE_EE_plunger_0');
     kino.debug.teleportPlayer([SPOT.plungerTo.x, SPOT.plungerTo.y + 2, SPOT.plungerTo.z]); audio?.play?.('dog_round', .5); toast?.('Pulled into the past · 10 s', 2.5);
   }
@@ -61,12 +67,18 @@ export function setupSide(api, { lowgrav, side2 }) {
   // ---- the plant -------------------------------------------------------------------------------------------------------------
   world.addInteraction({ position: SPOT.potPresent.clone(), text: () => st.sprout === 'pot' ? 'Take the sprout' : 'Take the gumball', hidden: () => !(st.sprout === 'pot' || st.sprout === 'grown'),
     use() {
-      if (st.sprout === 'pot') { st.sprout = 'held'; show('CASTLE_EE_plant_sprout_0', false); toast?.('A sprout · it needs time to grow', 2.5); audio?.play?.('buy', .4); return true; }
-      if (st.sprout === 'grown') { st.sprout = 'done'; show('CASTLE_EE_gumball_0', false); const id = kino.gobblegums?.gift?.(); if (!id) toast?.('A gumball · but no gobblegum pack to draw from', 2.5); audio?.play?.('box'); return true; }
+      if (st.sprout === 'pot' || st.sprout === 'grown') { sync.act('plant', { from: st.sprout }); return true; }
       return false;
     } });
-  world.addInteraction({ position: SPOT.potPast.clone(), text: () => 'Plant the sprout', hidden: () => st.sprout !== 'held',
-    use() { st.sprout = 'grown'; show('CASTLE_EE_plant_past_0'); show('CASTLE_EE_plant_grown_0'); show('CASTLE_EE_gumball_0'); toast?.('Planted, long ago...', 2.5); audio?.play?.('buy', .5); return true; } });
+  world.addInteraction({ position: SPOT.potPast.clone(), text: () => 'Plant the sprout', hidden: () => st.sprout !== 'held' || st.sproutBy !== sync.me,
+    use() { sync.act('plant', { from: 'held' }); return true; } });
+  // the sprout is carried by whoever took it; the gumball is the taker's
+  sync.on('plant', (d, ctx) => {
+    if (d.from !== st.sprout) return;
+    if (d.from === 'pot') { st.sprout = 'held'; st.sproutBy = ctx.by; show('CASTLE_EE_plant_sprout_0', false); if (ctx.mine) { toast?.('A sprout · it needs time to grow', 2.5); audio?.play?.('buy', .4); } }
+    else if (d.from === 'held') { if (st.sproutBy !== ctx.by) return; st.sprout = 'grown'; show('CASTLE_EE_plant_past_0'); show('CASTLE_EE_plant_grown_0'); show('CASTLE_EE_gumball_0'); if (ctx.mine) { toast?.('Planted, long ago...', 2.5); audio?.play?.('buy', .5); } }
+    else if (d.from === 'grown') { st.sprout = 'done'; show('CASTLE_EE_gumball_0', false); if (ctx.mine) { const id = kino.gobblegums?.gift?.(); if (!id) toast?.('A gumball · but no gobblegum pack to draw from', 2.5); audio?.play?.('box'); } }
+  });
 
   // ---- Disco Inferno -----------------------------------------------------------------------------------------------------------
   const arm = node('CASTLE_SM_ee_disco_arm_moon'), moon = node('CASTLE_SM_ee_disco_moon'), moonRocket = node('CASTLE_SM_ee_disco_moon_rocket'), earth = node('CASTLE_SM_ee_disco_earth');
@@ -74,7 +86,9 @@ export function setupSide(api, { lowgrav, side2 }) {
   function turnArm(k) { for (const o of [arm, moon, moonRocket]) { if (!o) continue; o.userData.restY ??= o.rotation.y; o.rotation.y = o.userData.restY + k * STEP; o.updateMatrixWorld(true); } }
   turnArm(st.arm);
   world.addInteraction({ position: SPOT.globe.clone(), text: () => 'Turn the moon', hidden: () => st.disco > 0,
-    use() { st.arm = (st.arm + 1) % 8; turnArm(st.arm); audio?.play?.('buy', .25); if (st.arm === 0) disco(); return true; } });
+    use() { sync.act('discoTurn'); return true; } });
+  sync.on('discoTurn', () => { if (st.disco > 0) return; st.arm = (st.arm + 1) % 8; turnArm(st.arm); audio?.play?.('buy', .25); if (st.arm === 0) disco(); });
+  sync.on('discoArm', d => { st.arm = d.k; turnArm(st.arm); });   // the host's starting angle
   let discoLights = [], dancers = new Map();
   function disco() {
     st.disco = 30; announce?.('DISCO INFERNO', '', 3); music('disco', { vol: .8 });
@@ -85,11 +99,11 @@ export function setupSide(api, { lowgrav, side2 }) {
     if (st.disco <= 0) return; st.disco -= dt; const t = performance.now() / 1000;
     discoLights.forEach((s, i) => { s.weight = Math.sin(t * 6 + i * 1.6) > 0 ? 1 : .15; s.color.setHSL((t * .3 + i * .25) % 1, 1, .55); });
     if (earth) { earth.rotation.y += dt * 4; earth.updateMatrixWorld(true); }
-    for (const z of enemies.list) {   // the zombies near the globe dance: they stop and turn on the spot
+    for (const z of sync.isHost ? enemies.list : []) {   // the zombies near the globe dance (the host's): they stop and turn on the spot
       if (z.boss || z.kind === 'panzer' || dancers.has(z) || z.root.position.distanceTo(SPOT.globe) > 650) continue;
       const prev = z.ai, at = z.root.position.clone(); dancers.set(z, prev); z.ai = d => { z.root.position.x = at.x; z.root.position.z = at.z; z.root.rotation.y += d * 5; };
     }
-    if (st.disco <= 0) { stopMusic(1.5); for (const s of discoLights) unlight(s); discoLights = []; for (const [z, prev] of dancers) z.ai = prev; dancers.clear(); st.arm = 1 + Math.floor(Math.random() * 7); turnArm(st.arm); }
+    if (st.disco <= 0) { stopMusic(1.5); for (const s of discoLights) unlight(s); discoLights = []; for (const [z, prev] of dancers) z.ai = prev; dancers.clear(); if (sync.isHost) sync.act('discoArm', { k: 1 + Math.floor(Math.random() * 7) }); }
   }
 
   host.on('update', dt => {
@@ -97,15 +111,15 @@ export function setupSide(api, { lowgrav, side2 }) {
     const f = feet(), lg = lowgrav?.state() ?? {};
     // pressure plates
     PADS.forEach((p, k) => { if (st.pads.has(k)) return; const on = Math.hypot(f.x - p.x, f.z - p.z) < 50 && Math.abs(f.y - p.y) < 40; st.padT[k] = on ? st.padT[k] + dt : 0;
-      if (st.padT[k] > 3) { st.pads.add(k); padGlows[k].visible = true; audio?.play?.('buy', .4); if (st.pads.size === 4) toast?.('The pyramid hums · watch the undercroft when the gravity drops', 3); } });
-    if (st.pads.size === 4 && lg.on && !st.lowWas) { const types = Object.keys(data.powerups ?? {}).filter(t => t !== 'fire_sale' || session.power); powerups?.spawn?.(types[Math.floor(Math.random() * types.length)], SPOT.powerup.clone()); }
+      if (st.padT[k] > 3 && !st.padAsked?.[k]) { (st.padAsked ??= {})[k] = true; sync.act('platePress', { k }); } });
+    if (sync.isHost && st.pads.size === 4 && lg.on && !st.lowWas) { const types = Object.keys(data.powerups ?? {}).filter(t => t !== 'fire_sale' || session.power); powerups?.spawn?.(types[Math.floor(Math.random() * types.length)], SPOT.powerup.clone()); }
     st.lowWas = !!lg.on;
     // the plunger wall-run: the four runes in a row, either way round, airborne the whole time
     if (!st.trip && !st.plunger && lg.on && lg.running && side2?.wallrun) {
       const k = RUNS.findIndex(p => p.distanceTo(f.clone().add(new THREE.Vector3(0, 35, 0))) < 120);
       if (k >= 0 && st.runs.at(-1) !== k) {
         const last = st.runs.at(-1), dir = st.runs.length > 1 ? (st.runs.at(-1) - st.runs.at(-2) + 4) % 4 : null, step = last == null ? null : (k - last + 4) % 4;
-        if (last == null || ((step === 1 || step === 3) && (dir == null || step === dir))) { st.runs.push(k); runGlows[k].visible = true; audio?.play?.('buy', .3); if (st.runs.length >= 8) trip(); }
+        if (last == null || ((step === 1 || step === 3) && (dir == null || step === dir))) { st.runs.push(k); runGlows[k].visible = true; audio?.play?.('buy', .3); if (st.runs.length >= 8) { st.runs = []; sync.act('plungerTrip'); } }
         else { st.runs = [k]; for (const g of runGlows) g.visible = false; runGlows[k].visible = true; }
       }
     }
@@ -113,10 +127,13 @@ export function setupSide(api, { lowgrav, side2 }) {
     if (st.trip) { st.trip.t -= dt; if (st.trip.t <= 0) { st.trip = null; show('CASTLE_EE_plunger_0', false); kino.debug.teleportPlayer([SPOT.plungerBack.x, SPOT.plungerBack.y + 2, SPOT.plungerBack.z]); toast?.('Back in the present', 2); } }
     discoTick(dt);
   });
+  sync.on('platePress', d => { if (st.pads.has(d.k)) return; st.pads.add(d.k); padGlows[d.k].visible = true; audio?.play?.('buy', .4); if (st.pads.size === 4) toast?.('The pyramid hums · watch the undercroft when the gravity drops', 3); });
+  if (sync.isHost) sync.act('discoArm', { k: st.arm });
   // the sprout is in its pot from the start
   show('CASTLE_EE_plant_sprout_0');
   host.on('reset', () => {
-    st.pads.clear(); st.padT = [0, 0, 0, 0]; st.runs = []; st.trip = null; st.sprout = 'pot'; st.disco = 0;
+    st.pads.clear(); st.padT = [0, 0, 0, 0]; st.padAsked = {}; st.runs = []; st.trip = null; st.sprout = 'pot'; st.sproutBy = null; st.disco = 0;
+    if (sync.isHost) sync.act('discoArm', { k: 1 + Math.floor(Math.random() * 7) });
     for (const g of [...padGlows, ...runGlows]) g.visible = false;
     for (const s of [...discoLights]) unlight(s); discoLights = []; for (const [z, prev] of dancers) z.ai = prev; dancers.clear();
     for (const n of ['CASTLE_EE_plunger_0', 'CASTLE_EE_plant_past_0', 'CASTLE_EE_plant_grown_0', 'CASTLE_EE_gumball_0']) show(n, false); show('CASTLE_EE_plant_sprout_0');

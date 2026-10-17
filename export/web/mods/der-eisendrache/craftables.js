@@ -27,7 +27,7 @@ const CRAFT = {
 };
 
 export function setupCraftables(api, { traps }) {
-  const { world, session, host, player, camera, enemies, audio, toast, announce, data, viewScene, view } = api;
+  const { world, session, host, player, camera, enemies, audio, toast, announce, data, viewScene, view, sync } = api;
   const root = world.root, kino = window.kino;
   const at = o => o.getWorldPosition(new THREE.Vector3());
   // a map node moved or shown at runtime (the static map's matrices are frozen: update them by hand)
@@ -46,9 +46,20 @@ export function setupCraftables(api, { traps }) {
   function reset() {
     for (const [o, h] of homes) { o.visible = false; o.position.copy(h); o.updateMatrixWorld(true); places.get(o)?.copy(at(o)); }
     st.have.spike.clear(); st.have.shield.clear(); st.built.spike = false; st.built.shield = null; st.shown.clear(); st.firstPanzer = false; st.armed = 0;
-    for (const part of CRAFT.shield.parts) { const list = spots['shield:' + part] ?? []; if (list.length) show('shield', part, list[Math.floor(Math.random() * list.length)]); }
+    if (sync.isHost) { const pick = {}; for (const part of CRAFT.shield.parts) { const n = spots['shield:' + part]?.length ?? 0; if (n) pick[part] = Math.floor(Math.random() * n); } sync.act('craftSpots', pick); }   // the host picks the shield parts' spots
     shieldReset();
   }
+  // ---- the team's events ---------------------------------------------------------------------------------------------
+  sync.on('craftSpots', d => { for (const [part, k] of Object.entries(d)) { const o = spots['shield:' + part]?.[k]; if (o) show('shield', part, o); } });
+  sync.on('partPick', (d, ctx) => { const o = st.shown.get(d.key); if (!o) return; const [cr, part] = d.key.split(':'); o.visible = false; st.shown.delete(d.key); st.have[cr].add(part); if (ctx.mine) audio?.play?.('buy', .5); toast?.(`${CRAFT[cr].name} part · ${st.have[cr].size}/${CRAFT[cr].parts.length}`, 2.5); });
+  sync.on('partDrop', d => { const o = spots[d.key]?.[d.k]; if (!o || st.shown.has(d.key)) return; const [cr, part] = d.key.split(':'); show(cr, part, o, d.p ? sync.v(d.p) : null); if (d.msg) toast?.(d.msg, 3); });
+  sync.on('build', (d, ctx) => {
+    if (d.cr === 'spike') { if (st.built.spike) return; st.built.spike = true; announce?.('RAGNAROK DG-4', 'BUILT', 2.5); }
+    else { if (st.built.shield) return; st.built.shield = benches[d.bench] ?? null; announce?.('ROCKET SHIELD', 'BUILT', 2.5); }
+    if (ctx.mine) audio?.play?.('buy', .7);
+  });
+  sync.on('guardsArm', () => { st.armed = session.time + 20; lever(wallSwitch, true); lever(consoleSwitch, false); toast?.('The console by the landing pad lit up · 20 s', 3); });
+  sync.on('guardsOpen', () => { if (!(st.armed > session.time)) return; st.armed = 0; lever(consoleSwitch, true); lever(wallSwitch, false); const o = spots['spike:guards']?.[0]; if (o) show('spike', 'guards', o); toast?.('A panel opened beside the console', 3); });
 
   // ---- picking parts up and building -----------------------------------------------------------------------------
   for (const [key, list] of Object.entries(spots)) for (const o of list) {
@@ -59,8 +70,7 @@ export function setupCraftables(api, { traps }) {
       text: () => `Pick up ${CRAFT[cr].label[part]}`,
       use() {
         if (!o.visible || st.shown.get(key) !== o) return false;
-        o.visible = false; st.shown.delete(key); st.have[cr].add(part); audio?.play?.('buy', .5);
-        toast?.(`${CRAFT[cr].name} part · ${st.have[cr].size}/${CRAFT[cr].parts.length}`, 2.5); return true;
+        sync.act('partPick', { key }); return true;
       },
     });
   }
@@ -69,7 +79,7 @@ export function setupCraftables(api, { traps }) {
     text: () => st.built.spike ? (kino.operator?.current === 'ragnarok' ? '' : 'Take the Ragnarok DG-4')
       : st.have.spike.size === 3 ? 'Build the Ragnarok DG-4' : `Ragnarok DG-4 · ${st.have.spike.size}/3 parts`,
     use() {
-      if (!st.built.spike) { if (st.have.spike.size < 3) return false; st.built.spike = true; audio?.play?.('buy', .7); announce?.('RAGNAROK DG-4', 'BUILT', 2.5); return true; }
+      if (!st.built.spike) { if (st.have.spike.size < 3) return false; sync.act('build', { cr: 'spike' }); return true; }
       if (kino.operator?.current === 'ragnarok' || !kino.operator) return false;
       kino.operator.give('ragnarok', { full: true }); return true;
     },
@@ -79,26 +89,25 @@ export function setupCraftables(api, { traps }) {
     text: () => st.built.shield ? (st.built.shield === b && !sh.owned ? 'Take the Rocket Shield' : '')
       : st.have.shield.size === 3 ? 'Build the Rocket Shield' : `Rocket Shield · ${st.have.shield.size}/3 parts`,
     use() {
-      if (!st.built.shield) { if (st.have.shield.size < 3) return false; st.built.shield = b; audio?.play?.('buy', .7); announce?.('ROCKET SHIELD', 'BUILT', 2.5); return true; }
+      if (!st.built.shield) { if (st.have.shield.size < 3) return false; sync.act('build', { cr: 'shield', bench: benches.indexOf(b) }); return true; }
       if (st.built.shield !== b || sh.owned) return false;
       takeShield(); return true;
     },
   });
 
   // ---- where the Ragnarok's parts come from -----------------------------------------------------------------------
-  host.on('kill', ({ enemy }) => {   // body: the first Panzersoldat to die drops it
-    if (enemy?.kind !== 'panzer' || st.firstPanzer || st.built.spike || st.have.spike.has('body')) return;
-    st.firstPanzer = true; const o = spots['spike:body']?.[0]; if (!o) return;
+  host.on('kill', ({ enemy }) => {   // body: the first Panzersoldat to die drops it (the host's kills)
+    if (!sync.isHost || enemy?.kind !== 'panzer' || st.firstPanzer || st.built.spike || st.have.spike.has('body')) return;
+    st.firstPanzer = true; if (!spots['spike:body']?.[0]) return;
     const p = enemy.root.position.clone(); const q = world.closest?.(p, { x: 80, y: 160, z: 80 }) ?? p;
-    show('spike', 'body', o, q.clone().add(new THREE.Vector3(0, 6, 0))); toast?.('The Panzersoldat dropped something', 3);
+    sync.act('partDrop', { key: 'spike:body', k: 0, p: sync.a(q.clone().add(new THREE.Vector3(0, 6, 0))), msg: 'The Panzersoldat dropped something' });
   });
   const down = new THREE.Vector3(0, -1, 0);
-  function handleDrop() {   // handle: falls from one of the coils onto the floor below
-    const list = spots['spike:handle'] ?? []; if (!list.length) return;
-    const o = list[Math.floor(Math.random() * list.length)], from = homes.get(o).clone(); o.parent.updateMatrixWorld(true); o.parent.localToWorld(from);
+  function handleDrop() {   // handle: falls from one of the coils onto the floor below (the host picks which)
+    const list = spots['spike:handle'] ?? []; if (!list.length || !sync.isHost) return;
+    const k = Math.floor(Math.random() * list.length), o = list[k], from = homes.get(o).clone(); o.parent.updateMatrixWorld(true); o.parent.localToWorld(from);
     const hit = world.raycast?.(new THREE.Ray(from.clone(), down), 0, 4000);
-    show('spike', 'handle', o, hit ? from.clone().addScaledVector(down, hit.distance - 6) : from);
-    toast?.('Something fell from the Tesla coils', 3);
+    sync.act('partDrop', { key: 'spike:handle', k, p: sync.a(hit ? from.clone().addScaledVector(down, hit.distance - 6) : from), msg: 'Something fell from the Tesla coils' });
   }
   // guards: the A10 wall switch during a rocket test fire, then the console's lever within 20 s
   const wallSwitch = root.getObjectByName('CASTLE_SM_spike_quest_wall_switch'), consoleSwitch = root.getObjectByName('CASTLE_SM_spike_quest_console_switch');
@@ -108,8 +117,7 @@ export function setupCraftables(api, { traps }) {
     text: () => st.built.spike || st.have.spike.has('guards') || st.shown.has('spike:guards') ? '' : traps?.state().rocket.phase === 'fire' ? 'Pull the switch' : st.armed > session.time ? '' : 'The switch is locked',
     use() {
       if (traps?.state().rocket.phase !== 'fire' || st.built.spike || st.have.spike.has('guards')) return false;
-      st.armed = session.time + 20; lever(wallSwitch, true); lever(consoleSwitch, false); audio?.play?.('buy', .5);
-      toast?.('The console by the landing pad lit up · 20 s', 3); return true;
+      sync.act('guardsArm'); audio?.play?.('buy', .5); return true;
     },
   });
   if (consoleSwitch) world.addInteraction({
@@ -117,8 +125,7 @@ export function setupCraftables(api, { traps }) {
     text: () => st.armed > session.time && !st.shown.has('spike:guards') ? 'Pull the lever' : '',
     use() {
       if (!(st.armed > session.time)) return false;
-      st.armed = 0; lever(consoleSwitch, true); lever(wallSwitch, false); const o = spots['spike:guards']?.[0];
-      if (o) show('spike', 'guards', o); audio?.play?.('buy', .7); toast?.('A panel opened beside the console', 3); return true;
+      sync.act('guardsOpen'); audio?.play?.('buy', .7); return true;
     },
   });
 
