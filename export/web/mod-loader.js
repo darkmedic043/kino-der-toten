@@ -58,7 +58,7 @@ export function resolveWeapons(data){
 
 export class ModHost {
   // camera / hideViewmodel let a mod take over rendering (e.g. third person).
-  constructor(base='mods/'){this.base=new URL(base,document.baseURI);this.mods=[];this.handlers=new Map();this.errors=[];this.camera=null;this.hideViewmodel=false;this.owners=new WeakMap();this.setupMod=null;}
+  constructor(base='mods/'){this.base=new URL(base,document.baseURI);this.mods=[];this.handlers=new Map();this.errors=[];this.camera=null;this.hideViewmodel=false;this.owners=new WeakMap();this.setupMod=null;this.warmObjects=[];}   // warmObjects: objects a mod shows only later (effect sprites), pushed during setup; the engine compiles their shaders while loading
   on(event,fn){if(this.setupMod&&!this.owners.has(fn))this.owners.set(fn,this.setupMod);if(!this.handlers.has(event))this.handlers.set(event,[]);this.handlers.get(event).push(fn);return()=>this.off(event,fn);}
   off(event,fn){const list=this.handlers.get(event);if(list)list.splice(list.indexOf(fn)>>>0,1);}
   emit(event,...args){

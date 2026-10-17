@@ -45,7 +45,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 
 - **Visual checks go on the real GPU** (GTX 1660 Ti): `--use-angle=vulkan --enable-gpu --ignore-gpu-blocklist`. SwiftShader hides beam/bloom artefacts and draws points tiny. Check point sizes by maths.
 - **Lighting**: never toggle a light's `.visible` (it recompiles every shader). Pool size is baked into shaders, so only resize it on a quality change. **Rebake** `baked-light.bin.gz` (`.tools/bake-lighting.mjs`) and `sunshafts.json` (`.tools/bake-sunshafts.mjs`) whenever fixtures or light sources change.
-- Don't set `needsUpdate` on texture swaps (forces a program rebuild). Compile and upload during loading, not on the first played frame.
+- Don't set `needsUpdate` on texture swaps (forces a program rebuild). Compile and upload during loading, not on the first played frame. Objects that only appear mid-game go in `host.warmObjects`, and late material changes belong in a `warm` handler, so the engine's `warmShaders()` builds them while loading (performance.md).
 - Don't upload every weapon's HD textures up front (it fills VRAM). Preload only targeted ones.
 - Colliders pushed onto `world.dynamic` need `.box` unless `window:true`, or `world.setDoors` crashes.
 - Don't publish ripped or third-party game assets. The user supplies downloads: yt-dlp is blocked for me by the classifier, so give the user a command with the output template quoted (`-o "$HOME/Downloads/name.%(ext)s"`).

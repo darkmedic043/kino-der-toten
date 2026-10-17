@@ -83,6 +83,7 @@ export function setupMoon(api,{quality,LIGHT_CLAMP,volume=null,baking=false}){
     const small=!o.isSkinnedMesh&&!o.isInstancedMesh&&o.geometry.boundingSphere.radius*o.getWorldScale(P).x<30;   // tiny props: shadows nobody sees, but each is a shadow-pass draw
     o.castShadow=!small&&!sky&&!glass&&!m?.transparent&&!(m?.blending>1)&&!glow.has(m);o.receiveShadow=!sky;});
   tagShadows(scene);let tagTimer=0;
+  host.on('warm',()=>tagShadows(scene));   // the engine's shader warm-up (see mod.js)
   const snap=new THREE.Vector3(Infinity,0,0);let sunTimer=0,sunSig='';
   function placeSun(force){
     // Follow the player in 500-unit steps (a moving shadow map shimmers) and redraw only then:

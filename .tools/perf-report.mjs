@@ -38,7 +38,7 @@ function windowLine(w) {
   return `  ${w.at.slice(11, 19)} ${String(w.fps).padStart(5)} fps  interval p50/p95/p99/max ${w.gap.join('/')} ms  update ${w.upd.join('/')}  render ${w.ren.join('/')}` +
     `  zombies ${w.zombies}  calls ${w.calls}  gc ${w.gc[0]} (${w.gc[1]} MB)  long ${w.long[0]} (${w.long[1]} ms, max ${w.long[2]})  heap ${w.heap}/${w.heapMax} MB` +
     (w.hitches?.length ? `\n      hitches [s, ms, update, render, gcMB]: ${w.hitches.map(h => `[${h.join(', ')}]`).join(' ')}` : '') +
-    (mods ? `\n      mods avg/max ms: ${mods}` : '');
+    (mods ? `\n      mods avg/max ms: ${mods}` : '') + (w.progs?.length ? `\n      shaders compiled mid-game: ${w.progs.join(', ')}` : '');
 }
 
 // group windows into sessions: same user and page, ending at a perfEnd or a gap of over 2 minutes
@@ -55,7 +55,7 @@ for (const s of sessions) {
   const w0 = s.windows[0] ?? s.end, sum = s.end;
   console.log(`\n=== ${w0.at.slice(0, 16).replace('T', ' ')}  ${s.who ?? 'anon'}  ${map(s.page)}  ${gpuShort(s.gpu)}${s.rind ? `  Rind ${s.rind}` : '  browser'}`);
   console.log(`    ${QUALITY[w0.q] ?? w0.q} quality, render scale ${w0.scale}, fps cap ${w0.cap || 'none'}, canvas ${w0.px}${w0.coop ? ', co-op' : ''}`);
-  if (sum) console.log(`    session: ${sum.minutes} min, ${sum.fps} fps avg, ${sum.hitches} hitches over 50 ms (worst ${sum.worst} ms), ${sum.gc} heap drops, long tasks ${sum.long[0]} (${sum.long[1]} ms)\n    frame intervals: ${histLine(sum.hist)}`);
+  if (sum) console.log(`    session: ${sum.minutes} min, ${sum.fps} fps avg, ${sum.hitches} hitches over 50 ms (worst ${sum.worst} ms), ${sum.gc} heap drops, ${sum.programs ?? '?'} shaders compiled mid-game, long tasks ${sum.long[0]} (${sum.long[1]} ms)\n    frame intervals: ${histLine(sum.hist)}`);
   const ws = s.windows;
   if (!ws.length) continue;
   const fps = ws.map(w => w.fps), avg = fps.reduce((a, b) => a + b, 0) / fps.length;

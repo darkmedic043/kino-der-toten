@@ -7,6 +7,7 @@
 // fork's zombies.js, which were two copies of this loop.
 import * as THREE from 'three';
 import { textureMemoryStats, setPrimaryRenderer } from './texture-memory.js';   // first: frees decoded texture images once uploaded
+import './skinned-bounds.js';   // fast SkinnedMesh bounds for every rigged model (no hitch when a zombie first draws)
 import { PlayerController } from './player-controller.js';
 import { ViewWeapon } from './animation.js';
 import { Enemies } from './enemies.js';
@@ -39,7 +40,7 @@ const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null;
 // three draws a transparent double-sided material in two passes and flags it needsUpdate before each, which re-checks
 // its program twice a draw (on The Giant, a glass material and the viewmodel's decals: ~10% of a frame). One pass
 // looks the same here. Swept once a second over both scenes for materials that appear later (was lighting-mod only).
-let singlePassTimer=0;
+let singlePassTimer=0,programCount=0;
 const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
 let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.6;renderer.autoClear=false;
@@ -435,11 +436,58 @@ try{
     if(instanceCull.meshes){console.info('[instance-cull]',instanceCull.sources,'meshes into',instanceCull.meshes,'batches,',instanceCull.instances,'instances in',instanceCull.buildMs,'ms');
       await paint();await renderer.compileAsync(scene,camera).catch(()=>{});}   // batched props need their own shader variants: compile them behind the loading screen
   }
+  if(!perfOff.has('noWarm')){progress('Preparing shaders',99);await paint();await warmShaders();
+    // mods keep adjusting materials for a moment after loading (the lighting mod tags late materials on a 1 s sweep,
+    // which changes their program): compile those too while the player is still on the start screen (cheap: programs
+    // already built are reused)
+    for(const delay of [1500,4000])setTimeout(()=>{if(!started&&!contextLost&&!document.hidden)warmShaders();},delay);}
   // a custom map's static objects stop recomputing their matrices every frame (Kino's world.js freezes its own root)
   if(!perfOff.has('noFreeze')&&world.root&&world.root.updateMatrixWorld===THREE.Object3D.prototype.updateMatrixWorld){staticFreeze=createStaticFreeze(world.root);globalThis.kino.staticFreeze=staticFreeze;}
   ready=true;
   progress('Ready',100);$('loading').hidden=true;$('start').disabled=contextLost;$('menu-status').textContent=contextLost?'Graphics paused. Waiting for the browser to restore the game…':touchControls.mode?'Tap to start':'Click to capture the mouse · Esc to pause';
 }catch(error){console.error(error);errors.push(String(error));$('load-label').textContent='Unable to start: '+error.message;$('menu-status').textContent='See the browser console for details';}
+// Shader warm-up (2026-10-17). The earlier load-time compiles (map-materials, instance batches) compile for the screen,
+// but the lighting mod draws the scene into its post-processing target, which needs other program variants (output
+// colour space, tone mapping). So only what the one warm-up frame drew was really ready: anything out of view or
+// hidden at load (map props behind the player, effects shown later) compiled the first time it was seen, a 40-90 ms
+// freeze each on the GTX 1660 Ti host (longer on Windows, where ANGLE compiles through D3D). This draws one frame with
+// a spy to learn which render target each scene goes into, then compiles every object in it for that target,
+// including hidden ones (made visible just for the compile; lights stay as they are, since toggling a light
+// recompiles every shader). compile doesn't upload textures, so hidden weapons don't fill video memory.
+// ?noWarm skips it.
+async function warmShaders(){
+  const t0=performance.now(),targets=new Map(),draw=renderer.render,later=new THREE.Group();
+  renderer.setAnimationLoop(null);   // no frame may draw the unhidden objects or move the render target meanwhile
+  try{
+    // Things that only appear later join the scene in front of the camera for this one frame: mods.warmObjects (effect
+    // sprites), the power-ups and the enemy templates (zombie bodies and heads, dogs, crawlers; clones share their
+    // materials). They're drawn for real (textures uploaded) behind the loading screen.
+    later.add(...mods.warmObjects.filter(o=>o?.isObject3D&&!o.parent));
+    for(const item of Object.values(powerups?.templates??{})){const aura=new THREE.Sprite(powerups.spriteMaterial);later.add(item.clone(true),aura);}
+    for(const t of [enemies?.templates,enemies?.heads,enemies?.dog,enemies?.quad,enemies?.quadHead].flat())if(t?.isObject3D&&!t.parent)later.add(t);
+    later.position.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(120));later.updateMatrixWorld(true);scene.add(later);
+    mods.emit('warm');   // mods finish pending material changes first (the lighting mod tags late meshes, these too)
+    renderer.render=function(s,c){if((s===scene||s===viewScene)&&!targets.has(s))targets.set(s,this.getRenderTarget());return draw.call(this,s,c);};
+    // shadow maps too (their depth programs), even where the lighting mod only redraws them on a schedule
+    renderer.shadowMap.needsUpdate=true;scene.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});
+    try{renderer.info.reset();renderer.clear();if(mods.renderWorld)mods.renderWorld(scene,camera);else renderer.render(scene,camera);renderer.clearDepth();renderer.render(viewScene,viewCamera);}
+    finally{renderer.render=draw;}
+    const before=renderer.info.programs.length,hidden=[];
+    for(const root of [scene,viewScene])root.traverse(o=>{if(!o.visible&&!o.isLight){hidden.push(o);o.visible=true;}});
+    try{for(const [s,target] of targets){const previous=renderer.getRenderTarget();renderer.setRenderTarget(target);
+      try{await renderer.compileAsync(s,s===viewScene?viewCamera:camera);}finally{renderer.setRenderTarget(previous);}}}
+    finally{for(const o of hidden)o.visible=false;}
+    // the gun and arms in hand are first drawn when play starts: upload their textures now (only these: every cached
+    // weapon's would fill video memory), or the first played frames stall on them (67 ms each on the host)
+    view?.pivot?.traverse(o=>{for(const m of [o.material].flat())if(m)for(const k of ['map','normalMap','emissiveMap','alphaMap','roughnessMap','metalnessMap','aoMap'])if(m[k]?.isTexture)renderer.initTexture(m[k]);});
+    // Without KHR_parallel_shader_compile (not on the Linux host; not promised elsewhere) compileAsync only queues the
+    // compiles: the driver does the work when a program is first used (link check, uniform lookup), which was a 360 ms
+    // first played frame. Using each program here (getUniforms/getAttributes) moves that wait behind the loading screen.
+    for(const program of renderer.info.programs){try{program.getUniforms();program.getAttributes();}catch{}}
+    console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects, in',Math.round(performance.now()-t0),'ms');
+  }catch(error){console.warn('[warm-shaders]',error);}
+  finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
+}
 renderer.info.autoReset=false;
 function renderFrame(now){
   if(document.hidden||contextLost)return;
@@ -450,6 +498,6 @@ function renderFrame(now){
   if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);}
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
   update(dt);const t1=performance.now();staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();if(mods.renderWorld)mods.renderWorld(scene,mods.camera??camera);else renderer.render(scene,mods.camera??camera);if(ready&&started&&!mods.hideViewmodel){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
-  if(playing)perf.frame(now,t1-t0,performance.now()-t1);else perf.pause();
+  if(playing){const n=renderer.info.programs.length;if(n>programCount)perf.programs(renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1);}else{programCount=renderer.info.programs.length;perf.pause();}
 }
 resumeRendering();

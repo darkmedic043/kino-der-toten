@@ -35,6 +35,9 @@ export default function setup(api){
     m.blending=additive?THREE.AdditiveBlending:THREE.NormalBlending;m.color.set(color);m.opacity=opacity;m.rotation=Math.random()*Math.PI*2;
     s.visible=true;scene.add(s);return s;
   }
+  // one pooled sprite (with a map, as every effect has) goes to the engine's load-time shader warm-up, so the first
+  // blood or impact effect doesn't compile its shader mid-game (2026-10-17)
+  {const s=sprite('glow');s.visible=false;s.removeFromParent();free.push(s);host.warmObjects?.push(s);}
   const cell=(s,i)=>{const [c,r]=GRID[s.material.userData.key],x=i%c,y=Math.floor(i/c)%r;s.material.map.offset.set(x/c,1-(y+1)/r);};
   // p: {key, at, vel, size:[from,to], life, fade:[in,out], opacity, additive, color, gravity, spin, frames(flipbook fps), cellIndex}
   function emit(p){

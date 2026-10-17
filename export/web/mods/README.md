@@ -184,11 +184,13 @@ It can also export `prepare(data)`, which runs before the game builds anything a
 | `getState()`, `reset()`, `damage(n)` | game helpers |
 | `host.on(event, fn)` | subscribe; returns an unsubscribe function |
 | `host.camera`, `host.hideViewmodel` | render from another camera, hide the gun (used by third person) |
+| `host.warmObjects` | push objects that only appear later (effect sprites, pickups), during setup and not in the scene: the engine compiles their shaders while loading so their first appearance doesn't stall. Hidden objects already in the scene are compiled anyway |
 | `mod` | `{id, url, manifest}`; use `new URL('file.json', mod.url)` to load your own files |
 
 | event | payload | notes |
 |---|---|---|
 | `ready` | — | all mods set up |
+| `warm` | — | the engine is about to compile every shader (end of loading, and again 1.5 s and 4 s later while on the start screen): apply pending material changes now so their programs are built behind the loading screen |
 | `easterEgg` | `{name}` | an `EGG_` group was completed (custom maps) |
 | `start` | — | first round begins |
 | `update` | `dt` | every frame while playing |

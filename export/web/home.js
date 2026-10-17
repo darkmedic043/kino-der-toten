@@ -1,5 +1,6 @@
 // Main menu (not part of upstream): map browser, loadout, character and mods.
 import { setPrimaryRenderer } from './texture-memory.js';   // first: frees decoded texture images once uploaded (menu previews, portraits, Gunsmith)
+import './skinned-bounds.js';   // fast SkinnedMesh bounds (menu characters and gun previews)
 import * as THREE from 'three';
 import { loadModel, ViewWeapon } from './animation.js';
 import { applyGlow, tickGlow } from './mods/bo3-weapons/glow.js';

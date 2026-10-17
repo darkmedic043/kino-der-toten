@@ -284,6 +284,9 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
   // One pass looks the same on flat glass and decals. Swept every second: map-materials makes decals transparent later.
   function singlePass(root){root.traverse(o=>{if(o.material)for(const x of [o.material].flat())if(x?.transparent&&x.side===THREE.DoubleSide&&!x.forceSinglePass)x.forceSinglePass=true;});}
   tagShadows(scene);singlePass(scene);let tagTimer=0;
+  // the engine's shader warm-up: tag what arrived since (the sweep below only runs during play, so late meshes changed
+  // program on the first played frame)
+  host.on('warm',()=>{tagShadows(scene);singlePass(scene);});
 
   // ---- Daytime: a physical sky and a sun whose shadows keep interiors dark, so
   // sunlight only gets in through the roof holes, windows and open doors.

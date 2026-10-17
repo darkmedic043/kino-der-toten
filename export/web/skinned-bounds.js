@@ -7,7 +7,13 @@
 //   objectBox(root, box?)      like new THREE.Box3().setFromObject(root), with skinned meshes measured this way
 //   fitSkinnedBounds(root)     sets mesh.boundingBox / boundingSphere on every skinned mesh, so the renderer's culling
 //                              and sorting never compute them the slow way
+// Since 2026-10-17 this module also replaces SkinnedMesh.computeBoundingBox / computeBoundingSphere with this loop for
+// every skinned mesh (engine.js imports it). Each new zombie measured its 3-5 body meshes the slow way on its first
+// drawn frame, about 4 ms each (16 ms a zombie on the GTX 1660 Ti host): a hitch at every spawn. The sphere is the
+// box's bounding sphere, slightly larger than three's point-by-point one, so culling stays conservative.
 import * as THREE from 'three';
+
+const SLOW_BOX = THREE.SkinnedMesh.prototype.computeBoundingBox;
 
 const _m = new THREE.Matrix4(), _box = new THREE.Box3();
 export function skinnedBox(mesh, box = new THREE.Box3()) {
@@ -23,7 +29,7 @@ export function skinnedBox(mesh, box = new THREE.Box3()) {
   }
   const morphed = g.morphAttributes.position?.length && mesh.morphTargetInfluences?.some(x => x);
   if (morphed) { // rare on box guns: fall back to three's (it handles morphs)
-    mesh.computeBoundingBox(); return box.copy(mesh.boundingBox);
+    SLOW_BOX.call(mesh); return box.copy(mesh.boundingBox);
   }
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
   for (let i = 0, n = P.count; i < n; i++) {
@@ -60,3 +66,10 @@ export function fitSkinnedBounds(root) {
     o.boundingBox = b; o.boundingSphere = b.getBoundingSphere(new THREE.Sphere());
   });
 }
+
+THREE.SkinnedMesh.prototype.computeBoundingBox = function () {
+  this.boundingBox = skinnedBox(this, this.boundingBox ?? new THREE.Box3());
+};
+THREE.SkinnedMesh.prototype.computeBoundingSphere = function () {
+  this.boundingSphere = skinnedBox(this, _box).getBoundingSphere(this.boundingSphere ?? new THREE.Sphere());
+};
