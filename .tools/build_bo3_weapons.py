@@ -322,6 +322,16 @@ MODW = [
        ads=('vm_bow_launcher_ads_base_up', 'vm_bow_launcher_ads_base_down'), shots=['wpn_bowss_fire_quick', 'wpn_bowss_fire_med', 'wpn_bowss_fire_long'], glow='#ff6a1a',
        projectile='wpn_t7_zmb_bow_base_projectile', offset=[0, -2, 0]),
 ]
+# its four upgrades (zm_castle_weap_quest_upgrade.gsc; mods/der-eisendrache/bows.js runs the quests and the element
+# effects): each view model carries every element's arrows and trims, so the others' are dropped
+ELEMENTS = {'storm': ('Storm Bow', '#7fd0ff'), 'rune': ('Fire Bow', '#ff6a1a'), 'wolf': ('Wolf Bow', '#9fd8ff'), 'demon': ('Void Bow', '#b06bff')}
+for el, (nm, col) in ELEMENTS.items():
+    others = [o for o in ELEMENTS if o != el]
+    drop = '|'.join([f'bow_{o}_(missile|missle)' for o in ['base'] + others] + [f'bow_{o}_(crystals|rocks|arches)' for o in others])
+    MODW.append(dict(cls='Wonder weapon', id=f'bo3_bow_{el}', name=nm, up=nm, model=f'wpn_t7_zmb_bow_{el}_view', world=f'wpn_t7_zmb_bow_{el}_world',
+                     pre='vm_bow_launcher', tpl='crossbow_explosive_zm', drop=drop, noBox=True,
+                     stats=dict(clipSize=1, maxAmmo=60, startAmmo=60, damage=1500, minDamage=0, explosionRadius=200, explosionInnerDamage=1500, explosionOuterDamage=400, price=0),
+                     roles=MODW[-1]['roles'], ads=MODW[-1]['ads'], shots=MODW[-1]['shots'], glow=col, projectile=f'wpn_t7_zmb_bow_{el}_projectile', offset=[0, -2, 0], element=el))
 # the mod's attachment models, mounted on the guns' tags by the weapon-levels mod (def.mounts)
 MOUNTS = {}
 for att, mdl, tag in [('reddot', 'reflex_vmgun', 'tag_red_dot'), ('holo', 'eotech_vmgun', 'tag_eotech'),
@@ -367,7 +377,7 @@ for w in MODW:
     # tag_red_dot inside the built-in holo, so a mounted sight floated off the gun)
     mounts = {k: v for k, v in MOUNTS.items() if v['tag'] in {b['name'] for b in gm['bones']} and not (w['id'] in BUILT_IN_SIGHT and k in ('reddot', 'holo', 'reflex2x'))}
     common2 = {**t, 'hideTags': PARTS.get(w['id'], []), 'mounts': mounts, 'statAttachments': ['extmag'], 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands, 'animations': A2, 'model': view, 'worldModel': world_url, 'lazyWorld': True,
-               'bo3': True, 'modWeapon': True, **({'noBox': True} if w.get('noBox') else {}), **({'scope': 'reflex'} if w['id'] in BUILT_IN_SIGHT else {}), 'glow': w['glow'], 'arc': w.get('arc', False), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls'],
+               'bo3': True, 'modWeapon': True, **({'noBox': True} if w.get('noBox') else {}), **({'scope': 'reflex'} if w['id'] in BUILT_IN_SIGHT else {}), 'glow': w['glow'], 'arc': w.get('arc', False), **({'element': w['element']} if w.get('element') else {}), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls'],
                # parts that are always on (the AS50's scope is its own model): mounted like attachments (mods/weapon-levels/mounts.js)
                'fixedParts': [{'model': model(mdl, 'part_'+mdl)[0], 'tag': tag} for mdl, tag in w.get('fixed', []) if (SRC/'xmodels'/mdl).exists()]}
     if w.get('projectile'): common2['projectileModel'] = model(w['projectile'], 'part_'+w['projectile'])[0]   # fired as the rocket
