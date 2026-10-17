@@ -1,5 +1,8 @@
-// The Ragnarok DG-4 (BO3, Der Eisendrache's "gravityspikes" craftable), as an operator weapon. Stand-in visuals (two
-// procedural spikes) until its model and animations are exported from BO3; the behaviour follows BO3's:
+// The Ragnarok DG-4 (BO3, Der Eisendrache's "gravityspikes" craftable), as an operator weapon. In first person it's
+// BO3's own talon spikes on Dempsey's arms with their vm_talon_spike_* clips (raise, idle, sprint, slam in/out, plant),
+// in a ViewWeapon of its own; planted, the wpn_zmb_dlc1_talon_spikes_prop model (both built by
+// .tools/build_bo3_weapons.py into mods/bo3-weapons, git-ignored). Without those files: procedural stand-in spikes.
+// Behaviour after BO3's:
 //   - left mouse: slam both spikes into the ground. Zombies within 200 die, those out to twice that are thrown back
 //     and stagger; slamming on the way down from a jump reaches 300. Costs 12% power.
 //   - right mouse: plant the spikes where you stand. A gravity field (radius 220) lifts every zombie that walks in and
@@ -7,8 +10,22 @@
 //     dead. Planted, it drains 10% a second.
 //   - held, the power drains 2.5% a second (40 s).
 // The Panzersoldat isn't lifted: a slam does it 1500 damage. Kills are the player's (points as usual), cause 'operator'.
+import { ViewWeapon, loadModel } from '../../animation.js';
+import { disposeSkeletons } from '../../runtime-assets.js';
+
 export function setupRagnarok(api,operator){
-  const {scene,viewScene,enemies,player,camera,audio,session}=api;
+  const {scene,viewScene,enemies,player,camera,audio,session,data}=api;
+  // the BO3 model's def (mods/bo3-weapons/weapons.json `operator.ragnarok`), its models warmed into the loader cache
+  let REAL=null;
+  fetch(new URL('../bo3-weapons/weapons.json',import.meta.url)).then(r=>r.ok?r.json():null).then(j=>{
+    REAL=j?.operator?.ragnarok??null;if(REAL)for(const u of [REAL.model,REAL.prop,REAL.handsModel])loadModel(u).catch(()=>{});
+  }).catch(()=>{});
+  // the canisters: BO3 draws their 115 fill (blob_115_bubbles, a blank white colour slot) with an effect shader and the
+  // glass over it see-through; here the fill glows 115 blue and the glass is tinted and translucent
+  const styled=new WeakSet();
+  function style115(root){root.traverse(o=>{for(const m of [o.material].flat()){if(!m||styled.has(m))continue;
+    if(/blob_115/.test(m.name)){m.color?.set(0x0a2a3a);m.emissive?.set(0x3fc8ff);m.emissiveIntensity=2.2;m.transparent=true;m.opacity=.9;styled.add(m);}
+    else if(/talon_spikes_glass/.test(m.name)){m.transparent=true;m.opacity=.35;m.depthWrite=false;m.color?.multiplyScalar(.8);styled.add(m);}}});}
   const KILL=200,KILL_AIR=300,FIELD=220;
   operator.register({id:'ragnarok',name:'Ragnarok DG-4',short:'RAGNAROK',color:'#5fb8ff',kills:60,drain:.025,
     icon:'M6 2l3 13M18 2l-3 13M6 15h6M12 15h6M9 15v6M15 15v6',activate});
@@ -28,20 +45,31 @@ export function setupRagnarok(api,operator){
     // ---- first person: one spike in each fist
     const held=new THREE.Group(),L=spike(),Rt=spike();L.position.set(-9,0,0);Rt.position.set(9,0,0);L.rotation.set(.32,.1,.25);Rt.rotation.set(.32,-.1,-.25);held.add(L,Rt);   // blades forward and up, fists low at the sides
     const REST=new THREE.Vector3(0,-11,-14);held.position.copy(REST).add(new THREE.Vector3(0,-30,0));viewScene?.add(held);
-    let t=0,slam=null,planted=null;
+    // the real one: its own ViewWeapon (the engine's stays hidden while an operator weapon is out)
+    const def=REAL;let vw=null,ended=false;
+    if(def&&viewScene){
+      held.visible=false;vw=new ViewWeapon(viewScene,data,()=>{});
+      vw.equip(def).then(()=>{if(ended){dropView();return;}style115(vw.root);if(planted)vw.pivot.visible=false;}).catch(e=>{console.warn('[ragnarok] model',e);dropView();held.visible=!planted;});
+    }
+    function dropView(){if(!vw)return;vw.pivot.removeFromParent();if(vw.root)disposeSkeletons(vw.root);vw=null;}
+    const real=()=>vw?.ready;
+    const play=(key,mode='fire')=>{if(!real()||!vw.rig.actions[key])return false;vw.mode=mode;vw.rig.play(key,false,1,.04);return true;};
+    const lastCam=camera.position.clone();
+    let t=0,slam=null,planted=null,planting=0;
     audio.play('buy',.5);
 
     // ---- slam
     function fire(down){
       if(!down)return;
       if(planted){pickUp();return;}
-      if(slam)return;
-      slam={t:0,hit:false,air:!player.grounded};
+      if(slam||planting)return;
+      // BO3's slam: slam_in drives the spikes down (the hit lands as it ends), slam_out pulls them back up
+      const d=def?.durations??{};slam={t:0,hit:false,air:!player.grounded,real:play('slamInAnim'),hitAt:Math.min(.55,(d.slamInAnim??.6)*.9),inEnd:d.slamInAnim??.6,outEnd:(d.slamInAnim??.6)+(d.slamOutAnim??.7)};
     }
     function aim(down){
-      if(!down||slam)return;
+      if(!down||slam||planting)return;
       if(planted){pickUp();return;}
-      plant();
+      if(play('plantAnim'))planting=Math.min(.6,(def.durations?.plantAnim??.67)*.85);else plant();   // the spikes leave the hands near the clip's end
     }
     function impact(air){
       const at=player.getFeetPosition(),r=air?KILL_AIR:KILL;
@@ -60,14 +88,21 @@ export function setupRagnarok(api,operator){
       const f=camera.getWorldDirection(new THREE.Vector3());f.y=0;f.normalize();
       const at=player.getFeetPosition().addScaledVector(f,60);
       const g=new THREE.Group();g.position.copy(at);
-      const s1=spike(),s2=spike();for(const [s,x] of [[s1,-16],[s2,16]]){s.rotation.x=-Math.PI/2;s.position.set(x,22,0);s.scale.setScalar(1.3);g.add(s);}   // driven point-first into the floor, grips up
+      if(def?.prop){   // BO3's planted pair: sized to its 30 in (the GLB is in BO3's centimetres) and driven a little into the floor
+        g.rotation.y=Math.atan2(f.x,f.z);
+        loadModel(def.prop).then(m=>{if(!m||planted?.g!==g){if(m)disposeSkeletons(m);return;}
+          const b=new THREE.Box3().setFromObject(m),h=b.max.y-b.min.y;if(h>50)m.scale.setScalar(1/2.54);
+          const b2=new THREE.Box3().setFromObject(m);m.position.y=-b2.min.y-6;m.traverse(o=>{o.frustumCulled=false;});style115(m);g.add(m);planted.prop=m;}).catch(()=>{});
+      }else{
+        const s1=spike(),s2=spike();for(const [s,x] of [[s1,-16],[s2,16]]){s.rotation.x=-Math.PI/2;s.position.set(x,22,0);s.scale.setScalar(1.3);g.add(s);}   // driven point-first into the floor, grips up
+      }
       // the field: a ring on the floor and a low wall of light streaks that fades upward (a solid cylinder washed the
       // whole view blue from inside)
       const fieldMat=new THREE.MeshBasicMaterial({color:0x5fb8ff,map:fieldTex(),transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
       const col=new THREE.Mesh(new THREE.CylinderGeometry(FIELD,FIELD,110,48,1,true),fieldMat);col.position.y=55;g.add(col);
       const ring=new THREE.Mesh(new THREE.RingGeometry(FIELD-6,FIELD,64),new THREE.MeshBasicMaterial({color:0x5fb8ff,transparent:true,opacity:.6,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=2;g.add(ring);
       const light=glowAt(at.clone().add(up.clone().multiplyScalar(60)),0x5fb8ff,3,FIELD*2.2);
-      scene.add(g);held.visible=false;audio.play('buy',.6);
+      scene.add(g);held.visible=false;if(vw)vw.pivot.visible=false;audio.play('buy',.6);
       planted={g,col,ring,at,light,lifted:new Map(),t:0};
     }
     function lift(z){
@@ -82,8 +117,9 @@ export function setupRagnarok(api,operator){
         z.ai=prev;if(!enemies.list.includes(z))continue;
         z.root.position.copy(base);enemies.hurt(z,1e9,false,false,'operator');
       }
+      if(p.prop){p.prop.removeFromParent();disposeSkeletons(p.prop);}   // the loader's shared materials stay
       unglow(p.light);p.g.removeFromParent();p.g.traverse(o=>{o.geometry?.dispose();if(o.material&&o.material!==metal&&o.material!==glow){o.material.map?.dispose();o.material.dispose();}});
-      held.visible=true;held.position.copy(REST).add(new THREE.Vector3(0,-20,0));
+      if(vw){vw.pivot.visible=true;play('raiseAnim','raise');}else{held.visible=true;held.position.copy(REST).add(new THREE.Vector3(0,-20,0));}
     }
 
     // streaks for the field's wall: vertical lines rising (offset scrolls), fading toward the top
@@ -110,7 +146,17 @@ export function setupRagnarok(api,operator){
       // held spikes: raise in, idle sway, the slam's wind-up and strike
       const rest=REST.clone().add(new THREE.Vector3(0,Math.sin(t*2)*.4,0));
       held.position.lerp(rest,Math.min(1,dt*10));
-      if(slam){
+      if(vw?.ready){
+        const moved=camera.position.distanceTo(lastCam)/Math.max(dt,1e-3);lastCam.copy(camera.position);
+        const sprint=!!api.view?.input?.sprint&&!slam&&!planting;
+        vw.update(dt,{moving:moved>20,sprint,ads:false,time:session.time});
+        if(slam?.real&&slam.t>=slam.inEnd&&vw.rig.current==='slamInAnim')play('slamOutAnim');
+      }
+      if(planting){planting=Math.max(0,planting-dt);if(!planting)plant();}
+      if(slam?.real){
+        slam.t+=dt;if(slam.t>=slam.hitAt&&!slam.hit){slam.hit=true;impact(slam.air||!player.grounded);}
+        if(slam.t>=slam.outEnd)slam=null;
+      }else if(slam){
         slam.t+=dt;const s=slam.t;
         if(s<.16){held.position.y=REST.y+s/.16*9;held.rotation.x=s/.16*.7;}
         else if(s<.3){const k=(s-.16)/.14;held.position.y=REST.y+9-k*19;held.rotation.x=.7-k*1.6;}
@@ -129,6 +175,7 @@ export function setupRagnarok(api,operator){
         if(k>=1){f.m.removeFromParent();f.m.geometry.dispose();f.m.material.dispose();unglow(f.l);fx.splice(i,1);}}
     }
     function end(){
+      ended=true;dropView();
       if(planted)pickUp();
       held.removeFromParent();held.traverse(o=>o.geometry?.dispose());
       // the shockwaves finish on their own

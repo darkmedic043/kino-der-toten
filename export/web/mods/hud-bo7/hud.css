@@ -117,3 +117,4 @@ body.bo7-hud #moon-hud #equipment{right:420px;bottom:40px}
 #bo7-round.text .lbl{display:none}
 #bo7-round.text .n{font:600 13px/1.3 var(--bo7-font);letter-spacing:2px;color:var(--bo7-text);text-shadow:0 1px 3px #000c}
 #bo7-left .lv[data-p]{white-space:nowrap;padding:0 5px}#bo7-left .lv[data-p]::before{content:'P' attr(data-p) '·';font-size:9px;opacity:.85}
+#bo7-right.op .ammo{visibility:hidden}   /* an operator weapon is out (operator-weapons): the gun's ammo means nothing */

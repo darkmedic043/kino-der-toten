@@ -956,6 +956,9 @@ if BSP == 'zm_castle':
         place_model('CASTLE_FLINGER_' + flag, m['model'], m['origin'], m.get('angles'),
                     {'flag': flag, 'path': path, 'speeds': speeds, 'volume': g(vec(vol['origin'])).tolist() if vol else g(vec(m['origin'])).tolist()})
         place_model('CASTLE_FLINGERON_' + flag, m['model'] + '_blue', m['origin'], m.get('angles'), hidden=True)
+        # the Wundersphere's shell (p7_zm_ctl_jumpsphere_snow: the domed housing over the pad, 194 x 210 x 139, origin at
+        # its base like the pad's) isn't in the map data we dump; it stands on every launch pad (user: "missing the shell")
+        place_model('CASTLE_FLINGERSHELL_' + flag, 'p7_zm_ctl_jumpsphere_snow', m['origin'], m.get('angles'))
         count('FLINGER')
 
 print('window openings (bottom, top, width):', openings)

@@ -83,12 +83,12 @@ export default async function setup(api){
   let t=0,last='';
   host.on('update',dt=>{
     if((t-=dt)<=0){t=.5;place();}
-    const w=session.weapon,def=w&&!session.weaponUnavailable?session.def:null;
+    const op=!!window.kino.operator?.active,w=session.weapon,def=w&&!session.weaponUnavailable&&!op?session.def:null;   // operator weapon out: no gun
     showGun(def?w.id:null);
     const frac=def?.clipSize?Math.max(0,Math.min(1,w.mag/def.clipSize)):0;
     const lv=($('progression-hud')?.querySelector('.lvl')?.textContent??'').replace(/\D+/g,''),nm=$('hud-portrait')?.querySelector('span')?.textContent??'';
     const rt=$('round')?.textContent??'',rn=/^I+$/.test(rt)?String(rt.length):rt;   // BO1 tallies (I–IIIII) shown as digits
-    const key=[Math.ceil(session.health),frac.toFixed(3),lv,nm,rn,w?.upgraded].join('|');if(key===last)return;last=key;
+    const key=[Math.ceil(session.health),frac.toFixed(3),lv,nm,rn,w?.upgraded,op].join('|');if(key===last)return;last=key;right.classList.toggle('op',op);
     q(left,'.hp b').textContent=Math.ceil(session.health);q(left,'.lv').textContent=lv;q(left,'.nm').textContent=nm;
     left.classList.toggle('low',session.health<session.maxHealth*.35);
     q(right,'.mag').setAttribute('d',frac>0?arc(ARC0,ARC0+(ARC1-ARC0)*frac):'');right.classList.toggle('empty',def&&w.mag===0);

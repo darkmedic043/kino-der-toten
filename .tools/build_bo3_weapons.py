@@ -378,5 +378,23 @@ for w in MODW:
     modsounds[w['id']] = {'shots': [k for k in map(snd, w['shots']) if k], 'last': [k for k in map(snd, w.get('last', [])) if k],
                           'notes': {n: k for n in sorted(notes) if (k := snd(n[6:]) or snd(n[6:]+'_r') or snd(NOTE_ALIAS.get(n[6:], '')))}}
     print(w['id'], 'anims', len(A2), 'sounds', len(modsounds[w['id']]['shots']), '+', len(modsounds[w['id']]['notes']), 'notes of', len(notes))
-(MOD/'weapons.json').write_text(json.dumps({'weapons': weapons, 'sounds': {'dg2': sounds, 'mod': modsounds, 'audio': audio_keys}, 'fx': fx}, indent=1))
+# ---- operator weapons (mods/operator-weapons), not guns: the Ragnarok DG-4 (BO3's talon spikes, exported from
+# zm_castle with its vm_talon_spike_* clips) on the same arms, as a def for its own ViewWeapon, plus the planted prop
+operator = {}
+if (SRC/'xmodels'/'wpn_zmb_dlc1_talon_spikes_view').exists():
+    rv, rm = model('wpn_zmb_dlc1_talon_spikes_view', 'ragnarok_view', RENAME)
+    rp = model('wpn_zmb_dlc1_talon_spikes_prop', 'ragnarok_prop', light=True)[0]
+    rb = {b['name']: b['lpos'] for b in rm['bones'] if 'lpos' in b and b['parent'] >= 0}
+    RA, RT = {}, {}
+    for key, name, loop in [('idleAnim', 'idle', True), ('raiseAnim', 'raise', False), ('firstRaiseAnim', 'first_raise', False), ('dropAnim', 'putaway', False),
+                            ('slamInAnim', 'slam_in', False), ('slamOutAnim', 'slam_out', False), ('plantAnim', 'plant', False), ('swipeAnim', 'melee_swipe', False),
+                            ('sprintInAnim', 'sprint_in', False), ('sprintLoopAnim', 'sprint_loop', True), ('sprintOutAnim', 'sprint_out', False), ('adsUpAnim', 'ads_up', False)]:
+        n = 'vm_talon_spike_' + name
+        if (SRC/'xanims'/(n+'.seanim')).exists(): RA[key], RT[key] = animation(n, rb, loop)
+    operator['ragnarok'] = {'id': 'ragnarok', 'model': rv, 'prop': rp, 'handsModel': hands, 'animations': RA, 'durations': RT,
+                            'raiseTime': RT.get('raiseAnim', .5), 'dropTime': RT.get('dropAnim', .5), 'sprintInTime': RT.get('sprintInAnim', .2),
+                            'sprintLoopTime': RT.get('sprintLoopAnim', .6), 'sprintOutTime': RT.get('sprintOutAnim', .2), 'adsInTime': .25, 'adsOutTime': .25,
+                            'viewOffset': [3, -4, 0], 'sprintOffset': [0, 0, 0], 'sprintRotation': [0, 0, 0], 'hideTags': []}
+    print('ragnarok anims', len(RA))
+(MOD/'weapons.json').write_text(json.dumps({'weapons': weapons, 'sounds': {'dg2': sounds, 'mod': modsounds, 'audio': audio_keys}, 'fx': fx, 'operator': operator}, indent=1))
 print('wrote', MOD/'weapons.json')

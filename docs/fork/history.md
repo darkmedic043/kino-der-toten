@@ -242,3 +242,4 @@
 - 2026-10-16: Der Eisendrache traps (Death Ray, masher, rocket test fire); level textures 512 px and 2048 px HD weapon textures dropped for video memory (waw-ports.md, performance.md).
 - 2026-10-16: Operator weapons: a second ability slot with its own meter (Y), the Ragnarok DG-4 first (stand-in visuals); BO7 HUD bubbles joined to the weapon dial (gameplay.md).
 - 2026-10-16: research costs ×3 (150,000 per item), class skills need twice the kills to charge, the Ragnarok 60 kills (research.md, classes.md, gameplay.md).
+- 2026-10-16: Ragnarok DG-4 uses BO3's model and clips; Wundersphere shells on Der Eisendrache's launch pads (gameplay.md, waw-ports.md).
