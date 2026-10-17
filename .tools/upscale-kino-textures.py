@@ -43,7 +43,9 @@ if WEAPONS:
                 if d.get(k) and (ROOT / d[k]).exists(): files.update(glb_images(ROOT / d[k]))
     uris = sorted(os.path.relpath(f, ROOT) for f in files if os.path.exists(f))
     OUT = ROOT / 'textures/hd-weapons'; OUT.mkdir(exist_ok=True)
-    TABLE, MAXSIZE = ROOT / 'mods/hd-weapons/hd.json', 1024
+    # up to 512 px: a 1024 px original made a 2048 px copy (22 MB of video memory each), and with the box's world
+    # models those filled ~770 MB on every map, enough to lose the WebGL context on a 6 GB card (Der Eisendrache)
+    TABLE, MAXSIZE = ROOT / 'mods/hd-weapons/hd.json', 512
 else:
     uris = None; TABLE, MAXSIZE = ROOT / 'mods/map-materials/hd.json', 512
 

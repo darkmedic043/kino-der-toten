@@ -239,3 +239,4 @@
 - 2026-10-16: Der Eisendrache Panzersoldat (BO3 model and animations; enemies.js z.ai and z.hit hooks) (waw-ports.md).
 - 2026-10-16: Der Eisendrache: Der Wunderfizz (waw-ports.md).
 - 2026-10-16: Der Eisendrache dragon heads animated, eat the corpses (waw-ports.md).
+- 2026-10-16: Der Eisendrache traps (Death Ray, masher, rocket test fire); level textures 512 px and 2048 px HD weapon textures dropped for video memory (waw-ports.md, performance.md).

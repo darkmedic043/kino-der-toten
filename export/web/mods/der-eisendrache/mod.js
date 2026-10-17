@@ -86,10 +86,10 @@ export default async function setup(api) {
       }));
     });
   }
-  const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api);
+  const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api), traps = setupTraps(api);
   setupRocketPad(api); setupDogRounds(api);
   await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
-  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz };
+  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz, traps };
 }
 
 // ---- BO3 fxanim rigs (CASTLE_<name> from the builder's fxanim_rig): bones carry extras.anims[key] = {rot, loc} runs,
@@ -789,4 +789,95 @@ function setupFizz(api) {
   });
   host.on('reset', pickStart);
   return { state: () => ({ at: st.at, uses: st.uses, left: st.left, spin: st.spin ? { perk: st.spin.perk.id, ready: st.spin.ready } : null, machines: machines.length }) };
+}
+
+// ---- Traps.
+//   Death Ray (zm_castle_death_ray_trap.gsc): the lever on the rooftop (CASTLE_DEATHRAY), 1000, power. For 15 s the two
+//   Tesla coils (CASTLE_BOLT_<n>) strike every zombie in the coil zone (CASTLE_TESLAZONE, ~380 x 130 around it): killed
+//   by lightning; a player in the zone loses a quarter of their max health every 2 s. Cooldown 60 s or to the round's end.
+//   Masher (zm_castle_masher_trap.gsc): three buttons (CASTLE_MASHBTN_<n>), 1500, power and the masher gate bought (the
+//   gatehouse door: connect_gatehouse_to_lowercourtyard). For 20 s the gate slams down (116 in 0.25 s, back up, 0.25 s
+//   pause), crushing whatever is under it (CASTLE_MASHZONE). Cooldown 60 s.
+//   Rocket test fire (zm_castle_rocket_trap.gsc): not bought. 60 s after the teleporter is first used, then every 30-240
+//   s (later 90-300): 7 s of warning, 3 s more, then 20 s of exhaust that kills anything on the pad (CASTLE_ROCKETBLAST,
+//   radius 430, and the ring of CASTLE_ROCKETFLAME_ vents); the teleporter is locked meanwhile.
+function setupTraps(api) {
+  const { world, session, host, scene, enemies, player, toast, announce, audio, damage } = api, root = world.root;
+  const at = n => { const o = root.getObjectByName(n); return o ? o.getWorldPosition(new THREE.Vector3()) : null; };
+  const fx = [];
+  const boltMat = new THREE.LineBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: .95, blending: THREE.AdditiveBlending });
+  function bolt(a, b) {   // a jagged lightning line, gone in a tenth of a second
+    const pts = [a.clone()], n = 9;
+    for (let i = 1; i < n; i++) { const t = i / n; pts.push(a.clone().lerp(b, t).add(new THREE.Vector3((Math.random() - .5) * 40, (Math.random() - .5) * 40, (Math.random() - .5) * 40))); }
+    pts.push(b.clone()); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), boltMat); scene.add(l); fx.push({ o: l, life: .1 });
+  }
+  const flameMat = new THREE.SpriteMaterial({ color: 0xff8a2a, transparent: true, opacity: .85, blending: THREE.AdditiveBlending, depthWrite: false });
+  const feet = () => player.getFeetPosition();
+  // Death Ray
+  const lever = at('CASTLE_DEATHRAY'), zone = at('CASTLE_TESLAZONE'), bolts = [at('CASTLE_BOLT_0'), at('CASTLE_BOLT_1')].filter(Boolean);
+  const ray = { on: 0, cool: 0, hurtAt: 0 };
+  const inTesla = p => zone && Math.abs(p.x - zone.x) < 380 && Math.abs(p.z - zone.z) < 130 && p.y > zone.y - 140 && p.y < zone.y + 160;
+  if (lever && zone && bolts.length) world.addInteraction({
+    position: lever, text: () => !session.power ? 'The power must be activated' : ray.on > session.time ? '' : ray.cool > session.time ? 'The Death Ray is cooling down' : 'Activate the Death Ray · 1000',
+    use() { if (!session.power || ray.on > session.time || ray.cool > session.time) return false; if (session.points < 1000) { toast?.('Not enough points', 2); return false; }
+      session.points -= 1000; ray.on = session.time + 15; ray.cool = ray.on + 60; audio?.play?.('buy'); announce?.('DEATH RAY', '', 2); return true; },
+  });
+  host.on('roundEnd', () => { if (ray.on < session.time) ray.cool = 0; });
+  // Masher
+  const btns = []; root.traverse(o => { if (/^CASTLE_MASHBTN_\d+$/.test(o.name)) btns.push(o.getWorldPosition(new THREE.Vector3())); });
+  const mashZone = at('CASTLE_MASHZONE'), mashDoor = [...world.doors.values()].find(d => /connectgatehousetolowercourtyard/.test(d.name));
+  const mash = { on: 0, cool: 0, t: 0 };
+  const gate = mashDoor?.parts?.[0]?.slides?.[0];
+  for (const b of btns) world.addInteraction({
+    position: b, text: () => !session.power ? 'The power must be activated' : !(mashDoor && world.isOpen(mashDoor, session)) ? 'Open the gate to use the masher' : mash.on > session.time ? '' : mash.cool > session.time ? 'The masher is cooling down' : 'Activate the masher · 1500',
+    use() { if (!session.power || !(mashDoor && world.isOpen(mashDoor, session)) || mash.on > session.time || mash.cool > session.time) return false;
+      if (session.points < 1500) { toast?.('Not enough points', 2); return false; }
+      session.points -= 1500; mash.on = session.time + 20; mash.cool = mash.on + 60; mash.t = 0; audio?.play?.('buy'); return true; },
+  });
+  // Rocket test fire
+  const blast = at('CASTLE_ROCKETBLAST'), vents = []; root.traverse(o => { if (/^CASTLE_ROCKETFLAME_\d+$/.test(o.name)) vents.push(o.getWorldPosition(new THREE.Vector3())); });
+  const rocket = { armed: null, next: null, phase: null, t0: 0 }, tp = world.teleporters?.find(t => t.name === 'rocketpad');
+  const rocketLight = new THREE.PointLight(0xff7a2a, 0, 1600, 1.4); if (blast) { rocketLight.position.copy(blast).add(new THREE.Vector3(0, 200, 0)); scene.add(rocketLight); }
+  const onPad = p => blast && (Math.hypot(p.x - blast.x, p.z - blast.z) < 430 || vents.some(v => Math.hypot(p.x - v.x, p.z - v.z) < 90)) && Math.abs(p.y - blast.y) < 260;
+  let zap = 0;
+  host.on('update', dt => {
+    dt = dt || 1 / 60; const now = session.time;
+    for (const f of [...fx]) { f.life -= dt; if (f.v) { f.o.position.addScaledVector(f.v, dt); f.o.scale.setScalar(f.o.scale.x + 120 * dt); f.o.material.opacity = Math.max(0, f.life / .7) * .85; } if (f.life <= 0) { f.o.removeFromParent(); fx.splice(fx.indexOf(f), 1); } }
+    // death ray
+    if (ray.on > now) {
+      zap -= dt;
+      if (zap <= 0) { zap = .12;
+        for (const z of [...enemies.list]) { const p = z.root.position; if (!inTesla(p)) continue; const src = bolts[Math.floor(Math.random() * bolts.length)]; bolt(src, p.clone().add(new THREE.Vector3(0, 45, 0))); enemies.hurt(z, z.kind === 'panzer' ? 2000 : 1e9, false, false, 'electric'); }
+        if (Math.random() < .5) bolt(bolts[0], bolts[bolts.length - 1]);
+      }
+      const f = feet(); if (inTesla(f) && now - ray.hurtAt > 2) { ray.hurtAt = now; bolt(bolts[0], f.clone().add(new THREE.Vector3(0, 40, 0))); damage(session.maxHealth / 4); audio?.play?.('teslaHit'); }
+    }
+    // masher: down 0.25 s, up 0.25 s, 0.25 s pause
+    if (gate && mash.on > now) {
+      mash.t = (mash.t + dt) % .75; const k = mash.t < .25 ? mash.t / .25 : mash.t < .5 ? 1 - (mash.t - .25) / .25 : 0;
+      mashDoor.parts[0].object.visible = gate.object.visible = true; gate.object.position.copy(gate.base).addScaledVector(gate.move, 1 - k); gate.object.updateMatrixWorld(true);
+      if (k > .85 && mashZone) {
+        for (const z of [...enemies.list]) { const p = z.root.position; if (Math.abs(p.x - mashZone.x) < 70 && Math.abs(p.z - mashZone.z) < 45 && Math.abs(p.y - (mashZone.y - 90)) < 120) enemies.hurt(z, z.kind === 'panzer' ? 3000 : 1e9, false, false, 'explosion'); }
+        const f = feet(); if (Math.abs(f.x - mashZone.x) < 60 && Math.abs(f.z - mashZone.z) < 35 && Math.abs(f.y - (mashZone.y - 90)) < 100) damage(session.maxHealth);
+      }
+    } else if (gate && mash.on && mash.on <= now) { gate.object.position.copy(gate.base).add(gate.move); gate.object.updateMatrixWorld(true); mashDoor.parts[0].object.visible = false; mash.on = 0; }
+    // rocket
+    if (!blast) return;
+    if (rocket.next == null && session.flags.has('castle:flag:castleteleporterused')) rocket.next = now + 60 + 30 + Math.random() * 210;
+    if (rocket.phase == null && rocket.next != null && now >= rocket.next) { rocket.phase = 'warn'; rocket.t0 = now; if (tp) tp.locked = true; announce?.('ROCKET TEST FIRE', 'CLEAR THE LAUNCH PAD', 4); audio?.play?.('dog_round', .6); }
+    if (rocket.phase) {
+      const t = now - rocket.t0;
+      rocket.phase = t >= 10 ? 'fire' : 'warn';
+      if (t >= 10 && t < 30) {
+        rocketLight.intensity = 9000 + Math.random() * 3000;
+        if (Math.random() < .7) for (const v of [blast, ...vents]) { const sp = new THREE.Sprite(flameMat); sp.position.copy(v).add(new THREE.Vector3((Math.random() - .5) * 60, 20, (Math.random() - .5) * 60)); sp.scale.setScalar(70); scene.add(sp); fx.push({ o: sp, v: new THREE.Vector3((Math.random() - .5) * 60, 260 + Math.random() * 200, (Math.random() - .5) * 60), life: .7 }); }
+        for (const z of [...enemies.list]) if (onPad(z.root.position)) enemies.hurt(z, z.kind === 'panzer' ? 1500 * dt : 1e9, false, false, 'fire');
+        if (onPad(feet())) damage(session.maxHealth * 2 * dt);
+      } else rocketLight.intensity = 0;
+      if (t >= 30) { rocket.phase = null; rocket.next = now + 90 + Math.random() * 210; if (tp) tp.locked = false; }
+    }
+  });
+  host.on('reset', () => { ray.on = ray.cool = 0; mash.on = mash.cool = 0; rocket.next = rocket.phase = null; rocketLight.intensity = 0; if (tp) tp.locked = false; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
+  return { state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase } }),
+    fireRocket: () => { rocket.next = session.time; } };
 }

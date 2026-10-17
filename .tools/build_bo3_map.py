@@ -922,6 +922,17 @@ if BSP == 'zm_castle':
         if e.get('classname') == 'zbarrier_zmcore_perk_random_machine':
             place_model(f'CASTLE_FIZZ_{k}', 'p7_zm_vending_wonder', e['origin'], e.get('angles'), {'start': e.get('script_noteworthy') == 'start_perk_random_machine', 'yaw': math.radians(vec(e.get('angles'))[1])}); k += 1
     count('FIZZ')
+    # Traps (zm_castle_death_ray_trap.gsc, zm_castle_masher_trap.gsc, zm_castle_rocket_trap.gsc)
+    for tn, nm in (('tesla_coil_activate', 'CASTLE_DEATHRAY'), ('tesla_coil_zone', 'CASTLE_TESLAZONE'), ('rocket_trap_blast_damage_vol', 'CASTLE_ROCKETBLAST'),
+                   ('rocket_trap_side_blast_damage_vol', 'CASTLE_ROCKETSIDE'), ('pf9382_auto5', 'CASTLE_MASHZONE')):
+        x = one(tn)
+        if x: add_node({'name': nm, 'translation': g(vec(x['origin'])).tolist()})
+    for k, tn in enumerate(('bolt_source_1', 'bolt_source_2')):
+        x = one(tn)
+        if x: add_node({'name': f'CASTLE_BOLT_{k}', 'translation': g(vec(x['origin'])).tolist()})
+    for k, x in enumerate(by_tn.get('s_masher_button', [])): add_node({'name': f'CASTLE_MASHBTN_{k}', 'translation': g(vec(x['origin'])).tolist()})
+    for k, x in enumerate(by_tn.get('rocket_trap_side_blast', [])): add_node({'name': f'CASTLE_ROCKETFLAME_{k}', 'translation': g(vec(x['origin'])).tolist(), 'extras': {'yaw': math.radians(vec(x.get('angles'))[1])}})
+    count('TRAPS')
     # Panzersoldat spawn points (zm_castle_mechz.gsc: a random mechz_location in an active zone)
     k = 0
     for e in ents:
