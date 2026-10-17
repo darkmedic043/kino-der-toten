@@ -10,7 +10,8 @@ const b=await chromium.launch({executablePath:process.env.HOME+'/.cache/ms-playw
   args:['--use-angle=vulkan','--enable-gpu','--ignore-gpu-blocklist','--disable-gpu-vsync','--disable-frame-rate-limit']});
 const p=await b.newPage({viewport:{width:1600,height:900}});const errs=[];p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://127.0.0.1:5190/');
-await p.evaluate(q=>{const s=JSON.parse(localStorage.getItem('kino.settings')||'{}');s.graphics={low:0,medium:1,high:2,ultra:3}[q];localStorage.setItem('kino.settings',JSON.stringify(s));},quality);
+// RS=0.5 (env): render scale, to take the GPU out of a CPU comparison (a fast GPU's view of the frame)
+await p.evaluate(([q,rs])=>{const s=JSON.parse(localStorage.getItem('kino.settings')||'{}');s.graphics={low:0,medium:1,high:2,ultra:3}[q];if(rs)s.renderScale=rs;else delete s.renderScale;localStorage.setItem('kino.settings',JSON.stringify(s));},[quality,+process.env.RS||0]);
 const t0=Date.now();await p.goto(`http://127.0.0.1:5190/play.html?map=${map}${query}`);   // query: A/B switches, e.g. '&noBatch'
 await p.waitForFunction(()=>window.kino?.debug?.getState?.().ready,null,{timeout:600000});const load=(Date.now()-t0)/1000;
 await p.evaluate(()=>{kino.debug.setActive(true);kino.debug.setInvulnerable?.(true);kino.mods.api.session.round=1;

@@ -116,7 +116,9 @@
       "machines": "bo3",
       "fog": 0.00022,
       "mergeStatic": true,
-      "mergeExclude": "^GIANT_"
+      "mergeExclude": "^GIANT_",
+      "textureArrays": 512,
+      "batchMeshes": true
     },
     {
       "id": "der-eisendrache",
@@ -137,6 +139,7 @@
       "mergeStatic": true,
       "mergeExclude": "^CASTLE_",
       "textureArrays": 256,
+      "batchMeshes": true,
       "instanceCullPixels": 6
     }
   ]

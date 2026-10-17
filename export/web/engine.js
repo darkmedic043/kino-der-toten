@@ -440,10 +440,13 @@ try{
     // or material names mods change later. The HD map textures go in first (map-materials, awaited up to 30 s).
     // (?textureArrays=N, ?batchMeshes, ?batchExclude=re override the map entry, for testing)
     const opt=k=>perfOff.has(k)?perfOff.get(k)||true:entry[k];
-    const arrays=perfOff.has('noArrays')?0:+(opt('textureArrays')||0),batchMeshes=!!opt('batchMeshes'),skip=opt('batchExclude')?new RegExp(opt('batchExclude')):null;
+    const arrays=perfOff.has('noArrays')?0:+(opt('textureArrays')||0),batchMeshes=!!opt('batchMeshes'),skipRe=opt('batchExclude')??entry.mergeExclude,skip=skipRe?new RegExp(skipRe):null;
+    // a plain mesh stays out like scene-merge's: under a custom-world marker (doors, movers, traps, risers), noMerge, or
+    // an excluded name on it, an ancestor or its material; instanced meshes keep the old rule (noCull only)
+    const keep=o=>{if(o.isInstancedMesh)return false;for(let p=o;p;p=p.parent){if(p.userData.marker||p.userData.noMerge||skip&&skip.test(p.name))return true;}return !!skip&&[o.material].flat().some(m=>skip.test(m?.name??''));};
     if(arrays&&batchMeshes)await Promise.race([globalThis.kino?.hdMaps,new Promise(r=>setTimeout(r,30000))]).catch(()=>{});
     instanceCull=await createInstanceCuller(world.root??world.mapRoot??scene,{target:scene,renderer,arrays,meshes:batchMeshes,
-      exclude:o=>o.userData.noCull||!!skip&&(skip.test(o.name)||[o.material].flat().some(m=>skip.test(m?.name??'')))});globalThis.kino.instanceCull=instanceCull;
+      exclude:o=>o.userData.noCull||keep(o)});globalThis.kino.instanceCull=instanceCull;
     if(instanceCull.meshes){console.info('[instance-cull]',instanceCull.sources,'meshes into',instanceCull.meshes,'batches,',instanceCull.instances,'instances in',instanceCull.buildMs,'ms');
       await paint();await renderer.compileAsync(scene,camera).catch(()=>{});}   // batched props need their own shader variants: compile them behind the loading screen
   }

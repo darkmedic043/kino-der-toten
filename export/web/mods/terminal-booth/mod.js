@@ -20,6 +20,26 @@ const BASE=new URL('./',import.meta.url).href;
 const LIVE=/^wire_(cab|jb|span2|side1|cut)/;
 const WIRE_COLOR={wire_red:'#ff3a22',wire_yellow:'#ffc21f',wire_blue:'#3f8cff',wire_green:'#39ff6a',wire_white:'#9fc4ff'};
 
+// Several booths on a map (Der Eisendrache: 8, ~400 draws a frame): the parts every booth shares (same geometry and
+// material; the screens, glass, coolant, LEDs and live wires get per-booth materials in build()) become one
+// InstancedMesh per part, so all the booths together cost one draw per part. Booths never move once placed. The
+// originals stay in each booth, hidden, so code that looks parts up by name still finds them. (2026-10-17)
+function instanceShared(booths,scene){
+  if(booths.length<2)return;
+  const groups=new Map();
+  for(const b of booths){b.root.updateMatrixWorld(true);b.root.traverse(o=>{
+    if(!o.isMesh||!o.visible||o.isSkinnedMesh||o.isInstancedMesh||Array.isArray(o.material)||o.material.transparent)return;
+    const k=o.geometry.uuid+'|'+o.material.uuid;let g=groups.get(k);if(!g)groups.set(k,g=[]);g.push(o);});}
+  for(const list of groups.values()){
+    if(list.length<2)continue;const first=list[0];
+    const im=new THREE.InstancedMesh(first.geometry,first.material,list.length);
+    list.forEach((o,i)=>im.setMatrixAt(i,o.matrixWorld));im.instanceMatrix.needsUpdate=true;im.computeBoundingSphere();
+    Object.assign(im,{name:'booths_'+first.name,castShadow:first.castShadow,receiveShadow:first.receiveShadow,renderOrder:first.renderOrder});
+    for(const o of list){o.visible=false;o.userData.instancedInto=im;}
+    scene.add(im);
+  }
+}
+
 export default async function setup(api){
   const cfg=await fetch(BASE+'placements.json').then(r=>r.json());
   const spots=cfg.maps[api.map?.id??'kino'];
@@ -33,6 +53,7 @@ export default async function setup(api){
   for(const b of booths)if(b.spot.clearDebris!==false)clearDebris(b);   // clearDebris:false where the floor itself is bumpy (The Giant's snow)
   window.kino.terminalBooth={booths};
   usePrompt(booths);
+  instanceShared(booths,scene);
   window.kino.lighting?.tag?.(scene);
 
   // ------------------------------------------------------------- placement
