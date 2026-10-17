@@ -244,3 +244,4 @@
 - 2026-10-16: research costs ×3 (150,000 per item), class skills need twice the kills to charge, the Ragnarok 60 kills (research.md, classes.md, gameplay.md).
 - 2026-10-16: Ragnarok DG-4 uses BO3's model and clips; Wundersphere shells on Der Eisendrache's launch pads (gameplay.md, waw-ports.md).
 - 2026-10-16: Der Eisendrache craftables (Ragnarok DG-4 parts from the Panzer, the Death Ray and the A10 switches; rocket shield parts) and BO3's rocket shield (block, bash, rocket dash, nitrous charges) (waw-ports.md).
+- 2026-10-16: Der Eisendrache low gravity in the undercroft: double jump, wall-running, floaters (waw-ports.md).
