@@ -10,7 +10,7 @@
 export function setupRagnarok(api,operator){
   const {scene,viewScene,enemies,player,camera,audio,session}=api;
   const KILL=200,KILL_AIR=300,FIELD=220;
-  operator.register({id:'ragnarok',name:'Ragnarok DG-4',short:'RAGNAROK',color:'#5fb8ff',kills:30,drain:.025,
+  operator.register({id:'ragnarok',name:'Ragnarok DG-4',short:'RAGNAROK',color:'#5fb8ff',kills:60,drain:.025,
     icon:'M6 2l3 13M18 2l-3 13M6 15h6M12 15h6M9 15v6M15 15v6',activate});
 
   function activate(ctx){

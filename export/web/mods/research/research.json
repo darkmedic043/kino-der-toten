@@ -1,16 +1,7 @@
 {
  "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Mule Kick and Shatter Blast aren't in BO7, so theirs are the fork's). Every perk and ammo mod has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle.",
  "unlockLevel": 11,
- "trackCost": [
-  2000,
-  3000,
-  4000,
-  5000,
-  6000,
-  8000,
-  10000,
-  12000
- ],
+ "trackCost": [6000, 9000, 12000, 15000, 18000, 24000, 30000, 36000],
  "xp": {
   "kill": 10,
   "headshot": 5,
