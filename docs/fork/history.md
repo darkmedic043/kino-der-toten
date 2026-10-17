@@ -255,3 +255,4 @@
 - 2026-10-17: KTX2 textures: everything under textures/ GPU-compressed (UASTC → BC7), Kino VRAM 3.4 → 1.2 GB (materials.md).
 - 2026-10-17: MelonTerm BANK.EXE (TranZit bank: 1,000,000-point vault build plus milestones, then 1,100 in per 1,000 banked, account-wide) and ARMORY.EXE (tabs; Ragnarok and rocket shield sold off Der Eisendrache once found there plus 250 kills); rocket shield moved into operator-weapons for every map (props.md).
 - 2026-10-17: Der Eisendrache: terminal booths at the eight gobblegum spots, Tab collectible tiles, the bow drawn as in BO3 (draw clips, no reload, charged shots cost arrows), animated spirit wolves and Skadi (waw-ports.md, props.md).
+- 2026-10-17: No Extended Mag on the bows (one-round weapons) (weapon-levels.md).

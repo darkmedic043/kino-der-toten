@@ -38,7 +38,10 @@ function ownAttachments(cat,def,id){
   if(!def)return [];
   // the gun's own attachment parts: its original hidden tags (applying attachments un-hides some)
   const hidden=new Set((pristine.get(def)?.hideTags)??def.hideTags??[]);
+  const oneRound=((pristine.get(def)?.clipSize)??def.clipSize)<=1;
   return cat.attachments.filter(a=>{
+    // one-round weapons (the bows, launchers) have no magazine to extend: a saved Extended Mag stops applying too
+    if(oneRound&&a.slot==='mag')return false;
     // guns with a built-in scope only take optics made to replace it
     if(a.slot==='optic'&&cat.builtInOptic.includes(id)!==!!a.builtIn)return false;
     // imported guns (mods/bo3-weapons): attachment models mounted on the gun's tags, and stat-only unlocks
