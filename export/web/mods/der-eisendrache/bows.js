@@ -32,7 +32,8 @@
 // Charged shots: hold fire with a bow to draw (1.6 s full), release to fire; a drawn arrow plays its element's charged form.
 // Testing: kino.castle.bows.state(), .advance(el) (finish the current step), .give(el).
 import * as THREE from 'three';
-import { loadModel } from '../../animation.js';
+import { loadModel, loadAnimation, Rig } from '../../animation.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { CollisionWorld } from '../../collision-world.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);   // BO3 (CoD) coordinates -> the map's
@@ -334,39 +335,68 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   for (const [k, [p]] of Object.entries(Q.demon.fossils)) I(p, () => 'Return the fossil', () => sync.act('bqUse', { el: 'demon', what: 'fossil', k }), () => !owner('demon') || stepOf('demon') !== 'fossils' || st.demon.fossils?.has(k));
   for (const [k, p] of Object.entries(Q.demon.armour)) I(p, () => 'Inspect the armour', () => sync.act('bqUse', { el: 'demon', what: 'armour', k }), () => !owner('demon') || stepOf('demon') !== 'runes');
 
-  // ---- charged shots (BO3: hold fire to draw further) -------------------------------------------------------------------
-  // With a bow in hand the left mouse button is taken over: holding it charges (up to 1.6 s, a ring round the
-  // crosshair), releasing fires through the engine (kino.debug.shoot). Released past 0.3 s the arrow is charged; full
-  // (BO3's chargeshotlevel 4) is what the storm batteries need. What the shooter was doing is kept for the impact.
-  const CHARGE = 1.6, ring = document.createElement('div'); ring.id = 'bow-charge';
+  // ---- the bow in hand: draw, hold, loose (BO3's vm_bow_launcher_draw / draw_loop / draw_cancel / fire) -------------------
+  // With a bow in hand the left mouse button (and the touch fire button: host.holdFire) is the bow's: pressing pulls the
+  // string (chargeAnim, then chargeLoopAnim held at full draw), releasing looses the arrow through the engine
+  // (kino.debug.shoot: its fire clip, sound and projectile). Held past 0.3 s the arrow is charged (a ring round the
+  // crosshair fills over 1.6 s; full is BO3's chargeshotlevel 4, what the storm batteries need) and takes more arrows:
+  // 2, or 3 drawn fully (fewer if the quiver runs short, which also caps the draw). There's no reload: the next arrow
+  // is nocked from the quiver as the fire clip ends. Sprinting, swapping or going down lets the string go.
+  const CHARGE = 1.6, view = api.view, ring = document.createElement('div'); ring.id = 'bow-charge';
   ring.style.cssText = 'position:fixed;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;z-index:3;pointer-events:none;display:none';
   document.body.append(ring);
-  let drawing = null, shot = null, lastImpact = null;
+  let drawing = null, shot = null, lastImpact = null, nockAt = 0;
   const bowInHand = () => isBow(session.weapon?.id) && !session.weaponUnavailable && !api.host?.gunBlocked;
   const elOf = id => /^bo3_bow_(\w+)$/.exec(id ?? '')?.[1] ?? 'base';
-  function release(t) {
-    drawing = null; ring.style.display = 'none'; const f = feet();
-    shot = { el: elOf(session.weapon?.id), k: t > .3 ? Math.min(1, t / CHARGE) : 0, full: t >= CHARGE, at: performance.now(), from: f, eye: camera.position.clone(), flung: !!pads?.flying?.(), run: !!lowgrav?.state?.().running,
-      battery: Q.storm.batteries.find(b => inV(f, b.charged))?.id ?? null };
-    window.kino.debug?.shoot?.();
+  const cost = k => (k >= 1 ? 3 : k > 0 ? 2 : 1);
+  const canDraw = () => bowInHand() && session.weapon.mag > 0 && session.phase !== 'reviving' && view?.ready && ['idle', 'fire', 'bowdraw'].includes(view.mode) && !view.input?.sprint;
+  function startDraw(touch) {
+    if (drawing || !canDraw()) return;
+    drawing = { t: 0, touch, id: session.weapon.id };
+    if (view.rig?.actions.chargeAnim) { view.mode = 'bowdraw'; view.rig.play('chargeAnim', false, 1, .06); drawing.clip = 'chargeAnim'; }
   }
-  addEventListener('mousedown', e => { if (e.button !== 0 || !api.getState().active || !bowInHand() || window.kino.operator?.active) return; e.stopImmediatePropagation(); if (session.weapon.mag > 0) drawing = { t: 0 }; }, true);
-  addEventListener('mouseup', e => { if (e.button !== 0 || !drawing) return; e.stopImmediatePropagation(); release(drawing.t); }, true);
+  function letGo() {   // the string goes slack without a shot
+    if (!drawing) return; ring.style.display = 'none';
+    if (view?.mode === 'bowdraw') { view.mode = 'fire'; if (!view.rig?.play('chargeCancelAnim', false, 1, .06)) view.mode = 'idle'; }
+    drawing = null;
+  }
+  function release() {
+    const d = drawing; if (!d) return; drawing = null; ring.style.display = 'none';
+    if (view?.mode === 'bowdraw') view.mode = 'idle';   // the engine's shot plays the fire clip from here
+    const quiver = session.weapon.reserve ?? 0;
+    let k = d.t > .3 ? Math.min(1, d.t / CHARGE) : 0; while (k > 0 && cost(k) - 1 > quiver) k = cost(k) === 3 ? .99 : 0;   // a short quiver caps the draw
+    const f = feet();
+    shot = { el: elOf(session.weapon?.id), k, full: k >= 1, at: performance.now(), from: f, eye: camera.position.clone(), flung: !!pads?.flying?.(), run: !!lowgrav?.state?.().running,
+      battery: Q.storm.batteries.find(b => inV(f, b.charged))?.id ?? null };
+    if (window.kino.debug?.shoot?.()) { session.weapon.reserve = Math.max(0, quiver - (cost(k) - 1)); nockAt = session.time + Math.max(.25, (session.def.fireTime ?? .32)); }
+    else shot = null;
+  }
+  addEventListener('mousedown', e => { if (e.button !== 0 || !api.getState().active || !bowInHand() || window.kino.operator?.active) return; e.stopImmediatePropagation(); startDraw(false); }, true);
+  addEventListener('mouseup', e => { if (e.button !== 0 || !bowInHand()) return; e.stopImmediatePropagation(); if (drawing && !drawing.touch) release(); }, true);
   // touch: the fire button reaches the engine, not mouse events; while a bow is in hand the engine leaves it to us
   host.holdFire = () => bowInHand() && touchHeld();
-  const touchHeld = () => !!api.view?.input?.fire && !mouseDown;
+  const touchHeld = () => !!view?.input?.fire && !mouseDown;
   let mouseDown = false, touchWas = false;
   addEventListener('mousedown', e => { if (e.button === 0) mouseDown = true; }, true); addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; }, true);
   host.on('update', dt => {
+    // nock the next arrow (no reload); a reload started anyway (R) is replaced by the nock
+    if (bowInHand()) {
+      const w = session.weapon;
+      if (session.reloadLeft > 0) { session.cancelReload?.(); if (w.mag === 0) nockAt = Math.min(nockAt || session.time, session.time); }
+      if (w.mag === 0 && (w.reserve ?? 0) > 0 && session.time >= nockAt) { w.mag = 1; w.reserve--; }
+    }
     const t = bowInHand() && touchHeld();
-    if (t && !touchWas && session.weapon.mag > 0 && !drawing) drawing = { t: 0, touch: true };
-    if (!t && touchWas && drawing?.touch) release(drawing.t);
+    if (t && !touchWas) startDraw(true);
+    if (!t && touchWas && drawing?.touch) release();
     touchWas = t;
-    if (!drawing) return; if (!bowInHand()) { drawing = null; ring.style.display = 'none'; return; }
+    if (!drawing) return;
+    if (!bowInHand() || session.weapon.id !== drawing.id || view?.input?.sprint || session.phase === 'reviving') { letGo(); return; }
     drawing.t += dt; const k = Math.min(1, drawing.t / CHARGE), col = '#' + (Q[elOf(session.weapon.id)]?.color ?? 0xffa040).toString(16).padStart(6, '0');
+    if (drawing.clip === 'chargeAnim' && view.mode === 'bowdraw' && !view.rig.actions.chargeAnim.isRunning()) { drawing.clip = 'chargeLoopAnim'; view.rig.play('chargeLoopAnim', true, 1, .08); }
     ring.style.display = drawing.t > .15 ? 'block' : 'none'; ring.style.background = `conic-gradient(${col} ${k * 360}deg, #ffffff22 0)`; ring.style.webkitMask = ring.style.mask = 'radial-gradient(circle, transparent 17px, #000 18px)';
     if (k >= 1 && !drawing.full) { drawing.full = true; audio?.play?.('buy', .3); }
   });
+  host.on('reset', () => { drawing = null; shot = null; nockAt = 0; ring.style.display = 'none'; });
 
   // ---- arrow impacts (the shooter's client): quest shots and the element effects ---------------------------------------
   // the bows' arrows explode through kino-features blast() -> effect(position, 0xffb347, 25)
@@ -425,6 +455,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   const souls = [];
   function soul(from, to, color) { const m = glow(from.clone().add(new THREE.Vector3(0, 40, 0)), color, 22); souls.push({ m, from: m.position.clone(), to: to.clone().add(new THREE.Vector3(0, 25, 0)), t: 0 }); }
   const want = new Map(), add = (id, p, color, size = 40, extra) => want.set(id, { p, color, size, ...extra });
+  let skadi = null;
   host.on('update', dt => {
     if (!dt) return;
     want.clear(); const t = performance.now() / 1000;
@@ -450,7 +481,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       }
       if (el === 'wolf') {
         if (step === 'skull') add('skull', q.skull.clone().add(new THREE.Vector3(0, 12, 0)), q.color, 35, { pulse: true });
-        if (step === 'escort' && s.d.p) { if (s.d.phase === 'dug') add('bones', q.digs[s.d.k].bones.clone().add(new THREE.Vector3(0, 15, 0)), q.color, 40, { pulse: true }); add('skadi', s.d.p.clone().add(new THREE.Vector3(0, 40, 0)), 0xbfe6ff, 70, { opacity: .5 }); }
+        if (step === 'escort' && s.d.p) { if (s.d.phase === 'dug') add('bones', q.digs[s.d.k].bones.clone().add(new THREE.Vector3(0, 15, 0)), q.color, 40, { pulse: true }); if (!skadi) add('skadi', s.d.p.clone().add(new THREE.Vector3(0, 40, 0)), 0xbfe6ff, 70, { opacity: .5 }); }
         if (step === 'burial' && my && lowgrav?.state?.().running) add('symbol', q.burial, q.color, 60, { pulse: true });
       }
       if (el === 'demon' && step === 'runes') {
@@ -473,7 +504,14 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     showNode('CASTLE_BQ_skull_0', ws === 'skull');
     showNode('CASTLE_SM_aq_wh_skadi_skull', ws === 'escort' && w.d.phase !== 'skull');
     Q.wolf.digs.forEach((g, k) => showNode('CASTLE_BQ_bones_' + g.id, ws === 'escort' && w.d.phase === 'dug' && w.d.k === k));
-    if (skadiNode) { const on = ws === 'escort' && !!w.d.p && w.d.phase !== 'skull'; showNode(skadiNode, on); if (on) { const to = w.d.path?.[w.d.i] ?? w.d.p; moveNode(skadiNode, w.d.p); const yaw = Math.atan2(-(to.z - w.d.p.z), to.x - w.d.p.x); if (Number.isFinite(yaw) && to.distanceTo(w.d.p) > 2) { skadiNode.rotation.y = yaw; skadiNode.updateMatrixWorld(true); } } }
+    const skadiOn = ws === 'escort' && !!w.d.p && w.d.phase !== 'skull';
+    if (!skadi && wolves.length) { skadi = wolfActor(wolves[0].root.children[0], wolves[0].index); skadi.busy = true; }
+    if (skadi) {
+      skadi.root.visible = skadiOn; showNode(skadiNode, false);
+      if (skadiOn) { const to = w.d.path?.[w.d.i] ?? w.d.p, moving = w.d.phase === 'walk' || w.d.phase === 'tomb', clip = moving && !w.d.wait ? 'trot' : w.d.phase === 'dug' ? 'dig' : 'howl';
+        skadi.root.position.copy(w.d.p); if (moving && to.distanceTo(w.d.p) > 2) skadi.root.rotation.y = Math.atan2(-(to.z - w.d.p.z), to.x - w.d.p.x);
+        if (skadi.clip !== clip) { skadi.clip = clip; skadi.rig.play(clip, true, clip === 'trot' ? 150 / (skadi.index.trot?.speed || 150) : 1, .2); } skadi.rig.update(dt); }
+    } else if (skadiNode) { const on = skadiOn; showNode(skadiNode, on); if (on) { const to = w.d.path?.[w.d.i] ?? w.d.p; moveNode(skadiNode, w.d.p); const yaw = Math.atan2(-(to.z - w.d.p.z), to.x - w.d.p.x); if (Number.isFinite(yaw) && to.distanceTo(w.d.p) > 2) { skadiNode.rotation.y = yaw; skadiNode.updateMatrixWorld(true); } } }
     const ledge = ws === 'burial' && session.time < (w.d.ledgeUntil ?? 0); ledgeMesh.visible = ledge; ledgeBox.enabled = ledge;
     showNode('CASTLE_BQ_king_0', w.stage !== 'idle' && (wi < 0 || wi > 3));
     const ds = stepOf('demon'), di = Q.demon.steps.indexOf(ds), dDone = st.demon.stage !== 'steps' && st.demon.stage !== 'idle';
@@ -501,14 +539,33 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat(color)); scene.add(l); fx.push({ o: l, life: .12 }); }
   function flash(p, color, intensity = 4, radius = 500, life = .5) { const pool = kino.lighting?.sources; if (!pool) return; const src = { position: p.clone(), color: new THREE.Color(color), intensity, radius, kind: 'solid', dynamic: true, cap: 2000, weight: 1 }; pool.push(src); fx.push({ light: src, life, max: life }); }
   host.warmObjects?.push(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 1, 0)]), lineMat(0xffffff)));
+  // the spirit wolves (BO3's c_gen_direwolf_ghost running ai_direwolf_base_run; .tools/build_castle_panzer.py wolf ->
+  // wolf/): a pool made while loading (hidden in the scene, so its shaders compile then)
+  const WDIR = new URL('./wolf/', import.meta.url).href, WOLF_SPEED = 650, wolves = [], WA = {};
+  const wolfReady = (async () => {
+    const [m, index] = await Promise.all([loadModel(WDIR + 'wolf.glb').catch(() => null), fetch(WDIR + 'anims.json').then(r => r.json()).catch(() => null)]);
+    if (!m || !index) return false;
+    await Promise.all(Object.keys(index).map(async k => { WA[k] = await loadAnimation(WDIR + 'anims/' + k + '.json').catch(() => null); }));
+    for (let i = 0; i < 7; i++) wolves.push(wolfActor(m, index));
+    return true;
+  })();
+  function wolfActor(m, index) {
+    const root = new THREE.Group(), body = cloneSkinned(m); root.add(body);
+    body.traverse(o => { if (o.isBone) o.userData.bindPosition = o.position.clone(); if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
+    const rig = new Rig(root); for (const [k, d] of Object.entries(WA)) if (d) rig.add(k, d);
+    root.visible = false; scene.add(root); return { root, rig, index, busy: false };
+  }
+  function spiritWolf(p, d, time, c) {
+    const a = wolves.find(w => !w.busy), at = p.clone();
+    if (a) { a.busy = true; a.root.visible = true; a.root.position.copy(at); a.rig.play('run', true, WOLF_SPEED / (a.index.run?.speed || WOLF_SPEED), 0); }
+    zones.push({ kind: 'wolf', at, d, t: time, life: time, actor: a ?? null, sprite: a ? null : glow(at.clone().add(new THREE.Vector3(0, 30, 0)), 0xbfe6ff, 70), hit: new Set(), c });
+  }
   const zones = [];
   const ELEMENT = {
     storm(p, c) { flash(p, 0x9fd8ff, 5, 600, 2.5); zones.push({ kind: 'storm', p, t: 2.5, tick: 0, c }); },
     rune(p, c) { flash(p, 0xff7a2a, 5, 500, 1); for (const z of [...enemies.list]) if (z.root.position.distanceTo(p) < 190) { kino.fx?.burn?.(z.root.position.clone().add(new THREE.Vector3(0, 40, 0))); zones.push({ kind: 'burn', z, t: .8, c }); } },
-    wolf(p, c, eye) {
-      const a = eye.clone().add(new THREE.Vector3(0, -30, 0)), dir = p.clone().sub(a), len = dir.length(); dir.normalize(); flash(p, 0xbfe6ff, 3, 400, .8);
-      for (const z of [...enemies.list]) { const m = z.root.position.clone().add(new THREE.Vector3(0, 35, 0)), t = m.clone().sub(a).dot(dir); if (t < 0 || t > len + 60) continue; if (a.clone().addScaledVector(dir, t).distanceTo(m) < 70) kill(z, 1500, c); }
-      for (let i = 0; i < 14; i++) { const m = glow(a.clone().addScaledVector(dir, len * i / 14), 0xbfe6ff, 50); fx.push({ sprite: m, life: .25 + i * .03 }); }
+    wolf(p, c, eye) {   // a spirit wolf leaps out where the arrow lands and runs on down the line of the shot
+      const d = p.clone().sub(eye).setY(0).normalize(); flash(p, 0xbfe6ff, 3, 400, .8); spiritWolf(p, d, 1, c);
     },
     demon(p, c) { flash(p, 0xb06bff, 5, 500, 1.5); zones.push({ kind: 'void', p, t: 1.5, held: new Set(), c }); const m = glow(p.clone().add(new THREE.Vector3(0, 30, 0)), 0xb06bff, 120); fx.push({ sprite: m, life: 1.5 }); },
   };
@@ -517,8 +574,8 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     storm(p, k, c) { flash(p, 0x9fd8ff, 6, 800, 6); zones.push({ kind: 'storm', p, t: 3 + 3 * k, tick: 0, r: 300 + 100 * k, rate: .2, c }); },
     rune(p, k, c) { flash(p, 0xff7a2a, 6, 600, 2); for (const z of [...enemies.list]) { if (z.boss || z.root.position.distanceTo(p) > 220 + 80 * k) continue; zones.push({ kind: 'prison', z, at: z.root.position.clone(), t: 2, c }); for (let i = 0; i < 3; i++) { const m = glow(z.root.position.clone().add(new THREE.Vector3(0, 25 + i * 30, 0)), 0xff7a2a, 55); fx.push({ sprite: m, life: 2 }); } } },
     wolf(p, k, c, eye) {
-      const d0 = p.clone().sub(eye).setY(0).normalize(); flash(p, 0xbfe6ff, 5, 600, 1.5);
-      for (const ang of [-.4, 0, .4]) { const d = d0.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), ang); zones.push({ kind: 'wolf', at: p.clone(), d, t: 1.2 + k, sprite: glow(p.clone().add(new THREE.Vector3(0, 30, 0)), 0xbfe6ff, 70), hit: new Set(), c }); }
+      const d0 = p.clone().sub(eye).setY(0).normalize(), n = k >= 1 ? 3 : 2; flash(p, 0xbfe6ff, 5, 600, 1.5);   // a pack: 2, 3 drawn fully
+      for (let i = 0; i < n; i++) spiritWolf(p, d0.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), (i - (n - 1) / 2) * .45), 1.4 + k, c);
     },
     demon(p, k, c) { flash(p, 0xb06bff, 6, 700, 5); zones.push({ kind: 'void', p, t: 3 + 2 * k, held: new Set(), r: 400, c }); const m = glow(p.clone().add(new THREE.Vector3(0, 40, 0)), 0xb06bff, 200); fx.push({ sprite: m, life: 3 + 2 * k }); zones.push({ kind: 'chompers', p, t: 3 + 2 * k, tick: 0, c }); },
   };
@@ -537,7 +594,13 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     const hostSide = sync.isHost;
     for (let i = zones.length - 1; i >= 0; i--) { const z = zones[i]; z.t -= dt;
       if (z.kind === 'prison') { if (enemies.list.includes(z.z)) { if (hostSide) { z.z.root.position.x = z.at.x; z.z.root.position.z = z.at.z; z.z.stuck = 0; } if (z.t <= 0) kill(z.z, 2500, z.c); } }
-      if (z.kind === 'wolf') { z.at.addScaledVector(z.d, 650 * dt); const g = world.closest?.(z.at, { x: 40, y: 120, z: 40 }); if (g) z.at.y = g.y; z.sprite.position.copy(z.at).y += 30; for (const e of [...enemies.list]) if (!e.boss && !z.hit.has(e) && e.root.position.distanceTo(z.at) < 90) { z.hit.add(e); kill(e, 1500, z.c); } if (z.t <= 0) unglow(z.sprite); }
+      if (z.kind === 'wolf') {
+        z.at.addScaledVector(z.d, WOLF_SPEED * dt); const g = world.closest?.(z.at, { x: 40, y: 120, z: 40 }); if (g) z.at.y = THREE.MathUtils.lerp(z.at.y, g.y, Math.min(1, dt * 12));
+        if (z.actor) { const r = z.actor.root; r.position.copy(z.at); r.rotation.y = Math.atan2(-z.d.z, z.d.x); r.scale.setScalar(Math.min(1, z.t * 3, (z.life - z.t) * 6 + .2)); z.actor.rig.update(dt); }
+        else if (z.sprite) z.sprite.position.copy(z.at).y += 30;
+        for (const e of [...enemies.list]) if (!e.boss && !z.hit.has(e) && e.root.position.distanceTo(z.at) < 90) { z.hit.add(e); kill(e, 1500, z.c); }
+        if (z.t <= 0) { if (z.actor) { z.actor.root.visible = false; z.actor.busy = false; } if (z.sprite) unglow(z.sprite); }
+      }
       if (z.kind === 'chompers' && (z.tick -= dt) <= 0) { z.tick = .3; const t = enemies.list.filter(e => !e.boss && e.root.position.distanceTo(z.p) < 650).sort((a, b) => a.root.position.distanceTo(z.p) - b.root.position.distanceTo(z.p))[0]; if (t) { const m = glow(t.root.position.clone().add(new THREE.Vector3(0, 40, 0)), 0xb06bff, 40); fx.push({ sprite: m, life: .4 }); kill(t, 600, z.c); } }
       if (z.kind === 'storm' && (z.tick -= dt) <= 0) { z.tick = z.rate ?? .3; const top = z.p.clone().add(new THREE.Vector3(0, 60, 0)); const n = enemies.list.filter(e => !e.boss && e.root.position.distanceTo(z.p) < (z.r ?? 240)).sort((a, b) => a.root.position.distanceTo(z.p) - b.root.position.distanceTo(z.p))[0];
         if (n) { bolt(top, n.root.position.clone().add(new THREE.Vector3(0, 45, 0)), 0xbfe6ff); kill(n, 800, z.c); } else bolt(top, z.p.clone().add(new THREE.Vector3((Math.random() - .5) * 120, 0, (Math.random() - .5) * 120)), 0xbfe6ff); }
@@ -562,6 +625,6 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       d: JSON.parse(JSON.stringify(s.d, (k, v) => v instanceof Set ? [...v] : v instanceof THREE.Vector3 ? v.toArray().map(Math.round) : v)), fire: s.fire }])),
     team: () => ({ paint: team.paint, deal: team.deal }),
     advance(el) { sync.act('bqDebug', { el }); },
-    give, sites: Q, last: () => lastImpact, testShot: o => { shot = { el: elOf(session.weapon?.id), k: 0, at: performance.now(), from: feet(), eye: camera.position.clone(), ...o }; }, golfPool: () => golfPool()?.p.clone() ?? null, skadi: () => st.wolf.d.p?.clone() ?? null, magma: () => magmaUntil - session.time,
+    ready: wolfReady, wolves: () => wolves.map(w => w.busy), give, sites: Q, last: () => lastImpact, testShot: o => { shot = { el: elOf(session.weapon?.id), k: 0, at: performance.now(), from: feet(), eye: camera.position.clone(), ...o }; }, golfPool: () => golfPool()?.p.clone() ?? null, skadi: () => st.wolf.d.p?.clone() ?? null, magma: () => magmaUntil - session.time,
   };
 }

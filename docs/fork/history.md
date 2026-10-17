@@ -253,3 +253,4 @@
 - 2026-10-17: Spawn and first-appearance stalls: fast skinned bounds for every rigged model, engine shader warm-up against the real render targets (warmObjects, 'warm' event, power-ups and enemy templates), shaders compiled mid-game in perf-diag (performance.md).
 - 2026-10-17: Der Eisendrache co-op (sync.js: ordered events, shared state, effects, host-credited damage) and the four bow upgrades rewritten as BO3 runs them (owners, one quest each, BO3's own triggers and steps; 58 quest props, map v=28); custom-world hides builder-hidden props before batching (coop.md, waw-ports.md).
 - 2026-10-17: KTX2 textures: everything under textures/ GPU-compressed (UASTC → BC7), Kino VRAM 3.4 → 1.2 GB (materials.md).
+- 2026-10-17: Der Eisendrache: terminal booths at the eight gobblegum spots, Tab collectible tiles, the bow drawn as in BO3 (draw clips, no reload, charged shots cost arrows), animated spirit wolves and Skadi (waw-ports.md, props.md).

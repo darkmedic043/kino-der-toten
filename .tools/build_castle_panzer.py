@@ -60,6 +60,22 @@ def anim(name, src=None, dest=None):
     ((dest or OUT)/'anims'/(name + '.json')).write_text(json.dumps(clip, separators=(',', ':')))
     return clip
 
+# ---- the Wolf Bow's spirit wolves (and Skadi): BO3's c_gen_direwolf_ghost and its ai_direwolf_base_* clips -> wolf/
+#   python3 .tools/build_castle_panzer.py wolf   (just this part)
+def build_wolf():
+    WOUT = ROOT/'export/web/mods/der-eisendrache/wolf'
+    (WOUT/'anims').mkdir(parents=True, exist_ok=True); (WOUT/'.gitignore').write_text('*\n')
+    SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/'c_gen_direwolf_ghost'/'c_gen_direwolf_ghost_LOD0.semodel')), WOUT/'wolf.glb', texture_loader=webp)
+    print('wolf', round((WOUT/'wolf.glb').stat().st_size / 1e6, 2), 'MB')
+    windex = {}
+    for key, src in {'run': 'ai_direwolf_base_run', 'trot': 'ai_direwolf_base_trot', 'howl': 'ai_direwolf_base_howl', 'attack': 'ai_direwolf_base_run_attack',
+                     'idle': 'ai_direwolf_base_idle_howl', 'dig': 'ai_zm_dlc1_wolf_digging'}.items():
+        if not (GH/'xanims'/(src + '.seanim')).exists(): print('no anim', src); continue
+        c = anim(key, src, WOUT); windex[key] = {'duration': c['duration'], 'speed': c['speed']}
+    (WOUT/'anims.json').write_text(json.dumps(windex, indent=1))
+    print('wolf', windex)
+if sys.argv[1:2] == ['wolf']: build_wolf(); sys.exit()
+
 (OUT/'anims').mkdir(parents=True, exist_ok=True); (OUT/'.gitignore').write_text('*\n')
 for name in MODELS:
     src = GH/'xmodels'/name/(name + '_LOD0.semodel')
@@ -117,3 +133,4 @@ COUT = ROOT/'export/web/mods/der-eisendrache/claw'
 COUT.mkdir(parents=True, exist_ok=True); (COUT/'.gitignore').write_text('*\n')
 SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/'c_t6_zom_mech_claw_hat'/'c_t6_zom_mech_claw_hat_LOD0.semodel')), COUT/'claw_hat.glb', texture_loader=webp)
 print('claw hat', round((COUT/'claw_hat.glb').stat().st_size / 1e6, 2), 'MB')
+build_wolf()

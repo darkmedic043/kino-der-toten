@@ -75,7 +75,8 @@ export default async function setup(api){
     const b={root,spot,leds:[],wires:[],sparks:[],cut:[],coolant:[],t:Math.random()*10};
     // A faint white light from the strip under the roof, filling the inside.
     // Added during loading and never toggled, so no shader recompiles later.
-    b.light=new THREE.PointLight(0xf2f6ff,cfg.lightIntensity??700,78*(spot.scale??1),2);b.light.position.set(0,82,13);b.light.castShadow=false;root.add(b.light);
+    // light:false (maps with many booths, e.g. Der Eisendrache: every real point light costs every pixel) leaves it to the map
+    if(spot.light!==false){b.light=new THREE.PointLight(0xf2f6ff,cfg.lightIntensity??700,78*(spot.scale??1),2);b.light.position.set(0,82,13);b.light.castShadow=false;root.add(b.light);}
     root.traverse(o=>{
       if(o.name.startsWith('spark_')){b.sparks.push({node:o,next:2+Math.random()*5,parts:null});return;}
       if(!o.isMesh)return;
@@ -450,13 +451,14 @@ export default async function setup(api){
     const power=!!session.power;
     for(const b of booths){
       b.t+=dt;
+      if(booths.length>1&&camera.position.distanceTo(b.root.position)>1400)continue;   // far booths keep their last frame (no canvas uploads)
       b.screen?.update(dt,power);b.sign?.update(dt,power);b.tapScreen?.update(dt,power);
       for(const l of b.leds)updateLed(l,dt,power);
       for(const w of b.wires){w.tex.offset.x-=dt*w.speed*(power?1:.25);
         let k=power?1:.15;if(w.flash){w.flash-=dt;k=6;if(w.flash<=0)w.flash=0;}w.mat.emissiveIntensity=1.8*k;}
       for(const c of b.coolant){c.tex.offset.y+=dt*(power?.35:.05);c.mat.emissiveIntensity=power?2.2:.5;}
       b.glow.opacity=(power?.22:.06)*(.93+Math.random()*.07);
-      b.light.intensity=(cfg.lightIntensity??700)*(.97+Math.random()*.03);
+      if(b.light)b.light.intensity=(cfg.lightIntensity??700)*(.97+Math.random()*.03);
       for(const s of b.sparks){
         if(s.parts)tickSpark(s,dt);
         else if(power&&(s.next-=dt)<=0){s.next=1.5+Math.random()*6;burst(s,b);}

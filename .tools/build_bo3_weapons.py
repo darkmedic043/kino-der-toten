@@ -313,12 +313,13 @@ MODW = [
        roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reload', rais='pullout', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
        ads=('vm_mag43_adsup', 'vm_mag43_adsdown'), shots=['weap_mg4_hvn_fire_plr'], glow='#ff3a3a'),
   # Der Eisendrache's Wrath of the Ancients (BO3's own bow, wpn_t7_zmb_bow_base_*, exported from zm_castle; the
-  # vm_bow_launcher_* clips): a quest weapon (mods/der-eisendrache), not in the Mystery Box. Fire looses the arrow,
-  # the draw plays as the reload (one arrow a draw); the arrow explodes on impact like the crossbow.
+  # vm_bow_launcher_* clips): a quest weapon (mods/der-eisendrache), not in the Mystery Box. Fire looses the arrow;
+  # bows.js plays draw / draw_loop / draw_cancel (chargeAnim...) while the shot is held and nocks the next arrow itself
+  # (no reload); the arrow explodes on impact like the crossbow.
   dict(cls='Wonder weapon', id='bo3_wrath_ancients', name='Wrath of the Ancients', up="Wrath of the Ancients", model='wpn_t7_zmb_bow_base_view', world='wpn_t7_zmb_bow_base_world',
        pre='vm_bow_launcher', tpl='crossbow_explosive_zm', drop=r'rune|storm|demon|wolf', noBox=True,
        stats=dict(clipSize=1, maxAmmo=60, startAmmo=60, damage=1100, minDamage=0, explosionRadius=180, explosionInnerDamage=1100, explosionOuterDamage=250, price=0),
-       roles=dict(idle='idle', fire='fire', reload='draw', rais='pullout', firstRaise='first_raise', drop='putaway', sprintIn='sprint_in', sprintLoop='sprint_loop', sprintOut='sprint_out'),
+       roles=dict(idle='idle', fire='fire', reload='draw', charge='draw', chargeLoop='draw_loop', chargeCancel='draw_cancel', rais='pullout', firstRaise='first_raise', drop='putaway', sprintIn='sprint_in', sprintLoop='sprint_loop', sprintOut='sprint_out'),
        ads=('vm_bow_launcher_ads_base_up', 'vm_bow_launcher_ads_base_down'), shots=['wpn_bowss_fire_quick', 'wpn_bowss_fire_med', 'wpn_bowss_fire_long'], glow='#ff6a1a',
        projectile='wpn_t7_zmb_bow_base_projectile', offset=[0, -2, 0]),
 ]
@@ -356,7 +357,7 @@ for w in MODW:
         role = 'raise' if role == 'rais' else role   # ('raise' is a Python keyword)
         name = w['pre']+'_'+suffix
         if not (SRC/'xanims'/(name+'.seanim')).exists(): print('  no anim', name); continue
-        A2[role+'Anim'], T2[role] = animation(name, gb, role in ('idle', 'emptyIdle', 'sprintLoop'))
+        A2[role+'Anim'], T2[role] = animation(name, gb, role in ('idle', 'emptyIdle', 'sprintLoop', 'chargeLoop'))
         notes |= {n for _, n in read_seanim(SRC/'xanims'/(name+'.seanim'))['notes'] if n.startswith('sndnt#')}
     for name in (w['pre']+'_inspect', w['pre']+'_inspect_full'):   # weapon inspect (hold reload; mods/inspect)
         if (SRC/'xanims'/(name+'.seanim')).exists():

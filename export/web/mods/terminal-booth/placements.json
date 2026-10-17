@@ -1,40 +1,134 @@
 {
-  "sign": "MelonTerm 2.7",
-  "lightIntensity": 700,
-  "maps": {
-    "kino": [
-      {
-        "position": [
-          -208,
-          82,
-          880
-        ],
-        "yaw": 90,
-        "model": "terminal_booth_compact.glb",
-        "scale": 0.9,
-        "note": "lobby, the wall under the west staircase next to the arch; compact + 0.9 scale because the stair stringer is ~87 above the floor"
-      }
+ "sign": "MelonTerm 2.7",
+ "lightIntensity": 700,
+ "maps": {
+  "kino": [
+   {
+    "position": [
+     -208,
+     82,
+     880
     ],
-    "the-giant": [
-      {
-        "position": [
-          -190,
-          3,
-          -560
-        ],
-        "yaw": -90,
-        "model": "terminal_booth_compact.glb",
-        "note": "start area, the lower courtyard: the plain concrete wall under the mainframe platform's railing (compact: the railing is above); clearDebris false: the uneven snow floor counts as debris and got holes cut in it",
-        "clearDebris": false
-      }
+    "yaw": 90,
+    "model": "terminal_booth_compact.glb",
+    "scale": 0.9,
+    "note": "lobby, the wall under the west staircase next to the arch; compact + 0.9 scale because the stair stringer is ~87 above the floor"
+   }
+  ],
+  "the-giant": [
+   {
+    "position": [
+     -190,
+     3,
+     -560
     ],
+    "yaw": -90,
+    "model": "terminal_booth_compact.glb",
+    "note": "start area, the lower courtyard: the plain concrete wall under the mainframe platform's railing (compact: the railing is above); clearDebris false: the uneven snow floor counts as debris and got holes cut in it",
+    "clearDebris": false
+   }
+  ],
   "sandbox": [
    {
-    "position": [-20, 0, 197],
+    "position": [
+     -20,
+     0,
+     197
+    ],
     "yaw": -90,
     "model": "terminal_booth_compact.glb",
     "note": "spawn room (lobby): the dividing wall's south half, facing the player spawn (the box and the trap switch are on its north half); map units are metres x 39.37"
    }
+  ],
+  "der-eisendrache": [
+   {
+    "position": [
+     144,
+     760,
+     -3677.5
+    ],
+    "yaw": -90.0,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "BO3 gobblegum machine: great hall"
+   },
+   {
+    "position": [
+     5316.1,
+     -2292,
+     2408.2
+    ],
+    "yaw": 122.8,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "BO3 gobblegum machine: rocket pad"
+   },
+   {
+    "position": [
+     1533,
+     281.1,
+     -1686
+    ],
+    "yaw": -3.6,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "BO3 gobblegum machine: gatehouse (start machine)"
+   },
+   {
+    "position": [
+     -500,
+     505,
+     -1277.8
+    ],
+    "yaw": -6.3,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "BO3 gobblegum machine: trophy room / subclocktower; slid 37 along the wall, clear of the armchair"
+   },
+   {
+    "position": [
+     -9,
+     128,
+     -2012
+    ],
+    "yaw": -135.0,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "BO3 gobblegum machine: undercroft"
+   },
+   {
+    "position": [
+     709.5,
+     -8,
+     -991.3
+    ],
+    "yaw": 68.2,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "BO3 gobblegum machine: start, by the gondola (start machine)"
+   },
+   {
+    "position": [
+     1475.0,
+     528,
+     -3179.1
+    ],
+    "yaw": 100.0,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "BO3 gobblegum machine: living quarters"
+   },
+   {
+    "position": [
+     -1326.1,
+     824,
+     -2618.1
+    ],
+    "yaw": -20.2,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "BO3 gobblegum machine: courtyard / armory"
+   }
   ]
-  }
+ }
 }

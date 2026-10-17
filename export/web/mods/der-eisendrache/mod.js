@@ -8,6 +8,7 @@ import { setupSide } from './side.js';
 import { setupSide2 } from './side2.js';
 import { useGameAudio } from './castle-audio.js';
 import { createSync } from './sync.js';
+import { setupTab } from './tab.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -104,6 +105,8 @@ export default async function setup(api) {
   const craft = setupCraftables(api, { traps }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav, pads, traps }), ee = setupEE(api, { bows, traps }), side2 = setupSide2(api, { bows }), side = setupSide(api, { lowgrav, side2 });
   useGameAudio(api.audio);
   setupRocketPad(api); setupDogRounds(api);
+  setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 });   // the Tab scoreboard's tiles
+  await bows?.ready;   // the spirit wolves too
   await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
   sync.ready();   // a guest catches up on the game's events so far
   window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz, traps, craft, lowgrav, bows, ee, side, side2, sync };
