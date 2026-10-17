@@ -105,3 +105,9 @@ for key, src in KANIMS.items():
     c = anim(key, src, KOUT); kindex[key] = {'duration': c['duration']}
 (KOUT/'anims.json').write_text(json.dumps(kindex, indent=1))
 print('keeper', len(kindex), 'anims')
+
+# ---- the plunger (zm_castle_ee_side.gsc's knife_plunger, a melee upgrade): its world model on the knife tag -> plunger/
+POUT = ROOT/'export/web/mods/der-eisendrache/plunger'
+POUT.mkdir(parents=True, exist_ok=True); (POUT/'.gitignore').write_text('*\n')
+SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/'wpn_t7_zmb_dlc1_plunger_world'/'wpn_t7_zmb_dlc1_plunger_world_LOD0.semodel')), POUT/'plunger.glb', texture_loader=webp)
+print('plunger', round((POUT/'plunger.glb').stat().st_size / 1e6, 2), 'MB')

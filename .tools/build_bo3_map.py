@@ -957,6 +957,12 @@ if BSP == 'zm_castle':
     for n in range(1, 5):
         x = one(f'cs_glow_{n}')
         if x: place_model(f'CASTLE_EE_csglow_{n}', x['model'], x['origin'], x.get('angles'), hidden=True)
+    # side Easter eggs (zm_castle_ee_side.gsc): the plunger in the past lab's corner, the plant pots (sprout and grown, past
+    # and present) and the gumball the grown plant holds
+    for tn, nm, mdl in (('ee_plunger_pickup', 'plunger', None), ('ee_plant_present', 'plant_sprout', 'p7_zm_ctl_plant_decor_sprout'), ('ee_plant_present', 'plant_grown', None),
+                        ('ee_plant_past', 'plant_past', 'p7_zm_ctl_plant_decor_sprout'), ('ee_plant_gobblegum', 'gumball', None)):
+        x = one(tn)
+        if x: place_model(f'CASTLE_EE_{nm}_0', mdl or x['model'], x['origin'], x.get('angles'), hidden=True); count('EE')
     x = one('fuse_box')
     if x: place_model('CASTLE_EE_fuse_slot_0', 'p7_zm_ctl_console_deathray_relay_2x', x['origin'], x.get('angles'), hidden=True)
     # Panzersoldat spawn points (zm_castle_mechz.gsc: a random mechz_location in an active zone)

@@ -212,5 +212,8 @@ export default async function setup(api){
   hud();
 
   window.kino.gobblegums={status,roll,chew,get hand(){return [...st.hand];},cfg,
-    give:id=>{if(!by[id]||st.hand.length>=cfg.handSize)return false;st.hand.push(id);hud();return true;},live,armed:id=>st.armed.has(id)};
+    give:id=>{if(!by[id]||st.hand.length>=cfg.handSize)return false;st.hand.push(id);hud();return true;},
+    // a free gum from your pack (Der Eisendrache's plant): into a free slot, or over the selected one when the hand is full
+    gift:()=>{const pool=(pack()?.ids??[]).filter(id=>by[id]&&!st.hand.includes(id));if(!pool.length)return null;const id=pool[Math.floor(Math.random()*pool.length)];
+      if(st.hand.length<cfg.handSize){st.hand.push(id);st.sel=st.hand.length-1;}else st.hand[st.sel]=id;hud();api.toast(`${by[id].name} · N to chew`,3);return id;},live,armed:id=>st.armed.has(id)};
 }
