@@ -248,3 +248,4 @@
 - 2026-10-16: Der Eisendrache elemental bow upgrades: four quests on BO3's locations, Storm/Fire/Wolf/Void bows with their element effects (waw-ports.md).
 - 2026-10-17: Der Eisendrache main Easter egg (time travel, Keeper protector, Simon says, rockets, the Keeper boss), charged bow shots, the longer bow quests (magma golf, wolf escort, rune sequence) (waw-ports.md).
 - 2026-10-17: Der Eisendrache side Easter eggs: pressure plates, the plunger, the plant gumball, Disco Inferno (waw-ports.md).
+- 2026-10-17: Der Eisendrache: clock tower, music eggs, skulls, claw hat, BO3's castle music and sounds, floating zombies in low gravity, touch bow draws (waw-ports.md).

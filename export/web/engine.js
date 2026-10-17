@@ -306,7 +306,7 @@ function update(dt){
       view.update(dt,{moving,sprint,ads:ads&&!session.def.dualWield,reloading:session.reloadLeft>0,empty:session.weapon.mag===0,time:session.time});
       view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();view.input={sprint,ads,fire:primary};   // this frame's input, for mods (inspect cancels on sprint/aim; operator weapons read touch/pad fire)
       perkDrink.update(dt,session);
-      if(!sprint&&session.phase!=='reviving'&&(primaryPressed||(primary&&session.def.automatic)||burstLeft>0||reloadShot)){
+      if(!sprint&&session.phase!=='reviving'&&!mods.holdFire?.()&&(primaryPressed||(primary&&session.def.automatic)||burstLeft>0||reloadShot)){   // holdFire: a mod handles the fire button (bows: hold to draw on touch)
         if(shoot()){reloadShot=false;if(burstLeft>0)burstLeft--;else if(session.def.fireType==='3-Round Burst')burstLeft=2;}
       }
       primaryPressed=false;

@@ -111,3 +111,9 @@ POUT = ROOT/'export/web/mods/der-eisendrache/plunger'
 POUT.mkdir(parents=True, exist_ok=True); (POUT/'.gitignore').write_text('*\n')
 SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/'wpn_t7_zmb_dlc1_plunger_world'/'wpn_t7_zmb_dlc1_plunger_world_LOD0.semodel')), POUT/'plunger.glb', texture_loader=webp)
 print('plunger', round((POUT/'plunger.glb').stat().st_size / 1e6, 2), 'MB')
+
+# ---- the claw hat (zm_castle_ee_side.gsc: three Panzersoldats killed by their own claws) for the character's head -> claw/
+COUT = ROOT/'export/web/mods/der-eisendrache/claw'
+COUT.mkdir(parents=True, exist_ok=True); (COUT/'.gitignore').write_text('*\n')
+SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/'c_t6_zom_mech_claw_hat'/'c_t6_zom_mech_claw_hat_LOD0.semodel')), COUT/'claw_hat.glb', texture_loader=webp)
+print('claw hat', round((COUT/'claw_hat.glb').stat().st_size / 1e6, 2), 'MB')

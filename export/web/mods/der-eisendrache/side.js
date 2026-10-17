@@ -2,8 +2,9 @@
 //   Pressure plates   the four stone plates around the undercroft pyramid (grav_pad_trigger): stand on each for 3 s
 //                     (it sinks and lights). With all four down, every time the gravity drops a power-up appears high
 //                     in the undercroft (low_grav_powerup_spawn), reachable while it's low.
-//   The plunger       while the gravity is low, wall-run past the four undercroft runes (ee_undercroft_wallrun_0-3) one
-//                     after another in either direction without touching the floor: you're pulled into the past lab
+//   The plunger       once the clock tower has struck 9:35 (side2.js), while the gravity is low, wall-run past the four
+//                     undercroft runes (ee_undercroft_wallrun_0-3) eight in a row (two laps), either way round, without
+//                     touching the floor: you're pulled into the past lab
 //                     for 10 s, where the plunger waits (ee_plunger_pickup). It replaces the knife: 3,000 a hit, and a
 //                     kill with it blows up the zombies around (BO3's charged strike).
 //   The plant         take the sprout from the pot in the lab (ee_plant_present), plant it in the same pot in the past
@@ -13,6 +14,7 @@
 //                     rocket's: 30 s of disco: coloured lights, the globe spinning, the zombies around it dancing.
 // Testing: kino.castle.side.state(), .plunger() (the trip), .disco().
 import * as THREE from 'three';
+import { sfx, music, stopMusic } from './castle-audio.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);
 const PADS = [W(-1191, 2541, 200), W(-907, 2256, 200), W(-1192, 1972, 200), W(-1476, 2257, 200)];
@@ -21,7 +23,7 @@ const SPOT = { powerup: W(-1596, 2264, 392), plungerTo: W(-211, 5086, 168), plun
   potPresent: W(-157, 3328, 197), potPast: W(-158, 4826, 196), gumball: W(-163, 3331, 226), globe: W(-856, 3500, 990) };
 const PLUNGER_URL = new URL('./plunger/plunger.glb', import.meta.url).href;
 
-export function setupSide(api, { lowgrav }) {
+export function setupSide(api, { lowgrav, side2 }) {
   const { world, session, host, player, enemies, scene, audio, toast, announce, data, view, powerups } = api;
   const root = world.root, kino = window.kino, feet = () => player.getFeetPosition();
   const node = n => root.getObjectByName(n);
@@ -46,12 +48,12 @@ export function setupSide(api, { lowgrav }) {
   let blasting = false;
   host.on('kill', ({ enemy, melee }) => {   // a plunger kill blows up its neighbours (once: their deaths don't chain)
     if (!st.plunger || !melee || !enemy?.root || blasting) return; const p = enemy.root.position;
-    kino.fx?.burn?.(p.clone().add(new THREE.Vector3(0, 40, 0))); blasting = true;
+    kino.fx?.burn?.(p.clone().add(new THREE.Vector3(0, 40, 0))); blasting = true; sfx('plunger_hit_0' + Math.floor(Math.random() * 4), .8);
     try { for (const z of [...enemies.list]) if (!z.boss && z.kind !== 'panzer' && z.root.position.distanceTo(p) < 90) enemies.hurt(z, 1e9, false, false, 'explosion'); } finally { blasting = false; }
   });
   world.addInteraction({ position: SPOT.plunger.clone(), text: () => 'Take the plunger', use() { givePlunger(); return true; }, hidden: () => !st.trip || st.plunger });
   function trip() {
-    st.trip = { t: 10 }; st.runs = []; for (const g of runGlows) g.visible = false;
+    st.trip = { t: 10 }; st.runs = []; for (const g of runGlows) g.visible = false; side2?.useWallrun();
     if (!st.plunger) show('CASTLE_EE_plunger_0');
     kino.debug.teleportPlayer([SPOT.plungerTo.x, SPOT.plungerTo.y + 2, SPOT.plungerTo.z]); audio?.play?.('dog_round', .5); toast?.('Pulled into the past · 10 s', 2.5);
   }
@@ -75,7 +77,7 @@ export function setupSide(api, { lowgrav }) {
     use() { st.arm = (st.arm + 1) % 8; turnArm(st.arm); audio?.play?.('buy', .25); if (st.arm === 0) disco(); return true; } });
   let discoLights = [], dancers = new Map();
   function disco() {
-    st.disco = 30; announce?.('DISCO INFERNO', '', 3); audio?.play?.('box');
+    st.disco = 30; announce?.('DISCO INFERNO', '', 3); music('disco', { vol: .8 });
     const c = SPOT.globe;
     discoLights = [[300, 0], [-300, 0], [0, 300], [0, -300]].map(([x, z], i) => light(c.clone().add(new THREE.Vector3(x, -60, z)), [0xff3a8a, 0x3aff8a, 0x3a8aff, 0xffd23a][i], 4, 700));
   }
@@ -87,7 +89,7 @@ export function setupSide(api, { lowgrav }) {
       if (z.boss || z.kind === 'panzer' || dancers.has(z) || z.root.position.distanceTo(SPOT.globe) > 650) continue;
       const prev = z.ai, at = z.root.position.clone(); dancers.set(z, prev); z.ai = d => { z.root.position.x = at.x; z.root.position.z = at.z; z.root.rotation.y += d * 5; };
     }
-    if (st.disco <= 0) { for (const s of discoLights) unlight(s); discoLights = []; for (const [z, prev] of dancers) z.ai = prev; dancers.clear(); st.arm = 1 + Math.floor(Math.random() * 7); turnArm(st.arm); }
+    if (st.disco <= 0) { stopMusic(1.5); for (const s of discoLights) unlight(s); discoLights = []; for (const [z, prev] of dancers) z.ai = prev; dancers.clear(); st.arm = 1 + Math.floor(Math.random() * 7); turnArm(st.arm); }
   }
 
   host.on('update', dt => {
@@ -99,11 +101,11 @@ export function setupSide(api, { lowgrav }) {
     if (st.pads.size === 4 && lg.on && !st.lowWas) { const types = Object.keys(data.powerups ?? {}).filter(t => t !== 'fire_sale' || session.power); powerups?.spawn?.(types[Math.floor(Math.random() * types.length)], SPOT.powerup.clone()); }
     st.lowWas = !!lg.on;
     // the plunger wall-run: the four runes in a row, either way round, airborne the whole time
-    if (!st.trip && !st.plunger && lg.on && lg.running) {
+    if (!st.trip && !st.plunger && lg.on && lg.running && side2?.wallrun) {
       const k = RUNS.findIndex(p => p.distanceTo(f.clone().add(new THREE.Vector3(0, 35, 0))) < 120);
       if (k >= 0 && st.runs.at(-1) !== k) {
         const last = st.runs.at(-1), dir = st.runs.length > 1 ? (st.runs.at(-1) - st.runs.at(-2) + 4) % 4 : null, step = last == null ? null : (k - last + 4) % 4;
-        if (last == null || ((step === 1 || step === 3) && (dir == null || step === dir))) { st.runs.push(k); runGlows[k].visible = true; audio?.play?.('buy', .3); if (st.runs.length >= 4) trip(); }
+        if (last == null || ((step === 1 || step === 3) && (dir == null || step === dir))) { st.runs.push(k); runGlows[k].visible = true; audio?.play?.('buy', .3); if (st.runs.length >= 8) trip(); }
         else { st.runs = [k]; for (const g of runGlows) g.visible = false; runGlows[k].visible = true; }
       }
     }

@@ -963,6 +963,15 @@ if BSP == 'zm_castle':
                         ('ee_plant_past', 'plant_past', 'p7_zm_ctl_plant_decor_sprout'), ('ee_plant_gobblegum', 'gumball', None)):
         x = one(tn)
         if x: place_model(f'CASTLE_EE_{nm}_0', mdl or x['model'], x['origin'], x.get('angles'), hidden=True); count('EE')
+    # the music eggs (three teddy bears, the music box: shown from the start), In Plain Sight's flying skulls and their
+    # piles (hidden), the three Panzer claws (shown, where they hang before they're shot down)
+    for k, x in enumerate(by_tn.get('hs_bear', [])): place_model(f'CASTLE_EE_bear_{k}', x['model'], x['origin'], x.get('angles')); count('EE')
+    x = one('ee_music_box')
+    if x: place_model('CASTLE_EE_musicbox_0', 'p7_fxanim_zm_castle_music_box_mod', x['origin'], x.get('angles')); count('EE')
+    for k in range(3):
+        for tn, nm, hid in ((f'ee_flying_skull_{k}', 'skull', True), (f'ee_skull_pile_{k}', 'skullpile', True), (f'ee_claw_{k}_start', 'claw', False)):
+            x = one(tn)
+            if x: place_model(f'CASTLE_EE_{nm}_{k}', x['model'], x['origin'], x.get('angles'), hidden=hid); count('EE')
     x = one('fuse_box')
     if x: place_model('CASTLE_EE_fuse_slot_0', 'p7_zm_ctl_console_deathray_relay_2x', x['origin'], x.get('angles'), hidden=True)
     # Panzersoldat spawn points (zm_castle_mechz.gsc: a random mechz_location in an active zone)

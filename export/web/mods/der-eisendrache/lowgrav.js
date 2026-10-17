@@ -14,7 +14,7 @@ const ON = 50, OFF = 60, RUN_MAX = 10, LOW = 300 / 800;
 const BOX = new THREE.Box3(new THREE.Vector3(-1750, 40, -3100), new THREE.Vector3(500, 560, -1700));
 
 export function setupLowGrav(api) {
-  const { world, session, host, player, camera, toast, announce, audio } = api;
+  const { world, session, host, player, camera, toast, announce, audio, enemies } = api;
   const floaters = []; world.root.traverse(o => { if (/^CASTLE_SM_undercroft_floater_model/.test(o.name)) floaters.push({ o, base: o.position.clone(), rot: o.rotation.clone(), ph: Math.random() * 6, rise: 30 + Math.random() * 40 }); });
   const st = { t: 0, on: false, started: false, inside: false, run: null, doubled: false, wasGrounded: true, k: 0 };
   const baseGravity = player.gravity;
@@ -76,6 +76,15 @@ export function setupLowGrav(api) {
         }
       }
     } else st.run = null;
+    // zombies in the room float too (BO3 switches them to its low-gravity locomotion): slow, high bounds as they go.
+    // The AI may set their height itself, so each frame's base is whatever it left (or ours minus the last bound)
+    for (const z of enemies.list) {
+      if (z.kind !== 'zombie' && z.kind !== 'dog') continue;
+      const y = z.root.position.y, base = z.lgSet != null && Math.abs(y - z.lgSet) < .01 ? y - (z.lgOff ?? 0) : y;
+      let off = 0;
+      if (on && BOX.containsPoint(z.root.position) && z.state !== 'rising' && z.state !== 'attack' && z.state !== 'dead') { z.lgT = (z.lgT ?? Math.random() * 3) + dt; const t = z.lgT % 3.2; off = t < 1.4 ? Math.sin(t / 1.4 * Math.PI) * 38 : 0; }
+      if (off || z.lgOff) { z.root.position.y = base + off; z.lgOff = off; z.lgSet = z.root.position.y; }
+    }
     // floaters rise and drift while it's on, settle when it's off
     st.k = THREE.MathUtils.damp(st.k, on ? 1 : 0, 1.2, dt);
     if (floaters.length && (st.k > .001 || floaters[0].o.position.y !== floaters[0].base.y)) for (const f of floaters) {

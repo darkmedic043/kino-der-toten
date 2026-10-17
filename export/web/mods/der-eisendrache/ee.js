@@ -27,6 +27,7 @@ import * as THREE from 'three';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { loadProfile, saveProfile } from '../../profile.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { sfx, music, stopMusic } from './castle-audio.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);   // BO3 coordinates -> the map's
 const KDIR = new URL('./keeper/', import.meta.url).href;
@@ -185,7 +186,7 @@ export function setupEE(api, { bows, traps }) {
   I(SPOT.lever, () => 'Pull the Death Ray lever', () => {
     st.done.add('rockets'); const o = node('CASTLE_SM_ee_death_ray_switch'); if (o) { o.rotation.z -= 1.2; o.updateMatrixWorld(true); }
     flash(W(4236, -2261, -1400), 0xffd6a0, 10, 4000, 4); flash(SPOT.lever, 0x9fd8ff, 6, 900, 1.2); audio?.play?.('explosion', .9);
-    announce?.('THE ROCKETS', 'LAUNCHED · TO THE MOON', 4); check(); return true;
+    announce?.('THE ROCKETS', 'LAUNCHED · TO THE MOON', 4); sfx('evt_moon_rocket_group', .9); check(); return true;
   }, () => !(st.done.has('tcLower') && st.done.has('tcLaunch')) || st.done.has('rockets'));
   // ---- 7. the fuse and the way to the boss ----------------------------------------------------------------------------
   I(SPOT.fuseBox, () => 'Place the fuse', () => { showNode('CASTLE_EE_fuse_slot_0'); place('fuse', 'fusePlaced', 'The MPD has power'); return true; }, () => !st.have.has('fuse'));
@@ -224,7 +225,7 @@ export function setupEE(api, { bows, traps }) {
     z.ai = dt => bossTick(dt);
     enemies.list.push(z); session.total = (session.total ?? 0) + 1; session.spawned = (session.spawned ?? 0) + 1;
     st.boss = { z, phase: 0, hp: PHASE_HP[0], state: 'intro', t: 0, casts: 0, spawnT: 2, spell: null, bar: bossBar() };
-    a.rig.play(KA.roar ? 'roar' : 'idle', false); announce?.('THE KEEPER', 'DESTROY IT', 3.5); audio?.play?.('dog_round', .9);
+    a.rig.play(KA.roar ? 'roar' : 'idle', false); announce?.('THE KEEPER', 'DESTROY IT', 3.5); music('boss_fight', { loop: true, vol: .7 });
   }
   // only the stunned Keeper takes damage; insta-kill and the Nuke don't touch it
   const hurt = enemies.hurt.bind(enemies);
@@ -320,6 +321,7 @@ export function setupEE(api, { bows, traps }) {
     kino.debug.teleportPlayer([ARENA.back.x, ARENA.back.y + 4, ARENA.back.z]); flash(ARENA.back, 0x9fd8ff, 8, 800, 1.2);
     enemies.autoSpawn = restore.auto; st.step = 9; session.flags.add('castle:ee:done'); session.addPoints?.(10000);
     try { const prof = loadProfile(); prof.rewards = { ...prof.rewards, castle: true }; saveProfile(prof); const wl = kino.weaponLevels; if (wl?.profile) { wl.profile.rewards = { ...wl.profile.rewards, castle: true }; wl.apply?.(); } } catch {}
+    stopMusic(1); sfx('moon_shockwave', 1); setTimeout(() => { const parts = ['castle_outro_part_1_mas', 'castle_outro_part_2_mas', 'castle_outro_part_3_mas']; let i = 0; const next = () => { if (i < parts.length) { const a = music(parts[i++], { vol: .8 }); a.onended = next; } }; next(); }, 1500);
     announce?.('BAD MOON RISING', 'THE ROCKETS STRIKE THE MOON', 6); flash(W(4236, -2261, -1000), 0xffe0b0, 12, 6000, 5); audio?.play?.('box'); hud();
   }
 
@@ -347,7 +349,7 @@ export function setupEE(api, { bows, traps }) {
   // a new game: everything back as the map started
   const lidRest = node('CASTLE_SM_lid_crate_stone')?.rotation.x, leverRest = node('CASTLE_SM_ee_death_ray_switch')?.rotation.z;
   host.on('reset', () => {
-    if (st.boss) { st.boss.bar.remove(); st.boss.z.root.removeFromParent(); enemies.autoSpawn = restore.auto; }
+    if (st.boss) { st.boss.bar.remove(); st.boss.z.root.removeFromParent(); enemies.autoSpawn = restore.auto; stopMusic(.5); }
     if (P) { P.a.root.removeFromParent(); P = null; }
     for (const f of bossFx.splice(0)) { if (f.line) f.line.removeFromParent(); for (const k of ['warn', 'wolf', 'chomper', 'ember']) drop(f[k]); }
     root.traverse(o => { if (/^CASTLE_EE_/.test(o.name)) { o.visible = false; o.updateMatrixWorld(true); } });

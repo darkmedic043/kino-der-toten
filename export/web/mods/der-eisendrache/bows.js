@@ -126,6 +126,18 @@ export function setupBows(api, { lowgrav }) {
     charged = t > .3 ? { el, k: Math.min(1, t / CHARGE), at: performance.now() } : null;
     window.kino.debug?.shoot?.();
   }, true);
+  // touch: the fire button reaches the engine, not mouse events; while a bow is in hand the engine leaves it to us
+  // (host.holdFire) and a held touch draws, a release fires, as the mouse does
+  host.holdFire = () => bowInHand() && touchHeld();
+  const touchHeld = () => !!api.view?.input?.fire && !mouseDown;
+  let mouseDown = false, touchWas = false;
+  addEventListener('mousedown', e => { if (e.button === 0) mouseDown = true; }, true); addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; }, true);
+  host.on('update', () => {
+    const t = bowInHand() && touchHeld();
+    if (t && !touchWas && session.weapon.mag > 0 && !drawing) drawing = { t: 0, touch: true };
+    if (!t && touchWas && drawing?.touch) { const d = drawing.t; drawing = null; ring.style.display = 'none'; const el = /^bo3_bow_(\w+)$/.exec(session.weapon?.id ?? '')?.[1] ?? 'base'; charged = d > .3 ? { el, k: Math.min(1, d / CHARGE), at: performance.now() } : null; window.kino.debug?.shoot?.(); }
+    touchWas = t;
+  });
   host.on('update', dt => {
     if (!drawing) return; if (!bowInHand()) { drawing = null; ring.style.display = 'none'; return; }
     drawing.t += dt; const k = Math.min(1, drawing.t / CHARGE), col = '#' + (Q[/^bo3_bow_(\w+)$/.exec(session.weapon.id)?.[1]]?.color ?? 0xffa040).toString(16).padStart(6, '0');

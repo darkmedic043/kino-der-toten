@@ -5,6 +5,8 @@ import { setupLowGrav } from './lowgrav.js';
 import { setupBows } from './bows.js';
 import { setupEE } from './ee.js';
 import { setupSide } from './side.js';
+import { setupSide2 } from './side2.js';
+import { useGameAudio } from './castle-audio.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -92,10 +94,11 @@ export default async function setup(api) {
     });
   }
   const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api), traps = setupTraps(api);
-  const craft = setupCraftables(api, { traps }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav }), ee = setupEE(api, { bows, traps }), side = setupSide(api, { lowgrav });
+  const craft = setupCraftables(api, { traps }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav }), ee = setupEE(api, { bows, traps }), side2 = setupSide2(api, { bows }), side = setupSide(api, { lowgrav, side2 });
+  useGameAudio(api.audio);
   setupRocketPad(api); setupDogRounds(api);
   await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
-  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz, traps, craft, lowgrav, bows, ee, side };
+  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz, traps, craft, lowgrav, bows, ee, side, side2 };
 }
 
 // ---- BO3 fxanim rigs (CASTLE_<name> from the builder's fxanim_rig): bones carry extras.anims[key] = {rot, loc} runs,
@@ -603,6 +606,7 @@ function setupBow(api) {
 //   back go to the power-supply cap; when it breaks the Panzer reels and its core takes double damage.
 const PZ_DIR = new URL('panzer/', import.meta.url).href;
 function setupPanzer(api) {
+  const clawHat = () => (window.kino?.castle?.clawHat ? .5 : 1);   // the claw hat (side2.js): BO3 halves its melee, fire and splash
   const { world, session, host, scene, enemies, player, announce, audio, damage } = api, root = world.root;
   const spots = []; root.traverse(o => { if (/^CASTLE_MECHZ_\d+$/.test(o.name)) spots.push({ p: o.getWorldPosition(new THREE.Vector3()), zone: o.userData.zone, yaw: o.userData.yaw ?? 0 }); });
   const A = {};
@@ -672,8 +676,8 @@ function setupPanzer(api) {
     const eye = tp.clone().add(new THREE.Vector3(0, 40, 0)), from = pos.clone().add(new THREE.Vector3(0, 70, 0)), seen = world.lineClear(from, eye);
     face(z, tp);
     // attacks
-    if (seen && dist < 95 && z.cool.melee <= 0) return busy(z, Math.random() < .5 ? 'melee_a' : 'melee_b', null, { at: .55, hit: () => { if (pos.distanceTo(tp) < 110) damage(70); } }, 1.8);
-    if (seen && dist < 260 && z.cool.ft <= 0) return busy(z, 'ft_sweep', dt2 => { const to = tp.clone().sub(pos).setY(0).normalize(); if (pos.distanceTo(tp) < 300 && to.dot(fwd(z)) > .7) damage(70 * dt2); flame(z); }, null, 4.5);
+    if (seen && dist < 95 && z.cool.melee <= 0) return busy(z, Math.random() < .5 ? 'melee_a' : 'melee_b', null, { at: .55, hit: () => { if (pos.distanceTo(tp) < 110) damage(70 * clawHat()); } }, 1.8);
+    if (seen && dist < 260 && z.cool.ft <= 0) return busy(z, 'ft_sweep', dt2 => { const to = tp.clone().sub(pos).setY(0).normalize(); if (pos.distanceTo(tp) < 300 && to.dot(fwd(z)) > .7) damage(70 * dt2 * clawHat()); flame(z); }, null, 4.5);
     if (seen && dist > 300 && dist < 1100 && z.cool.gun <= 0) return busy(z, 'chaingun_fire', dt2 => { z.gunT = (z.gunT ?? 0) - dt2; if (z.gunT <= 0) { z.gunT = .12; tracer(z, eye); if (Math.random() < .3) damage(6); } }, null, 7, 2.2);
     // move along the navmesh
     z.repath -= dt;
