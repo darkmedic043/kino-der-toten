@@ -23,6 +23,7 @@ import { configureKinoAssets, assetDiagnostics } from './runtime-assets.js';
 import { ModHost } from './mod-loader.js';
 import { settings } from './settings.js';
 import { installGameMenu } from './game-menu.js';
+import { createPerfDiag } from './perf-diag.js';
 
 export const vector=a=>new THREE.Vector3().fromArray(a);
 export const perkInfo={specialty_quickrevive:{name:'Quick Revive',price:1500,color:'#509ebc',icon:'QR'},specialty_fastreload:{name:'Speed Cola',price:3000,color:'#478450',icon:'SC'},specialty_rof:{name:'Double Tap',price:2000,color:'#b37528',icon:'DT'},specialty_armorvest:{name:'Juggernog',price:2500,color:'#a53835',icon:'J'}};
@@ -87,6 +88,10 @@ function diag(ev,extra={}){
   try{navigator.sendBeacon('/api/client-log',JSON.stringify({ev,page:location.pathname+location.search,t:+((performance.now()-diagT0)/1000).toFixed(1),gpu:diagGpu,ua:navigator.userAgent,
     heap:performance.memory?Math.round(performance.memory.usedJSHeapSize/1e6):null,frames:renderedFrames,calls:renderer.info?.render?.calls,ready,...extra}));}catch{}
 }
+// play-time frame timing (perf-diag.js): 10 s summaries while playing, one for the session when the page goes away
+const perf=createPerfDiag({context:()=>({q:settings.graphics,scale:settings.renderScale,cap:settings.fpsCap,px:renderer.domElement.width+'x'+renderer.domElement.height,
+  calls:renderer.info?.render?.calls,tris:renderer.info?.render?.triangles,zombies:enemies?.list?.length??0,round:session?.round,coop:!!globalThis.kino?.coop?.code})});mods.perf=perf;
+addEventListener('pagehide',()=>perf.end());
 {const beat=setInterval(()=>{diag('beat',{label:$('load-label')?.textContent});if(ready&&performance.now()-diagT0>0&&(diag.readyAt??=performance.now())&&performance.now()-diag.readyAt>20000)clearInterval(beat);},2000);}
 addEventListener('error',e=>diag('error',{message:String(e.message).slice(0,300),src:e.filename?.split('/').pop(),line:e.lineno}));
 addEventListener('unhandledrejection',e=>diag('rejection',{message:String(e.reason?.message??e.reason).slice(0,300)}));
@@ -104,7 +109,7 @@ $('start').addEventListener('click',start);$('restart').addEventListener('click'
 renderer.domElement.addEventListener('click',()=>{if(!active)start();});
 // mods.keepActive: a mod's UI (the terminal booth) frees the cursor without pausing the game
 document.addEventListener('pointerlockchange',()=>{if((touchControls.mode||mods.keepActive)&&!document.pointerLockElement)return;setActive(document.pointerLockElement===renderer.domElement);});
-function suspendRendering(){renderer.setAnimationLoop(null);if(ready){setActive(false);document.exitPointerLock?.();}audio.pause();}
+function suspendRendering(){perf.pause();renderer.setAnimationLoop(null);if(ready){setActive(false);document.exitPointerLock?.();}audio.pause();}
 function resumeRendering(){previous=performance.now();lastRendered=0;if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendRendering();else resumeRendering();});
 addEventListener('pagehide',suspendRendering);addEventListener('pageshow',resumeRendering);
@@ -434,6 +439,8 @@ function renderFrame(now){
   lastRendered=now;const dt=Math.min((now-previous)/1000,.06);previous=now;frameTime+=dt;frameCount++;renderedFrames++;
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
   if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);}
-  update(dt);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();if(mods.renderWorld)mods.renderWorld(scene,mods.camera??camera);else renderer.render(scene,mods.camera??camera);if(ready&&started&&!mods.hideViewmodel){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
+  const playing=active&&started,t0=performance.now();mods.profiling=playing;
+  update(dt);const t1=performance.now();staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();if(mods.renderWorld)mods.renderWorld(scene,mods.camera??camera);else renderer.render(scene,mods.camera??camera);if(ready&&started&&!mods.hideViewmodel){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
+  if(playing)perf.frame(now,t1-t0,performance.now()-t1);else perf.pause();
 }
 resumeRendering();

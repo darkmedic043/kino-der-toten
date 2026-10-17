@@ -58,10 +58,12 @@ export function resolveWeapons(data){
 
 export class ModHost {
   // camera / hideViewmodel let a mod take over rendering (e.g. third person).
-  constructor(base='mods/'){this.base=new URL(base,document.baseURI);this.mods=[];this.handlers=new Map();this.errors=[];this.camera=null;this.hideViewmodel=false;}
-  on(event,fn){if(!this.handlers.has(event))this.handlers.set(event,[]);this.handlers.get(event).push(fn);return()=>this.off(event,fn);}
+  constructor(base='mods/'){this.base=new URL(base,document.baseURI);this.mods=[];this.handlers=new Map();this.errors=[];this.camera=null;this.hideViewmodel=false;this.owners=new WeakMap();this.setupMod=null;}
+  on(event,fn){if(this.setupMod&&!this.owners.has(fn))this.owners.set(fn,this.setupMod);if(!this.handlers.has(event))this.handlers.set(event,[]);this.handlers.get(event).push(fn);return()=>this.off(event,fn);}
   off(event,fn){const list=this.handlers.get(event);if(list)list.splice(list.indexOf(fn)>>>0,1);}
   emit(event,...args){
+    // per-frame 'update' handlers are timed per mod while the engine is profiling a played frame (perf-diag.js)
+    if(event==='update'&&this.profiling&&this.perf){for(const fn of this.handlers.get(event)??[]){const t=performance.now();try{fn(...args);}catch(error){this.report(`${event} handler`,error);}this.perf.mod(this.owners.get(fn)??'?',performance.now()-t);}return;}
     for(const fn of this.handlers.get(event)??[]){try{fn(...args);}catch(error){this.report(`${event} handler`,error);}}
   }
   report(where,error){console.error(`[mods] ${where}:`,error);this.errors.push(`${where}: ${error?.message??error}`);}
@@ -113,8 +115,11 @@ export class ModHost {
       if(!mod.manifest.script)continue;
       try{
         const module=mod.module??await import(new URL(mod.manifest.script,mod.url).href);
-        await module.default?.({...api,mod,host,on:this.on.bind(this),emit:this.emit.bind(this)});
+        this.setupMod=mod.id;   // handlers registered while it sets up are its own (perf-diag per-mod timing)
+        const on=(event,fn)=>{if(!this.owners.has(fn))this.owners.set(fn,mod.id);return this.on(event,fn);};
+        await module.default?.({...api,mod,host,on,emit:this.emit.bind(this)});
       }catch(error){this.report(`mod ${mod.id} script`,error);}
+      this.setupMod=null;
     }
     this.emit('ready');
   }

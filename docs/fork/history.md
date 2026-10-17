@@ -249,3 +249,4 @@
 - 2026-10-17: Der Eisendrache main Easter egg (time travel, Keeper protector, Simon says, rockets, the Keeper boss), charged bow shots, the longer bow quests (magma golf, wolf escort, rune sequence) (waw-ports.md).
 - 2026-10-17: Der Eisendrache side Easter eggs: pressure plates, the plunger, the plant gumball, Disco Inferno (waw-ports.md).
 - 2026-10-17: Der Eisendrache: clock tower, music eggs, skulls, claw hat, BO3's castle music and sounds, floating zombies in low gravity, touch bow draws (waw-ports.md).
+- 2026-10-17: Play-time frame diagnostics (perf-diag.js, .tools/perf-report.mjs) after the user reported frame loss on a 4070 Ti Super; Rind 0.3.3 turns vsync back on (performance.md).
