@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { binds } from '../../settings.js';
 import { setupRagnarok } from './ragnarok.js';
+import { setupRocketShield } from './rocket-shield.js';
 
 export default async function setup(api){
   const {host,session,view,audio}=api;
@@ -137,6 +138,7 @@ export default async function setup(api){
   kino.operator={register,give,take,use,putAway,addCharge,defs,
     get current(){return st.def?.id??null;},get handle(){return st.active;},get charge(){return st.charge;},get active(){return !!st.active;},get power(){return st.power;}};
   setupRagnarok(api,kino.operator);
+  kino.rocketShield=setupRocketShield(api);   // BO3's rocket shield: built on Der Eisendrache, bought at the Armory elsewhere
   kino.cheats?.addCommand?.('operator',{usage:'operator <id|none>',text:'Give an operator weapon, charged: '+[...defs.keys()].join(', '),cheat:true,
     run:([id])=>{if(!id||id==='none'){take();return 'Operator weapon removed';}const m=[...defs.keys()].find(k=>k.startsWith(id.toLowerCase()));if(!m)return 'Unknown: '+[...defs.keys()].join(', ');give(m,{full:true});return defs.get(m).name+' (charged)';}});
 }

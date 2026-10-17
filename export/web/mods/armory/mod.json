@@ -1,0 +1,5 @@
+{
+  "name": "Armory",
+  "description": "ARMORY.EXE on the terminal booth: operator weapons (Ragnarok DG-4) and shields (rocket shield) bought outside their home map, once found there and used for 250 kills. Scorestreaks to come.",
+  "script": "mod.js"
+}

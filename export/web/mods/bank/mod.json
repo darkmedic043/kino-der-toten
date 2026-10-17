@@ -1,0 +1,5 @@
+{
+  "name": "Bank",
+  "description": "TranZit's bank on the terminal booth (BANK.EXE): build the vault with 1,000,000 invested points and a few milestones, then bank points across every map and match (1,100 in for 1,000 banked). Needs mains power.",
+  "script": "mod.js"
+}

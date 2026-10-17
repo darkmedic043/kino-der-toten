@@ -10,6 +10,10 @@
 // STARK.EXE (mods/stark): the Iron Man armors; opts.stark() -> status, opts.starkAct(action, id) -> true | 'reason'.
 // GOBBLE.EXE (mods/gobblegums): rolls a gobblegum from your pack on a slot-machine reel; opts.gums() -> status,
 //   opts.gumRoll() -> {id, commit()} | 'reason' (commit puts it in your hand once the reel stops).
+// BANK.EXE (mods/bank, above EXFIL): TranZit's bank. Build the vault first (invest points until every requirement is met),
+//   then deposit (1,100 per 1,000 banked) and withdraw across matches; opts.bank() -> status, opts.bankAct(action, amount).
+// ARMORY.EXE (mods/armory, above BANK): tabs of special gear bought off its home map (operator weapons, shields,
+//   scorestreaks later); opts.armory() -> status, opts.armoryBuy(id) -> true | 'reason'.
 
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
 // perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine: a Melon Pass reward);
@@ -138,6 +142,31 @@ const CSS = `
 #melonterm .detail li::before{content:'>';position:absolute;left:2px;color:var(--g2)}
 #melonterm .detail .note{font-size:19px;color:var(--g2);opacity:.85}
 #melonterm .app.exfil{position:absolute;right:16px;bottom:14px}
+#melonterm .app.bank{position:absolute;right:16px;bottom:134px}
+#melonterm .app.armory{position:absolute;right:16px;bottom:254px}
+#melonterm .arm{flex:1;min-height:0;display:flex;flex-direction:column}#melonterm .arm>.perks{flex:1;min-height:0}
+#melonterm .tabs{display:flex;gap:0;border-bottom:2px solid var(--line);background:#04180c}
+#melonterm .tabs button{font:inherit;font-size:20px;letter-spacing:2px;padding:3px 16px;color:var(--g2);background:none;border:0;border-right:2px solid var(--line);cursor:pointer}
+#melonterm .tabs button:hover{color:var(--g)}#melonterm .tabs button.on{background:var(--g2);color:var(--bg);text-shadow:none}
+#melonterm .tabs button.soon{color:var(--dim)}#melonterm .tabs button.soon.on{background:var(--dim);color:var(--bg)}
+#melonterm .arm .soonbox{flex:1;display:grid;place-items:center;text-align:center;font-size:26px;color:var(--dim);letter-spacing:2px}
+#melonterm .arm .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+#melonterm .arm .gear{width:70%;height:70%}
+#melonterm .arm .prog{height:12px;border:2px solid var(--g2);max-width:360px}#melonterm .arm .prog i{display:block;height:100%;background:var(--g)}
+#melonterm .bnk{flex:1;min-height:0;overflow:auto;padding:18px 26px;display:flex;flex-direction:column;gap:10px;font-size:22px;line-height:1.2}
+#melonterm .bnk h2{margin:0;font:inherit;font-size:38px;line-height:1;letter-spacing:2px;color:var(--warn);text-shadow:0 0 8px #ffb00088}
+#melonterm .bnk .note{font-size:19px;color:var(--g2);opacity:.85}
+#melonterm .bnk ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+#melonterm .bnk li{padding-left:34px;position:relative}#melonterm .bnk li::before{content:'[ ]';position:absolute;left:0;color:var(--dim)}
+#melonterm .bnk li.ok::before{content:'[X]';color:var(--g)}#melonterm .bnk li.ok{color:#b6ffcb}
+#melonterm .bnk li small{display:block;font-size:17px;color:var(--dim)}
+#melonterm .bnk .have{float:right;color:var(--g2)}#melonterm .bnk li.ok .have{color:var(--g)}
+#melonterm .bnk .bar2{height:12px;border:2px solid var(--g2);margin-top:3px}#melonterm .bnk .bar2 i{display:block;height:100%;background:var(--g)}
+#melonterm .bnk .row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}#melonterm .bnk .row>b{width:120px;font-weight:normal;letter-spacing:2px;color:var(--dim)}
+#melonterm .bnk .row .buy{font-size:21px;padding:0 10px}
+#melonterm .bnk .bal{display:flex;align-items:baseline;gap:16px;padding:6px 14px;border:2px solid var(--warn);align-self:flex-start;color:var(--warn)}
+#melonterm .bnk .bal b{font-weight:normal;font-size:46px;line-height:1;text-shadow:0 0 10px #ffb000aa}
+#melonterm .bnk .msg{border:0;background:none;padding:0}
 #melonterm .app.off .sq{border-color:var(--dim);background:#03160a;box-shadow:none}
 #melonterm .app.off svg{opacity:.5;filter:grayscale(1)}#melonterm .app.off span{color:var(--dim)}
 #melonterm .app.live .sq{animation:mt-pulse 1.2s ease-in-out infinite}
@@ -191,6 +220,12 @@ const STARK_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-render
 const GUMS_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <circle cx="16" cy="11" r="9" fill="none" stroke="#7dffa6" stroke-width="2"/><circle cx="12" cy="9" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="15" cy="13" r="2"/><circle cx="20" cy="13" r="2" fill="#c9ffd9"/>
   <rect x="9" y="20" width="14" height="9"/><rect x="14" y="23" width="4" height="3" fill="#031208"/><rect x="7" y="29" width="18" height="2"/></svg>`;
+const BANK_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#ffd36b">
+  <path d="M16 2 3 9v2h26V9z"/><rect x="5" y="13" width="3" height="11"/><rect x="11" y="13" width="3" height="11"/><rect x="18" y="13" width="3" height="11"/><rect x="24" y="13" width="3" height="11"/>
+  <rect x="3" y="25" width="26" height="2"/><rect x="2" y="28" width="28" height="2"/><rect x="14" y="5" width="4" height="3" fill="#031208"/></svg>`;
+const ARMORY_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
+  <path d="M16 3 6 7v8c0 7 4 11 10 14 6-3 10-7 10-14V7z" fill="none" stroke="#7dffa6" stroke-width="2"/>
+  <rect x="15" y="9" width="2" height="14"/><rect x="11" y="13" width="10" height="2"/><rect x="13" y="20" width="6" height="2" fill="#c9ffd9"/></svg>`;
 const EXFIL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <rect x="4" y="6" width="24" height="2"/><rect x="15" y="8" width="2" height="3"/><rect x="9" y="11" width="15" height="7"/><rect x="6" y="13" width="3" height="3"/>
   <rect x="2" y="12" width="4" height="2"/><rect x="11" y="12" width="5" height="3" fill="#031208"/><rect x="11" y="19" width="2" height="3"/><rect x="20" y="19" width="2" height="3"/>
@@ -219,6 +254,8 @@ function build() {
         <button class="app" data-app="arsenal"><div class="sq">${ARSENAL_ICON}</div><span>ARSENAL</span></button>
         <button class="app" data-app="stark"><div class="sq">${STARK_ICON}</div><span>STARK</span></button>
         <button class="app" data-app="gums"><div class="sq">${GUMS_ICON}</div><span>GUMS</span></button></div>
+      <button class="app armory" data-app="armory"><div class="sq">${ARMORY_ICON}</div><span>ARMORY</span></button>
+      <button class="app bank off" data-app="bank"><div class="sq">${BANK_ICON}</div><span>BANK</span></button>
       <button class="app exfil off" data-app="exfil"><div class="sq">${EXFIL_ICON}</div><span>EXFIL</span></button>
       <div class="win" data-win="perks" hidden>
         <div class="title"><span>PERKS.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
@@ -236,6 +273,14 @@ function build() {
         <div class="title"><span>GOBBLE.EXE · GOBBLEGUMS</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="gum"><div class="reelbox"><div class="reel"><div class="strip"></div><div class="line"></div></div></div><div class="side"></div></div>
       </div>
+      <div class="win" data-win="armory" hidden>
+        <div class="title"><span>ARMORY.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
+        <div class="arm"></div>
+      </div>
+      <div class="win" data-win="bank" hidden>
+        <div class="title"><span>BANK.EXE · MELON SAVINGS &amp; LOAN</span><span class="grow"></span><button data-close title="Close">×</button></div>
+        <div class="bnk"></div>
+      </div>
       <div class="win" data-win="exfil" hidden>
         <div class="title"><span>EXFIL.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="exf"></div>
@@ -251,6 +296,8 @@ function build() {
   const gmWin = $('[data-win=gums]'), gmStrip = $('.strip'), gmSide = $('.gum .side'); let gmState = '', gmMsg = ['', ''], gmSpin = false, gmWon = null, gmPending = null;   // gmPending: a gum rolled into a full hand, waiting for swap or keep
   const grid = $('.grid'), detail = $('.detail'), msg = $('.msg');
   let exState = '';
+  const amWin = $('[data-win=armory]'), amBody = $('.arm'); let amState = '', amMsg = ['', ''], amTab = 'operators', amShown = 0;
+  const bkWin = $('[data-win=bank]'), bkBody = $('.bnk'), bkIcon = $('[data-app=bank]'); let bkState = '', bkMsg = ['', ''];
   let opts = null, shown = 0, clock = 0, lastState = '';
 
   // Keep the game from seeing key presses and clicks while the desktop is up. Key releases still go through, so a
@@ -259,9 +306,9 @@ function build() {
   for (const t of ['click', 'mousedown', 'mouseup', 'pointerdown', 'wheel', 'contextmenu']) root.addEventListener(t, e => e.stopPropagation());
 
   function key(e) {
-    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden) closeApp(); else close(); return; }
+    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden) closeApp(); else close(); return; }
     if (!gmWin.hidden) { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); gumRoll(); } return; }
-    if (!arWin.hidden || !stWin.hidden) return;
+    if (!arWin.hidden || !stWin.hidden || !bkWin.hidden || !amWin.hidden) return;
     if (!exWin.hidden) { if (e.code === 'Enter') { e.preventDefault(); callExfil(); } return; }
     if (win.hidden) { if (e.code === 'Enter') { e.preventDefault(); openApp('perks'); } return; }
     if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); buy(shown); return; }
@@ -309,6 +356,9 @@ function build() {
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
   }
   function openApp(name) {
+    bkWin.hidden = amWin.hidden = true;
+    if (name === 'armory') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; amState = ''; amMsg = ['', '']; amWin.hidden = false; drawArmory(); $('.open').textContent = '[ARMORY.EXE]'; opts.onApp?.(name); return; }
+    if (name === 'bank') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; bkState = ''; bkMsg = ['', '']; bkWin.hidden = false; drawBank(); $('.open').textContent = '[BANK.EXE]'; opts.onApp?.(name); return; }
     if (name === 'gums') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = true; gmState = ''; if (!gmSpin && !gmPending) { gmMsg = ['', '']; gmWon = null; idleReel(); } gmWin.hidden = false; drawGums(); $('.open').textContent = '[GOBBLE.EXE]'; opts.onApp?.('gobble'); return; }
     gmWin.hidden = true;
     if (name === 'stark') { win.hidden = exWin.hidden = arWin.hidden = true; stState = ''; stMsg = ['', '']; stWin.hidden = false; drawStark(); $('.open').textContent = '[STARK.EXE]'; opts.onApp?.(name); return; }
@@ -319,7 +369,7 @@ function build() {
     say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
     opts.onApp?.(name); grid.querySelector(`[data-i="${shown}"]`)?.focus({ preventScroll: true });
   }
-  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; $('.open').textContent = ''; }
+  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = true; $('.open').textContent = ''; }
   // ---- STARK.EXE: the Iron Man armors (mods/stark) ---------------------------------------------------------------
   const MARK = { mk1: 'I', mk3: 'III', mk4: 'IV', mk5: 'V', mk6: 'VI', wm: 'WM', mk16: 'XVI' };
   function starkDo(action, id) {
@@ -468,6 +518,89 @@ function build() {
     gmSide.querySelector('.buy').addEventListener('click', gumRoll);
     for (const b of gmSide.querySelectorAll('[data-swap]')) b.addEventListener('click', () => gumResolve(b.dataset.swap === 'keep' ? null : +b.dataset.swap));
   }
+  // ---- ARMORY.EXE: tabs of gear (mods/armory), each laid out like PERKS.EXE (tiles left, details right) -----------
+  const gearIcon = it => `<svg class="gear" viewBox="0 0 24 24" fill="none" stroke="${it.color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px ${it.color})"><path d="${it.icon ?? 'M7 12h10M12 7v10'}"/></svg>`;
+  function armoryBuy(it) {
+    const r = opts.armoryBuy?.(it.id) ?? 'ARMORY.EXE is not installed';
+    amMsg = r === true ? [`${it.name.toUpperCase()} ISSUED`, 'ok'] : [String(r).toUpperCase(), 'bad'];
+    amState = ''; status(); drawArmory();
+  }
+  function drawArmory() {
+    if (amWin.hidden) return;
+    const st = opts?.armory?.(); if (!st) { amBody.innerHTML = '<p>ARMORY.EXE is not installed.</p>'; return; }
+    const key = JSON.stringify([st, amMsg, amTab, amShown]); if (key === amState) return; amState = key;
+    const tab = st.tabs.find(t => t.id === amTab) ?? st.tabs[0];
+    const tabs = `<div class="tabs">${st.tabs.map(t => `<button data-tab="${t.id}" class="${t.id === tab.id ? 'on' : ''} ${t.soon ? 'soon' : ''}">${esc(t.name)}</button>`).join('')}</div>`;
+    const msg = `<div class="msg ${amMsg[1]}">${esc(amMsg[0] || (tab.soon ? '> OFFLINE' : st.power ? '> HOVER AN ITEM · CLICK TO BUY' : '> ACCESS DENIED · RESTORE MAINS POWER'))}</div>`;
+    if (tab.soon || !tab.items.length) {
+      amBody.innerHTML = `${tabs}<div class="soonbox">${esc(tab.name)}<br>COMING SOON</div>${msg}`;
+    } else {
+      const it = tab.items[Math.min(amShown, tab.items.length - 1)];
+      const tag = i => i.why === 'home' ? 'BUILD HERE' : !i.unlocked ? 'LOCKED' : i.why === 'power' ? 'NO POWER' : '';
+      const label = it.why === 'home' ? `BUILD IT HERE ON ${it.homeName.toUpperCase()}` : !it.unlocked ? 'LOCKED' : it.why === 'owned' ? 'OWNED'
+        : it.why === 'power' ? 'NEEDS POWER' : it.why === 'points' ? 'NOT ENOUGH POINTS' : `BUY · ${it.price.toLocaleString()}`;
+      const unlock = it.unlocked ? `<div class="status"><span>UNLOCKED · ${it.have.toLocaleString()} KILLS</span></div>`
+        : `<h3>UNLOCK</h3><ul><li style="${it.found ? `color:${it.color}` : ''}">${it.found ? '[X]' : '[ ]'} Find it on ${esc(it.homeName)}</li>
+           <li>${it.have.toLocaleString()} / ${it.kills.toLocaleString()} kills with it${it.found ? '' : ' (after finding it)'}</li></ul>
+           <div class="prog"><i style="width:${100 * it.have / it.kills}%"></i></div>`;
+      amBody.innerHTML = `${tabs}<div class="perks"><div class="left"><div class="grid">${tab.items.map((i, k) => `<button class="tile ${i.unlocked && i.why !== 'home' ? '' : 'locked'} ${i.owned ? 'owned' : ''} ${k === amShown ? 'on' : ''}" data-i="${k}" title="${esc(i.name)}">${gearIcon(i)}<span class="tag">${tag(i)}</span></button>`).join('')}</div>${msg}</div>
+        <div class="detail"><div class="head"><div class="big" style="border-color:${it.color}">${gearIcon(it)}</div><div>
+          <h2 style="color:${it.color}">${esc(it.name.toUpperCase())}</h2><div class="blurb">${esc(it.blurb)}</div><div class="price">${it.price.toLocaleString()} PTS</div></div></div>
+          <button class="buy ${it.unlocked ? '' : 'locked'}" ${it.why ? 'disabled' : ''}>${label}</button>
+          ${unlock}
+          <h3>SPECS</h3><ul>${it.specs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+          <div class="note">* Not sold on ${esc(it.homeName)}: build it there.</div></div></div>`;
+      for (const t of amBody.querySelectorAll('.tile')) { t.addEventListener('mouseenter', () => { amShown = +t.dataset.i; drawArmory(); }); t.addEventListener('click', () => armoryBuy(tab.items[+t.dataset.i])); }
+      amBody.querySelector('.buy').addEventListener('click', () => armoryBuy(it));
+    }
+    for (const b of amBody.querySelectorAll('[data-tab]')) b.addEventListener('click', () => { amTab = b.dataset.tab; amShown = 0; amMsg = ['', '']; drawArmory(); });
+  }
+  // ---- BANK.EXE: TranZit's bank (mods/bank). Locked: the vault's build checklist and INVEST; open: deposit / withdraw --
+  const pts = n => n.toLocaleString();
+  function bankDo(action, amount) {
+    const r = opts.bankAct?.(action, amount) ?? 'BANK.EXE is not installed';
+    bkMsg = r === true ? [{ invest: 'INVESTMENT RECEIVED · THE VAULT GROWS', activate: 'VAULT ONLINE · WELCOME, VALUED CUSTOMER', deposit: 'DEPOSIT CLEARED', withdraw: 'CASH DISPENSED' }[action] ?? 'OK', 'ok'] : [String(r).toUpperCase(), 'bad'];
+    bkState = ''; status(); drawBank();
+  }
+  function drawBank() {
+    const st = opts?.bank?.();
+    bkIcon.classList.toggle('off', !st?.unlocked);
+    if (bkWin.hidden) return;
+    if (!st) { bkBody.innerHTML = '<p>BANK.EXE is not installed.</p>'; return; }
+    const key = JSON.stringify([st, bkMsg]); if (key === bkState) return; bkState = key;
+    const off = !st.power, dis = c => off || !c ? 'disabled' : '';
+    const power = off ? '<div class="warn">NO MAINS POWER · THE VAULT WON\'T RUN ON THE AUX BATTERY</div>' : '';
+    const cheat = st.cheating ? '<div class="warn">CHEAT MODE · INVESTING AND DEPOSITS ARE LOCKED THIS GAME</div>' : '';
+    const msg = `<div class="msg ${bkMsg[1]}">${esc(bkMsg[0] || (st.unlocked ? '> DEPOSIT OR WITHDRAW IN 1,000S' : '> INVEST POINTS TO BUILD THE VAULT'))}</div>`;
+    let body;
+    if (!st.unlocked) {
+      const reqs = st.reqs.map(r => `<li class="${r.ok ? 'ok' : ''}">${esc(r.text)}<span class="have">${pts(Math.min(r.have, r.need))} / ${pts(r.need)}</span>
+        ${r.id === 'invest' ? `<div class="bar2"><i style="width:${Math.min(100, 100 * r.have / r.need)}%"></i></div>` : ''}${r.detail ? `<small>${esc(r.detail.toUpperCase())}</small>` : ''}</li>`).join('');
+      const can = n => !st.cheating && st.points >= n, all = Math.floor(st.points / st.step) * st.step;
+      const room = st.reqs[0].need - st.invested, top = room > 0 ? Math.min(all, room) : all;
+      body = `<h2>VAULT UNDER CONSTRUCTION</h2>
+        <div class="note">A VAULT FOR THE DEDICATED. INVESTED POINTS BUILD IT AND ARE NEVER RETURNED. PROGRESS IS SAVED TO YOUR ACCOUNT.</div>
+        ${power}${cheat}<ul>${reqs}</ul>
+        ${st.ready ? `<button class="buy" data-act="activate" ${dis(true)}>ACTIVATE VAULT</button>`
+          : `<div class="row"><b>INVEST</b><button class="buy" data-act="invest" data-n="1000" ${dis(can(1000))}>1,000</button>
+             <button class="buy" data-act="invest" data-n="10000" ${dis(can(10000))}>10,000</button>
+             <button class="buy" data-act="invest" data-n="max" ${dis(can(1000))}>ALL · ${pts(top)}</button></div>`}`;
+    } else {
+      const unit = st.step + st.fee, can = n => !st.cheating && st.points >= n / st.step * unit, most = Math.floor(st.points / unit) * st.step;
+      body = `<h2>MELON SAVINGS &amp; LOAN</h2>${power}${cheat}
+        <div class="bal">BALANCE <b>${pts(st.balance)}</b></div>
+        <div class="row"><b>DEPOSIT</b><button class="buy" data-act="deposit" data-n="1000" ${dis(can(1000))}>1,000 · ${pts(unit)} PTS</button>
+          <button class="buy" data-act="deposit" data-n="10000" ${dis(can(10000))}>10,000 · ${pts(10 * unit)} PTS</button>
+          <button class="buy" data-act="deposit" data-n="max" ${dis(can(1000))}>MAX · ${pts(most)}</button></div>
+        <div class="row"><b>WITHDRAW</b><button class="buy" data-act="withdraw" data-n="1000" ${dis(st.balance >= 1000)}>1,000</button>
+          <button class="buy" data-act="withdraw" data-n="10000" ${dis(st.balance >= 10000)}>10,000</button>
+          <button class="buy" data-act="withdraw" data-n="max" ${dis(st.balance > 0)}>ALL · ${pts(st.balance)}</button></div>
+        <div class="note">* ${pts(unit)} POINTS IN FOR EVERY ${pts(st.step)} BANKED. WITHDRAWALS ARE FREE. YOUR BALANCE CARRIES ACROSS EVERY MAP AND MATCH.</div>
+        <div class="note">LIFETIME · DEPOSITED ${pts(st.deposited)} · WITHDRAWN ${pts(st.withdrawn)}</div>`;
+    }
+    bkBody.innerHTML = body + msg;
+    for (const b of bkBody.querySelectorAll('[data-act]')) b.addEventListener('click', () => bankDo(b.dataset.act, b.dataset.n === 'max' ? 'max' : +b.dataset.n || 0));
+  }
   // ---- EXFIL.EXE --------------------------------------------------------------------------------------------
   const exfilStatus = () => opts?.exfil?.() ?? { available: false, reason: 'Exfil is not installed' };
   function drawExfil() {
@@ -503,7 +636,7 @@ function build() {
     const state = PERKS.map(p => blocked(p)).join() + opts.points();
     if (!win.hidden && state !== lastState) { renderGrid(); select(shown); }
     lastState = state;
-    drawExfil(); drawArsenal(); drawStark(); drawGums();
+    drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory();
     $('[data-app=stark]').classList.toggle('off', !opts.stark?.()?.unlocked);
   }
   function open(o) {
@@ -522,6 +655,8 @@ function build() {
   root.querySelector('[data-app=arsenal]').addEventListener('click', () => openApp('arsenal'));
   root.querySelector('[data-app=stark]').addEventListener('click', () => openApp('stark'));
   root.querySelector('[data-app=gums]').addEventListener('click', () => openApp('gums'));
+  root.querySelector('[data-app=bank]').addEventListener('click', () => openApp('bank'));
+  root.querySelector('[data-app=armory]').addEventListener('click', () => openApp('armory'));
   for (const b of root.querySelectorAll('[data-close]')) b.addEventListener('click', closeApp);
   root.querySelector('[data-logoff]').addEventListener('click', close);
   return { open, close, isOpen: () => !root.hidden };
