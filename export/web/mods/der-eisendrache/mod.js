@@ -9,6 +9,8 @@ import { setupSide2 } from './side2.js';
 import { useGameAudio } from './castle-audio.js';
 import { createSync } from './sync.js';
 import { setupTab } from './tab.js';
+import { setupWeather } from './weather.js';
+import { mergeProps, instanceProps } from './merge-props.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -40,7 +42,9 @@ export default async function setup(api) {
     for (const x of s.flags) if (x.startsWith('zone:')) zones.add(x.slice(5));
     return zones;
   };
+  if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes); }
   setupLook(api);
+  const weather = setupWeather(api);   // snow outdoors, flames on the fixtures (weather.js)
   // Der Eisendrache's own zombies (BO3's c_zom_der_zombie_body1-3 + head1-3, .tools/build_castle_zombies.py; git-ignored,
   // ripped), driven by BO1's zombie clips. The clips set each joint's local rotation in BO1's joint frames; BO3's joints
   // sit in other frames (the ankles and balls most: feet turned backwards, user), so every skeleton is re-bound first:
@@ -106,10 +110,11 @@ export default async function setup(api) {
   useGameAudio(api.audio);
   setupRocketPad(api); setupDogRounds(api);
   setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 });   // the Tab scoreboard's tiles
+  const bounds = setupBounds(api, { lowgrav });   // after the pads: it watches their flights
   await bows?.ready;   // the spirit wolves too
   await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
   sync.ready();   // a guest catches up on the game's events so far
-  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz, traps, craft, lowgrav, bows, ee, side, side2, sync };
+  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz, traps, craft, lowgrav, bows, ee, side, side2, sync, bounds, weather };
 }
 
 // ---- BO3 fxanim rigs (CASTLE_<name> from the builder's fxanim_rig): bones carry extras.anims[key] = {rot, loc} runs,
@@ -306,7 +311,7 @@ function setupGondola(api) {
   });
   host.on('reset', () => { pK = 1; });
   carBox = () => { const c = carOf('CASTLE_TRAM02') ?? carCol[1]; return c ? c.m.box.clone().expandByScalar(12) : null; };
-  return { state: () => ({ ...st, item: !!st.item }), giveFuse: () => { st.held = true; } };
+  return { state: () => ({ ...st, item: !!st.item }), giveFuse: () => { st.held = true; }, cars: () => carCol.map(c => c.m?.box).filter(Boolean) };   // cars: the docked car boxes (the snow stays out of them)
 }
 
 // ---- Landing pads (zm_castle_flingers.gsc). Switch a landing pad on (free; its model turns blue), then its launch pad
@@ -378,13 +383,15 @@ function setupPads(api) {
 // ---- Look: a bright overcast Alpine day (the engine's default lights are retuned every frame, as for The Giant) and a
 // pool of warm point lights on the lit fixtures nearest the camera (CASTLE_LAMP_<n>: candles, torches, sconces, lamp
 // cages... from the static models), so the castle's halls and the undercroft aren't black. More with the power on.
-const POOL = 6, LAMP = { color: 0xffb877, on: 2600, off: 1700, range: 600, decay: 1.4 };   // 6: each point light is paid per pixel on every material (10 cost ~5 FPS)
+const POOL = 6, LAMP = { color: 0xffac62, bulb: 0xffd9a8, on: 3000, off: 2000, range: 620, decay: 1.4 };   // 6: each point light is paid per pixel on every material (10 cost ~5 FPS)
 function setupLook({ scene, world, session, host, camera }) {
   const kids = scene.children;
   const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
   const [key, fill] = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
-  const lamps = []; world.root?.traverse(o => { if (/^CASTLE_LAMP_/.test(o.name)) lamps.push(o.getWorldPosition(new THREE.Vector3())); });
-  const pool = Array.from({ length: Math.min(POOL, lamps.length) }, () => { const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); scene.add(l); return l; });
+  // lamps carry extras.kind since map v=29 ('fire': candles, torches, fire pits, chandeliers; 'electric'): a fire's light
+  // flickers and sits warmer; a bulb's is steady and paler
+  const lamps = [], fireAt = new Map(); world.root?.traverse(o => { if (/^CASTLE_LAMP_/.test(o.name)) { const p = o.getWorldPosition(new THREE.Vector3()); lamps.push(p); if (o.userData.kind !== 'electric') fireAt.set(p, Math.random() * 6.2832); } });
+  const pool = Array.from({ length: Math.min(POOL, lamps.length) }, () => { const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); l.userData.fire = null; scene.add(l); return l; });
   // the sky: BO3's skybox model isn't exported (a flat grey background showed through the castle's breaches): a dome at
   // the far plane with an overcast gradient, a soft sun glow and drifting cloud bands; the fog takes its horizon colour
   const HORIZON = new THREE.Color(0xd9dfe6);
@@ -412,22 +419,28 @@ function setupLook({ scene, world, session, host, camera }) {
   // BO3's own skybox (skybox_zm_castle: the moonlit Alps; sky/ in the map folder, git-ignored, exported with Greyhound):
   // its panorama is stored dim (BO3 brightens it in game), so it's drawn at SKY_GAIN; the procedural dome stays as the
   // fallback. The fog then takes a colour from the panorama's horizon.
-  const SKY_GAIN = 3.2, dir = world.entry?.dir ?? 'mods/maps/der-eisendrache/';
+  const SKY_GAIN = 3.4, FOG = 0x4f5e78, dir = world.entry?.dir ?? 'mods/maps/der-eisendrache/';
+  if (scene.fog) scene.fog.density = Math.max(scene.fog.density, .00023);   // BO3's valley haze (the map entry's .00018 read thin)
   // sampled per pixel by view direction on the sky sphere (BO3's 96-vertex box interpolated its UVs linearly and warped
   // it, user; an equirectangular scene.background turned every map material white here)
   if (!/[?&]noSky/.test(location.search)) new THREE.TextureLoader().loadAsync(dir + 'sky/skybox.webp').then(tex => {
     tex.colorSpace = THREE.SRGBColorSpace; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.wrapS = THREE.RepeatWrapping;
     sky.material = new THREE.ShaderMaterial({
-      side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { map: { value: tex }, gain: { value: SKY_GAIN } },
+      side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { map: { value: tex }, gain: { value: SKY_GAIN }, haze: { value: new THREE.Color(FOG) } },
       vertexShader: sky.material.vertexShader,
-      fragmentShader: `uniform sampler2D map; uniform float gain; varying vec3 vDir;
+      fragmentShader: `uniform sampler2D map; uniform float gain; uniform vec3 haze; varying vec3 vDir;
         void main(){ vec3 d = normalize(vDir); vec2 uv = vec2(atan(d.x, -d.z) / 6.2831853 + 0.5, 1.0 - acos(clamp(d.y, -1.0, 1.0)) / 3.1415927);
-          gl_FragColor = vec4(texture2D(map, uv).rgb * gain, 1.0);
+          // the panorama's horizon band is a mirrored strip of painted peaks with black cut-outs (BO3 draws its vista
+          // models over it; here it showed as a ring of upside-down blue mountains, 2026-10-17): the real vista models
+          // stand at the horizon, so below ~10° the sky fades into the fog's haze
+          vec3 c = texture2D(map, uv).rgb * gain; float band = smoothstep(0.55, 0.69, uv.y);
+          c = mix(haze, mix(c, vec3(dot(c, vec3(0.3, 0.5, 0.2))), 0.25), band);   // a little less saturated: BO3's storm sky is grey-blue
+          gl_FragColor = vec4(c, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,
     });
-    if (scene.fog) scene.fog.color.set(0x5d6f8c); scene.background = new THREE.Color(0x5d6f8c);
+    if (scene.fog) scene.fog.color.set(FOG); scene.background = new THREE.Color(FOG);
   }).catch(() => {});
   let skyModel = null;
   if (scene.fog) scene.fog.color.copy(HORIZON);
@@ -436,18 +449,24 @@ function setupLook({ scene, world, session, host, camera }) {
   host.on('update', () => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
     sky.position.copy(camera.position); if (sky.material.uniforms.time) sky.material.uniforms.time.value += dt; skyModel?.position.copy(camera.position);
-    if (ambient) { ambient.color.setHex(0xa4afc0); ambient.intensity = .95; }
-    if (hemi) { hemi.color.setHex(0xe2e9f3); hemi.groundColor.setHex(0x625a50); hemi.intensity = 1.15; }
-    if (key) { key.color.setHex(0xfff2e0); key.intensity = 1.5; key.position.set(.45, 1, .3); }
-    if (fill) { fill.color.setHex(0x8da2c2); fill.intensity = .45; }
+    // BO3's castle sits under a grey-blue storm sky: cool, slightly dimmer daylight than before (2026-10-17; it read as
+    // bright white noon under a night sky), the warmth coming from the lamp pool and the flames
+    if (ambient) { ambient.color.setHex(0x8e9db6); ambient.intensity = .8; }
+    if (hemi) { hemi.color.setHex(0xc3d0e4); hemi.groundColor.setHex(0x4c4a48); hemi.intensity = 1.0; }
+    if (key) { key.color.setHex(0xe9eef7); key.intensity = 1.25; key.position.set(.45, 1, .3); }
+    if (fill) { fill.color.setHex(0x74889f); fill.intensity = .4; }
     if ((timer -= dt) <= 0 && pool.length) {
       timer = .5;
       const eye = camera.position, near = lamps.map(p => ({ p, d: p.distanceToSquared(eye) })).sort((a, b) => a.d - b.d).slice(0, pool.length);
       const free = pool.filter(l => !near.some(n => n.p.equals(l.position)));
-      for (const n of near) if (!pool.some(l => l.position.equals(n.p))) { const l = free.shift(); if (l) { l.position.copy(n.p); l.intensity = 0; } }
+      for (const n of near) if (!pool.some(l => l.position.equals(n.p))) { const l = free.shift(); if (l) { l.position.copy(n.p); l.intensity = 0; l.userData.fire = fireAt.has(n.p) ? fireAt.get(n.p) : null; l.color.setHex(fireAt.has(n.p) ? LAMP.color : LAMP.bulb); } }
     }
-    const want = session.power ? LAMP.on : LAMP.off;
-    for (const l of pool) l.intensity += (want - l.intensity) * Math.min(1, dt * 2.5);
+    if (timer > .49 && world.wallGuns) for (const g of world.wallGuns) g.visible = g.position.distanceToSquared(camera.position) < 1800 * 1800;
+    const want = session.power ? LAMP.on : LAMP.off, T = performance.now() / 1000;
+    for (const l of pool) {
+      l.userData.level = (l.userData.level ?? 0) + (want - (l.userData.level ?? 0)) * Math.min(1, dt * 2.5);
+      const f = l.userData.fire; l.intensity = l.userData.level * (f == null ? 1 : .86 + .09 * Math.sin(T * 9.1 + f) + .05 * Math.sin(T * 23.7 + f * 2.0));   // a flame's flicker
+    }
   });
 }
 
@@ -947,4 +966,34 @@ function setupTraps(api) {
   host.on('reset', () => { ray.on = ray.cool = 0; mash.on = mash.cool = 0; rocket.next = rocket.phase = null; rocket.warned = false; rocketLight.intensity = 0; if (tp) tp.locked = false; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
   return { state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase } }),
     fireRocket: () => { rocket.next = session.time; } };
+}
+
+// ---- Out of bounds (2026-10-17). BO3 rings the castle with kill triggers below its walls and over the valley; the
+// port's outer edges are open drops (the collision stops at the playable area). A player who falls out of the castle
+// comes back to where they last stood on the navmesh a few seconds earlier, with a share of their health gone, instead
+// of falling for ever (BO3 downs you outright; solo that would be the game).
+function setupBounds({ world, player, host, session, damage, toast, audio }, { lowgrav }) {
+  const safe = [];   // grounded navmesh spots, one every 0.5 s, the last 8 (~4 s back: before the step off the edge)
+  let t = 0, air = 0, flying = false, fallen = 0;
+  const pre = world.prePlayer; world.prePlayer = dt => (flying = !!pre?.(dt));   // the landing pads' flights
+  const floor = (world.bounds?.min.y ?? 0) - 200;
+  host.on('update', dt => {
+    if (!dt || session.phase === 'gameover' || session.phase === 'preparing') return;
+    const feet = player.getFeetPosition();
+    if (flying) { air = 0; return; }
+    if (player.onFloor) {
+      air = 0;
+      if ((t += dt) >= .5) { t = 0; const p = world.closest(feet, { x: 40, y: 80, z: 40 }); if (p && Math.abs(p.y - feet.y) < 60 && p.distanceTo(feet) < 56) { safe.push(feet.clone()); if (safe.length > 8) safe.shift(); } }
+    } else air += dt;
+    // a long free fall (low gravity jumps last ~1.2 s, a wall-run holds you level) or well under the lowest floor
+    const slow = lowgrav?.state?.().inside;
+    const lost = feet.y < floor || (air > (slow ? 5 : 3.2) && player.velocity.y < -700);
+    if (!lost || !safe.length) return;
+    const back = safe[0];
+    player.setPosition(back.clone().add(new THREE.Vector3(0, 4, 0))); player.velocity.set(0, 0, 0); air = 0; safe.length = 0; safe.push(back);
+    damage(Math.round(session.maxHealth * .45)); toast('You fell from the castle', 3);
+    fallen++;
+  });
+  host.on('reset', () => { safe.length = 0; air = 0; t = 0; });
+  return { state: () => ({ safe: safe.length, air: Math.round(air * 10) / 10, floor, fallen }) };
 }

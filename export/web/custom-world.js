@@ -154,7 +154,7 @@ export class CustomWorld {
     const placeMachine=async(perk,position,yaw,offset)=>{
       if((BO3_MACHINES[perk]||MACHINE_FALLBACK[perk])&&(entry.machines==='bo3'||!PERK_MODELS[perk])){
         const o=(BO3_MACHINES[perk]?await loadModel(BO3_MACHINE(BO3_MACHINES[perk])).catch(()=>null):null)??(MACHINE_FALLBACK[perk]?await loadModel(MACHINE_FALLBACK[perk]).catch(()=>null):null);
-        if(o){o.position.copy(position);o.rotation.y=yaw+FACE+offset;this.scene.add(o);return o;}   // BO3 and BO1 machine GLBs both face +Z
+        if(o){o.position.copy(position);o.rotation.y=yaw+FACE+offset;o.name='machine_'+perk;this.scene.add(o);return o;}   // BO3 and BO1 machine GLBs both face +Z (named: Der Eisendrache merges their pieces)
       }
       return PERK_MODELS[perk]||perk==='pap'?place(perk==='pap'?'zombie_vending_packapunch':PERK_MODELS[perk],position,yaw,offset):null;
     };
@@ -172,8 +172,8 @@ export class CustomWorld {
       const dir=m.position.clone().sub(near.position).setY(0).normalize(),width=+(m.extras.width??56),height=+(m.extras.height??64);
       const outside=m.position.clone().addScaledVector(dir,-26),inside=this.closest(m.position.clone().addScaledVector(dir,42))??m.position.clone().addScaledVector(dir,42);
       outside.y=inside.y;
-      const frame=new THREE.Group();frame.position.copy(m.position);frame.rotation.y=Math.atan2(dir.x,dir.z);this.scene.add(frame);
-      const wood=new THREE.MeshStandardMaterial({color:0x6b4a2b,roughness:.9});
+      const frame=new THREE.Group();frame.position.copy(m.position);frame.rotation.y=Math.atan2(dir.x,dir.z);frame.name='window_boards';this.scene.add(frame);   // named, one shared material: Der Eisendrache instances every board (29 windows x 6 = 174 draws)
+      const wood=this.wood??=new THREE.MeshStandardMaterial({color:0x6b4a2b,roughness:.9});
       const boards=[...Array(6)].map((_,n)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(width+8,7,2),wood);b.position.set(0,(n-2.5)*height/6.5,n%2?1.5:-1.5);b.rotation.z=(n%3-1)*.12;frame.add(b);return b;});
       const clip=new THREE.BoxGeometry(width,height,14);clip.rotateY(frame.rotation.y);clip.translate(m.position.x,m.position.y,m.position.z);
       this.dynamic.push({collider:new CollisionWorld(clip),box:new THREE.Box3().setFromBufferAttribute(clip.attributes.position),enabled:true,window:true});
@@ -193,7 +193,15 @@ export class CustomWorld {
         if(!this.data.weapons[weapon]){this.warn(`${rawName(m.object)}: unknown weapon`);continue;}
         this.interactions.push({kind:'wallbuy',weapon,position:m.position.clone()});
         tasks.push(loadModel(this.data.weapons[weapon].worldModel).then(o=>{if(!o)return;o.position.copy(m.position);o.rotation.y=m.yaw+Math.PI/2;
-          for(const tag of this.data.weapons[weapon].hideTags??[]){const bone=o.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}this.scene.add(o);}));
+          for(const tag of this.data.weapons[weapon].hideTags??[]){const bone=o.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}this.scene.add(o);
+          // rigged models load with frustum culling off (animation.js); a wall gun never moves, so cull it by its posed bounds
+          // (Der Eisendrache drew its ~240 wall-gun meshes every frame, whatever the view; 2026-10-17)
+          o.updateMatrixWorld(true);o.traverse(c=>{if(!c.isMesh)return;if(c.isSkinnedMesh)c.computeBoundingSphere();else c.geometry.boundingSphere||c.geometry.computeBoundingSphere();c.frustumCulled=true;
+            // a hidden attachment (its bone scaled ~0) is still a draw: skip meshes whose dominant bone chain is hidden
+            if(c.isSkinnedMesh&&c.skeleton&&c.geometry.attributes.skinIndex){const g=c.geometry,v=g.index?g.index.getX(0):0,si=g.attributes.skinIndex,sw=g.attributes.skinWeight;let best=0,bw=-1;
+              for(let k=0;k<4;k++){const w=sw.getComponent(v,k);if(w>bw){bw=w;best=si.getComponent(v,k);}}
+              for(let b=c.skeleton.bones[best];b;b=b.parent){if(b.scale.x<1e-4){c.visible=false;break;}if(b===o)break;}}});
+          (this.wallGuns??=[]).push(o);}));
       }
       if(m.type==='PERK'){
         const perk=PERKS[String(m.extras.perk??m.arg.split('_')[0]).toLowerCase()];

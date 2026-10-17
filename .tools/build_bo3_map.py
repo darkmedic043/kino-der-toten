@@ -224,6 +224,22 @@ def convex_hull(pts):
     c = P.mean(0); n = np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]])
     flip = (n * (P[T].mean(1) - c)).sum(1) < 0; T[flip] = T[flip][:, [0, 2, 1]]   # outward
     return P, T
+# Collision for a detailed prop (over 1,500 triangles: door frames, furniture, consoles, vehicles, the Death Ray...):
+# the same mesh decimated to about `target` triangles (Blender's Decimate collapse). Openings stay open (a box or a hull
+# would close a door frame or an arch); the shape is close enough to stand against.
+_simp_cache = {}
+def simplify(pts, tris, target=1500):
+    key = (id(pts), target)
+    if key in _simp_cache: return _simp_cache[key]
+    import bpy
+    me = bpy.data.meshes.new('col'); me.from_pydata([tuple(map(float, p)) for p in pts], [], [tuple(map(int, t)) for t in tris]); me.validate()
+    ob = bpy.data.objects.new('col', me); bpy.context.scene.collection.objects.link(ob)
+    mod = ob.modifiers.new('d', 'DECIMATE'); mod.ratio = max(0.01, min(1.0, target / max(1, len(tris)))); mod.use_collapse_triangulate = True
+    ev = ob.evaluated_get(bpy.context.evaluated_depsgraph_get()).data; ev.calc_loop_triangles()
+    P = np.array([v.co[:] for v in ev.vertices], dtype=np.float64); T = np.array([lt.vertices[:] for lt in ev.loop_triangles], dtype=np.int64)
+    bpy.data.objects.remove(ob); bpy.data.meshes.remove(me)
+    if len(T) == 0: P, T = pts, tris
+    _simp_cache[key] = (P, T); return P, T
 # a box from its 8 corners (index = x*4 + y*2 + z over min/max), outward-facing triangles
 BOX_TRIS = np.array([[0, 1, 3], [0, 3, 2], [4, 6, 7], [4, 7, 5], [0, 4, 5], [0, 5, 1], [2, 3, 7], [2, 7, 6], [0, 2, 6], [0, 6, 4], [1, 5, 7], [1, 7, 3]])
 prop_geo = {}   # model -> (positions in model space, inches, glTF axes; triangles)
@@ -306,6 +322,8 @@ col_P, col_T, n0, solid_props = [], [], 0, 0
 # player and bullets: they go to PCOL_props, which CustomWorld adds to collision but leaves out of the navmesh.
 pcol_P, pcol_T, pn0, pcol_props = [], [], 0, 0
 CLUTTER = re.compile(r'debris|rubble|brick|rock_|stone_pile|plank|board|crate|box|barrel|bucket|basket|sack|bag|pile|hay|log|branch|bone|skull|helmet|ammo|shell|tool|pot|pan|chair_.*broken|broken|scrap|junk|tire|ladder|cart_wheel|wheel', re.I)
+HULL = re.compile(r'boulder|granite', re.I)
+decimated = 0
 tri = np.concatenate(solid); used, inv = np.unique(tri.ravel(), return_inverse=True)
 col_P.append(Pg[used].astype(np.float64)); col_T.append(inv.reshape(-1, 3)); n0 = len(used)
 for name, insts in by_model.items():
@@ -327,11 +345,17 @@ for name, insts in by_model.items():
         lo3, hi3 = pp.min(0), pp.max(0)
         pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
         tt = BOX_TRIS
+    elif BSP == 'zm_castle' and HULL.search(base_): pp, tt = convex_hull(pp)   # boulders: solid, their hull (2026-10-17; they had no collision over 1,500 triangles)
     elif STRUCTURAL and STRUCTURAL.search(base_) and len(tt) <= 1500: pass   # Der Eisendrache: walls, columns, arches... as they are
-    elif BSP == 'zm_castle' and len(tt) <= 1500 and size[1] >= 40 and size.max() <= 360 and not CLUTTER.search(base_):
-        # everything else that stands at least 40 high (railings, furniture, machines...): the player-only layer
-        # (PCOL_props), as its own mesh. Lower things you could only snag on (crates, rubble, clutter: there was so
-        # much of it you got stuck everywhere, user), bigger irregular ones and detailed ones (a box would close gaps) don't
+    elif STRUCTURAL and STRUCTURAL.search(base_):   # detailed structural props: decimated, player-only (in the navmesh layer they added ~40 s to the load; zombies never had them)
+        pp, tt = simplify(pp, tt); decimated += 1; player_only = True
+    elif BSP == 'zm_castle' and size[1] >= 40 and size.max() <= 360 and not CLUTTER.search(base_):
+        # everything else that stands at least 40 high (railings, furniture, machines, door frames, vehicles...): the
+        # player-only layer (PCOL_props), as its own mesh, decimated when detailed (2026-10-17: over 1,500 triangles they
+        # had no collision at all: door frames, consoles, trucks, beds, the Death Ray; user: "add collision where it needs
+        # to be"). Lower things you could only snag on (crates, rubble, clutter: there was so much of it you got stuck
+        # everywhere, user) and bigger irregular ones (a box would close gaps) don't
+        if len(tt) > 1500: pp, tt = simplify(pp, tt); decimated += 1
         player_only = True
     else: continue
     for it in insts:
@@ -371,7 +395,7 @@ print(f'stairs: {ramps} ramps from {len(steps)} treads')
 CP, CT = np.concatenate(col_P).astype(np.float32), np.concatenate(col_T).astype(np.uint32)
 gltf['meshes'].append({'name': 'COL_world', 'primitives': [{'attributes': {'POSITION': accessor(CP, 'VEC3', 34962, True)}, 'indices': accessor(CT.ravel(), 'SCALAR', 34963)}]})
 add_node({'name': 'COL_world', 'mesh': len(gltf['meshes']) - 1})
-print(f'collision: {len(CT)} triangles ({solid_props} solid props)')
+print(f'collision: {len(CT)} triangles ({solid_props} solid props, {decimated} prop models decimated)')
 if pcol_P:
     PP, PT = np.concatenate(pcol_P).astype(np.float32), np.concatenate(pcol_T).astype(np.uint32)
     gltf['meshes'].append({'name': 'PCOL_props', 'primitives': [{'attributes': {'POSITION': accessor(PP, 'VEC3', 34962, True)}, 'indices': accessor(PT.ravel(), 'SCALAR', 34963)}]})
@@ -1009,11 +1033,37 @@ if BSP == 'zm_castle':
     count('MECHZ')
     # lamps for the der-eisendrache mod's light pool: lit fixtures among the static models, merged within 150 units
     LIT = re.compile(r'candle_.*_on|torch_wall|light_sconce|light_cage|light_spot_hanging$|light_industrial|hurricane_lamp|light_chandelier(?!_chain)|light_lamp_vintage|light_bulb_edison|camp_fire_pit|light_hanging_ball_01$', re.I)
+    FIRE = re.compile(r'candle|torch|fire_pit|hurricane|chandelier', re.I)   # a flame (the mod draws one) rather than a bulb
     lamps = []
     for m in info['models']:
-        if LIT.search(m['name']) and all(np.linalg.norm(np.array(m['origin']) - np.array(q)) > 150 for q in lamps): lamps.append(m['origin'])
-    for k, o in enumerate(lamps): add_node({'name': f'CASTLE_LAMP_{k}', 'translation': g(o).tolist()})
+        if LIT.search(m['name']) and all(np.linalg.norm(np.array(m['origin']) - np.array(q)) > 150 for q, _ in lamps): lamps.append((m['origin'], m['name']))
+    for k, (o, nm) in enumerate(lamps): add_node({'name': f'CASTLE_LAMP_{k}', 'translation': g(o).tolist(), 'extras': {'kind': 'fire' if FIRE.search(nm) else 'electric', 'model': nm}})
     counts['CASTLE_LAMP'] = len(lamps)
+    # flames for the mod (2026-10-17): every lit candle, wall torch, fire pit, hurricane lamp and candle chandelier gets
+    # CASTLE_FLAME_<k> nodes at its flame tips: the top 15% of the model's vertices (the wicks, the torch head, the
+    # logs), farthest-point sampled at least 14 apart (a chandelier's candles each get one), extras {kind, size}
+    FLAME = [(re.compile(r'candle_(sml|med)', re.I), 'candle', 9), (re.compile(r'candle_tall', re.I), 'candle', 11), (re.compile(r'torch_wall', re.I), 'torch', 34),
+             (re.compile(r'fire_pit', re.I), 'fire', 60), (re.compile(r'hurricane_lamp', re.I), 'lamp', 12), (re.compile(r'chandelier(?!_chain|_mount|.*_off|.*_sconce)', re.I), 'candle', 10)]
+    k = 0
+    for m in info['models']:
+        kind = next(((kd, sz) for rx, kd, sz in FLAME if rx.search(m['name']) and LIT.search(m['name'])), None)
+        if not kind or m['name'] not in prop_geo: continue
+        o = np.array(m['origin'])
+        if not np.all((o >= lo) & (o <= hi)): continue
+        pp = prop_geo[m['name']][0]
+        A = np.array(m['axes'], dtype=np.float64).reshape(3, 3); M = A.T; sc = np.linalg.norm(M, axis=0); M = M / np.where(sc > 1e-6, sc, 1)
+        R = C @ M @ C.T; W = pp @ R.T * (m['scale'] * sc.mean()) + g(o)
+        if kind[0] == 'lamp': top = W[np.abs(W[:, 1] - (W[:, 1].min() + W[:, 1].max()) / 2) < 6]   # the wick sits mid-glass
+        else: top = W[W[:, 1] >= W[:, 1].max() - max(2.0, (W[:, 1].max() - W[:, 1].min()) * .15)]
+        if not len(top): continue
+        pts = [top.mean(0)]
+        for _ in range(7):
+            d = np.min([np.linalg.norm(top - q, axis=1) for q in pts], axis=0); j = int(np.argmax(d))
+            if d[j] < 14: break
+            pts.append(top[j])
+        for q in pts:
+            add_node({'name': f'CASTLE_FLAME_{k}', 'translation': [float(x) for x in q], 'extras': {'kind': kind[0], 'size': kind[1]}}); k += 1
+    counts['CASTLE_FLAME'] = k
     for e in by_tn.get('115_flinger_pad_aimer', []):
         m = one(e.get('target'))
         if not m: continue
