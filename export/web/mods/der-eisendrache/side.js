@@ -20,9 +20,9 @@ import * as THREE from 'three';
 import { sfx, music, stopMusic } from './castle-audio.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);
-const PADS = [W(-1191, 2541, 200), W(-907, 2256, 200), W(-1192, 1972, 200), W(-1476, 2257, 200)];
-const RUNS = [W(-1593, 2240, 480), W(-1193, 1892, 480), W(-845, 2240, 480), W(-1193, 2604, 480)];
-const SPOT = { powerup: W(-1596, 2264, 392), plungerTo: W(-211, 5086, 168), plunger: W(-76, 5118, 217), plungerBack: W(-1535, 2302, 224),
+export const PADS = [W(-1191, 2541, 200), W(-907, 2256, 200), W(-1192, 1972, 200), W(-1476, 2257, 200)];
+export const RUNS = [W(-1593, 2240, 480), W(-1193, 1892, 480), W(-845, 2240, 480), W(-1193, 2604, 480)];
+export const SPOT = { powerup: W(-1596, 2264, 392), plungerTo: W(-211, 5086, 168), plunger: W(-76, 5118, 217), plungerBack: W(-1535, 2302, 224),
   potPresent: W(-157, 3328, 197), potPast: W(-158, 4826, 196), gumball: W(-163, 3331, 226), globe: W(-856, 3500, 990) };
 const PLUNGER_URL = new URL('./plunger/plunger.glb', import.meta.url).href;
 

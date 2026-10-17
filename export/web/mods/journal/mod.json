@@ -1,0 +1,5 @@
+{
+  "name": "Journal",
+  "description": "JOURNAL.EXE on the terminal booth: every map's Easter eggs and quests, step by step. Doing a step records its instructions for good; tracking a quest shows its current step and drops markers on the screen.",
+  "script": "mod.js"
+}

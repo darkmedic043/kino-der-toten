@@ -11,7 +11,7 @@ export default async function setup(api){
   const root=document.createElement('div');root.id='scoreboard';document.body.append(root);
   const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const collectibles=new Map();
-  window.kino.scoreboard={addCollectible(def){collectibles.set(def.id,def);return def;},removeCollectible(id){collectibles.delete(id);}};
+  window.kino.scoreboard={addCollectible(def){collectibles.set(def.id,def);return def;},removeCollectible(id){collectibles.delete(id);},get:id=>collectibles.get(id)};   // get: the journal reads maps' tiles (The Giant)
 
   // ---- stats ---------------------------------------------------------------------------------------
   let downs=0,revives=0,lastPhase=session.phase;

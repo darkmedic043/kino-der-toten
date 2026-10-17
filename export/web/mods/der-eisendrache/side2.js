@@ -23,10 +23,10 @@ import { loadModel } from '../../animation.js';
 import { sfx, sfxAt, music, musicPlaying } from './castle-audio.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);
-const SPOT = { towerTop: W(-1084, 1582, 1072), lever: W(-991, 1566, 844), rod: W(-854, 1490, 1388) };
-const GRAMOPHONES = [W(-1105, 3396, 684), W(572, 2828, 726), W(-1099, 2772, 292)];
-const CLAWS = [0, 1, 2].map(k => ({ start: [W(-211, 509, 293), W(-32, 4080, 1045), W(1700, 2786, 767)][k], fell: [W(-211, 509, 205), W(-32, 4080, 789), W(1698, 2785, 594)][k], shot: [W(-767, 257, 377), W(32, 3224, 921), W(1680, 1831, 593)][k] }));
-const SKULLS = [W(-1515, 160, 456), W(1790, 1230, 364), W(-848, 2891, 926)];
+export const SPOT = { towerTop: W(-1084, 1582, 1072), lever: W(-991, 1566, 844), rod: W(-854, 1490, 1388) };
+export const GRAMOPHONES = [W(-1105, 3396, 684), W(572, 2828, 726), W(-1099, 2772, 292)];
+export const CLAWS = [0, 1, 2].map(k => ({ start: [W(-211, 509, 293), W(-32, 4080, 1045), W(1700, 2786, 767)][k], fell: [W(-211, 509, 205), W(-32, 4080, 789), W(1698, 2785, 594)][k], shot: [W(-767, 257, 377), W(32, 3224, 921), W(1680, 1831, 593)][k] }));
+export const SKULLS = [W(-1515, 160, 456), W(1790, 1230, 364), W(-848, 2891, 926)];
 const HAT_URL = new URL('./claw/claw_hat.glb', import.meta.url).href;
 
 export function setupSide2(api, { bows }) {

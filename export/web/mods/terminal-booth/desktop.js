@@ -14,6 +14,8 @@
 //   then deposit (1,100 per 1,000 banked) and withdraw across matches; opts.bank() -> status, opts.bankAct(action, amount).
 // ARMORY.EXE (mods/armory, above BANK): tabs of special gear bought off its home map (operator weapons, shields,
 //   scorestreaks later); opts.armory() -> status, opts.armoryBuy(id) -> true | 'reason'.
+// JOURNAL.EXE (mods/journal, top of the right column): every map's Easter eggs step by step, recorded once done;
+//   TRACK puts the current step on the HUD with markers. opts.journal() -> status, opts.journalTrack(map, quest | null).
 
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
 // perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine: a Melon Pass reward);
@@ -142,8 +144,23 @@ const CSS = `
 #melonterm .detail li::before{content:'>';position:absolute;left:2px;color:var(--g2)}
 #melonterm .detail .note{font-size:19px;color:var(--g2);opacity:.85}
 #melonterm .app.exfil{position:absolute;right:16px;bottom:14px}
-#melonterm .app.bank{position:absolute;right:16px;bottom:134px}
-#melonterm .app.armory{position:absolute;right:16px;bottom:254px}
+#melonterm .app.bank{position:absolute;right:16px;bottom:108px}
+#melonterm .app.armory{position:absolute;right:16px;bottom:202px}
+#melonterm .app.journal{position:absolute;right:16px;bottom:296px}
+#melonterm .jnl{flex:1;min-height:0;display:flex;flex-direction:column}
+#melonterm .jnl .body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr)}
+#melonterm .jnl .qs{overflow:auto;border-right:2px dashed var(--line);padding:8px}
+#melonterm .jnl .q{display:flex;flex-direction:column;align-items:flex-start;width:100%;text-align:left;font:inherit;color:inherit;background:none;border:2px solid transparent;padding:4px 8px;cursor:pointer}
+#melonterm .jnl .q:hover{border-color:var(--line)}#melonterm .jnl .q.on{border-color:var(--g);background:#0b3d1d}
+#melonterm .jnl .q b{font-weight:normal;font-size:22px}#melonterm .jnl .q small{font-size:16px;color:var(--dim);letter-spacing:1px}
+#melonterm .jnl .q small em{font-style:normal;color:var(--warn)}
+#melonterm .jnl .steps{overflow:auto;padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+#melonterm .jnl .steps h2{margin:0;font:inherit;font-size:32px;color:#b6ffcb;letter-spacing:1px;line-height:1}
+#melonterm .jnl .st{padding-left:30px;position:relative;font-size:20px}
+#melonterm .jnl .st::before{content:attr(data-n);position:absolute;left:0;top:0;color:var(--dim)}
+#melonterm .jnl .st b{font-weight:normal;color:#b6ffcb;font-size:22px}#melonterm .jnl .st p{margin:2px 0 0;color:var(--g2);font-size:19px;line-height:1.2}
+#melonterm .jnl .st.lock{color:var(--dim)}#melonterm .jnl .st.lock b{color:var(--dim)}
+#melonterm .jnl .st.now b::after{content:' · DONE THIS MATCH';color:var(--g);font-size:16px}
 #melonterm .arm{flex:1;min-height:0;display:flex;flex-direction:column}#melonterm .arm>.perks{flex:1;min-height:0}
 #melonterm .tabs{display:flex;gap:0;border-bottom:2px solid var(--line);background:#04180c}
 #melonterm .tabs button{font:inherit;font-size:20px;letter-spacing:2px;padding:3px 16px;color:var(--g2);background:none;border:0;border-right:2px solid var(--line);cursor:pointer}
@@ -226,6 +243,9 @@ const BANK_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-renderi
 const ARMORY_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <path d="M16 3 6 7v8c0 7 4 11 10 14 6-3 10-7 10-14V7z" fill="none" stroke="#7dffa6" stroke-width="2"/>
   <rect x="15" y="9" width="2" height="14"/><rect x="11" y="13" width="10" height="2"/><rect x="13" y="20" width="6" height="2" fill="#c9ffd9"/></svg>`;
+const JOURNAL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
+  <path d="M6 4h17l3 3v21H6z" fill="none" stroke="#7dffa6" stroke-width="2"/><rect x="9" y="4" width="2" height="24"/>
+  <rect x="14" y="10" width="9" height="2"/><rect x="14" y="15" width="9" height="2"/><rect x="14" y="20" width="6" height="2"/><path d="M21 24l3-3 3 3-3 3z" fill="#ffd36b"/></svg>`;
 const EXFIL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <rect x="4" y="6" width="24" height="2"/><rect x="15" y="8" width="2" height="3"/><rect x="9" y="11" width="15" height="7"/><rect x="6" y="13" width="3" height="3"/>
   <rect x="2" y="12" width="4" height="2"/><rect x="11" y="12" width="5" height="3" fill="#031208"/><rect x="11" y="19" width="2" height="3"/><rect x="20" y="19" width="2" height="3"/>
@@ -254,6 +274,7 @@ function build() {
         <button class="app" data-app="arsenal"><div class="sq">${ARSENAL_ICON}</div><span>ARSENAL</span></button>
         <button class="app" data-app="stark"><div class="sq">${STARK_ICON}</div><span>STARK</span></button>
         <button class="app" data-app="gums"><div class="sq">${GUMS_ICON}</div><span>GUMS</span></button></div>
+      <button class="app journal" data-app="journal"><div class="sq">${JOURNAL_ICON}</div><span>JOURNAL</span></button>
       <button class="app armory" data-app="armory"><div class="sq">${ARMORY_ICON}</div><span>ARMORY</span></button>
       <button class="app bank off" data-app="bank"><div class="sq">${BANK_ICON}</div><span>BANK</span></button>
       <button class="app exfil off" data-app="exfil"><div class="sq">${EXFIL_ICON}</div><span>EXFIL</span></button>
@@ -272,6 +293,10 @@ function build() {
       <div class="win" data-win="gums" hidden>
         <div class="title"><span>GOBBLE.EXE · GOBBLEGUMS</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="gum"><div class="reelbox"><div class="reel"><div class="strip"></div><div class="line"></div></div></div><div class="side"></div></div>
+      </div>
+      <div class="win" data-win="journal" hidden>
+        <div class="title"><span>JOURNAL.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
+        <div class="jnl"></div>
       </div>
       <div class="win" data-win="armory" hidden>
         <div class="title"><span>ARMORY.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
@@ -296,6 +321,7 @@ function build() {
   const gmWin = $('[data-win=gums]'), gmStrip = $('.strip'), gmSide = $('.gum .side'); let gmState = '', gmMsg = ['', ''], gmSpin = false, gmWon = null, gmPending = null;   // gmPending: a gum rolled into a full hand, waiting for swap or keep
   const grid = $('.grid'), detail = $('.detail'), msg = $('.msg');
   let exState = '';
+  const jnWin = $('[data-win=journal]'), jnBody = $('.jnl'); let jnState = '', jnMap = null, jnQuest = null, jnMsg = '';
   const amWin = $('[data-win=armory]'), amBody = $('.arm'); let amState = '', amMsg = ['', ''], amTab = 'operators', amShown = 0;
   const bkWin = $('[data-win=bank]'), bkBody = $('.bnk'), bkIcon = $('[data-app=bank]'); let bkState = '', bkMsg = ['', ''];
   let opts = null, shown = 0, clock = 0, lastState = '';
@@ -306,9 +332,9 @@ function build() {
   for (const t of ['click', 'mousedown', 'mouseup', 'pointerdown', 'wheel', 'contextmenu']) root.addEventListener(t, e => e.stopPropagation());
 
   function key(e) {
-    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden) closeApp(); else close(); return; }
+    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden) closeApp(); else close(); return; }
     if (!gmWin.hidden) { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); gumRoll(); } return; }
-    if (!arWin.hidden || !stWin.hidden || !bkWin.hidden || !amWin.hidden) return;
+    if (!arWin.hidden || !stWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden) return;
     if (!exWin.hidden) { if (e.code === 'Enter') { e.preventDefault(); callExfil(); } return; }
     if (win.hidden) { if (e.code === 'Enter') { e.preventDefault(); openApp('perks'); } return; }
     if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); buy(shown); return; }
@@ -356,7 +382,8 @@ function build() {
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
   }
   function openApp(name) {
-    bkWin.hidden = amWin.hidden = true;
+    bkWin.hidden = amWin.hidden = jnWin.hidden = true;
+    if (name === 'journal') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; jnState = ''; jnMsg = ''; jnWin.hidden = false; drawJournal(); $('.open').textContent = '[JOURNAL.EXE]'; opts.onApp?.(name); return; }
     if (name === 'armory') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; amState = ''; amMsg = ['', '']; amWin.hidden = false; drawArmory(); $('.open').textContent = '[ARMORY.EXE]'; opts.onApp?.(name); return; }
     if (name === 'bank') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; bkState = ''; bkMsg = ['', '']; bkWin.hidden = false; drawBank(); $('.open').textContent = '[BANK.EXE]'; opts.onApp?.(name); return; }
     if (name === 'gums') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = true; gmState = ''; if (!gmSpin && !gmPending) { gmMsg = ['', '']; gmWon = null; idleReel(); } gmWin.hidden = false; drawGums(); $('.open').textContent = '[GOBBLE.EXE]'; opts.onApp?.('gobble'); return; }
@@ -369,7 +396,7 @@ function build() {
     say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
     opts.onApp?.(name); grid.querySelector(`[data-i="${shown}"]`)?.focus({ preventScroll: true });
   }
-  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = true; $('.open').textContent = ''; }
+  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = jnWin.hidden = true; $('.open').textContent = ''; }
   // ---- STARK.EXE: the Iron Man armors (mods/stark) ---------------------------------------------------------------
   const MARK = { mk1: 'I', mk3: 'III', mk4: 'IV', mk5: 'V', mk6: 'VI', wm: 'WM', mk16: 'XVI' };
   function starkDo(action, id) {
@@ -518,6 +545,31 @@ function build() {
     gmSide.querySelector('.buy').addEventListener('click', gumRoll);
     for (const b of gmSide.querySelectorAll('[data-swap]')) b.addEventListener('click', () => gumResolve(b.dataset.swap === 'keep' ? null : +b.dataset.swap));
   }
+  // ---- JOURNAL.EXE: map tabs, the map's quests (left), the selected quest's steps (right); TRACK on the map you're on --
+  function drawJournal() {
+    if (jnWin.hidden) return;
+    const st = opts?.journal?.(); if (!st) { jnBody.innerHTML = '<p>JOURNAL.EXE is not installed.</p>'; return; }
+    jnMap ??= st.maps.some(m => m.map === st.map) ? st.map : st.maps[0]?.map;
+    const m = st.maps.find(x => x.map === jnMap) ?? st.maps[0];
+    if (!m.quests.some(q => q.id === jnQuest)) jnQuest = (m.quests.find(q => q.tracked) ?? m.quests[0])?.id;
+    const key = JSON.stringify([st, jnMap, jnQuest, jnMsg]); if (key === jnState) return; jnState = key;
+    const q = m.quests.find(x => x.id === jnQuest);
+    const tabs = `<div class="tabs">${st.maps.map(x => `<button data-map="${x.map}" class="${x.map === m.map ? 'on' : ''}">${esc(x.title.toUpperCase())}${x.here ? ' ◆' : ''}</button>`).join('')}</div>`;
+    const list = m.quests.map(x => `<button class="q ${x.id === jnQuest ? 'on' : ''}" data-q="${x.id}"><b>${esc(x.name.toUpperCase())}</b><small>${esc(x.kind)} · ${x.recorded} / ${x.total} RECORDED${x.tracked ? ' · <em>TRACKING</em>' : ''}</small></button>`).join('');
+    const steps = q ? q.steps.map((s, i) => s.recorded
+      ? `<div class="st ${s.now ? 'now' : ''}" data-n="${i + 1}."><b>${esc(s.title.toUpperCase())}</b><p>${esc(s.how)}</p></div>`
+      : `<div class="st lock ${s.now ? 'now' : ''}" data-n="${i + 1}."><b>??? · NOT YET RECORDED</b><p>Do this step once and the journal keeps it.</p></div>`).join('') : '';
+    const trackBtn = !q ? '' : !m.here ? `<button class="buy" disabled>PLAY ${esc(m.title.toUpperCase())} TO TRACK</button>`
+      : q.tracked ? '<button class="buy" data-track="off">STOP TRACKING</button>' : '<button class="buy" data-track="on">TRACK QUEST · MARKERS ON</button>';
+    jnBody.innerHTML = `${tabs}<div class="body"><div class="qs">${list || '<p>No quests on this map.</p>'}</div><div class="steps">${q ? `<h2>${esc(q.name.toUpperCase())}</h2>${trackBtn}${steps}` : ''}</div></div>
+      <div class="msg ${st.cheating ? 'bad' : jnMsg ? 'ok' : ''}">${esc(st.cheating ? 'CHEAT MODE · NOTHING IS RECORDED THIS GAME' : jnMsg || '> A STEP IS RECORDED THE FIRST TIME YOU DO IT · MARKERS SHOW RECORDED STEPS')}</div>`;
+    for (const b of jnBody.querySelectorAll('[data-map]')) b.addEventListener('click', () => { jnMap = b.dataset.map; jnQuest = null; jnMsg = ''; drawJournal(); });
+    for (const b of jnBody.querySelectorAll('[data-q]')) b.addEventListener('click', () => { jnQuest = b.dataset.q; jnMsg = ''; drawJournal(); });
+    jnBody.querySelector('[data-track]')?.addEventListener('click', e => {
+      const on = e.currentTarget.dataset.track === 'on'; opts.journalTrack?.(m.map, on ? q.id : null);
+      jnMsg = on ? `TRACKING ${q.name.toUpperCase()}` : 'TRACKING OFF'; jnState = ''; drawJournal();
+    });
+  }
   // ---- ARMORY.EXE: tabs of gear (mods/armory), each laid out like PERKS.EXE (tiles left, details right) -----------
   const gearIcon = it => `<svg class="gear" viewBox="0 0 24 24" fill="none" stroke="${it.color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px ${it.color})"><path d="${it.icon ?? 'M7 12h10M12 7v10'}"/></svg>`;
   function armoryBuy(it) {
@@ -636,7 +688,7 @@ function build() {
     const state = PERKS.map(p => blocked(p)).join() + opts.points();
     if (!win.hidden && state !== lastState) { renderGrid(); select(shown); }
     lastState = state;
-    drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory();
+    drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory(); drawJournal();
     $('[data-app=stark]').classList.toggle('off', !opts.stark?.()?.unlocked);
   }
   function open(o) {
@@ -657,6 +709,7 @@ function build() {
   root.querySelector('[data-app=gums]').addEventListener('click', () => openApp('gums'));
   root.querySelector('[data-app=bank]').addEventListener('click', () => openApp('bank'));
   root.querySelector('[data-app=armory]').addEventListener('click', () => openApp('armory'));
+  root.querySelector('[data-app=journal]').addEventListener('click', () => openApp('journal'));
   for (const b of root.querySelectorAll('[data-close]')) b.addEventListener('click', closeApp);
   root.querySelector('[data-logoff]').addEventListener('click', close);
   return { open, close, isOpen: () => !root.hidden };
