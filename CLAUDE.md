@@ -40,6 +40,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 - No system browser. Use Playwright's Chromium in `~/.cache/ms-playwright`. The upstream `.tools/test-*.mjs` scripts hard-code Windows paths.
 - BO1 (base game) is installed via Steam; OpenAssetTools is built at `~/.local/opt/OpenAssetTools`. `.tools/build_wonder_weapons.py` builds extra wonder weapons from it into `mods/wonder-weapons/` (git-ignored assets; see `weapons.md`).
 - Blender 5.2.2 (portable, `~/.local/bin/blender`) builds the terminal booth: `.tools/build-terminal-booth.py` (about 14 min per variant with the bake).
+- KTX-Software 4.4.2 (official release, `~/.local/opt/ktx-software`, run with `LD_LIBRARY_PATH=lib`) encodes the KTX2 textures (`.tools/build-ktx2.mjs`).
 
 ## Rules that bite if forgotten
 
@@ -47,6 +48,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 - **Lighting**: never toggle a light's `.visible` (it recompiles every shader). Pool size is baked into shaders, so only resize it on a quality change. **Rebake** `baked-light.bin.gz` (`.tools/bake-lighting.mjs`) and `sunshafts.json` (`.tools/bake-sunshafts.mjs`) whenever fixtures or light sources change.
 - Don't set `needsUpdate` on texture swaps (forces a program rebuild). Compile and upload during loading, not on the first played frame. Objects that only appear mid-game go in `host.warmObjects`, and late material changes belong in a `warm` handler, so the engine's `warmShaders()` builds them while loading (performance.md).
 - Don't upload every weapon's HD textures up front (it fills VRAM). Preload only targeted ones.
+- **KTX2**: textures under `textures/` are served as GPU-compressed copies from `export/web/ktx2/` (git-ignored). After adding or changing textures there, rerun `node .tools/build-ktx2.mjs` or the old copy keeps being served (materials.md).
 - Colliders pushed onto `world.dynamic` need `.box` unless `window:true`, or `world.setDoors` crashes.
 - Don't publish ripped or third-party game assets. The user supplies downloads: yt-dlp is blocked for me by the classifier, so give the user a command with the output template quoted (`-o "$HOME/Downloads/name.%(ext)s"`).
 - **Mod order matters** (`mods/mods.json`): `weapon-levels` must load before `progression`, or the starting gun is built before attachments apply. 16 mods are **core systems** (`CORE_MODS` in `mod-loader.js`): always loaded even if dropped from mods.json; keep the two lists in the same order (core.md).

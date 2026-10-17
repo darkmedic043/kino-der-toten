@@ -17,6 +17,7 @@ const CODE = /\.(m?js|css|html)$/i;
 const OWN = [
   /^icon\.svg$/,
   /^vendor\/.+\.(m?js|txt)$/,                                       // three.js, three-mesh-bvh and their licences
+  /^vendor\/jsm\/libs\/basis\/basis_transcoder\.wasm$/,                   // the Basis Universal KTX2 transcoder (Apache-2.0)
   /^mods\/(mods|maps)\.json$/, /^mods\/README\.md$/,
   /^mods\/[^/]+\/mod\.json$/,                                       // every mod's manifest
   /^mods\/(classes\/classes|characters\/characters|progression\/progression|gobblegums\/gums|prestige\/prestige|research\/research|credits\/credits|shop\/catalog|pass\/season|weapon-levels\/(attachments|camos)|movement\/data|player-health\/data|terminal-booth\/placements|hd-weapons\/hd|map-materials\/(hd|hd-materials|normals)|(gun|event|zombie)-sounds\/sounds|_template\/data|lighting\/fixtures)\.json$/,

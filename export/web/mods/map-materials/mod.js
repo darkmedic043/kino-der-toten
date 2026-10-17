@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { CollisionWorld } from '../../collision-world.js';
 import { settings, onSettingsChange } from '../../settings.js';
+import { ktx2Texture } from '../../ktx2.js';   // KTX2 copies of the normal and HD maps when listed
 
 const GLASS=/glass/;
 const MULTIPLY=/decal_(burn_scortch|burntstain|darkstain|grime|lightstain_03|wall_fillet)|eb_dec_pipe_stain|jun_dec_blast_crater/;
@@ -87,7 +88,7 @@ export default async function setup(api){
     const loader=new THREE.ImageBitmapLoader(),cache=new Map();loader.setOptions({imageOrientation:'none',premultiplyAlpha:'none',colorSpaceConversion:'none'});
     const jobs=[...seen].filter(m=>table[m.name]&&!m.normalMap).map(async m=>{
       const url=new URL(table[m.name],document.baseURI).href;
-      if(!cache.has(url))cache.set(url,loader.loadAsync(url).then(b=>new THREE.Texture(b)).then(t=>{t.needsUpdate=true;t.flipY=false;t.colorSpace=THREE.NoColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=aniso;return t;}).catch(()=>null));
+      if(!cache.has(url))cache.set(url,ktx2Texture(url).then(k=>k??loader.loadAsync(url).then(b=>new THREE.Texture(b))).then(t=>{t.needsUpdate=true;t.flipY=false;t.colorSpace=THREE.NoColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=aniso;return t;}).catch(()=>null));
       const tex=await cache.get(url);if(tex){m.normalMap=tex;m.normalScale=normalScale.clone().multiplyScalar(window.kino.normalStrength??1);m.needsUpdate=true;}});
     await Promise.all(jobs);console.info('[map-materials] normal maps on',jobs.length,'materials');
   }catch(e){console.warn('[map-materials] normal maps',e);}
@@ -103,10 +104,10 @@ export default async function setup(api){
     for(const m of seen){const f=table[m.name];if(!f||!m.map)continue;const e=byFile.get(f)??byFile.set(f,{materials:[],texture:null,loading:null}).get(f);e.materials.push(m);m.userData.sdMap=m.map;}
     const loader=new THREE.ImageBitmapLoader();loader.setOptions({imageOrientation:'none',premultiplyAlpha:'none'});
     const queue=[...byFile.entries()];let want=null;
-    const load=([file,e])=>e.loading??=loader.loadAsync(new URL(file,document.baseURI).href).then(bitmap=>{
-      const src=e.materials[0].userData.sdMap,t=new THREE.Texture(bitmap);
+    const load=([file,e])=>{const url=new URL(file,document.baseURI).href;return e.loading??=ktx2Texture(url).then(k=>k??loader.loadAsync(url).then(bitmap=>new THREE.Texture(bitmap))).then(t=>{
+      const src=e.materials[0].userData.sdMap;
       t.flipY=false;t.colorSpace=src.colorSpace;t.wrapS=src.wrapS;t.wrapT=src.wrapT;t.repeat.copy(src.repeat);t.offset.copy(src.offset);
-      t.anisotropy=aniso;t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.needsUpdate=true;e.texture=t;return t;}).catch(()=>null);
+      t.anisotropy=aniso;t.generateMipmaps=!t.isCompressedTexture;t.minFilter=THREE.LinearMipmapLinearFilter;t.needsUpdate=true;e.texture=t;return t;}).catch(()=>null);};   // KTX2 copies carry their mips
     function apply(on){
       want=on;let i=0;
       const step=async()=>{if(want!==on)return;

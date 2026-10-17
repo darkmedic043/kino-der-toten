@@ -252,3 +252,4 @@
 - 2026-10-17: Play-time frame diagnostics (perf-diag.js, .tools/perf-report.mjs) after the user reported frame loss on a 4070 Ti Super; Rind 0.3.3 turns vsync back on (performance.md).
 - 2026-10-17: Spawn and first-appearance stalls: fast skinned bounds for every rigged model, engine shader warm-up against the real render targets (warmObjects, 'warm' event, power-ups and enemy templates), shaders compiled mid-game in perf-diag (performance.md).
 - 2026-10-17: Der Eisendrache co-op (sync.js: ordered events, shared state, effects, host-credited damage) and the four bow upgrades rewritten as BO3 runs them (owners, one quest each, BO3's own triggers and steps; 58 quest props, map v=28); custom-world hides builder-hidden props before batching (coop.md, waw-ports.md).
+- 2026-10-17: KTX2 textures: everything under textures/ GPU-compressed (UASTC → BC7), Kino VRAM 3.4 → 1.2 GB (materials.md).

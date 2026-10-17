@@ -40,3 +40,6 @@ Thumbs.db
 
 # Rind launcher downloads and update feed (built and copied by ~/projects/rind/scripts/release.sh)
 /export/web/rind/
+
+# KTX2 copies of the game textures (.tools/build-ktx2.mjs): derived from ripped assets, rebuilt locally
+/export/web/ktx2/

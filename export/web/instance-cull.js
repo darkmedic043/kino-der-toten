@@ -53,7 +53,8 @@ function lodsOf(g){
 // (the material's colour x the instance's, BatchedMesh colours).
 const NO_ARRAY_MAPS=['lightMap','aoMap','emissiveMap','roughnessMap','metalnessMap','alphaMap','bumpMap','displacementMap','envMap','specularMap'];
 const plainUv=t=>!t||(t.offset.x===0&&t.offset.y===0&&t.repeat.x===1&&t.repeat.y===1&&t.rotation===0&&t.channel===0&&t.wrapS===THREE.RepeatWrapping&&t.wrapT===THREE.RepeatWrapping);
-const arrayable=m=>m.isMeshStandardMaterial&&!m.isMeshPhysicalMaterial&&!m.transparent&&m.map?.source?.data&&!NO_ARRAY_MAPS.some(k=>m[k])&&plainUv(m.map)&&plainUv(m.normalMap);
+// (GPU-compressed KTX2 maps can't be copied into these RGBA layers: those materials batch the plain way)
+const arrayable=m=>m.isMeshStandardMaterial&&!m.isMeshPhysicalMaterial&&!m.transparent&&m.map?.source?.data&&!m.map.isCompressedTexture&&!m.normalMap?.isCompressedTexture&&!NO_ARRAY_MAPS.some(k=>m[k])&&plainUv(m.map)&&plainUv(m.normalMap);
 const arrayKey=m=>[m.side,m.alphaTest,!!m.normalMap,m.normalMap?m.normalScale.toArray().join():'',m.roughness,m.metalness,m.emissive.getHex(),m.emissiveIntensity,m.flatShading,m.vertexColors,m.fog,m.map.colorSpace,m.customProgramCacheKey()].join(',');
 function arrayMaterial(base,mapArray,normalArray,layerTex){
   const m=base.clone();m.name='array_'+base.name;m.color.set(1,1,1);

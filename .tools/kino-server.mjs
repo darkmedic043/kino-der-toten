@@ -27,7 +27,7 @@ const SESSION_DAYS = 90, MAX_BODY = 256 * 1024;
 mkdirSync(join(DATA, 'profiles'), { recursive: true });
 
 const TYPES = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8',
-  '.css':'text/css; charset=utf-8','.glb':'model/gltf-binary','.gltf':'model/gltf+json','.webp':'image/webp','.wasm':'application/wasm','.yml':'text/yaml; charset=utf-8','.wav':'audio/wav','.ogg':'audio/ogg',
+  '.css':'text/css; charset=utf-8','.glb':'model/gltf-binary','.gltf':'model/gltf+json','.webp':'image/webp','.ktx2':'image/ktx2','.wasm':'application/wasm','.yml':'text/yaml; charset=utf-8','.wav':'audio/wav','.ogg':'audio/ogg',
   '.bin':'application/octet-stream','.png':'image/png','.jpg':'image/jpeg','.md':'text/plain; charset=utf-8','.txt':'text/plain; charset=utf-8'};
 
 // ---- Storage (small JSON files, written atomically) -------------------------

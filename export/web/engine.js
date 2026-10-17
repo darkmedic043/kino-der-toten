@@ -25,6 +25,7 @@ import { ModHost } from './mod-loader.js';
 import { settings } from './settings.js';
 import { installGameMenu } from './game-menu.js';
 import { createPerfDiag } from './perf-diag.js';
+import { setupKtx2, ktx2Stats } from './ktx2.js';
 
 export const vector=a=>new THREE.Vector3().fromArray(a);
 export const perkInfo={specialty_quickrevive:{name:'Quick Revive',price:1500,color:'#509ebc',icon:'QR'},specialty_fastreload:{name:'Speed Cola',price:3000,color:'#478450',icon:'SC'},specialty_rof:{name:'Double Tap',price:2000,color:'#b37528',icon:'DT'},specialty_armorvest:{name:'Juggernog',price:2500,color:'#a53835',icon:'J'}};
@@ -34,6 +35,7 @@ const $=id=>document.getElementById(id), keys=new Set(),audio=new GameAudio(),mo
 const profile=configureKinoAssets();
 audio.maxBufferBytes=profile.mobile?16*1024*1024:Infinity;audio.preload=!profile.mobile;
 const renderer=new THREE.WebGLRenderer({antialias:!profile.mobile,powerPreference:profile.mobile?'default':'high-performance'});setPrimaryRenderer(renderer);   // only its uploads free images (texture-memory.js)
+setupKtx2(renderer);   // GPU-compressed copies of the textures for every glTF loaded from here on (ktx2.js)
 renderer.setPixelRatio(Math.min(devicePixelRatio,profile.mobile?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
 // smallest instanced prop drawn, in screen pixels, by graphics quality (Low..Ultra; instance-cull.js)
 const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null;
@@ -365,7 +367,7 @@ function getState(){
 function fullState(){return {map:entry?.id,ready,active,started,input:{touch:touchControls.getState(),primary,ads},...(session?session.snapshot():{}),player:player?{...player.state,rotation:camera.rotation.toArray().slice(0,3),position:camera.position.toArray(),feet:player.getFeetPosition().toArray()}:null,enemies:enemies?.snapshot()??[],prompt:promptText,
   barriers:world?.barriers?.map(b=>({id:b.id,count:b.count,boards:map.boardCount(b),position:b.position.toArray(),inside:b.inside.toArray(),group:b.group}))??[],
   performance:{fps,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},viewmodelReady:view?.ready??false,...(map?.state?.()??{}),errors:[...errors,...mods.errors]};}
-globalThis.kino={mods,debug:{textureMemory:textureMemoryStats,getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,
+globalThis.kino={mods,debug:{textureMemory:textureMemoryStats,ktx2:ktx2Stats,getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,
   giveWeapon:id=>{session.giveWeapon(id);equipView();},spawnEnemy:(p,kind)=>enemies.spawn(vector(p),null,kind).id,clearEnemies:()=>{for(const z of [...enemies.list])enemies.hurt(z,999999);},collectPowerup:collect,
   step:seconds=>{for(let t=0;t<seconds;t+=1/60)update(Math.min(1/60,seconds-t));},navigationPath:(a,b)=>world.path(vector(a),vector(b)).map(v=>v.toArray()),
   setAutoSpawn:value=>{enemies.autoSpawn=value;enemies.autoRounds=value;},setInvulnerable:value=>{session.effects.invulnerable=value?Infinity:0;},damageEnemy:(id,n=999999)=>{const z=enemies.list.find(z=>z.id===id);if(z)enemies.hurt(z,n);},

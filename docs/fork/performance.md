@@ -120,3 +120,6 @@ Measured with a scripted 45 s play (kills, rounds advancing, camera turning) on 
 - Results: Cheese Cube 0 mid-game compiles (was 3 incl. the 90 ms one), steady 60 FPS with ~1.4 ms update / ~3.5 ms render. Kino: 0 mid-game compiles (was 12), hitches over 50 ms in 45 s 14 → 5. What's left on the first played frames is GPU-side (driver pipeline creation on first draw, cached by the NVIDIA driver between runs) and doesn't show in our CPU timings.
 - `perf-diag.js` now reports shader programs compiled during play (names per window, a session count), shown by perf-report.
 - Testing gotcha: another session's headless Chromium on the same 6 GB GPU can make runs lose the WebGL context (Kino peaks ~4.5 GB alone). The scratchpad scripts detect `webglcontextlost` and retry; treat a lost run as invalid.
+
+## KTX2 textures (2026-10-17)
+GPU-compressed (BC7 via UASTC) copies of everything under `textures/`: Kino VRAM 3.42 → 1.21 GB, page RAM 4.54 → 3.57 GB, same load time and FPS. Details, numbers and what isn't covered yet: materials.md, "KTX2 textures".
