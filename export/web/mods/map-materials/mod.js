@@ -98,7 +98,8 @@ export default async function setup(api){
   // the game starts (decoded off the main thread); Settings → HD textures
   // switches between them and the originals. Phones keep the originals.
   const coarse=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
-  fetch(new URL('hd-materials.json',api.mod.url)).then(r=>r.ok?r.json():null).then(table=>{
+  // window.kino.hdMaps: settles once the HD maps are in (or off), so the engine's map batching (texture arrays) gets them
+  window.kino.hdMaps=fetch(new URL('hd-materials.json',api.mod.url)).then(r=>r.ok?r.json():null).then(table=>{
     if(!table)return;
     const byFile=new Map();   // hd url -> {materials, original maps, texture}
     for(const m of seen){const f=table[m.name];if(!f||!m.map)continue;const e=byFile.get(f)??byFile.set(f,{materials:[],texture:null,loading:null}).get(f);e.materials.push(m);m.userData.sdMap=m.map;}
@@ -108,19 +109,22 @@ export default async function setup(api){
       const src=e.materials[0].userData.sdMap;
       t.flipY=false;t.colorSpace=src.colorSpace;t.wrapS=src.wrapS;t.wrapT=src.wrapT;t.repeat.copy(src.repeat);t.offset.copy(src.offset);
       t.anisotropy=aniso;t.generateMipmaps=!t.isCompressedTexture;t.minFilter=THREE.LinearMipmapLinearFilter;t.needsUpdate=true;e.texture=t;return t;}).catch(()=>null);};   // KTX2 copies carry their mips
-    function apply(on){
+    const swap=(entry,t)=>{const sd=new Set();for(const m of entry[1].materials){sd.add(m.userData.sdMap);m.map=t;}   // same program: no needsUpdate (it forced a rebuild per swap)
+      for(const x of sd)x.dispose();};   // frees the original's GPU copy; it re-uploads if switched back
+    // eager (while loading): every HD map at once, before the engine batches the map; later toggles go one per frame
+    function apply(on,eager=false){
       want=on;let i=0;
+      if(on&&eager)return Promise.all(queue.map(async entry=>{const t=await load(entry);if(t&&want===on)swap(entry,t);})).then(()=>console.info('[map-materials] HD textures on',queue.length));
       const step=async()=>{if(want!==on)return;
         if(!on){for(const [,e] of queue)for(const m of e.materials){if(m.map!==m.userData.sdMap)m.map=m.userData.sdMap;}return;}
         const entry=queue[i++];if(!entry){console.info('[map-materials] HD textures on',queue.length);return;}
-        const t=await load(entry);if(t&&want){const sd=new Set();for(const m of entry[1].materials){sd.add(m.userData.sdMap);m.map=t;}   // same program: no needsUpdate (it forced a rebuild per swap)
-          for(const x of sd)x.dispose();}   // frees the original's GPU copy; it re-uploads if switched back
+        const t=await load(entry);if(t&&want)swap(entry,t);
         requestAnimationFrame(step);};
       step();
     }
     const enabled=()=>!coarse&&settings.hdTextures!==false;
-    apply(enabled());
     onSettingsChange((s,key)=>{if(key==='hdTextures'||key===null)apply(enabled());});
+    return enabled()?apply(true,true):null;
   }).catch(e=>console.warn('[map-materials] HD textures',e));
 
   // The theatre chandelier's opaque slot also holds its bead and crystal cards,

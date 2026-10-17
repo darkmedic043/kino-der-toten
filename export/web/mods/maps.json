@@ -8,6 +8,9 @@
         "zombies"
       ],
       "url": "play.html?map=kino",
+      "textureArrays": 512,
+      "batchMeshes": true,
+      "batchExclude": "sky_day",
       "image": "mods/maps/thumbs/kino.webp",
       "tagline": "The lights are out. The show goes on.",
       "place": "BERLIN, GERMANY",

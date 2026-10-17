@@ -83,7 +83,7 @@ export function patchMaterial(m,uniforms){
     prev?.call(m,shader,renderer);
     Object.assign(shader.uniforms,uniforms);
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vBakedPos;')
-      .replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvBakedPos=(modelMatrix*vec4(transformed,1.)).xyz;');
+      .replace('#include <worldpos_vertex>','#include <worldpos_vertex>\n{vec4 bp=vec4(transformed,1.);\n#ifdef USE_BATCHING\nbp=batchingMatrix*bp;\n#endif\n#ifdef USE_INSTANCING\nbp=instanceMatrix*bp;\n#endif\nvBakedPos=(modelMatrix*bp).xyz;}');   // as three's worldpos_vertex: batched and instanced props carry their placement in batchingMatrix/instanceMatrix (without them those props sampled the volume at their model origin and came out black, 2026-10-17)
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
       varying vec3 vBakedPos;uniform highp sampler3D bakedSolid,bakedPower,bakedDir;uniform vec3 bakedOrigin,bakedSize;uniform float bakedCell,bakedScale,bakedPowerMix,bakedStrength;
       vec3 bakedDecode(vec3 c){return c*c*bakedScale;}`)

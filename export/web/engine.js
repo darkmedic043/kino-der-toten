@@ -436,7 +436,14 @@ try{
   // static instanced props: batched per material, culled per instance (instance-cull.js)
   if(!perfOff.has('noBatch')){
     // the map's own props only (mods' instanced effects, e.g. the lighting beams, have their own shaders)
-    instanceCull=await createInstanceCuller(world.root??world.mapRoot??scene,{target:scene,renderer,arrays:perfOff.has('noArrays')?0:entry.textureArrays??0});globalThis.kino.instanceCull=instanceCull;
+    // maps.json batchMeshes: plain map meshes join texture-array batches too (Kino's shell); batchExclude: a regex on mesh
+    // or material names mods change later. The HD map textures go in first (map-materials, awaited up to 30 s).
+    // (?textureArrays=N, ?batchMeshes, ?batchExclude=re override the map entry, for testing)
+    const opt=k=>perfOff.has(k)?perfOff.get(k)||true:entry[k];
+    const arrays=perfOff.has('noArrays')?0:+(opt('textureArrays')||0),batchMeshes=!!opt('batchMeshes'),skip=opt('batchExclude')?new RegExp(opt('batchExclude')):null;
+    if(arrays&&batchMeshes)await Promise.race([globalThis.kino?.hdMaps,new Promise(r=>setTimeout(r,30000))]).catch(()=>{});
+    instanceCull=await createInstanceCuller(world.root??world.mapRoot??scene,{target:scene,renderer,arrays,meshes:batchMeshes,
+      exclude:o=>o.userData.noCull||!!skip&&(skip.test(o.name)||[o.material].flat().some(m=>skip.test(m?.name??'')))});globalThis.kino.instanceCull=instanceCull;
     if(instanceCull.meshes){console.info('[instance-cull]',instanceCull.sources,'meshes into',instanceCull.meshes,'batches,',instanceCull.instances,'instances in',instanceCull.buildMs,'ms');
       await paint();await renderer.compileAsync(scene,camera).catch(()=>{});}   // batched props need their own shader variants: compile them behind the loading screen
   }
