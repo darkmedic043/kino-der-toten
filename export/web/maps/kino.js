@@ -114,7 +114,7 @@ export async function createMap(ctx,entry){
     debug:{
       completionState:()=>F().snapshot(),
       getEntities:()=>ctx.data.entities.filter(e=>e.classname==='trigger_use'||e.targetname==='initial_spawn_points'),
-      specialState:()=>({meteors:meteors.size,gasClouds:gasClouds.length,boxLocation:W().activeBox.id,box:ctx.mysteryBox.snapshot().find(b=>b.id===W().activeBox.id)?.roll??null,boxes:ctx.mysteryBox.snapshot(),boxMoves:ctx.mysteryBox.moves,fireSale:!!W().fireSale,pickups:ctx.powerups.snapshot()}),
+      specialState:()=>({meteors:meteors.size,meteorIds:[...meteors],gasClouds:gasClouds.length,boxLocation:W().activeBox.id,box:ctx.mysteryBox.snapshot().find(b=>b.id===W().activeBox.id)?.roll??null,boxes:ctx.mysteryBox.snapshot(),boxMoves:ctx.mysteryBox.moves,fireSale:!!W().fireSale,pickups:ctx.powerups.snapshot()}),
     },
   };
 }

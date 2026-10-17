@@ -413,7 +413,7 @@ export function setupEE(api, { bows, traps }) {
   });
 
   const out = {
-    state: () => ({ step: st.step, hint: HINT[st.step] ?? '', summon: st.summon.size, travel: { lit: st.travel.lit, hits: st.travel.hits, ready: st.travel.ready }, have: [...st.have], done: [...st.done],
+    state: () => ({ step: st.step, hint: HINT[st.step] ?? '', summon: st.summon.size, summoned: [...st.summon], travel: { lit: st.travel.lit, hits: st.travel.hits, ready: st.travel.ready }, have: [...st.have], done: [...st.done],
       protector: P ? { stone: P.stone, kills: P.kills, moving: !!P.move } : null, simon: st.simon.map(s => s && { round: s.round, phase: s.phase, at: s.at }),
       boss: st.boss ? { phase: st.boss.phase, hp: Math.round(st.boss.hp), state: st.boss.state, casts: st.boss.casts } : null, keeper: !!K, code: CODE.join('') }),
     skip(n) {   // testing: complete the steps before n

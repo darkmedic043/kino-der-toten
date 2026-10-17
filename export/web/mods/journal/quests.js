@@ -6,7 +6,8 @@
 //   L.ents(name)     positions of the map's entities with that targetname (BO1 maps)
 //   L.castle, L.de   Der Eisendrache: window.kino.castle and the quest spots exported by its ee/side/side2 modules
 // A quest is linear (progress(L) -> how many steps are done) or not (step.done(L) per step, in any order).
-// step.where(L) -> [Vector3] puts markers on the screen while the quest is tracked (only once the step is recorded).
+// step.where(L) -> [Vector3] puts markers on the screen while the quest is tracked (only once the step is recorded);
+// spots already dealt with this match are left out, so only what is still to do is marked.
 
 const n = v => [v].flat().filter(Boolean);
 const bowStage = (L, el) => {   // Der Eisendrache bow quest -> steps done: start, arrow, its own steps, place, souls, take
@@ -16,6 +17,7 @@ const bowStage = (L, el) => {   // Der Eisendrache bow quest -> steps done: star
     : s.stage === 'souls' ? 3 + k : s.stage === 'ready' ? 4 + k : 5 + k;
 };
 const site = (L, el) => L.castle?.bows?.sites?.[el] ?? {};
+const bowD = (L, el) => L.castle?.bows?.state()?.[el]?.d ?? {};   // the bow quest's current step's progress (Sets as arrays)
 const BOW_TAIL = el => [
   { title: 'Place the arrow', how: 'Put the reforged arrow on its pedestal around the undercroft pyramid (a Max Ammo drops).', where: L => n(site(L, el).pedestal) },
   { title: 'Feed the pedestal', how: 'Get 20 kills in the undercroft while the arrow is on its pedestal. Only the arrow\'s owner\'s kills count.', where: L => n(site(L, el).pedestal) },
@@ -27,7 +29,7 @@ export const JOURNAL = [
   { map: 'der-eisendrache', title: 'Der Eisendrache', quests: [
     { id: 'main', name: 'Main Easter egg', kind: 'MAIN QUEST', progress: L => Math.min(9, L.castle?.ee?.state().step ?? 0), steps: [
       { title: 'Upgrade a bow', how: 'The quest starts once any elemental bow has been upgraded (see the four bow quests).' },
-      { title: 'The summoning key', how: 'Shoot the six summoning targets around the lab teleporter with a bow. The past laboratory opens.', where: L => L.de?.SUMMON ?? [] },
+      { title: 'The summoning key', how: 'Shoot the six summoning targets around the lab teleporter with a bow. The past laboratory opens.', where: L => { const hit = L.castle?.ee?.state().summoned ?? []; return (L.de?.SUMMON ?? []).filter((p, k) => !hit.includes(k)); } },
       { title: 'Into the past', how: 'One of seven targets around the castle lights up: hit it with an upgraded bow, then the next, four in a row (anything else hit, or the round ending, resets it). Primed, the lab teleporter takes you to the past for the rest of the round. In the past: read the safe\'s combination, take the MPD canister and the lab fuse. In the present, the combination opens the safe (the golden key and two tesla connectors). In the past again the key opens the crate: the channeling stone. Put the canister in the MPD and the stone on the cracked plinth by the road.',
         where: L => { const s = L.castle?.ee?.state(), d = L.de; if (!s || !d) return []; const items = L.prompts(/combination|canister|golden key|channeling stone|safe/i);
           if (items.length) return items; return s.travel.ready ? [d.PAD.present] : s.travel.lit != null ? n(d.TRAVEL[s.travel.lit]) : d.TRAVEL; } },
@@ -36,7 +38,8 @@ export const JOURNAL = [
       { title: 'Simon says', how: 'At the consoles on the lower tower and the launch platform: watch the runes, then press use while the monitor shows each rune in the same order (3, 4, then 5 runes).',
         where: L => (L.de?.SPOT.consoles ?? []).filter((p, k) => L.castle?.ee?.state().simon?.[k]?.phase !== 'done') },
       { title: 'Rockets to the moon', how: 'Put the two tesla connectors on the Death Ray bases on the roof, then pull its lever.',
-        where: L => { const p = L.prompts(/tesla connector|Death Ray lever/); return p.length ? p : n(L.de && [L.de.SPOT.tcLower, L.de.SPOT.tcLaunch, L.de.SPOT.lever]).flat(); } },
+        where: L => { const p = L.prompts(/tesla connector|Death Ray lever/); if (p.length || !L.de) return p; const done = L.castle?.ee?.state().done ?? [];
+          return [['tcLower', L.de.SPOT.tcLower], ['tcLaunch', L.de.SPOT.tcLaunch], ['rockets', L.de.SPOT.lever]].filter(([f]) => !done.includes(f)).map(([, q]) => q); } },
       { title: 'The lab fuse', how: 'Put the lab fuse (from the past) in the fuse box on the roof.', where: L => n(L.de?.SPOT.fuseBox) },
       { title: 'To the boss', how: 'Plant the Ragnarok DG-4 on one of the four plates around the MPD in the undercroft (or, without one, touch the MPD).', where: L => [...(L.de?.SPOT.plates ?? []), ...n(L.de?.SPOT.mpd)] },
       { title: 'Defeat the Keeper', how: 'It teleports around the arena casting the bows\' spells. Every third cast it charges a storm at the centre: plant the Ragnarok under it (or hit it with an upgraded bow) to stun it. Only stunned does it take damage (headshots double). Unstunned, the storm hits everyone outside the five safe circles. Three phases.' },
@@ -44,9 +47,9 @@ export const JOURNAL = [
     { id: 'storm', name: 'Storm Bow', kind: 'BOW UPGRADE', progress: L => bowStage(L, 'storm'), steps: [
       { title: 'Start the quest', how: 'Shoot the weather vane on top of the clock tower with Wrath of the Ancients.', where: L => n(site(L, 'storm').start) },
       ARROW('storm'),
-      { title: 'The beacons', how: 'Shoot the three beacons far out from the castle (the wall, the cliff, the rocket pad).', where: L => site(L, 'storm').beacons ?? [] },
+      { title: 'The beacons', how: 'Shoot the three beacons far out from the castle (the wall, the cliff, the rocket pad).', where: L => (site(L, 'storm').beacons ?? []).filter((b, k) => !bowD(L, 'storm').lit?.includes(k)) },
       { title: 'Wall-run', how: 'While the undercroft\'s gravity is low, wall-run through its five triggers without landing.', where: L => site(L, 'storm').wallrun ?? [] },
-      { title: 'The batteries', how: 'Fill the three storm batteries (gatehouse, clock tower, rocket pad) with 5 kills each; then stand on a filled battery and fire a fully drawn arrow at a beacon, once per beacon.', where: L => (site(L, 'storm').batteries ?? []).map(b => b.at) },
+      { title: 'The batteries', how: 'Fill the three storm batteries (gatehouse, clock tower, rocket pad) with 5 kills each; then stand on a filled battery and fire a fully drawn arrow at a beacon, once per beacon.', where: L => (site(L, 'storm').batteries ?? []).filter(b => !bowD(L, 'storm').used?.includes(b.id)).map(b => b.at) },
       { title: 'Reforge', how: 'Reforge the arrow on the roof.', where: L => n(site(L, 'storm').reforge) },
       ...BOW_TAIL('storm'),
     ] },
@@ -54,7 +57,7 @@ export const JOURNAL = [
       { title: 'Start the quest', how: 'Shoot the clock on the clock tower wall with Wrath of the Ancients.', where: L => n(site(L, 'rune').start) },
       ARROW('rune'),
       { title: 'The obelisk', how: 'Just after a rocket test fire (within 7.5 s), shoot the obelisk by the rocket pad: a magma ball rises over the roof.', where: L => n(site(L, 'rune').obelisk) },
-      { title: 'The runic circles', how: 'Shoot each runic circle (road, rampart, roof) while flying off a launch pad, then charge each with 9 kills standing in it (a symbol lights every 3).', where: L => (site(L, 'rune').circles ?? []).map(c => c.trig) },
+      { title: 'The runic circles', how: 'Shoot each runic circle (road, rampart, roof) while flying off a launch pad, then charge each with 9 kills standing in it (a symbol lights every 3).', where: L => (site(L, 'rune').circles ?? []).filter(c => !(bowD(L, 'rune').kills?.[c.id] >= 9)).map(c => c.trig) },
       { title: 'The clock', how: 'Turn the clock in the clock tower: its wheel shows one fireplace and keeps that fireplace\'s circle.', where: L => n(site(L, 'rune').clock) },
       { title: 'Magma golf', how: 'Standing in the circle\'s pool, each arrow\'s landing makes the next pool; get an arrow into the fireplace the wheel shows (under 3 shots: a Max Ammo). 4 misses and it waits for the next round.', where: L => n(L.castle?.bows?.golfPool?.()) },
       { title: 'The fireplace', how: 'Use the fireplace to take the magma.', where: L => L.prompts(/Take the magma/) },
@@ -62,7 +65,7 @@ export const JOURNAL = [
       ...BOW_TAIL('rune'),
     ] },
     { id: 'wolf', name: 'Wolf Bow', kind: 'BOW UPGRADE', progress: L => bowStage(L, 'wolf'), steps: [
-      { title: 'The paintings', how: 'Holding a bow, use the four king paintings in their order 1-4 (they are dealt to four walls at random; a wrong one starts over). A wall in the undercroft breaks.', where: L => { const p = L.prompts(/Touch the painting/); return p.length ? p : Object.values(site(L, 'wolf').paintings ?? {}); } },
+      { title: 'The paintings', how: 'Holding a bow, use the four king paintings in their order 1-4 (they are dealt to four walls at random; a wrong one starts over). A wall in the undercroft breaks.', where: L => { const P = site(L, 'wolf').paintings ?? {}, t = L.castle?.bows?.team?.(), next = t?.deal?.[t.paint]; return next && P[next] ? [P[next]] : Object.values(P); } },
       ARROW('wolf'),
       { title: 'The skull shrine', how: 'Shoot the skull shrine above the rocket pad.', where: L => n(site(L, 'wolf').shrine) },
       { title: 'The wolf skull', how: 'Pick up the wolf skull where it rolls, below the shrine.', where: L => n(site(L, 'wolf').skull) },
@@ -124,13 +127,13 @@ export const JOURNAL = [
       { title: 'Turn the moon', how: 'Use the astroglobe to turn its moon arm 45° at a time until it lines up: 30 s of disco lights, and the zombies nearby dance.', where: L => n(L.de?.SIDE?.globe) },
     ] },
     { id: 'requiem', name: 'Requiem (music egg)', kind: 'SIDE EGG', progress: L => (L.castle?.side2?.state().gram ?? 0) >= 3 ? 1 : 0, steps: [
-      { title: 'The gramophones', how: 'Play the three gramophones around the castle.', where: L => { const p = L.prompts(/Play the gramophone/); return p.length ? p : L.de?.GRAMOPHONES ?? []; } },
+      { title: 'The gramophones', how: 'Play the three gramophones around the castle.', where: L => L.prompts(/Play the gramophone/) },
     ] },
     { id: 'deadagain', name: 'Dead Again (music egg)', kind: 'SIDE EGG', progress: L => (L.castle?.side2?.state().bears ?? 0) >= 3 ? 1 : 0, steps: [
       { title: 'The teddy bears', how: 'Squeeze the three teddy bears hidden around the castle.', where: L => L.prompts(/Squeeze the teddy bear/) },
     ] },
     { id: 'skulls', name: 'In Plain Sight skulls', kind: 'SIDE EGG', progress: L => (L.castle?.side2?.state().skulls.length ?? 0) >= 3 ? 1 : 0, steps: [
-      { title: 'Break the skulls', how: 'Chew In Plain Sight: three floating skulls show. Break each with an upgraded-bow arrow; a pile grows in the lab, and with three it gives a power-up.', where: L => [...(L.de?.SKULLS ?? []), ...L.prompts(/Take the skulls/)] },
+      { title: 'Break the skulls', how: 'Chew In Plain Sight: three floating skulls show. Break each with an upgraded-bow arrow; a pile grows in the lab, and with three it gives a power-up.', where: L => { const broke = L.castle?.side2?.state().skulls ?? []; return [...(L.de?.SKULLS ?? []).filter((p, k) => !broke.includes(k)), ...L.prompts(/Take the skulls/)]; } },
     ] },
     { id: 'claw', name: 'The claw hat', kind: 'SIDE EGG',
       progress: L => { const s = L.castle?.side2?.state(); return !s ? 0 : s.hat ? 2 : s.claws.every(c => c >= 1) ? 1 : 0; }, steps: [
@@ -144,7 +147,7 @@ export const JOURNAL = [
       progress: L => { const q = L.moon?.quest; if (!q) return 0; const order = MOON_STAGES.map(s => s.stage), i = order.indexOf(q.stage); return q.completed ? MOON_STAGES.length : Math.max(0, i); },
       steps: null },   // filled below from MOON_STAGES
     { id: 'music', name: 'Musical Easter egg', kind: 'SIDE EGG', progress: L => { const q = L.moon?.quest; return q && q.musicEggs.size >= L.ents('8bitsongs').length && q.musicEggs.size ? 1 : 0; }, steps: [
-      { title: 'The radios', how: 'Find and use every hidden music trigger around the map.', where: L => L.ents('8bitsongs') },
+      { title: 'The radios', how: 'Find and use every hidden music trigger around the map.', where: L => L.ents('8bitsongs', e => !L.moon?.quest?.musicEggs.has(e.id)) },
     ] },
   ] },
 
@@ -152,14 +155,14 @@ export const JOURNAL = [
     { id: 'reels', name: 'Film reels', kind: 'MAP QUEST',
       progress: L => { const r = L.reels(); if (!r) return 0; const i = r.installed.length; return i >= 3 ? 5 : i ? 4 : r.carried ? 3 : r.room || r.reels.some(x => x.collected) ? 2 : L.session.teleporter === 'linked' || L.session.teleporter === 'cooldown' ? 1 : 0; },
       steps: [
-        { title: 'Link the teleporter', how: 'With the power on, use the teleporter pad on the stage, then link it at the mainframe pad in the lobby within 30 s.', where: L => [...L.ents('trigger_teleport_pad_0'), ...L.ents('pf16_auto1')] },
+        { title: 'Link the teleporter', how: 'With the power on, use the teleporter pad on the stage, then link it at the mainframe pad in the lobby within 30 s.', where: L => L.session.teleporter === 'linking' ? L.ents('pf16_auto1') : L.ents('trigger_teleport_pad_0') },
         { title: 'A room outside time', how: 'Teleport to the projection room. On the way back you may land in a room outside time for a few seconds.', where: L => L.ents('trigger_teleport_pad_0') },
         { title: 'Take a film reel', how: 'In the room outside time, take the film reel before it pulls you back.', where: L => (L.reels()?.reels ?? []).filter(r => !r.collected).map(r => L.v(r.position)) },
         { title: 'Load the projector', how: 'Carry the reel to the projector in the projection room and load it.', where: L => L.ents('trigger_change_projector_reels') },
         { title: 'All three films', how: 'Find and project all three film reels.', where: L => L.ents('trigger_change_projector_reels') },
       ] },
     { id: 'meteors', name: '115 (music egg)', kind: 'SIDE EGG', progress: L => (L.meteors() ?? 0) >= 3 ? 1 : 0, steps: [
-      { title: 'The meteor fragments', how: 'Find the three glowing meteor fragments around the theater and listen to each.', where: L => L.ents('meteor_egg_trigger') },
+      { title: 'The meteor fragments', how: 'Find the three glowing meteor fragments around the theater and listen to each.', where: L => { const got = L.meteorIds(); return L.ents('meteor_egg_trigger', e => !got.includes(e.id)); } },
     ] },
   ] },
 
@@ -190,7 +193,7 @@ export const JOURNAL = [
       { title: 'Hide and seek', how: 'Three things appear around the map (a monkey bomb, a Bowie knife teddy bear, a perk bottle teddy bear): shoot all three. The prize spins in the fly trap room: take it.', where: L => [...L.nodes(/^GIANT_EE_/), ...L.nodes(/^GIANT_PRIZE/)] },
     ] },
     { id: 'song', name: 'Beauty of Annihilation', kind: 'SIDE EGG', progress: L => L.tile('giant-song')?.done() ? 1 : 0, steps: [
-      { title: 'The spine beakers', how: 'Find and use the three beakers with a brain and spine in them.', where: L => L.nodes(/^GIANT_JAR_/) },
+      { title: 'The spine beakers', how: 'Find and use the three beakers with a brain and spine in them.', where: L => L.prompts(/specimen jar/) },
     ] },
   ] },
 ];
@@ -209,7 +212,7 @@ const MOON_STAGES = [
   { stage: 'plates', title: 'The Area 51 plates', how: 'Grenade the plates on the shelf in Area 51, throw a Gersh Device beside them, then a QED beside the plates in Receiving Bay.', where: L => L.moon.quest.plates === 'receiving' ? L.ents('sq_ctvg_tp2') : L.ents('sq_cassimir_plates') },
   { stage: 'wire', title: 'The wire', how: 'Find the wire in the laboratories and connect it at the Receiving Bay terminal.', where: L => L.moon.quest.wire ? L.targets('sq_charge_terminal') : L.targets('sq_wire_pos', t => t.e.id === L.moon.quest.wireId) },
   { stage: 'charge', title: 'Charge the Vril Device', how: 'Hold F at the Receiving Bay terminal for 60 s.', where: L => L.targets('sq_charge_terminal') },
-  { stage: 'tanks', title: 'All four collectors', how: 'Fill all four MPD collectors with 25 souls each.', where: L => [...L.ents('sq_first_tank'), ...L.ents('sq_second_tank')] },
+  { stage: 'tanks', title: 'All four collectors', how: 'Fill all four MPD collectors with 25 souls each.', where: L => [...L.ents('sq_first_tank'), ...L.ents('sq_second_tank')].filter((p, i) => !(L.moon.quest.tanks?.[i] >= 25)) },
   { stage: 'swap', title: 'The charged device', how: 'Insert the charged Vril Device into the MPD.', where: L => L.targets('sq_pyramid_console') },
   { stage: 'final_simon', title: 'The final sequences', how: 'Repeat the final colour sequences, three games of them.', where: L => L.targets('sq_ss_button') },
   { stage: 'final_qed', title: 'QED at the MPD', how: 'Throw a QED beside the sphere at the MPD.', where: L => L.targets('sq_pyramid_console') },

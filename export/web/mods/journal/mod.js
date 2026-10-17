@@ -1,9 +1,10 @@
 // The journal (JOURNAL.EXE on the terminal booth, user 2026-10-17): every map's Easter eggs and quests, step by step
 // (mods/journal/quests.js). Doing a step records it for good (kino.mods.journal, cloud-synced): its instructions show
 // in the journal from then on. Tracking a quest of the map you're on shows its current step in a panel and drops
-// markers on the screen at the step's spots (only for steps you have recorded; an unrecorded step says so).
+// markers on the screen at the step's spots still to do (only for steps you have recorded; an unrecorded step says so).
+// A finished quest stops being tracked and leaves the screen.
 // Steps are watched twice a second; cheat games record nothing. Team progress counts in co-op (the quests are shared).
-// window.kino.journal: {status(), track(map, quest), untrack()}
+// window.kino.journal: {status(), track(map, quest), untrack(), points(quest, step)}
 import * as THREE from 'three';
 import { JOURNAL, questsFor } from './quests.js';
 
@@ -36,13 +37,14 @@ export default async function setup(api) {
       if (!list) { list = []; world?.root?.traverse(o => { const m = re.exec(o.name); if (m) list.push([o, m]); }); nodeCache.set(key, list); }
       return list.filter(([o, m]) => shown(o) && (!keep || keep(m))).map(([o]) => pos(o));
     },
-    ents: name => (L.moon?.data?.entities ?? api.data?.entities ?? []).filter(e => e.targetname === name && e.position).map(e => v(e.position)),
+    ents: (name, keep) => (L.moon?.data?.entities ?? api.data?.entities ?? []).filter(e => e.targetname === name && e.position && (!keep || keep(e))).map(e => v(e.position)),
     targets: (kind, keep) => (L.moon?.targets ?? []).filter(t => t.kind === kind && t.e?.position && (!keep || keep(t))).map(t => v(t.e.position)),
     power: () => (world?.interactions ?? []).filter(e => e.kind === 'power' && e.position).map(e => e.position.clone()),
     cc: () => kino.cheeseCube?.state?.(), ccSuits: () => kino.cheeseCube?.suits?.(),
     tile: id => kino.scoreboard?.get?.(id),
     reels: () => { try { return kino.debug?.completionState?.(); } catch { return null; } },
     meteors: () => { try { return kino.debug?.specialState?.().meteors; } catch { return null; } },
+    meteorIds: () => { try { return kino.debug?.specialState?.().meteorIds ?? []; } catch { return []; } },
   };
   if (mapId === 'der-eisendrache') {
     Promise.all([import('../der-eisendrache/ee.js'), import('../der-eisendrache/side.js'), import('../der-eisendrache/side2.js')])
@@ -82,10 +84,14 @@ export default async function setup(api) {
     const t = loadTrack(), q = t?.map === mapId ? quests.find(x => x.id === t.quest) : null;
     if (!q) { tracked = null; draw(); return; }
     const now = doneNow(q), i = now.findIndex(d => !d), rec = recordedOf(loadJournal(), mapId, q.id);
-    const step = q.steps[i], known = i >= 0 && rec.has(i);
+    if (i < 0) {   // the whole quest is done: stop tracking it
+      try { localStorage.removeItem(TRACK); } catch {} api.toast?.(`JOURNAL · ${q.name} complete`, 3);
+      tracked = null; draw(); return;
+    }
+    const step = q.steps[i], known = rec.has(i);
     const points = [];   // markers within 60 units of one another are drawn once
     if (known && step.where) for (const p of safe(() => step.where(L), [])) if (p?.isVector3 && points.length < 24 && !points.some(q => q.distanceTo(p) < 60)) points.push(p);
-    tracked = { q, i, done: i < 0, step, known, points };
+    tracked = { q, i, step, known, points };
     draw();
   }
 
@@ -111,8 +117,7 @@ export default async function setup(api) {
     panel.classList.toggle('on', !!t);
     if (!t) { panel.innerHTML = ''; return; }
     const total = t.q.steps.length;
-    panel.innerHTML = t.done ? `<small>JOURNAL · TRACKING</small><b>${esc(t.q.name)}</b><p>Complete this match.</p>`
-      : `<small>JOURNAL · STEP ${t.i + 1} / ${total}</small><b>${esc(t.q.name)}${t.known ? ' · ' + esc(t.step.title) : ''}</b>`
+    panel.innerHTML = `<small>JOURNAL · STEP ${t.i + 1} / ${total}</small><b>${esc(t.q.name)}${t.known ? ' · ' + esc(t.step.title) : ''}</b>`
         + (t.known ? `<p>${esc(t.step.how.length > 160 ? t.step.how.slice(0, 157) + '…' : t.step.how)}</p>` : '<p class="un">Not recorded yet: work this step out once and the journal keeps it.</p>');
   }
   const tmp = new THREE.Vector3(), cam = new THREE.Vector3();
@@ -152,5 +157,7 @@ export default async function setup(api) {
         steps: q.steps.map((s, i) => rec.has(i) ? { title: s.title, how: s.how, recorded: true, now: !!now?.[i] } : { recorded: false, now: !!now?.[i] }) };
     }) })) };
   }
-  kino.journal = { status, track, untrack };
+  // points(quest, step): that step's marker positions right now (testing; errors are not swallowed)
+  const points = (id, i) => { live(); return quests.find(q => q.id === id)?.steps[i]?.where?.(L) ?? []; };
+  kino.journal = { status, track, untrack, points };
 }
