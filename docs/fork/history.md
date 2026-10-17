@@ -240,3 +240,4 @@
 - 2026-10-16: Der Eisendrache: Der Wunderfizz (waw-ports.md).
 - 2026-10-16: Der Eisendrache dragon heads animated, eat the corpses (waw-ports.md).
 - 2026-10-16: Der Eisendrache traps (Death Ray, masher, rocket test fire); level textures 512 px and 2048 px HD weapon textures dropped for video memory (waw-ports.md, performance.md).
+- 2026-10-16: Operator weapons: a second ability slot with its own meter (Y), the Ragnarok DG-4 first (stand-in visuals); BO7 HUD bubbles joined to the weapon dial (gameplay.md).

@@ -11,7 +11,8 @@ export default async function setup(api){
   style.textContent=`
     body.touch-mode #hud-portrait{display:none}
     body.touch-mode #equip-hud{right:12px;top:112px;bottom:auto;gap:8px;transform:scale(.8);transform-origin:top right;z-index:8}
-    body.touch-mode #class-skill{pointer-events:auto;touch-action:none;cursor:pointer}
+    body.touch-mode :is(#class-skill,#operator-weapon){pointer-events:auto;touch-action:none;cursor:pointer}
+    body.touch-mode #operator-weapon :is(kbd,small){display:none}
     body.touch-mode #class-skill kbd{display:none}
     body.touch-mode #weapon-level{right:12px;bottom:auto;top:168px}
     body.touch-mode #progression-hud{left:200px;bottom:24px}
@@ -34,10 +35,10 @@ export default async function setup(api){
     }`;
   document.head.append(style);
 
-  // Tap the class badge to use the action skill (the classes mod listens for KeyZ).
+  // Tap the class badge to use the action skill (the classes mod listens for KeyZ), the operator weapon's for Y.
   document.addEventListener('pointerdown',e=>{
-    if(!e.target.closest?.('#class-skill'))return;
-    e.preventDefault();e.stopPropagation();key('keydown','KeyZ');key('keyup','KeyZ');
+    const op=e.target.closest?.('#operator-weapon');if(!op&&!e.target.closest?.('#class-skill'))return;
+    e.preventDefault();e.stopPropagation();const k=op?'KeyY':'KeyZ';key('keydown',k);key('keyup',k);   // the operator weapon's bubble: Y
   },true);
 
   // Third person (T), where the chosen operator is shown: no key on a phone, so a toolbar button.

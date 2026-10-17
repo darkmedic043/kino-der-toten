@@ -41,7 +41,7 @@ body.bo7-hud #moon-hud #equipment{right:420px;bottom:40px}
 
 /* ---- bottom right: ammo · weapon dial · ability ---------------------------------------------------------- */
 #bo7-right{right:26px;bottom:22px;display:flex;align-items:flex-end;gap:12px}
-#bo7-right .ammo{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:34px;min-width:110px}
+#bo7-right .ammo{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:76px;min-width:110px}
 #bo7-right .wname{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
 #bo7-right #weapon-name{font:600 15px/1 var(--bo7-font);letter-spacing:1.5px;text-transform:uppercase;color:#d8d3c8}
 #bo7-right.pap #weapon-name{color:#c79bff}
@@ -55,7 +55,8 @@ body.bo7-hud #moon-hud #equipment{right:420px;bottom:40px}
 #bo7-right.empty #mag{color:#ff5a48}
 #bo7-right #reload-label{height:auto;min-height:14px;margin-top:4px;font:600 12px/1 var(--bo7-font);letter-spacing:2px;color:#e7c46a}
 
-#bo7-right .dial{position:relative;width:164px;height:164px}
+/* the dial leaves room at its right for the two bubbles joined to it, and below for the lower one */
+#bo7-right .dial{position:relative;width:164px;height:164px;margin:0 78px 42px 0}
 #bo7-right .dial .ring{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 #bo7-right .dial .track{fill:none;stroke:#ffffff1f;stroke-width:1.5}
 #bo7-right .dial .inner{fill:radial-gradient(#0000,#0006);fill:#00000038;stroke:#ffffff14;stroke-width:1}
@@ -82,14 +83,24 @@ body.bo7-hud #moon-hud #equipment{right:420px;bottom:40px}
 #bo7-right #gum-hud .name{font-weight:600;font-size:14px;white-space:nowrap}
 #bo7-right #gum-hud .keys{font-size:11px;white-space:nowrap}
 #bo7-right #gum-hud .act{align-items:flex-end;white-space:nowrap;order:-1;margin-bottom:4px}
-/* the class ability in its own ring, right of the dial */
-#bo7-right .ability{position:relative;width:96px;height:96px;margin-bottom:6px;display:grid;place-items:center}
-#bo7-right .ability:empty,#bo7-right .ability:not(:has(#class-skill)){display:none}
-#bo7-right .ability .ring{position:absolute;inset:0;width:100%;height:100%}
-#bo7-right .ability .ring circle{fill:#00000040;stroke:#ffffff30;stroke-width:1.5}
-#bo7-right #class-skill{position:relative;right:auto;bottom:auto;margin:0;transform:scale(1.05)}
-#bo7-right #class-skill kbd{top:auto;bottom:-27px;padding:1px 4px;border:1px solid #ffffffaa;border-radius:2px;background:#000a;font:700 10px/1 var(--bo7-font);color:#fff}
-#bo7-right #class-skill small{bottom:auto;top:-22px;font:600 10px/1 var(--bo7-font)}
+/* bubbles joined to the dial (user, 2026-10-16): the class ability at its upper right, the operator weapon at its
+   lower right, each on a short bridge (.links) from the dial's ring at -30 / +30 degrees */
+#bo7-right .dial .links{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+#bo7-right .dial .links rect{fill:#0000004d;stroke:#ffffff30;stroke-width:1.5}
+#bo7-right .dial:not(:has(#class-skill)) .l-ability{display:none}
+#bo7-right .sat{position:absolute;width:84px;height:84px;display:grid;place-items:center;transform:translate(-50%,-50%)}
+#bo7-right .sat.ability{left:196px;top:16px}
+#bo7-right .sat.operator{left:196px;top:148px}
+#bo7-right .ability:not(:has(#class-skill)){display:none}
+#bo7-right .sat .ring{position:absolute;inset:0;width:100%;height:100%}
+#bo7-right .sat .ring circle{fill:#00000040;stroke:#ffffff30;stroke-width:1.5}
+#bo7-right #class-skill{position:relative;right:auto;bottom:auto;margin:0;transform:scale(.95)}
+#bo7-right #class-skill kbd{top:-20px;bottom:auto;padding:1px 4px;border:1px solid #ffffffaa;border-radius:2px;background:#000a;font:700 10px/1 var(--bo7-font);color:#fff}
+#bo7-right #class-skill small{top:auto;bottom:-19px;font:600 10px/1 var(--bo7-font)}
+#bo7-right #operator-weapon{position:relative;right:auto;bottom:auto;transform:scale(.95)}
+#bo7-right #operator-weapon kbd{top:-20px;padding:1px 4px;border:1px solid #ffffffaa;border-radius:2px;background:#000a;font:700 10px/1 var(--bo7-font);color:#fff}
+#bo7-right #operator-weapon small{bottom:-18px;font:600 10px/1 var(--bo7-font)}
+#bo7-right #operator-weapon b{font:700 15px/1 var(--bo7-font)}
 
 /* ---- bottom centre: perks, power-up timers above them ------------------------------------------------------ */
 #bo7-perks{left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px}

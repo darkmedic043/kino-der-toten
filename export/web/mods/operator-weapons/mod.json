@@ -1,0 +1,5 @@
+{
+  "name": "Operator Weapons",
+  "description": "A slot for operator weapons (the Ragnarok DG-4 and others): a charge meter of its own, filled by your kills, separate from the class action skill. Y pulls the weapon out when it's charged.",
+  "script": "mod.js"
+}

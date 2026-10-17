@@ -3,8 +3,9 @@
 // into BO7-shaped containers and restyles them (hud.css):
 //   bottom left  · player card: portrait, level badge, name, HP, segmented health bar, points (room left for
 //                  self-revives and other slots later, the user's plan)
-//   bottom right · ammo, then a dial with the gun's silhouette, a magazine arc and lethal/tactical/mine on top,
-//                  then the class ability in its own ring; gobblegums stacked vertically above the dial
+//   bottom right · ammo, then a dial with the gun's silhouette, a magazine arc and lethal/tactical/mine on top;
+//                  bubbles joined to the dial: the class ability at its upper right, the operator weapon
+//                  (operator-weapons) at its lower right; gobblegums stacked vertically above the dial
 //   bottom centre · perks, with power-up timers above them
 //   top right    · the round
 // Load it last (mods.json): the nodes it adopts must exist. Touch devices keep the classic layout (touch-extras
@@ -28,8 +29,11 @@ export default async function setup(api){
     <div class="hp"><b></b> HP</div><div class="bar"></div><div class="xp"></div><div class="pts">${ESSENCE}</div></div><div class="extra"></div>`);
   const right=make('bo7-right',`<div class="ammo"><div class="wname"></div><div class="count"></div><div class="reload"></div></div>
     <div class="dial"><svg class="ring" viewBox="0 0 160 160"><circle class="track" cx="80" cy="80" r="74"/><path class="mag-track"/><path class="mag"/>
-      <circle class="inner" cx="80" cy="80" r="62"/></svg><img class="gun" alt=""><div class="eq"></div><div class="gums"></div></div>
-    <div class="ability"><svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg></div>`);
+      <circle class="inner" cx="80" cy="80" r="62"/></svg>
+      <svg class="links" viewBox="0 0 164 164"><rect class="l-ability" x="74" y="-7" width="22" height="14" rx="3" transform="translate(82 82) rotate(-30)"/><rect class="l-operator" x="74" y="-7" width="22" height="14" rx="3" transform="translate(82 82) rotate(30)"/></svg>
+      <img class="gun" alt=""><div class="eq"></div><div class="gums"></div>
+      <div class="sat ability"><svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg></div>
+      <div class="sat operator"><svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg></div></div>`);
   const perks=make('bo7-perks','<div class="fx"></div><div class="row"></div>');
   const round=make('bo7-round','<span class="lbl">ROUND</span><b class="n"></b><span class="rem"></span>');
   const q=(el,s)=>el.querySelector(s);
@@ -49,7 +53,7 @@ export default async function setup(api){
     [()=>$('hud-portrait'),q(left,'.pf')],[()=>healthTrack,q(left,'.bar')],[()=>pointsEl,q(left,'.pts')],[()=>$('progression-hud'),q(left,'.xp')],
     [()=>$('weapon-name'),q(right,'.wname')],[()=>$('weapon-level'),q(right,'.wname')],[()=>$('ammo-mod-tag'),q(right,'.wname')],
     [()=>$('ammo'),q(right,'.count')],[()=>$('reload-label'),q(right,'.reload')],
-    [()=>$('equip-hud'),q(right,'.eq')],[()=>$('class-skill'),q(right,'.ability')],[()=>$('gum-hud'),q(right,'.gums')],
+    [()=>$('equip-hud'),q(right,'.eq')],[()=>$('class-skill'),q(right,'.ability')],[()=>$('operator-weapon'),q(right,'.operator')],[()=>$('gum-hud'),q(right,'.gums')],
     [()=>$('perks'),q(perks,'.row')],[()=>$('effects'),q(perks,'.fx')],[()=>$('remaining'),q(round,'.rem')],
   ];
   function place(){for(const [get,parent] of adopt){const n=get();if(n&&n.parentNode!==parent)parent.append(n);}}

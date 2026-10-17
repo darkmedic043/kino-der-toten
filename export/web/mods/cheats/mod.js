@@ -54,6 +54,7 @@ export default async function setup(api){
     clear:{usage:'clear',text:'Clear this console',run:()=>{log.innerHTML='';}},
   };
   commands.spawn=commands.give;   // common alias
+  state.addCommand=(name,cmd)=>{commands[name]=cmd;};   // other mods' commands (operator-weapons: `operator`)
   const listed=new Set(['spawn']);
 
   function exec(line){

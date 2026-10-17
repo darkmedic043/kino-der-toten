@@ -12,7 +12,7 @@
 // HUD it restyles). Their folders stay under mods/ because tools, the Rind installer and other mods use those paths.
 // The MODS tab lists them as built in. In load order:
 export const CORE_MODS=['lighting','fx','map-materials','ammo-counters','player-health','movement','fall-damage','double-tap',
-  'perks-plus','weapon-levels','progression','characters','hud','scoreboard','hud-bo7'];
+  'perks-plus','weapon-levels','progression','characters','hud','operator-weapons','scoreboard','hud-bo7'];
 export const isCoreMod=id=>CORE_MODS.includes(id);
 // mods.json's list with any missing core system put back after the core system before it (or first).
 export function withCore(enabled){

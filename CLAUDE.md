@@ -13,7 +13,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Lighting mod, baked irradiance volume, beams, sun, viewmodel light, mystery box map bulbs, Moon lighting | `lighting.md` |
 | Map materials, normal maps, HD textures (map + weapons) | `materials.md` |
 | Performance measurements and load-time warm-ups | `performance.md` |
-| Health, HUD/hit sounds, BO7 HUD layout (`hud-bo7`), zombie voices, music, cheat console, perks (PhD, Quick Revive), fall damage, exfil | `gameplay.md` |
+| Health, HUD/hit sounds, BO7 HUD layout (`hud-bo7`), operator weapons (Ragnarok), zombie voices, music, cheat console, perks (PhD, Quick Revive), fall damage, exfil | `gameplay.md` |
 | Movement mod (crouch/prone/slide/mantle, BO7 omnimovement, dive, wall jump), first-person motion and mantle hand IK, stairs | `movement.md` |
 | Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs, BO3 imports (Greyhound, DG-2), weapon inspect, BO7 weapons rebuilt in Blender on BO1 skeletons (Grimhawk) | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby), friends and presence; the Rind launcher (`~/projects/rind`) uses the same sign-in and friends API | `coop.md` |
@@ -49,7 +49,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 - Don't upload every weapon's HD textures up front (it fills VRAM). Preload only targeted ones.
 - Colliders pushed onto `world.dynamic` need `.box` unless `window:true`, or `world.setDoors` crashes.
 - Don't publish ripped or third-party game assets. The user supplies downloads: yt-dlp is blocked for me by the classifier, so give the user a command with the output template quoted (`-o "$HOME/Downloads/name.%(ext)s"`).
-- **Mod order matters** (`mods/mods.json`): `weapon-levels` must load before `progression`, or the starting gun is built before attachments apply. 15 mods are **core systems** (`CORE_MODS` in `mod-loader.js`): always loaded even if dropped from mods.json; keep the two lists in the same order (core.md).
+- **Mod order matters** (`mods/mods.json`): `weapon-levels` must load before `progression`, or the starting gun is built before attachments apply. 16 mods are **core systems** (`CORE_MODS` in `mod-loader.js`): always loaded even if dropped from mods.json; keep the two lists in the same order (core.md).
 - **Profile saves**: `kino.mods.progression` is shared. Any code that saves a cached copy must take `weaponXp`/`attachments`/`camo`/`rewards` from storage first, or it wipes weapon XP, camo progress and map rewards (the Cheese Cube camo was lost this way, 2026-10-06).
 - **Attachments**: BO1 viewmodels carry every attachment, hidden by `hideTags`. Read availability from the *pristine* `hideTags` (applying attachments un-hides tags). Viewmodels are cached, so re-show bones on equip. Surfaces share one vertex buffer, so iterate a mesh's **index**, and treat a mesh as hidden when its dominant bone chain is scaled ~0. Some Pack-a-Punched guns show extra parts natively (the Commando's dual mag, the PM63's extended mag): compare against the stock base/upgrade `hideTags` before treating a part as attachment-added.
 - Materials are shared between copies of a model: per-mesh changes (hiding dot cards) must not be skipped by a per-material "already patched" check, and temporary material changes (Gunsmith pulse) must be restored.

@@ -166,7 +166,7 @@ function collect(type){
   if(type==='carpenter'){for(const b of world.barriers)world.setBoards(b,map.boardCount(b));audio.event('powerup/carpenter/end/end_00',.7);}
   map.onPowerup?.(type);
 }
-const blocked=()=>!!map?.blocked?.();
+const blocked=()=>!!map?.blocked?.()||!!mods.gunBlocked;   // gunBlocked: a mod has put the gun away (operator weapons)
 function shoot(){
   if(!active||blocked()||!view.ready||view.mode==='raise'||session.busy||session.weaponUnavailable)return false;
   if(session.reloadLeft>0&&session.def.segmentedReload&&session.weapon.mag>0){session.interruptReload();reloadShot=true;return false;}
@@ -304,7 +304,7 @@ function update(dt){
       if(!map.prePlayer?.(dt))player.update(dt,session.phase==='reviving'?{forward:forward*crawl,strafe:strafe*crawl,crouch:true}:{forward,strafe,sprint,crouch:keys.has('ControlLeft')||keys.has('ControlRight')||keys.has('KeyC')||touch.crouch,jump:keys.has('Space'),jumpPressed:touch.jump});
       if(world.bounds&&player.getFeetPosition().y<world.bounds.min.y-600){player.respawn();toast('You fell out of the map');}
       view.update(dt,{moving,sprint,ads:ads&&!session.def.dualWield,reloading:session.reloadLeft>0,empty:session.weapon.mag===0,time:session.time});
-      view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();view.input={sprint,ads};   // this frame's input, for mods (inspect cancels on sprint/aim)
+      view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();view.input={sprint,ads,fire:primary};   // this frame's input, for mods (inspect cancels on sprint/aim; operator weapons read touch/pad fire)
       perkDrink.update(dt,session);
       if(!sprint&&session.phase!=='reviving'&&(primaryPressed||(primary&&session.def.automatic)||burstLeft>0||reloadShot)){
         if(shoot()){reloadShot=false;if(burstLeft>0)burstLeft--;else if(session.def.fireType==='3-Round Burst')burstLeft=2;}
