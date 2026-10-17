@@ -1,7 +1,7 @@
 // The journal (JOURNAL.EXE on the terminal booth, user 2026-10-17): every map's Easter eggs and quests, step by step
 // (mods/journal/quests.js). Doing a step records it for good (kino.mods.journal, cloud-synced): its instructions show
 // in the journal from then on. Tracking a quest of the map you're on shows its current step in a panel and drops
-// markers on the screen at the step's spots (only for steps you have recorded; an unrecorded step says so).
+// markers on the screen at the step's spots (unrecorded steps get markers too, but their instructions stay hidden).
 // Steps are watched twice a second; cheat games record nothing. Team progress counts in co-op (the quests are shared).
 // window.kino.journal: {status(), track(map, quest), untrack()}
 import * as THREE from 'three';
@@ -84,7 +84,7 @@ export default async function setup(api) {
     const now = doneNow(q), i = now.findIndex(d => !d), rec = recordedOf(loadJournal(), mapId, q.id);
     const step = q.steps[i], known = i >= 0 && rec.has(i);
     const points = [];   // markers within 60 units of one another are drawn once
-    if (known && step.where) for (const p of safe(() => step.where(L), [])) if (p?.isVector3 && points.length < 24 && !points.some(q => q.distanceTo(p) < 60)) points.push(p);
+    if (step?.where) for (const p of safe(() => step.where(L), [])) if (p?.isVector3 && points.length < 24 && !points.some(q => q.distanceTo(p) < 60)) points.push(p);
     tracked = { q, i, done: i < 0, step, known, points };
     draw();
   }
@@ -106,14 +106,14 @@ export default async function setup(api) {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   let panelKey = '';
   function draw() {
-    const t = tracked, key = t ? [t.q.id, t.i, t.known].join() : '';
+    const t = tracked, key = t ? [t.q.id, t.i, t.known, !!t.points.length].join() : '';
     if (key === panelKey) return; panelKey = key;
     panel.classList.toggle('on', !!t);
     if (!t) { panel.innerHTML = ''; return; }
     const total = t.q.steps.length;
     panel.innerHTML = t.done ? `<small>JOURNAL · TRACKING</small><b>${esc(t.q.name)}</b><p>Complete this match.</p>`
       : `<small>JOURNAL · STEP ${t.i + 1} / ${total}</small><b>${esc(t.q.name)}${t.known ? ' · ' + esc(t.step.title) : ''}</b>`
-        + (t.known ? `<p>${esc(t.step.how.length > 160 ? t.step.how.slice(0, 157) + '…' : t.step.how)}</p>` : '<p class="un">Not recorded yet: work this step out once and the journal keeps it.</p>');
+        + (t.known ? `<p>${esc(t.step.how.length > 160 ? t.step.how.slice(0, 157) + '…' : t.step.how)}</p>` : `<p class="un">Not recorded yet${t.points.length ? ': the markers show where. Do' : ': do'} it once and the journal keeps the instructions.</p>`);
   }
   const tmp = new THREE.Vector3(), cam = new THREE.Vector3();
   function project() {
