@@ -266,7 +266,7 @@
       "rarity": "ultra",
       "type": "instant",
       "level": 70,
-      "desc": "Gives you every perk in the game."
+      "desc": "Gives you 6 random perks you don't have."
     },
     {
       "id": "bountiful_harvest",

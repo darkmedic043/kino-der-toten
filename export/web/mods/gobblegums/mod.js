@@ -62,6 +62,7 @@ export default async function setup(api){
     return p;
   }
   const drop=(type,angle=0)=>powerups?.spawn(type,dropPoint(angle));
+  const PERKAHOLIC=6;
   const perkList=()=>PERKS.filter(p=>!session.perks?.has(p.id)&&perkUnlocked(p));   // pass-locked perks (Widow's Wine) only once owned
   function givePerk(p){
     if(api.perkInfo&&!api.perkInfo[p.id])api.perkInfo[p.id]={name:p.name,price:p.price,color:p.color,icon:p.badge};
@@ -76,7 +77,7 @@ export default async function setup(api){
     // several power-ups fan out in an arc ahead of you
     if(g.powerups)g.powerups.forEach((t,i,a)=>drop(t,(i-(a.length-1)/2)*.42));
     if(g.points)session.points+=g.points;
-    if(id==='perkaholic')for(const p of perkList())givePerk(p);
+    if(id==='perkaholic'){const rest=perkList();for(let i=0;i<PERKAHOLIC&&rest.length;i++)givePerk(rest.splice(Math.floor(Math.random()*rest.length),1)[0]);}   // 6 random perks you don't have (was every perk; user, 2026-10-18: more perks keep coming)
     if(g.type==='timed')st.timed[id]=session.time+g.duration;
     if(g.type==='conditional'){st.armed.add(id);if(g.charges)st.charges[id]=g.charges;}
     if(id==='on_the_house'){const rest=perkList();if(rest.length){const p=rest[Math.floor(Math.random()*rest.length)];givePerk(p);api.toast(`On the House · ${p.name}`,3);}}

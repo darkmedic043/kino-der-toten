@@ -957,10 +957,12 @@ function setupPanzer(api) {
 }
 
 // ---- Der Wunderfizz (BO3's random perk machine, zm_perk_random). Five machines (CASTLE_FIZZ_<n>); one is lit at a
-// time, starting at one of the two start spots, with the power on. 1500 points: the ball spins (3 s) and lands on a
+// time, starting at one of the two start spots, with the power on. The current perk price less 1,000 (user, 2026-10-18:
+// 2,500 -> 1,500, 3,000 -> 2,000...): the ball spins (3 s) and lands on a
 // random perk you don't have (pass-locked ones only once owned), which you take within 10 s. After 3-6 uses it moves
 // on (another machine lights up).
-const FIZZ_COST = 1500;
+const FIZZ_DISCOUNT = 1000;
+const fizzCost = session => Math.max(0, session.perkPrice - FIZZ_DISCOUNT);   // the perk price ladder (rules.js perkPrice), 1,000 off
 // Co-op: the machine (where it is, its spin) is shared; the perk is the buyer's (their own missing perks, sent with the
 // purchase); the host lets an untaken spin lapse and moves it with the shared random stream.
 function setupFizz(api) {
@@ -982,13 +984,14 @@ function setupFizz(api) {
   for (const [i, m] of machines.entries()) world.addInteraction({
     position: m.p.clone().add(new THREE.Vector3(0, 45, 0)),
     hidden: () => i !== st.at,
-    text: () => !session.power ? 'The power must be activated' : st.spin ? (st.spin.by !== sync.me ? 'Der Wunderfizz is in use' : st.spin.ready ? `Take ${st.spin.perk.name}` : 'Der Wunderfizz is spinning…') : pool().length ? `Der Wunderfizz · ${FIZZ_COST}` : 'You have every perk',
+    text: () => !session.power ? 'The power must be activated' : st.spin ? (st.spin.by !== sync.me ? 'Der Wunderfizz is in use' : st.spin.ready ? `Take ${st.spin.perk.name}` : 'Der Wunderfizz is spinning…') : pool().length ? `Der Wunderfizz · ${fizzCost(session)}` : 'You have every perk',
     use() {
       if (!session.power) return false;
       if (st.spin) { if (!st.spin.ready || st.spin.by !== sync.me) return false; sync.act('fizzTake'); return true; }
       const list = pool(); if (!list.length) return false;
-      if (session.points < FIZZ_COST) { toast?.('Not enough points', 2); return false; }
-      session.points -= FIZZ_COST; sync.act('fizzBuy', { pool: list.map(p => p.id) });
+      const cost = fizzCost(session);
+      if (session.points < cost) { toast?.('Not enough points', 2); return false; }
+      session.points -= cost; sync.act('fizzBuy', { pool: list.map(p => p.id) });
       return true;
     },
   });
