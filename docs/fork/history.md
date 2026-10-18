@@ -272,3 +272,4 @@
 - 2026-10-17 (night): Rind runs Melon Zombies as its own program by default (`Rind --melon-zombies`, ~/projects/rind/CLAUDE.md).
 - 2026-10-18: Idle-machine confirmation of the castle frame-rate pass: 74 FPS average, worst view 54 (was 36 / 17), Kino 109 (performance.md).
 - 2026-10-17: Melonopoly is a native Rust game now (Rind 0.5.2): its Linux/Windows builds are published under git-ignored `export/web/rind/games/melonopoly/`; the web version at `/melonopoly/` is gone. It still uses the co-op rooms (`/api/ws`) for its P2P signalling and relay fallback.
+- 2026-10-18: Account Prestige Master (one prestige past X, BO7-style badge and labels) and the Bank opens with it, replacing the investing route; vaults already open stay open (props.md, weapon-levels.md).

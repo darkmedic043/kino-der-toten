@@ -15,7 +15,7 @@ import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mod
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
 import { weaponProgress, maxLevel, migrateWeaponLevels } from './mods/weapon-levels/gunsmith.js';
-import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, canPrestigeWeapon, prestigeWeapon, canPrestigePlayer, prestigePlayer, prestigeBadge, roman, RULES as PRESTIGE, TIER_NAMES, PRESTIGE_COLORS } from './mods/prestige/prestige.js';
+import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, canPrestigeWeapon, prestigeWeapon, canPrestigePlayer, prestigePlayer, prestigeBadge, prestigeName, prestigeShort, prestigeColor, isPrestigeMaster, roman, RULES as PRESTIGE, TIER_NAMES, PRESTIGE_COLORS } from './mods/prestige/prestige.js';
 import { camoById } from './mods/weapon-levels/camo.js';
 import { loadCredits, grantCredits, loadCreditsConfig } from './mods/credits/credits.js';
 import { loadCatalog as loadShopCatalog, cosmetics as shopCosmetics, installRewards } from './mods/shop/shop.js';
@@ -134,9 +134,9 @@ function renderProfile(){
   {const cardEl=document.getElementById('p-card'),cd=shopCat&&shopCosmetics(shopCat).card;if(cardEl)cardEl.innerHTML=cd?cardSvg(cd,$('p-char')?.textContent||'Survivor','LEVEL '+profile.level):'';}
   const pr=loadPrestige(),n=pr.player.prestige,el=$('p-prestige');
   if(el){const can=canPrestigePlayer(pr,profile.level);
-    $('p-level').innerHTML=(n?prestigeBadge(n,18)+`<span class="pr-n" style="color:${PRESTIGE_COLORS[Math.min(n,10)]}">P${roman(n)}</span> `:'')+'LEVEL '+profile.level;
+    $('p-level').innerHTML=(n?prestigeBadge(n,18)+`<span class="pr-n" style="color:${prestigeColor(n)}">${prestigeShort(n)}</span> `:'')+'LEVEL '+profile.level;
     el.innerHTML=(pr.player.tokens?`<span class="pr-tok">${pr.player.tokens} PRESTIGE TOKEN${pr.player.tokens>1?'S':''}</span>`:'')+
-      (can?`<button class="pr-btn" data-prestige="player">PRESTIGE ${roman(n+1)}</button>`:n<PRESTIGE.playerMax?`<span class="pr-next">Prestige at level ${PRESTIGE.playerLevel}</span>`:'');}
+      (can?`<button class="pr-btn" data-prestige="player">${isPrestigeMaster(n+1)?'ENTER PRESTIGE MASTER · OPENS THE BANK':prestigeName(n+1)}</button>`:n<=PRESTIGE.playerMax?`<span class="pr-next">${isPrestigeMaster(n+1)?'Prestige Master':'Prestige'} at level ${PRESTIGE.playerLevel}</span>`:'');}
 }
 // two clicks: the first arms the button, the second does it
 function armed(btn){if(btn.dataset.armed){return true;}btn.dataset.armed='1';const t=btn.textContent;btn.textContent='CONFIRM · '+t;setTimeout(()=>{if(btn.isConnected){delete btn.dataset.armed;btn.textContent=t;}},4000);return false;}
@@ -145,7 +145,8 @@ document.addEventListener('click',e=>{
   if(b.dataset.prestige==='player'){const pr=loadPrestige();if(!canPrestigePlayer(pr,profile.level)||!armed(b))return;
     prestigePlayer(pr,profile.level);savePrestige(pr);const st=loadProfile();st.level=1;st.xp=0;saveProfile(st);profile.level=1;profile.xp=0;
     const bonus=creditsCfg?.prestige?.player??0;if(bonus)grantCredits(bonus,`player prestige ${pr.player.prestige}`);
-    renderProfile();toast(`Prestige ${roman(pr.player.prestige)} · +1 prestige token${bonus?` · +${bonus} credits`:''} · everything you unlocked stays`);return;}
+    renderProfile();toast(isPrestigeMaster(pr.player.prestige)?`PRESTIGE MASTER · the Bank is open (BANK.EXE on any terminal) · +1 prestige token${bonus?` · +${bonus} credits`:''}`
+      :`Prestige ${roman(pr.player.prestige)} · +1 prestige token${bonus?` · +${bonus} credits`:''} · everything you unlocked stays`);return;}
   const id=b.dataset.prestige,d=weapons[id];if(!d||!gunsmith)return;
   const pr=loadPrestige(),p=weaponProgress(loadProfile(),id),cap=maxLevel(gunsmith,d,id);if(!canPrestigeWeapon(pr,id,p.level,cap)||!armed(b))return;
   const r=prestigeWeapon(pr,id);savePrestige(pr);

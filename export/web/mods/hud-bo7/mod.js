@@ -12,7 +12,7 @@
 // places those panels around the on-screen buttons).
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
-import { loadPrestige, PRESTIGE_COLORS, roman } from '../prestige/prestige.js';
+import { loadPrestige, prestigeColor, prestigeName, prestigeShort } from '../prestige/prestige.js';
 
 export default async function setup(api){
   if(matchMedia('(pointer: coarse)').matches)return;
@@ -38,7 +38,7 @@ export default async function setup(api){
   const round=make('bo7-round','<span class="lbl">ROUND</span><b class="n"></b><span class="rem"></span>');
   const q=(el,s)=>el.querySelector(s);
   // player prestige: the level badge takes the prestige colour and a numeral
-  {const n=loadPrestige().player.prestige,lv=q(left,'.lv');if(n){const c=PRESTIGE_COLORS[Math.min(n,PRESTIGE_COLORS.length-1)];lv.style.background=c;lv.style.borderColor='#fff';lv.dataset.p=roman(n);lv.title='Prestige '+roman(n);}}
+  {const n=loadPrestige().player.prestige,lv=q(left,'.lv');if(n){const c=prestigeColor(n);lv.style.background=c;lv.style.borderColor='#fff';lv.dataset.p=prestigeShort(n);lv.title=prestigeName(n);}}
 
   // ---- the magazine arc across the top of the dial (BO7's orange arc) ---------------------------------------
   const arc=(a0,a1,r=74)=>{const p=a=>[80+r*Math.cos(a*Math.PI/180),80+r*Math.sin(a*Math.PI/180)].map(v=>v.toFixed(2));

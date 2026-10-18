@@ -10,7 +10,7 @@
 // STARK.EXE (mods/stark): the Iron Man armors; opts.stark() -> status, opts.starkAct(action, id) -> true | 'reason'.
 // GOBBLE.EXE (mods/gobblegums): rolls a gobblegum from your pack on a slot-machine reel; opts.gums() -> status,
 //   opts.gumRoll() -> {id, commit()} | 'reason' (commit puts it in your hand once the reel stops).
-// BANK.EXE (mods/bank, above EXFIL): TranZit's bank. Build the vault first (invest points until every requirement is met),
+// BANK.EXE (mods/bank, above EXFIL): TranZit's bank. The vault opens at account Prestige Master (the prestige after X),
 //   then deposit (1,100 per 1,000 banked) and withdraw across matches; opts.bank() -> status, opts.bankAct(action, amount).
 // ARMORY.EXE (mods/armory, above BANK): tabs of special gear bought off its home map (operator weapons, shields,
 //   scorestreaks later); opts.armory() -> status, opts.armoryBuy(id) -> true | 'reason'.
@@ -188,6 +188,7 @@ const CSS = `
 #melonterm .bnk li{padding-left:34px;position:relative}#melonterm .bnk li::before{content:'[ ]';position:absolute;left:0;color:var(--dim)}
 #melonterm .bnk li.ok::before{content:'[X]';color:var(--g)}#melonterm .bnk li.ok{color:#b6ffcb}
 #melonterm .bnk li small{display:block;font-size:17px;color:var(--dim)}
+#melonterm .bnk .pips{display:flex;gap:6px;margin:8px 0 2px}#melonterm .bnk .pips i{width:22px;height:14px;border:2px solid var(--g2)}#melonterm .bnk .pips i.on{background:var(--g)}#melonterm .bnk .pips i.m{width:44px;border-color:#ffd36b}#melonterm .bnk .pips i.m.on{background:#ffd36b}
 #melonterm .bnk .have{float:right;color:var(--g2)}#melonterm .bnk li.ok .have{color:var(--g)}
 #melonterm .bnk .bar2{height:12px;border:2px solid var(--g2);margin-top:3px}#melonterm .bnk .bar2 i{display:block;height:100%;background:var(--g)}
 #melonterm .bnk .row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}#melonterm .bnk .row>b{width:120px;font-weight:normal;letter-spacing:2px;color:var(--dim)}
@@ -621,11 +622,11 @@ function build() {
     }
     for (const b of amBody.querySelectorAll('[data-tab]')) b.addEventListener('click', () => { amTab = b.dataset.tab; amShown = 0; amMsg = ['', '']; drawArmory(); });
   }
-  // ---- BANK.EXE: TranZit's bank (mods/bank). Locked: the vault's build checklist and INVEST; open: deposit / withdraw --
+  // ---- BANK.EXE: TranZit's bank (mods/bank). Locked: the road to Prestige Master; open: deposit / withdraw ----------
   const pts = n => n.toLocaleString();
   function bankDo(action, amount) {
     const r = opts.bankAct?.(action, amount) ?? 'BANK.EXE is not installed';
-    bkMsg = r === true ? [{ invest: 'INVESTMENT RECEIVED · THE VAULT GROWS', activate: 'VAULT ONLINE · WELCOME, VALUED CUSTOMER', deposit: 'DEPOSIT CLEARED', withdraw: 'CASH DISPENSED' }[action] ?? 'OK', 'ok'] : [String(r).toUpperCase(), 'bad'];
+    bkMsg = r === true ? [{ deposit: 'DEPOSIT CLEARED', withdraw: 'CASH DISPENSED' }[action] ?? 'OK', 'ok'] : [String(r).toUpperCase(), 'bad'];
     bkState = ''; status(); drawBank();
   }
   function drawBank() {
@@ -636,21 +637,16 @@ function build() {
     const key = JSON.stringify([st, bkMsg]); if (key === bkState) return; bkState = key;
     const off = !st.power, dis = c => off || !c ? 'disabled' : '';
     const power = off ? '<div class="warn">NO MAINS POWER · THE VAULT WON\'T RUN ON THE AUX BATTERY</div>' : '';
-    const cheat = st.cheating ? '<div class="warn">CHEAT MODE · INVESTING AND DEPOSITS ARE LOCKED THIS GAME</div>' : '';
-    const msg = `<div class="msg ${bkMsg[1]}">${esc(bkMsg[0] || (st.unlocked ? '> DEPOSIT OR WITHDRAW IN 1,000S' : '> INVEST POINTS TO BUILD THE VAULT'))}</div>`;
+    const cheat = st.cheating ? '<div class="warn">CHEAT MODE · DEPOSITS ARE LOCKED THIS GAME</div>' : '';
+    const msg = `<div class="msg ${bkMsg[1]}">${esc(bkMsg[0] || (st.unlocked ? '> DEPOSIT OR WITHDRAW IN 1,000S' : '> VAULT SEALED · PRESTIGE MASTER REQUIRED'))}</div>`;
     let body;
     if (!st.unlocked) {
-      const reqs = st.reqs.map(r => `<li class="${r.ok ? 'ok' : ''}">${esc(r.text)}<span class="have">${pts(Math.min(r.have, r.need))} / ${pts(r.need)}</span>
-        ${r.id === 'invest' ? `<div class="bar2"><i style="width:${Math.min(100, 100 * r.have / r.need)}%"></i></div>` : ''}${r.detail ? `<small>${esc(r.detail.toUpperCase())}</small>` : ''}</li>`).join('');
-      const can = n => !st.cheating && st.points >= n, all = Math.floor(st.points / st.step) * st.step;
-      const room = st.reqs[0].need - st.invested, top = room > 0 ? Math.min(all, room) : all;
-      body = `<h2>VAULT UNDER CONSTRUCTION</h2>
-        <div class="note">A VAULT FOR THE DEDICATED. INVESTED POINTS BUILD IT AND ARE NEVER RETURNED. PROGRESS IS SAVED TO YOUR ACCOUNT.</div>
-        ${power}${cheat}<ul>${reqs}</ul>
-        ${st.ready ? `<button class="buy" data-act="activate" ${dis(true)}>ACTIVATE VAULT</button>`
-          : `<div class="row"><b>INVEST</b><button class="buy" data-act="invest" data-n="1000" ${dis(can(1000))}>1,000</button>
-             <button class="buy" data-act="invest" data-n="10000" ${dis(can(10000))}>10,000</button>
-             <button class="buy" data-act="invest" data-n="max" ${dis(can(1000))}>ALL · ${pts(top)}</button></div>`}`;
+      // the account prestiges I..X, then Prestige Master (st.master = X + 1)
+      const steps = Array.from({ length: st.master }, (_, k) => `<i class="${k < st.prestige ? 'on' : ''} ${k === st.master - 1 ? 'm' : ''}"></i>`).join('');
+      body = `<h2>VAULT SEALED</h2>
+        <div class="note">A VAULT FOR THE DEDICATED. IT OPENS FOR ACCOUNTS THAT REACH PRESTIGE MASTER: PRESTIGE ALL THE WAY TO X, THEN ONCE MORE. PRESTIGE FROM THE RANK CARD IN THE MAIN MENU.</div>
+        ${power}<ul><li class="${st.prestige > st.master - 1 ? 'ok' : ''}">REACH PRESTIGE MASTER<span class="have">${esc(st.prestigeName)}</span>
+          <div class="pips">${steps}</div><small>${st.master - st.prestige > 0 ? `${st.master - st.prestige} PRESTIGE${st.master - st.prestige > 1 ? 'S' : ''} TO GO` : ''}</small></li></ul>`;
     } else {
       const unit = st.step + st.fee, can = n => !st.cheating && st.points >= n / st.step * unit, most = Math.floor(st.points / unit) * st.step;
       body = `<h2>MELON SAVINGS &amp; LOAN</h2>${power}${cheat}

@@ -6,7 +6,7 @@
 import { loadCatalog, cosmetics, installRewards } from './shop.js';
 import { cardSvg } from './card.js';
 import { loadProfile } from '../../profile.js';
-import { loadPrestige } from '../prestige/prestige.js';
+import { loadPrestige, prestigeName } from '../prestige/prestige.js';
 
 export default async function setup(api){
   const {host,mod}=api;
@@ -27,7 +27,7 @@ export default async function setup(api){
     window.kino.boxGlow=C.glow?.box??null;
     // the calling card in the pause menu, under the map title
     const p=loadProfile(),pr=loadPrestige().player.prestige;
-    if(C.card){card.innerHTML=cardSvg(C.card,(p.name??document.querySelector('#account .name')?.textContent)||'Survivor',`LEVEL ${p.level}${pr?' · PRESTIGE '+pr:''}`);
+    if(C.card){card.innerHTML=cardSvg(C.card,(p.name??document.querySelector('#account .name')?.textContent)||'Survivor',`LEVEL ${p.level}${pr?' · '+prestigeName(pr):''}`);
       const anchor=document.querySelector('#menu .menu-content .tagline')??document.getElementById('map-tagline');if(anchor&&card.previousElementSibling!==anchor)anchor.after(card);}
     else card.remove();
   }

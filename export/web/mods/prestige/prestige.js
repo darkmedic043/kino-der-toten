@@ -8,6 +8,8 @@
 //   re-locks: unlocks follow the highest level ever reached (unlockLvl in profile.js reads `peak`).
 // Store: kino.mods.prestige = {player:{prestige, peak, tokens}, weapons:{[id]:{tier, mlevel, mxp}}, camos:[ids]},
 // cloud-synced (cloud.js TRACKED). Tiers: 0 none, 1 Prestige I, 2 Prestige II, 3 Master. Numbers: prestige.json.
+// The account prestiges I..playerMax (X), then once more into Prestige Master (player.prestige = playerMax + 1, BO7's
+// top rank; it opens the Bank: mods/bank). Nothing past Master.
 export const PRESTIGE_KEY='kino.mods.prestige';
 export const RULES={playerLevel:55,playerMax:10,masterXp:500,masterMax:250,masterCamoAt:50};
 export const TIER_NAMES=['','PRESTIGE I','PRESTIGE II','PRESTIGE MASTER'];
@@ -51,7 +53,14 @@ export function grantMasterXp(p,id,amount){
 }
 
 // ---- player prestige ---------------------------------------------------------------------------------------------
-export const canPrestigePlayer=(p,level)=>level>=RULES.playerLevel&&p.player.prestige<RULES.playerMax;
+export const canPrestigePlayer=(p,level)=>level>=RULES.playerLevel&&p.player.prestige<=RULES.playerMax;   // X -> Master is the last one
+// account Prestige Master: one prestige past playerMax
+export const isPrestigeMaster=n=>n>RULES.playerMax;
+export const hasPrestigeMaster=(p=loadPrestige())=>isPrestigeMaster(p.player.prestige);
+// 'PRESTIGE IV' / 'PRESTIGE MASTER', and the short HUD form 'PIV' / 'MASTER'
+export const prestigeName=n=>isPrestigeMaster(n)?'PRESTIGE MASTER':'PRESTIGE '+roman(n);
+export const prestigeShort=n=>isPrestigeMaster(n)?'MASTER':'P'+roman(n);
+export const prestigeColor=n=>isPrestigeMaster(n)?MASTER_COLOR:PRESTIGE_COLORS[Math.min(n,PRESTIGE_COLORS.length-1)];
 // Prestige the account: the caller sets profile.level=1, profile.xp=0. Unlocks keep the peak level.
 export function prestigePlayer(p,level){p.player.peak=Math.max(p.player.peak,level);p.player.prestige++;p.player.tokens++;}
 // A token unlocks one Prestige I or II camo of any gun for the global list.
@@ -62,8 +71,10 @@ export function spendToken(p,camoId){
 // the badge: a roman numeral on a coloured chevron, colour by prestige
 export const PRESTIGE_COLORS=['#8a8577','#4aa3ff','#3fcf6a','#c9d24a','#f0a030','#ff6a3d','#ff3d6e','#c45bff','#7a6bff','#e8e8e8','#ffd65a'];
 const ROMAN=['','I','II','III','IV','V','VI','VII','VIII','IX','X'];
+export const MASTER_COLOR='#ff4b3a';
 export function prestigeBadge(n,size=22){
-  if(!n)return '';const c=PRESTIGE_COLORS[Math.min(n,PRESTIGE_COLORS.length-1)];
+  if(!n)return '';const c=prestigeColor(n);
+  if(isPrestigeMaster(n))return `<svg class="prestige-badge master" viewBox="0 0 24 24" width="${size}" height="${size}" aria-label="Prestige Master"><path d="M12 2l9 5v10l-9 5-9-5V7z" fill="${c}33" stroke="${c}" stroke-width="1.6"/><path d="M12 6.2l1.7 3.6 3.9.4-2.9 2.6.8 3.9L12 14.7l-3.5 2 .8-3.9-2.9-2.6 3.9-.4z" fill="#ffd65a" stroke="${c}" stroke-width=".8" stroke-linejoin="round"/></svg>`;
   return `<svg class="prestige-badge" viewBox="0 0 24 24" width="${size}" height="${size}" aria-label="Prestige ${n}"><path d="M12 2l9 5v10l-9 5-9-5V7z" fill="${c}22" stroke="${c}" stroke-width="1.6"/><path d="M7 9l5 3 5-3M7 13l5 3 5-3" fill="none" stroke="${c}" stroke-width="1.6"/></svg>`;
 }
 export const roman=n=>ROMAN[n]??String(n);
