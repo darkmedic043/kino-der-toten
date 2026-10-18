@@ -12,10 +12,14 @@
 // light bar, player LEDs and rumble over WebHID (dualsense.js; Chrome/Edge and Rind, after one click
 // on ENABLE DUALSENSE FEATURES in the pause menu, remembered by the browser). Xbox One/Series pads
 // get trigger rumble through the Gamepad haptics API where the browser offers it (Chrome on Windows).
+// Menu navigation (gamepad-nav.js): while the game is paused the D-pad / left stick move a focus ring over
+// the pause menu and the settings overlay, Cross/A activates (Cross on ENTER / nothing focused resumes),
+// Circle/B closes the overlay or resumes, L1/R1 switch the settings tabs, sliders adjust with left/right.
 import { settings, onSettingsChange } from '../../settings.js';
 import { weaponClass } from '../weapon-levels/camo.js';
 import { identify, isDualSense, glyphUrl, glyph, label, INDEX } from './glyphs.js';
 import { DualSenseLink, trigger, PLAYER_LEDS } from './dualsense.js';
+import { GamepadNav, padState } from '../../gamepad-nav.js';
 
 const DEAD=.15;
 // button index -> key. 8 = Back/Create/View, 12-15 = D-pad, 17 = touchpad press / Xbox Share (hold: scoreboard).
@@ -52,6 +56,7 @@ body.using-pad #equip-hud kbd,body.using-pad #class-skill kbd,body.using-pad #op
 .menu-controls.pad .pg{display:inline-block;width:18px;height:18px;margin-right:6px;vertical-align:middle;background:center/contain no-repeat}
 .menu-controls.pad .pad-name{flex-basis:100%;color:#a39d8c;font-size:9px;letter-spacing:2px}.menu-controls.pad .pad-name b{color:#cfc7b3;font-weight:700}.menu-controls.pad .pad-name i{color:#7fcf6a;font-style:normal;margin-left:10px}
 #dualsense-link{display:block}
+body.using-pad:not(.menu-open) #pad-nav-hint{display:none!important}
 ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
   const hints=document.createElement('div');hints.className='menu-controls pad';
   const menuControls=document.querySelector('#menu .menu-controls');menuControls?.after(hints);
@@ -64,8 +69,14 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
     const forced=GLYPH_SETTING[settings.padGlyphs|0];
     pad.brand=forced&&forced!=='auto'?forced:(info?.brand??'generic');
     for(const b of ['xbox','ps','nintendo','generic'])document.body.classList.toggle('pad-'+b,pad.brand===b);
-    renderHints();
+    renderHints();nav.setHints(glyphUrl,pad.brand);
   }
+  // ---- menu navigation while paused ---------------------------------------------------------------------------
+  const overlay=()=>{const o=document.getElementById('settings-overlay');return o&&!o.hidden?o:null;};
+  const resume=()=>{const st=api.getState?.()??{};if(!st.ready)return;if(st.phase==='gameover')api.reset();nav.clear();api.setActive(true);};
+  const nav=new GamepadNav({scope:()=>overlay()??document.getElementById('menu')??document.body,initial:()=>document.getElementById('start'),
+    onBack:()=>{if(overlay())return false;resume();return true;},onStart:null});
+  nav.startLabel='RESUME';pad.nav=nav;
   onSettingsChange((s,k)=>{if(k===null||k==='padGlyphs')applyBrand();if(k===null||k==='padLightbar'||k==='padTriggers')pushNative(true);});
   applyBrand();
 
@@ -155,7 +166,7 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
   let emptyClick=false;
 
   function frame(now){
-    requestAnimationFrame(frame);
+    requestAnimationFrame(frame);pad.frames=(pad.frames|0)+1;
     const dt=Math.min(.05,(now-lastT)/1000);lastT=now;
     const gp=[...(navigator.getGamepads?.()??[])].find(g=>g&&g.connected);gpNow=gp;
     pad.connected=!!gp;
@@ -165,12 +176,12 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
     const st=api.getState?.()??{};
     if(b.some(Boolean)||gp.axes.some(a=>Math.abs(a)>.3)){pad.last=now;document.body.classList.add('using-pad');}
     // Start: pause / resume (resuming needs no pointer lock; the right stick looks).
-    if(pressed(START)||(!st.active&&st.ready&&pressed(0))){
+    if(pressed(START)||(!st.active&&st.ready&&pressed(0)&&!overlay()&&(!nav.current||nav.current.id==='start'))){
       if(st.active)key('Escape',true);
-      else if(st.ready){if(st.phase==='gameover')api.reset();api.setActive(true);}
+      else resume();   // Start, or Cross/A with nothing (or ENTER) focused: back into the game without pointer lock
       prev=b;pushNative(false,st.active);return;
     }
-    if(!st.active){if(held.size||sprintLatch)release();prev=b;pushNative(false,false);return;}
+    if(!st.active){if(held.size||sprintLatch)release();if(st.ready)nav.step(padState(gp),now);prev=b;pushNative(false,false);return;}
     // Left stick: analog movement. L3 latches sprint until the stick is let go.
     const [lx,ly]=stick(gp.axes[0]??0,gp.axes[1]??0);pad.move.forward=-ly;pad.move.strafe=lx;
     if(pressed(SPRINT)&&Math.hypot(lx,ly)>.3&&!sprintLatch){sprintLatch=true;key('ShiftLeft',true);}

@@ -1,6 +1,8 @@
 // Main menu (not part of upstream): map browser, loadout, character and mods.
 import { setPrimaryRenderer } from './texture-memory.js';   // first: frees decoded texture images once uploaded (menu previews, portraits, Gunsmith)
 import './skinned-bounds.js';   // fast SkinnedMesh bounds (menu characters and gun previews)
+import { installGamepadNav } from './gamepad-nav.js';   // early: it records click listeners as menu elements get them
+import { identify as identifyPad, glyphUrl as padGlyph } from './mods/controller/glyphs.js';
 import * as THREE from 'three';
 import { loadModel, ViewWeapon } from './animation.js';
 import { applyGlow, tickGlow } from './mods/bo3-weapons/glow.js';
@@ -755,3 +757,11 @@ try{
   const view=renderClasses($('classes-root'),classCfg,{getState:()=>loadClassProfile(classCfg),setState:s=>saveClassProfile(s)});
   addEventListener('focus',()=>view.redraw());
 }catch(error){console.warn('[classes]',error);$('classes-root').textContent='Classes unavailable: '+error.message;}
+
+// Controller navigation of the menu (gamepad-nav.js): D-pad / stick move the focus ring, A selects, B backs out of
+// the Gunsmith (Escape) or returns to the tab strip, L1/R1 change tabs, L2/R2 the second strip (Armory panes,
+// settings tabs), Start plays the selected map. The corner strip shows the pad's own glyphs.
+const padNav=installGamepadNav({glyphs:{identify:identifyPad,glyphUrl:padGlyph},startLabel:'PLAY',
+  scope:()=>document.getElementById('gsv')??document.body,initial:()=>document.querySelector('#tabs button.active'),
+  onBack:()=>{if(document.getElementById('gsv'))return false;const t=document.querySelector('#tabs button.active');if(t)padNav.focus(t);return true;},
+  onStart:()=>document.querySelector('#hero-actions a,#hero-actions button')?.click()});
