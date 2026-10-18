@@ -7,7 +7,8 @@
 //   - left mouse fires: a hitscan round that goes through every zombie in its path up to a wall (PIERCE of them);
 //     2000 to the body, 4000 to the head (zombieHealth: 3953 at round 24, 4348 at 25), the Panzersoldat takes 2000.
 //     After each shot the hammer is cocked again (the rechamber clip), about 0.95 s a shot.
-//   - right mouse aims down the sight (BO3's ads_base_up pose, the camera zooms like a gun's ADS).
+//   - right mouse aims down the sight (BO3's ads_base_up pose, the camera zooms like a gun's ADS); aimed in, the sight's
+//     see-through reticle replaces the HUD crosshair (fixAnnihilatorMaterials).
 //   - melee (V) pistol-whips for 100.
 //   - the meter is its ammo: 18 shots to empty (no drain over time). 50 kills charge it.
 //   - a kill disintegrates the zombie (gone in a burst of gore, BO3's gib sound), except under Insta-Kill as in BO3.
@@ -19,6 +20,20 @@ const SHOTS = 18, BODY = 2000, HEAD = 4000, PANZER = 2000, PIERCE = 8, WHIP = 10
 // notetrack aliases (BO3's alias table isn't exportable) -> the bank's files
 const NOTE = { fly_annihilator_rechamber: 'fly_anni_rechamber_02', fly_annihilator_rechamber_ads: 'fly_anni_rechamber_ads_01',
   fly_annihilator_first_raise: 'annihilator_first_raise' };
+
+// The export marks every material opaque, so the sight's reticle (trifocal: yellow brackets and a ring on a transparent
+// sheet) drew as a black box over the sight and the decal sheet as black patches (user, 2026-10-18: "the annihilators
+// sights seem a bit buggy"). The reticle becomes a see-through glowing sheet, the decals are cut out by their alpha.
+export function fixAnnihilatorMaterials(root, THREE) {
+  root?.traverse(o => { if (!o.isMesh) return; for (const m of [o.material].flat()) {
+    if (!m || m.userData.anniFixed) continue; m.userData.anniFixed = true;
+    if (/annihilator_trifocal/.test(m.name)) {
+      Object.assign(m, { transparent: true, alphaTest: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+      if (m.emissive && m.map) { m.emissiveMap = m.map; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 1.4; }
+      o.renderOrder = 3; m.needsUpdate = true;
+    } else if (/annihilator_decals/.test(m.name)) { Object.assign(m, { transparent: false, alphaTest: .5 }); m.needsUpdate = true; }
+  } });
+}
 
 export function setupAnnihilator(api, operator) {
   const { scene, viewScene, enemies, player, camera, audio, session, world, data } = api;
@@ -43,6 +58,7 @@ export function setupAnnihilator(api, operator) {
       vw = new ViewWeapon(viewScene, data, n => { const m = /^sndnt#(.+)$/.exec(n); if (m) sound(NOTE[m[1]] ?? m[1], .8); });
       vw.equip(def).then(() => {
         if (ended) { dropView(); return; }
+        fixAnnihilatorMaterials(vw.pivot, THREE);
         if (fresh && vw.rig.actions.firstRaiseAnim) { vw.mode = 'raise'; vw.rig.play('firstRaiseAnim', false, 1, .04); }
         fresh = false;
       }).catch(e => { console.warn('[annihilator] model', e); dropView(); standIn(); });
@@ -151,6 +167,7 @@ export function setupAnnihilator(api, operator) {
         vw.update(dt, { moving: moved > 20, sprint, ads: aiming && !sprint, time: session.time });
         // the engine eases the FOV back to the setting each frame before mods run: zoom from the weapon's own aim
         camera.fov = baseFov * (1 - vw.aim * (1 - ADS_FOV)); camera.updateProjectionMatrix();
+        crosshair(vw.aim > .85);   // aimed in, the sight's own ring is the reticle (as the scopes mod does for red dots)
       } else if (stand) stand.position.z += (-16 - stand.position.z) * Math.min(1, dt * 10);
       for (let i = tracers.length - 1; i >= 0; i--) { const o = tracers[i]; o.t += dt; o.l.material.opacity = Math.max(0, .9 - o.t * 6);
         if (o.t > .15) { o.l.removeFromParent(); o.l.geometry.dispose(); o.l.material.dispose(); tracers.splice(i, 1); } }
@@ -158,8 +175,10 @@ export function setupAnnihilator(api, operator) {
         o.m.rotation.x += o.spin.x * dt; o.m.rotation.y += o.spin.y * dt;
         if (o.t > 1.4) { o.m.removeFromParent(); chunks.splice(i, 1); } }
     }
+    let hidCross = false;
+    function crosshair(hide) { if (hide === hidCross) return; hidCross = hide; const ch = document.getElementById('crosshair'); if (ch) ch.style.visibility = hide ? 'hidden' : ''; }
     function end() {
-      ended = true; dropView();
+      ended = true; dropView(); crosshair(false);
       if (stand) { stand.removeFromParent(); stand.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.(); }); stand = null; }
       for (const o of tracers) { o.l.removeFromParent(); o.l.geometry.dispose(); o.l.material.dispose(); } tracers.length = 0;
       // the gore lands on its own, then the shared geometry goes

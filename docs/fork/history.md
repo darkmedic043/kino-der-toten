@@ -285,3 +285,4 @@
 - 2026-10-18: Prismatic Punch's wall cooldown 10 s -> 45 s (Quick Flash: 27 s) (reaper-perks.md).
 - 2026-10-18: Prismatic Punch's cooldown starts when the wall goes down, not when it rises (reaper-perks.md).
 - 2026-10-18: Dam-A-Nade's refill comes when a round starts, not when it ends; The Giant's vat water is see-through, so the Fly Trap's underwater bear can be seen (reaper-perks.md, waw-ports.md).
+- 2026-10-18: Annihilator sight fixed: the reticle was an opaque black box (see-through now) and the decals black patches; the HUD crosshair hides while aimed in (gameplay.md).

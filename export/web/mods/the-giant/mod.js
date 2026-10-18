@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { CollisionWorld } from '../../collision-world.js';
 import { loadModel } from '../../animation.js';
 import { binds } from '../../settings.js';
+import { fixAnnihilatorMaterials } from '../operator-weapons/annihilator.js';
 
 const LINK_TIME = 30, WHERE = { pad0: 'east', pad1: 'south', pad2: 'west' };
 export default function setup(api) {
@@ -192,7 +193,7 @@ function setupEggs(api) {
         if (stage !== 'prize' || !m) return;
         m.scale.setScalar(1 / 2.54); const g = new THREE.Group(); g.add(m);
         const b = new THREE.Box3().setFromObject(m); m.position.sub(b.getCenter(new THREE.Vector3()));
-        m.traverse(o => { o.frustumCulled = false; }); place(g);
+        m.traverse(o => { o.frustumCulled = false; }); fixAnnihilatorMaterials(m, THREE); place(g);
       }).catch(() => { const m = box()?.display?.(PRIZE); if (m && stage === 'prize') place(m); });
     } else { const m = box()?.display?.(PRIZE); if (m) place(m); }
     announce?.('THE FLY TRAP', 'A GIFT WAITS BY THE MULE KICK MACHINE', 6);
