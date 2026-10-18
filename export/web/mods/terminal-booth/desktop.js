@@ -16,6 +16,11 @@
 //   scorestreaks later); opts.armory() -> status, opts.armoryBuy(id) -> true | 'reason'.
 // JOURNAL.EXE (mods/journal, top of the right column): every map's Easter eggs step by step, recorded once done;
 //   TRACK puts the current step on the HUD with markers. opts.journal() -> status, opts.journalTrack(map, quest | null).
+// Home screen (2026-10-17, user): the icons sit on a phone-style cell grid (cells of at least 108x112 px, stretched to fill
+//   the desk) and the player arranges them: drag an icon (mouse: just drag; touch: hold or drag) onto a cell to move it,
+//   onto another icon to swap the two. The layout is saved per grid shape ("cols x rows", so a phone and a desktop each
+//   keep their own) in localStorage kino.mods.terminal {layout:{'9x4':{perks:[c,r],...}}}, cloud-synced (cloud.js TRACKED).
+//   RESET ICONS in the taskbar restores the default (shop apps down the left, map apps up the right).
 
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
 // perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine: a Melon Pass reward);
@@ -88,7 +93,9 @@ const CSS = `
 #melonterm .warn{color:var(--warn);text-shadow:0 0 6px #ffb00088}
 #melonterm .desk{position:relative;flex:1;min-height:0;padding:20px;
   background:linear-gradient(#0c3a1c22 1px,transparent 1px) 0 0/32px 32px,linear-gradient(90deg,#0c3a1c22 1px,transparent 1px) 0 0/32px 32px}
-#melonterm .icons{display:grid;grid-template-columns:96px;grid-auto-rows:110px;gap:10px;width:96px}
+#melonterm .apps{position:absolute;inset:0}
+#melonterm .cells{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .15s}#melonterm .desk.arranging .cells{opacity:1}
+#melonterm .cell{position:absolute;border:1px dashed #1f6b3a88}#melonterm .cell.hot{border:2px solid var(--g);background:#3dff8a22;box-shadow:0 0 14px #3dff8a55}
 #melonterm .stk{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}#melonterm .stk>.perks{flex:1;min-height:0}
 #melonterm .stk .panel{padding:20px 26px;display:flex;flex-direction:column;gap:10px;font-size:22px}
 #melonterm .stk .panel h2{margin:0;font:inherit;font-size:38px;color:#ffd36b;letter-spacing:2px}
@@ -97,12 +104,16 @@ const CSS = `
 #melonterm .stk .bar2{height:14px;border:2px solid var(--g2);max-width:420px}#melonterm .stk .bar2 i{display:block;height:100%;background:var(--g)}
 #melonterm .stk .suit{font:bold 22px 'Arial Black',Arial,sans-serif;color:#ffd36b;text-shadow:0 0 8px #ff9f2a}
 #melonterm .ars{flex:1;min-height:0;display:flex;flex-direction:column}#melonterm .ars .tile.owned::after{content:'LOADED'}#melonterm .ars>.perks{flex:1;min-height:0}
-#melonterm .app{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;background:none;border:0;color:inherit;font:inherit;font-size:19px;padding:0}
+#melonterm .app{position:absolute;width:96px;height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;background:none;border:0;color:inherit;font:inherit;font-size:19px;padding:0;
+  touch-action:none;transition:left .18s ease-out,top .18s ease-out}
+#melonterm .app.drag{transition:none;z-index:5;pointer-events:none;filter:drop-shadow(0 0 10px #3dff8a);transform:scale(1.08)}
+#melonterm .desk.arranging .app:not(.drag){animation:mt-jiggle .5s ease-in-out infinite alternate}
+@keyframes mt-jiggle{from{rotate:-1.5deg}to{rotate:1.5deg}}
 #melonterm .app .sq{width:64px;height:64px;border:2px solid var(--g2);background:#062a14;display:grid;place-items:center;box-shadow:0 0 10px #3dff8a33,inset 0 0 12px #000a}
 #melonterm .app:hover .sq,#melonterm .app:focus-visible .sq{background:#0d4a24;box-shadow:0 0 16px #3dff8a88,inset 0 0 12px #0008}
 #melonterm .app:hover span,#melonterm .app:focus-visible span{background:var(--g);color:var(--bg);text-shadow:none}
 #melonterm .app span{padding:0 4px}
-#melonterm .win{position:absolute;inset:16px 128px 16px 132px;display:flex;flex-direction:column;border:2px solid var(--g2);background:#020d06f2;box-shadow:0 0 0 2px #000,8px 8px 0 #0008,0 0 30px #3dff8a22}
+#melonterm .win{position:absolute;inset:16px;z-index:6;display:flex;flex-direction:column;border:2px solid var(--g2);background:#020d06f2;box-shadow:0 0 0 2px #000,8px 8px 0 #0008,0 0 30px #3dff8a22}
 #melonterm .win[hidden]{display:none}
 #melonterm .title{display:flex;align-items:center;gap:10px;padding:3px 4px 3px 12px;background:var(--g2);color:var(--bg);font-size:21px;letter-spacing:2px;text-shadow:none}
 #melonterm .title button{width:30px;height:26px;border:2px solid var(--bg);background:var(--g2);color:var(--bg);font:inherit;font-size:20px;line-height:1;cursor:pointer;padding:0}
@@ -143,10 +154,7 @@ const CSS = `
 #melonterm .detail li{padding-left:22px;position:relative}
 #melonterm .detail li::before{content:'>';position:absolute;left:2px;color:var(--g2)}
 #melonterm .detail .note{font-size:19px;color:var(--g2);opacity:.85}
-#melonterm .app.exfil{position:absolute;right:16px;bottom:14px}
-#melonterm .app.bank{position:absolute;right:16px;bottom:108px}
-#melonterm .app.armory{position:absolute;right:16px;bottom:202px}
-#melonterm .app.journal{position:absolute;right:16px;bottom:296px}
+#melonterm .bar .exlive{animation:mt-blink 1.2s steps(2) infinite}@keyframes mt-blink{to{opacity:.35}}
 #melonterm .jnl{flex:1;min-height:0;display:flex;flex-direction:column}
 #melonterm .jnl .body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr)}
 #melonterm .jnl .qs{overflow:auto;border-right:2px dashed var(--line);padding:8px}
@@ -217,7 +225,7 @@ const CSS = `
 #melonterm .gum .won{font-size:30px;text-shadow:0 0 10px var(--c)}
 #melonterm .gum .hand{display:flex;gap:8px}#melonterm .gum .hand .ball{width:34px;height:34px}#melonterm .gum .hand .empty{width:34px;height:34px;border-radius:50%;border:2px dashed var(--dim)}
 @media(max-width:760px){#melonterm .gum{grid-template-columns:1fr;grid-template-rows:auto 1fr}#melonterm .reelbox{border-right:0;border-bottom:2px dashed var(--line)}}
-@media(max-width:760px){#melonterm .crt{width:96vw;height:92vh}#melonterm .win{inset:8px 8px 120px}#melonterm .perks{grid-template-columns:1fr;grid-template-rows:auto 1fr}#melonterm .left{border-right:0;border-bottom:2px dashed var(--line)}
+@media(max-width:760px){#melonterm .crt{width:96vw;height:92vh}#melonterm .win{inset:8px}#melonterm .perks{grid-template-columns:1fr;grid-template-rows:auto 1fr}#melonterm .left{border-right:0;border-bottom:2px dashed var(--line)}
   #melonterm .grid{grid-template-columns:repeat(4,minmax(0,1fr));padding:10px;gap:8px}#melonterm .tile{padding:6px}#melonterm .tile .tag{display:none}
   #melonterm .bar{gap:10px;font-size:17px}#melonterm .bar .clock{display:none}#melonterm .detail{padding:14px}#melonterm .detail .big{width:90px;height:90px}#melonterm .detail h2{font-size:30px}}
 `;
@@ -268,16 +276,17 @@ function build() {
   const style = document.createElement('style'); style.textContent = CSS; document.head.append(style);
   const root = document.createElement('div'); root.id = 'melonterm'; root.hidden = true;
   root.innerHTML = `<div class="crt glow">
-    <div class="bar"><span>MELONTERM 2.7</span><span class="grow"></span><span class="pwr"></span><span class="pts"></span><span class="clock"></span></div>
+    <div class="bar"><span>MELONTERM 2.7</span><span class="grow"></span><span class="exlive warn" hidden>EXFIL OPEN</span><span class="pwr"></span><span class="pts"></span><span class="clock"></span></div>
     <div class="desk">
-      <div class="icons"><button class="app" data-app="perks"><div class="sq">${PERKS_ICON}</div><span>PERKS</span></button>
+      <div class="cells"></div>
+      <div class="apps"><button class="app" data-app="perks"><div class="sq">${PERKS_ICON}</div><span>PERKS</span></button>
         <button class="app" data-app="arsenal"><div class="sq">${ARSENAL_ICON}</div><span>ARSENAL</span></button>
         <button class="app" data-app="stark"><div class="sq">${STARK_ICON}</div><span>STARK</span></button>
-        <button class="app" data-app="gums"><div class="sq">${GUMS_ICON}</div><span>GUMS</span></button></div>
-      <button class="app journal" data-app="journal"><div class="sq">${JOURNAL_ICON}</div><span>JOURNAL</span></button>
-      <button class="app armory" data-app="armory"><div class="sq">${ARMORY_ICON}</div><span>ARMORY</span></button>
-      <button class="app bank off" data-app="bank"><div class="sq">${BANK_ICON}</div><span>BANK</span></button>
-      <button class="app exfil off" data-app="exfil"><div class="sq">${EXFIL_ICON}</div><span>EXFIL</span></button>
+        <button class="app" data-app="gums"><div class="sq">${GUMS_ICON}</div><span>GUMS</span></button>
+        <button class="app" data-app="journal"><div class="sq">${JOURNAL_ICON}</div><span>JOURNAL</span></button>
+        <button class="app" data-app="armory"><div class="sq">${ARMORY_ICON}</div><span>ARMORY</span></button>
+        <button class="app off" data-app="bank"><div class="sq">${BANK_ICON}</div><span>BANK</span></button>
+        <button class="app off" data-app="exfil"><div class="sq">${EXFIL_ICON}</div><span>EXFIL</span></button></div>
       <div class="win" data-win="perks" hidden>
         <div class="title"><span>PERKS.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="perks"><div class="left"><div class="grid"></div><div class="msg"></div></div><div class="detail"></div></div>
@@ -311,7 +320,7 @@ function build() {
         <div class="exf"></div>
       </div>
     </div>
-    <div class="task"><button data-logoff>LOG OFF</button><span class="open"></span><span class="grow"></span><span class="hint">ESC · LOG OFF</span></div>
+    <div class="task"><button data-logoff>LOG OFF</button><span class="open"></span><span class="grow"></span><span class="hint">DRAG ICONS TO ARRANGE · ESC LOG OFF</span><button data-reset title="Put the icons back where they started">RESET ICONS</button></div>
   </div>`;
   document.body.append(root);
   const $ = s => root.querySelector(s);
@@ -690,10 +699,12 @@ function build() {
     lastState = state;
     drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory(); drawJournal();
     $('[data-app=stark]').classList.toggle('off', !opts.stark?.()?.unlocked);
+    $('.exlive').hidden = !exIcon.classList.contains('live');
   }
   function open(o) {
     opts = o; root.hidden = false; status(); clearInterval(clock); clock = setInterval(status, 250);
     const c = root.querySelector('.crt'); c.style.animation = 'none'; void c.offsetWidth; c.style.animation = '';
+    layout();
     if (!win.hidden) { say('> SELECT A PERK'); renderGrid(); select(shown); }
     exState = ''; drawExfil();
     opts.onOpen?.();
@@ -702,14 +713,86 @@ function build() {
     if (root.hidden) return; root.hidden = true; clearInterval(clock); const o = opts; opts = null;
     o?.onClose?.();
   }
-  root.querySelector('[data-app=perks]').addEventListener('click', () => openApp('perks'));
-  root.querySelector('[data-app=exfil]').addEventListener('click', () => openApp('exfil'));
-  root.querySelector('[data-app=arsenal]').addEventListener('click', () => openApp('arsenal'));
-  root.querySelector('[data-app=stark]').addEventListener('click', () => openApp('stark'));
-  root.querySelector('[data-app=gums]').addEventListener('click', () => openApp('gums'));
-  root.querySelector('[data-app=bank]').addEventListener('click', () => openApp('bank'));
-  root.querySelector('[data-app=armory]').addEventListener('click', () => openApp('armory'));
-  root.querySelector('[data-app=journal]').addEventListener('click', () => openApp('journal'));
+  // ---- Home screen: icons on a cell home, dragged into place like a phone's ---------------------------------------
+  const desk = $('.desk'), appsEl = $('.apps'), cellsEl = $('.cells'), apps = [...appsEl.querySelectorAll('.app')];
+  const PAD = 20, ICON_W = 96, ICON_H = 110, MIN_W = 108, MIN_H = 112, STORE = 'kino.mods.terminal';
+  // default: shop apps down the left column, map apps up the right column (negative = from the far edge)
+  const HOME = { perks: [0, 0], arsenal: [0, 1], stark: [0, 2], gums: [0, 3], journal: [-1, -4], armory: [-1, -3], bank: [-1, -2], exfil: [-1, -1] };
+  let home = { cols: 1, rows: 1, cw: MIN_W, ch: MIN_H, key: '' }, cells = {}, drag = null, swallowClick = false;
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) ?? {}; } catch { return {}; } };
+  const save = layout => { try { const d = load(); d.layout = { ...(d.layout ?? {}), [home.key]: layout }; localStorage.setItem(STORE, JSON.stringify(d)); } catch {} };
+  const inGrid = ([c, r]) => c >= 0 && r >= 0 && c < home.cols && r < home.rows;
+  function defaults() {   // HOME anchors, then any that clash or fall off the home take the first free cell
+    const out = {}, used = new Set();
+    for (const a of apps) {
+      const h = HOME[a.dataset.app] ?? [0, 0], p = [h[0] < 0 ? home.cols + h[0] : h[0], h[1] < 0 ? home.rows + h[1] : h[1]];
+      if (inGrid(p) && !used.has(p.join())) { out[a.dataset.app] = p; used.add(p.join()); }
+    }
+    for (const a of apps) {
+      if (out[a.dataset.app]) continue;
+      let p = null;
+      for (let c = 0; c < home.cols && !p; c++) for (let r = 0; r < home.rows; r++) if (!used.has([c, r].join())) { p = [c, r]; break; }
+      p ??= [home.cols - 1, home.rows - 1];   // more icons than cells (tiny screen): pile up in the last one
+      out[a.dataset.app] = p; used.add(p.join());
+    }
+    return out;
+  }
+  function layout() {
+    if (root.hidden) return;
+    const w = Math.max(1, desk.clientWidth - PAD * 2), h = Math.max(1, desk.clientHeight - PAD * 2);
+    const cols = Math.max(1, Math.floor(w / MIN_W)), rows = Math.max(1, Math.floor(h / MIN_H));
+    home = { cols, rows, cw: w / cols, ch: h / rows, key: cols + 'x' + rows };
+    const saved = load().layout?.[home.key], used = new Set();
+    cells = defaults();
+    if (saved) {   // saved cells win where they still fit and don't clash; the rest keep their default spot
+      const def = cells; cells = {};
+      for (const a of apps) { const p = saved[a.dataset.app]; if (Array.isArray(p) && inGrid(p) && !used.has(p.join())) { cells[a.dataset.app] = p; used.add(p.join()); } }
+      for (const a of apps) if (!cells[a.dataset.app]) { let p = def[a.dataset.app]; if (used.has(p.join())) { p = null; for (let c = 0; c < cols && !p; c++) for (let r = 0; r < rows; r++) if (!used.has([c, r].join())) { p = [c, r]; break; } p ??= def[a.dataset.app]; } cells[a.dataset.app] = p; used.add(p.join()); }
+    }
+    cellsEl.innerHTML = '';
+    for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+      const d = document.createElement('div'); d.className = 'cell'; d.dataset.cell = c + ',' + r;
+      d.style.cssText = `left:${PAD + c * home.cw + 3}px;top:${PAD + r * home.ch + 3}px;width:${home.cw - 6}px;height:${home.ch - 6}px`; cellsEl.append(d);
+    }
+    place();
+  }
+  function place() { for (const a of apps) { const [c, r] = cells[a.dataset.app]; a.style.left = PAD + c * home.cw + (home.cw - ICON_W) / 2 + 'px'; a.style.top = PAD + r * home.ch + (home.ch - ICON_H) / 2 + 'px'; } }
+  const cellAt = (x, y) => { const b = desk.getBoundingClientRect(); const c = Math.floor((x - b.left - PAD) / home.cw), r = Math.floor((y - b.top - PAD) / home.ch); return inGrid([c, r]) ? [c, r] : null; };
+  const nameAt = p => p && apps.find(a => cells[a.dataset.app].join() === p.join())?.dataset.app;
+  function beginDrag() {
+    if (!drag || drag.active) return;
+    drag.active = true; clearTimeout(drag.timer); drag.btn.classList.add('drag'); desk.classList.add('arranging'); moveDrag(drag.x, drag.y);
+  }
+  function moveDrag(x, y) {
+    drag.x = x; drag.y = y; if (!drag.active) return;
+    drag.btn.style.left = drag.left + x - drag.sx + 'px'; drag.btn.style.top = drag.top + y - drag.sy + 'px';
+    const p = cellAt(x, y); for (const d of cellsEl.children) d.classList.toggle('hot', !!p && d.dataset.cell === p.join());
+  }
+  function endDrag(x, y, cancel) {
+    const d = drag; drag = null; if (!d) return; clearTimeout(d.timer);
+    if (!d.active) return;
+    swallowClick = true; setTimeout(() => { swallowClick = false; }, 0);
+    d.btn.classList.remove('drag'); desk.classList.remove('arranging');
+    const to = cancel ? null : cellAt(x, y), me = d.btn.dataset.app;
+    if (to && to.join() !== cells[me].join()) {
+      const other = nameAt(to); if (other) cells[other] = cells[me];   // swap with whatever sits there
+      cells[me] = to; save(cells);
+    }
+    place();
+  }
+  appsEl.addEventListener('pointerdown', e => {
+    const btn = e.target.closest('.app'); if (!btn || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    drag = { btn, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, left: parseFloat(btn.style.left) || 0, top: parseFloat(btn.style.top) || 0, active: false, id: e.pointerId,
+      timer: setTimeout(beginDrag, 380) };   // hold to pick up (touch), or just drag
+    try { btn.setPointerCapture(e.pointerId); } catch {}
+  });
+  appsEl.addEventListener('pointermove', e => { if (!drag || e.pointerId !== drag.id) return; if (!drag.active && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 8) beginDrag(); moveDrag(e.clientX, e.clientY); });
+  appsEl.addEventListener('pointerup', e => { if (drag && e.pointerId === drag.id) endDrag(e.clientX, e.clientY, false); });
+  appsEl.addEventListener('pointercancel', e => { if (drag && e.pointerId === drag.id) endDrag(0, 0, true); });
+  appsEl.addEventListener('click', e => { const btn = e.target.closest('.app'); if (!btn || swallowClick) return; openApp(btn.dataset.app); });
+  new ResizeObserver(() => layout()).observe(desk);
+  root.querySelector('[data-reset]').addEventListener('click', () => { try { const d = load(); delete d.layout?.[home.key]; localStorage.setItem(STORE, JSON.stringify(d)); } catch {} layout(); });
+
   for (const b of root.querySelectorAll('[data-close]')) b.addEventListener('click', closeApp);
   root.querySelector('[data-logoff]').addEventListener('click', close);
   return { open, close, isOpen: () => !root.hidden };
