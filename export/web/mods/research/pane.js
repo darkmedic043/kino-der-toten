@@ -1,3 +1,4 @@
+import { keepScroll } from '../../keep-scroll.js';
 // Armory → Research (roadmap Phase 5, BO7 style): pick an item (perk or ammo mod); its 8 augments form a linear track
 // researched in order, one at a time across all items; the end of the track (mastery) opens a second Minor slot.
 // Equip one Major and one Minor (two once mastered) per item. Rules and store: research.js. Touch-sized; one column on phones.
@@ -52,7 +53,7 @@ export function renderResearch(root,{cfg,level,toast}){
     return `<div class="rs-step ${a.kind}${done?' done':''}${now?' now':''}${!done&&!isNext?' locked':''}${on?' eq':''}"><span class="st">${i+1} · ${a.kind.toUpperCase()} · ${st}</span>
       <div class="act">${btn}</div><strong>${esc(a.name)}</strong><p>${esc(a.desc)}</p>${done?'':`<div class="bar"><i style="width:${(100*xp/cost).toFixed(1)}%"></i></div><span class="st">${Math.floor(xp).toLocaleString()} / ${cost.toLocaleString()} RESEARCH XP</span>`}</div>`;};
   const fill=Math.max(0,doneN(it)-.5)/7;
-  root.innerHTML=`<style>${RESEARCH_CSS}</style><div class="rs">
+  keepScroll(root).innerHTML=`<style>${RESEARCH_CSS}</style><div class="rs">
     <div class="rs-list">${group('perk','PERKS')}${group('ammo','AMMO MODS')}</div>
     <div class="rs-main" style="--c:${it.color}">
       ${open?'':`<div class="rs-lock">Research opens at level ${cfg.unlockLevel}.</div>`}

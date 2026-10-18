@@ -23,6 +23,8 @@
 //   RESET ICONS in the taskbar restores the default (shop apps down the left, map apps up the right). App windows open in the
 //   middle, inset one grid column on each side, so the icons on the outer edges stay visible (user, 2026-10-17); phones cover the desk.
 
+import { keepScroll } from '../../keep-scroll.js';
+
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
 // perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine: a Melon Pass reward);
 // the terminal and the free-perk gums both check this
@@ -360,7 +362,7 @@ function build() {
   const blocked = p => opts.owned(p) ? 'owned' : !perkUnlocked(p) ? 'pass' : opts.needsPower(p) && !opts.power() ? 'power' : '';
 
   function renderGrid() {
-    grid.innerHTML = PERKS.map((p, i) => {
+    keepScroll(grid).innerHTML = PERKS.map((p, i) => {
       const why = blocked(p);
       return `<button class="tile ${why === 'power' || why === 'pass' ? 'locked' : ''} ${why === 'owned' ? 'owned' : ''}" data-i="${i}" title="${esc(p.name)}">${art(p)}<span class="tag">${why === 'power' ? 'NO POWER' : why === 'pass' ? 'MELON PASS' : ''}</span></button>`;
     }).join('');
@@ -432,14 +434,14 @@ function build() {
       else if (st.phase === 'cores') body = `<h2>RECOVERING CORES</h2><p>${st.cores} / ${st.coresNeeded} ARMOR CORES</p><div class="bar2"><i style="width:${100 * st.cores / st.coresNeeded}%"></i></div><p>KILL ZOMBIES AND PICK UP THE GLOWING CORES.</p>`;
       else if (st.phase === 'upload') body = `<h2>CORES RECOVERED</h2><p>UPLOAD THEM, THEN HOLD THIS TERMINAL FOR ${st.uplink} S.</p><button class="buy" data-act="upload">UPLOAD CORES</button>`;
       else body = `<h2>UPLINK ${st.uplinkLeft} S</h2><div class="bar2"><i style="width:${100 * (1 - st.uplinkLeft / st.uplink)}%"></i></div><p>STAY NEAR A TERMINAL UNTIL IT COMPLETES.</p>`;
-      stBody.innerHTML = `<div class="panel">${body}${msgHtml}</div>`;
+      keepScroll(stBody).innerHTML = `<div class="panel">${body}${msgHtml}</div>`;
       for (const b of stBody.querySelectorAll('[data-act]')) b.addEventListener('click', () => starkDo(b.dataset.act));
       return;
     }
     // online: the armors, laid out like PERKS.EXE
     if (!stBody.querySelector('.grid')) stBody.innerHTML = '<div class="perks"><div class="left"><div class="grid"></div><div class="msg"></div></div><div class="detail"></div></div>';
     const grid = stBody.querySelector('.grid'), detail = stBody.querySelector('.detail'), msg = stBody.querySelector('.msg');
-    grid.innerHTML = st.suits.map((s, i) => `<button class="tile ${s.unlocked ? '' : 'locked'} ${s.owned ? 'owned' : ''} ${i === stShown ? 'on' : ''}" data-i="${i}" title="${esc(s.name)}">
+    keepScroll(grid).innerHTML = st.suits.map((s, i) => `<button class="tile ${s.unlocked ? '' : 'locked'} ${s.owned ? 'owned' : ''} ${i === stShown ? 'on' : ''}" data-i="${i}" title="${esc(s.name)}">
       <span class="suit">${MARK[s.id] ?? s.id}</span><span class="tag">${!s.unlocked ? 'LOCKED' : s.worn ? 'WORN' : s.owned ? s.power + '%' : ''}</span></button>`).join('');
     for (const t of grid.children) { t.addEventListener('mouseenter', () => { stShown = +t.dataset.i; drawStark(); }); t.addEventListener('click', () => { const s = st.suits[+t.dataset.i]; starkDo(s.worn ? 'recall' : s.owned ? 'deploy' : 'buy', s.id); }); }
     const s = st.suits[Math.min(stShown, st.suits.length - 1)];
@@ -476,7 +478,7 @@ function build() {
     const st = opts?.arsenal?.(); if (!st) { arBody.innerHTML = '<p>Ammo mods are not installed.</p>'; return; }
     const key = JSON.stringify([st.power, st.points, st.weapon, st.mod, arMsg, arShown]); if (key === arState) return; arState = key;
     const { grid, detail, msg } = arsenalBody(), cur = st.mod, w = st.weapon;
-    grid.innerHTML = st.mods.map((m, i) => {
+    keepScroll(grid).innerHTML = st.mods.map((m, i) => {
       const on = cur?.id === m.id, locked = !st.power || !w;
       return `<button class="tile ${locked ? 'locked' : ''} ${on ? 'owned' : ''} ${i === arShown ? 'on' : ''}" data-i="${i}" title="${esc(m.name)}">${modIcon(m)}
         <span class="tag">${!st.power ? 'NO POWER' : on ? 'TIER ' + ROMAN[cur.tier] : ''}</span></button>`;
@@ -545,7 +547,7 @@ function build() {
     const label = gmSpin ? 'ROLLING ...' : gmPending ? 'CHOOSE ABOVE' : !st.ok ? 'NO PACK' : left <= 0 ? 'COME BACK NEXT ROUND' : st.points < st.price ? 'NOT ENOUGH POINTS' : `ROLL · ${st.price.toLocaleString()}`;
     const hand = Array.from({ length: st.handSize }, (_, i) => { const g = st.pack.find(g => g.name === st.hand[i]); return g ? `<div class="ball" style="--c:${g.color}" title="${esc(g.name)}"></div>` : '<div class="empty"></div>'; }).join('');
     const swap = gmPending ? `<div class="swap">${st.hand.map((name, i) => { const g = st.pack.find(g => g.name === name); return `<button data-swap="${i}" style="--c:${g?.color ?? '#888'}"><div class="ball"></div>SWAP OUT ${esc(name.toUpperCase())}</button>`; }).join('')}<button data-swap="keep">KEEP MY HAND</button></div>` : '';
-    gmSide.innerHTML = `<h2>GOBBLEGUMS</h2>
+    keepScroll(gmSide).innerHTML = `<h2>GOBBLEGUMS</h2>
       ${gmWon ? `<div class="won" style="--c:${gmWon.color};color:${gmWon.color}">${esc(gmWon.name.toUpperCase())}</div><div class="note">${esc(gmWon.desc)}</div>` : ''}${swap}
       ${st.ok ? `<div>PACK · ${st.pack.length} GUMS${st.auto ? ' (AUTO)' : ''}</div>` : `<div class="warn">NO USABLE PACK</div><div class="note">${esc(st.problems[0] ?? '')} · BUILD IT IN THE ARMORY</div>`}
       <div class="status"><span>ROLLS THIS ROUND ${st.rolls} / ${st.rollsPerRound}</span><span>NEXT ${st.price.toLocaleString()} PTS</span></div>
@@ -571,10 +573,10 @@ function build() {
       : `<div class="st lock ${s.now ? 'now' : ''}" data-n="${i + 1}."><b>??? · NOT YET RECORDED</b><p>Do this step once and the journal keeps it.</p></div>`).join('') : '';
     const trackBtn = !q ? '' : !m.here ? `<button class="buy" disabled>PLAY ${esc(m.title.toUpperCase())} TO TRACK</button>`
       : q.tracked ? '<button class="buy" data-track="off">STOP TRACKING</button>' : '<button class="buy" data-track="on">TRACK QUEST · MARKERS ON</button>';
-    jnBody.innerHTML = `${tabs}<div class="body"><div class="qs">${list || '<p>No quests on this map.</p>'}</div><div class="steps">${q ? `<h2>${esc(q.name.toUpperCase())}</h2>${trackBtn}${steps}` : ''}</div></div>
+    keepScroll(jnBody).innerHTML = `${tabs}<div class="body"><div class="qs">${list || '<p>No quests on this map.</p>'}</div><div class="steps">${q ? `<h2>${esc(q.name.toUpperCase())}</h2>${trackBtn}${steps}` : ''}</div></div>
       <div class="msg ${st.cheating ? 'bad' : jnMsg ? 'ok' : ''}">${esc(st.cheating ? 'CHEAT MODE · NOTHING IS RECORDED THIS GAME' : jnMsg || '> A STEP IS RECORDED THE FIRST TIME YOU DO IT · MARKERS SHOW RECORDED STEPS')}</div>`;
-    for (const b of jnBody.querySelectorAll('[data-map]')) b.addEventListener('click', () => { jnMap = b.dataset.map; jnQuest = null; jnMsg = ''; drawJournal(); });
-    for (const b of jnBody.querySelectorAll('[data-q]')) b.addEventListener('click', () => { jnQuest = b.dataset.q; jnMsg = ''; drawJournal(); });
+    for (const b of jnBody.querySelectorAll('[data-map]')) b.addEventListener('click', () => { jnMap = b.dataset.map; jnQuest = null; jnMsg = ''; drawJournal(); for (const x of jnBody.querySelectorAll('.qs,.steps')) x.scrollTop = 0; });
+    for (const b of jnBody.querySelectorAll('[data-q]')) b.addEventListener('click', () => { const changed = jnQuest !== b.dataset.q; jnQuest = b.dataset.q; jnMsg = ''; drawJournal(); if (changed) { const st = jnBody.querySelector('.steps'); if (st) st.scrollTop = 0; } });
     jnBody.querySelector('[data-track]')?.addEventListener('click', e => {
       const on = e.currentTarget.dataset.track === 'on'; opts.journalTrack?.(m.map, on ? q.id : null);
       jnMsg = on ? `TRACKING ${q.name.toUpperCase()}` : 'TRACKING OFF'; jnState = ''; drawJournal();
@@ -605,13 +607,15 @@ function build() {
         : `<h3>UNLOCK</h3><ul><li style="${it.found ? `color:${it.color}` : ''}">${it.found ? '[X]' : '[ ]'} Find it on ${esc(it.homeName)}</li>
            <li>${it.have.toLocaleString()} / ${it.kills.toLocaleString()} kills with it${it.found ? '' : ' (after finding it)'}</li></ul>
            <div class="prog"><i style="width:${100 * it.have / it.kills}%"></i></div>`;
-      amBody.innerHTML = `${tabs}<div class="perks"><div class="left"><div class="grid">${tab.items.map((i, k) => `<button class="tile ${i.unlocked && i.why !== 'home' ? '' : 'locked'} ${i.owned ? 'owned' : ''} ${k === amShown ? 'on' : ''}" data-i="${k}" title="${esc(i.name)}">${gearIcon(i)}<span class="tag">${tag(i)}</span></button>`).join('')}</div>${msg}</div>
+      const shownBefore = amBody.querySelector('.tile.on')?.dataset.i;
+      keepScroll(amBody).innerHTML = `${tabs}<div class="perks"><div class="left"><div class="grid">${tab.items.map((i, k) => `<button class="tile ${i.unlocked && i.why !== 'home' ? '' : 'locked'} ${i.owned ? 'owned' : ''} ${k === amShown ? 'on' : ''}" data-i="${k}" title="${esc(i.name)}">${gearIcon(i)}<span class="tag">${tag(i)}</span></button>`).join('')}</div>${msg}</div>
         <div class="detail"><div class="head"><div class="big" style="border-color:${it.color}">${gearIcon(it)}</div><div>
           <h2 style="color:${it.color}">${esc(it.name.toUpperCase())}</h2><div class="blurb">${esc(it.blurb)}</div><div class="price">${it.price.toLocaleString()} PTS</div></div></div>
           <button class="buy ${it.unlocked ? '' : 'locked'}" ${it.why ? 'disabled' : ''}>${label}</button>
           ${unlock}
           <h3>SPECS</h3><ul>${it.specs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
           <div class="note">* Not sold on ${esc(it.homeName)}: build it there.</div></div></div>`;
+      if (shownBefore !== undefined && +shownBefore !== amShown) amBody.querySelector('.detail').scrollTop = 0;   // a different item's details start at the top
       for (const t of amBody.querySelectorAll('.tile')) { t.addEventListener('mouseenter', () => { amShown = +t.dataset.i; drawArmory(); }); t.addEventListener('click', () => armoryBuy(tab.items[+t.dataset.i])); }
       amBody.querySelector('.buy').addEventListener('click', () => armoryBuy(it));
     }
@@ -660,7 +664,7 @@ function build() {
         <div class="note">* ${pts(unit)} POINTS IN FOR EVERY ${pts(st.step)} BANKED. WITHDRAWALS ARE FREE. YOUR BALANCE CARRIES ACROSS EVERY MAP AND MATCH.</div>
         <div class="note">LIFETIME · DEPOSITED ${pts(st.deposited)} · WITHDRAWN ${pts(st.withdrawn)}</div>`;
     }
-    bkBody.innerHTML = body + msg;
+    keepScroll(bkBody).innerHTML = body + msg;
     for (const b of bkBody.querySelectorAll('[data-act]')) b.addEventListener('click', () => bankDo(b.dataset.act, b.dataset.n === 'max' ? 'max' : +b.dataset.n || 0));
   }
   // ---- EXFIL.EXE --------------------------------------------------------------------------------------------
@@ -671,7 +675,7 @@ function build() {
     if (exWin.hidden || key === exState) return; exState = key;
     const rw = st.reward, xp = rw ? `<dt>REWARD</dt><dd>+${rw.account.toLocaleString()} XP · +${rw.cls.toLocaleString()} CLASS XP</dd>` : '';
     const when = `<dt>WINDOWS</dt><dd>START OF ROUND ${st.first ?? 11}, THEN EVERY ${st.every ?? 5} ROUNDS</dd>`;
-    exBody.innerHTML = st.active
+    keepScroll(exBody).innerHTML = st.active
       ? `<h2>EXFIL IN PROGRESS</h2><div class="state go">CHOPPER INBOUND</div><dl><dt>LANDING ZONE</dt><dd>${esc(st.zone.toUpperCase())}</dd>${xp}</dl>`
       : st.available
       ? `<h2>EXFIL AVAILABLE</h2><div class="state go">WINDOW OPEN · CLOSES WHEN ROUND ${st.closes} ENDS</div>
