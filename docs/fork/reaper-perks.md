@@ -35,7 +35,7 @@ The user (2026-10-18): "add one of the reaper perks, im thinking prismatic punch
 | 3 | Quick Flash | Minor | Cooldown 45 s → 27 s |
 | 4 | Scatter Light | Major | Every ricochet bounces on to a second zombie within 220 for half its damage |
 | 5 | Prism Charge | Minor | 25% of bullet kills raise a wall (was 15%) |
-| 6 | Full Spectrum | Major | Ricochets have a 20% chance to set off a random ammo mod (and its augments) |
+| 6 | Full Spectrum | Major | Ricochets have a 20% chance to set off your gun's own ammo mod at its tier (and its augments); nothing without one (was a random mod until the user's change, 2026-10-18) |
 | 7 | Amplifier | Minor | Ricochets +50% damage |
 | 8 | Supernova | Major | A wall that reached double size bursts when it fades: 0.6 zh within 250 |
 

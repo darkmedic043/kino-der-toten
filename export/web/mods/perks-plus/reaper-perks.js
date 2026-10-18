@@ -304,7 +304,7 @@ export function setupReaperPerks(api, catalogue, base) {
   // ---- Prismatic Punch (switched on): bullet kills (15%, 45 s cooldown: PP_COOLDOWN, counted from when the wall goes down) raise an energy wall for 10 s; a bullet through
   //      it ricochets into the nearest zombie within 400; each hit grows it 10% (max x2, then 2 ricochets). Augments
   //      (pp.*): size (starts bigger), cooldown, chance, damage, afterglow (s at max size), scatter (each ricochet jumps on
-  //      for that share of its damage), spectrum (chance of a random ammo mod), nova (a maxed wall bursts when it fades).
+  //      for that share of its damage), spectrum (chance of the gun's own ammo mod), nova (a maxed wall bursts when it fades).
   const walls = []; let wallReady = 0;
   const PP_COOLDOWN = 45;   // s from a wall going down to the next one (was 10 from it going up; user, 2026-10-18: "much longer", "starts only after the wall goes down")
   // ---- Who's Who: see whosWho (30 s to revive your body; upgraded, the body shoots and the clone keeps every gun).
@@ -659,7 +659,8 @@ export function setupReaperPerks(api, catalogue, base) {
     const n = w.size >= 2 ? 2 : 1, done = new Set(), k = 1 + stat('pp.damage');
     for (let i = 0; i < n; i++) {
       const z = nearest(point, 400, done); if (!z) break; done.add(z); bolt(point, chest(z), 0xd6a8ff); hurt(z, dmg * k, 'bullet');
-      if (stat('pp.spectrum') && Math.random() < stat('pp.spectrum') && alive(z)) { const A = window.kino?.ammoMods; if (A?.MODS?.length) { const id = A.MODS[Math.floor(Math.random() * A.MODS.length)].id; A.trigger(id, z, 1); host.emit('ammoModFired', { id, tier: 1, enemy: z, pop: true }); } }
+      const own = session.weapon?.ammoMod, A = window.kino?.ammoMods;   // Full Spectrum: the gun's own ammo mod at its tier (user, 2026-10-18: not a random one); none without one
+      if (own?.id && A?.trigger && stat('pp.spectrum') && Math.random() < stat('pp.spectrum') && alive(z)) { const tier = own.tier ?? 1; A.trigger(own.id, z, tier); host.emit('ammoModFired', { id: own.id, tier, enemy: z, pop: true }); }
       if (stat('pp.scatter')) { const o = nearest(z.root.position, 220, done); if (o) { done.add(o); bolt(chest(z), chest(o), 0xb98cff); hurt(o, dmg * k * stat('pp.scatter'), 'bullet'); } }
     }
     w.size = Math.min(2, w.size + .1); w.m.scale.setScalar(w.size);

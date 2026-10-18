@@ -1183,7 +1183,7 @@
     {
      "name": "Full Spectrum",
      "kind": "major",
-     "desc": "Ricochets have a 20% chance to set off a random ammo mod on the zombie they hit.",
+     "desc": "Ricochets have a 20% chance to set off your gun's ammo mod on the zombie they hit (nothing without one).",
      "effects": {
       "pp.spectrum": 0.2
      },
