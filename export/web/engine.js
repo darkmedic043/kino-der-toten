@@ -26,7 +26,7 @@ import { settings } from './settings.js';
 import { installGameMenu } from './game-menu.js';
 import { createPerfDiag } from './perf-diag.js';
 import { setupKtx2, ktx2Stats } from './ktx2.js';
-import { stillSkeletons } from './still-skeletons.js';
+import { stillSkeletons, hideBones } from './still-skeletons.js';
 
 export const vector=a=>new THREE.Vector3().fromArray(a);
 export const perkInfo={specialty_quickrevive:{name:'Quick Revive',price:1500,color:'#509ebc',icon:'QR'},specialty_fastreload:{name:'Speed Cola',price:3000,color:'#478450',icon:'SC'},specialty_rof:{name:'Double Tap',price:2000,color:'#b37528',icon:'DT'},specialty_armorvest:{name:'Juggernog',price:2500,color:'#a53835',icon:'J'}};
@@ -340,21 +340,23 @@ function update(dt){
   muzzle.intensity=Math.max(0,muzzle.intensity-dt*2200);camera.fov=THREE.MathUtils.damp(camera.fov,ads&&!session.def.dualWield&&!session.drinking&&!session.meleeLeft&&!session.reloadLeft?(session.def.adsFov||56)*settings.fov/78:settings.fov,12,dt);camera.updateProjectionMatrix();
   hud();
 }
-function hud(){
+const T=(id,v)=>{v=String(v);const el=$(id);if(el&&el.textContent!==v)el.textContent=v;};
+function hud(){   // (2026-10-17) text and style written only when they change: every assignment invalidated layout each frame (~1% of a Der Eisendrache frame)
+
   const s=session,w=s.weapon;
-  const rt=map.roundText?.();$('round').textContent=rt?.round??(s.round<=5?'I'.repeat(s.round):String(s.round));$('remaining').textContent=rt?.remaining??(s.phase==='preparing'?'STARTS IN '+Math.max(0,Math.ceil(s.countdown)):(s.total-s.killed)+' REMAINING');
-  $('points').textContent=s.points.toLocaleString();$('mag').textContent=s.weaponUnavailable?'—':w.mag;$('reserve').textContent=s.weaponUnavailable?'—':w.reserve;$('weapon-name').textContent=s.weaponUnavailable?(s.pack?'Weapon in Pack-a-Punch':'No weapon'):s.def.name;$('grenades').textContent='G · '+s.grenades+' GRENADES'+(s.claymoresOwned?'  |  4 · '+s.claymores+' CLAYMORES':'')+(s.monkeysOwned?'  |  X · '+s.monkeys+' MONKEYS':'');$('reload-label').textContent=s.weaponUnavailable?'':s.reloadLeft>0?'RELOADING':w.mag===0?'R TO RELOAD':s.weapon.upgraded&&data.weapons[w.id].upgrade?.attachment?'5 · SWITCH ATTACHMENT':'';
-  if(touchControls.mode){$('grenades').textContent=$('grenades').textContent.replace('G · ','').replace('4 · ','').replace('X · ','');$('reload-label').textContent=$('reload-label').textContent.replace('R TO RELOAD','TAP RELOAD').replace('5 · SWITCH ATTACHMENT','TAP ALT FIRE');}
-  $('health-fill').style.width=(100*s.health/s.maxHealth)+'%';$('health-label').textContent=Math.ceil(s.health)+' / '+s.maxHealth;
+  const rt=map.roundText?.();T('round',rt?.round??(s.round<=5?'I'.repeat(s.round):String(s.round)));T('remaining',rt?.remaining??(s.phase==='preparing'?'STARTS IN '+Math.max(0,Math.ceil(s.countdown)):(s.total-s.killed)+' REMAINING'));
+  T('points',s.points.toLocaleString());T('mag',s.weaponUnavailable?'—':w.mag);T('reserve',s.weaponUnavailable?'—':w.reserve);T('weapon-name',s.weaponUnavailable?(s.pack?'Weapon in Pack-a-Punch':'No weapon'):s.def.name);T('grenades','G · '+s.grenades+' GRENADES'+(s.claymoresOwned?'  |  4 · '+s.claymores+' CLAYMORES':'')+(s.monkeysOwned?'  |  X · '+s.monkeys+' MONKEYS':''));T('reload-label',s.weaponUnavailable?'':s.reloadLeft>0?'RELOADING':w.mag===0?'R TO RELOAD':s.weapon.upgraded&&data.weapons[w.id].upgrade?.attachment?'5 · SWITCH ATTACHMENT':'');
+  if(touchControls.mode){T('grenades',$('grenades').textContent.replace('G · ','').replace('4 · ','').replace('X · ',''));T('reload-label',$('reload-label').textContent.replace('R TO RELOAD','TAP RELOAD').replace('5 · SWITCH ATTACHMENT','TAP ALT FIRE'));}
+  $('health-fill').style.width=(100*s.health/s.maxHealth)+'%';T('health-label',Math.ceil(s.health)+' / '+s.maxHealth);
   $('hurt').style.opacity=s.health<s.maxHealth?(1-s.health/s.maxHealth)*.8:0;$('hitmarker').style.opacity=hitUntil>s.time?1:0;$('flash').style.opacity=Math.max(0,flashUntil-s.time);
   $('prompt').innerHTML=active&&promptText?(promptText==='Barricade secured'?promptText:touchControls.mode?'<kbd>USE</kbd> '+promptText.replace('Hold F','Hold USE'):'<kbd>F</kbd> '+promptText):'';
-  if(toastUntil<s.time)$('toast').textContent='';if(announcementUntil<s.time)$('announcement').style.opacity=0;
+  if(toastUntil<s.time)T('toast','');if(announcementUntil<s.time)$('announcement').style.opacity=0;
   const perks=map.perkInfo??perkInfo,perkHtml=[...s.perks].filter(id=>perks[id]).map(id=>`<span class="perk" title="${perks[id].name}" style="background:${perks[id].color}">${perks[id].icon}</span>`).join('');if($('perks').innerHTML!==perkHtml)$('perks').innerHTML=perkHtml;
   const extra=map.hudEffects?.()??'';
   const effectHtml=Object.entries(s.effects).filter(([k,t])=>t>s.time&&powerupNames[k]).map(([k,t])=>`<span class="powerup-timer ${t-s.time<5&&Math.floor(s.time*4)%2?'expiring':''}"><img src="${data.powerups[k].icon}" alt="${powerupNames[k]}"><span>${Math.ceil(t-s.time)}s</span></span>`).join('')+extra;if($('effects').innerHTML!==effectHtml)$('effects').innerHTML=effectHtml;
-  const where=map.location?.();if(where!=null&&$('location'))$('location').textContent=where;
-  $('objective').textContent=map.objective?.()??'';
-  if(debugVisible)$('debug').textContent=`${fps} FPS · ${renderer.info.render.calls} calls\n${camera.position.toArray().map(v=>v.toFixed(1)).join(', ')}\n${enemies.list.length} enemies · ${world.navDisabled?.size??0} blocked polygons`;
+  const where=map.location?.();if(where!=null&&$('location'))T('location',where);
+  T('objective',map.objective?.()??'');
+  if(debugVisible)T('debug',`${fps} FPS · ${renderer.info.render.calls} calls\n${camera.position.toArray().map(v=>v.toFixed(1)).join(', ')}\n${enemies.list.length} enemies · ${world.navDisabled?.size??0} blocked polygons`);
 }
 
 // getState: mods call it every frame (some several times a physics step) mostly for .active/.ready/.started/.input, and
@@ -459,7 +461,10 @@ try{
   // rigged props that never move keep their bone textures instead of re-uploading them every frame (still-skeletons.js;
   // the whole scene: Der Eisendrache's 461 still props sit outside world.root). Late arrivals join on the 1 s sweep.
   if(!NO_STILL)stillSkeletons(scene);
-  if(!perfOff.has('noFreeze')&&world.root&&world.root.updateMatrixWorld===THREE.Object3D.prototype.updateMatrixWorld){staticFreeze=createStaticFreeze(world.root);globalThis.kino.staticFreeze=staticFreeze;}
+  // (2026-10-17: the whole scene, with the walk cut short under static subtrees; bones with nothing attached are hidden
+  // from the renderer's object walk, see still-skeletons.js)
+  if(!perfOff.has('noFreeze')&&world.root&&world.root.updateMatrixWorld===THREE.Object3D.prototype.updateMatrixWorld){staticFreeze=createStaticFreeze(scene);globalThis.kino.staticFreeze=staticFreeze;console.info('[static-freeze]',staticFreeze.frozen,'frozen,',staticFreeze.skips,'subtrees skipped');}
+  if(!perfOff.has('noFreeze'))console.info('[still-skeletons] bones hidden:',hideBones(scene));
   ready=true;
   progress('Ready',100);$('loading').hidden=true;$('start').disabled=contextLost;$('menu-status').textContent=contextLost?'Graphics paused. Waiting for the browser to restore the game…':touchControls.mode?'Tap to start':'Click to capture the mouse · Esc to pause';
 }catch(error){console.error(error);errors.push(String(error));$('load-label').textContent='Unable to start: '+error.message;$('menu-status').textContent='See the browser console for details';}

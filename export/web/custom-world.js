@@ -127,6 +127,9 @@ export class CustomWorld {
       }
       // pieces with a `move` property [x, y, z] (scene units; the BO3 map builder writes BO3's script_vector) slide that far
       // when the door opens, then disappear; without one the door disappears at once
+      // (2026-10-17) a BO3 door prop is a mesh per material (a sliding door 10-17 draws, Der Eisendrache ~90 a view):
+      // pieces under one node sharing a material and the same slide become one mesh with that slide
+      mergeDoorPieces(m.object);
       const slides=[];m.object.traverse(o=>{const v=o.userData?.move;if(Array.isArray(v)&&v.length===3)slides.push({object:o,base:o.position.clone(),move:new THREE.Vector3(...v)});});
       const part={object:m.object,collider:boxCollider(plug),box,plug,enabled:true,slides,anim:null};
       this.doors.set(name,{name,cost,zone,electric:!!m.extras.electric,parts:[part],box});this.dynamic.push(part);
@@ -536,4 +539,34 @@ export class CustomWorld {
     this.activeBox=this.boxLocations.find(b=>b.start)??this.boxLocations[0];this.updateBox();this.setDoors(session);
     if(this.powerHandle)this.powerHandle.rotation.x=0;
   }
+}
+
+// Door pieces merged per parent node, material and `move` (the merged piece slides as its parts did). Geometry is baked
+// into the node's space, so the merged mesh sits at the origin and slides from there. Originals' geometry is kept (other
+// doors may share it).
+function mergeDoorPieces(door){
+  const parents=new Set();door.traverse(o=>{if(o.children.length>1)parents.add(o);});
+  let merged=0;
+  for(const parent of parents){
+    const groups=new Map();
+    for(const o of parent.children){
+      if(!o.isMesh||o.isSkinnedMesh||o.isInstancedMesh||o.isBatchedMesh||!o.visible||Array.isArray(o.material)||o.morphTargetInfluences?.length||o.children.length)continue;
+      const g=o.geometry;if(!g.index||Object.values(g.attributes).some(a=>a.isInterleavedBufferAttribute))continue;
+      const layout=Object.keys(g.attributes).sort().map(k=>`${k}:${g.attributes[k].itemSize}${g.attributes[k].normalized?'n':''}`).join(',');
+      const key=[o.material.uuid,layout,String(o.userData.move??''),o.castShadow,o.receiveShadow,o.renderOrder,o.layers.mask].join('|');
+      (groups.get(key)??groups.set(key,[]).get(key)).push(o);
+    }
+    for(const list of groups.values()){
+      if(list.length<2)continue;
+      const geos=list.map(o=>{const g=o.geometry.clone();o.updateMatrix();g.applyMatrix4(o.matrix);return g;});
+      const geo=mergeGeometries(geos,false);for(const g of geos)g.dispose();
+      if(!geo)continue;
+      const first=list[0],mesh=new THREE.Mesh(geo,first.material);
+      mesh.name='merged_'+(first.name||first.material.name);for(const k of ['castShadow','receiveShadow','renderOrder','frustumCulled'])mesh[k]=first[k];mesh.layers.mask=first.layers.mask;
+      mesh.userData={merged:list.length,marker:true,...(first.userData.move?{move:first.userData.move}:{})};geo.computeBoundingSphere();geo.computeBoundingBox();
+      for(const o of list){parent.remove(o);merged++;}
+      parent.add(mesh);mesh.updateMatrixWorld(true);
+    }
+  }
+  return merged;
 }

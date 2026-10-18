@@ -9,7 +9,7 @@
 // collision and bullets use the world's own colliders.
 import * as THREE from 'three';
 import { MeshoptSimplifier } from './vendor/meshopt_simplifier.js';
-import { imageOf, dropImage } from './texture-memory.js';
+import { imageOf, dropImage, hasImage } from './texture-memory.js';
 
 // three r185 bug: WebGLRenderer.setProgram tests `object.colorTexture` on a BatchedMesh, but the class keeps it in
 // `_colorsTexture`; for a batch without colours `undefined !== null` held, so every batched draw looked its program up
@@ -57,9 +57,13 @@ const plainUv=t=>!t||(t.offset.x===0&&t.offset.y===0&&t.repeat.x===1&&t.repeat.y
 // batches split by map size, format and mip count, and the map and normal map must both be compressed or both not.
 const packed=t=>!!t?.isCompressedTexture&&t.mipmaps?.length>0&&t.mipmaps.every(l=>l.data);
 const texKey=t=>!t?'':packed(t)?`c${t.image.width}x${t.image.height}:${t.format}:${t.mipmaps.length}`:'i';
-const arrayable=m=>m.isMeshStandardMaterial&&!m.isMeshPhysicalMaterial&&!m.transparent&&m.map?.source?.data&&!NO_ARRAY_MAPS.some(k=>m[k])&&plainUv(m.map)&&plainUv(m.normalMap)
+// (2026-10-17) a map whose decoded image texture-memory.js already released (uploaded during loading) still qualifies:
+// fillArray gets it back from its file. Transparent materials qualify too (prop decals and glass: ~130 draws a view on
+// Der Eisendrache), grouped by their blend state; a batch of them draws in instance order, which for overlays with a
+// polygon offset is as stable as the per-material order they had
+const arrayable=m=>m.isMeshStandardMaterial&&!m.isMeshPhysicalMaterial&&m.map&&hasImage(m.map.source)&&!NO_ARRAY_MAPS.some(k=>m[k])&&plainUv(m.map)&&plainUv(m.normalMap)
   &&(m.map.isCompressedTexture?packed(m.map)&&(!m.normalMap||packed(m.normalMap)):!m.normalMap?.isCompressedTexture);
-const arrayKey=m=>[texKey(m.map),texKey(m.normalMap),m.side,m.alphaTest,!!m.normalMap,m.normalMap?m.normalScale.toArray().join():'',m.roughness,m.metalness,m.emissive.getHex(),m.emissiveIntensity,m.flatShading,m.vertexColors,m.fog,m.map.colorSpace,m.customProgramCacheKey()].join(',');
+const arrayKey=m=>[texKey(m.map),texKey(m.normalMap),m.side,m.alphaTest,m.transparent,m.opacity,m.depthWrite,m.depthTest,m.blending,m.polygonOffset,m.polygonOffsetFactor,m.polygonOffsetUnits,m.forceSinglePass,!!m.normalMap,m.normalMap?m.normalScale.toArray().join():'',m.roughness,m.metalness,m.emissive.getHex(),m.emissiveIntensity,m.flatShading,m.vertexColors,m.fog,m.map.colorSpace,m.customProgramCacheKey()].join(',');
 function arrayMaterial(base,mapArray,normalArray,layerTex){
   const m=base.clone();m.name='array_'+base.name;m.color.set(1,1,1);
   const dummy=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);dummy.needsUpdate=true;dummy.colorSpace=base.map.colorSpace;m.map=dummy;
@@ -120,7 +124,7 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
     for(let p=o.parent;p;p=p.parent)if(!p.visible)return;
     const g=o.geometry;if(Object.values(g.attributes).some(a=>a.isInterleavedBufferAttribute)||Object.keys(g.morphAttributes).length)return;
     const layout=Object.keys(g.attributes).sort().map(k=>`${k}:${g.attributes[k].itemSize}${g.attributes[k].normalized?'n':''}:${g.attributes[k].array.constructor.name}`).join(',');
-    const arr=maxLayers&&arrayable(o.material),rest=[layout,!!g.index,o.castShadow,o.receiveShadow,o.renderOrder,o.layers.mask].join('|');
+    const arr=maxLayers&&arrayable(o.material),rest=[layout,!!g.index,o.castShadow,o.receiveShadow,arr&&o.material.transparent?Math.floor(o.renderOrder/1000):o.renderOrder,o.layers.mask].join('|');
     if(single&&!arr)return;   // a plain mesh only joins a texture-array batch (per-material batching saves it nothing)
     let key=[o.material.uuid,rest].join('|');
     if(arr){const base='arr|'+arrayKey(o.material)+'|'+rest;let c=chunks.get(base);
@@ -164,6 +168,7 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
     // at their counts and culls against each camera, the shadow cameras included (BatchedMesh.onBeforeShadow)
     if(e.single)batch.perObjectFrustumCulled=true;
     for(const p of ['castShadow','receiveShadow','renderOrder'])batch[p]=first[p];batch.layers.mask=first.layers.mask;
+    if(e.arr&&first.material.transparent)batch.renderOrder=Math.min(...e.sources.map(o=>o.renderOrder));
     for(const g of e.geos.keys())e.geos.set(g,[batch.addGeometry(g),...lods.get(g).map(l=>{const id=batch.addGeometry(l);l.dispose();return id;})]);   // [LOD0, LOD1, LOD2]
     const n=e.n,pos=new Float32Array(n*3),rad=new Float32Array(n),ids=new Int32Array(n),geo=[],lod=new Uint8Array(n);let k=0;
     for(const o of e.sources){

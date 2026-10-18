@@ -9,7 +9,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from '../../vendor/jsm/utils/BufferGeometryUtils.js';
 
-const TOP = /^(CASTLE_(?!TRAM)|DOOR_|machine_)/i;
+// (2026-10-17: the gondola cars are merged too: the mod filters their meshes by material name and parent name, which a
+// per-node, per-material merge keeps, and their doors are joint nodes, which keep animating; 246 -> ~70 draws)
+const TOP = /^(CASTLE_|DOOR_|machine_)/i;
 export function mergeProps(root, scene = null) {
   const parents = new Set();
   for (const top of [...root.children, ...(scene?.children ?? [])]) {
@@ -47,7 +49,7 @@ export function mergeProps(root, scene = null) {
 // the originals stay in place on no render layer, and the instances follow them: a node a mod moves (floaters, gates,
 // flying Pack-a-Punch parts, sliding doors) or shows and hides (the pads' blue variants, torn boards) is mirrored the
 // next frame. Worst view 2,016 -> ~1,100 draws.
-const SKIP = /^CASTLE_(TRAM|EE|BQ|PART|DRAGON|PAPPART)/i;
+const SKIP = /^CASTLE_(TRAM|PTRAM|EE|BQ|PART|DRAGON|PAPPART)/i;   // (PTRAM: the mod collects the gate meshes for colliders after this runs)
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0), M = new THREE.Matrix4(), S = new THREE.Matrix4();
 export function instanceProps(root, scene, host) {
   const groups = new Map(), unit = new THREE.BoxGeometry(1, 1, 1);
@@ -55,31 +57,40 @@ export function instanceProps(root, scene, host) {
     if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || o.isBatchedMesh || Array.isArray(o.material) || o.morphTargetInfluences?.length || o.layers.mask === 0) return;
     const box = o.geometry.type === 'BoxGeometry' ? o.geometry.parameters : null;
     const key = [box ? 'box' : o.geometry.uuid, o.material.uuid, o.castShadow, o.receiveShadow, o.renderOrder, o.layers.mask].join('|');
-    (groups.get(key) ?? groups.set(key, []).get(key)).push({ o, box, last: new Float32Array(16).fill(NaN), vis: null });
+    (groups.get(key) ?? groups.set(key, []).get(key)).push({ o, box, last: new Float64Array(16).fill(NaN), lm: new Float64Array(6).fill(NaN), vis: null, par: null });   // Float64: a Float32 copy never compared equal to the matrix's doubles, so every instance was re-set and re-uploaded every frame (2026-10-17)
   });
   for (const top of root.children) if (/^(CASTLE_|DOOR_)/i.test(top.name) && !SKIP.test(top.name)) consider(top);
   for (const top of scene.children) if (/^window_boards$/.test(top.name)) consider(top);
   const visible = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
-  const matrix = e => { e.o.updateWorldMatrix?.(false, false); return e.box ? M.multiplyMatrices(e.o.matrixWorld, S.makeScale(e.box.width, e.box.height, e.box.depth)) : e.o.matrixWorld; };
+  // (2026-10-17) the originals leave the scene graph (the renderer and the matrix walk visited 780 of them a frame for
+  // nothing): each remembers its parent node, and its world matrix is the node's times its own local one (recomposed
+  // from position/rotation/scale, so a piece a door slides still follows)
+  const matrix = e => { const o = e.o; if (o.matrixAutoUpdate) o.updateMatrix(); o.matrixWorld.multiplyMatrices(e.par.matrixWorld, o.matrix); return e.box ? M.multiplyMatrices(o.matrixWorld, S.makeScale(e.box.width, e.box.height, e.box.depth)) : o.matrixWorld; };
   const sets = [];
   for (const g of groups.values()) {
     if (g.length < 2) continue;   // even a pair halves its draws (the floaters are several models used 2-3 times each)
     const first = g[0].o, im = new THREE.InstancedMesh(first.geometry.type === 'BoxGeometry' ? unit : first.geometry, first.material, g.length);
     im.name = 'instanced_' + (first.name || first.material.name || 'box').replace(/_\d+$/, '');
     for (const k of ['castShadow', 'receiveShadow', 'renderOrder']) im[k] = first[k]; im.layers.mask = first.layers.mask; im.frustumCulled = true; im.userData.noCull = true;
-    g.forEach((e, k) => { const vis = visible(e.o); e.vis = vis; e.last.set(e.o.matrixWorld.elements); im.setMatrixAt(k, vis ? matrix(e) : ZERO); e.o.layers.mask = 0; });
+    g.forEach((e, k) => { e.par = e.o.parent; const vis = visible(e.o); e.vis = vis; im.setMatrixAt(k, vis ? matrix(e) : ZERO); e.last.set(e.par.matrixWorld.elements); const lm = e.o.matrix.elements; e.lm.set([lm[12], lm[13], lm[14], lm[0], lm[5], lm[10]]); e.par.remove(e.o); e.o.userData.instancedInto = im; });
     im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); scene.add(im);
     sets.push({ g, im });
   }
+  // per frame (2026-10-17: this loop was the castle mod's whole cost, ~0.6 ms a frame: a parent walk per piece): the
+  // visibility of a piece's parent chain is computed once per parent per frame, the piece adds only its own flag
+  let frame = 0; const parVis = new Map();
+  const visOf = (par) => { let v = parVis.get(par); if (!v) parVis.set(par, v = { f: -1, on: true }); if (v.f !== frame) { v.f = frame; v.on = visible(par); } return v.on; };
   host?.on('update', () => {
+    frame++;
     for (const { g, im } of sets) {
       let dirty = false;
-      g.forEach((e, k) => {
-        const w = e.o.matrixWorld.elements, vis = visible(e.o); let same = vis === e.vis;
-        for (let i = 0; same && i < 16; i++) if (w[i] !== e.last[i]) same = false;
-        if (same) return;
-        e.last.set(w); e.vis = vis; dirty = true; im.setMatrixAt(k, vis ? matrix(e) : ZERO);
-      });
+      for (let k = 0; k < g.length; k++) {
+        const e = g[k], o = e.o, vis = o.visible && visOf(e.par); let same = vis === e.vis;
+        if (same) { if (o.matrixAutoUpdate) o.updateMatrix(); const l = e.last, pw = e.par.matrixWorld.elements, lm = o.matrix.elements; same = pw[12] === l[12] && pw[13] === l[13] && pw[14] === l[14] && pw[0] === l[0] && pw[5] === l[5] && pw[10] === l[10] && pw[1] === l[1] && pw[2] === l[2] && pw[4] === l[4] && pw[6] === l[6] && pw[8] === l[8] && pw[9] === l[9] && lm[12] === e.lm[0] && lm[13] === e.lm[1] && lm[14] === e.lm[2] && lm[0] === e.lm[3] && lm[5] === e.lm[4] && lm[10] === e.lm[5]; }
+        if (same) continue;
+        e.last.set(e.par.matrixWorld.elements); const lm = o.matrix.elements; e.lm[0] = lm[12]; e.lm[1] = lm[13]; e.lm[2] = lm[14]; e.lm[3] = lm[0]; e.lm[4] = lm[5]; e.lm[5] = lm[10];
+        e.vis = vis; dirty = true; im.setMatrixAt(k, vis ? matrix(e) : ZERO);
+      }
       if (dirty) { im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); }
     }
   });

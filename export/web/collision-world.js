@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { acceleratedRaycast, MeshBVH } from 'three-mesh-bvh';
+import { acceleratedRaycast, MeshBVH, ExtendedTriangle } from 'three-mesh-bvh';
 import { loadBinaryParts } from './binary-parts.js';
 
 const _bounds = new THREE.Box3();
@@ -10,6 +10,7 @@ const _normal = new THREE.Vector3();
 const _originalCenter = new THREE.Vector3();
 const _resolvedCenter = new THREE.Vector3();
 const _segmentCenter = new THREE.Vector3();
+const _candTri = new ExtendedTriangle();   // (closestPointToSegment is three-mesh-bvh's)
 
 function typedArray(buffer, descriptor) {
   const constructors = { Float32Array, Uint16Array, Uint32Array, Int32Array };
@@ -100,6 +101,30 @@ export class CollisionWorld {
     this.mesh.visible = Boolean(visible);
   }
 
+  // Candidate cache (2026-10-17): the player's physics tests the capsule 4-8 times a step (the move, up to five overlap
+  // iterations, step tries), and each test walked the whole BVH (Der Eisendrache: 6.5M triangles, ~11% of a frame on the
+  // GTX 1660 Ti host). The triangles within a padded box around the capsule are gathered once (one walk) and reused
+  // while the capsule stays inside the box; each has its bounds for a cheap reject. Only indexed geometry (every map).
+  _gather(bounds, radius) {
+    const c = this._cand ??= { box: new THREE.Box3(), count: 0, idx: new Int32Array(1024), tb: new Float32Array(1024 * 6) };
+    const pad = Math.max(radius * 2.5, 36);
+    c.box.copy(bounds); c.box.min.addScalar(-pad); c.box.max.addScalar(pad); c.count = 0;
+    const box = c.box;
+    this.bvh.shapecast({
+      intersectsBounds: (b) => b.intersectsBox(box),
+      intersectsTriangle: (t, i) => {
+        if (c.count === c.idx.length) { const idx = new Int32Array(c.idx.length * 2); idx.set(c.idx); c.idx = idx; const tb = new Float32Array(idx.length * 6); tb.set(c.tb); c.tb = tb; }
+        const k = c.count++, o = k * 6, a = t.a, b = t.b, cc = t.c;
+        c.idx[k] = i;
+        c.tb[o] = Math.min(a.x, b.x, cc.x); c.tb[o + 1] = Math.min(a.y, b.y, cc.y); c.tb[o + 2] = Math.min(a.z, b.z, cc.z);
+        c.tb[o + 3] = Math.max(a.x, b.x, cc.x); c.tb[o + 4] = Math.max(a.y, b.y, cc.y); c.tb[o + 5] = Math.max(a.z, b.z, cc.z);
+        return false;
+      },
+    });
+    return c;
+  }
+  invalidateCache() { if (this._cand) this._cand.box.makeEmpty(); }
+
   capsuleIntersect(capsule) {
     _segment.start.copy(capsule.start);
     _segment.end.copy(capsule.end);
@@ -110,27 +135,37 @@ export class CollisionWorld {
     _bounds.min.addScalar(-capsule.radius);
     _bounds.max.addScalar(capsule.radius);
     let hit = false;
-
-    this.bvh.shapecast({
-      intersectsBounds: (box) => box.intersectsBox(_bounds),
-      intersectsTriangle: (triangle) => {
-        const distance = triangle.closestPointToSegment(_segment, _trianglePoint, _capsulePoint);
-        if (distance >= capsule.radius) return false;
-        const depth = capsule.radius - distance;
-        _normal.subVectors(_capsulePoint, _trianglePoint);
-        if (_normal.lengthSq() < 1e-12) {
-          triangle.getNormal(_normal);
-          _segmentCenter.addVectors(_segment.start, _segment.end).multiplyScalar(0.5);
-          if (_normal.dot(_segmentCenter.sub(triangle.a)) < 0) _normal.negate();
-        } else {
-          _normal.multiplyScalar(1 / Math.max(distance, 1e-12));
-        }
-        _segment.start.addScaledVector(_normal, depth);
-        _segment.end.addScaledVector(_normal, depth);
-        hit = true;
-        return false;
-      },
-    });
+    const test = (triangle) => {
+      const distance = triangle.closestPointToSegment(_segment, _trianglePoint, _capsulePoint);
+      if (distance >= capsule.radius) return false;
+      const depth = capsule.radius - distance;
+      _normal.subVectors(_capsulePoint, _trianglePoint);
+      if (_normal.lengthSq() < 1e-12) {
+        triangle.getNormal(_normal);
+        _segmentCenter.addVectors(_segment.start, _segment.end).multiplyScalar(0.5);
+        if (_normal.dot(_segmentCenter.sub(triangle.a)) < 0) _normal.negate();
+      } else {
+        _normal.multiplyScalar(1 / Math.max(distance, 1e-12));
+      }
+      _segment.start.addScaledVector(_normal, depth);
+      _segment.end.addScaledVector(_normal, depth);
+      hit = true;
+      return false;
+    };
+    const index = this.geometry.index;
+    if (this.useCache !== false && index && this.geometry.attributes.position.array) {   // useCache = false: the plain BVH walk (tests, A/B)
+      const c = this._cand?.box.containsBox(_bounds) ? this._cand : this._gather(_bounds, capsule.radius);
+      const pos = this.geometry.attributes.position.array, ia = index.array, tb = c.tb, tri = _candTri;
+      const minX = _bounds.min.x, minY = _bounds.min.y, minZ = _bounds.min.z, maxX = _bounds.max.x, maxY = _bounds.max.y, maxZ = _bounds.max.z;
+      for (let k = 0, n = c.count; k < n; k++) {
+        const o = k * 6;
+        if (tb[o] > maxX || tb[o + 3] < minX || tb[o + 1] > maxY || tb[o + 4] < minY || tb[o + 2] > maxZ || tb[o + 5] < minZ) continue;
+        const t = c.idx[k] * 3, a = ia[t] * 3, b = ia[t + 1] * 3, cc = ia[t + 2] * 3;
+        tri.a.set(pos[a], pos[a + 1], pos[a + 2]); tri.b.set(pos[b], pos[b + 1], pos[b + 2]); tri.c.set(pos[cc], pos[cc + 1], pos[cc + 2]);
+        tri.needsUpdate = true;   // ExtendedTriangle caches its plane and edge data: refresh it for these vertices (stale data gave NaN contacts)
+        test(tri);
+      }
+    } else this.bvh.shapecast({ intersectsBounds: (box) => box.intersectsBox(_bounds), intersectsTriangle: test });
 
     if (!hit) return false;
     _resolvedCenter.addVectors(_segment.start, _segment.end).multiplyScalar(0.5);

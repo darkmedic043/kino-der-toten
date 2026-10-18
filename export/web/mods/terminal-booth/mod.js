@@ -18,6 +18,7 @@ import { CollisionWorld } from '../../collision-world.js';
 
 const BASE=new URL('./',import.meta.url).href;
 const LIVE=/^wire_(cab|jb|span2|side1|cut)/;
+const SMALL_FAR=900;
 const WIRE_COLOR={wire_red:'#ff3a22',wire_yellow:'#ffc21f',wire_blue:'#3f8cff',wire_green:'#39ff6a',wire_white:'#9fc4ff'};
 
 // Several booths on a map (Der Eisendrache: 8, ~400 draws a frame): the parts every booth shares (same geometry and
@@ -51,6 +52,7 @@ export default async function setup(api){
   for(const spot of spots)booths.push(build(await loadModel(BASE+(spot.model??'terminal_booth.glb')),spot));
   routeAround(booths);
   for(const b of booths)if(b.spot.clearDebris!==false)clearDebris(b);   // clearDebris:false where the floor itself is bumpy (The Giant's snow)
+  col?.invalidateCache?.();   // the player's capsule test caches nearby triangles (collision-world.js); some just moved
   window.kino.terminalBooth={booths};
   usePrompt(booths);
   instanceShared(booths,scene);
@@ -93,7 +95,7 @@ export default async function setup(api){
   // ---------------------------------------------------------------- build
   function build(root,spot){
     root.name='terminal_booth';snap(root,spot);scene.add(root);collide(root);
-    const b={root,spot,leds:[],wires:[],sparks:[],cut:[],coolant:[],t:Math.random()*10};
+    const b={root,spot,leds:[],wires:[],sparks:[],cut:[],coolant:[],small:[],t:Math.random()*10};   // small: LEDs, wires, glass, coolant (hidden past SMALL_FAR; ~35 draws a booth)
     // A faint white light from the strip under the roof, filling the inside.
     // Added during loading and never toggled, so no shader recompiles later.
     // light:false (maps with many booths, e.g. Der Eisendrache: every real point light costs every pixel) leaves it to the map
@@ -103,6 +105,7 @@ export default async function setup(api){
       if(!o.isMesh)return;
       const n=o.name,m=o.material;
       o.castShadow=o.receiveShadow=true;
+      if(/^(led_|wire_|glass|coolant)/.test(n)||/glass/.test(m.name))b.small.push(o);
       if(n==='crt_screen'){b.screenAt=new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());b.screen=screen(cfg.screen);o.material=b.screen.material;o.castShadow=false;}
       else if(n==='tap_screen'){b.tapScreen=tapScreen();o.material=b.tapScreen.material;o.castShadow=false;}
       else if(n==='sign_glow'){b.sign=sign(cfg.sign??'MelonTerm 2.7');o.material=b.sign.material;o.castShadow=false;}
@@ -475,7 +478,11 @@ export default async function setup(api){
     const power=!!session.power;
     for(const b of booths){
       b.t+=dt;
-      if(booths.length>1&&camera.position.distanceTo(b.root.position)>1400)continue;   // far booths keep their last frame (no canvas uploads)
+      const far=camera.position.distanceTo(b.root.position);
+      // (2026-10-17) the LEDs, wires, glass tubes and coolant lines are a draw each (~35 a booth, 8 booths on Der
+      // Eisendrache) and a few pixels past 900 units: hidden there
+      const small=far>SMALL_FAR;if(b.smallHidden!==small){b.smallHidden=small;for(const o of b.small)if(!o.userData.instancedInto)o.visible=!small;}
+      if(booths.length>1&&far>1400)continue;   // far booths keep their last frame (no canvas uploads)
       b.screen?.update(dt,power);b.sign?.update(dt,power);b.tapScreen?.update(dt,power);
       for(const l of b.leds)updateLed(l,dt,power);
       for(const w of b.wires){w.tex.offset.x-=dt*w.speed*(power?1:.25);

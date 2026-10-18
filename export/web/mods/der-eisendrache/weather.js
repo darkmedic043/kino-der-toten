@@ -67,7 +67,8 @@ export function setupWeather({ scene, camera, world, renderer, host, session }) 
   out.snow = snow;
   // ---- flames
   const pts = [], sz = [], ph = [], kinds = [];
-  world.root?.traverse(o => { if (/^CASTLE_FLAME_/.test(o.name)) { const p = o.getWorldPosition(new THREE.Vector3()); pts.push(p.x, p.y, p.z); sz.push(o.userData.size ?? 10); ph.push(Math.random() * 6.2832); kinds.push(o.userData.kind); } });
+  // (the marker nodes are hidden once read: 376 empty objects the renderer walked every frame)
+  world.root?.traverse(o => { if (/^CASTLE_FLAME_/.test(o.name)) { const p = o.getWorldPosition(new THREE.Vector3()); pts.push(p.x, p.y, p.z); sz.push(o.userData.size ?? 10); ph.push(Math.random() * 6.2832); kinds.push(o.userData.kind); if (!o.children.length) o.visible = false; } });
   let flames = null;
   if (pts.length) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); g.setAttribute('size', new THREE.Float32BufferAttribute(sz, 1)); g.setAttribute('phase', new THREE.Float32BufferAttribute(ph, 1));

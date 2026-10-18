@@ -100,6 +100,8 @@ installTextureMemory();   // on import: the engine and the menu import this firs
 
 // For code that copies a texture's pixels elsewhere (instance-cull.js texture arrays): the source's image, decoded again
 // from its file if it was released (the source itself is left as it is), or null if it can't be had.
+// a source with an image, or with a released one that can come back from its file
+export const hasImage = source => !!source && (!!(source.data && !(source.data instanceof ImageBitmap && !source.data.width)) || released.has(source));
 export async function imageOf(source) {
   const img = source?.data;
   if (img && !(img instanceof ImageBitmap && !img.width)) return img;

@@ -243,7 +243,7 @@ export default function setup(api){
 
   // ---- Camera feel ------------------------------------------------------------------------------
   let phase=0,dip=0,dipV=0,roll=0,wasGrounded=true,lastVy=0,bobBlend=0,fallTime=0,crouchOffset=0;
-  let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0,stairVel=0;
+  let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0,stairVel=0,nanOnce=false;
   const downRay=new THREE.Ray(new THREE.Vector3(),new THREE.Vector3(0,-1,0));
   function flatUnderfoot(){
     const col=api.world?.collision;if(!col?.raycastFirst)return false;
@@ -294,6 +294,12 @@ export default function setup(api){
     camera.position.y+=y+dip+crouchOffset+stairOffset;
     camera.position.x+=Math.cos(camera.rotation.y)*side;camera.position.z-=Math.sin(camera.rotation.y)*side;
     camera.rotation.z=roll+Math.cos(phase)*.004*bob*bobBlend;
+    // (2026-10-17) a non-finite value here poisons the camera for good (every later frame reads it back): report once
+    // what it was and start the feel over
+    if(!Number.isFinite(camera.rotation.z+camera.position.x+camera.position.y+camera.position.z)){
+      if(!nanOnce){nanOnce=true;console.error('[movement] non-finite camera feel',JSON.stringify({dt,speed,grounded,phase,bob,bobBlend,roll,dip,dipV,crouchOffset,stairOffset,stairVel,y,side,ry:camera.rotation.y,eye,jump,lastEye,feetY,lastFeetY,fallTime,lastVy,vel:v.toArray()}));}
+      phase=dip=dipV=roll=bobBlend=crouchOffset=stairOffset=stairVel=0;camera.rotation.z=0;   /* the controller resyncs the position next frame */
+    }
   });
 
   // ---- Dive sounds: weight on the launch and the landing --------------------------------------

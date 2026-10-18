@@ -396,7 +396,7 @@ function setupLook({ scene, world, session, host, camera }) {
   const [key, fill] = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
   // lamps carry extras.kind since map v=29 ('fire': candles, torches, fire pits, chandeliers; 'electric'): a fire's light
   // flickers and sits warmer; a bulb's is steady and paler
-  const lamps = [], fireAt = new Map(); world.root?.traverse(o => { if (/^CASTLE_LAMP_/.test(o.name)) { const p = o.getWorldPosition(new THREE.Vector3()); lamps.push(p); if (o.userData.kind !== 'electric') fireAt.set(p, Math.random() * 6.2832); } });
+  const lamps = [], fireAt = new Map(); world.root?.traverse(o => { if (/^CASTLE_LAMP_/.test(o.name)) { const p = o.getWorldPosition(new THREE.Vector3()); lamps.push(p); if (o.userData.kind !== 'electric') fireAt.set(p, Math.random() * 6.2832); if (!o.children.length) o.visible = false; } });   // (empty marker nodes hidden once read: the renderer walked 359 of them a frame)
   const pool = [];
   const resize = () => {
     const n = Math.min(poolSize(), lamps.length);
