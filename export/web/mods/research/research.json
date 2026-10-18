@@ -1272,7 +1272,7 @@
     {
      "name": "Resupply",
      "kind": "minor",
-     "desc": "The end-of-round refill gives your whole tactical slot back, not just one.",
+     "desc": "The round-start refill gives your whole tactical slot back, not just one.",
      "effects": {
       "dn.resupply": 1
      },

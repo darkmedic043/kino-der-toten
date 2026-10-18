@@ -41,7 +41,7 @@ The user (2026-10-18): "add one of the reaper perks, im thinking prismatic punch
 
 ### Dam-A-Nade (implemented)
 
-- **Base**: explosions (`cause` explosion / grenade) deal x1.5; you carry 5 lethals (one more than 4, filled when you drink it) and one more tactical (4 Monkey Bombs, Gersh Devices or QEDs); at each round's end your lethals refill and one tactical comes back; Max Ammo fills both to the bigger limits.
+- **Base**: explosions (`cause` explosion / grenade) deal x1.5; you carry 5 lethals (one more than 4, filled when you drink it) and one more tactical (4 Monkey Bombs, Gersh Devices or QEDs); when each round starts (the countdown ends; user, 2026-10-18: it was at the round's end) your lethals refill and one tactical comes back, and the round-end +2 grenades no longer cuts a 5- or 6-grenade belt back to 4; Max Ammo fills both to the bigger limits.
 - **Research track** (`dn.*`):
 
 | # | Augment | Kind | Effect |
@@ -52,7 +52,7 @@ The user (2026-10-18): "add one of the reaper perks, im thinking prismatic punch
 | 4 | Chain Reaction | Major | Explosive kills explode: 0.3 zh within 110 (cause `shrapnel`, so they don't chain or take the x1.5) |
 | 5 | Recycler | Minor | 8% of explosive kills give a grenade back |
 | 6 | Incendiary | Major | Explosives set the zombies they don't kill burning (4 s, 0.15 zh/s) |
-| 7 | Resupply | Minor | The round-end refill gives the whole tactical slot back, not one |
+| 7 | Resupply | Minor | The round-start refill gives the whole tactical slot back, not one |
 | 8 | Demolition Expert | Major | x2 explosive damage instead of x1.5 (the mod's upgrade) |
 
 - **Verified** (2026-10-18, a Kino match, GPU headless): both bought at the engine's perk path and drunk; Refraction wall 1.4x, a 400-damage bullet through it did 600 with Amplifier and grew it to 1.5x, a miss and a blocked bullet did nothing, 6 more hits maxed it, Supernova hit when it faded; explosions 1,000 → 1,500, bullets unchanged; Bandolier: 6 grenades after a round end and after Max Ammo, Monkey Bombs 1 → 2 at round end and 4 on Max Ammo; Chain Reaction hurt a zombie next to an explosive kill. Menu: page 6 / 8 show PERK UNLOCK tiles; Armory → Research lists both tracks. `test/reaper-pass.test.mjs`.

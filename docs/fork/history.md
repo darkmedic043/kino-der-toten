@@ -284,3 +284,4 @@
 - 2026-10-18: Der Wunderfizz costs the current perk price less 1,000 (was a flat 1,500); Perkaholic gives 6 random perks instead of every perk (waw-ports.md, gobblegums.md).
 - 2026-10-18: Prismatic Punch's wall cooldown 10 s -> 45 s (Quick Flash: 27 s) (reaper-perks.md).
 - 2026-10-18: Prismatic Punch's cooldown starts when the wall goes down, not when it rises (reaper-perks.md).
+- 2026-10-18: Dam-A-Nade's refill comes when a round starts, not when it ends; The Giant's vat water is see-through, so the Fly Trap's underwater bear can be seen (reaper-perks.md, waw-ports.md).

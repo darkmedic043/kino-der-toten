@@ -265,6 +265,10 @@ function setupEggs(api) {
 // has a fixed size: changing the number of lights recompiles every shader. Lamps are dim until the power is on.
 const POOL = 8, LAMP = { color: 0xffc58a, on: 2200, off: 700, range: 650, decay: 1.4 };
 function setupLook({ scene, world, session, host, camera }) {
+  // the vats' water (one of them hides the Fly Trap's Bowie-knife bear) came out of the export as an opaque grey sheet:
+  // see-through, tinted, and drawn after what's under it (user, 2026-10-18)
+  world.root?.traverse(o => { if (!o.isMesh) return; for (const m of [o.material].flat()) if (/t7_water_zm_der_vats/.test(m?.name ?? '')) {
+    Object.assign(m, { transparent: true, opacity: .32, depthWrite: false, roughness: .12, metalness: 0 }); m.color?.setHex(0x7fb0aa); m.needsUpdate = true; o.renderOrder = 2; } });
   const kids = scene.children;
   const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
   const dirs = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);

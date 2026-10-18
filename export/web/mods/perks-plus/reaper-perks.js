@@ -596,6 +596,8 @@ export function setupReaperPerks(api, catalogue, base) {
       downSnap = null;
     }
     if (tomb && (tomb.upgraded ? session.round > tomb.round && t > tomb.until : t > tomb.until)) { tomb.s.removeFromParent(); tomb = null; }
+    // Dam-A-Nade: the refill comes when a round starts (its countdown ends), not when the last one ends (user, 2026-10-18)
+    if (phase === 'fighting' && lastPhase === 'preparing' && has('damnade')) { session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(stat('dn.resupply') ? Infinity : 1); }
     // Nuka Cola: a co-op down
     if (phase === 'reviving' && lastPhase !== 'reviving' && lastPerks.has(S('nukacola'))) nukaGoesOff();
     // Winter's Wail charges come back with rounds (roundEnd); Moonshine's slides too
@@ -605,7 +607,6 @@ export function setupReaperPerks(api, catalogue, base) {
   });
   host.on('roundEnd', () => {
     slidesLeft = up('moonshine') ? 30 : 20; if (has('winterwail')) wails = Math.min(up('winterwail') ? 4 : 3, wails + 1);
-    if (has('damnade')) { session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(stat('dn.resupply') ? Infinity : 1); }
     if (has('crusade')) window.kino?.rocketShield?.heal?.(Infinity);
   });
   // Winter's Wail and Estatic Elixir react to being hit (after the shield and other savers)
@@ -665,7 +666,7 @@ export function setupReaperPerks(api, catalogue, base) {
     if (w.size >= 2 && !w.maxed) { w.maxed = true; if (stat('pp.afterglow')) w.until = Math.max(w.until, now() + stat('pp.afterglow')); sound('prismatic', 'punch_max_size', .6); }
   }
   // ---- Dam-A-Nade (switched on): explosives x1.5, one more lethal (5) and tactical, lethals refill and a tactical comes
-  //      back at each round's end (Max Ammo fills both). Augments (dn.*): damage, stun (s frozen), burn, shrapnel (explosive
+  //      back when each round starts (Max Ammo fills both). Augments (dn.*): damage, stun (s frozen), burn, shrapnel (explosive
   //      kills explode), lethal / tactical (+n carried), scav (explosive kills give a grenade back), resupply (full tactical).
   const nadeMax = () => 5 + stat('dn.lethal');
   const tacticalMax = () => 4 + stat('dn.tactical');   // 3 Monkey Bombs / Gersh / QED, +1
@@ -674,6 +675,8 @@ export function setupReaperPerks(api, catalogue, base) {
     if (t?.id) t.count = Math.min(tacticalMax(), (t.count ?? 0) + n);
     else if (session.monkeysOwned) session.monkeys = Math.min(tacticalMax(), (session.monkeys ?? 0) + n);
   }
+  { const next = session.nextRound?.bind(session);   // the round-end +2 grenades caps at 4: keep a Dam-A-Nade belt's 5th and 6th
+    if (next) session.nextRound = (...a) => { const before = session.grenades ?? 0, r = next(...a); if (has('damnade')) session.grenades = Math.max(session.grenades ?? 0, Math.min(before, nadeMax())); return r; }; }
   { const powerup = session.powerup?.bind(session);   // Max Ammo: the bigger belt and tactical slot, filled
     if (powerup) session.powerup = (type, ...rest) => { const r = powerup(type, ...rest); if (type === 'full_ammo' && has('damnade')) { session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(Infinity); } return r; }; }
 
