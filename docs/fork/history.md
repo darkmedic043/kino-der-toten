@@ -261,3 +261,4 @@
 - 2026-10-17: Der Eisendrache's eight terminal booths moved from the BO3 gum machine spots to the nearest flat walls, square to them (props.md).
 - 2026-10-17: Der Eisendrache clean-up: collision for the detailed props (decimated), boulder hulls, out-of-bounds recovery, snowfall with a roof map, flames on 376 fixtures, BO3-like sky and light, repeated props instanced and wall guns culled (waw-ports.md, performance.md).
 - 2026-10-17: Der Eisendrache lamp pool by graphics quality (4/6/10/16, in-view lamps first, fade before moving: no pop-in); spring chains skip hidden bodies and cache their ground rays (Bondrewd cost ~7 ms a frame in first person) (waw-ports.md, characters.md).
+- 2026-10-17: Melonopoly (~/projects/melonopoly, the user's Monopoly-style game for Rind) is published into git-ignored `export/web/melonopoly/` and uses the co-op rooms (`/api/ws`) for its P2P signalling and relay fallback.
