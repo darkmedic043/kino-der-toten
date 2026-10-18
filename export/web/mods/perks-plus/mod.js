@@ -12,13 +12,14 @@
 //     (Moon's session has the perk and its gas immunity natively, but no dive explosion).
 import * as THREE from 'three';
 import { BO7_PERKS, BO7_ICONS, setupBo7Perks } from './bo7-perks.js';
-import { setupReaperPerks } from './reaper-perks.js';
+import { setupReaperPerks, REAPER_ON } from './reaper-perks.js';
 export const MORE_PERKS = {
   specialty_longersprint: { name: 'Stamin-Up', price: 2000, color: '#ebbd4b', icon: 'S' },
   specialty_deadshot: { name: 'Deadshot Daiquiri', price: 1500, color: '#9da8ac', icon: 'DS' },
   specialty_additionalprimaryweapon: { name: 'Mule Kick', price: 4000, color: '#82a86c', icon: 'MK' },
   specialty_flakjacket: { name: 'PhD Flopper', price: 2000, color: '#be83da', icon: 'PhD' },
   ...BO7_PERKS,   // Vulture Aid, Widow's Wine, Wisp Tea, Death Perception, Elemental Pop, Melee Macchiato (bo7-perks.js)
+  ...REAPER_ON,   // the Reaper Collection perks that are switched on: Prismatic Punch, Dam-A-Nade (reaper-perks.js)
 };
 // their purchase stings: Moon's (BO1) recordings, played by the engine as audio.play(<perk id>)
 const STINGS = { specialty_longersprint: 'moon/audio/bce4d0477d3fb5e84e5d.ogg', specialty_deadshot: 'moon/audio/b08fede0bf04968b7f78.ogg',
@@ -41,7 +42,7 @@ export default function setup(api) {
   const { host, session, player, world, map, audio, mod, enemies, scene, perkInfo, camera, powerups, announce, toast } = api;
   addIcons(mod?.url ?? import.meta.url);
   phdFlopper({ host, session, player, world, audio, enemies, scene });
-  // the Reaper Collection perks: working but switched off (cheat console only; reaper-perks.js, docs/fork/reaper-perks.md)
+  // the Reaper Collection perks: working; all but REAPER_ON switched off (cheat console only; reaper-perks.js, docs/fork/reaper-perks.md)
   const base = new URL('./', mod?.url ?? import.meta.url);
   fetch(new URL('reaper-perks.json', base)).then(r => r.ok ? r.json() : null).then(j => { if (j?.perks) setupReaperPerks(api, j.perks, base); })
     .catch(e => console.warn('[perks-plus] reaper perks', e));

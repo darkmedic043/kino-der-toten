@@ -1,0 +1,5 @@
+{
+  "name": "Radio",
+  "description": "RADIO.EXE on the terminal booth: the maps' Easter-egg songs, unlocked by doing their eggs, with a player, a queue and a cooldown after each song.",
+  "script": "mod.js"
+}

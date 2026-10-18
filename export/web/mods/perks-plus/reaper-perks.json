@@ -144,7 +144,7 @@
    "specialty": "specialty_damnade",
    "origin": "custom",
    "new": true,
-   "status": "working, switched off",
+   "status": "implemented (Melon Pass unlock, research augments)",
    "effect": "Stronger explosives, one more lethal and tactical; at round end all lethals and 1 tactical refill",
    "upgrade": "Even stronger explosives",
    "source": {
@@ -654,7 +654,7 @@
    "specialty": "specialty_prismatic_punch",
    "origin": "custom",
    "new": true,
-   "status": "working, switched off",
+   "status": "implemented (Melon Pass unlock, research augments)",
    "effect": "Kills raise an energy wall that ricochets bullets toward zombies; shooting it grows it (extra ricochet at max)",
    "upgrade": "Bigger wall, longer at max, more stray ricochets",
    "source": {

@@ -455,6 +455,7 @@ export default async function setup(api){
         exfil:()=>window.kino.exfil?.status(),callExfil:()=>window.kino.exfil?.start()??'Exfil is not installed',
         stark:()=>window.kino.stark?.status(),starkAct:(a,id)=>window.kino.stark?.act(a,id)??'STARK.EXE is not installed',
         journal:()=>window.kino.journal?.status(),journalTrack:(m,q)=>q?window.kino.journal?.track(m,q):window.kino.journal?.untrack(),
+        radio:()=>window.kino.radio?.status(),radioAct:(a,x)=>window.kino.radio?.act(a,x)??'RADIO.EXE is not installed',
         armory:()=>window.kino.armory?.status(),armoryBuy:id=>window.kino.armory?.buy(id)??'ARMORY.EXE is not installed',
         bank:()=>window.kino.bank?.status(),bankAct:(a,n)=>window.kino.bank?.act(a,n)??'BANK.EXE is not installed',
         gums:()=>window.kino.gobblegums?.status(),gumRoll:()=>window.kino.gobblegums?.roll()??'Gobblegums are not installed',

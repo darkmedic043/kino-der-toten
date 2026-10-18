@@ -31,9 +31,9 @@ import { loadResearchConfig } from './mods/research/research.js';
 import { renderResearch } from './mods/research/pane.js';
 import { mountShop } from './mods/shop/shop-tab.js';
 import { mountPass, PASS_CSS } from './mods/pass/pass-tab.js';
-import { loadPass, loadSeason, tokens as passTokens } from './mods/pass/pass.js';
+import { loadPass, loadSeason, reconcile as reconcilePass, tokens as passTokens } from './mods/pass/pass.js';
 {const st=document.createElement('style');st.textContent=PASS_CSS;document.head.append(st);}
-let seasonCfg=null;loadSeason(new URL('mods/pass/',document.baseURI)).then(s=>{seasonCfg=s;try{renderProfile();}catch{}}).catch(()=>{});
+let seasonCfg=null;loadSeason(new URL('mods/pass/',document.baseURI)).then(async s=>{seasonCfg=s;await cloudReady;reconcilePass(s,loadPass());try{renderProfile();}catch{}}).catch(()=>{});   // reconcile: claimed slots whose reward was swapped
 addEventListener('kino-pass',()=>{try{renderProfile();}catch{}});
 let researchCfg=null;
 loadResearchConfig(new URL('mods/research/',document.baseURI)).then(c=>{researchCfg=c;drawResearch();}).catch(e=>console.warn('[research]',e));

@@ -3,6 +3,9 @@
 // who holds the perk, but nothing sells them yet. No machine, terminal, gobblegum or map gives them; only the cheat
 // console does (`reaper <id|all|list|none>`, `reaper up <id|all>` for the upgraded "double buy" version). They are in
 // the perk table (offSale) only so the HUD shows their icon while held.
+// Switched ON (REAPER_ON, user 2026-10-18): Prismatic Punch and Dam-A-Nade. The terminal's PERKS app sells them once
+// their Melon Pass reward is owned (page 6 / page 8), and their double-buy upgrade is replaced by an 8-augment research
+// track each (research.json, read here through kino.research.stat).
 // Catalogue (names, effects, upgrades, origin): reaper-perks.json; one section per perk with the numbers chosen here:
 // docs/fork/reaper-perks.md. The mod's scripts weren't decompiled, so every number here is ours, picked to fit the
 // sheet's text and this game's zombie health (zh = zombieHealth(round): 1045 at round 10, 3953 at 24).
@@ -10,6 +13,11 @@ import * as THREE from 'three';
 import { zombieHealth } from '../../rules.js';
 
 const UP = new THREE.Vector3(0, 40, 0);
+// the switched-on perks' perk table entries (perks-plus MORE_PERKS adds them; terminal: mods/terminal-booth/desktop.js PERKS)
+export const REAPER_ON = {
+  specialty_prismatic_punch: { name: 'Prismatic Punch', price: 3500, color: '#c89bff', icon: 'PP', reaper: 'prismatic' },
+  specialty_damnade: { name: 'Dam-A-Nade', price: 3000, color: '#8a9a4a', icon: 'DN', reaper: 'damnade' },
+};
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 export function setupReaperPerks(api, catalogue, base) {
@@ -36,6 +44,7 @@ export function setupReaperPerks(api, catalogue, base) {
   const fwd = () => camera.getWorldDirection(V()).setY(0).normalize();
   const sound = (id, kind, v = .8) => { const k = 'reaper/' + id + '/' + kind; if (audio?.manifest?.[k]) audio.play(k, v); };
   const sprinting = () => !!(api.view?.input?.sprint ?? player.input?.sprint);
+  const stat = k => window.kino?.research?.stat?.(k) ?? 0;   // research augments of the switched-on perks (only counts perks you hold)
 
   // ---- shared visuals -----------------------------------------------------------------------------------------------
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -292,8 +301,10 @@ export function setupReaperPerks(api, catalogue, base) {
   //      a 10 s personal Double Points.
   const fountains = []; let polosaDouble = 0;
   host.on('beforePoints', e => { if (polosaDouble > now() && e.amount > 0) e.amount *= 2; });
-  // ---- Prismatic Punch: kills (15%, 10 s cooldown) raise an energy wall for 10 s; a bullet through it ricochets into
-  //      the nearest zombie; each hit grows it (max x2, then 2 ricochets). Upgrade: starts bigger, 15 s at max.
+  // ---- Prismatic Punch (switched on): bullet kills (15%, 10 s cooldown) raise an energy wall for 10 s; a bullet through
+  //      it ricochets into the nearest zombie within 400; each hit grows it 10% (max x2, then 2 ricochets). Augments
+  //      (pp.*): size (starts bigger), cooldown, chance, damage, afterglow (s at max size), scatter (each ricochet jumps on
+  //      for that share of its damage), spectrum (chance of a random ammo mod), nova (a maxed wall bursts when it fades).
   const walls = []; let wallReady = 0;
   // ---- Who's Who: see whosWho (30 s to revive your body; upgraded, the body shoots and the clone keeps every gun).
 
@@ -302,7 +313,10 @@ export function setupReaperPerks(api, catalogue, base) {
   host.on('beforeEnemyDamage', e => {
     const z = e.enemy; if (!z) return; z.rpCause = e.cause;
     const bullet = e.cause === 'bullet' && !e.melee, expl = e.cause === 'explosion' || e.cause === 'grenade';
-    if (has('damnade') && expl) e.amount *= up('damnade') ? 2 : 1.5;
+    if (has('damnade') && expl) {   // Dam-A-Nade: x1.5 (+ Demolition Expert), Concussion freezes and Incendiary burns what lives
+      e.amount *= 1.5 + stat('dn.damage');
+      if (stat('dn.stun') || stat('dn.burn')) queueMicrotask(() => { if (!alive(z)) return; if (stat('dn.stun')) slow(z, stat('dn.stun'), 1, stat('dn.stun'), 0xffd27a); if (stat('dn.burn')) burn(z, 4, zh() * stat('dn.burn')); });
+    }
     if (e.melee) {
       if (has('crusade')) e.amount *= 2;
       if (has('razor')) { e.amount *= up('razor') ? 6 : 3; heal(10); queueMicrotask(() => { const f = fwd(); for (const o of [...enemies.list]) { if (o === z) continue; const v = o.root.position.clone().sub(feet()).setY(0); if (v.length() < 100 && v.normalize().dot(f) > .5) hurt(o, e.amount, 'melee'); } }); }
@@ -340,7 +354,11 @@ export function setupReaperPerks(api, catalogue, base) {
       if (Math.random() < .03) { const s = sprite(0xffd34f, 30); s.position.copy(at).y += 20; fountains.push({ at, until: t + 8, next: 0, s: keep(s, 8, (o, k) => { o.scale.setScalar(26 + Math.sin(now() * 8) * 6); }) }); }
       if (up('pointpolosa') && Math.random() < .04) { polosaDouble = t + 10; toast?.('Point Polosa · Double Points 10 s', 2); }
     }
-    if (has('prismatic') && t >= wallReady && Math.random() < .15 && z.rpCause === 'bullet') { wallReady = t + 10; raiseWall(at); }
+    if (has('prismatic') && t >= wallReady && Math.random() < .15 + stat('pp.chance') && z.rpCause === 'bullet') { wallReady = t + 10 * (1 - stat('pp.cooldown')); raiseWall(at); }
+    if (has('damnade') && (z.rpCause === 'explosion' || z.rpCause === 'grenade')) {
+      if (stat('dn.shrapnel')) queueMicrotask(() => { blast(at, 110, zh() * stat('dn.shrapnel'), 'shrapnel', z); fx(at.clone().add(V(0, 25, 0)), .35, 0xffb347); });   // 'shrapnel': doesn't chain
+      if (stat('dn.scav') && Math.random() < stat('dn.scav') && session.grenades < nadeMax()) { session.grenades++; toast?.('Dam-A-Nade · grenade recovered', 1); }
+    }
     if (has('magnet') && up('magnet') && Math.random() < .02) powerups?.spawn?.(MOCHA_POOL[Math.floor(Math.random() * 4)], at);
     if (has('timeslip') && up('timeslip')) { const op = window.kino?.operator; if (op?.current && !op.active && op.defs?.get(op.current)) op.addCharge(.5 / op.defs.get(op.current).kills); window.kino?.classes?.addCharge?.(.5); }
     if (has('tactiquilla')) { recentKills.push(t); while (recentKills.length && t - recentKills[0] > .5) recentKills.shift(); if (recentKills.length >= 2) pts((recentKills.length - 1) * (up('tactiquilla') ? 100 : 50)); }
@@ -481,8 +499,8 @@ export function setupReaperPerks(api, catalogue, base) {
     }
     // Change Chews: the element turns over when you fall below 40%
     if (has('changechews')) { const low = session.health < session.maxHealth * .4; if (low && !wasLow) { element = (element + 1) % 4; toast?.('Change Chews · ' + ELEMENTS[element][0], 1.5); } wasLow = low; }
-    // Dam-A-Nade: 5 grenades held
-    if (has('damnade') && !session.rpNade) { session.rpNade = true; session.grenades = Math.max(session.grenades ?? 0, 5); }
+    // Dam-A-Nade: a full belt of lethals when you drink it (5, 6 with Bandolier)
+    if (has('damnade') && !session.rpNade) { session.rpNade = true; session.grenades = Math.max(session.grenades ?? 0, nadeMax()); }
     // Dying Wish: the end
     if (dyingUntil && t >= dyingUntil) { dyingUntil = 0; sound('dyingwish', 'end'); if (up('dyingwish')) session.health = session.maxHealth; }
     // Electric Cherry
@@ -560,7 +578,9 @@ export function setupReaperPerks(api, catalogue, base) {
     // Point Polosa fountains
     for (let i = fountains.length - 1; i >= 0; i--) { const q = fountains[i]; if (t > q.until) { fountains.splice(i, 1); continue; } if (t > q.next && q.at.clone().setY(f.y).distanceTo(f) < 70) { q.next = t + .25; pts(10); } }
     // Prismatic Punch walls
-    for (let i = walls.length - 1; i >= 0; i--) { const w = walls[i]; if (t > w.until) { w.m.removeFromParent(); w.m.geometry.dispose(); w.m.material.dispose(); walls.splice(i, 1); continue; } w.m.material.opacity = .25 + Math.sin(t * 4) * .05; }
+    for (let i = walls.length - 1; i >= 0; i--) { const w = walls[i]; if (t > w.until) {
+      if (w.maxed && stat('pp.nova')) { blast(w.at, 250, zh() * stat('pp.nova'), 'energy'); fx(w.at, .9, 0xc89bff); ring(w.at.clone().setY(feet().y), 250, 0xd6a8ff); }   // Supernova
+      w.m.removeFromParent(); w.m.geometry.dispose(); w.m.material.dispose(); walls.splice(i, 1); continue; } w.m.material.opacity = .25 + Math.sin(t * 4) * .05; }
     // Who's Who: the body's clock (and, upgraded, its gun)
     if (ghost.body) { const b = ghost.body;
       if (up('whoswho') && t > b.fire) { const z = nearest(b.at, 700); if (z) { b.fire = t + .5; bolt(b.at.clone().add(V(0, 20, 0)), chest(z), 0xffe08a); hurt(z, zh() * .3, 'bullet'); } }
@@ -584,7 +604,7 @@ export function setupReaperPerks(api, catalogue, base) {
   });
   host.on('roundEnd', () => {
     slidesLeft = up('moonshine') ? 30 : 20; if (has('winterwail')) wails = Math.min(up('winterwail') ? 4 : 3, wails + 1);
-    if (has('damnade')) { session.grenades = 5; if (session.monkeysOwned) session.monkeys = Math.min((session.monkeys ?? 0) + 1, 4); }
+    if (has('damnade')) { session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(stat('dn.resupply') ? Infinity : 1); }
     if (has('crusade')) window.kino?.rocketShield?.heal?.(Infinity);
   });
   // Winter's Wail and Estatic Elixir react to being hit (after the shield and other savers)
@@ -616,18 +636,45 @@ export function setupReaperPerks(api, catalogue, base) {
     lures.push({ at: from.clone(), r: 700, until: now() + life }); player.setPosition(spot); ring(from, 80, 0x9fd8ff);
   }
   function raiseWall(at) {
-    const size = up('prismatic') ? 1.4 : 1, m = new THREE.Mesh(new THREE.PlaneGeometry(120, 100), new THREE.MeshBasicMaterial({ color: 0xc89bff, transparent: true, opacity: .28, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const size = 1 + stat('pp.size'), m = new THREE.Mesh(new THREE.PlaneGeometry(120, 100), new THREE.MeshBasicMaterial({ color: 0xc89bff, transparent: true, opacity: .28, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
     m.position.copy(at).y += 50; m.lookAt(camera.position.x, m.position.y, camera.position.z); m.scale.setScalar(size); scene.add(m);
-    const w = { m, at: m.position.clone(), until: now() + 10, size }; walls.push(w); sound('prismatic', 'punch_activate', .6);
-    const arm = () => world?.addShootTarget?.({ position: w.at, radius: 55 * w.size, hit(target, ray, point) {
-      if (!walls.includes(w)) return;
-      const n = w.size >= 2 ? 2 : 1, done = new Set();
-      for (let i = 0; i < n; i++) { const z = nearest(point ?? w.at, 400, done); if (!z) break; done.add(z); bolt((point ?? w.at).clone(), chest(z), 0xd6a8ff); hurt(z, session.def?.damage ?? 100, 'bullet'); }
-      w.size = Math.min(2, w.size + .1); w.m.scale.setScalar(w.size); if (w.size >= 2 && !w.maxed) { w.maxed = true; if (up('prismatic')) w.until = now() + 15; sound('prismatic', 'punch_max_size', .6); }
-      arm();
-    } });
-    arm();
+    walls.push({ m, at: m.position.clone(), until: now() + 10, size }); sound('prismatic', 'punch_activate', .6);
   }
+  // a bullet (the engine's per-pellet 'shot', so every map) that crosses a wall before it stopped ricochets off it
+  const plane = new THREE.Plane(), local = V(), hitAt = V();
+  host.on('shot', e => {
+    if (!walls.length || !has('prismatic') || !e?.origin || !e.direction) return;
+    const ray = new THREE.Ray(e.origin, e.direction);
+    for (const w of walls) {
+      w.m.updateMatrixWorld(); plane.setFromNormalAndCoplanarPoint(V(0, 0, 1).applyQuaternion(w.m.quaternion), w.at);
+      if (!ray.intersectPlane(plane, hitAt) || hitAt.distanceTo(e.origin) > e.distance) continue;
+      w.m.worldToLocal(local.copy(hitAt)); if (Math.abs(local.x) > 60 || Math.abs(local.y) > 50) continue;
+      ricochet(w, hitAt.clone(), e.def?.damage ?? session.def?.damage ?? 100);
+      break;
+    }
+  });
+  function ricochet(w, point, dmg) {
+    const n = w.size >= 2 ? 2 : 1, done = new Set(), k = 1 + stat('pp.damage');
+    for (let i = 0; i < n; i++) {
+      const z = nearest(point, 400, done); if (!z) break; done.add(z); bolt(point, chest(z), 0xd6a8ff); hurt(z, dmg * k, 'bullet');
+      if (stat('pp.spectrum') && Math.random() < stat('pp.spectrum') && alive(z)) { const A = window.kino?.ammoMods; if (A?.MODS?.length) { const id = A.MODS[Math.floor(Math.random() * A.MODS.length)].id; A.trigger(id, z, 1); host.emit('ammoModFired', { id, tier: 1, enemy: z, pop: true }); } }
+      if (stat('pp.scatter')) { const o = nearest(z.root.position, 220, done); if (o) { done.add(o); bolt(chest(z), chest(o), 0xb98cff); hurt(o, dmg * k * stat('pp.scatter'), 'bullet'); } }
+    }
+    w.size = Math.min(2, w.size + .1); w.m.scale.setScalar(w.size);
+    if (w.size >= 2 && !w.maxed) { w.maxed = true; if (stat('pp.afterglow')) w.until = Math.max(w.until, now() + stat('pp.afterglow')); sound('prismatic', 'punch_max_size', .6); }
+  }
+  // ---- Dam-A-Nade (switched on): explosives x1.5, one more lethal (5) and tactical, lethals refill and a tactical comes
+  //      back at each round's end (Max Ammo fills both). Augments (dn.*): damage, stun (s frozen), burn, shrapnel (explosive
+  //      kills explode), lethal / tactical (+n carried), scav (explosive kills give a grenade back), resupply (full tactical).
+  const nadeMax = () => 5 + stat('dn.lethal');
+  const tacticalMax = () => 4 + stat('dn.tactical');   // 3 Monkey Bombs / Gersh / QED, +1
+  function tacticalBack(n) {
+    const t = window.kino?.tactical;
+    if (t?.id) t.count = Math.min(tacticalMax(), (t.count ?? 0) + n);
+    else if (session.monkeysOwned) session.monkeys = Math.min(tacticalMax(), (session.monkeys ?? 0) + n);
+  }
+  { const powerup = session.powerup?.bind(session);   // Max Ammo: the bigger belt and tactical slot, filled
+    if (powerup) session.powerup = (type, ...rest) => { const r = powerup(type, ...rest); if (type === 'full_ammo' && has('damnade')) { session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(Infinity); } return r; }; }
 
   // ---- chips ------------------------------------------------------------------------------------------------------------
   chip(() => has('dyingwish') ? [dyingUntil > now() ? 'DYING WISH ' + Math.ceil(dyingUntil - now()) : now() < dyingReady ? 'DW ' + Math.ceil(dyingReady - now()) + 's' : 'DYING WISH', dyingUntil > now() || now() >= dyingReady] : null);
@@ -664,12 +711,12 @@ export function setupReaperPerks(api, catalogue, base) {
   // ---- the perk table (HUD only: offSale, nothing sells them) and the cheat console ---------------------------------------
   const table = api.map?.perkInfo ?? api.world?.perkInfo ?? api.perkInfo;   // what the HUD reads (Moon's own, custom maps', the engine's)
   const COLORS = { banana: '#f2d43a', bandolier: '#8a6a3a', blazephase: '#ff7a1a', bloodbullets: '#a01818', bloodwolf: '#c0202a', bull_ice: '#8fd6ff', cashback: '#3aa860',
-    changechews: '#d65fc4', crusade: '#c9a24a', damnade: '#6a7a3a', downers: '#5a4a8a', dyingwish: '#b01a1a', electriccherry: '#4fa8ff', estatic: '#7f9cff', razor: '#9fe8ff',
+    changechews: '#d65fc4', crusade: '#c9a24a', damnade: '#8a9a4a', downers: '#5a4a8a', dyingwish: '#b01a1a', electriccherry: '#4fa8ff', estatic: '#7f9cff', razor: '#9fe8ff',
     ffyl: '#e05a2a', icu: '#e8e8f0', inferno: '#ff5a1a', moonshine: '#8aa83a', magnet: '#e04a6a', mh_mocha: '#7a4a2a', momentum: '#3ad0a0', milk: '#f0f0e0', nitrogen: '#6ad0ff',
     nobear: '#a07a4a', nukacola: '#d02a2a', phdslider: '#b36cff', packbox: '#8a3ad0', pointcrusher: '#d0a02a', repairman: '#5a8a5a', spectorshot: '#7fe8d0', stronghold: '#8a9aa8',
     swarmscotch: '#7a6a2a', tactiquilla: '#c03a5a', timeslip: '#8a5ad0', tombstone: '#6a6a7a', victorious: '#3a8a3a', vigor: '#ffb43d', winterwail: '#9fd8ff', zombshell: '#7ab83a',
     bubbleblink: '#7fc8ff', guardianangel: '#fff2a8', pointpolosa: '#ffd34f', prismatic: '#c89bff', whoswho: '#4a7ab0' };
-  if (table) for (const [id, spec] of Object.entries(ids)) table[spec] ??= { name: catalogue[id].name, price: 0, color: COLORS[id] ?? '#888', icon: catalogue[id].name.split(/[\s-]+/).map(w => w[0]).join('').slice(0, 3).toUpperCase(), offSale: true, reaper: id };
+  if (table) for (const [id, spec] of Object.entries(ids)) table[spec] ??= REAPER_ON[spec] ? { ...REAPER_ON[spec] } : { name: catalogue[id].name, price: 0, color: COLORS[id] ?? '#888', icon: catalogue[id].name.split(/[\s-]+/).map(w => w[0]).join('').slice(0, 3).toUpperCase(), offSale: true, reaper: id };
   // HUD icons from the git-ignored build (reaper/icons/<id>.webp), only for files that exist
   (async () => {
     const rules = [];
@@ -683,6 +730,7 @@ export function setupReaperPerks(api, catalogue, base) {
     if (!j || !audio?.manifest) return;
     for (const [id, e] of Object.entries(j)) {
       for (const k of ['sting', 'jingle']) if (e[k]) audio.manifest['reaper/' + id + '/' + k] ??= { url: new URL('reaper/' + e[k], base).href };
+      if (e.sting && REAPER_ON[e.specialty]) audio.manifest[e.specialty] ??= { url: new URL('reaper/' + e.sting, base).href };   // the buy sting (engine: audio.play(<perk id>))
       for (const [k, u] of Object.entries(e.sounds ?? {})) audio.manifest['reaper/' + id + '/' + k] ??= { url: new URL('reaper/' + u, base).href };
     }
   }).catch(() => {});
@@ -699,5 +747,5 @@ export function setupReaperPerks(api, catalogue, base) {
       for (const id of list) give(id); session.health = session.maxHealth; return 'Perks: ' + list.map(id => catalogue[id].name).join(', ');
     } }); };
   addCheat();
-  window.kino.reaperPerks = { ids, has, up, upgraded, give, catalogue, get armour() { return armour; }, get momentum() { return momentum; }, get wolf() { return !!wolf; } };
+  window.kino.reaperPerks = { ids, has, up, upgraded, give, catalogue, raiseWall, walls, nadeMax, tacticalMax, get armour() { return armour; }, get momentum() { return momentum; }, get wolf() { return !!wolf; } };
 }

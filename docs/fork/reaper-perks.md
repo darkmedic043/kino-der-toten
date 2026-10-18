@@ -1,13 +1,61 @@
-# Reaper Collection perks (working, switched off)
+# Reaper Collection perks (2 implemented, 43 working but switched off)
 
-The user's requests (2026-10-18): first "add all 45 perks with their effects, but dont implement them, just keep them in the files while i figure out what i want to do, document each and every one of them", then "add the functions of all of them", answered "working, but switched off". So every effect below **works**, but **nothing sells the perks**: no machine, no terminal PERKS entry, no gobblegum or Easter egg gives them. Only the cheat console does:
+The user's requests (2026-10-18): first "add all 45 perks with their effects, but dont implement them, just keep them in the files while i figure out what i want to do, document each and every one of them", then "add the functions of all of them", answered "working, but switched off". So every effect below **works**, but **nothing sells the perks** (except the two in Implemented): no machine, no terminal PERKS entry, no gobblegum or Easter egg gives them. Only the cheat console does:
 
 - `reaper list` (held ones marked `*`, upgraded `**`), `reaper <id|name|all>`, `reaper up <id|all>` (the mod's upgraded "double buy" version), `reaper none`.
-- To switch one on for real later: add it to the terminal's `PERKS` list (`mods/terminal-booth/desktop.js`) and/or a machine marker alias, and give it a drink in perks-plus `data.json`.
+- **Implemented** (sold for real, see the next section): Prismatic Punch and Dam-A-Nade.
+- To switch one on for real later (as was done for those two): add it to the terminal's `PERKS` list (`mods/terminal-booth/desktop.js`) and/or a machine marker alias, and give it a drink in perks-plus `data.json`.
 
-Code: `export/web/mods/perks-plus/reaper-perks.js` (`setupReaperPerks`, started by perks-plus once `reaper-perks.json` loads; `window.kino.reaperPerks` {ids, has, up, upgraded, give, armour, momentum}). The perks are in the perk table with `offSale: true` only so the HUD shows them while held (icons from the git-ignored `reaper/icons/` when built, else letter badges). **zh** below = `zombieHealth(round)` (1045 at round 10, 3953 at 24): the mod's scripts weren't decompiled, so every number is ours. Perks with charges or timers show a chip above the perks (`#reaper-chips`).
+Code: `export/web/mods/perks-plus/reaper-perks.js` (`setupReaperPerks`, started by perks-plus once `reaper-perks.json` loads; `window.kino.reaperPerks` {ids, has, up, upgraded, give, armour, momentum, raiseWall, walls, nadeMax, tacticalMax}). The perks are in the perk table with `offSale: true` only so the HUD shows them while held (icons from the git-ignored `reaper/icons/` when built, else letter badges). **zh** below = `zombieHealth(round)` (1045 at round 10, 3953 at 24): the mod's scripts weren't decompiled, so every number is ours. Perks with charges or timers show a chip above the perks (`#reaper-chips`).
 
 Engine/mod hooks added for them: `session.damage` gets an outermost wrapper (installed on the first frame, so it also wraps the co-op mod's downs) for the lethal-hit perks and Stone Cold armour; `session.spend` (Cashback), `mysteryBox.start/take` (No Bear, Timeslip, Pack-A-Box), `powerups.onCollect` (Nuka, Mocha, Repairman's Carpenter), `world.setBoards` (Repairman), `enemies.lureTarget` (Bubble Blink, Zombshell), the player's speed getters (I.C.U., Momentum, Fighter's Fizz) are wrapped; engine.js fires while sprinting when the mod host's `sprintFire()` says so (Tactiquilla); the rocket shield takes `.perk` hooks and has `heal(n)`; the multiplayer mod multiplies the bleed-out by `kino.coopBleedMul()` and exposes `kino.coopDown`.
+
+## Implemented
+
+The user (2026-10-18): "add one of the reaper perks, im thinking prismatic punch looks the best, give it the augment system, and have it be unlocked in page 6 of the melon pass, replacing the crows calling card. also add dam-a-nade, same stuff with the augment system, can be unlocked in page 8 and replaces the harvest moon glow there… ignore their double buy effect, can probably be reused in the augment system". Done the way Widow's Wine was (pass.md):
+
+| Perk | Perk id | Unlock (Melon Pass Season 1) | Terminal | Drink |
+|---|---|---|---|---|
+| **Prismatic Punch** | `specialty_prismatic_punch` | page 6 (Night Shift) tier 9, premium: `pass.s1.perk.prismatic`, replaced the Crows calling card | PERKS app, 3,500 on the tile (the Cold War price ladder applies) | Quick Revive's bottle |
+| **Dam-A-Nade** | `specialty_damnade` | page 8 (Embers) tier 7, free: `pass.s1.perk.damnade`, replaced the Harvest Moon Glow | PERKS app, 3,000 on the tile | PhD Flopper's (Moon) bottle |
+
+- **Where**: `REAPER_ON` in `reaper-perks.js` (perk table entries; perks-plus adds them to `MORE_PERKS`), the terminal's `PERKS` with `unlock` (locked tile until the pass item is owned; the free-perk gums skip them until then), drinks in perks-plus `data.json` (tracked BO1 bottles, since the extracted BO3 bottles are git-ignored and rigged differently), HUD icons and Dam-A-Nade's sting from the git-ignored `reaper/` build (letter badges PP / DN without it). Pass thumbnails show the Reaper icon (`data.icon` a path under perks-plus/, `data.color` the glow).
+- **No double-buy**: their "upgraded" versions aren't sold; the cheat's `reaper up` no longer changes them. The two upgrades became Majors on their research tracks (Afterglow, Demolition Expert), and Prismatic's "bigger wall" is the Refraction Minor.
+- **Saves that already claimed the old rewards**: the pass remembers claims by slot, so `reconcile()` (pass.js, run by the main menu when the season loads) hands over the item of every claimed slot that isn't owned. Owners of the Crows card / Harvest Moon Glow keep the ids, but the items are gone from the catalogue, so they no longer show or apply (`cosmetics()` skips unknown items).
+
+### Prismatic Punch (implemented)
+
+- **Base**: 15% of bullet kills (10 s cooldown) raise a purple energy wall at the kill, facing you, for 10 s. A bullet that crosses it (the engine's per-pellet `shot` event, so every map; a bullet stopped by a zombie in front doesn't reach it) ricochets into the nearest zombie within 400 for the gun's damage, and the wall grows 10% per hit, up to double size, where it fires two ricochets. The mod's activate / max-size sounds.
+- **Research track** (`pp.*`, Minor/Major alternating):
+
+| # | Augment | Kind | Effect |
+|---|---|---|---|
+| 1 | Refraction | Minor | Walls start 40% bigger |
+| 2 | Afterglow | Major | At double size the wall stays up 15 s from then (the mod's upgrade) |
+| 3 | Quick Flash | Minor | Cooldown 10 s → 6 s |
+| 4 | Scatter Light | Major | Every ricochet bounces on to a second zombie within 220 for half its damage |
+| 5 | Prism Charge | Minor | 25% of bullet kills raise a wall (was 15%) |
+| 6 | Full Spectrum | Major | Ricochets have a 20% chance to set off a random ammo mod (and its augments) |
+| 7 | Amplifier | Minor | Ricochets +50% damage |
+| 8 | Supernova | Major | A wall that reached double size bursts when it fades: 0.6 zh within 250 |
+
+### Dam-A-Nade (implemented)
+
+- **Base**: explosions (`cause` explosion / grenade) deal x1.5; you carry 5 lethals (one more than 4, filled when you drink it) and one more tactical (4 Monkey Bombs, Gersh Devices or QEDs); at each round's end your lethals refill and one tactical comes back; Max Ammo fills both to the bigger limits.
+- **Research track** (`dn.*`):
+
+| # | Augment | Kind | Effect |
+|---|---|---|---|
+| 1 | Bandolier | Minor | One more lethal (6) |
+| 2 | Concussion | Major | Explosives freeze the zombies they don't kill for 2 s |
+| 3 | Extra Tactical | Minor | One more tactical (5) |
+| 4 | Chain Reaction | Major | Explosive kills explode: 0.3 zh within 110 (cause `shrapnel`, so they don't chain or take the x1.5) |
+| 5 | Recycler | Minor | 8% of explosive kills give a grenade back |
+| 6 | Incendiary | Major | Explosives set the zombies they don't kill burning (4 s, 0.15 zh/s) |
+| 7 | Resupply | Minor | The round-end refill gives the whole tactical slot back, not one |
+| 8 | Demolition Expert | Major | x2 explosive damage instead of x1.5 (the mod's upgrade) |
+
+- **Verified** (2026-10-18, a Kino match, GPU headless): both bought at the engine's perk path and drunk; Refraction wall 1.4x, a 400-damage bullet through it did 600 with Amplifier and grew it to 1.5x, a miss and a blocked bullet did nothing, 6 more hits maxed it, Supernova hit when it faded; explosions 1,000 → 1,500, bullets unchanged; Bandolier: 6 grenades after a round end and after Max Ammo, Monkey Bombs 1 → 2 at round end and 4 on Max Ammo; Chain Reaction hurt a zombie next to an explosive kill. Menu: page 6 / 8 show PERK UNLOCK tiles; Armory → Research lists both tracks. `test/reaper-pass.test.mjs`.
 
 ## Where things are
 
@@ -34,7 +82,7 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 | Cashback Cocktail | `cashback` | custom | 20% cash back on any purchase | bottle jingle |
 | Change Chews | `changechews` | Infinite Warfare | Headshots can trigger one of 4 elemental explosions | bottle jingle |
 | Crusader's Ale | `crusade` | custom (MadGaz) | Double melee points, more knife damage, the shield repairs itself between rounds | bottle jingle |
-| Dam-A-Nade | `damnade` | custom | Stronger explosives, one more lethal and tactical | bottle jingle |
+| **Dam-A-Nade** (implemented) | `damnade` | custom | Stronger explosives, one more lethal and tactical | bottle jingle |
 | Downer's Delight | `downers` | custom | Double bleed-out time | bottle jingle |
 | Dying Wish | `dyingwish` | Black Ops 4 | Negates death for 9 s on 1 health (5 min cooldown) | bottle  |
 | Electric Cherry | `electriccherry` | Black Ops II | Reloading releases an electric burst | bottle  |
@@ -56,7 +104,7 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 | PhD Flopper (Cold War) | `phdslider` | Black Ops Cold War | Sliding into zombies explodes | bottle jingle |
 | Point Crusher | `pointcrusher` | custom | Can earn extra points per kill | bottle  |
 | Point Polosa | `pointpolosa` | custom | Rarely, killed zombies become point fountains | -  |
-| Prismatic Punch | `prismatic` | custom | Kills raise an energy wall that ricochets bullets toward zombies | bottle  |
+| **Prismatic Punch** (implemented) | `prismatic` | custom | Kills raise an energy wall that ricochets bullets toward zombies | bottle  |
 | Repairman Rum | `repairman` | custom | Instant window repairs, double repair points | bottle jingle |
 | Spectre Shot | `spectorshot` | custom | Switching weapons near 10+ zombies summons a spectral copy of the last gun that auto-fires | bottle jingle |
 | Stone Cold Stronghold | `stronghold` | Black Ops 4 | Standing still forms a ring that builds armour over time | bottle  |
@@ -168,7 +216,7 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 - **Effect**: Stronger explosives, one more lethal and tactical; at round end all lethals and 1 tactical refill.
 - **Upgrade** (the mod's double-buy): Even stronger explosives.
 - **Assets**: machine `cz_zombie_vending_damnade`, bottle, icon, jingle + sting.
-- **As built**: Explosion damage x1.5 (x2 upgraded); you hold 5 grenades (one more than the usual 4) and they're refilled to 5 at each round's end, plus one Monkey Bomb if you own them (max 4).
+- **As built**: **implemented** (2026-10-18): see "Dam-A-Nade (implemented)" above; the upgrade is the Demolition Expert augment.
 - **Implementation notes (before building)**: Grenade damage up (`beforeEnemyDamage` cause 'explosion' from the player's grenades), +1 lethal and +1 tactical capacity (the throwables mod / `session` grenade counts), refill all lethals and one tactical on `roundEnd`. Upgrade: more damage.
 
 ### Downer's Delight (`downers`)
@@ -366,7 +414,7 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 - **Effect**: Kills raise an energy wall that ricochets bullets toward zombies; shooting it grows it (extra ricochet at max).
 - **Upgrade** (the mod's double-buy): Bigger wall, longer at max, more stray ricochets.
 - **Assets**: machine `cz_zombie_vending_prismatic_punch`, bottle, icon, **no jingle**.
-- **As built**: 15% of bullet kills (10 s cooldown) raise a purple energy wall facing you for 10 s, a `world.addShootTarget`: a bullet through it ricochets into the nearest zombie within 400 for the gun's damage, and each hit grows the wall 10% (up to 2x, then two ricochets). Upgraded: it starts 1.4x and lasts 15 s once at max. The mod's activate/max sounds. Not done: stray misses ricocheting.
+- **As built**: **implemented** (2026-10-18): see "Prismatic Punch (implemented)" above. The wall now reacts to the engine's `shot` event (it was a `world.addShootTarget`, which only custom maps have); the upgrade is split into the Refraction and Afterglow augments.
 - **Implementation notes (before building)**: Kills raise an energy wall (a translucent plane) for a while; bullets passing through it ricochet to a nearby zombie (a second `rayHit` from the wall); shooting the wall grows it, and at max size it adds a ricochet. Upgrade: bigger wall, longer at max, stray shots ricochet more. Bigger job (ray vs wall test in the shot path). The mod's activate/max-size/ricochet sounds are exported.
 
 ### Repairman Rum (`repairman`)

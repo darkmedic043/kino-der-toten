@@ -12,6 +12,8 @@
 //   opts.gumRoll() -> {id, commit()} | 'reason' (commit puts it in your hand once the reel stops).
 // BANK.EXE (mods/bank, above EXFIL): TranZit's bank. The vault opens at account Prestige Master (the prestige after X),
 //   then deposit (1,100 per 1,000 banked) and withdraw across matches; opts.bank() -> status, opts.bankAct(action, amount).
+// RADIO.EXE (mods/radio, above JOURNAL): the maps' Easter-egg songs once their eggs are done; a player, a queue, a
+//   cooldown after each song; opts.radio() -> status, opts.radioAct(action, arg).
 // ARMORY.EXE (mods/armory, above BANK): tabs of special gear bought off its home map (operator weapons, shields,
 //   scorestreaks later); opts.armory() -> status, opts.armoryBuy(id) -> true | 'reason'.
 // JOURNAL.EXE (mods/journal, top of the right column): every map's Easter eggs step by step, recorded once done;
@@ -25,8 +27,8 @@
 
 import { keepScroll } from '../../keep-scroll.js';
 
-const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
-// perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine: a Melon Pass reward);
+const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href, REAPER = new URL('../perks-plus/reaper/icons/', import.meta.url).href;
+// perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine, Prismatic Punch, Dam-A-Nade: Melon Pass rewards);
 // the terminal and the free-perk gums both check this
 export const perkUnlocked = p => { if (!p.unlock) return true; try { return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned ?? []).includes(p.unlock); } catch { return false; } };
 // Every perk in the game. Double-Dew (Cheese Cube) is left out for now, at the user's request.
@@ -76,6 +78,13 @@ export const PERKS = [
   { id: 'specialty_meleemacchiato', name: 'Melee Macchiato', price: 3000, color: '#8b5a2b', badge: 'MM', icon: OWN + 'meleemacchiato.webp',
     blurb: 'One punch.',
     effects: ['Your melee one-shots zombies through round 20 (2,700 damage after)', 'Punched zombies are thrown back'] },
+  // Reaper Collection perks switched on (mods/perks-plus/reaper-perks.js); Melon Pass unlocks, augments in Armory -> Research
+  { id: 'specialty_prismatic_punch', name: 'Prismatic Punch', price: 3500, color: '#c89bff', badge: 'PP', icon: REAPER + 'prismatic.webp', unlock: 'pass.s1.perk.prismatic',
+    blurb: 'Bend the light. Bend the bullets.',
+    effects: ['Bullet kills sometimes (15%) raise an energy wall facing you for 10 s (10 s cooldown)', 'Shots through the wall ricochet into the nearest zombie for the gun\'s damage', 'Every hit grows the wall; at double size it fires two ricochets'] },
+  { id: 'specialty_damnade', name: 'Dam-A-Nade', price: 3000, color: '#8a9a4a', badge: 'DN', icon: REAPER + 'damnade.webp', unlock: 'pass.s1.perk.damnade',
+    blurb: 'More boom, more often.',
+    effects: ['Explosives deal 50% more damage', 'Carry one more lethal (5 grenades) and one more tactical', 'At the end of every round your lethals refill and you get one tactical back'] },
 ];
 
 const CSS = `
@@ -228,6 +237,24 @@ const CSS = `
 #melonterm .gum .swap{display:flex;flex-direction:column;gap:6px}#melonterm .gum .swap button{display:flex;align-items:center;gap:10px;padding:6px 10px;background:none;border:2px solid var(--c,var(--line));color:inherit;font:inherit;font-size:20px;text-align:left;cursor:pointer}#melonterm .gum .swap button:hover{background:#ffffff14}#melonterm .gum .swap .ball{width:24px;height:24px;flex:none}
 #melonterm .gum .won{font-size:30px;text-shadow:0 0 10px var(--c)}
 #melonterm .gum .hand{display:flex;gap:8px}#melonterm .gum .hand .ball{width:34px;height:34px}#melonterm .gum .hand .empty{width:34px;height:34px;border-radius:50%;border:2px dashed var(--dim)}
+#melonterm .rad{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);font-size:22px;line-height:1.2}
+#melonterm .rad .deck{padding:16px 22px;border-right:2px dashed var(--line);display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto}
+#melonterm .rad .np .lbl{font-size:18px;color:var(--g2);letter-spacing:2px}#melonterm .rad .np h2{margin:0;font:inherit;font-size:36px;line-height:1;letter-spacing:2px;color:var(--warn);text-shadow:0 0 8px #ffb00088}
+#melonterm .rad .np .by{font-size:18px;color:var(--g2)}
+#melonterm .rad .seek{height:16px;border:2px solid var(--g2);cursor:pointer;margin-top:6px}#melonterm .rad .seek i{display:block;height:100%;width:0;background:var(--g)}
+#melonterm .rad .times{display:flex;justify-content:space-between;font-size:18px;color:var(--g2)}
+#melonterm .rad .ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}#melonterm .rad .ctl .buy{font-size:21px;padding:0 10px}
+#melonterm .rad .vl{display:flex;align-items:center;gap:6px;font-size:18px}#melonterm .rad .vol{width:110px;accent-color:#7dffa6}
+#melonterm .rad h3{margin:6px 0 0;font:inherit;font-size:20px;letter-spacing:2px;color:var(--g2)}
+#melonterm .rad ol{margin:0;padding-left:28px;font-size:20px}#melonterm .rad ol li{display:flex;gap:6px;align-items:center}#melonterm .rad ol .t{flex:1}
+#melonterm .rad ol button{font:inherit;font-size:16px;background:transparent;color:var(--g);border:1px solid var(--g2);cursor:pointer;padding:0 6px}#melonterm .rad ol button:disabled{color:var(--dim);border-color:var(--dim);cursor:default}
+#melonterm .rad .lib{padding:16px 22px;overflow:auto;min-height:0;display:flex;flex-direction:column;gap:8px}
+#melonterm .rad .song{display:flex;gap:8px;align-items:center;border:2px solid var(--line);padding:6px 10px}#melonterm .rad .song.ready{border-color:var(--g2)}
+#melonterm .rad .song .info{flex:1;display:flex;flex-direction:column}#melonterm .rad .song small{font-size:17px;color:var(--g2)}#melonterm .rad .song.locked{opacity:.6}
+#melonterm .rad .song .buy{font-size:19px;padding:0 8px}
+#melonterm .rad .tag{font-size:16px;color:var(--g2)}#melonterm .rad .tag.on{color:var(--g)}#melonterm .rad .tag.lock{color:var(--dim)}
+#melonterm .rad .note{font-size:17px;color:var(--g2);opacity:.85}
+@media(max-width:760px){#melonterm .rad{grid-template-columns:1fr;grid-template-rows:auto 1fr}#melonterm .rad .deck{border-right:0;border-bottom:2px dashed var(--line)}}
 @media(max-width:760px){#melonterm .gum{grid-template-columns:1fr;grid-template-rows:auto 1fr}#melonterm .reelbox{border-right:0;border-bottom:2px dashed var(--line)}}
 @media(max-width:760px){#melonterm .crt{width:96vw;height:92vh}#melonterm .win{inset:8px}#melonterm .perks{grid-template-columns:1fr;grid-template-rows:auto 1fr}#melonterm .left{border-right:0;border-bottom:2px dashed var(--line)}
   #melonterm .grid{grid-template-columns:repeat(4,minmax(0,1fr));padding:10px;gap:8px}#melonterm .tile{padding:6px}#melonterm .tile .tag{display:none}
@@ -255,6 +282,10 @@ const BANK_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-renderi
 const ARMORY_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <path d="M16 3 6 7v8c0 7 4 11 10 14 6-3 10-7 10-14V7z" fill="none" stroke="#7dffa6" stroke-width="2"/>
   <rect x="15" y="9" width="2" height="14"/><rect x="11" y="13" width="10" height="2"/><rect x="13" y="20" width="6" height="2" fill="#c9ffd9"/></svg>`;
+const RADIO_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
+  <rect x="21" y="2" width="2" height="9"/><rect x="3" y="10" width="26" height="18" fill="none" stroke="#7dffa6" stroke-width="2"/>
+  <circle cx="11" cy="19" r="5" fill="none" stroke="#7dffa6" stroke-width="2"/><circle cx="11" cy="19" r="1.5" fill="#c9ffd9"/>
+  <rect x="19" y="14" width="7" height="2"/><rect x="19" y="18" width="7" height="2"/><rect x="19" y="22" width="4" height="2" fill="#ffd36b"/></svg>`;
 const JOURNAL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <path d="M6 4h17l3 3v21H6z" fill="none" stroke="#7dffa6" stroke-width="2"/><rect x="9" y="4" width="2" height="24"/>
   <rect x="14" y="10" width="9" height="2"/><rect x="14" y="15" width="9" height="2"/><rect x="14" y="20" width="6" height="2"/><path d="M21 24l3-3 3 3-3 3z" fill="#ffd36b"/></svg>`;
@@ -287,6 +318,7 @@ function build() {
         <button class="app" data-app="arsenal"><div class="sq">${ARSENAL_ICON}</div><span>ARSENAL</span></button>
         <button class="app" data-app="stark"><div class="sq">${STARK_ICON}</div><span>STARK</span></button>
         <button class="app" data-app="gums"><div class="sq">${GUMS_ICON}</div><span>GUMS</span></button>
+        <button class="app" data-app="radio"><div class="sq">${RADIO_ICON}</div><span>RADIO</span></button>
         <button class="app" data-app="journal"><div class="sq">${JOURNAL_ICON}</div><span>JOURNAL</span></button>
         <button class="app" data-app="armory"><div class="sq">${ARMORY_ICON}</div><span>ARMORY</span></button>
         <button class="app off" data-app="bank"><div class="sq">${BANK_ICON}</div><span>BANK</span></button>
@@ -310,6 +342,17 @@ function build() {
       <div class="win" data-win="journal" hidden>
         <div class="title"><span>JOURNAL.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="jnl"></div>
+      </div>
+      <div class="win" data-win="radio" hidden>
+        <div class="title"><span>RADIO.EXE · MELON FM</span><span class="grow"></span><button data-close title="Close">×</button></div>
+        <div class="rad"><div class="deck">
+          <div class="np"></div>
+          <div class="seek" title="Click to seek"><i></i></div><div class="times"><span class="t0">0:00</span><span class="t1">0:00</span></div>
+          <div class="ctl"><button class="buy" data-r="toggle">PLAY</button><button class="buy" data-r="skip">SKIP</button><button class="buy" data-r="stop">STOP</button>
+            <label class="vl">VOL <input type="range" min="0" max="1" step="0.05" class="vol"></label></div>
+          <div class="msg"></div>
+          <h3>UP NEXT</h3><div class="q"></div>
+        </div><div class="lib"></div></div>
       </div>
       <div class="win" data-win="armory" hidden>
         <div class="title"><span>ARMORY.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
@@ -335,6 +378,7 @@ function build() {
   const grid = $('.grid'), detail = $('.detail'), msg = $('.msg');
   let exState = '';
   const jnWin = $('[data-win=journal]'), jnBody = $('.jnl'); let jnState = '', jnMap = null, jnQuest = null, jnMsg = '';
+  const rdWin = $('[data-win=radio]'), rdLib = $('.rad .lib'), rdQ = $('.rad .q'), rdNp = $('.rad .np'), rdVol = $('.rad .vol'); let rdState = '', rdMsg = ['', ''];
   const amWin = $('[data-win=armory]'), amBody = $('.arm'); let amState = '', amMsg = ['', ''], amTab = 'operators', amShown = 0;
   const bkWin = $('[data-win=bank]'), bkBody = $('.bnk'), bkIcon = $('[data-app=bank]'); let bkState = '', bkMsg = ['', ''];
   let opts = null, shown = 0, clock = 0, lastState = '';
@@ -345,7 +389,8 @@ function build() {
   for (const t of ['click', 'mousedown', 'mouseup', 'pointerdown', 'wheel', 'contextmenu']) root.addEventListener(t, e => e.stopPropagation());
 
   function key(e) {
-    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden) closeApp(); else close(); return; }
+    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden || !rdWin.hidden) closeApp(); else close(); return; }
+    if (!rdWin.hidden) { if (e.code === 'Space') { e.preventDefault(); radioDo('toggle'); } return; }
     if (!gmWin.hidden) { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); gumRoll(); } return; }
     if (!arWin.hidden || !stWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden) return;
     if (!exWin.hidden) { if (e.code === 'Enter') { e.preventDefault(); callExfil(); } return; }
@@ -395,7 +440,8 @@ function build() {
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
   }
   function openApp(name) {
-    bkWin.hidden = amWin.hidden = jnWin.hidden = true;
+    bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = true;
+    if (name === 'radio') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; rdState = ''; rdMsg = ['', '']; rdWin.hidden = false; drawRadio(); $('.open').textContent = '[RADIO.EXE]'; opts.onApp?.(name); return; }
     if (name === 'journal') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; jnState = ''; jnMsg = ''; jnWin.hidden = false; drawJournal(); $('.open').textContent = '[JOURNAL.EXE]'; opts.onApp?.(name); return; }
     if (name === 'armory') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; amState = ''; amMsg = ['', '']; amWin.hidden = false; drawArmory(); $('.open').textContent = '[ARMORY.EXE]'; opts.onApp?.(name); return; }
     if (name === 'bank') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; bkState = ''; bkMsg = ['', '']; bkWin.hidden = false; drawBank(); $('.open').textContent = '[BANK.EXE]'; opts.onApp?.(name); return; }
@@ -409,7 +455,7 @@ function build() {
     say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
     opts.onApp?.(name); grid.querySelector(`[data-i="${shown}"]`)?.focus({ preventScroll: true });
   }
-  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = jnWin.hidden = true; $('.open').textContent = ''; }
+  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = true; $('.open').textContent = ''; }
   // ---- STARK.EXE: the Iron Man armors (mods/stark) ---------------------------------------------------------------
   const MARK = { mk1: 'I', mk3: 'III', mk4: 'IV', mk5: 'V', mk6: 'VI', wm: 'WM', mk16: 'XVI' };
   function starkDo(action, id) {
@@ -622,6 +668,46 @@ function build() {
     }
     for (const b of amBody.querySelectorAll('[data-tab]')) b.addEventListener('click', () => { amTab = b.dataset.tab; amShown = 0; amMsg = ['', '']; drawArmory(); });
   }
+  // ---- RADIO.EXE: the Easter-egg songs (mods/radio). The deck (progress, buttons, volume) updates in place every tick;
+  // the song list and the queue redraw when they change ------------------------------------------------------------
+  const mmss = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+  function radioDo(action, arg) {
+    const r = opts?.radioAct?.(action, arg) ?? 'RADIO.EXE is not installed';
+    rdMsg = r === true ? [{ play: 'NOW PLAYING', queue: 'ADDED TO THE QUEUE', skip: 'SKIPPED', stop: 'RADIO OFF' }[action] ?? '', 'ok'] : [String(r).toUpperCase(), 'bad'];
+    rdState = ''; drawRadio();
+  }
+  function drawRadio() {
+    if (rdWin.hidden) return;
+    const st = opts?.radio?.(); if (!st) { rdLib.innerHTML = '<p>RADIO.EXE is not installed.</p>'; return; }
+    const n = st.now;
+    rdWin.querySelector('.seek i').style.width = n?.dur ? Math.min(100, n.pos / n.dur * 100) + '%' : '0';
+    rdWin.querySelector('.t0').textContent = mmss(n?.pos ?? 0); rdWin.querySelector('.t1').textContent = mmss(n?.dur ?? 0);
+    const tg = rdWin.querySelector('[data-r=toggle]'); tg.textContent = n && !n.paused ? 'PAUSE' : 'PLAY'; tg.disabled = !n && !st.queue.length;
+    rdWin.querySelector('[data-r=skip]').disabled = rdWin.querySelector('[data-r=stop]').disabled = !n;
+    if (document.activeElement !== rdVol) rdVol.value = st.volume;
+    const key = JSON.stringify([st.songs, st.queue, n && [n.id, n.paused], rdMsg]); if (key === rdState) return; rdState = key;
+    rdNp.innerHTML = n ? `<div class="lbl">${n.paused ? 'PAUSED' : 'NOW PLAYING'}</div><h2>${esc(n.title.toUpperCase())}</h2><div class="by">${esc(n.artist)} · ${esc(n.mapName.toUpperCase())}</div>`
+      : `<div class="lbl">RADIO OFF</div><h2>MELON FM</h2><div class="by">${st.unlocked ? 'PICK A SONG ON THE RIGHT' : 'NO SONGS YET · DO A MAP\'S MUSICAL EASTER EGG'}</div>`;
+    const m = rdWin.querySelector('.rad .msg'); m.textContent = rdMsg[0]; m.className = 'msg ' + rdMsg[1];
+    rdQ.innerHTML = st.queue.length ? `<ol>${st.queue.map((q, i) => `<li><span class="t">${esc(q.title.toUpperCase())}</span><button data-up="${i}" title="Move up" ${i ? '' : 'disabled'}>UP</button><button data-un="${i}" title="Remove">×</button></li>`).join('')}</ol>`
+      : '<div class="note">THE QUEUE IS EMPTY · + QUEUE A SONG</div>';
+    const tag = s => s.state === 'locked' ? '<span class="tag lock">LOCKED</span>'
+      : s.state === 'map' ? '<span class="tag warn">ON THIS MAP · DO ITS EGG THIS GAME</span>'
+      : s.state === 'cooldown' ? `<span class="tag">RESTING ${mmss(s.cooldown)}</span>`
+      : s.playing ? '<span class="tag on">ON AIR</span>' : s.queued ? '<span class="tag on">QUEUED</span>' : '';
+    const can = s => s.state === 'ready' && !s.playing && !s.queued;
+    keepScroll(rdLib).innerHTML = `<h3>SONGS · ${st.unlocked}/${st.total} FOUND</h3>` + st.songs.map(s => `<div class="song ${s.state}">
+        <div class="info"><b>${s.state === 'locked' ? '? ? ?' : esc(s.title.toUpperCase())}</b><small>${s.state === 'locked' ? 'A MUSICAL EASTER EGG' : esc(s.artist)} · ${esc(s.mapName.toUpperCase())}</small>${tag(s)}</div>
+        ${s.state === 'locked' ? '' : `<button class="buy" data-play="${s.id}" ${can(s) ? '' : 'disabled'}>PLAY</button><button class="buy" data-queue="${s.id}" ${can(s) ? '' : 'disabled'}>+ QUEUE</button>`}</div>`).join('')
+      + `<div class="note">* A SONG RESTS ${Math.round(st.cooldownSecs / 60)} MINUTES AFTER IT ENDS. A SONG FROM THE MAP YOU'RE ON PLAYS ONCE ITS EGG IS DONE THIS GAME.</div>`;
+    for (const b of rdLib.querySelectorAll('[data-play]')) b.addEventListener('click', () => radioDo('play', b.dataset.play));
+    for (const b of rdLib.querySelectorAll('[data-queue]')) b.addEventListener('click', () => radioDo('queue', b.dataset.queue));
+    for (const b of rdQ.querySelectorAll('[data-up]')) b.addEventListener('click', () => radioDo('up', +b.dataset.up));
+    for (const b of rdQ.querySelectorAll('[data-un]')) b.addEventListener('click', () => radioDo('unqueue', +b.dataset.un));
+  }
+  for (const b of rdWin.querySelectorAll('[data-r]')) b.addEventListener('click', () => radioDo(b.dataset.r));
+  rdWin.querySelector('.seek').addEventListener('click', e => { const r = e.currentTarget.getBoundingClientRect(); radioDo('seek', (e.clientX - r.left) / r.width); });
+  rdVol.addEventListener('input', () => opts?.radioAct?.('volume', +rdVol.value));
   // ---- BANK.EXE: TranZit's bank (mods/bank). Locked: the road to Prestige Master; open: deposit / withdraw ----------
   const pts = n => n.toLocaleString();
   function bankDo(action, amount) {
@@ -698,7 +784,7 @@ function build() {
     const state = PERKS.map(p => blocked(p)).join() + opts.points();
     if (!win.hidden && state !== lastState) { renderGrid(); select(shown); }
     lastState = state;
-    drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory(); drawJournal();
+    drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory(); drawJournal(); drawRadio();
     $('[data-app=stark]').classList.toggle('off', !opts.stark?.()?.unlocked);
     $('.exlive').hidden = !exIcon.classList.contains('live');
   }
@@ -718,7 +804,7 @@ function build() {
   const desk = $('.desk'), appsEl = $('.apps'), cellsEl = $('.cells'), apps = [...appsEl.querySelectorAll('.app')];
   const PAD = 20, ICON_W = 96, ICON_H = 110, MIN_W = 108, MIN_H = 112, STORE = 'kino.mods.terminal';
   // default: shop apps down the left column, map apps up the right column (negative = from the far edge)
-  const HOME = { perks: [0, 0], arsenal: [0, 1], stark: [0, 2], gums: [0, 3], journal: [-1, -4], armory: [-1, -3], bank: [-1, -2], exfil: [-1, -1] };
+  const HOME = { perks: [0, 0], arsenal: [0, 1], stark: [0, 2], gums: [0, 3], journal: [-1, -4], armory: [-1, -3], bank: [-1, -2], exfil: [-1, -1], radio: [-1, -5] };
   let home = { cols: 1, rows: 1, cw: MIN_W, ch: MIN_H, key: '' }, cells = {}, drag = null, swallowClick = false;
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) ?? {}; } catch { return {}; } };
   const save = layout => { try { const d = load(); d.layout = { ...(d.layout ?? {}), [home.key]: layout }; localStorage.setItem(STORE, JSON.stringify(d)); } catch {} };

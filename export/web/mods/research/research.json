@@ -1,5 +1,5 @@
 {
- "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Mule Kick and Shatter Blast aren't in BO7, so theirs are the fork's). Every perk and ammo mod has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle.",
+ "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Mule Kick and Shatter Blast aren't in BO7, so theirs are the fork's). Every perk and ammo mod has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) have the fork's own tracks; their mod's double-buy upgrades are two of the Majors (Afterglow, Demolition Expert).",
  "unlockLevel": 11,
  "trackCost": [6000, 9000, 12000, 15000, 18000, 24000, 30000, 36000],
  "xp": {
@@ -1126,6 +1126,166 @@
       "mm.maul": 1
      },
      "id": "p.meleemacchiato.mochamaul"
+    }
+   ]
+  },
+  {
+   "id": "specialty_prismatic_punch",
+   "name": "Prismatic Punch",
+   "kind": "perk",
+   "color": "#c89bff",
+   "augments": [
+    {
+     "name": "Refraction",
+     "kind": "minor",
+     "desc": "Walls start 40% bigger (and reach double size sooner).",
+     "effects": {
+      "pp.size": 0.4
+     },
+     "id": "p.prismatic.refraction"
+    },
+    {
+     "name": "Afterglow",
+     "kind": "major",
+     "desc": "A wall that reaches double size stays up for 15 s from then (the mod's double-buy upgrade).",
+     "effects": {
+      "pp.afterglow": 15
+     },
+     "id": "p.prismatic.afterglow"
+    },
+    {
+     "name": "Quick Flash",
+     "kind": "minor",
+     "desc": "A new wall can rise 40% sooner after the last (10 s -> 6 s).",
+     "effects": {
+      "pp.cooldown": 0.4
+     },
+     "id": "p.prismatic.quickflash"
+    },
+    {
+     "name": "Scatter Light",
+     "kind": "major",
+     "desc": "Every ricochet bounces on to a second zombie close by for half its damage.",
+     "effects": {
+      "pp.scatter": 0.5
+     },
+     "id": "p.prismatic.scatterlight"
+    },
+    {
+     "name": "Prism Charge",
+     "kind": "minor",
+     "desc": "Bullet kills raise a wall 25% of the time instead of 15%.",
+     "effects": {
+      "pp.chance": 0.1
+     },
+     "id": "p.prismatic.prismcharge"
+    },
+    {
+     "name": "Full Spectrum",
+     "kind": "major",
+     "desc": "Ricochets have a 20% chance to set off a random ammo mod on the zombie they hit.",
+     "effects": {
+      "pp.spectrum": 0.2
+     },
+     "id": "p.prismatic.fullspectrum"
+    },
+    {
+     "name": "Amplifier",
+     "kind": "minor",
+     "desc": "Ricochets deal 50% more damage.",
+     "effects": {
+      "pp.damage": 0.5
+     },
+     "id": "p.prismatic.amplifier"
+    },
+    {
+     "name": "Supernova",
+     "kind": "major",
+     "desc": "A wall that reached double size bursts when it fades, hitting zombies within 250 for 60% of a zombie's health.",
+     "effects": {
+      "pp.nova": 0.6
+     },
+     "id": "p.prismatic.supernova"
+    }
+   ]
+  },
+  {
+   "id": "specialty_damnade",
+   "name": "Dam-A-Nade",
+   "kind": "perk",
+   "color": "#8a9a4a",
+   "augments": [
+    {
+     "name": "Bandolier",
+     "kind": "minor",
+     "desc": "Carry one more lethal (6 grenades).",
+     "effects": {
+      "dn.lethal": 1
+     },
+     "id": "p.damnade.bandolier"
+    },
+    {
+     "name": "Concussion",
+     "kind": "major",
+     "desc": "Explosives freeze the zombies they don't kill for 2 s.",
+     "effects": {
+      "dn.stun": 2
+     },
+     "id": "p.damnade.concussion"
+    },
+    {
+     "name": "Extra Tactical",
+     "kind": "minor",
+     "desc": "Carry one more tactical (5 Monkey Bombs, Gersh Devices or QEDs).",
+     "effects": {
+      "dn.tactical": 1
+     },
+     "id": "p.damnade.extratactical"
+    },
+    {
+     "name": "Chain Reaction",
+     "kind": "major",
+     "desc": "Zombies killed by your explosives explode, hitting zombies close by for 30% of a zombie's health.",
+     "effects": {
+      "dn.shrapnel": 0.3
+     },
+     "id": "p.damnade.chainreaction"
+    },
+    {
+     "name": "Recycler",
+     "kind": "minor",
+     "desc": "Explosive kills have an 8% chance to give a grenade back.",
+     "effects": {
+      "dn.scav": 0.08
+     },
+     "id": "p.damnade.recycler"
+    },
+    {
+     "name": "Incendiary",
+     "kind": "major",
+     "desc": "Explosives set the zombies they don't kill on fire for 4 s.",
+     "effects": {
+      "dn.burn": 0.15
+     },
+     "id": "p.damnade.incendiary"
+    },
+    {
+     "name": "Resupply",
+     "kind": "minor",
+     "desc": "The end-of-round refill gives your whole tactical slot back, not just one.",
+     "effects": {
+      "dn.resupply": 1
+     },
+     "id": "p.damnade.resupply"
+    },
+    {
+     "name": "Demolition Expert",
+     "kind": "major",
+     "desc": "Explosives deal double damage instead of 1.5x (the mod's double-buy upgrade).",
+     "effects": {
+      "dn.damage": 0.5
+     },
+     "id": "p.damnade.demolitionexpert"
     }
    ]
   },

@@ -12,6 +12,7 @@ const level = v => (gameAudio?.enabled === false ? 0 : Math.max(0, Math.min(1, v
 export function sfx(name, vol = 1) { const a = new Audio(BASE + name + '.ogg'); a.volume = level(vol); a.play().catch(() => {}); return a; }
 export function sfxAt(name, pos, camera, vol = 1, range = 1500) { const d = camera?.position ? camera.position.distanceTo(pos) : 0; if (d > range) return null; return sfx(name, vol * (1 - d / range) ** 1.5); }
 export function music(name, { loop = false, vol = .8 } = {}) {
+  globalThis.kino?.radio?.heard?.('castle:' + name);   // RADIO.EXE: an egg song joins the radio (mods/radio)
   stopMusic(.3); const a = new Audio(BASE + name + '.ogg'); a.loop = loop; a.volume = level(vol); a._vol = vol; a.play().catch(() => {}); track = a; return a;
 }
 export function stopMusic(fade = .8) {

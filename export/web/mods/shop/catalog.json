@@ -1362,16 +1362,17 @@
    "pass": "s1"
   },
   {
-   "id": "pass.s1.card.crows",
-   "cat": "card",
-   "name": "Crows",
+   "id": "pass.s1.perk.prismatic",
+   "cat": "perk",
+   "name": "Prismatic Punch",
    "price": 0,
-   "rarity": "common",
-   "desc": "A Season 1 calling card.",
+   "rarity": "legendary",
+   "desc": "Unlocks Prismatic Punch (a Reaper Collection perk, with research augments) at the terminal's PERKS app (user, 2026-10-18: replaced the Crows calling card).",
    "data": {
-    "c1": "#0a0a0a",
-    "c2": "#5a5a5a",
-    "pattern": "noise"
+    "perk": "specialty_prismatic_punch",
+    "label": "PERK UNLOCK",
+    "icon": "reaper/icons/prismatic.webp",
+    "color": "#c89bff"
    },
    "pass": "s1"
   },
@@ -1583,14 +1584,17 @@
    "pass": "s1"
   },
   {
-   "id": "pass.s1.glow.harvestmoon",
-   "cat": "glow",
-   "name": "Harvest Moon Glow",
+   "id": "pass.s1.perk.damnade",
+   "cat": "perk",
+   "name": "Dam-A-Nade",
    "price": 0,
    "rarity": "legendary",
-   "desc": "Season 1 Mystery Box glow.",
+   "desc": "Unlocks Dam-A-Nade (a Reaper Collection perk, with research augments) at the terminal's PERKS app (user, 2026-10-18: replaced the Harvest Moon Glow).",
    "data": {
-    "box": "#ff9a1a"
+    "perk": "specialty_damnade",
+    "label": "PERK UNLOCK",
+    "icon": "reaper/icons/damnade.webp",
+    "color": "#8a9a4a"
    },
    "pass": "s1"
   },

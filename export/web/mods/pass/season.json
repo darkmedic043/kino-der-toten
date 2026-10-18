@@ -514,7 +514,7 @@
      "id": "p6.9",
      "reward": {
       "type": "item",
-      "id": "pass.s1.card.crows"
+      "id": "pass.s1.perk.prismatic"
      },
      "premium": true
     }
@@ -668,7 +668,7 @@
      "id": "p8.7",
      "reward": {
       "type": "item",
-      "id": "pass.s1.glow.harvestmoon"
+      "id": "pass.s1.perk.damnade"
      },
      "premium": false
     },

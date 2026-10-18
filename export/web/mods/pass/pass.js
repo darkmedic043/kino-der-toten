@@ -42,6 +42,14 @@ function give(season,p,entry){
   else if(r.type==='gum'){if(!p.gums.includes(r.id))p.gums.push(r.id);}
   p.granted[entry.id]=true;return true;
 }
+// Rewards are remembered by slot (granted['p6.9']), so a slot whose reward was swapped for a new item after it was claimed
+// (Crows card -> Prismatic Punch, Harvest Moon Glow -> Dam-A-Nade) hands the new item over here. Returns the items granted.
+export function reconcile(season,p){
+  if(p.season!==season.id)return [];const out=[];
+  for(const pg of season.pages)for(const e of [...pg.items,pg.major])
+    if(p.granted[e.id]&&e.reward.type==='item'&&grantReward('item',e.reward.id))out.push(e.reward.id);
+  return out;
+}
 // Spend a token on a reward. Returns {granted:[entries], held:bool (premium, waiting for the pass), major:entry|null} or a reason.
 export function unlock(season,p,id){
   const it=itemOf(season,id);if(!it||it.major)return 'Not a tier reward';if(p.unlocked[id])return 'Already unlocked';
