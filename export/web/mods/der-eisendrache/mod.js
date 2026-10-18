@@ -107,9 +107,9 @@ export default async function setup(api) {
   sync.on('points', d => { if (d.to === sync.me) session.points += d.n; });
   sync.on('msg', d => { if (!d.to || d.to === sync.me) api.toast?.(d.text, d.s ?? 3); });
   const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api), traps = setupTraps(api);
-  const craft = setupCraftables(api, { traps }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav, pads, traps }), ee = setupEE(api, { bows, traps }), side2 = setupSide2(api, { bows }), side = setupSide(api, { lowgrav, side2 });
+  const craft = setupCraftables(api, { traps, pads }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav, pads, traps }), ee = setupEE(api, { bows, traps }), side2 = setupSide2(api, { bows }), side = setupSide(api, { lowgrav, side2 });
   useGameAudio(api.audio);
-  setupRocketPad(api); setupDogRounds(api);
+  setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupRocketCollision(api);
   setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 });   // the Tab scoreboard's tiles
   const bounds = setupBounds(api, { lowgrav });   // after the pads: it watches their flights
   await bows?.ready;   // the spirit wolves too
@@ -378,7 +378,8 @@ function setupPads(api) {
   };
   host.on('reset', () => { flight = null; if (api.features) api.features.flight = false; for (const p of pads) p.readyAt = 0; show(); });
   show();
-  return { pads: () => pads.map(p => ({ flag: p.flag, active: active(p), length: Math.round(p.length), ready: session.time >= p.readyAt })), flying: () => !!flight };
+  return { pads: () => pads.map(p => ({ flag: p.flag, active: active(p), length: Math.round(p.length), ready: session.time >= p.readyAt })), flying: () => !!flight,
+    flightPad: () => flight?.pad.flag ?? null, curves: () => pads.map(p => ({ flag: p.flag, curve: p.curve })) };   // craftables: the Ragnarok handle is caught in flight
 }
 
 // ---- Look: a bright overcast Alpine day (the engine's default lights are retuned every frame, as for The Giant) and a
@@ -562,6 +563,84 @@ function setupRocketPad({ world, session, host, player, sync }) {
   host.on('update', () => { if (!session.flags.has('castle:flag:castleteleporterused') && player.getFeetPosition().distanceTo(dest) < 900) sync.flag('castle:flag:castleteleporterused'); });
 }
 
+// ---- The power door from the start to the undercroft (BO3: zombie_door electric_door connect_start_to_undercroft,
+// trigger at (263 1632 152)). Its pieces aren't in the entity dump, so the map build has no door there and the
+// passage stood open before the power (user, 2026-10-18: "the door to the temple room from spawn is open before power
+// is turned on"). A copy of the map's own power gate (the courtyard-to-rooftop one) fills the opening, measured through
+// the collision (x 172-348, floor 96, lintel 224, narrowest at z -1612), as an electric door: shut until the power,
+// then it sinks and goes, and setDoors cuts and restores the navmesh under it like any door.
+const UC_GATE = { name: 'DOOR_connectstarttoundercroft_power', min: [172, 96, -1620], max: [348, 226, -1604] };
+function setupUndercroftGate({ world, session }) {
+  if (!world.doors || world.doors.has(UC_GATE.name)) return;
+  const box = new THREE.Box3(new THREE.Vector3(...UC_GATE.min), new THREE.Vector3(...UC_GATE.max)), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  const g = new THREE.Group(); g.name = 'UCGATE_start_undercroft';
+  const ref = world.doors.get('DOOR_connectcourtyardtorooftop_750')?.parts[0]?.object;
+  let meshes = 0; ref?.traverse(o => { if (o.isMesh) meshes++; });
+  if (meshes) {
+    const piece = ref.clone(true); piece.visible = true; piece.position.set(0, 0, 0); piece.rotation.set(0, 0, 0); piece.scale.set(1, 1, 1);
+    piece.traverse(o => { o.visible = true; o.layers.set(0); if (o.userData?.move) delete o.userData.move; });   // merge-props drew the original as instances (layers off)
+    piece.updateMatrixWorld(true);
+    const pb = new THREE.Box3().setFromObject(piece), ps = pb.getSize(new THREE.Vector3()), pc = pb.getCenter(new THREE.Vector3());
+    const wide = ps.x >= ps.z ? 'x' : 'z', inner = new THREE.Group(); inner.add(piece); piece.position.sub(pc);
+    if (wide === 'z') inner.rotation.y = Math.PI / 2;
+    inner.scale.set(size.x / Math.max(1, ps[wide]), size.y / Math.max(1, ps.y), 1);
+    g.add(inner);
+  } else g.add(new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: .6, roughness: .5 })));
+  g.position.copy(c); g.userData.move = [0, -size.y - 4, 0];   // sinks into the floor when the power comes on
+  world.root.add(g); g.updateMatrixWorld(true);
+  const geo = new THREE.BoxGeometry(size.x, size.y, size.z).translate(c.x, c.y, c.z);
+  const part = { object: g, collider: new CollisionWorld(geo), box, plug: box.clone(), enabled: true, slides: [{ object: g, base: g.position.clone(), move: new THREE.Vector3(...g.userData.move) }], anim: null };
+  world.doors.set(UC_GATE.name, { name: UC_GATE.name, cost: 0, zone: 'connectstarttoundercroft', electric: true, parts: [part], box });
+  world.dynamic.push(part);
+  world.interactions?.push({ kind: 'door', door: UC_GATE.name, position: c.clone(), box });
+  world.setDoors(session);
+}
+
+// ---- The rocket pad's rockets and gantry had no collision (user, 2026-10-18: "walk through the rocket"): the map build
+// gives props collision only up to 1,500 triangles and 360 across, and the A10 rocket's base alone is 74,000. Here each
+// piece standing near the pad (the rocket on its ring, the fallen one, the gantry's bottom) becomes stacked 40-unit
+// prisms around its outline (a 2D convex hull per slab, so the tilted fallen rocket follows its slope), as a
+// player-only collider (`window: true`: CustomWorld's capsule test uses it, the navmesh isn't cut and shots pass).
+const ROCKET_PIECES = /rocket_a10_(base|mid)|rocket_gantry_bottom/, PAD_AREA = new THREE.Box3(new THREE.Vector3(3500, -2600, 1000), new THREE.Vector3(6500, -1500, 3700));
+function hull2(pts) {   // monotone chain over [x, z]
+  pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (pts.length < 3) return pts;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+  for (const p of pts) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function setupRocketCollision({ world }) {
+  if (!world.root || !world.dynamic) return;
+  const SLAB = 40, tris = [], m4 = new THREE.Matrix4(), im = new THREE.Matrix4(), v = new THREE.Vector3(), seen = new Set();
+  world.root.updateMatrixWorld(true);
+  world.root.traverse(o => {
+    if (!o.isMesh || !ROCKET_PIECES.test(o.name + ' ' + (o.parent?.name ?? '') + ' ' + (o.geometry?.name ?? ''))) return;
+    const pos = o.geometry?.attributes?.position; if (!pos) return;
+    for (let i = 0; i < (o.isInstancedMesh ? o.count : 1); i++) {
+      m4.copy(o.matrixWorld); if (o.isInstancedMesh) { o.getMatrixAt(i, im); m4.multiply(im); }
+      v.setFromMatrixPosition(m4); const key = o.geometry.uuid + v.toArray().map(Math.round).join(); if (seen.has(key)) continue; seen.add(key);
+      const slabs = new Map(), step = Math.max(1, Math.floor(pos.count / 6000));
+      let inPad = false;
+      for (let k = 0; k < pos.count; k += step) {
+        v.fromBufferAttribute(pos, k).applyMatrix4(m4); if (PAD_AREA.containsPoint(v)) inPad = true;
+        const s = Math.floor(v.y / SLAB); (slabs.get(s) ?? slabs.set(s, []).get(s)).push([v.x, v.z]);
+      }
+      if (!inPad) continue;
+      for (const [s, pts] of slabs) {
+        if (s * SLAB > PAD_AREA.max.y) continue;   // out of reach
+        const h = hull2(pts); if (h.length < 3) continue;
+        const y0 = s * SLAB, y1 = y0 + SLAB;
+        for (let a = 0; a < h.length; a++) { const p = h[a], q = h[(a + 1) % h.length]; tris.push(p[0], y0, p[1], q[0], y0, q[1], q[0], y1, q[1], p[0], y0, p[1], q[0], y1, q[1], p[0], y1, p[1]); }
+        for (let a = 1; a < h.length - 1; a++) for (const y of [y0, y1]) tris.push(h[0][0], y, h[0][1], h[a][0], y, h[a][1], h[a + 1][0], y, h[a + 1][1]);
+      }
+    }
+  });
+  if (!tris.length) { console.warn('[der-eisendrache] rocket pad pieces not found: no rocket collision'); return; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(tris, 3));
+  world.dynamic.push({ name: 'rocket', collider: new CollisionWorld(g), box: new THREE.Box3().setFromBufferAttribute(g.attributes.position), enabled: true, window: true });
+  world.collision?.invalidateCache?.();
+}
+
 // ---- Dog rounds as zm_castle_dogs.gsc: the first 4-5 rounds in, then every 7-13 rounds
 function setupDogRounds({ session, host, sync }) {   // the host runs the rounds (guests take dogRound from its snapshot)
   let seen = 0;
@@ -677,6 +756,11 @@ function setupBow(api) {
 //   a claw melee within 95. Armour: body hits do a quarter; head hits go to the faceplate first; when it breaks it
 //   flies off, the Panzer is stunned, then goes berserk (sprints) and takes double damage to the head. Hits on its
 //   back go to the power-supply cap; when it breaks the Panzer reels and its core takes double damage.
+//   Unreachable target (user, 2026-10-18: it never followed to the rocket pad, which only the teleporter reaches): after
+//   4 s with no navmesh path ending near the player it takes off on its jetpack (hover_start) and drops in again at the
+//   CASTLE_MECHZ_ spot nearest the player (or the nearest floor beside them), as BO3's mechz flies to an unreachable
+//   player. Nukes leave it standing (BO3's nuke skips bosses; it used to die to one), and insta-kill only doubles the
+//   damage it takes (it used to die to any hit under insta-kill).
 const PZ_DIR = new URL('panzer/', import.meta.url).href;
 // Co-op: the host spawns and runs it (it hunts the nearest standing player; its hits reach teammates through
 // sync.hitPlayer); guests build a copy when the host's snapshot names a 'panzer' (enemies.spawn below), animated
@@ -695,6 +779,14 @@ function setupPanzer(api) {
   })();
   const st = { next: 12, list: [] };
   const V = () => new THREE.Vector3();
+  // insta-kill doesn't kill it outright (user, 2026-10-18): it takes double damage instead
+  const hurt0 = enemies.hurt.bind(enemies);
+  enemies.hurt = (z, amount, ...rest) => {
+    const fx = session.effects; if (z?.kind !== 'panzer' || !(fx.insta_kill > session.time)) return hurt0(z, amount, ...rest);
+    const insta = fx.insta_kill; fx.insta_kill = 0; try { return hurt0(z, amount * 2, ...rest); } finally { fx.insta_kill = insta; }
+  };
+  const nuke = enemies.nuke.bind(enemies);   // a nuke leaves the Panzer standing
+  enemies.nuke = onDeath => { const keep = enemies.list.filter(z => z.kind === 'panzer'); for (const z of keep) enemies.list.splice(enemies.list.indexOf(z), 1); const r = nuke(onDeath); enemies.list.push(...keep); return r; };
   // a part model (built around its own root joint) skinned onto the body's bones, in the body's bind space
   function attachPart(body, part, rootName) {
     body.updateMatrixWorld(true); part.updateMatrixWorld(true);
@@ -756,6 +848,11 @@ function setupPanzer(api) {
       if (z.act === 'hover_land' && z.t - z.landAt > (assets.index.hover_land?.duration ?? 1.3)) { z.state = 'chase'; z.repath = 0; }
       return;
     }
+    if (z.state === 'takeoff') {   // flying to a spot near an unreachable player
+      const k = Math.min(1, (z.t - z.offAt) / 1.6); pos.y = z.offFrom + 700 * k * k;
+      if (k >= 1) { z.ground.copy(z.dest); pos.copy(z.dest).add(new THREE.Vector3(0, 700, 0)); z.t = 0; z.state = 'arrive'; play(z, 'hover_loop'); }
+      return;
+    }
     if (z.state === 'busy') { if (z.t >= z.busyUntil) { z.state = 'chase'; z.repath = 0; } else { z.busy?.(dt); return; } }
     const eye = tp.clone().add(new THREE.Vector3(0, 40, 0)), from = pos.clone().add(new THREE.Vector3(0, 70, 0)), seen = world.lineClear(from, eye);
     face(z, tp);
@@ -765,13 +862,27 @@ function setupPanzer(api) {
     if (seen && dist > 300 && dist < 1100 && z.cool.gun <= 0) return busy(z, 'chaingun_fire', dt2 => { z.gunT = (z.gunT ?? 0) - dt2; if (z.gunT <= 0) { z.gunT = .12; tracer(z, eye); if (Math.random() < .3) damage(6); } }, null, 7, 2.2);
     // move along the navmesh
     z.repath -= dt;
-    if (z.repath <= 0) { z.repath = .5; z.path = world.path(pos, tp) ?? []; z.pathIndex = 1; }
+    if (z.repath <= 0) {
+      z.repath = .5; z.path = world.path(pos, tp) ?? []; z.pathIndex = 1;
+      // no path that ends near the player for 4 s: fly there
+      const end = z.path[z.path.length - 1];
+      z.lost = !end || end.distanceTo(tp) > 150 ? (z.lost ?? 0) + .5 : 0;
+      if (z.lost >= 4) { z.lost = 0; return fly(z, tp); }
+    }
     const goal = z.path[z.pathIndex] ?? tp, d = goal.clone().sub(pos); d.y = 0;
     if (d.length() < 12 && z.pathIndex < z.path.length - 1) z.pathIndex++;
     const k = z.berserk ? 'sprint' : dist > 700 ? 'run' : 'walk_basic';
     play(z, k); const speed = (assets.index[k]?.speed || 40) * (z.berserk ? 1 : 1);
     if (d.length() > 1) { d.normalize(); pos.addScaledVector(d, Math.min(speed * dt, goal.distanceTo(pos))); face(z, goal); }
     const y = world.surfaceY?.(pos.x, pos.y + 40, pos.z); if (y != null && Math.abs(y - pos.y) < 60) pos.y += (y - pos.y) * Math.min(1, dt * 10);
+  }
+  function fly(z, tp) {
+    const near = spots.slice().sort((a, b) => a.p.distanceTo(tp) - b.p.distanceTo(tp))[0];
+    // no spot near the player: land 250 off them, on the side it came from
+    const back = z.root.position.clone().sub(tp).setY(0); if (back.lengthSq() < 1) back.set(1, 0, 0);
+    const at = near && near.p.distanceTo(tp) < 1200 ? near.p : tp.clone().addScaledVector(back.normalize(), 250);
+    z.dest = (world.closest(at, { x: 200, y: 300, z: 200 }) ?? world.closest(tp, { x: 200, y: 300, z: 200 }) ?? tp).clone();
+    z.state = 'takeoff'; z.offAt = z.t; z.offFrom = z.root.position.y; play(z, 'hover_start', false);
   }
   function busy(z, k, each, note, cool, len) {
     z.state = 'busy'; play(z, k, !!len); const dur = len ?? assets.index[k]?.duration ?? 2; z.busyUntil = z.t + dur;
@@ -816,7 +927,7 @@ function setupPanzer(api) {
   // armour
   host.on('beforeEnemyDamage', e => {
     const z = e.enemy; if (z?.kind !== 'panzer' || !sync.isHost) return;
-    if (z.state === 'arrive') { e.amount = 0; return; }
+    if (z.state === 'arrive' || z.state === 'takeoff') { e.amount = 0; return; }
     let amount = e.amount * (e.cause === 'explosion' ? .5 : 1);
     if (e.head && z.face > 0) {
       z.face -= amount; e.amount = 0;
@@ -892,10 +1003,15 @@ function setupFizz(api) {
   return { state: () => ({ at: st.at, uses: st.uses, left: st.left, spin: st.spin ? { perk: st.spin.perk.id, ready: st.spin.ready } : null, machines: machines.length }) };
 }
 
+const TESLA_AREA = new THREE.Box3(new THREE.Vector3(-340, 0, -2600), new THREE.Vector3(600, 0, -1850));   // the roof between the coils (x/z; floor cells measured at load)
 // ---- Traps.
 //   Death Ray (zm_castle_death_ray_trap.gsc): the lever on the rooftop (CASTLE_DEATHRAY), 1000, power. For 15 s the two
-//   Tesla coils (CASTLE_BOLT_<n>) strike every zombie in the coil zone (CASTLE_TESLAZONE, ~380 x 130 around it): killed
-//   by lightning; a player in the zone loses a quarter of their max health every 2 s. Cooldown 60 s or to the round's end.
+//   Tesla coils (CASTLE_BOLT_<n>) strike every zombie on the rooftop between them: killed by lightning; a player there
+//   loses a quarter of their max health every 2 s. Cooldown 60 s or to the round's end. The area (user, 2026-10-18: it
+//   missed most of the roof; it was a 760 x 260 box around CASTLE_TESLAZONE) is the roof's floor itself: 25-unit cells
+//   in TESLA_AREA whose floor (a ray down) lies 80 below to 20 above the zone marker, measured once at load (BO3's
+//   tesla_coil_zone is a brush volume the dump doesn't carry). While it runs the cells glow blue and arcs strike the
+//   floor across the whole area, so you can see where it reaches.
 //   Masher (zm_castle_masher_trap.gsc): three buttons (CASTLE_MASHBTN_<n>), 1500, power and the masher gate bought (the
 //   gatehouse door: connect_gatehouse_to_lowercourtyard). For 20 s the gate slams down (116 in 0.25 s, back up, 0.25 s
 //   pause), crushing whatever is under it (CASTLE_MASHZONE). Cooldown 60 s.
@@ -919,7 +1035,23 @@ function setupTraps(api) {
   // Death Ray
   const lever = at('CASTLE_DEATHRAY'), zone = at('CASTLE_TESLAZONE'), bolts = [at('CASTLE_BOLT_0'), at('CASTLE_BOLT_1')].filter(Boolean);
   const ray = { on: 0, cool: 0, hurtAt: 0 };
-  const inTesla = p => zone && Math.abs(p.x - zone.x) < 380 && Math.abs(p.z - zone.z) < 130 && p.y > zone.y - 140 && p.y < zone.y + 160;
+  const CELL = 25, cells = new Map(), cellKey = (x, z) => Math.floor(x / CELL) + ',' + Math.floor(z / CELL);
+  if (zone) {
+    const down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
+    for (let x = TESLA_AREA.min.x; x < TESLA_AREA.max.x; x += CELL) for (let z = TESLA_AREA.min.z; z < TESLA_AREA.max.z; z += CELL) {
+      o.set(x + CELL / 2, zone.y + 60, z + CELL / 2); const h = world.raycast(new THREE.Ray(o, down), 0, 160);
+      const y = h ? o.y - h.distance : null; if (y != null && y > zone.y - 80 && y < zone.y + 20) cells.set(cellKey(o.x, o.z), { x: o.x, y, z: o.z });
+    }
+  }
+  const inTesla = p => { const c = cells.get(cellKey(p.x, p.z)); return !!c && p.y > c.y - 40 && p.y < c.y + 160; };
+  // the glow: one quad per cell just above its floor, shown while the ray runs
+  const cellList = [...cells.values()], glowMat = new THREE.MeshBasicMaterial({ color: 0x7fc4ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+  const glow = cellList.length ? (() => {
+    const v = [], h = CELL / 2;
+    for (const c of cellList) { const y = c.y + 1.5; v.push(c.x - h, y, c.z - h, c.x + h, y, c.z - h, c.x + h, y, c.z + h, c.x - h, y, c.z - h, c.x + h, y, c.z + h, c.x - h, y, c.z + h); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    const m = new THREE.Mesh(g, glowMat); m.frustumCulled = false; m.visible = false; m.renderOrder = 6; scene.add(m); host.warmObjects?.push(m); return m;
+  })() : null;
   if (lever && zone && bolts.length) world.addInteraction({
     position: lever, text: () => !session.power ? 'The power must be activated' : ray.on > session.time ? '' : ray.cool > session.time ? 'The Death Ray is cooling down' : 'Activate the Death Ray · 1000',
     use() { if (!session.power || ray.on > session.time || ray.cool > session.time) return false; if (session.points < 1000) { toast?.('Not enough points', 2); return false; }
@@ -952,11 +1084,13 @@ function setupTraps(api) {
     if (ray.on > now) {
       zap -= dt;
       if (zap <= 0) { zap = .12;
+        for (let k = 0; k < 3 && cellList.length; k++) { const c = cellList[Math.floor(Math.random() * cellList.length)]; bolt(bolts[Math.floor(Math.random() * bolts.length)], new THREE.Vector3(c.x, c.y + 2, c.z)); }   // arcs across the whole area
         for (const z of [...enemies.list]) { const p = z.root.position; if (!inTesla(p)) continue; const src = bolts[Math.floor(Math.random() * bolts.length)]; bolt(src, p.clone().add(new THREE.Vector3(0, 45, 0))); if (sync.isHost) enemies.hurt(z, z.kind === 'panzer' ? 2000 : 1e9, false, false, 'electric'); }
         if (Math.random() < .5) bolt(bolts[0], bolts[bolts.length - 1]);
       }
+      if (glow) { glow.visible = true; glowMat.opacity = .14 + Math.random() * .16; }
       const f = feet(); if (inTesla(f) && now - ray.hurtAt > 2) { ray.hurtAt = now; bolt(bolts[0], f.clone().add(new THREE.Vector3(0, 40, 0))); damage(session.maxHealth / 4); audio?.play?.('teslaHit'); }
-    }
+    } else if (glow?.visible) glow.visible = false;
     // masher: down 0.25 s, up 0.25 s, 0.25 s pause
     if (gate && mash.on > now) {
       mash.t = (mash.t + dt) % .75; const k = mash.t < .25 ? mash.t / .25 : mash.t < .5 ? 1 - (mash.t - .25) / .25 : 0;
@@ -988,7 +1122,7 @@ function setupTraps(api) {
   sync.shared('rocket', () => ({ next: rocket.next == null ? null : rocket.next - session.time, phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : 0 }),
     s => { rocket.next = s.next == null ? null : session.time + s.next; if (s.phase) { if (!rocket.phase) rocket.t0 = session.time - s.t; rocket.phase = s.phase; } else rocket.phase = null; });
   host.on('reset', () => { ray.on = ray.cool = 0; mash.on = mash.cool = 0; rocket.next = rocket.phase = null; rocket.warned = false; rocketLight.intensity = 0; if (tp) tp.locked = false; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
-  return { state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase } }),
+  return { inTesla, teslaCells: () => cells.size, state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase } }),
     fireRocket: () => { rocket.next = session.time; } };
 }
 

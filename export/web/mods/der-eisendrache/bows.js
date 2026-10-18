@@ -373,8 +373,9 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     if (window.kino.debug?.shoot?.()) { session.weapon.reserve = Math.max(0, quiver - (cost(k) - 1)); nockAt = session.time + Math.max(.25, (session.def.fireTime ?? .32)); }
     else shot = null;
   }
-  addEventListener('mousedown', e => { if (e.button !== 0 || !api.getState().active || !bowInHand() || window.kino.operator?.active) return; e.stopImmediatePropagation(); startDraw(false); }, true);
-  addEventListener('mouseup', e => { if (e.button !== 0 || !bowInHand()) return; e.stopImmediatePropagation(); if (drawing && !drawing.touch) release(); }, true);
+  addEventListener('mousedown', e => { if (e.button !== 0 || !api.getState().active || host.keepActive || !bowInHand() || window.kino.operator?.active) return;   // keepActive: a UI is up (the terminal), its clicks aren't shots
+  e.stopImmediatePropagation(); startDraw(false); }, true);
+  addEventListener('mouseup', e => { if (e.button !== 0 || !bowInHand() || (host.keepActive && !drawing)) return; e.stopImmediatePropagation(); if (drawing && !drawing.touch) release(); }, true);
   // touch: the fire button reaches the engine, not mouse events; while a bow is in hand the engine leaves it to us
   host.holdFire = () => bowInHand() && touchHeld();
   const touchHeld = () => !!view?.input?.fire && !mouseDown;

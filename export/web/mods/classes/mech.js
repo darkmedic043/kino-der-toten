@@ -173,7 +173,7 @@ export async function setupMech(ctx){
   // ---- input -------------------------------------------------------------------------------------------------------
   const BLOCK=new Set(['KeyR','KeyV','KeyG','KeyF','KeyE','Digit1','Digit2','Digit3','Digit4','Digit5','KeyX','KeyQ']);
   addEventListener('mousedown',e=>{
-    if(!api.getState().active)return;
+    if(!api.getState().active||host.keepActive)return;   // keepActive: a UI is up (the terminal), its clicks aren't shots
     if(riding&&e.button===0){trig.mg=true;e.stopImmediatePropagation();return;}
     if(phase!=='piloting'||(e.button!==0&&e.button!==2))return;
     const side=e.button===0?'left':'right';trig[side]=true;trig[side+'At']=session.time;

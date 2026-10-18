@@ -69,10 +69,10 @@ export default async function setup(api){
   const BLOCK=new Set(['KeyR','KeyV','KeyG','Digit1','Digit2','Digit3','Digit4','Digit5','KeyX','KeyQ']);
   addEventListener('keydown',e=>{if(st.active&&api.getState().active&&BLOCK.has(e.code)){e.stopImmediatePropagation();if(e.code==='KeyV'&&!e.repeat)st.active.melee?.();}},true);   // a weapon with melee() (the Annihilator's pistol-whip) gets the knife key
   addEventListener('mousedown',e=>{
-    if(!st.active||!api.getState().active||(e.button!==0&&e.button!==2))return;
+    if(!st.active||!api.getState().active||host.keepActive||(e.button!==0&&e.button!==2))return;   // keepActive: a UI is up (the terminal), its clicks aren't shots
     e.stopImmediatePropagation();(e.button===0?st.active.fire:st.active.aim)?.(true);
   },true);
-  addEventListener('mouseup',e=>{if(!st.active||(e.button!==0&&e.button!==2))return;e.stopImmediatePropagation();(e.button===0?st.active.fire:st.active.aim)?.(false);},true);
+  addEventListener('mouseup',e=>{if(!st.active||host.keepActive||(e.button!==0&&e.button!==2))return;e.stopImmediatePropagation();(e.button===0?st.active.fire:st.active.aim)?.(false);},true);
 
   host.on('beforeEnemyDamage',e=>{if(e.enemy)e.enemy.lastCause=e.cause;});
   host.on('kill',e=>{

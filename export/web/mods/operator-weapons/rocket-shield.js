@@ -1,11 +1,11 @@
 // BO3's rocket shield, on every map (moved out of Der Eisendrache's craftables, 2026-10-17, so the Armory can sell it
 // elsewhere). Der Eisendrache builds it from parts; other maps buy it at a terminal's ARMORY.EXE (mods/armory).
 // H raises it (Settings: "Rocket shield"), H again lowers it. Raised it's a ViewWeapon of BO3's rocket shield on
-// Dempsey's arms (gun put away like an operator weapon); left mouse bashes (kills what's in front up to 2500 health,
+// Dempsey's arms (gun put away like an operator weapon); left mouse bashes (the 2 nearest zombies in front: kills up to 2500 health,
 // the rest are knocked back), right mouse fires its rockets (a charge: a 0.55 s dash that kills everything in the way,
 // 3 charges). Charges come back from nitrous tanks where the map has them (setTanks: Der Eisendrache), otherwise one a
 // round. It takes zombie hits from the front while raised and from behind while on your back (1500 health; the
-// dmg1/dmg2 looks at 2/3 and 1/3), then breaks.
+// dmg1/dmg2 looks at 2/3 and 1/3), then breaks. A Carpenter repairs it.
 // window.kino.rocketShield: {give(), raise(), lower(), state(), setTanks(objects, onEmpty), hitting, owned}
 //   hitting is true while the shield's own bash/dash damage is applied (the Armory counts its kills with it).
 import * as THREE from 'three';
@@ -47,8 +47,13 @@ export function setupRocketShield(api) {
     const old = sh.vw; sh.vw = new ViewWeapon(viewScene, data, () => {});
     const vw = sh.vw; vw.equip({ ...DEF, id: 'rocket_shield_' + sh.look, model: modelFor(sh.look) }).then(() => {
       if (sh.vw !== vw) { drop(vw); return; } if (old) drop(old);
-      // the window: raised, the shield fills the view and you look through it (its glass would draw solid grey)
-      vw.root.traverse(o => { for (const m of [o.material].flat()) if (m && /rocket_shield_glass/.test(m.name)) { m.transparent = true; m.opacity = .12; m.depthWrite = false; } });
+      // the window: raised, the shield fills the view and you look through it (its glass would draw solid grey). The worn
+      // looks (dmg1/dmg2) swap the glass for BO3's damage decals: a plain broken pane (no texture: faint like the glass)
+      // and the shatter cracks, whose texture carries them in its alpha (user, 2026-10-18: a cracked shield was opaque)
+      vw.root.traverse(o => { for (const m of [o.material].flat()) {
+        if (m && /rocket_shield_glass|glass_broken_transparent/.test(m.name)) { m.transparent = true; m.opacity = .12; m.depthWrite = false; }
+        else if (m && /glass_shatter/.test(m.name)) { m.transparent = true; m.opacity = .85; m.depthWrite = false; }
+      } });
     }).catch(e => { console.warn('[rocket-shield] model', e); });
   }
   function drop(vw) { if (!vw) return; vw.pivot.removeFromParent(); if (vw.root) disposeSkeletons(vw.root); }
@@ -68,6 +73,7 @@ export function setupRocketShield(api) {
     const d = camera.getWorldDirection(new THREE.Vector3()); d.y = 0; d.normalize();
     sh.dash = { t: 0, dir: d, hit: new Set() }; audio?.play?.('explosion', .5);
   }
+  const BASH_MAX = 2, BASH_RANGE = 90, BASH_COS = .7;   // the bash: at most 2 zombies, within 90 and ~45 degrees of straight ahead
   const fwd = () => { const d = camera.getWorldDirection(new THREE.Vector3()); d.y = 0; return d.normalize(); };
   function inFront(p, range, cos) {
     const f = player.getFeetPosition(), v = p.clone().sub(f); v.y = 0; const d = v.length();
@@ -79,10 +85,10 @@ export function setupRocketShield(api) {
   const BLOCK = new Set(['KeyR', 'KeyV', 'KeyG', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyX', 'KeyQ', 'KeyY']);
   addEventListener('keydown', e => { if (sh.raised && api.getState().active && BLOCK.has(e.code)) e.stopImmediatePropagation(); }, true);
   addEventListener('mousedown', e => {
-    if (!sh.raised || !api.getState().active || (e.button !== 0 && e.button !== 2)) return;
+    if (!sh.raised || !api.getState().active || host.keepActive || (e.button !== 0 && e.button !== 2)) return;   // keepActive: the terminal's clicks
     e.stopImmediatePropagation(); if (e.button === 0) bash(); else boost();
   }, true);
-  addEventListener('mouseup', e => { if (sh.raised && (e.button === 0 || e.button === 2)) e.stopImmediatePropagation(); }, true);
+  addEventListener('mouseup', e => { if (sh.raised && !host.keepActive && (e.button === 0 || e.button === 2)) e.stopImmediatePropagation(); }, true);
   let padFire = false, padAim = false;
 
   // hits: a zombie in front (raised) or behind (on your back) hits the shield instead
@@ -92,11 +98,21 @@ export function setupRocketShield(api) {
     const z = attacker(); if (!z) return;
     const to = z.root.position.clone().sub(camera.position); to.y = 0; to.normalize(); const dot = to.dot(fwd());
     if (!(sh.raised ? (dot > .3 || !!hooks.perk?.allSides?.()) : dot < -.3)) return;
-    sh.health -= e.amount; e.amount = 0; audio?.play?.('hit', .4);
+    sh.health -= e.amount; e.amount = 0; e.shielded = true;   // the hud mod gives it a grey hitmarker and a thump
     if (sh.health <= 0) { try { hooks.perk?.broke?.(player.getFeetPosition()); } catch (err) { console.warn('[rocket-shield]', err); } lower(); sh.owned = false; sh.health = 0; announce?.('ROCKET SHIELD', 'DESTROYED', 2); toast?.(brokeHint, 2.5); for (const c of tanks) c.visible = false; }
     else if (sh.raised && look() !== sh.look) { sh.look = look(); equip(); }
     hud();
   });
+  // a Carpenter repairs the shield fully, as it does the boards (user, 2026-10-18)
+  const powerups = api.powerups;
+  if (powerups?.onCollect) {
+    const collect = powerups.onCollect;
+    powerups.onCollect = (type, at) => {
+      const r = collect(type, at);
+      if (type === 'carpenter' && sh.owned && sh.health < MAX()) { sh.health = MAX(); if (sh.raised && look() !== sh.look) { sh.look = look(); equip(); } hud(); toast?.('Rocket shield repaired', 1.6); }
+      return r;
+    };
+  }
   // nitrous tanks are back each round; maps without them give a charge back instead
   host.on('roundEnd', () => {
     if (!sh.owned) return;
@@ -122,8 +138,11 @@ export function setupRocketShield(api) {
       sh.bash.t += dt;
       if (sh.bash.t > .22 && !sh.bash.hit) {
         sh.bash.hit = true; audio?.play?.('hit', .6);
-        for (const z of [...enemies.list]) {
-          const p = z.root.position; if (!inFront(p, 95, .45)) continue;
+        // the two nearest zombies in a narrower cone (user, 2026-10-18: it hit too many; was every zombie within 95 and ~63 degrees)
+        const f = player.getFeetPosition(), struck = enemies.list.filter(z => inFront(z.root.position, BASH_RANGE, BASH_COS))
+          .sort((a, b) => a.root.position.distanceTo(f) - b.root.position.distanceTo(f)).slice(0, BASH_MAX);
+        for (const z of struck) {
+          const p = z.root.position;
           if (z.kind === 'panzer') { hurt(z, 500, false, true, 'melee'); continue; }
           if (z.health <= 2500) { hurt(z, 1e9, false, true, 'melee'); continue; }
           hurt(z, 2500, false, true, 'melee'); const v = p.clone().sub(player.getFeetPosition()); v.y = 0; p.addScaledVector(v.normalize(), 50);

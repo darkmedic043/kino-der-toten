@@ -3,8 +3,10 @@
 // table) and CASTLE_BENCH_open_<k> (the three open workbenches); the shield's recharges CASTLE_SHIELDCHARGE_<k>.
 //   Ragnarok DG-4 (gravityspike): built at its own table, then taken as the operator weapon (mods/operator-weapons),
 //   charged. Its parts come as in BO3:
-//     body   - dropped where the first Panzersoldat dies (zm_castle_mechz.gsc notifies its death origin)
-//     handle - falls from the Tesla coils when the Death Ray has finished a run (one of its two spots, onto the floor)
+//     body   - dropped where a Panzersoldat dies (zm_castle_mechz.gsc notifies its death origin), until it's taken
+//     handle - when the Death Ray has finished a run it hangs in the air at one of its two spots by the Tesla coils
+//              (BO3's), out of reach on foot: fly past it on the landing pad whose flight comes nearest and it's
+//              grabbed in flight (user, 2026-10-18; it used to fall to the floor). Within GRAB of the flight path.
 //     guards - during a rocket test fire, the wall switch at the rocket pad (spike_quest_wall_switch) arms the
 //              console at the landing pad (spike_quest_console_switch, where BO3 lights its lamps one by one) for
 //              20 s; its lever drops the guards beside it
@@ -19,7 +21,7 @@ const CRAFT = {
   shield: { name: 'Rocket Shield', parts: ['dolly', 'clamp', 'door'], label: { dolly: 'the eagle', clamp: 'the window', door: 'the fuel tank' } },
 };
 
-export function setupCraftables(api, { traps }) {
+export function setupCraftables(api, { traps, pads }) {
   const { world, session, host, player, camera, enemies, audio, toast, announce, data, viewScene, view, sync } = api;
   const root = world.root, kino = window.kino;
   const at = o => o.getWorldPosition(new THREE.Vector3());
@@ -60,7 +62,7 @@ export function setupCraftables(api, { traps }) {
     const [cr, part] = key.split(':');
     const pos = at(o); places.set(o, pos);   // moved with the part (show)
     world.addInteraction({
-      position: pos, hidden: () => !(o.visible && st.shown.get(key) === o),
+      position: pos, hidden: () => key === 'spike:handle' || !(o.visible && st.shown.get(key) === o),   // the handle is caught in flight
       text: () => `Pick up ${CRAFT[cr].label[part]}`,
       use() {
         if (!o.visible || st.shown.get(key) !== o) return false;
@@ -90,18 +92,23 @@ export function setupCraftables(api, { traps }) {
   });
 
   // ---- where the Ragnarok's parts come from -----------------------------------------------------------------------
-  host.on('kill', ({ enemy }) => {   // body: the first Panzersoldat to die drops it (the host's kills)
-    if (!sync.isHost || enemy?.kind !== 'panzer' || st.firstPanzer || st.built.spike || st.have.spike.has('body')) return;
-    st.firstPanzer = true; if (!spots['spike:body']?.[0]) return;
+  host.on('kill', ({ enemy }) => {   // body: a Panzersoldat's death drops it until someone has it (the host's kills; it was the first one only, so a missed drop was gone for good)
+    if (!sync.isHost || enemy?.kind !== 'panzer' || st.built.spike || st.have.spike.has('body') || st.shown.has('spike:body')) return;
+    st.firstPanzer = true; if (!spots['spike:body']?.[0]) { console.warn('[der-eisendrache] no CASTLE_PART_spike_body spot'); return; }
     const p = enemy.root.position.clone(); const q = world.closest?.(p, { x: 80, y: 160, z: 80 }) ?? p;
     sync.act('partDrop', { key: 'spike:body', k: 0, p: sync.a(q.clone().add(new THREE.Vector3(0, 6, 0))), msg: 'The Panzersoldat dropped something' });
   });
-  const down = new THREE.Vector3(0, -1, 0);
-  function handleDrop() {   // handle: falls from one of the coils onto the floor below (the host picks which)
+  // handle: hangs at one of its spots (the host picks which) until someone flies past it on a landing pad
+  const GRAB = 140;
+  const nearestPad = p => {   // the pad whose flight passes closest to p: { flag, d }
+    let best = { flag: null, d: Infinity };
+    for (const { flag, curve } of pads?.curves?.() ?? []) for (let i = 0; i <= 200; i++) { const d = curve.getPointAt(i / 200).distanceTo(p); if (d < best.d) best = { flag, d }; }
+    return best;
+  };
+  function handleDrop() {
     const list = spots['spike:handle'] ?? []; if (!list.length || !sync.isHost) return;
-    const k = Math.floor(Math.random() * list.length), o = list[k], from = homes.get(o).clone(); o.parent.updateMatrixWorld(true); o.parent.localToWorld(from);
-    const hit = world.raycast?.(new THREE.Ray(from.clone(), down), 0, 4000);
-    sync.act('partDrop', { key: 'spike:handle', k, p: sync.a(hit ? from.clone().addScaledVector(down, hit.distance - 6) : from), msg: 'Something fell from the Tesla coils' });
+    const k = Math.floor(Math.random() * list.length);
+    sync.act('partDrop', { key: 'spike:handle', k, msg: 'Something is caught in the Tesla coils · fly past it on a landing pad' });
   }
   // guards: the A10 wall switch during a rocket test fire, then the console's lever within 20 s
   const wallSwitch = root.getObjectByName('CASTLE_SM_spike_quest_wall_switch'), consoleSwitch = root.getObjectByName('CASTLE_SM_spike_quest_console_switch');
@@ -129,6 +136,14 @@ export function setupCraftables(api, { traps }) {
     const rayOn = !!traps?.state().ray.on;
     if (st.rayWas && !rayOn && !st.built.spike && !st.have.spike.has('handle') && !st.shown.has('spike:handle')) handleDrop();
     st.rayWas = rayOn;
+    // the hanging handle: grabbed by whoever flies past it (my own flight; the pick is a team event)
+    const h = st.shown.get('spike:handle');
+    if (h && pads?.flying?.()) {
+      h.userData.at ??= at(h); h.userData.pad ??= nearestPad(h.userData.at);
+      const me = player.getFeetPosition(), reach = Math.max(GRAB, h.userData.pad.d + 60);   // a spot no flight passes within GRAB still gets taken by the nearest pad's
+      if (pads.flightPad?.() === h.userData.pad.flag && (me.distanceTo(h.userData.at) < reach || me.clone().add(new THREE.Vector3(0, 60, 0)).distanceTo(h.userData.at) < reach)) sync.act('partPick', { key: 'spike:handle' });
+    }
+    if (h) h.rotation.y += dt * 1.5;   // turning in the air, so it's seen
   });
   host.on('reset', reset);
 

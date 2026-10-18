@@ -43,7 +43,20 @@ export default function setup(api){
   // ---- Directional damage indicator --------------------------------------------
   const ring=document.createElement('div');ring.id='damage-ring';document.body.append(ring);
   const marks=[];
-  host.on('beforeDamage',e=>{
+  // A hit the rocket shield took (e.shielded, set by operator-weapons/rocket-shield.js; user, 2026-10-18): a grey hitmarker
+  // and a dull thump instead of the hurt cues. Mods later in the order change e.amount after this handler runs, so the
+  // choice waits until every handler has (a microtask; cosmetic only).
+  const shieldMark=document.createElement('div');shieldMark.id='shield-hitmarker';shieldMark.textContent='×';
+  shieldMark.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);font-size:37px;opacity:0;z-index:4;pointer-events:none;color:#8d9196;transition:opacity .15s';
+  document.body.append(shieldMark);let shieldMarkT=0;
+  function shieldHit(){
+    shieldMark.style.transition='none';shieldMark.style.opacity=1;clearTimeout(shieldMarkT);shieldMarkT=setTimeout(()=>{shieldMark.style.transition='opacity .15s';shieldMark.style.opacity=0;},120);
+    const c=out();if(!c)return;const t=c.currentTime;
+    thump(c,t,{from:95,to:40,length:.18,body:.9,knock:.45,knockCut:500});   // low and muffled: metal plate, not flesh
+  }
+  host.on('beforeDamage',e=>queueMicrotask(()=>{
+    if(e.shielded){shieldHit();return;}
+    if(!(e.amount>0))return;
     if(session.effects.invulnerable>session.time||['reviving','gameover'].includes(session.phase))return;
     hurt(e.amount);
     // The enemy that just landed its attack (the game doesn't pass the attacker).
@@ -53,7 +66,7 @@ export default function setup(api){
     let m=marks.find(m=>m.enemy===z);
     if(!m){const el=document.createElement('i');ring.append(el);m={enemy:z,el};marks.push(m);}
     m.from=z.root.position.clone();m.life=1.6;m.strength=Math.min(1,.55+e.amount/60);
-  });
+  }));
   const fwd=new THREE.Vector3(),right=new THREE.Vector3();
   host.on('update',dt=>{
     camera.getWorldDirection(fwd);fwd.y=0;fwd.normalize();right.set(-fwd.z,0,fwd.x);

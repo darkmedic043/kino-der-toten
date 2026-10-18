@@ -16,6 +16,9 @@ export async function createMap(ctx,entry){
   const returnToLobby=()=>{const dest=ctx.data.entities.find(e=>e.targetname==='theater_teleport_player0');ctx.moveTo(vector(dest.position),dest.yaw);cooldownUntil=S().time+90;};
   return {
     title:'Kino der Toten',announceTitle:'Kino der Toten',bestKey:'kino.best',shotRange:6000,
+    // the short flight down to the Speed Cola room is a 30-degree ramp in the collision: standing on it slid you down (user,
+    // 2026-10-18); slopeStick pushes the capsule straight up out of walkable slopes (player-controller.js), as on the BO3 maps
+    player:{slopeStick:true},
     async loadData(){return fetch('game-data.json').then(r=>r.json());},
     async loadWorld(progress){
       const world=new World(scene,ctx.data);await world.load(progress);
