@@ -278,3 +278,4 @@
 - 2026-10-18: The Annihilator (BO3, from the running game on The Giant) as an operator weapon and The Giant's Fly Trap prize: 18 shots, piercing, disintegrating kills, ADS, pistol-whip (gameplay.md, waw-ports.md). The 45 Reaper Collection perks catalogued, not implemented: `perks-plus/reaper-perks.json`, one section each in reaper-perks.md.
 - 2026-10-18: All 45 Reaper Collection perks work, switched off (`perks-plus/reaper-perks.js`; cheat console `reaper <id|all>`, `reaper up`): nothing sells them yet; numbers per perk in reaper-perks.md. Hooks: outermost `session.damage` wrapper, `mods.sprintFire` in engine.js, rocket shield `.perk`/`heal`, co-op `coopBleedMul`/`coopDown`.
 - 2026-10-18: The Annihilator in the Armory (OPERATOR WEAPONS, 25,000; found on The Giant via the Fly Trap, 150 kills to unlock) (props.md, gameplay.md).
+- 2026-10-18: Bullet tracers (`mods/tracers`, engine `shot` event per pellet) (gameplay.md).

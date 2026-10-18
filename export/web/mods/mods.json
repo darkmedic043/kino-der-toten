@@ -2,6 +2,7 @@
   "enabled": [
     "lighting",
     "fx",
+    "tracers",
     "terminal-booth",
     "map-materials",
     "moon-weapons",

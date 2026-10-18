@@ -1,0 +1,5 @@
+{
+  "name": "Bullet tracers",
+  "description": "Every bullet leaves a short bright streak that flies from your gun to where it hit (the engine's per-pellet 'shot' event).",
+  "script": "mod.js"
+}
