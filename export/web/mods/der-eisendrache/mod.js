@@ -1,5 +1,6 @@
 // Der Eisendrache (a BO3 map ported by .tools/build_bo3_map.py; see docs/fork/waw-ports.md). Does nothing elsewhere.
 import * as THREE from 'three';
+import { settings, onSettingsChange } from '../../settings.js';
 import { setupCraftables } from './craftables.js';
 import { setupLowGrav } from './lowgrav.js';
 import { setupBows } from './bows.js';
@@ -383,7 +384,12 @@ function setupPads(api) {
 // ---- Look: a bright overcast Alpine day (the engine's default lights are retuned every frame, as for The Giant) and a
 // pool of warm point lights on the lit fixtures nearest the camera (CASTLE_LAMP_<n>: candles, torches, sconces, lamp
 // cages... from the static models), so the castle's halls and the undercroft aren't black. More with the power on.
-const POOL = 6, LAMP = { color: 0xffac62, bulb: 0xffd9a8, on: 3000, off: 2000, range: 620, decay: 1.4 };   // 6: each point light is paid per pixel on every material (10 cost ~5 FPS)
+// The pool grows with the graphics quality (Low..Ultra 4/6/10/16): every point light is paid per pixel on every material
+// (on the GTX 1660 Ti 10 cost ~5 FPS; a fast GPU barely notices), and its size is in the shaders, so it only changes with
+// the setting (one recompile then). Lamps in view are picked over ones behind you, and a light fades out before it moves
+// to another lamp, so lamps don't pop on and off as you walk.
+const POOL_BY_QUALITY = [4, 6, 10, 16], LAMP = { color: 0xffac62, bulb: 0xffd9a8, on: 3000, off: 2000, range: 620, decay: 1.4 };
+const poolSize = () => POOL_BY_QUALITY[Math.max(0, Math.min(3, Math.round(settings.graphics ?? 2)))];
 function setupLook({ scene, world, session, host, camera }) {
   const kids = scene.children;
   const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
@@ -391,7 +397,15 @@ function setupLook({ scene, world, session, host, camera }) {
   // lamps carry extras.kind since map v=29 ('fire': candles, torches, fire pits, chandeliers; 'electric'): a fire's light
   // flickers and sits warmer; a bulb's is steady and paler
   const lamps = [], fireAt = new Map(); world.root?.traverse(o => { if (/^CASTLE_LAMP_/.test(o.name)) { const p = o.getWorldPosition(new THREE.Vector3()); lamps.push(p); if (o.userData.kind !== 'electric') fireAt.set(p, Math.random() * 6.2832); } });
-  const pool = Array.from({ length: Math.min(POOL, lamps.length) }, () => { const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); l.userData.fire = null; scene.add(l); return l; });
+  const pool = [];
+  const resize = () => {
+    const n = Math.min(poolSize(), lamps.length);
+    while (pool.length > n) pool.pop().removeFromParent();
+    while (pool.length < n) { const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); Object.assign(l.userData, { fire: null, lamp: null, level: 0 }); scene.add(l); pool.push(l); }
+    timer = 0;
+  };
+  let timer = 0; resize();
+  onSettingsChange((_, k) => { if (k === 'graphics' || k === null) resize(); });
   // the sky: BO3's skybox model isn't exported (a flat grey background showed through the castle's breaches): a dome at
   // the far plane with an overcast gradient, a soft sun glow and drifting cloud bands; the fog takes its horizon colour
   const HORIZON = new THREE.Color(0xd9dfe6);
@@ -445,7 +459,7 @@ function setupLook({ scene, world, session, host, camera }) {
   let skyModel = null;
   if (scene.fog) scene.fog.color.copy(HORIZON);
   scene.background = HORIZON.clone();
-  let last = performance.now(), timer = 0;
+  let last = performance.now();
   host.on('update', () => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
     sky.position.copy(camera.position); if (sky.material.uniforms.time) sky.material.uniforms.time.value += dt; skyModel?.position.copy(camera.position);
@@ -456,15 +470,25 @@ function setupLook({ scene, world, session, host, camera }) {
     if (key) { key.color.setHex(0xe9eef7); key.intensity = 1.25; key.position.set(.45, 1, .3); }
     if (fill) { fill.color.setHex(0x74889f); fill.intensity = .4; }
     if ((timer -= dt) <= 0 && pool.length) {
-      timer = .5;
-      const eye = camera.position, near = lamps.map(p => ({ p, d: p.distanceToSquared(eye) })).sort((a, b) => a.d - b.d).slice(0, pool.length);
-      const free = pool.filter(l => !near.some(n => n.p.equals(l.position)));
-      for (const n of near) if (!pool.some(l => l.position.equals(n.p))) { const l = free.shift(); if (l) { l.position.copy(n.p); l.intensity = 0; l.userData.fire = fireAt.has(n.p) ? fireAt.get(n.p) : null; l.color.setHex(fireAt.has(n.p) ? LAMP.color : LAMP.bulb); } }
+      timer = .25;
+      // score: distance, with lamps behind the camera counted as 2.2x as far (they light less of what you see), and a lit
+      // lamp as 0.8x (so one on the edge of the budget doesn't flick in and out)
+      const eye = camera.position, fwd = camera.getWorldDirection(new THREE.Vector3()), to = new THREE.Vector3();
+      const lit = new Set(pool.map(l => !l.userData.leaving && l.userData.lamp).filter(Boolean));
+      const pick = new Set(lamps.map(p => { const d = p.distanceTo(eye) * (lit.has(p) ? .8 : 1); return { p, s: to.subVectors(p, eye).dot(fwd) < -60 ? d * 2.2 : d }; }).sort((a, b) => a.s - b.s).slice(0, pool.length).map(n => n.p));
+      for (const l of pool) l.userData.leaving = !!l.userData.lamp && !pick.has(l.userData.lamp);
+      const open = [...pick].filter(p => !pool.some(l => l.userData.lamp === p));
+      // a free light (or one that has faded out) takes the next lamp that wants one
+      for (const l of pool) if (open.length && (!l.userData.lamp || (l.userData.leaving && l.userData.level < 40))) {
+        const p = open.shift(); l.userData.lamp = p; l.userData.leaving = false; l.userData.level = 0; l.position.copy(p);
+        l.userData.fire = fireAt.has(p) ? fireAt.get(p) : null; l.color.setHex(fireAt.has(p) ? LAMP.color : LAMP.bulb);
+      }
     }
-    if (timer > .49 && world.wallGuns) for (const g of world.wallGuns) g.visible = g.position.distanceToSquared(camera.position) < 1800 * 1800;
+    if (timer > .24 && world.wallGuns) for (const g of world.wallGuns) g.visible = g.position.distanceToSquared(camera.position) < 1800 * 1800;
     const want = session.power ? LAMP.on : LAMP.off, T = performance.now() / 1000;
     for (const l of pool) {
-      l.userData.level = (l.userData.level ?? 0) + (want - (l.userData.level ?? 0)) * Math.min(1, dt * 2.5);
+      const goal = l.userData.lamp && !l.userData.leaving ? want : 0;
+      l.userData.level += (goal - l.userData.level) * Math.min(1, dt * (goal ? 2.5 : 5));
       const f = l.userData.fire; l.intensity = l.userData.level * (f == null ? 1 : .86 + .09 * Math.sin(T * 9.1 + f) + .05 * Math.sin(T * 23.7 + f * 2.0));   // a flame's flicker
     }
   });

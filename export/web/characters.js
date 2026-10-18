@@ -148,7 +148,8 @@ export async function createCharacter(entry,data){
     // "springBones": dangling chains (coat tails) simulated after the body is posed (spring-bones.js).
     // (one group or a list, e.g. a coat and a tail with their own settings)
     const springs=[entry.springBones??[]].flat().map(cfg=>new SpringBones(model,cfg));
-    const withSprings=c=>{c.springs=springs;if(springs.length){const u=c.update;c.update=(dt,...a)=>{u.call(c,dt,...a);for(const sp of springs)sp.update(dt);};}return c;};
+    // chains only swing on a body that's drawn (your own is hidden in first person: Bondrewd's coat cost ~7 ms a frame there)
+    const withSprings=c=>{c.springs=springs;if(springs.length){const u=c.update;c.update=(dt,...a)=>{u.call(c,dt,...a);if(c.root.visible)for(const sp of springs)sp.update(dt);};}return c;};
     // "motion": "bo1": Black Ops' own player animations, retargeted (bo1-motion.js).
     if(entry.motion==='bo1'){
       const rig=await bo1Rig(model,holder,entry,data).catch(e=>{console.warn('[bo1-motion]',e);return null;});

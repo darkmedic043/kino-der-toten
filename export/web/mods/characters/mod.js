@@ -55,8 +55,13 @@ export default async function setup(api){
     if(want&&want!==entry)swapTo(want).catch(e=>console.warn('[characters] suit swap',e));
   });
   // Spring chains (coat, tail) rest on the level itself: stairs, ledges, slopes.
-  function groundSprings(ch){const down=new THREE.Vector3(0,-1,0),from=new THREE.Vector3(),ray=new THREE.Ray(from,down);
-    for(const sp of ch.springs??[])sp.ground=(x,y,z)=>{from.set(x,y+40,z);const h=api.world?.raycast(ray,0,400);return h?from.y-h.distance:null;};}
+  // The heights are cached per 8-unit cell for a tenth of a second: a long coat asked ~50 times a frame, and each ray walks
+  // the whole level (Der Eisendrache: ~7 ms a frame).
+  function groundSprings(ch){const down=new THREE.Vector3(0,-1,0),from=new THREE.Vector3(),ray=new THREE.Ray(from,down),cache=new Map();let at=0;
+    for(const sp of ch.springs??[])sp.ground=(x,y,z)=>{
+      const now=performance.now();if(now-at>100){cache.clear();at=now;}
+      const key=Math.round(x/8)+','+Math.round(z/8)+','+Math.round(y/24);if(cache.has(key))return cache.get(key);
+      from.set(x,y+40,z);const h=api.world?.raycast(ray,0,400),g=h?from.y-h.distance:null;cache.set(key,g);return g;};}
   groundSprings(character);window.kino.character=character;window.kino.characterEntry=entry;   // debug handle (the Pilot class seats a copy of the operator in its mech)
   const view=new ThirdPersonCamera(camera);window.kino.thirdPersonCamera=view;   // the Pilot class pulls it back while in its mech
   let third=false,last=null,lastYaw=null,airT=0;
