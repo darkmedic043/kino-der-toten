@@ -271,3 +271,4 @@
 - 2026-10-17 (night): Castle smoke test (doors, power, perks from every side, gondola, box, Panzer, zombies, traps, teleporter, low gravity, bows, Easter-egg state) passes with no console errors; `kino.debug.lookAt` with a Vector3 (not an array) was turning the camera NaN in the test harness, and the movement mod's camera feel now recovers from a non-finite value instead of keeping it forever (movement.md).
 - 2026-10-17 (night): Rind runs Melon Zombies as its own program by default (`Rind --melon-zombies`, ~/projects/rind/CLAUDE.md).
 - 2026-10-18: Idle-machine confirmation of the castle frame-rate pass: 74 FPS average, worst view 54 (was 36 / 17), Kino 109 (performance.md).
+- 2026-10-17: Melonopoly is a native Rust game now (Rind 0.5.2): its Linux/Windows builds are published under git-ignored `export/web/rind/games/melonopoly/`; the web version at `/melonopoly/` is gone. It still uses the co-op rooms (`/api/ws`) for its P2P signalling and relay fallback.
