@@ -98,7 +98,7 @@ export function setupRocketShield(api) {
     const z = attacker(); if (!z) return;
     const to = z.root.position.clone().sub(camera.position); to.y = 0; to.normalize(); const dot = to.dot(fwd());
     if (!(sh.raised ? (dot > .3 || !!hooks.perk?.allSides?.()) : dot < -.3)) return;
-    sh.health -= e.amount; e.amount = 0; e.shielded = true;   // the hud mod gives it a grey hitmarker and a thump
+    sh.health -= e.amount; e.amount = 0; e.shielded = true;   // the hud mod points a grey damage arc at the attacker and plays a thump
     if (sh.health <= 0) { try { hooks.perk?.broke?.(player.getFeetPosition()); } catch (err) { console.warn('[rocket-shield]', err); } lower(); sh.owned = false; sh.health = 0; announce?.('ROCKET SHIELD', 'DESTROYED', 2); toast?.(brokeHint, 2.5); for (const c of tanks) c.visible = false; }
     else if (sh.raised && look() !== sh.look) { sh.look = look(); equip(); }
     hud();

@@ -3,6 +3,7 @@
 #damage-ring i{position:absolute;left:-90px;top:-150px;width:180px;height:150px;transform-origin:90px 150px;opacity:0;
   background:radial-gradient(ellipse 90px 22px at 50% 16%,#e0231bdd 0%,#c0191299 45%,transparent 72%);
   -webkit-mask:linear-gradient(#000 0 40%,transparent 60%);mask:linear-gradient(#000 0 40%,transparent 60%);filter:drop-shadow(0 0 6px #ff2a1a88)}
+#damage-ring i.shield{background:radial-gradient(ellipse 90px 22px at 50% 16%,#c3c8cedd 0%,#8d939a99 45%,transparent 72%);filter:drop-shadow(0 0 6px #b8c0c888)}   /* a hit the rocket shield took */
 body.menu-open #damage-ring{visibility:hidden}
 /* Equipment cluster, bottom-right under the ammo: lethal | tactical | claymores. */
 body.equip-hud #grenades{display:none}
