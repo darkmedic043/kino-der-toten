@@ -2,7 +2,9 @@
 // starting weapons and passive bonuses. Tuning lives in progression.json; the
 // profile (shared with the main menu) is in ../../profile.js.
 import { makeWeapon } from '../../rules.js';
-import { loadProfile, saveProfile, xpToNext as curve, unlocks as unlocksFor, validLoadout, boxFilter, cloudReady, unlockLvl } from '../../profile.js';
+import { loadProfile, saveProfile, levelNeed, unlocks as unlocksFor, validLoadout, boxFilter, cloudReady, unlockLvl } from '../../profile.js';
+import { hasPrestigeMaster, awardMasterRewards, milestoneText, masterLook } from '../prestige/prestige.js';
+import { grantCredits } from '../credits/credits.js';
 import { loadModel } from '../../animation.js';
 
 export default async function setup(api){
@@ -12,7 +14,9 @@ export default async function setup(api){
   const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('progression.css',mod.url).href;document.head.append(css);
 
   const bonuses=Object.fromEntries(config.bonuses.map(b=>[b.id,b]));
-  const xpToNext=level=>curve(config,level);
+  const xpToNext=level=>levelNeed(config,level);   // Prestige Master: flat per level, Infinity at its cap (1,000)
+  const atCap=()=>xpToNext(profile.level)===Infinity;
+  const xpText=()=>atCap()?'MAX LEVEL':`${profile.xp} / ${xpToNext(profile.level)} XP`,xpPct=()=>atCap()?100:100*profile.xp/xpToNext(profile.level);
   const unlocked=level=>unlocksFor(config,Math.max(level,unlockLvl(profile)),data.weapons);   // after a player prestige, re-reaching a level announces nothing new
 
   // The menu may have changed the profile in another tab; re-read on focus.
@@ -67,6 +71,13 @@ export default async function setup(api){
     const before=unlocked(profile.level);
     let levelled=false;
     while(profile.xp>=xpToNext(profile.level)){profile.xp-=xpToNext(profile.level);profile.level++;levelled=true;}
+    if(atCap())profile.xp=0;   // Prestige Master level 1,000: nothing further
+    if(levelled&&hasPrestigeMaster()){   // Master levels: the BO7 announcement, and any milestone reached pays out
+      const got=awardMasterRewards(profile.level,grantCredits);
+      api.announce('Level '+profile.level,'PRESTIGE MASTER',4);
+      for(const m of got)api.toast(`Master level ${m.level} · ${milestoneText(m)}`,6);
+      save();renderHud();renderMenu();return;
+    }
     if(levelled){
       const now=unlocked(profile.level);
       const news=[...now.weapons.filter(id=>!before.weapons.includes(id)).map(id=>data.weapons[id].name),
@@ -95,7 +106,8 @@ export default async function setup(api){
   document.body.append(hud);
   function renderHud(){
     hud.querySelector('.lvl').textContent='LV '+profile.level;
-    hud.querySelector('i').style.width=(100*profile.xp/xpToNext(profile.level)).toFixed(1)+'%';
+    hud.querySelector('i').style.width=xpPct().toFixed(1)+'%';
+    {const m=hasPrestigeMaster()?masterLook(profile.level).color:'';hud.querySelector('.lvl').style.color=m;hud.style.setProperty('--lv',m||'');}
   }
   renderHud();
 
@@ -104,12 +116,12 @@ export default async function setup(api){
   const panel=document.createElement('div');panel.id='loadout-panel';
   document.querySelector('#menu .menu-controls')?.before(panel);
   function renderMenu(){
-    const l=validLoadout(config,profile,data.weapons),need=xpToNext(profile.level);
+    const l=validLoadout(config,profile,data.weapons);
     const names=data.weapons[l.primary].name;
     const perks=l.bonuses.map(id=>bonuses[id].name).join(', ')||'No bonus';
     panel.innerHTML=`
-      <div class="head"><span class="eyebrow">LOADOUT</span><strong>LEVEL ${profile.level}</strong><span class="xp">${profile.xp} / ${need} XP</span></div>
-      <div class="bar"><i style="width:${(100*profile.xp/need).toFixed(1)}%"></i></div>
+      <div class="head"><span class="eyebrow">LOADOUT</span><strong>LEVEL ${profile.level}</strong><span class="xp">${xpText()}</span></div>
+      <div class="bar"><i style="width:${xpPct().toFixed(1)}%"></i></div>
       <p class="line"><b>${names}</b> · ${perks}</p>
       <a class="edit" href="./">Main menu · change loadout</a>`;
   }

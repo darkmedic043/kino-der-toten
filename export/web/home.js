@@ -10,12 +10,12 @@ import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
 import { startSocial, onSocial, request, accept, decline, cancel, remove, statusText } from './social.js';
 import { mergePatch, resolveWeapons, withCore, isCoreMod } from './mod-loader.js';
-import { loadProfile, saveProfile, loadProgression, xpToNext, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
+import { loadProfile, saveProfile, loadProgression, xpToNext, levelNeed, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
 import { weaponProgress, maxLevel, migrateWeaponLevels } from './mods/weapon-levels/gunsmith.js';
-import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, canPrestigeWeapon, prestigeWeapon, canPrestigePlayer, prestigePlayer, prestigeBadge, prestigeName, prestigeShort, prestigeColor, isPrestigeMaster, roman, RULES as PRESTIGE, TIER_NAMES, PRESTIGE_COLORS } from './mods/prestige/prestige.js';
+import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, canPrestigeWeapon, prestigeWeapon, canPrestigePlayer, prestigePlayer, prestigeBadge, prestigeName, prestigeShort, prestigeColor, isPrestigeMaster, masterLook, nextMasterMilestone, milestoneText, awardMasterRewards, MASTER_MILESTONES, roman, RULES as PRESTIGE, TIER_NAMES, PRESTIGE_COLORS } from './mods/prestige/prestige.js';
 import { camoById } from './mods/weapon-levels/camo.js';
 import { loadCredits, grantCredits, loadCreditsConfig } from './mods/credits/credits.js';
 import { loadCatalog as loadShopCatalog, cosmetics as shopCosmetics, installRewards } from './mods/shop/shop.js';
@@ -123,27 +123,44 @@ renderSettings($('settings-panel'));
 
 // ---- Profile card -------------------------------------------------------------
 function renderProfile(){
-  const need=xpToNext(config,profile.level),c=characters.find(c=>c.id===profile.character)??characters[0];
-  $('p-level').textContent='LEVEL '+profile.level;$('p-bar').style.width=(100*profile.xp/need).toFixed(1)+'%';
-  $('p-xp').textContent=`${profile.xp.toLocaleString()} / ${need.toLocaleString()} XP`;$('p-char').textContent=c?.name??'';
+  const need=levelNeed(config,profile.level),c=characters.find(c=>c.id===profile.character)??characters[0];
+  $('p-level').textContent='LEVEL '+profile.level;$('p-bar').style.width=(need===Infinity?100:100*profile.xp/need).toFixed(1)+'%';
+  $('p-xp').textContent=need===Infinity?'MAX LEVEL':`${profile.xp.toLocaleString()} / ${need.toLocaleString()} XP`;$('p-char').textContent=c?.name??'';
   $('p-stats').textContent=`${profile.kills.toLocaleString()} kills · best round ${profile.bestRound||'—'} · ${profile.games} games`;
   // Phase 4: player prestige (badge, tokens, the button from PRESTIGE.playerLevel)
   applyMenuTheme();
   const chip=document.getElementById('credits-chip');if(chip)chip.textContent=loadCredits().balance.toLocaleString()+' CR';
   {const pc=document.getElementById('pass-chip');if(pc&&seasonCfg){const n=passTokens(seasonCfg,loadPass());pc.textContent=n>0?n+' TOKEN'+(n>1?'S':''):'';}}
-  {const cardEl=document.getElementById('p-card'),cd=shopCat&&shopCosmetics(shopCat).card;if(cardEl)cardEl.innerHTML=cd?cardSvg(cd,$('p-char')?.textContent||'Survivor','LEVEL '+profile.level):'';}
+  {const cardEl=document.getElementById('p-card'),cd=shopCat&&shopCosmetics(shopCat).card;if(cardEl)cardEl.innerHTML=cd?cardSvg(cd,$('p-char')?.textContent||'Survivor','LEVEL '+profile.level+(isPrestigeMaster(loadPrestige().player.prestige)?' · '+masterLook(profile.level).title.toUpperCase():'')):'';}
   const pr=loadPrestige(),n=pr.player.prestige,el=$('p-prestige');
   if(el){const can=canPrestigePlayer(pr,profile.level);
-    $('p-level').innerHTML=(n?prestigeBadge(n,18)+`<span class="pr-n" style="color:${prestigeColor(n)}">${prestigeShort(n)}</span> `:'')+'LEVEL '+profile.level;
-    el.innerHTML=(pr.player.tokens?`<span class="pr-tok">${pr.player.tokens} PRESTIGE TOKEN${pr.player.tokens>1?'S':''}</span>`:'')+
+    const master=isPrestigeMaster(n),look=master?masterLook(profile.level):null;
+    // Master levels (BO7): pay any milestone reached outside a match (e.g. this account just entered Master)
+    if(master){const got=awardMasterRewards(profile.level,grantCredits);for(const m of got)toast(`Master level ${m.level} · ${milestoneText(m)}`);}
+    $('p-level').innerHTML=(n?prestigeBadge(n,master?20:18,profile.level)+(master?'':`<span class="pr-n" style="color:${prestigeColor(n)}">${prestigeShort(n)}</span> `):'')+
+      (master?`<span class="${look.legend?'lv-legend':''}" style="color:${look.color}">LEVEL ${profile.level}</span>`:'LEVEL '+profile.level);
+    const nx=master?nextMasterMilestone(profile.level):null;
+    el.innerHTML=(master?`<span class="pr-title" style="color:${look.color}">${esc(look.title.toUpperCase())}</span><span class="pr-next">${nx?`Next · level ${nx.level}: ${esc(milestoneText(nx))}`:'Every Master reward earned'}</span><button type="button" class="pr-rewards" data-master-rewards>MASTER REWARDS</button>`:'')+
+      (pr.player.tokens?`<span class="pr-tok">${pr.player.tokens} PRESTIGE TOKEN${pr.player.tokens>1?'S':''}</span>`:'')+
       (can?`<button class="pr-btn" data-prestige="player">${isPrestigeMaster(n+1)?'ENTER PRESTIGE MASTER · OPENS THE BANK':prestigeName(n+1)}</button>`:n<=PRESTIGE.playerMax?`<span class="pr-next">${isPrestigeMaster(n+1)?'Prestige Master':'Prestige'} at level ${PRESTIGE.playerLevel}</span>`:'');}
 }
+// Prestige Master's reward track (BO7): every milestone, reached ones ticked
+document.addEventListener('click',e=>{
+  if(!e.target.closest('[data-master-rewards]'))return;
+  const lvl=loadProfile().level,box=document.getElementById('master-rewards')??Object.assign(document.createElement('div'),{id:'master-rewards'});
+  if(box.isConnected&&!box.hidden){box.hidden=true;return;}
+  box.hidden=false;
+  box.innerHTML=`<div class="mr-head"><b>MASTER REWARDS</b><span>LV ${lvl}</span></div><ol>${MASTER_MILESTONES.map(m=>{const l=masterLook(m.level);
+    return `<li class="${m.level<=lvl?'got':''}"><span class="mr-lv" style="color:${l.color}">${m.level}</span>${m.icon?prestigeBadge(PRESTIGE.playerMax+1,22,m.level):'<i class="mr-cr">CR</i>'}<span>${esc(milestoneText(m))}</span>${m.level<=lvl?'<em>✓</em>':''}</li>`;}).join('')}</ol>`;
+  document.getElementById('p-prestige')?.after(box);box.scrollIntoView({block:'nearest',behavior:'smooth'});
+});
 // two clicks: the first arms the button, the second does it
 function armed(btn){if(btn.dataset.armed){return true;}btn.dataset.armed='1';const t=btn.textContent;btn.textContent='CONFIRM · '+t;setTimeout(()=>{if(btn.isConnected){delete btn.dataset.armed;btn.textContent=t;}},4000);return false;}
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-prestige]');if(!b)return;
   if(b.dataset.prestige==='player'){const pr=loadPrestige();if(!canPrestigePlayer(pr,profile.level)||!armed(b))return;
-    prestigePlayer(pr,profile.level);savePrestige(pr);const st=loadProfile();st.level=1;st.xp=0;saveProfile(st);profile.level=1;profile.xp=0;
+    prestigePlayer(pr,profile.level);savePrestige(pr);const lv1=isPrestigeMaster(pr.player.prestige)?PRESTIGE.accountMasterStart:1;   // Master: levels carry on from 56 (BO7)
+    const st=loadProfile();st.level=lv1;st.xp=0;saveProfile(st);profile.level=lv1;profile.xp=0;
     const bonus=creditsCfg?.prestige?.player??0;if(bonus)grantCredits(bonus,`player prestige ${pr.player.prestige}`);
     renderProfile();toast(isPrestigeMaster(pr.player.prestige)?`PRESTIGE MASTER · the Bank is open (BANK.EXE on any terminal) · +1 prestige token${bonus?` · +${bonus} credits`:''}`
       :`Prestige ${roman(pr.player.prestige)} · +1 prestige token${bonus?` · +${bonus} credits`:''} · everything you unlocked stays`);return;}

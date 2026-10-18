@@ -4,12 +4,15 @@
 
 export { cloudReady } from './cloud.js';
 import { weaponClass } from './mods/weapon-levels/camo.js';
-import { loadPrestige } from './mods/prestige/prestige.js';
+import { loadPrestige, isPrestigeMaster, masterLevelXp, RULES as PRESTIGE } from './mods/prestige/prestige.js';
 export const PROFILE_KEY='kino.mods.progression';
 
 export function loadProfile(){
   const empty={xp:0,level:1,kills:0,games:0,bestRound:0,character:'mannequin',loadout:{primary:'m1911_zm',secondary:'',tactical:'',bonuses:[]}};
-  try{const saved=JSON.parse(localStorage.getItem(PROFILE_KEY));return saved?{...empty,...saved,loadout:{...empty.loadout,...saved.loadout}}:empty;}catch{return empty;}
+  let p;try{const saved=JSON.parse(localStorage.getItem(PROFILE_KEY));p=saved?{...empty,...saved,loadout:{...empty.loadout,...saved.loadout}}:empty;}catch{p=empty;}
+  // Prestige Master's levels start at accountMasterStart (an account that entered Master before Master levels existed went back to 1)
+  if(p.level<PRESTIGE.accountMasterStart&&isPrestigeMaster(loadPrestige().player.prestige)){p={...p,level:PRESTIGE.accountMasterStart,xp:0};}
+  return p;
 }
 export function saveProfile(profile){try{localStorage.setItem(PROFILE_KEY,JSON.stringify(profile));}catch{}}
 
@@ -20,6 +23,8 @@ export async function loadProgression(){
 }
 
 export const xpToNext=(config,level)=>Math.round(config.levelCurve.base*level**config.levelCurve.exponent);
+// XP for the next account level: the curve, or Prestige Master's flat cost (Infinity at its cap, 1,000)
+export const levelNeed=(config,level,prestige=loadPrestige().player.prestige)=>isPrestigeMaster(prestige)?masterLevelXp(level):xpToNext(config,level);
 
 // Weapon unlocks (2026-10-14): the base BO1 guns (`kit: true`) are the first
 // unlock kit, owned from level 1; their `gunsmith` level opens them in the

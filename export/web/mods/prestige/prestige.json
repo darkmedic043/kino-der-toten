@@ -1,8 +1,11 @@
 {
-  "_note": "Phase 4 prestige numbers (prestige.js). playerLevel: the account can prestige from this level (BO7: 55); playerMax: prestiges before the badge stops climbing. Weapons prestige at their own max level (attachments + 1). Prestige Master: masterXp weapon XP per Master level (a kill is 10, a headshot 15), up to masterMax; the animated Master camo comes at Master level masterCamoAt.",
+  "_note": "Phase 4 prestige numbers (prestige.js). playerLevel: the account can prestige from this level (BO7: 55); playerMax: prestiges before the badge stops climbing. Weapons prestige at their own max level (attachments + 1). Prestige Master: masterXp weapon XP per Master level (a kill is 10, a headshot 15), up to masterMax; the animated Master camo comes at Master level masterCamoAt. Account Prestige Master (the prestige after playerMax): the level carries on from accountMasterStart to accountMasterCap at a flat accountMasterXp per level (about what level 55 costs on the normal curve); milestones are MASTER_MILESTONES in prestige.js.",
   "playerLevel": 55,
   "playerMax": 10,
   "masterXp": 500,
   "masterMax": 250,
-  "masterCamoAt": 50
+  "masterCamoAt": 50,
+  "accountMasterStart": 56,
+  "accountMasterCap": 1000,
+  "accountMasterXp": 10000
 }

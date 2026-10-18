@@ -12,7 +12,7 @@
 // places those panels around the on-screen buttons).
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
-import { loadPrestige, prestigeColor, prestigeName, prestigeShort } from '../prestige/prestige.js';
+import { loadPrestige, prestigeColor, prestigeName, prestigeShort, isPrestigeMaster, masterLook } from '../prestige/prestige.js';
 
 export default async function setup(api){
   if(matchMedia('(pointer: coarse)').matches)return;
@@ -39,6 +39,7 @@ export default async function setup(api){
   const q=(el,s)=>el.querySelector(s);
   // player prestige: the level badge takes the prestige colour and a numeral
   {const n=loadPrestige().player.prestige,lv=q(left,'.lv');if(n){const c=prestigeColor(n);lv.style.background=c;lv.style.borderColor='#fff';lv.dataset.p=prestigeShort(n);lv.title=prestigeName(n);}}
+  const master=isPrestigeMaster(loadPrestige().player.prestige);   // Master: the badge takes the level colour (changes every 100 levels)
 
   // ---- the magazine arc across the top of the dial (BO7's orange arc) ---------------------------------------
   const arc=(a0,a1,r=74)=>{const p=a=>[80+r*Math.cos(a*Math.PI/180),80+r*Math.sin(a*Math.PI/180)].map(v=>v.toFixed(2));
@@ -89,7 +90,7 @@ export default async function setup(api){
     const lv=($('progression-hud')?.querySelector('.lvl')?.textContent??'').replace(/\D+/g,''),nm=$('hud-portrait')?.querySelector('span')?.textContent??'';
     const rt=$('round')?.textContent??'',rn=/^I+$/.test(rt)?String(rt.length):rt;   // BO1 tallies (I–IIIII) shown as digits
     const key=[Math.ceil(session.health),frac.toFixed(3),lv,nm,rn,w?.upgraded,op].join('|');if(key===last)return;last=key;right.classList.toggle('op',op);
-    q(left,'.hp b').textContent=Math.ceil(session.health);q(left,'.lv').textContent=lv;q(left,'.nm').textContent=nm;
+    q(left,'.hp b').textContent=Math.ceil(session.health);q(left,'.lv').textContent=lv;if(master&&lv){const lc=masterLook(+lv);q(left,'.lv').style.background=lc.color;q(left,'.lv').title='Prestige Master · '+lc.title;}q(left,'.nm').textContent=nm;
     left.classList.toggle('low',session.health<session.maxHealth*.35);
     q(right,'.mag').setAttribute('d',frac>0?arc(ARC0,ARC0+(ARC1-ARC0)*frac):'');right.classList.toggle('empty',def&&w.mag===0);
     right.classList.toggle('pap',!!w?.upgraded);
