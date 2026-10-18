@@ -25,14 +25,14 @@ The user (2026-10-18): "add one of the reaper perks, im thinking prismatic punch
 
 ### Prismatic Punch (implemented)
 
-- **Base**: 15% of bullet kills (10 s cooldown) raise a purple energy wall at the kill, facing you, for 10 s. A bullet that crosses it (the engine's per-pellet `shot` event, so every map; a bullet stopped by a zombie in front doesn't reach it) ricochets into the nearest zombie within 400 for the gun's damage, and the wall grows 10% per hit, up to double size, where it fires two ricochets. The mod's activate / max-size sounds.
+- **Base**: 15% of bullet kills (45 s cooldown; 10 s until 2026-10-18, the user asked for it much longer) raise a purple energy wall at the kill, facing you, for 10 s. A bullet that crosses it (the engine's per-pellet `shot` event, so every map; a bullet stopped by a zombie in front doesn't reach it) ricochets into the nearest zombie within 400 for the gun's damage, and the wall grows 10% per hit, up to double size, where it fires two ricochets. The mod's activate / max-size sounds.
 - **Research track** (`pp.*`, Minor/Major alternating):
 
 | # | Augment | Kind | Effect |
 |---|---|---|---|
 | 1 | Refraction | Minor | Walls start 40% bigger |
 | 2 | Afterglow | Major | At double size the wall stays up 15 s from then (the mod's upgrade) |
-| 3 | Quick Flash | Minor | Cooldown 10 s → 6 s |
+| 3 | Quick Flash | Minor | Cooldown 45 s → 27 s |
 | 4 | Scatter Light | Major | Every ricochet bounces on to a second zombie within 220 for half its damage |
 | 5 | Prism Charge | Minor | 25% of bullet kills raise a wall (was 15%) |
 | 6 | Full Spectrum | Major | Ricochets have a 20% chance to set off a random ammo mod (and its augments) |

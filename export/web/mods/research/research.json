@@ -1156,7 +1156,7 @@
     {
      "name": "Quick Flash",
      "kind": "minor",
-     "desc": "A new wall can rise 40% sooner after the last (10 s -> 6 s).",
+     "desc": "A new wall can rise 40% sooner after the last (45 s -> 27 s).",
      "effects": {
       "pp.cooldown": 0.4
      },

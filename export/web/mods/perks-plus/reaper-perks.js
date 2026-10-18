@@ -301,11 +301,12 @@ export function setupReaperPerks(api, catalogue, base) {
   //      a 10 s personal Double Points.
   const fountains = []; let polosaDouble = 0;
   host.on('beforePoints', e => { if (polosaDouble > now() && e.amount > 0) e.amount *= 2; });
-  // ---- Prismatic Punch (switched on): bullet kills (15%, 10 s cooldown) raise an energy wall for 10 s; a bullet through
+  // ---- Prismatic Punch (switched on): bullet kills (15%, 45 s cooldown: PP_COOLDOWN) raise an energy wall for 10 s; a bullet through
   //      it ricochets into the nearest zombie within 400; each hit grows it 10% (max x2, then 2 ricochets). Augments
   //      (pp.*): size (starts bigger), cooldown, chance, damage, afterglow (s at max size), scatter (each ricochet jumps on
   //      for that share of its damage), spectrum (chance of a random ammo mod), nova (a maxed wall bursts when it fades).
   const walls = []; let wallReady = 0;
+  const PP_COOLDOWN = 45;   // s between walls (was 10; user, 2026-10-18: "much longer")
   // ---- Who's Who: see whosWho (30 s to revive your body; upgraded, the body shoots and the clone keeps every gun).
 
   // ---- damage dealt -------------------------------------------------------------------------------------------------
@@ -354,7 +355,7 @@ export function setupReaperPerks(api, catalogue, base) {
       if (Math.random() < .03) { const s = sprite(0xffd34f, 30); s.position.copy(at).y += 20; fountains.push({ at, until: t + 8, next: 0, s: keep(s, 8, (o, k) => { o.scale.setScalar(26 + Math.sin(now() * 8) * 6); }) }); }
       if (up('pointpolosa') && Math.random() < .04) { polosaDouble = t + 10; toast?.('Point Polosa · Double Points 10 s', 2); }
     }
-    if (has('prismatic') && t >= wallReady && Math.random() < .15 + stat('pp.chance') && z.rpCause === 'bullet') { wallReady = t + 10 * (1 - stat('pp.cooldown')); raiseWall(at); }
+    if (has('prismatic') && t >= wallReady && Math.random() < .15 + stat('pp.chance') && z.rpCause === 'bullet') { wallReady = t + PP_COOLDOWN * (1 - stat('pp.cooldown')); raiseWall(at); }
     if (has('damnade') && (z.rpCause === 'explosion' || z.rpCause === 'grenade')) {
       if (stat('dn.shrapnel')) queueMicrotask(() => { blast(at, 110, zh() * stat('dn.shrapnel'), 'shrapnel', z); fx(at.clone().add(V(0, 25, 0)), .35, 0xffb347); });   // 'shrapnel': doesn't chain
       if (stat('dn.scav') && Math.random() < stat('dn.scav') && session.grenades < nadeMax()) { session.grenades++; toast?.('Dam-A-Nade · grenade recovered', 1); }
