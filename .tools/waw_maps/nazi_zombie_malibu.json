@@ -1,0 +1,12 @@
+{
+  "_comment": "Malibu Drive (ZK's Avengers map). Per-map settings for build_waw_map.py; coordinates are CoD units (x, y, z up). Players start in the Asgard lobby (character select) and take the Bifrost to the driveway (asgard_summon_0).",
+  "instanceProps": true,
+  "cellSize": 2048,
+  "collisionMargin": 600,
+  "collisionBoxes": [[[-20600, 3400], [-12900, 5400]]],
+  "compactZones": true,
+  "startZones": ["zone_driveway1"],
+  "doorModels": true,
+  "teleports": [{"name": "bifrost", "from": "asgard_trig", "to": "asgard_summon_0", "zone": "start", "cost": 0, "cooldown": 3, "power": false, "visual": false}],
+  "randomWallbuys": {"get_new_weapon": ["m14_zm", "famas_zm", "ak74u_zm", "galil_zm", "mp5k_zm", "spas_zm"]}
+}

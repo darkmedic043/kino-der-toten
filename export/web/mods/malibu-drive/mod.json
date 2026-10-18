@@ -1,0 +1,5 @@
+{
+  "name": "Malibu Drive extras",
+  "description": "Malibu Drive's (ZK's World at War Avengers map) own rules: the Asgard lobby and its Bifrost, the zone links from the map's script and the station guns that re-roll every round. Only active on that map.",
+  "script": "mod.js"
+}
