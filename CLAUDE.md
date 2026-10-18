@@ -17,7 +17,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Movement mod (crouch/prone/slide/mantle, BO7 omnimovement, dive, wall jump), first-person motion and mantle hand IK, stairs | `movement.md` |
 | Moon weapons, Thundergun, weapon-part animation fix, ammo bulbs, BO3 imports (Greyhound, DG-2), weapon inspect, BO7 weapons rebuilt in Blender on BO1 skeletons (Grimhawk) | `weapons.md` |
 | Co-op (WebSocket rooms, protocol, downs/revives, lobby), friends and presence; the Rind launcher (`~/projects/rind`) uses the same sign-in and friends API | `coop.md` |
-| Props: terminal booth (Blender generator, bake, placement mod, MelonTerm desktop and its apps incl. BANK and ARMORY) | `props.md` |
+| Props: terminal booth (Blender generator, bake, placement mod, MelonTerm desktop, its home-screen icon grid and apps incl. BANK and ARMORY) | `props.md` |
 | Weapon levels, attachments (incl. mounted BO3 parts), camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound, Phase 4 prestige (weapon + player, prestige camos) | `weapon-levels.md` |
 | Classes (BL4 loadouts), skill trees, all six action skills, the Mech class, Phase 3 charging, resources, synergies, either-or nodes (`skills.js`) | `classes.md` |
 | Gobblegums (pack ladder, GUMS terminal app, effects) | `gobblegums.md` |
@@ -39,6 +39,8 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 - Discord secrets are in `~/.config/kino/discord.env`. Never print or commit them. Player data is in `~/.local/share/kino`.
 - git-lfs is at `~/.local/bin/git-lfs` (about 1 GB of assets). Host Node is 20 (`npm test` still passes); the container uses 24.
 - No system browser. Use Playwright's Chromium in `~/.cache/ms-playwright`. The upstream `.tools/test-*.mjs` scripts hard-code Windows paths.
+- Headless UI tests of a single module (e.g. MelonTerm's desktop.js): `page.route()` a fake same-origin `http://127.0.0.1:5190/test.html` (use 127.0.0.1, `localhost` doesn't connect), then `import('/mods/...')` in `page.evaluate` with stubbed opts. `playwright-core` only resolves from inside the repo (ESM ignores NODE_PATH): symlink `node_modules` into the scratchpad or run from the repo.
+- Another session may have uncommitted edits in shared files (history.md, CLAUDE.md). To commit only your own line: `git show HEAD:<file> > tmp`, append your line, `git update-index --cacheinfo 100644,$(git hash-object -w tmp),<file>`, then commit; the working tree keeps everyone's edits.
 - BO1 (base game) is installed via Steam; OpenAssetTools is built at `~/.local/opt/OpenAssetTools`. `.tools/build_wonder_weapons.py` builds extra wonder weapons from it into `mods/wonder-weapons/` (git-ignored assets; see `weapons.md`).
 - Blender 5.2.2 (portable, `~/.local/bin/blender`) builds the terminal booth: `.tools/build-terminal-booth.py` (about 14 min per variant with the bake).
 - KTX-Software 4.4.2 (official release, `~/.local/opt/ktx-software`, run with `LD_LIBRARY_PATH=lib`) encodes the KTX2 textures (`.tools/build-ktx2.mjs`).
