@@ -20,7 +20,8 @@
 //   the desk) and the player arranges them: drag an icon (mouse: just drag; touch: hold or drag) onto a cell to move it,
 //   onto another icon to swap the two. The layout is saved per grid shape ("cols x rows", so a phone and a desktop each
 //   keep their own) in localStorage kino.mods.terminal {layout:{'9x4':{perks:[c,r],...}}}, cloud-synced (cloud.js TRACKED).
-//   RESET ICONS in the taskbar restores the default (shop apps down the left, map apps up the right).
+//   RESET ICONS in the taskbar restores the default (shop apps down the left, map apps up the right). App windows open in the
+//   middle, inset one grid column on each side, so the icons on the outer edges stay visible (user, 2026-10-17); phones cover the desk.
 
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href;
 // perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine: a Melon Pass reward);
@@ -113,7 +114,7 @@ const CSS = `
 #melonterm .app:hover .sq,#melonterm .app:focus-visible .sq{background:#0d4a24;box-shadow:0 0 16px #3dff8a88,inset 0 0 12px #0008}
 #melonterm .app:hover span,#melonterm .app:focus-visible span{background:var(--g);color:var(--bg);text-shadow:none}
 #melonterm .app span{padding:0 4px}
-#melonterm .win{position:absolute;inset:16px;z-index:6;display:flex;flex-direction:column;border:2px solid var(--g2);background:#020d06f2;box-shadow:0 0 0 2px #000,8px 8px 0 #0008,0 0 30px #3dff8a22}
+#melonterm .win{position:absolute;inset:16px var(--side,128px);z-index:6;display:flex;flex-direction:column;border:2px solid var(--g2);background:#020d06f2;box-shadow:0 0 0 2px #000,8px 8px 0 #0008,0 0 30px #3dff8a22}
 #melonterm .win[hidden]{display:none}
 #melonterm .title{display:flex;align-items:center;gap:10px;padding:3px 4px 3px 12px;background:var(--g2);color:var(--bg);font-size:21px;letter-spacing:2px;text-shadow:none}
 #melonterm .title button{width:30px;height:26px;border:2px solid var(--bg);background:var(--g2);color:var(--bg);font:inherit;font-size:20px;line-height:1;cursor:pointer;padding:0}
@@ -742,6 +743,7 @@ function build() {
     const w = Math.max(1, desk.clientWidth - PAD * 2), h = Math.max(1, desk.clientHeight - PAD * 2);
     const cols = Math.max(1, Math.floor(w / MIN_W)), rows = Math.max(1, Math.floor(h / MIN_H));
     home = { cols, rows, cw: w / cols, ch: h / rows, key: cols + 'x' + rows };
+    desk.style.setProperty('--side', PAD + w / cols + 'px');   // app windows sit in the middle, one column in from each side
     const saved = load().layout?.[home.key], used = new Set();
     cells = defaults();
     if (saved) {   // saved cells win where they still fit and don't clash; the rest keep their default spot
