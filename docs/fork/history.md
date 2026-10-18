@@ -283,3 +283,4 @@
 - 2026-10-18: Prismatic Punch and Dam-A-Nade switched on: Melon Pass unlocks (page 6 replaces the Crows card, page 8 the Harvest Moon Glow; claimed slots reconcile), sold at the terminal, drinks, 8-augment research tracks each replacing their double-buy upgrade; the wall now reacts to the engine `shot` event on every map (reaper-perks.md, pass.md, research.md).
 - 2026-10-18: Der Wunderfizz costs the current perk price less 1,000 (was a flat 1,500); Perkaholic gives 6 random perks instead of every perk (waw-ports.md, gobblegums.md).
 - 2026-10-18: Prismatic Punch's wall cooldown 10 s -> 45 s (Quick Flash: 27 s) (reaper-perks.md).
+- 2026-10-18: Prismatic Punch's cooldown starts when the wall goes down, not when it rises (reaper-perks.md).

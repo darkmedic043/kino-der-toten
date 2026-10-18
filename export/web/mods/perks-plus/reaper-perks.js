@@ -301,12 +301,12 @@ export function setupReaperPerks(api, catalogue, base) {
   //      a 10 s personal Double Points.
   const fountains = []; let polosaDouble = 0;
   host.on('beforePoints', e => { if (polosaDouble > now() && e.amount > 0) e.amount *= 2; });
-  // ---- Prismatic Punch (switched on): bullet kills (15%, 45 s cooldown: PP_COOLDOWN) raise an energy wall for 10 s; a bullet through
+  // ---- Prismatic Punch (switched on): bullet kills (15%, 45 s cooldown: PP_COOLDOWN, counted from when the wall goes down) raise an energy wall for 10 s; a bullet through
   //      it ricochets into the nearest zombie within 400; each hit grows it 10% (max x2, then 2 ricochets). Augments
   //      (pp.*): size (starts bigger), cooldown, chance, damage, afterglow (s at max size), scatter (each ricochet jumps on
   //      for that share of its damage), spectrum (chance of a random ammo mod), nova (a maxed wall bursts when it fades).
   const walls = []; let wallReady = 0;
-  const PP_COOLDOWN = 45;   // s between walls (was 10; user, 2026-10-18: "much longer")
+  const PP_COOLDOWN = 45;   // s from a wall going down to the next one (was 10 from it going up; user, 2026-10-18: "much longer", "starts only after the wall goes down")
   // ---- Who's Who: see whosWho (30 s to revive your body; upgraded, the body shoots and the clone keeps every gun).
 
   // ---- damage dealt -------------------------------------------------------------------------------------------------
@@ -355,7 +355,7 @@ export function setupReaperPerks(api, catalogue, base) {
       if (Math.random() < .03) { const s = sprite(0xffd34f, 30); s.position.copy(at).y += 20; fountains.push({ at, until: t + 8, next: 0, s: keep(s, 8, (o, k) => { o.scale.setScalar(26 + Math.sin(now() * 8) * 6); }) }); }
       if (up('pointpolosa') && Math.random() < .04) { polosaDouble = t + 10; toast?.('Point Polosa · Double Points 10 s', 2); }
     }
-    if (has('prismatic') && t >= wallReady && Math.random() < .15 + stat('pp.chance') && z.rpCause === 'bullet') { wallReady = t + PP_COOLDOWN * (1 - stat('pp.cooldown')); raiseWall(at); }
+    if (has('prismatic') && t >= wallReady && Math.random() < .15 + stat('pp.chance') && z.rpCause === 'bullet') { wallReady = Infinity; raiseWall(at); }   // no new wall while one stands; the cooldown starts when it fades
     if (has('damnade') && (z.rpCause === 'explosion' || z.rpCause === 'grenade')) {
       if (stat('dn.shrapnel')) queueMicrotask(() => { blast(at, 110, zh() * stat('dn.shrapnel'), 'shrapnel', z); fx(at.clone().add(V(0, 25, 0)), .35, 0xffb347); });   // 'shrapnel': doesn't chain
       if (stat('dn.scav') && Math.random() < stat('dn.scav') && session.grenades < nadeMax()) { session.grenades++; toast?.('Dam-A-Nade · grenade recovered', 1); }
@@ -581,7 +581,7 @@ export function setupReaperPerks(api, catalogue, base) {
     // Prismatic Punch walls
     for (let i = walls.length - 1; i >= 0; i--) { const w = walls[i]; if (t > w.until) {
       if (w.maxed && stat('pp.nova')) { blast(w.at, 250, zh() * stat('pp.nova'), 'energy'); fx(w.at, .9, 0xc89bff); ring(w.at.clone().setY(feet().y), 250, 0xd6a8ff); }   // Supernova
-      w.m.removeFromParent(); w.m.geometry.dispose(); w.m.material.dispose(); walls.splice(i, 1); continue; } w.m.material.opacity = .25 + Math.sin(t * 4) * .05; }
+      w.m.removeFromParent(); w.m.geometry.dispose(); w.m.material.dispose(); walls.splice(i, 1); if (!walls.length) wallReady = t + PP_COOLDOWN * (1 - stat('pp.cooldown')); continue; } w.m.material.opacity = .25 + Math.sin(t * 4) * .05; }
     // Who's Who: the body's clock (and, upgraded, its gun)
     if (ghost.body) { const b = ghost.body;
       if (up('whoswho') && t > b.fire) { const z = nearest(b.at, 700); if (z) { b.fire = t + .5; bolt(b.at.clone().add(V(0, 20, 0)), chest(z), 0xffe08a); hurt(z, zh() * .3, 'bullet'); } }

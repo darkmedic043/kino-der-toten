@@ -25,7 +25,7 @@ The user (2026-10-18): "add one of the reaper perks, im thinking prismatic punch
 
 ### Prismatic Punch (implemented)
 
-- **Base**: 15% of bullet kills (45 s cooldown; 10 s until 2026-10-18, the user asked for it much longer) raise a purple energy wall at the kill, facing you, for 10 s. A bullet that crosses it (the engine's per-pellet `shot` event, so every map; a bullet stopped by a zombie in front doesn't reach it) ricochets into the nearest zombie within 400 for the gun's damage, and the wall grows 10% per hit, up to double size, where it fires two ricochets. The mod's activate / max-size sounds.
+- **Base**: 15% of bullet kills (45 s cooldown, counted from when the wall goes down, so Afterglow doesn't eat into it; until 2026-10-18 it was 10 s from the wall going up) raise a purple energy wall at the kill, facing you, for 10 s. A bullet that crosses it (the engine's per-pellet `shot` event, so every map; a bullet stopped by a zombie in front doesn't reach it) ricochets into the nearest zombie within 400 for the gun's damage, and the wall grows 10% per hit, up to double size, where it fires two ricochets. The mod's activate / max-size sounds.
 - **Research track** (`pp.*`, Minor/Major alternating):
 
 | # | Augment | Kind | Effect |
