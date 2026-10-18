@@ -8,13 +8,16 @@
 //     early and keeps what's left.
 //   - downed, a new game or losing the weapon puts it away.
 // Weapons register themselves (window.kino.operator.register(def)); def.activate(ctx) returns a handle:
-//   { update(dt), fire(down), aim(down), end() }   fire/aim: the left / right mouse button pressed (true) or released
+//   { update(dt), fire(down), aim(down), end(), melee?() }   fire/aim: the left / right mouse button pressed (true) or
+//   released; melee: the knife key (V) while it's out (the Annihilator's pistol-whip). def.given?() runs on give().
+// Registered: the Ragnarok DG-4 (ragnarok.js), the Annihilator (annihilator.js, The Giant's Fly Trap prize).
 // The slot is filled by give(id): map pickups and buildables (Der Eisendrache's Ragnarok craftable, later), the cheat
 // console (`operator <id>`). Its HUD bubble is #operator-weapon (hud-bo7 puts it at the weapon dial's lower right).
 import * as THREE from 'three';
 import { binds } from '../../settings.js';
 import { setupRagnarok } from './ragnarok.js';
 import { setupRocketShield } from './rocket-shield.js';
+import { setupAnnihilator } from './annihilator.js';
 
 export default async function setup(api){
   const {host,session,view,audio}=api;
@@ -27,7 +30,7 @@ export default async function setup(api){
   function give(id,{full=false}={}){
     const def=defs.get(id);if(!def)return false;
     if(st.active)putAway();
-    st.def=def;st.charge=full?1:0;hud();
+    st.def=def;st.charge=full?1:0;hud();try{def.given?.();}catch(e){console.warn('[operator]',e);}
     api.toast?.(`${def.name} · operator weapon`,2.5);return true;
   }
   function take(){if(st.active)putAway();st.def=null;st.charge=0;hud();}
@@ -64,7 +67,7 @@ export default async function setup(api){
   addEventListener('keydown',e=>{if(e.code==='KeyY'&&!e.repeat)use();});   // game-menu re-sends a rebound key as KeyY
   // the gun keys do nothing while it's out (reload, knife, grenade, weapon slots, buy, monkey, swap)
   const BLOCK=new Set(['KeyR','KeyV','KeyG','Digit1','Digit2','Digit3','Digit4','Digit5','KeyX','KeyQ']);
-  addEventListener('keydown',e=>{if(st.active&&api.getState().active&&BLOCK.has(e.code))e.stopImmediatePropagation();},true);
+  addEventListener('keydown',e=>{if(st.active&&api.getState().active&&BLOCK.has(e.code)){e.stopImmediatePropagation();if(e.code==='KeyV'&&!e.repeat)st.active.melee?.();}},true);   // a weapon with melee() (the Annihilator's pistol-whip) gets the knife key
   addEventListener('mousedown',e=>{
     if(!st.active||!api.getState().active||(e.button!==0&&e.button!==2))return;
     e.stopImmediatePropagation();(e.button===0?st.active.fire:st.active.aim)?.(true);
@@ -138,6 +141,7 @@ export default async function setup(api){
   kino.operator={register,give,take,use,putAway,addCharge,defs,
     get current(){return st.def?.id??null;},get handle(){return st.active;},get charge(){return st.charge;},get active(){return !!st.active;},get power(){return st.power;}};
   setupRagnarok(api,kino.operator);
+  setupAnnihilator(api,kino.operator);   // The Giant's Fly Trap prize; the cheat console elsewhere
   kino.rocketShield=setupRocketShield(api);   // BO3's rocket shield: built on Der Eisendrache, bought at the Armory elsewhere
   kino.cheats?.addCommand?.('operator',{usage:'operator <id|none>',text:'Give an operator weapon, charged: '+[...defs.keys()].join(', '),cheat:true,
     run:([id])=>{if(!id||id==='none'){take();return 'Operator weapon removed';}const m=[...defs.keys()].find(k=>k.startsWith(id.toLowerCase()));if(!m)return 'Unknown: '+[...defs.keys()].join(', ');give(m,{full:true});return defs.get(m).name+' (charged)';}});

@@ -12,6 +12,7 @@
 //     (Moon's session has the perk and its gas immunity natively, but no dive explosion).
 import * as THREE from 'three';
 import { BO7_PERKS, BO7_ICONS, setupBo7Perks } from './bo7-perks.js';
+import { setupReaperPerks } from './reaper-perks.js';
 export const MORE_PERKS = {
   specialty_longersprint: { name: 'Stamin-Up', price: 2000, color: '#ebbd4b', icon: 'S' },
   specialty_deadshot: { name: 'Deadshot Daiquiri', price: 1500, color: '#9da8ac', icon: 'DS' },
@@ -36,9 +37,14 @@ function addIcons(base) {
     Object.entries(ICONS).map(([t, f]) => `#perks span[title="${t}"]{background-image:url(${new URL('icons/' + f, base).href})!important}`).join('');
   document.head.append(style);
 }
-export default function setup({ host, session, player, world, map, audio, mod, enemies, scene, perkInfo, camera, powerups, announce, toast }) {
+export default function setup(api) {
+  const { host, session, player, world, map, audio, mod, enemies, scene, perkInfo, camera, powerups, announce, toast } = api;
   addIcons(mod?.url ?? import.meta.url);
   phdFlopper({ host, session, player, world, audio, enemies, scene });
+  // the Reaper Collection perks: working but switched off (cheat console only; reaper-perks.js, docs/fork/reaper-perks.md)
+  const base = new URL('./', mod?.url ?? import.meta.url);
+  fetch(new URL('reaper-perks.json', base)).then(r => r.ok ? r.json() : null).then(j => { if (j?.perks) setupReaperPerks(api, j.perks, base); })
+    .catch(e => console.warn('[perks-plus] reaper perks', e));
   if (map?.id === 'moon') return;
   const table = world?.perkInfo ?? perkInfo;   // custom maps' table, else the engine's (Kino), so the terminal can sell them anywhere
   if (table) for (const [id, p] of Object.entries(MORE_PERKS)) table[id] ??= p;

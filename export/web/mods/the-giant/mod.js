@@ -6,6 +6,8 @@
 //   teleporter works from then on). All three linked: the mainframe door rises and Pack-a-Punch opens.
 import * as THREE from 'three';
 import { CollisionWorld } from '../../collision-world.js';
+import { loadModel } from '../../animation.js';
+import { binds } from '../../settings.js';
 
 const LINK_TIME = 30, WHERE = { pad0: 'east', pad1: 'south', pad2: 'west' };
 export default function setup(api) {
@@ -110,15 +112,21 @@ function setupBridges({ world, session, host, audio }) {
 // ---- Easter eggs, after zm_factory.gsc (BO3 source):
 //   Fly Trap: shoot the control panel (GIANT_FLYTRAP) with a Pack-a-Punched gun; 9 s later three targets appear around
 //   the map (GIANT_EE_*: a monkey bomber, a teddy bear with a Bowie knife, a teddy bear with Juggernog and an M1911);
-//   shoot all three and the Annihilator spins at GIANT_PRIZE, free to each player who takes it. The Annihilator isn't
-//   in the game: the prize is a Pack-a-Punched Python (BO1's magnum, the nearest thing).
+//   shoot all three and the Annihilator spins at GIANT_PRIZE, free to each player who takes it. It's BO3's Annihilator
+//   (2026-10-18): an operator weapon (mods/operator-weapons/annihilator.js), given fully charged and shown spinning
+//   in the furnace as BO3's world model. Without the BO3 files (mods/bo3-weapons/weapons.json `operator.annihilator`)
+//   the prize falls back to a Pack-a-Punched Python (BO1's magnum, the nearest thing).
 //   Music: use the three spine jars (GIANT_JAR_<n>) for Beauty of Annihilation (Giant Remix), git-ignored
 //   sounds/beauty-of-annihilation.ogg extracted from BO3's zm_factory sound bank.
 // Models Greyhound didn't export (GIANT_EESUB_<model> slots) get BO1 stand-ins from the Mystery Box's display copies.
 const STAND_IN = { zombie_monkey_bomber: 'zombie_cymbal_monkey', viewmodel_zombie_cymbal_monkey: 'zombie_cymbal_monkey', t6_wpn_pistol_m1911_world: 'm1911_zm' };
-const PRIZE = 'python_zm', SONG = 'giant_beauty_of_annihilation';
+const PRIZE = 'python_zm', OPERATOR = 'annihilator', SONG = 'giant_beauty_of_annihilation';
+// the Annihilator operator weapon, when its BO3 files are built (the operator mod fetches them at startup)
+let ANNIHILATOR = null;
+fetch(new URL('../bo3-weapons/weapons.json', import.meta.url)).then(r => r.ok ? r.json() : null).then(j => { ANNIHILATOR = j?.operator?.annihilator ?? null; }).catch(() => {});
 function setupEggs(api) {
   const { world, session, host, toast, announce, audio, data } = api, box = () => api.mysteryBox ?? globalThis.kino?.mods?.api?.mysteryBox;
+  const op = () => globalThis.kino?.operator, annihilator = () => op()?.defs?.has(OPERATOR) && ANNIHILATOR ? ANNIHILATOR : null;
   const root = world.root; if (!root) return;
   const node = name => root.getObjectByName(name), at = o => o.getWorldPosition(new THREE.Vector3());
   const flytrap = node('GIANT_FLYTRAP'), prizeAt = node('GIANT_PRIZE'), prizeUse = node('GIANT_PRIZE_USE');
@@ -177,18 +185,33 @@ function setupEggs(api) {
   };
   const givePrize = () => {
     stage = 'prize';
-    prize = box()?.display?.(PRIZE) ?? null;
-    if (prize) { prize.position.copy(at(prizeAt)); scene().add(prize); globalThis.kino?.lighting?.tag?.(prize); }
+    const place = m => { prize = m; prize.position.copy(at(prizeAt)); scene().add(prize); globalThis.kino?.lighting?.tag?.(prize); };
+    if (annihilator()) {   // BO3's world model (in centimetres), turned on its side like the prize in the furnace
+      const url = annihilator().worldModel;
+      loadModel(url).then(m => {
+        if (stage !== 'prize' || !m) return;
+        m.scale.setScalar(1 / 2.54); const g = new THREE.Group(); g.add(m);
+        const b = new THREE.Box3().setFromObject(m); m.position.sub(b.getCenter(new THREE.Vector3()));
+        m.traverse(o => { o.frustumCulled = false; }); place(g);
+      }).catch(() => { const m = box()?.display?.(PRIZE); if (m && stage === 'prize') place(m); });
+    } else { const m = box()?.display?.(PRIZE); if (m) place(m); }
     announce?.('THE FLY TRAP', 'A GIFT WAITS BY THE MULE KICK MACHINE', 6);
     host.emit?.('easterEgg', { name: 'fly trap' });
   };
   const scene = () => api.scene;
   world.addInteraction({
     position: at(prizeUse ?? prizeAt),
-    hidden: () => stage !== 'prize' || session.inventory.some(w => w.id === PRIZE && w.upgraded && !w.lost),
-    text: () => 'Take the Annihilator (Pack-a-Punched Python)',
+    hidden: () => stage !== 'prize' || (annihilator() ? op()?.current === OPERATOR && op().charge >= 1 && !op().active
+      : session.inventory.some(w => w.id === PRIZE && w.upgraded && !w.lost)),
+    text: () => annihilator() ? 'Take the Annihilator (operator weapon)' : 'Take the Annihilator (Pack-a-Punched Python)',
     use() {
-      if (stage !== 'prize' || !data.weapons[PRIZE]) return false;
+      if (stage !== 'prize') return false;
+      if (annihilator()) {   // into the operator slot, charged (a held Annihilator is refilled)
+        if (op().active) op().putAway(); op().give(OPERATOR, { full: true }); globalThis.kino?.armory?.found?.(OPERATOR); audio?.play?.('buy');   // found: the Armory's unlock (mods/armory)
+        toast('Reward: Annihilator · ' + (binds().operator ?? 'KeyY').replace(/^Key/, '') + ' to use', 5);
+        return true;
+      }
+      if (!data.weapons[PRIZE]) return false;
       session.giveWeapon(PRIZE);
       const w = session.inventory.find(x => x.id === PRIZE);
       if (w) { w.upgraded = true; w.mag = session.def.clipSize; w.reserve = session.def.maxAmmo; }

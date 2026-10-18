@@ -1,6 +1,6 @@
 // The Armory (ARMORY.EXE on the terminal booth, user 2026-10-17): special gear bought outside the map it comes from,
-// in tabs: OPERATOR WEAPONS (the Ragnarok DG-4), SHIELDS (the rocket shield) and SCORESTREAKS (to come). Each item has
-// to be earned on its home map first: find it there (Der Eisendrache: take it from its bench), then get item.kills kills
+// in tabs: OPERATOR WEAPONS (the Ragnarok DG-4, the Annihilator), SHIELDS (the rocket shield) and SCORESTREAKS (to come). Each item has
+// to be earned on its home map first: find it there (Der Eisendrache: take it from its bench; The Giant: the Fly Trap), then get item.kills kills
 // with it. After that every other map sells it at a terminal for item.price (mains power on). It can't be bought on
 // its home map: you build it there. Progress is account-wide in kino.mods.armory (cloud.js TRACKED).
 // window.kino.armory: {status(), buy(id) -> true | 'reason', found(id)}
@@ -12,6 +12,9 @@ export const TABS = [
     { id: 'ragnarok', name: 'Ragnarok DG-4', home: 'der-eisendrache', homeName: 'Der Eisendrache', price: 30000, kills: 250, color: '#5fd0ff',
       blurb: 'Gravity spikes. Slam the ground, or plant them and lift the horde.',
       specs: ['Operator weapon slot: Y to pull it out once charged (bought fully charged)', 'Left mouse slams: kills within 200 (300 from a jump)', 'Right mouse plants a lift field; either button slams them all down', 'Recharges from your kills'] },
+    { id: 'annihilator', name: 'Annihilator', home: 'the-giant', homeName: 'The Giant', price: 25000, kills: 150, color: '#f2c14e',
+      blurb: "Seraph's revolver. Six depleted-uranium rounds a cylinder, eighteen to a charge.",
+      specs: ['Operator weapon slot: Y to pull it out once charged (bought fully charged)', '18 shots: each goes through every zombie in its path', 'One-shot headshots to round 24; kills disintegrate', 'Right mouse aims, V pistol-whips', 'Recharges from your kills'] },
   ] },
   { id: 'shields', name: 'SHIELDS', items: [
     { id: 'rocket_shield', name: 'Rocket Shield', home: 'der-eisendrache', homeName: 'Der Eisendrache', price: 20000, kills: 250, color: '#ff9a3a', icon: SHIELD_ICON,
@@ -45,14 +48,14 @@ export default async function setup(api) {
     if (!was && unlocked(r, item)) api.announce?.(item.name.toUpperCase(), 'UNLOCKED IN THE ARMORY', 3);
   }
   // kills with each item: the shield's own bash/dash (rocketShield.hitting while its damage lands, kill is synchronous)
-  // and the Ragnarok's (cause 'operator', recorded by operator-weapons as enemy.lastCause)
+  // and the operator weapons' (cause 'operator', recorded by operator-weapons as enemy.lastCause; the one in the slot)
   host.on('kill', e => {
     if (e.remote || !e.enemy || cheating()) return;
     if (kino.rocketShield?.hitting) addKill('rocket_shield');
-    else if (e.enemy.lastCause === 'operator' && kino.operator?.current === 'ragnarok') addKill('ragnarok');
+    else if (e.enemy.lastCause === 'operator' && ITEMS[kino.operator?.current]?.tab === 'operators') addKill(kino.operator.current);
   });
 
-  const owned = id => id === 'ragnarok' ? kino.operator?.current === 'ragnarok' : id === 'rocket_shield' ? !!kino.rocketShield?.owned : false;
+  const owned = id => ITEMS[id]?.tab === 'operators' ? kino.operator?.current === id : id === 'rocket_shield' ? !!kino.rocketShield?.owned : false;
   // why it can't be bought right now ('' when it can)
   function blocked(item, rec) {
     if (item.home === mapId) return 'home';
@@ -79,10 +82,10 @@ export default async function setup(api) {
     if (why === 'owned') return 'You already have it';
     if (why === 'power') return 'No mains power';
     if (session.phase === 'reviving' || session.busy) return 'Terminal busy';
-    if (id === 'ragnarok' && kino.operator?.active) return 'Put your operator weapon away first';
+    if (ITEMS[id].tab === 'operators' && kino.operator?.active) return 'Put your operator weapon away first';
     if (host.gunBlocked) return 'Lower what you are holding first';
     if (!session.spend(item.price)) return 'Not enough points';
-    if (id === 'ragnarok') kino.operator?.give('ragnarok', { full: true });
+    if (ITEMS[id].tab === 'operators') kino.operator?.give(id, { full: true });
     else if (id === 'rocket_shield') kino.rocketShield?.give();
     return true;
   }

@@ -238,6 +238,7 @@ export default async function setup(api){
 
   // ---- Downs, revives, bleed-out and spectating ------------------------------------------------
   const me={down:false,dead:false,bleed:0,reviving:null,progress:0,spectate:0};
+  window.kino.coopDown=me;   // read by perks (Tombstone: bled out or revived)
   const overlay=document.createElement('div');overlay.id='coop-down';overlay.innerHTML='<strong></strong><span></span>';document.body.append(overlay);
   const revive=document.createElement('div');revive.id='coop-revive';revive.innerHTML='<span></span><i><b></b></i>';document.body.append(revive);
   let forcingGameOver=false;
@@ -249,7 +250,8 @@ export default async function setup(api){
     hurtSession(Math.max(0,session.health-1));goDown();return true;
   };
   function goDown(){
-    me.down=true;me.bleed=BLEED_OUT;session.phase='reviving';session.reviveLeft=Infinity;session.health=0;session.perks.clear();session.cancelReload();
+    // coopBleedMul: Downer's Delight (perks-plus reaper-perks.js), read before the perks are cleared
+    me.down=true;me.bleed=BLEED_OUT*(window.kino?.coopBleedMul?.()??1);session.phase='reviving';session.reviveLeft=Infinity;session.health=0;session.perks.clear();session.cancelReload();
     queueMicrotask(()=>api.announce('You are down','HOLD ON · A TEAMMATE CAN REVIVE YOU',5));showPanel();
   }
   function getUp(){

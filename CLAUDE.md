@@ -21,6 +21,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Weapon levels, attachments (incl. mounted BO3 parts), camos, Gunsmith view, scopes, flamethrower, Pack-a-Punch sound, Phase 4 prestige (weapon + player, prestige camos) | `weapon-levels.md` |
 | Classes (BL4 loadouts), skill trees, all six action skills, the Mech class, Phase 3 charging, resources, synergies, either-or nodes (`skills.js`) | `classes.md` |
 | Gobblegums (pack ladder, GUMS terminal app, effects) | `gobblegums.md` |
+| Reaper Collection perks: 45 working but switched off (cheat `reaper`; one section each, `perks-plus/reaper-perks.js/.json`) | `reaper-perks.md` |
 | Journal: every map's Easter eggs step by step, recorded once done, tracking with on-screen markers (JOURNAL.EXE) | `journal.md` |
 | Research: perk and ammo mod augments (Phase 5) | `research.md` |
 | Credits, challenges and the Shop tab (Phase 6) | `shop.md` |

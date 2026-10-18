@@ -424,5 +424,29 @@ if (SRC/'xmodels'/'wpn_t7_zmb_dlc1_rocket_shield_view').exists():
                                 'sprintLoopTime': ST.get('sprintLoopAnim', .6), 'sprintOutTime': ST.get('sprintOutAnim', .2), 'adsInTime': .25, 'adsOutTime': .25,
                                 'viewOffset': [0, 0, 0], 'sprintOffset': [0, 0, 0], 'sprintRotation': [0, 0, 0], 'hideTags': []}
     print('rocket shield anims', len(SA))
+# The Annihilator (BO3's hero_annihilator, The Giant's Fly Trap prize; exported from zm_factory with its vm_annihilator_*
+# clips): an operator weapon with its own ViewWeapon (mods/operator-weapons/annihilator.js). Sounds from Greyhound's Load
+# File on zone/snd/all/zm_factory.all.sabl (search "annihilator,anni_"), copied to <export_dir>/sounds/annihilator/.
+if (SRC/'xmodels'/'wpn_t7_hero_annihilator_view').exists():
+    av, am = model('wpn_t7_hero_annihilator_view', 'annihilator_view', RENAME)
+    aw = model('wpn_t7_hero_annihilator_world', 'annihilator_world', light=True)[0]
+    ab = {b['name']: b['lpos'] for b in am['bones'] if 'lpos' in b and b['parent'] >= 0}
+    AA, AT = {}, {}
+    for key, name, loop in [('idleAnim', 'idle', True), ('raiseAnim', 'pullout', False), ('firstRaiseAnim', 'first_raise', False), ('dropAnim', 'putaway', False),
+                            ('fireAnim', 'fire', False), ('adsFireAnim', 'fire_ads', False), ('rechamberAnim', 'rechamber', False),
+                            ('adsRechamberAnim', 'rechamber_ads', False), ('meleeAnim', 'gunbutt_swipe', False), ('sprintInAnim', 'sprint_in', False),
+                            ('sprintLoopAnim', 'sprint_loop', True), ('sprintOutAnim', 'sprint_out', False), ('adsUpAnim', 'ads_base_up', False)]:
+        n = 'vm_annihilator_' + name
+        if (SRC/'xanims'/(n+'.seanim')).exists(): AA[key], AT[key] = animation(n, ab, loop)
+    asnd = {}
+    for wav in sorted((SRC/'sounds'/'annihilator').glob('*.wav')):
+        out = MOD/'audio'/'annihilator'/(wav.stem+'.ogg'); out.parent.mkdir(parents=True, exist_ok=True)
+        if not out.exists(): subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', str(wav), '-ac', '2', '-c:a', 'libvorbis', '-q:a', '5', str(out)], check=True)
+        asnd[wav.stem] = WEB+'audio/annihilator/'+out.name
+    operator['annihilator'] = {'id': 'annihilator', 'model': av, 'worldModel': aw, 'handsModel': hands, 'animations': AA, 'durations': AT, 'sounds': asnd,
+                               'raiseTime': AT.get('raiseAnim', .6), 'dropTime': AT.get('dropAnim', .6), 'sprintInTime': AT.get('sprintInAnim', .2),
+                               'sprintLoopTime': AT.get('sprintLoopAnim', 1), 'sprintOutTime': AT.get('sprintOutAnim', .2), 'adsInTime': .2, 'adsOutTime': .2,
+                               'viewOffset': [3, -4, 0], 'sprintOffset': [0, 0, 0], 'sprintRotation': [0, 0, 0], 'hideTags': []}
+    print('annihilator anims', len(AA), 'sounds', len(asnd))
 (MOD/'weapons.json').write_text(json.dumps({'weapons': weapons, 'sounds': {'dg2': sounds, 'mod': modsounds, 'audio': audio_keys}, 'fx': fx, 'operator': operator}, indent=1))
 print('wrote', MOD/'weapons.json')

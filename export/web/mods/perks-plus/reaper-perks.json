@@ -1,0 +1,773 @@
+{
+ "_about": "The Reaper Collection Rebuilt perks (BO3 workshop mod 3814067303 by Logical Reaper), catalogued for Melon Zombies. Their effects work (mods/perks-plus/reaper-perks.js reads this file) but they are switched off: nothing sells them, only the cheat console gives them (`reaper <id|all>`, `reaper up <id|all>`). effect/upgrade: the mod author's \"All Perks\" sheet. origin: the game the perk first appeared in, where known (custom = the mod or another modder). source: the BO3/mod asset names .tools/build_reaper_perks.py builds from into mods/perks-plus/reaper/ (git-ignored). new: false = Melon Zombies already has the perk (listed for its machine and jingle). Write-up: docs/fork/reaper-perks.md.",
+ "perks": {
+  "banana": {
+   "name": "Banana Colada",
+   "specialty": "specialty_banana",
+   "origin": "custom (MadGaz)",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Sliding leaves a yellow trail that zombies slip and die on",
+   "upgrade": "Perk damage is doubled",
+   "source": {
+    "machine": "vending_banana_colada",
+    "icon": "specialty_banana_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_banana_colada_c",
+    "sound": "madgazperks/bannana_colada/bc_"
+   }
+  },
+  "bandolier": {
+   "name": "Bandolier Bandit",
+   "specialty": "specialty_bandolier",
+   "origin": "Black Ops 4",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Extra ammo for all weapons",
+   "upgrade": "Stowed weapons slowly refill their clips",
+   "source": {
+    "machine": "cz_zombie_vending_bandolier",
+    "icon": "specialty_bandolier_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_bandolier_bandit_c",
+    "sound": null
+   }
+  },
+  "blazephase": {
+   "name": "Blaze Phase",
+   "specialty": "specialty_blazephase",
+   "origin": "Black Ops 4",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Crouching charges up fire; standing releases it and flings you forward, igniting zombies",
+   "upgrade": "Charges further and explodes when stopped",
+   "source": {
+    "machine": "p7_zm_vending_blazephase_on",
+    "icon": "specialty_blaze_phase_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_blaze_phase_c",
+    "sound": null
+   }
+  },
+  "bloodbullets": {
+   "name": "Blood Bullets",
+   "specialty": "specialty_bloodbullets",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Ammo in the active gun slowly regenerates (clip size sets the rate); not wonder weapons except the Ray Gun",
+   "upgrade": "Occasionally affects stowed weapons and wonder weapons",
+   "source": {
+    "machine": "cz_zombie_vending_blood_bullets",
+    "icon": "specialty_bloodbullets_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_blood_bullets_c",
+    "sound": "reaps_cz/blood_bullets/bloodbullets_"
+   }
+  },
+  "bloodwolf": {
+   "name": "Blood Wolf Bite",
+   "specialty": "specialty_bloodwolf",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Dealing a lot of damage quickly spawns a friendly wolf that hunts zombies",
+   "upgrade": "The wolf's kills drop mini power-ups (points, ammo, specialist power); shorter recharge",
+   "source": {
+    "machine": "cz_zombie_vending_blood_wolf_bite",
+    "icon": "specialty_bloodwolf_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_bloodwolf_c",
+    "sound": null
+   }
+  },
+  "bull_ice": {
+   "name": "Bull Ice Blast",
+   "specialty": "specialty_bull_ice",
+   "origin": "custom (MadGaz)",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Double jump, then crouch in the air to slam down and blast zombies into ice",
+   "upgrade": "Perk range doubled",
+   "source": {
+    "machine": "vending_bull_ice_blast_on",
+    "icon": "specialty_bull_ice_blast_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_bull_ice_blast_c",
+    "sound": "madgazperks/bull_ice_blast/ice_"
+   }
+  },
+  "cashback": {
+   "name": "Cashback Cocktail",
+   "specialty": "specialty_cashback",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "20% cash back on any purchase",
+   "upgrade": "10% more cash back",
+   "source": {
+    "machine": "cz_zombie_vending_cashback",
+    "icon": "specialty_cashback_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_cashback_c",
+    "sound": "reaps_cz/cashback/cashback_"
+   }
+  },
+  "changechews": {
+   "name": "Change Chews",
+   "specialty": "specialty_changechews",
+   "origin": "Infinite Warfare",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Headshots can trigger one of 4 elemental explosions; the element changes at low health",
+   "upgrade": "Effects are stronger and last longer",
+   "source": {
+    "machine": "cz_zombie_vending_changechews_on",
+    "icon": "specialty_changechews_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_changechews_c",
+    "sound": [
+     "reaps_cz/changechews/mus_zmb_town_perk_attract_changechews",
+     "reaps_cz/changechews/mus_zmb_town_perk_purchase_changechews"
+    ]
+   }
+  },
+  "crusade": {
+   "name": "Crusader's Ale",
+   "specialty": "specialty_crusade",
+   "origin": "custom (MadGaz)",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Double melee points, more knife damage, the shield repairs itself between rounds",
+   "upgrade": "Kills can slightly heal the shield",
+   "source": {
+    "machine": "vending_crusader_ale",
+    "icon": "specialty_crusader_ale_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_crusader_ale_c",
+    "sound": "madgazperks/crusaders_ale/crusade_"
+   }
+  },
+  "damnade": {
+   "name": "Dam-A-Nade",
+   "specialty": "specialty_damnade",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Stronger explosives, one more lethal and tactical; at round end all lethals and 1 tactical refill",
+   "upgrade": "Even stronger explosives",
+   "source": {
+    "machine": "cz_zombie_vending_damnade",
+    "icon": "specialty_damnade_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_damnade_c",
+    "sound": "reaps_cz/damanade/damanade_"
+   }
+  },
+  "downers": {
+   "name": "Downer's Delight",
+   "specialty": "specialty_downersdelight",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Double bleed-out time; keep your primary weapon when downed",
+   "upgrade": "Triple bleed-out time",
+   "source": {
+    "machine": "cz_zombie_vending_downers_delight",
+    "icon": "specialty_downersdelight_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_downers_delight_c",
+    "sound": "reaps_cz/downers/downers_"
+   }
+  },
+  "dyingwish": {
+   "name": "Dying Wish",
+   "specialty": "specialty_dyingwish",
+   "origin": "Black Ops 4",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Negates death for 9 s on 1 health (5 min cooldown); melee kills basic zombies outright meanwhile",
+   "upgrade": "Full health after the invincibility",
+   "source": {
+    "machine": "cz_vending_dying_wish_new",
+    "icon": "specialty_dyingwish_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_dying_wish_c",
+    "sound": null
+   }
+  },
+  "electriccherry": {
+   "name": "Electric Cherry",
+   "specialty": "specialty_electriccherry",
+   "origin": "Black Ops II",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Reloading releases an electric burst",
+   "upgrade": "Larger range and more damage",
+   "source": {
+    "machine": "p6_zm_vending_electric_cherry_on",
+    "icon": "specialty_electric_cherry_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_electric_cherry_c",
+    "sound": null
+   }
+  },
+  "estatic": {
+   "name": "Estatic Elixir",
+   "specialty": "specialty_estatic",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Sprinting builds an electric charge that stuns nearby zombies",
+   "upgrade": "Every 10 stuns stores a charge (max 4); when hit, a charge stuns nearby zombies",
+   "source": {
+    "machine": "cz_zombie_vending_estatic",
+    "icon": "specialty_estatic_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_estatic_c",
+    "sound": "reaps_cz/estatic_elixir/estatic_"
+   }
+  },
+  "razor": {
+   "name": "Ethereal Razor",
+   "specialty": "specialty_razor",
+   "origin": "Black Ops 4",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Melee hits several zombies, deals much more damage and heals",
+   "upgrade": "Melee damage greatly increased again",
+   "source": {
+    "machine": "cz_vending_razor_new",
+    "icon": "specialty_razor_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_ethereal_razor_c",
+    "sound": null
+   }
+  },
+  "ffyl": {
+   "name": "Fighter's Fizz",
+   "specialty": "specialty_ffyl",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Keep your gun when downed; get a kill to revive yourself and keep all perks",
+   "upgrade": "Keep Fighter's Fizz when reviving (losing the upgrade)",
+   "source": {
+    "machine": "zombie_vending_ffyl_on",
+    "icon": "specialty_ffyl_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_ffyl_c",
+    "sound": "_logical/perks/fighterfizz/"
+   }
+  },
+  "icu": {
+   "name": "I.C.U.",
+   "specialty": "specialty_icu",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Faster health regen, speed boost at low health, invincible while doing actions",
+   "upgrade": "Invincibility and speed boost last longer",
+   "source": {
+    "machine": "zombie_vending_icu_on",
+    "icon": "specialty_icu_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_icu_c",
+    "sound": "_logical/perks/icu/"
+   }
+  },
+  "inferno": {
+   "name": "Inciner-Brandy",
+   "specialty": "specialty_inferno",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Chance to ignite zombies (damage over time); zombies killed by fire can explode",
+   "upgrade": "Fire lasts longer",
+   "source": {
+    "machine": "cz_zombie_vending_inferno",
+    "icon": "specialty_inferno_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_inferno_c",
+    "sound": null
+   }
+  },
+  "moonshine": {
+   "name": "Madgaz Moonshine",
+   "specialty": "specialty_moonshine",
+   "origin": "custom (MadGaz)",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Sliding makes an explosion (20 a round); shot zombies can catch fire",
+   "upgrade": "30 slide charges, higher fire chance",
+   "source": {
+    "machine": "vending_madgaz_moonshine",
+    "icon": "specialty_madgaz_moonshine_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_madgaz_moonshine_c",
+    "sound": "madgazperks/madgaz_moonshine/moonshine_"
+   }
+  },
+  "magnet": {
+   "name": "Magnet Margarita",
+   "specialty": "specialty_magnet",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Power-ups drift toward the nearest player with this perk, stopping short of them",
+   "upgrade": "Power-ups move twice as fast; your kills can spawn bonus power-ups",
+   "source": {
+    "machine": "cz_zombie_vending_magnet",
+    "icon": "specialty_magnet_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_magnet_c",
+    "sound": null
+   }
+  },
+  "mh_mocha": {
+   "name": "Miracle Hands Mocha",
+   "specialty": "specialty_mh_mocha",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Faster equipment use; change a power-up up to 3 times",
+   "upgrade": "No Carpenter or Nuke results, one more change, Max Ammo becomes a free perk bottle",
+   "source": {
+    "machine": "cz_zombie_vending_mh_mocha",
+    "icon": "specialty_mh_mocha_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_mh_mocha_c",
+    "sound": "reaps_cz/mh_mocha/mh_mocha_"
+   }
+  },
+  "momentum": {
+   "name": "Momentum Mojito",
+   "specialty": "specialty_momentum",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Sprinting builds speed; at top speed, charged sprints damage zombies you pass (10 charges, refilled by kills; double-tap sprint toggles kill mode)",
+   "upgrade": "15 charges, momentum starts faster with more charges, not lost when sliding",
+   "source": {
+    "machine": "p6_zm_vending_momentum_on",
+    "icon": "specialty_momentum_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_momentum_c",
+    "sound": "reaps_cz/momentum/momentum_"
+   }
+  },
+  "milk": {
+   "name": "Muscle Milk",
+   "specialty": "specialty_milk",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Melee stabs chain electricity between zombies (15 s cooldown)",
+   "upgrade": "Chains further, shorter cooldown",
+   "source": {
+    "machine": "zombie_vending_milk_on",
+    "icon": "specialty_milk_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_milk_c",
+    "sound": "_logical/perks/milk/"
+   }
+  },
+  "nitrogen": {
+   "name": "Nitrogen Cooled",
+   "specialty": "specialty_nitrogen",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Nearby zombies slow to a walk",
+   "upgrade": "Larger range",
+   "source": {
+    "machine": "cz_zombie_vending_nitrogen",
+    "icon": "specialty_nitrogen_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_nitrogen_c",
+    "sound": null
+   }
+  },
+  "nobear": {
+   "name": "No Bear Brew",
+   "specialty": "specialty_nobear",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "No teddy bears from the Mystery Box",
+   "upgrade": "Move the box once a round; it sometimes spins free nearby",
+   "source": {
+    "machine": "p7_zm_vending_nobear_on",
+    "icon": "specialty_nobear_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_nobear_c",
+    "sound": "reaps_cz/no_bear_brew/nobear_"
+   }
+  },
+  "nukacola": {
+   "name": "Nuka Cola",
+   "specialty": "specialty_nukacola",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Going down sets off a Nuke",
+   "upgrade": "Picking up a power-up can spawn another (always with Nukes)",
+   "source": {
+    "machine": "cz_zombie_vending_nuka_cola",
+    "icon": "specialty_nukacola_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_nuka_cola_c",
+    "sound": null
+   }
+  },
+  "phdslider": {
+   "name": "PhD Flopper (Cold War)",
+   "specialty": "specialty_phdslider",
+   "origin": "Black Ops Cold War",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Sliding into zombies explodes; immune to explosive damage",
+   "upgrade": "More damage from higher drops and longer slides",
+   "source": {
+    "machine": "cz_zombie_vending_da_phd_slider",
+    "icon": "specialty_phdslider_cw_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_phd_slider_c",
+    "sound": "reaps_cz/phd_slider/mus_phd_"
+   }
+  },
+  "packbox": {
+   "name": "Pack-A-Box",
+   "specialty": "specialty_packbox",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Chance of a Pack-a-Punched weapon from the Mystery Box",
+   "upgrade": "Higher chance; can come re-Pack-a-Punched",
+   "source": {
+    "machine": "cz_zombie_vending_packbox",
+    "icon": "specialty_packbox_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_packbox_c",
+    "sound": null
+   }
+  },
+  "pointcrusher": {
+   "name": "Point Crusher",
+   "specialty": "specialty_point",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Can earn extra points per kill",
+   "upgrade": "Chance to double the extra points",
+   "source": {
+    "machine": "cz_vending_point_crusher",
+    "icon": "specialty_pointcrusher_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_point_crusher_c",
+    "sound": null
+   }
+  },
+  "repairman": {
+   "name": "Repairman Rum",
+   "specialty": "specialty_repairman",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Instant window repairs, double repair points; boards you repaired explode when torn off",
+   "upgrade": "4x repair point cap; Carpenter gets every effect and double points",
+   "source": {
+    "machine": "cz_vending_repairman_on",
+    "icon": "specialty_repairman_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_repairman_c",
+    "sound": "reaps_cz/repairman_rum/repairman_"
+   }
+  },
+  "spectorshot": {
+   "name": "Spectre Shot",
+   "specialty": "specialty_spectorshot",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Switching weapons near 10+ zombies summons a spectral copy of the last gun that auto-fires; hits slow, kills refill that gun",
+   "upgrade": "Spectral hits deal bonus damage and go for heads; longer, faster cooldown",
+   "source": {
+    "machine": "cz_vending_spectorshot_on",
+    "icon": "specialty_spectorshot_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_spectorshot_c",
+    "sound": "reaps_cz/spectorshot/spectorshot_"
+   }
+  },
+  "stronghold": {
+   "name": "Stone Cold Stronghold",
+   "specialty": "specialty_stronghold",
+   "origin": "Black Ops 4",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Standing still forms a ring that builds armour over time",
+   "upgrade": "Armour builds faster and lingers after leaving the ring",
+   "source": {
+    "machine": "cz_zombie_vending_stronghold_on",
+    "icon": "specialty_stronghold_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_stone_cold_stronghold_c",
+    "sound": null
+   }
+  },
+  "swarmscotch": {
+   "name": "Swarm Scotch",
+   "specialty": "specialty_swarmscotch",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Some headshots and empty-clip reloads release a friendly insect swarm that damages zombies",
+   "upgrade": "Swarm survivors spawn swarms more often; more swarm damage",
+   "source": {
+    "machine": "cz_zombie_vending_swarmscotch",
+    "icon": "specialty_swarmscotch_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_swarm_scotch_c",
+    "sound": null
+   }
+  },
+  "tactiquilla": {
+   "name": "Tactiquilla Sangria",
+   "specialty": "specialty_tactiquilla",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Fire while sprinting, chance to regain fired ammo, multi-kills give bonus points",
+   "upgrade": "Higher ammo chance, doubled multi-kill rewards",
+   "source": {
+    "machine": "xela_perk_tactiquilla_on",
+    "icon": "specialty_tactiquilla_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_tac_c",
+    "sound": "_logical/perks/tac/"
+   }
+  },
+  "timeslip": {
+   "name": "Timeslip",
+   "specialty": "specialty_timeslip",
+   "origin": "Black Ops 4",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Faster Mystery Box spins and Pack-a-Punch",
+   "upgrade": "Faster special-weapon recharge, instant box spins",
+   "source": {
+    "machine": "cz_vending_timeslip2",
+    "icon": "specialty_timeslip_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_timeslip_c",
+    "sound": null
+   }
+  },
+  "tombstone": {
+   "name": "Tombstone",
+   "specialty": "specialty_tombstone",
+   "origin": "Black Ops II",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Solo: when downed, sacrifice all but one random gun to revive. Co-op: bleeding out leaves a stash of perks and weapons for 1 minute after respawn",
+   "upgrade": "Co-op: the stash doesn't start fading until the round after respawn",
+   "source": {
+    "machine": "cz_zombie_vending_da_tombstone",
+    "icon": "specialty_tombstone_zombies",
+    "label": null,
+    "sound": "reaps_cz/tombstone/mus_tombstone_"
+   }
+  },
+  "victorious": {
+   "name": "Victorious Tortoise",
+   "specialty": "specialty_victorious",
+   "origin": "Black Ops 4",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "A held shield blocks damage from every direction and explodes when destroyed",
+   "upgrade": "Double shield health",
+   "source": {
+    "machine": "cz_vending_victorious",
+    "icon": "specialty_tortoise_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_victorious_tortoise_c",
+    "sound": null
+   }
+  },
+  "vigor": {
+   "name": "Vigor Rush",
+   "specialty": "specialty_vigor",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Bullet hits on zombies make small explosions",
+   "upgrade": "Double explosion damage",
+   "source": {
+    "machine": "km_zm_vending_vigor_rush_on_vm",
+    "icon": "specialty_vigor_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_vigor_c",
+    "sound": null
+   }
+  },
+  "winterwail": {
+   "name": "Winter's Wail",
+   "specialty": "specialty_winterwail",
+   "origin": "Black Ops 4",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Getting hurt slows and freezes nearby zombies (3 uses)",
+   "upgrade": "One more charge; the effect lingers",
+   "source": {
+    "machine": "cz_zombie_vending_winterswail",
+    "icon": "specialty_winters_wail_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_winterswail_c",
+    "sound": null
+   }
+  },
+  "zombshell": {
+   "name": "Zombshell",
+   "specialty": "specialty_zombshell",
+   "origin": "Black Ops 4",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Shooting a zombie can create a slowing field that also weakens zombies",
+   "upgrade": "Zombies ignore you while you stand in the field",
+   "source": {
+    "machine": "cz_vending_zombshell",
+    "icon": "specialty_zombshell_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_zombshell_c",
+    "sound": null
+   }
+  },
+  "bubbleblink": {
+   "name": "Bubble Blink Blast",
+   "specialty": "specialty_bubble_blink",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Melee the air while sprinting to teleport forward, leaving a decoy afterimage; kills recharge",
+   "upgrade": "2 charges, longer afterimage",
+   "source": {
+    "machine": "cz_zombie_vending_bubble_blink",
+    "icon": "specialty_bubble_blink_zombies",
+    "label": null,
+    "sound": null
+   }
+  },
+  "guardianangel": {
+   "name": "Guardian Angel Ale",
+   "specialty": "specialty_guardian_angel",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Taking damage grants 5 s of invincibility; kills recharge",
+   "upgrade": "Hits while recharging grant 0.6 s of invincibility",
+   "source": {
+    "machine": "cz_zombie_vending_guardian_angel",
+    "icon": "specialty_guardian_angel_zombies",
+    "label": null,
+    "sound": null
+   }
+  },
+  "pointpolosa": {
+   "name": "Point Polosa",
+   "specialty": "specialty_point_polosa",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Rarely, killed zombies become point fountains",
+   "upgrade": "Zombies can drop 10 s mini Double Points",
+   "source": {
+    "machine": "cz_zombie_vending_point_polosa",
+    "icon": "specialty_point_polosa_zombies",
+    "label": null,
+    "sound": null
+   }
+  },
+  "prismatic": {
+   "name": "Prismatic Punch",
+   "specialty": "specialty_prismatic_punch",
+   "origin": "custom",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Kills raise an energy wall that ricochets bullets toward zombies; shooting it grows it (extra ricochet at max)",
+   "upgrade": "Bigger wall, longer at max, more stray ricochets",
+   "source": {
+    "machine": "cz_zombie_vending_prismatic_punch",
+    "icon": "specialty_prismatic_punch_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_prismatic_punch_c",
+    "sound": null
+   }
+  },
+  "whoswho": {
+   "name": "Who's Who",
+   "specialty": "specialty_whos_who",
+   "origin": "Black Ops II",
+   "new": true,
+   "status": "working, switched off",
+   "effect": "Going down spawns a clone you control with the gun you held; reviving your body restores your perks",
+   "upgrade": "Your downed body keeps shooting; the clone has all your weapons",
+   "source": {
+    "machine": "cz_zombie_vending_whoswho",
+    "icon": "specialty_whoswho_zombies",
+    "label": null,
+    "sound": "reaps_cz/whos_who/mus_whoswho_"
+   }
+  },
+  "vultureaid": {
+   "name": "Vulture Aid",
+   "specialty": "specialty_vultureaid",
+   "origin": "Black Ops II",
+   "new": false,
+   "status": "already in Melon Zombies (bo7-perks.js)",
+   "effect": "",
+   "upgrade": "",
+   "source": {
+    "machine": "p6_zm_vending_vultureaid_on",
+    "icon": "specialty_vulture_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_vulture_c",
+    "sound": "reaps_cz/vulture_aid/mus_vulture_aid_"
+   }
+  },
+  "widowswine": {
+   "name": "Widow's Wine",
+   "specialty": "specialty_widowswine",
+   "origin": "Black Ops III",
+   "new": false,
+   "status": "already in Melon Zombies (bo7-perks.js)",
+   "effect": "",
+   "upgrade": "",
+   "source": {
+    "machine": "p7_zm_vending_widows_wine",
+    "icon": "specialty_widows_wine_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_widow_c",
+    "sound": null
+   }
+  },
+  "wisptea": {
+   "name": "Wisp Tea",
+   "specialty": "specialty_wisptea",
+   "origin": "Black Ops 7",
+   "new": false,
+   "status": "already in Melon Zombies (bo7-perks.js)",
+   "effect": "",
+   "upgrade": "",
+   "source": {
+    "machine": "cz_vending_wisp_tea",
+    "icon": "specialty_wisp_tea_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_wisp_tea_c",
+    "sound": "reaps_cz/wisp_tea/mus_wisp_tea_"
+   }
+  },
+  "deathperception": {
+   "name": "Death Perception",
+   "specialty": "specialty_deathperception",
+   "origin": "Black Ops Cold War",
+   "new": false,
+   "status": "already in Melon Zombies (bo7-perks.js)",
+   "effect": "",
+   "upgrade": "",
+   "source": {
+    "machine": "cz_zombie_vending_da_death_perception",
+    "icon": "specialty_death_perception_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_death_perception_c",
+    "sound": "reaps_cz/death_perception/mus_death_perception_"
+   }
+  },
+  "elementalpop": {
+   "name": "Elemental Pop",
+   "specialty": "specialty_elementalpop",
+   "origin": "Black Ops 4",
+   "new": false,
+   "status": "already in Melon Zombies (bo7-perks.js)",
+   "effect": "",
+   "upgrade": "",
+   "source": {
+    "machine": "cz_zombie_vending_elemental_pop",
+    "icon": "specialty_elementalpop_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_elemental_pop_c",
+    "sound": "reaps_cz/elemental_pop/mus_elemental_pop_"
+   }
+  },
+  "meleemacchiato": {
+   "name": "Melee Macchiato",
+   "specialty": "specialty_meleemacchiato",
+   "origin": "Black Ops 6",
+   "new": false,
+   "status": "already in Melon Zombies (bo7-perks.js)",
+   "effect": "",
+   "upgrade": "",
+   "source": {
+    "machine": "cz_vending_melee_macchiato",
+    "icon": "specialty_melee_macchiato_zombies",
+    "label": "i_wpn_t7_zmb_perk_bottle_paper_melee_macchiato_c",
+    "sound": "reaps_cz/melee_macchiato/mus_melee_macchiato_"
+   }
+  }
+ }
+}
