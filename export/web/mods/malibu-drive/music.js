@@ -57,7 +57,9 @@ export function setupMusic(kit, heroes) {
   const set = name => { want = name; if (!stopped) play(name); };
 
   // ---- the titles (the original's centred HUD text: gold, fading in and out)
-  const box = document.createElement('div');
+  const box = document.createElement('div'); box.id = 'malibu-titles';
+  const hide = document.createElement('style'); hide.textContent = 'body:has(#scoreboard.on) #malibu-titles{visibility:hidden}';   // the Tab board covers them
+  document.head.append(hide);
   box.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:22vh;pointer-events:none;z-index:35';   // below the round announcement
   let gen = 0;   // a new sequence (the trip down, a reset) cuts the one before
   document.body.append(box);
