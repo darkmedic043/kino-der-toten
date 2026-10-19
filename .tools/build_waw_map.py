@@ -437,6 +437,11 @@ def main():
             continue
         o = vec(e.get('origin'))
         row = {'name': t, 'class': e.get('classname'), 'origin': [round(c, 2) for c in g(o)], 'yaw': vec(e.get('angles'))[1], 'model': e.get('model', '')}
+        for k, key in (('script_noteworthy', 'note'), ('target', 'target'), ('script_string', 'string'), ('script_linkto', 'linkto')):
+            if e.get(k):
+                row[key] = e[k]
+        if e.get('angles'):
+            row['angles'] = vec(e['angles'])
         mi = int(e['model'][1:]) if e.get('model', '').startswith('*') else None
         if mi in brush and 'mins' in brush[mi]:
             lo, hi = brush[mi]['mins'], brush[mi]['maxs']

@@ -7,8 +7,13 @@
 //     (several triggers buy one door: door extras `zones`); a zone is active when its flag is set and a neighbour is active.
 //   Station guns (_custom_weapon_spawns.gsc): every get_new_weapon station rolls one of seven guns (M14 twice) at the start
 //     and again after each round; shown as a blue hologram of the gun.
+//   Heroes (heroes.js) and Tony Stark's armors (tony.js) use the map's own weapons, models, animations and sounds:
+//     .tools/waw_maps/malibu_assets.py writes them into the map folder (weapons.json, models/, anims/, sounds/; git-ignored).
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { createKit } from './common.js';
+import { setupHeroes } from './heroes.js';
+import { setupTony } from './tony.js';
 
 // [zone, neighbour, flag zone] in the builder's compact ids (zone_ prefix and underscores dropped; zone_driveway1 is 'start')
 const ADJ = [
@@ -26,9 +31,42 @@ const ALWAYS = ['start', 'helizone', 'ccube'];
 const STATION = ['famas_zm', 'ak74u_zm', 'galil_zm', 'mp5k_zm', 'm14_zm', 'm14_zm', 'spas_zm'];
 const inLobby = p => p.x < -12500 && p.y < 8500;   // Asgard and the character room float below the city's west end
 
-export default function setup(api) {
+// the map's weapons that are a hero's own gear (taken away when you change hero)
+const HERO_GEAR = ['tony_phone', 'widow_pistols', 'widow_pistols_upgraded', 'spiderman', 'thor_hammer', 'cap_shield', 'hawkeye_bow1', 'hawkeye_bow2',
+  'hawkeye_bow3', 'hulk_hands', 'mean_juice', 'scarlet_witch'];
+// armor weapons: suit power each shot costs (the suits' jarvis_power_shot: a rocket 3, the rest 1; the minigun and handgun
+// drain while firing)
+const SUIT_POWER = { mk3_repulsor: 1, heavy_repulsor: 2, mk3_rocket: 3, mk1_rocket: 4, mk6_rocket: 3, mk42_flare: 2, mk1_flamethrower: .5, wm_minigun: .2,
+  wm_handgun: .2, mk16_cloaking: 0, mk33_blades: 0, mk5_suitcase: 0 };
+// weapon fireSound -> the iwd sound (sounds/<name>.ogg)
+const FIRE = { repulsor_fire_plr: 'repulsor_fire', missle_fire_plr: 'missile_fire', wm_minigun_fire_plr: 'minigun_fire', wm_handgun_fire_plr: 'handgun_fire',
+  thor_hammer_fire_npc: 'thor_hammer_fire', bow_fire_plr: 'bow_fire' };
+
+export default async function setup(api) {
   if (api.map?.id !== 'malibu-drive') return;
   const { world, session, host, player, scene, data } = api;
+  const kit = await createKit(api);
+
+  // ---- the map's weapons (weapons.json from the asset build), as malibu_<name>
+  const defs = await fetch(kit.dir + 'weapons.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
+  if (!Object.keys(defs).length) console.warn('[malibu-drive] weapons.json missing: run .tools/waw_maps/malibu_assets.py');
+  const arms = data.characters?.viewmodel_usa_pow_arms ?? data.characters?.viewhands_usmc;
+  for (const [id, d] of Object.entries(defs)) {
+    if (HERO_GEAR.includes(d.mapWeapon)) d.malibuHero = true;
+    if (d.mapWeapon in SUIT_POWER) { d.suitWeapon = true; d.suitPower = SUIT_POWER[d.mapWeapon]; }
+    // the arms: WaW's SetViewmodel overrides a weapon's own (isHandModelOverridable), so the hero's or armor's arms show;
+    // without one, the placeholders ("no model", cloth) fall back to this game's arms
+    const placeholder = /viewmodel_hands_(no_model|cloth)\.glb$/.test(d.handsModel ?? '') || !d.handsModel;
+    d.malibuArms = placeholder ? arms : d.handsModel; d.handsModel = d.malibuArms;
+    if (FIRE[d.fireSound]) d.malibuSound = FIRE[d.fireSound];
+    d.camo = null;
+    data.weapons[id] = d;
+  }
+  // their fire sounds (the map's), in place of the engine's lookup by weapon id
+  if (api.audio?.weapon) { const play = api.audio.weapon.bind(api.audio); api.audio.weapon = (kind, def, ...rest) => { if (def?.mapWeapon) { if (kind === 'shot' && def.malibuSound) kit.sound(def.malibuSound, { volume: .6 }); return; } return play(kind, def, ...rest); }; }
+
+  const heroes = setupHeroes(kit);
+  const tony = setupTony(kit, heroes);
 
   // ---- zones ----
   const opened = () => {
@@ -82,5 +120,5 @@ export default function setup(api) {
   host.on('reset', () => roll());
 
   window.kino ??= {};
-  window.kino.malibu = { zones: () => [...world.activeZones(session)], flags: () => [...opened()], inLobby: () => lobby(), stations: () => stations.map(s => s.weapon), roll };
+  window.kino.malibu = { zones: () => [...world.activeZones(session)], flags: () => [...opened()], inLobby: () => lobby(), stations: () => stations.map(s => s.weapon), roll, kit, heroes, tony };
 }

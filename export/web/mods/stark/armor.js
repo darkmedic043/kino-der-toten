@@ -114,7 +114,7 @@ export function createArmor({ api, host, session, player, sound, toast, announce
 
   function putOn(s, { quick = false } = {}) {
     worn = s; session.health = session.maxHealth;
-    if (!originalSpeed) originalSpeed = { move: player.moveSpeed, sprint: player.sprintSpeed };
+    originalSpeed = { move: player.moveSpeed, sprint: player.sprintSpeed };   // taken each time (Malibu Drive's heroes walk at their own speeds)
     player.moveSpeed = originalSpeed.move * s.speed; player.sprintSpeed = s.noSprint ? player.moveSpeed : originalSpeed.sprint * s.speed;
     lowWarned = s.power < 25; critWarned = s.power < 11; lastShots = session.shots ?? 0;
     const kit = s.weapons.filter(id => W[id]);
@@ -160,7 +160,7 @@ export function createArmor({ api, host, session, player, sound, toast, announce
   let cloakShots = 0, cloakAt = 0;
   host.on('update', dt => {
     const step = typeof dt === 'number' && dt > 0 && dt < .25 ? dt : 1 / 60;
-    if (!worn?.weapons.includes('iron_mk16_cloak')) { if (cloaked) setCloak(false); cloakAt = 0; cloakShots = session.shots ?? 0; return; }
+    if (!worn?.weapons.some(id => W[id]?.cloakToggle)) { if (cloaked) setCloak(false); cloakAt = 0; cloakShots = session.shots ?? 0; return; }
     const shots = session.shots ?? 0;
     if (shots > cloakShots && session.def?.cloakToggle && !cloakAt) cloakAt = now() + 1.5; cloakShots = shots;
     if (cloakAt && now() >= cloakAt) { cloakAt = 0; setCloak(!cloaked); }

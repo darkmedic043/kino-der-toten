@@ -175,7 +175,8 @@ function readBitmask(reader, boneCount) {
 export function parseXAnim(buffer) {
   const reader = new Reader(buffer);
   const version = reader.u16();
-  if (version !== 19) throw new Error(`unsupported xanim version ${version}`);
+  // 17 is World at War's (T4) layout: the same as 19 for what is read here (flags 0x1 looped, 0x2 delta)
+  if (version !== 19 && version !== 17) throw new Error(`unsupported xanim version ${version}`);
 
   const numFrames = reader.u16();
   const boneCount = reader.u16();

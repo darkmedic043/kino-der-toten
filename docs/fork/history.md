@@ -289,3 +289,4 @@
 - 2026-10-18: Rocket shield hits show a grey directional damage arc toward the attacker instead of a grey hitmarker (waw-ports.md).
 - 2026-10-18: Prismatic Punch's Full Spectrum sets off your gun's own ammo mod, not a random one (reaper-perks.md).
 - 2026-10-18: Malibu Drive (ZK's WaW Avengers map) imported, base map: the city with instanced props and a collision mesh (WaW builder options), the Asgard lobby and its Bifrost, zone links, station guns re-rolled each round (waw-ports.md). The heroes and the rest come next.
+- 2026-10-18: Malibu Drive: character select with the 11 heroes (posed figures, stats, gear, lines), Tony Stark and the armors (JARVIS towers, Magnificent Seven, Hall of Armors lift, phone summons, transports, War Machine); map assets packed by malibu_assets.py, WaW xanims (v17) supported (waw-ports.md).
