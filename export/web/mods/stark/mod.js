@@ -1,6 +1,7 @@
-// STARK.EXE (fork): the Iron Man armors on every map that has a terminal (not Cheese Cube, which has its Hall of Armors).
-// Account unlocks come from Cheese Cube (unlocks.js): building its six armor parts unlocks STARK.EXE and the Iron Man line,
-// its trivia the War Machine, beating it 5 times the Mark XVI. Each game, once the power is on:
+// STARK.EXE (fork): the Iron Man armors on every map that has a terminal (not Cheese Cube or Malibu Drive, which have
+// their own: Malibu's tony.js gives STARK.EXE its armors there). Account unlocks come from Cheese Cube and Malibu Drive
+// (unlocks.js): building Cheese Cube's six armor parts or bringing Malibu's JARVIS online unlocks STARK.EXE and the Iron
+// Man line, Cheese Cube's trivia or Malibu's War Machine the War Machine, beating either 5 times the Mark XVI. Each game, once the power is on:
 //   1. ARMOR UPLINK (started from the terminal): recover CORES armor cores. Zombies drop them (CORE_CHANCE a kill, hellhounds
 //      always); they glow blue where they fell, last CORE_LIFE seconds, and are picked up by walking over them.
 //   2. Upload them at the terminal: an UPLINK-second holdout; the clock only runs while you stay within UPLINK_RANGE of a
@@ -22,7 +23,7 @@ const need = id => id === 'wm' ? 'stark_wm' : id === 'mk16' ? 'stark_mk16' : 'st
 
 export default function setup(api) {
   const { host, session, player, scene, audio, data } = api;
-  if (api.map?.id === 'cheese-cube' || !api.enemies) return;
+  if (api.map?.id === 'cheese-cube' || api.map?.id === 'malibu-drive' || !api.enemies) return;   // both have their own armors (Malibu's sets kino.stark)
   addSuitWeapons(data.weapons);
   const base = jarvisBase(), snd = soundPlayer(audio, base + 'sounds/'), sound = snd.play;
   const suits = SUITS.map(s => ({ ...s, cost: PRICE[s.id] ?? s.cost, owned: false, power: MAX_POWER }));

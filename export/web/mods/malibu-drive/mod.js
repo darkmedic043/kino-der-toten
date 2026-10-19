@@ -12,10 +12,12 @@
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { createKit } from './common.js';
+import { createSync } from '../der-eisendrache/sync.js';
 import { setupHeroes } from './heroes.js';
 import { setupTony } from './tony.js';
 import { setupPowers } from './powers.js';
 import { setupQuests } from './quests.js';
+import { setupMusic } from './music.js';
 
 // [zone, neighbour, flag zone] in the builder's compact ids (zone_ prefix and underscores dropped; zone_driveway1 is 'start')
 const ADJ = [
@@ -48,6 +50,9 @@ export default async function setup(api) {
   if (api.map?.id !== 'malibu-drive') return;
   const { world, session, host, player, scene, data } = api;
   const kit = await createKit(api);
+  // co-op: the quests, Tony's armors and the map's world changes are ordered events every client applies (Der
+  // Eisendrache's sync layer: the host orders and seeds them; solo they apply at once)
+  const sync = kit.sync = createSync(api);
 
   // ---- the map's weapons (weapons.json from the asset build), as malibu_<name>
   const defs = await fetch(kit.dir + 'weapons.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
@@ -73,6 +78,7 @@ export default async function setup(api) {
   const tony = setupTony(kit, heroes);
   const powers = setupPowers(kit, heroes, tony);
   const quests = setupQuests(kit, heroes, tony, powers);
+  const music = setupMusic(kit, heroes);
   // powers, not guns: the phone, the serum, the Hulk's fists, Scarlet's hex, the blades and the cloak never run dry or reload
   const NO_AMMO = ['tony_phone', 'mean_juice', 'hulk_hands', 'scarlet_witch', 'mk33_blades', 'mk16_cloaking'].map(n => 'malibu_' + n);
   host.on('update', () => { const w = session.weapon, d = session.def; if (w && d && NO_AMMO.includes(d.id) && w.mag < d.clipSize) { w.mag = d.clipSize; session.cancelReload?.(); } });
@@ -98,7 +104,7 @@ export default async function setup(api) {
 
   // ---- Asgard: no spawns while everyone is up there ----
   const spawnBarriers = world.spawnBarriers.bind(world);
-  const lobby = () => inLobby(player.getFeetPosition()) && !(api.coop?.peers?.() ?? []).some(p => p.position && !inLobby(p.position));
+  const lobby = () => sync.players().every(p => inLobby(p.pos));   // co-op: everyone up there
   world.spawnBarriers = s => lobby() ? [] : spawnBarriers(s);
 
   // ---- Asgard's sky: the lobby floats below the city, whose underside filled its sky; a starry ceiling under the city
@@ -126,10 +132,12 @@ export default async function setup(api) {
     st.yaw = st.model?.rotation.y ?? 0;
   }
   let rollId = 0;
-  const roll = async () => {
+  sync.on('mq:roll', d => show(d.picks));
+  const roll = () => { if (sync.isHost) sync.act('mq:roll', { picks: stations.map(() => STATION[Math.floor(Math.random() * STATION.length)]) }); };
+  const show = async picks => {
     const id = ++rollId;
-    await Promise.all(stations.map(async st => {
-      const weapon = STATION[Math.floor(session.random() * STATION.length)];
+    await Promise.all(stations.map(async (st, i) => {
+      const weapon = picks[i] ?? STATION[0];
       st.weapon = weapon;
       const o = await loadModel(data.weapons[weapon]?.worldModel).catch(() => null);
       if (id !== rollId || !o) return;
@@ -142,8 +150,9 @@ export default async function setup(api) {
   };
   roll();
   host.on('roundEnd', () => roll());
-  host.on('reset', () => roll());
+  host.on('reset', () => setTimeout(roll, 500));
+  sync.ready();
 
   window.kino ??= {};
-  window.kino.malibu = { zones: () => [...world.activeZones(session)], flags: () => [...opened()], inLobby: () => lobby(), stations: () => stations.map(s => s.weapon), roll, kit, heroes, tony, powers, quests };
+  window.kino.malibu = { zones: () => [...world.activeZones(session)], flags: () => [...opened()], inLobby: () => inLobby(player.getFeetPosition()), allInLobby: () => lobby(), stations: () => stations.map(s => s.weapon), roll, kit, heroes, tony, powers, quests, music };
 }

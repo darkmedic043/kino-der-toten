@@ -5,7 +5,8 @@
 // even if it was unlocked before.
 //   Unlocks: the engine's audio.playMusic (Kino's 115 and the custom maps' egg reward, Moon's hidden recordings and
 //   Coming Home, The Giant's Beauty of Annihilation) and Der Eisendrache's castle-audio music() (which calls
-//   kino.radio.heard('castle:<name>')): Requiem (gramophones), Dead Again (bears).
+//   kino.radio.heard('castle:<name>')): Requiem (gramophones), Dead Again (bears). Malibu Drive's music.js: its intro song (the first Bifrost trip) and
+//   ending music (the Easter egg's win) as 'malibu:intro' / 'malibu:ending'.
 //   Playback: one HTML audio element at the game's volume (and silent while the game is muted), radio volume on top;
 //   the map's ambience stops while the radio plays and comes back when it stops. An egg song starting in the game
 //   pauses the radio.
@@ -22,6 +23,8 @@ export const SONGS = [
   { id: 'beauty', title: 'Beauty of Annihilation', artist: 'Elena Siegman', map: 'the-giant', mapName: 'The Giant', egg: 'The three specimen jars', url: 'mods/the-giant/sounds/beauty-of-annihilation.ogg', keys: ['giant_beauty_of_annihilation'] },
   { id: 'requiem', title: 'Requiem', artist: 'Clark S. Nova', map: 'der-eisendrache', mapName: 'Der Eisendrache', egg: 'The three gramophones', url: 'mods/der-eisendrache/audio/requiem.ogg', keys: ['castle:requiem'] },
   { id: 'dead_again', title: 'Dead Again', artist: 'Elena Siegman', map: 'der-eisendrache', mapName: 'Der Eisendrache', egg: 'The three teddy bears', url: 'mods/der-eisendrache/audio/dead_again.ogg', keys: ['castle:dead_again'] },
+  { id: 'malibu_intro', title: 'Age of Apocalypse (Intro)', artist: 'Malibu Drive', map: 'malibu-drive', mapName: 'Malibu Drive', egg: 'The Bifrost down to Earth', url: 'mods/maps/malibu-drive/sounds/malibu_drive_intro_song.ogg', keys: ['malibu:intro'] },
+  { id: 'malibu_ending', title: 'The Avengers Saved Malibu', artist: 'Malibu Drive', map: 'malibu-drive', mapName: 'Malibu Drive', egg: 'The antidote (the main Easter egg)', url: 'mods/maps/malibu-drive/sounds/malibu_ending_music.ogg', keys: ['malibu:ending'] },
 ];
 const BY_ID = Object.fromEntries(SONGS.map(s => [s.id, s])), BY_KEY = Object.fromEntries(SONGS.flatMap(s => s.keys.map(k => [k, s])));
 

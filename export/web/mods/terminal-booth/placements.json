@@ -129,6 +129,18 @@
     "light": false,
     "note": "courtyard / armory: the wall beside the stone pillar; 2026-10-17: moved from the BO3 gum machine spot to the nearest flat wall, square to it"
    }
+  ],
+  "malibu-drive": [
+   {
+    "position": [
+     8225,
+     11265,
+     -4512
+    ],
+    "yaw": 0,
+    "model": "terminal_booth_compact.glb",
+    "note": "Tony Stark's living room: the white panelled wall (fitting for STARK.EXE). Found by a flat-wall scan (collision and rendered walls agree, floor level, 110 clear in front); the driveway where the Bifrost lands has no real walls (only clips and parked vehicles)"
+   }
   ]
  }
 }

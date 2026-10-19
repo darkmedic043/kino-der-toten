@@ -30,7 +30,11 @@ const W_ = n => 'malibu_' + n;
 const POWER_MAX = 200;
 
 export function setupPowers(kit, heroes, tony) {
-  const { api, one, named, center, say, dialog, wait, move, nodes, show, sound, figure, model, remove, now, feet, v3 } = kit;
+  const { api, one, named, center, say, dialog, wait, move, nodes, show, sound, figure, model, remove, now, feet, v3, sync } = kit;
+  // co-op (kit.sync): what others see or share is an ordered event (the valves, Mjolnir's stand, the shield's fall and
+  // pick-up, the bows); holds on zombies (webs, telekinesis) run on the host, where the zombies are
+  const ev = (type, fn) => { sync.on('mp:' + type, fn); return (d = {}) => sync.act('mp:' + type, d); };
+  const zById = id => enemies.list.find(z => z.id === id);
   const { world, session, host, player, data, scene, camera, enemies, toast } = api;
   const W = data.weapons;
   const is = id => heroes.is(id);
@@ -119,25 +123,30 @@ export function setupPowers(kit, heroes, tony) {
   // ================================================================ Bruce Banner and the Hulk
   const valves = named('mean_juice_trig').map((e, i) => ({ i, e, order: null }));
   let next = 1, assigned = 0, serum = false, fill = 0, valveBusy = false;
-  const assign = () => { const free = valves.filter(v => v.order == null); if (free.length) { free[Math.floor(Math.random() * free.length)].order = ++assigned; } };
-  assign();
-  for (const v of valves) world.addInteraction({ position: center(v.e), hidden: () => serum, text: () => 'Turn the valve', async use() {
-    if (!is('banner') || hulkOn) { say(`${heroes.name()}: I should let ^2Bruce Banner^7 mess with this stuff.`); return false; }
-    if (valveBusy) return false;
-    if (!banterDone) { banterDone = true; say('^2Bruce Banner^7: I need to fill the tank in the correct order.'); }
+  const assign = rand => { const free = valves.filter(v => v.order == null); if (free.length) { free[Math.floor(rand() * free.length)].order = ++assigned; } };
+  const valveInit = ev('valveInit', (d, ctx) => { if (!assigned) assign(ctx.rand); });
+  if (sync.isHost) valveInit();
+  const valveEv = ev('valve', async (d, ctx) => {
+    const v = valves[d.i]; if (!v || serum) return;
     valveBusy = true; sound('malibu_console_beep', { volume: .4 });
+    if (!banterDone) { banterDone = true; say('^2Bruce Banner^7: I need to fill the tank in the correct order.'); }
     if (v.order !== next) {
       move('mean_juice_fill', up(-2 * fill), 1); fill = 0; next = 1;
-      if (Math.random() < .4) say('^2Bruce Banner^7: Nope. I gotta get these in the right order.');
-      await wait(1); valveBusy = false; return true;
+      if (ctx.rand() < .4) say('^2Bruce Banner^7: Nope. I gotta get these in the right order.');
+      await wait(1); valveBusy = false; return;
     }
     next++; fill++; move('mean_juice_fill', up(2), 1); await wait(1);
-    if (assigned === next - 1) assign();
+    if (assigned === next - 1) assign(ctx.rand);
     if (fill === 6) {
       serum = true; say('^2Bruce Banner^7: Yes!!! Now I have the serum.');
-      heroes.giveGear('banner', W_('mean_juice'));
+      if (ctx.mine) heroes.giveGear('banner', W_('mean_juice'));
     }
-    valveBusy = false; return true;
+    valveBusy = false;
+  });
+  for (const v of valves) world.addInteraction({ position: center(v.e), hidden: () => serum, text: () => 'Turn the valve', use() {
+    if (!is('banner') || hulkOn) { say(`${heroes.name()}: I should let ^2Bruce Banner^7 mess with this stuff.`); return false; }
+    if (valveBusy) return false;
+    valveBusy = true; valveEv({ i: v.i }); return true;
   } });
   let banterDone = false, hulkOn = false, hulkSaved = null, clapBusy = false, stepAt = 0, calmAt = 0, drinking = false;
   hook((d) => {
@@ -209,19 +218,24 @@ export function setupPowers(kit, heroes, tony) {
 
   // ================================================================ Mjolnir (Thor, Vision)
   const hammerTrig = one('thor_hammer_trig');
-  let hammerWith = null;   // hero id holding it
+  let hammerWith = null;   // {hero, by}: who holds it (it leaves its stand for everyone)
+  const hammerEv = ev('hammer', (d, ctx) => {
+    if (d.back) { if (hammerWith?.by === ctx.by) { hammerWith = null; show('thor_hammer', true); } return; }
+    if (hammerWith) return;
+    hammerWith = { hero: d.hero, by: ctx.by }; heroes.find('hammer'); show('thor_hammer', false);
+    say(d.hero === 'thor' ? '^3Thor^7: The mighty power of Mjolnir is upon me!' : '^3Vision^7: I shall wield this weapon with nobility');
+    if (ctx.mine) heroes.give(W_('thor_hammer'));
+  });
   if (hammerTrig) world.addInteraction({ position: center(hammerTrig), hidden: () => !!hammerWith, text: () => 'Lift Mjolnir', use() {
     if (!is('thor') && !is('vision')) { if (!hulkOn) say(`${heroes.name()}: I can't lift this`); return false; }
-    hammerWith = heroes.hero().id; heroes.find('hammer'); show('thor_hammer', false);
-    say(is('thor') ? '^3Thor^7: The mighty power of Mjolnir is upon me!' : '^3Vision^7: I shall wield this weapon with nobility');
-    heroes.give(W_('thor_hammer')); return true;
+    hammerEv({ hero: heroes.hero().id }); return true;
   } });
   heroes.onChange((h, prev) => {
-    if (hammerWith && prev?.id === hammerWith) { hammerWith = null; show('thor_hammer', true); }
+    if (hammerWith && hammerWith.by === sync.me && prev?.id === hammerWith.hero) hammerEv({ back: true });
     if (h?.id !== 'banner') hulkDone();
     if (h?.id !== 'scarlet') shieldDown(false);
     if (h?.id !== 'vision') molecular(false);
-    if (h?.id === 'thor' && hammerWith && hammerWith !== 'thor') say('^3Thor^7: Someone else has Mjolnir...');
+    if (h?.id === 'thor' && hammerWith && hammerWith.by !== sync.me) say('^3Thor^7: Someone else has Mjolnir...');
     bar.style.display = 'none';
   });
   hook((d) => {
@@ -242,23 +256,29 @@ export function setupPowers(kit, heroes, tony) {
   host.on('update', () => {
     // the Hulk's clap or punch near it brings it down
     if (shieldState === 'hanging' && hulkOn && shieldBox && (clapBusy || (session.meleeLeft ?? 0) > 0) && shieldBox.distanceToPoint(feet()) < 900 && fwd().dot(shieldBox.getCenter(new THREE.Vector3()).sub(eye()).normalize()) > .8) {
-      shieldState = 'falling';
-      (async () => {
-        const o = nodes('cap_shield')[0], base = v3(shieldEnt.origin);
-        await move('cap_shield', v3(m1.origin).sub(base), .5, { rot: new THREE.Euler(0, 0, Math.PI * 14) });
-        await move('cap_shield', v3(m2.origin).sub(v3(m1.origin)), 1, { rot: new THREE.Euler(0, 0, Math.PI * 5) });
-        shieldState = 'down';
-      })();
+      shieldState = 'asked'; shieldFallEv();
     }
     if (shieldState === 'down') {
       const at = v3(m2.origin);
       if (feet().distanceTo(at) < 90) {
-        if (is('cap')) {
-          shieldState = 'taken'; show('cap_shield', false); heroes.find('shield'); heroes.giveGear('cap', W_('cap_shield'));
-          say('^4Captain America^7: Yes!!! I have my shield now.');
-        } else if (!hulkOn && now() > (shieldNagAt ?? 0)) { shieldNagAt = now() + 3; say(`${heroes.name()}: I should leave this for ^4Captain America`); }
+        if (is('cap')) { shieldState = 'asked'; shieldTakeEv(); }
+        else if (!hulkOn && now() > (shieldNagAt ?? 0)) { shieldNagAt = now() + 3; say(`${heroes.name()}: I should leave this for ^4Captain America`); }
       }
     }
+  });
+  const shieldFallEv = ev('shieldFall', async () => {
+    if (shieldState === 'falling' || shieldState === 'down' || shieldState === 'taken') return;
+    shieldState = 'falling';
+    const base = v3(shieldEnt.origin);
+    await move('cap_shield', v3(m1.origin).sub(base), .5, { rot: new THREE.Euler(0, 0, Math.PI * 14) });
+    await move('cap_shield', v3(m2.origin).sub(v3(m1.origin)), 1, { rot: new THREE.Euler(0, 0, Math.PI * 5) });
+    if (shieldState === 'falling') shieldState = 'down';
+  });
+  const shieldTakeEv = ev('shieldTake', (d, ctx) => {
+    if (shieldState === 'taken') return;
+    shieldState = 'taken'; show('cap_shield', false); heroes.find('shield');
+    if (ctx.mine) heroes.giveGear('cap', W_('cap_shield'));
+    say('^4Captain America^7: Yes!!! I have my shield now.');
   });
   let shieldNagAt = 0, shieldOut = false;
   if (shieldTrig) world.addInteraction({ position: center(shieldTrig), hidden: () => shieldState !== 'hanging' || hulkOn, text: () => "Captain America's shield", use() {
@@ -307,11 +327,15 @@ export function setupPowers(kit, heroes, tony) {
   // ================================================================ Hawkeye's bows
   const bowTrig = one('hawkeye_bow_trig');
   kit.prop('hawkeye_bow', 'worldmodel_hawkeye_bow1');
+  const bowsEv = ev('bows', (d, ctx) => {
+    if (heroes.found('bows')) return;
+    heroes.find('bows'); show('hawkeye_bow', false); sound('pickup_part', { volume: .6 });
+    if (ctx.mine) for (const b of ['hawkeye_bow1', 'hawkeye_bow2', 'hawkeye_bow3']) heroes.giveGear('hawkeye', W_(b));
+    say('^6Hawkeye^7: There we go.');
+  });
   if (bowTrig) world.addInteraction({ position: center(bowTrig), hidden: () => heroes.found('bows'), text: () => "Hawkeye's bow", use() {
     if (!is('hawkeye')) { if (!hulkOn) say(`${heroes.name()}: I should let ^6Hawkeye^7 mess with this.`); return false; }
-    heroes.find('bows'); show('hawkeye_bow', false); sound('pickup_part', { volume: .6 });
-    for (const b of ['hawkeye_bow1', 'hawkeye_bow2', 'hawkeye_bow3']) heroes.giveGear('hawkeye', W_(b));
-    say('^6Hawkeye^7: There we go.'); return true;
+    bowsEv(); return true;
   } });
   if (W[W_('hawkeye_bow1')]) Object.assign(W[W_('hawkeye_bow1')], { projectileType: 'bolt', fuseTime: 6, explosionRadius: 0 });
   hook((d) => {
@@ -334,6 +358,13 @@ export function setupPowers(kit, heroes, tony) {
 
   // ================================================================ Scarlet Witch
   let shield = false, holding = null;
+  const tkHeld = new Map();   // the host's held zombies: id -> {by, dir, ai}
+  const tkEv = ev('tk', (d, ctx) => {
+    if (!sync.isHost) return;
+    const z = zById(d.id); if (!z) return;
+    if (d.on) { if (tkHeld.has(d.id)) return; const p = sync.players().find(q => q.id === ctx.by)?.pos ?? feet(); tkHeld.set(d.id, { by: ctx.by, dir: z.root.position.clone().sub(p).setY(0).normalize(), ai: z.ai }); z.ai = () => {}; }
+    else { const h = tkHeld.get(d.id); if (h) { z.ai = h.ai; tkHeld.delete(d.id); } }
+  });
   function shieldDown(snd = true) { if (!shield) return; shield = false; heroes.setForm(null); if (snd) sound('scarlet_shield_down', { volume: .6 }); }
   hook((d) => {
     if (d?.id !== W_('scarlet_witch')) return false;
@@ -353,34 +384,45 @@ export function setupPowers(kit, heroes, tony) {
     const ads = !!api.getState().input?.ads && def() === W_('scarlet_witch') && is('scarlet');
     if (ads && !adsPrev && !shield) {
       const z = inFront({ range: 200, max: 1 })[0];
-      if (z) { holding = { z, ai: z.ai }; z.ai = () => {}; sound('scarlet_shield_up', { volume: .5 }); }
+      if (z) { holding = { id: z.id }; tkEv({ id: z.id, on: true }); sound('scarlet_shield_up', { volume: .5 }); }
     }
-    if (!ads && adsPrev && holding) { const { z, ai } = holding; holding = null; z.ai = ai; sound('scarlet_shield_down', { volume: .5 }); }
+    if (!ads && adsPrev && holding) { tkEv({ id: holding.id, on: false }); holding = null; sound('scarlet_shield_down', { volume: .5 }); }
     adsPrev = ads;
-    if (holding) {
-      if (!enemies.list.includes(holding.z)) holding = null;
-      else { const at = feet().add(fwd().setY(0).normalize().multiplyScalar(70)).add(up(40)); holding.z.root.position.lerp(at, Math.min(1, step * 6)); if (Math.random() < .2) kit.fx(holding.z.root.position.clone().add(up(40)), 0xff3355, 3); }
+    if (holding && !zById(holding.id)) holding = null;
+    // the host holds each held zombie in front of its holder (the local holder by where they look, a teammate by the
+    // side the zombie was on when grabbed)
+    for (const [id, h] of tkHeld) {
+      const z = zById(id); if (!z) { tkHeld.delete(id); continue; }
+      const pos = h.by === sync.me ? feet() : sync.players().find(q => q.id === h.by)?.pos; if (!pos) continue;
+      const dir = h.by === sync.me ? fwd().setY(0).normalize() : h.dir;
+      z.root.position.lerp(pos.clone().add(dir.clone().multiplyScalar(70)).add(up(40)), Math.min(1, step * 6));
+      if (Math.random() < .2) kit.fx(z.root.position.clone().add(up(40)), 0xff3355, 3);
     }
     if (is('scarlet')) showBar('HEX POWER', power.scarlet, '#ff4d6a');
   });
 
   // ================================================================ Spider-Man
   const globs = [];
+  const globEv = ev('glob', async d => {
+    const z = zById(d.id); if (!z || z.glob) return;
+    z.glob = { until: now() + 20, ai: z.ai, g: null };
+    if (sync.isHost) z.ai = () => {};
+    globs.push(z);
+    const g = await model('malibu_web_glob'); if (g && z.glob) { g.position.copy(z.root.position); scene.add(g); z.glob.g = g; }
+  });
   hook((d) => {
     if (d?.id !== W_('spiderman')) return false;
     sound('web_fire_' + (1 + Math.floor(Math.random() * 3)), { volume: .6 });
     launch({ speed: 2000, gravity: 150, life: 2, onHit: async at => {
       sound('web_impact', { volume: .5, at });
       const z = enemies.list.filter(z => !z.glob && z.root.position.distanceTo(at) < 100).sort((a, b) => a.root.position.distanceTo(at) - b.root.position.distanceTo(at))[0];
-      if (!z) return;
-      const g = await model('malibu_web_glob'); if (g) { g.position.copy(z.root.position); scene.add(g); }
-      z.glob = { until: now() + 20, ai: z.ai, g }; z.ai = () => {}; globs.push(z);
+      if (z) globEv({ id: z.id });
     } });
     return true;
   });
   let senseAt = 0;
   host.on('update', () => {
-    for (let i = globs.length - 1; i >= 0; i--) { const z = globs[i]; if (!enemies.list.includes(z) || now() > z.glob.until) { if (enemies.list.includes(z)) z.ai = z.glob.ai; z.glob.g?.removeFromParent(); z.glob = null; globs.splice(i, 1); } }
+    for (let i = globs.length - 1; i >= 0; i--) { const z = globs[i]; if (!enemies.list.includes(z) || now() > z.glob.until) { if (enemies.list.includes(z) && sync.isHost) z.ai = z.glob.ai; z.glob.g?.removeFromParent(); z.glob = null; globs.splice(i, 1); } }
     if (!is('spiderman') || now() < senseAt || enemies.list.length >= 7) return;
     const p = feet(), f = fwd().setY(0).normalize();
     if (enemies.list.some(z => z.root.position.distanceTo(p) < 100 && z.root.position.clone().sub(p).setY(0).normalize().dot(f) < Math.cos(70 * Math.PI / 180))) {
@@ -442,7 +484,7 @@ export function setupPowers(kit, heroes, tony) {
   }
 
   host.on('reset', () => {
-    hulkOn = false; hulkSaved = null; serum = false; next = 1; assigned = 0; fill = 0; for (const v of valves) v.order = null; assign();
+    hulkOn = false; hulkSaved = null; serum = false; next = 1; assigned = 0; fill = 0; valveBusy = false; banterDone = false; for (const v of valves) v.order = null; setTimeout(() => { if (sync.isHost) valveInit(); }, 300); tkHeld.clear();
     hammerWith = null; shieldState = 'hanging'; shieldOut = false; shield = false; holding = null; molecularOn = false; fast = false;
     power.hulk = power.scarlet = power.vision = POWER_MAX; globs.length = 0; shots.length = 0; bar.style.display = 'none';
   });

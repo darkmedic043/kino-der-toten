@@ -30,4 +30,4 @@
   - `hurt(z, amount, ctx)`: damage on the host only (its zombies are the real ones), credited to `ctx.by` through the multiplayer mod's `res`. `hitPlayer(id, amount)` uses `hit`. The multiplayer mod's `dmg` now sets `host.remoteBy` (the teammate who hit) next to `host.remoteDamage`.
   - Kills: the host relays its zombies' deaths as `kill` events `{p, kind, melee, head, by, bp, crawler}` (`bp`: where the killer stood), after the frame's other kill listeners (queueMicrotask).
   - Per system: gondola (host phases, fuse/call events), pads, Pack-a-Punch, rocket-pad flag, dog rounds (host), dragons (sync kills; one bow per player), Panzer (host spawns, guests mirror through an `enemies.spawn` wrapper), Wunderfizz, traps (host kills), craftables (host picks spots; shield and nitrous stay personal), low gravity, the Easter egg and the Keeper boss (guests mirror it), side eggs, and the bow quests (ownership per player, see waw-ports.md).
-
+- **Malibu Drive in co-op (2026-10-18)**: the map's quests, Tony's armors and the heroes' powers run on Der Eisendrache's `sync.js` too (waw-ports.md, Malibu Drive, Co-op).

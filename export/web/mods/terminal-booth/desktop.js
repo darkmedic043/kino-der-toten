@@ -457,7 +457,7 @@ function build() {
   }
   function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = true; $('.open').textContent = ''; }
   // ---- STARK.EXE: the Iron Man armors (mods/stark) ---------------------------------------------------------------
-  const MARK = { mk1: 'I', mk3: 'III', mk4: 'IV', mk5: 'V', mk6: 'VI', wm: 'WM', mk16: 'XVI' };
+  const MARK = { mk1: 'I', mk3: 'III', mk4: 'IV', mk5: 'V', mk6: 'VI', wm: 'WM', mk16: 'XVI', mk33: 'XXXIII', mk42: 'XLII' };
   function starkDo(action, id) {
     const r = opts.starkAct?.(action, id) ?? 'STARK.EXE is not installed';
     stMsg = r === true ? [{ start: 'UPLINK INITIATED · RECOVER THE CORES', upload: 'UPLOADING · HOLD THE TERMINAL', buy: 'ARMOR PURCHASED', deploy: 'ARMOR INBOUND', recall: 'ARMOR RECALLED' }[action] ?? 'OK', 'ok'] : [String(r).toUpperCase(), 'bad'];
@@ -470,10 +470,12 @@ function build() {
     const msgHtml = `<div class="msg ${stMsg[1]}">${esc(stMsg[0] || '')}</div>`;
     if (!st.unlocked || !st.power || st.phase !== 'online') {
       let body;
-      if (!st.unlocked) body = `<h2>ACCESS DENIED</h2><p>STARK INDUSTRIES CREDENTIALS REQUIRED. EARN THEM ON CHEESE CUBE:</p>
-        <ul><li class="${st.req.stark ? 'ok' : ''}">Build the six Iron Man armor parts in the Hall of Armors (Iron Man armors)</li>
-        <li class="${st.req.stark_wm ? 'ok' : ''}">Complete the trivia (War Machine)</li>
-        <li class="${st.req.stark_mk16 ? 'ok' : ''}">Beat the map ${st.winsNeeded} times · ${Math.min(st.wins, st.winsNeeded)} / ${st.winsNeeded} (Mark XVI)</li></ul>`;
+      // a map with its own armors (Malibu Drive) explains its own rules
+      if (st.offline) body = `<h2>${esc(st.offline.title)}</h2>${st.offline.lines.map(l => `<p>${esc(l)}</p>`).join('')}`;
+      else if (!st.unlocked) body = `<h2>ACCESS DENIED</h2><p>STARK INDUSTRIES CREDENTIALS REQUIRED. EARN THEM ON CHEESE CUBE OR MALIBU DRIVE:</p>
+        <ul><li class="${st.req.stark ? 'ok' : ''}">Build the six Iron Man armor parts in Cheese Cube's Hall of Armors, or bring Malibu Drive's JARVIS online (Iron Man armors)</li>
+        <li class="${st.req.stark_wm ? 'ok' : ''}">Complete Cheese Cube's trivia, or buy War Machine on Malibu Drive (War Machine)</li>
+        <li class="${st.req.stark_mk16 ? 'ok' : ''}">Beat Cheese Cube or Malibu Drive ${st.winsNeeded} times · ${Math.min(st.wins, st.winsNeeded)} / ${st.winsNeeded} (Mark XVI)</li></ul>`;
       else if (!st.power) body = `<h2>ARMORY OFFLINE</h2><p>RESTORE MAINS POWER TO REACH THE STARK SATELLITE.</p>`;
       else if (st.phase === 'offline') body = `<h2>ARMOR UPLINK</h2><p>THE ARMORS NEED POWER CORES BEFORE THEY CAN BE DEPLOYED HERE.</p>
         <ul><li>Recover ${st.coresNeeded} armor cores: the undead drop them (hellhounds always). They glow blue.</li><li>Upload them here, then hold the terminal for ${st.uplink} s.</li></ul>
@@ -489,16 +491,16 @@ function build() {
     if (!stBody.querySelector('.grid')) stBody.innerHTML = '<div class="perks"><div class="left"><div class="grid"></div><div class="msg"></div></div><div class="detail"></div></div>';
     const grid = stBody.querySelector('.grid'), detail = stBody.querySelector('.detail'), msg = stBody.querySelector('.msg');
     keepScroll(grid).innerHTML = st.suits.map((s, i) => `<button class="tile ${s.unlocked ? '' : 'locked'} ${s.owned ? 'owned' : ''} ${i === stShown ? 'on' : ''}" data-i="${i}" title="${esc(s.name)}">
-      <span class="suit">${MARK[s.id] ?? s.id}</span><span class="tag">${!s.unlocked ? 'LOCKED' : s.worn ? 'WORN' : s.owned ? s.power + '%' : ''}</span></button>`).join('');
+      <span class="suit">${MARK[s.id] ?? s.mark ?? s.id}</span><span class="tag">${!s.unlocked ? 'LOCKED' : s.worn ? 'WORN' : s.owned ? s.power + '%' : ''}</span></button>`).join('');
     for (const t of grid.children) { t.addEventListener('mouseenter', () => { stShown = +t.dataset.i; drawStark(); }); t.addEventListener('click', () => { const s = st.suits[+t.dataset.i]; starkDo(s.worn ? 'recall' : s.owned ? 'deploy' : 'buy', s.id); }); }
     const s = st.suits[Math.min(stShown, st.suits.length - 1)];
-    const label = !s.unlocked ? 'LOCKED · EARN IT ON CHEESE CUBE' : s.worn ? 'RECALL ARMOR' : s.owned ? (st.delivering ? 'ARMOR INBOUND' : s.ready ? 'DEPLOY ARMOR' : `CHARGING · ${s.power}%`) : st.points < s.cost ? 'NOT ENOUGH POINTS' : `BUY · ${s.cost.toLocaleString()}`;
-    const can = s.unlocked && (s.worn || (s.owned ? s.ready && !st.delivering : st.points >= s.cost));
-    detail.innerHTML = `<div class="head"><div class="big"><span class="suit" style="font-size:40px">${MARK[s.id] ?? ''}</span></div><div>
-        <h2>${esc(s.name.toUpperCase())}</h2><div class="blurb">${s.owned ? `POWER ${s.power}%` : 'STARK INDUSTRIES ARMOR'}</div><div class="price">${s.cost.toLocaleString()} PTS</div></div></div>
+    const label = !s.unlocked ? 'LOCKED · EARN IT ON CHEESE CUBE OR MALIBU DRIVE' : s.worn ? 'RECALL ARMOR' : s.note ?? (s.owned ? (st.delivering ? 'ARMOR INBOUND' : s.ready ? 'DEPLOY ARMOR' : `CHARGING · ${s.power}%`) : st.points < s.cost ? 'NOT ENOUGH POINTS' : `BUY · ${s.cost.toLocaleString()}`);
+    const can = s.unlocked && (s.worn || (!s.blocked && (s.owned ? s.ready && !st.delivering : st.points >= s.cost)));
+    detail.innerHTML = `<div class="head"><div class="big"><span class="suit" style="font-size:40px">${MARK[s.id] ?? s.mark ?? ''}</span></div><div>
+        <h2>${esc(s.name.toUpperCase())}</h2><div class="blurb">${s.owned ? `POWER ${s.power}%` : 'STARK INDUSTRIES ARMOR'}</div>${s.cost ? `<div class="price">${s.cost.toLocaleString()} PTS</div>` : ''}</div></div>
       <button class="buy ${s.unlocked ? '' : 'locked'}" ${can ? '' : 'disabled'}>${label}</button>
       <h3>SPECS</h3><ul><li>Health ${s.hp}</li><li>Speed ×${s.speed}</li><li>${s.weapons.map(esc).join(' · ')}</li><li>Hold Space in the air to fly; shots and flight use power</li></ul>
-      <div class="note">* Deployed where you stand. When its power runs out it flies home and recharges.</div>`;
+      <div class="note">${esc(st.footnote ?? '* Deployed where you stand. When its power runs out it flies home and recharges.')}</div>`;
     detail.querySelector('.buy').addEventListener('click', () => starkDo(s.worn ? 'recall' : s.owned ? 'deploy' : 'buy', s.id));
     msg.textContent = stMsg[0] || '> HOVER AN ARMOR · CLICK TO BUY OR DEPLOY'; msg.className = 'msg ' + stMsg[1];
   }

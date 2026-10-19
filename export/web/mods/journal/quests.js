@@ -5,11 +5,14 @@
 //   L.nodes(re)      positions of visible map nodes whose name matches re (builder markers, quest props)
 //   L.ents(name)     positions of the map's entities with that targetname (BO1 maps)
 //   L.castle, L.de   Der Eisendrache: window.kino.castle and the quest spots exported by its ee/side/side2 modules
+//   L.malibu()       Malibu Drive: window.kino.malibu (its quests' flags() and the map kit)
 // A quest is linear (progress(L) -> how many steps are done) or not (step.done(L) per step, in any order).
 // step.where(L) -> [Vector3] puts markers on the screen while the quest is tracked (only once the step is recorded);
 // spots already dealt with this match are left out, so only what is still to do is marked.
 
 const n = v => [v].flat().filter(Boolean);
+const mq = L => L.malibu?.()?.quests?.flags?.();   // Malibu Drive's quest flags (malibu-drive/quests.js)
+const at = (L, name) => { const k = L.malibu?.()?.kit, e = k?.one(name); return e ? [k.center(e)] : []; };   // a Malibu entity's spot
 const bowStage = (L, el) => {   // Der Eisendrache bow quest -> steps done: start, arrow, its own steps, place, souls, take
   const s = L.castle?.bows?.state()?.[el], Q = L.castle?.bows?.sites?.[el]; if (!s || !Q) return 0;
   const k = Q.steps.length;
@@ -194,6 +197,47 @@ export const JOURNAL = [
     ] },
     { id: 'song', name: 'Beauty of Annihilation', kind: 'SIDE EGG', progress: L => L.tile('giant-song')?.done() ? 1 : 0, steps: [
       { title: 'The spine beakers', how: 'Find and use the three beakers with a brain and spine in them.', where: L => L.prompts(/specimen jar/) },
+    ] },
+  ] },
+
+  { map: 'malibu-drive', title: 'Malibu Drive', quests: [
+    { id: 'main', name: 'Save Malibu', kind: 'MAIN QUEST', progress: L => { const f = mq(L); if (!f) return 0; return f.step < 0 ? 12 : f.step >= 14 ? f.step : f.dreamed ? 13 : f.step; }, steps: [
+      { title: 'Message from Nick Fury', how: 'Read Nick Fury\'s briefing on the screen, then press F when finished.', where: L => L.prompts(/Nick Fury|when finished/) },
+      { title: 'The analysis tank', how: 'Get zombies into Tony\'s analysis tank. They die under JARVIS\'s scan: super-charge one first, a zombie near the battery when Mjolnir hits it.', where: L => [...at(L, 'charge_battery_trig'), ...at(L, 'tony_tank')] },
+      { title: 'The bribe', how: 'Read the bio by the holo-floor, then bribe the server (8,000).', where: L => L.prompts(/the bio|Bribe the server/) },
+      { title: 'The server', how: 'Tony breaks into the server on the 4th floor of the Best Eastern. Windows updates the first time: try again next round.', where: L => L.prompts(/^Server$/) },
+      { title: 'The hidden base', how: 'Find the loose brick, then open the base\'s three locks: the dials (left 2, middle 3, right 9; a press steps one down), the two consoles used by the same hero within 15 s, and Mjolnir thrown at the charger.',
+        where: L => L.prompts(/loose brick| dial · |Security console|^Charger$/) },
+      { title: 'The Hulk\'s vault', how: 'The Hulk smashes the second vault door.', where: L => at(L, 'ee_step_5_vault2_trig') },
+      { title: 'The last vault', how: 'Open the third vault (10,000).', where: L => L.prompts(/Open Vault/) },
+      { title: 'The mainframe', how: 'Look at the SHIELD mainframe, then everyone hacks a console at once: heroes who know computers only (Tony, Banner, Vision, Black Widow).', where: L => L.prompts(/SHIELD mainframe|^Console$/) },
+      { title: 'Tony gets in', how: 'Tony uses the mainframe.', where: L => L.prompts(/SHIELD mainframe/) },
+      { title: 'The Ray Gun', how: 'Get a Ray Gun from the Tesseract and upgrade it at the Infinity Stones.' },
+      { title: 'The machine\'s parts', how: 'Bring the three parts to the machine by Tony\'s bed (one part carried at a time).', where: L => L.prompts(/Pick up the (?!key)|Add part/) },
+      { title: 'Charge the machine', how: 'Shoot the machine with the upgraded Ray Gun 100 times.', where: L => at(L, 'ee_step_10_trig') },
+      { title: 'Tony\'s dream', how: 'Everyone stands by the machine and Tony, without an armor, uses it: three rounds in his dream, the Cheese Cube. Read the code on the wall; the Cheese Gun is on its wall there.', where: L => L.prompts(/Use machine/) },
+      { title: 'Find it', how: 'Find what the dream pointed at. Spider-Man can wear the black suit there (faster and tougher, but it takes him over after 150 s).', where: L => L.prompts(/Something is here|black suit/) },
+      { title: 'The cell', how: 'Take the key and open the cell.', where: L => L.prompts(/Pick up the key|Cell door/).slice(0, 2) },
+      { title: 'The Red Hulk', how: 'Hit the Red Hulk 20 times with the upgraded Ray Gun while he stands in the beach\'s salt water.', where: L => [...at(L, 'kill_red_hulk_0'), ...at(L, 'kill_red_hulk_1')] },
+      { title: 'The corpse', how: 'Black Widow, then Bruce Banner (not the Hulk), go to the Red Hulk\'s corpse.' },
+      { title: 'The four stations', how: 'Press the buttons in order, light the 25 plates, shoot the ten pop-up targets (1.5 s each), and bounce Cap\'s shield off the four dishes.', where: L => { const f = mq(L)?.machines, k = L.malibu?.()?.kit; if (!f || !k) return []; const all = name => k.named(name).map(e => k.center(e));
+          return [...(f.a ? [] : L.prompts(/^Button$/)), ...(f.b ? [] : all('ee_step_17_b_plate').slice(0, 1)), ...(f.c ? [] : all('ee_step_17_c_target').slice(0, 1)), ...(f.d ? [] : all('ee_step_17_d_dish'))]; } },
+      { title: 'The antidote', how: 'Bruce Banner (not the Hulk) adds the 115 antidote at the mainframe.', where: L => L.prompts(/Add the 115 antidote/) },
+      { title: 'Spread it', how: 'Spread the antidote over Malibu: the Avengers save Malibu at the end of the round.', where: L => L.prompts(/Spread the 115 antidote/) },
+    ] },
+    { id: 'stones', name: 'The Infinity Stones', kind: 'MAP QUEST', steps: [
+      { title: 'The Time Stone', how: 'Everyone stands at the Time Stone for 100 s during a round.', done: L => !!mq(L)?.stones.time, where: L => at(L, 'stone_time_start_trig') },
+      { title: 'The Power Stone', how: 'Hit the Power Stone 25 times with Mjolnir: only Thor can focus it.', done: L => !!mq(L)?.stones.power, where: L => at(L, 'power_stone_start_trig') },
+      { title: 'The Reality Stone', how: 'It zaps anyone within reach: neutralise it with Hawkeye\'s Electro-Shock arrow.', done: L => !!mq(L)?.stones.reality, where: L => at(L, 'stone_reality_start_trig') },
+      { title: 'The Soul Stone', how: 'Find the glowing stone by Tony\'s bed, then kill zombies in its room. All four wake the upgrade pedestal (Pack-a-Punch).', done: L => !!mq(L)?.stones.soul, where: L => [...L.prompts(/glowing stone/), ...at(L, 'stone_soul_start_room')].slice(0, 1) },
+    ] },
+    { id: 'batman', name: 'The Dark Knight', kind: 'SIDE EGG', progress: L => { const f = mq(L); if (!f) return 0; return f.batSightings > 3 ? 3 : f.batmanGone ? 2 : f.batEggs >= 6 ? 1 : 0; }, steps: [
+      { title: 'Something odd', how: 'Shoot the black car, find the scene with the batarang, and pick up the four strange objects around Malibu. A wall comes down.', where: L => L.prompts(/strange object/) },
+      { title: 'Someone else', how: 'Walk up to the figure behind the wall.' },
+      { title: 'Sightings', how: 'He shows up four more times around the map: get close before he vanishes.' },
+    ] },
+    { id: 'jail', name: 'The police jail', kind: 'MAP QUEST', progress: L => mq(L)?.cellOpen ? 1 : 0, steps: [
+      { title: 'The key', how: 'One of three keys around the station opens the cell (it closes with another use, and the key comes back after a round).', where: L => L.prompts(/Pick up the key|Cell door/).slice(0, 2) },
     ] },
   ] },
 ];

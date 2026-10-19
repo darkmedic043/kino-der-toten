@@ -41,6 +41,7 @@ export default async function setup(api) {
     targets: (kind, keep) => (L.moon?.targets ?? []).filter(t => t.kind === kind && t.e?.position && (!keep || keep(t))).map(t => v(t.e.position)),
     power: () => (world?.interactions ?? []).filter(e => e.kind === 'power' && e.position).map(e => e.position.clone()),
     cc: () => kino.cheeseCube?.state?.(), ccSuits: () => kino.cheeseCube?.suits?.(),
+    malibu: () => kino.malibu,
     tile: id => kino.scoreboard?.get?.(id),
     reels: () => { try { return kino.debug?.completionState?.(); } catch { return null; } },
     meteors: () => { try { return kino.debug?.specialState?.().meteors; } catch { return null; } },

@@ -46,7 +46,7 @@ MODELS = ['captain_america', 'backmodel_cap_shield', 'hawkeye_full_body', 'spide
 HUD = ['hud_tony_stark', 'jarvis_interface1', 'jarvis_interface2', 'jarvis_interface_mk4', 'jarvis_interface_mk5', 'jarvis_interface_mk16',
        'iron_man_mask', 'iron_man_mk1_mask', 'hud_iron_man_mk1', 'fxt_iron_man_summon_waypoint', '1stperson_view_freeplay', '1stperson_view_hulk',
        'hud_banner', 'hud_black_spidey', 'hud_black_widow', 'hud_cap', 'hud_hawkeye', 'hud_hulk', 'hud_quicksilver', 'hud_rhode', 'hud_scarlet',
-       'hud_scarlet_shield', 'hud_spiderman', 'hud_thor', 'hud_vision', 'hud_avengers_logo']
+       'hud_scarlet_shield', 'hud_spiderman', 'hud_thor', 'hud_vision', 'hud_avengers_logo', 'hud_avengers_intro']
 
 for sub in ['models', 'textures', 'anims', 'sounds', 'hud']:
     (OUT / sub).mkdir(parents=True, exist_ok=True)
