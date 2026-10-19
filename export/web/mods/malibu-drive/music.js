@@ -1,6 +1,7 @@
 // Malibu Drive's music (_zombiemode.gsc do_pre_intro, begin_custom_ambient_music, play_random_music, end_game_music and
 // the intro titles): the map's own tracks from its iwd (sounds/, git-ignored), in place of this game's ambience.
-//   Asgard: the pre-intro loops (malibu_pre_intro) under "Welcome to Asgard" and "Choose a Hero to Continue".
+//   Asgard: the pre-intro loops (malibu_pre_intro) under "Welcome to Asgard" and "Choose a Hero to Continue" (then, once
+//     a hero is chosen, "Take the Bifrost to Earth": ours, the original leaves it to the player).
 //   The first Bifrost trip down: the intro song (malibu_drive_intro_song) with the opening titles ("Earth Has Fallen",
 //     "There's Only One Group", "Who Can Save the World", the Avengers logo, "Malibu Drive: Age of Apocalypse"); 20 s
 //     later Captain America's radio line and the round music starts.
@@ -81,6 +82,13 @@ export function setupMusic(kit, heroes) {
     if (await title('Welcome to Asgard', { hold: 3 }) && !heroes.hero()) await title('Choose a Hero to Continue', { hold: 3 });
   }
   host.on('start', welcome);
+  // a hero chosen up there: where to go next (the original only says "Choose a Hero to Continue")
+  heroes.onChange((h, prev) => {
+    if (!h || prev || intro || !window.kino.malibu?.inLobby?.()) return;
+    const g = ++gen; box.innerHTML = '';
+    say('[i] Cross the bridge east to the ^5Bifrost^7 and press F at its pad to go down to Earth');
+    wait(1.5).then(() => { if (g === gen) title('Take the Bifrost to Earth', { hold: 4, sub: 'Cross the bridge and press F at its pad' }); });
+  });
   let lobbyWas = true;
   host.on('update', () => {
     const lobby = !!window.kino.malibu?.inLobby?.();

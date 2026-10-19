@@ -119,6 +119,20 @@ export function setupHeroes(kit) {
       if (f.statue) f.statue.visible = busy;
     }
   };
+  // the full-body idles are authored about the character's origin with the body lowered (30-45 below it for most):
+  // sample the feet through the loop and lift the figure so the lowest foot stands on the floor
+  const onFloor = (fig, floorY) => {
+    const rig = fig.userData.rig; if (!rig) return;
+    const feet = []; fig.traverse(c => { if (c.isBone && /^j_(ball|ankle)_(le|ri)$/.test(c.name)) feet.push(c); });
+    if (!feet.length) return;
+    const balls = feet.some(b => b.name.startsWith('j_ball')), dur = rig.data?.a?.duration ?? 1, p = new THREE.Vector3();
+    let low = Infinity;
+    for (let i = 0; i < 12; i++) {
+      rig.update(i ? dur / 12 : 0); fig.updateMatrixWorld(true);
+      for (const b of feet) if (!balls || b.name.startsWith('j_ball')) low = Math.min(low, b.getWorldPosition(p).y);
+    }
+    if (Number.isFinite(low)) { fig.position.y += floorY + (balls ? 1.5 : 4) - low; fig.updateMatrixWorld(true); }
+  };
   (async () => {
     for (const h of HEROES) {
       const at = one(h.spawn); if (!at) continue;
@@ -127,6 +141,7 @@ export function setupHeroes(kit) {
       const hit = world.raycast(new THREE.Ray(position.clone().add(new THREE.Vector3(0, 90, 0)), new THREE.Vector3(0, -1, 0)), 0, 200);
       if (hit) position.y = position.y + 90 - hit.distance;
       const fig = await figure(h.figure, h.anim, { position, yaw, attach: h.attach ?? [] });
+      if (fig) onFloor(fig, position.y);
       const statue = await figure(h.statue, null, { position: position.clone().add(new THREE.Vector3(0, h.statue === 'malibu_gold_lion' ? 27 : 0, 0)), yaw });
       if (statue) statue.visible = false;
       figures.set(h.id, { fig, statue });

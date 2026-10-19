@@ -21,7 +21,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else '~/projects/waw-malibu-drive').expanduser()
 OUT = ROOT / 'export/web/mods/maps/malibu-drive'
 WEB = 'mods/maps/malibu-drive/'
-ZONES = [SRC / 'dump/nazi_zombie_malibu', SRC / 'dump_mod/mod']   # later wins
+# later wins; dump_stock/<zone> (lowest): stock WaW zones' materials and images the map uses but doesn't carry (Rhodes's
+# raider/marine skins from mak, Quicksilver's guard pieces from see1/ber3/localized_mp_seelow), dumped with
+#   Unlinker --search-path "<WaW>/main" --image-format DDS --include-assets material,image -o "dump_stock/?zone?" <WaW>/zone/english/<zone>.ff
+ZONES = sorted((SRC / 'dump_stock').glob('*')) + [SRC / 'dump/nazi_zombie_malibu', SRC / 'dump_mod/mod']
 IWD = SRC / 'iwd'
 
 # the heroes' and armors' weapons (names of the map's weapons/sp files)
@@ -57,12 +60,32 @@ def find(rel):
 def ffmpeg(*args):
     return subprocess.run(['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y', *map(str, args)], capture_output=True, text=True)
 
+# World at War's own archives: images a zone loads from disk (.iwi), when no dump has them as DDS
+WAW_MAIN = pathlib.Path('/mass_drive/SteamLibrary/steamapps/common/Call of Duty World at War/main')
+
+def iwi(name):
+    rel = 'images/' + name + '.iwi'
+    if (IWD / rel).is_file():
+        return (IWD / rel).read_bytes()
+    for f in sorted(WAW_MAIN.glob('iw_*.iwd'), reverse=True):
+        with zipfile.ZipFile(f) as z:
+            if rel in z.namelist():
+                return z.read(rel)
+    return None
+
 def texture(name, size=1024):
     src = find('images/' + name + '.dds')
-    if not src:
-        return None
     safe = re.sub(r'[^A-Za-z0-9_.-]', '_', name) + '.webp'
     target = OUT / 'textures' / safe
+    if not src and not target.exists():
+        data = iwi(name)
+        try:
+            dds = data and iwi_to_dds(data)
+        except ValueError as e:
+            print('iwi failed', name, e); dds = None
+        if not dds:
+            return None
+        src = OUT / 'textures' / '_tmp.dds'; src.write_bytes(dds)
     if not target.exists():
         r = ffmpeg('-i', src, '-vf', f"scale='min({size},iw)':-2", '-c:v', 'libwebp', '-quality', '88', target)
         if r.returncode:
@@ -95,6 +118,8 @@ def model(name, gun=False):
         if uri:
             ix = len(doc['images']); doc['images'].append({'uri': uri}); doc['textures'].append({'source': ix, 'sampler': 0})
             m['pbrMetallicRoughness']['baseColorTexture'] = {'index': ix}
+        elif 'eye_iris' in m['name']:
+            m['pbrMetallicRoughness']['baseColorFactor'] = [.22, .13, .07, 1]   # BO2 eye irises whose image the map doesn't ship
         bits = info.get('stateBits', [])
         if any(sb.get('alphaTest', 'disabled') != 'disabled' for sb in bits):
             m['alphaMode'] = 'MASK'; m['alphaCutoff'] = .5
