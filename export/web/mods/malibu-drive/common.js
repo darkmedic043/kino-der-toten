@@ -165,5 +165,38 @@ export async function createKit(api) {
   const flash = (s = .3) => { flashEl.style.transition = 'none'; flashEl.style.opacity = .55; requestAnimationFrame(() => { flashEl.style.transition = `opacity ${s}s`; flashEl.style.opacity = 0; }); };
   const feet = () => api.player.getFeetPosition();
   const near = (p, r) => feet().distanceTo(p) < r;
-  return { api, dir, ents, named, one, center, yawOf, cod, now, nodes, show, boxOf, solid, move, moveTo, wait, sound, model, figure, prop, remove, onImpact, impact, fx, flash, say, dialog, feet, near, remember, v3 };
+  // ---- on-screen waypoints: waypoint(position, label, {color, when}) -> {set(position), remove()}; shown while when()
+  // is true, held at the screen's edge when off screen or behind, with the distance in metres
+  const marks = []; let markBox = null;
+  const waypoint = (position, label, { color = '#7fe0ff', when = () => true } = {}) => {
+    if (!markBox) {
+      markBox = document.createElement('div'); markBox.id = 'malibu-waypoints';
+      markBox.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4';
+      const st = document.createElement('style');
+      st.textContent = '#malibu-waypoints i{position:absolute;left:0;top:0;width:0;height:0;font:700 11px/1.2 Arial,sans-serif;color:#fff;text-shadow:0 1px 2px #000,0 0 4px #000;letter-spacing:1px}'
+        + '#malibu-waypoints i::before{content:"";position:absolute;left:-9px;top:-9px;width:14px;height:14px;border:2px solid var(--c);background:color-mix(in srgb,var(--c) 25%,transparent);transform:rotate(45deg);box-shadow:0 0 10px var(--c)}'
+        + '#malibu-waypoints i span{position:absolute;left:-60px;width:120px;top:12px;text-align:center}body.menu-open #malibu-waypoints{visibility:hidden}';
+      document.head.append(st); document.body.append(markBox);
+    }
+    const el = document.createElement('i'); el.style.setProperty('--c', color); el.innerHTML = '<span></span>'; el.style.display = 'none'; markBox.append(el);
+    const m = { position: position.clone(), label, when, el, set(p) { this.position.copy(p); }, remove() { el.remove(); marks.splice(marks.indexOf(this), 1); } };
+    marks.push(m); return m;
+  };
+  const markTmp = new THREE.Vector3(), markCam = new THREE.Vector3();
+  host.on('update', () => {
+    if (!marks.length) return;
+    const cam = api.camera, W = innerWidth, H = innerHeight, M = 40; cam.getWorldPosition(markCam);
+    for (const m of marks) {
+      let on = false; try { on = !!m.when(); } catch {}
+      m.el.style.display = on ? '' : 'none'; if (!on) continue;
+      const behind = markTmp.copy(m.position).applyMatrix4(cam.matrixWorldInverse).z > 0;
+      markTmp.copy(m.position).project(cam);
+      let x = (markTmp.x + 1) / 2 * W, y = (1 - markTmp.y) / 2 * H;
+      if (behind) { x = W - x; y = H - M; }
+      x = Math.min(W - M, Math.max(M, x)); y = Math.min(H - M, Math.max(M, y));
+      m.el.style.transform = `translate(${x}px,${y}px)`;
+      m.el.firstChild.textContent = `${m.label} · ${Math.round(m.position.distanceTo(markCam) * .0254)} m`;
+    }
+  });
+  return { api, dir, ents, named, one, center, yawOf, cod, now, nodes, show, boxOf, solid, move, moveTo, wait, sound, model, figure, prop, remove, onImpact, impact, fx, flash, say, dialog, feet, near, waypoint, remember, v3 };
 }

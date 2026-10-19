@@ -170,6 +170,9 @@ export function setupHeroes(kit) {
   // ---- the Bifrost needs a hero ("Choose a character to continue")
   const bifrost = world.teleporters.find(t => t.name === 'bifrost');
   if (bifrost) { Object.defineProperty(bifrost, 'locked', { configurable: true, get: () => !hero, set() {} }); bifrost.lockedText = 'Choose a character to continue'; }
+  // a waypoint on the Bifrost pad while you're up there with a hero (ours: the original leaves the way to the player)
+  const pad = world.interactions.find(e => e.kind === 'teleport' && world.teleporters[e.teleporter] === bifrost);
+  if (pad) kit.waypoint(pad.position.clone().add(new THREE.Vector3(0, 20, 0)), 'BIFROST', { when: () => !!hero && session.phase !== 'gameover' && !!window.kino.malibu?.inLobby?.() });
 
   // ---- co-op: heroes are unique; peers announce theirs
   const peerHero = new Map();

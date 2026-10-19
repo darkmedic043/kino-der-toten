@@ -295,3 +295,4 @@
 - 2026-10-18: Malibu Drive co-op (quests, Tony's armors, powers on sync.js), the map's music and intro titles (music.js), STARK.EXE/RADIO/JOURNAL integration and a terminal booth in Tony's house (waw-ports.md).
 - 2026-10-18: Malibu Drive: a second terminal booth on the driveway, by the Bifrost landing (props.md).
 - 2026-10-18: Malibu Drive lobby: hero figures stand on the floor, Rhodes and Quicksilver textured from stock WaW zones, a "Take the Bifrost to Earth" hint after choosing a hero (waw-ports.md).
+- 2026-10-18: Malibu Drive: a BIFROST waypoint on the pad while you're in Asgard with a hero (`kit.waypoint`) (waw-ports.md).
