@@ -88,15 +88,25 @@ class Builder:
             own = next((t['image'] for t in m.get('textures', []) if not t.get('name') and t['image'] not in PLACEHOLDER and not t['image'].startswith('$')), None)
             if own:
                 info['image'], info['glow'] = own, True
-        for sb in m.get('stateBits', []):
-            if sb.get('alphaTest', 'disabled') != 'disabled':
-                info['alpha'] = 'MASK'
+        # alpha test in the third technique only (a depth/shadow pass) is on almost every opaque material (it made
+        # Malibu's police car bodies vanish); a real cut-out tests in its first technique (Nick Fury's briefing: the text
+        # is the alpha) or in two or more (foliage, fences, grass cards). gt0 cuts at .3 (lower and mipmapped text turned to blocks), ge128 at half
+        # sidedness from the first technique: World at War culls back faces on most materials, not on foliage or the
+        # cars; drawing everything two-sided showed see-through materials twice (Nick Fury's briefing: its back quad
+        # through the letters)
+        info['cull'] = (m.get('stateBits') or [{}])[0].get('cullFace', 'none')
+        info['unlit'] = 'unlit' in (m.get('techniqueSet') or '')   # screens: full-size images (Nick Fury's briefing is a page of text)
+        tests = [sb.get('alphaTest', 'disabled') for sb in m.get('stateBits', [])]
+        if tests and (tests[0] != 'disabled' or sum(t != 'disabled' for t in tests) >= 2):
+            info['alpha'] = 'MASK'
+            info['cutoff'] = 0.3 if (tests[0] if tests[0] != 'disabled' else next(t for t in tests if t != 'disabled')) == 'gt0' else 0.5
         for sb in m.get('stateBits', []):
             if sb.get('blendOpRgb', 'disabled') != 'disabled' and sb.get('dstBlendRgb') not in (None, 'zero') and 'glass' in name + (info['image'] or ''):
                 info['alpha'] = 'BLEND'
         return info
 
-    def texture(self, image):
+    def texture(self, image, size=None):
+        size = size or self.max_tex
         if image in self.tex_index:
             return self.tex_index[image]
         src = self.dump / 'images' / (image + '.dds')
@@ -104,7 +114,7 @@ class Builder:
         if src.exists():
             out = self.tmp / (re.sub(r'[^A-Za-z0-9_.-]', '_', image) + '.webp')
             r = subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(src), '-frames:v', '1', '-vf',
-                                f"scale='min({self.max_tex},iw)':-1", '-c:v', 'libwebp', '-quality', '80', str(out)], capture_output=True)
+                                f"scale='min({size},iw)':-1", '-c:v', 'libwebp', '-quality', '80', str(out)], capture_output=True)
             if r.returncode == 0 and out.exists():
                 view = self.add_view(out.read_bytes())
                 self.images.append({'bufferView': view, 'mimeType': 'image/webp', 'name': image})
@@ -118,18 +128,18 @@ class Builder:
             return self.mat_index[name]
         info = self.material_info(name)
         pbr = {'metallicFactor': 0.0, 'roughnessFactor': 0.9}
-        tex = self.texture(info['image']) if info['image'] else None
+        tex = self.texture(info['image'], 2048 if info.get('unlit') else None) if info['image'] else None
         if tex is not None:
             pbr['baseColorTexture'] = {'index': tex}
         else:
             pbr['baseColorFactor'] = [0.5, 0.5, 0.5, 1]
-        mat = {'name': name, 'pbrMetallicRoughness': pbr, 'doubleSided': True}
+        mat = {'name': name, 'pbrMetallicRoughness': pbr, 'doubleSided': info.get('cull') != 'back'}
         if info.get('glow') and tex is not None:
             mat['emissiveTexture'] = {'index': tex}; mat['emissiveFactor'] = [1, 1, 1]
         if info['alpha'] != 'OPAQUE':
             mat['alphaMode'] = info['alpha']
             if info['alpha'] == 'MASK':
-                mat['alphaCutoff'] = 0.5
+                mat['alphaCutoff'] = info.get('cutoff', 0.5)
         self.materials.append(mat)
         self.mat_index[name] = len(self.materials) - 1
         return self.mat_index[name]
@@ -162,7 +172,7 @@ class Builder:
         if tex is None:
             self.mat_index[key] = None; return None
         self.materials.append({'name': key, 'pbrMetallicRoughness': {'metallicFactor': 0.0, 'roughnessFactor': 0.9, 'baseColorTexture': {'index': tex}},
-                               'doubleSided': True, 'alphaMode': 'BLEND'})
+                               'doubleSided': self.material_info(name).get('cull') != 'back', 'alphaMode': 'BLEND'})
         self.mat_index[key] = len(self.materials) - 1
         return self.mat_index[key]
 
@@ -402,6 +412,12 @@ def main():
                 b.add_mesh_node('ENT_' + name, surfaces_to_prims(b, group, flip))
     if rising_surfaces:  # a death plane that climbs (see RISING in mods/README.md): render-only, no collision or navigation
         b.add_mesh_node(f"RISING_{rising['delay']}_{rising['speed']}", surfaces_to_prims(b, rising_surfaces, flip))
+    door_brushes = collections.defaultdict(list)
+    cm_path = pathlib.Path(str(obj_base) + '.clipmap.json')
+    if cm_path.exists():
+        for br in json.load(open(cm_path))['brushes']:
+            if br['model'] and br['contents'] & 0x10011:   # solid, glass or player clip
+                door_brushes[br['model']].append(br)
     for zone_id, cost, wanted, info in doors:
         pieces = [s for s in surfaces if s['idx'] in wanted]
         prims = surfaces_to_prims(b, pieces, flip) if pieces else []
@@ -414,7 +430,18 @@ def main():
                         prims += load_static_glb(b, path, {'origin': vec(e['origin']), 'axis': [[R[0][c], R[1][c], R[2][c]] for c in range(3)],
                                                            'scale': float(e.get('modelscale', 1) or 1)}, flip)
         if prims:
-            b.add_mesh_node(f'DOOR_{zone_id}_{cost}', prims, extras={'zone': zone_id, 'zones': info['zones']} if cfg.get('doorModels') else None)
+            extras = {'zone': zone_id, 'zones': info['zones']} if cfg.get('doorModels') else {}
+            # the game's own blocker: the door brush models' clip-map brushes (relative to each piece's origin; a full
+            # clip often far taller than the visible door): CustomWorld adds it to the door's collision
+            clip = []
+            for piece in by_target.get(info['target'], []):
+                o = vec(piece.get('origin', '0 0 0'))
+                for br in door_brushes.get(int(piece['model'].lstrip('*')), []):
+                    clip.append([br['mins'][k] + o[k] for k in range(3)]); clip.append([br['maxs'][k] + o[k] for k in range(3)])
+            if clip:
+                lo = [min(c[k] for c in clip) for k in range(3)]; hi = [max(c[k] for c in clip) for k in range(3)]
+                extras['clip'] = [[round(lo[0], 2), round(lo[2], 2), round(-hi[1], 2)], [round(hi[0], 2), round(hi[2], 2), round(-lo[1], 2)]]   # glTF (x, z, -y)
+            b.add_mesh_node(f'DOOR_{zone_id}_{cost}', prims, extras=extras or None)
 
     # markers
     for e in ents:   # cfg 'playerSpawn': the structs (by targetname) to start at instead of initial_spawn_points
@@ -456,6 +483,21 @@ def main():
             b.add_marker(f'ZSPAWN_{z}', o)
     if dropped:
         print(f'dropped {dropped} spawners below z={low}')
+    # AI traversals (node_negotiation_begin -> its node_negotiation_end: fence hops, climbs, jump-downs) as TRAVERSE
+    # markers: CustomWorld makes them navmesh off-mesh links, so zombies cross where the original's did
+    byname = collections.defaultdict(list)
+    for e in ents:
+        byname[e.get('targetname')].append(e)
+    trav = 0
+    for e in ents:
+        if e.get('classname') != 'node_negotiation_begin':
+            continue
+        end = next((x for x in byname.get(e.get('target'), []) if x.get('classname') == 'node_negotiation_end'), None)
+        if end:
+            b.add_marker(f'TRAVERSE_{trav}', vec(e['origin']), 0, {'to': [round(c, 3) for c in g(vec(end['origin']))], 'anim': e.get('animscript', '')})
+            trav += 1
+    if trav:
+        print(f'{trav} AI traversals')
     models = {e['targetname']: e for e in ents if e.get('classname') == 'script_model' and e.get('targetname')}
     def site(e):  # the machine model the trigger points at, else the trigger
         m = models.get(e.get('target', ''))
@@ -637,6 +679,181 @@ def inst_transform(inst):
     s = inst['scale'] * sum(sc) / 3
     return R, [s * sx, s, s], g(inst['origin'])
 
+# ---- the clipMap (the game's collision) ------------------------------------------------------------------------------
+# World at War contents flags (the ones that matter here)
+SOLID, GLASS, WATER, PLAYERCLIP, MONSTERCLIP = 0x1, 0x10, 0x20, 0x10000, 0x20000
+
+def solve3(A, rhs):
+    M = [list(A[r]) + [rhs[r]] for r in range(3)]
+    for c in range(3):
+        piv = max(range(c, 3), key=lambda r: abs(M[r][c])); M[c], M[piv] = M[piv], M[c]
+        if abs(M[c][c]) < 1e-9:
+            return None
+        for r in range(3):
+            if r != c:
+                f = M[r][c] / M[c][c]; M[r] = [M[r][k] - f * M[c][k] for k in range(4)]
+    return [M[i][3] / M[i][i] for i in range(3)]
+
+def brush_mesh(br):
+    """A brush (its AABB plus non-axial side planes, each keeping n.p <= d) as triangles wound outward, in CoD space."""
+    lo, hi = br['mins'], br['maxs']
+    planes = [((1, 0, 0), hi[0]), ((-1, 0, 0), -lo[0]), ((0, 1, 0), hi[1]), ((0, -1, 0), -lo[1]), ((0, 0, 1), hi[2]), ((0, 0, -1), -lo[2])]
+    planes += [(tuple(sd[:3]), sd[3]) for sd in br['sides']]
+    pts = []
+    for i in range(len(planes)):
+        for j in range(i + 1, len(planes)):
+            for k in range(j + 1, len(planes)):
+                v = solve3([planes[i][0], planes[j][0], planes[k][0]], [planes[i][1], planes[j][1], planes[k][1]])
+                if v and all(sum(n[a] * v[a] for a in range(3)) <= d + .05 for n, d in planes) and not any(sum((v[a] - q[a]) ** 2 for a in range(3)) < .01 for q in pts):
+                    pts.append(v)
+    tris = []
+    for n, d in planes:
+        on = [i for i, v in enumerate(pts) if abs(sum(n[a] * v[a] for a in range(3)) - d) < .05]
+        if len(on) < 3:
+            continue
+        c = [sum(pts[i][a] for i in on) / len(on) for a in range(3)]
+        u = [pts[on[0]][a] - c[a] for a in range(3)]; ul = math.sqrt(sum(x * x for x in u)) or 1; u = [x / ul for x in u]
+        w = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]]
+        on.sort(key=lambda i: math.atan2(sum((pts[i][a] - c[a]) * w[a] for a in range(3)), sum((pts[i][a] - c[a]) * u[a] for a in range(3))))
+        tris.extend((on[0], on[k], on[k + 1]) for k in range(1, len(on) - 1))   # counter-clockwise seen from outside
+    return pts, tris
+
+def coll_tri(t):
+    """An xmodel collision triangle (plane, svec, tvec) as its three corners in model space, wound to face its plane."""
+    n, d, sv, sw, tv, tw = t[0:3], t[3], t[4:7], t[7], t[8:11], t[11]
+    # nearly dependent rows (degenerate triangles) put corners thousands of units off (a van's box became a 4,772-unit wall)
+    det = (n[0] * (sv[1] * tv[2] - sv[2] * tv[1]) - n[1] * (sv[0] * tv[2] - sv[2] * tv[0]) + n[2] * (sv[0] * tv[1] - sv[1] * tv[0]))
+    norms = math.sqrt(sum(x * x for x in n) * sum(x * x for x in sv) * sum(x * x for x in tv))
+    if not norms or abs(det) / norms < 1e-3:
+        return None
+    out = [solve3([n, sv, tv], [d, s + sw, u + tw]) for s, u in ((0, 0), (1, 0), (0, 1))]
+    if not all(out):
+        return None
+    a, c, e = out; u = [c[i] - a[i] for i in range(3)]; v = [e[i] - a[i] for i in range(3)]
+    cr = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+    return [a, e, c] if sum(cr[i] * n[i] for i in range(3)) < 0 else out
+
+def inv3(A):
+    det = (A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]) - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+           + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]))
+    if abs(det) < 1e-12:
+        return None
+    return [[(A[(c + 1) % 3][(r + 1) % 3] * A[(c + 2) % 3][(r + 2) % 3] - A[(c + 1) % 3][(r + 2) % 3] * A[(c + 2) % 3][(r + 1) % 3]) / det
+             for c in range(3)] for r in range(3)]
+
+def clipmap_collision(cm, keep, flip, col_mesh):
+    """COL_world (stops the player and shapes the navmesh): solid and glass brushes, the terrain, the colliding static
+    models. PCOL_clip: player clip, with or without monster clip (the player only). NCOL_clip: monster clip only (the
+    navmesh only)."""
+    CP, CT, PP, PT, NP, NT = [], [], [], [], [], []
+    def add(P, T, pts, tris):
+        base = len(P); P.extend(g(v) for v in pts)
+        T.extend(((a + base, d + base, c + base) if flip else (a + base, c + base, d + base)) for a, c, d in tris)
+    counts = collections.Counter()
+    for br in cm['brushes']:
+        if br['model']:
+            continue   # brush models (doors, barriers, quest pieces) come from the render dump with their own collision
+        ct = br['contents']
+        if ct & WATER or not ct & (SOLID | GLASS | PLAYERCLIP | MONSTERCLIP):
+            continue
+        if not keep((br['mins'][0] + br['maxs'][0]) / 2, (br['mins'][1] + br['maxs'][1]) / 2):
+            continue
+        pts, tris = brush_mesh(br)
+        if not tris:
+            continue
+        # tall full clip (player and monster) stops the player only: Malibu's zombies spawn on the hills behind
+        # full-clip walls and walk in (the original's AI followed path nodes, not a navmesh)
+        ramp = br['maxs'][2] - br['mins'][2] <= 96 or any(.5 <= sd[2] <= .97 for sd in br['sides'])
+        if ct & (SOLID | GLASS) or (ct & PLAYERCLIP and ct & MONSTERCLIP and ramp):
+            # full clip that zombies walk on (wedges over stairs and rough ground, low slabs) stays in the navmesh
+            add(CP, CT, pts, tris); counts['solid'] += 1
+        elif ct & PLAYERCLIP:
+            add(PP, PT, pts, tris); counts['player clip'] += 1
+        else:
+            add(NP, NT, pts, tris); counts['monster clip'] += 1
+    V, mats = cm['verts'], cm['materials']
+    for part in cm['partitions']:
+        model, mat, idx = part[0], part[1], part[2:]
+        ct = mats[mat]['contents'] if 0 <= mat < len(mats) else SOLID
+        if model or ct & WATER or not ct & (SOLID | GLASS | PLAYERCLIP | MONSTERCLIP):
+            continue
+        # patches are clip too, sorted like the brushes (clip_player walls along Malibu's roads: the player only);
+        # full clip (player and monster) per triangle: ramps facing up (over the beach stairs) stay walkable for
+        # zombies, steep ones stop the player only
+        P, T = (CP, CT) if ct & (SOLID | GLASS) else (PP, PT) if ct & PLAYERCLIP else (NP, NT)
+        full = not ct & (SOLID | GLASS) and ct & PLAYERCLIP and ct & MONSTERCLIP
+        pts = [V[3 * i:3 * i + 3] for i in idx]
+        if not pts or not keep(pts[0][0], pts[0][1]):
+            continue
+        # the dump's winding isn't uniform (about 40/60): terrain and patches face up (the navmesh only walks
+        # up-facing triangles); near-vertical ones are left as they are
+        tris, ramps = [], []
+        for k in range(0, len(pts), 3):
+            a, c, e = pts[k], pts[k + 1], pts[k + 2]
+            nz = (c[0] - a[0]) * (e[1] - a[1]) - (c[1] - a[1]) * (e[0] - a[0])
+            t = (k, k + 2, k + 1) if nz < 0 else (k, k + 1, k + 2)
+            if full:
+                u = [c[i] - a[i] for i in range(3)]; v = [e[i] - a[i] for i in range(3)]
+                n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+                if abs(n[2]) > .55 * (math.sqrt(sum(x * x for x in n)) or 1):
+                    ramps.append(t); continue
+            tris.append(t)
+        if tris:
+            add(P, T, pts, tris)
+        if ramps:
+            add(CP, CT, pts, ramps)
+        counts['terrain tris'] += len(pts) // 3
+    # static models: their collision triangles (often the whole render mesh: a car is 3,000-16,000), simplified by
+    # snapping the corners to an 8-unit grid in world units (3.1 M triangles over the placements become ~650 k)
+    scale = {}
+    for sm in cm['staticModels']:
+        M = inv3(sm['invScaledAxis'])
+        if M:
+            scale.setdefault(sm['model'], math.sqrt(sum(M[r][0] ** 2 for r in range(3))) or 1)
+    shapes = {}
+    for name, xm in cm['xmodels'].items():
+        if name not in scale:
+            continue
+        grid = 8 / scale[name]; verts, index, tris, seen = [], {}, [], set()
+        for sf in xm['collSurfs']:
+            if not sf['contents'] & (SOLID | GLASS):
+                continue
+            for t in (coll_tri(t) for t in sf['tris']):
+                if not t:
+                    continue
+                q = [tuple(round(v[a] / grid) for a in range(3)) for v in t]
+                if len(set(q)) < 3 or tuple(sorted(q)) in seen:
+                    continue
+                seen.add(tuple(sorted(q)))
+                for k in q:
+                    if k not in index:
+                        index[k] = len(verts); verts.append([c * grid for c in k])
+                tris.append(tuple(index[k] for k in q))
+        if tris:
+            shapes[name] = [(verts, tris)]
+    for sm in cm['staticModels']:
+        surfs = shapes.get(sm['model']); o = sm['origin']
+        if not surfs or not keep(o[0], o[1]):
+            continue
+        M = inv3(sm['invScaledAxis'])
+        if not M:
+            continue
+        mirrored = (M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0])
+                    + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0])) < 0
+        # vehicles stop the player but stay out of the navmesh (Malibu's crashed semi fills the garage way out of
+        # Tony's house; the original's zombies followed path nodes): the same choice the name heuristics made
+        car = bool(VEHICLE.search(sm['model']) or re.search(r'semi|police|fire_truck|news_van|pickup|sportscar|sedan', sm['model'], re.I))
+        for pts, tris in surfs:
+            placed = [[o[r] + sum(M[r][k] * v[k] for k in range(3)) for r in range(3)] for v in pts]
+            add(PP if car else CP, PT if car else CT, placed, [(a, d, c) for a, c, d in tris] if mirrored else tris)
+        counts['vehicles' if car else 'static models'] += 1
+    col_mesh('COL_world', CP, CT)
+    if PT:
+        col_mesh('PCOL_clip', PP, PT)
+    if NT:
+        col_mesh('NCOL_clip', NP, NT)
+    print('clipMap collision: ' + ', '.join(f'{v} {k}' for k, v in counts.items()) + f'; {len(CT)} solid, {len(PT)} player-only, {len(NT)} nav-only triangles')
+
 def instanced_props(b, dump, obj_base, cfg, flip, world_surfaces, ents, brush):
     b.instancing = True
     cell_size = cfg.get('propCell', 2048)
@@ -692,6 +909,17 @@ def instanced_props(b, dump, obj_base, cfg, flip, world_surfaces, ents, brush):
     CP, CT, PP, PT = [], [], [], []
     def add(P, T, pts, tris):
         base = len(P); P.extend(pts); T.extend((a + base, c + base, d + base) for a, c, d in tris)
+    def col_mesh(name, P, T):
+        lo = [min(p[i] for p in P) for i in range(3)]; hi = [max(p[i] for p in P) for i in range(3)]
+        b.meshes.append({'name': name, 'primitives': [{'attributes': {'POSITION': b.accessor(f32(P), 5126, len(P), 'VEC3', 34962, [lo, hi])},
+                                                        'indices': b.accessor(b''.join(struct.pack('<3I', *t) for t in T), 5125, len(T) * 3, 'SCALAR', 34963)}]})
+        b.nodes.append({'name': name, 'mesh': len(b.meshes) - 1})
+    cm_path = pathlib.Path(str(obj_base) + '.clipmap.json')
+    if cm_path.exists() and cfg.get('clipCollision', True):
+        # the game's own collision (the clipMap, dumped by .tools/oat/ClipMapDumperT4.cpp): exact where the name
+        # heuristics below guess
+        clipmap_collision(json.load(open(cm_path)), inside if areas else (lambda x, y: True), flip, col_mesh)
+        return instances
     for s in world_surfaces:
         if SKIP_MATERIAL.search(s['mat']) or re.search(r'water|decal', s['mat'], re.I):   # terrain stays (its materials are named grass)
             continue
@@ -732,11 +960,6 @@ def instanced_props(b, dump, obj_base, cfg, flip, world_surfaces, ents, brush):
                 add(PP, PT, placed, tt); player_only += 1
             else:
                 add(CP, CT, placed, tt); solid += 1
-    def col_mesh(name, P, T):
-        lo = [min(p[i] for p in P) for i in range(3)]; hi = [max(p[i] for p in P) for i in range(3)]
-        b.meshes.append({'name': name, 'primitives': [{'attributes': {'POSITION': b.accessor(f32(P), 5126, len(P), 'VEC3', 34962, [lo, hi])},
-                                                        'indices': b.accessor(b''.join(struct.pack('<3I', *t) for t in T), 5125, len(T) * 3, 'SCALAR', 34963)}]})
-        b.nodes.append({'name': name, 'mesh': len(b.meshes) - 1})
     col_mesh('COL_world', CP, CT)
     if PP:
         col_mesh('PCOL_props', PP, PT)

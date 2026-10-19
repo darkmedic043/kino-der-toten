@@ -123,7 +123,8 @@ def model(name, gun=False):
         elif 'eye_iris' in m['name']:
             m['pbrMetallicRoughness']['baseColorFactor'] = [.22, .13, .07, 1]   # BO2 eye irises whose image the map doesn't ship
         bits = info.get('stateBits', [])
-        if any(sb.get('alphaTest', 'disabled') != 'disabled' for sb in bits):
+        tests = [sb.get('alphaTest', 'disabled') for sb in bits]
+        if tests and (tests[0] != 'disabled' or sum(t != 'disabled' for t in tests) >= 2):   # see build_waw_map.py material_info
             m['alphaMode'] = 'MASK'; m['alphaCutoff'] = .5
         elif any(sb.get('blendOpRgb', 'disabled') != 'disabled' and sb.get('dstBlendRgb') not in (None, 'zero') for sb in bits):
             m['alphaMode'] = 'BLEND'
