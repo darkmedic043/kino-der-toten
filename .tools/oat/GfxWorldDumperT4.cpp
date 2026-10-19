@@ -82,6 +82,13 @@ namespace gfx_world
                     std::snprintf(line, sizeof(line), "vn %.4f %.4f %.4f\n", normal[0], normal[1], normal[2]);
                     out << line;
                 }
+                // vertex colours (D3DCOLOR: B, G, R, A in memory); a terrain blend's alpha is how much of its second layer shows
+                for (const unsigned i : used)
+                {
+                    const auto& c = vertices[tris.firstVertex + i].color.array;
+                    std::snprintf(line, sizeof(line), "vc %.3f %.3f %.3f %.3f\n", c[2] / 255.0f, c[1] / 255.0f, c[0] / 255.0f, c[3] / 255.0f);
+                    out << line;
+                }
                 for (size_t f = 0; f + 2 < faces.size(); f += 3)
                 {
                     std::snprintf(line, sizeof(line), "f %u/%u/%u %u/%u/%u %u/%u/%u\n", faces[f], faces[f], faces[f], faces[f + 1], faces[f + 1], faces[f + 1], faces[f + 2], faces[f + 2], faces[f + 2]);

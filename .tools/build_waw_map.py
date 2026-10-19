@@ -39,7 +39,7 @@ def read_obj(path):
     surfaces, cur, nv = [], None, 0
     for line in open(path):
         if line.startswith('o '):
-            cur = {'idx': int(line.split('_')[1]), 'mat': '', 'v': [], 'vt': [], 'vn': [], 'f': [], 'vbase': nv}
+            cur = {'idx': int(line.split('_')[1]), 'mat': '', 'v': [], 'vt': [], 'vn': [], 'vc': [], 'f': [], 'vbase': nv}
             surfaces.append(cur)
         elif line.startswith('usemtl '):
             cur['mat'] = line.split(None, 1)[1].strip()
@@ -49,9 +49,13 @@ def read_obj(path):
             cur['vt'].append(tuple(float(x) for x in line.split()[1:3]))
         elif line.startswith('vn '):
             cur['vn'].append(tuple(float(x) for x in line.split()[1:4]))
+        elif line.startswith('vc '):   # vertex colour (dumps from 2026-10-18 on); alpha = a terrain blend's second layer
+            cur['vc'].append(tuple(float(x) for x in line.split()[1:5]))
         elif line.startswith('f '):
             cur['f'].append(tuple(int(t.split('/')[0]) - 1 - cur['vbase'] for t in line.split()[1:4]))
     return surfaces
+
+PLACEHOLDER = {'blank_override', '$white', 'white'}
 
 class Builder:
     def __init__(self, dump, max_tex):
@@ -65,13 +69,25 @@ class Builder:
     # ---- materials and textures ----
     def material_info(self, name):
         path = self.dump / 'materials' / (name + '.json')
-        info = {'image': None, 'alpha': 'OPAQUE'}
+        if not path.exists():
+            # terrain blends (`*11n_7n`: two layers mixed, sometimes with a leading comma) are dumped under
+            # materials/generated/ with `*` as `_`; their first colorMap is the base layer
+            path = self.dump / 'materials' / 'generated' / (name.lstrip(',').replace('*', '_') + '.json')
+        info = {'image': None, 'alpha': 'OPAQUE', 'layer': None}
         if not path.exists():
             return info
         m = json.load(open(path))
         for t in m.get('textures', []):
-            if t.get('semantic') == 'colorMap' and not t['image'].startswith('$'):
+            if t.get('semantic') == 'colorMap' and not t['image'].startswith('$') and (not info['image'] or t.get('name') == 'colorMap'):
                 info['image'] = t['image']
+            if t.get('name') == 'colorMap1' and path.parent.name == 'generated' and not t['image'].startswith('$'):
+                info['layer'] = t['image']   # a blend's second layer, shown by the vertex alpha
+        if info['image'] in PLACEHOLDER:
+            # custom glowing materials (Malibu's Asgard bridge and stars) keep a blank colorMap and their real image in
+            # an unnamed slot: draw that, lit by itself
+            own = next((t['image'] for t in m.get('textures', []) if not t.get('name') and t['image'] not in PLACEHOLDER and not t['image'].startswith('$')), None)
+            if own:
+                info['image'], info['glow'] = own, True
         for sb in m.get('stateBits', []):
             if sb.get('alphaTest', 'disabled') != 'disabled':
                 info['alpha'] = 'MASK'
@@ -108,6 +124,8 @@ class Builder:
         else:
             pbr['baseColorFactor'] = [0.5, 0.5, 0.5, 1]
         mat = {'name': name, 'pbrMetallicRoughness': pbr, 'doubleSided': True}
+        if info.get('glow') and tex is not None:
+            mat['emissiveTexture'] = {'index': tex}; mat['emissiveFactor'] = [1, 1, 1]
         if info['alpha'] != 'OPAQUE':
             mat['alphaMode'] = info['alpha']
             if info['alpha'] == 'MASK':
@@ -134,17 +152,34 @@ class Builder:
         self.accessors.append(a)
         return len(self.accessors) - 1
 
-    def primitive(self, matname, pos, nor, uv, idx, flip):
+    def layer_material(self, name):
+        # a terrain blend's second layer as its own see-through material (`_blend`: CustomWorld draws it over the
+        # surface with a polygon offset), faded per vertex by COLOR_0's alpha
+        key = name + '_blend'
+        if key in self.mat_index:
+            return self.mat_index[key]
+        tex = self.texture(self.material_info(name)['layer'])
+        if tex is None:
+            self.mat_index[key] = None; return None
+        self.materials.append({'name': key, 'pbrMetallicRoughness': {'metallicFactor': 0.0, 'roughnessFactor': 0.9, 'baseColorTexture': {'index': tex}},
+                               'doubleSided': True, 'alphaMode': 'BLEND'})
+        self.mat_index[key] = len(self.materials) - 1
+        return self.mat_index[key]
+
+    def primitive(self, matname, pos, nor, uv, idx, flip, colors=None, material=None):
         idx = wind(pos, nor, idx, flip)
         pos_b = b''.join(struct.pack('<3f', *p) for p in pos)
         nor_b = b''.join(struct.pack('<3f', *n) for n in nor)
         uv_b = b''.join(struct.pack('<2f', *t) for t in uv)
         idx_b = b''.join(struct.pack('<3I', *f) for f in idx)
         lo = [min(p[i] for p in pos) for i in range(3)]; hi = [max(p[i] for p in pos) for i in range(3)]
-        return {'attributes': {'POSITION': self.accessor(pos_b, 5126, len(pos), 'VEC3', 34962, [lo, hi]),
+        prim = {'attributes': {'POSITION': self.accessor(pos_b, 5126, len(pos), 'VEC3', 34962, [lo, hi]),
                                'NORMAL': self.accessor(nor_b, 5126, len(nor), 'VEC3', 34962),
                                'TEXCOORD_0': self.accessor(uv_b, 5126, len(uv), 'VEC2', 34962)},
-                'indices': self.accessor(idx_b, 5125, len(idx) * 3, 'SCALAR', 34963), 'material': self.material(matname)}
+                'indices': self.accessor(idx_b, 5125, len(idx) * 3, 'SCALAR', 34963), 'material': self.material(matname) if material is None else material}
+        if colors:
+            prim['attributes']['COLOR_0'] = self.accessor(b''.join(struct.pack('<4f', *c) for c in colors), 5126, len(colors), 'VEC4', 34962)
+        return prim
 
     def add_mesh_node(self, name, prims, translation=None, extras=None):
         self.meshes.append({'name': name, 'primitives': prims})
@@ -191,13 +226,24 @@ def wind(pos, nor, idx, flip):
     return fixed
 
 def surfaces_to_prims(b, surfaces, flip):
-    by_mat = collections.defaultdict(lambda: ([], [], [], []))
+    by_mat = collections.defaultdict(lambda: ([], [], [], [], []))
     for s in surfaces:
-        pos, nor, uv, idx = by_mat[s['mat']]
+        pos, nor, uv, idx, col = by_mat[s['mat']]
         base = len(pos)
         pos.extend(g(p) for p in s['v']); nor.extend(g(n) for n in s['vn']); uv.extend((t[0], 1 - t[1]) for t in s['vt'])  # the OBJ's v is flipped (v up); glTF's points down
+        col.extend((1, 1, 1, c[3]) for c in s['vc']) if len(s['vc']) == len(s['v']) else col.extend((1, 1, 1, 0) for _ in s['v'])
         idx.extend((base + a, base + c, base + d) for a, c, d in s['f'])
-    return [b.primitive(mat, *data, flip) for mat, data in by_mat.items() if data[3]]
+    prims = []
+    for mat, (pos, nor, uv, idx, col) in by_mat.items():
+        if not idx:
+            continue
+        prims.append(b.primitive(mat, pos, nor, uv, idx, flip))
+        # a terrain blend: its second layer on top where the vertex alpha shows it
+        if b.material_info(mat)['layer'] and any(c[3] > .02 for c in col):
+            lm = b.layer_material(mat)
+            if lm is not None:
+                prims.append(b.primitive(mat, pos, nor, uv, idx, flip, colors=col, material=lm))
+    return prims
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
@@ -243,7 +289,9 @@ def main():
     lo = [min(v[i] for s in small for v in s['v']) - 150 for i in (0, 1)]
     hi = [max(v[i] for s in small for v in s['v']) + 150 for i in (0, 1)]
     for s in surfaces:
-        if s in small:
+        # long surfaces inside the footprint (Malibu's Asgard bridge) are left alone: the UV refit below is fitted on
+        # one triangle and smeared their textures
+        if s in small or all(lo[i] <= v[i] <= hi[i] for v in s['v'] for i in (0, 1)):
             continue
         a = next((t for t in s['f']), None)
         p0, p1, p2 = (s['v'][k] for k in a); t0, t1, t2 = (s['vt'][k] for k in a)
@@ -257,6 +305,8 @@ def main():
             fit = (lin(t0[0], t1[0], t2[0]), lin(t0[1], t1[1], t2[1]))
         for k, v in enumerate(s['v']):
             x, y = min(max(v[0], lo[0]), hi[0]), min(max(v[1], lo[1]), hi[1])
+            if (x, y) == (v[0], v[1]):
+                continue
             s['v'][k] = (x, y, v[2])
             if fit:
                 s['vt'][k] = tuple(f[0] * x + f[1] * y + f[2] for f in fit)

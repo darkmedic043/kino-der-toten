@@ -114,6 +114,8 @@ def model(name, gun=False):
         info = json.loads(p.read_text()) if p else {}
         slots = info.get('textures', [])
         color = next((t.get('image') for t in slots if t.get('semantic') == 'colorMap' or t.get('name') == 'colorMap'), None)
+        if color in ('blank_override', '$white', 'white'):   # a glow material (Vision's ghost): its image is in an unnamed slot
+            color = next((t.get('image') for t in slots if not t.get('name') and t.get('image') not in ('blank_override', '$white', 'white')), color)
         uri = texture(color) if color and not color.startswith('$') else None
         if uri:
             ix = len(doc['images']); doc['images'].append({'uri': uri}); doc['textures'].append({'source': ix, 'sampler': 0})
