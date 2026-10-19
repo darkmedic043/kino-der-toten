@@ -294,7 +294,7 @@
    "specialty": "specialty_magnet",
    "origin": "custom",
    "new": true,
-   "status": "working, switched off",
+   "status": "implemented (Melon Pass unlock, command-wheel power-up stash, research augments)",
    "effect": "Power-ups drift toward the nearest player with this perk, stopping short of them",
    "upgrade": "Power-ups move twice as fast; your kills can spawn bonus power-ups",
    "source": {

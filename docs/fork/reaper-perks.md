@@ -1,12 +1,12 @@
-# Reaper Collection perks (2 implemented, 43 working but switched off)
+# Reaper Collection perks (3 implemented, 42 working but switched off)
 
-The user's requests (2026-10-18): first "add all 45 perks with their effects, but dont implement them, just keep them in the files while i figure out what i want to do, document each and every one of them", then "add the functions of all of them", answered "working, but switched off". So every effect below **works**, but **nothing sells the perks** (except the two in Implemented): no machine, no terminal PERKS entry, no gobblegum or Easter egg gives them. Only the cheat console does:
+The user's requests (2026-10-18): first "add all 45 perks with their effects, but dont implement them, just keep them in the files while i figure out what i want to do, document each and every one of them", then "add the functions of all of them", answered "working, but switched off". So every effect below **works**, but **nothing sells the perks** (except the three in Implemented): no machine, no terminal PERKS entry, no gobblegum or Easter egg gives them. Only the cheat console does:
 
 - `reaper list` (held ones marked `*`, upgraded `**`), `reaper <id|name|all>`, `reaper up <id|all>` (the mod's upgraded "double buy" version), `reaper none`.
-- **Implemented** (sold for real, see the next section): Prismatic Punch and Dam-A-Nade.
-- To switch one on for real later (as was done for those two): add it to the terminal's `PERKS` list (`mods/terminal-booth/desktop.js`) and/or a machine marker alias, and give it a drink in perks-plus `data.json`.
+- **Implemented** (sold for real, see the next section): Prismatic Punch, Dam-A-Nade and Magnet Margarita.
+- To switch one on for real later (as was done for those three): add it to the terminal's `PERKS` list (`mods/terminal-booth/desktop.js`) and/or a machine marker alias, and give it a drink in perks-plus `data.json`.
 
-Code: `export/web/mods/perks-plus/reaper-perks.js` (`setupReaperPerks`, started by perks-plus once `reaper-perks.json` loads; `window.kino.reaperPerks` {ids, has, up, upgraded, give, armour, momentum, raiseWall, walls, nadeMax, tacticalMax}). The perks are in the perk table with `offSale: true` only so the HUD shows them while held (icons from the git-ignored `reaper/icons/` when built, else letter badges). **zh** below = `zombieHealth(round)` (1045 at round 10, 3953 at 24): the mod's scripts weren't decompiled, so every number is ours. Perks with charges or timers show a chip above the perks (`#reaper-chips`).
+Code: `export/web/mods/perks-plus/reaper-perks.js` (`setupReaperPerks`, started by perks-plus once `reaper-perks.json` loads; `window.kino.reaperPerks` {ids, has, up, upgraded, give, armour, momentum, raiseWall, walls, nadeMax, tacticalMax, magnet}). The perks are in the perk table with `offSale: true` only so the HUD shows them while held (icons from the git-ignored `reaper/icons/` when built, else letter badges). **zh** below = `zombieHealth(round)` (1045 at round 10, 3953 at 24): the mod's scripts weren't decompiled, so every number is ours. Perks with charges or timers show a chip above the perks (`#reaper-chips`).
 
 Engine/mod hooks added for them: `session.damage` gets an outermost wrapper (installed on the first frame, so it also wraps the co-op mod's downs) for the lethal-hit perks and Stone Cold armour; `session.spend` (Cashback), `mysteryBox.start/take` (No Bear, Timeslip, Pack-A-Box), `powerups.onCollect` (Nuka, Mocha, Repairman's Carpenter), `world.setBoards` (Repairman), `enemies.lureTarget` (Bubble Blink, Zombshell), the player's speed getters (I.C.U., Momentum, Fighter's Fizz) are wrapped; engine.js fires while sprinting when the mod host's `sprintFire()` says so (Tactiquilla); the rocket shield takes `.perk` hooks and has `heal(n)`; the multiplayer mod multiplies the bleed-out by `kino.coopBleedMul()` and exposes `kino.coopDown`.
 
@@ -18,10 +18,13 @@ The user (2026-10-18): "add one of the reaper perks, im thinking prismatic punch
 |---|---|---|---|---|
 | **Prismatic Punch** | `specialty_prismatic_punch` | page 6 (Night Shift) tier 9, premium: `pass.s1.perk.prismatic`, replaced the Crows calling card | PERKS app, 3,500 on the tile (the Cold War price ladder applies) | Quick Revive's bottle |
 | **Dam-A-Nade** | `specialty_damnade` | page 8 (Embers) tier 7, free: `pass.s1.perk.damnade`, replaced the Harvest Moon Glow | PERKS app, 3,000 on the tile | PhD Flopper's (Moon) bottle |
+| **Magnet Margarita** | `specialty_magnet` | page 10 (Last Light) tier 1, free: `pass.s1.perk.magnet`, took the Crop Circle camo's slot (the camo moved to page 9 tier 9, premium, in place of the Pyre calling card) | PERKS app, 2,500 on the tile | Juggernog's bottle (as Vulture Aid) |
 
-- **Where**: `REAPER_ON` in `reaper-perks.js` (perk table entries; perks-plus adds them to `MORE_PERKS`), the terminal's `PERKS` with `unlock` (locked tile until the pass item is owned; the free-perk gums skip them until then), drinks in perks-plus `data.json` (tracked BO1 bottles, since the extracted BO3 bottles are git-ignored and rigged differently), HUD icons and Dam-A-Nade's sting from the git-ignored `reaper/` build (letter badges PP / DN without it). Pass thumbnails show the Reaper icon (`data.icon` a path under perks-plus/, `data.color` the glow).
-- **No double-buy**: their "upgraded" versions aren't sold; the cheat's `reaper up` no longer changes them. The two upgrades became Majors on their research tracks (Afterglow, Demolition Expert), and Prismatic's "bigger wall" is the Refraction Minor.
-- **Saves that already claimed the old rewards**: the pass remembers claims by slot, so `reconcile()` (pass.js, run by the main menu when the season loads) hands over the item of every claimed slot that isn't owned. Owners of the Crows card / Harvest Moon Glow keep the ids, but the items are gone from the catalogue, so they no longer show or apply (`cosmetics()` skips unknown items).
+Magnet Margarita (user, 2026-10-19): "implements magnet margarita? havbe it be in page 10 of the battle pass, move crop circle camo into page 9, making it replace the pyre calling card, and move magnet margarita into where crop circle used to be… make a new system, a simple command wheel, this allows me to add stuff to perks without crowding the controls… magnet margarita has the ability to "store" powerups… pick it up with the new command, later being able to drop the powerup with the same command wheel, ofcourse add in some augments too… one of the augments allow it to hold more power ups".
+
+- **Where**: `REAPER_ON` in `reaper-perks.js` (perk table entries; perks-plus adds them to `MORE_PERKS`; Magnet Margarita's code is `perks-plus/magnet.js`), the terminal's `PERKS` with `unlock` (locked tile until the pass item is owned; the free-perk gums skip them until then), drinks in perks-plus `data.json` (tracked BO1 bottles, since the extracted BO3 bottles are git-ignored and rigged differently), HUD icons and Dam-A-Nade's sting from the git-ignored `reaper/` build (letter badges PP / DN / MM without it; Magnet Margarita has no jingle or sting in the mod). Pass thumbnails show the Reaper icon (`data.icon` a path under perks-plus/, `data.color` the glow).
+- **No double-buy**: their "upgraded" versions aren't sold; the cheat's `reaper up` no longer changes them. The upgrades became Majors on their research tracks (Afterglow, Demolition Expert, Attraction), and Prismatic's "bigger wall" is the Refraction Minor; Magnet Margarita's "twice as fast" is the Strong Pull Minor.
+- **Saves that already claimed the old rewards**: the pass remembers claims by slot, so `reconcile()` (pass.js, run by the main menu when the season loads) hands over the item of every claimed slot that isn't owned. A claimed p9.9 gives the Crop Circle camo and a claimed p10.1 Magnet Margarita (2026-10-19). Owners of the Crows card / Harvest Moon Glow / Pyre card keep the ids, but the items are gone from the catalogue, so they no longer show or apply (`cosmetics()` skips unknown items).
 
 ### Prismatic Punch (implemented)
 
@@ -56,6 +59,29 @@ The user (2026-10-18): "add one of the reaper perks, im thinking prismatic punch
 | 8 | Demolition Expert | Major | x2 explosive damage instead of x1.5 (the mod's upgrade) |
 
 - **Verified** (2026-10-18, a Kino match, GPU headless): both bought at the engine's perk path and drunk; Refraction wall 1.4x, a 400-damage bullet through it did 600 with Amplifier and grew it to 1.5x, a miss and a blocked bullet did nothing, 6 more hits maxed it, Supernova hit when it faded; explosions 1,000 → 1,500, bullets unchanged; Bandolier: 6 grenades after a round end and after Max Ammo, Monkey Bombs 1 → 2 at round end and 4 on Max Ammo; Chain Reaction hurt a zombie next to an explosive kill. Menu: page 6 / 8 show PERK UNLOCK tiles; Armory → Research lists both tracks. `test/reaper-pass.test.mjs`.
+
+### Magnet Margarita (implemented)
+
+- **Base**: power-ups within 1,500 drift toward you at 120/s and stop 90 short (horizontally), so walking into one stays your choice. With a power-up within 140, the **command wheel** (hold U) offers **STORE POWER-UP**: it leaves the ground (no effect, no pickup sound) and goes into your stash, which holds 1 and keeps it from timing out. Each stored one is a **DROP <name>** slice: it comes down 110 in front of you (short of a wall) with a fresh 26.5 s lifetime, for you or a teammate to walk into, and isn't pulled back to you. Lose the perk (go down) and what you stored falls out in a ring 100 round you. A chip above the perks lists the stash, or shows "U · STORE POWER-UP" when one is in reach.
+- **Co-op**: the host's power-ups are the real ones. A client with the perk sends `mmPull` (with its pull / linger augments) every second; the host pulls power-ups toward the nearest puller, itself included, and sends their positions (`mmPos`, 8 a second). STORE sends `mmStore` (the host removes it and answers `mmStored`; the client's copy hides at once); DROP and bonus drops send `mmDrop`, which the host spawns.
+- **Research track** (`mm.*`):
+
+| # | Augment | Kind | Effect |
+|---|---|---|---|
+| 1 | Strong Pull | Minor | Power-ups drift 50% faster, from as far as 2,500 (was 1,500) (the mod's "twice as fast", toned down) |
+| 2 | Deep Pockets | Major | The stash holds 3 power-ups (was 1) (user: "one of the augments allow it to hold more power ups") |
+| 3 | Long Reach | Minor | Store from 260 away (was 140) |
+| 4 | Magnetic Pulse | Major | Storing or dropping sends out a pulse: zombies within 220 take 0.3 zh and freeze for 1.5 s |
+| 5 | Lingering | Minor | Power-ups on the ground within 600 of you don't time out (held before they start blinking) |
+| 6 | Attraction | Major | 3% of your kills drop a bonus Nuke, Insta-Kill, Double Points or Max Ammo (the mod's upgrade; on a co-op client, in front of you) |
+| 7 | Restock | Minor | Every 5th round, a random Insta-Kill, Double Points or Max Ammo appears in a free stash slot when the round starts |
+| 8 | Double Dip | Major | A drop from the stash comes out twice 35% of the time |
+
+- **Verified** (2026-10-19, Kino, GPU headless): a power-up spawned 600 away came to 90 and stopped; holding U and pushing the mouse up stored it (no Insta-Kill, gone from the ground); the wheel then showed "Stash full (1/1)" and DROP INSTA-KILL, which put it 110 ahead, not pulled. With Deep Pockets three were stored and a fourth refused; Double Dip dropped two; removing the perk spilled the rest. Co-op (host + client in one browser): the host pulled a power-up to the client (90 on the host, the client's copy following), the client stored it (gone on both, no Double Points) and dropped it back (spawned by the host). `test/reaper-pass.test.mjs` covers the pass slots, the track and the terminal.
+
+## The command wheel
+
+`mods/command-wheel` (user, 2026-10-19: "a simple command wheel, this allows me to add stuff to perks without crowding the controls"). Hold **U** (rebindable: Settings → Controls, "Command wheel (hold)") or the middle mouse button: a radial menu opens round the crosshair while the game keeps running; look is frozen and the mouse picks a slice; let go (or click) to use it. 1-8 pick a slice, the mouse wheel steps through them, Esc or right click closes. Phones: a WHEEL toolbar button, shown while there is something on it; slices are tapped. Nothing on it: a toast says so. Other code adds commands with `window.kino.commandWheel.add(id, () => [{ label, sub, icon, color, disabled, use }])` (asked each time it opens; at most 8 slices) and `remove(id)`; `entries()` / `use(i)` for tests. Its only user so far is Magnet Margarita.
 
 ## Where things are
 
@@ -93,7 +119,7 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 | I.C.U. | `icu` | custom | Faster health regen, speed boost at low health, invincible while doing actions | bottle jingle |
 | Inciner-Brandy | `inferno` | custom | Chance to ignite zombies (damage over time) | bottle  |
 | Madgaz Moonshine | `moonshine` | custom (MadGaz) | Sliding makes an explosion (20 a round) | bottle jingle |
-| Magnet Margarita | `magnet` | custom | Power-ups drift toward the nearest player with this perk, stopping short of them | bottle  |
+| **Magnet Margarita** (implemented) | `magnet` | custom | Power-ups drift toward the nearest player with this perk, stopping short of them; store them and drop them later from the command wheel | bottle  |
 | Miracle Hands Mocha | `mh_mocha` | custom | Faster equipment use | bottle jingle |
 | Momentum Mojito | `momentum` | custom | Sprinting builds speed | bottle jingle |
 | Muscle Milk | `milk` | custom | Melee stabs chain electricity between zombies (15 s cooldown) | bottle jingle |
@@ -315,7 +341,7 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 - **Effect**: Power-ups drift toward the nearest player with this perk, stopping short of them.
 - **Upgrade** (the mod's double-buy): Power-ups move twice as fast; your kills can spawn bonus power-ups.
 - **Assets**: machine `cz_zombie_vending_magnet`, bottle, icon, **no jingle**.
-- **As built**: Power-ups within 1500 drift toward you at 120/s (240 upgraded) and stop 90 short, so you still choose to take them. Upgraded: 2% of kills drop a bonus power-up (Nuke, Insta-Kill, Double Points or Max Ammo).
+- **As built**: implemented (2026-10-19): see "Magnet Margarita (implemented)" under Implemented. Before that (switched off) it was the pull alone: 120/s from 1500, stopping 90 short; upgraded 240/s and 2% of kills dropping a bonus power-up.
 - **Implementation notes (before building)**: Power-ups on the ground drift toward the nearest player who has the perk, stopping a short distance away (move the power-up objects in `update`). Upgrade: double speed, and kills can drop bonus power-ups (`powerups.spawn`).
 
 ### Miracle Hands Mocha (`mh_mocha`)

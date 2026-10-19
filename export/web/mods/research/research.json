@@ -1,5 +1,5 @@
 {
- "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Mule Kick and Shatter Blast aren't in BO7, so theirs are the fork's). Every perk and ammo mod has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) have the fork's own tracks; their mod's double-buy upgrades are two of the Majors (Afterglow, Demolition Expert).",
+ "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Mule Kick and Shatter Blast aren't in BO7, so theirs are the fork's). Every perk and ammo mod has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) and Magnet Margarita (2026-10-19) have the fork's own tracks; their mod's double-buy upgrades are Majors (Afterglow, Demolition Expert, Attraction).",
  "unlockLevel": 11,
  "trackCost": [6000, 9000, 12000, 15000, 18000, 24000, 30000, 36000],
  "xp": {
@@ -1286,6 +1286,86 @@
       "dn.damage": 0.5
      },
      "id": "p.damnade.demolitionexpert"
+    }
+   ]
+  },
+  {
+   "id": "specialty_magnet",
+   "name": "Magnet Margarita",
+   "kind": "perk",
+   "color": "#e04a6a",
+   "augments": [
+    {
+     "name": "Strong Pull",
+     "kind": "minor",
+     "desc": "Power-ups drift to you 50% faster, from as far as 2,500 away (was 1,500).",
+     "effects": {
+      "mm.pull": 0.5
+     },
+     "id": "p.magnet.strongpull"
+    },
+    {
+     "name": "Deep Pockets",
+     "kind": "major",
+     "desc": "Your stash holds 3 power-ups instead of 1.",
+     "effects": {
+      "mm.slots": 2
+     },
+     "id": "p.magnet.deeppockets"
+    },
+    {
+     "name": "Long Reach",
+     "kind": "minor",
+     "desc": "Store power-ups from farther away (260, was 140).",
+     "effects": {
+      "mm.reach": 120
+     },
+     "id": "p.magnet.longreach"
+    },
+    {
+     "name": "Magnetic Pulse",
+     "kind": "major",
+     "desc": "Storing or dropping a power-up sends out a pulse: zombies within 220 take 30% of a zombie's health and freeze for 1.5 s.",
+     "effects": {
+      "mm.pulse": 0.3
+     },
+     "id": "p.magnet.pulse"
+    },
+    {
+     "name": "Lingering",
+     "kind": "minor",
+     "desc": "Power-ups on the ground within 600 of you don't time out.",
+     "effects": {
+      "mm.linger": 1
+     },
+     "id": "p.magnet.lingering"
+    },
+    {
+     "name": "Attraction",
+     "kind": "major",
+     "desc": "3% of your kills drop a bonus power-up: Nuke, Insta-Kill, Double Points or Max Ammo (the mod's double-buy upgrade).",
+     "effects": {
+      "mm.bonus": 0.03
+     },
+     "id": "p.magnet.attraction"
+    },
+    {
+     "name": "Restock",
+     "kind": "minor",
+     "desc": "Every 5th round, a random power-up (Insta-Kill, Double Points or Max Ammo) appears in a free stash slot when the round starts.",
+     "effects": {
+      "mm.restock": 5
+     },
+     "id": "p.magnet.restock"
+    },
+    {
+     "name": "Double Dip",
+     "kind": "major",
+     "desc": "A power-up you drop from your stash has a 35% chance to come out twice.",
+     "effects": {
+      "mm.twin": 0.35
+     },
+     "id": "p.magnet.doubledip"
     }
    ]
   },

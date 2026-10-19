@@ -85,6 +85,9 @@ export const PERKS = [
   { id: 'specialty_damnade', name: 'Dam-A-Nade', price: 3000, color: '#8a9a4a', badge: 'DN', icon: REAPER + 'damnade.webp', unlock: 'pass.s1.perk.damnade',
     blurb: 'More boom, more often.',
     effects: ['Explosives deal 50% more damage', 'Carry one more lethal (5 grenades) and one more tactical', 'At the start of every round your lethals refill and you get one tactical back'] },
+  { id: 'specialty_magnet', name: 'Magnet Margarita', price: 2500, color: '#e04a6a', badge: 'MM', icon: REAPER + 'magnet.webp', unlock: 'pass.s1.perk.magnet',
+    blurb: 'Keep one for later.',
+    effects: ['Power-ups drift toward you and stop just short', 'Command wheel (hold U): STORE the power-up in reach, DROP it again when you want it', 'Your stash holds 1 power-up and keeps it from timing out'] },
 ];
 
 const CSS = `

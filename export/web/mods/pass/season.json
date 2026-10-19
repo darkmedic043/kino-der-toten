@@ -769,7 +769,7 @@
      "id": "p9.9",
      "reward": {
       "type": "item",
-      "id": "pass.s1.card.pyre"
+      "id": "pass.s1.camo.cropcircle"
      },
      "premium": true
     }
@@ -790,7 +790,7 @@
      "id": "p10.1",
      "reward": {
       "type": "item",
-      "id": "pass.s1.camo.cropcircle"
+      "id": "pass.s1.perk.magnet"
      },
      "premium": false
     },

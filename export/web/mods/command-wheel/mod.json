@@ -1,0 +1,5 @@
+{
+  "name": "Command Wheel",
+  "description": "A radial command wheel (hold U or the middle mouse button): perks and other systems add their extra actions to it instead of taking a key each. First user: Magnet Margarita's power-up stash.",
+  "script": "mod.js"
+}

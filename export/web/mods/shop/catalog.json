@@ -1731,20 +1731,6 @@
    "pass": "s1"
   },
   {
-   "id": "pass.s1.card.pyre",
-   "cat": "card",
-   "name": "Pyre",
-   "price": 0,
-   "rarity": "rare",
-   "desc": "A Season 1 calling card.",
-   "data": {
-    "c1": "#1a0500",
-    "c2": "#ffb347",
-    "pattern": "stripes"
-   },
-   "pass": "s1"
-  },
-  {
    "id": "pass.s1.camo.cropcircle",
    "cat": "camo",
    "name": "Crop Circle",
@@ -1753,6 +1739,21 @@
    "desc": "Season 1 camo: works on every gun.",
    "data": {
     "camo": "season.cropcircle"
+   },
+   "pass": "s1"
+  },
+  {
+   "id": "pass.s1.perk.magnet",
+   "cat": "perk",
+   "name": "Magnet Margarita",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Unlocks Magnet Margarita (a Reaper Collection perk with a power-up stash on the command wheel, and research augments) at the terminal's PERKS app (user, 2026-10-19: took the Crop Circle camo's place, which moved to page 9).",
+   "data": {
+    "perk": "specialty_magnet",
+    "label": "PERK UNLOCK",
+    "icon": "reaper/icons/magnet.webp",
+    "color": "#e04a6a"
    },
    "pass": "s1"
   },

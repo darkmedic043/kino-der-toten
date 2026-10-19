@@ -3,20 +3,23 @@
 // who holds the perk, but nothing sells them yet. No machine, terminal, gobblegum or map gives them; only the cheat
 // console does (`reaper <id|all|list|none>`, `reaper up <id|all>` for the upgraded "double buy" version). They are in
 // the perk table (offSale) only so the HUD shows their icon while held.
-// Switched ON (REAPER_ON, user 2026-10-18): Prismatic Punch and Dam-A-Nade. The terminal's PERKS app sells them once
-// their Melon Pass reward is owned (page 6 / page 8), and their double-buy upgrade is replaced by an 8-augment research
-// track each (research.json, read here through kino.research.stat).
+// Switched ON (REAPER_ON, user 2026-10-18): Prismatic Punch and Dam-A-Nade, then Magnet Margarita (2026-10-19, its own
+// file: magnet.js, with a power-up stash on the command wheel). The terminal's PERKS app sells them once their Melon Pass
+// reward is owned (page 6 / page 8 / page 10), and their double-buy upgrade is replaced by an 8-augment research track
+// each (research.json, read here through kino.research.stat).
 // Catalogue (names, effects, upgrades, origin): reaper-perks.json; one section per perk with the numbers chosen here:
 // docs/fork/reaper-perks.md. The mod's scripts weren't decompiled, so every number here is ours, picked to fit the
 // sheet's text and this game's zombie health (zh = zombieHealth(round): 1045 at round 10, 3953 at 24).
 import * as THREE from 'three';
 import { zombieHealth } from '../../rules.js';
+import { setupMagnet } from './magnet.js';
 
 const UP = new THREE.Vector3(0, 40, 0);
 // the switched-on perks' perk table entries (perks-plus MORE_PERKS adds them; terminal: mods/terminal-booth/desktop.js PERKS)
 export const REAPER_ON = {
   specialty_prismatic_punch: { name: 'Prismatic Punch', price: 3500, color: '#c89bff', icon: 'PP', reaper: 'prismatic' },
   specialty_damnade: { name: 'Dam-A-Nade', price: 3000, color: '#8a9a4a', icon: 'DN', reaper: 'damnade' },
+  specialty_magnet: { name: 'Magnet Margarita', price: 2500, color: '#e04a6a', icon: 'MM', reaper: 'magnet' },
 };
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
@@ -240,8 +243,7 @@ export function setupReaperPerks(api, catalogue, base) {
     if (!has('moonshine') || slidesLeft <= 0) return; slidesLeft--;
     const at = feet(); blast(at, 140, zh()); fx(at.clone().add(V(0, 10, 0)), .8, 0xff8a2a); ring(at, 140, 0xff8a2a); audio?.play?.('explosion', .5);
   });
-  // ---- Magnet Margarita: power-ups drift to you (120/s, 240 upgraded) and stop 90 short. Upgrade: kills drop a bonus
-  //      power-up 2% of the time.
+  // ---- Magnet Margarita: switched on, in magnet.js (the pull, the command-wheel stash and its augments)
   // ---- Miracle Hands Mocha: F at a power-up changes it (3 times each, 4 upgraded); upgraded: never Carpenter or Nuke,
   //      and a Max Ammo you pick up is a free perk too. Faster equipment: grenade/monkey throws aren't timed here.
   const MOCHA_POOL = ['nuke', 'insta_kill', 'double_points', 'full_ammo', 'carpenter', 'fire_sale'];
@@ -360,7 +362,6 @@ export function setupReaperPerks(api, catalogue, base) {
       if (stat('dn.shrapnel')) queueMicrotask(() => { blast(at, 110, zh() * stat('dn.shrapnel'), 'shrapnel', z); fx(at.clone().add(V(0, 25, 0)), .35, 0xffb347); });   // 'shrapnel': doesn't chain
       if (stat('dn.scav') && Math.random() < stat('dn.scav') && session.grenades < nadeMax()) { session.grenades++; toast?.('Dam-A-Nade · grenade recovered', 1); }
     }
-    if (has('magnet') && up('magnet') && Math.random() < .02) powerups?.spawn?.(MOCHA_POOL[Math.floor(Math.random() * 4)], at);
     if (has('timeslip') && up('timeslip')) { const op = window.kino?.operator; if (op?.current && !op.active && op.defs?.get(op.current)) op.addCharge(.5 / op.defs.get(op.current).kills); window.kino?.classes?.addCharge?.(.5); }
     if (has('tactiquilla')) { recentKills.push(t); while (recentKills.length && t - recentKills[0] > .5) recentKills.shift(); if (recentKills.length >= 2) pts((recentKills.length - 1) * (up('tactiquilla') ? 100 : 50)); }
     const b = burning.get(z); if (b?.explode && Math.random() < b.explode) { blast(at, 100, zh() * .5, 'explosion', z); fx(at.clone().add(V(0, 30, 0)), .5, 0xff6a1a); }
@@ -523,8 +524,6 @@ export function setupReaperPerks(api, catalogue, base) {
       const low = session.health < session.maxHealth * .35; if (low) icuLinger = up('icu') ? t + 2 : t; if (low || t < icuLinger) speedMul *= 1.25;
       if (session.drinking || session.busy) session.effects.invulnerable = Math.max(session.effects.invulnerable ?? 0, t + (up('icu') ? 2 : .15));
     }
-    // Magnet Margarita
-    if (has('magnet')) for (const p of powerups?.items ?? []) { const to = f.clone().setY(p.root.position.y).sub(p.root.position), d = to.length(); if (d > 90 && d < 1500) p.root.position.addScaledVector(to.normalize(), Math.min(d - 90, dt * (up('magnet') ? 240 : 120))); }
     // Momentum Mojito
     if (has('momentum')) {
       const sliding = window.kino?.movement?.state?.sliding;
@@ -752,5 +751,6 @@ export function setupReaperPerks(api, catalogue, base) {
       for (const id of list) give(id); session.health = session.maxHealth; return 'Perks: ' + list.map(id => catalogue[id].name).join(', ');
     } }); };
   addCheat();
-  window.kino.reaperPerks = { ids, has, up, upgraded, give, catalogue, raiseWall, walls, nadeMax, tacticalMax, get armour() { return armour; }, get momentum() { return momentum; }, get wolf() { return !!wolf; } };
+  const magnet = setupMagnet(api, { has, stat, feet, now, zh, near, hurt, slow, ring, fx, chip, toast });
+  window.kino.reaperPerks = { ids, has, up, upgraded, give, catalogue, raiseWall, walls, nadeMax, tacticalMax, magnet, get armour() { return armour; }, get momentum() { return momentum; }, get wolf() { return !!wolf; } };
 }
