@@ -28,7 +28,7 @@ IWD = SRC / 'iwd'
 WEAPONS = ['tony_phone', 'mk3_repulsor', 'mk3_rocket', 'mk1_flamethrower', 'mk1_rocket', 'mk6_rocket', 'mk16_cloaking', 'mk33_blades',
            'mk42_flare', 'heavy_repulsor', 'mk5_suitcase', 'wm_minigun', 'wm_handgun', 'thor_hammer', 'cap_shield', 'hawkeye_bow1',
            'hawkeye_bow2', 'hawkeye_bow3', 'widow_pistols', 'widow_pistols_upgraded', 'hulk_hands', 'mean_juice', 'spiderman',
-           'scarlet_witch', 'colt']
+           'scarlet_witch', 'colt', 'malibu_cheese_gun']
 # models the mod places itself (lobby figures, statues, flying armors, props)
 MODELS = ['captain_america', 'backmodel_cap_shield', 'hawkeye_full_body', 'spider_man', 'spider_man_black', 'hulk', 'hulk_red', 'black_widow_0',
           'quicksilver_torso', 'quicksilver_legs', 'quicksilver_head', 'worldmodel_tony_stark', 'rhode1', 'rhode', 'vision', 'vision_ghost',
@@ -37,7 +37,7 @@ MODELS = ['captain_america', 'backmodel_cap_shield', 'hawkeye_full_body', 'spide
           'iron_man_worldmodel_mk16_cloak', 'iron_man_worldmodel_mk33', 'iron_man_worldmodel_mk42', 'iron_man_worldmodel_mk42_pieces',
           'iron_man_worldmodel_mk44', 'iron_man_world_prototype', 'iron_wm_world', 'world_wm_minigun', 'iron_man_missile_model',
           'malibu_tesserrect_top', 'malibu_tesserrect_bottom', 'malibu_web_glob', 'malibu_web_glob_2', 'scarlet_shield', 'hawkeye_arrow1',
-          'thor_hammer', 'cap_shield', 'worldmodel_hawkeye_bow1', 'wm_battery', 'iron_patriot', 'iron_man_mk42',
+          'thor_hammer', 'cap_shield', 'worldmodel_hawkeye_bow1', 'wm_battery', 'iron_patriot', 'iron_man_mk42', 'malibu_napalm_zombie_body', 'malibu_batman', 'malibu_drinking_glass',
           # viewhands: a weapon whose hands are viewmodel_hands_no_model uses the player's (SetViewmodel: the hero's or the armor's)
           'viewhands_tony_stark', 'viewhands_banner', 'viewhands_cap', 'viewhands_hawkeye', 'viewhands_quicksilver', 'viewhands_scarlet_witch',
           'viewhands_thor', 'viewhands_vision', 'viewhands_vision_ghost', 'black_widow_viewhands', 'spider_man_view', 'spider_man_view_black', 'hulk_view',

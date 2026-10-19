@@ -15,6 +15,7 @@ import { createKit } from './common.js';
 import { setupHeroes } from './heroes.js';
 import { setupTony } from './tony.js';
 import { setupPowers } from './powers.js';
+import { setupQuests } from './quests.js';
 
 // [zone, neighbour, flag zone] in the builder's compact ids (zone_ prefix and underscores dropped; zone_driveway1 is 'start')
 const ADJ = [
@@ -61,14 +62,17 @@ export default async function setup(api) {
     d.malibuArms = placeholder ? arms : d.handsModel; d.handsModel = d.malibuArms;
     if (FIRE[d.fireSound]) d.malibuSound = FIRE[d.fireSound];
     d.camo = null;
+    // the map's plain guns fire with this game's sounds for the nearest gun
+    d.soundsFrom = { malibu_cheese_gun: 'mp5k_zm', widow_pistols: 'cz75_zm', widow_pistols_upgraded: 'cz75_zm', colt: 'cz75_zm' }[d.mapWeapon];
     data.weapons[id] = d;
   }
   // their fire sounds (the map's), in place of the engine's lookup by weapon id
-  if (api.audio?.weapon) { const play = api.audio.weapon.bind(api.audio); api.audio.weapon = (kind, def, ...rest) => { if (def?.mapWeapon) { if (kind === 'shot' && def.malibuSound) kit.sound(def.malibuSound, { volume: .6 }); return; } return play(kind, def, ...rest); }; }
+  if (api.audio?.weapon) { const play = api.audio.weapon.bind(api.audio); api.audio.weapon = (kind, def, ...rest) => { if (def?.mapWeapon) { if (def.soundsFrom && data.weapons[def.soundsFrom]) return play(kind, data.weapons[def.soundsFrom], ...rest); if (kind === 'shot' && def.malibuSound) kit.sound(def.malibuSound, { volume: .6 }); return; } return play(kind, def, ...rest); }; }
 
   const heroes = setupHeroes(kit);
   const tony = setupTony(kit, heroes);
   const powers = setupPowers(kit, heroes, tony);
+  const quests = setupQuests(kit, heroes, tony, powers);
   // powers, not guns: the phone, the serum, the Hulk's fists, Scarlet's hex, the blades and the cloak never run dry or reload
   const NO_AMMO = ['tony_phone', 'mean_juice', 'hulk_hands', 'scarlet_witch', 'mk33_blades', 'mk16_cloaking'].map(n => 'malibu_' + n);
   host.on('update', () => { const w = session.weapon, d = session.def; if (w && d && NO_AMMO.includes(d.id) && w.mag < d.clipSize) { w.mag = d.clipSize; session.cancelReload?.(); } });
@@ -96,6 +100,22 @@ export default async function setup(api) {
   const spawnBarriers = world.spawnBarriers.bind(world);
   const lobby = () => inLobby(player.getFeetPosition()) && !(api.coop?.peers?.() ?? []).some(p => p.position && !inLobby(p.position));
   world.spawnBarriers = s => lobby() ? [] : spawnBarriers(s);
+
+  // ---- Asgard's sky: the lobby floats below the city, whose underside filled its sky; a starry ceiling under the city
+  // (facing down only, so from the city it isn't there)
+  {
+    const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
+    const grd = g.createRadialGradient(256, 256, 20, 256, 256, 360); grd.addColorStop(0, '#2a2f6b'); grd.addColorStop(1, '#05060f'); g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * .9})`; g.fillRect(Math.random() * 512, Math.random() * 512, Math.random() < .1 ? 2 : 1, Math.random() < .1 ? 2 : 1); }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const sky = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000), new THREE.MeshBasicMaterial({ map: tex, fog: false }));
+    sky.rotation.x = Math.PI / 2; sky.position.set(-16500, 9600, -4400); sky.name = 'malibu_asgard_sky'; scene.add(sky);
+  }
+  // the Bifrost: its sound and a flash when you arrive on Earth
+  let wasLobby = true;
+  host.on('update', () => { const l = inLobby(player.getFeetPosition()); if (wasLobby && !l && session.phase !== 'gameover') { kit.sound('bifrost_tele', { volume: .7 }); kit.flash(.8); } wasLobby = l; });
+  // the map's round change sound
+  host.on('roundEnd', () => kit.sound('round_change', { volume: .5 }));
 
   // ---- station guns ----
   const stations = world.interactions.filter(e => e.kind === 'wallbuy' && e.position && STATION.includes(e.weapon));
@@ -125,5 +145,5 @@ export default async function setup(api) {
   host.on('reset', () => roll());
 
   window.kino ??= {};
-  window.kino.malibu = { zones: () => [...world.activeZones(session)], flags: () => [...opened()], inLobby: () => lobby(), stations: () => stations.map(s => s.weapon), roll, kit, heroes, tony, powers };
+  window.kino.malibu = { zones: () => [...world.activeZones(session)], flags: () => [...opened()], inLobby: () => lobby(), stations: () => stations.map(s => s.weapon), roll, kit, heroes, tony, powers, quests };
 }

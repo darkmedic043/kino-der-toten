@@ -168,5 +168,7 @@
     "shield_transport_body",
     "thor_hammer",
     "wm_model"
-  ]
+  ],
+  "boxSpots": "tesserrect_spawn",
+  "pap": "upgrade_trig"
 }

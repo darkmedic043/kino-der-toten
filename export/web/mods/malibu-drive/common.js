@@ -144,7 +144,25 @@ export async function createKit(api) {
     for (const l of lines) l.el.remove(); lines.length = 0; talking = false;
   });
 
+  // ---- impacts (quests: "shoot this with X"): bullets (the engine's shot event), projectile blasts, the heroes' own
+  // projectiles and melee report where they hit and with what; damage triggers listen
+  const impactFns = [];
+  const onImpact = fn => impactFns.push(fn);
+  const impact = (point, weaponId, kind = 'bullet') => { for (const fn of impactFns) fn(point, weaponId, kind); };
+  host.on('shot', e => { if (e?.origin && e.direction) impact(e.origin.clone().addScaledVector(e.direction, e.distance ?? 0), e.def?.id ?? session.def?.id, 'bullet'); });
+  const features = api.features;
+  if (features?.blast && !features.blast.malibu) { const blast = features.blast.bind(features); features.blast = (position, def, ...rest) => { impact(position.clone(), def?.id, 'blast'); return blast(position, def, ...rest); }; features.blast.malibu = true; }
+  // ---- a quick glow burst (the original's playfx) and a screen flash
+  const bursts = [];
+  const fx = (position, color = 0xffffff, size = 10) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    m.position.copy(position); m.scale.setScalar(size * .3); api.scene.add(m); bursts.push({ m, t0: performance.now(), size });
+  };
+  host.on('update', () => { const t = performance.now(); for (let i = bursts.length - 1; i >= 0; i--) { const b = bursts[i], k = (t - b.t0) / 350; if (k >= 1) { b.m.removeFromParent(); b.m.geometry.dispose(); b.m.material.dispose(); bursts.splice(i, 1); continue; } b.m.scale.setScalar(b.size * (.3 + k)); b.m.material.opacity = .9 * (1 - k); } });
+  const flashEl = document.createElement('div'); flashEl.style.cssText = 'position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:39;transition:opacity .25s';
+  document.body.append(flashEl);
+  const flash = (s = .3) => { flashEl.style.transition = 'none'; flashEl.style.opacity = .55; requestAnimationFrame(() => { flashEl.style.transition = `opacity ${s}s`; flashEl.style.opacity = 0; }); };
   const feet = () => api.player.getFeetPosition();
   const near = (p, r) => feet().distanceTo(p) < r;
-  return { api, dir, ents, named, one, center, yawOf, cod, now, nodes, show, boxOf, solid, move, moveTo, wait, sound, model, figure, prop, remove, say, dialog, feet, near, remember, v3 };
+  return { api, dir, ents, named, one, center, yawOf, cod, now, nodes, show, boxOf, solid, move, moveTo, wait, sound, model, figure, prop, remove, onImpact, impact, fx, flash, say, dialog, feet, near, remember, v3 };
 }

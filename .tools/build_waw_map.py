@@ -379,6 +379,16 @@ def main():
             b.add_marker('TELEPORT_' + tp['name'], vec(a['origin']), vec(a.get('angles'))[1],
                          {k: tp[k] for k in ('cost', 'cooldown', 'power', 'visual') if k in tp})
             b.add_marker('TPDEST_' + tp['name'], vec(d['origin']), vec(d.get('angles'))[1], {'zone': tp['zone']} if 'zone' in tp else None)
+    # cfg 'pap': the entity (by targetname) Pack-a-Punch stands at (Malibu Drive's Infinity Stone pedestal)
+    if cfg.get('pap') and named_ent.get(cfg['pap']):
+        e = named_ent[cfg['pap']]
+        b.add_marker('PAP', vec(e['origin']), vec(e.get('angles'))[1])
+    # cfg 'boxSpots': trigger targetname whose target structs are the Mystery Box spots (Malibu Drive's Tesseract)
+    if cfg.get('boxSpots'):
+        for e in ents:
+            if e.get('targetname') == cfg['boxSpots'] and named_ent.get(e.get('target', '')):
+                d = named_ent[e['target']]
+                b.add_marker('BOX', vec(d['origin']), vec(d.get('angles'))[1], {'spot': e['target']})
     # cfg 'randomWallbuys': {targetname: [weapon ids]}: each trigger is a wall buy whose weapon the map mod rolls at load
     for t, pool in cfg.get('randomWallbuys', {}).items():
         for e in ents:
@@ -437,7 +447,7 @@ def main():
             continue
         o = vec(e.get('origin'))
         row = {'name': t, 'class': e.get('classname'), 'origin': [round(c, 2) for c in g(o)], 'yaw': vec(e.get('angles'))[1], 'model': e.get('model', '')}
-        for k, key in (('script_noteworthy', 'note'), ('target', 'target'), ('script_string', 'string'), ('script_linkto', 'linkto')):
+        for k, key in (('script_noteworthy', 'note'), ('target', 'target'), ('script_string', 'string'), ('script_linkto', 'linkto'), ('radius', 'radius'), ('height', 'height')):
             if e.get(k):
                 row[key] = e[k]
         if e.get('angles'):

@@ -9,12 +9,12 @@
 //     in a 1000-unit corridor in front, 10 power), heavy steps. Hulk power (200) drains 1 a second and comes back 1 a second
 //     as Banner; at 0, or holding F for 2 s, he calms down. The Hulk smashes Cap's shield down from where it hangs.
 //   Thor: Mjolnir lies in the city (`thor_hammer_trig`): Thor or Vision can lift it (it leaves its stand until they change
-//     hero). Throwing it calls lightning down where it lands (kills within 110).
+//     hero). Throwing it calls lightning where it lands that chains through up to ten zombies (_zombiemode_tesla.gsc).
 //   Captain America: his shield fell off the helicarrier and hangs on Tony's beach house (`cap_shield`); the Hulk knocks
 //     it down, Cap picks it up there. Thrown, it ricochets through up to eight zombies within 1250 and comes back. Carried
 //     on his back (another gun out), it stops hits from behind.
 //   Hawkeye: his bows are in a shop in the city (`hawkeye_bow_trig`): Spearhead, Explosive and Electro-Shock arrows
-//     (the electro arrow, 1 damage in the map's file, shocks the zombies near where it lands here).
+//     (the electro arrow chains lightning through up to six, as the map's tesla script does).
 //   Black Widow: her pistols (Natasha's Bad Boys); fast and tough.
 //   Quicksilver: hold F for super speed.
 //   Scarlet Witch: her hex (fire) raises a shield that makes her invulnerable but slow (10 power a second; 5 back a
@@ -54,7 +54,7 @@ export function setupPowers(kit, heroes, tony) {
     return out;
   }
   const fling = (z, cause = 'melee') => enemies.list.includes(z) && enemies.hurt(z, 1e6, false, cause === 'melee', cause);
-  const shake = (s = .5) => { api.flash?.(.05); const r = camera.rotation; r.x += (Math.random() - .5) * .03 * s; r.y += (Math.random() - .5) * .03 * s; };
+  const shake = (s = .5) => { kit.flash(.05); const r = camera.rotation; r.x += (Math.random() - .5) * .03 * s; r.y += (Math.random() - .5) * .03 * s; };
 
   // ---- a hero power bar (Hulk, Scarlet Witch, Vision share the map's level.*_power pools)
   const power = { hulk: POWER_MAX, scarlet: POWER_MAX, vision: POWER_MAX };
@@ -77,7 +77,7 @@ export function setupPowers(kit, heroes, tony) {
     if (!o) return;
     const from = eye().addScaledVector(fwd(), 24).add(up(-6));
     o.position.copy(from); o.lookAt(from.clone().add(fwd())); scene.add(o);
-    shots.push({ o, v: fwd().multiplyScalar(speed), gravity, life, spin, onHit });
+    shots.push({ o, v: fwd().multiplyScalar(speed), gravity, life, spin, onHit, weapon: def() });
   }
   host.on('update', dt => {
     const step = typeof dt === 'number' && dt > 0 && dt < .25 ? dt : 1 / 60;
@@ -88,7 +88,7 @@ export function setupPowers(kit, heroes, tony) {
       if (s.spin) s.o.rotation.z += s.spin * step;
       if (hit || wall || s.life <= 0) {
         const at = hit?.point ?? wall?.position ?? s.o.position;
-        shots.splice(i, 1); s.o.removeFromParent(); lastImpact = { at: at.toArray().map(Math.round), z: !!hit, wall: !!wall, life: s.life }; s.onHit?.(at.clone(), hit?.z ?? null);
+        shots.splice(i, 1); s.o.removeFromParent(); lastImpact = { at: at.toArray().map(Math.round), z: !!hit, wall: !!wall, life: s.life }; kit.impact(at.clone(), s.weapon, 'projectile'); s.onHit?.(at.clone(), hit?.z ?? null);
         continue;
       }
       s.o.position.add(travel);
@@ -102,6 +102,7 @@ export function setupPowers(kit, heroes, tony) {
   host.on('update', () => {
     const m = session.meleeLeft ?? 0, started = m > meleePrev; meleePrev = m;
     if (!started) return;
+    kit.impact(eye().addScaledVector(fwd(), 60), def(), 'melee');
     const h = heroes.hero(), id = def(), hulk = !!hulkOn;
     const heroWeapon = [W_('thor_hammer'), W_('cap_shield'), W_('spiderman'), W_('scarlet_witch'), W_('hawkeye_bow1'), W_('hawkeye_bow2'), W_('hawkeye_bow3'), W_('hulk_hands')].includes(id);
     if (!heroWeapon && !tony.armor.worn() && !hulk) return;
@@ -148,7 +149,8 @@ export function setupPowers(kit, heroes, tony) {
     if (d?.id === W_('hulk_hands') && hulkOn && !clapBusy) {
       clapBusy = true;
       (async () => {
-        await wait(.9); sound('hulk_thunder_clap', { volume: .8 }); shake(2); api.effect?.(eye().addScaledVector(fwd(), 60), 0x9fd0ff, 30);
+        await wait(.9); sound('hulk_thunder_clap', { volume: .8 }); shake(2); kit.fx(eye().addScaledVector(fwd(), 60), 0x9fd0ff, 30);
+        for (const d of [60, 140, 220]) kit.impact(eye().addScaledVector(fwd(), d), W_('hulk_hands'), 'melee');
         power.hulk -= 10;
         for (const z of inFront({ range: 1000, max: 21 })) fling(z, 'thunder');
         await wait(1); clapBusy = false;
@@ -186,6 +188,25 @@ export function setupPowers(kit, heroes, tony) {
     }
   });
 
+  // chain lightning (_zombiemode_tesla.gsc treats Mjolnir and the Electro-Shock arrow as the Wunderwaffe): from where it
+  // lands to the nearest zombie within 140, then hop to the next within 300, up to `max`, a bolt drawn for each hop
+  function chain(at, max) {
+    const hit = new Set(); let from = at.clone(), reach = 140;
+    for (let k = 0; k < max; k++) {
+      const z = enemies.list.filter(z => !hit.has(z) && z.root.position.clone().add(up(40)).distanceTo(from) < reach).sort((a, b) => a.root.position.distanceTo(from) - b.root.position.distanceTo(from))[0];
+      if (!z) break;
+      hit.add(z); const to = z.root.position.clone().add(up(40));
+      bolt(from, to); from = to; reach = 300;
+      enemies.hurt(z, 1e6, false, false, 'tesla');
+    }
+  }
+  const boltMat = new THREE.LineBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: .95, blending: THREE.AdditiveBlending, depthWrite: false });
+  function bolt(a, b) {
+    const pts = [a.clone()]; for (let i = 1; i < 8; i++) pts.push(a.clone().lerp(b, i / 8).add(new THREE.Vector3((Math.random() - .5) * 18, (Math.random() - .5) * 18, (Math.random() - .5) * 18))); pts.push(b.clone());
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), boltMat); scene.add(line);
+    setTimeout(() => { line.removeFromParent(); line.geometry.dispose(); }, 180);
+  }
+
   // ================================================================ Mjolnir (Thor, Vision)
   const hammerTrig = one('thor_hammer_trig');
   let hammerWith = null;   // hero id holding it
@@ -207,9 +228,9 @@ export function setupPowers(kit, heroes, tony) {
     if (d?.id !== W_('thor_hammer')) return false;
     sound('thor_hammer_fire', { volume: .7 });
     launch({ modelName: 'thor_hammer', speed: 2250, life: 1.5, spin: 18, onHit: at => {
-      api.effect?.(at, 0xcfe6ff, 40); shake(1);
+      kit.fx(at, 0xcfe6ff, 40); shake(1);
       const bolt = new THREE.PointLight(0xbfe0ff, 12, 500); bolt.position.copy(at).add(up(60)); scene.add(bolt); setTimeout(() => bolt.removeFromParent(), 250);
-      for (const z of [...enemies.list]) if (z.root.position.distanceTo(at) < 110 + 30) enemies.hurt(z, 1e6, false, false, 'thunder');
+      chain(at, 10);
     } });
     return true;
   });
@@ -254,7 +275,8 @@ export function setupPowers(kit, heroes, tony) {
       const i = session.inventory.findIndex(w => w.id === W_('cap_shield')); if (i >= 0) { session.inventory[i].mag = 0; }
       const o = await model('cap_shield'); if (!o) { shieldOut = false; return; }
       o.position.copy(eye().add(up(-10))); scene.add(o);
-      const targets = inFront({ range: 1250, max: 8 });
+      const special = kit.shieldTarget?.(eye(), fwd());   // the Easter egg's dishes (quests.js)
+      const targets = special ? [] : inFront({ range: 1250, max: 8 });
       const flyTo = async (getAt, speed = 1 / .0015) => {
         for (let t = 0; t < 4; t += 1 / 60) {
           const at = getAt(); if (!at) return;
@@ -265,7 +287,8 @@ export function setupPowers(kit, heroes, tony) {
           await new Promise(r => requestAnimationFrame(r));
         }
       };
-      if (targets.length) for (const z of targets) { await flyTo(() => enemies.list.includes(z) ? z.root.position.clone().add(up(40)) : null); if (enemies.list.includes(z)) { sound('iron_punch', { volume: .5 }); fling(z, 'shield'); } }
+      if (special) { await flyTo(() => special.at); special.hit(); }
+      else if (targets.length) for (const z of targets) { await flyTo(() => enemies.list.includes(z) ? z.root.position.clone().add(up(40)) : null); if (enemies.list.includes(z)) { sound('iron_punch', { volume: .5 }); fling(z, 'shield'); } }
       else { const hit = world.raycast(new THREE.Ray(eye(), fwd()), 1, 1500), far = hit ? hit.point.clone() : eye().addScaledVector(fwd(), 1500); await flyTo(() => far); }
       await flyTo(() => eye().add(up(-10)));
       o.removeFromParent(); shieldOut = false;
@@ -295,8 +318,8 @@ export function setupPowers(kit, heroes, tony) {
     if (d?.id !== W_('hawkeye_bow3')) return false;
     sound('bow_fire', { volume: .6 });
     launch({ modelName: 'hawkeye_arrow1', speed: 3000, gravity: 200, life: 3, onHit: at => {
-      api.effect?.(at, 0x7fe0ff, 16);
-      let n = 0; for (const z of [...enemies.list]) if (z.root.position.distanceTo(at) < 160 && n < 6) { n++; enemies.hurt(z, 300 + 100 * session.round, false, false, 'shock'); }
+      kit.fx(at, 0x7fe0ff, 16);
+      chain(at, 6);
     } });
     return true;
   });
@@ -306,7 +329,7 @@ export function setupPowers(kit, heroes, tony) {
   host.on('update', () => {
     const want = is('quicksilver') && held() > .2 && session.phase !== 'reviving';
     if (want !== fast) { fast = want; heroes.setForm(fast ? { speed: 4 } : null); }
-    if (fast && Math.random() < .3) api.effect?.(feet().add(up(30)), 0xc8d4ff, 2);
+    if (fast && Math.random() < .3) kit.fx(feet().add(up(30)), 0xc8d4ff, 2);
   });
 
   // ================================================================ Scarlet Witch
@@ -336,7 +359,7 @@ export function setupPowers(kit, heroes, tony) {
     adsPrev = ads;
     if (holding) {
       if (!enemies.list.includes(holding.z)) holding = null;
-      else { const at = feet().add(fwd().setY(0).normalize().multiplyScalar(70)).add(up(40)); holding.z.root.position.lerp(at, Math.min(1, step * 6)); if (Math.random() < .2) api.effect?.(holding.z.root.position.clone().add(up(40)), 0xff3355, 3); }
+      else { const at = feet().add(fwd().setY(0).normalize().multiplyScalar(70)).add(up(40)); holding.z.root.position.lerp(at, Math.min(1, step * 6)); if (Math.random() < .2) kit.fx(holding.z.root.position.clone().add(up(40)), 0xff3355, 3); }
     }
     if (is('scarlet')) showBar('HEX POWER', power.scarlet, '#ff4d6a');
   });
@@ -361,7 +384,7 @@ export function setupPowers(kit, heroes, tony) {
     if (!is('spiderman') || now() < senseAt || enemies.list.length >= 7) return;
     const p = feet(), f = fwd().setY(0).normalize();
     if (enemies.list.some(z => z.root.position.distanceTo(p) < 100 && z.root.position.clone().sub(p).setY(0).normalize().dot(f) < Math.cos(70 * Math.PI / 180))) {
-      senseAt = now() + 2; sound('spider_sense', { volume: .6 }); api.flash?.(.15); say('^1Spider-Man^7: My spider-sense is tingling!');
+      senseAt = now() + 2; sound('spider_sense', { volume: .6 }); kit.flash(.15); say('^1Spider-Man^7: My spider-sense is tingling!');
     }
   });
   // web-zips at the grapple points: zip to the point, then to where it leads
@@ -399,7 +422,7 @@ export function setupPowers(kit, heroes, tony) {
       }
       if (molecularOn) {
         power.vision -= 10 * step;
-        for (const z of [...enemies.list]) if (z.root.position.distanceTo(feet()) < 80) { enemies.hurt(z, 1e6, false, false, 'vision'); api.effect?.(z.root.position.clone().add(up(40)), 0xffe28a, 6); }
+        for (const z of [...enemies.list]) if (z.root.position.distanceTo(feet()) < 80) { enemies.hurt(z, 1e6, false, false, 'vision'); kit.fx(z.root.position.clone().add(up(40)), 0xffe28a, 6); }
         if (power.vision < 2) { power.vision = 3; molecular(false); }
       } else power.vision = Math.min(POWER_MAX, power.vision + step);
       showBar('MOLECULAR', power.vision, '#ffd23f');
@@ -411,7 +434,7 @@ export function setupPowers(kit, heroes, tony) {
     let busy = false;
     world.addInteraction({ position: center(e), hidden: () => !is('vision'), text: () => 'Phase through', async use() {
       if (busy) return false; busy = true;
-      heroes.setForm({ ...(heroes.form()), hands: 'viewhands_vision_ghost' }); api.flash?.(.3);
+      heroes.setForm({ ...(heroes.form()), hands: 'viewhands_vision_ghost' }); kit.flash(.3);
       await zip([v3(to.origin)], 1);
       await wait(.5); if (!molecularOn) heroes.setForm(null);
       busy = false; return true;
