@@ -163,7 +163,7 @@ export function setupPowers(kit, heroes, tony) {
     hulkOn = true; sound('hulk_smash', { volume: .8 });
     session.cancelReload?.(); hulkSaved = { inventory: session.inventory.map(w => ({ ...w })), slot: session.slot };
     session.inventory = [{ id: W_('hulk_hands'), mag: 1, reserve: 40, upgraded: false }]; session.slot = 0;
-    heroes.setForm({ hp: 600, speed: .85, hands: 'hulk_view' });
+    heroes.setForm({ hp: 600, speed: .85, hands: 'hulk_view', hud: 'hud_hulk', overlay: '1stperson_view_hulk' });
     session.health = session.maxHealth; api.equipView?.();
     announce('HULK SMASH', 'THE INCREDIBLE HULK', 3);
   }

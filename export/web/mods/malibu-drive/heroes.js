@@ -7,17 +7,17 @@
 import * as THREE from 'three';
 
 export const HEROES = [
-  { id: 'tony', name: 'Tony Stark', color: 6, hp: 100, speed: 1, hands: 'viewhands_tony_stark', figure: 'worldmodel_tony_stark', anim: 'full_body_tony', spawn: 'tony_spawn', statue: 'malibu_gold_statue_2', gear: ['malibu_tony_phone'] },
-  { id: 'banner', name: 'Bruce Banner', color: 2, hp: 150, speed: 1, hands: 'viewhands_banner', figure: 'hulk', anim: 'full_body_hulk', spawn: 'hulk_spawn', statue: 'malibu_gold_statue_1', gear: [] },
-  { id: 'widow', name: 'Black Widow', color: 0, hp: 300, speed: 1.3, hands: 'black_widow_viewhands', figure: 'black_widow_0', anim: 'full_body_widow', spawn: 'widow_spawn', statue: 'malibu_gold_statue_2', gear: ['malibu_widow_pistols'] },
-  { id: 'hawkeye', name: 'Hawkeye', color: 6, hp: 350, speed: 1.2, hands: 'viewhands_hawkeye', figure: 'hawkeye_full_body', anim: 'full_body_hawkeye', spawn: 'hawkeye_spawn', statue: 'malibu_gold_statue_2', gear: [], found: 'bows' },
-  { id: 'cap', name: 'Captain America', color: 4, hp: 400, speed: 1.2, hands: 'viewhands_cap', figure: 'captain_america', attach: ['backmodel_cap_shield'], anim: 'full_body_cap', spawn: 'cap_spawn', statue: 'malibu_gold_statue_1', gear: [], found: 'shield' },
-  { id: 'thor', name: 'Thor', color: 3, hp: 400, speed: 1.2, hands: 'viewhands_thor', figure: 'thor_full_body_model', anim: 'full_body_thor', spawn: 'thor_spawn', statue: 'malibu_gold_statue_1', gear: [], found: 'hammer' },
-  { id: 'quicksilver', name: 'Quicksilver', color: 5, hp: 120, speed: 1.5, hands: 'viewhands_quicksilver', figure: 'quicksilver_torso', attach: ['quicksilver_legs', 'quicksilver_head'], anim: 'full_body_mk42', spawn: 'quicksilver_spawn', statue: 'malibu_gold_lion', gear: [] },
-  { id: 'scarlet', name: 'Scarlet Witch', color: 1, hp: 150, speed: 1.2, hands: 'viewhands_scarlet_witch', figure: 'scarlet_witch_0', anim: 'full_body_scarlet', spawn: 'scarlet_spawn', statue: 'malibu_gold_statue_2', gear: ['malibu_scarlet_witch'] },
-  { id: 'spiderman', name: 'Spider-Man', color: 1, hp: 300, speed: 1.3, hands: 'spider_man_view', figure: 'spider_man', anim: 'full_body_spiderman', spawn: 'spiderman_spawn', statue: 'malibu_gold_lion', gear: ['malibu_spiderman'] },
-  { id: 'rhodes', name: 'James Rhodes', color: 3, hp: 200, speed: 1.2, hands: null, figure: 'rhode1', anim: 'full_body_rhode', spawn: 'rhodes_spawn', statue: 'malibu_gold_statue_2', gear: [] },
-  { id: 'vision', name: 'Vision', color: 3, hp: 250, speed: 1.2, hands: 'viewhands_vision', figure: 'vision', anim: 'full_body_vision', spawn: 'vision_spawn', statue: 'malibu_gold_statue_1', gear: [] },
+  { id: 'tony', hud: 'hud_tony_stark', name: 'Tony Stark', color: 6, hp: 100, speed: 1, hands: 'viewhands_tony_stark', figure: 'worldmodel_tony_stark', anim: 'full_body_tony', spawn: 'tony_spawn', statue: 'malibu_gold_statue_2', gear: ['malibu_tony_phone'] },
+  { id: 'banner', hud: 'hud_banner', name: 'Bruce Banner', color: 2, hp: 150, speed: 1, hands: 'viewhands_banner', figure: 'hulk', anim: 'full_body_hulk', spawn: 'hulk_spawn', statue: 'malibu_gold_statue_1', gear: [] },
+  { id: 'widow', hud: 'hud_black_widow', name: 'Black Widow', color: 0, hp: 300, speed: 1.3, hands: 'black_widow_viewhands', figure: 'black_widow_0', anim: 'full_body_widow', spawn: 'widow_spawn', statue: 'malibu_gold_statue_2', gear: ['malibu_widow_pistols'] },
+  { id: 'hawkeye', hud: 'hud_hawkeye', name: 'Hawkeye', color: 6, hp: 350, speed: 1.2, hands: 'viewhands_hawkeye', figure: 'hawkeye_full_body', anim: 'full_body_hawkeye', spawn: 'hawkeye_spawn', statue: 'malibu_gold_statue_2', gear: [], found: 'bows' },
+  { id: 'cap', hud: 'hud_cap', name: 'Captain America', color: 4, hp: 400, speed: 1.2, hands: 'viewhands_cap', figure: 'captain_america', attach: ['backmodel_cap_shield'], anim: 'full_body_cap', spawn: 'cap_spawn', statue: 'malibu_gold_statue_1', gear: [], found: 'shield' },
+  { id: 'thor', hud: 'hud_thor', name: 'Thor', color: 3, hp: 400, speed: 1.2, hands: 'viewhands_thor', figure: 'thor_full_body_model', anim: 'full_body_thor', spawn: 'thor_spawn', statue: 'malibu_gold_statue_1', gear: [], found: 'hammer' },
+  { id: 'quicksilver', hud: 'hud_quicksilver', name: 'Quicksilver', color: 5, hp: 120, speed: 1.5, hands: 'viewhands_quicksilver', figure: 'quicksilver_torso', attach: ['quicksilver_legs', 'quicksilver_head'], anim: 'full_body_mk42', spawn: 'quicksilver_spawn', statue: 'malibu_gold_lion', gear: [] },
+  { id: 'scarlet', hud: 'hud_scarlet', name: 'Scarlet Witch', color: 1, hp: 150, speed: 1.2, hands: 'viewhands_scarlet_witch', figure: 'scarlet_witch_0', anim: 'full_body_scarlet', spawn: 'scarlet_spawn', statue: 'malibu_gold_statue_2', gear: ['malibu_scarlet_witch'] },
+  { id: 'spiderman', hud: 'hud_spiderman', name: 'Spider-Man', color: 1, hp: 300, speed: 1.3, hands: 'spider_man_view', figure: 'spider_man', anim: 'full_body_spiderman', spawn: 'spiderman_spawn', statue: 'malibu_gold_lion', gear: ['malibu_spiderman'] },
+  { id: 'rhodes', hud: 'hud_rhode', name: 'James Rhodes', color: 3, hp: 200, speed: 1.2, hands: null, figure: 'rhode1', anim: 'full_body_rhode', spawn: 'rhodes_spawn', statue: 'malibu_gold_statue_2', gear: [] },
+  { id: 'vision', hud: 'hud_vision', name: 'Vision', color: 3, hp: 250, speed: 1.2, hands: 'viewhands_vision', figure: 'vision', anim: 'full_body_vision', spawn: 'vision_spawn', statue: 'malibu_gold_statue_1', gear: [] },
 ];
 const HP_SCALE = 1.5;
 // the lines each hero says when picked (one exchange at random; `missing` while their gear is still to be found)
@@ -79,7 +79,7 @@ export function setupHeroes(kit) {
     if (h) session.health = session.maxHealth; else session.health = Math.min(session.health, session.maxHealth);
     setArms();
     for (const id of [...(h?.gear ?? []), ...(gearFor.get(h?.id) ?? [])]) give(id);
-    refreshFigures();
+    refreshFigures(); refreshHud();
     if (h && !quiet) {
       say(`[i] You are now playing as ^${h.color}${h.name}`);
       const L = LINES[h.name];
@@ -90,6 +90,24 @@ export function setupHeroes(kit) {
     if (!remote) window.kino.coop?.id && window.kino.coop.send('all', { t: 'malibu', k: 'hero', d: h?.id ?? null });
     for (const fn of listeners) fn(h, prev);
   }
+
+  // ---- the hero's icon (top right, as the original's *_interface: 100 x 100) and full-screen overlays (the Hulk's view;
+  // without a hero, the freeplay view)
+  const icon = document.createElement('img'), overlay = document.createElement('img');
+  icon.style.cssText = 'position:fixed;right:22px;top:132px;width:92px;height:92px;z-index:29;pointer-events:none;display:none;filter:drop-shadow(0 2px 4px #000)';
+  overlay.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:fill;z-index:28;pointer-events:none;display:none;opacity:.55';
+  document.body.append(overlay, icon);
+  let suited = false;
+  const hudUrl = n => DIR + 'hud/' + n + '.webp';
+  const refreshHud = () => {
+    const name = over.hud ?? hero?.hud;
+    icon.style.display = name && !suited ? 'block' : 'none'; if (name) icon.src = hudUrl(name);
+    const ov = over.overlay ?? (!hero && window.kino.malibu?.inLobby?.() ? '1stperson_view_freeplay' : null);
+    overlay.style.display = ov ? 'block' : 'none'; if (ov) overlay.src = hudUrl(ov);
+  };
+  host.on('suitChange', ({ on }) => { suited = on; refreshHud(); });
+  let lobbyWas = null;
+  host.on('update', () => { const l = !!window.kino.malibu?.inLobby?.(); if (l !== lobbyWas) { lobbyWas = l; refreshHud(); } });
 
   // ---- the figures in the character room, gold statues while taken
   const figures = new Map();   // hero id -> {fig, statue}
@@ -150,7 +168,7 @@ export function setupHeroes(kit) {
   });
   net?.on?.('left', p => { const id = peerHero.get(p?.id); if (id) { taken.delete(id); peerHero.delete(p.id); refreshFigures(); } });
 
-  host.on('reset', () => { hero = null; over = {}; taken.clear(); found.clear(); gearFor.clear(); armsOverride = null; player.moveSpeed = base.move; player.sprintSpeed = base.sprint; setArms(); refreshFigures(); });
+  host.on('reset', () => { hero = null; over = {}; taken.clear(); found.clear(); gearFor.clear(); armsOverride = null; suited = false; player.moveSpeed = base.move; player.sprintSpeed = base.sprint; setArms(); refreshFigures(); refreshHud(); });
 
   return {
     hero: () => hero, is: id => hero?.id === id, become, HEROES,
@@ -159,7 +177,7 @@ export function setupHeroes(kit) {
     giveGear: (heroId, id) => { const list = gearFor.get(heroId) ?? []; if (!list.includes(id)) list.push(id); gearFor.set(heroId, list); if (hero?.id === heroId) give(id); },
     give, takeGear, setArms: n => { armsOverride = n; setArms(); }, handsUrl,
     // a form over the hero (the Hulk, Vision's Molecular Mode...): {hp, speed, hands}; null clears it
-    setForm: f => { over = f ?? {}; applySpeed(); session.health = Math.min(session.maxHealth, f?.hp ? session.maxHealth : session.health); setArms(); }, form: () => over,
+    setForm: f => { over = f ?? {}; applySpeed(); session.health = Math.min(session.maxHealth, f?.hp ? session.maxHealth : session.health); setArms(); refreshHud(); }, form: () => over,
     name: () => hero ? hero.name : 'Freeplay',
   };
 }

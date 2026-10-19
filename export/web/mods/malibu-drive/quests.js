@@ -559,7 +559,7 @@ export function setupQuests(kit, heroes, tony, powers) {
   // you over after 150 s
   let spidey = null;
   function blackSpidey(on) {
-    if (on) { spidey = { until: now() + 150 }; heroes.setForm({ hp: 450, speed: 1.6, hands: 'spider_man_view_black' }); say('^1Spider-Man^7: I feel so much stronger and faster...'); for (const p of ['specialty_fastreload', 'specialty_rof']) session.perks?.add?.(p); }
+    if (on) { spidey = { until: now() + 150 }; heroes.setForm({ hp: 450, speed: 1.6, hands: 'spider_man_view_black', hud: 'hud_black_spidey' }); say('^1Spider-Man^7: I feel so much stronger and faster...'); for (const p of ['specialty_fastreload', 'specialty_rof']) session.perks?.add?.(p); }
     else { spidey = null; heroes.setForm(null); for (const p of ['specialty_fastreload', 'specialty_rof']) session.perks?.delete?.(p); }
   }
   host.on('update', () => {
