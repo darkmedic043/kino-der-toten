@@ -159,7 +159,8 @@ export class CustomWorld {
     this.traversals=markers.filter(m=>m.type==='TRAVERSE'&&Array.isArray(m.extras.to)).map(m=>({from:m.position.clone(),to:new THREE.Vector3(...m.extras.to),both:!!m.extras.both}));
     const offMeshConnections=markers.filter(m=>m.type==='TRAVERSE'&&Array.isArray(m.extras.to)).map((m,i)=>({startPosition:{x:m.position.x,y:m.position.y,z:m.position.z},
       endPosition:{x:m.extras.to[0],y:m.extras.to[1],z:m.extras.to[2]},radius:60,bidirectional:!!m.extras.both,userId:i}));   // 60: a hop starts at the wall, where the navmesh is eroded back
-    const nav=generateTiledNavMesh(positions,indices,{offMeshConnections,cs,ch,tileSize:32,walkableSlopeAngle:48,walkableHeight:Math.ceil(70/ch),walkableClimb:Math.floor(18/ch),walkableRadius:Math.max(1,Math.round(14/cs)),
+    // map entry navHeight: the headroom a zombie needs (70; Malibu Drive 60: some of its passages leave 71, lost to rounding)
+    const nav=generateTiledNavMesh(positions,indices,{offMeshConnections,cs,ch,tileSize:32,walkableSlopeAngle:48,walkableHeight:Math.ceil((this.entry.navHeight??70)/ch),walkableClimb:Math.floor(18/ch),walkableRadius:Math.max(1,Math.round(14/cs)),
       maxEdgeLen:Math.round(48/cs),maxSimplificationError:1.3,minRegionArea:8,mergeRegionArea:20,maxVertsPerPoly:6,detailSampleDist:6,detailSampleMaxError:1});
     if(!nav.success)throw new Error('Navigation mesh generation failed: '+(nav.error??'unknown error'));
     this.nav=nav.navMesh;this.query=new NavMeshQuery(this.nav,{maxNodes:65535});this.query.defaultQueryHalfExtents={x:70,y:100,z:70};
@@ -203,6 +204,20 @@ export class CustomWorld {
       this.barriers.push({id:'spawn_'+i,position:inside.clone(),outside:walk?inside.clone():m.position.clone(),inside,group:zoneOf(m),boards:[],count:0,repairTime:0,rewardRound:0,reward:0,walk});
     }
     if(!this.barriers.length)throw new Error('The map has no zombie spawns (ZSPAWN markers)');
+    // Map entry strandedSpawns {keep: [zone groups]}: a spawn on a navmesh island that can't walk to the start zone
+    // (Malibu Drive's hotel roof: its stairs don't make it into the navmesh) moves to the nearest walkable point that
+    // can, within 1500; `keep` lists the groups meant to be apart (Malibu's dream in the Cheese Cube)
+    if(this.entry.strandedSpawns){
+      const keep=new Set(this.entry.strandedSpawns.keep??[]),ref=(this.barriers.find(b=>b.group==='start')??this.barriers[0]).inside;
+      const reaches=p=>{const pa=this.path(p,ref);return pa.length>0&&pa.at(-1).distanceTo(ref)<40;};let moved=0;
+      for(const b of this.barriers){
+        if(keep.has(b.group)||reaches(b.inside))continue;
+        let best=null;
+        for(let r=60;r<=1500&&!best;r+=60)for(let k=0;k<12&&!best;k++){const a=k/12*Math.PI*2,c=this.closest(new THREE.Vector3(b.inside.x+Math.cos(a)*r,b.inside.y,b.inside.z+Math.sin(a)*r),{x:30,y:1200,z:30});if(c&&reaches(c))best=c;}
+        if(best){b.inside=best.clone();b.position=best.clone();if(!b.walk)b.outside=best.clone();moved++;}
+      }
+      if(moved)console.info('[custom-world]',moved,'stranded zombie spawns moved to walkable ground');
+    }
 
     const tasks=[];
     for(const m of markers){

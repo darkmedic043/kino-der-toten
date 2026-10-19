@@ -158,6 +158,8 @@
       "perkYaw": 270,
       "doorMargin": 40,
       "doorHeadroom": 80,
+      "navHeight": 60,
+      "strandedSpawns": { "keep": ["ccube"] },
       "mergeStatic": true,
       "mergeExclude": "^ENT_",
       "batchMeshes": true
