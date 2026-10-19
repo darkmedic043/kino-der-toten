@@ -140,6 +140,16 @@
     "yaw": 0,
     "model": "terminal_booth_compact.glb",
     "note": "Tony Stark's living room: the white panelled wall (fitting for STARK.EXE). Found by a flat-wall scan (collision and rendered walls agree, floor level, 110 clear in front); the driveway where the Bifrost lands has no real walls (only clips and parked vehicles)"
+   },
+   {
+    "position": [
+     -1768,
+     10613.8,
+     -5012.6
+    ],
+    "yaw": 180,
+    "model": "terminal_booth_compact.glb",
+    "note": "the driveway (start zone): against the low white wall on the roundabout's north side, facing the Bifrost landing (the summon pad is 196 away). The driveway has no tall walls; found by a scan for low walls (10 and 22 high) with 80 clear in front"
    }
   ]
  }
