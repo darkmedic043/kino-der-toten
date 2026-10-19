@@ -303,3 +303,4 @@
 - 2026-10-19: Tab board QUESTS row: this map's journal quests with their current step; Tab + 1-9 tracks one (journal.md).
 - 2026-10-19: Malibu Drive: the beach reaches the house (a link over the spiral stair), zombies hop the driveway's walls (enemies.js walks traversal hops), clip blocks only the player (CLIP_ class: shoot zombies coming in), carts out of the navmesh, hero figures opaque again (waw-ports.md).
 - 2026-10-19: Malibu Drive: stranded spawns (hotel roof, office2's closed room) moved to walkable ground that reaches the map (`strandedSpawns`), zombie headroom 60 (waw-ports.md).
+- 2026-10-19: Malibu Drive: zombies come down the hotel's spiral stair from the roof (two-way links up its steps, `spiralStairs`; enemies.js headway check) (waw-ports.md).

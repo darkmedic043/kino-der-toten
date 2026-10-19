@@ -186,5 +186,19 @@
       ],
       "both": true
     }
+  ],
+  "spiralStairs": [
+    {
+      "note": "the hotel lobby spiral, up five floors to the roof (its rooftop spawns)",
+      "center": [
+        -11777,
+        5027
+      ],
+      "radius": 150,
+      "z": [
+        10775,
+        11600
+      ]
+    }
   ]
 }

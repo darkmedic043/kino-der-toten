@@ -148,7 +148,7 @@
       "description": "ZK's World at War Avengers map, ported from its compiled zones: Tony Stark's Malibu house, the beach, the city and the Cheese Cube. Work in progress.",
       "modes": ["zombies", "explore"],
       "dir": "mods/maps/malibu-drive/",
-      "model": "malibu-drive.glb?v=10",
+      "model": "malibu-drive.glb?v=11",
       "scale": 1,
       "background": "#9fb6c9",
       "exposure": 1.05,

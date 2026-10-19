@@ -112,6 +112,17 @@ export class Enemies {
       if(freeWalk)this.walkFree(z,goal,dt);
       else{z.repath-=dt;
       if(z.repath<=0&&!z.path[z.pathIndex]?.hop){z.path=this.world.path(z.root.position,goal);z.pathIndex=1;z.repath=.55+(z.id%5)*.07;}}   // no replanning mid-hop
+      // held in place: under 12 units of headway in 1.2 s while chasing with a path (navmesh snapping keeps a zombie on its
+      // own patch where the navmesh breaks into fragments, a spiral stair's steps; each replan sends it back to the first
+      // corner): step to the first path point more than 25 away, if within 130 (the hotel spiral needs 118; crowds stall too: a short shuffle at worst)
+      if(!freeWalk&&z.state==='chase'&&z.path.length>1){
+        z.progT=(z.progT??0)+dt;z.progAt??=z.root.position.clone();
+        if(z.progT>1.2){
+          if(z.root.position.distanceTo(z.progAt)<12&&dist>100){const far=z.path.slice(z.pathIndex).find(p=>p.distanceTo(z.root.position)>25);
+            if(far&&Math.hypot(far.x-z.root.position.x,far.z-z.root.position.z)<130){z.root.position.copy(far);z.pathIndex=z.path.indexOf(far)+1;}}
+          z.progAt.copy(z.root.position);z.progT=0;
+        }
+      }
       const target=freeWalk?null:z.path[z.pathIndex];
       if(target?.hop){   // a traversal (custom maps' off-mesh links: fence hops, climbs, jump-downs): straight to its end, off the navmesh
         const d=target.clone().sub(z.root.position),len=d.length();

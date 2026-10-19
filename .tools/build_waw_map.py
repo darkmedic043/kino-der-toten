@@ -514,6 +514,11 @@ def main():
     for t in cfg.get('traversals', []):
         b.add_marker(f'TRAVERSE_{trav}', t['from'], 0, {'to': [round(c, 3) for c in g(t['to'])], 'anim': 'map', 'both': bool(t.get('both'))})
         trav += 1
+    cm_file = pathlib.Path(str(obj_base) + '.clipmap.json')
+    if cfg.get('spiralStairs') and cm_file.exists():
+        for frm, to in spiral_links(json.load(open(cm_file)), cfg['spiralStairs']):
+            b.add_marker(f'TRAVERSE_{trav}', list(frm), 0, {'to': [round(c, 3) for c in g(to)], 'anim': 'spiral', 'both': True})
+            trav += 1
     if trav:
         print(f'{trav} AI traversals')
     models = {e['targetname']: e for e in ents if e.get('classname') == 'script_model' and e.get('targetname')}
@@ -758,6 +763,29 @@ def inv3(A):
         return None
     return [[(A[(c + 1) % 3][(r + 1) % 3] * A[(c + 2) % 3][(r + 2) % 3] - A[(c + 1) % 3][(r + 2) % 3] * A[(c + 2) % 3][(r + 1) % 3]) / det
              for c in range(3)] for r in range(3)]
+
+def spiral_links(cm, spirals):
+    """cfg 'spiralStairs' [{center: [x, y], radius, z: [lo, hi], every?}]: a spiral stair's wedge steps come out of the
+    navmesh as fragments that don't link up (Malibu's hotel: 19 breaks up five floors to the roof), so zombies get a
+    chain of two-way links up it, step top to step top every `every` steps (4: about 28 up and a quarter turn), like
+    the map's own traversals. The steps are the thin wedge brushes (slanted sides) inside the cylinder, one per height."""
+    out = []
+    for sp in spirals:
+        cx, cy = sp['center']; R = sp.get('radius', 150); z0, z1 = sp['z']; every = sp.get('every', 4)
+        by_h = {}
+        for br in cm['brushes']:
+            lo, hi = br['mins'], br['maxs']
+            x, y = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2
+            if br['model'] or not br['contents'] & SOLID or hi[2] - lo[2] > 16 or len(br['sides']) < 2 or not z0 < hi[2] < z1 or math.hypot(x - cx, y - cy) > R:
+                continue
+            by_h.setdefault(round(hi[2]), (x, y, hi[2] + 1))
+        tops = [by_h[h] for h in sorted(by_h)]
+        if len(tops) < 2:
+            print('spiral stair with no steps at', sp['center']); continue
+        picks = tops[::every] + ([tops[-1]] if (len(tops) - 1) % every else [])
+        out += [(a, b) for a, b in zip(picks, picks[1:])]
+        print(f"spiral stair at {sp['center']}: {len(tops)} steps, {len(picks) - 1} links ({round(tops[0][2])}-{round(tops[-1][2])})")
+    return out
 
 def clipmap_collision(cm, keep, flip, col_mesh):
     """COL_world (stops the player and shapes the navmesh): solid and glass brushes, the terrain, the colliding static
