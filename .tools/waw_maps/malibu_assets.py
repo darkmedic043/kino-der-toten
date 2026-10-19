@@ -31,7 +31,11 @@ IWD = SRC / 'iwd'
 WEAPONS = ['tony_phone', 'mk3_repulsor', 'mk3_rocket', 'mk1_flamethrower', 'mk1_rocket', 'mk6_rocket', 'mk16_cloaking', 'mk33_blades',
            'mk42_flare', 'heavy_repulsor', 'mk5_suitcase', 'wm_minigun', 'wm_handgun', 'thor_hammer', 'cap_shield', 'hawkeye_bow1',
            'hawkeye_bow2', 'hawkeye_bow3', 'widow_pistols', 'widow_pistols_upgraded', 'hulk_hands', 'mean_juice', 'spiderman',
-           'scarlet_witch', 'colt', 'malibu_cheese_gun']
+           'scarlet_witch', 'colt', 'malibu_cheese_gun',
+           # the map's own guns (the stations' rolls, the Tesseract, the stones' upgrades): WaW guns in Malibu skins
+           'malibu_ak74', 'malibu_ak74_upgraded', 'malibu_cz75', 'malibu_cz75_upgraded', 'malibu_famas', 'malibu_famas_upgraded',
+           'malibu_galil', 'malibu_galil_upgraded', 'malibu_m14', 'malibu_m14_upgraded', 'malibu_m1927', 'malibu_m1927_upgraded',
+           'malibu_mp5k', 'malibu_mp5k_upgraded', 'malibu_spas', 'malibu_spas_upgraded', 'malibu_cheese_gun_upgraded']
 # models the mod places itself (lobby figures, statues, flying armors, props)
 MODELS = ['captain_america', 'backmodel_cap_shield', 'hawkeye_full_body', 'spider_man', 'spider_man_black', 'hulk', 'hulk_red', 'black_widow_0',
           'quicksilver_torso', 'quicksilver_legs', 'quicksilver_head', 'worldmodel_tony_stark', 'rhode1', 'rhode', 'vision', 'vision_ghost',
@@ -173,7 +177,7 @@ def weapon(name):
             'startAmmo': int(num('startAmmo', 0)), 'maxAmmo': int(num('maxAmmo', 0)), 'damage': num('damage'), 'minDamage': num('minDamage', num('damage')),
             'meleeDamage': num('meleeDamage', 150), 'range': 2000, 'fireTime': num('fireTime', .33), 'reloadTime': num('reloadTime', 2),
             'reloadEmptyTime': num('reloadEmptyTime', num('reloadTime', 2)), 'automatic': d.get('fireType') == 'Full Auto', 'fireType': d.get('fireType') or 'Single Shot',
-            'pellets': 1, 'headMultiplier': 1, 'hideTags': d.get('hideTags', '').split(),
+            'pellets': max(1, int(num('shotCount', 1))), 'headMultiplier': 1, 'hideTags': d.get('hideTags', '').split(),
             'projectileSpeed': num('projectileSpeed') if projectile else 0, 'explosionRadius': num('explosionRadius') if projectile else 0,
             'explosionInnerDamage': num('explosionInnerDamage') if projectile else 0, 'explosionOuterDamage': num('explosionOuterDamage') if projectile else 0,
             'model': model(d.get('gunModel'), gun=True), 'handsModel': model(d.get('handModel')), 'worldModel': model(d.get('worldModel')),

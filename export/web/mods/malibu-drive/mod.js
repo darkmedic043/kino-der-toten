@@ -32,7 +32,15 @@ const ALIAS = { tonybeachstairs: 'tonybeachstaircase' };
 // zones the original starts with besides the driveway: the helicarrier and the Cheese Cube, reached by their own events
 const ALWAYS = ['start', 'helizone', 'ccube'];
 // get_new_weapon's roll: Famas, AK, Galil, MP5K, M14 (two of seven), SPAS-12
-const STATION = ['famas_zm', 'ak74u_zm', 'galil_zm', 'mp5k_zm', 'm14_zm', 'm14_zm', 'spas_zm'];
+const STATION = ['famas_zm', 'ak74u_zm', 'galil_zm', 'mp5k_zm', 'm14_zm', 'm14_zm', 'spas_zm'];   // the builder's stand-ins at the stations
+// the map's own guns (dlc3_code.gsc include_weapons, weapons/sp: WaW guns in Malibu skins; each upgrades to its
+// <name>_upgraded at the stones), for this game's nearest gun (sounds; and the station stand-ins above)
+const MAP_GUN = { malibu_famas: 'famas_zm', malibu_ak74: 'ak74u_zm', malibu_galil: 'galil_zm', malibu_mp5k: 'mp5k_zm', malibu_m14: 'm14_zm',
+  malibu_spas: 'spas_zm', malibu_cz75: 'cz75_zm', malibu_m1927: 'thompson_zm', malibu_cheese_gun: 'mp5k_zm' };
+// the stations roll these (_custom_weapon_spawns.gsc: Famas, AK, Galil, MP5K, M14 twice in seven, SPAS)
+const STATION_GUNS = ['malibu_famas', 'malibu_ak74', 'malibu_galil', 'malibu_mp5k', 'malibu_m14', 'malibu_m14', 'malibu_spas'];
+// the Tesseract (_tesserrect_suitcase.gsc get_random_weapon_tesserrect: eleven even picks, the M14 twice)
+const TESSERACT = ['malibu_famas', 'malibu_ak74', 'malibu_galil', 'malibu_mp5k', 'malibu_m14', 'malibu_m14', 'malibu_m1927', 'malibu_cz75', 'malibu_spas', 'malibu_cheese_gun'];
 const inLobby = p => p.x < -12500 && p.y < 8500;   // Asgard and the character room float below the city's west end
 
 // the map's weapons that are a hero's own gear (taken away when you change hero)
@@ -68,9 +76,23 @@ export default async function setup(api) {
     if (FIRE[d.fireSound]) d.malibuSound = FIRE[d.fireSound];
     d.camo = null;
     // the map's plain guns fire with this game's sounds for the nearest gun
-    d.soundsFrom = { malibu_cheese_gun: 'mp5k_zm', widow_pistols: 'cz75_zm', widow_pistols_upgraded: 'cz75_zm', colt: 'cz75_zm' }[d.mapWeapon];
+    d.soundsFrom = { ...MAP_GUN, widow_pistols: 'cz75_zm', widow_pistols_upgraded: 'cz75_zm', colt: 'cz75_zm' }[d.mapWeapon.replace(/_upgraded$/, '')];
     data.weapons[id] = d;
   }
+  // a gun's upgrade is its <name>_upgraded file (the stones' Pack-a-Punch reads def.upgrade)
+  const OWN = ['id', 'mapWeapon', 'malibuHero', 'suitWeapon', 'suitPower', 'soundsFrom', 'camo'];
+  for (const name of Object.keys(MAP_GUN)) {
+    const d = data.weapons['malibu_' + name], up = data.weapons['malibu_' + name + '_upgraded'];
+    if (d && up) d.upgrade = Object.fromEntries(Object.entries(up).filter(([k]) => !OWN.includes(k)));
+  }
+  // station prices (_custom_weapon_spawns.gsc new_weapon: cost; ammo half of it)
+  for (const [name, price] of Object.entries({ malibu_famas: 1200, malibu_ak74: 1200, malibu_galil: 1500, malibu_mp5k: 1000, malibu_m14: 500, malibu_spas: 1200 }))
+    if (data.weapons['malibu_' + name]) data.weapons['malibu_' + name].price = price;
+  const gun = name => data.weapons['malibu_' + name] ? 'malibu_' + name : MAP_GUN[name];   // the map's, else this game's nearest
+  // the Tesseract's pool, with display models (the box loaded its models before the mods ran)
+  data.boxPool = [...TESSERACT.map(gun), 'ray_gun_zm'].filter(id => data.weapons[id]);
+  if (api.mysteryBox?.models) for (const id of new Set(data.boxPool)) if (!api.mysteryBox.models[id] && data.weapons[id].worldModel)
+    loadModel(data.weapons[id].worldModel).then(m => { api.mysteryBox.models[id] = m; }).catch(() => {});
   // their fire sounds (the map's), in place of the engine's lookup by weapon id
   if (api.audio?.weapon) { const play = api.audio.weapon.bind(api.audio); api.audio.weapon = (kind, def, ...rest) => { if (def?.mapWeapon) { if (def.soundsFrom && data.weapons[def.soundsFrom]) return play(kind, data.weapons[def.soundsFrom], ...rest); if (kind === 'shot' && def.malibuSound) kit.sound(def.malibuSound, { volume: .6 }); return; } return play(kind, def, ...rest); }; }
 
@@ -154,11 +176,11 @@ export default async function setup(api) {
   }
   let rollId = 0;
   sync.on('mq:roll', d => show(d.picks));
-  const roll = () => { if (sync.isHost) sync.act('mq:roll', { picks: stations.map(() => STATION[Math.floor(Math.random() * STATION.length)]) }); };
+  const roll = () => { if (sync.isHost) sync.act('mq:roll', { picks: stations.map(() => gun(STATION_GUNS[Math.floor(Math.random() * STATION_GUNS.length)])) }); };
   const show = async picks => {
     const id = ++rollId;
     await Promise.all(stations.map(async (st, i) => {
-      const weapon = picks[i] ?? STATION[0];
+      const weapon = data.weapons[picks[i]] ? picks[i] : STATION[0];
       st.weapon = weapon;
       const o = await loadModel(data.weapons[weapon]?.worldModel).catch(() => null);
       if (id !== rollId || !o) return;

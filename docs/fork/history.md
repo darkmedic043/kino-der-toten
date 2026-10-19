@@ -299,3 +299,4 @@
 - 2026-10-18: Malibu Drive: waypoints on every quest's current step once the journal has it recorded (waw-ports.md).
 - 2026-10-18: Malibu Drive textures: terrain blends and decal-merged surfaces (95 were white; the grass), the rainbow Asgard bridge and the glow materials; the GfxWorld dumper writes vertex colours (waw-ports.md).
 - 2026-10-19: Malibu Drive collision and pathing from the game's clip map (new OAT ClipMapDumperT4): brushes, clip, terrain, static models, door clip, 245 AI traversals as off-mesh links, longer paths; police car bodies (alpha test rule), per-material sidedness, Nick Fury's briefing readable (waw-ports.md).
+- 2026-10-19: Malibu Drive's own guns (Famas, AK-47, Galil, MP5k, M14, M1927, CZ75, SPAS-12 in Malibu skins, their upgrades) at the stations and in the Tesseract (waw-ports.md).
