@@ -14,7 +14,7 @@ export const HEROES = [
   { id: 'cap', name: 'Captain America', color: 4, hp: 400, speed: 1.2, hands: 'viewhands_cap', figure: 'captain_america', attach: ['backmodel_cap_shield'], anim: 'full_body_cap', spawn: 'cap_spawn', statue: 'malibu_gold_statue_1', gear: [], found: 'shield' },
   { id: 'thor', name: 'Thor', color: 3, hp: 400, speed: 1.2, hands: 'viewhands_thor', figure: 'thor_full_body_model', anim: 'full_body_thor', spawn: 'thor_spawn', statue: 'malibu_gold_statue_1', gear: [], found: 'hammer' },
   { id: 'quicksilver', name: 'Quicksilver', color: 5, hp: 120, speed: 1.5, hands: 'viewhands_quicksilver', figure: 'quicksilver_torso', attach: ['quicksilver_legs', 'quicksilver_head'], anim: 'full_body_mk42', spawn: 'quicksilver_spawn', statue: 'malibu_gold_lion', gear: [] },
-  { id: 'scarlet', name: 'Scarlet Witch', color: 1, hp: 150, speed: 1.2, hands: 'viewhands_scarlet_witch', figure: 'scarlet_witch_0', anim: 'full_body_scarlet', spawn: 'scarlet_spawn', statue: 'malibu_gold_statue_2', gear: [] },
+  { id: 'scarlet', name: 'Scarlet Witch', color: 1, hp: 150, speed: 1.2, hands: 'viewhands_scarlet_witch', figure: 'scarlet_witch_0', anim: 'full_body_scarlet', spawn: 'scarlet_spawn', statue: 'malibu_gold_statue_2', gear: ['malibu_scarlet_witch'] },
   { id: 'spiderman', name: 'Spider-Man', color: 1, hp: 300, speed: 1.3, hands: 'spider_man_view', figure: 'spider_man', anim: 'full_body_spiderman', spawn: 'spiderman_spawn', statue: 'malibu_gold_lion', gear: ['malibu_spiderman'] },
   { id: 'rhodes', name: 'James Rhodes', color: 3, hp: 200, speed: 1.2, hands: null, figure: 'rhode1', anim: 'full_body_rhode', spawn: 'rhodes_spawn', statue: 'malibu_gold_statue_2', gear: [] },
   { id: 'vision', name: 'Vision', color: 3, hp: 250, speed: 1.2, hands: 'viewhands_vision', figure: 'vision', anim: 'full_body_vision', spawn: 'vision_spawn', statue: 'malibu_gold_statue_1', gear: [] },
@@ -38,7 +38,9 @@ export function setupHeroes(kit) {
   // health: the larger of the normal value and the hero's (armors wrap this again)
   const own = Object.getOwnPropertyDescriptor(session, 'maxHealth');
   const baseMax = own?.get ? () => own.get.call(session) : () => own?.value ?? 150;
-  Object.defineProperty(session, 'maxHealth', { configurable: true, get() { return hero ? baseMax() - 150 + hero.hp * HP_SCALE : baseMax(); }, set() {} });
+  let over = {};   // a form's stats over the hero's (the Hulk: hp, speed, hands)
+  Object.defineProperty(session, 'maxHealth', { configurable: true, get() { return hero ? baseMax() - 150 + (over.hp ?? hero.hp) * HP_SCALE : baseMax(); }, set() {} });
+  const applySpeed = () => { const scale = over.speed ?? hero?.speed ?? 1; player.moveSpeed = base.move * scale; player.sprintSpeed = base.sprint * scale; };
 
   // arms: SetViewmodel. Weapons whose own hands are WaW's "no model"/cloth placeholders use the player's arms, as do all
   // of this game's guns (data.characters' default arms)
@@ -47,7 +49,7 @@ export function setupHeroes(kit) {
   const defaultArms = { pow: data.characters?.viewmodel_usa_pow_arms, usmc: data.characters?.viewhands_usmc };
   let armsOverride = null;   // an armor's arms (tony.js), over the hero's
   const setArms = () => {
-    const url = handsUrl(armsOverride ?? hero?.hands);
+    const url = handsUrl(armsOverride ?? over.hands ?? hero?.hands);
     if (data.characters) { data.characters.viewmodel_usa_pow_arms = url ?? defaultArms.pow; if (!defaultArms.pow) data.characters.viewhands_usmc = url ?? defaultArms.usmc; }
     for (const d of Object.values(W)) if (d.malibuArms) d.handsModel = url ?? d.malibuArms;
     api.view && (api.view.currentId = null);   // the view caches by weapon id: re-equip with the new arms
@@ -71,10 +73,9 @@ export function setupHeroes(kit) {
     const prev = hero;
     if (prev) taken.delete(prev.id);
     takeGear();
-    hero = h;
+    hero = h; over = {};
     if (h) taken.set(h.id, 'me');
-    const scale = h?.speed ?? 1;
-    player.moveSpeed = base.move * scale; player.sprintSpeed = base.sprint * scale;
+    applySpeed();
     if (h) session.health = session.maxHealth; else session.health = Math.min(session.health, session.maxHealth);
     setArms();
     for (const id of [...(h?.gear ?? []), ...(gearFor.get(h?.id) ?? [])]) give(id);
@@ -149,7 +150,7 @@ export function setupHeroes(kit) {
   });
   net?.on?.('left', p => { const id = peerHero.get(p?.id); if (id) { taken.delete(id); peerHero.delete(p.id); refreshFigures(); } });
 
-  host.on('reset', () => { hero = null; taken.clear(); found.clear(); gearFor.clear(); armsOverride = null; player.moveSpeed = base.move; player.sprintSpeed = base.sprint; setArms(); refreshFigures(); });
+  host.on('reset', () => { hero = null; over = {}; taken.clear(); found.clear(); gearFor.clear(); armsOverride = null; player.moveSpeed = base.move; player.sprintSpeed = base.sprint; setArms(); refreshFigures(); });
 
   return {
     hero: () => hero, is: id => hero?.id === id, become, HEROES,
@@ -157,6 +158,8 @@ export function setupHeroes(kit) {
     found: what => found.has(what), find: what => found.add(what),
     giveGear: (heroId, id) => { const list = gearFor.get(heroId) ?? []; if (!list.includes(id)) list.push(id); gearFor.set(heroId, list); if (hero?.id === heroId) give(id); },
     give, takeGear, setArms: n => { armsOverride = n; setArms(); }, handsUrl,
+    // a form over the hero (the Hulk, Vision's Molecular Mode...): {hp, speed, hands}; null clears it
+    setForm: f => { over = f ?? {}; applySpeed(); session.health = Math.min(session.maxHealth, f?.hp ? session.maxHealth : session.health); setArms(); }, form: () => over,
     name: () => hero ? hero.name : 'Freeplay',
   };
 }

@@ -14,6 +14,7 @@ import { loadModel } from '../../animation.js';
 import { createKit } from './common.js';
 import { setupHeroes } from './heroes.js';
 import { setupTony } from './tony.js';
+import { setupPowers } from './powers.js';
 
 // [zone, neighbour, flag zone] in the builder's compact ids (zone_ prefix and underscores dropped; zone_driveway1 is 'start')
 const ADJ = [
@@ -67,6 +68,10 @@ export default async function setup(api) {
 
   const heroes = setupHeroes(kit);
   const tony = setupTony(kit, heroes);
+  const powers = setupPowers(kit, heroes, tony);
+  // powers, not guns: the phone, the serum, the Hulk's fists, Scarlet's hex, the blades and the cloak never run dry or reload
+  const NO_AMMO = ['tony_phone', 'mean_juice', 'hulk_hands', 'scarlet_witch', 'mk33_blades', 'mk16_cloaking'].map(n => 'malibu_' + n);
+  host.on('update', () => { const w = session.weapon, d = session.def; if (w && d && NO_AMMO.includes(d.id) && w.mag < d.clipSize) { w.mag = d.clipSize; session.cancelReload?.(); } });
 
   // ---- zones ----
   const opened = () => {
@@ -120,5 +125,5 @@ export default async function setup(api) {
   host.on('reset', () => roll());
 
   window.kino ??= {};
-  window.kino.malibu = { zones: () => [...world.activeZones(session)], flags: () => [...opened()], inLobby: () => lobby(), stations: () => stations.map(s => s.weapon), roll, kit, heroes, tony };
+  window.kino.malibu = { zones: () => [...world.activeZones(session)], flags: () => [...opened()], inLobby: () => lobby(), stations: () => stations.map(s => s.weapon), roll, kit, heroes, tony, powers };
 }

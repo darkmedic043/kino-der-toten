@@ -68,12 +68,14 @@ def texture(name, size=1024):
     return '../textures/' + quote(safe)
 
 done_models = {}
-def model(name):
+GUNS = set()
+def model(name, gun=False):
     name = (name or '').lstrip(',')
     if not name:
         return None
-    if name in done_models:
-        return done_models[name]
+    key = name + ('#gun' if gun else '')
+    if key in done_models:
+        return done_models[key]
     src = find('model_export/' + name + '_lod0.glb')
     if not src:
         print('missing model', name); done_models[name] = None; return None
@@ -100,10 +102,14 @@ def model(name):
             m['emissiveFactor'] = [1, 1, 1]
             if uri:
                 m['emissiveTexture'] = {'index': ix}
+    if (gun or name in GUNS) and not any(nd.get('name') == 'j_gun' for nd in doc.get('nodes', [])):
+        # a static gun model: the view attaches guns by their j_gun bone, so the scene's roots go under a j_gun node
+        sc = doc['scenes'][doc.get('scene', 0)]
+        doc['nodes'].append({'name': 'j_gun', 'children': sc['nodes']}); sc['nodes'] = [len(doc['nodes']) - 1]
     raw = json.dumps(doc, separators=(',', ':')).encode(); raw += b' ' * (-len(raw) % 4); tail = b[20 + n:]
     (OUT / 'models' / (name + '.glb')).write_bytes(struct.pack('<III', 0x46546c67, 2, 20 + len(raw) + len(tail)) + struct.pack('<II', len(raw), 0x4e4f534a) + raw + tail)
-    done_models[name] = WEB + 'models/' + name + '.glb'
-    return done_models[name]
+    done_models[key] = WEB + 'models/' + name + '.glb'
+    return done_models[key]
 
 ANIM_DIRS = [SRC / 'dump_anim/nazi_zombie_malibu/xanim', SRC / 'dump_anim/mod/xanim']
 def animation(name):
@@ -140,7 +146,7 @@ def weapon(name):
             'pellets': 1, 'headMultiplier': 1, 'hideTags': d.get('hideTags', '').split(),
             'projectileSpeed': num('projectileSpeed') if projectile else 0, 'explosionRadius': num('explosionRadius') if projectile else 0,
             'explosionInnerDamage': num('explosionInnerDamage') if projectile else 0, 'explosionOuterDamage': num('explosionOuterDamage') if projectile else 0,
-            'model': model(d.get('gunModel')), 'handsModel': model(d.get('handModel')), 'worldModel': model(d.get('worldModel')),
+            'model': model(d.get('gunModel'), gun=True), 'handsModel': model(d.get('handModel')), 'worldModel': model(d.get('worldModel')),
             'projectileModel': model(d.get('projectileModel')) if projectile and d.get('projectileModel') not in ('tag_flash', 'tag_origin') else None,
             'animations': {k: v for k, v in anims.items() if v},
             'adsInTime': num('adsTransInTime', .2), 'adsOutTime': num('adsTransOutTime', .2), 'adsFov': num('adsZoomFov1', 65),
@@ -163,6 +169,11 @@ def iwi_to_dds(data):
     return header + data[-size:]
 
 def main():
+    # every weapon's gun model gets its j_gun root, whichever use packs it first
+    for w in WEAPONS:
+        f = IWD / 'weapons/sp' / w
+        if f.exists():
+            a = f.read_text(errors='replace').split('\\'); GUNS.add(dict(zip(a[1::2], a[2::2])).get('gunModel', '').lstrip(','))
     defs = {}
     for w in WEAPONS:
         d = weapon(w)
