@@ -32,27 +32,49 @@ export function setupFirstPerson(api,state){
   const spring=(k,c)=>({x:0,v:0,k,c,step(target,dt){this.v+=((target-this.x)*this.k-this.v*this.c)*dt;this.x+=this.v*dt;return this.x;}});
   const s={yawLag:spring(90,14),pitchLag:spring(90,14),roll:spring(60,11),lift:spring(70,9),
     swayX:spring(80,12),swayY:spring(70,11),swayZ:spring(70,11),kickP:spring(150,15),kickY:spring(150,15),kickZ:spring(120,14),settle:spring(120,13),dip:spring(90,12),
-    bobPhase:0,bobAmp:0,sprintBlend:0,exert:0,breathT:0,slide:0,dive:0,mantle:0,kick:0,weight:1};
+    bobPhase:0,bobAmp:0,sprintBlend:0,sprintSpring:spring(70,12),exert:0,breathT:0,slide:0,dive:0,mantle:0,kick:0,weight:1};
   const base={yawLag:[90,14],pitchLag:[90,14],roll:[60,11],lift:[70,9],swayX:[80,12],swayY:[70,11],swayZ:[70,11],kickP:[150,15],kickY:[150,15],kickZ:[120,14],settle:[120,13],dip:[90,12]};
   // Framing (2026-10-19, from the BO7 reference footage: the gun sits a little lower and further right, and a touch
   // further away, than BO1's hip pose). BO1 rigs get that shift; an imported BO3 rig (its own arms, about 2.2x the
   // scale) is measured once at idle and its grip moved to BO1's rifle grip position (scaled), which replaces the
   // authored corner offsets: every gun then frames alike. Gone in ADS, like the engine's own viewOffset.
-  const FRAME={bo7:new THREE.Vector3(.5,-.7,-1.3),grip:new THREE.Vector3(2.6,-4.6,-8.2),wrists:12.5};
-  const frame={id:null,target:new THREE.Vector3(),cur:new THREE.Vector3(),tries:0};
+  // the sprint pose: translation (view space, after the turn) and the turn (pitch up, yaw left, roll) about the grip
+// (measured off the reference: the gun is held low and nearly level, swung left and canted; the steep look on the screen
+// is perspective, a low gun pointing away rises toward the horizon)
+const SPRINT={pos:[.3,-2,1],rot:[.15,.45,.3],dual:{pos:[0,-1.2,.6],rot:[.1,0,0]}};   // (dual wield: both guns drop and come in, no cant)
+const sprintQ=new THREE.Quaternion(),tmpQ=new THREE.Quaternion(),sprintE=new THREE.Euler(),sprintG=new THREE.Vector3(),sprintT=new THREE.Vector3();
+const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-8.2),wrists:12.5,arm:23.7};
+  const frame={id:null,target:new THREE.Vector3(),cur:new THREE.Vector3(),tries:0,rig:1,len:30,oneHanded:false};   // rig: the viewmodel's scale (BO3 rigs 2.2); len: the gun's length in BO1 units
   const measureFrame=()=>{   // once per weapon, at idle (the pivot carries the engine's offset: we read world positions)
     const root=view.root,vc=api.viewCamera;if(!root||!vc)return false;vc.updateMatrixWorld(true);const inv=vc.matrixWorldInverse;
     const at=n=>{const o=root.getObjectByName(n);return o?o.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv):null;};
-    const grip=at('j_gun')??at('tag_weapon'),wr=at('j_wrist_ri'),wl=at('j_wrist_le');if(!grip||!wr||!wl)return false;
-    const rig=wr.distanceTo(wl)/FRAME.wrists,imported=rig>1.6;
-    if(imported){const T=FRAME.grip.clone().add(FRAME.bo7).multiplyScalar(rig);frame.target.copy(T).sub(grip);frame.target.z=THREE.MathUtils.clamp(frame.target.z,-6,6);}
-    else frame.target.copy(FRAME.bo7);
+    const grip=at('j_gun')??at('tag_weapon'),wr=at('j_wrist_ri'),wl=at('j_wrist_le'),sh=at('j_shoulder_le'),el=at('j_elbow_le');if(!grip||!wr||!wl)return false;
+    // imported rigs (BO3/BO7 viewmodels with their own hands) are told by their source, not their size: a BO1 rig with the
+    // hands far apart (China Lake, Death Machine) measured as imported and lost the sprint pose
+    const def=session.def,imported=!!def?.handsModel||/bo3-weapons|bo7-weapons|_vmgun/.test(def?.model||'');
+    // the rig's scale from the left arm's length (a BO1 arm is 23.7; the pose-dependent wrist spacing made a one-handed
+    // UZI measure tiny and sit in the camera), falling back to the wrist spacing
+    const rig=sh&&el?(sh.distanceTo(el)+el.distanceTo(wl))/FRAME.arm:wr.distanceTo(wl)/FRAME.wrists;frame.rig=imported?Math.max(.5,rig):1;
+    // the gun's length (view space, along the barrel): the sprint pose drops a long rifle more than a pistol
+    const gb=new THREE.Box3().setFromObject(view.gun??root);frame.len=Number.isFinite(gb.max.z-gb.min.z)?(gb.max.z-gb.min.z)/frame.rig:30;
+    // imported rigs keep their authored hip placement (every BO3 gun has a hand-set def.viewOffset; normalising their grip
+    // onto the BO1 grip fought it and put a third of them off the screen): only the BO7 shift, in their scale
+    frame.target.copy(FRAME.bo7).multiplyScalar(frame.rig);
+    frame.oneHanded=wl.distanceTo(grip)>18*frame.rig;   // the left hand is off the gun (a one-handed BO3 pistol: the arm hangs): no hand lag
+    view.sprintPose=true;   // every rig: the BO7 pose below (imported BO3 rigs' own sprint clips put the gun off the screen)
     return true;};
   let lastYaw=camera.rotation.y,lastPitch=camera.rotation.x,wasGrounded=true,lastVy=0,lastRight=0,lastFwd=0,accR=0,accF=0,lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,lastRecoil=0,lastAim=0,lastDef=null;
   host.on('walljump',()=>{s.kick=1;});
-  window.kino.fpMotion={s,reachLeft,weight:()=>s.weight};
+  const cam={roll:0,pitch:0,fov:0,prev:0};   // what the camera itself does this frame (read by the movement mod's camera feel)
+  const handLag={p:new THREE.Vector3(),v:new THREE.Vector3(),init:false,w:0,tmp:new THREE.Vector3(),acc:new THREE.Vector3(),off:new THREE.Vector3()};
+  const flags={cam:true,hand:true};   // runtime switches for testing (kino.fpMotion.flags)
+  window.kino.fpMotion={s,reachLeft,weight:()=>s.weight,cam,flags,handLag,frame};
   host.on('diveLand',()=>{s.lift.v-=40;s.kickP.v+=3;});
   view.bobScale=0;   // the engine's on/off bob is replaced by the distance-driven one below
+  // BO1's sprint clips held the gun flat across the bottom of the screen; BO7 lowers it to the right with the muzzle up
+  // and to the left and keeps both hands on it, so BO1 rigs keep their idle grip while sprinting and this layer poses it
+  // (view.sprintPose, animation.js). Imported BO3 rigs keep their own authored sprint, which already looks like that.
+  view.sprintPose=true;
 
   // ---- two-bone IK on the left arm --------------------------------------------------
   const tmp={s:new THREE.Vector3(),e:new THREE.Vector3(),w:new THREE.Vector3(),q:new THREE.Quaternion(),pq:new THREE.Quaternion()};
@@ -70,7 +92,7 @@ export function setupFirstPerson(api,state){
     const root=view.root;if(!root||weight<=0)return;
     const sh=root.getObjectByName('j_shoulder_le'),el=root.getObjectByName('j_elbow_le'),wr=root.getObjectByName('j_wrist_le');
     if(!sh||!el||!wr)return;
-    root.updateMatrixWorld(true);
+    view.pivot.updateMatrixWorld(true);   // from the pivot: it carries this layer's motion and getWorldPosition no longer refreshes parents
     sh.getWorldPosition(tmp.s);el.getWorldPosition(tmp.e);wr.getWorldPosition(tmp.w);
     const a=tmp.s.distanceTo(tmp.e),b=tmp.e.distanceTo(tmp.w);
     // blend the target from where the hand is now, so it eases in and out
@@ -87,12 +109,12 @@ export function setupFirstPerson(api,state){
     aimBone(el,tmp.e,null,tmp.w.clone(),tmp.s.clone().addScaledVector(dir,d));
     // open the hand: wrist and fingers ease toward the model's relaxed bind pose
     if(open)for(const b of handBones(root)){const bind=bindLocal(b);if(bind)b.quaternion.slerp(bind,weight);}
-    root.updateMatrixWorld(true);
+    view.pivot.updateMatrixWorld(true);
   }
   // The rig's animations don't key every arm bone every frame, so IK edits would
   // pile up: remember what the animation left, and put it back next frame.
   const touched=new Map();   // bone → {anim, ik}
-  function restoreArm(){for(const [b,r] of touched){if(b.quaternion.equals(r.ik))b.quaternion.copy(r.anim);}touched.clear();}
+  function restoreArm(){let n=0;for(const [b,r] of touched){if(b.quaternion.equals(r.ik)){b.quaternion.copy(r.anim);n++;}}touched.clear();return n;}
   function remember(bones){for(const b of bones)touched.set(b,{anim:b.quaternion.clone(),ik:null});}
   function sealArm(){for(const [b,r] of touched)r.ik=b.quaternion.clone();}
   let handCache=null;
@@ -115,7 +137,7 @@ export function setupFirstPerson(api,state){
   const clamp=THREE.MathUtils.clamp;
   host.on('update',dtRaw=>{
     if(!dtRaw||!view.pivot||!view.ready)return;
-    const dt=Math.min(dtRaw,.05);
+    const dt=Math.min(dtRaw,.05);s.t=(s.t??0)+dt;   // s.t: the layer's own clock (tests sample against it)
     const def=session.def;if(def!==lastDef){lastDef=def;s.weight=weaponWeight(def);}
     const str=settings.gunMotion??1,w=s.weight,amp=Math.pow(w,.6)*str,lag=Math.pow(w,.4);
     // springs soften with weight: a heavy gun lags more and settles later
@@ -123,7 +145,7 @@ export function setupFirstPerson(api,state){
     const aim=view.aim??0,hip=1-aim*.85,hipR=1-aim*.9;   // aiming keeps the gun steady
     const sprint=view.mode==='sprint'||view.mode==='sprintIn';
     // ---- look inertia and bank
-    let dy=camera.rotation.y-lastYaw,dx=camera.rotation.x-lastPitch;lastYaw=camera.rotation.y;lastPitch=camera.rotation.x;
+    let dy=camera.rotation.y-lastYaw,dx=camera.rotation.x-lastPitch-(cam.pitch-cam.prev);lastYaw=camera.rotation.y;lastPitch=camera.rotation.x;cam.prev=cam.pitch;   // minus the sway the camera feel applied last frame
     if(dy>Math.PI)dy-=Math.PI*2;if(dy<-Math.PI)dy+=Math.PI*2;
     const yawRate=dy/dtRaw,pitchRate=dx/dtRaw;
     const yl=s.yawLag.step(clamp(-yawRate*.018*amp,-.13*amp,.13*amp),dt),pl=s.pitchLag.step(clamp(-pitchRate*.015*amp,-.1*amp,.1*amp),dt);
@@ -151,13 +173,15 @@ export function setupFirstPerson(api,state){
     const lf=s.lift.step(0,dt),dp=s.dip.step(0,dt),kp=s.kickP.step(0,dt),ky=s.kickY.step(0,dt),kz=s.kickZ.step(0,dt),st=s.settle.step(0,dt);
     // ---- bob: a figure-8 paced by distance travelled
     const speed=Math.hypot(v.x,v.z),moving=speed>15&&grounded&&!state.sliding&&!state.mantling&&view.mode!=='melee';
-    const stride=player.crouched?36:sprint?52:44;
+    // one cycle of the figure-8 is two steps: at 190 u/s a walk takes about 2.5 steps a second, a 285 u/s sprint about 2.9
+    // (the first version had strides of 36-52, four times the cadence: the view shook rather than bobbed)
+    const stride=player.crouched?110:sprint?200:150;
     if(moving)s.bobPhase+=speed*dt*(Math.PI*2/stride);
     const want=moving?Math.min(1,speed/190)*(sprint?1.35:1)*(player.crouched?.55:1):0;
     s.bobAmp+=(want-s.bobAmp)*Math.min(1,dt*(want>s.bobAmp?6:9));
-    s.sprintBlend+=((sprint?1:0)-s.sprintBlend)*Math.min(1,dt*5);
+    s.sprintSpring.step(sprint&&speed>60?1:0,dt);s.sprintBlend=THREE.MathUtils.clamp(s.sprintSpring.x,-.15,1.15);
     const bA=s.bobAmp*amp*(1-aim*.9),ph=s.bobPhase;
-    const bobX=Math.sin(ph)*.26*bA*(1+.7*s.sprintBlend),bobY=Math.cos(ph*2)*.15*bA,bobZ=Math.sin(ph*2)*.07*bA*s.sprintBlend;
+    const bobX=Math.sin(ph)*.26*bA*(1+.3*s.sprintBlend),bobY=Math.cos(ph*2)*.15*bA,bobZ=Math.sin(ph*2)*.07*bA*s.sprintBlend;
     const bobRoll=Math.sin(ph)*.022*bA,bobPitch=Math.cos(ph*2)*.009*bA,bobYaw=-Math.sin(ph)*.012*bA*s.sprintBlend;
     // ---- breathing and exertion
     s.exert+=((sprint&&speed>200?1:0)-s.exert)*Math.min(1,dt*(sprint?.35:.12));
@@ -168,6 +192,7 @@ export function setupFirstPerson(api,state){
     const ease=(x,to,rate)=>x+(to-x)*Math.min(1,dt*rate);
     s.slide=ease(s.slide,state.sliding?1:0,state.sliding?12:6);
     s.dive=ease(s.dive,state.diving?1:0,state.diving?10:5);
+    s.reload=ease(s.reload??0,session.reloadLeft>0&&view.mode==='reload'?1:0,session.reloadLeft>0?9:6);   // reloads bring the gun in and turn it toward you (BO7)
     const mt=state.mantling,mk=mt?Math.sin(Math.min(1,mt.t)*Math.PI):0;   // up and back down over the climb
     s.mantle=ease(s.mantle,mt?1:0,mt?14:7);
     s.kick=Math.max(0,s.kick-dt*3.5);
@@ -182,12 +207,24 @@ export function setupFirstPerson(api,state){
     R.y+=yl*hipR;R.x+=pl*hipR+lf*-.004+sy*-.02*hipR;R.z+=rl*hipR;
     // movement inertia
     P.x+=sx*.9*hip;P.z+=sz*.8*hip;P.y+=-Math.abs(sz)*.12*hip;R.z+=-sx*.09*hipR;R.x+=-sz*.05*hipR;R.y+=-sx*.03*hipR;
-    // sprint pose (BO7: the gun drops to the right and tilts, muzzle up and left) over BO1's sprint clip
-    const sb=s.sprintBlend;P.x+=.7*sb;P.y+=-.45*sb;R.z+=-.2*sb;R.y+=.12*sb;R.x+=.06*sb;
+    // sprint pose (BO7 reference: the gun drops to the bottom of the screen, nearly centred, the muzzle swung up and to
+    // the left so only the front half shows, canted, both hands on it; it swings with the stride and lags the turn).
+    // The turn is about the grip (the right hand), not the camera, so the gun goes down rather than the muzzle up.
+    // Imported BO3 rigs have an authored sprint: a trace only.
+    const sb=s.sprintBlend,sw=s.sprintBlend*s.bobAmp;
+    if(sb>.001){
+      const SP=def?.dualWield?SPRINT.dual:SPRINT,rig=frame.rig,lenK=THREE.MathUtils.clamp(frame.len/32,.5,1.15)*rig;   // a pistol drops less than a rifle; a 2.2x rig is 2.2x further away
+      sprintQ.setFromEuler(sprintE.set(SP.rot[0]*sb+Math.cos(ph*2)*.025*sw,SP.rot[1]*sb+Math.sin(ph)*.05*sw,SP.rot[2]*sb+Math.sin(ph)*.06*sw));
+      tmpQ.setFromEuler(R);sprintG.copy(FRAME.grip).multiplyScalar(rig).add(frame.cur);sprintT.copy(sprintG).applyQuaternion(sprintQ);   // where the turn would take the grip
+      P.add(sprintG.sub(sprintT).applyQuaternion(tmpQ));P.x+=SP.pos[0]*rig*sb+Math.sin(ph)*.35*sw*amp;P.y+=SP.pos[1]*lenK*sb-Math.abs(Math.cos(ph))*.3*sw*amp;P.z+=SP.pos[2]*rig*sb;
+      sprintE.setFromQuaternion(sprintQ.premultiply(tmpQ));R.copy(sprintE);
+    }
     // bob and breathing
     P.x+=bobX+brX*hip;P.y+=bobY+brY*hip;P.z+=bobZ;R.z+=bobRoll*hipR;R.x+=bobPitch*hipR+brP*hip;R.y+=bobYaw*hipR;
     // fire kick (over the engine's own recoil) and the aim settle
     R.x+=kp*.014;R.y+=ky*.005;P.z+=kz*.06;P.y+=st*.03;R.x+=st*.005;
+    // reload: in, down and turned toward the player a little
+    P.x+=.3*s.reload;P.y+=-.35*s.reload;P.z+=.4*s.reload;R.y+=.14*s.reload;R.z+=.1*s.reload;R.x+=.05*s.reload;
     // slide: cant the gun, pull it in and down
     P.x+=-.5*s.slide;P.y+=-.4*s.slide;P.z+=.8*s.slide;R.z+=.38*s.slide;R.x+=.06*s.slide;
     // dive: tuck down and roll
@@ -197,10 +234,31 @@ export function setupFirstPerson(api,state){
     // mantle: gun drops away to the right
     // (pitched down around the camera rather than moved, so the left shoulder stays in reach of the ledge)
     const g=Math.max(s.mantle*.85,mk);P.x+=1.2*g;P.y+=-1.2*g;R.x+=-.95*g;R.z+=-.35*g;R.y+=.18*g;
+    // the camera: a share of the same motion, so the whole view sways with the gun (the movement mod applies it)
+    cam.roll=rl*.35*hipR+bobRoll*.5+.07*s.slide+.14*s.dive-.1*k+Math.sin(ph)*.012*sw-sx*.03*hipR;
+    cam.pitch=lf*-.0025*hip+kp*.0045+Math.cos(ph*2)*.004*sw+sy*.012*hip+.03*s.slide-.06*s.dive+.05*k;
+    cam.fov=(5*s.sprintBlend+3*s.slide+2*s.dive)*str;
+    if(!flags.cam)cam.roll=cam.pitch=cam.fov=0;
+    if(!Number.isFinite(cam.roll+cam.pitch+cam.fov)){cam.roll=cam.pitch=cam.fov=0;}
     if(!Number.isFinite(P.x+P.y+P.z+R.x+R.y+R.z)){for(const k in base){s[k].x=0;s[k].v=0;}s.bobAmp=0;s.exert=0;P.set(0,0,0);R.set(0,0,0);}   // never let a bad frame stick
-    view.root?.updateMatrixWorld(true);
+    view.pivot.updateMatrixWorld(true);
     // mantle: left hand reaches for the ledge and stays planted while climbing
-    restoreArm();
+    if(restoreArm())view.pivot.updateMatrixWorld(true);   // (the matrices must follow the bones put back)
+    // adaptive hands: the left hand trails the gun's quick moves a little (a spring in view space on the animated wrist)
+    // and is put back on the grip by the two-bone IK, so the support hand reads as its own thing; off while reloading,
+    // meleeing, inspecting or aiming (those clips and the sights own the hand)
+    const handMode=view.mode==='idle'||view.mode==='sprint'||view.mode==='sprintIn'||view.mode==='sprintOut'||view.mode==='fire';
+    handLag.w=ease(handLag.w,flags.hand&&!mt?.hand&&handMode&&str>0&&!frame.oneHanded&&!window.kino.inspect?.state?1:0,8);   // eased in and out, so no pop at the edges; not on a hand that hangs free
+    if(handLag.w>.01){
+      const r=view.root,wl=r.getObjectByName('j_wrist_le');
+      if(wl){const now=wl.getWorldPosition(handLag.tmp);
+        if(!handLag.init||handLag.p.distanceTo(now)>6){handLag.p.copy(now);handLag.v.set(0,0,0);handLag.init=true;}
+        else{handLag.acc.subVectors(now,handLag.p).multiplyScalar(170/lag).addScaledVector(handLag.v,-19/Math.sqrt(lag));handLag.v.addScaledVector(handLag.acc,dt);handLag.p.addScaledVector(handLag.v,dt);}
+        const off=handLag.off.subVectors(handLag.p,now),max=.6*w*frame.rig,len=off.length();if(len>1e-6)off.multiplyScalar(max/(max+len));   // never off the gun: saturates smoothly at max (a hard clamp kinked)
+        const wgt=.55*Math.min(1,str)*(1-aim)*handLag.w;
+        if(wgt>.01&&off.length()>.003){remember(['j_shoulder_le','j_elbow_le'].map(n=>r.getObjectByName(n)).filter(Boolean));reachLeft(off.add(now),wgt,false);sealArm();}
+      }
+    }else handLag.init=false;
     if(mt?.hand&&s.mantle>.01){
       const r=view.root;remember(['j_shoulder_le','j_elbow_le'].map(n=>r.getObjectByName(n)).filter(Boolean).concat(handBones(r)));
       const local=camera.worldToLocal(mt.hand.clone());   // the viewmodel lives in camera space

@@ -243,7 +243,7 @@ export default function setup(api){
 
   // ---- Camera feel ------------------------------------------------------------------------------
   let phase=0,dip=0,dipV=0,roll=0,wasGrounded=true,lastVy=0,bobBlend=0,fallTime=0,crouchOffset=0;
-  let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0,stairVel=0,nanOnce=false;
+  let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0,stairVel=0,nanOnce=false,camPitch=0;
   const downRay=new THREE.Ray(new THREE.Vector3(),new THREE.Vector3(0,-1,0));
   function flatUnderfoot(){
     const col=api.world?.collision;if(!col?.raycastFirst)return false;
@@ -293,12 +293,16 @@ export default function setup(api){
     else stairOffset+=(0-stairOffset)*Math.min(1,dt*11);
     camera.position.y+=y+dip+crouchOffset+stairOffset;
     camera.position.x+=Math.cos(camera.rotation.y)*side;camera.position.z-=Math.sin(camera.rotation.y)*side;
-    camera.rotation.z=roll+Math.cos(phase)*.004*bob*bobBlend;
+    // the whole view sways with the gun (fp.js: bank into turns and strafes, slide and dive cant, sprint cadence, the
+    // landing nod, the fire kick, a sprint/slide FOV kick); the pitch is applied as a difference, the mouse owns the base
+    const cam=window.kino.fpMotion?.cam;
+    camera.rotation.z=roll+Math.cos(phase)*.004*bob*bobBlend+(cam?.roll??0);
+    if(cam){camera.rotation.x+=cam.pitch-camPitch;camPitch=cam.pitch;host.fovOffset=cam.fov;}
     // (2026-10-17) a non-finite value here poisons the camera for good (every later frame reads it back): report once
     // what it was and start the feel over
     if(!Number.isFinite(camera.rotation.z+camera.position.x+camera.position.y+camera.position.z)){
       if(!nanOnce){nanOnce=true;console.error('[movement] non-finite camera feel',JSON.stringify({dt,speed,grounded,phase,bob,bobBlend,roll,dip,dipV,crouchOffset,stairOffset,stairVel,y,side,ry:camera.rotation.y,eye,jump,lastEye,feetY,lastFeetY,fallTime,lastVy,vel:v.toArray()}));}
-      phase=dip=dipV=roll=bobBlend=crouchOffset=stairOffset=stairVel=0;camera.rotation.z=0;   /* the controller resyncs the position next frame */
+      phase=dip=dipV=roll=bobBlend=crouchOffset=stairOffset=stairVel=0;camPitch=0;camera.rotation.z=0;if(!Number.isFinite(camera.rotation.x))camera.rotation.x=0;   /* the controller resyncs the position next frame */
     }
   });
 

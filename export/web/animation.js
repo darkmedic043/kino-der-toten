@@ -157,7 +157,8 @@ export class ViewWeapon {
     if(!this.ready)return;
     this.rig.update(dt);this.meleeLeft=Math.max(0,this.meleeLeft-dt);
     const action=this.rig.actions[this.rig.current],finished=!action?.isRunning();
-    const sprintKey=phase=>{const key='sprint'+phase+(empty?'Empty':'')+'Anim';return this.rig.actions[key]?key:'sprint'+phase+'Anim';};
+    // sprintPose (mods/movement/fp.js): no sprint clips; the idle grip keeps playing and the motion layer poses the sprint
+    const sprintKey=phase=>{if(this.sprintPose)return 'sprintPoseAnim';const key='sprint'+phase+(empty?'Empty':'')+'Anim';return this.rig.actions[key]?key:'sprint'+phase+'Anim';};
     if(this.mode==='melee'&&this.meleeLeft===0){for(const model of Object.values(this.knives))model.visible=false;this.meleeType=null;this.mode='idle';}
     if(this.mode==='reload'&&!reloading)this.mode='idle';
     if(['fire','raise','sprintOut'].includes(this.mode)&&finished)this.mode='idle';
@@ -175,7 +176,7 @@ export class ViewWeapon {
     // def.viewOffset [x,y,z] (view space): where the weapon rests at the hip (e.g. BO3 guns sit lower, in the corner); gone in ADS
     if(this.def.viewOffset)this.pivot.position.add(new THREE.Vector3(...this.def.viewOffset).multiplyScalar(1-this.aim));
     // Ray Gun uses authored weapon offsets in place of sprint XAnims.
-    const offsetSprint=sprint&&!this.rig.actions.sprintLoopAnim&&this.mode==='sprint';
+    const offsetSprint=sprint&&!this.rig.actions.sprintLoopAnim&&this.mode==='sprint'&&!this.sprintPose;   // (sprintPose: the motion layer's pose instead)
     this.sprintBlend=THREE.MathUtils.damp(this.sprintBlend,offsetSprint?1:0,16,dt);
     if(this.sprintBlend>.001){this.pivot.position.addScaledVector(new THREE.Vector3(...this.def.sprintOffset),this.sprintBlend);const r=this.def.sprintRotation;this.pivot.rotation.set(r[0]*this.sprintBlend,r[1]*this.sprintBlend,r[2]*this.sprintBlend);}
     this.root.updateMatrixWorld(true);

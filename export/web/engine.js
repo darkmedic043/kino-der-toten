@@ -338,7 +338,7 @@ function update(dt){
       for(const p of [...particles]){p.life-=dt;p.velocity.y-=200*dt;p.mesh.position.addScaledVector(p.velocity,dt);if(p.life<=0){p.mesh.removeFromParent();p.mesh.geometry.dispose();p.mesh.material.dispose();particles.splice(particles.indexOf(p),1);}}
     }
   }
-  muzzle.intensity=Math.max(0,muzzle.intensity-dt*2200);camera.fov=THREE.MathUtils.damp(camera.fov,ads&&!session.def.dualWield&&!session.drinking&&!session.meleeLeft&&!session.reloadLeft?(session.def.adsFov||56)*settings.fov/78:settings.fov,12,dt);camera.updateProjectionMatrix();
+  muzzle.intensity=Math.max(0,muzzle.intensity-dt*2200);camera.fov=THREE.MathUtils.damp(camera.fov,(ads&&!session.def.dualWield&&!session.drinking&&!session.meleeLeft&&!session.reloadLeft?(session.def.adsFov||56)*settings.fov/78:settings.fov)+(mods.fovOffset??0),12,dt);   // mods.fovOffset: the movement mod's sprint/slide kickcamera.updateProjectionMatrix();
   hud();
 }
 const T=(id,v)=>{v=String(v);const el=$(id);if(el&&el.textContent!==v)el.textContent=v;};
