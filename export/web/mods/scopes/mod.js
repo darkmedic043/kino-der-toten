@@ -148,7 +148,7 @@ export default async function setup(api){
     if(!n)return null;
     sum.divideScalar(n).sub(align.applied);
     // centre the dot, and keep the sight window at arm's length rather than around the eye
-    const depth=-sum.z,want=9;
+    const depth=-sum.z,want=9;align.depth=depth;
     return new THREE.Vector3(-sum.x,-sum.y,depth<want?-(want-depth):0);
   }
 
@@ -159,15 +159,20 @@ export default async function setup(api){
   host.on('update',dt=>{
     const def=session.def,kind=scopeOf(def),aim=view.aim??0;t+=dt;
     // sights: centre the dot while aiming
-    align.applied.set(0,0,0);
+    align.applied.set(0,0,0);let aligned=false;
     if(kind&&!MAGNIFIED[kind]&&view.gun&&view.pivot){
       const key=def.id+(def.attachments??'');
       // re-measured while aiming (the ADS pose and mounted parts are still settling when aim first passes .97,
       // so a one-off measurement could leave the dot well off the sight); eased so it doesn't jitter
-      if(aim>.6){const off=measure();if(off){if(align.key!==key){align.offset.copy(off);align.key=key;}else align.offset.lerp(off,1-Math.exp(-dt*10));}}
+      if(aim>.6){const off=measure();if(off){if(align.key!==key){align.offset.copy(off);align.key=key;}else align.offset.lerp(off,1-Math.exp(-dt*10));
+        align.err=Math.hypot(off.x-align.offset.x,off.y-align.offset.y)/Math.max(1,align.depth);}   // how far the sight still is from the centre (radians)
+        else aligned=true;}   // nothing to measure (the Grimhawk's rangefinder has no lens card): the dot shows as it always did
+      if(align.key===key)aligned=(align.err??1)<.007;
       if(align.key===key){align.applied.copy(align.offset).multiplyScalar(aim);view.pivot.position.add(align.applied);view.root?.updateMatrixWorld(true);}
     }
-    const wantDot=!!(kind&&!MAGNIFIED[kind]&&aim>.85&&!session.reloadLeft);
+    // the dot shows once the sight has arrived under it (within about 0.4°) and stays while aiming: at a fixed aim .85 it hung
+    // in the air while the gun was still swinging in from the sprint pose or a reload (2026-10-19)
+    const wantDot=!!(kind&&!MAGNIFIED[kind]&&aim>.85&&!session.reloadLeft&&(dotOn||aligned));
     if(wantDot!==dotOn){dotOn=wantDot;dot.style.display=wantDot?'block':'none';const ch=document.getElementById('crosshair');if(ch&&!scoped)ch.style.visibility=wantDot?'hidden':'';}
     // magnified: full-screen scope once fully aimed
     const want=!!(kind&&MAGNIFIED[kind]&&aim>.92&&session.weapon&&!session.reloadLeft);

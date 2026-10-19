@@ -1,7 +1,7 @@
 // Player character + third-person view (T). The character is chosen in the
 // main menu and stored in the shared profile.
 import { createCharacter, loadCharacterRegistry, ThirdPersonCamera, armsUrl, tintArms, loadCharacterGltf, renderPortrait, holdWeapon, applyStance } from '../../characters.js';
-import { FirstPersonArms } from '../../fp-arms.js';
+import { FirstPersonArms, ArmSetArms } from '../../fp-arms.js';
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { loadProfile, cloudReady } from '../../profile.js';
@@ -124,11 +124,18 @@ export default async function setup(api){
 
   // "fpArms": the character's own arms in first person, posed onto the hidden
   // T5 viewmodel rig (see fp-arms.js). Perk drinks use their own viewmodels.
+  const activeView=()=>{const k=window.kino.knuckles;if(k?.active)return k.view;const d=api.perkDrink;return d?.current?d.views[d.current]:api.view;};
   if(entry.fpArms&&entry.type==='gltf'&&api.viewScene){
     const fp=new FirstPersonArms(api.viewScene,await loadCharacterGltf(entry),entry);window.kino.fpArms=fp;   // debug handle
-    const active=()=>{const k=window.kino.knuckles;if(k?.active)return k.view;const d=api.perkDrink;return d?.current?d.views[d.current]:api.view;};
-    host.on('update',()=>fp.sync(active(),!third));
-    fp.sync(active(),true);
+    host.on('update',()=>fp.sync(activeView(),!third));
+    fp.sync(activeView(),true);
+  }
+  // A character without its own model (an arm set plus colours) gets that arm set on the imported rigs too (a BO3
+  // weapon's own arms, def.handsModel), re-bound to their skeleton (fp-arms.js ArmSetArms); BO1 rigs load it themselves
+  // (prepare). Before, those guns showed Dempsey's BO3 arms in the operator's colours. 2026-10-19.
+  else if(armsUrl(entry)&&api.viewScene){
+    const set=new ArmSetArms(api.viewScene,await loadModel(armsUrl(entry)),entry.id);window.kino.fpArmsSet=set;   // (the cached source: tinted above)
+    host.on('update',()=>{const v=activeView();if(v?.def?.handsModel)set.sync(v);});
   }
 
   // The current weapon, held in the character's right hand (third person only).

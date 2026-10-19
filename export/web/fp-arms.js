@@ -45,11 +45,14 @@ export class FirstPersonArms {
     const pick=s=>arms.filter(b=>Math.sign(local(b).x)===s).sort((a,b)=>Math.abs(local(b).x)-Math.abs(local(a).x))[0];
     const sides={};
     for(const [t5,s] of [['ri',-1],['le',1]]){
-      const arm=pick(s),fore=firstChild(arm),hand=firstChild(fore);if(!hand)return null;
+      // the next joint down is the child that has children of its own: a twist bone (T5's j_wristtwist under the elbow)
+      // comes first in some rigs and has none, and taking it for the hand left the hand and fingers mapped to the elbow
+      const down=b=>b?.children.filter(c=>c.isBone).find(c=>c.children.some(cc=>cc.isBone))??firstChild(b);
+      const arm=pick(s),fore=down(arm),hand=down(fore);if(!hand)return null;
       const fingers={};
       for(const base of hand.children.filter(c=>c.isBone)){
         const kind=fingerKinds.find(([,re])=>re.test(base.name));if(!kind||fingers[kind[0]])continue;
-        const chain=[base];while(chain.length<3&&firstChild(chain.at(-1)))chain.push(firstChild(chain.at(-1)));
+        const chain=[/palm/i.test(base.name)&&firstChild(base)?firstChild(base):base];   // (T5's own ring and pinky hang off palm bones: start at the knuckle)while(chain.length<3&&firstChild(chain.at(-1)))chain.push(firstChild(chain.at(-1)));
         fingers[kind[0]]=chain;
       }
       sides[t5]={arm,fore,hand,fingers};
@@ -298,4 +301,19 @@ export class FirstPersonArms {
   // Called every frame with the active viewmodel; cheap once a rig is attached.
   sync(view){if(this.ok&&view?.hands)this.attach(view.hands);}
   dispose(){}
+}
+
+// A character without its own model (an arm set plus colours, characters.js) on an imported rig (def.handsModel: a BO3
+// weapon's own arms, about 2.2x the scale, another bind pose): the arm set is re-skinned onto that rig exactly like a
+// character's own arms above (it is a model with arm, hand and finger bones like any other). The rig's own arms are hidden.
+// BO1 rigs load the arm set itself (mods/characters prepare) and are left alone. Before (2026-10-19) those guns showed
+// Dempsey's BO3 arms in the operator's colours, one material for the whole arm, so the glove came out in the sleeve's
+// colour. (A plain per-bone re-bind by name was tried first: BO3's knuckle frames point the other way, so every finger twisted.)
+export class ArmSetArms extends FirstPersonArms {
+  // arms: the loaded arm set (its tinted, cached source); id: the character's, for warnings
+  constructor(scene,arms,id){
+    // yaw -90: the set's arms spread along z and reach along +x; rig() wants the right arm at -x and the arms facing +z.
+    // The whole upper arm stays (the set is made for first person) and the set's materials are already toned for the viewmodel.
+    super(scene,{scene:arms},{id:id+':arms',yaw:-90,fpArmsArm:'^j_shoulder_(ri|le)$',fpArmsUpper:true,fpArmsTone:1});
+  }
 }

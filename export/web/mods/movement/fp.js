@@ -60,7 +60,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     // imported rigs keep their authored hip placement (every BO3 gun has a hand-set def.viewOffset; normalising their grip
     // onto the BO1 grip fought it and put a third of them off the screen): only the BO7 shift, in their scale
     frame.target.copy(FRAME.bo7).multiplyScalar(frame.rig);
-    frame.oneHanded=wl.distanceTo(grip)>18*frame.rig;   // the left hand is off the gun (a one-handed BO3 pistol: the arm hangs): no hand lag
+    frame.oneHanded=gb.distanceToPoint(wl)>6*frame.rig;   // the left hand is off the gun (a one-handed BO3 pistol: the arm hangs): no hand lag (by the gun's box: by the grip's distance the Ray Gun, held at its front, counted as one-handed)
     view.sprintPose=true;   // every rig: the BO7 pose below (imported BO3 rigs' own sprint clips put the gun off the screen)
     return true;};
   let lastYaw=camera.rotation.y,lastPitch=camera.rotation.x,wasGrounded=true,lastVy=0,lastRight=0,lastFwd=0,accR=0,accF=0,lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,lastRecoil=0,lastAim=0,lastDef=null;
@@ -72,8 +72,8 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
   host.on('diveLand',()=>{s.lift.v-=40;s.kickP.v+=3;});
   view.bobScale=0;   // the engine's on/off bob is replaced by the distance-driven one below
   // BO1's sprint clips held the gun flat across the bottom of the screen; BO7 lowers it to the right with the muzzle up
-  // and to the left and keeps both hands on it, so BO1 rigs keep their idle grip while sprinting and this layer poses it
-  // (view.sprintPose, animation.js). Imported BO3 rigs keep their own authored sprint, which already looks like that.
+  // and to the left and keeps both hands on it, so every rig keeps its idle grip while sprinting and this layer poses it
+  // (view.sprintPose, animation.js; the imported BO3 rigs' own sprint clips put the gun off the screen).
   view.sprintPose=true;
 
   // ---- two-bone IK on the left arm --------------------------------------------------
@@ -115,7 +115,9 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
   // pile up: remember what the animation left, and put it back next frame.
   const touched=new Map();   // bone → {anim, ik}
   function restoreArm(){let n=0;for(const [b,r] of touched){if(b.quaternion.equals(r.ik)){b.quaternion.copy(r.anim);n++;}}touched.clear();return n;}
-  function remember(bones){for(const b of bones)touched.set(b,{anim:b.quaternion.clone(),ik:null});}
+  // (once per bone per frame: the mantle reach runs after the hand lag's, and remembering the hand lag's result as the
+  // animation's baked a little of it into the arm every frame; after each mantle the hand sat further off the grip)
+  function remember(bones){for(const b of bones)if(!touched.has(b))touched.set(b,{anim:b.quaternion.clone(),ik:null});}
   function sealArm(){for(const [b,r] of touched)r.ik=b.quaternion.clone();}
   let handCache=null;
   function handBones(root){
@@ -210,8 +212,9 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     // sprint pose (BO7 reference: the gun drops to the bottom of the screen, nearly centred, the muzzle swung up and to
     // the left so only the front half shows, canted, both hands on it; it swings with the stride and lags the turn).
     // The turn is about the grip (the right hand), not the camera, so the gun goes down rather than the muzzle up.
-    // Imported BO3 rigs have an authored sprint: a trace only.
-    const sb=s.sprintBlend,sw=s.sprintBlend*s.bobAmp;
+    // hip poses: gone by the time the sights are up ((1-aim)^2: before the reflex dot shows at aim .85; it used to hang in
+    // the air while the gun was still swinging in from the sprint pose or the reload tilt)
+    const hp=(1-aim)*(1-aim),sb=s.sprintBlend*hp,sw=s.sprintBlend*s.bobAmp*hp;
     if(sb>.001){
       const SP=def?.dualWield?SPRINT.dual:SPRINT,rig=frame.rig,lenK=THREE.MathUtils.clamp(frame.len/32,.5,1.15)*rig;   // a pistol drops less than a rifle; a 2.2x rig is 2.2x further away
       sprintQ.setFromEuler(sprintE.set(SP.rot[0]*sb+Math.cos(ph*2)*.025*sw,SP.rot[1]*sb+Math.sin(ph)*.05*sw,SP.rot[2]*sb+Math.sin(ph)*.06*sw));
@@ -224,20 +227,20 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     // fire kick (over the engine's own recoil) and the aim settle
     R.x+=kp*.014;R.y+=ky*.005;P.z+=kz*.06;P.y+=st*.03;R.x+=st*.005;
     // reload: in, down and turned toward the player a little
-    P.x+=.3*s.reload;P.y+=-.35*s.reload;P.z+=.4*s.reload;R.y+=.14*s.reload;R.z+=.1*s.reload;R.x+=.05*s.reload;
+    const rd=s.reload*hp;P.x+=.3*rd;P.y+=-.35*rd;P.z+=.4*rd;R.y+=.14*rd;R.z+=.1*rd;R.x+=.05*rd;
     // slide: cant the gun, pull it in and down
-    P.x+=-.5*s.slide;P.y+=-.4*s.slide;P.z+=.8*s.slide;R.z+=.38*s.slide;R.x+=.06*s.slide;
+    const sl=s.slide*hp;P.x+=-.5*sl;P.y+=-.4*sl;P.z+=.8*sl;R.z+=.38*sl;R.x+=.06*sl;
     // dive: tuck down and roll
-    P.y+=-1.4*s.dive;P.x+=.5*s.dive;R.z+=.5*s.dive;R.x+=-.15*s.dive;
+    const dv=s.dive*hp;P.y+=-1.4*dv;P.x+=.5*dv;R.z+=.5*dv;R.x+=-.15*dv;
     // wall jump kick
-    const k=s.kick*s.kick;R.x+=.22*k;R.z+=-.25*k;P.y+=-.8*k;
+    const k=s.kick*s.kick,kg=k*hp;R.x+=.22*kg;R.z+=-.25*kg;P.y+=-.8*kg;
     // mantle: gun drops away to the right
     // (pitched down around the camera rather than moved, so the left shoulder stays in reach of the ledge)
-    const g=Math.max(s.mantle*.85,mk);P.x+=1.2*g;P.y+=-1.2*g;R.x+=-.95*g;R.z+=-.35*g;R.y+=.18*g;
+    const g=Math.max(s.mantle*.85,mk)*hp;P.x+=1.2*g;P.y+=-1.2*g;R.x+=-.95*g;R.z+=-.35*g;R.y+=.18*g;
     // the camera: a share of the same motion, so the whole view sways with the gun (the movement mod applies it)
     cam.roll=rl*.35*hipR+bobRoll*.5+.07*s.slide+.14*s.dive-.1*k+Math.sin(ph)*.012*sw-sx*.03*hipR;
     cam.pitch=lf*-.0025*hip+kp*.0045+Math.cos(ph*2)*.004*sw+sy*.012*hip+.03*s.slide-.06*s.dive+.05*k;
-    cam.fov=(5*s.sprintBlend+3*s.slide+2*s.dive)*str;
+    cam.fov=(5*s.sprintBlend*hp+3*s.slide+2*s.dive)*str;   // (the camera keeps the slide and dive cant while aiming; the gun is on the sights)
     if(!flags.cam)cam.roll=cam.pitch=cam.fov=0;
     if(!Number.isFinite(cam.roll+cam.pitch+cam.fov)){cam.roll=cam.pitch=cam.fov=0;}
     if(!Number.isFinite(P.x+P.y+P.z+R.x+R.y+R.z)){for(const k in base){s[k].x=0;s[k].v=0;}s.bobAmp=0;s.exert=0;P.set(0,0,0);R.set(0,0,0);}   // never let a bad frame stick
