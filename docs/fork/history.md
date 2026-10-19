@@ -296,3 +296,4 @@
 - 2026-10-18: Malibu Drive: a second terminal booth on the driveway, by the Bifrost landing (props.md).
 - 2026-10-18: Malibu Drive lobby: hero figures stand on the floor, Rhodes and Quicksilver textured from stock WaW zones, a "Take the Bifrost to Earth" hint after choosing a hero (waw-ports.md).
 - 2026-10-18: Malibu Drive: a BIFROST waypoint on the pad while you're in Asgard with a hero (`kit.waypoint`) (waw-ports.md).
+- 2026-10-18: Malibu Drive: waypoints on every quest's current step once the journal has it recorded (waw-ports.md).

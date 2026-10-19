@@ -79,6 +79,27 @@ export default async function setup(api) {
   const powers = setupPowers(kit, heroes, tony);
   const quests = setupQuests(kit, heroes, tony, powers);
   const music = setupMusic(kit, heroes);
+  // ---- waypoints on every quest's current step once the journal has it recorded (mods/journal: a step's instructions
+  // unlock for good once done); the quest tracked in the journal keeps the journal's own markers instead
+  const COLOR = { 'MAIN QUEST': '#ffd36b', 'MAP QUEST': '#7dffa6', 'SIDE EGG': '#e58cff' };
+  const questMarks = [], shown = [];
+  let markTick = 0;
+  host.on('update', dt => {
+    if ((markTick -= typeof dt === 'number' ? dt : 1 / 60) > 0) return; markTick = .5;
+    shown.length = 0;
+    const journal = window.kino.journal, here = session.phase === 'gameover' ? null : journal?.status?.().maps.find(m => m.here);
+    for (const q of here?.quests ?? []) {
+      if (q.tracked) continue;
+      const i = q.steps.findIndex(st => !st.now), step = q.steps[i];
+      if (!step?.recorded) continue;
+      let points = []; try { points = journal.points(q.id, i) ?? []; } catch {}
+      for (const p of points.filter(p => p?.isVector3).slice(0, 4)) shown.push({ p, label: step.title.toUpperCase(), color: COLOR[q.kind] ?? '#ffd36b' });
+    }
+    shown.forEach((w, k) => {
+      const m = questMarks[k] ??= kit.waypoint(w.p, '', { when: () => k < shown.length });
+      m.set(w.p); m.label = w.label; m.el.style.setProperty('--c', w.color);
+    });
+  });
   // powers, not guns: the phone, the serum, the Hulk's fists, Scarlet's hex, the blades and the cloak never run dry or reload
   const NO_AMMO = ['tony_phone', 'mean_juice', 'hulk_hands', 'scarlet_witch', 'mk33_blades', 'mk16_cloaking'].map(n => 'malibu_' + n);
   host.on('update', () => { const w = session.weapon, d = session.def; if (w && d && NO_AMMO.includes(d.id) && w.mag < d.clipSize) { w.mag = d.clipSize; session.cancelReload?.(); } });
