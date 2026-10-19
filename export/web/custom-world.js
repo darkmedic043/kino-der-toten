@@ -37,6 +37,8 @@ const COLLISION_NAME=/^(COL|UCX|collision)[_.-]/i;
 const PLAYER_COLLISION_NAME=/^PCOL[_.-]/i;
 // NCOL_ meshes: navmesh only, no player collision (World at War's monster clip: where zombies may not walk)
 const NAV_ONLY_NAME=/^NCOL[_.-]/i;
+// CLIP_ meshes: the player only (World at War's player clip): bullets, grenades and zombies pass
+const CLIP_NAME=/^CLIP[_.-]/i;
 // Machine models face their local +Z; markers face their local +X (Blender's red axis).
 const FACE=Math.PI/2;
 const up=new THREE.Vector3(0,1,0),_negOffset=new THREE.Vector3();
@@ -78,8 +80,8 @@ export class CustomWorld {
         position:o.getWorldPosition(new THREE.Vector3()),yaw:worldYaw(o)});
     });
     const meshes=[];root.traverse(o=>{if(o.isMesh&&!o.userData.marker)meshes.push(o);});
-    const dedicated=meshes.filter(o=>COLLISION_NAME.test(rawName(o))),playerOnly=meshes.filter(o=>PLAYER_COLLISION_NAME.test(rawName(o))),navOnly=meshes.filter(o=>NAV_ONLY_NAME.test(rawName(o)));
-    for(const o of [...dedicated,...playerOnly,...navOnly])o.visible=false;
+    const dedicated=meshes.filter(o=>COLLISION_NAME.test(rawName(o))),playerOnly=meshes.filter(o=>PLAYER_COLLISION_NAME.test(rawName(o))),navOnly=meshes.filter(o=>NAV_ONLY_NAME.test(rawName(o))),clipOnly=meshes.filter(o=>CLIP_NAME.test(rawName(o)));
+    for(const o of [...dedicated,...playerOnly,...navOnly,...clipOnly])o.visible=false;
     root.traverse(o=>{if(o.userData.hidden)o.visible=false;});   // builder props hidden until a mod shows them (kept out of the batching, which would drop their names)
     // Overlay layers (BO3 ports' _blend surfaces and decals: see-through, drawn over the surface below): a fixed draw
     // order per material (sorted by distance, stacked layers swapped as the camera moved and flickered) and a polygon
@@ -89,10 +91,11 @@ export class CustomWorld {
         if(!layer.has(m)){layer.set(m,layer.size);m.polygonOffset=true;m.polygonOffsetFactor=-1;m.polygonOffsetUnits=/decal/i.test(m.name)?-8:-4;}
         o.renderOrder=(/decal/i.test(m.name)?2000:1000)+layer.get(m);}}
     progress('Building collision',35);
-    const solid=positionsOf(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)));
+    const solid=positionsOf(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)&&!clipOnly.includes(o)));
+    this.clipCollision=clipOnly.length?new CollisionWorld(positionsOf(clipOnly)):null;   // the player's capsule only (physics)
     if(!solid)throw new Error('The map has no meshes to stand on');
-    this.collision=new CollisionWorld(playerOnly.length?positionsOf([...(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o))),...playerOnly]):solid);
-    const navSource=navOnly.length?positionsOf([...(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o))),...navOnly]):solid;
+    this.collision=new CollisionWorld(playerOnly.length?positionsOf([...(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)&&!clipOnly.includes(o))),...playerOnly]):solid);
+    const navSource=navOnly.length?positionsOf([...(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)&&!clipOnly.includes(o))),...navOnly]):solid;
 
     // RISING_<delay>_<speed>: a mesh (a death plane such as rising lava or cheese) that starts rising after <delay>
     // seconds of game time at <speed> units/s and kills whatever it reaches. Render-only: no collision or navigation.
@@ -152,8 +155,10 @@ export class CustomWorld {
     const positions=navSource.attributes.position.array,indices=new Uint32Array(positions.length/3).map((_,i)=>i);
     // TRAVERSE markers (extras.to: the far end; World at War ports: the AI's fence hops, climbs and jump-downs) become
     // one-way off-mesh links: a path may cross there, and a zombie hops the gap like a narrow doorway (enemies.js)
+    // path() marks the point a link ends at (`hop`), and enemies.js walks a zombie straight to it
+    this.traversals=markers.filter(m=>m.type==='TRAVERSE'&&Array.isArray(m.extras.to)).map(m=>({from:m.position.clone(),to:new THREE.Vector3(...m.extras.to),both:!!m.extras.both}));
     const offMeshConnections=markers.filter(m=>m.type==='TRAVERSE'&&Array.isArray(m.extras.to)).map((m,i)=>({startPosition:{x:m.position.x,y:m.position.y,z:m.position.z},
-      endPosition:{x:m.extras.to[0],y:m.extras.to[1],z:m.extras.to[2]},radius:24,bidirectional:false,userId:i}));
+      endPosition:{x:m.extras.to[0],y:m.extras.to[1],z:m.extras.to[2]},radius:60,bidirectional:!!m.extras.both,userId:i}));   // 60: a hop starts at the wall, where the navmesh is eroded back
     const nav=generateTiledNavMesh(positions,indices,{offMeshConnections,cs,ch,tileSize:32,walkableSlopeAngle:48,walkableHeight:Math.ceil(70/ch),walkableClimb:Math.floor(18/ch),walkableRadius:Math.max(1,Math.round(14/cs)),
       maxEdgeLen:Math.round(48/cs),maxSimplificationError:1.3,minRegionArea:8,mergeRegionArea:20,maxVertsPerPoly:6,detailSampleDist:6,detailSampleMaxError:1});
     if(!nav.success)throw new Error('Navigation mesh generation failed: '+(nav.error??'unknown error'));
@@ -273,6 +278,7 @@ export class CustomWorld {
       // the deepest contact of all: returning the level's first meant a capsule resting on the level never felt doors,
       // clips or platforms (walked through Der Eisendrache's gondola walls while standing on the station)
       let best=this.collision.capsuleIntersect(c)||null;const keep=h=>{if(h&&(!best||h.depth>best.depth))best=h;};
+      if(this.clipCollision)keep(this.clipCollision.capsuleIntersect(c));
       for(const d of this.dynamic)if(d.enabled&&d.collider)keep(d.collider.capsuleIntersect(c));
       for(const m of this.movers){if(m.disabled)continue;if(!m.near.containsPoint(c.start)&&!m.near.containsPoint(c.end))continue;const t=c.clone();t.translate(_negOffset.copy(m.offset).negate());keep(m.collider.capsuleIntersect(t));}
       if(best)return best;
@@ -386,7 +392,10 @@ export class CustomWorld {
   closest(p,extents){const r=this.query.findClosestPoint({x:p.x,y:p.y,z:p.z},extents?{halfExtents:extents}:undefined);return r.success?new THREE.Vector3(r.point.x,r.point.y,r.point.z):null;}
   // long routes on big maps (Malibu Drive) run past Detour's default 256 path polygons and came back cut short: zombies
   // walked to the end of a partial path and stood there
-  path(a,b){const r=this.query.computePath({x:a.x,y:a.y,z:a.z},{x:b.x,y:b.y,z:b.z},{maxPathPolys:4096,maxStraightPathPoints:1024});return r.success?r.path.map(p=>new THREE.Vector3(p.x,p.y,p.z)):[];}
+  path(a,b){const r=this.query.computePath({x:a.x,y:a.y,z:a.z},{x:b.x,y:b.y,z:b.z},{maxPathPolys:4096,maxStraightPathPoints:1024});if(!r.success)return [];
+    const pts=r.path.map(p=>new THREE.Vector3(p.x,p.y,p.z)),T=this.traversals;
+    if(T?.length)for(let i=1;i<pts.length;i++){const p=pts[i-1],q=pts[i];if(T.some(t=>p.distanceTo(t.from)<40&&q.distanceTo(t.to)<40||t.both&&p.distanceTo(t.to)<40&&q.distanceTo(t.from)<40))q.hop=true;}   // an off-mesh link's far end
+    return pts;}
   raycast(ray,near=0,far=Infinity,windows=false){let hit=this.collision.rayIntersect(ray,near,far);
     for(const m of this.movers??[]){if(m.disabled)continue;const r=new THREE.Ray(ray.origin.clone().sub(m.offset),ray.direction),h=m.collider.rayIntersect(r,near,hit?Math.min(hit.distance,far):far);if(h){h.position.add(m.offset);h.point.add(m.offset);hit=h;}}for(const d of this.dynamic){if(!d.enabled||!d.collider||(!windows&&d.window))continue;const h=d.collider.rayIntersect(ray,near,hit?Math.min(hit.distance,far):far);if(h)hit=h;}return hit;}
   lineClear(a,b){const v=b.clone().sub(a),dist=v.length();return !this.raycast(new THREE.Ray(a,v.normalize()),1,Math.max(1,dist-4));}

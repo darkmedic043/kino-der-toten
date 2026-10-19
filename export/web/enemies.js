@@ -111,9 +111,13 @@ export class Enemies {
       const freeWalk=!!(this.freeMode&&z.free);
       if(freeWalk)this.walkFree(z,goal,dt);
       else{z.repath-=dt;
-      if(z.repath<=0){z.path=this.world.path(z.root.position,goal);z.pathIndex=1;z.repath=.55+(z.id%5)*.07;}}
+      if(z.repath<=0&&!z.path[z.pathIndex]?.hop){z.path=this.world.path(z.root.position,goal);z.pathIndex=1;z.repath=.55+(z.id%5)*.07;}}   // no replanning mid-hop
       const target=freeWalk?null:z.path[z.pathIndex];
-      if(target){
+      if(target?.hop){   // a traversal (custom maps' off-mesh links: fence hops, climbs, jump-downs): straight to its end, off the navmesh
+        const d=target.clone().sub(z.root.position),len=d.length();
+        if(len<8){z.root.position.copy(target);z.pathIndex++;}else{z.root.position.addScaledVector(d,Math.min(1,z.speed*1.2*dt/len));z.root.rotation.y=Math.atan2(-d.z,d.x);}
+        z.blockT=0;
+      }else if(target){
         const delta=target.clone().sub(z.root.position),horizontal=Math.hypot(delta.x,delta.z);
         if(horizontal<10){z.pathIndex++;}
         else{

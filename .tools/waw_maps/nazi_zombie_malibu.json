@@ -170,5 +170,21 @@
     "wm_model"
   ],
   "boxSpots": "tesserrect_spawn",
-  "pap": "upgrade_trig"
+  "pap": "upgrade_trig",
+  "traversals": [
+    {
+      "note": "the spiral stair up from the beach: its top wedge steps are narrower than the navmesh cells, so the beach was an island",
+      "from": [
+        6914,
+        7048,
+        10501
+      ],
+      "to": [
+        6867,
+        7048,
+        10547
+      ],
+      "both": true
+    }
+  ]
 }

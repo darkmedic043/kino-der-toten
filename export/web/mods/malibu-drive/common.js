@@ -90,7 +90,7 @@ export async function createKit(api) {
   };
 
   // ---- models from the asset build (models/<name>.glb) and posed figures (anims/<name>.json)
-  const MODELS_V = 4;   // bump when the asset build changes the models (kino-server and Cloudflare cache .glb for a day)
+  const MODELS_V = 5;   // bump when the asset build changes the models (kino-server and Cloudflare cache .glb for a day)
   const model = name => loadModel(dir + 'models/' + name + '.glb?v=' + MODELS_V).catch(() => null);
   const rigs = new Set();
   const figure = async (name, anim, { position, yaw = 0, attach = [] } = {}) => {

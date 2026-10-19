@@ -488,14 +488,32 @@ def main():
     byname = collections.defaultdict(list)
     for e in ents:
         byname[e.get('targetname')].append(e)
-    trav = 0
+    links = []
     for e in ents:
         if e.get('classname') != 'node_negotiation_begin':
             continue
         end = next((x for x in byname.get(e.get('target'), []) if x.get('classname') == 'node_negotiation_end'), None)
         if end:
-            b.add_marker(f'TRAVERSE_{trav}', vec(e['origin']), 0, {'to': [round(c, 3) for c in g(vec(end['origin']))], 'anim': e.get('animscript', '')})
-            trav += 1
+            links.append((vec(e['origin']), vec(end['origin']), e.get('animscript', '')))
+    # the AI climbs in stages (up to a narrow ledge, then up again) and the ledges between have no navmesh: a link that
+    # ends within 90 of another's start also gets one straight to that one's end (two stages deep)
+    chained = []
+    for a in links:
+        for b2 in links:
+            if b2 is not a and math.dist(a[1], b2[0]) < 90 and math.dist(a[0], b2[1]) > 40:
+                chained.append((a[0], b2[1], a[2] + '+' + b2[2]))
+                for c2 in links:
+                    if c2 is not b2 and c2 is not a and math.dist(b2[1], c2[0]) < 90 and math.dist(a[0], c2[1]) > 40:
+                        chained.append((a[0], c2[1], a[2] + '+' + b2[2] + '+' + c2[2]))
+    trav = 0
+    for frm, to, anim in links + chained:
+        b.add_marker(f'TRAVERSE_{trav}', frm, 0, {'to': [round(c, 3) for c in g(to)], 'anim': anim})
+        trav += 1
+    # cfg 'traversals' [{from, to, both?, note}] (CoD units): extra links where the navmesh can't follow the map (Malibu's
+    # spiral stair up from the beach: its wedge steps are narrower than the navmesh cells); both: two-way
+    for t in cfg.get('traversals', []):
+        b.add_marker(f'TRAVERSE_{trav}', t['from'], 0, {'to': [round(c, 3) for c in g(t['to'])], 'anim': 'map', 'both': bool(t.get('both'))})
+        trav += 1
     if trav:
         print(f'{trav} AI traversals')
     models = {e['targetname']: e for e in ents if e.get('classname') == 'script_model' and e.get('targetname')}
@@ -743,9 +761,10 @@ def inv3(A):
 
 def clipmap_collision(cm, keep, flip, col_mesh):
     """COL_world (stops the player and shapes the navmesh): solid and glass brushes, the terrain, the colliding static
-    models. PCOL_clip: player clip, with or without monster clip (the player only). NCOL_clip: monster clip only (the
-    navmesh only)."""
-    CP, CT, PP, PT, NP, NT = [], [], [], [], [], []
+    models. CLIP_world: player clip, with or without monster clip (the player only: bullets and zombies pass, as in the
+    game, so zombies coming over the driveway's edge can be shot). PCOL_vehicles: cars (the player and bullets, not the
+    navmesh). NCOL_clip: monster clip only (the navmesh only)."""
+    CP, CT, PP, PT, NP, NT, VP, VT = [], [], [], [], [], [], [], []
     def add(P, T, pts, tris):
         base = len(P); P.extend(g(v) for v in pts)
         T.extend(((a + base, d + base, c + base) if flip else (a + base, c + base, d + base)) for a, c, d in tris)
@@ -842,17 +861,19 @@ def clipmap_collision(cm, keep, flip, col_mesh):
                     + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0])) < 0
         # vehicles stop the player but stay out of the navmesh (Malibu's crashed semi fills the garage way out of
         # Tony's house; the original's zombies followed path nodes): the same choice the name heuristics made
-        car = bool(VEHICLE.search(sm['model']) or re.search(r'semi|police|fire_truck|news_van|pickup|sportscar|sedan', sm['model'], re.I))
+        car = bool(VEHICLE.search(sm['model']) or re.search(r'semi|police|fire_truck|news_van|pickup|sportscar|sedan|_cart', sm['model'], re.I))   # _cart: Malibu's metal carts parked across the city2 doorway
         for pts, tris in surfs:
             placed = [[o[r] + sum(M[r][k] * v[k] for k in range(3)) for r in range(3)] for v in pts]
-            add(PP if car else CP, PT if car else CT, placed, [(a, d, c) for a, c, d in tris] if mirrored else tris)
+            add(VP if car else CP, VT if car else CT, placed, [(a, d, c) for a, c, d in tris] if mirrored else tris)
         counts['vehicles' if car else 'static models'] += 1
     col_mesh('COL_world', CP, CT)
     if PT:
-        col_mesh('PCOL_clip', PP, PT)
+        col_mesh('CLIP_world', PP, PT)
+    if VT:
+        col_mesh('PCOL_vehicles', VP, VT)
     if NT:
         col_mesh('NCOL_clip', NP, NT)
-    print('clipMap collision: ' + ', '.join(f'{v} {k}' for k, v in counts.items()) + f'; {len(CT)} solid, {len(PT)} player-only, {len(NT)} nav-only triangles')
+    print('clipMap collision: ' + ', '.join(f'{v} {k}' for k, v in counts.items()) + f'; {len(CT)} solid, {len(PT)} clip (player only), {len(VT)} vehicle, {len(NT)} nav-only triangles')
 
 def instanced_props(b, dump, obj_base, cfg, flip, world_surfaces, ents, brush):
     b.instancing = True

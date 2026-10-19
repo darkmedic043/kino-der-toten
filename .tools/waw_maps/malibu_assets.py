@@ -130,7 +130,7 @@ def model(name, gun=False):
         tests = [sb.get('alphaTest', 'disabled') for sb in bits]
         if tests and (tests[0] != 'disabled' or sum(t != 'disabled' for t in tests) >= 2):   # see build_waw_map.py material_info
             m['alphaMode'] = 'MASK'; m['alphaCutoff'] = .5
-        elif any(sb.get('blendOpRgb', 'disabled') != 'disabled' and sb.get('dstBlendRgb') not in (None, 'zero') for sb in bits):
+        elif bits and bits[0].get('blendOpRgb', 'disabled') != 'disabled' and bits[0].get('dstBlendRgb') not in (None, 'zero'):   # the first technique (later ones blend on most materials: every hero went see-through)
             m['alphaMode'] = 'BLEND'
         if re.search(r'holo|glow|repulsor|_fx|lightning', m['name'], re.I):
             m['emissiveFactor'] = [1, 1, 1]
