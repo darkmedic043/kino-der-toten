@@ -96,6 +96,16 @@ function restore(s) {
 }
 
 export const textureMemoryStats = () => ({ ...stats, mb: Math.round(stats.bytes / 1e6) });
+// Bring back every released image an object's materials use and have those textures re-upload (2026-10-19: the
+// third-person world models of the imported guns drew black: their textures share sources with the viewmodels', which
+// had uploaded and freed the images first, and the automatic re-decode never reached them). Returns when all are back.
+export function restoreImages(root) {
+  const jobs = [];
+  root.traverse(o => { for (const m of [o.material].flat()) { if (!m) continue; for (const k in m) { const t = m[k]; if (!t?.isTexture || !t.source) continue;
+    const r = released.get(t.source); if (!r) continue;
+    jobs.push(restore(t.source)?.then(() => { t.dispose(); t.needsUpdate = true; })); } } });
+  return Promise.all(jobs);
+}
 installTextureMemory();   // on import: the engine and the menu import this first
 
 // For code that copies a texture's pixels elsewhere (instance-cull.js texture arrays): the source's image, decoded again

@@ -64,7 +64,7 @@ export default async function setup(api){
       from.set(x,y+40,z);const h=api.world?.raycast(ray,0,400),g=h?from.y-h.distance:null;cache.set(key,g);return g;};}
   groundSprings(character);window.kino.character=character;window.kino.characterEntry=entry;   // debug handle (the Pilot class seats a copy of the operator in its mech)
   const view=new ThirdPersonCamera(camera);window.kino.thirdPersonCamera=view;   // the Pilot class pulls it back while in its mech
-  let third=false,last=null,lastYaw=null,airT=0;
+  let third=false,last=null,lastYaw=null,airT=0,lastSide=0,lastFwd=0,accS=0,accF=0;const leanCur={x:0,z:0};
   const apply=()=>{host.camera=third?view.update(api.world):null;host.hideViewmodel=third;character.root.visible=third;};
   addEventListener('keydown',e=>{if(e.code==='KeyT'&&!e.repeat&&api.getState().active){third=!third;apply();api.toast(third?'Third person · T to switch back':'First person',2);}});
   host.on('update',dt=>{
@@ -75,6 +75,12 @@ export default async function setup(api){
     const speed=Math.hypot(vel.x,vel.z),forward=vel.x*Math.sin(yaw)+vel.z*Math.cos(yaw),side=vel.x*Math.cos(yaw)-vel.z*Math.sin(yaw);
     const mv=window.kino.movement?.state,stance=mv?.diving?'dive':mv?.prone?'prone':mv?.sliding?'slide':mv?.mantling?'mantle':player.crouched?'crouch':'';
     if(character.pose)driveActions(dt,speed,yaw);
+    // (2026-10-19) weight and inertia in third person too: the body leans into accelerations (character frame)
+    if(character.pose&&dt>0){const aS=(side-lastSide)/dt,aF=(forward-lastFwd)/dt;lastSide=side;lastFwd=forward;
+      accS+=(THREE.MathUtils.clamp(aS,-3000,3000)-accS)*Math.min(1,dt*14);accF+=(THREE.MathUtils.clamp(aF,-3000,3000)-accF)*Math.min(1,dt*14);
+      const w=Math.pow(window.kino.fpMotion?.weight?.()??1,.5),lx=THREE.MathUtils.clamp(-accS/3000,-1,1)*w+THREE.MathUtils.clamp(side/285,-1,1)*.35,lz=THREE.MathUtils.clamp(accF/3000,-1,1)*w;
+      if(character.bo1)character.pose({lean:{x:lx,z:lz}});   // BO1 rigs bend the spine (bo1-motion.js)
+      else{leanCur.x+=(lx-leanCur.x)*Math.min(1,dt*7);leanCur.z+=(lz-leanCur.z)*Math.min(1,dt*7);character.root.rotation.z=leanCur.x*.08;character.root.rotation.x=-leanCur.z*.07;}}   // others tip as a whole (their pose() takes numbers only)
     // Stairs and small bumps leave the ground for a few frames: only a jump or a real drop
     // (over a quarter second in the air) counts as airborne for the jump/fall/land poses.
     const onGround=player.state?.grounded??player.isGrounded??true;airT=onGround?0:airT+dt;
@@ -137,6 +143,19 @@ export default async function setup(api){
     if(key!==heldKey){pivot?.removeFromParent();return;}held=pivot;
     window.kino.camo?.apply(pivot,api.data.weapons[s.weapon.id]?.camo);
   }
-  host.on('update',()=>{if(third)syncWeapon();});
+  host.on('update',()=>{if(third)syncWeapon();
+    // the held gun sways in the hands like the first-person one: look lag, movement inertia, the fire kick
+    const b=held?.userData?.base,m=window.kino.fpMotion?.s;if(!held||!b||!m)return;
+    const w=Math.pow(window.kino.fpMotion.weight?.()??1,.6);
+    held.position.copy(b.position).add(new THREE.Vector3(m.swayX.x*.35*w,-Math.abs(m.swayZ.x)*.15*w+m.lift.x*.03,m.swayZ.x*.3*w+m.kickZ.x*.05));
+    held.quaternion.copy(b.quaternion).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(m.pitchLag.x*.9+m.kickP.x*.015,m.yawLag.x*.9+m.kickY.x*.005,m.roll.x*.6)));});
+  // BO3 weapons bring their own first-person arms (def.handsModel): a character without its own arms rig tints them as
+  // it tints BO1's hands, so every gun shows the same hands (2026-10-19)
+  let lastViewRoot=null;
+  host.on('update',()=>{const root=api.view?.root;if(!root||root===lastViewRoot)return;lastViewRoot=root;const tint=entry.handsTint;if(!tint||window.kino.fpArms)return;
+    const keys=Object.keys(tint).sort((a,b)=>b.length-a.length);
+    root.traverse(o=>{if(!o.isSkinnedMesh)return;for(const m of [o.material].flat()){if(!m||m.userData.handsTinted)continue;const name=(m.name??'').toLowerCase();if(!/viewarm|viewhand|hands|arm|glove|sleeve/.test(name))continue;
+      const k=keys.find(k=>k!=='*'&&name.includes(k.toLowerCase()))??(keys.includes('*')?'*':keys[0]);if(!k)continue;
+      m.userData.handsTinted=true;m.color.set(tint[k]);if(entry.handsFlat){m.map=null;m.roughness=.65;}m.needsUpdate=true;}});});
   host.on('reset',()=>{heldKey='x';});
 }

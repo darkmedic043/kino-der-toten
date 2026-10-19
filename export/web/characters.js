@@ -11,6 +11,7 @@ import { Rig, loadModel, loadAnimation } from './animation.js';
 import { bo1Rig } from './bo1-motion.js';
 import { SpringBones } from './spring-bones.js';
 import { poseIdle } from './mods/bo3-weapons/pose.js';
+import { restoreImages } from './texture-memory.js';
 
 export async function loadCharacterRegistry(){
   const url=new URL('mods/characters/characters.json',document.baseURI);
@@ -441,6 +442,7 @@ export async function holdWeapon(character,entry,def,hideTags=def?.hideTags){
   if(!character.hand||!def?.worldModel)return null;
   const model=await loadModel(def.worldModel);if(!model)return null;
   await poseIdle(model,def);   // imported BO3 guns: parts sit where the idle animation puts them
+  restoreImages(model).catch(()=>{});   // (their textures' images may have been freed after the viewmodel's upload: black guns)
   for(const tag of hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
   const grip={...GRIPS[entry.type]??GRIPS.gltf,...entry.weapon},pivot=new THREE.Group();pivot.add(model);
   if(character.procedural&&!entry.weapon?.rotation){
@@ -457,7 +459,10 @@ export async function holdWeapon(character,entry,def,hideTags=def?.hideTags){
   pivot.position.fromArray(grip.position??[0,0,0]);
   // Undo the hand's scale (models are resized to fit), so the gun stays true to size.
   character.root.updateMatrixWorld(true);const hs=character.hand.getWorldScale(new THREE.Vector3()),rs=character.root.getWorldScale(new THREE.Vector3());
-  pivot.scale.set(rs.x/hs.x,rs.y/hs.y,rs.z/hs.z).multiplyScalar(grip.scale??1);
+  // imported BO3 rigs are about 2.2x BO1's scale (an AK read 83 inches long): def.worldScale, or that factor for them
+  const ws=def.worldScale??(/bo3-weapons|wpn_t7|_vmgun/.test(def.worldModel)?1/2.2:1);
+  pivot.scale.set(rs.x/hs.x,rs.y/hs.y,rs.z/hs.z).multiplyScalar((grip.scale??1)*ws);
+  pivot.userData.base={position:pivot.position.clone(),quaternion:pivot.quaternion.clone()};   // the motion layer sways it from here
   character.hand.add(pivot);character.hold?.(true);return pivot;
 }
 

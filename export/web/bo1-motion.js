@@ -133,7 +133,7 @@ export async function bo1Rig(model,holder,entry,data){
 
   // State shared with the action layer.
   const st={stance:'',prev:'',oneshot:null,oneshotT:0,phase:{},air:0,grounded:true,lastVy:0,holding:false,
-    recoil:0,recoilV:0,flinchX:0,flinchXV:0,flinchZ:0,flinchZV:0,slap:0,slapV:0,melee:0,throw:0,pitch:0,
+    recoil:0,recoilV:0,flinchX:0,flinchXV:0,flinchZ:0,flinchZV:0,slap:0,slapV:0,melee:0,throw:0,pitch:0,lean:{x:0,z:0},leanCur:{x:0,z:0},
     env:{reload:0,drink:0,swap:0,sprint:0,ads:0},target:{reload:0,drink:0,swap:0,sprint:0,ads:0}};
   const spring=(x,v,freq,damp,dt)=>{v+=(freq*freq*(0-x)-2*damp*freq*v)*dt;return [x+v*dt,v];};
   const playOnce=(k)=>{st.oneshot=k;st.oneshotT=0;const a=acts[CLIPS[k]];a.reset();a.time=0;};
@@ -196,10 +196,15 @@ export async function bo1Rig(model,holder,entry,data){
     const toss=th>0?(th<.4?th/.4:1-(th-.4)/.6):0,release=th>.4?Math.sin((th-.4)/.6*Math.PI):0;
     // Aim pitch bends the torso with the camera (not while sprinting, sliding or prone).
     const pitchW=stance===''||stance==='crouch'?1-st.env.sprint:0;st.pitch+=((m.pitch??0)*pitchW-st.pitch)*Math.min(1,dt*10);
+    // lean (2026-10-19): the body tips into accelerations (set by the characters mod from the player's velocity: x = to
+    // its left, z = forward, -1..1), hips and chest sharing it, the head staying level; grounded stances only
+    const lw=grounded&&stance!=='prone'&&stance!=='dive'?1:.3;
+    st.leanCur.x+=((st.lean?.x??0)*lw-st.leanCur.x)*Math.min(1,dt*7);st.leanCur.z+=((st.lean?.z??0)*lw-st.leanCur.z)*Math.min(1,dt*7);
     // Additive rotations (character space, about the character's right/up/forward axes).
     const extra=new Map(),put=(b,axis,a)=>{if(!b||!a)return;const r=new THREE.Quaternion().setFromAxisAngle(axis,a);extra.set(b,(extra.get(b)??new THREE.Quaternion()).premultiply(r));};
     const chest=H.spine.at(-1)??H.hips,low=H.spine[0];
     put(low,X,-st.pitch*.35);put(chest,X,-st.pitch*.45-R*.08+st.flinchZ*.22+rel*.06-drink*.08);put(H.neck,X,-st.pitch*.2);
+    put(low,Z,st.leanCur.x*.11);put(chest,Z,st.leanCur.x*.07);put(low,X,st.leanCur.z*.09);put(chest,X,st.leanCur.z*.06);put(H.neck,Z,-st.leanCur.x*.12);put(H.neck,X,-st.leanCur.z*.1);
     put(chest,Y,swing*.45+toss*.3-release*.4);put(chest,Z,st.flinchX*.25);
     put(H.head,X,rel*.3-drink*.4+st.flinchZ*.2);put(H.head,Y,-swing*.2+rel*.12);
     const ri=H.sides.ri,le=H.sides.le;

@@ -169,7 +169,7 @@ export class ViewWeapon {
     this.aim=THREE.MathUtils.clamp(this.aim+(aiming?dt/Math.max(.01,this.def.adsInTime):-dt/Math.max(.01,this.def.adsOutTime)),0,1);
     this.applyAim(!['idle','fire'].includes(this.mode));
     this.recoil=Math.max(0,this.recoil-dt*8);
-    const bob=moving&&this.mode!=='melee'?(1-this.aim)*.13:0;
+    const bob=moving&&this.mode!=='melee'?(1-this.aim)*.13*(this.bobScale??1):0;   // bobScale: a motion layer (mods/movement/fp.js) replaces this bob with its own
     this.pivot.position.set(Math.sin(time*(sprint?13:9))*bob,Math.cos(time*(sprint?26:18))*bob*.7,this.recoil*.25);
     this.pivot.rotation.set(this.recoil*.012,0,0);
     // def.viewOffset [x,y,z] (view space): where the weapon rests at the hip (e.g. BO3 guns sit lower, in the corner); gone in ADS
