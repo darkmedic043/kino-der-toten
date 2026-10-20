@@ -2421,9 +2421,16 @@
             "edge": 0.2,
             "borrow": 60,
             "dark": 45,
+            "harvest": {
+              "time": 20,
+              "full": 2,
+              "dmg": 0.5,
+              "heal": 10,
+              "range": 900
+            },
             "stake": "A random perk of yours (never Mule Kick)",
             "table": "That perk goes dark",
-            "win": "It comes back, and you borrow a perk you don't have for 60s",
+            "win": "It comes back, you borrow a perk you don't have for 60s, and Soul Harvest runs for 20s: every kill throws its soul at the nearest zombie for half its health. Holding every perk already? Soul Harvest runs 40s and every soul heals you 10",
             "bust": "It stays dark for 45s more"
           },
           {

@@ -318,3 +318,4 @@
 - 2026-10-20 (later): the Gambler's rack (timers, marker, hand cards) moved to the left edge mid-screen; bottom right covered the guns and gobblegums.
 - 2026-10-20: Gambler's ante wheel (hold Z, aim, let go; tap keeps it open) and every ante made temporary: Bankroll pot, Blood's Bloodlust, Iron's Overclocked/loaner gun, Soul's dark and borrowed perks, new Clock ante; Pack-a-Punch removed (classes.md).
 - 2026-10-20 (later): retargeted fingers (Bondrewd) rigid since the 19th: the finger chain walk in fp-arms.js had slipped into a comment; the middle and tip bones map to the glove joints again (perk bottle, knuckle crack, grips).
+- 2026-10-20 (later): Soul's win adds Soul Harvest (kills throw souls at nearby zombies); a player holding every perk gets it twice as long with healing instead of +2000 points.

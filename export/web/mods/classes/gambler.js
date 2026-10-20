@@ -24,7 +24,7 @@ const svg=d=>'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3
 const WHEEL_ICON={card:svg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M12 8l2.5 4-2.5 4-2.5-4z"/>'),shuffle:svg('<path d="M3 7h4l10 10h4M3 17h4L17 7h4M18 4l3 3-3 3M18 14l3 3-3 3"/>')};
 const pickOne=a=>a[Math.floor(Math.random()*a.length)];
 const MULE='specialty_additionalprimaryweapon';
-const ANTE_MOD={overclock:'Overclocked',bloodlust:'Bloodlust'};   // timed mods the antes pay (rewards are in classes.json)
+const ANTE_MOD={overclock:'Overclocked',bloodlust:'Bloodlust',harvest:'Soul Harvest'};   // timed mods the antes pay (rewards are in classes.json)
 
 export function setupGambler(ctx){
   const {api,cls}=ctx,{host,session,data,scene,camera,player,enemies,world,audio}=api;
@@ -107,6 +107,7 @@ export function setupGambler(ctx){
     if(mine&&e.head&&modOn('golden'))session.addPoints(100);
     if(mine&&modOn('overclock')&&session.weapon&&session.def)session.weapon.mag=Math.max(session.weapon.mag,session.def.clipSize);   // Iron's win: kills refill the mag
     if(mine&&modOn('bloodlust'))session.health=Math.min(session.maxHealth,session.health+ANTE.blood.lust.heal);
+    if(mine&&modOn('harvest'))harvest(e.enemy);
     if(phase!=='play'||!(mine||cause==='ricochet'&&S('gamble.trickShot')))return;
     const t=session.time,melee=e.melee||cause==='melee';
     if(run.ante.id==='bankroll')run.pot+=ANTE.bankroll.pot;
@@ -161,7 +162,9 @@ export function setupGambler(ctx){
     if(a==='bankroll'){const n=(r.stake+r.pot)*ANTE.bankroll.pay[tier];session.points+=n;out.push('+'+n+' POINTS');}
     if(a==='blood'){session.health=session.maxHealth;timed('bloodlust',ANTE.blood.lust.time);out.push('FULL HEALTH','BLOODLUST');}
     if(a==='iron'){timed('overclock',ANTE.iron.over.time);refill();out.push('OVERCLOCKED');}
-    if(a==='soul'){if(r.dark)out.push(givePerk(r.dark));out.push(borrow());}
+    if(a==='soul'){   // Soul Harvest; holding every perk already, it runs twice as long and every soul heals you
+      if(r.dark)out.push(givePerk(r.dark));const b=borrow(),H=ANTE.soul.harvest;
+      timed('harvest',b?H.time:H.time*H.full);mods.get('harvest').heal=!b;out.push(b??'FULL HOUSE');out.push(b?'SOUL HARVEST':'SOUL HARVEST ×2');}
     if(a==='clock'){clockBack=true;out.push('HALF CHARGED');}
     if(S('gamble.diceTotem')&&familyOf(r.id)==='dice')out.push(plant(pickOne(Object.keys(TOTEM))));   // Hot Dice
     if(S('gamble.freeze')&&(tier==='big'||tier==='jackpot'))freeze(feet(),600,3);   // Freeze Frame
@@ -210,7 +213,7 @@ export function setupGambler(ctx){
   }
   function borrow(){
     const p=pickOne(PERKS.filter(p=>p.id!==MULE&&!session.perks.has(p.id)&&perkUnlocked(p)));
-    if(!p){session.addPoints(2000);return '+2000 POINTS';}
+    if(!p)return null;
     givePerk(p.id);borrowed.push({id:p.id,until:session.time+ANTE.soul.borrow});session.health=session.maxHealth;
     return p.name.toUpperCase()+' BORROWED';
   }
@@ -324,13 +327,23 @@ export function setupGambler(ctx){
     r.addColorStop(0,'#fff');r.addColorStop(.3,'#fffa');r.addColorStop(1,'#fff0');g.fillStyle=r;g.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);})();
   const cardTex=(()=>{const c=document.createElement('canvas');c.width=32;c.height=48;const g=c.getContext('2d');
     g.fillStyle='#f8f4ea';g.fillRect(2,2,28,44);g.strokeStyle='#f2c94c';g.lineWidth=3;g.strokeRect(2,2,28,44);g.fillStyle='#c4202f';g.font='bold 20px serif';g.textAlign='center';g.fillText('♦',16,31);return new THREE.CanvasTexture(c);})();
-  const SPRITE={fire:{map:glow,color:0xff7a2a,size:46},bolt:{map:glow,color:0xb98cff,size:18},card:{map:cardTex,color:0xffffff,size:14}};
+  const SPRITE={fire:{map:glow,color:0xff7a2a,size:46},soul:{map:glow,color:0x9a6cff,size:30},bolt:{map:glow,color:0xb98cff,size:18},card:{map:cardTex,color:0xffffff,size:14}};
   for(const k in SPRITE)SPRITE[k].mat=new THREE.SpriteMaterial({map:SPRITE[k].map,color:SPRITE[k].color,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
-  function launch(kind,goal,{speed,delay=0,spread=0},hit){
+  function launch(kind,goal,{speed,delay=0,spread=0,from=null},hit){
     const sp=new THREE.Sprite(SPRITE[kind].mat);sp.scale.set(SPRITE[kind].size,SPRITE[kind].size*(kind==='card'?1.5:1),1);
-    const dir=camera.getWorldDirection(new THREE.Vector3()),pos=camera.position.clone().addScaledVector(dir,30).addScaledVector(up,-10);
+    const dir=camera.getWorldDirection(new THREE.Vector3()),pos=from?from.clone():camera.position.clone().addScaledVector(dir,30).addScaledVector(up,-10);
     if(spread)pos.add(new THREE.Vector3((Math.random()-.5)*spread,(Math.random()-.5)*spread,(Math.random()-.5)*spread));
     shots.push({sp,pos,z:goal.isVector3?null:goal,to:goal.isVector3?goal.clone():chest(goal),speed,delay,hit,life:3});
+  }
+  function harvest(dead){   // the soul of a kill flies to the nearest zombie it can see (its own hits don't throw more)
+    const at=dead.root.position.clone().addScaledVector(up,45),H=ANTE.soul.harvest;
+    const z=enemies.list.filter(o=>o!==dead&&o.root.position.distanceTo(dead.root.position)<H.range&&world.lineClear(at,chest(o)))
+      .sort((a,b)=>a.root.position.distanceTo(dead.root.position)-b.root.position.distanceTo(dead.root.position))[0];
+    if(!z)return;
+    launch('soul',z,{speed:950,from:at},(p,hit)=>{
+      if(hit)enemies.hurt(hit,H.dmg*hp(),false,false,'soul');
+      if(mods.get('harvest')?.heal)session.health=Math.min(session.maxHealth,session.health+H.heal);
+    });
   }
   function line(a,b,color){
     const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
