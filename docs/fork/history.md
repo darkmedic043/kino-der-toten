@@ -322,3 +322,4 @@
 - 2026-10-20 (later): dual wield in the motion layer: each gun and arm sways on its own (own springs, alternate stride pump, own fire kick, breathing, drift) and sprints turned out and canted per arm; heavy weapons (LMGs, Thundergun, Death Machine) sprint lower, more canted and slower into the pose.
 - 2026-10-20 (later): Gambler house specials: each game's wins pay its own timed special (Split, Loaded Dice, Coin Shower, Poker Face, Rolling Thunder, House Spin), and winning every game in the pool runs them all at once (Grand Tour).
 - 2026-10-20 (later): the Mystery Box no longer offers a tactical you already hold (Monkey Bombs, Gersch Device, QED).
+- 2026-10-20 (later): Bondrewd Premium's suit showed through the Blessed fur and the claws: the plate pull-in now stops outside the inner layers and the finger scale is baked into every layer alike.
