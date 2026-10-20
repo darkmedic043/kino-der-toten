@@ -313,3 +313,4 @@
 - 2026-10-19 (later): Tab board: the quests row removed (tracking stays in the journal); Malibu Drive registers its collectible tiles (stones, Easter egg, locks, bed machine, stations, Batman, cell, JARVIS, armor).
 - 2026-10-19 (night): `GET /api/helm`: friends' Helm rooms (page `/helm/`), so Rind can watch the user's Claude Code sessions peer to peer (coop.md, Helm rooms).
 - 2026-10-19 (later): Bondrewd's palms seated on the grips (a live palm fit in the retarget: the hand slides along the palm normal until its palm face meets the glove's; `fpArmsPalmMaterial` names the palm).
+- 2026-10-19 (later): the support hand holds underbarrel attachments (foregrip with the wrist rolled, launcher, Masterkey, flamethrower); Bondrewd's bracer plates pulled in and first-person metal capped.

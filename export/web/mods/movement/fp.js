@@ -63,12 +63,32 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     frame.oneHanded=gb.distanceToPoint(wl)>6*frame.rig;   // the left hand is off the gun (a one-handed BO3 pistol: the arm hangs): no hand lag (by the gun's box: by the grip's distance the Ray Gun, held at its front, counted as one-handed)
     view.sprintPose=true;   // every rig: the BO7 pose below (imported BO3 rigs' own sprint clips put the gun off the screen)
     return true;};
+  // underbarrel parts the support hand holds: the attachment's shown tag, the hand's spot under the part (gun frame) and the wrist roll
+  // (at(box, centre): where the wrist goes, view space at idle. A vertical grip: held at mid height from its left face, the
+  // palm a hand's length ahead of the wrist wraps it with the roll. A launcher or shotgun: under its forward section.)
+  const UNDER={grip:{tags:['tag_grip','tag_foregrip','tag_foregripd'],roll:1.2,at:(b,c)=>new THREE.Vector3(c.x-.9,c.y,c.z+2)},
+    gl:{tags:['tag_grenade_launcher','tag_m203','tag_bouncing_grenade_launcher'],at:(b,c)=>new THREE.Vector3(c.x,c.y-1.2,b.min.z+5)},
+    masterkey:{tags:['tag_masterkey'],at:(b,c)=>new THREE.Vector3(c.x,c.y-1,b.min.z+4.5)},
+    flamer:{tags:['tag_flame_unit'],at:(b,c)=>new THREE.Vector3(c.x,c.y-1.2,b.min.z+5)}};
+  const under={key:null,kind:null,tries:0,w:0,at:new THREE.Vector3(),tmp:new THREE.Vector3(),roll:0},rollQ=new THREE.Quaternion();
+  function measureUnder(def){   // once per weapon and attachment set, at idle: the part's extent in the gun's frame
+    under.kind=null;const ids=(def?.attachments??'').split('+'),kind=Object.keys(UNDER).find(k=>ids.includes(k));if(!kind||!view.gun)return;
+    const r=view.root,g=r.getObjectByName('j_gun')??r.getObjectByName('tag_weapon');if(!g)return;
+    const bone=UNDER[kind].tags.map(t=>r.getObjectByName(t)).find(b=>b&&b.scale.x>.5);if(!bone)return;
+    view.pivot.updateMatrixWorld(true);const p=new THREE.Vector3(),box=new THREE.Box3();let n=0;   // (view space: the gun bone's own axes are not the view's)
+    view.gun.traverse(o=>{if(!o.isMesh||!o.visible||!o.isSkinnedMesh)return;const geo=o.geometry,P=geo.attributes.position,SI=geo.attributes.skinIndex,SW=geo.attributes.skinWeight,I=geo.index,count=I?I.count:P.count,bones=o.skeleton.bones;
+      for(let k=0;k<count;k+=2){const i=I?I.getX(k):k;let best=0,bw=-1;for(let c=0;c<4;c++){const ww=SW.getComponent(i,c);if(ww>bw){bw=ww;best=SI.getComponent(i,c);}}let b=bones[best],ok=false;for(;b;b=b.parent)if(b===bone){ok=true;break;}if(!ok)continue;
+        p.fromBufferAttribute(P,i);o.applyBoneTransform(i,p);o.localToWorld(p);if(p.lengthSq()<1e-6||Math.abs(p.x)>60)continue;box.expandByPoint(p);n++;}});
+    if(n<8)return;const U=UNDER[kind],c=box.getCenter(new THREE.Vector3());
+    under.at.copy(U.at(box,c)).applyMatrix4(g.matrixWorld.clone().invert());under.roll=U.roll??0;under.kind=kind;
+    under.box=[box.min.toArray(),box.max.toArray()];
+  }
   let lastYaw=camera.rotation.y,lastPitch=camera.rotation.x,wasGrounded=true,lastVy=0,lastRight=0,lastFwd=0,accR=0,accF=0,lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,lastRecoil=0,lastAim=0,lastDef=null;
   host.on('walljump',()=>{s.kick=1;});
   const cam={roll:0,pitch:0,fov:0,prev:0};   // what the camera itself does this frame (read by the movement mod's camera feel)
-  const handLag={p:new THREE.Vector3(),v:new THREE.Vector3(),init:false,w:0,tmp:new THREE.Vector3(),acc:new THREE.Vector3(),off:new THREE.Vector3()};
+  const handLag={p:new THREE.Vector3(),v:new THREE.Vector3(),init:false,w:0,tmp:new THREE.Vector3(),acc:new THREE.Vector3(),off:new THREE.Vector3(),lag:new THREE.Vector3()};
   const flags={cam:true,hand:true};   // runtime switches for testing (kino.fpMotion.flags)
-  window.kino.fpMotion={s,reachLeft,weight:()=>s.weight,cam,flags,handLag,frame};
+  window.kino.fpMotion={s,reachLeft,weight:()=>s.weight,cam,flags,handLag,frame,under:()=>under};
   host.on('diveLand',()=>{s.lift.v-=40;s.kickP.v+=3;});
   view.bobScale=0;   // the engine's on/off bob is replaced by the distance-driven one below
   // BO1's sprint clips held the gun flat across the bottom of the screen; BO7 lowers it to the right with the muzzle up
@@ -259,10 +279,30 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
         if(!handLag.init||handLag.p.distanceTo(now)>6){handLag.p.copy(now);handLag.v.set(0,0,0);handLag.init=true;}
         else{handLag.acc.subVectors(now,handLag.p).multiplyScalar(170/lag).addScaledVector(handLag.v,-19/Math.sqrt(lag));handLag.v.addScaledVector(handLag.acc,dt);handLag.p.addScaledVector(handLag.v,dt);}
         const off=handLag.off.subVectors(handLag.p,now),max=.6*w*frame.rig,len=off.length();if(len>1e-6)off.multiplyScalar(max/(max+len));   // never off the gun: saturates smoothly at max (a hard clamp kinked)
+        handLag.lag.copy(off);   // (kept apart: `off` becomes the absolute target below)
         const wgt=.55*Math.min(1,str)*(1-aim)*handLag.w;
         if(wgt>.01&&off.length()>.003){remember(['j_shoulder_le','j_elbow_le'].map(n=>r.getObjectByName(n)).filter(Boolean));reachLeft(off.add(now),wgt,false);sealArm();}
       }
     }else handLag.init=false;
+    // ---- the support hand on an underbarrel attachment (2026-10-19, user: "do the hands also change when certain attachments
+    // are used too?"): a foregrip, grenade launcher, Masterkey or flamethrower moves the left hand from the handguard onto the
+    // part (two-bone IK to a point under it, measured once from the part's vertices in the gun's frame), the foregrip with
+    // the wrist rolled to wrap a vertical grip. BO3 guns' Grip is a stat-only unlock with no part: nothing to hold.
+    under.w=ease(under.w,under.kind&&flags.hand&&!mt?.hand&&handMode&&!frame.oneHanded&&!window.kino.inspect?.state?1:0,6);
+    if(under.key!==view.currentId+'|'+(def?.attachments??'')){under.key=view.currentId+'|'+(def?.attachments??'');under.kind=null;under.tries=0;}
+    if(!under.kind&&under.tries>=0&&view.mode==='idle'&&++under.tries>2){under.tries=-1;measureUnder(def);}
+    if(under.kind&&under.w>.01){
+      const r=view.root,g=r.getObjectByName('j_gun')??r.getObjectByName('tag_weapon'),wl=r.getObjectByName('j_wrist_le'),el=r.getObjectByName('j_elbow_le');
+      const sh=r.getObjectByName('j_shoulder_le');
+      if(g&&wl&&el&&sh){const target=under.tmp.copy(under.at).applyMatrix4(g.matrixWorld);if(handLag.w>.01&&handLag.init)target.add(handLag.lag);
+        // within the arm's reach (a launcher's forward grip is further than a T5 arm goes: the hand holds it nearer the receiver)
+        const sp=sh.getWorldPosition(tmp.s),reach=.95*(sp.distanceTo(el.getWorldPosition(tmp.e))+tmp.e.distanceTo(wl.getWorldPosition(tmp.w))),d=sp.distanceTo(target);if(d>reach)target.sub(sp).multiplyScalar(reach/d).add(sp);
+        remember(['j_shoulder_le','j_elbow_le','j_wrist_le'].map(n=>r.getObjectByName(n)).filter(Boolean));
+        reachLeft(target,Math.min(1,str>0?1:0)*under.w,false);
+        if(under.roll){const axis=wl.getWorldPosition(tmp.w).sub(el.getWorldPosition(tmp.e)).normalize();   // roll the hand about the forearm
+          rollQ.setFromAxisAngle(axis,under.roll*under.w);wl.getWorldQuaternion(tmp.q);const world=rollQ.multiply(tmp.q);wl.parent.getWorldQuaternion(tmp.pq);wl.quaternion.copy(tmp.pq.invert().multiply(world));view.pivot.updateMatrixWorld(true);}
+        sealArm();}
+    }
     if(mt?.hand&&s.mantle>.01){
       const r=view.root;remember(['j_shoulder_le','j_elbow_le'].map(n=>r.getObjectByName(n)).filter(Boolean).concat(handBones(r)));
       const local=camera.worldToLocal(mt.hand.clone());   // the viewmodel lives in camera space

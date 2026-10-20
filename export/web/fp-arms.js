@@ -198,6 +198,11 @@ export class FirstPersonArms {
     const skip=this.entry.fpArmsExclude?new RegExp(this.entry.fpArmsExclude,'i'):null;
     const keepBones=new Map();for(const S of Object.values(sides))(this.entry.fpArmsUpper===false?S.fore:S.arm).traverse(b=>{if(b.isBone&&!(skip&&skip.test(b.name)))keepBones.set(b,S);});
     const parts=[],palmLists=new Map(),palmMat=this.entry.fpArmsPalmMaterial?new RegExp(this.entry.fpArmsPalmMaterial,'i'):null;   // (palm fit: this part's palm vertices per hand)
+    // fpArmsForearmPlates {material, scale}: vertices of that material bound to a forearm are pulled toward the forearm's
+    // axis (elbow to wrist) by the factor. Bondrewd Premium's bracer plates stand 3.6-4.7 units off an arm 2 units thick
+    // and came at the camera as a flat black wedge (2026-10-19, user: "it look[s] extremely screwed in fpv").
+    const plates=this.entry.fpArmsForearmPlates,plateMat=plates?.material?new RegExp(plates.material,'i'):null;
+    const foreAxis={};for(const [t5,S] of Object.entries(sides)){const a=pos(S.fore),b=pos(S.hand);foreAxis[t5]={a,dir:b.clone().sub(a).normalize()};}
     model.traverse(o=>{
       if(!o.isSkinnedMesh)return;
       o.skeleton.update();
@@ -217,7 +222,10 @@ export class FirstPersonArms {
       const P=new Float32Array(used.length*3),UV=g.attributes.uv?new Float32Array(used.length*2):null,SI=new Uint16Array(used.length*4),SW=new Float32Array(used.length*4),v3=new THREE.Vector3();
       used.forEach((v,i)=>{
         o.getVertexPosition(v,v3);v3.applyMatrix4(o.matrixWorld);
-        if(rt){v3.add(shift[sideOf[v].t5]);P.set([v3.x,v3.y,v3.z],i*3);if(UV)UV.set([g.attributes.uv.getX(v),g.attributes.uv.getY(v)],i*2);
+        if(rt){const S=sideOf[v];
+          if(plateMat&&plateMat.test([o.material].flat()[0]?.name??'')){const fx=foreAxis[S.t5];let w=0;for(let k=0;k<4;k++){const b=src[si.getComponent(v,k)];if(b===S.fore||(b&&b.parent===S.fore&&b!==S.hand))w+=sw.getComponent(v,k);}
+            if(w>.5){const d=v3.clone().sub(fx.a),t=d.dot(fx.dir);const radial=d.addScaledVector(fx.dir,-t);v3.addScaledVector(radial,(plates.scale??.6)-1);}}
+          v3.add(shift[S.t5]);P.set([v3.x,v3.y,v3.z],i*3);if(UV)UV.set([g.attributes.uv.getX(v),g.attributes.uv.getY(v)],i*2);
           const w=new Map();for(let k=0;k<4;k++){const weight=sw.getComponent(v,k);if(!weight)continue;const j=rtIndex.get(src[si.getComponent(v,k)])??rtIndex.get(sideOf[v].arm);w.set(j,(w.get(j)??0)+weight);}
           const top=[...w].sort((a,b)=>b[1]-a[1]).slice(0,4),sum=top.reduce((s,[,x])=>s+x,0)||1;top.forEach(([j,weight],k)=>{SI[i*4+k]=j;SW[i*4+k]=weight/sum;});
           // (fpArmsPalmMaterial: only this material counts as the palm; Bondrewd's gauntlet plates stand 0.5 proud of its palm
@@ -242,6 +250,7 @@ export class FirstPersonArms {
       // The viewmodel lights are strong; tone the arms down to sit with the gun. fpArmsTone: a factor, or [r,g,b] to
       // also warm them (the viewmodel light reads cooler than the map's on light fur)
       const material=[o.material].flat()[0].clone(),tone=this.entry.fpArmsTone??.8;
+      if(material.metalness>.35)material.metalness=.35;   // the viewmodel scene has no environment map: full metal rendered black (Bondrewd's plates)
       if(Array.isArray(tone))material.color.multiply(new THREE.Color(...tone));else material.color.multiplyScalar(tone);
       material.vertexColors=false;   // colours aren't baked; a material expecting them renders black
       // fpArmsNearCut (view units): the arm surface is cut away where it comes closer to the camera than this (a clean
