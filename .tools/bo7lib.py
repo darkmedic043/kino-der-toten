@@ -188,12 +188,14 @@ def rrect_xz(x0, x1, z0, z1, r, n=4):
     return pts
 
 
-def text(body, size, at, rot_z=0., part='j_gun', m=None, extrude=.01, side=1):
+def text(body, size, at, rot_z=0., part='j_gun', m=None, extrude=.01, side=1, font=None, tilt=0.):
+    """font: a .ttf/.otf path (the default font has no Cyrillic). tilt: degrees the face leans up (text on a curve's shoulder)."""
     cu = bpy.data.curves.new('t', 'FONT'); cu.body = body; cu.size = size; cu.extrude = extrude
+    if font: cu.font = bpy.data.fonts.load(font, check_existing=True)
     cu.align_x = 'CENTER'; cu.align_y = 'CENTER'
     ob = bpy.data.objects.new('t_' + body[:8], cu); COL.objects.link(ob)
     # on the gun's right (-y) or left (+y) side, reading front-to-back as seen from that side
-    ob.rotation_euler = (math.radians(90), 0, math.radians(180) if side > 0 else 0); ob.location = at
+    ob.rotation_euler = (math.radians(90 - tilt), 0, math.radians(180) if side > 0 else 0); ob.location = at
     bpy.context.view_layer.update()
     me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
     me.transform(ob.matrix_world); bpy.data.objects.remove(ob)

@@ -34,7 +34,7 @@ const COLOR = 0xd9a2ff, PAP_COLOR = 0xff6fd0;
 export function prepareSiren(data) {
   const m16 = data.weapons.m16_zm;
   if (!m16) { console.warn('[bo7-weapons] no M16 to build the Siren on'); return; }
-  const model = BASE + 'siren_view.glb?v=1', world = BASE + 'siren_world.glb?v=1';
+  const model = BASE + 'siren_view.glb?v=2', world = BASE + 'siren_world.glb?v=2';
   const hideTags = [...ATTACHMENT_TAGS, ...SPARE_TAGS];
   const gun = Object.assign(structuredClone(m16), {
     id: SIREN, name: 'Siren', price: 1500, clipSize: 6, startAmmo: 36, maxAmmo: 66, damage: 1400, minDamage: 1400, range: 8000,

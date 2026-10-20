@@ -39,8 +39,22 @@ M.update(
     echo=mat('sr_echo', '#200830', .3, 0, '#b65cff', 3),           # Echo Rounds
     lens=mat('reflex_lens_sr', '#a9d6e6', .05, 0, alpha=.08),      # named so the scopes mod treats it as a reflex lens
     dot=mat('sr_dot', '#300000', .3, 0, '#ff2a1a', 12),
+    # the prototype finish: red-oxide primer, stencil paint, masking tape, bare copper, loose wiring and a circuit board
+    primer=worn('sr_primer', '#62291c', .8, 0, bare='#9a9ea4', wear=.55),
+    stencil=worn('sr_stencil', '#d9d3bd', .6, 0, bare='#7d8186', wear=.4, bare_metal=False),
+    masking=worn('sr_masking', '#c9b98e', .88, 0, bare='#ddd1ab', wear=.25, bare_metal=False),
+    copper=worn('sr_copper', '#a8622f', .32, 1, bare='#de9a64', wear=.35),
+    wred=worn('sr_wire_red', '#8a1410', .5, 0, bare='#b02a20', wear=.15, bare_metal=False),
+    wblue=worn('sr_wire_blue', '#173f8a', .5, 0, bare='#2c5cb0', wear=.15, bare_metal=False),
+    wwhite=worn('sr_wire_white', '#c8c8c0', .55, 0, bare='#e4e4dc', wear=.15, bare_metal=False),
+    pcb=worn('sr_pcb', '#1c4a26', .5, 0, bare='#b7953e', wear=.3, bare_metal=False),
+    # the lettering stays out of the bake (glyphs that small lose strokes in the atlas)
+    ink_w=mat('sr_ink_white', '#cfc9b2', .6, 0), ink_r=mat('sr_ink_red', '#8a1a14', .55, 0), ink_k=mat('sr_ink_black', '#151515', .6, 0),
 )
-BAKED = ('silver', 'dark', 'poly', 'steel', 'rubber', 'hose', 'redpaint', 'tan', 'label')
+BAKED = ('silver', 'dark', 'poly', 'steel', 'rubber', 'hose', 'redpaint', 'tan', 'label',
+         'primer', 'stencil', 'masking', 'copper', 'wred', 'wblue', 'wwhite', 'pcb')
+STENCIL = '/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf'   # has Cyrillic, unlike Blender's default font
+MARKER = '/usr/share/fonts/opentype/urw-base35/Z003-MediumItalic.otf'       # a script face for the pen notes on the tape
 
 SZ, SR = 2.2, 1.45      # shroud axis height and radius (kept near the M16 handguard so the left hand fits)
 CZ, CR = -2.0, 1.55     # canister axis height and radius
@@ -90,18 +104,19 @@ win_frame = prism(rrect_xz(4.4, 7.2, 0.3, 3.0, .45), -.97, .97)
 solid('window_frame', win_frame, M['steel'], cuts=[prism(rrect_xz(4.75, 6.85, 0.65, 2.65, .25), -2, 2)], bw=.06, seg=2)
 for s in (1, -1):
     for x, z in ((4.6, .45), (7.0, .45), (4.6, 2.85), (7.0, 2.85)):
-        solid('wscrew', screw(x, s * .99, z, .09, .05), M['steel'], bw=0)
+        solid('wscrew', screw(x, s * .99, z, .11, .06, seg=6), M['steel'], bw=0)   # hex bolts
 solid('em_plate', prism(rrect_xz(-2.55, -0.95, 2.6, 3.1, .15), .78, .9), M['label'], bw=.02)
 text('E&M', .34, (-1.75, .91, 2.85), side=1, m=M['dark'])
-for s_ in (1, -1):   # the light upper panel over the coil bay and window
-    solid('top_panel', prism(fillet([(-0.4, 2.95), (8.4, 2.95), (8.4, 3.45), (-0.4, 3.45)], .1), s_ * .84, s_ * .92), M['silver'], bw=.02)
-    text('SIREN  EM-7', .2, (2.0, s_ * .93, 3.2), side=s_, m=M['dark'])
+for s_ in (1, -1):   # the upper panel over the coil bay and window: still in primer on the left, Cyrillic stencils
+    solid('top_panel', prism(fillet([(-0.4, 2.95), (8.4, 2.95), (8.4, 3.45), (-0.4, 3.45)], .1), s_ * .84, s_ * .92),
+          M['primer' if s_ > 0 else 'silver'], bw=.02)
+    text('СИРЕНА  ЭМ-7', .24, (2.0, s_ * .93, 3.2), side=s_, m=M['ink_w' if s_ > 0 else 'ink_k'], font=STENCIL)
 # coil in the bay: a core, windings, and the green charge bands
 solid('coil_core', cylbm(.55, -0.5, 4.4, 1.78, seg=20), M['steel'], bw=0)
 for i in range(13):
     x = -0.2 + i * .33
     if 1.6 < x < 2.6: continue
-    solid('winding', cylbm(.74, x, x + .2, 1.78, seg=24), M['dark'], bw=.03, seg=1)
+    solid('winding', cylbm(.74, x, x + .2, 1.78, seg=24), M['copper'], bw=.03, seg=1)   # bare copper
 for x in (1.65, 1.95, 2.25):
     solid('band', cylbm(.78, x, x + .2, 1.78, seg=24), M['green'], bw=.03, seg=1)
 # top rail with flat teeth
@@ -121,7 +136,7 @@ solid('collar_slot', prism(rrect_xz(6.2, 7.9, -.6, -.1, .12), .8, .86), M['steel
 # ---------------------------------------------------------------- front block and coupling
 fb = prism(fillet([(8.5, 0.0), (11.4, 0.4), (11.4, 3.65), (8.5, 3.55)], .3), -1.15, 1.15)
 fb_cuts = [prism(rrect_xz(9.15, 10.85, z0, z0 + .7, .25), y0, y1) for z0 in (0.75, 2.35) for y0, y1 in ((.98, 2), (-2, -.98))]
-solid('front_block', fb, M['dark'], cuts=fb_cuts, bw=.1, seg=3)
+solid('front_block', fb, M['primer'], cuts=fb_cuts, bw=.1, seg=3)   # never got its top coat
 for z0 in (0.75, 2.35):
     for s in (1, -1):
         solid('slot_grip', prism(rrect_xz(9.35, 10.65, z0 + .18, z0 + .52, .15), s * .98 - .06, s * .98 + .06), M['steel'], bw=.03)
@@ -130,7 +145,8 @@ ring('coupling', 1.72, 1.0, 11.3, 11.75, M['steel'], bw=.05)
 ring('coupling2', 1.6, 1.0, 11.75, 12.05, M['dark'], bw=.04)
 
 # ---------------------------------------------------------------- shroud (brushed alloy), bands, rails
-solid('shroud', cylbm(SR, 11.9, 18.3, SZ, seg=40), M['silver'], bw=.06, seg=2)
+HATCH = (13.65, 15.35, SZ + .4, SZ + 1.0)   # an open service hatch above the left side rail (its cover is missing)
+solid('shroud', cylbm(SR, 11.9, 18.3, SZ, seg=40), M['silver'], cuts=[boxbm(HATCH[0], HATCH[1], .95, 2, HATCH[2], HATCH[3])], bw=.06, seg=2)
 for x in (13.15, 15.7):
     ring('red_band', SR + .015, SR - .2, x, x + .26, M['redpaint'], bw=.01)
 for x in (12.75, 17.25):
@@ -171,6 +187,55 @@ for x in (-2.1, -1.8, -1.5, -1.2, -0.9):
 tube('cable', [(-0.4, 1.0, 2.15), (0.6, 1.08, 1.9), (2.0, 1.12, 1.0), (3.4, 1.12, 0.35), (4.2, 1.05, -0.2), (4.6, .95, -0.85)],
      .15, M['rubber'], res=10)
 
+# ---------------------------------------------------------------- prototype work: loose wiring, an open hatch, welds, stencils
+# a loom of four wires from the coil bay along the receiver, past the front block, into the circuit board in the hatch
+LOOM = [(3.7, .35, 2.25), (4.0, .9, 2.55), (4.6, 1.1, 3.16), (6.0, 1.1, 3.18), (7.6, 1.12, 3.06), (8.6, 1.26, 3.0),
+        (10.0, 1.3, 3.12), (11.5, 1.42, 3.4), (12.5, 1.36, 3.45), (13.3, 1.2, 3.2)]
+for i, (m, end) in enumerate((('wred', (14.0, 1.07, 2.75)), ('rubber', (14.35, 1.07, 2.85)),
+                               ('wblue', (14.1, 1.07, 3.02)), ('wwhite', (14.7, 1.07, 2.95)))):
+    a = [i * math.pi / 2 + k * 1.1 for k in range(len(LOOM))]   # loosely twisted round each other
+    tube('loom', [(x, y + .06 * math.cos(t), z + .06 * math.sin(t)) for (x, y, z), t in zip(LOOM, a)] + [end], .05, M[m], res=6)
+    solid('lug', cylbm(.07, end[0], end[0] + .14, end[2], y=1.04, axis='y', seg=8), M['copper'], bw=0)
+for x, y, z in ((6.0, 1.1, 3.18), (10.0, 1.3, 3.12)):   # electrical tape wraps
+    ring('tape', .16, .02, x - .14, x + .14, M['rubber'], z=z, y=y, seg=14, bw=.02)
+ring('zip', .145, .02, 7.0, 7.05, M['wwhite'], z=3.13, y=1.11, seg=12, bw=0)
+solid('zip_head', boxbm(6.96, 7.1, 1.24, 1.34, 3.04, 3.16), M['wwhite'], bw=0)
+# the circuit board in the hatch: chips, capacitors, solder pads; screw bosses round the empty cover seat
+solid('pcb', boxbm(HATCH[0] + .1, HATCH[1] - .1, .95, 1.0, HATCH[2] + .05, HATCH[3] - .05), M['pcb'], bw=0)
+for x0, x1, z0, z1 in ((13.85, 14.25, 2.68, 2.92), (14.5, 15.15, 2.72, 2.88), (14.85, 15.15, 2.98, 3.12)):
+    solid('chip', boxbm(x0, x1, 1.0, 1.05, z0, z1), M['rubber'], bw=.005)
+for x, z, r in ((13.95, 3.08, .08), (14.45, 3.1, .07), (14.6, 3.1, .07)):
+    solid('cap', cylbm(r, x, x + .22, z, y=1.11, axis='y', seg=10), M['wblue' if r > .075 else 'steel'], bw=.01)
+for x in (13.6, 15.4):
+    for z in (HATCH[2] + .08, HATCH[3] - .08):
+        solid('hatch_boss', screw(x, onside(0, z, SZ, SR, .01), z, .07, .05, seg=6), M['steel'], bw=0)
+# a loose red jumper looping over the window to a terminal on the front block
+tube('jumper', [(5.6, 1.12, 3.1), (6.3, 1.27, 2.3), (7.0, 1.32, 1.55), (7.8, 1.28, 1.3), (8.5, 1.26, 1.55), (8.85, 1.25, 1.9)],
+     .045, M['wred'], res=8)
+solid('terminal', screw(8.85, 1.19, 1.9, .14, .1, seg=6), M['copper'], bw=0)
+for x, z in ((8.8, .4), (11.1, .7), (8.8, 3.3), (11.05, 3.4)):   # hex bolts on the front block
+    solid('fb_bolt', screw(x, 1.19, z, .12, .08, seg=6), M['steel'], bw=0)
+# a rough weld down the seam where the front block meets the receiver
+weld = bmesh.new()
+for k in range(22):
+    z = .3 + k * .12
+    bmesh.ops.create_icosphere(weld, subdivisions=1, radius=.075 + .02 * math.sin(k * 2.7),
+                               matrix=Matrix.Translation((8.47 + .02 * math.sin(k * 1.3), .9, z)))
+solid('weld', weld, M['steel'], bw=0)
+# a warning plate below the coil bay: lightning triangle, "DANGER! HIGH VOLTAGE"
+solid('warn_plate', prism(rrect_xz(-0.7, 2.4, .28, .88, .06), .85, .89), M['stencil'], bw=.01)
+solid('warn_tri', prism([(-0.62, .34), (-0.02, .34), (-0.32, .84)], .89, .9), M['redpaint'], bw=0)
+solid('warn_bolt', prism([(-.25, .72), (-.30, .72), (-.38, .55), (-.31, .55), (-.37, .40), (-.24, .60), (-.31, .60)], .9, .91), M['rubber'], bw=0)
+text('ОПАСНО!', .2, (1.0, .9, .68), m=M['ink_r'], font=STENCIL)
+text('ВЫСОКОЕ НАПРЯЖЕНИЕ', .12, (1.0, .9, .44), m=M['ink_k'], font=STENCIL)
+text('№004', .3, (10.25, 1.16, 1.9), m=M['ink_w'], font=STENCIL)
+# masking tape round the shroud with a pen note: "don't touch"
+ring('masking', SR + .012, SR - .2, 16.05, 17.15, M['masking'], bw=.005)
+text('не трогать!', .2, (16.6, (SR + .02) * math.cos(math.radians(40)), SZ + (SR + .02) * math.sin(math.radians(40))),
+     m=M['ink_k'], font=MARKER, tilt=40)
+text('ОПЫТНЫЙ ОБРАЗЕЦ', .26, (-6.1, .69, 2.25), m=M['ink_w'], font=STENCIL)   # "experimental prototype"
+text('ЭМ-7  СЕРИЯ 0', .18, (-6.4, .69, 1.8), m=M['ink_w'], font=STENCIL)
+
 # ---------------------------------------------------------------- stock: skeletal, with vents, a tan plate and labels
 stock = prism(fillet([(-2.9, 3.45), (-8.4, 3.0), (-9.4, 3.35), (-14.4, 3.35), (-14.9, 2.85), (-14.9, -2.4), (-14.4, -2.85),
                       (-7.6, -2.85), (-3.7, -0.6), (-2.9, -0.1)], .4), -.68, .68)
@@ -205,6 +270,9 @@ for i, z in enumerate((CZ + .25, CZ - .2, CZ - .65)):   # the yellow wires along
     tube('wire', pts, .06, M['hose'], part=C, res=6)
     solid('wire_end', cylbm(.1, 7.85, 8.15, z, y=onside(0, z, CZ, CR, .08), seg=10), M['rubber'], part=C, bw=0)
 solid('can_label', prism(rrect_xz(6.2, 8.0, CZ + 1.2, CZ + 1.45, .05), 0, .92), M['label'], part=C, bw=0)
+ring('can_tape', CR + .012, CR - .2, 3.85, 4.55, M['masking'], part=C, z=CZ, bw=.005)
+text('004', .24, (4.2, CR + .03, CZ + .1), part=C, m=M['ink_k'], font=MARKER)
+text('НЕ ВСКРЫВАТЬ', .15, (5.35, onside(0, CZ - .15, CZ, CR, .02), CZ - .15), part=C, m=M['ink_r'], font=STENCIL)   # "do not open"
 
 # ---------------------------------------------------------------- flip-up irons (tag_iron_sight)
 IS = 'tag_iron_sight'
@@ -322,3 +390,11 @@ solid('ls_box', prism(fillet([(14.6, SZ - .5), (17.4, SZ - .5), (17.4, SZ + .5),
 solid('ls_lens', cylbm(.2, 17.38, 17.44, SZ, y=-(SR + .6), seg=16), M['dot'], part=LS, bw=0)
 
 export(OUT, RENDER, 'sr', BAKED, frame=(5.5, 0, 0.5), ortho=46)
+
+if RENDER:   # close-ups of the bare gun (no attachments) for checking the small stencils and wiring
+    sc = bpy.context.scene; co = sc.camera
+    for o in bpy.data.objects:
+        if o.name.startswith('part_tag_') and o.name not in ('part_tag_clip', 'part_tag_iron_sight', 'part_tag_sr_grip'): o.hide_render = True
+    for name, (x, z, sc_) in (('close_rcv', (3.0, 1.8, 13)), ('close_front', (13.0, 2.4, 13)), ('close_stock', (-6.0, 0.5, 13))):
+        co.location = (x, 60, z); co.rotation_euler = (math.radians(90), 0, math.radians(180)); co.data.ortho_scale = sc_
+        sc.render.filepath = f'{RENDER}/sr_{name}.png'; bpy.ops.render.render(write_still=True)
