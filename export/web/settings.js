@@ -4,7 +4,7 @@
 const KEY='kino.settings';
 // Phones start on Low graphics without HD textures (the lighting and HD texture work is heavy there); a saved choice wins.
 const COARSE=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,gunMotion:1,renderScale:1,graphics:COARSE?0:2,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,fpsCap:COARSE?30:0,padSensitivity:1,padGlyphs:0,padVibration:true,padTriggers:true,padLightbar:true,binds:{}};
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,gunMotion:1,casinoFx:2,renderScale:1,graphics:COARSE?0:2,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,fpsCap:COARSE?30:0,padSensitivity:1,padGlyphs:0,padVibration:true,padTriggers:true,padLightbar:true,binds:{}};
 // Rebindable actions and the key each game page listens for. game-menu.js
 // translates a rebound key into its default so the game code stays unchanged.
 export const ACTIONS=[
@@ -41,6 +41,7 @@ const FIELDS=[
   {key:'padLightbar',tab:'controls',label:'DualSense light bar and LEDs',type:'toggle',hint:'The light bar follows your health; the player LEDs count your perks'},
   {key:'headBob',tab:'gameplay',label:'Head bob',type:'toggle',hint:'Camera moves with your steps and landings'},
   {key:'gunMotion',tab:'gameplay',label:'Weapon motion',type:'range',min:0,max:1.5,step:.1,format:v=>Math.round(v*100)+'%',hint:'How much the gun sways, lags and settles with your movement (0 = steady)'},
+  {key:'casinoFx',tab:'gameplay',label:'Casino effects',type:'range',min:0,max:2,step:1,format:v=>['Minimal','Reduced','Full'][Math.round(v)]??'Full',hint:'The Gambler class: how much of the screen its games take over (bulbs, flashes, the table felt)'},
   {key:'fov',tab:'gameplay',label:'Field of view',type:'range',min:60,max:110,step:1,format:v=>v+'°'},
   {key:'volume',tab:'audio',label:'Master volume',type:'range',min:0,max:1.5,step:.05,format:v=>Math.round(v*100)+'%'},
   {key:'music',tab:'audio',label:'Background music',type:'toggle',hint:'Ambient soundtrack; Easter-egg songs always play'},

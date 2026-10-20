@@ -2293,6 +2293,834 @@
           }
         }
       ]
+    },
+    {
+      "id": "gambler",
+      "name": "Gambler",
+      "tagline": "Puts it all on red, then shoots the wheel until it lands there.",
+      "color": "#f2c94c",
+      "resource": {
+        "id": "fortune",
+        "name": "Fortune",
+        "max": 20,
+        "color": "#f2c94c",
+        "decayDelay": 20,
+        "decay": 0.5,
+        "per": {
+          "gun": 0.01
+        },
+        "desc": "Kills during a Run give 1 Fortune (headshots 2); wins give 3, big wins 5, jackpots 10. Each point: +1% gun damage. Windfall: an empty-mag reload has a 1.5% chance per Fortune point to start Hot Streak. Fortune drains after 20s without a gain."
+      },
+      "gambler": {
+        "pick": 1.3,
+        "ride": {
+          "time": 3,
+          "max": 3
+        },
+        "hand": 3,
+        "marker": 3,
+        "reshuffle": 4,
+        "games": {
+          "blackjack": {
+            "name": "Blackjack",
+            "icon": "cards"
+          },
+          "dice": {
+            "name": "Bone Dice",
+            "icon": "dice"
+          },
+          "slots": {
+            "name": "One-Armed Bandit",
+            "icon": "slots"
+          },
+          "poker": {
+            "name": "Poker",
+            "icon": "cards"
+          },
+          "fistful": {
+            "name": "Fistful of Dice",
+            "icon": "dice"
+          },
+          "roulette": {
+            "name": "Roulette",
+            "icon": "wheel"
+          }
+        },
+        "antes": [
+          {
+            "id": "chip",
+            "name": "Chip",
+            "color": "#d8d2c4",
+            "edge": 0,
+            "desc": "Free. Nothing extra on a win or a bust."
+          },
+          {
+            "id": "bankroll",
+            "name": "Bankroll",
+            "color": "#6fcf6a",
+            "edge": [
+              0.08,
+              0.12,
+              0.16
+            ],
+            "cost": [
+              1000,
+              2500,
+              5000
+            ],
+            "pay": {
+              "win": 2,
+              "big": 3,
+              "jackpot": 5
+            },
+            "desc": "Stake 1,000 points (2,500 from round 10, 5,000 from round 20). A win pays 2×, a big win 3×, a jackpot 5×. A bust loses the stake."
+          },
+          {
+            "id": "blood",
+            "name": "Blood",
+            "color": "#d94a5c",
+            "edge": 0.12,
+            "desc": "Your health. A win heals you fully and pays one tier up; a bust halves your health."
+          },
+          {
+            "id": "iron",
+            "name": "Iron",
+            "color": "#9fb4c8",
+            "edge": 0.16,
+            "desc": "The gun in your hands. A win Pack-a-Punches it; a bust swaps it for a random mystery box weapon."
+          },
+          {
+            "id": "soul",
+            "name": "Soul",
+            "color": "#8f6ae0",
+            "edge": 0.2,
+            "needsPerk": true,
+            "desc": "A perk (you need one to bet it). A win gives you a perk you don't have; a bust takes one of yours."
+          }
+        ],
+        "busts": {
+          "cards": "Your Fortune is halved.",
+          "dice": "The zombies around you run 25% faster for 8s.",
+          "wheel": "Your reloads are 40% slower for 8s."
+        },
+        "rewards": [
+          {
+            "id": "hotHand",
+            "name": "Hot Hand",
+            "kind": "mod",
+            "tiers": [
+              "win"
+            ],
+            "time": 20,
+            "desc": "Each kill: +4% gun damage and fire rate, up to 10 stacks."
+          },
+          {
+            "id": "dealer",
+            "name": "Dealer's Choice",
+            "kind": "mod",
+            "tiers": [
+              "win"
+            ],
+            "time": 20,
+            "desc": "Every hit has a 20% chance each to burn, arc a shock to a zombie nearby, or slow the zombie by half."
+          },
+          {
+            "id": "cash",
+            "name": "Cash Rounds",
+            "kind": "mod",
+            "tiers": [
+              "win"
+            ],
+            "time": 20,
+            "desc": "+10 points per hit, +40 per kill."
+          },
+          {
+            "id": "bottomless",
+            "name": "Bottomless",
+            "kind": "mod",
+            "tiers": [
+              "win"
+            ],
+            "time": 20,
+            "desc": "Shots use no ammo."
+          },
+          {
+            "id": "ace",
+            "name": "Ace of Spades",
+            "kind": "card",
+            "tiers": [
+              "win"
+            ],
+            "desc": "Your next 8 hits deal 4× damage."
+          },
+          {
+            "id": "fireball",
+            "name": "Fireball",
+            "kind": "card",
+            "tiers": [
+              "win"
+            ],
+            "desc": "A fireball where you aim: a 240 blast for a full zombie's health, setting the rest alight."
+          },
+          {
+            "id": "missile",
+            "name": "Magic Missile",
+            "kind": "card",
+            "tiers": [
+              "win"
+            ],
+            "desc": "6 homing bolts, each for half a zombie's health."
+          },
+          {
+            "id": "golden",
+            "name": "Golden Gun",
+            "kind": "mod",
+            "tiers": [
+              "big"
+            ],
+            "time": 20,
+            "desc": "Double gun damage; headshot kills pay +100 points."
+          },
+          {
+            "id": "blackhole",
+            "name": "Black Hole",
+            "kind": "card",
+            "tiers": [
+              "big"
+            ],
+            "desc": "Pulls the zombies where you aim in for 4s, then implodes for 90% of a zombie's health."
+          },
+          {
+            "id": "wild",
+            "name": "Wild Card",
+            "kind": "card",
+            "tiers": [
+              "big"
+            ],
+            "desc": "Deals you two random cards."
+          },
+          {
+            "id": "lightning",
+            "name": "Lightning Totem",
+            "kind": "totem",
+            "tiers": [
+              "big"
+            ],
+            "time": 20,
+            "desc": "Strikes a zombie within 450 every 0.7s for 35% of its health."
+          },
+          {
+            "id": "eldritch",
+            "name": "Eldritch Totem",
+            "kind": "totem",
+            "tiers": [
+              "big"
+            ],
+            "time": 20,
+            "desc": "Zombies within 320 take 30% more damage and move 35% slower."
+          },
+          {
+            "id": "overshield",
+            "name": "Overshield Totem",
+            "kind": "totem",
+            "tiers": [
+              "big"
+            ],
+            "time": 20,
+            "desc": "Within 280 of it you take 60% less damage and heal 10 a second."
+          }
+        ],
+        "jackpot": {
+          "name": "High Roller Mode",
+          "time": 18,
+          "ricochet": 0.5,
+          "radius": 320,
+          "cardEvery": 0.12,
+          "cardDmg": 0.2,
+          "desc": "18s of infinite ammo; half your bullets ricochet to a zombie within 320, and every shot throws a seeking card (at most one per 0.12s) for 20% of a zombie's health."
+        },
+        "extras": {
+          "MELON 777": "Double points for the whole High Roller Mode.",
+          "BLACKJACK": "Deals you an Ace of Spades and a Wild Card.",
+          "BOXCARS": "A ring of six blasts around you.",
+          "GREEN 0": "Every zombie freezes for 5s.",
+          "FIVE OF A KIND": "Pack-a-Punches the gun in your hands.",
+          "STRAIGHT FLUSH": "Pack-a-Punches the gun in your hands.",
+          "ROYAL FLUSH": "Pack-a-Punches the gun in your hands.",
+          "HIGH ROLLER": "Let It Ride to the top: nothing extra, just the mode."
+        },
+        "run": {
+          "marker": "Each bust fills the Marker; once it's full (3 busts), the next bust pays as a win (MARKER PAID). Any win clears it.",
+          "ride": "After a win: Z lets it ride on a coin flip (a win pays one tier up, a loss busts), R cashes out. Up to 3 rides.",
+          "reshuffle": "Command wheel: deal the game again for 4 Fortune.",
+          "hand": "Cards wait in your hand (3): Z plays the top one while Ante Up charges, or pick one on the command wheel."
+        }
+      },
+      "synergies": [
+        {
+          "id": "acehigh",
+          "a": "gace",
+          "b": "gwild",
+          "name": "Ace High",
+          "desc": "The card Wild Draw deals you is an Ace of Spades or a Wild Card.",
+          "effects": {
+            "gamble.aceDeal": 1
+          }
+        },
+        {
+          "id": "trickshot",
+          "a": "gnudge",
+          "b": "gbank",
+          "name": "Trick Shot",
+          "desc": "Bank Shot works at any Fortune, and ricochets count as kills for the game.",
+          "effects": {
+            "gamble.trickShot": 1
+          }
+        }
+      ],
+      "trees": [
+        {
+          "id": "draw",
+          "name": "Luck of the Draw",
+          "color": "#d94a5c",
+          "desc": "Cards: a hand to hold and play.",
+          "game": "blackjack",
+          "action": {
+            "id": "ante",
+            "name": "Ante Up",
+            "icon": "ante",
+            "desc": "Put something on the table and a casino game deals itself across your screen: blackjack, bone dice or the one-armed bandit, more as the trees unlock them. Your gun tilts the odds while it plays: kills, headshots and multikills peek, nudge and re-roll. Z and R make the calls. Wins pay out gun power-ups, cards to play and totems; jackpots start High Roller Mode.",
+            "base": {
+              "cooldown": 90
+            }
+          },
+          "nodes": [
+            {
+              "id": "gcount",
+              "name": "Card Counter",
+              "ranks": 5,
+              "icon": "target",
+              "desc": "House Edge −{v}% on every ante you put up.",
+              "effects": {
+                "gamble.tilt": 0.02
+              },
+              "tier": 1
+            },
+            {
+              "id": "gsleight",
+              "name": "Sleight of Hand",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Reload speed +{v}%.",
+              "effects": {
+                "player.reload": 0.04
+              },
+              "tier": 1
+            },
+            {
+              "id": "gstack",
+              "name": "Stacked Deck",
+              "ranks": 2,
+              "icon": "cards",
+              "desc": "Your hand holds {v} more cards.",
+              "effects": {
+                "gamble.hand": 1
+              },
+              "tier": 1,
+              "fmt": "n"
+            },
+            {
+              "id": "ghigh",
+              "name": "High Card",
+              "ranks": 5,
+              "icon": "chip",
+              "desc": "Fortune holds {v} more.",
+              "effects": {
+                "fortune.max": 2
+              },
+              "tier": 2,
+              "fmt": "n"
+            },
+            {
+              "id": "gtell",
+              "name": "Dealer's Tell",
+              "ranks": 3,
+              "icon": "eye",
+              "desc": "Let It Ride odds +{v}%.",
+              "effects": {
+                "gamble.ride": 0.04
+              },
+              "tier": 2
+            },
+            {
+              "id": "gace",
+              "name": "Ace in the Hole",
+              "ranks": 1,
+              "icon": "cards",
+              "desc": "A bust with a card in your hand burns the card instead: the ante and the family's bust penalty are skipped.",
+              "effects": {
+                "gamble.saveBust": 1
+              },
+              "tier": 2,
+              "type": "augment"
+            },
+            {
+              "id": "gpoker",
+              "name": "Poker",
+              "ranks": 1,
+              "icon": "cards",
+              "desc": "Adds Poker to your games: five cards, kills rank up your lowest card, two headshots in a row make a wild. Z or R locks the hand; when the clock runs out the loose cards are drawn again.",
+              "effects": {
+                "gamble.game.poker": 1
+              },
+              "tier": 3,
+              "type": "game",
+              "game": "poker"
+            },
+            {
+              "id": "gshark",
+              "name": "Card Shark",
+              "ranks": 5,
+              "icon": "cards",
+              "desc": "Cards you play hit +{v}% harder.",
+              "effects": {
+                "gamble.cardDmg": 0.1
+              },
+              "tier": 3
+            },
+            {
+              "id": "gwild",
+              "name": "Wild Draw",
+              "ranks": 1,
+              "icon": "cards",
+              "desc": "Every Run deals you a card as it starts.",
+              "effects": {
+                "gamble.runCard": 1
+              },
+              "tier": 3,
+              "type": "augment"
+            },
+            {
+              "id": "gdouble",
+              "name": "Double Down",
+              "ranks": 5,
+              "icon": "coin",
+              "desc": "Wins have a {v}% chance to pay one more reward.",
+              "effects": {
+                "gamble.payout": 0.1
+              },
+              "tier": 4
+            },
+            {
+              "id": "gsplit",
+              "name": "Split Hand",
+              "ranks": 1,
+              "icon": "cards",
+              "desc": "A card you play has a 35% chance to come back to your hand.",
+              "effects": {
+                "gamble.cardsExtra": 0.35
+              },
+              "tier": 4,
+              "type": "augment"
+            },
+            {
+              "id": "gdead",
+              "name": "Dead Man's Hand",
+              "ranks": 5,
+              "icon": "skull",
+              "desc": "Below 40% health, gun damage +{v}% for each card in your hand.",
+              "effects": {
+                "gamble.deadHand": 0.03
+              },
+              "tier": 5
+            },
+            {
+              "id": "gcold",
+              "name": "Cold Deck",
+              "ranks": 1,
+              "icon": "snow",
+              "desc": "Playing a card freezes the zombies within 260 for 2s.",
+              "effects": {
+                "gamble.coldDeck": 1
+              },
+              "tier": 5,
+              "type": "augment"
+            },
+            {
+              "id": "gtines",
+              "name": "Devil's Tines",
+              "ranks": 1,
+              "icon": "cards",
+              "desc": "One more augment slot, and every win deals you a card on top of its payout.",
+              "effects": {
+                "gamble.slots": 1,
+                "gamble.winCard": 1
+              },
+              "tier": 6,
+              "type": "capstone"
+            }
+          ]
+        },
+        {
+          "id": "bones",
+          "name": "Roll the Bones",
+          "color": "#e8b04a",
+          "desc": "Dice and totems.",
+          "game": "dice",
+          "action": {
+            "id": "ante",
+            "name": "Ante Up",
+            "icon": "ante",
+            "desc": "Put something on the table and a casino game deals itself across your screen: blackjack, bone dice or the one-armed bandit, more as the trees unlock them. Your gun tilts the odds while it plays: kills, headshots and multikills peek, nudge and re-roll. Z and R make the calls. Wins pay out gun power-ups, cards to play and totems; jackpots start High Roller Mode.",
+            "base": {
+              "cooldown": 90
+            }
+          },
+          "nodes": [
+            {
+              "id": "gloaded",
+              "name": "Loaded Dice",
+              "ranks": 5,
+              "icon": "dice",
+              "desc": "Kills during a Run have a {v}% chance to count twice.",
+              "effects": {
+                "gamble.luck": 0.03
+              },
+              "tier": 1
+            },
+            {
+              "id": "geight",
+              "name": "Hard Eight",
+              "ranks": 5,
+              "icon": "fist",
+              "desc": "Melee damage +{v}%.",
+              "effects": {
+                "player.melee": 0.08
+              },
+              "tier": 1
+            },
+            {
+              "id": "gcharm",
+              "name": "Bone Charm",
+              "ranks": 5,
+              "icon": "totem",
+              "desc": "Totems last +{v}% longer.",
+              "effects": {
+                "gamble.totemTime": 0.08
+              },
+              "tier": 1
+            },
+            {
+              "id": "gseven",
+              "name": "Lucky Seven",
+              "ranks": 3,
+              "icon": "chip",
+              "desc": "Fortune gains +{v}%.",
+              "effects": {
+                "fortune.gain": 0.2
+              },
+              "tier": 2
+            },
+            {
+              "id": "gcrap",
+              "name": "Crapshoot",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Damage taken −{v}%.",
+              "effects": {
+                "player.armor": 0.03
+              },
+              "tier": 2
+            },
+            {
+              "id": "gsnake",
+              "name": "Snake Eyes",
+              "ranks": 1,
+              "icon": "dice",
+              "desc": "Dice games' busts are a push half the time.",
+              "effects": {
+                "gamble.rerollBust": 0.5
+              },
+              "tier": 2,
+              "type": "augment"
+            },
+            {
+              "id": "gfist",
+              "name": "Fistful of Dice",
+              "ranks": 1,
+              "icon": "dice",
+              "desc": "Adds Fistful of Dice to your games: five dice to fill with one face. A kill may hold a die, a melee kill sets one, Z re-rolls the loose dice once.",
+              "effects": {
+                "gamble.game.fistful": 1
+              },
+              "tier": 3,
+              "type": "game",
+              "game": "fistful"
+            },
+            {
+              "id": "gmed",
+              "name": "Big Medicine",
+              "ranks": 1,
+              "icon": "totem",
+              "desc": "Totems follow you around instead of staying where they were planted.",
+              "effects": {
+                "gamble.totemFollow": 1
+              },
+              "tier": 3,
+              "type": "augment"
+            },
+            {
+              "id": "gthunder",
+              "name": "Rolling Thunder",
+              "ranks": 5,
+              "icon": "bolt",
+              "desc": "Totem damage +{v}%.",
+              "effects": {
+                "gamble.totemDmg": 0.1
+              },
+              "tier": 3
+            },
+            {
+              "id": "gweight",
+              "name": "Weighted Dice",
+              "ranks": 2,
+              "icon": "dice",
+              "desc": "The Marker pays out {v} bust sooner.",
+              "effects": {
+                "gamble.marker": 1
+              },
+              "tier": 4,
+              "fmt": "n"
+            },
+            {
+              "id": "ghotdice",
+              "name": "Hot Dice",
+              "ranks": 1,
+              "icon": "flame",
+              "desc": "Dice games that pay also plant a random totem at your feet.",
+              "effects": {
+                "gamble.diceTotem": 1
+              },
+              "tier": 4,
+              "type": "augment"
+            },
+            {
+              "id": "gcomeback",
+              "name": "Comeback Roll",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Ante Up cooldown −{v}%.",
+              "effects": {
+                "ability.cooldown": 0.04
+              },
+              "tier": 5
+            },
+            {
+              "id": "gfives",
+              "name": "Pair of Fives",
+              "ranks": 1,
+              "icon": "recycle",
+              "desc": "A bust gives back 50% of the meter.",
+              "effects": {
+                "gamble.bustRefund": 0.5
+              },
+              "tier": 5,
+              "type": "augment"
+            },
+            {
+              "id": "gallin",
+              "name": "All In",
+              "ranks": 1,
+              "icon": "coin",
+              "desc": "Let It Ride goes up to 4 times at +10% odds, and losing a ride still pays your first win.",
+              "effects": {
+                "gamble.allIn": 1
+              },
+              "tier": 6,
+              "type": "capstone"
+            }
+          ]
+        },
+        {
+          "id": "chaos",
+          "name": "Chaos Walking",
+          "color": "#8f6ae0",
+          "desc": "The wheel and the hot streak.",
+          "game": "slots",
+          "action": {
+            "id": "ante",
+            "name": "Ante Up",
+            "icon": "ante",
+            "desc": "Put something on the table and a casino game deals itself across your screen: blackjack, bone dice or the one-armed bandit, more as the trees unlock them. Your gun tilts the odds while it plays: kills, headshots and multikills peek, nudge and re-roll. Z and R make the calls. Wins pay out gun power-ups, cards to play and totems; jackpots start High Roller Mode.",
+            "base": {
+              "cooldown": 90
+            }
+          },
+          "nodes": [
+            {
+              "id": "gtrigger",
+              "name": "Hair Trigger",
+              "ranks": 5,
+              "icon": "crosshair",
+              "desc": "Fire rate +{v}% while your Fortune is at half or more.",
+              "effects": {
+                "gamble.rate": 0.03
+              },
+              "tier": 1
+            },
+            {
+              "id": "gjitters",
+              "name": "Jitters",
+              "ranks": 5,
+              "icon": "coin",
+              "desc": "Points earned +{v}%.",
+              "effects": {
+                "player.points": 0.03
+              },
+              "tier": 1
+            },
+            {
+              "id": "gpocket",
+              "name": "Pocket Change",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Gun power-ups last +{v}% longer.",
+              "effects": {
+                "gamble.modTime": 0.08
+              },
+              "tier": 1
+            },
+            {
+              "id": "gside",
+              "name": "Side Bets",
+              "ranks": 5,
+              "icon": "coin",
+              "desc": "{v}% of reloads flip a coin: heads, the reload finishes at once and you gain 1 Fortune.",
+              "effects": {
+                "gamble.sideBet": 0.06
+              },
+              "tier": 2
+            },
+            {
+              "id": "gnudge",
+              "name": "Nudge",
+              "ranks": 1,
+              "icon": "double",
+              "desc": "Multikills and melee kills count twice in a game.",
+              "effects": {
+                "gamble.nudge": 1
+              },
+              "tier": 2,
+              "type": "augment"
+            },
+            {
+              "id": "gwind",
+              "name": "Windfall Odds",
+              "ranks": 3,
+              "icon": "chip",
+              "desc": "Windfall chance +{v}% per Fortune.",
+              "effects": {
+                "gamble.windfall": 0.01
+              },
+              "tier": 2
+            },
+            {
+              "id": "groul",
+              "name": "Roulette",
+              "ranks": 1,
+              "icon": "wheel",
+              "desc": "Adds Roulette to your games: you bet a colour and a lucky number. Kills brake the wheel when that lands it on your colour, headshots knock it a pocket on.",
+              "effects": {
+                "gamble.game.roulette": 1
+              },
+              "tier": 3,
+              "type": "game",
+              "game": "roulette"
+            },
+            {
+              "id": "gstreak",
+              "name": "Hot Streak",
+              "ranks": 5,
+              "icon": "flame",
+              "desc": "Hot Streak lasts +{v}% longer and its fire rate and reload bonus grows by as much.",
+              "effects": {
+                "gamble.streak": 0.1
+              },
+              "tier": 3
+            },
+            {
+              "id": "grigged",
+              "name": "Marquee Rigged",
+              "ranks": 1,
+              "icon": "wheel",
+              "desc": "Reshuffle is free.",
+              "effects": {
+                "gamble.freeShuffle": 1
+              },
+              "tier": 3,
+              "type": "augment"
+            },
+            {
+              "id": "gchaos",
+              "name": "Chaos Theory",
+              "ranks": 5,
+              "icon": "cards",
+              "desc": "High Roller Mode's seeking cards and ricochets hit +{v}% harder.",
+              "effects": {
+                "gamble.hrDmg": 0.1
+              },
+              "tier": 4
+            },
+            {
+              "id": "gbank",
+              "name": "Bank Shot",
+              "ranks": 1,
+              "icon": "target",
+              "desc": "At full Fortune your bullets ricochet 25% of the time.",
+              "effects": {
+                "gamble.ricochet": 0.25
+              },
+              "tier": 4,
+              "type": "augment"
+            },
+            {
+              "id": "gfever",
+              "name": "Casino Fever",
+              "ranks": 5,
+              "icon": "chip",
+              "desc": "Fortune's gun damage bonus +{v}%.",
+              "effects": {
+                "gamble.fortuneMul": 0.1
+              },
+              "tier": 5
+            },
+            {
+              "id": "gfreeze",
+              "name": "Freeze Frame",
+              "ranks": 1,
+              "icon": "snow",
+              "desc": "Big wins and jackpots freeze the zombies within 600 for 3s.",
+              "effects": {
+                "gamble.freeze": 1
+              },
+              "tier": 5,
+              "type": "augment"
+            },
+            {
+              "id": "ghouse",
+              "name": "House Rules",
+              "ranks": 1,
+              "icon": "wheel",
+              "desc": "You pick the game every Run (R cycles it at the ante), Reshuffle is free and the House Edge is halved.",
+              "effects": {
+                "gamble.houseRules": 1
+              },
+              "tier": 6,
+              "type": "capstone"
+            }
+          ]
+        }
+      ]
     }
   ],
   "augmentSlots": 2,

@@ -1,6 +1,6 @@
 // Phase 3 class skills (BL3/BL4 style), the parts that aren't the action skill itself:
-//   · the class resource (cls.resource): Engineer Uplink, Fortifier Grit, Pilot Combat Data, drawn as a bar beside the
-//     skill hex
+//   · the class resource (cls.resource): Engineer Uplink, Fortifier Grit, Pilot Combat Data, Gambler Fortune, drawn as a
+//     bar beside the skill hex
 //   · kill skills (stacks that expire), conditional passives (sidearm, low health, near your fortification, last quarter
 //     of the mag, after a skill hit) and triggers (Bombardier, Retaliation, the Grit shockwave)
 // mod.js calls onHit for every zombie the action skill damages and asks reloadMul / rateMul / killChargeMul / spendData.
@@ -19,8 +19,11 @@ export function setupSkills(x){
 
   // ---- the class resource ------------------------------------------------------------------------------------
   const R=cls.resource??null,res={value:0,last:-99};
-  const max=()=>!R?0:R.max+(R.id==='uplink'?S()['uplink.max']??0:R.id==='grit'?S()['grit.max']??0:0);
+  const max=()=>!R?0:R.max+(R.id==='uplink'?S()['uplink.max']??0:R.id==='grit'?S()['grit.max']??0:R.id==='fortune'?S()['fortune.max']??0:0);
   function gain(n){if(!R)return;const was=Math.floor(res.value);res.value=Math.min(max(),res.value+n);res.last=session.time;if(Math.floor(res.value)!==was)draw();}
+  // Fortune gains scale with Lucky Seven; spend takes some off (Reshuffle, a cards bust)
+  const gainF=n=>gain(n*(1+(S()['fortune.gain']??0)));
+  function spend(n){if(!R)return;res.value=Math.max(0,res.value-n);draw();}
   function spendAll(){const v=Math.floor(res.value);res.value=0;draw();return v;}
   const v=()=>Math.floor(res.value);
 
@@ -44,6 +47,7 @@ export function setupSkills(x){
     if(!melee)focus={z,t:session.time};
     let k=0;
     if(R?.id==='uplink'&&!melee)k+=v()*R.per.gun;
+    if(R?.id==='fortune'&&!melee)k+=v()*R.per.gun*(1+(s['gamble.fortuneMul']??0));
     if(R?.id==='grit'&&melee)k+=v()*R.per.melee;
     if(!melee){
       if(s['eng.crossfire']&&z.gadgetHit>session.time-2)k+=s['eng.crossfire'];
@@ -75,6 +79,7 @@ export function setupSkills(x){
     if(s['fort.dugin']&&nearAbility())addStack('dugin',1e6,5);
     if(R?.id==='grit'&&nearAbility())gain(1);
     if(R?.id==='data'&&!actionUp())gain(1);
+    if(R?.id==='fortune'&&actionUp())gainF(e.head?2:1);   // kills during a Run
   });
 
   // ---- the action skill's hits (mod.js onHit) ---------------------------------------------------------------------
@@ -128,7 +133,7 @@ export function setupSkills(x){
     @keyframes res-pulse{to{filter:brightness(1.8)}}`;document.head.append(st);setTimeout(draw,600);}
 
   return {
-    onHit,res,gain,spendAll,count,
+    onHit,res,gain,gainF,spend,spendAll,count,max,
     get focus(){return focus&&session.time-focus.t<4&&enemies.list.includes(focus.z)?focus.z:null;},
     // reload time multiplier (Uplink, Field Kit)
     reloadMul:()=>1-Math.min(.5,(R?.id==='uplink'?v()*R.per.reload:0)+(pistol()?S()['side.fieldKit']??0:0)),

@@ -63,6 +63,11 @@ export function pruneLoadout(cfg,cls,state){
     const per={};L.augments=(L.augments??[]).filter(id=>{const n=nodes(cls).find(n=>n.id===id);if(!n||n.type!=='augment'||!unlocked(cfg,cls,state,n)||![L.left,L.right].includes(n.weapon))return false;per[n.weapon]=(per[n.weapon]??0)+1;return per[n.weapon]<=(cls.mech.augmentSlots??2);});
     if(L.capstone&&!state.points[L.capstone])L.capstone=null;return;
   }
+  if(cls.gambler){   // the Gambler: one action skill, augments from any tree
+    L.augments=(L.augments??[]).filter(id=>{const n=nodes(cls).find(n=>n.id===id);return n&&n.type==='augment'&&unlocked(cfg,cls,state,n);});
+    if(L.capstone&&!state.points[L.capstone])L.capstone=null;
+    L.augments=L.augments.slice(0,augmentSlots(cfg,cls,state));return;
+  }
   const t=tree(cls,L.action);
   L.augments=(L.augments??[]).filter(id=>{const n=t.nodes.find(n=>n.id===id);return n&&unlocked(cfg,cls,state,{...n,tree:t.id});}).slice(0,cfg.augmentSlots??2);
   if(L.capstone&&!state.points[L.capstone])L.capstone=null;
@@ -118,6 +123,7 @@ export function toggleAugment(cfg,cls,state,node){
     if(augmentsOn(cls,state,node.weapon).length>=(cls.mech.augmentSlots??2))return 'full';
     l.augments.push(node.id);return null;
   }
+  if(cls.gambler){if(l.augments.length>=augmentSlots(cfg,cls,state))return 'full';l.augments.push(node.id);return null;}
   if(node.tree!==l.action)return 'tree';
   if(l.augments.length>=slots)return 'full';
   l.augments.push(node.id);return null;
@@ -151,6 +157,7 @@ export function actionStats(cls,state){
   const dmg=1+k('ability.damage'),dur=1+k('ability.duration'),cd=b.cooldown*Math.max(.3,1-k('ability.cooldown')),rate=1+k('ability.rate'),size=1+k('ability.size'),slow=k('ability.slow'),two=!!k('cap.double');
   const common={cooldown:cd,dmgMul:dmg,slow:Math.min(.8,slow)};
   switch(act.id){
+    case 'ante':return {...common,games:gamblerGames(cls,state),hand:(cls.gambler.hand??3)+k('gamble.hand'),rides:(cls.gambler.ride?.max??3)+(k('gamble.allIn')?1:0),edge:Math.max(0,1-k('gamble.tilt'))*(k('gamble.houseRules')?.5:1)};
     case 'mech':{const m=mechStats(cls,state).mech;return {...common,cooldown:m.cooldown,duration:m.duration,hitCost:m.hitCost};}
     case 'wall':return {...common,health:Math.round(b.health*dur*(two?.75:1)),width:b.width*size,height:b.height,count:two?2:1};
     case 'snare':return {...common,radius:b.radius*size,durability:Math.round(b.durability*dur),damage:b.damage*dmg,tick:.5/rate,slow:Math.min(.85,b.slow+slow),count:two?2:1};
@@ -166,6 +173,7 @@ export function actionRows(cls,state,a){
   const act=actionOf(cls,state),b=act.base,up=(x,y)=>Math.abs(x-y)>1e-6,pct=v=>Math.round(v*100)+'%',sec=v=>v.toFixed(0)+'s';
   const cdRow=['COOLDOWN',sec(a.cooldown),up(a.cooldown,b.cooldown)],slowRow=['SLOW',a.slow?pct(a.slow):'—',a.slow>0];
   switch(act.id){
+    case 'ante':return [cdRow,['GAMES',String(a.games.length),a.games.length>3],['HAND',a.hand+' CARDS',a.hand>(cls.gambler.hand??3)],['RIDES','UP TO '+a.rides,a.rides>(cls.gambler.ride?.max??3)],['HOUSE EDGE',a.edge<1?'−'+Math.round((1-a.edge)*100)+'%':'—',a.edge<1],['CALLS','Z · R',false]];
     case 'mech':return [cdRow,['INTEGRITY',sec(a.duration),up(a.duration,b.duration)],['PER HIT','−'+a.hitCost.toFixed(1)+'s',up(a.hitCost,b.hitCost)],['ARMS','LMB · RMB',false]];
     case 'wall':return [cdRow,['LASTS','UNTIL BROKEN',false],['HITS',String(a.health),a.health!==b.health],['WIDTH',String(Math.round(a.width)),up(a.width,b.width)],['DAMAGE',pct(a.dmgMul-1)==='0%'?'—':'+'+pct(a.dmgMul-1),a.dmgMul>1],['WALLS',String(a.count),a.count>1]];
     case 'snare':return [cdRow,['LASTS','UNTIL WORN',false],['WEAR',a.durability+' zombie-s',a.durability!==b.durability],['DAMAGE',pct(a.damage)+'/s',up(a.damage,b.damage)],['SLOW',pct(a.slow),up(a.slow,b.slow)],['RADIUS',String(Math.round(a.radius)),up(a.radius,b.radius)]];
@@ -225,4 +233,15 @@ export function mechWeapon(cls,s,id){
   if(id==='fist')Object.assign(out,{refire:w.refire/rate,pound:!!aug('pound'),dash:!!aug('dash'),execute:aug('execute')});
   if(id==='arc')Object.assign(out,{tick:w.tick/rate,chain:w.chain+aug('chain'),stun:!!aug('stun')});
   return out;
+}
+
+// ---- the Gambler ----------------------------------------------------------------------------------------
+// One action skill (Ante Up) in all three trees. Each tree's base game (tree.game) is always in the pool; tier-3
+// 'game' nodes add one more when they have a point. Augments come from any tree: augmentSlots, +1 with Devil's Tines.
+export function gamblerGames(cls,state){
+  return [...cls.trees.map(t=>t.game),...nodes(cls).filter(n=>n.type==='game'&&state.points?.[n.id]>0).map(n=>n.game)].filter(Boolean);
+}
+export function augmentSlots(cfg,cls,state){
+  const cap=state.loadout?.capstone&&nodes(cls).find(n=>n.id===state.loadout.capstone);
+  return (cfg.augmentSlots??2)+(cls.gambler?cap?.effects?.['gamble.slots']??0:0);
 }

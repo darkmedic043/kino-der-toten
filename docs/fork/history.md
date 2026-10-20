@@ -314,3 +314,4 @@
 - 2026-10-19 (night): `GET /api/helm`: friends' Helm rooms (page `/helm/`), so Rind can watch the user's Claude Code sessions peer to peer (coop.md, Helm rooms).
 - 2026-10-19 (later): Bondrewd's palms seated on the grips (a live palm fit in the retarget: the hand slides along the palm normal until its palm face meets the glove's; `fpArmsPalmMaterial` names the palm).
 - 2026-10-19 (later): the support hand holds underbarrel attachments (foregrip with the wrist rolled, launcher, Masterkey, flamethrower); Bondrewd's bracer plates pulled in and first-person metal capped.
+- 2026-10-20: the **Gambler** class (C4SH-style): Ante Up deals a random casino game across the screen (blackjack, bone dice, slots; poker, fistful of dice, roulette as tree unlocks), the gun tilts the odds, wins pay gun power-ups, cards and totems, jackpots start an 18 s High Roller Mode (classes.md; Helm Classes note).
