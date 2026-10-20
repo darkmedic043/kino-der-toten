@@ -835,7 +835,7 @@ export function setupQuests(kit, heroes, tony, powers) {
     remove(holoZombie); holoZombie = null; remove(glass); glass = null; blackout.style.opacity = 0; roundWaiters.length = 0; talking = false;
   });
 
-  return { state: () => ({ step, part: part?.id ?? null, stones, papLocked: world.papLocked, locks, dials: DIALS.map(d => d.value), charge, machines, a: aCount, b: bCount, c: cCount, d: dishes.filter(x => x.turned).length, red: redId != null, redHits, batEggs, batSightings, keyIdx, cellOpen, padUses, timeState, powerHits, soulState, realityDone, briefState, dreamed, found13, step13Done }),
+  return { state: () => ({ step, part: part?.id ?? null, partLabel: part?.label ?? null, stones, papLocked: world.papLocked, locks, dials: DIALS.map(d => d.value), charge, machines, a: aCount, b: bCount, c: cCount, d: dishes.filter(x => x.turned).length, red: redId != null, redHits, batEggs, batSightings, keyIdx, cellOpen, padUses, timeState, powerHits, soulState, realityDone, briefState, dreamed, found13, step13Done }),
     setStep: n => stepEv({ n }), take: (id, label) => { setPart({ id, label }); return true; }, setPart, spawnRedHulk, startStations, dream: () => dreamEv({}),
     // the journal reads these (its quests' steps)
     flags: () => ({ step, stones: { time: timeState === 'done', power: powerDone, reality: realityDone, soul: soulState === 'done' }, timeState, soulState, batEggs, batmanGone, batSightings, batSpot: !!batSpot, keyIdx, cellOpen, locks: { dials: dialsDone, consoles: lock2Done, charger: lock3Done }, built: [...built], machines: { a: aDone, b: bDone, c: cDone, d: dDone }, dreamed, found13, step13Done, cheeseWall, red: redId != null }) };

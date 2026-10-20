@@ -55,16 +55,3 @@ body.touch-mode #scoreboard th{padding:0 8px 2px;font-size:8px;letter-spacing:.1
 body.touch-mode #scoreboard .sb-who i{width:28px;height:28px}
 body.touch-mode #scoreboard .sb-tile{min-width:92px;padding:5px 8px}
 @media (max-width:700px){#scoreboard .sb-meta div:not(.sb-round){display:none}#scoreboard td{font-size:15px;padding:8px 6px}#scoreboard th{padding:0 6px 2px;letter-spacing:.1em}}
-/* QUESTS: the journal's quests for this map (Tab + 1-9 tracks one) */
-#scoreboard .sb-quests h3 small{margin-left:10px;font-size:9px;letter-spacing:.2em;color:#6d6d68}
-#scoreboard .sb-quest{display:flex;align-items:flex-start;gap:9px;min-width:190px;max-width:290px;padding:7px 10px;border-left:3px solid #6c6c68;background:#26262499;position:relative}
-#scoreboard .sb-quest kbd{display:grid;place-items:center;flex:none;width:20px;height:20px;margin-top:2px;font:700 12px/1 Impact,'Arial Narrow',sans-serif;color:#dededa;background:#0d0d0c;border:1px solid #4a4a46}
-#scoreboard .sb-quest span{display:block;font-size:9px;letter-spacing:.22em;color:#9a9a96;text-transform:uppercase}
-#scoreboard .sb-quest b{display:block;margin-top:2px;font:600 15px/1.1 Impact,'Arial Narrow',sans-serif;letter-spacing:.04em;color:#dededa}
-#scoreboard .sb-quest em{display:block;margin-top:2px;font-style:normal;font-size:11px;color:#b9b9b4}
-#scoreboard .sb-quest i{position:absolute;top:6px;right:8px;font-style:normal;font-size:8px;letter-spacing:.2em;color:#7dffa6}
-#scoreboard .sb-quest.tracked{border-left-color:#7dffa6;background:#1f2e2499}
-#scoreboard .sb-quest.tracked kbd{border-color:#7dffa6;color:#7dffa6}
-#scoreboard .sb-quest.done{border-left-color:#c9a23a}
-#scoreboard .sb-quest.done em{color:#e6c35a}
-body.touch-mode #scoreboard .sb-quests h3 small{display:none}

@@ -5,9 +5,8 @@
 //   (re-adding an id replaces it; `parts` draws a buildable's parts as a row of slots, like Mob of the Dead: dark = not found, white = carried, gold = built)
 // In co-op each client shares its stats with the others about twice a second (kino.coop, a `stats` message).
 // A quick tap (touch buttons send a synthetic Tab) toggles it instead of holding.
-// QUESTS (2026-10-19): this map's quests from the journal (mods/journal, kino.journal): progress, the current step's
-// title once recorded, and which one is tracked; with Tab held, 1-9 tracks that quest (again: stops tracking).
-// Number keys switch weapons otherwise, so they are only taken while the board is up.
+// (A quests section with Tab + 1-9 tracking was here for a day; the user found the board weird with it, 2026-10-19:
+// quests and tracking live in the journal, the board shows what you have collected.)
 export default async function setup(api){
   const {host,session,world,mod}=api;
   const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('scoreboard.css',mod.url).href;document.head.append(css);
@@ -45,19 +44,12 @@ export default async function setup(api){
     for(const g of world?.eggs?.values?.()??[]){const found=g.items.filter(i=>i.found).length;tiles.push(tile('Easter egg · '+g.name,`${found} / ${g.items.length}`,!!g.done));}
     for(const c of collectibles.values()){let v='',done=false,parts=null;try{v=c.value();done=!!c.done?.();parts=c.parts?.();}catch{}tiles.push(parts?build(c.label,parts,v,done):tile(c.label,v,done));}
     const objective=document.getElementById('moon-objective')?.textContent?.trim();
-    const quests=questList().map((q,i)=>{const done=q.steps.filter(x=>x.now).length,cur=q.steps.find(x=>!x.now);
-      const step=!cur?'Complete':cur.recorded?cur.title:'Not recorded yet';
-      return `<div class="sb-quest${q.tracked?' tracked':''}${!cur?' done':''}"><kbd>${i+1}</kbd><div><span>${esc(q.kind)} · ${done} / ${q.total}</span><b>${esc(q.name)}</b><em>${esc(step)}</em></div>${q.tracked?'<i>TRACKED</i>':''}</div>`;});
     return `<div class="sb-panel"><div class="sb-head"><div><small>${net?.id?'CO-OP':'SOLO'}</small><h2>${esc(mapTitle())}</h2></div>
       <div class="sb-meta"><div><b>${clock()}</b><span>TIME</span></div><div class="sb-round"><b>${session.round}</b><span>ROUND</span></div></div></div>
       ${objective?`<p class="sb-objective">${esc(objective)}</p>`:''}
       <table><thead><tr><th></th><th>PLAYER</th><th>SCORE</th><th>KILLS</th><th>DOWNS</th><th>REVIVES</th><th>HEADSHOTS</th></tr></thead><tbody>${rows.join('')}</tbody></table>
-      ${quests.length?`<div class="sb-collect sb-quests"><h3>QUESTS <small>HOLD TAB + 1-${Math.min(9,quests.length)} TO TRACK</small></h3><div class="sb-tiles">${quests.join('')}</div></div>`:''}
       <div class="sb-collect"><h3>COLLECTIBLES</h3><div class="sb-tiles">${tiles.join('')||'<span class="sb-none">Nothing collected yet</span>'}</div></div></div>`;
   }
-
-  // this map's journal quests, in the journal's order (up to 9: the number keys)
-  function questList(){try{return (window.kino.journal?.status?.().maps.find(m=>m.here)?.quests??[]).slice(0,9);}catch{return [];}}
 
   // ---- input: hold Tab ------------------------------------------------------------------------------
   let shown=false,sticky=false,drawAt=0;
@@ -69,12 +61,6 @@ export default async function setup(api){
     if(e.repeat)return;
     if(e.remapped){sticky=!shown;set(!shown);return;}   // touch buttons send a tap
     set(true);
-  },true);
-  addEventListener('keydown',e=>{   // Tab + a number: track that quest (the journal's markers show it), again: untrack
-    if(!shown||typing(e))return;const n=/^(?:Digit|Numpad)([1-9])$/.exec(e.code)?.[1];if(!n)return;
-    e.preventDefault();e.stopImmediatePropagation();if(e.repeat)return;
-    const q=questList()[+n-1],j=window.kino.journal;if(!q||!j)return;
-    q.tracked?j.untrack():j.track(api.map?.id??'kino',q.id);root.innerHTML=html();drawAt=performance.now()+200;
   },true);
   addEventListener('keyup',e=>{if(e.code!=='Tab'||typing(e))return;e.preventDefault();e.stopImmediatePropagation();if(!sticky)set(false);},true);
   addEventListener('blur',()=>set(false));

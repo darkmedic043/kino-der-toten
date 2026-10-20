@@ -1,5 +1,5 @@
 {
   "name": "Scoreboard (hold Tab)",
-  "description": "Hold Tab for every player's points, kills, headshots, downs and accuracy, with the perks, equipment, Easter egg progress and quest items you have collected along the bottom. Maps and mods can add collectibles through kino.scoreboard.",
+  "description": "Hold Tab for every player's points, kills, headshots, downs and accuracy, with the Easter egg progress, collectibles and buildables you have collected along the bottom. Maps and mods add theirs through kino.scoreboard.",
   "script": "mod.js"
 }

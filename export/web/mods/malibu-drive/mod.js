@@ -18,6 +18,7 @@ import { setupTony } from './tony.js';
 import { setupPowers } from './powers.js';
 import { setupQuests } from './quests.js';
 import { setupMusic } from './music.js';
+import { setupTab } from './tab.js';
 
 // [zone, neighbour, flag zone] in the builder's compact ids (zone_ prefix and underscores dropped; zone_driveway1 is 'start')
 const ADJ = [
@@ -101,6 +102,7 @@ export default async function setup(api) {
   const powers = setupPowers(kit, heroes, tony);
   const quests = setupQuests(kit, heroes, tony, powers);
   const music = setupMusic(kit, heroes);
+  setupTab(api, { quests, tony });   // the Tab board's tiles
   // ---- waypoints on every quest's current step once the journal has it recorded (mods/journal: a step's instructions
   // unlock for good once done); the quest tracked in the journal keeps the journal's own markers instead
   const COLOR = { 'MAIN QUEST': '#ffd36b', 'MAP QUEST': '#7dffa6', 'SIDE EGG': '#e58cff' };
