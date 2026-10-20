@@ -6,6 +6,7 @@
 // the page's own action (resume, play). Used by mods/controller in the game (fed its button state
 // every frame) and standalone on the main menu (installGamepadNav polls the Gamepad API itself).
 // Import it before anything that builds menu elements: it records click listeners as they are added.
+import { seatPad } from './seat.js';   // split screen (Rind): only this player's controller
 const clickable=new WeakSet();
 if(typeof EventTarget!=='undefined'&&!EventTarget.prototype.addEventListener.__padNav){
   const orig=EventTarget.prototype.addEventListener;
@@ -134,7 +135,7 @@ export function installGamepadNav(opts={}){
   if(opts.glyphs){const {identify,glyphUrl}=opts.glyphs;nav.startLabel=opts.startLabel;
     const update=gp=>{const b=identify(gp.id).brand;if(b!==brand){brand=b;nav.setHints(glyphUrl,b);}};nav.updateBrand=update;}
   function frame(now){requestAnimationFrame(frame);
-    const gp=[...(navigator.getGamepads?.()??[])].find(g=>g&&g.connected);if(!gp)return;
+    const gp=seatPad();if(!gp)return;
     nav.updateBrand?.(gp);nav.step(padState(gp),now);}
   requestAnimationFrame(frame);return nav;
 }

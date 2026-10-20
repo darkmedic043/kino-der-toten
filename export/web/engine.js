@@ -27,6 +27,7 @@ import { installGameMenu } from './game-menu.js';
 import { createPerfDiag } from './perf-diag.js';
 import { setupKtx2, ktx2Stats } from './ktx2.js';
 import { stillSkeletons, hideBones } from './still-skeletons.js';
+import { padOnly } from './seat.js';   // Rind split screen: a controller-only half has no focus to lose
 
 export const vector=a=>new THREE.Vector3().fromArray(a);
 export const perkInfo={specialty_quickrevive:{name:'Quick Revive',price:1500,color:'#509ebc',icon:'QR'},specialty_fastreload:{name:'Speed Cola',price:3000,color:'#478450',icon:'SC'},specialty_rof:{name:'Double Tap',price:2000,color:'#b37528',icon:'DT'},specialty_armorvest:{name:'Juggernog',price:2500,color:'#a53835',icon:'J'}};
@@ -120,7 +121,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendRend
 addEventListener('pagehide',suspendRendering);addEventListener('pageshow',resumeRendering);
 renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();diag('contextlost');contextLost=true;suspendRendering();$('start').disabled=true;$('menu-status').textContent='Graphics paused. Waiting for the browser to restore the game…';});
 renderer.domElement.addEventListener('webglcontextrestored',()=>{diag('contextrestored');if(textureMemoryStats().released){location.reload();return;}/* freed images can't be re-uploaded: start fresh */contextLost=false;$('start').disabled=!ready;$('menu-status').textContent='Graphics restored · click to resume';resumeRendering();});
-addEventListener('blur',()=>{keys.clear();primary=false;ads=false;if(started&&active){setActive(false);document.exitPointerLock?.();}});
+addEventListener('blur',()=>{keys.clear();primary=false;ads=false;if(started&&active&&!padOnly()){setActive(false);document.exitPointerLock?.();}});
 addEventListener('mousemove',e=>{if(!active||document.pointerLockElement!==renderer.domElement)return;const sensitivity=(ads?.0012*settings.adsSensitivity:.002)*settings.sensitivity;camera.rotation.y-=e.movementX*sensitivity;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-e.movementY*sensitivity*(settings.invertY?-1:1),-1.5,1.5);});
 addEventListener('mousedown',e=>{if(!active||e.sourceCapabilities?.firesTouchEvents||e.target.closest?.('#touch-controls'))return;if(e.button===0){mousePrimary=primary=true;primaryPressed=true;}if(e.button===2)mouseAim=ads=true;});
 addEventListener('mouseup',e=>{if(e.sourceCapabilities?.firesTouchEvents)return;if(e.button===0)mousePrimary=primary=false;if(e.button===2)mouseAim=ads=false;});

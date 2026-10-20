@@ -20,6 +20,7 @@ import { weaponClass } from '../weapon-levels/camo.js';
 import { identify, isDualSense, glyphUrl, glyph, label, INDEX } from './glyphs.js';
 import { DualSenseLink, trigger, PLAYER_LEDS } from './dualsense.js';
 import { GamepadNav, padState } from '../../gamepad-nav.js';
+import { seat, seatPad } from '../../seat.js';
 
 const DEAD=.15;
 // button index -> key. 8 = Back/Create/View, 12-15 = D-pad, 17 = touchpad press / Xbox Share (hold: scoreboard).
@@ -73,9 +74,13 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
   }
   // ---- menu navigation while paused ---------------------------------------------------------------------------
   const overlay=()=>{const o=document.getElementById('settings-overlay');return o&&!o.hidden?o:null;};
-  const resume=()=>{const st=api.getState?.()??{};if(!st.ready)return;if(st.phase==='gameover')api.reset();nav.clear();api.setActive(true);};
-  const nav=new GamepadNav({scope:()=>overlay()??document.getElementById('menu')??document.body,initial:()=>document.getElementById('start'),
-    onBack:()=>{if(overlay())return false;resume();return true;},onStart:null});
+  // the co-op lobby (multiplayer mod) sits over the pause menu until the game starts: the pad works its buttons, and
+  // nothing resumes past it (Start presses START GAME / JOIN THE GAME when it is enabled)
+  const lobby=()=>{const l=document.getElementById('coop-lobby');return l&&!l.hidden?l:null;};
+  const resume=()=>{const st=api.getState?.()??{};if(!st.ready||lobby())return;if(st.phase==='gameover')api.reset();nav.clear();api.setActive(true);};
+  const nav=new GamepadNav({scope:()=>overlay()??lobby()??document.getElementById('menu')??document.body,
+    initial:()=>lobby()?(lobby().querySelector('.go:not(:disabled)')??lobby().querySelector('button')):document.getElementById('start'),
+    onBack:()=>{if(overlay())return false;if(lobby())return true;resume();return true;},onStart:null});
   nav.startLabel='RESUME';pad.nav=nav;
   onSettingsChange((s,k)=>{if(k===null||k==='padGlyphs')applyBrand();if(k===null||k==='padLightbar'||k==='padTriggers')pushNative(true);});
   applyBrand();
@@ -90,7 +95,8 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
     const ok=await link.connect({interactive:true});linkBtn.disabled=false;
     api.toast?.(ok?'DualSense connected · adaptive triggers and light bar on':'DualSense not linked (Chrome, Edge or Rind needed; Linux needs hidraw access)',4);});
   link.onchange=on=>{pad.native=on;linkBtn.hidden=on||!showLinkButton();natKey='';renderHints();};
-  const showLinkButton=()=>!!info&&isDualSense(info)&&DualSenseLink.supported()&&!link.connected;
+  // (not in split screen: WebHID can't tell which DualSense is this player's, so both copies would drive the same one)
+  const showLinkButton=()=>!!info&&isDualSense(info)&&DualSenseLink.supported()&&!link.connected&&!seat();
   // Already granted (an earlier click, or Rind's permission handler): link without asking.
   let autoTried=false;
   async function autoLink(){if(autoTried||!showLinkButton())return;autoTried=true;if((await DualSenseLink.granted()).length)await link.connect();linkBtn.hidden=!showLinkButton();}
@@ -168,7 +174,7 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
   function frame(now){
     requestAnimationFrame(frame);pad.frames=(pad.frames|0)+1;
     const dt=Math.min(.05,(now-lastT)/1000);lastT=now;
-    const gp=[...(navigator.getGamepads?.()??[])].find(g=>g&&g.connected);gpNow=gp;
+    const gp=seatPad();gpNow=gp;   // (split screen: this player's controller only)
     pad.connected=!!gp;
     if(gp&&(!info||info.id!==gp.id)){info=identify(gp.id);info.id=gp.id;pad.kind=info.kind;pad.name=info.name;applyBrand();linkBtn.hidden=!showLinkButton();autoLink();}
     if(!gp){if(prev.length){release();prev=[];}if(link.connected)pushNative(false,false);return;}
@@ -176,7 +182,8 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
     const st=api.getState?.()??{};
     if(b.some(Boolean)||gp.axes.some(a=>Math.abs(a)>.3)){pad.last=now;document.body.classList.add('using-pad');}
     // Start: pause / resume (resuming needs no pointer lock; the right stick looks).
-    if(pressed(START)||(!st.active&&st.ready&&pressed(0)&&!overlay()&&(!nav.current||nav.current.id==='start'))){
+    if(!st.active&&lobby()&&pressed(START)){lobby().querySelector('.go:not(:disabled)')?.click();prev=b;pushNative(false,false);return;}
+    if(pressed(START)||(!st.active&&st.ready&&pressed(0)&&!overlay()&&!lobby()&&(!nav.current||nav.current.id==='start'))){
       if(st.active)key('Escape',true);
       else resume();   // Start, or Cross/A with nothing (or ENTER) focused: back into the game without pointer lock
       prev=b;pushNative(false,st.active);return;

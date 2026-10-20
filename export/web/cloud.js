@@ -4,6 +4,9 @@
 
 const TRACKED=/^kino\.(mods\.progression|mods\.classes|mods\.career|mods\.gobblegums|mods\.bank|mods\.armory|mods\.radio|mods\.journal|mods\.terminal|mods\.prestige|mods\.research|mods\.credits|mods\.shop|mods\.pass|settings|best(\..+)?)$/;
 const STAMP='kino.cloud.updatedAt';
+// whose progress the local copy is (the account's public id): set on every sync. Rind keeps each account in its own
+// storage, but a browser can see several accounts sign in one after another.
+const OWNER='kino.cloud.owner';
 const store=(()=>{try{return localStorage;}catch{return null;}})();
 const rawSet=store?Storage.prototype.setItem.bind(store):()=>{};
 let account={signedIn:false},pushTimer=0,pulling=false;
@@ -30,7 +33,15 @@ if(store){
 // Newest wins: server copy replaces local keys, or local progress is uploaded.
 async function sync(){
   const r=await fetch('/api/profile',{credentials:'same-origin'});if(!r.ok)return;
-  const remote=await r.json(),local=snapshot();
+  const remote=await r.json();
+  // Progress left here by another account is never uploaded to this one (newest-wins would hand it over): it is dropped
+  // and this account's own copy comes down.
+  const owner=store.getItem(OWNER);
+  if(owner&&account.id&&owner!==account.id){
+    pulling=true;try{for(const k of Object.keys(snapshot().keys))store.removeItem(k);store.removeItem(STAMP);}finally{pulling=false;}
+  }
+  if(account.id)rawSet(OWNER,account.id);
+  const local=snapshot();
   if(remote.keys&&(remote.updatedAt??0)>local.updatedAt){
     pulling=true;
     try{for(const [k,v] of Object.entries(remote.keys))rawSet(k,v);mergeRewards(local.keys);rawSet(STAMP,String(remote.updatedAt));}finally{pulling=false;}

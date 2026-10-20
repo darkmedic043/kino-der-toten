@@ -10,6 +10,7 @@ import { loadProfile, cloudReady } from '../../profile.js';
 import { cardSvg } from '../shop/card.js';
 import { startSocial, onSocial, socialState, request as friendRequest, invite as friendInvite, isFriend, isPending, statusText } from '../../social.js';
 import { loadCharacterRegistry, createCharacter, holdWeapon, applyStance } from '../../characters.js';
+import { padOnly } from '../../seat.js';
 
 const SNAP_RATE=12,POSE_RATE=15,STATES=['chase','attack','barricade','entering','rising'];
 const BLEED_OUT=30,REVIVE_TIME=3,REVIVE_RANGE=90;
@@ -463,12 +464,14 @@ export default async function setup(api){
   }
   // enter the game. From a click (host, or a guest's JOIN): capture the mouse now. From the host's start: run the game at
   // once and capture the mouse on the first click (pointer lock needs a user gesture).
+  // A controller player (split screen's controller seats, or anyone last using a pad) needs no mouse: in at once.
   let clickHint=null;
+  const padPlayer=()=>padOnly()||document.body.classList.contains('using-pad');
   function enter(fromGesture=true){
     lobby.go=true;lob.hidden=true;
-    if(fromGesture){document.getElementById('start')?.click();return;}
+    if(fromGesture&&!padPlayer()){document.getElementById('start')?.click();return;}
     window.kino.debug.resume();
-    if(!document.pointerLockElement&&!clickHint){clickHint=document.createElement('div');clickHint.id='coop-click';clickHint.textContent='THE GAME HAS STARTED · CLICK TO PLAY';document.body.append(clickHint);
+    if(!padPlayer()&&!document.pointerLockElement&&!clickHint){clickHint=document.createElement('div');clickHint.id='coop-click';clickHint.textContent='THE GAME HAS STARTED · CLICK TO PLAY';document.body.append(clickHint);
       const once=()=>{clickHint?.remove();clickHint=null;removeEventListener('pointerdown',once,true);document.getElementById('start')?.click();};addEventListener('pointerdown',once,true);}
     sendInfo();
   }
