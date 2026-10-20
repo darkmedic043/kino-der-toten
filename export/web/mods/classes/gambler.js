@@ -426,9 +426,9 @@ export function setupGambler(ctx){
     #gmb .ban h2{margin:2px 0 6px;font-size:16px;color:#fff}#gmb .ban p{margin:0;font-size:12px;color:#f2e2b0}
     #gmb .coin{display:inline-block;width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff3c0,#f2c94c 50%,#a37a12);margin:6px;animation:gmbFlip .25s linear infinite}
     @keyframes gmbFlip{50%{transform:scaleX(.08)}}
-    #gmb .rack{position:absolute;right:24px;bottom:210px;text-align:right}
+    #gmb .rack{position:absolute;left:28px;top:46%;transform:translateY(-50%);text-align:left}   /* left edge, mid-screen: the bottom right holds the guns and gobblegums, the top right the round and co-op panel */
     #gmb .rack div{margin-top:3px}#gmb .rack .hrm{font-size:18px;font-weight:900;color:#f2c94c;text-shadow:0 0 12px #f2c94c}
-    #gmb .hc{display:inline-block;width:40px;height:56px;margin-left:4px;padding-top:4px;background:#f8f4ea;color:#151515;border:2px solid #f2c94c;border-radius:5px;font-size:9px;line-height:1.1;text-align:center;text-shadow:none;vertical-align:bottom;white-space:normal}
+    #gmb .hc{display:inline-block;width:40px;height:56px;margin-right:4px;padding-top:4px;background:#f8f4ea;color:#151515;border:2px solid #f2c94c;border-radius:5px;font-size:9px;line-height:1.1;text-align:center;text-shadow:none;vertical-align:bottom;white-space:normal}
     #gmb .hc kbd{display:block;margin-top:2px;font:800 10px sans-serif;color:#a37a12}
     #gmb .tm{font-size:12px}#gmb .tm b{color:#fff}`;
   document.head.append(style);
