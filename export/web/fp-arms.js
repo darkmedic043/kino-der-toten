@@ -266,6 +266,13 @@ export class FirstPersonArms {
     const TWIST_SHARE=.6;   // how much of the hand-against-forearm roll the forearm takes on
     const bones=rt.map(e=>{const b=new THREE.Bone();b.name=e.name;b.matrixAutoUpdate=false;b.matrixWorldAutoUpdate=false;return b;});
     const skeleton=new THREE.Skeleton(bones,rt.map(e=>e.bind.clone().invert())),reach=this.entry.fpArmsReach!==false;
+    // fpArmsFingerScale here too ({thumb: .55, '*': .8}): a finger chain is scaled about its base knuckle (the knuckle's
+    // matrix carries the scale; the rest of the chain hangs off it and inherits). Bondrewd Premium's gauntlet claws stood
+    // in front of the pistol sights (2026-10-19, user: "the claw often gets in the way when ads").
+    const fs=this.entry.fpArmsFingerScale??{};
+    rt.forEach(e=>{const m=/^j_(index|mid|ring|pinky|thumb)_(ri|le)_0$/.exec(e.t5||'');e.fk=m?(fs[m[1]]??fs['*']??1):null;});
+    rt.forEach(e=>{if(e.fk==null){let p=e.parent;while(p>=0&&rt[p].fk==null)p=rt[p].parent;e.fk=p>=0?rt[p].fk:1;}});
+    const Sf=new THREE.Matrix4();
     const m=new THREE.Matrix4(),p=new THREE.Vector3();
     skeleton.solve=()=>rt.forEach((e,i)=>{
       const W=bones[i].matrixWorld,t=live[i];
@@ -294,7 +301,7 @@ export class FirstPersonArms {
         if(Math.abs(tw)>.01)W.premultiply(Rm.makeRotationAxis(a,tw*TWIST_SHARE));
       }
       if(e.kind==='back'){W.setPosition(0,0,0);p.copy(e.d).applyMatrix4(W);W.setPosition(new THREE.Vector3().setFromMatrixPosition(bones[e.child].matrixWorld).sub(p));}
-      else if(e.kind==='follow'&&e.parent>=0){m.multiplyMatrices(bones[e.parent].matrixWorld,e.local);if(t)W.setPosition(p.setFromMatrixPosition(m));else W.copy(m);}
+      else if(e.kind==='follow'&&e.parent>=0){m.multiplyMatrices(bones[e.parent].matrixWorld,e.local);if(t){W.setPosition(p.setFromMatrixPosition(m));if(e.fk!==1)W.multiply(Sf.makeScale(e.fk,e.fk,e.fk));}else W.copy(m);}   // (a T5-mapped knuckle resets the scale: put it back)
     });
     return skeleton;
   }

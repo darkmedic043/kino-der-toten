@@ -238,8 +238,9 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     // (pitched down around the camera rather than moved, so the left shoulder stays in reach of the ledge)
     const g=Math.max(s.mantle*.85,mk)*hp;P.x+=1.2*g;P.y+=-1.2*g;R.x+=-.95*g;R.z+=-.35*g;R.y+=.18*g;
     // the camera: a share of the same motion, so the whole view sways with the gun (the movement mod applies it)
-    cam.roll=rl*.35*hipR+bobRoll*.5+.07*s.slide+.14*s.dive-.1*k+Math.sin(ph)*.012*sw-sx*.03*hipR;
-    cam.pitch=lf*-.0025*hip+kp*.0045+Math.cos(ph*2)*.004*sw+sy*.012*hip+.03*s.slide-.06*s.dive+.05*k;
+    // (the sprint's roll and nod halved on 2026-10-19, user: "screen shake seems a bit excessive")
+    cam.roll=rl*.35*hipR+bobRoll*.3+.07*s.slide+.14*s.dive-.1*k+Math.sin(ph)*.005*sw-sx*.03*hipR;
+    cam.pitch=lf*-.0025*hip+kp*.0045+Math.cos(ph*2)*.0018*sw+sy*.012*hip+.03*s.slide-.06*s.dive+.05*k;
     cam.fov=(5*s.sprintBlend*hp+3*s.slide+2*s.dive)*str;   // (the camera keeps the slide and dive cant while aiming; the gun is on the sights)
     if(!flags.cam)cam.roll=cam.pitch=cam.fov=0;
     if(!Number.isFinite(cam.roll+cam.pitch+cam.fov)){cam.roll=cam.pitch=cam.fov=0;}

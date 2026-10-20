@@ -131,7 +131,7 @@ export default async function setup(api){
   const v=new THREE.Vector3();
   function measure(){
     // centroid of the visible dot / lens vertices, skinned, in view space
-    const sum=new THREE.Vector3();let n=0;
+    const sumL=new THREE.Vector3(),sumB=new THREE.Vector3();let nL=0,nB=0;
     // view.update moves the pivot but only refreshes the gun below it: recompute the pivot too, or the measure
     // sees last frame's alignment offset (and the continuous re-measure settles halfway)
     view.pivot.updateMatrixWorld(true);
@@ -140,12 +140,14 @@ export default async function setup(api){
     const shown=o=>{if(!o.isSkinnedMesh)return true;const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight;if(!si||!sw)return true;
       const i=g.index?g.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
       for(let b=o.skeleton.bones[best];b;b=b.parent)if(b.isBone&&b.scale.x<1e-3)return false;return true;};
-    view.gun.traverse(o=>{if(!o.isMesh||!o.visible)return;const m=[o.material].flat()[0];if(!(DOTS.test(m?.name)||/reflex_lens|scope_pka_lens|aimpoint_red_dot/.test(m?.name))||!shown(o))return;
+    view.gun.traverse(o=>{if(!o.isMesh||!o.visible)return;const m=[o.material].flat()[0],name=m?.name??'',lens=DOTS.test(name)||/reflex_lens|scope_pka_lens/.test(name),body=/aimpoint_red_dot/.test(name);if(!(lens||body)||!shown(o))return;
       // surfaces share one vertex buffer; only the indexed vertices are this mesh's
       const P=o.geometry.attributes.position,I=o.geometry.index,count=I?I.count:P.count,step=Math.max(1,Math.floor(count/60));
       for(let k=0;k<count;k+=step){const i=I?I.getX(k):k;v.fromBufferAttribute(P,i);if(o.isSkinnedMesh)o.applyBoneTransform(i,v);o.localToWorld(v);
-        if(v.lengthSq()<1e-6||Math.abs(v.x)>50)continue;sum.add(v);n++;}});
-    if(!n)return null;
+        if(v.lengthSq()<1e-6||Math.abs(v.x)>50)continue;if(lens){sumL.add(v);nL++;}else{sumB.add(v);nB++;}}});
+    // the lens (the dot's window) when the optic has one, the Aimpoint's body only without: the body's centroid sits 0.4
+    // below its tube, which put the window above the dot and the M14's rear sight under it (2026-10-19)
+    const n=nL||nB,sum=nL?sumL:sumB;if(!n)return null;
     sum.divideScalar(n).sub(align.applied);
     // centre the dot, and keep the sight window at arm's length rather than around the eye
     const depth=-sum.z,want=9;align.depth=depth;
