@@ -37,3 +37,8 @@
   - No WebHID DualSense link in split screen (`showLinkButton` is false with a seat): it can't tell which DualSense is whose. Rumble through the Gamepad API still goes to each player's own pad.
   - Both copies play their own sound (music and announcer twice, a few ms apart); not changed.
   - Tested (scratch kino server on 5199 with fake sessions, Rind driving the runtime on an Xvfb display, CDP into both halves; 22 checks): each half signed in as its own account with separate local storage, seat info and tags, F8/F9, player 1 opening Kino hosted a room and player 2 followed into it, Kino loaded in both (39 s, GTX 1660 Ti), the host started and player 2 went in without a click, a fake controller moved player 2 only, blur paused player 1 only (more in Rind's CLAUDE.md).
+
+## Helm rooms (2026-10-19)
+
+- Helm (`~/projects/helm`, a program in Rind: the user's control room for Claude Code sessions) lets friends watch peer to peer, the way Melonopoly plays: the Helm server holds a co-op room with `page: '/helm/'` (`map: 'Helm'`), joined as the owner (their `kino_session`, handed over by Rind), and a viewer's Rind joins it only for the WebRTC handshake (or the relay fallback), then leaves, so the 4-player limit isn't a viewer limit.
+- `GET /api/helm` (signed in) lists the Helm rooms whose host is the caller or one of their friends: `{rooms: [{code, owner: {id, name, picture}, me}]}`. Anyone can still join a Helm room by code (`/api/ws` join); Helm itself decides what each viewer may see from the joiner's `uid`.

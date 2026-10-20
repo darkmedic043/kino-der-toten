@@ -311,3 +311,4 @@
 - 2026-10-19 (later): Bondrewd Premium's claws shrunk and its hands put back on the grips (finger scaling in retarget mode, reach clamp off), red dots centred on their lens (the M14), the sprint camera sway halved.
 - 2026-10-19 (evening): Split screen through the Rind launcher (two Discord accounts, one window, one co-op room; `seat.js` routes each half's controller, a controller-only half doesn't pause on blur), the co-op lobby works with a controller, and cloud.js no longer uploads one account's cached progress to another (`kino.cloud.owner`). See coop.md and Rind's CLAUDE.md.
 - 2026-10-19 (later): Tab board: the quests row removed (tracking stays in the journal); Malibu Drive registers its collectible tiles (stones, Easter egg, locks, bed machine, stations, Batman, cell, JARVIS, armor).
+- 2026-10-19 (night): `GET /api/helm`: friends' Helm rooms (page `/helm/`), so Rind can watch the user's Claude Code sessions peer to peer (coop.md, Helm rooms).

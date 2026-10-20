@@ -111,6 +111,15 @@ async function api(req, res, url) {
     const s = session(req); if (s) { sessions.delete(s.id); saveSessions(); }
     return send(res, 200, { signedIn: false }, { 'Set-Cookie': 'kino_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
   }
+  // Helm (~/projects/helm, a program in Rind): a Helm server hosts a room (page /helm/) as its owner so friends can watch
+  // its Claude Code sessions peer to peer. This lists the Helm rooms hosted by the caller's friends (and the caller).
+  if (url === '/api/helm' && req.method === 'GET') {
+    const s = session(req); if (!s) return send(res, 401, { error: 'Sign in to watch your friends\' Helm' });
+    const mine = new Set([s.sub, ...friendsOf(s.sub)]);
+    const list = [...rooms.values()].filter(r => r.page === '/helm/').map(r => [r, r.players.get(r.host)]).filter(([, h]) => h?.sub && mine.has(h.sub))
+      .map(([r, h]) => ({ code: r.code, owner: { id: pubId(h.sub), name: h.name, picture: h.picture ?? null }, me: h.sub === s.sub }));
+    return send(res, 200, { rooms: list });
+  }
   if (url.startsWith('/api/rooms/') && req.method === 'GET') {
     const room = rooms.get(url.slice(11).toUpperCase());
     return room ? send(res, 200, { code: room.code, page: room.page, map: room.map, players: room.players.size, max: MAX_PLAYERS }) : send(res, 404, { error: 'No game with that code' });
