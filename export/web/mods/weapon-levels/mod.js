@@ -71,7 +71,7 @@ export default async function setup(api){
   // move (they animate tag_clip, the stock mag). While one is fitted, hide the
   // stock mag and drive the fitted mag's bone from tag_clip every frame,
   // keeping their rest-pose offset, so it comes out and goes back in.
-  const MAG_TAGS=['tag_ext_clip','tag_extended_clip','tag_clip_extended','tag_dual_clip','tag_double_clip','tag_duel_clip','tag_drum','tag_ammo_expander','tag_gh_expanse'];   // tag_gh_expanse: the Grimhawk's P.T. Expanse
+  const MAG_TAGS=['tag_ext_clip','tag_extended_clip','tag_clip_extended','tag_dual_clip','tag_double_clip','tag_duel_clip','tag_drum','tag_ammo_expander','tag_gh_expanse','tag_sr_deflect','tag_sr_overclock'];   // tag_gh_expanse: the Grimhawk's P.T. Expanse; tag_sr_*: the Siren's cells
   let follow=null;
   const restWorld=(skel,bone)=>{const i=skel.bones.indexOf(bone);return i<0?null:skel.boneInverses[i].clone().invert();};
   function magFollow(def){

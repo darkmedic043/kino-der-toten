@@ -6,6 +6,9 @@
 //                                 (white = glowing), animated in camo.js's shader
 // Class motifs: sniper scope rings, shotgun buckshot, SMG speed lines, AR chevron marks, LMG belt links, pistol
 // engraving, launcher blast rays, special glyph runes.
+// Hand-made: the Siren's Wailing Tide (I), Choir Grille (II) and Song of Circe (Master).
+// Hand-made designs for one gun (named in .tools/prestige-guns.json, not in STYLES so no other gun is dealt them)
+const OWN=new Set(['wailtide','choirgrille','songofcirce']);
 export const STYLES={1:['shards','chevrons','splinter','contour','scales','brush'],2:['lattice','filigree','damascus','mosaic','carbon','facets'],3:['cracks','circuit','runes','lightning','magma','constellation']};
 
 const hsl=(h,s,l,a=1)=>`hsla(${((h%360)+360)%360},${s}%,${l}%,${a})`;
@@ -19,6 +22,17 @@ function voronoi(S,n,r){const pts=[...Array(n)].map(()=>[r()*S,r()*S]),cell=new 
 
 // ---- Prestige I ------------------------------------------------------------------------------------------------
 const P1={
+  // the Siren's Prestige I (hand-made, .tools/prestige-guns.json): rows of mirrored sound waves, bold ribbons in two tones
+  wailtide(g,S,r,p,w){g.fillStyle=hsl(p.h,35,11);g.fillRect(0,0,S,S);const n=6,H=S/n,TAU=6.283;
+    for(let j=0;j<n;j++){const cy=j*H+H/2,k=2+Math.floor(r()*4),m=1+Math.floor(r()*2),ph=r()*TAU,ph2=r()*TAU,A=H*.46,hot=j%3===1,l=26+r()*12;
+      const env=x=>.3+.7*Math.abs(Math.sin(Math.PI*m*x/S+ph2)),top=[],bot=[];
+      for(let x=0;x<=S;x+=4){const a=A*env(x)*(.45+.55*Math.abs(Math.sin(TAU*k*x/S+ph)));top.push([x,cy-a]);bot.push([x,cy+a]);}
+      w(()=>{g.fillStyle=hot?hsl(p.h2,70,46):hsl(p.h,55,l);poly(g,[...top,...bot.reverse()]);bot.reverse();g.fill();
+        g.strokeStyle=hot?hsl(p.h2,85,72):hsl(p.h,70,l+22);g.lineWidth=1.4;g.beginPath();top.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
+        g.beginPath();bot.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.stroke();
+        g.strokeStyle=hsl(p.h,30,8);g.lineWidth=2;g.beginPath();g.moveTo(0,cy);g.lineTo(S,cy);g.stroke();});
+      // a thin echo between the rows
+      const ey=(j+1)*H,ek=4+Math.floor(r()*5),eph=r()*TAU;w(()=>{g.strokeStyle=hsl(p.h2,60,55,.55);g.lineWidth=1.2;g.beginPath();for(let x=0;x<=S;x+=4)g.lineTo(x,ey+Math.sin(TAU*ek*x/S+eph)*H*.08);g.stroke();});}},
   shards(g,S,r,p,w){g.fillStyle=hsl(p.h,30,16);g.fillRect(0,0,S,S);for(let i=0;i<90;i++){const x=r()*S,y=r()*S,len=40+r()*150,wd=8+r()*30,a=r()*Math.PI,l=26+r()*36,sh=(r()-.5)*40;
     const pts=[[0,-wd*.2],[len*.55,-wd],[len,0],[len*.4,wd]].map(([u,v])=>[x+u*Math.cos(a)-v*Math.sin(a),y+u*Math.sin(a)+v*Math.cos(a)]);
     w(()=>{g.fillStyle=hsl(p.h+sh,55,l);poly(g,pts);g.fill();g.strokeStyle=hsl(p.h+sh,80,l+25);g.lineWidth=1.2;g.stroke();});}},
@@ -40,6 +54,14 @@ const P1={
 // ---- Prestige II ---------------------------------------------------------------------------------------------------
 const gold=(g,x0,y0,x1,y1)=>{const gr=g.createLinearGradient(x0,y0,x1,y1);gr.addColorStop(0,'#fff0b8');gr.addColorStop(.5,'#c9952f');gr.addColorStop(1,'#ffe39a');return gr;};
 const P2={
+  // the Siren's Prestige II: a gilded speaker grille, staggered perforations broken by engraved speaker cones with gem domes
+  choirgrille(g,S,r,p,w){g.fillStyle=hsl(p.h,55,30);g.fillRect(0,0,S,S);for(let i=0;i<260;i++){const y=r()*S;g.strokeStyle=hsl(p.h,50,22+r()*28,.3);g.lineWidth=1;g.beginPath();g.moveTo(0,y);g.lineTo(S,y);g.stroke();}
+    const cones=[...Array(5)].map(()=>[r()*S,r()*S,34+r()*24]),near=(x,y)=>cones.some(([cx,cy,R])=>{let dx=Math.abs(x-cx),dy=Math.abs(y-cy);if(dx>S/2)dx=S-dx;if(dy>S/2)dy=S-dy;return dx*dx+dy*dy<(R+7)**2;});
+    const G=16;for(let row=0;row<S/G;row++)for(let col=0;col<S/G;col++){const x=col*G+(row%2?G/2:0)+G/4,y=row*G+G/2;if(near(x,y))continue;
+      g.fillStyle=hsl(p.h2,40,7);g.beginPath();g.arc(x,y,4.6,0,6.283);g.fill();g.strokeStyle=hsl(p.h,75,66,.8);g.lineWidth=1;g.beginPath();g.arc(x,y,5.4,.6,2.6);g.stroke();}
+    for(const [cx,cy,R] of cones)w(()=>{for(let k=0;k<6;k++){const rr=R-k*R/7;g.fillStyle=hsl(p.h,55+k*3,k%2?24:38);g.beginPath();g.arc(cx,cy,rr,0,6.283);g.fill();g.strokeStyle=hsl(p.h,80,70,.7);g.lineWidth=1.2;g.stroke();}
+      const gr=g.createRadialGradient(cx-R*.08,cy-R*.08,1,cx,cy,R*.24);gr.addColorStop(0,hsl(p.h2,80,78));gr.addColorStop(1,hsl(p.h2,70,22));g.fillStyle=gr;g.beginPath();g.arc(cx,cy,R*.24,0,6.283);g.fill();
+      g.strokeStyle=hsl(p.h,40,14);g.lineWidth=2;g.beginPath();g.arc(cx,cy,R+2,0,6.283);g.stroke();});},
   lattice(g,S,r,p){const R=30,W=Math.sqrt(3)*R;g.fillStyle=hsl(p.h,40,15);g.fillRect(0,0,S,S);for(let row=-1;row*R*1.5<S+R;row++)for(let col=-1;col*W<S+W;col++){const cx=col*W+(row%2?W/2:0),cy=row*R*1.5,l=30+r()*30;
     const gr=g.createLinearGradient(cx-R,cy-R,cx+R,cy+R);gr.addColorStop(0,hsl(p.h,65,l+15));gr.addColorStop(1,hsl(p.h,60,l-12));g.beginPath();for(let k=0;k<6;k++){const a=Math.PI/6+k*Math.PI/3;g.lineTo(cx+Math.cos(a)*(R-2),cy+Math.sin(a)*(R-2));}g.closePath();g.fillStyle=gr;g.fill();g.strokeStyle=gold(g,cx-R,cy,cx+R,cy);g.lineWidth=2.5;g.stroke();}},
   filigree(g,S,r,p,w){g.fillStyle=hsl(p.h,45,14);g.fillRect(0,0,S,S);g.lineCap='round';for(let i=0;i<34;i++){const x=r()*S,y=r()*S,rad=20+r()*40,turns=1.5+r()*1.5,dir=r()<.5?1:-1;
@@ -65,6 +87,15 @@ const d4=(d,i,[r,g,b])=>{d[i*4]=r;d[i*4+1]=g;d[i*4+2]=b;d[i*4+3]=255;};
 // ---- Master (base, glow) ----------------------------------------------------------------------------------------------
 // Each returns the base on `g` (dark, the gun's colour) or, with glow=true, a white-on-black mask of what lights up.
 const PM={
+  // the Siren's Master: oscilloscope traces and voice-print bars over a graticule; the traces and bars glow and pulse
+  songofcirce(g,S,r,p,w,glow){const TAU=6.283;g.fillStyle=glow?'#000':hsl(p.h,45,7);g.fillRect(0,0,S,S);
+    if(!glow){g.strokeStyle=hsl(p.h,30,12);g.lineWidth=1;for(let x=0;x<S;x+=32){g.beginPath();g.moveTo(x+.5,0);g.lineTo(x+.5,S);g.stroke();g.beginPath();g.moveTo(0,x+.5);g.lineTo(S,x+.5);g.stroke();}}
+    for(let i=0;i<8;i++){const cy=(i+.2+r()*.6)*S/8,k=1+Math.floor(r()*3),m=1+Math.floor(r()*2),A=12+r()*20,ph=r()*TAU,ph2=r()*TAU,ph3=r()*TAU;
+      w(()=>{g.strokeStyle=glow?'#fff':hsl(p.h,40,24);g.lineWidth=glow?2.6:2;g.beginPath();
+        for(let x=0;x<=S;x+=4){const e=.35+.65*Math.sin(Math.PI*m*x/S+ph3)**2;g.lineTo(x,cy+A*e*(.7*Math.sin(TAU*k*x/S+ph)+.3*Math.sin(TAU*k*5*x/S+ph2)));}g.stroke();});}
+    for(let i=0;i<7;i++){const x0=r()*S,cy=(i+.5)*S/7,n=18+Math.floor(r()*14),H=30+r()*36,ph=r()*TAU,hs=[...Array(n)].map((_,k)=>H*(.25+.6*Math.abs(Math.sin(k*.45+ph))+.15*r()));
+      w(()=>{g.fillStyle=glow?'rgba(255,255,255,.85)':hsl(p.h2,35,20);hs.forEach((h,k)=>g.fillRect(x0+k*6,cy-h/2,3.2,h));});}
+    for(let i=0;i<5;i++){const cx=r()*S,cy=r()*S,a0=r()*TAU;w(()=>{g.strokeStyle=glow?'rgba(255,255,255,.7)':hsl(p.h,35,18);g.lineWidth=1.6;for(let k=1;k<=3;k++){g.beginPath();g.arc(cx,cy,10+k*12,a0,a0+1.4);g.stroke();g.beginPath();g.arc(cx,cy,10+k*12,a0+Math.PI,a0+Math.PI+1.4);g.stroke();}});}},
   cracks(g,S,r,p,w,glow){const T=256,v=voronoi(T,34,r),img=g.createImageData(T,T),shade=[...Array(34)].map(()=>.6+r()*.8);
     for(let i=0;i<T*T;i++){const e=v.edge[i];if(glow){const k=Math.max(0,1-e/3.2)**1.5*255;d4(img.data,i,[k,k,k]);}else{const c=hslRgb(p.h+200,.35,.09*shade[v.cell[i]]),rim=Math.max(0,1-e/6)*.25;d4(img.data,i,c.map(x=>(x+rim)*255));}}
     blit(g,img,T,S);},
@@ -112,6 +143,6 @@ export function drawPrestigeArt(spec,glow=false){
   // tone: within a design, neighbouring guns alternate normal / darker / lighter so close hues still read differently
   if(!glow&&spec.tone===1){g.globalCompositeOperation='multiply';g.fillStyle='rgba(70,70,80,.55)';g.fillRect(0,0,S,S);g.globalCompositeOperation='source-over';}
   if(!glow&&spec.tone===2){g.globalCompositeOperation='screen';g.fillStyle='rgba(255,250,235,.22)';g.fillRect(0,0,S,S);g.globalCompositeOperation='source-over';}
-  if(!glow&&MOTIF[spec.cls])MOTIF[spec.cls](g,S,rng(spec.seed*13+spec.tier),spec,w);
+  if(!glow&&MOTIF[spec.cls]&&!OWN.has(spec.style))MOTIF[spec.cls](g,S,rng(spec.seed*13+spec.tier),spec,w);   // hand-made designs carry their own
   return c;
 }

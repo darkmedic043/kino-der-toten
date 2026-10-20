@@ -444,6 +444,99 @@
         "damageMul": 1.06
       },
       "desc": "Every shot hits a little harder."
+    },
+    {
+      "id": "sr_tuningfork",
+      "name": "Tuning Fork Reflex",
+      "slot": "optic",
+      "tags": [
+        "tag_sr_reflex"
+      ],
+      "scope": "reflex",
+      "desc": "Two prongs ringing either side of a lilac dot. Steadier aim and a slightly tighter view.",
+      "stats": {
+        "adsFovMul": 0.92,
+        "hipSpreadMul": 0.8
+      }
+    },
+    {
+      "id": "sr_deflect",
+      "name": "MFS Deflection Core",
+      "slot": "mag",
+      "tags": [
+        "tag_sr_deflect"
+      ],
+      "desc": "BO7's prestige magazine. Orbs ricochet off walls and leap from zombie to zombie instead of passing through, and fly 50% faster (about 48 m of travel). 9 rounds, slower to fire.",
+      "stats": {
+        "clipMul": 1.5,
+        "fireMul": 0.67
+      }
+    },
+    {
+      "id": "sr_overclock",
+      "name": "Overclock Cell",
+      "slot": "mag",
+      "tags": [
+        "tag_sr_overclock"
+      ],
+      "desc": "A hot, finned cell that reaches full charge in half the time. Only 4 rounds.",
+      "stats": {
+        "clipMul": 0.67
+      }
+    },
+    {
+      "id": "sr_resonance",
+      "name": "Resonance Chamber",
+      "slot": "barrel",
+      "tags": [
+        "tag_sr_resonance"
+      ],
+      "desc": "Charging makes the orb bigger instead of faster: a full charge is nearly four times as wide, at walking pace, and clears a corridor."
+    },
+    {
+      "id": "sr_baffle",
+      "name": "Hush Baffle",
+      "slot": "muzzle",
+      "tags": [
+        "tag_sr_baffle"
+      ],
+      "desc": "A fluted baffle that muffles the wail and the shot. Kills are a little more likely to drop a power-up.",
+      "stats": {
+        "suppressed": true
+      }
+    },
+    {
+      "id": "sr_echo",
+      "name": "Echo Rounds",
+      "slot": "ammo",
+      "tags": [
+        "tag_sr_echo"
+      ],
+      "desc": "A fully charged shot leaves an echo: a ghost orb follows the same path 0.4 s later, at half damage, for no ammo."
+    },
+    {
+      "id": "sr_lancet",
+      "name": "Lancet Tear Grip",
+      "slot": "grip",
+      "tags": [
+        "tag_sr_lancet"
+      ],
+      "replaces": [
+        "tag_sr_grip"
+      ],
+      "desc": "BO7's raked grip: charges 15% faster and holds the charge while you sprint."
+    },
+    {
+      "id": "sr_soma",
+      "name": "Soma-81 Grip",
+      "slot": "grip",
+      "tags": [
+        "tag_sr_soma"
+      ],
+      "replaces": [
+        "tag_sr_grip"
+      ],
+      "desc": "A chunky rubber grip: 6% faster movement with the Siren in hand."
     }
   ],
   "ironSights": {
@@ -509,6 +602,9 @@
     ],
     "bo3_mr23_tesla": [
       "j_rearsight"
+    ],
+    "siren_zm": [
+      "tag_iron_sight"
     ]
   },
   "_ironSightsNote": "Iron sights (front and rear) removed when an optic is fitted, so the front post doesn't show through the sight window. On the M16/Commando the bone is the carry handle with the front post; on the FAMAS it's the handle. 2026-10-15: the BO3 imports whose stock sight is its own bone: SMG5, 93R tag_ironsight; RPD, MG4 tag_frontsight_up; MR23 j_rearsight (the 93R's tag_handle is its fold-down grip). MP7, AA12 and P90 sights are part of the receiver mesh (no bone), so they stay.",

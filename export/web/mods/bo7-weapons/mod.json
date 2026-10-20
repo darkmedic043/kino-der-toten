@@ -1,5 +1,5 @@
 {
   "name": "BO7 weapons",
-  "description": "Black Ops 7 weapons rebuilt from scratch (own models skinned to BO1 skeletons, so BO1 animations drive them): the Grimhawk, a homing flechette rifle, from the Mystery Box.",
+  "description": "Black Ops 7 weapons rebuilt from scratch (own models skinned to BO1 skeletons, so BO1 animations drive them): the Grimhawk, a homing flechette rifle, and the Siren, a charge weapon whose slow orbs pass through every zombie in their path, both from the Mystery Box.",
   "script": "mod.js"
 }

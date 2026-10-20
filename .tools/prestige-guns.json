@@ -340,5 +340,38 @@
   "name": "War Machine Handgun",
   "cls": "pistol",
   "max": 3
+ },
+ {
+  "id": "siren_zm",
+  "name": "Siren",
+  "cls": "special",
+  "max": 10,
+  "styles": [
+   "wailtide",
+   "choirgrille",
+   "songofcirce"
+  ],
+  "names": [
+   "Wailing Tide",
+   "Choir Grille",
+   "Song of Circe"
+  ],
+  "pal": [
+   [
+    278,
+    186,
+    0
+   ],
+   [
+    44,
+    284,
+    0
+   ],
+   [
+    290,
+    182,
+    0
+   ]
+  ]
  }
 ]

@@ -11,6 +11,7 @@
 //   - Pack-a-Punched (the Grim Reaper): faster rounds that home from the hip as well, and harder hits
 // Shots: the Grimhawk's own (see the sound section); the G11's as a fallback.
 import * as THREE from 'three';
+import { prepareSiren, setupSiren, SIREN } from './siren.js';
 
 const BASE = new URL('./', import.meta.url).href;
 const ID = 'grimhawk_zm';
@@ -26,6 +27,7 @@ const VIEW_OFFSET = [.6, -.4, -3];
 const SPEED = 2600, DROP = 520, LIFE = 2.2, TURN = 3.2, CONE = Math.cos(THREE.MathUtils.degToRad(16)), REACH = 1800, MAX = 60;
 
 export function prepare(data) {
+  prepareSiren(data);   // the Siren (siren.js)
   const m16 = data.weapons.m16_zm;
   if (!m16) { console.warn('[bo7-weapons] no M16 to build the Grimhawk on'); return; }
   const model = BASE + 'grimhawk_view.glb?v=13', world = BASE + 'grimhawk_world.glb?v=13';   // own models (not under models/: Rind installs them)
@@ -48,6 +50,7 @@ export function prepare(data) {
 
 export default function setup(api) {
   const { host, session, camera, scene, world, enemies, audio, data, view, viewCamera } = api;
+  if (data.weapons[SIREN]) setupSiren(api);
   if (!data.weapons[ID]) return;
   const isGrim = def => (def?.baseId ?? def?.id) === ID;
 
