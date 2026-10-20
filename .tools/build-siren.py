@@ -21,15 +21,16 @@ PARTS.update({k: [] for k in ('j_gun', 'tag_clip', 'tag_iron_sight', 'tag_sr_gri
                               'tag_sr_overclock', 'tag_sr_resonance', 'tag_sr_baffle', 'tag_sr_echo', 'tag_sr_lancet',
                               'tag_sr_soma', 'tag_foregrip', 'tag_laser_box')})
 M.update(
-    silver=worn('sr_silver', '#b2b5b8', .3, .85, bare='#d6d8da', wear=.45),    # shroud and canister: brushed alloy
-    dark=worn('sr_dark', '#666a70', .42, .55, bare='#a4a8ae', wear=.7),        # receiver, front block, muzzle
-    poly=worn('sr_polymer', '#2a2b2e', .72, 0, bare='#3c3d40', wear=.35, bare_metal=False),   # stock, grip
-    steel=worn('sr_steel', '#55595e', .35, 1, bare='#90949a', wear=.6),        # rail, irons, screws, coil
-    rubber=worn('sr_rubber', '#131313', .88, 0, bare='#262626', wear=.2, bare_metal=False),   # cable, fittings, pad
-    hose=worn('sr_hose', '#8c7420', .42, .55, bare='#c9ab42', wear=.3),        # the yellow coolant lines
-    redpaint=worn('sr_redpaint', '#8e1b15', .5, 0, bare='#b9bbbd', wear=.55, bare_metal=False),
-    tan=worn('sr_tan', '#a48d6a', .6, .1, bare='#c9b896', wear=.3, bare_metal=False),
-    label=worn('sr_label', '#c9ccd0', .45, .2, bare='#e0e2e5', wear=.2),
+    # a hand-built prototype: enamel paint chipped through the primer to bare steel, grime run down the sides, rust
+    silver=worn('sr_silver', '#b2b5b8', .3, .85, bare='#d6d8da', wear=.45, brushed=.9, dirt=.35),   # shroud, canister: brushed alloy
+    dark=worn('sr_dark', '#4f5559', .5, .15, bare='#a4a8ae', wear=.7, chips=.55, under='#6a2c1f', mottle=.5, dirt=.45, rust=.2),
+    poly=worn('sr_polymer', '#26272a', .6, 0, bare='#8d9197', wear=.4, chips=.35, under='#3d3f42', mottle=.4, dirt=.4),   # stock, grip: painted steel
+    steel=worn('sr_steel', '#55595e', .35, 1, bare='#90949a', wear=.6, dirt=.3, rust=.3),     # rail, irons, screws
+    rubber=worn('sr_rubber', '#131313', .88, 0, bare='#262626', wear=.2, bare_metal=False, dirt=.3),   # cable, fittings, pad
+    hose=worn('sr_hose', '#8c7420', .42, .3, bare='#c9ab42', wear=.3, chips=.45, under='#7d7f7a', dirt=.35),   # the yellow coolant lines
+    redpaint=worn('sr_redpaint', '#8e1b15', .5, 0, bare='#b9bbbd', wear=.55, chips=.6, under='#5f5f5a', dirt=.3),
+    tan=worn('sr_tan', '#a48d6a', .6, .1, bare='#c9b896', wear=.3, bare_metal=False, chips=.3, under='#6b6252', dirt=.3),
+    label=worn('sr_label', '#c9ccd0', .45, .2, bare='#e0e2e5', wear=.2, chips=.2, under='#8a8d90', dirt=.3),
     window=mat('sr_window', '#4a080a', .15, 0, '#ff3b3b', 2.2),    # the receiver's red window
     green=mat('sr_green', '#06300c', .3, 0, '#3dff6a', 3),         # the coil's charge bands
     bore=mat('sr_bore', '#2a0c34', .2, 0, '#e3a6ff', 4),           # the lilac glow down the muzzle
@@ -40,19 +41,22 @@ M.update(
     lens=mat('reflex_lens_sr', '#a9d6e6', .05, 0, alpha=.08),      # named so the scopes mod treats it as a reflex lens
     dot=mat('sr_dot', '#300000', .3, 0, '#ff2a1a', 12),
     # the prototype finish: red-oxide primer, stencil paint, masking tape, bare copper, loose wiring and a circuit board
-    primer=worn('sr_primer', '#62291c', .8, 0, bare='#9a9ea4', wear=.55),
-    stencil=worn('sr_stencil', '#d9d3bd', .6, 0, bare='#7d8186', wear=.4, bare_metal=False),
-    masking=worn('sr_masking', '#c9b98e', .88, 0, bare='#ddd1ab', wear=.25, bare_metal=False),
-    copper=worn('sr_copper', '#a8622f', .32, 1, bare='#de9a64', wear=.35),
+    primer=worn('sr_primer', '#62291c', .8, 0, bare='#9a9ea4', wear=.55, chips=.3, under='#4a4d52', mottle=.6, dirt=.4, rust=.35),
+    stencil=worn('sr_stencil', '#d9d3bd', .6, 0, bare='#7d8186', wear=.4, chips=.35, under='#55595e', dirt=.3),
+    masking=worn('sr_masking', '#c9b98e', .88, 0, bare='#ddd1ab', wear=.25, bare_metal=False, dirt=.5),
+    copper=worn('sr_copper', '#a8622f', .32, 1, bare='#de9a64', wear=.35, dirt=.2),
+    bakelite=worn('sr_bakelite', '#3b1a0f', .35, 0, bare='#5a2c18', wear=.25, bare_metal=False, mottle=.6, dirt=.2),   # tube sockets
     wred=worn('sr_wire_red', '#8a1410', .5, 0, bare='#b02a20', wear=.15, bare_metal=False),
     wblue=worn('sr_wire_blue', '#173f8a', .5, 0, bare='#2c5cb0', wear=.15, bare_metal=False),
     wwhite=worn('sr_wire_white', '#c8c8c0', .55, 0, bare='#e4e4dc', wear=.15, bare_metal=False),
     pcb=worn('sr_pcb', '#1c4a26', .5, 0, bare='#b7953e', wear=.3, bare_metal=False),
     # the lettering stays out of the bake (glyphs that small lose strokes in the atlas)
+    glass=mat('sr_glass', '#c8d4cf', .05, 0, alpha=.22),              # vacuum tube envelopes
+    filament=mat('sr_filament', '#401000', .3, 0, '#ff8a2a', 6),      # their glowing heaters
     ink_w=mat('sr_ink_white', '#cfc9b2', .6, 0), ink_r=mat('sr_ink_red', '#8a1a14', .55, 0), ink_k=mat('sr_ink_black', '#151515', .6, 0),
 )
 BAKED = ('silver', 'dark', 'poly', 'steel', 'rubber', 'hose', 'redpaint', 'tan', 'label',
-         'primer', 'stencil', 'masking', 'copper', 'wred', 'wblue', 'wwhite', 'pcb')
+         'primer', 'stencil', 'masking', 'copper', 'wred', 'wblue', 'wwhite', 'pcb', 'bakelite')
 STENCIL = '/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf'   # has Cyrillic, unlike Blender's default font
 MARKER = '/usr/share/fonts/opentype/urw-base35/Z003-MediumItalic.otf'       # a script face for the pen notes on the tape
 
@@ -87,6 +91,14 @@ def vcyl(r, x, y, z0, z1, seg=16, r2=None):
     bm.transform(Matrix.Translation((x, y, (z0 + z1) / 2))); return bm
 
 
+def rivets(pts, y, r=.055, m='steel', part='j_gun'):
+    """Round rivet heads on a +y face at the (x, z) points."""
+    bm = bmesh.new()
+    for x, z in pts:
+        bmesh.ops.create_icosphere(bm, subdivisions=2, radius=r, matrix=Matrix.Translation((x, y, z)) @ Matrix.Diagonal((1, .5, 1, 1)))
+    return solid('rivets', bm, M[m], part=part, bw=0)
+
+
 def onside(x, z, cz, r, out=.02):
     """The y of the canister/shroud's +y surface at height z (for wires lying on it)."""
     return math.sqrt(max(r * r - (z - cz) ** 2, 0)) + out
@@ -111,6 +123,7 @@ for s_ in (1, -1):   # the upper panel over the coil bay and window: still in pr
     solid('top_panel', prism(fillet([(-0.4, 2.95), (8.4, 2.95), (8.4, 3.45), (-0.4, 3.45)], .1), s_ * .84, s_ * .92),
           M['primer' if s_ > 0 else 'silver'], bw=.02)
     text('СИРЕНА  ЭМ-7', .24, (2.0, s_ * .93, 3.2), side=s_, m=M['ink_w' if s_ > 0 else 'ink_k'], font=STENCIL)
+rivets([(x, z) for x in [-0.15 + .7 * k for k in range(13)] for z in (3.02, 3.38) if not (1.0 < x < 3.0)], .92)
 # coil in the bay: a core, windings, and the green charge bands
 solid('coil_core', cylbm(.55, -0.5, 4.4, 1.78, seg=20), M['steel'], bw=0)
 for i in range(13):
@@ -135,12 +148,22 @@ solid('collar_slot', prism(rrect_xz(6.2, 7.9, -.6, -.1, .12), .8, .86), M['steel
 
 # ---------------------------------------------------------------- front block and coupling
 fb = prism(fillet([(8.5, 0.0), (11.4, 0.4), (11.4, 3.65), (8.5, 3.55)], .3), -1.15, 1.15)
-fb_cuts = [prism(rrect_xz(9.15, 10.85, z0, z0 + .7, .25), y0, y1) for z0 in (0.75, 2.35) for y0, y1 in ((.98, 2), (-2, -.98))]
+fb_cuts = [prism(rrect_xz(9.15, 10.85, z0, z0 + .7, .25), -2, -.98) for z0 in (0.75, 2.35)]
+fb_cuts.append(prism(rrect_xz(9.0, 11.0, .65, 3.15, .2), .45, 2))   # the left side's cover is off: a vacuum-tube bay
 solid('front_block', fb, M['primer'], cuts=fb_cuts, bw=.1, seg=3)   # never got its top coat
 for z0 in (0.75, 2.35):
-    for s in (1, -1):
-        solid('slot_grip', prism(rrect_xz(9.35, 10.65, z0 + .18, z0 + .52, .15), s * .98 - .06, s * .98 + .06), M['steel'], bw=.03)
-solid('chev', prism([(11.0, 1.6), (11.2, 1.4), (11.0, 1.2), (10.9, 1.2), (11.1, 1.4), (10.9, 1.6)], 1.13, 1.18), M['label'], bw=0)
+    solid('slot_grip', prism(rrect_xz(9.35, 10.65, z0 + .18, z0 + .52, .15), -1.04, -.92), M['steel'], bw=.03)
+solid('chev', prism([(11.0, 1.6), (11.2, 1.4), (11.0, 1.2), (10.9, 1.2), (11.1, 1.4), (10.9, 1.6)], -1.18, -1.13), M['label'], bw=0)
+solid('tube_chassis', boxbm(9.05, 10.95, .45, .52, .7, 3.1), M['steel'], bw=.01)
+for x in (9.55, 10.45):   # two valves on bakelite sockets, glass envelopes with a glowing heater inside
+    solid('valve_socket', vcyl(.36, x, .85, .66, .95, 18), M['bakelite'], bw=.03)
+    solid('valve_glass', vcyl(.3, x, .85, .95, 2.7, 20), M['glass'], bw=0)
+    solid('valve_top', vcyl(.3, x, .85, 2.7, 2.95, 20, r2=.1), M['glass'], bw=0)
+    solid('valve_plate', boxbm(x - .17, x + .17, .8, .9, 1.25, 2.35), M['steel'], bw=0)
+    solid('valve_heater', vcyl(.045, x, .95, 1.15, 2.45, 8), M['filament'], bw=0)
+    solid('valve_getter', vcyl(.2, x, .85, 2.55, 2.6, 16), M['copper'], bw=0)
+tube('valve_link', [(9.55, 1.12, .8), (10.0, 1.2, .7), (10.45, 1.12, .8)], .035, M['wwhite'], res=6)
+tube('valve_feed', [(10.45, 1.1, .78), (10.85, 1.18, 1.2), (10.9, 1.24, 2.9), (10.6, 1.3, 3.1)], .04, M['wblue'], res=6)
 ring('coupling', 1.72, 1.0, 11.3, 11.75, M['steel'], bw=.05)
 ring('coupling2', 1.6, 1.0, 11.75, 12.05, M['dark'], bw=.04)
 
@@ -213,8 +236,9 @@ for x in (13.6, 15.4):
 tube('jumper', [(5.6, 1.12, 3.1), (6.3, 1.27, 2.3), (7.0, 1.32, 1.55), (7.8, 1.28, 1.3), (8.5, 1.26, 1.55), (8.85, 1.25, 1.9)],
      .045, M['wred'], res=8)
 solid('terminal', screw(8.85, 1.19, 1.9, .14, .1, seg=6), M['copper'], bw=0)
-for x, z in ((8.8, .4), (11.1, .7), (8.8, 3.3), (11.05, 3.4)):   # hex bolts on the front block
+for x, z in ((8.8, .4), (8.8, 3.3), (11.05, 3.4)):   # hex bolts on the front block (one never went back in)
     solid('fb_bolt', screw(x, 1.19, z, .12, .08, seg=6), M['steel'], bw=0)
+solid('fb_hole', screw(11.15, 1.15, .55, .07, .02, seg=10), M['rubber'], bw=0)
 # a rough weld down the seam where the front block meets the receiver
 weld = bmesh.new()
 for k in range(22):
@@ -225,16 +249,14 @@ solid('weld', weld, M['steel'], bw=0)
 # a warning plate below the coil bay: lightning triangle, "DANGER! HIGH VOLTAGE"
 solid('warn_plate', prism(rrect_xz(-0.7, 2.4, .28, .88, .06), .85, .89), M['stencil'], bw=.01)
 solid('warn_tri', prism([(-0.62, .34), (-0.02, .34), (-0.32, .84)], .89, .9), M['redpaint'], bw=0)
+rivets([(-0.6, .35), (2.3, .35), (-0.6, .81), (2.3, .81)], .89, r=.04)
 solid('warn_bolt', prism([(-.25, .72), (-.30, .72), (-.38, .55), (-.31, .55), (-.37, .40), (-.24, .60), (-.31, .60)], .9, .91), M['rubber'], bw=0)
 text('ОПАСНО!', .2, (1.0, .9, .68), m=M['ink_r'], font=STENCIL)
 text('ВЫСОКОЕ НАПРЯЖЕНИЕ', .12, (1.0, .9, .44), m=M['ink_k'], font=STENCIL)
-text('№004', .3, (10.25, 1.16, 1.9), m=M['ink_w'], font=STENCIL)
 # masking tape round the shroud with a pen note: "don't touch"
 ring('masking', SR + .012, SR - .2, 16.05, 17.15, M['masking'], bw=.005)
 text('не трогать!', .2, (16.6, (SR + .02) * math.cos(math.radians(40)), SZ + (SR + .02) * math.sin(math.radians(40))),
      m=M['ink_k'], font=MARKER, tilt=40)
-text('ОПЫТНЫЙ ОБРАЗЕЦ', .26, (-6.1, .69, 2.25), m=M['ink_w'], font=STENCIL)   # "experimental prototype"
-text('ЭМ-7  СЕРИЯ 0', .18, (-6.4, .69, 1.8), m=M['ink_w'], font=STENCIL)
 
 # ---------------------------------------------------------------- stock: skeletal, with vents, a tan plate and labels
 stock = prism(fillet([(-2.9, 3.45), (-8.4, 3.0), (-9.4, 3.35), (-14.4, 3.35), (-14.9, 2.85), (-14.9, -2.4), (-14.4, -2.85),
@@ -243,16 +265,27 @@ st_cuts = [prism(fillet([(-4.7, 0.65), (-9.5, 0.65), (-9.5, -1.95), (-7.9, -1.95
 st_cuts += [prism(rrect_xz(x, x + .22, 1.95, 2.75, .1), -2, 2) for x in (-10.4, -10.8, -11.2, -11.6)]
 st_cuts += [prism(rrect_xz(x, x + .22, 1.95, 2.75, .1), -2, 2) for x in (-13.0, -13.4, -13.8)]
 st_cuts += [prism(rrect_xz(-14.0, -10.4, -2.3, -1.4, .3), .58, 2)]   # a recessed panel low on the butt
+st_cuts += [prism(rrect_xz(-8.0, -4.45, 1.05, 2.75, .25), .2, 2)]     # the capacitor compartment (cover off)
 solid('stock', stock, M['poly'], cuts=st_cuts, bw=.16, seg=3)
 solid('butt_pad', prism(fillet([(-14.85, 3.0), (-15.35, 2.9), (-15.35, -2.45), (-14.85, -2.55)], .2), -.72, .72), M['rubber'],
       cuts=[boxbm(-15.5, -15.2, -1, 1, z, z + .12) for z in (-1.8, -1.0, -0.2, 0.6, 1.4, 2.2)], bw=.08, seg=2)
 solid('em_label', prism(rrect_xz(-13.1, -10.4, .9, 1.65, .1), .6, .72), M['label'], bw=.02)
-text('E&M', .3, (-12.55, .73, 1.28), side=1, m=M['dark'])
+text('ОПЫТНЫЙ ОБРАЗЕЦ', .2, (-11.75, .73, 1.42), m=M['ink_k'], font=STENCIL)   # "experimental prototype"
+text('ЭМ-7  СЕРИЯ 0  №004', .13, (-11.75, .73, 1.1), m=M['ink_k'], font=STENCIL)
+rivets([(-13.0, .98), (-10.5, .98), (-13.0, 1.57), (-10.5, 1.57)], .72, r=.045)
+for z in (1.38, 1.9, 2.42):   # three capacitor cans with paper sleeves, strapped down, bussed to the receiver cable
+    solid('cap_can', cylbm(.25, -7.75, -4.85, z, y=.45, seg=24), M['silver'], bw=.04, seg=2)
+    ring('cap_sleeve', .262, .2, -7.2, -5.7, M['tan'], z=z, y=.45, seg=24, bw=.01)
+    solid('cap_post', cylbm(.07, -4.9, -4.62, z, y=.45, seg=8), M['copper'], bw=0)
+solid('cap_bus', boxbm(-4.72, -4.6, .36, .54, 1.25, 2.55), M['copper'], bw=.01)
+solid('cap_strap', boxbm(-6.45, -6.15, .69, .74, 1.0, 2.8), M['steel'], bw=.01)
+rivets([(-6.3, 1.04), (-6.3, 2.76)], .74, r=.05)
+tube('cap_lead', [(-4.62, .48, 1.95), (-4.1, .78, 2.05), (-3.2, .96, 2.15), (-2.3, 1.0, 2.15)], .1, M['rubber'], res=8)
 solid('warn', prism([(-13.4, -.4), (-12.9, -.4), (-13.15, .05)], .62, .73), M['redpaint'], bw=0)
 solid('tan_plate', prism(rrect_xz(-11.9, -10.0, -.35, .3, .28), .6, .8), M['tan'], bw=.04, seg=2)
 for x in (-11.45, -10.45):
     solid('tan_slot', prism(rrect_xz(x - .3, x + .3, -.2, .15, .12), .78, .84), M['dark'], bw=0)
-for x, z in ((-5.0, 2.6), (-13.6, -1.2)):
+for x, z in ((-3.75, 2.75), (-13.6, -1.2)):
     ring('sling', .32, .15, 0, .14, M['steel'], z=0, bw=.02).data.transform(Matrix.Translation((x, .7, z)) @ Matrix.Rotation(math.radians(90), 4, 'Z'))
 
 # ---------------------------------------------------------------- canister (tag_clip): the magazine
@@ -271,7 +304,7 @@ for i, z in enumerate((CZ + .25, CZ - .2, CZ - .65)):   # the yellow wires along
     solid('wire_end', cylbm(.1, 7.85, 8.15, z, y=onside(0, z, CZ, CR, .08), seg=10), M['rubber'], part=C, bw=0)
 solid('can_label', prism(rrect_xz(6.2, 8.0, CZ + 1.2, CZ + 1.45, .05), 0, .92), M['label'], part=C, bw=0)
 ring('can_tape', CR + .012, CR - .2, 3.85, 4.55, M['masking'], part=C, z=CZ, bw=.005)
-text('004', .24, (4.2, CR + .03, CZ + .1), part=C, m=M['ink_k'], font=MARKER)
+text('№004', .22, (4.2, CR + .03, CZ + .1), part=C, m=M['ink_k'], font=MARKER)
 text('НЕ ВСКРЫВАТЬ', .15, (5.35, onside(0, CZ - .15, CZ, CR, .02), CZ - .15), part=C, m=M['ink_r'], font=STENCIL)   # "do not open"
 
 # ---------------------------------------------------------------- flip-up irons (tag_iron_sight)
@@ -389,12 +422,15 @@ LS = 'tag_laser_box'
 solid('ls_box', prism(fillet([(14.6, SZ - .5), (17.4, SZ - .5), (17.4, SZ + .5), (14.6, SZ + .5)], .2), -(SR + .9), -(SR + .32)), M['dark'], part=LS, bw=.08, seg=3)
 solid('ls_lens', cylbm(.2, 17.38, 17.44, SZ, y=-(SR + .6), seg=16), M['dot'], part=LS, bw=0)
 
-export(OUT, RENDER, 'sr', BAKED, frame=(5.5, 0, 0.5), ortho=46)
+export(OUT, RENDER, 'sr', BAKED, tex=4096, frame=(5.5, 0, 0.5), ortho=46)
 
 if RENDER:   # close-ups of the bare gun (no attachments) for checking the small stencils and wiring
     sc = bpy.context.scene; co = sc.camera
     for o in bpy.data.objects:
         if o.name.startswith('part_tag_') and o.name not in ('part_tag_clip', 'part_tag_iron_sight', 'part_tag_sr_grip'): o.hide_render = True
-    for name, (x, z, sc_) in (('close_rcv', (3.0, 1.8, 13)), ('close_front', (13.0, 2.4, 13)), ('close_stock', (-6.0, 0.5, 13))):
+    for name, (x, z, sc_) in (('close_rcv', (3.0, 1.8, 13)), ('close_front', (12.0, 2.2, 13)), ('close_stock', (-6.5, 0.5, 13))):
         co.location = (x, 60, z); co.rotation_euler = (math.radians(90), 0, math.radians(180)); co.data.ortho_scale = sc_
         sc.render.filepath = f'{RENDER}/sr_{name}.png'; bpy.ops.render.render(write_still=True)
+    co.location = (-30, 26, 16)   # roughly the player's view: from behind, left and above
+    co.rotation_euler = (Vector((6, 0, 2)) - co.location).to_track_quat('-Z', 'Z').to_euler(); co.data.ortho_scale = 30
+    sc.render.filepath = f'{RENDER}/sr_close_hip.png'; bpy.ops.render.render(write_still=True)

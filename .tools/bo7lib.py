@@ -30,9 +30,13 @@ def mat(name, base, rough=.5, metal=0., emit=None, strength=0., alpha=1.):
 METAL = {}   # baked material -> the socket feeding Metallic (for the metal bake)
 
 
-def worn(name, base, rough=.5, metal=0., bare='#9a9da2', wear=.6, grain=1., bare_metal=True):
+def worn(name, base, rough=.5, metal=0., bare='#9a9da2', wear=.6, grain=1., bare_metal=True,
+         chips=0., under=None, mottle=0., dirt=0., rust=0., brushed=0.):
     """A used gun finish for baking: paint/coating worn to bare steel on the edges, light scratches, fine grain,
-    grime in the crevices, and rounded edges (bevel normal) so the low-poly shapes read smooth."""
+    grime in the crevices, and rounded edges (bevel normal) so the low-poly shapes read smooth.
+    Optional (0..1, all off by default): chips = flaked paint (ragged chips, densest on edges, through an `under` coat
+    ring to bare metal, with a lip in the normal); mottle = uneven paint tone; dirt = grime streaks run down (z);
+    rust = rust bloom on the bare metal and in crevices; brushed = fine lengthwise (x) brushing."""
     m = bpy.data.materials.new(name); m.use_nodes = True
     N, L = m.node_tree.nodes, m.node_tree.links; b = N['Principled BSDF']
     def node(t, **kw):
@@ -77,21 +81,56 @@ def worn(name, base, rough=.5, metal=0., bare='#9a9da2', wear=.6, grain=1., bare
         scr = line if scr == 0. else math('MAXIMUM', scr, line)
     zone = mr(noise(obj, .8, 3), .5, .65)
     w = math('MAXIMUM', w, math('MULTIPLY', math('MULTIPLY', scr, zone), .7 * wear))
+    if chips:   # flaked paint: a ragged fractal noise, pushed up on the edges and in patches, cut at two levels
+        f = math('ADD', noise(obj, 1.8, 14, .66), math('MULTIPLY', edge, .3))
+        f = math('ADD', f, math('MULTIPLY', math('SUBTRACT', noise(obj, .45, 2), .5), .5))
+        t = .7 - .26 * chips
+        cu = mr(f, t, t + .008); cb = mr(f, t + .035, t + .043)   # under coat ring, then bare metal inside it
+    else:
+        cu = cb = 0.
     # grime in crevices, fine grain
     ao = node('ShaderNodeAmbientOcclusion', samples=12); ao.inputs['Distance'].default_value = .6
     grime = mr(ao.outputs['AO'], .95, .45, 0., .55)
     grainv = mr(noise(obj, 60, 3), .3, .7, -.06 * grain, .06 * grain)
     col = srgb(base)
-    c = mix(w, col, srgb(bare)); c = mix(grime, c, srgb('#0a0a0b'))
+    if mottle:   # the paint's tone drifts a little across a panel
+        mh = node('ShaderNodeHueSaturation'); mh.inputs['Color'].default_value = col
+        L.new(mr(noise(obj, .35, 3), .3, .7, 1 - .22 * mottle, 1 + .22 * mottle), mh.inputs['Value'])
+        col = mh.outputs['Color']
+    if brushed:   # fine lengthwise brushing
+        bmp = node('ShaderNodeMapping'); L.new(obj, bmp.inputs['Vector']); bmp.inputs['Scale'].default_value = (.15, 30, 30)
+        brv = mr(noise(bmp.outputs['Vector'], 6, 4), .3, .7, -.08 * brushed, .08 * brushed)
+        grainv = math('ADD', grainv, brv)
+    c = mix(cu, col, srgb(under or '#5c2a1e')) if chips else col
+    if chips: c = mix(cb, c, srgb(bare))
+    c = mix(w, c, srgb(bare))
+    bare_m = math('MAXIMUM', w, cb) if chips else w
+    if rust:   # rust blooms on the bare metal and creeps out of the crevices
+        rz = mr(noise(obj, 5, 8, .6), .45, .62)
+        rm = math('MULTIPLY', math('MAXIMUM', math('MULTIPLY', bare_m, 1.), math('MULTIPLY', grime, .9)), math('MULTIPLY', rz, rust), clamp=True)
+        c = mix(rm, c, mix(mr(noise(obj, 14, 4), .3, .7), srgb('#6b3415'), srgb('#3b1d0e')))
+    if dirt:   # grime streaks run down the sides
+        dmp = node('ShaderNodeMapping'); L.new(obj, dmp.inputs['Vector']); dmp.inputs['Scale'].default_value = (2.5, 2.5, .3)
+        dm = math('MULTIPLY', mr(noise(dmp.outputs['Vector'], 3, 6), .48, .68), dirt * .6, clamp=True)
+        c = mix(dm, c, srgb('#2a251c'))
+    c = mix(grime, c, srgb('#0a0a0b'))
     hsv = node('ShaderNodeHueSaturation'); L.new(c, hsv.inputs['Color']); L.new(math('ADD', grainv, 1.), hsv.inputs['Value'])
     L.new(hsv.outputs['Color'], b.inputs['Base Color'])
-    r = math('ADD', mix(w, rough, .3, False), math('MULTIPLY', grainv, 1.5)); r = mix(grime, r, .85, False)
+    r = mix(w, rough, .3, False)
+    if chips: r = mix(cu, r, .78, False); r = mix(cb, r, .32, False)
+    if rust: r = mix(rm, r, .92, False)
+    if dirt: r = mix(dm, r, .9, False)
+    r = math('ADD', r, math('MULTIPLY', grainv, 1.5)); r = mix(grime, r, .85, False)
     L.new(r, b.inputs['Roughness'])
-    mt = mix(w, metal, 1. if bare_metal else metal, False); L.new(mt, b.inputs['Metallic']); METAL[name] = mt
+    mt = mix(bare_m, metal, 1. if bare_metal else metal, False)
+    if rust: mt = mix(rm, mt, 0., False)
+    L.new(mt, b.inputs['Metallic']); METAL[name] = mt
     # rounded edges + micro surface
     bev2 = node('ShaderNodeBevel', samples=8); bev2.inputs['Radius'].default_value = .09
-    bump = node('ShaderNodeBump'); bump.inputs['Strength'].default_value = .25; bump.inputs['Distance'].default_value = .02
-    L.new(math('SUBTRACT', math('MULTIPLY', noise(obj, 40, 3), .3), w), bump.inputs['Height']); L.new(bev2.outputs['Normal'], bump.inputs['Normal'])
+    bump = node('ShaderNodeBump'); bump.inputs['Strength'].default_value = .25 if not chips else .4; bump.inputs['Distance'].default_value = .02
+    h = math('SUBTRACT', math('MULTIPLY', noise(obj, 40, 3), .3), w)
+    if chips: h = math('SUBTRACT', h, math('ADD', math('MULTIPLY', cu, .5), math('MULTIPLY', cb, .5)))   # the paint's lip round a chip
+    L.new(h, bump.inputs['Height']); L.new(bev2.outputs['Normal'], bump.inputs['Normal'])
     L.new(bump.outputs['Normal'], b.inputs['Normal'])
     return m
 
