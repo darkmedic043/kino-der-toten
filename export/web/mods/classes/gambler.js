@@ -1,9 +1,10 @@
 // The Gambler's action skill, Ante Up (classes mod).
-// Z opens the ante picker: put a chip, points, your health, your gun or a perk on the table and a random casino game
+// Z opens the ante wheel: put a chip, points, your health, your gun, a perk or the skill's own clock on the table and a
+// random casino game
 // (gambler-games.js) deals itself across the screen. While it plays, your kills, headshots, melee kills and multikills go
 // to the game (each lands unless the ante's House Edge eats it) and Z / R make its calls. A win can ride on a coin flip,
 // then pays gun power-ups (mods), cards for your hand and totems; a jackpot starts High Roller Mode. A bust costs the
-// ante and the game family's penalty. Numbers live in classes.json (cls.gambler); the overlay (#gmb) follows Settings →
+// ante (for a while: no ante pays or costs anything for good) and the game family's penalty. Numbers live in classes.json (cls.gambler); the overlay (#gmb) follows Settings →
 // Casino effects. Local only: co-op partners see the zombies die, not the table.
 import * as THREE from 'three';
 import { zombieHealth, makeWeapon } from '../../rules.js';
@@ -22,6 +23,8 @@ const TOTEM={lightning:{color:0x7fc8ff,r:450},eldritch:{color:0x9a5cff,r:320},ov
 const svg=d=>'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#f2c94c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`);
 const WHEEL_ICON={card:svg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M12 8l2.5 4-2.5 4-2.5-4z"/>'),shuffle:svg('<path d="M3 7h4l10 10h4M3 17h4L17 7h4M18 4l3 3-3 3M18 14l3 3-3 3"/>')};
 const pickOne=a=>a[Math.floor(Math.random()*a.length)];
+const MULE='specialty_additionalprimaryweapon';
+const ANTE_MOD={overclock:'Overclocked',bloodlust:'Bloodlust'};   // timed mods the antes pay (rewards are in classes.json)
 
 export function setupGambler(ctx){
   const {api,cls}=ctx,{host,session,data,scene,camera,player,enemies,world,audio}=api;
@@ -36,9 +39,9 @@ export function setupGambler(ctx){
   const around=(at,r)=>enemies.list.filter(z=>z.root.position.distanceTo(at)<r);
   const say=(text,s=1.4)=>api.toast?.(text,s);
 
-  // phase: idle · ante (the picker) · play (a game on the table) · ride (Let It Ride after a win). Ante Up is "up"
+  // phase: idle · ante (the wheel) · play (a game on the table) · ride (Let It Ride after a win). Ante Up is "up"
   // (its meter holds) from the picker until the payout.
-  let phase='idle',pick=null,run=null,banner=null,marker=0,lastGame=null,hr=null,streak=null;
+  let phase='idle',wheel=null,lastAnte=null,run=null,banner=null,marker=0,lastGame=null,hr=null,streak=null;
   let windfallT=-99,aceHits=0,aceShot=-1,cashShot=-1,reloadSlowUntil=-1,lastCard=-9;
   const hand=[],mods=new Map(),totems=[],shots=[],holes=[],queue=[],lines=[],slowed=new Map(),anims=new Map();
   const modOn=id=>mods.has(id);
@@ -47,30 +50,36 @@ export function setupGambler(ctx){
   const stacks=()=>mods.get('hotHand')?.stacks??0;
 
   // ---- antes ---------------------------------------------------------------------------------------------------------
+  // Every ante is temporary: what it stakes comes back or costs you for a while, and what it pays wears off.
   const bank=()=>{const i=session.round<10?0:session.round<20?1:2;return {cost:ANTE.bankroll.cost[i],edge:ANTE.bankroll.edge[i]};};
   const edgeOf=a=>a.id==='bankroll'?bank().edge:a.edge;
   const freePick=()=>!!S('gamble.houseRules')||streakOn();
-  const antes=()=>G.antes.filter(a=>a.id==='bankroll'?session.points>=bank().cost:a.id==='soul'?session.perks.size>0:a.id==='iron'?!!data.weapons[session.weapon?.id]:true);
+  const perkName=id=>PERKS.find(p=>p.id===id)?.name??api.perkInfo?.[id]?.name??'A perk';
+  const soulPerks=()=>[...session.perks].filter(id=>id!==MULE&&!borrowed.some(b=>b.id===id));   // never Mule Kick (it would cost a gun) or a borrowed perk
+  const why=a=>a.id==='bankroll'&&session.points<bank().cost?'NEED '+bank().cost:a.id==='iron'&&loaner?'ON LOAN':a.id==='iron'&&!data.weapons[session.weapon?.id]?'NO GUN':a.id==='soul'&&!soulPerks().length?'NEED A PERK':'';
+  let loaner=null,clockBack=false;const dark=[],borrowed=[];
 
   function deploy(){
-    if(phase==='ante'){pick.i=(pick.i+1)%pick.list.length;pick.t=G.pick;audio.play('board',.25);return;}   // Z: the next ante; the pick confirms itself
+    if(phase==='ante'){if(wheel.sticky)bet();return;}   // the wheel left open by a tap: Z bets the chosen ante
     if(phase==='play'){call('z');return;}
     if(phase==='ride'){flip();return;}
     if(ctx.getCooldown()>0){if(hand.length)playCard(0);else ctx.notReady();return;}   // charging: Z plays the top card
     const st=api.getState?.();if(st&&!st.active||session.busy||session.phase==='reviving')return;
-    pick={list:antes(),i:0,t:G.pick,game:nextGame(A().games,lastGame)};phase='ante';audio.play('buy',.4);draw(true);
+    openWheel();
   }
   addEventListener('keydown',e=>{
     if(e.repeat||e.code!==(binds().reload??'KeyR'))return;
-    if(phase==='ante'&&freePick()){const g=A().games;pick.game=g[(g.indexOf(pick.game)+1)%g.length];pick.t=G.pick;audio.play('board',.25);}   // House Rules / Hot Streak: R picks the game
+    if(phase==='ante'&&freePick()){const g=A().games;wheel.game=g[(g.indexOf(wheel.game)+1)%g.length];audio.play('board',.25);drawWheel();}   // House Rules / Hot Streak: R picks the game
     else if(phase==='play')call('reload');
     else if(phase==='ride'&&!run.flip)settle(run.tier,run.label);   // cash out
   });
 
   function startRun(ante,id){
-    let stake=0;if(ante.id==='bankroll'){const b=bank();if(session.spend(b.cost))stake=b.cost;else ante=ANTE.chip;}
-    run={ante,id,s:newGame(id),k:Math.max(.3,1-edgeOf(ante)*A().edge),stake,rides:0,burst:[],log:[],odds:null,oddsT:0,word:null,wordN:0,start:session.time};
-    lastGame=id;pick=null;phase='play';ctx.setCooldown(A().cooldown);
+    let stake=0,lost=null;
+    if(ante.id==='bankroll'){const b=bank();if(session.spend(b.cost))stake=b.cost;else ante=ANTE.chip;}
+    if(ante.id==='soul'){lost=pickOne(soulPerks());if(lost){session.perks.delete(lost);session.health=Math.min(session.health,session.maxHealth);}else ante=ANTE.chip;}   // the perk goes dark for the game
+    run={ante,id,s:newGame(id),k:Math.max(.3,1-edgeOf(ante)*A().edge),stake,pot:0,dark:lost,hitT:-9,rides:0,burst:[],log:[],odds:null,oddsT:0,word:null,wordN:0,start:session.time};
+    lastGame=id;lastAnte=ante.id;phase='play';ctx.setCooldown(A().cooldown);
     if(S('gamble.runCard'))deal(S('gamble.aceDeal')?(Math.random()<.5?'ace':'wild'):randomCard());   // Wild Draw (Ace High)
     audio.play('round',.45);flash(ante.name.toUpperCase()+' ON THE TABLE');
   }
@@ -96,8 +105,11 @@ export function setupGambler(ctx){
     if(mine&&modOn('hotHand'))mods.get('hotHand').stacks=Math.min(10,stacks()+1);
     if(mine&&modOn('cash'))session.addPoints(40);
     if(mine&&e.head&&modOn('golden'))session.addPoints(100);
+    if(mine&&modOn('overclock')&&session.weapon&&session.def)session.weapon.mag=Math.max(session.weapon.mag,session.def.clipSize);   // Iron's win: kills refill the mag
+    if(mine&&modOn('bloodlust'))session.health=Math.min(session.maxHealth,session.health+ANTE.blood.lust.heal);
     if(phase!=='play'||!(mine||cause==='ricochet'&&S('gamble.trickShot')))return;
     const t=session.time,melee=e.melee||cause==='melee';
+    if(run.ante.id==='bankroll')run.pot+=ANTE.bankroll.pot;
     run.log.push({t,head:!!e.head,melee});
     feed(melee?'melee':e.head?'head':'kill');
     run.burst=run.burst.filter(x=>t-x<.35);run.burst.push(t);if(run.burst.length>=2){run.burst.length=0;feed('multi');}
@@ -127,11 +139,17 @@ export function setupGambler(ctx){
   function settle(tier,label){
     const r=run;phase='idle';run=null;
     if(r.ante.id==='blood'&&(tier==='win'||tier==='big'))tier=tierUp(tier);   // Blood pays one tier up
-    const lines=tier==='bust'?bust(r):tier==='push'?(r.stake?(session.points+=r.stake,['STAKE BACK']):[]):pay(r,tier,label);
+    const lines=tier==='bust'?bust(r):tier==='push'?push(r):pay(r,tier,label);
     banner={tier,label,lines,t:3.2};
     audio.play(tier==='jackpot'?'packapunch':tier==='bust'?'empty':tier==='push'?'board':'buy',.6);
     if(tier==='bust'&&S('gamble.bustRefund'))window.kino.classes?.addCharge?.(A().cooldown*S('gamble.bustRefund'));   // Pair of Fives
+    if(clockBack){clockBack=false;window.kino.classes?.addCharge?.(A().cooldown*ANTE.clock.refund);}   // Clock: Ante Up comes back half charged
     ctx.hud();draw(true);
+  }
+  function push(r){
+    const out=[],n=r.stake+r.pot;if(n){session.points+=n;out.push('STAKE BACK');}
+    if(r.dark)out.push(givePerk(r.dark));
+    return out;
   }
   function pay(r,tier,label){
     marker=0;const out=[];
@@ -139,24 +157,25 @@ export function setupGambler(ctx){
     for(const id of payout(tier,G.rewards,{extra:Math.random()<S('gamble.payout')?1:0}))   // Double Down
       out.push(id==='jackpot'?(highRoller(label),JP.name.toUpperCase()):grant(id));
     if(S('gamble.winCard'))out.push(deal(randomCard()));   // Devil's Tines
-    if(r.ante.id==='bankroll'){const n=r.stake*ANTE.bankroll.pay[tier];session.points+=n;out.push('+'+n+' POINTS');}
-    if(r.ante.id==='blood'){session.health=session.maxHealth;out.push('FULL HEALTH');}
-    if(r.ante.id==='iron')out.push(papHeld()?'PACK-A-PUNCHED':'REFILLED');
-    if(r.ante.id==='soul'){const p=givePerk();out.push(p?p.name.toUpperCase():'+2000 POINTS');}
+    const a=r.ante.id;
+    if(a==='bankroll'){const n=(r.stake+r.pot)*ANTE.bankroll.pay[tier];session.points+=n;out.push('+'+n+' POINTS');}
+    if(a==='blood'){session.health=session.maxHealth;timed('bloodlust',ANTE.blood.lust.time);out.push('FULL HEALTH','BLOODLUST');}
+    if(a==='iron'){timed('overclock',ANTE.iron.over.time);refill();out.push('OVERCLOCKED');}
+    if(a==='soul'){if(r.dark)out.push(givePerk(r.dark));out.push(borrow());}
+    if(a==='clock'){clockBack=true;out.push('HALF CHARGED');}
     if(S('gamble.diceTotem')&&familyOf(r.id)==='dice')out.push(plant(pickOne(Object.keys(TOTEM))));   // Hot Dice
     if(S('gamble.freeze')&&(tier==='big'||tier==='jackpot'))freeze(feet(),600,3);   // Freeze Frame
     return out;
   }
   function bust(r){
     marker=Math.min(markerMax(),marker+1);
-    if(S('gamble.saveBust')&&hand.length)return ['ACE IN THE HOLE · '+REWARD[hand.shift()].name.toUpperCase()+' BURNED'];
-    const out=[];
-    if(r.ante.id==='bankroll')out.push('−'+r.stake+' POINTS');
-    if(r.ante.id==='blood'){session.health=Math.max(1,Math.floor(session.health/2));out.push('HEALTH HALVED');}
-    if(r.ante.id==='iron'){const id=boxGun();if(id){session.inventory[session.slot]=makeWeapon(data.weapons[id],true);session.cancelReload();api.equipView?.();out.push('NOW HOLDING '+data.weapons[id].name.toUpperCase());}}
-    if(r.ante.id==='soul'){const id=pickOne([...session.perks]);if(id){session.perks.delete(id);
-      if(session.inventory.length>session.weaponSlots){session.inventory.splice(session.weaponSlots);session.slot=Math.min(session.slot,session.inventory.length-1);session.cancelReload();api.equipView?.();}   // Mule Kick
-      session.health=Math.min(session.health,session.maxHealth);out.push((PERKS.find(p=>p.id===id)?.name??api.perkInfo?.[id]?.name??'A PERK').toUpperCase()+' LOST');}}
+    if(S('gamble.saveBust')&&hand.length){if(r.dark)givePerk(r.dark);return ['ACE IN THE HOLE · '+REWARD[hand.shift()].name.toUpperCase()+' BURNED'];}
+    const out=[],a=r.ante.id;
+    if(a==='bankroll')out.push('−'+r.stake+' POINTS'+(r.pot?' · POT LOST':''));
+    if(a==='blood'){session.health=Math.max(1,Math.floor(session.health/2));out.push('HEALTH HALVED');}
+    if(a==='iron'){const n=loan();if(n)out.push('LOANER: '+n.toUpperCase());}
+    if(a==='soul'&&r.dark){dark.push({id:r.dark,until:session.time+ANTE.soul.dark});out.push(perkName(r.dark).toUpperCase()+' DARK '+ANTE.soul.dark+'S');}
+    if(a==='clock'){ctx.setCooldown(ctx.getCooldown()+ANTE.clock.overtime);out.push('OVERTIME +'+ANTE.clock.overtime+'S');}
     const fam=familyOf(r.id);
     if(fam==='cards')sk()?.spend(Math.ceil(fortune()/2));
     else if(fam==='dice')for(const z of around(feet(),600))speedMod(z,'bust',1.25,8);
@@ -164,21 +183,38 @@ export function setupGambler(ctx){
     out.push(G.busts[fam].replace(/\.$/,'').toUpperCase());
     return out;
   }
-  function papHeld(){
-    const w=session.weapon,d=data.weapons[w?.id];if(!d)return false;
-    const fresh=!w.upgraded&&!!d.upgrade;if(fresh){w.upgraded=true;audio.play('packapunch',.5);}
-    w.mag=session.def.clipSize;w.reserve=session.def.maxAmmo;api.equipView?.();return fresh;
-  }
-  function givePerk(){
-    const p=pickOne(PERKS.filter(p=>!session.perks.has(p.id)&&perkUnlocked(p)));
-    if(!p){session.addPoints(2000);return null;}
-    if(api.perkInfo&&!api.perkInfo[p.id])api.perkInfo[p.id]={name:p.name,price:p.price,color:p.color,icon:p.badge};
-    session.perks.add(p.id);session.health=session.maxHealth;return p;
-  }
+  // Iron: a bust lends you a box gun for a while; yours (ammo, attachments and all) comes back where the loaner is.
   function boxGun(){
     const own=new Set(session.inventory.map(w=>w.id));
     return pickOne(Object.keys(api.mysteryBox?.models??{}).filter(id=>id!=='teddy'&&id!=='zombie_cymbal_monkey'&&data.weapons[id]&&!own.has(id)));
   }
+  function loan(){
+    if(loaner){loaner.until+=ANTE.iron.loan;return data.weapons[loaner.w.id]?.name??'Loaner';}   // one loan at a time: yours stays safe
+    const id=boxGun();if(!id)return null;
+    const w=makeWeapon(data.weapons[id],true);
+    loaner={orig:session.inventory[session.slot],w,i:session.slot,until:session.time+ANTE.iron.loan};
+    session.inventory[session.slot]=w;session.cancelReload();api.equipView?.();return data.weapons[id].name;
+  }
+  function giveBack(){
+    const l=loaner;loaner=null;
+    let i=session.inventory.indexOf(l.w);   // traded away? into a free slot, else where the loan was
+    if(i<0){if(session.inventory.length<session.weaponSlots){session.inventory.push(l.orig);say(data.weapons[l.orig.id]?.name+' is back');return;}i=Math.min(l.i,session.inventory.length-1);}
+    session.inventory[i]=l.orig;if(i===session.slot){session.cancelReload();api.equipView?.();}
+    say(data.weapons[l.orig.id]?.name+' is back');
+  }
+  function refill(){const w=session.weapon;if(w&&session.def){w.mag=session.def.clipSize;w.reserve=session.def.maxAmmo;}}
+  // Soul: the perk on the table comes back; a win lends one you don't have.
+  function givePerk(id){
+    if(api.perkInfo&&!api.perkInfo[id]){const p=PERKS.find(p=>p.id===id);if(p)api.perkInfo[id]={name:p.name,price:p.price,color:p.color,icon:p.badge};}
+    session.perks.add(id);return perkName(id).toUpperCase()+' BACK';
+  }
+  function borrow(){
+    const p=pickOne(PERKS.filter(p=>p.id!==MULE&&!session.perks.has(p.id)&&perkUnlocked(p)));
+    if(!p){session.addPoints(2000);return '+2000 POINTS';}
+    givePerk(p.id);borrowed.push({id:p.id,until:session.time+ANTE.soul.borrow});session.health=session.maxHealth;
+    return p.name.toUpperCase()+' BORROWED';
+  }
+  function timed(id,secs){const until=session.time+secs,m=mods.get(id);if(m)m.until=Math.max(m.until,until);else mods.set(id,{until,stacks:0});}
 
   // ---- rewards ----------------------------------------------------------------------------------------------------------
   const randomCard=()=>pickOne(G.rewards.filter(r=>r.kind==='card')).id;
@@ -213,12 +249,12 @@ export function setupGambler(ctx){
     if(label==='BLACKJACK'){deal('ace');deal('wild');}
     if(label==='BOXCARS'){const f=feet();for(let i=0;i<6;i++){const a=i/6*Math.PI*2,at=f.clone().add(new THREE.Vector3(Math.cos(a)*220,30,Math.sin(a)*220));queue.push({delay:.15+i*.12,blast:at});}}
     if(label==='GREEN 0')freeze(null,0,5);
-    if(['FIVE OF A KIND','STRAIGHT FLUSH','ROYAL FLUSH'].includes(label))papHeld();
+    if(['FIVE OF A KIND','STRAIGHT FLUSH','ROYAL FLUSH'].includes(label)){timed('overclock',JP.time);refill();}   // Overclocked for the whole mode
   }
   function startStreak(){streak={until:session.time+12*(1+S('gamble.streak'))};api.announce?.('HOT STREAK','WINDFALL',2);audio.play('buy',.6);}
 
   // ---- the gun ------------------------------------------------------------------------------------------------------------
-  const rateMul=()=>(1+.04*stacks())*(fortune()>=fortuneMax()/2?1+S('gamble.rate'):1)*(streakOn()?1+.25*(1+S('gamble.streak')):1);
+  const rateMul=()=>(1+.04*stacks())*(phase==='play'&&run.ante.id==='iron'?1+ANTE.iron.rate:1)*(modOn('overclock')?1+ANTE.iron.over.rate:1)*(fortune()>=fortuneMax()/2?1+S('gamble.rate'):1)*(streakOn()?1+.25*(1+S('gamble.streak')):1);
   const fire=session.fire.bind(session);
   session.fire=(...a)=>{
     const ok=fire(...a);if(!ok)return ok;
@@ -239,8 +275,9 @@ export function setupGambler(ctx){
   host.on('beforeEnemyDamage',e=>{
     const z=e.enemy;if(!z)return;
     if(totems.some(t=>t.id==='eldritch'&&t.g.position.distanceTo(z.root.position)<t.r))e.amount*=1.3;
+    if(e.cause==='melee'&&modOn('bloodlust'))e.amount*=ANTE.blood.lust.melee;
     if(e.cause!=='bullet')return;
-    let k=(modOn('golden')?2:1)*(1+.04*stacks());
+    let k=(modOn('golden')?2:1)*(modOn('overclock')?ANTE.iron.over.dmg:1)*(1+.04*stacks());
     if(S('gamble.deadHand')&&session.health<session.maxHealth*.4)k*=1+S('gamble.deadHand')*hand.length;   // Dead Man's Hand
     if(aceHits>0){k*=4;if(session.shots!==aceShot){aceShot=session.shots;aceHits--;}}   // one hit per shot, so pellets share it
     e.amount*=k;
@@ -255,7 +292,10 @@ export function setupGambler(ctx){
     else if(r<.4)queue.push({from:z,dmg:amount*.5,cause:'arc',color:0x9fd4ff,range:220});
     else if(r<.6)speedMod(z,'dealer',.5,3);
   }
-  host.on('beforeDamage',e=>{if(totems.some(t=>t.id==='overshield'&&t.g.position.distanceTo(feet())<t.r))e.amount*=.4;});
+  host.on('beforeDamage',e=>{
+    if(totems.some(t=>t.id==='overshield'&&t.g.position.distanceTo(feet())<t.r))e.amount*=.4;
+    if(phase==='play'&&run.ante.id==='blood'&&e.amount>0&&session.time-run.hitT>=ANTE.blood.hitGap){run.hitT=session.time;feed('kill');}   // Blood: the hits you take play like kills
+  });
   host.on('beforePoints',e=>{if(e.amount>0&&hr?.double)e.amount*=2;});
 
   // ---- zombies: speed and animation changes undone on time ---------------------------------------------------------------
@@ -318,9 +358,9 @@ export function setupGambler(ctx){
   host.on('update',dt=>{
     if(!dt)return;
     const t=session.time;
-    if(phase==='ante'&&(pick.t-=dt)<=0)startRun(pick.list[pick.i],pick.game);
+    if(phase==='ante')wheelPad();
     else if(phase==='play'){
-      GAMES[run.id].tick(run.s,dt,Math.random);
+      GAMES[run.id].tick(run.s,run.ante.id==='clock'?dt*(1-ANTE.clock.slow):dt,Math.random);   // Clock: the game runs slow
       if(run.s.over)finish();
       else if((run.oddsT-=dt)<=0){   // the odds bar: the rest of the game played out at your recent pace
         run.oddsT=.6;const rec=run.log.filter(l=>t-l.t<8),n=rec.length,span=Math.min(8,Math.max(2,t-run.start));
@@ -328,9 +368,13 @@ export function setupGambler(ctx){
       }
     }else if(phase==='ride')ride(dt);
     if(banner&&(banner.t-=dt)<=0)banner=null;
-    for(const [id,m] of mods)if(t>m.until)mods.delete(id);
+    for(const [id,m] of mods)if(t>m.until){mods.delete(id);if(ANTE_MOD[id])say(ANTE_MOD[id]+' over',1);}
     if(hr&&t>hr.until){hr=null;say(JP.name+' over');}
     if(streak&&t>streak.until)streak=null;
+    if(session.phase==='reviving'&&(dark.length||borrowed.length||run?.dark)){dark.length=borrowed.length=0;if(run)run.dark=null;}   // a down took the perks: nothing to give back
+    for(let i=dark.length-1;i>=0;i--)if(t>dark[i].until){say(givePerk(dark[i].id));dark.splice(i,1);}
+    for(let i=borrowed.length-1;i>=0;i--)if(t>borrowed[i].until){const id=borrowed[i].id;borrowed.splice(i,1);session.perks.delete(id);session.health=Math.min(session.health,session.maxHealth);say(perkName(id)+' returned');}
+    if(loaner&&t>loaner.until)giveBack();
     for(let i=queue.length-1;i>=0;i--){   // ricochets, arcs and blasts, out of the damage event
       const q=queue[i];if(q.delay>0&&(q.delay-=dt)>0)continue;queue.splice(i,1);
       if(q.blast){ctx.blast(q.blast,200,.8,true);continue;}
@@ -367,21 +411,105 @@ export function setupGambler(ctx){
     if((drawT-=dt)<=0){drawT=.08;draw();}
   });
   host.on('reset',()=>{
-    phase='idle';pick=run=banner=hr=streak=null;marker=aceHits=0;hand.length=0;mods.clear();queue.length=0;holes.length=0;
+    if(phase==='ante')closeWheel();
+    phase='idle';wheel=run=banner=hr=streak=loaner=null;marker=aceHits=0;dark.length=borrowed.length=0;clockBack=false;hand.length=0;mods.clear();queue.length=0;holes.length=0;
     for(const o of totems)o.g.removeFromParent();totems.length=0;for(const p of shots)p.sp.removeFromParent();shots.length=0;
     slowed.clear();anims.clear();draw(true);
   });
 
   // ---- the command wheel: Reshuffle and the hand ------------------------------------------------------------------------------
-  const wheel=()=>{
+  const commands=()=>{
     const out=[];
     if(phase==='play'){const free=S('gamble.freeShuffle')||S('gamble.houseRules')||streakOn();
       out.push({label:'Reshuffle',sub:free?'Free':`${G.reshuffle} Fortune (${fortune()})`,color:cls.color,icon:WHEEL_ICON.shuffle,disabled:!free&&fortune()<G.reshuffle,use:reshuffle});}
     hand.forEach((id,i)=>out.push({label:REWARD[id].name,sub:'Play card',color:'#f8f4ea',icon:WHEEL_ICON.card,use:()=>playCard(i)}));
     return out;
   };
-  const register=()=>{if(window.kino?.commandWheel)window.kino.commandWheel.add('gambler',wheel);else setTimeout(register,300);};
+  const register=()=>{if(window.kino?.commandWheel)window.kino.commandWheel.add('gambler',commands);else setTimeout(register,300);};
   register();
+
+  // ---- the ante wheel ----------------------------------------------------------------------------------------------------------
+  // Hold Z: the wheel opens round the crosshair; aim with the mouse or right stick, let go to bet the lit ante (let go in the
+  // middle to back out). A tap leaves it open with the last ante lit: Z or a click bets, 1-6 pick, right click or Esc close.
+  const WR=170,HUB=62,C=WR+14;
+  const touchMode=()=>document.body.classList.contains('touch-mode');
+  function openWheel(){
+    const list=G.antes.map(a=>({a,why:why(a)}));
+    wheel={list,sel:-1,cx:0,cy:0,t0:performance.now(),sticky:false,game:nextGame(A().games,lastGame)};
+    phase='ante';banner=null;window.kino.lookHold=true;audio.play('buy',.4);buildWheel();draw(true);
+  }
+  function closeWheel(){wheel=null;window.kino.lookHold=false;wh.classList.remove('show');if(phase==='ante')phase='idle';draw(true);}
+  function bet(){
+    const e=wheel.list[wheel.sel];
+    if(!e||e.why){if(e)audio.play('empty',.4);closeWheel();return;}
+    const game=wheel.game;closeWheel();startRun(e.a,game);
+  }
+  function selectAnte(i,place){
+    if(place&&i>=0){const a=i/wheel.list.length*Math.PI*2;wheel.cx=Math.sin(a)*WR*.55;wheel.cy=-Math.cos(a)*WR*.55;}
+    if(i!==wheel.sel){wheel.sel=i;if(i>=0)audio.play('board',.18);}
+    drawWheel();
+  }
+  function aimWheel(dx,dy){
+    let x=wheel.cx+dx,y=wheel.cy+dy;const d=Math.hypot(x,y);if(d>WR*.8){x*=WR*.8/d;y*=WR*.8/d;}
+    wheel.cx=x;wheel.cy=y;
+    if(Math.hypot(x,y)<HUB*.6)return selectAnte(-1);
+    const n=wheel.list.length,a=(Math.atan2(x,-y)+Math.PI*2)%(Math.PI*2);selectAnte(Math.round(a/(Math.PI*2/n))%n);
+  }
+  function wheelPad(){   // the right stick points straight at a slice; letting go keeps it lit
+    if(!api.getState?.()?.active&&!touchMode()||session.phase==='reviving'){closeWheel();return;}
+    const gp=[...(navigator.getGamepads?.()??[])].find(g=>g?.connected);if(!gp)return;
+    const x=gp.axes[2]??0,y=gp.axes[3]??0;if(Math.hypot(x,y)<.5)return;
+    wheel.cx=wheel.cy=0;aimWheel(x*WR*.6,y*WR*.6);
+  }
+  const ON=()=>phase==='ante';
+  addEventListener('keyup',e=>{
+    if(!ON()||wheel.sticky||e.code!=='KeyZ'&&e.code!==binds().ability)return;
+    if(performance.now()-wheel.t0<250&&!Math.hypot(wheel.cx,wheel.cy)){   // a tap: stay open, the last ante lit
+      wheel.sticky=true;const i=wheel.list.findIndex(x=>x.a.id===lastAnte&&!x.why);selectAnte(i>=0?i:wheel.list.findIndex(x=>!x.why),true);return;}
+    bet();
+  },true);
+  addEventListener('keydown',e=>{
+    if(!ON())return;
+    if(e.code==='Escape'){closeWheel();return;}
+    const n=/^Digit([1-9])$/.exec(e.code)?.[1];
+    if(n&&+n<=wheel.list.length){e.preventDefault();e.stopImmediatePropagation();selectAnte(+n-1,true);bet();}
+  },true);
+  addEventListener('mousemove',e=>{if(!ON()||touchMode())return;e.stopImmediatePropagation();aimWheel(e.movementX,e.movementY);},true);   // no looking round while choosing
+  addEventListener('mousedown',e=>{if(!ON()||touchMode())return;e.preventDefault();e.stopImmediatePropagation();if(e.button===0)bet();else if(e.button===2)closeWheel();},true);
+  addEventListener('wheel',e=>{
+    if(!ON())return;e.stopImmediatePropagation();
+    const n=wheel.list.length,d=e.deltaY>0?1:-1;let i=wheel.sel<0?(d>0?-1:0):wheel.sel;
+    for(let k=0;k<n;k++){i=(i+d+n)%n;if(!wheel.list[i].why)break;}selectAnte(i,true);
+  },{capture:true,passive:true});
+
+  function slice(a0,a1,r0,r1){
+    const p=(a,r)=>`${(C+Math.sin(a)*r).toFixed(1)} ${(C-Math.cos(a)*r).toFixed(1)}`;
+    return `M${p(a0,r1)} A${r1} ${r1} 0 0 1 ${p(a1,r1)} L${p(a1,r0)} A${r0} ${r0} 0 0 0 ${p(a0,r0)}Z`;
+  }
+  function buildWheel(){
+    const n=wheel.list.length,step=Math.PI*2/n;
+    let svgs=`<svg viewBox="0 0 ${C*2} ${C*2}" width="${C*2}" height="${C*2}"><circle class="felt" cx="${C}" cy="${C}" r="${WR+8}"/>`;
+    wheel.list.forEach(({a,why},i)=>{const m=i*step;
+      svgs+=`<path class="sl${why?' off':''}" data-i="${i}" style="--c:${a.color}" d="${slice(m-step/2+.02,m+step/2-.02,HUB+6,WR)}"/>`;});
+    svgs+=`<circle class="bulbs" cx="${C}" cy="${C}" r="${WR+8}" pathLength="72"/><circle class="hub" cx="${C}" cy="${C}" r="${HUB}"/></svg>`;
+    let labels='';
+    wheel.list.forEach(({a,why},i)=>{const m=i*step,r=(HUB+WR)/2+4;
+      labels+=`<div class="wl${why?' off':''}" data-i="${i}" style="left:${C+Math.sin(m)*r}px;top:${C-Math.cos(m)*r}px;--c:${a.color}">${touchMode()?'':`<i>${i+1}</i>`}<span class="tok"></span><b>${a.name.toUpperCase()}</b><small>${why||(edgeOf(a)?'EDGE '+Math.round(edgeOf(a)*A().edge*100)+'%':'NO EDGE')}</small></div>`;});
+    wh.innerHTML=`<div class="disc">${svgs}${labels}<div class="hubt"></div>${touchMode()?'':'<div class="wdot"></div>'}</div><div class="wi"></div>`;
+    wh.classList.add('show');drawWheel();
+  }
+  function drawWheel(){
+    if(!wheel)return;
+    wh.querySelectorAll('[data-i]').forEach(x=>x.classList.toggle('sel',+x.dataset.i===wheel.sel));
+    const dot=wh.querySelector('.wdot');if(dot)dot.style.transform=`translate(${wheel.cx}px,${wheel.cy}px)`;
+    wh.querySelector('.hubt').innerHTML=`TABLE<b>${GAMES[wheel.game].name.toUpperCase()}</b>${freePick()?`<small>${key('reload')} CHANGE</small>`:''}`;
+    const e=wheel.list[wheel.sel],z=key('ability');
+    if(!e){wh.querySelector('.wi').innerHTML=`<div class="ttl">ANTE UP</div><div class="hint">${wheel.sticky?`AIM · ${z} OR CLICK TO BET · 1-${wheel.list.length} · RIGHT CLICK TO FOLD`:`AIM AT AN ANTE · LET GO OF ${z} TO BET · LET GO IN THE MIDDLE TO FOLD`}</div>`;return;}
+    const a=e.a,stake=a.id==='bankroll'?bank().cost+' points':a.stake;
+    wh.querySelector('.wi').innerHTML=`<div class="ttl" style="color:${a.color}">${a.name.toUpperCase()}${e.why?` · <b>${e.why}</b>`:''}</div>`+
+      `<div class="wr"><small>STAKE</small>${stake}</div><div class="wr"><small>IN PLAY</small>${a.table}</div>`+
+      `<div class="wr w"><small>WIN</small>${a.win}</div><div class="wr l"><small>BUST</small>${a.bust}</div>`;
+  }
 
   // ---- the casino overlay -------------------------------------------------------------------------------------------------------
   const style=document.createElement('style');style.textContent=`
@@ -417,10 +545,29 @@ export function setupGambler(ctx){
     #gmb .ol{display:flex;justify-content:space-between;font-size:10px;margin-top:2px;color:#d8c99a}
     #gmb .hint{font-size:10px;color:#cfc3a0;margin-top:5px;letter-spacing:.1em}
     #gmb .mk{font-size:10px;color:#d8c99a;margin-top:3px}#gmb .mk i{display:inline-block;width:8px;height:8px;border-radius:50%;border:1px solid #f2c94c;margin:0 2px;vertical-align:middle}#gmb .mk i.f{background:#f2c94c}
-    #gmb .chips{display:flex;gap:10px;justify-content:center;margin:8px 0 6px}
-    #gmb .chip{width:58px;height:58px;border-radius:50%;border:5px dashed var(--c);background:#0007;display:flex;align-items:center;justify-content:center;font-size:10px;opacity:.45;transition:transform .12s}
-    #gmb .chip.sel{opacity:1;transform:scale(1.18);box-shadow:0 0 16px var(--c)}
-    #gmb .desc{font-size:11px;color:#e8ddb8;max-width:430px;margin:0 auto}
+    #gmb .wh{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;pointer-events:auto}#gmb .wh.show{display:block}
+    #gmb .disc{position:relative;width:${C*2}px;height:${C*2}px;animation:gmbIn .16s ease-out}
+    @keyframes gmbIn{from{transform:scale(.7) rotate(-25deg);opacity:0}}
+    #gmb .disc svg{position:absolute;inset:0;overflow:visible;filter:drop-shadow(0 4px 14px #000a)}
+    #gmb .felt{fill:#0b3520e8;stroke:#f2c94c;stroke-width:4}
+    #gmb .bulbs{fill:none;stroke:#ffe7a0;stroke-width:5;stroke-linecap:round;stroke-dasharray:0 1}
+    #gmb.fx2 .bulbs{animation:gmbBulbs .9s linear infinite}@keyframes gmbBulbs{to{stroke-dashoffset:-2}}
+    #gmb .sl{fill:var(--c);fill-opacity:.28;stroke:#f2c94c;stroke-opacity:.5;stroke-width:1.5;transform-origin:${C}px ${C}px;transition:transform .1s,fill-opacity .1s}
+    #gmb .sl.sel{fill-opacity:.85;stroke-opacity:1;stroke-width:3;transform:scale(1.07)}#gmb .sl.off{fill:#444;fill-opacity:.35}
+    #gmb .hub{fill:#14502f;stroke:#f2c94c;stroke-width:3}
+    #gmb .hubt{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:${HUB*2-10}px;text-align:center;font-size:9px;letter-spacing:.16em;color:#d8c99a}
+    #gmb .hubt b{display:block;font-size:13px;color:#fff;letter-spacing:.04em;margin-top:2px}#gmb .hubt small{display:block;margin-top:3px;color:#f2c94c;font-size:8px}
+    #gmb .wl{position:absolute;transform:translate(-50%,-50%);text-align:center;width:96px;transition:transform .1s}
+    #gmb .wl .tok{display:block;width:30px;height:30px;margin:0 auto 3px;border-radius:50%;background:var(--c);border:4px dashed #fffc;box-shadow:0 2px 4px #0009}
+    #gmb .wl b{display:block;font-size:13px}#gmb .wl small{display:block;font-size:9px;color:#e8ddb8;letter-spacing:.08em}
+    #gmb .wl i{position:absolute;top:-6px;left:14px;font:800 10px sans-serif;font-style:normal;color:#f2c94c}
+    #gmb .wl.sel{transform:translate(-50%,-50%) scale(1.15)}#gmb .wl.sel b{color:#fff;text-shadow:0 0 10px var(--c)}
+    #gmb .wl.off{opacity:.5}#gmb .wl.off .tok{filter:grayscale(1)}#gmb .wl.off small{color:#f08a8a}
+    #gmb .wdot{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px;border-radius:50%;background:#fff;box-shadow:0 0 8px #f2c94c}
+    #gmb .wi{width:420px;margin:-4px auto 0;padding:8px 14px;background:#0b3520ee;border:2px solid #f2c94c;border-radius:12px;font-size:12px}
+    #gmb .wr{display:grid;grid-template-columns:58px 1fr;align-items:baseline;margin:2px 0;color:#f2e2b0}#gmb .wr small{color:#d8c99a;font-size:9px;letter-spacing:.12em}
+    #gmb .wr.w{color:#9fe39a}#gmb .wr.l{color:#f08a8a}
+    #gmb.fx0 .disc{animation:none}#gmb.fx0 .disc svg{filter:none}
     #gmb .ban{position:absolute;top:36%;left:50%;transform:translate(-50%,-50%);text-align:center;display:none}#gmb .ban.show{display:block}
     #gmb .ban h1{margin:0;font-size:46px;font-weight:900;letter-spacing:.1em;text-shadow:0 0 18px currentColor,0 2px 4px #000}
     #gmb .ban h2{margin:2px 0 6px;font-size:16px;color:#fff}#gmb .ban p{margin:0;font-size:12px;color:#f2e2b0}
@@ -433,9 +580,13 @@ export function setupGambler(ctx){
     #gmb .tm{font-size:12px}#gmb .tm b{color:#fff}`;
   document.head.append(style);
   const el=document.createElement('div');el.id='gmb';
-  el.innerHTML='<div class="edge"><i></i><i></i><i></i><i></i></div><div class="board"><div class="word"></div><div class="bd"></div></div><div class="ban"></div><div class="rack"></div>';
+  el.innerHTML='<div class="edge"><i></i><i></i><i></i><i></i></div><div class="board"><div class="word"></div><div class="bd"></div></div><div class="ban"></div><div class="rack"></div><div class="wh"></div>';
   document.body.append(el);
-  const [board,word,bd,ban,rack]=['.board','.word','.bd','.ban','.rack'].map(s=>el.querySelector(s));
+  const [board,word,bd,ban,rack,wh]=['.board','.word','.bd','.ban','.rack','.wh'].map(s=>el.querySelector(s));
+  wh.addEventListener('pointerdown',e=>{   // touch: tap an ante to bet it, the middle to fold
+    if(!ON()||!touchMode())return;e.preventDefault();e.stopPropagation();
+    const x=e.target.closest?.('[data-i]');if(x){selectAnte(+x.dataset.i);bet();}else closeWheel();
+  });
   let drawT=0,last={},wordShown=-1;
   const put=(node,key,html)=>{if(last[key]!==html){last[key]=html;node.innerHTML=html;}};
   const key=c=>(binds()[c]??'').replace(/^Key/,'');
@@ -463,24 +614,21 @@ export function setupGambler(ctx){
     return `<div class="odds">${seg.map(([v,c])=>`<i style="width:${v*100}%;background:${c}"></i>`).join('')}</div><div class="ol"><span>BUST ${pct(o.bust)}</span><span>WIN ${pct(o.win)}</span><span>JACKPOT ${pct(o.jackpot)}</span></div>`;
   }
   const markerPips=()=>`<div class="mk">MARKER ${[...Array(markerMax())].map((_,i)=>`<i class="${i<marker?'f':''}"></i>`).join('')}</div>`;
+  const stakeNote=r=>r.ante.id==='bankroll'?` ${r.stake+r.pot} ON THE LINE`:r.dark?` · ${perkName(r.dark).toUpperCase()} DARK`:r.ante.id==='clock'?' · SLOW CLOCK':'';
   function draw(force){
     if(force)last={};
     const lvl=Math.round(settings.casinoFx??2);
     el.className=`fx${lvl}${phase!=='idle'?' on':''}${hr&&lvl?' hr':''}`;
     // the board: the ante picker, a game or the ride
-    if(phase==='ante'){const a=pick.list[pick.i];
-      put(bd,'b',`<div class="ttl">ANTE UP · TABLE <b>${GAMES[pick.game].name.toUpperCase()}</b></div><div class="chips">${pick.list.map((x,i)=>`<div class="chip${i===pick.i?' sel':''}" style="--c:${x.color}">${x.name.toUpperCase()}</div>`).join('')}</div>`+
-        `<div class="desc">${a.id==='bankroll'?a.desc.replace(/^Stake [\d,]+ points[^.]*\./,`Stake ${bank().cost} points.`):a.desc}${edgeOf(a)?` House Edge ${Math.round(edgeOf(a)*A().edge*100)}%.`:''}</div>`+
-        `<div class="clock"><i style="width:${Math.round(pick.t/G.pick*100)}%"></i></div><div class="hint">${key('ability')} NEXT ANTE${freePick()?` · ${key('reload')} NEXT GAME`:''}</div>`);}
-    else if(phase==='play'){const s=run.s,g=GAMES[s.id],now=s.id==='blackjack'||s.id==='slots'&&s.t<STOPS[2]?'':g.result(s).label;
+    if(phase==='play'){const s=run.s,g=GAMES[s.id],now=s.id==='blackjack'||s.id==='slots'&&s.t<STOPS[2]?'':g.result(s).label;
       if(wordShown!==run.wordN){wordShown=run.wordN;word.innerHTML=run.word?`<span>${run.word}</span>`:'';}   // its own node, so redraws don't restart the pop
-      put(bd,'b',`<div class="ttl">${run.ante.name.toUpperCase()} · <b>${g.name.toUpperCase()}</b></div><div class="tbl">${table(s)}</div>`+
+      put(bd,'b',`<div class="ttl">${run.ante.name.toUpperCase()}${stakeNote(run)} · <b>${g.name.toUpperCase()}</b></div><div class="tbl">${table(s)}</div>`+
         `<div class="now">${now?'NOW: '+now:'&nbsp;'}</div><div class="clock"><i style="width:${Math.round(Math.max(0,1-s.t/s.dur)*100)}%"></i></div>${oddsBar(run.odds)}<div class="hint">${g.hint.replace(/\bZ\b/g,key('ability')).replace(/\bR\b/g,key('reload'))}</div>${markerPips()}`);}
     else if(phase==='ride'){const [n,c]=TIER[run.tier],[n2,c2]=TIER[tierUp(run.tier)];
       put(bd,'b',`<div class="ttl">LET IT RIDE · ${run.label}</div><div class="tbl" style="font-size:22px"><span style="color:${c}">${n}</span> → <span style="color:${c2}">${n2}</span></div>`+
         (run.flip?'<div class="tbl"><span class="coin"></span></div>':`<div class="now">ODDS ${Math.round(rideChance()*100)}% · RIDE ${run.rides+1} OF ${A().rides}${S('gamble.allIn')?' · ALL IN: A LOSS STILL PAYS':''}</div><div class="clock"><i style="width:${Math.round(run.rideT/G.ride.time*100)}%"></i></div>`)+
         `<div class="hint">${key('ability')} FLIP · ${key('reload')} CASH OUT</div>`);}
-    board.classList.toggle('show',phase!=='idle');if(phase!=='play'&&word.firstChild){word.innerHTML='';wordShown=-1;}
+    board.classList.toggle('show',phase==='play'||phase==='ride');if(phase!=='play'&&word.firstChild){word.innerHTML='';wordShown=-1;}
     // the result banner
     if(banner){const [n,c]=TIER[banner.tier];put(ban,'n',`<h1 style="color:${c}">${n}</h1><h2>${banner.label}</h2><p>${banner.lines.join(' · ')}</p>`);}
     ban.classList.toggle('show',!!banner);
@@ -488,8 +636,11 @@ export function setupGambler(ctx){
     const t=session.time,rows=[];
     if(hr)rows.push(`<div class="hrm">${JP.name.toUpperCase()} ${sec(hr.until-t)}</div>`);
     if(streak)rows.push(`<div class="tm" style="color:#ff9a4a">HOT STREAK <b>${sec(streak.until-t)}</b></div>`);
-    for(const [id,m] of mods)rows.push(`<div class="tm">${REWARD[id].name.toUpperCase()}${id==='hotHand'&&m.stacks?' ×'+m.stacks:''} <b>${sec(m.until-t)}</b></div>`);
+    for(const [id,m] of mods)rows.push(`<div class="tm">${(REWARD[id]?.name??ANTE_MOD[id]).toUpperCase()}${id==='hotHand'&&m.stacks?' ×'+m.stacks:''} <b>${sec(m.until-t)}</b></div>`);
     for(const o of totems)rows.push(`<div class="tm">${REWARD[o.id].name.toUpperCase()} <b>${sec(o.until-t)}</b></div>`);
+    if(loaner)rows.push(`<div class="tm">LOANER <b>${sec(loaner.until-t)}</b></div>`);
+    for(const d of dark)rows.push(`<div class="tm" style="color:#b9a0f0">${perkName(d.id).toUpperCase()} DARK <b>${sec(d.until-t)}</b></div>`);
+    for(const b of borrowed)rows.push(`<div class="tm" style="color:#b9a0f0">${perkName(b.id).toUpperCase()} (BORROWED) <b>${sec(b.until-t)}</b></div>`);
     if(aceHits)rows.push(`<div class="tm">ACE OF SPADES <b>×${aceHits}</b></div>`);
     if(phase==='idle'&&marker)rows.push(markerPips());
     if(hand.length)rows.push(`<div>${hand.map((id,i)=>`<span class="hc">${REWARD[id].name.toUpperCase()}${i===0&&ctx.getCooldown()>0&&phase==='idle'?`<kbd>${key('ability')}</kbd>`:''}</span>`).join('')}</div>`);
@@ -499,10 +650,11 @@ export function setupGambler(ctx){
 
   return {
     deploy,up:()=>phase!=='idle',
-    left:()=>phase==='ante'?'ANTE':phase==='ride'?'RIDE':run?Math.ceil(Math.max(0,run.s.dur-run.s.t)):'',
+    left:()=>phase==='ante'?'BET':phase==='ride'?'RIDE':run?Math.ceil(Math.max(0,run.s.dur-run.s.t)):'',
     near:()=>false,
     // debug handles: kino.classes.gamb
     get phase(){return phase;},get run(){return run;},hand,mods,totems,marker:()=>marker,
-    grant,deal,play,plant,highRoller,startRun:(ante='chip',game='slots')=>{pick=null;startRun(ANTE[ante],game);},
+    grant,deal,play,plant,highRoller,startRun:(ante='chip',game='slots')=>{if(phase==='ante')closeWheel();startRun(ANTE[ante],game);},
+    get wheel(){return wheel;},openWheel,aimWheel,bet,closeWheel,get loaner(){return loaner;},dark,borrowed,
   };
 }

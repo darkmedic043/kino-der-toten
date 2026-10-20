@@ -316,3 +316,4 @@
 - 2026-10-19 (later): the support hand holds underbarrel attachments (foregrip with the wrist rolled, launcher, Masterkey, flamethrower); Bondrewd's bracer plates pulled in and first-person metal capped.
 - 2026-10-20: the **Gambler** class (C4SH-style): Ante Up deals a random casino game across the screen (blackjack, bone dice, slots; poker, fistful of dice, roulette as tree unlocks), the gun tilts the odds, wins pay gun power-ups, cards and totems, jackpots start an 18 s High Roller Mode (classes.md; Helm Classes note).
 - 2026-10-20 (later): the Gambler's rack (timers, marker, hand cards) moved to the left edge mid-screen; bottom right covered the guns and gobblegums.
+- 2026-10-20: Gambler's ante wheel (hold Z, aim, let go; tap keeps it open) and every ante made temporary: Bankroll pot, Blood's Bloodlust, Iron's Overclocked/loaner gun, Soul's dark and borrowed perks, new Clock ante; Pack-a-Punch removed (classes.md).

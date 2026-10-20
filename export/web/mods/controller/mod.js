@@ -197,8 +197,10 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
     const [rx,ry]=stick(gp.axes[2]??0,gp.axes[3]??0),ads=b[AIM];
     const rate=3.4*(settings.sensitivity??1)*(settings.padSensitivity??1)*(ads?.5*(settings.adsSensitivity??1):1);
     const curve=v=>v*Math.abs(v);
-    camera.rotation.y-=curve(rx)*rate*dt;
-    camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x-curve(ry)*rate*.75*dt*(settings.invertY?-1:1)));
+    if(!window.kino?.lookHold){   // a radial picker (the Gambler's ante wheel) is reading the stick
+      camera.rotation.y-=curve(rx)*rate*dt;
+      camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x-curve(ry)*rate*.75*dt*(settings.invertY?-1:1)));
+    }
     // Triggers: fire and aim (mouse buttons). Buttons: their keys, held as long as the button.
     hold(FIRE,0,b[FIRE]);hold(AIM,2,b[AIM]);
     for(const [i,code] of Object.entries(KEYS))hold(+i,code,b[+i]);
