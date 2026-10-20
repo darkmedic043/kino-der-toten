@@ -46,7 +46,10 @@ export default async function setup(api){
   // ---- The Mystery Box list (edited in the main menu's Loadout pane) -----------------
   // mystery-box.js reads window.kino.boxList on every roll: what this player switched on,
   // weighted by rarity. Lethals aren't guns: the box hands them out through giveWeapon.
-  const owned=id=>id==='frag_grenade_zm'?session.grenades>=4:id==='claymore_zm'?!!session.claymoresOwned:false;
+  // a tactical you hold never rolls again (2026-10-20, user: "box spins can't give duplicate tacticals"): Monkey Bombs while
+  // owned (mystery-box.js checks that for its own pool; the loadout list's extras come through here), the moon-equipment
+  // mod's Gersch Device and QED while they are the slot's (kino.tactical.id; a different one may still roll: it replaces)
+  const owned=id=>id==='frag_grenade_zm'?session.grenades>=4:id==='claymore_zm'?!!session.claymoresOwned:id==='zombie_cymbal_monkey'?!!session.monkeysOwned:data.equipment?.[id]?.tactical?window.kino.tactical?.id===id:false;
   Object.defineProperty(window.kino,'boxList',{configurable:true,get:()=>({...boxFilter(config,profile,data),owned})});
   const giveWeapon=session.giveWeapon.bind(session);
   session.giveWeapon=(id,...rest)=>{
