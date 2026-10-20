@@ -125,15 +125,31 @@ export class FirstPersonArms {
     // from it at their own lengths, the fingers at their own lengths). Stays on model, where the
     // per-joint offsets below stretch a short forearm thin and noodle short fingers.
     const rt=this.entry.fpArmsRetarget?[]:null,rtIndex=new Map();
+    // Palm fit (retarget mode): the vertices bound to the wrist bone, T5's glove's (indices into the rig's own meshes)
+    // and the character's hand's (indices into the baked arms, filled in by the bake below). Each frame solve() keeps
+    // those within the palm (between the wrist and the knuckles, in the live palm frame), measures both palms' faces
+    // along the palm normal, the character's as drawn, and slides the hand along the normal until the faces meet on
+    // the gun's side. Bondrewd's gauntlet palm sat 0.25 off the pistol's backstrap (2026-10-19, user: "the palm isn't
+    // fully on the back of the gun"). Live rather than once: the hand turns against the glove's frame as it plays.
+    const palmFit=(t5,S)=>{
+      if(!T(`j_mid_${t5}_0`)||!T(`j_index_${t5}_0`))return null;
+      const primary=(o,i)=>{const SI=o.geometry.attributes.skinIndex,SW=o.geometry.attributes.skinWeight;let best=0,bw=-1;for(let c=0;c<4;c++){const ww=SW.getComponent(i,c);if(ww>bw){bw=ww;best=SI.getComponent(i,c);}}return o.skeleton.bones[best];};
+      const o=template[0],idx=[];   // (the first mesh only: BO1's surfaces share one vertex buffer)
+      for(let i=0;i<o.geometry.attributes.position.count;i++)if(primary(o,i)?.name==='j_wrist_'+t5)idx.push(i);
+      if(idx.length<8)return null;
+      return {t5:[{mi:0,idx:Uint32Array.from(idx)}],bIdx:[],hand:S.hand,ups:new Float32Array(4096),shift:0};};
     if(rt)for(const [t5,S] of Object.entries(sides)){
       const sh=new THREE.Matrix4().makeTranslation(shift[t5]);
       const add=(bone,info)=>{const t=info.t5&&T(info.t5);rtIndex.set(bone,rt.length);
         rt.push({...info,name:bone.name,t5:t?info.t5:null,bind:sh.clone().multiply(bone.matrixWorld),t5BindInv:t?t.matrixWorld.clone().invert():null,parent:rtIndex.get(bone.parent)??-1});};
       // the hand turns with T5's palm (its knuckles), not just the wrist bone: T5's animations move the
       // knuckles relative to the wrist, and following the wrist alone left the hand rolled up to ~110°
-      const kn=['mid','index','pinky'].map(n=>`j_${n}_${t5}_0`);
+      // the palm's frame from the wrist, middle and index knuckles: rigid to the wrist like the glove's palm (the pinky
+      // knuckle rides the pinky's palm bone, which folds round a grip and tilted a rigid gauntlet palm off the grip)
+      const kn=[`j_mid_${t5}_0`,`j_index_${t5}_0`,'j_wrist_'+t5];
       const knOk=kn.every(n=>T(n))&&T('j_wrist_'+t5);
       add(S.hand,{kind:'anchor',t5:'j_wrist_'+t5,kn:knOk?kn:null,qBindInv:knOk?handBasis(tp('j_wrist_'+t5),tp(kn[0]),tp(kn[1]),tp(kn[2])).invert():null,t5BindPos:tp('j_wrist_'+t5)});
+      {const hb=rt[rtIndex.get(S.hand)];hb.palm=knOk?palmFit(t5,S):null;}
       add(S.fore,{kind:'back',t5:'j_elbow_'+t5,child:rtIndex.get(S.hand)});
       add(S.arm,{kind:'back',t5:'j_shoulder_'+t5,child:rtIndex.get(S.fore)});
       const finger=new Map();for(const [n,ch] of Object.entries(S.fingers))ch.forEach((b,i)=>finger.set(b,`j_${n}_${t5}_${i}`));
@@ -181,7 +197,7 @@ export class FirstPersonArms {
     // fpArmsExclude (regex): bones left out of first person (big fur flaps, armour)
     const skip=this.entry.fpArmsExclude?new RegExp(this.entry.fpArmsExclude,'i'):null;
     const keepBones=new Map();for(const S of Object.values(sides))(this.entry.fpArmsUpper===false?S.fore:S.arm).traverse(b=>{if(b.isBone&&!(skip&&skip.test(b.name)))keepBones.set(b,S);});
-    const parts=[];
+    const parts=[],palmLists=new Map(),palmMat=this.entry.fpArmsPalmMaterial?new RegExp(this.entry.fpArmsPalmMaterial,'i'):null;   // (palm fit: this part's palm vertices per hand)
     model.traverse(o=>{
       if(!o.isSkinnedMesh)return;
       o.skeleton.update();
@@ -203,7 +219,11 @@ export class FirstPersonArms {
         o.getVertexPosition(v,v3);v3.applyMatrix4(o.matrixWorld);
         if(rt){v3.add(shift[sideOf[v].t5]);P.set([v3.x,v3.y,v3.z],i*3);if(UV)UV.set([g.attributes.uv.getX(v),g.attributes.uv.getY(v)],i*2);
           const w=new Map();for(let k=0;k<4;k++){const weight=sw.getComponent(v,k);if(!weight)continue;const j=rtIndex.get(src[si.getComponent(v,k)])??rtIndex.get(sideOf[v].arm);w.set(j,(w.get(j)??0)+weight);}
-          const top=[...w].sort((a,b)=>b[1]-a[1]).slice(0,4),sum=top.reduce((s,[,x])=>s+x,0)||1;top.forEach(([j,weight],k)=>{SI[i*4+k]=j;SW[i*4+k]=weight/sum;});return;}
+          const top=[...w].sort((a,b)=>b[1]-a[1]).slice(0,4),sum=top.reduce((s,[,x])=>s+x,0)||1;top.forEach(([j,weight],k)=>{SI[i*4+k]=j;SW[i*4+k]=weight/sum;});
+          // (fpArmsPalmMaterial: only this material counts as the palm; Bondrewd's gauntlet plates stand 0.5 proud of its palm
+          // and would seat themselves on the grip instead of the hand)
+          const pf=rt[rtIndex.get(sideOf[v].hand)]?.palm;if(pf&&top[0]?.[0]===rtIndex.get(sideOf[v].hand)&&(!palmMat||palmMat.test([o.material].flat()[0]?.name??'')))(palmLists.get(pf)??palmLists.set(pf,[]).get(pf)).push(i);
+          return;}
         {const d=new THREE.Vector3();for(let k=0;k<4;k++){const w=sw.getComponent(v,k),sc=w&&scaleBones.get(src[si.getComponent(v,k)]);if(sc)d.addScaledVector(v3.clone().sub(sc.base),w*(sc.k-1));}v3.add(d);}
         const move=new THREE.Vector3();let wsum=0;
         for(let k=0;k<4;k++){const weight=sw.getComponent(v,k);if(!weight)continue;const off=offAt(src[si.getComponent(v,k)],v3);if(off){move.addScaledVector(off,weight);wsum+=weight;}}
@@ -214,6 +234,7 @@ export class FirstPersonArms {
         const top=[...w].sort((a,b)=>b[1]-a[1]).slice(0,4),sum=top.reduce((s,[,x])=>s+x,0)||1;
         top.forEach(([name,weight],k)=>{SI[i*4+k]=t5Index.get(name)??0;SW[i*4+k]=weight/sum;});
       });
+      for(const [pf,list] of palmLists){if(list.length>=8)pf.bIdx.push({k:parts.length,idx:Uint32Array.from(list)});}palmLists.clear();
       const geo=new THREE.BufferGeometry();
       geo.setAttribute('position',new THREE.BufferAttribute(P,3));if(UV)geo.setAttribute('uv',new THREE.BufferAttribute(UV,2));
       geo.setAttribute('skinIndex',new THREE.BufferAttribute(SI,4));geo.setAttribute('skinWeight',new THREE.BufferAttribute(SW,4));
@@ -249,23 +270,29 @@ export class FirstPersonArms {
     const built=this.builds.get(key);if(!built)return;   // this rig keeps its own arms
     this.parts=built.parts;this.rt=built.rt;
     hands.traverse(o=>{if(isT5Arms(o))o.visible=false;});
-    const skeleton=this.rt&&this.retargetSkeleton(template.skeleton);
+    const liveT5=[];hands.traverse(o=>{if(isT5Arms(o))liveT5.push(o);});
+    const skeleton=this.rt&&this.retargetSkeleton(template.skeleton,liveT5);
+    const made=[];
     for(const {geometry,material} of this.parts){
       const mesh=new THREE.SkinnedMesh(geometry,material);mesh.frustumCulled=false;mesh.name='fp_arms';
-      template.parent.add(mesh);
+      template.parent.add(mesh);made.push(mesh);
       // retarget: solve the bones after the scene's matrices are final (before the bone texture uploads)
-      if(skeleton){mesh.bind(skeleton,new THREE.Matrix4());mesh.onBeforeRender=()=>{skeleton.solve();skeleton.update();};}
+      if(skeleton){mesh.bind(skeleton,new THREE.Matrix4());mesh.onBeforeRender=renderer=>{const f=renderer.info.render.frame;if(skeleton.drawn===f)return;skeleton.drawn=f;skeleton.solve();skeleton.update();};}   // (once a frame for all the parts)
       else mesh.bind(template.skeleton,template.bindMatrix);
     }
+    if(skeleton)skeleton.fp=made;   // (palm fit reads the drawn palm from them)
   }
   // Bones driven by a live T5 skeleton (fpArmsRetarget); their matrixWorld is set directly.
-  retargetSkeleton(t5){
+  retargetSkeleton(t5,liveT5=[]){
     const rt=this.rt,live=rt.map(e=>e.t5?t5.getBoneByName(e.t5):null),knLive=rt.map(e=>e.kn?e.kn.map(n=>t5.getBoneByName(n)):null);
     const q=new THREE.Quaternion(),v0=new THREE.Vector3(),v1=new THREE.Vector3(),v2=new THREE.Vector3(),v3=new THREE.Vector3(),R=new THREE.Matrix4(),Tm=new THREE.Matrix4();
     const Rm=new THREE.Matrix4(),Qa=new THREE.Quaternion(),Qb=new THREE.Quaternion(),Qc=new THREE.Quaternion(),Qd=new THREE.Quaternion(),Qe=new THREE.Quaternion(),Qf=new THREE.Quaternion();
     const TWIST_SHARE=.6;   // how much of the hand-against-forearm roll the forearm takes on
     const bones=rt.map(e=>{const b=new THREE.Bone();b.name=e.name;b.matrixAutoUpdate=false;b.matrixWorldAutoUpdate=false;return b;});
     const skeleton=new THREE.Skeleton(bones,rt.map(e=>e.bind.clone().invert())),reach=this.entry.fpArmsReach!==false;
+    const gunLive=t5.getBoneByName('tag_weapon')??t5.getBoneByName('j_gun')??null,qb=new THREE.Quaternion(),vu=new THREE.Vector3(),vg=new THREE.Vector3(),vf=new THREE.Vector3(),vl=new THREE.Vector3(),vs=new THREE.Vector3(),vp=new THREE.Vector3();   // (palm fit)
+    // the face of a palm on the gun's side: the 10th (or 90th) percentile of its vertices along the palm normal
+    const face=(ups,n,side)=>{const a=ups.subarray(0,n).sort();return side<0?a[Math.floor(n*.1)]:a[Math.floor(n*.9)];};
     // fpArmsFingerScale here too ({thumb: .55, '*': .8}): a finger chain is scaled about its base knuckle (the knuckle's
     // matrix carries the scale; the rest of the chain hangs off it and inherits). Bondrewd Premium's gauntlet claws stood
     // in front of the pistol sights (2026-10-19, user: "the claw often gets in the way when ads").
@@ -274,12 +301,33 @@ export class FirstPersonArms {
     rt.forEach(e=>{if(e.fk==null){let p=e.parent;while(p>=0&&rt[p].fk==null)p=rt[p].parent;e.fk=p>=0?rt[p].fk:1;}});
     const Sf=new THREE.Matrix4();
     const m=new THREE.Matrix4(),p=new THREE.Vector3();
-    skeleton.solve=()=>rt.forEach((e,i)=>{
+    // Palm fit, measured before any bone is rebuilt this frame, while every bone still holds last frame's drawn pose
+    // (applyBoneTransform reads the bones' matrices themselves): both palms' faces along the live palm normal, the glove's
+    // and the character's as drawn, and the gap goes into the shift a half at a time (an integrating correction that
+    // measures what is drawn, blended weights and all; it settles in a few frames).
+    const palmPass=()=>{
+      if(!gunLive||!liveT5.length||!skeleton.fp)return;
+      let gloveFresh=false;
+      for(const e of rt){const P=e.palm;if(!P||e.kind!=='anchor')continue;const t=live[rt.indexOf(e)],kl=knLive[rt.indexOf(e)];if(!t||!kl||!kl.every(Boolean))continue;
+        v0.setFromMatrixPosition(t.matrixWorld);v1.setFromMatrixPosition(kl[0].matrixWorld);v2.setFromMatrixPosition(kl[1].matrixWorld);
+        vf.copy(v1).sub(v0).normalize();vl.copy(v2).sub(v0).normalize();vu.crossVectors(vf,vl).normalize();vs.crossVectors(vf,vu).normalize();const len=v1.distanceTo(v0);
+        const side=Math.sign(vg.setFromMatrixPosition(gunLive.matrixWorld).sub(v0).dot(vu))||-1;
+        if(!gloveFresh){gloveFresh=true;t5.update();}   // the glove is hidden: nothing else refreshes its skinning
+        const take=()=>{vp.sub(v0);const a=vp.dot(vf),c=vp.dot(vs);if(a<0||a>len*1.1||Math.abs(c)>len*.8||n>=P.ups.length)return;P.ups[n++]=vp.dot(vu);};
+        let n=0;for(const {mi,idx} of P.t5){const o=liveT5[mi];if(!o)continue;const pos=o.geometry.attributes.position;for(let k=0;k<idx.length;k++){vp.fromBufferAttribute(pos,idx[k]);o.applyBoneTransform(idx[k],vp);o.localToWorld(vp);take();}}
+        const fT=n>=8?face(P.ups,n,side):null;n=0;
+        if(skeleton.solveFrame>1)for(const {k,idx} of P.bIdx){const o=skeleton.fp[k];if(!o)continue;const pos=o.geometry.attributes.position;for(let q2=0;q2<idx.length;q2+=2){vp.fromBufferAttribute(pos,idx[q2]);o.applyBoneTransform(idx[q2],vp);o.localToWorld(vp);take();}}
+        const fB=n>=8?face(P.ups,n,side):null;P.lastT=fT;P.lastB=fB;P.lastSide=side;
+        if(fT!=null&&fB!=null)P.shift=THREE.MathUtils.clamp(P.shift+(fT-fB)*.5,-2,2);}
+    };
+    skeleton.solveFrame=0;skeleton.drawn=-1;skeleton.solve=()=>{skeleton.solveFrame++;palmPass();rt.forEach((e,i)=>{
       const W=bones[i].matrixWorld,t=live[i];
       const kl=knLive[i];
       if(t&&kl&&kl.every(Boolean)){   // the palm: rotate by how T5's knuckle frame turned since bind, pinned to T5's wrist
-        q.copy(handBasis(v0.setFromMatrixPosition(t.matrixWorld),v1.setFromMatrixPosition(kl[0].matrixWorld),v2.setFromMatrixPosition(kl[1].matrixWorld),v3.setFromMatrixPosition(kl[2].matrixWorld))).multiply(e.qBindInv);
+        qb.copy(handBasis(v0.setFromMatrixPosition(t.matrixWorld),v1.setFromMatrixPosition(kl[0].matrixWorld),v2.setFromMatrixPosition(kl[1].matrixWorld),v3.setFromMatrixPosition(kl[2].matrixWorld)));q.copy(qb).multiply(e.qBindInv);
         R.makeRotationFromQuaternion(q);W.makeTranslation(-e.t5BindPos.x,-e.t5BindPos.y,-e.t5BindPos.z).premultiply(R).premultiply(Tm.makeTranslation(v0.x,v0.y,v0.z)).multiply(e.bind);
+        // palm fit: slide along the live palm normal by what the pre-pass measured
+        if(e.palm&&e.palm.shift){const P=e.palm;vf.copy(v1).sub(v0).normalize();vl.copy(v2).sub(v0).normalize();vu.crossVectors(vf,vl).normalize();W.elements[12]+=vu.x*P.shift;W.elements[13]+=vu.y*P.shift;W.elements[14]+=vu.z*P.shift;}
       }
       else if(t)W.multiplyMatrices(t.matrixWorld,e.t5BindInv).multiply(e.bind);   // T5's rotation since bind
       // A character arm shorter than T5's cannot reach T5's wrist on a full stretch (the knife lunge): hanging the arm back
@@ -302,7 +350,7 @@ export class FirstPersonArms {
       }
       if(e.kind==='back'){W.setPosition(0,0,0);p.copy(e.d).applyMatrix4(W);W.setPosition(new THREE.Vector3().setFromMatrixPosition(bones[e.child].matrixWorld).sub(p));}
       else if(e.kind==='follow'&&e.parent>=0){m.multiplyMatrices(bones[e.parent].matrixWorld,e.local);if(t){W.setPosition(p.setFromMatrixPosition(m));if(e.fk!==1)W.multiply(Sf.makeScale(e.fk,e.fk,e.fk));}else W.copy(m);}   // (a T5-mapped knuckle resets the scale: put it back)
-    });
+    });};
     return skeleton;
   }
   // Called every frame with the active viewmodel; cheap once a rig is attached.
