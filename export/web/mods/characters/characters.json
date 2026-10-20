@@ -397,7 +397,7 @@
    },
    "fpArms": true,
    "fpArmsRetarget": true,
-   "fpArmsNearCut": 5, "fpArmsFingerScale": {"thumb": 0.55, "*": 0.8}, "fpArmsReach": false, "fpArmsPalmMaterial": "^Body$", "fpArmsForearmPlates": {"material": "^Transform$", "scale": 0.55},
+   "fpArmsNearCut": 5, "fpArmsHandSkin": {"material": "^Body$", "like": "^Transform$", "color": "#c8cdcf", "when": {"blessing": ["fur", "blessed"]}}, "fpArmsFingerScale": {"thumb": 0.55, "*": 0.8}, "fpArmsReach": false, "fpArmsPalmMaterial": "^Body$", "fpArmsForearmPlates": {"material": "^Transform$", "scale": 0.55},
    "springBones": [
     {
      "chains": [

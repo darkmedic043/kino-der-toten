@@ -8,7 +8,8 @@
 // hands stay on grips and fingers curl with every animation.
 import * as THREE from 'three';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
-import { applyVariants } from './characters.js';
+import { applyVariants, variantPick } from './characters.js';
+import { imageOf } from './texture-memory.js';
 
 const FINGERS=[['thumb',/thumb/i],['index',/index/i],['mid',/mid/i],['ring',/ring/i],['pinky',/little|pinky/i]];
 const pos=(o,out=new THREE.Vector3())=>o.getWorldPosition(out);
@@ -27,6 +28,13 @@ function handBasis(wrist,mid,index,little){
   // wrong quaternion and left retargeted hands rolled
   const up=new THREE.Vector3().crossVectors(f,l).normalize(),side=new THREE.Vector3().crossVectors(f,up).normalize();
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(f,up,side));
+}
+
+// the average colour of an image (drawn small; null when it cannot be drawn, e.g. a compressed texture's data)
+function imageAverage(img){
+  try{if(!img||!(img.width>0))return null;const c=document.createElement('canvas');c.width=c.height=8;const ctx=c.getContext('2d');ctx.drawImage(img,0,0,8,8);
+    const d=ctx.getImageData(0,0,8,8).data;let r=0,g=0,b=0,n=0;for(let i=0;i<d.length;i+=4){if(d[i+3]<64)continue;r+=d[i];g+=d[i+1];b+=d[i+2];n++;}
+    return n?new THREE.Color(r/n/255,g/n/255,b/n/255).convertSRGBToLinear():null;}catch{return null;}
 }
 
 export class FirstPersonArms {
@@ -215,6 +223,20 @@ export class FirstPersonArms {
     // ...but never inside the layers under them: the floor is the other materials' forearm radius (95th percentile) plus a
     // margin (plates.margin, .5). Without it the pull-in dragged Bondrewd's Blessed fur (the same material) inside the suit
     // and the metal forearm, which showed through it (2026-10-20, user: "showing the regular arms/hands underneath").
+    // fpArmsHandSkin {material, like, color, when}: the hand and fingers of `material` (the suit under Bondrewd's Blessed fur)
+    // are drawn in a plain material coloured like `like`'s (its colour times its map's average; `color` instead or as the
+    // fallback) when the variant picks in `when` ({group: [option ids]}) hold. Between the fur strands the black suit
+    // showed as a dark patch on the back of the hand (2026-10-20, user: "can you cover that dark patch on the hand too").
+    const skin=this.entry.fpArmsHandSkin,picks=variantPick(this.entry,{...this.entry.choice,...this.entry.fpArmsChoice});
+    const skinOn=!!skin?.material&&(!skin.when||Object.entries(skin.when).every(([g,ids])=>ids.includes(picks[g]?.id))),skinMat=skinOn?new RegExp(skin.material,'i'):null,likeMat=skinOn&&skin.like?new RegExp(skin.like,'i'):null;
+    const handSets=new Map();for(const S of Object.values(sides)){const set=new Set();S.hand.traverse(b=>{if(b.isBone)set.add(b);});handSets.set(S,set);}
+    const toneOf=c=>{const tone=this.entry.fpArmsTone??.8;if(Array.isArray(tone))c.multiply(new THREE.Color(...tone));else c.multiplyScalar(tone);return c;};
+    let skinColor=null;this.skinMats??=[];
+    if(skinOn){skinColor=new THREE.Color(skin.color??'#c8cdcf');
+      // the like material's map is usually off the CPU by now (texture-memory.js frees uploaded images): decode it again
+      // from its file and recolour the hand parts when it lands (a frame or two; the configured colour until then)
+      let like=null;if(likeMat)model.traverse(o=>{if(like||!o.isMesh)return;for(const m of [o.material].flat())if(m&&likeMat.test(m.name??'')){like=m;break;}});
+      if(like?.map?.source){const base=like.color.clone(),mats=this.skinMats;imageOf(like.map.source).then(img=>{const avg=imageAverage(img);if(!avg)return;const c=toneOf(base.multiply(avg));for(const m of mats)m.color.copy(c);}).catch(()=>{});}}
     const innerR={};if(plateMat){const lists={};for(const t5 of Object.keys(sides))lists[t5]=[];const vp=new THREE.Vector3();
       model.traverse(o=>{if(!o.isSkinnedMesh||plateMat.test([o.material].flat()[0]?.name??''))return;o.skeleton.update();const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight,src=o.skeleton.bones;
         for(let v=0;v<g.attributes.position.count;v++){let S=null,w=0;for(let k=0;k<4;k++){const b=src[si.getComponent(v,k)],s=keepBones.get(b);if(s&&(b===s.fore||(b?.parent===s.fore&&b!==s.hand))){w+=sw.getComponent(v,k);S??=s;}}if(!S||w<=.5)continue;
@@ -237,8 +259,10 @@ export class FirstPersonArms {
       if(!tris.length)return;
       const used=[...new Set(tris)],remap=new Map(used.map((v,i)=>[v,i]));
       const P=new Float32Array(used.length*3),UV=g.attributes.uv?new Float32Array(used.length*2):null,SI=new Uint16Array(used.length*4),SW=new Float32Array(used.length*4),v3=new THREE.Vector3();
+      const skinThis=!!skinMat&&skinMat.test([o.material].flat()[0]?.name??''),handFlag=skinThis?new Uint8Array(used.length):null;
       used.forEach((v,i)=>{
         o.getVertexPosition(v,v3);v3.applyMatrix4(o.matrixWorld);
+        if(handFlag){const hs=handSets.get(sideOf[v]);let hw=0;for(let k=0;k<4;k++)if(hs?.has(src[si.getComponent(v,k)]))hw+=sw.getComponent(v,k);handFlag[i]=hw>.5?1:0;}
         if(rt){const S=sideOf[v];
           {const d=new THREE.Vector3();for(let k=0;k<4;k++){const w=sw.getComponent(v,k),sc=w&&scaleBones.get(src[si.getComponent(v,k)]);if(sc)d.addScaledVector(v3.clone().sub(sc.base),w*(sc.k-1));}v3.add(d);}   // (fpArmsFingerScale, every layer by its weights)
           if(plateMat&&plateMat.test([o.material].flat()[0]?.name??'')){const fx=foreAxis[S.t5];let w=0;for(let k=0;k<4;k++){const b=src[si.getComponent(v,k)];if(b===S.fore||(b&&b.parent===S.fore&&b!==S.hand))w+=sw.getComponent(v,k);}
@@ -274,13 +298,19 @@ export class FirstPersonArms {
       // fpArmsNearCut (view units): the arm surface is cut away where it comes closer to the camera than this (a clean
       // near-plane cut; a dithered fade read as noise). Bondrewd's Blessed fur filled the whole screen as the knife lunge swung the forearm past the lens.
       const near=this.entry.fpArmsNearCut;
-      if(near){
+      const nearCut=material=>{if(!near)return;
         material.onBeforeCompile=sh=>{
           sh.vertexShader=sh.vertexShader.replace('void main() {','varying float vFpDepth;\nvoid main() {').replace('#include <project_vertex>','#include <project_vertex>\n\tvFpDepth=-mvPosition.z;');
           sh.fragmentShader=sh.fragmentShader.replace('void main() {',`varying float vFpDepth;\nvoid main() {\n\tif(vFpDepth<${near.toFixed(2)})discard;`);
         };
-        material.customProgramCacheKey=()=>'fpNearCut'+near;
-      }
+        material.customProgramCacheKey=()=>'fpNearCut'+near;};
+      nearCut(material);
+      // fpArmsHandSkin: the hand's triangles go to their own part in the plain fur-coloured material (the attributes and
+      // the normals, computed over the whole surface above, are shared)
+      if(handFlag){const all=geo.getIndex().array,hand=[],rest=[];for(let t=0;t<all.length;t+=3)(handFlag[all[t]]&&handFlag[all[t+1]]&&handFlag[all[t+2]]?hand:rest).push(all[t],all[t+1],all[t+2]);
+        if(hand.length){const g2=new THREE.BufferGeometry();for(const [name,attr] of Object.entries(geo.attributes))g2.setAttribute(name,attr);g2.setIndex(hand);geo.setIndex(rest);
+          const m2=new THREE.MeshStandardMaterial({color:toneOf(skinColor.clone()),roughness:skin.roughness??.9,metalness:0,side:material.side});nearCut(m2);this.skinMats.push(m2);
+          if(rest.length)parts.push({geometry:geo,material});parts.push({geometry:g2,material:m2});return;}}
       parts.push({geometry:geo,material});
     });
     this.parts=parts;this.rt=rt;return parts.length>0;
