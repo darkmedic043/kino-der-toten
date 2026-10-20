@@ -52,7 +52,11 @@ export class FirstPersonArms {
       const fingers={};
       for(const base of hand.children.filter(c=>c.isBone)){
         const kind=fingerKinds.find(([,re])=>re.test(base.name));if(!kind||fingers[kind[0]])continue;
-        const chain=[/palm/i.test(base.name)&&firstChild(base)?firstChild(base):base];   // (T5's own ring and pinky hang off palm bones: start at the knuckle)while(chain.length<3&&firstChild(chain.at(-1)))chain.push(firstChild(chain.at(-1)));
+        // (T5's own ring and pinky hang off palm bones: start at the knuckle.) The walk down the chain must stay out of
+        // this comment: with it swallowed (2026-10-19 to 10-20) every chain was its knuckle alone, the middle and tip bones
+        // had no glove joint to follow and Bondrewd's fingers were rigid (user: "not working like actual hands").
+        const chain=[/palm/i.test(base.name)&&firstChild(base)?firstChild(base):base];
+        while(chain.length<3&&firstChild(chain.at(-1)))chain.push(firstChild(chain.at(-1)));
         fingers[kind[0]]=chain;
       }
       sides[t5]={arm,fore,hand,fingers};
