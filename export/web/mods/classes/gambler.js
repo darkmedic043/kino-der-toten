@@ -24,12 +24,14 @@ const svg=d=>'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3
 const WHEEL_ICON={card:svg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M12 8l2.5 4-2.5 4-2.5-4z"/>'),shuffle:svg('<path d="M3 7h4l10 10h4M3 17h4L17 7h4M18 4l3 3-3 3M18 14l3 3-3 3"/>')};
 const pickOne=a=>a[Math.floor(Math.random()*a.length)];
 const MULE='specialty_additionalprimaryweapon';
+const PUNCH={blackjack:'21',dice:'BD',slots:'777',poker:'PK',fistful:'FD',roulette:'RL'};   // the Grand Tour card's labels
 const ANTE_MOD={overclock:'Overclocked',bloodlust:'Bloodlust',harvest:'Soul Harvest'};   // timed mods the antes pay (rewards are in classes.json)
 
 export function setupGambler(ctx){
   const {api,cls}=ctx,{host,session,data,scene,camera,player,enemies,world,audio}=api;
   const G=cls.gambler,JP=G.jackpot,REWARD=Object.fromEntries(G.rewards.map(r=>[r.id,r])),ANTE=Object.fromEntries(G.antes.map(a=>[a.id,a]));
   const S=k=>ctx.S()[k]??0,A=()=>ctx.A(),sk=()=>ctx.skills?.();
+  const SP=G.specials,TOUR=G.tour,modName=id=>REWARD[id]?.name??ANTE_MOD[id]??SP[id]?.name;   // each game's house special is a timed mod keyed by the game's id
   const fortune=()=>Math.floor(sk()?.res?.value??0),fortuneMax=()=>sk()?.max()??20;
   const hp=()=>zombieHealth(session.round,data.rules);
   const fx=()=>window.kino.fx??{};
@@ -42,7 +44,8 @@ export function setupGambler(ctx){
   // phase: idle · ante (the wheel) · play (a game on the table) · ride (Let It Ride after a win). Ante Up is "up"
   // (its meter holds) from the picker until the payout.
   let phase='idle',wheel=null,lastAnte=null,run=null,banner=null,marker=0,lastGame=null,hr=null,streak=null;
-  let windfallT=-99,aceHits=0,aceShot=-1,cashShot=-1,reloadSlowUntil=-1,lastCard=-9;
+  let windfallT=-99,aceHits=0,aceShot=-1,cashShot=-1,reloadSlowUntil=-1,lastCard=-9,loadedShot=-1,loaded=false,pokerHeads=0;
+  const punch=new Set();   // the Grand Tour's punch card: the games won since the last tour
   const hand=[],mods=new Map(),totems=[],shots=[],holes=[],queue=[],lines=[],slowed=new Map(),anims=new Map();
   const modOn=id=>mods.has(id);
   const hrOn=()=>!!hr;
@@ -108,6 +111,7 @@ export function setupGambler(ctx){
     if(mine&&modOn('overclock')&&session.weapon&&session.def)session.weapon.mag=Math.max(session.weapon.mag,session.def.clipSize);   // Iron's win: kills refill the mag
     if(mine&&modOn('bloodlust'))session.health=Math.min(session.maxHealth,session.health+ANTE.blood.lust.heal);
     if(mine&&modOn('harvest'))harvest(e.enemy);
+    if(mine)specialKill(e);
     if(phase!=='play'||!(mine||cause==='ricochet'&&S('gamble.trickShot')))return;
     const t=session.time,melee=e.melee||cause==='melee';
     if(run.ante.id==='bankroll')run.pot+=ANTE.bankroll.pot;
@@ -166,6 +170,9 @@ export function setupGambler(ctx){
       if(r.dark)out.push(givePerk(r.dark));const b=borrow(),H=ANTE.soul.harvest;
       timed('harvest',b?H.time:H.time*H.full);mods.get('harvest').heal=!b;out.push(b??'FULL HOUSE');out.push(b?'SOUL HARVEST':'SOUL HARVEST ×2');}
     if(a==='clock'){clockBack=true;out.push('HALF CHARGED');}
+    if(SP[r.id]){timed(r.id,SP.time*SP.scale[tier]);out.push(SP[r.id].name.toUpperCase());}   // the game's house special
+    if(A().games.includes(r.id)){punch.add(r.id);if(A().games.every(g=>punch.has(g))){   // Grand Tour: every game in the pool won
+      punch.clear();for(const g of A().games)timed(g,TOUR.time);sk()?.gainF(TOUR.fortune*A().games.length);out.push(TOUR.name.toUpperCase()+' ×'+A().games.length);}}
     if(S('gamble.diceTotem')&&familyOf(r.id)==='dice')out.push(plant(pickOne(Object.keys(TOTEM))));   // Hot Dice
     if(S('gamble.freeze')&&(tier==='big'||tier==='jackpot'))freeze(feet(),600,3);   // Freeze Frame
     return out;
@@ -283,12 +290,29 @@ export function setupGambler(ctx){
     let k=(modOn('golden')?2:1)*(modOn('overclock')?ANTE.iron.over.dmg:1)*(1+.04*stacks());
     if(S('gamble.deadHand')&&session.health<session.maxHealth*.4)k*=1+S('gamble.deadHand')*hand.length;   // Dead Man's Hand
     if(aceHits>0){k*=4;if(session.shots!==aceShot){aceShot=session.shots;aceHits--;}}   // one hit per shot, so pellets share it
+    if(modOn('dice')){if(loadedShot!==session.shots){loadedShot=session.shots;loaded=Math.random()<SP.dice.chance;}if(loaded)k*=SP.dice.mult;}   // Loaded Dice: one roll a shot
+    if(e.head&&modOn('poker'))k*=SP.poker.head;   // Poker Face
     e.amount*=k;
+    if(modOn('blackjack'))queue.push({from:z,dmg:e.amount*SP.blackjack.split,cause:'split',color:0xf8f4ea,range:SP.blackjack.range});   // Split
     if(modOn('cash')&&cashShot!==session.shots){cashShot=session.shots;session.addPoints(10);}
     if(modOn('dealer'))dealer(z,e.amount);
     const p=(hrOn()?JP.ricochet:0)+(S('gamble.ricochet')&&(S('gamble.trickShot')||fortune()>=fortuneMax())?S('gamble.ricochet'):0);   // Bank Shot
     if(p&&Math.random()<p)queue.push({from:z,dmg:e.amount*.6*(1+S('gamble.hrDmg')),cause:'ricochet',color:0xffd76a});
   });
+  function specialKill(e){   // the house specials that trigger on your kills
+    const at=e.enemy.root.position.clone().addScaledVector(up,45);
+    if(modOn('slots')){const C=SP.slots,z=nearby(at,C.range,e.enemy);   // Coin Shower
+      for(let i=0;i<C.coins&&z.length;i++)launch('coin',z[i%z.length],{speed:900,from:at,spread:30},(p,hit)=>{if(hit){enemies.hurt(hit,C.dmg*hp(),false,false,'coin');session.addPoints(C.points);}});}
+    if(modOn('fistful')&&Math.random()<SP.fistful.chance)queue.push({delay:.2,blast:e.enemy.root.position.clone().addScaledVector(up,30),r:SP.fistful.radius,k:SP.fistful.dmg});   // Rolling Thunder
+    if(e.head&&modOn('poker')&&++pokerHeads>=SP.poker.every){pokerHeads=0;say('POKER FACE · '+deal(randomCard()),1);}
+    if(modOn('roulette')){const R=SP.roulette,r=Math.random();   // House Spin
+      if(r<R.green){freeze(feet(),600,3);session.addPoints(R.greenPoints);say('HOUSE SPIN · GREEN 0',1.6);}
+      else if(r<(1+R.green)/2){if(session.weapon&&session.def)session.weapon.mag=Math.max(session.weapon.mag,session.def.clipSize);}
+      else for(const z of nearby(at,320,e.enemy).slice(0,R.arcs)){line(at,chest(z),0xd94a5c);enemies.hurt(z,R.arcDmg*hp(),false,false,'arc');}}
+  }
+  function nearby(at,range,not){   // zombies in sight of a point, nearest first
+    return enemies.list.filter(z=>z!==not&&alive(z)&&z.root.position.distanceTo(at)<range&&world.lineClear(at,chest(z))).sort((a,b)=>a.root.position.distanceTo(at)-b.root.position.distanceTo(at));
+  }
   function dealer(z,amount){
     const r=Math.random();
     if(r<.2)z.turretBurn={until:session.time+3,dps:hp()*.08,tick:.5};   // mod.js burns it
@@ -327,7 +351,7 @@ export function setupGambler(ctx){
     r.addColorStop(0,'#fff');r.addColorStop(.3,'#fffa');r.addColorStop(1,'#fff0');g.fillStyle=r;g.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);})();
   const cardTex=(()=>{const c=document.createElement('canvas');c.width=32;c.height=48;const g=c.getContext('2d');
     g.fillStyle='#f8f4ea';g.fillRect(2,2,28,44);g.strokeStyle='#f2c94c';g.lineWidth=3;g.strokeRect(2,2,28,44);g.fillStyle='#c4202f';g.font='bold 20px serif';g.textAlign='center';g.fillText('♦',16,31);return new THREE.CanvasTexture(c);})();
-  const SPRITE={fire:{map:glow,color:0xff7a2a,size:46},soul:{map:glow,color:0x9a6cff,size:30},bolt:{map:glow,color:0xb98cff,size:18},card:{map:cardTex,color:0xffffff,size:14}};
+  const SPRITE={fire:{map:glow,color:0xff7a2a,size:46},soul:{map:glow,color:0x9a6cff,size:30},bolt:{map:glow,color:0xb98cff,size:18},coin:{map:glow,color:0xffc531,size:16},card:{map:cardTex,color:0xffffff,size:14}};
   for(const k in SPRITE)SPRITE[k].mat=new THREE.SpriteMaterial({map:SPRITE[k].map,color:SPRITE[k].color,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false});
   function launch(kind,goal,{speed,delay=0,spread=0,from=null},hit){
     const sp=new THREE.Sprite(SPRITE[kind].mat);sp.scale.set(SPRITE[kind].size,SPRITE[kind].size*(kind==='card'?1.5:1),1);
@@ -381,7 +405,7 @@ export function setupGambler(ctx){
       }
     }else if(phase==='ride')ride(dt);
     if(banner&&(banner.t-=dt)<=0)banner=null;
-    for(const [id,m] of mods)if(t>m.until){mods.delete(id);if(ANTE_MOD[id])say(ANTE_MOD[id]+' over',1);}
+    for(const [id,m] of mods)if(t>m.until){mods.delete(id);if(ANTE_MOD[id]||SP[id])say(modName(id)+' over',1);}
     if(hr&&t>hr.until){hr=null;say(JP.name+' over');}
     if(streak&&t>streak.until)streak=null;
     if(session.phase==='reviving'&&(dark.length||borrowed.length||run?.dark)){dark.length=borrowed.length=0;if(run)run.dark=null;}   // a down took the perks: nothing to give back
@@ -390,7 +414,7 @@ export function setupGambler(ctx){
     if(loaner&&t>loaner.until)giveBack();
     for(let i=queue.length-1;i>=0;i--){   // ricochets, arcs and blasts, out of the damage event
       const q=queue[i];if(q.delay>0&&(q.delay-=dt)>0)continue;queue.splice(i,1);
-      if(q.blast){ctx.blast(q.blast,200,.8,true);continue;}
+      if(q.blast){ctx.blast(q.blast,q.r??200,q.k??.8,true);continue;}
       if(!alive(q.from))continue;
       const from=chest(q.from),to=enemies.list.filter(z=>z!==q.from&&z.root.position.distanceTo(q.from.root.position)<(q.range??JP.radius)&&world.lineClear(from,chest(z)))
         .sort((a,b)=>a.root.position.distanceTo(q.from.root.position)-b.root.position.distanceTo(q.from.root.position))[0];
@@ -425,7 +449,7 @@ export function setupGambler(ctx){
   });
   host.on('reset',()=>{
     if(phase==='ante')closeWheel();
-    phase='idle';wheel=run=banner=hr=streak=loaner=null;marker=aceHits=0;dark.length=borrowed.length=0;clockBack=false;hand.length=0;mods.clear();queue.length=0;holes.length=0;
+    phase='idle';wheel=run=banner=hr=streak=loaner=null;marker=aceHits=0;dark.length=borrowed.length=0;clockBack=false;hand.length=0;mods.clear();punch.clear();pokerHeads=0;queue.length=0;holes.length=0;
     for(const o of totems)o.g.removeFromParent();totems.length=0;for(const p of shots)p.sp.removeFromParent();shots.length=0;
     slowed.clear();anims.clear();draw(true);
   });
@@ -515,7 +539,7 @@ export function setupGambler(ctx){
     if(!wheel)return;
     wh.querySelectorAll('[data-i]').forEach(x=>x.classList.toggle('sel',+x.dataset.i===wheel.sel));
     const dot=wh.querySelector('.wdot');if(dot)dot.style.transform=`translate(${wheel.cx}px,${wheel.cy}px)`;
-    wh.querySelector('.hubt').innerHTML=`TABLE<b>${GAMES[wheel.game].name.toUpperCase()}</b>${freePick()?`<small>${key('reload')} CHANGE</small>`:''}`;
+    wh.querySelector('.hubt').innerHTML=`TABLE<b>${GAMES[wheel.game].name.toUpperCase()}</b>${SP[wheel.game]?`<em>${SP[wheel.game].name.toUpperCase()}</em>`:''}${freePick()?`<small>${key('reload')} CHANGE</small>`:''}`;
     const e=wheel.list[wheel.sel],z=key('ability');
     if(!e){wh.querySelector('.wi').innerHTML=`<div class="ttl">ANTE UP</div><div class="hint">${wheel.sticky?`AIM · ${z} OR CLICK TO BET · 1-${wheel.list.length} · RIGHT CLICK TO FOLD`:`AIM AT AN ANTE · LET GO OF ${z} TO BET · LET GO IN THE MIDDLE TO FOLD`}</div>`;return;}
     const a=e.a,stake=a.id==='bankroll'?bank().cost+' points':a.stake;
@@ -569,7 +593,8 @@ export function setupGambler(ctx){
     #gmb .sl.sel{fill-opacity:.85;stroke-opacity:1;stroke-width:3;transform:scale(1.07)}#gmb .sl.off{fill:#444;fill-opacity:.35}
     #gmb .hub{fill:#14502f;stroke:#f2c94c;stroke-width:3}
     #gmb .hubt{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:${HUB*2-10}px;text-align:center;font-size:9px;letter-spacing:.16em;color:#d8c99a}
-    #gmb .hubt b{display:block;font-size:13px;color:#fff;letter-spacing:.04em;margin-top:2px}#gmb .hubt small{display:block;margin-top:3px;color:#f2c94c;font-size:8px}
+    #gmb .hubt b{display:block;font-size:13px;color:#fff;letter-spacing:.04em;margin-top:2px}#gmb .hubt small{display:block;margin-top:3px;color:#f2c94c;font-size:8px}#gmb .hubt em{display:block;font-style:normal;color:#9fd4ff;font-size:8px;margin-top:2px}
+    #gmb .pc{display:inline-block;margin-left:4px;padding:0 3px;border:1px solid #5a5446;color:#5a5446;font-size:9px}#gmb .pc.on{border-color:#f2c94c;color:#f2c94c}
     #gmb .wl{position:absolute;transform:translate(-50%,-50%);text-align:center;width:96px;transition:transform .1s}
     #gmb .wl .tok{display:block;width:30px;height:30px;margin:0 auto 3px;border-radius:50%;background:var(--c);border:4px dashed #fffc;box-shadow:0 2px 4px #0009}
     #gmb .wl b{display:block;font-size:13px}#gmb .wl small{display:block;font-size:9px;color:#e8ddb8;letter-spacing:.08em}
@@ -649,12 +674,13 @@ export function setupGambler(ctx){
     const t=session.time,rows=[];
     if(hr)rows.push(`<div class="hrm">${JP.name.toUpperCase()} ${sec(hr.until-t)}</div>`);
     if(streak)rows.push(`<div class="tm" style="color:#ff9a4a">HOT STREAK <b>${sec(streak.until-t)}</b></div>`);
-    for(const [id,m] of mods)rows.push(`<div class="tm">${(REWARD[id]?.name??ANTE_MOD[id]).toUpperCase()}${id==='hotHand'&&m.stacks?' ×'+m.stacks:''} <b>${sec(m.until-t)}</b></div>`);
+    for(const [id,m] of mods)rows.push(`<div class="tm">${modName(id).toUpperCase()}${id==='hotHand'&&m.stacks?' ×'+m.stacks:''} <b>${sec(m.until-t)}</b></div>`);
     for(const o of totems)rows.push(`<div class="tm">${REWARD[o.id].name.toUpperCase()} <b>${sec(o.until-t)}</b></div>`);
     if(loaner)rows.push(`<div class="tm">LOANER <b>${sec(loaner.until-t)}</b></div>`);
     for(const d of dark)rows.push(`<div class="tm" style="color:#b9a0f0">${perkName(d.id).toUpperCase()} DARK <b>${sec(d.until-t)}</b></div>`);
     for(const b of borrowed)rows.push(`<div class="tm" style="color:#b9a0f0">${perkName(b.id).toUpperCase()} (BORROWED) <b>${sec(b.until-t)}</b></div>`);
     if(aceHits)rows.push(`<div class="tm">ACE OF SPADES <b>×${aceHits}</b></div>`);
+    if(punch.size)rows.push(`<div class="tm">${TOUR.name.toUpperCase()} ${A().games.map(g=>`<span class="pc${punch.has(g)?' on':''}">${PUNCH[g]??g}</span>`).join('')}</div>`);
     if(phase==='idle'&&marker)rows.push(markerPips());
     if(hand.length)rows.push(`<div>${hand.map((id,i)=>`<span class="hc">${REWARD[id].name.toUpperCase()}${i===0&&ctx.getCooldown()>0&&phase==='idle'?`<kbd>${key('ability')}</kbd>`:''}</span>`).join('')}</div>`);
     put(rack,'r',rows.join(''));
@@ -667,7 +693,7 @@ export function setupGambler(ctx){
     near:()=>false,
     // debug handles: kino.classes.gamb
     get phase(){return phase;},get run(){return run;},hand,mods,totems,marker:()=>marker,
-    grant,deal,play,plant,highRoller,startRun:(ante='chip',game='slots')=>{if(phase==='ante')closeWheel();startRun(ANTE[ante],game);},
+    grant,deal,play,plant,highRoller,punch:()=>[...punch],startRun:(ante='chip',game='slots')=>{if(phase==='ante')closeWheel();startRun(ANTE[ante],game);},
     get wheel(){return wheel;},openWheel,aimWheel,bet,closeWheel,get loaner(){return loaner;},dark,borrowed,
   };
 }

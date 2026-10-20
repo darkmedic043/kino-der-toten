@@ -2598,6 +2598,61 @@
           "ROYAL FLUSH": "Overclocked (double damage, faster fire, kills refill the mag) for the whole of High Roller Mode.",
           "HIGH ROLLER": "Let It Ride to the top: nothing extra, just the mode."
         },
+        "specials": {
+          "time": 15,
+          "scale": {
+            "win": 1,
+            "big": 1.5,
+            "jackpot": 2
+          },
+          "blackjack": {
+            "name": "Split",
+            "split": 0.5,
+            "range": 260,
+            "desc": "Every bullet hit splits: half of it jumps to the nearest zombie within 260."
+          },
+          "dice": {
+            "name": "Loaded Dice",
+            "chance": 0.1667,
+            "mult": 6,
+            "desc": "Every shot rolls a die: on a six its hits deal 6× damage."
+          },
+          "slots": {
+            "name": "Coin Shower",
+            "coins": 3,
+            "dmg": 0.25,
+            "points": 25,
+            "range": 500,
+            "desc": "Each kill sprays 3 gold coins at the zombies nearby, each for 25% of a zombie's health and +25 points."
+          },
+          "poker": {
+            "name": "Poker Face",
+            "head": 2,
+            "every": 3,
+            "desc": "Headshots deal 2× damage, and every 3rd headshot kill deals you a card."
+          },
+          "fistful": {
+            "name": "Rolling Thunder",
+            "chance": 0.34,
+            "radius": 220,
+            "dmg": 0.8,
+            "desc": "Each kill rolls a die: on a 5 or 6 the body blows up, hitting everything within 220 for 80% of a zombie's health."
+          },
+          "roulette": {
+            "name": "House Spin",
+            "arcs": 3,
+            "arcDmg": 0.4,
+            "green": 0.027,
+            "greenPoints": 500,
+            "desc": "Each kill spins the wheel: red refills your magazine, black arcs to 3 zombies for 40% of their health each, green (1 in 37) freezes every zombie near you and pays 500 points."
+          }
+        },
+        "tour": {
+          "name": "Grand Tour",
+          "time": 20,
+          "fortune": 2,
+          "desc": "Win every game in your pool once (the punch card on the rack) and the Grand Tour runs every one of their specials at once for 20s, plus 2 Fortune per game. The card then starts over."
+        },
         "run": {
           "marker": "Each bust fills the Marker; once it's full (3 busts), the next bust pays as a win (MARKER PAID). Any win clears it.",
           "ride": "After a win: Z lets it ride on a coin flip (a win pays one tier up, a loss busts), R cashes out. Up to 3 rides.",
@@ -2718,7 +2773,7 @@
               "name": "Poker",
               "ranks": 1,
               "icon": "cards",
-              "desc": "Adds Poker to your games: five cards, kills rank up your lowest card, two headshots in a row make a wild. Z or R locks the hand; when the clock runs out the loose cards are drawn again.",
+              "desc": "Adds Poker to your games: five cards, kills rank up your lowest card, two headshots in a row make a wild. Z or R locks the hand; when the clock runs out the loose cards are drawn again. Its wins pay Poker Face (headshots deal double damage, every 3rd headshot kill deals a card).",
               "effects": {
                 "gamble.game.poker": 1
               },
@@ -2898,7 +2953,7 @@
               "name": "Fistful of Dice",
               "ranks": 1,
               "icon": "dice",
-              "desc": "Adds Fistful of Dice to your games: five dice to fill with one face. A kill may hold a die, a melee kill sets one, Z re-rolls the loose dice once.",
+              "desc": "Adds Fistful of Dice to your games: five dice to fill with one face. A kill may hold a die, a melee kill sets one, Z re-rolls the loose dice once. Its wins pay Rolling Thunder (kills may blow up the body).",
               "effects": {
                 "gamble.game.fistful": 1
               },
@@ -3078,7 +3133,7 @@
               "name": "Roulette",
               "ranks": 1,
               "icon": "wheel",
-              "desc": "Adds Roulette to your games: you bet a colour and a lucky number. Kills brake the wheel when that lands it on your colour, headshots knock it a pocket on.",
+              "desc": "Adds Roulette to your games: you bet a colour and a lucky number. Kills brake the wheel when that lands it on your colour, headshots knock it a pocket on. Its wins pay House Spin (each kill refills your mag, arcs to 3 zombies, or rarely freezes them all).",
               "effects": {
                 "gamble.game.roulette": 1
               },

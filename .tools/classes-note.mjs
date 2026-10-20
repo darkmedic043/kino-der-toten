@@ -113,6 +113,16 @@ for (const x of c.classes) {
     p('|---|---|');
     for (const [k, v] of Object.entries(g.extras)) p(`| **${k}** | ${v} |`);
     p('');
+    if (g.specials) {
+      const SP = g.specials, sc = SP.scale;
+      p(`**House specials**: every game also pays its own special when you win it, on top of the rewards: ${SP.time}s on a win, ${SP.time * sc.big}s on a big win, ${SP.time * sc.jackpot}s on a jackpot. More games in the pool means more kinds of special.`);
+      p('');
+      p('| Game | Special | What it does |');
+      p('|---|---|---|');
+      for (const [id, gm] of Object.entries(g.games)) if (SP[id]) p(`| **${gm.name}** | **${SP[id].name}** | ${SP[id].desc} |`);
+      p('');
+      if (g.tour) { p(`**${g.tour.name}**: ${g.tour.desc}`); p(''); }
+    }
     p('**Busts** cost the ante (above) plus the game family\'s penalty:');
     p('');
     for (const [k, v] of Object.entries(g.busts)) p(`- **${k[0].toUpperCase() + k.slice(1)}**: ${v}`);
