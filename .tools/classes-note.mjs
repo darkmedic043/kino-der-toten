@@ -75,7 +75,7 @@ for (const x of c.classes) {
     p('');
     p('**A Run, step by step**');
     p('');
-    p('1. **Spin up the ante wheel**: hold Z, aim at an ante with the mouse or right stick, let go to bet it (let go in the middle to back out). A tap leaves the wheel open with your last ante lit: Z or a click bets it, 1-6 pick one, right click closes. The game, shown in the middle, is drawn at random from your pool and never repeats the last one.');
+    p('1. **Spin up the ante wheel**: press Z and point at an ante with the mouse or right stick (a pointer on the hub shows which one is lit), then click it or let go of Z on it to bet. Letting go anywhere else leaves the wheel open (a quick tap lights your last ante), so you can take your time; 1-6 bet straight away, right click or Esc folds. A greyed-out ante says why and keeps the wheel open. The game, shown in the middle, is drawn at random from your pool and never repeats the last one.');
     p('2. **The game plays across your screen** while you keep shooting. Kills, headshots, melee and multikills are your moves; Z and R make the calls. The table shows the live odds of a bust, win and jackpot.');
     p(`3. **Let It Ride**: after a win, Z flips a coin (a win pays one tier up, a loss busts), R cashes out. ${g.run.ride.replace(/^.*Up to/, 'Up to')}`);
     p('4. **Payout**: the ante pays on top of the rewards (below), or takes its penalty on a bust. Nothing an ante pays or costs is permanent: it all wears off or comes back.');

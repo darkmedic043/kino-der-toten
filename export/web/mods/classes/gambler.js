@@ -63,7 +63,7 @@ export function setupGambler(ctx){
   let loaner=null,clockBack=false;const dark=[],borrowed=[];
 
   function deploy(){
-    if(phase==='ante'){if(wheel.sticky)bet();return;}   // the wheel left open by a tap: Z bets the chosen ante
+    if(phase==='ante'){if(wheel.sticky)bet(true);return;}   // the wheel left open: Z bets the lit ante (in the middle it folds)
     if(phase==='play'){call('z');return;}
     if(phase==='ride'){flip();return;}
     if(ctx.getCooldown()>0){if(hand.length)playCard(0);else ctx.notReady();return;}   // charging: Z plays the top card
@@ -476,9 +476,10 @@ export function setupGambler(ctx){
     phase='ante';banner=null;window.kino.lookHold=true;audio.play('buy',.4);buildWheel();draw(true);
   }
   function closeWheel(){wheel=null;window.kino.lookHold=false;wh.classList.remove('show');if(phase==='ante')phase='idle';draw(true);}
-  function bet(){
+  function bet(fold){   // fold: nothing lit closes the wheel; a greyed-out ante never does
     const e=wheel.list[wheel.sel];
-    if(!e||e.why){if(e)audio.play('empty',.4);closeWheel();return;}
+    if(!e){if(fold)closeWheel();return;}
+    if(e.why){audio.play('empty',.4);say(e.a.name+': '+e.why.toLowerCase(),1.2);return;}
     const game=wheel.game;closeWheel();startRun(e.a,game);
   }
   function selectAnte(i,place){
@@ -501,9 +502,11 @@ export function setupGambler(ctx){
   const ON=()=>phase==='ante';
   addEventListener('keyup',e=>{
     if(!ON()||wheel.sticky||e.code!=='KeyZ'&&e.code!==binds().ability)return;
-    if(performance.now()-wheel.t0<250&&!Math.hypot(wheel.cx,wheel.cy)){   // a tap: stay open, the last ante lit
-      wheel.sticky=true;const i=wheel.list.findIndex(x=>x.a.id===lastAnte&&!x.why);selectAnte(i>=0?i:wheel.list.findIndex(x=>!x.why),true);return;}
-    bet();
+    const lit=wheel.list[wheel.sel];
+    if(lit&&!lit.why){bet();return;}   // let go on an ante: bet it
+    wheel.sticky=true;   // anywhere else the wheel stays open: point and click (or Z) to bet, right click or Esc folds
+    if(lit)bet();else if(performance.now()-wheel.t0<250){const i=wheel.list.findIndex(x=>x.a.id===lastAnte&&!x.why);if(i>=0)selectAnte(i,true);}   // a tap: the last ante lit
+    drawWheel();
   },true);
   addEventListener('keydown',e=>{
     if(!ON())return;
@@ -512,7 +515,7 @@ export function setupGambler(ctx){
     if(n&&+n<=wheel.list.length){e.preventDefault();e.stopImmediatePropagation();selectAnte(+n-1,true);bet();}
   },true);
   addEventListener('mousemove',e=>{if(!ON()||touchMode())return;e.stopImmediatePropagation();aimWheel(e.movementX,e.movementY);},true);   // no looking round while choosing
-  addEventListener('mousedown',e=>{if(!ON()||touchMode())return;e.preventDefault();e.stopImmediatePropagation();if(e.button===0)bet();else if(e.button===2)closeWheel();},true);
+  addEventListener('mousedown',e=>{if(!ON()||touchMode())return;e.preventDefault();e.stopImmediatePropagation();if(e.button===0){wheel.sticky=true;bet(true);}else if(e.button===2)closeWheel();},true);
   addEventListener('wheel',e=>{
     if(!ON())return;e.stopImmediatePropagation();
     const n=wheel.list.length,d=e.deltaY>0?1:-1;let i=wheel.sel<0?(d>0?-1:0):wheel.sel;
@@ -528,7 +531,7 @@ export function setupGambler(ctx){
     let svgs=`<svg viewBox="0 0 ${C*2} ${C*2}" width="${C*2}" height="${C*2}"><circle class="felt" cx="${C}" cy="${C}" r="${WR+8}"/>`;
     wheel.list.forEach(({a,why},i)=>{const m=i*step;
       svgs+=`<path class="sl${why?' off':''}" data-i="${i}" style="--c:${a.color}" d="${slice(m-step/2+.02,m+step/2-.02,HUB+6,WR)}"/>`;});
-    svgs+=`<circle class="bulbs" cx="${C}" cy="${C}" r="${WR+8}" pathLength="72"/><circle class="hub" cx="${C}" cy="${C}" r="${HUB}"/></svg>`;
+    svgs+=`<circle class="bulbs" cx="${C}" cy="${C}" r="${WR+8}" pathLength="72"/><circle class="hub" cx="${C}" cy="${C}" r="${HUB}"/><line class="ndl" x1="${C}" y1="${C}" x2="${C}" y2="${C}"/></svg>`;
     let labels='';
     wheel.list.forEach(({a,why},i)=>{const m=i*step,r=(HUB+WR)/2+4;
       labels+=`<div class="wl${why?' off':''}" data-i="${i}" style="left:${C+Math.sin(m)*r}px;top:${C-Math.cos(m)*r}px;--c:${a.color}">${touchMode()?'':`<i>${i+1}</i>`}<span class="tok"></span><b>${a.name.toUpperCase()}</b><small>${why||(edgeOf(a)?'EDGE '+Math.round(edgeOf(a)*A().edge*100)+'%':'NO EDGE')}</small></div>`;});
@@ -539,9 +542,13 @@ export function setupGambler(ctx){
     if(!wheel)return;
     wh.querySelectorAll('[data-i]').forEach(x=>x.classList.toggle('sel',+x.dataset.i===wheel.sel));
     const dot=wh.querySelector('.wdot');if(dot)dot.style.transform=`translate(${wheel.cx}px,${wheel.cy}px)`;
+    const nd=wh.querySelector('.ndl'),d=Math.hypot(wheel.cx,wheel.cy)||1;   // the needle points from the hub at the lit ante
+    for(const [k,r] of [['1',HUB-4],['2',HUB+20]]){nd.setAttribute('x'+k,C+wheel.cx/d*r);nd.setAttribute('y'+k,C+wheel.cy/d*r);}nd.style.opacity=wheel.sel<0?0:1;
+    if(wheel.sel>=0)nd.style.stroke=wheel.list[wheel.sel].why?'#888':wheel.list[wheel.sel].a.color;
+    wh.querySelector('.disc').classList.toggle('lit',wheel.sel>=0);
     wh.querySelector('.hubt').innerHTML=`TABLE<b>${GAMES[wheel.game].name.toUpperCase()}</b>${SP[wheel.game]?`<em>${SP[wheel.game].name.toUpperCase()}</em>`:''}${freePick()?`<small>${key('reload')} CHANGE</small>`:''}`;
     const e=wheel.list[wheel.sel],z=key('ability');
-    if(!e){wh.querySelector('.wi').innerHTML=`<div class="ttl">ANTE UP</div><div class="hint">${wheel.sticky?`AIM · ${z} OR CLICK TO BET · 1-${wheel.list.length} · RIGHT CLICK TO FOLD`:`AIM AT AN ANTE · LET GO OF ${z} TO BET · LET GO IN THE MIDDLE TO FOLD`}</div>`;return;}
+    if(!e){wh.querySelector('.wi').innerHTML=`<div class="ttl">ANTE UP</div><div class="hint">MOVE THE MOUSE TO AN ANTE · CLICK${wheel.sticky?` OR ${z}`:` OR LET GO OF ${z}`} TO BET · 1-${wheel.list.length} · RIGHT CLICK OR ESC TO FOLD</div>`;return;}
     const a=e.a,stake=a.id==='bankroll'?bank().cost+' points':a.stake;
     wh.querySelector('.wi').innerHTML=`<div class="ttl" style="color:${a.color}">${a.name.toUpperCase()}${e.why?` · <b>${e.why}</b>`:''}</div>`+
       `<div class="wr"><small>STAKE</small>${stake}</div><div class="wr"><small>IN PLAY</small>${a.table}</div>`+
@@ -590,7 +597,8 @@ export function setupGambler(ctx){
     #gmb .bulbs{fill:none;stroke:#ffe7a0;stroke-width:5;stroke-linecap:round;stroke-dasharray:0 1}
     #gmb.fx2 .bulbs{animation:gmbBulbs .9s linear infinite}@keyframes gmbBulbs{to{stroke-dashoffset:-2}}
     #gmb .sl{fill:var(--c);fill-opacity:.28;stroke:#f2c94c;stroke-opacity:.5;stroke-width:1.5;transform-origin:${C}px ${C}px;transition:transform .1s,fill-opacity .1s}
-    #gmb .sl.sel{fill-opacity:.85;stroke-opacity:1;stroke-width:3;transform:scale(1.07)}#gmb .sl.off{fill:#444;fill-opacity:.35}
+    #gmb .sl.sel{fill-opacity:.85;stroke-opacity:1;stroke-width:3;transform:scale(1.07)}#gmb .disc.lit .sl:not(.sel){fill-opacity:.14}#gmb .disc.lit .wl:not(.sel){opacity:.55}
+    #gmb .ndl{stroke-width:7;stroke-linecap:round;transition:opacity .1s;filter:drop-shadow(0 0 4px #000)}#gmb .sl.off{fill:#444;fill-opacity:.35}
     #gmb .hub{fill:#14502f;stroke:#f2c94c;stroke-width:3}
     #gmb .hubt{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:${HUB*2-10}px;text-align:center;font-size:9px;letter-spacing:.16em;color:#d8c99a}
     #gmb .hubt b{display:block;font-size:13px;color:#fff;letter-spacing:.04em;margin-top:2px}#gmb .hubt small{display:block;margin-top:3px;color:#f2c94c;font-size:8px}#gmb .hubt em{display:block;font-style:normal;color:#9fd4ff;font-size:8px;margin-top:2px}

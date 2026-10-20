@@ -324,3 +324,4 @@
 - 2026-10-20 (later): the Mystery Box no longer offers a tactical you already hold (Monkey Bombs, Gersch Device, QED).
 - 2026-10-20 (later): Bondrewd Premium's suit showed through the Blessed fur and the claws: the plate pull-in now stops outside the inner layers and the finger scale is baked into every layer alike.
 - 2026-10-20 (later): Bondrewd Premium's suit hand takes the fur's colour under the Blessing fur (`fpArmsHandSkin`), covering the dark patch between the strands.
+- 2026-10-20 (later): the Gambler's ante wheel works like the command wheel: point and click (or let go of Z) on an ante; letting go elsewhere no longer folds it, a pointer on the hub shows the lit ante.
