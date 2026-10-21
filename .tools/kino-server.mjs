@@ -29,7 +29,7 @@ mkdirSync(join(DATA, 'profiles'), { recursive: true });
 
 const TYPES = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8',
   '.css':'text/css; charset=utf-8','.glb':'model/gltf-binary','.gltf':'model/gltf+json','.webp':'image/webp','.ktx2':'image/ktx2','.wasm':'application/wasm','.yml':'text/yaml; charset=utf-8','.wav':'audio/wav','.ogg':'audio/ogg',
-  '.bin':'application/octet-stream','.png':'image/png','.jpg':'image/jpeg','.md':'text/plain; charset=utf-8','.txt':'text/plain; charset=utf-8'};
+  '.bin':'application/octet-stream','.png':'image/png','.svg':'image/svg+xml','.jpg':'image/jpeg','.md':'text/plain; charset=utf-8','.txt':'text/plain; charset=utf-8'};
 
 // ---- Storage (small JSON files, written atomically) -------------------------
 const readJson = (file, fallback) => { try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return fallback; } };
