@@ -296,6 +296,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     pct(0,'Damage',s.damageMul);pct(0,'Range',s.rangeMul);pct(0,'Fire rate',s.fireMul);
     if(s.suppressed)out.push(['pro','Quiet shots']);
     if(s.clipMul)out.push(['pro',`Magazine +${Math.round((s.clipMul-1)*100)}%`]);
+    if(s.reserveMul)out.push(['pro',`Reserve ammo +${Math.round((s.reserveMul-1)*100)}%`]);
     if(s.reloadMul)out.push([s.reloadMul<1?'pro':'con',`Reload ${s.reloadMul<1?'−':'+'}${Math.round(Math.abs(1-s.reloadMul)*100)}%`]);
     if(s.adsFov||s.adsFovMul)out.push(['pro','Zoom +']);
     if(s.headMul)out.push(['pro',`Headshots +${Math.round((s.headMul-1)*100)}%`]);

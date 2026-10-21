@@ -373,5 +373,38 @@
     0
    ]
   ]
+ },
+ {
+  "id": "havoc_zm",
+  "name": "GDL Havoc",
+  "cls": "launcher",
+  "max": 10,
+  "styles": [
+   "dangerclose",
+   "liveordnance",
+   "chainreaction"
+  ],
+  "names": [
+   "Danger Close",
+   "Live Ordnance",
+   "Chain Reaction"
+  ],
+  "pal": [
+   [
+    28,
+    46,
+    0
+   ],
+   [
+    176,
+    44,
+    0
+   ],
+   [
+    14,
+    320,
+    0
+   ]
+  ]
  }
 ]

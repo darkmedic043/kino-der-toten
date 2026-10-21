@@ -1,7 +1,8 @@
-// Skins a BO7 gun's Blender parts (.tools/build-grimhawk.py, .tools/build-siren.py) onto the BO1 M16 viewmodel's own skeleton, so every
-// M16 animation drives it, and writes a static world model in the M16 world model's frame.
-//   node .tools/assemble-grimhawk.mjs <parts.glb> <out_view.glb> <out_world.glb> [--gun siren]   (default grimhawk)
-// Each part mesh (part_<bone>) is weighted 100% to that bone. The M16's skeleton nodes and skin (with its inverse bind
+// Skins a BO7 gun's Blender parts (.tools/build-grimhawk.py, build-siren.py, build-havoc.py) onto a BO1 donor viewmodel's own
+// skeleton (the M16's; the China Lake's for the Havoc), so every donor animation drives it, and writes a static world model in
+// the donor world model's frame.
+//   node .tools/assemble-grimhawk.mjs <parts.glb> <out_view.glb> <out_world.glb> [--gun siren|havoc]   (default grimhawk)
+// Each part mesh (part_<bone>) is weighted 100% to that bone. The donor's skeleton nodes and skin (with its inverse bind
 // matrices) are copied as they are; its meshes are dropped. Blender's export (Z-up -> Y-up) lands the parts in the same
 // space as the M16's own vertices (x forward, y up, z = -CoD y), which is the skin's bind space.
 import fs from 'node:fs';
@@ -10,11 +11,11 @@ import path from 'node:path';
 const args = process.argv.slice(2), gi = args.indexOf('--gun'), GUN = gi >= 0 ? args.splice(gi, 2)[1] : 'grimhawk';
 const [partsPath, viewOut, worldOut] = args;
 const WEB = path.resolve(import.meta.dirname, '../export/web');
-const DONOR = path.join(WEB, 'models/t5_weapon_viewmodel_m16a1.glb');
 // Per gun: MUZZLE = tag_flash (CoD units, j_gun space); NEW_BONES = attachment bones the M16 lacks, children of j_gun at
 // these j_gun-space (CoD) positions (fitted mags sit where tag_clip does, so weapon-levels' fitted-mag follow keeps them
 // with the reload); BODY = the baked material (camos tile it CAMO_SCALE times denser, the whole gun shares one atlas);
-// WORLD_PARTS = the bare gun for the world model (a static mesh can't hide attachments).
+// WORLD_PARTS = the bare gun for the world model (a static mesh can't hide attachments); DONOR and WORLD_SHIFT (viewmodel gun
+// space -> the donor world model's, glTF axes) default to the M16's.
 const CLIP = [4.29, -0.01, 1.29];
 const GUNS = {
   grimhawk: { MUZZLE: [30.45, 0, 2.4], BODY: 'gh_body',
@@ -26,9 +27,18 @@ const GUNS = {
       tag_sr_resonance: [16.8, 0, 2.2], tag_sr_baffle: [24.4, 0, 2.2], tag_sr_echo: [16.6, 2.4, 2.2], tag_sr_lancet: [-1.6, 0, -1.5],
       tag_sr_soma: [-1.6, 0, -1.5], tag_foregrip: [15.2, 0, -1], tag_laser_box: [16, -2, 2.2] },
     WORLD_PARTS: ['j_gun', 'tag_clip', 'tag_iron_sight', 'tag_sr_grip'] },
+  // the China Lake (EX41): its world model is shorter than the viewmodel (muzzle 8 in further back, 1.8 lower); lined up on the sights
+  havoc: { DONOR: 'models/t5_weapon_ex41_viewmodel.glb', WORLD_SHIFT: [-7.5, -1.7, 0], MUZZLE: [21.0, 0, 2.0], BODY: 'hv_body',
+    NEW_BONES: { tag_hv_cap: [19.4, 0, -1.05], tag_hv_grip: [-6.7, 0, -0.8], tag_hv_ballistic: [6, 0, 4.5], tag_hv_prox: [20.8, 0, 2],
+      tag_hv_daisy: [21.2, 0, 2], tag_hv_kinetic: [12, 0, 2], tag_hv_mortar: [17.5, 0, 2], tag_hv_airstrike: [20, 0, -1.05],
+      tag_hv_extube: [21.5, 0, -1.05], tag_hv_tripwire: [17.4, 0, -3], tag_hv_actuator: [-6.7, 0, -0.8], tag_hv_dash: [-6.7, 0, -0.8],
+      tag_hv_bandolier: [-16.5, 1.2, 1.2], tag_hv_breacher: [-20.6, 0, 0], tag_hv_napalm: [-1, 2, -1.3], tag_hv_cryo: [-1, 2, -1.3],
+      tag_hv_arc: [-1, 2, -1.3], tag_hv_cluster: [-1, 2, -1.3], tag_hv_singularity: [-1, 2, -1.3], tag_laser_box: [13, -2, 2.5] },
+    WORLD_PARTS: ['j_gun', 'j_pump', 'tag_hv_cap', 'tag_hv_grip'] },
 };
 const { MUZZLE, NEW_BONES, BODY, WORLD_PARTS } = GUNS[GUN];
-const WORLD_SHIFT = [-10.5, -2.55, 0];   // viewmodel gun space -> the M16 world model's (CoD (-10.5, 0, -2.55), in glTF axes)
+const DONOR = path.join(WEB, GUNS[GUN].DONOR ?? 'models/t5_weapon_viewmodel_m16a1.glb');
+const WORLD_SHIFT = GUNS[GUN].WORLD_SHIFT ?? [-10.5, -2.55, 0];   // the M16's: CoD (-10.5, 0, -2.55), in glTF axes
 const CAMO_SCALE = 9;
 
 function readGlb(file) {
@@ -144,7 +154,7 @@ for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith
   console.log(`[${GUN}] viewmodel`, viewOut, [...partMeshes.keys()].join(', '));
 }
 
-// ---- world model: one static mesh in the M16 world model's frame (root tag_weapon, gun shifted) ------------------
+// ---- world model: one static mesh in the donor world model's frame (root tag_weapon, gun shifted) ------------------
 {
   const out = { asset: { version: '2.0', generator: 'assemble-' + GUN }, scene: 0, scenes: [{ nodes: [0] }], nodes: [], meshes: [], materials: [], accessors: [], bufferViews: [] };
   const w = writer(), fromParts = copier(parts, out, w);
@@ -153,7 +163,7 @@ for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith
   for (const [bone, mi] of partMeshes) if (WORLD_PARTS.includes(bone)) for (const p of parts.json.meshes[mi].primitives)
     prims.push({ attributes: Object.fromEntries(Object.entries(p.attributes).map(([k, v]) => [k, fromParts(v)])), indices: fromParts(p.indices), material: p.material, mode: 4 });
   out.meshes.push({ name: GUN + '_world', primitives: prims });
-  // the M16 world model's root: tag_weapon turned -90° about X (CoD Z-up); the mesh sits beside it, shifted
+  // the donor world model's root: tag_weapon turned -90° about X (CoD Z-up); the mesh sits beside it, shifted
   out.nodes.push({ name: GUN + '_world_root', children: [1, 2] });
   out.nodes.push({ name: 'tag_weapon', rotation: [-Math.SQRT1_2, 0, 0, Math.SQRT1_2] });
   out.nodes.push({ name: 'surf0', mesh: 0, translation: WORLD_SHIFT });

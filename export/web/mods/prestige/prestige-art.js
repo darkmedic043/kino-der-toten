@@ -6,9 +6,10 @@
 //                                 (white = glowing), animated in camo.js's shader
 // Class motifs: sniper scope rings, shotgun buckshot, SMG speed lines, AR chevron marks, LMG belt links, pistol
 // engraving, launcher blast rays, special glyph runes.
-// Hand-made: the Siren's Wailing Tide (I), Choir Grille (II) and Song of Circe (Master).
+// Hand-made: the Siren's Wailing Tide (I), Choir Grille (II) and Song of Circe (Master); the GDL Havoc's Danger Close (I),
+// Live Ordnance (II) and Chain Reaction (Master).
 // Hand-made designs for one gun (named in .tools/prestige-guns.json, not in STYLES so no other gun is dealt them)
-const OWN=new Set(['wailtide','choirgrille','songofcirce']);
+const OWN=new Set(['wailtide','choirgrille','songofcirce','dangerclose','liveordnance','chainreaction']);
 export const STYLES={1:['shards','chevrons','splinter','contour','scales','brush'],2:['lattice','filigree','damascus','mosaic','carbon','facets'],3:['cracks','circuit','runes','lightning','magma','constellation']};
 
 const hsl=(h,s,l,a=1)=>`hsla(${((h%360)+360)%360},${s}%,${l}%,${a})`;
@@ -22,6 +23,18 @@ function voronoi(S,n,r){const pts=[...Array(n)].map(()=>[r()*S,r()*S]),cell=new 
 
 // ---- Prestige I ------------------------------------------------------------------------------------------------
 const P1={
+  // the GDL Havoc's Prestige I: hazard-stripe bands between dark plates, stencilled 40MM blocks and two-tone blast stars
+  dangerclose(g,S,r,p,w){g.fillStyle=hsl(p.h,25,10);g.fillRect(0,0,S,S);const B=S/4,st=S/16;
+    for(let b=0;b<4;b++){if(b%2)continue;const y0=b*B+B*.18,y1=y0+B*.64;g.save();g.beginPath();g.rect(0,y0,S,y1-y0);g.clip();
+      g.fillStyle=hsl(p.h2,85,52);g.fillRect(0,y0,S,y1-y0);g.fillStyle=hsl(p.h,30,8);
+      for(let x=-S;x<S*2;x+=st*2){poly(g,[[x,y0],[x+st,y0],[x+st+(y1-y0),y1],[x+(y1-y0),y1]]);g.fill();}g.restore();
+      g.fillStyle=hsl(p.h,20,6);g.fillRect(0,y0-3,S,3);g.fillRect(0,y1,S,3);}
+    for(let i=0;i<14;i++){const cx=r()*S,cy=(Math.floor(r()*2)*2+1)*B+B*(.25+r()*.5),R=14+r()*26,n=7+Math.floor(r()*5),a0=r()*6.283,hot=r()<.5;
+      const pts=[...Array(n*2)].map((_,k)=>{const a=a0+k/(n*2)*6.283,rr=k%2?R*.38:R*(.75+r()*.45);return [cx+Math.cos(a)*rr,cy+Math.sin(a)*rr];});
+      w(()=>{g.fillStyle=hot?hsl(p.h,80,46):hsl(p.h2,70,40,.85);poly(g,pts);g.fill();g.strokeStyle=hsl(p.h,25,6);g.lineWidth=2;g.stroke();});}
+    g.font='bold 20px monospace';g.textBaseline='middle';
+    for(let i=0;i<6;i++){const x=r()*S,y=(Math.floor(r()*2)*2+1)*B+B*(.2+r()*.6),t=['40MM','HE-DP','RW-842','DANGER'][Math.floor(r()*4)];
+      w(()=>{g.fillStyle=hsl(p.h2,60,62,.8);g.fillText(t,x,y);});}},
   // the Siren's Prestige I (hand-made, .tools/prestige-guns.json): rows of mirrored sound waves, bold ribbons in two tones
   wailtide(g,S,r,p,w){g.fillStyle=hsl(p.h,35,11);g.fillRect(0,0,S,S);const n=6,H=S/n,TAU=6.283;
     for(let j=0;j<n;j++){const cy=j*H+H/2,k=2+Math.floor(r()*4),m=1+Math.floor(r()*2),ph=r()*TAU,ph2=r()*TAU,A=H*.46,hot=j%3===1,l=26+r()*12;
@@ -54,6 +67,18 @@ const P1={
 // ---- Prestige II ---------------------------------------------------------------------------------------------------
 const gold=(g,x0,y0,x1,y1)=>{const gr=g.createLinearGradient(x0,y0,x1,y1);gr.addColorStop(0,'#fff0b8');gr.addColorStop(.5,'#c9952f');gr.addColorStop(1,'#ffe39a');return gr;};
 const P2={
+  // the GDL Havoc's Prestige II: gilded 40 mm rounds laid in staggered rows on dark enamel, riveted rails between the rows
+  liveordnance(g,S,r,p,w){g.fillStyle=hsl(p.h,45,13);g.fillRect(0,0,S,S);for(let i=0;i<300;i++){g.fillStyle=hsl(p.h,40,9+r()*10,.4);g.fillRect(r()*S,r()*S,2+r()*3,1);}
+    const R=8,H=S/8;
+    for(let j=0;j<8;j++){const cy=j*H+H/2,off=j%2?S/16:0,flip=j%2;
+      g.fillStyle=gold(g,0,cy-H/2,0,cy-H/2+5);g.fillRect(0,cy-H/2,S,4);for(let x=8;x<S;x+=S/16){g.fillStyle='#3a2a10';g.beginPath();g.arc(x+off*.5,cy-H/2+2,1.6,0,6.283);g.fill();}
+      for(let i=0;i<8;i++){const cx=i*S/8+off+S/16,dir=flip?-1:1,x0=cx-26*dir,x1=cx+18*dir;
+        w(()=>{g.fillStyle=gold(g,0,cy-R,0,cy+R);g.fillRect(Math.min(x0,cx-6*dir),cy-R,Math.abs(cx-6*dir-x0),R*2);   // the case
+          g.fillStyle=hsl(p.h,55,30);g.fillRect(Math.min(cx-6*dir,x1-8*dir),cy-R*.92,Math.abs(x1-8*dir-(cx-6*dir)),R*1.84);   // the enamel body
+          g.beginPath();g.ellipse(x1-8*dir,cy,9,R*.92,0,dir>0?-Math.PI/2:Math.PI/2,dir>0?Math.PI/2:Math.PI*1.5);g.fillStyle=hsl(p.h,60,38);g.fill();   // the nose
+          g.fillStyle=gold(g,0,cy-R,0,cy+R);g.fillRect(cx-7*dir-(dir<0?3:0),cy-R,3,R*2);g.fillRect(x0-(dir>0?0:3)+dir*2,cy-R-1,3,R*2+2);   // driving band, rim
+          g.strokeStyle='rgba(40,25,5,.7)';g.lineWidth=1;g.strokeRect(Math.min(x0,x1),cy-R,Math.abs(x1-x0),R*2);
+          g.fillStyle='rgba(255,240,190,.35)';g.fillRect(Math.min(x0,x1)+2,cy-R*.7,Math.abs(x1-x0)-4,2);});}}},
   // the Siren's Prestige II: a gilded speaker grille, staggered perforations broken by engraved speaker cones with gem domes
   choirgrille(g,S,r,p,w){g.fillStyle=hsl(p.h,55,30);g.fillRect(0,0,S,S);for(let i=0;i<260;i++){const y=r()*S;g.strokeStyle=hsl(p.h,50,22+r()*28,.3);g.lineWidth=1;g.beginPath();g.moveTo(0,y);g.lineTo(S,y);g.stroke();}
     const cones=[...Array(5)].map(()=>[r()*S,r()*S,34+r()*24]),near=(x,y)=>cones.some(([cx,cy,R])=>{let dx=Math.abs(x-cx),dy=Math.abs(y-cy);if(dx>S/2)dx=S-dx;if(dy>S/2)dy=S-dy;return dx*dx+dy*dy<(R+7)**2;});
@@ -87,6 +112,17 @@ const d4=(d,i,[r,g,b])=>{d[i*4]=r;d[i*4+1]=g;d[i*4+2]=b;d[i*4+3]=255;};
 // ---- Master (base, glow) ----------------------------------------------------------------------------------------------
 // Each returns the base on `g` (dark, the gun's colour) or, with glow=true, a white-on-black mask of what lights up.
 const PM={
+  // the GDL Havoc's Master: shockwave rings racing out of blast cores, scorched rays and stuck-round beacons; rings,
+  // rays and beacons glow and pulse
+  chainreaction(g,S,r,p,w,glow){const TAU=6.283;g.fillStyle=glow?'#000':hsl(p.h,40,7);g.fillRect(0,0,S,S);
+    if(!glow)for(let i=0;i<700;i++){g.fillStyle=hsl(p.h,30,5+r()*9,.6);g.fillRect(r()*S,r()*S,2,2);}
+    const cores=[...Array(7)].map(()=>[r()*S,r()*S,60+r()*70]);
+    for(const [cx,cy,R] of cores){const n=14+Math.floor(r()*8),rays=[...Array(n)].map(()=>[r()*TAU,R*(.5+r()*.8)]),gaps=[...Array(4)].map(()=>r()*TAU);
+      w(()=>{g.strokeStyle=glow?'rgba(255,255,255,.55)':hsl(p.h,35,14);g.lineWidth=2;for(const [a,l] of rays){g.beginPath();g.moveTo(cx+Math.cos(a)*8,cy+Math.sin(a)*8);g.lineTo(cx+Math.cos(a)*l,cy+Math.sin(a)*l);g.stroke();}
+        for(let k=1;k<=4;k++){g.strokeStyle=glow?`rgba(255,255,255,${1-k*.18})`:hsl(p.h2,30,14+k*2);g.lineWidth=glow?4-k*.6:2.4;
+          for(let s=0;s<3;s++){const a=gaps[k-1]+s*TAU/3;g.beginPath();g.arc(cx,cy,R*k/4,a,a+TAU/3-.35);g.stroke();}}
+        g.fillStyle=glow?'#fff':hsl(p.h,50,22);g.beginPath();g.arc(cx,cy,9,0,TAU);g.fill();});}
+    for(let i=0;i<16;i++){const x=r()*S,y=r()*S;w(()=>{g.fillStyle=glow?'#fff':hsl(p.h,25,16);g.fillRect(x-4,y-7,8,14);g.fillStyle=glow?'rgba(255,255,255,.9)':hsl(p.h2,60,30);g.beginPath();g.arc(x,y-3,2.4,0,TAU);g.fill();});}},
   // the Siren's Master: oscilloscope traces and voice-print bars over a graticule; the traces and bars glow and pulse
   songofcirce(g,S,r,p,w,glow){const TAU=6.283;g.fillStyle=glow?'#000':hsl(p.h,45,7);g.fillRect(0,0,S,S);
     if(!glow){g.strokeStyle=hsl(p.h,30,12);g.lineWidth=1;for(let x=0;x<S;x+=32){g.beginPath();g.moveTo(x+.5,0);g.lineTo(x+.5,S);g.stroke();g.beginPath();g.moveTo(0,x+.5);g.lineTo(S,x+.5);g.stroke();}}

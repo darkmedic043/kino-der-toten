@@ -537,6 +537,188 @@
         "tag_sr_grip"
       ],
       "desc": "A chunky rubber grip: 6% faster movement with the Siren in hand."
+    },
+    {
+      "id": "hv_ballistic",
+      "name": "Ballistic Computer",
+      "slot": "optic",
+      "tags": [
+        "tag_hv_ballistic"
+      ],
+      "desc": "A green rangefinder screen on the rail. Draws the round's arc as you aim and rings where it will land."
+    },
+    {
+      "id": "hv_prox",
+      "name": "Proximity Fuse",
+      "slot": "muzzle",
+      "tags": [
+        "tag_hv_prox"
+      ],
+      "desc": "Six seeker eyes on the muzzle. Stuck rounds arm after half a second and go off by themselves when a zombie walks up: the Havoc lays mines."
+    },
+    {
+      "id": "hv_kinetic",
+      "name": "Kinetic Rail",
+      "slot": "barrel",
+      "tags": [
+        "tag_hv_kinetic"
+      ],
+      "desc": "Copper coils round the barrel. Rounds fly much faster and flatter, and a round that sticks to a zombie hits it hard on the way in.",
+      "stats": {
+        "rangeMul": 1.5
+      }
+    },
+    {
+      "id": "hv_napalm",
+      "name": "Napalm Rounds",
+      "slot": "ammo",
+      "tags": [
+        "tag_hv_napalm"
+      ],
+      "desc": "Each blast leaves a burning pool for 5 seconds that keeps hurting anything standing in it."
+    },
+    {
+      "id": "hv_dash",
+      "name": "Redwell Dash",
+      "slot": "grip",
+      "tags": [
+        "tag_hv_dash"
+      ],
+      "desc": "BO7's skeleton grip. 7% faster on your feet with the Havoc in hand.",
+      "replaces": [
+        "tag_hv_grip"
+      ]
+    },
+    {
+      "id": "hv_extube",
+      "name": "Extended Tube",
+      "slot": "mag",
+      "tags": [
+        "tag_hv_extube"
+      ],
+      "desc": "A longer magazine tube under the barrel. 8 rounds, slower to reload.",
+      "stats": {
+        "clipMul": 2,
+        "reloadMul": 1.15
+      },
+      "replaces": [
+        "tag_hv_cap"
+      ]
+    },
+    {
+      "id": "hv_cryo",
+      "name": "Cryo Rounds",
+      "slot": "ammo",
+      "tags": [
+        "tag_hv_cryo"
+      ],
+      "desc": "Blasts freeze: zombies caught in (or near) one slow to 40% for 4 seconds, and a zombie that dies frozen shatters. Slightly less damage."
+    },
+    {
+      "id": "hv_tripwire",
+      "name": "Tripwire Spool",
+      "slot": "under",
+      "tags": [
+        "tag_hv_tripwire"
+      ],
+      "desc": "Strings a laser wire from each stuck round to the one you fired before it (up to about 16 m, in line of sight). A zombie crossing a wire sets off both ends."
+    },
+    {
+      "id": "hv_mortar",
+      "name": "Mortar Sleeve",
+      "slot": "barrel",
+      "tags": [
+        "tag_hv_mortar"
+      ],
+      "desc": "Finned sleeve and an elevation quadrant. Rounds are lobbed high over cover; blasts are 35% wider and 20% harder."
+    },
+    {
+      "id": "hv_arc",
+      "name": "Arc Rounds",
+      "slot": "ammo",
+      "tags": [
+        "tag_hv_arc"
+      ],
+      "desc": "Each blast throws lightning on to up to five more zombies outside it, each link at 45% damage."
+    },
+    {
+      "id": "hv_bandolier",
+      "name": "Bandolier",
+      "slot": "stock",
+      "tags": [
+        "tag_hv_bandolier"
+      ],
+      "desc": "Four spare rounds strapped to the stock. 50% more reserve ammo.",
+      "stats": {
+        "reserveMul": 1.5
+      }
+    },
+    {
+      "id": "hv_daisy",
+      "name": "Daisy Chain",
+      "slot": "muzzle",
+      "tags": [
+        "tag_hv_daisy"
+      ],
+      "desc": "Detonation sequencer. Your rounds go off one after another in the order you fired them, 0.12 s apart, each 15% bigger than the last."
+    },
+    {
+      "id": "hv_actuator",
+      "name": "Actuator",
+      "slot": "grip",
+      "tags": [
+        "tag_hv_actuator"
+      ],
+      "desc": "BO7's hydraulic rear grip: a ram racks the pump for you. Fires 40% faster and reloads 15% faster.",
+      "stats": {
+        "fireMul": 1.4,
+        "reloadMul": 0.85
+      },
+      "replaces": [
+        "tag_hv_grip"
+      ]
+    },
+    {
+      "id": "hv_cluster",
+      "name": "Cluster Rounds",
+      "slot": "ammo",
+      "tags": [
+        "tag_hv_cluster"
+      ],
+      "desc": "Each blast scatters five bomblets that bounce and go off a moment later."
+    },
+    {
+      "id": "hv_breacher",
+      "name": "Breacher Stock",
+      "slot": "stock",
+      "tags": [
+        "tag_hv_breacher"
+      ],
+      "desc": "Shock-absorbing stock. Your own blasts never hurt you; standing close to one throws you into the air instead (Havoc jumps)."
+    },
+    {
+      "id": "hv_singularity",
+      "name": "Singularity Rounds",
+      "slot": "ammo",
+      "tags": [
+        "tag_hv_singularity"
+      ],
+      "desc": "A detonation first pulls zombies within about 10 m in for most of a second, then blows at 150% damage and 15% wider."
+    },
+    {
+      "id": "hv_airstrike",
+      "name": "MFS Airstrike Mag",
+      "slot": "mag",
+      "tags": [
+        "tag_hv_airstrike"
+      ],
+      "desc": "BO7's prestige magazine. Rounds don't stick: they fly 40% faster, bounce off walls and airburst as they pass a zombie (or after 1.2 s). No detonator needed.",
+      "stats": {
+        "reloadMul": 0.9
+      },
+      "replaces": [
+        "tag_hv_cap"
+      ]
     }
   ],
   "ironSights": {

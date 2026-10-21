@@ -141,6 +141,7 @@ function applyStats(obj,list,cat,show){
     if(s.hipSpreadMul)obj.hipSpread=+((obj.hipSpread??.012)*s.hipSpreadMul).toFixed(4);   // stacks (grip + stock); .012 is the engine's default
     if(s.suppressed)obj.suppressed=true;
     if(s.fireMul&&obj.fireTime)obj.fireTime=+(obj.fireTime/s.fireMul).toFixed(4);
+    if(s.reserveMul){if(obj.maxAmmo)obj.maxAmmo=Math.round(obj.maxAmmo*s.reserveMul);if(obj.startAmmo)obj.startAmmo=Math.round(obj.startAmmo*s.reserveMul);}   // the Havoc's Bandolier
     if(a.scope)obj.scope=a.scope;
   }
   if(obj.hideTags)obj.hideTags=obj.hideTags.filter(t=>!show.has(t));

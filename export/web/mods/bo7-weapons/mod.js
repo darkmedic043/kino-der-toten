@@ -12,6 +12,7 @@
 // Shots: the Grimhawk's own (see the sound section); the G11's as a fallback.
 import * as THREE from 'three';
 import { prepareSiren, setupSiren, SIREN } from './siren.js';
+import { prepareHavoc, setupHavoc, HAVOC } from './havoc.js';
 
 const BASE = new URL('./', import.meta.url).href;
 const ID = 'grimhawk_zm';
@@ -28,6 +29,7 @@ const SPEED = 2600, DROP = 520, LIFE = 2.2, TURN = 3.2, CONE = Math.cos(THREE.Ma
 
 export function prepare(data) {
   prepareSiren(data);   // the Siren (siren.js)
+  prepareHavoc(data);   // the GDL Havoc (havoc.js)
   const m16 = data.weapons.m16_zm;
   if (!m16) { console.warn('[bo7-weapons] no M16 to build the Grimhawk on'); return; }
   const model = BASE + 'grimhawk_view.glb?v=13', world = BASE + 'grimhawk_world.glb?v=13';   // own models (not under models/: Rind installs them)
@@ -51,6 +53,7 @@ export function prepare(data) {
 export default function setup(api) {
   const { host, session, camera, scene, world, enemies, audio, data, view, viewCamera } = api;
   if (data.weapons[SIREN]) setupSiren(api);
+  if (data.weapons[HAVOC]) setupHavoc(api);
   if (!data.weapons[ID]) return;
   const isGrim = def => (def?.baseId ?? def?.id) === ID;
 
