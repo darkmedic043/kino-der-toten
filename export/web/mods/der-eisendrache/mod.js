@@ -601,7 +601,11 @@ function setupUndercroftGate({ world, session }) {
 // piece standing near the pad (the rocket on its ring, the fallen one, the gantry's bottom) becomes stacked 40-unit
 // prisms around its outline (a 2D convex hull per slab, so the tilted fallen rocket follows its slope), as a
 // player-only collider (`window: true`: CustomWorld's capsule test uses it, the navmesh isn't cut and shots pass).
-const ROCKET_PIECES = /rocket_a10_(base|mid)|rocket_gantry_bottom/, PAD_AREA = new THREE.Box3(new THREE.Vector3(3500, -2600, 1000), new THREE.Vector3(6500, -1500, 3700));
+// The chainlink fences around the pad (p7_proto_fence_chainlink and its posts) had none either (user, 2026-10-21: "the
+// area around the rocket missing collision"; the builder's NO_COLLIDE takes 'chain' for a hanging chain): you walked
+// through them and off the cliff behind the launch pad. Each fence becomes a box around its panel (its long axis from
+// the vertices' spread, at least 8 thick), in the same collider.
+const ROCKET_PIECES = /rocket_a10_(base|mid)|rocket_gantry_bottom/, FENCES = /proto_fence_chainlink/, PAD_AREA = new THREE.Box3(new THREE.Vector3(3500, -2600, 1000), new THREE.Vector3(6500, -1500, 3700));
 function hull2(pts) {   // monotone chain over [x, z]
   pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (pts.length < 3) return pts;
   const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
@@ -609,16 +613,38 @@ function hull2(pts) {   // monotone chain over [x, z]
   for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
   return lo.slice(0, -1).concat(up.slice(0, -1));
 }
+function fenceBox(pts, y0, y1, tris) {   // a box around a flat panel's [x, z] points: long axis by their spread
+  let mx = 0, mz = 0; for (const p of pts) { mx += p[0]; mz += p[1]; } mx /= pts.length; mz /= pts.length;
+  let cxx = 0, czz = 0, cxz = 0; for (const p of pts) { const dx = p[0] - mx, dz = p[1] - mz; cxx += dx * dx; czz += dz * dz; cxz += dx * dz; }
+  const a = Math.atan2(2 * cxz, cxx - czz) / 2, ux = Math.cos(a), uz = Math.sin(a);
+  let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity;
+  for (const p of pts) { const dx = p[0] - mx, dz = p[1] - mz, u = dx * ux + dz * uz, w = -dx * uz + dz * ux; u0 = Math.min(u0, u); u1 = Math.max(u1, u); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
+  if (w1 - w0 < 8) { const c = (w0 + w1) / 2; w0 = c - 4; w1 = c + 4; }
+  const h = [[u0, w0], [u1, w0], [u1, w1], [u0, w1]].map(([u, w]) => [mx + u * ux - w * uz, mz + u * uz + w * ux]);
+  prism(h, y0, y1, tris);
+}
+function prism(h, y0, y1, tris) {   // walls and caps of a convex [x, z] outline from y0 to y1
+  for (let a = 0; a < h.length; a++) { const p = h[a], q = h[(a + 1) % h.length]; tris.push(p[0], y0, p[1], q[0], y0, q[1], q[0], y1, q[1], p[0], y0, p[1], q[0], y1, q[1], p[0], y1, p[1]); }
+  for (let a = 1; a < h.length - 1; a++) for (const y of [y0, y1]) tris.push(h[0][0], y, h[0][1], h[a][0], y, h[a][1], h[a + 1][0], y, h[a + 1][1]);
+}
 function setupRocketCollision({ world }) {
   if (!world.root || !world.dynamic) return;
   const SLAB = 40, tris = [], m4 = new THREE.Matrix4(), im = new THREE.Matrix4(), v = new THREE.Vector3(), seen = new Set();
+  let fences = 0;
   world.root.updateMatrixWorld(true);
   world.root.traverse(o => {
-    if (!o.isMesh || !ROCKET_PIECES.test(o.name + ' ' + (o.parent?.name ?? '') + ' ' + (o.geometry?.name ?? ''))) return;
+    const name = o.name + ' ' + (o.parent?.name ?? '') + ' ' + (o.geometry?.name ?? ''), fence = FENCES.test(name);
+    if (!o.isMesh || !(fence || ROCKET_PIECES.test(name))) return;
     const pos = o.geometry?.attributes?.position; if (!pos) return;
     for (let i = 0; i < (o.isInstancedMesh ? o.count : 1); i++) {
       m4.copy(o.matrixWorld); if (o.isInstancedMesh) { o.getMatrixAt(i, im); m4.multiply(im); }
       v.setFromMatrixPosition(m4); const key = o.geometry.uuid + v.toArray().map(Math.round).join(); if (seen.has(key)) continue; seen.add(key);
+      if (fence) {
+        const pts = []; let y0 = Infinity, y1 = -Infinity;
+        for (let k = 0; k < pos.count; k++) { v.fromBufferAttribute(pos, k).applyMatrix4(m4); pts.push([v.x, v.z]); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); }
+        if (y1 - y0 >= 40) { fenceBox(pts, y0, y1, tris); fences++; }   // (the fallen posts lie flat: no wall)
+        continue;
+      }
       const slabs = new Map(), step = Math.max(1, Math.floor(pos.count / 6000));
       let inPad = false;
       for (let k = 0; k < pos.count; k += step) {
@@ -629,13 +655,12 @@ function setupRocketCollision({ world }) {
       for (const [s, pts] of slabs) {
         if (s * SLAB > PAD_AREA.max.y) continue;   // out of reach
         const h = hull2(pts); if (h.length < 3) continue;
-        const y0 = s * SLAB, y1 = y0 + SLAB;
-        for (let a = 0; a < h.length; a++) { const p = h[a], q = h[(a + 1) % h.length]; tris.push(p[0], y0, p[1], q[0], y0, q[1], q[0], y1, q[1], p[0], y0, p[1], q[0], y1, q[1], p[0], y1, p[1]); }
-        for (let a = 1; a < h.length - 1; a++) for (const y of [y0, y1]) tris.push(h[0][0], y, h[0][1], h[a][0], y, h[a][1], h[a + 1][0], y, h[a + 1][1]);
+        prism(h, s * SLAB, s * SLAB + SLAB, tris);
       }
     }
   });
   if (!tris.length) { console.warn('[der-eisendrache] rocket pad pieces not found: no rocket collision'); return; }
+  if (!fences) console.warn('[der-eisendrache] no chainlink fences found at the rocket pad');
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(tris, 3));
   world.dynamic.push({ name: 'rocket', collider: new CollisionWorld(g), box: new THREE.Box3().setFromBufferAttribute(g.attributes.position), enabled: true, window: true });
   world.collision?.invalidateCache?.();

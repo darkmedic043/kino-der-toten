@@ -4,9 +4,12 @@
 //   Ragnarok DG-4 (gravityspike): built at its own table, then taken as the operator weapon (mods/operator-weapons),
 //   charged. Its parts come as in BO3:
 //     body   - dropped where a Panzersoldat dies (zm_castle_mechz.gsc notifies its death origin), until it's taken
-//     handle - when the Death Ray has finished a run it hangs in the air at one of its two spots by the Tesla coils
-//              (BO3's), out of reach on foot: fly past it on the landing pad whose flight comes nearest and it's
-//              grabbed in flight (user, 2026-10-18; it used to fall to the floor). Within GRAB of the flight path.
+//     handle - when the Death Ray has finished a run it hangs in the air at one of its two spots (BO3's), out of
+//              reach on foot: fly past it on the launch pad whose flight comes nearest and it's grabbed in flight
+//              (user, 2026-10-18; it used to fall to the floor). Within GRAB of the flight path. Each spot is on one
+//              pad's flight only, so the message names that pad, the host prefers a spot whose pad is already on, and
+//              the handle (a hand's length) crackles with a blue glow so it's seen from the ground (user, 2026-10-21:
+//              "doesn't actually drop", it was there but too small to see and the pad was a guess).
 //     guards - during a rocket test fire, the wall switch at the rocket pad (spike_quest_wall_switch) arms the
 //              console at the landing pad (spike_quest_console_switch, where BO3 lights its lamps one by one) for
 //              20 s; its lever drops the guards beside it
@@ -22,7 +25,7 @@ const CRAFT = {
 };
 
 export function setupCraftables(api, { traps, pads }) {
-  const { world, session, host, player, camera, enemies, audio, toast, announce, data, viewScene, view, sync } = api;
+  const { world, session, host, player, camera, scene, enemies, audio, toast, announce, data, viewScene, view, sync } = api;
   const root = world.root, kino = window.kino;
   const at = o => o.getWorldPosition(new THREE.Vector3());
   // a map node moved or shown at runtime (the static map's matrices are frozen: update them by hand)
@@ -98,8 +101,9 @@ export function setupCraftables(api, { traps, pads }) {
     const p = enemy.root.position.clone(); const q = world.closest?.(p, { x: 80, y: 160, z: 80 }) ?? p;
     sync.act('partDrop', { key: 'spike:body', k: 0, p: sync.a(q.clone().add(new THREE.Vector3(0, 6, 0))), msg: 'The Panzersoldat dropped something' });
   });
-  // handle: hangs at one of its spots (the host picks which) until someone flies past it on a landing pad
+  // handle: hangs at one of its spots (the host picks which) until someone flies past it on a launch pad
   const GRAB = 140;
+  const padName = flag => flag.replace(/_pad_flag$/, '').replace(/^v10_/, '').replace(/_/g, ' ');   // upper_courtyard_pad_flag: 'upper courtyard'
   const nearestPad = p => {   // the pad whose flight passes closest to p: { flag, d }
     let best = { flag: null, d: Infinity };
     for (const { flag, curve } of pads?.curves?.() ?? []) for (let i = 0; i <= 200; i++) { const d = curve.getPointAt(i / 200).distanceTo(p); if (d < best.d) best = { flag, d }; }
@@ -107,8 +111,10 @@ export function setupCraftables(api, { traps, pads }) {
   };
   function handleDrop() {
     const list = spots['spike:handle'] ?? []; if (!list.length || !sync.isHost) return;
-    const k = Math.floor(Math.random() * list.length);
-    sync.act('partDrop', { key: 'spike:handle', k, msg: 'Something is caught in the Tesla coils · fly past it on a landing pad' });
+    const on = new Set((pads?.pads?.() ?? []).filter(p => p.active).map(p => p.flag)), all = list.map((o, k) => k);
+    const live = all.filter(k => on.has(nearestPad(at(list[k])).flag)), pool = live.length ? live : all;
+    const k = pool[Math.floor(Math.random() * pool.length)], flag = nearestPad(at(list[k])).flag;
+    sync.act('partDrop', { key: 'spike:handle', k, msg: flag ? `The Tesla coils threw something into the air · catch it flying from the ${padName(flag)} launch pad${on.has(flag) ? '' : ' (switch its landing pad on first)'}` : 'The Tesla coils threw something into the air' });
   }
   // guards: the A10 wall switch during a rocket test fire, then the console's lever within 20 s
   const wallSwitch = root.getObjectByName('CASTLE_SM_spike_quest_wall_switch'), consoleSwitch = root.getObjectByName('CASTLE_SM_spike_quest_console_switch');
@@ -130,6 +136,26 @@ export function setupCraftables(api, { traps, pads }) {
     },
   });
 
+  // the hanging handle's crackle: a glow and three arcs re-struck every few frames (no light: each costs every pixel here)
+  const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.3, 'rgba(255,255,255,.4)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x8fd0ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  const arcMat = new THREE.LineBasicMaterial({ color: 0xcfeeff, transparent: true, opacity: .9, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  const ARC = 7, arcs = Array.from({ length: 3 }, () => { const l = new THREE.Line(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(ARC * 3), 3)), arcMat); l.frustumCulled = false; return l; });
+  for (const o of [halo, ...arcs]) { o.visible = false; scene?.add(o); }
+  let restrike = 0;
+  const crackle = (h, dt) => {
+    for (const o of [halo, ...arcs]) o.visible = !!h;
+    if (!h) return;
+    const c = h.userData.at ??= at(h); halo.position.copy(c); halo.scale.setScalar(70 + 25 * Math.random());
+    if ((restrike -= dt) > 0) return; restrike = .06;
+    const d = new THREE.Vector3(), q = new THREE.Vector3();
+    for (const l of arcs) {
+      const a = l.geometry.attributes.position; d.randomDirection(); const len = 25 + 30 * Math.random();
+      for (let i = 0; i < ARC; i++) { const t = i / (ARC - 1); q.copy(c).addScaledVector(d, 4 + t * len); if (i && i < ARC - 1) q.add(new THREE.Vector3().randomDirection().multiplyScalar(6)); a.setXYZ(i, q.x, q.y, q.z); }
+      a.needsUpdate = true;
+    }
+  };
+
   host.on('update', dt => {
     if (!dt) return;
     // the Death Ray finishing a run drops the handle (once, while the Ragnarok isn't built)
@@ -144,6 +170,7 @@ export function setupCraftables(api, { traps, pads }) {
       if (pads.flightPad?.() === h.userData.pad.flag && (me.distanceTo(h.userData.at) < reach || me.clone().add(new THREE.Vector3(0, 60, 0)).distanceTo(h.userData.at) < reach)) sync.act('partPick', { key: 'spike:handle' });
     }
     if (h) h.rotation.y += dt * 1.5;   // turning in the air, so it's seen
+    crackle(h, dt);
   });
   host.on('reset', reset);
 
