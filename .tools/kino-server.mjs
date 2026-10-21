@@ -9,8 +9,9 @@
 //                     sign-in is disabled without them (keep the secret out of git)
 //   KINO_PUBLIC_URL   public https address, used for the OAuth redirect
 import { createReadStream, statSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, appendFileSync } from 'node:fs';
-import { createServer } from 'node:http';
-import { createHash, randomBytes } from 'node:crypto';
+import { createServer, request as httpRequest } from 'node:http';
+import { connect } from 'node:net';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { extname, join, resolve, sep } from 'node:path';
 import { installManifest, folderManifest } from './install-manifest.mjs';
 import { homedir } from 'node:os';
@@ -110,6 +111,13 @@ async function api(req, res, url) {
   if (url === '/api/auth/logout' && req.method === 'POST') {
     const s = session(req); if (s) { sessions.delete(s.id); saveSessions(); }
     return send(res, 200, { signedIn: false }, { 'Set-Cookie': 'kino_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
+  }
+  // A token for a native game Rind launches (it can't use the cookie): see gameToken below.
+  if (url === '/api/game-token' && req.method === 'GET') {
+    const s = session(req); if (!s) return send(res, 401, { error: 'not signed in' });
+    const game = new URL(req.url, 'http://x').searchParams.get('game') || '';
+    if (!/^[a-z0-9-]{1,40}$/.test(game)) return send(res, 400, { error: 'bad game id' });
+    remember(s); return send(res, 200, gameToken(s, game));
   }
   // Helm (~/projects/helm, a program in Rind): a Helm server hosts a room (page /helm/) as its owner so friends can watch
   // its Claude Code sessions peer to peer. This lists the Helm rooms hosted by the caller's friends (and the caller).
@@ -418,17 +426,76 @@ function onSocket(req, sock) {
   });
 }
 
+// ---- Game tokens and the Night Shift proxy ------------------------------------
+// Rind fetches GET /api/game-token?game=<id> with the account's cookie and hands the token to the native game it starts.
+// Token = b64url(JSON {v:1, g: game, u: pubId, n: name, p: picture, e: expiry ms}) + '.' + b64url(HMAC-SHA256), with the
+// key in DATA/game-token.key (made on first use, kept across restarts).
+const GAME_TOKEN_HOURS = 24, TOKEN_KEY_FILE = join(DATA, 'game-token.key');
+let tokenKey = null;
+function gameKey() {
+  if (tokenKey) return tokenKey;
+  try { const k = readFileSync(TOKEN_KEY_FILE); if (k.length >= 32) return tokenKey = k; } catch {}
+  tokenKey = randomBytes(32); writeFileSync(TOKEN_KEY_FILE, tokenKey, { mode: 0o600 }); return tokenKey;
+}
+const tokenSig = body => createHmac('sha256', gameKey()).update(body).digest('base64url');
+function gameToken(s, game) {
+  const e = Date.now() + GAME_TOKEN_HOURS * 36e5;
+  const body = Buffer.from(JSON.stringify({ v: 1, g: game, u: pubId(s.sub), n: s.name, p: s.picture ?? null, e })).toString('base64url');
+  return { token: body + '.' + tokenSig(body), expires: e };
+}
+function readGameToken(token, game) {
+  const [body, sig, extra] = String(token || '').split('.');
+  if (!body || !sig || extra !== undefined) return null;
+  const want = Buffer.from(tokenSig(body)), got = Buffer.from(sig);
+  if (want.length !== got.length || !timingSafeEqual(want, got)) return null;
+  try { const t = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')); return t.v === 1 && t.g === game && t.e > Date.now() ? t : null; } catch { return null; }
+}
+// Night Shift (~/projects/opsec, a Rind game): /api/opsec/* goes to its game server's unix socket with the prefix
+// stripped. The WebSocket (/api/opsec/ws) needs the game's token in X-Opsec-Token; the server gets the player as
+// X-Opsec-User (b64url JSON {id, name, picture, owner, friendOfOwner, friends}), never the cookie or the token, and any
+// X-Opsec-User a client sends is dropped. OPSEC_OWNER = the site owner's friend id (the game is friends-only).
+const OPSEC_SOCKET = process.env.OPSEC_SOCKET || '/opsec/opsec.sock', OPSEC_OWNER = process.env.OPSEC_OWNER || '';
+const OPSEC_DROP = /^(x-opsec-user|x-opsec-token|cookie)$/i;
+const opsecPath = req => req.url.replace(/^\/api\/opsec/, '') || '/';
+function proxyOpsec(req, res) {
+  const headers = Object.fromEntries(Object.entries(req.headers).filter(([k]) => !OPSEC_DROP.test(k)));
+  const up = httpRequest({ socketPath: OPSEC_SOCKET, method: req.method, path: opsecPath(req), headers }, r => { res.writeHead(r.statusCode, r.headers); r.pipe(res); });
+  up.on('error', () => { if (!res.headersSent) send(res, 503, { error: 'Night Shift is offline' }); else res.destroy(); });
+  req.pipe(up);
+}
+function opsecSocket(req, sock, head) {
+  const t = readGameToken(req.headers['x-opsec-token'], 'opsec');
+  if (!t) { sock.end('HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n'); return; }
+  const sub = subOf(t.u), owner = OPSEC_OWNER ? subOf(OPSEC_OWNER) : null;
+  const who = { id: t.u, name: t.n, picture: t.p ?? null, owner: !!OPSEC_OWNER && t.u === OPSEC_OWNER,
+    friendOfOwner: !!(sub && owner && (social.friends[owner] ?? []).includes(sub)),
+    friends: sub ? (social.friends[sub] ?? []).map(f => social.users[f]?.pid).filter(Boolean) : [] };
+  const lines = [`${req.method} ${opsecPath(req)} HTTP/1.1`];
+  for (let i = 0; i < req.rawHeaders.length; i += 2) if (!OPSEC_DROP.test(req.rawHeaders[i])) lines.push(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}`);
+  lines.push('X-Opsec-User: ' + Buffer.from(JSON.stringify(who)).toString('base64url'));
+  let open = false;
+  const up = connect({ path: OPSEC_SOCKET }), end = () => { sock.destroy(); up.destroy(); };
+  up.on('connect', () => { open = true; up.write(lines.join('\r\n') + '\r\n\r\n'); if (head?.length) up.write(head); sock.pipe(up); up.pipe(sock); });
+  up.on('error', () => { if (open) end(); else sock.end('HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n'); });
+  up.on('close', end); sock.on('error', end); sock.on('close', end);
+}
+
 const server = createServer(async (req, res) => {
   let url; try { url = decodeURIComponent(new URL(req.url, 'http://localhost').pathname); } catch { res.writeHead(400).end('bad request'); return; }
   try {
+    if (url === '/api/opsec' || url.startsWith('/api/opsec/')) return proxyOpsec(req, res);
     if (url.startsWith('/api/')) return await api(req, res, url);
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
     if (url === '/__health') return send(res, 200, { app: 'kino-browser-zombies', root: ROOT, accounts: ENABLED });
     serveFile(req, res, url);
   } catch (e) { console.error(e); if (!res.headersSent) send(res, 500, { error: 'server error' }); }
 });
-server.on('upgrade', (req, sock) => {
+server.on('upgrade', (req, sock, head) => {
   const url = new URL(req.url, 'http://x'), key = req.headers['sec-websocket-key'];
+  if (url.pathname === '/api/opsec/ws') {
+    if (!key || (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host)) { sock.destroy(); return; }
+    return opsecSocket(req, sock, head);
+  }
   if (!['/api/ws', '/api/social/ws'].includes(url.pathname) || !key || (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host)) { sock.destroy(); return; }
   const accept = createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   sock.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);

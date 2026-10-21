@@ -42,3 +42,22 @@
 
 - Helm (`~/projects/helm`, a program in Rind: the user's control room for Claude Code sessions) lets friends watch peer to peer, the way Melonopoly plays: the Helm server holds a co-op room with `page: '/helm/'` (`map: 'Helm'`), joined as the owner (their `kino_session`, handed over by Rind), and a viewer's Rind joins it only for the WebRTC handshake (or the relay fallback), then leaves, so the 4-player limit isn't a viewer limit.
 - `GET /api/helm` (signed in) lists the Helm rooms whose host is the caller or one of their friends: `{rooms: [{code, owner: {id, name, picture}, me}]}`. Anyone can still join a Helm room by code (`/api/ws` join); Helm itself decides what each viewer may see from the joiner's `uid`.
+
+## Game tokens and Night Shift (2026-10-21)
+
+- Native games that Rind starts can't use the site cookie. Instead, Rind fetches **`GET /api/game-token?game=<id>`** (signed in; `id` matches `^[a-z0-9-]{1,40}$`) with the account's cookie and hands the token to the game (Rind's catalog template `{token}`, catalog api 2).
+  - Token: `b64url(JSON {v:1, g: game, u: pubId, n: name, p: picture, e: expiry ms}) + '.' + b64url(HMAC-SHA256)`, valid 24 h.
+  - The key is `DATA/game-token.key` (32 random bytes, mode 600, made on first use, kept across restarts; deleting it voids every token).
+  - `readGameToken(token, game)` checks the signature (timing-safe), the game and the expiry.
+- **Night Shift** (`~/projects/opsec`, a co-op sysadmin game on real OpenBSD boxes) has its own game server, which kino fronts on its unix socket `OPSEC_SOCKET` (default `/opsec/opsec.sock`; the quadlet mounts `~/.local/share/opsec/sock` there).
+  - `/api/opsec/*` is proxied with the prefix stripped (`/api/opsec/leaderboard` → `/leaderboard`, query kept). The cookie and any `x-opsec-*` headers are dropped. If the socket is down, the answer is 503.
+  - The WebSocket `/api/opsec/ws` needs the token in `X-Opsec-Token` (401 otherwise; native clients send no Origin, a foreign Origin is refused).
+  - The upgrade is replayed to the socket as `/ws` with `X-Opsec-User: b64url(JSON {id, name, picture, owner, friendOfOwner, friends: [pids]})`, without the token or cookie, then piped both ways.
+  - `OPSEC_OWNER` = the site owner's pid (Helm's `ownerPid`). The game server decides who may play (friends-only) from `owner`/`friendOfOwner`.
+- Tested 2026-10-21 against a scratch server (port 5199, fake owner/friend/stranger sessions, a stub game server on a scratch socket), 17 checks:
+  - token issue, 401 without a cookie, the key file;
+  - identity for owner/friend/stranger, frames both ways, a spoofed `X-Opsec-User` dropped;
+  - bad/expired/other-game tokens and a foreign Origin refused;
+  - the HTTP proxy;
+  - 503 with the socket gone;
+  - the key reused after a restart.
