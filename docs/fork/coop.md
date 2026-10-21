@@ -54,6 +54,11 @@
   - The WebSocket `/api/opsec/ws` needs the token in `X-Opsec-Token` (401 otherwise; native clients send no Origin, a foreign Origin is refused).
   - The upgrade is replayed to the socket as `/ws` with `X-Opsec-User: b64url(JSON {id, name, picture, owner, friendOfOwner, friends: [pids]})`, without the token or cookie, then piped both ways.
   - `OPSEC_OWNER` = the site owner's pid (Helm's `ownerPid`). The game server decides who may play (friends-only) from `owner`/`friendOfOwner`.
+- **Outside rooms** (rooms hosted by a Rind catalog game's own server, such as Night Shift's):
+  - A social status may carry `page: '/rind/<id>/'` (and `players`, 1–4) with its `room`. `statusOf` then reports that room as is (joinable under 4 players, `players` null when not given) instead of looking it up in this server's rooms.
+  - `POST /api/social/invite` accepts a room code that isn't one of ours when the inviter's own status is in that outside room; the invite carries its page.
+  - Rind routes `/rind/<id>/` pages to that game.
+  - `social.js` `statusText` leaves out the "n/4" when the count is unknown.
 - Tested 2026-10-21 against a scratch server (port 5199, fake owner/friend/stranger sessions, a stub game server on a scratch socket), 17 checks:
   - token issue, 401 without a cookie, the key file;
   - identity for owner/friend/stranger, frames both ways, a spoofed `X-Opsec-User` dropped;

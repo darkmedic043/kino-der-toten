@@ -223,6 +223,7 @@ function statusOf(sub) {
   if (!conns.length) return { status: 'offline', seen: social.users[sub]?.seen ?? null };
   const g = conns.map(c => c.status).find(x => x.status === 'game');
   if (!g) return { status: 'online', where: conns.some(c => c.status.status === 'menu') ? 'menu' : 'launcher' };   // launcher: the Rind desktop app
+  if (g.room && g.page) return { status: 'game', map: g.mapName || g.map || null, room: g.room, page: g.page, players: g.players ?? null, joinable: (g.players ?? 0) < MAX_PLAYERS };
   const room = g.room && rooms.get(g.room);
   return { status: 'game', map: g.mapName || g.map || null, room: room ? room.code : null, page: room ? room.page : null,
     players: room ? room.players.size : null, joinable: !!room && room.players.size < MAX_PLAYERS };
@@ -274,9 +275,13 @@ async function socialApi(req, res, url) {
   }
   if (url === '/api/social/invite') {
     if (!friendsOf(me).includes(other)) return send(res, 403, { error: 'Only friends can be invited' });
-    const room = rooms.get(String(b.room || '').toUpperCase()); if (!room) return send(res, 404, { error: 'Start or join a co-op game first' });
+    // an outside room (a Rind catalog game's own server) that the inviter's status says they are in, or one of ours
+    const code = String(b.room || '').toUpperCase();
+    const ext = code && [...(presence.get(me) ?? [])].map(c => c.status).find(st => st.status === 'game' && st.page && st.room === code);
+    const room = !ext && rooms.get(code);
+    if (!room && !ext) return send(res, 404, { error: 'Start or join a co-op game first' });
     if (!presence.get(other)?.size) return send(res, 409, { error: 'They are offline' });
-    push(other, { t: 'invite', from: view(me), room: room.code, page: room.page, map: String(b.map || room.map || '').slice(0, 64) });
+    push(other, { t: 'invite', from: view(me), room: code, page: room ? room.page : ext.page, map: String(b.map || (room ? room.map : ext.mapName) || '').slice(0, 64) });
     return send(res, 200, { ok: true });
   }
   return send(res, 404, { error: 'unknown endpoint' });
@@ -300,6 +305,8 @@ function onSocialSocket(req, sock) {
   wsFrames(sock, msg => {
     if (msg.t !== 'status') return;
     conn.status = { status: ['game', 'launcher'].includes(msg.status) ? msg.status : 'menu', map: String(msg.map || '').slice(0, 64), mapName: String(msg.mapName || '').slice(0, 64), room: String(msg.room || '').slice(0, 8).toUpperCase() };
+    // A room hosted outside this server (a Rind catalog game's own server, e.g. Night Shift): its page is /rind/<id>/.
+    if (/^\/rind\/[a-z0-9-]{1,40}\/$/.test(msg.page ?? '')) { conn.status.page = msg.page; if (Number.isInteger(msg.players) && msg.players > 0 && msg.players <= MAX_PLAYERS) conn.status.players = msg.players; }
     notifyFriends(sub);
   });
 }

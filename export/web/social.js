@@ -73,7 +73,7 @@ export { notify };
 // status line for a friend: "Online", "In game · Kino der Toten · co-op 2/4", "Last seen 3h ago"
 export function statusText(f){
   if(f.status==='online')return f.where==='launcher'?'Online · in Rind':'Online · in the menu';
-  if(f.status==='game')return 'In game'+(f.map?' · '+f.map:'')+(f.room?` · co-op ${f.players}/4`:' · solo');
+  if(f.status==='game')return 'In game'+(f.map?' · '+f.map:'')+(f.room?` · co-op${f.players?` ${f.players}/4`:''}`:' · solo');
   if(!f.seen)return 'Offline';
   const m=Math.round((Date.now()-f.seen)/60000);
   return 'Offline · last seen '+(m<1?'just now':m<60?m+'m ago':m<1440?Math.round(m/60)+'h ago':Math.round(m/1440)+'d ago');
