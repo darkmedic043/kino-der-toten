@@ -19,7 +19,7 @@ RENDER = argv[argv.index('--render') + 1] if '--render' in argv else None
 
 PARTS.update({k: [] for k in ('j_gun', 'tag_clip', 'tag_iron_sight', 'tag_sr_grip', 'tag_sr_reflex', 'tag_sr_deflect',
                               'tag_sr_overclock', 'tag_sr_resonance', 'tag_sr_baffle', 'tag_sr_echo', 'tag_sr_lancet',
-                              'tag_sr_soma', 'tag_foregrip', 'tag_laser_box')})
+                              'tag_sr_soma', 'tag_ext_clip', 'tag_double_clip', 'tag_foregrip', 'tag_laser_box')})
 M.update(
     # a hand-built prototype: enamel paint chipped through the primer to bare steel, grime run down the sides, rust
     silver=worn('sr_silver', '#b2b5b8', .3, .85, bare='#d6d8da', wear=.45, brushed=.9, dirt=.35),   # shroud, canister: brushed alloy
@@ -306,6 +306,55 @@ solid('can_label', prism(rrect_xz(6.2, 8.0, CZ + 1.2, CZ + 1.45, .05), 0, .92), 
 ring('can_tape', CR + .012, CR - .2, 3.85, 4.55, M['masking'], part=C, z=CZ, bw=.005)
 text('№004', .22, (4.2, CR + .03, CZ + .1), part=C, m=M['ink_k'], font=MARKER)
 text('НЕ ВСКРЫВАТЬ', .15, (5.35, onside(0, CZ - .15, CZ, CR, .02), CZ - .15), part=C, m=M['ink_r'], font=STENCIL)   # "do not open"
+
+# Extended Mag (the shared extmag, on the M16's own tag_ext_clip): a second canister section screwed on in front of
+# the first, joined by a ribbed coupling with a sight-glass, the yellow wires running on along both
+X = 'tag_ext_clip'
+solid('xc_can', cylbm(CR, 3.6, 8.3, CZ, seg=40), M['silver'], part=X, bw=.05)
+solid('xc_can2', cylbm(CR, 9.3, 12.2, CZ, seg=40), M['primer'], part=X, bw=.05)
+solid('xc_coupling', cylbm(CR + .14, 8.2, 9.4, CZ, seg=40), M['dark'], part=X,
+      cuts=[cylbm(CR + .3, x, x + .1, CZ, seg=40) for x in (8.4, 8.65, 8.9, 9.15)], bw=.04, seg=1)
+solid('xc_gauge', cylbm(.32, 8.8, 9.3, CZ - .1, y=CR + .1, seg=16, axis='y'), M['steel'], part=X, bw=.02)
+solid('xc_gauge_in', cylbm(.22, 8.8, 9.2, CZ - .1, y=CR + .2, seg=16, axis='y'), M['lens'], part=X, bw=0)
+solid('xc_front', cylbm(CR + .06, 12.1, 12.55, CZ, seg=40), M['dark'], part=X, cuts=[cylbm(CR - .45, 12.4, 12.7, CZ, seg=40)], bw=.08, seg=2)
+solid('xc_front_in', cylbm(CR - .45, 12.25, 12.45, CZ, seg=40), M['steel'], part=X, bw=.02)
+solid('xc_back', cylbm(CR + .05, 3.3, 3.7, CZ, seg=40), M['dark'], part=X, bw=.06, seg=2)
+solid('xc_neck', boxbm(4.3, 8.2, -.7, .7, CZ + CR - .3, -0.6), M['dark'], part=X, bw=.05)
+solid('xc_plug', boxbm(5.3, 6.3, .75, 1.0, -1.2, -.7), M['dark'], part=X, bw=.03)
+for z in (CZ + .25, CZ - .2, CZ - .65):
+    pts = [(5.8, .9, -1.0), (6.0, onside(0, -1.1, CZ, CR, .08), -1.15), (6.4, onside(0, z + .35, CZ, CR, .08), z + .35),
+           (6.9, onside(0, z, CZ, CR, .08), z), (11.4, onside(0, z, CZ, CR, .22), z)]
+    tube('xc_wire', pts, .06, M['hose'], part=X, res=6)
+    solid('xc_wire_end', cylbm(.1, 11.35, 11.65, z, y=onside(0, z, CZ, CR, .22), seg=10), M['rubber'], part=X, bw=0)
+solid('xc_label', prism(rrect_xz(9.7, 11.6, CZ + 1.2, CZ + 1.45, .05), 0, .92), M['label'], part=X, bw=0)
+ring('xc_tape', CR + .012, CR - .2, 3.85, 4.55, M['masking'], part=X, z=CZ, bw=.005)
+ring('xc_tape2', CR + .012, CR - .2, 10.2, 10.7, M['masking'], part=X, z=CZ, bw=.005)
+text('№004', .22, (4.2, CR + .03, CZ + .1), part=X, m=M['ink_k'], font=MARKER)
+text('№004-Б', .22, (10.25, CR + .03, CZ + .1), part=X, m=M['ink_k'], font=MARKER)
+text('×1.5', .3, (11.0, onside(0, CZ - .7, CZ, CR, .02), CZ - .7), part=X, m=M['ink_r'], font=STENCIL)
+
+# Dual Mag (the shared dualmag, on tag_double_clip): a spare canister strapped under the stock one, a coolant bridge
+# between them, so a reload just swaps which one feeds
+DM = 'tag_double_clip'
+Z2 = CZ - 2 * CR - .12   # the spare's axis
+for nm, z, mat in (('dm_can', CZ, 'silver'), ('dm_spare', Z2, 'primer')):
+    solid(nm, cylbm(CR, 3.6, 8.7, z, seg=40), M[mat], part=DM, bw=.05)
+    solid(nm + '_front', cylbm(CR + .06, 8.6, 9.15, z, seg=40), M['dark'], part=DM, cuts=[cylbm(CR - .45, 8.95, 9.3, z, seg=40)], bw=.08, seg=2)
+    solid(nm + '_front_in', cylbm(CR - .45, 8.8, 9.0, z, seg=40), M['steel'], part=DM, bw=.02)
+    solid(nm + '_back', cylbm(CR + .05, 3.3, 3.7, z, seg=40), M['dark'], part=DM, bw=.06, seg=2)
+solid('dm_neck', boxbm(4.3, 8.2, -.7, .7, CZ + CR - .3, -0.6), M['dark'], part=DM, bw=.05)
+solid('dm_plug', boxbm(5.3, 6.3, .75, 1.0, -1.2, -.7), M['dark'], part=DM, bw=.03)
+for x in (4.9, 7.6):   # two straps round both: a steel band and a cam buckle on the side
+    solid('dm_strap', boxbm(x, x + .45, -CR - .1, CR + .1, Z2 - CR - .1, CZ + CR + .1), M['rubber'], part=DM,
+          cuts=[boxbm(x - .1, x + .55, -CR, CR, Z2 - CR, CZ + CR)], bw=.02)
+    solid('dm_buckle', boxbm(x - .05, x + .5, CR + .05, CR + .3, Z2 + CR - .5, Z2 + CR + .5), M['steel'], part=DM, bw=.03)
+tube('dm_bridge', [(9.2, 0, CZ - .3), (9.7, 0, CZ - .6), (9.7, 0, Z2 + .6), (9.2, 0, Z2 + .3)], .2, M['hose'], part=DM, res=8)
+for z in (CZ - .3, Z2 + .3):
+    solid('dm_bridge_nut', cylbm(.28, 8.95, 9.3, z, seg=12), M['copper'], part=DM, bw=.02)
+solid('dm_label', prism(rrect_xz(5.4, 7.2, Z2 + .1, Z2 + .45, .05), 0, CR + .02), M['label'], part=DM, bw=0)
+text('ЗАПАС', .26, (5.5, onside(0, Z2 - .5, Z2, CR, .02), Z2 - .5), part=DM, m=M['ink_r'], font=STENCIL)   # "spare"
+text('№004', .22, (4.2, CR + .03, CZ + .1), part=DM, m=M['ink_k'], font=MARKER)
+text('№005', .22, (4.2, CR + .03, Z2 + .1), part=DM, m=M['ink_k'], font=MARKER)
 
 # ---------------------------------------------------------------- flip-up irons (tag_iron_sight)
 IS = 'tag_iron_sight'

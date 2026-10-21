@@ -406,5 +406,38 @@
     0
    ]
   ]
+ },
+ {
+  "id": "roc_zm",
+  "name": "ROC 20mm",
+  "cls": "special",
+  "max": 10,
+  "styles": [
+   "ammocrate",
+   "breechworks",
+   "flaknight"
+  ],
+  "names": [
+   "Ammo Crate",
+   "Breechworks",
+   "Flak Night"
+  ],
+  "pal": [
+   [
+    72,
+    48,
+    0
+   ],
+   [
+    210,
+    40,
+    0
+   ],
+   [
+    228,
+    28,
+    0
+   ]
+  ]
  }
 ]

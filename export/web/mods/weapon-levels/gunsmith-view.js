@@ -9,7 +9,7 @@ import { loadModel } from '../../animation.js';
 import { applyGlow, tickGlow } from '../bo3-weapons/glow.js';
 import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
-import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
+import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
@@ -271,8 +271,8 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
             <div class="camo-row"><i class="sw" data-swatch="${c.id}" style="background-image:url(${swatch(c)})${c.anim?`;--a:rgb(${c.anim.c1.map(v=>Math.round(v*255))});--b:rgb(${c.anim.c2.map(v=>Math.round(v*255))})`:''}"></i><div><strong>${esc(c.name)}</strong>
             <div class="pc"><span class="${locked?'neu':'pro'}">${esc(what)}${need>1?` · ${have} / ${need}`:''}</span>${locked&&own&&c.prestige<3&&pr.player.tokens?` <span class="tok" data-token="${c.id}">USE TOKEN</span>`:''}</div>
             ${need>1?`<div class="cbar"><b style="width:${(100*have/need).toFixed(1)}%"></b></div>`:''}</div></div></button>`;}
-        const have=c.reward?(done.has(c.id)?1:0):c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:Math.min(c.count,p[c.challenge]??0),need=c.classMastery?cp.total:c.mastery?base.length:c.count;
-        const what=c.classMastery?`Gold on every ${cp.label.toLowerCase().replace(/s$/,'')}`:c.mastery?'Complete every challenge camo':cats.challenges[c.challenge];
+        const have=c.reward?(done.has(c.id)?1:0):c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:Math.min(c.count,p[challengeOf(cats,id,c)]??0),need=c.classMastery?cp.total:c.mastery?base.length:c.count;
+        const what=c.classMastery?`Gold on every ${cp.label.toLowerCase().replace(/s$/,'')}`:c.mastery?'Complete every challenge camo':cats.challenges[challengeOf(cats,id,c)];
         return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'LOCKED':''}</span>
           <div class="camo-row"><i class="sw" data-swatch="${c.id}" style="background-image:url(${swatch(c)})"></i><div><strong>${esc(c.name)}</strong>
           <div class="pc"><span class="${locked?'neu':'pro'}">${esc(what)} · ${have} / ${need}</span></div>
@@ -295,6 +295,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const pct=(k,label,m)=>{if(!m)return;const v=Math.round((m-1)*100);out.push([v>=0?'pro':'con',`${label} ${v>=0?'+':'−'}${Math.abs(v)}%`]);};
     pct(0,'Damage',s.damageMul);pct(0,'Range',s.rangeMul);pct(0,'Fire rate',s.fireMul);
     if(s.suppressed)out.push(['pro','Quiet shots']);
+    if(s.auto)out.push(['pro','Full auto']);
     if(s.clipMul)out.push(['pro',`Magazine +${Math.round((s.clipMul-1)*100)}%`]);
     if(s.reserveMul)out.push(['pro',`Reserve ammo +${Math.round((s.reserveMul-1)*100)}%`]);
     if(s.reloadMul)out.push([s.reloadMul<1?'pro':'con',`Reload ${s.reloadMul<1?'−':'+'}${Math.round(Math.abs(1-s.reloadMul)*100)}%`]);

@@ -184,8 +184,9 @@ export function setupHavoc(api) {
     r.obj.lookAt(tmp.copy(at).add(z ? at.clone().sub(z.root.position).setY(0).normalize() : normal));
     stickSound(at);
     if (z) {
-      const impact = r.a.includes('hv_kinetic') ? r.def.damage * .35 : 60;
-      enemies.hurt(z, impact, false, false, 'bullet');
+      const head = Math.abs(at.y - (enemies.headPosition?.(z)?.y ?? z.root.position.y + 63)) < 9;   // a round that sticks in the head
+      const impact = (r.a.includes('hv_kinetic') ? r.def.damage * .35 : 60) * (head ? 2 : 1);
+      enemies.hurt(z, impact, head, false, 'bullet');
       if (!alive(z)) r.stuck = { normal: up.clone() };   // the impact killed it: the round stays where it was
     }
     if (r.a.includes('hv_tripwire') || r.a.includes('hv_prox')) burst(at, r.a.includes('hv_prox') ? 0xff3030 : 0xff2a2a, 3, .3);

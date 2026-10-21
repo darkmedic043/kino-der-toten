@@ -13,14 +13,16 @@
 import * as THREE from 'three';
 import { prepareSiren, setupSiren, SIREN } from './siren.js';
 import { prepareHavoc, setupHavoc, HAVOC } from './havoc.js';
+import { prepareRoc, setupRoc, ROC } from './roc.js';
 
 const BASE = new URL('./', import.meta.url).href;
 const ID = 'grimhawk_zm';
 // every attachment part, hidden until fitted (weapon-levels attachments.json: gh_rangefinder, gh_expanse, gh_hawkeye,
 // gh_longbarrel, and the shared suppressor, grip and laser)
 const ATTACHMENT_TAGS = ['tag_gh_rangefinder', 'tag_gh_hawkeye', 'tag_gh_expanse', 'tag_suppressor', 'tag_gh_longbarrel', 'tag_foregrip', 'tag_laser_box'];
-// The M16 skeleton's own extended / dual mag bones (no Grimhawk meshes on them) must be hidden too: weapon-levels' mag
-// follow takes a visible one for a built-in mag and drove the Expanse drum from it (a bone the reload never moves).
+// The M16 skeleton's own extended / dual mag bones carry the Grimhawk's Extended / Dual Mag (2026-10-21; empty before,
+// so the Gunsmith offered mags with no model) and must be hidden too: weapon-levels' mag follow takes a visible one for
+// a built-in mag and drove the Expanse drum from it (a bone the reload never moves).
 const SPARE_TAGS = ['tag_ext_clip', 'tag_double_clip'];
 // At the hip it sat as close as the BO1 M16 and read as huge (a long, bulky gun): pushed 3 units away from the eye
 // along the view camera's axis (-z), nudged right and down (ViewWeapon's def.viewOffset; gone in ADS).
@@ -30,9 +32,10 @@ const SPEED = 2600, DROP = 520, LIFE = 2.2, TURN = 3.2, CONE = Math.cos(THREE.Ma
 export function prepare(data) {
   prepareSiren(data);   // the Siren (siren.js)
   prepareHavoc(data);   // the GDL Havoc (havoc.js)
+  prepareRoc(data);   // the ROC 20mm (roc.js)
   const m16 = data.weapons.m16_zm;
   if (!m16) { console.warn('[bo7-weapons] no M16 to build the Grimhawk on'); return; }
-  const model = BASE + 'grimhawk_view.glb?v=13', world = BASE + 'grimhawk_world.glb?v=13';   // own models (not under models/: Rind installs them)
+  const model = BASE + 'grimhawk_view.glb?v=14', world = BASE + 'grimhawk_world.glb?v=14';   // own models (not under models/: Rind installs them)
   const base = structuredClone(m16);
   const gun = Object.assign(base, {
     id: ID, name: 'Grimhawk', price: 1500, clipSize: 25, startAmmo: 125, maxAmmo: 225,
@@ -54,6 +57,7 @@ export default function setup(api) {
   const { host, session, camera, scene, world, enemies, audio, data, view, viewCamera } = api;
   if (data.weapons[SIREN]) setupSiren(api);
   if (data.weapons[HAVOC]) setupHavoc(api);
+  if (data.weapons[ROC]) setupRoc(api);
   if (!data.weapons[ID]) return;
   const isGrim = def => (def?.baseId ?? def?.id) === ID;
 

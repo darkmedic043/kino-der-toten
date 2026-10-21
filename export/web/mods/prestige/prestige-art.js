@@ -7,9 +7,9 @@
 // Class motifs: sniper scope rings, shotgun buckshot, SMG speed lines, AR chevron marks, LMG belt links, pistol
 // engraving, launcher blast rays, special glyph runes.
 // Hand-made: the Siren's Wailing Tide (I), Choir Grille (II) and Song of Circe (Master); the GDL Havoc's Danger Close (I),
-// Live Ordnance (II) and Chain Reaction (Master).
+// Live Ordnance (II) and Chain Reaction (Master); the ROC 20mm's Ammo Crate (I), Breechworks (II) and Flak Night (Master).
 // Hand-made designs for one gun (named in .tools/prestige-guns.json, not in STYLES so no other gun is dealt them)
-const OWN=new Set(['wailtide','choirgrille','songofcirce','dangerclose','liveordnance','chainreaction']);
+const OWN=new Set(['wailtide','choirgrille','songofcirce','dangerclose','liveordnance','chainreaction','ammocrate','breechworks','flaknight']);
 export const STYLES={1:['shards','chevrons','splinter','contour','scales','brush'],2:['lattice','filigree','damascus','mosaic','carbon','facets'],3:['cracks','circuit','runes','lightning','magma','constellation']};
 
 const hsl=(h,s,l,a=1)=>`hsla(${((h%360)+360)%360},${s}%,${l}%,${a})`;
@@ -23,6 +23,15 @@ function voronoi(S,n,r){const pts=[...Array(n)].map(()=>[r()*S,r()*S]),cell=new 
 
 // ---- Prestige I ------------------------------------------------------------------------------------------------
 const P1={
+  // the ROC 20mm's Prestige I: olive crate planks with seams and nails, yellow lot bands, stencilled 20MM HE and rows of shells
+  ammocrate(g,S,r,p,w){const P=S/8,TAU=6.283;g.fillStyle=hsl(p.h,30,17);g.fillRect(0,0,S,S);
+    for(let k=0;k<8;k++){g.fillStyle=hsl(p.h,28+r()*8,14+r()*7);g.fillRect(0,k*P+1,S,P-2);for(let i=0;i<40;i++){g.strokeStyle=hsl(p.h,25,10+r()*12,.35);g.lineWidth=1;const y=k*P+3+r()*(P-6),x=r()*S;g.beginPath();g.moveTo(x,y);g.lineTo(x+60+r()*160,y+(r()-.5)*2);g.stroke();}
+      g.fillStyle=hsl(p.h,30,7);g.fillRect(0,k*P,S,2);for(let x=0;x<S;x+=S/4){const o=(k%2)*S/8;g.fillStyle=hsl(p.h,20,32);g.beginPath();g.arc(x+o+10,k*P+8,2.2,0,TAU);g.arc(x+o+10,k*P+P-8,2.2,0,TAU);g.fill();}}
+    for(let i=0;i<2;i++){const y=Math.floor(r()*8)*P+P*.3;g.fillStyle=hsl(p.h2,80,48);g.fillRect(0,y,S,P*.14);g.fillRect(0,y+P*.26,S,P*.06);}
+    const words=['20MM HE','ROC','LOT 7-24','HE-T','20 X 102','LIVE'];g.textBaseline='middle';
+    for(let i=0;i<12;i++){const x=r()*S,y=(Math.floor(r()*8)+.55)*P,t=words[Math.floor(r()*words.length)],yel=r()<.45;w(()=>{g.font='bold 30px monospace';g.fillStyle=yel?hsl(p.h2,75,52,.9):'rgba(10,10,6,.75)';g.fillText(t,x,y);});}
+    for(let i=0;i<7;i++){const x=r()*S,y=r()*S,n=4+Math.floor(r()*4);w(()=>{for(let k=0;k<n;k++){const yy=y+k*13;g.fillStyle=hsl(p.h2,45,30);g.fillRect(x,yy,34,9);g.fillStyle=hsl(p.h2,55,40);g.fillRect(x,yy+1,34,2);
+      g.fillStyle=hsl(p.h,25,26);g.beginPath();g.moveTo(x+34,yy);g.lineTo(x+44,yy+2.5);g.quadraticCurveTo(x+52,yy+4.5,x+44,yy+6.5);g.lineTo(x+34,yy+9);g.closePath();g.fill();g.fillStyle=hsl(p.h2,80,45);g.fillRect(x+36,yy,2.5,9);}});}},
   // the GDL Havoc's Prestige I: hazard-stripe bands between dark plates, stencilled 40MM blocks and two-tone blast stars
   dangerclose(g,S,r,p,w){g.fillStyle=hsl(p.h,25,10);g.fillRect(0,0,S,S);const B=S/4,st=S/16;
     for(let b=0;b<4;b++){if(b%2)continue;const y0=b*B+B*.18,y1=y0+B*.64;g.save();g.beginPath();g.rect(0,y0,S,y1-y0);g.clip();
@@ -67,6 +76,15 @@ const P1={
 // ---- Prestige II ---------------------------------------------------------------------------------------------------
 const gold=(g,x0,y0,x1,y1)=>{const gr=g.createLinearGradient(x0,y0,x1,y1);gr.addColorStop(0,'#fff0b8');gr.addColorStop(.5,'#c9952f');gr.addColorStop(1,'#ffe39a');return gr;};
 const P2={
+  // the ROC 20mm's Prestige II: engine-turned gunmetal (overlapping machined swirls), riveted breech plates and brass rivets
+  breechworks(g,S,r,p,w){const G=32,TAU=6.283;g.fillStyle=hsl(p.h,12,20);g.fillRect(0,0,S,S);
+    for(let row=0;row<S/G+1;row++)for(let col=0;col<S/G+1;col++){const cx=col*G+(row%2)*G/2,cy=row*G*.85,a=r()*TAU,l=22+r()*14;w(()=>{const gr=g.createRadialGradient(cx-6,cy-6,2,cx,cy,G*.62);
+      gr.addColorStop(0,hsl(p.h,14,l+22));gr.addColorStop(.55,hsl(p.h,12,l));gr.addColorStop(1,hsl(p.h,14,l-10));g.fillStyle=gr;g.beginPath();g.arc(cx,cy,G*.62,0,TAU);g.fill();
+      g.strokeStyle=hsl(p.h,10,l+30,.35);g.lineWidth=1;for(let k=1;k<6;k++){g.beginPath();g.arc(cx,cy,k*3.4,a+k*.5,a+k*.5+2.4);g.stroke();}});}
+    const seams=[...Array(3)].map(()=>[Math.floor(r()*16)*G,r()<.5]);
+    for(const [o,vert] of seams)w(()=>{g.fillStyle=hsl(p.h,15,6);vert?g.fillRect(o-2,0,4,S):g.fillRect(0,o-2,S,4);g.fillStyle=hsl(p.h,10,40,.5);vert?g.fillRect(o+2,0,1,S):g.fillRect(0,o+2,S,1);
+      for(let t=G/2;t<S;t+=G){const x=vert?o+9:t,y=vert?t:o+9;const gr=g.createRadialGradient(x-1.5,y-1.5,.5,x,y,5);gr.addColorStop(0,hsl(p.h2,80,78));gr.addColorStop(.5,hsl(p.h2,65,45));gr.addColorStop(1,hsl(p.h2,50,18));g.fillStyle=gr;g.beginPath();g.arc(x,y,5,0,TAU);g.fill();}});
+    for(let i=0;i<6;i++){const x=r()*S,y=r()*S;w(()=>{g.font='bold 15px monospace';g.fillStyle=hsl(p.h2,55,55,.8);g.fillText('ROC-20 · '+(1000+Math.floor(x*7)%9000),x,y);});}},
   // the GDL Havoc's Prestige II: gilded 40 mm rounds laid in staggered rows on dark enamel, riveted rails between the rows
   liveordnance(g,S,r,p,w){g.fillStyle=hsl(p.h,45,13);g.fillRect(0,0,S,S);for(let i=0;i<300;i++){g.fillStyle=hsl(p.h,40,9+r()*10,.4);g.fillRect(r()*S,r()*S,2+r()*3,1);}
     const R=8,H=S/8;
@@ -112,10 +130,21 @@ const d4=(d,i,[r,g,b])=>{d[i*4]=r;d[i*4+1]=g;d[i*4+2]=b;d[i*4+3]=255;};
 // ---- Master (base, glow) ----------------------------------------------------------------------------------------------
 // Each returns the base on `g` (dark, the gun's colour) or, with glow=true, a white-on-black mask of what lights up.
 const PM={
+  // the ROC 20mm's Master: a night sky full of tracer streams (every fifth round lit) and flak bursts; tracers and bursts glow
+  flaknight(g,S,r,p,w,glow){const TAU=6.283,n=rng(p.seed*7+1);g.fillStyle=glow?'#000':hsl(p.h,45,7);g.fillRect(0,0,S,S);
+    if(!glow){for(let i=0;i<900;i++){g.fillStyle=`rgba(255,255,255,${n()*.22})`;g.fillRect(n()*S,n()*S,1,1);}for(let i=0;i<14;i++){const x=n()*S,y=n()*S,R=40+n()*70;w(()=>{const gr=g.createRadialGradient(x,y,0,x,y,R);gr.addColorStop(0,hsl(p.h,25,16,.6));gr.addColorStop(1,hsl(p.h,25,10,0));g.fillStyle=gr;g.fillRect(x-R,y-R,2*R,2*R);});}}
+    const A=-.55-r()*.25;
+    for(let i=0;i<16;i++){const x=r()*S,y=r()*S,a=A+(r()-.5)*.35,len=220+r()*260,bend=(r()-.5)*.0012,ph=r()*48;
+      w(()=>{g.lineCap='round';for(let t=ph;t<len;t+=48){const x1=x+Math.cos(a)*t,y1=y+Math.sin(a)*t+bend*t*t,x2=x+Math.cos(a)*(t+16),y2=y+Math.sin(a)*(t+16)+bend*(t+16)*(t+16);
+        g.strokeStyle=glow?'rgba(255,255,255,.9)':hsl(p.h2,85,50);g.lineWidth=glow?3.2:2.4;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();}});}
+    for(let i=0;i<9;i++){const x=r()*S,y=r()*S,R=22+r()*26,puffs=[...Array(10)].map(()=>[r()*TAU,R*(.7+r()*.4),5+r()*7]),bits=[...Array(16)].map(()=>[r()*TAU,R*(1.2+r()*.9)]);
+      w(()=>{for(const [a,d,pr] of puffs){g.fillStyle=glow?'rgba(255,255,255,.28)':hsl(p.h,15,22,.85);g.beginPath();g.arc(x+Math.cos(a)*d,y+Math.sin(a)*d,pr,0,TAU);g.fill();}
+        const gr=g.createRadialGradient(x,y,0,x,y,R*.8);gr.addColorStop(0,glow?'rgba(255,255,255,1)':hsl(p.h2,90,70));gr.addColorStop(1,glow?'rgba(255,255,255,0)':hsl(p.h2,80,30,0));g.fillStyle=gr;g.beginPath();g.arc(x,y,R*.8,0,TAU);g.fill();
+        g.fillStyle=glow?'rgba(255,255,255,.8)':hsl(p.h2,70,55);for(const [a,d] of bits)g.fillRect(x+Math.cos(a)*d,y+Math.sin(a)*d,2,2);});}},
   // the GDL Havoc's Master: shockwave rings racing out of blast cores, scorched rays and stuck-round beacons; rings,
   // rays and beacons glow and pulse
   chainreaction(g,S,r,p,w,glow){const TAU=6.283;g.fillStyle=glow?'#000':hsl(p.h,40,7);g.fillRect(0,0,S,S);
-    if(!glow)for(let i=0;i<700;i++){g.fillStyle=hsl(p.h,30,5+r()*9,.6);g.fillRect(r()*S,r()*S,2,2);}
+    if(!glow){const n=rng(p.seed*7+1);for(let i=0;i<700;i++){g.fillStyle=hsl(p.h,30,5+n()*9,.6);g.fillRect(n()*S,n()*S,2,2);}}   // own generator: the glow must keep r()'s sequence
     const cores=[...Array(7)].map(()=>[r()*S,r()*S,60+r()*70]);
     for(const [cx,cy,R] of cores){const n=14+Math.floor(r()*8),rays=[...Array(n)].map(()=>[r()*TAU,R*(.5+r()*.8)]),gaps=[...Array(4)].map(()=>r()*TAU);
       w(()=>{g.strokeStyle=glow?'rgba(255,255,255,.55)':hsl(p.h,35,14);g.lineWidth=2;for(const [a,l] of rays){g.beginPath();g.moveTo(cx+Math.cos(a)*8,cy+Math.sin(a)*8);g.lineTo(cx+Math.cos(a)*l,cy+Math.sin(a)*l);g.stroke();}

@@ -111,7 +111,7 @@ export function grantWeaponXp(cat,def,id,profile,amount){
   return unlockedAttachments(cat,def,id,profile).slice(before);
 }
 
-const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','suppressed','attachments','attachment','mounted'];
+const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','suppressed','automatic','fireType','attachments','attachment','mounted'];
 function snapshot(obj){if(!pristine.has(obj)){const s={};for(const k of STAT_FIELDS)s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);pristine.set(obj,s);}return pristine.get(obj);}
 function restore(obj){const s=snapshot(obj);for(const k of STAT_FIELDS){if(s[k]===undefined)delete obj[k];else obj[k]=structuredClone(s[k]);}}
 
@@ -141,6 +141,7 @@ function applyStats(obj,list,cat,show){
     if(s.hipSpreadMul)obj.hipSpread=+((obj.hipSpread??.012)*s.hipSpreadMul).toFixed(4);   // stacks (grip + stock); .012 is the engine's default
     if(s.suppressed)obj.suppressed=true;
     if(s.fireMul&&obj.fireTime)obj.fireTime=+(obj.fireTime/s.fireMul).toFixed(4);
+    if(s.auto){obj.automatic=true;obj.fireType='Full Auto';}   // the ROC's MFS Warhead Autoloader
     if(s.reserveMul){if(obj.maxAmmo)obj.maxAmmo=Math.round(obj.maxAmmo*s.reserveMul);if(obj.startAmmo)obj.startAmmo=Math.round(obj.startAmmo*s.reserveMul);}   // the Havoc's Bandolier
     if(a.scope)obj.scope=a.scope;
   }

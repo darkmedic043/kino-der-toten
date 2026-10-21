@@ -17,7 +17,7 @@ COL = bpy.context.scene.collection
 # catalog entry's tags). Bones the M16 skeleton lacks are added by .tools/assemble-grimhawk.mjs (NEW_BONES there).
 PARTS = {'j_gun': [], 'tag_clip': [], 'j_charging_handle': [], 'tag_iron_sight': [], 'tag_gh_barrel': [],
          'tag_gh_rangefinder': [], 'tag_gh_hawkeye': [], 'tag_gh_expanse': [], 'tag_suppressor': [],
-         'tag_gh_longbarrel': [], 'tag_foregrip': [], 'tag_laser_box': []}
+         'tag_gh_longbarrel': [], 'tag_foregrip': [], 'tag_laser_box': [], 'tag_ext_clip': [], 'tag_double_clip': []}
 
 
 def srgb(h):
@@ -369,6 +369,39 @@ for x in (0.6, 3.9):
 tur = bmesh.new(); bmesh.ops.create_cone(tur, cap_ends=True, segments=18, radius1=.3, radius2=.3, depth=.4); tur.transform(Matrix.Translation((2.3, 0, SIGHT + .62)))
 solid('hk_turret', tur, M['steel'], part=HK, bw=.03)
 solid('hk_band', cylbm(.53, 2.0, 2.6, SIGHT, seg=28), M['silver'], part=HK, bw=.02)
+# Extended Mag (the shared extmag, on the M16's own tag_ext_clip): the same slab, 2.2 deeper, a third ribbed panel
+# and a longer window
+XM, DROP = 'tag_ext_clip', 2.2
+low = lambda pts, below=-.5: [(x, z - DROP if z < below else z) for x, z in pts]
+xmag = prism(fillet(low([(2.6, 1.15), (6.85, 1.15), (7.1, -0.3), (9.35, -2.3), (9.75, -4.9), (9.3, -5.45), (4.0, -5.6), (3.35, -5.0), (2.75, -0.4)]), 0.35), -.7, .7)
+xcuts = []
+for s_ in (1, -1):
+    y0, y1 = (.6, .9) if s_ > 0 else (-.9, -.6)
+    xcuts.append(prism([(3.6, -0.6), (6.6, -0.6), (8.1, -2.0), (8.2, -2.6), (3.75, -2.6)], y0, y1))
+    xcuts.append(prism([(3.85, -3.0), (8.5, -3.0), (8.7, -4.85), (4.0, -4.85)], y0, y1))
+    xcuts.append(prism([(3.95, -5.25), (8.8, -5.25), (9.0, -7.05), (4.0, -7.05)], y0, y1))
+solid('xm_body', xmag, M['poly'], part=XM, cuts=xcuts, bw=.16, seg=4)
+for s_ in (1, -1):
+    win = prism([(7.25, -0.45), (9.35, -2.35), (9.65, -6.8), (9.5, -6.8), (9.2, -2.45), (7.15, -0.6)], s_ * .62, s_ * .71)
+    solid(f'xm_win{s_}', win, M['amber'], part=XM, bw=0)
+    text('V', .75, (7.0, s_ * .63, -3.9), part=XM, side=s_, m=M['label'])
+    text('XL', .5, (6.4, s_ * .63, -6.3), part=XM, side=s_, m=M['label'])
+solid('xm_base', prism(fillet(low([(3.9, -5.5), (9.35, -5.35), (9.45, -5.85), (3.8, -6.0)], 0), 0.2), -.76, .76), M['rubber'], part=XM, bw=.06)
+
+# Dual Mag (the shared dualmag, on tag_double_clip): the stock slab and a spare taped to its left, set lower, so a
+# reload flips to the other
+DM, DY, DZ = 'tag_double_clip', 1.5, -1.4
+slab = [(2.6, 1.15), (6.85, 1.15), (7.1, -0.3), (9.35, -2.3), (9.75, -4.9), (9.3, -5.45), (4.0, -5.6), (3.35, -5.0), (2.75, -0.4)]
+for k, (dy, dz) in enumerate(((0, 0), (DY, DZ))):
+    sh = lambda pts: [(x, z + dz) for x, z in pts]
+    solid(f'dm_mag{k}', prism(fillet(sh(slab), 0.35), dy - .7, dy + .7), M['poly'], part=DM, bw=.16, seg=4)
+    s_ = -1 if k == 0 else 1   # the outer faces keep their windows
+    win = prism(sh([(7.25, -0.45), (9.35, -2.35), (9.55, -4.6), (9.4, -4.6), (9.2, -2.45), (7.15, -0.6)]), dy + s_ * .62, dy + s_ * .71)
+    solid(f'dm_win{k}', win, M['amber'], part=DM, bw=0)
+    solid(f'dm_base{k}', prism(fillet(sh([(3.9, -5.5), (9.35, -5.35), (9.45, -5.85), (3.8, -6.0)]), 0.2), dy - .76, dy + .76), M['rubber'], part=DM, bw=.06)
+for z0 in (-2.0, -4.0):   # two wraps of tape round both
+    solid('dm_tape', prism(fillet([(3.7, z0), (8.75, z0), (8.8, z0 - .5), (3.75, z0 - .5)], .05), -.74, DY + .74), M['rubber'], part=DM, bw=.01)
+text('V', .75, (7.0, DY + .72, -3.9 + DZ), part=DM, side=1, m=M['label'])
 
 # P.T. Expanse mag (BO7): a fan-shaped drum hung from the magwell, grid face, amber arc window. It has its own
 # reload (mods/bo7-weapons drumReload: the M16 reload's hands would clip through it)

@@ -23,7 +23,7 @@ const BASE = new URL('./', import.meta.url).href;
 export const SIREN = 'siren_zm';
 const ATTACHMENT_TAGS = ['tag_sr_reflex', 'tag_sr_deflect', 'tag_sr_overclock', 'tag_sr_resonance', 'tag_sr_baffle', 'tag_sr_echo',
   'tag_sr_lancet', 'tag_sr_soma', 'tag_foregrip', 'tag_laser_box'];
-const SPARE_TAGS = ['tag_ext_clip', 'tag_double_clip'];   // the M16's own spare mag bones (see mod.js)
+const SPARE_TAGS = ['tag_ext_clip', 'tag_double_clip'];   // the M16's own spare mag bones: the Extended / Dual canisters
 const VIEW_OFFSET = [.6, -.4, -3.2];   // pushed out from the eye like the Grimhawk's (a long gun read as huge at the M16's hip)
 const CHARGE = 2, TAP = .12;                  // seconds to full charge; held less than TAP is a tap
 const SLOW = 520, FAST = 1600;                // orb speed (units/s): tap, full charge (BO7: 12.7 m/s -> 38 m/s)
@@ -34,7 +34,7 @@ const COLOR = 0xd9a2ff, PAP_COLOR = 0xff6fd0;
 export function prepareSiren(data) {
   const m16 = data.weapons.m16_zm;
   if (!m16) { console.warn('[bo7-weapons] no M16 to build the Siren on'); return; }
-  const model = BASE + 'siren_view.glb?v=4', world = BASE + 'siren_world.glb?v=4';
+  const model = BASE + 'siren_view.glb?v=5', world = BASE + 'siren_world.glb?v=5';
   const hideTags = [...ATTACHMENT_TAGS, ...SPARE_TAGS];
   const gun = Object.assign(structuredClone(m16), {
     id: SIREN, name: 'Siren', price: 1500, clipSize: 6, startAmmo: 36, maxAmmo: 66, damage: 1400, minDamage: 1400, range: 8000,
@@ -254,9 +254,11 @@ export function setupSiren(api) {
     const dx = p.x - f.x, dz = p.z - f.z, dy = p.y < f.y ? f.y - p.y : p.y > f.y + tall ? p.y - f.y - tall : 0;
     return dx * dx + dz * dz + dy * dy < (r + body) ** 2;
   }
+  // a headshot when the orb arrives at head height: it strikes the moment it touches the body cylinder, usually still
+  // well out to the side, so a distance-to-head test almost never fired (2026-10-21)
   function headOf(z, p, r) {
     const h = enemies.headPosition?.(z) ?? tmp2.copy(z.root.position).add(new THREE.Vector3(0, z.kind === 'dog' ? 28 : 63, 0));
-    return h.distanceTo(p) < Math.max(9, r * .55);
+    return Math.abs(p.y - h.y) < 7 + Math.min(r * .4, 10);
   }
   // entrance (Gaze of Circe): the zombie holds still, swaying, for a moment; the song: zombies walk to the shatter
   const songs = [];

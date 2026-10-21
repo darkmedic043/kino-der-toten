@@ -19,7 +19,7 @@ export default function setup(api){
     try{localStorage.setItem(CAREER_KEY,JSON.stringify(career));}catch{}};
   const base=id=>(id??'').replace(/_upgraded(_zm)?$/,'_zm');
   const gun=()=>base(session.def?.baseId??session.weapon?.id);
-  const LAUNCHER=/china_lake|m72_law|crossbow|ray_gun|m1911_upgraded|rpg/;
+  const LAUNCHER=/china_lake|m72_law|crossbow|ray_gun|m1911_upgraded|rpg|havoc|roc_zm/;
   // What dealt each enemy's last damage, for kill credit.
   const lastCause=new WeakMap();
   host.on('beforeEnemyDamage',e=>{
@@ -28,7 +28,7 @@ export default function setup(api){
     else if(c==='turret')who='sentry_turret';
     else if(c==='gersh')who='black_hole_bomb';
     else if(c==='electric')who='trap';
-    else if(c==='explosion')who=LAUNCHER.test(gun())||session.def?.projectile?gun():'frag_grenade_zm';
+    else if(c==='explosion')who=LAUNCHER.test(gun())||session.def?.projectileSpeed>0||session.def?.explosionRadius>0?gun():'frag_grenade_zm';
     else who=gun();
     if(e.enemy)lastCause.set(e.enemy,who);
   });

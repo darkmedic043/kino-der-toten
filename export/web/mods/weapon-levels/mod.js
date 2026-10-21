@@ -117,20 +117,27 @@ export default async function setup(api){
 
   // ---- XP -----------------------------------------------------------------------
   const cheating=()=>!!window.kino.cheats?.used;
-  const lastCause=new WeakMap();
-  host.on('beforeEnemyDamage',e=>{if(e.enemy)lastCause.set(e.enemy,e.cause);});
-  const lastKill=new Map();
+  // Kill credit (2026-10-21): the gun is the one in hand when the killing damage was dealt (a ROC thermite pool or a
+  // Havoc charge that finishes a zombie after a swap still counts for it), and besides the plain gun causes a weapon
+  // can name its own (KILL_CAUSES, or def.killCauses): the Wave Gun's 'wave', the DG-2's 'tesla', Winter's Howl
+  // shatters, the ROC's and Havoc's blasts and fire. Grenades are still credited to a held launcher (known limit).
+  const KILL_CAUSES={microwavegun_zm:['wave'],tesla_gun_zm:['tesla'],freezegun_zm:['explosion'],roc_zm:['explosion','fire'],havoc_zm:['explosion','fire']};
+  const GUN_CAUSES=new Set(['bullet','projectile','thunder','flame','freeze']);
+  const lastHit=new WeakMap();
+  host.on('beforeEnemyDamage',e=>{if(e.enemy)lastHit.set(e.enemy,{cause:e.cause,id:session.weapon?.id});});
+  const lastKill=new Map(),crowds=new Map();
   host.on('kill',({enemy,head,melee,remote})=>{
     if(remote||melee||cheating()||!session.weapon)return;
-    const now=performance.now()/1000,multi=now-(lastKill.get(session.weapon.id)??-9)<1.5;lastKill.set(session.weapon.id,now);
-    const cause=lastCause.get(enemy);
-    const launcher=session.def?.projectileSpeed>0;
-    if(!(cause==='bullet'||cause==='projectile'||cause==='thunder'||cause==='flame'||cause==='freeze'||(cause==='explosion'&&launcher)))return;
-    const id=session.weapon.id,def=data.weapons[id];if(!def)return;
+    const hit=lastHit.get(enemy),cause=hit?.cause,id=hit?.id&&data.weapons[hit.id]?hit.id:session.weapon.id,def=data.weapons[id];if(!def)return;
+    const extra=def.killCauses??KILL_CAUSES[def.baseId??id]??KILL_CAUSES[id]??[];
+    if(!(GUN_CAUSES.has(cause)||extra.includes(cause)||(cause==='explosion'&&def.projectileSpeed>0)))return;
+    const now=performance.now()/1000,multi=now-(lastKill.get(id)??-9)<1.5;lastKill.set(id,now);
+    // crowd kills: the 3rd and later kill inside a 1.5 s chain (the camo swap for guns that can't headshot)
+    const cr=crowds.get(id),run=cr&&now-cr.t<1.5?cr.n+1:1;crowds.set(id,{t:now,n:run});const crowd=run>=3;
     profile=loadProfile();
     // camo challenges (any gun)
     const mv=window.kino.movement?.state;
-    const camos=countCamoKill(cats,profile,id,{head,low:!!(mv?.prone||api.player?.crouched),moving:!!(mv?.sliding||mv?.diving),multi},data.weapons);
+    const camos=countCamoKill(cats,profile,id,{head,low:!!(mv?.prone||api.player?.crouched),moving:!!(mv?.sliding||mv?.diving),multi,crowd},data.weapons);
     if(camos.length){const dia=camos.find(c=>c.classMastery),cls=window.kino.camoClass?.(id);
       api.toast(dia?`Diamond camo unlocked for every ${cls??'gun in this class'} · equip it in the Gunsmith`:`${def.name} · ${camos.map(c=>c.name).join(', ')} camo unlocked · equip it in the Gunsmith`,6);}
     if(!available(cat,def,id).length){save();return;}

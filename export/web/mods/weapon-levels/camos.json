@@ -7,7 +7,8 @@
     "moving": "Kills while sliding or diving",
     "multi": "Multi-kills (2+ within 1.5 s)",
     "cheese": "Buy the ending of Cheese Cube Unlimited",
-    "shop": "Buy it in the Shop"
+    "shop": "Buy it in the Shop",
+    "crowd": "Crowd kills (3+ within 1.5 s)"
   },
   "camos": [
     {
@@ -366,5 +367,23 @@
       "scale": 2,
       "mix": 0.95
     }
-  ]
+  ],
+  "_altNote": "alt: weapon id -> {challenge: replacement}, for guns that can't do a challenge (no headshots from a Thundergun blast); progress counts on the replacement",
+  "alt": {
+    "thundergun_zm": {
+      "headshots": "crowd"
+    },
+    "microwavegun_zm": {
+      "headshots": "crowd"
+    },
+    "freezegun_zm": {
+      "headshots": "crowd"
+    },
+    "tesla_gun_zm": {
+      "headshots": "crowd"
+    },
+    "microwavegundw_zm": {
+      "headshots": "crowd"
+    }
+  }
 }

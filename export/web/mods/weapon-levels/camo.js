@@ -231,20 +231,26 @@ export const CLASSES=[['ar','ASSAULT RIFLES',['Rifle']],['smg','SMGS',['Submachi
 export const classOf=(weapons,id)=>{const d=weapons?.[id];return d?CLASSES.find(c=>c[2].includes(weaponClass(d)))?.[0]??'special':'special';};
 export const classLabel=key=>CLASSES.find(c=>c[0]===key)?.[1]??key;
 // the guns of a class that count toward Diamond (no Pack-a-Punch entries)
-export function classGuns(weapons,key){return Object.keys(weapons??{}).filter(id=>!/upgraded/.test(id)&&weapons[id]?.model&&classOf(weapons,id)===key);}
+// Stark's suit weapons (stark/armor.js copy a base gun's model) and guns that never kill don't count (2026-10-21: the
+// suitcase and cloak made pistol Diamond impossible in a match)
+export function classGuns(weapons,key){return Object.keys(weapons??{}).filter(id=>{const d=weapons[id];
+  return !/upgraded/.test(id)&&d?.model&&!d.suitWeapon&&!d.hideGun&&!/^iron_/.test(id)&&(d.damage??1)>0&&classOf(weapons,id)===key;});}
 
 // ---- challenges -------------------------------------------------------------------------------
 export const camoProgress=(profile,id)=>profile.camo?.[id]?.p??{};
+// The challenge a camo asks of this gun: camos.json "alt" swaps one for guns that can't do it (2026-10-21: the
+// Thundergun, Wave Gun, Winter's Howl and DG-2 can't score headshots, so their Tiger asks for crowd kills instead)
+export const challengeOf=(cats,id,c)=>cats.alt?.[id]?.[c.challenge]??c.challenge;
 const baseCamos=cats=>cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward&&!c.shop);   // shop camos are bought (Phase 6)   // reward camos come from a map's reward flag (profile.rewards), not a challenge
 // a gun has Gold (its mastery) when every challenge camo is done
-export function hasMastery(cats,profile,id){const p=camoProgress(profile,id);return baseCamos(cats).every(c=>(p[c.challenge]??0)>=c.count);}
+export function hasMastery(cats,profile,id){const p=camoProgress(profile,id);return baseCamos(cats).every(c=>(p[challengeOf(cats,id,c)]??0)>=c.count);}
 // Diamond progress for a gun's class: guns with Gold / guns in the class
 export function classProgress(cats,profile,id,weapons){
   const key=classOf(weapons,id);if(!weapons||key==='special')return null;
   const guns=classGuns(weapons,key);return {key,label:classLabel(key),done:guns.filter(g=>hasMastery(cats,profile,g)).length,total:guns.length};
 }
 export function camoUnlocked(cats,profile,id,weapons){
-  const p=camoProgress(profile,id),list=baseCamos(cats),done=new Set(list.filter(c=>(p[c.challenge]??0)>=c.count).map(c=>c.id));
+  const p=camoProgress(profile,id),list=baseCamos(cats),done=new Set(list.filter(c=>(p[challengeOf(cats,id,c)]??0)>=c.count).map(c=>c.id));
   if(list.every(c=>done.has(c.id)))for(const c of cats.camos)if(c.mastery)done.add(c.id);
   const cp=classProgress(cats,profile,id,weapons);
   if(cp&&cp.total&&cp.done===cp.total)for(const c of cats.camos)if(c.classMastery)done.add(c.id);
@@ -262,7 +268,7 @@ export function countCamoKill(cats,profile,id,flags,weapons){
   profile.camo??={};const e=profile.camo[id]??={p:{}};e.p??={};
   const before=camoUnlocked(cats,profile,id,weapons);
   const add=k=>{e.p[k]=(e.p[k]??0)+1;};
-  add('kills');if(flags.head)add('headshots');if(flags.low)add('low');if(flags.moving)add('moving');if(flags.multi)add('multi');
+  add('kills');if(flags.head)add('headshots');if(flags.low)add('low');if(flags.moving)add('moving');if(flags.multi)add('multi');if(flags.crowd)add('crowd');
   const after=camoUnlocked(cats,profile,id,weapons);
   return cats.camos.filter(c=>after.has(c.id)&&!before.has(c.id));
 }

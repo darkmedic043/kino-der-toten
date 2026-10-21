@@ -1,5 +1,5 @@
 {
   "name": "BO7 weapons",
-  "description": "Black Ops 7 weapons rebuilt from scratch (own models skinned to BO1 skeletons, so BO1 animations drive them): the Grimhawk, a homing flechette rifle; the Siren, a charge weapon whose slow orbs pass through every zombie in their path; and the GDL Havoc, a pump-action launcher whose sticky grenades wait for the aim button. All from the Mystery Box.",
+  "description": "Black Ops 7 weapons rebuilt from scratch (own models skinned to BO1 skeletons, so BO1 animations drive them): the Grimhawk, a homing flechette rifle; the Siren, a charge weapon whose slow orbs pass through every zombie in their path; the GDL Havoc, a pump-action launcher whose sticky grenades wait for the aim button; and the ROC 20mm, a semi-auto cannon firing explosive shells. All from the Mystery Box.",
   "script": "mod.js"
 }

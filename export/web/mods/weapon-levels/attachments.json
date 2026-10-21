@@ -719,6 +719,217 @@
       "replaces": [
         "tag_hv_cap"
       ]
+    },
+    {
+      "id": "ro_gunner",
+      "name": "Gunner's Scope",
+      "slot": "optic",
+      "tags": [
+        "tag_ro_gunner"
+      ],
+      "scope": "acog",
+      "desc": "An armoured 4× box sight on the rail, like a vehicle gun's. +25% headshot damage.",
+      "stats": {
+        "adsFov": 30,
+        "headMul": 1.25
+      }
+    },
+    {
+      "id": "ro_reflex",
+      "name": "Breach Reflex",
+      "slot": "optic",
+      "tags": [
+        "tag_ro_reflex"
+      ],
+      "scope": "reflex",
+      "desc": "An open red dot on a tall mount. Aimed shots kick half as much.",
+      "stats": {
+        "adsFovMul": 0.95
+      }
+    },
+    {
+      "id": "ro_concuss",
+      "name": "Concussion Brake",
+      "slot": "muzzle",
+      "tags": [
+        "tag_ro_concuss"
+      ],
+      "desc": "A flared, finned bell. The muzzle blast shoves zombies in front of you back several metres and staggers them for a second.",
+      "replaces": [
+        "tag_ro_brake"
+      ]
+    },
+    {
+      "id": "ro_hush",
+      "name": "Thump Baffle",
+      "slot": "muzzle",
+      "tags": [
+        "tag_ro_hush"
+      ],
+      "desc": "A fat suppressor can: the crack becomes a thump. Less kick; with HE or Flak shells the blast is a little tighter but 15% harder.",
+      "stats": {
+        "suppressed": true
+      },
+      "replaces": [
+        "tag_ro_brake"
+      ]
+    },
+    {
+      "id": "ro_tungsten",
+      "name": "Tungsten Rail Barrel",
+      "slot": "barrel",
+      "tags": [
+        "tag_ro_tungsten"
+      ],
+      "desc": "Copper rails along the barrel. 50% more range, and the shell punches through one more zombie.",
+      "stats": {
+        "rangeMul": 1.5
+      }
+    },
+    {
+      "id": "ro_mfs",
+      "name": "MFS Warhead Autoloader",
+      "slot": "mag",
+      "tags": [
+        "tag_ro_mfs"
+      ],
+      "desc": "BO7's prestige magazine: a drum autoloader. Full auto, 15 rounds and a faster cycle, but a wider spread from the hip.",
+      "stats": {
+        "auto": true,
+        "clipMul": 3,
+        "fireMul": 1.5,
+        "hipSpreadMul": 1.8,
+        "reloadMul": 1.2
+      }
+    },
+    {
+      "id": "ro_damper",
+      "name": "Damper Grip",
+      "slot": "grip",
+      "tags": [
+        "tag_ro_damper"
+      ],
+      "desc": "A rubber grip on a damped spring. 40% less kick and steadier hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.8
+      },
+      "replaces": [
+        "tag_ro_grip"
+      ]
+    },
+    {
+      "id": "ro_snap",
+      "name": "Snap Grip",
+      "slot": "grip",
+      "tags": [
+        "tag_ro_snap"
+      ],
+      "desc": "A slim skeleton grip with a mag-release paddle. 20% faster reloads.",
+      "stats": {
+        "reloadMul": 0.8
+      },
+      "replaces": [
+        "tag_ro_grip"
+      ]
+    },
+    {
+      "id": "ro_buffer",
+      "name": "Hydraulic Buffer Stock",
+      "slot": "stock",
+      "tags": [
+        "tag_ro_buffer"
+      ],
+      "desc": "Twin hydraulic cylinders in the stock soak 60% of the kick. Steadier from the hip.",
+      "stats": {
+        "hipSpreadMul": 0.7
+      },
+      "replaces": [
+        "tag_ro_stock"
+      ]
+    },
+    {
+      "id": "ro_kick",
+      "name": "Kick Stock",
+      "slot": "stock",
+      "tags": [
+        "tag_ro_kick"
+      ],
+      "desc": "A bare strut with a stiff spring and no buffer. Every shot shoves you back along your aim; fire at your feet to cannon-jump.",
+      "replaces": [
+        "tag_ro_stock"
+      ]
+    },
+    {
+      "id": "ro_bipod",
+      "name": "Bipod",
+      "slot": "under",
+      "tags": [
+        "tag_ro_bipod"
+      ],
+      "desc": "Folding legs under the barrel. Braced (crouched, prone or standing still): +40% damage, no kick, and a 15% bigger blast with HE or Flak shells."
+    },
+    {
+      "id": "ro_he",
+      "name": "HE Shells",
+      "slot": "ammo",
+      "tags": [
+        "tag_ro_he"
+      ],
+      "desc": "High-explosive shells: each bursts on what it hits (or in the air at the end of its range) in a small blast, trading 40% of the direct hit for it. Close blasts hurt you too, unless you have PhD Flopper."
+    },
+    {
+      "id": "ro_sabot",
+      "name": "Sabot Darts",
+      "slot": "ammo",
+      "tags": [
+        "tag_ro_sabot"
+      ],
+      "desc": "Tungsten darts instead of shells: each one goes through every zombie in line for 150% damage."
+    },
+    {
+      "id": "ro_thermite",
+      "name": "Thermite Shells",
+      "slot": "ammo",
+      "tags": [
+        "tag_ro_thermite"
+      ],
+      "desc": "Incendiary rounds: the ground where each one strikes burns for four seconds."
+    },
+    {
+      "id": "ro_flak",
+      "name": "Flak Fuse",
+      "slot": "ammo",
+      "tags": [
+        "tag_ro_flak"
+      ],
+      "desc": "Explosive shells with a proximity fuse: each airbursts beside the first zombie it passes, throwing shrapnel on ahead along its line, or bursts on what it hits."
+    },
+    {
+      "id": "ro_shock",
+      "name": "Shock Shells",
+      "slot": "ammo",
+      "tags": [
+        "tag_ro_shock"
+      ],
+      "desc": "Lightning arcs from where each round strikes to up to four more zombies."
+    },
+    {
+      "id": "ro_canister",
+      "name": "Canister Shot",
+      "slot": "ammo",
+      "tags": [
+        "tag_ro_canister"
+      ],
+      "desc": "A can of flechettes: the ROC becomes a shotgun. Ten pellets."
+    },
+    {
+      "id": "ro_mark",
+      "name": "Tracer Mark",
+      "slot": "ammo",
+      "tags": [
+        "tag_ro_mark"
+      ],
+      "desc": "Every zombie the round hits glows orange for eight seconds and takes 50% more damage from everything."
     }
   ],
   "ironSights": {
@@ -786,6 +997,9 @@
       "j_rearsight"
     ],
     "siren_zm": [
+      "tag_iron_sight"
+    ],
+    "roc_zm": [
       "tag_iron_sight"
     ]
   },

@@ -35,6 +35,14 @@ const GUNS = {
       tag_hv_bandolier: [-16.5, 1.2, 1.2], tag_hv_breacher: [-20.6, 0, 0], tag_hv_napalm: [-1, 2, -1.3], tag_hv_cryo: [-1, 2, -1.3],
       tag_hv_arc: [-1, 2, -1.3], tag_hv_cluster: [-1, 2, -1.3], tag_hv_singularity: [-1, 2, -1.3], tag_laser_box: [13, -2, 2.5] },
     WORLD_PARTS: ['j_gun', 'j_pump', 'tag_hv_cap', 'tag_hv_grip'] },
+  // the ROC 20mm on the M16: a long cannon, its brake out at 34.9 (the shells' saddle on the receiver's left)
+  roc: { MUZZLE: [34.9, 0, 2.2], BODY: 'ro_body',
+    NEW_BONES: { tag_ro_grip: [-1.6, 0, -1.5], tag_ro_damper: [-1.6, 0, -1.5], tag_ro_snap: [-1.6, 0, -1.5], tag_ro_stock: [-8, 0, 1],
+      tag_ro_buffer: [-8, 0, 1], tag_ro_kick: [-8, 0, 1], tag_ro_brake: [32.7, 0, 2.2], tag_ro_concuss: [32.7, 0, 2.2], tag_ro_hush: [32.7, 0, 2.2],
+      tag_ro_gunner: [3, 0, 5.2], tag_ro_reflex: [3.8, 0, 5.2], tag_ro_tungsten: [25, 0, 2.2], tag_ro_mfs: CLIP,
+      tag_ro_bipod: [15.5, 0, 0], tag_foregrip: [14.3, 0, -1], tag_laser_box: [12.3, -1.6, 1.85],
+      ...Object.fromEntries(['he', 'sabot', 'thermite', 'flak', 'shock', 'canister', 'mark'].map(k => ['tag_ro_' + k, [-1, 1.2, 2.1]])) },
+    WORLD_PARTS: ['j_gun', 'tag_clip', 'tag_iron_sight', 'tag_ro_grip', 'tag_ro_stock', 'tag_ro_brake'] },
 };
 const { MUZZLE, NEW_BONES, BODY, WORLD_PARTS } = GUNS[GUN];
 const DONOR = path.join(WEB, GUNS[GUN].DONOR ?? 'models/t5_weapon_viewmodel_m16a1.glb');
