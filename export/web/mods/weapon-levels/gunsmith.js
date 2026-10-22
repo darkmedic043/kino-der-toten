@@ -89,6 +89,9 @@ export function equipped(cat,def,id,profile){
   const ok=new Set(unlockedAttachments(cat,def,id,profile).map(a=>a.id)),seen=new Set();
   return (profile.attachments?.[id]??[]).filter(a=>{
     const at=cat.attachments.find(x=>x.id===a);if(!at||!ok.has(a)||seen.has(at.slot))return false;seen.add(at.slot);return true;
+  }).filter((a,_,list)=>{   // an attachment's excludes (the XM325's Titan Wield: no underbarrel or magazine) drop those slots
+    const slot=cat.attachments.find(x=>x.id===a).slot;
+    return !list.some(b=>b!==a&&cat.attachments.find(x=>x.id===b).excludes?.includes(slot));
   });
 }
 
@@ -97,7 +100,9 @@ export function toggle(cat,def,id,profile,attId){
   const at=cat.attachments.find(a=>a.id===attId);if(!at)return;
   const cur=equipped(cat,def,id,profile);
   profile.attachments??={};
-  profile.attachments[id]=cur.includes(attId)?cur.filter(a=>a!==attId):[...cur.filter(a=>cat.attachments.find(x=>x.id===a)?.slot!==at.slot),attId];
+  // fitting one clears its slot, the slots it excludes, and anything that excludes its slot
+  const clash=a=>{const x=cat.attachments.find(y=>y.id===a);return x?.slot===at.slot||at.excludes?.includes(x?.slot)||x?.excludes?.includes(at.slot);};
+  profile.attachments[id]=cur.includes(attId)?cur.filter(a=>a!==attId):[...cur.filter(a=>!clash(a)),attId];
 }
 
 // Grant XP to one weapon. Returns the attachments newly unlocked (may be []).

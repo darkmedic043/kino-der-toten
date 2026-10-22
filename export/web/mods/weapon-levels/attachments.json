@@ -930,6 +930,231 @@
         "tag_ro_mark"
       ],
       "desc": "Every zombie the round hits glows orange for eight seconds and takes 50% more damage from everything."
+    },
+    {
+      "id": "xm_comp",
+      "name": "RL-7.62 Compensator",
+      "slot": "muzzle",
+      "tags": [
+        "tag_xm_comp"
+      ],
+      "desc": "A ported compensator. 25% less kick per shot.",
+      "replaces": [
+        "tag_xm_muzzle"
+      ]
+    },
+    {
+      "id": "xm_chief",
+      "name": "R-556 Chief Barrel",
+      "slot": "barrel",
+      "tags": [
+        "tag_xm_chief"
+      ],
+      "desc": "A heavy fluted barrel. 25% more range and a little more damage at distance.",
+      "stats": {
+        "rangeMul": 1.25
+      },
+      "replaces": [
+        "tag_xm_barrel"
+      ]
+    },
+    {
+      "id": "xm_vas",
+      "name": "VAS Foregrip",
+      "slot": "under",
+      "tags": [
+        "tag_xm_vas"
+      ],
+      "desc": "A stubby vertical grip. 25% less kick, tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.8
+      }
+    },
+    {
+      "id": "xm_fastbelt",
+      "name": "Wessi Fast Belt",
+      "slot": "mag",
+      "tags": [
+        "tag_xm_fastbelt"
+      ],
+      "desc": "A short 50-round belt in a slim pouch: 30% faster reloads.",
+      "stats": {
+        "clipMul": 0.834,
+        "reloadMul": 0.7
+      }
+    },
+    {
+      "id": "xm_reflex",
+      "name": "Kepler Reflex",
+      "slot": "optic",
+      "tags": [
+        "tag_xm_reflex"
+      ],
+      "desc": "An open reflex sight with a red dot.",
+      "stats": {
+        "adsFovMul": 1.05
+      },
+      "scope": "reflex"
+    },
+    {
+      "id": "xm_lucius",
+      "name": "Lucius-90 Grip",
+      "slot": "grip",
+      "tags": [
+        "tag_xm_lucius"
+      ],
+      "desc": "A textured rear grip. Steadier hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.85
+      },
+      "replaces": [
+        "tag_xm_grip"
+      ]
+    },
+    {
+      "id": "xm_sup",
+      "name": "Monolithic Suppressor",
+      "slot": "muzzle",
+      "tags": [
+        "tag_xm_sup"
+      ],
+      "desc": "Suppressed. Slightly shorter range, 10% less kick.",
+      "stats": {
+        "suppressed": true,
+        "rangeMul": 0.9
+      },
+      "replaces": [
+        "tag_xm_muzzle"
+      ]
+    },
+    {
+      "id": "xm_fractal",
+      "name": "Fractal-LRB Barrel",
+      "slot": "barrel",
+      "tags": [
+        "tag_xm_fractal"
+      ],
+      "desc": "A long ribbed barrel. 40% more range, 15% less kick.",
+      "stats": {
+        "rangeMul": 1.4
+      },
+      "replaces": [
+        "tag_xm_barrel"
+      ]
+    },
+    {
+      "id": "xm_extbelt",
+      "name": "Enforcer Extended Belt",
+      "slot": "mag",
+      "tags": [
+        "tag_xm_extbelt"
+      ],
+      "desc": "An 85-round belt in a big pouch. Slower to reload.",
+      "stats": {
+        "clipMul": 1.417,
+        "reloadMul": 1.15
+      }
+    },
+    {
+      "id": "xm_overpressured",
+      "name": "Overpressured Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Hotter loads: 15% more damage and 10% more range.",
+      "stats": {
+        "damageMul": 1.15,
+        "rangeMul": 1.1
+      }
+    },
+    {
+      "id": "xm_aegis",
+      "name": "Aegis-X40 Stock",
+      "slot": "stock",
+      "tags": [
+        "tag_xm_aegis"
+      ],
+      "desc": "A padded heavy stock. 40% less kick, steadier hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.9
+      },
+      "replaces": [
+        "tag_xm_stock"
+      ]
+    },
+    {
+      "id": "xm_cryo",
+      "name": "Cryo Shroud",
+      "slot": "barrel",
+      "tags": [
+        "tag_xm_cryo"
+      ],
+      "desc": "Custom: a liquid-cooled barrel shroud. The barrel heats 35% slower and every hit chills the zombie (slower for 2 s; a long burst freezes it nearly still).",
+      "stats": {
+        "rangeMul": 1.1
+      },
+      "replaces": [
+        "tag_xm_barrel"
+      ]
+    },
+    {
+      "id": "xm_ars",
+      "name": "Accelerated Recoil System",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "A lighter bolt: 20% faster fire, 20% more kick, and the barrel heats faster.",
+      "stats": {
+        "fireMul": 1.2
+      }
+    },
+    {
+      "id": "xm_mfs",
+      "name": "MFS Motion Strike Laser",
+      "slot": "laser",
+      "tags": [
+        "tag_xm_mfs"
+      ],
+      "desc": "A side laser. 30% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.7
+      }
+    },
+    {
+      "id": "xm_thermal",
+      "name": "Thermal Feedback",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: the hotter the barrel, the harder each round hits, up to +50% damage just short of overheating. Sustained fire builds heat on any belt."
+    },
+    {
+      "id": "xm_leyden",
+      "name": "Leyden Spark Belt Fed",
+      "slot": "mag",
+      "tags": [
+        "tag_xm_leyden"
+      ],
+      "desc": "BO7's prestige belt: 300 rounds fed straight from your reserve, so it never reloads, but about 55 rounds of sustained fire overheat it (a 1.9 s lockout). Custom: when it overheats the stored charge leaps from the gun as lightning that chains through up to six nearby zombies.",
+      "stats": {
+        "clipMul": 5
+      }
+    },
+    {
+      "id": "xm_titan",
+      "name": "Titan Wield",
+      "slot": "stock",
+      "tags": [
+        "tag_xm_titan"
+      ],
+      "desc": "BO7's Season 2 conversion: a second XM325 in your left hand. Hip fire only, each gun runs its own 500-round belt (1,000 in the counter) fed from your reserve with no reloads and fires 25% slower for 40% less damage per round (together, 50% faster than one gun). Each gun overheats after about 50 rounds of sustained fire. No underbarrel or magazine attachments.",
+      "stats": {
+        "clipMul": 16.667,
+        "damageMul": 0.6,
+        "fireMul": 1.5,
+        "hipSpreadMul": 1.25
+      },
+      "excludes": [
+        "under",
+        "mag"
+      ]
     }
   ],
   "ironSights": {
@@ -1000,6 +1225,9 @@
       "tag_iron_sight"
     ],
     "roc_zm": [
+      "tag_iron_sight"
+    ],
+    "xm325_zm": [
       "tag_iron_sight"
     ]
   },

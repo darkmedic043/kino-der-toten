@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { prepareSiren, setupSiren, SIREN } from './siren.js';
 import { prepareHavoc, setupHavoc, HAVOC } from './havoc.js';
 import { prepareRoc, setupRoc, ROC } from './roc.js';
+import { prepareXm325, setupXm325, XM325 } from './xm325.js';
 
 const BASE = new URL('./', import.meta.url).href;
 const ID = 'grimhawk_zm';
@@ -33,6 +34,7 @@ export function prepare(data) {
   prepareSiren(data);   // the Siren (siren.js)
   prepareHavoc(data);   // the GDL Havoc (havoc.js)
   prepareRoc(data);   // the ROC 20mm (roc.js)
+  prepareXm325(data);   // the XM325 LMG (xm325.js)
   const m16 = data.weapons.m16_zm;
   if (!m16) { console.warn('[bo7-weapons] no M16 to build the Grimhawk on'); return; }
   const model = BASE + 'grimhawk_view.glb?v=14', world = BASE + 'grimhawk_world.glb?v=14';   // own models (not under models/: Rind installs them)
@@ -58,6 +60,7 @@ export default function setup(api) {
   if (data.weapons[SIREN]) setupSiren(api);
   if (data.weapons[HAVOC]) setupHavoc(api);
   if (data.weapons[ROC]) setupRoc(api);
+  if (data.weapons[XM325]) setupXm325(api);
   if (!data.weapons[ID]) return;
   const isGrim = def => (def?.baseId ?? def?.id) === ID;
 

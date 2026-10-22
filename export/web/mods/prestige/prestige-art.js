@@ -7,9 +7,10 @@
 // Class motifs: sniper scope rings, shotgun buckshot, SMG speed lines, AR chevron marks, LMG belt links, pistol
 // engraving, launcher blast rays, special glyph runes.
 // Hand-made: the Siren's Wailing Tide (I), Choir Grille (II) and Song of Circe (Master); the GDL Havoc's Danger Close (I),
-// Live Ordnance (II) and Chain Reaction (Master); the ROC 20mm's Ammo Crate (I), Breechworks (II) and Flak Night (Master).
+// Live Ordnance (II) and Chain Reaction (Master); the ROC 20mm's Ammo Crate (I), Breechworks (II) and Flak Night (Master);
+// the XM325's Voltaic (I), Fated (II) and Cobalt Circuit (Master).
 // Hand-made designs for one gun (named in .tools/prestige-guns.json, not in STYLES so no other gun is dealt them)
-const OWN=new Set(['wailtide','choirgrille','songofcirce','dangerclose','liveordnance','chainreaction','ammocrate','breechworks','flaknight']);
+const OWN=new Set(['wailtide','choirgrille','songofcirce','dangerclose','liveordnance','chainreaction','ammocrate','breechworks','flaknight','voltaic','fated','cobaltcircuit']);
 export const STYLES={1:['shards','chevrons','splinter','contour','scales','brush'],2:['lattice','filigree','damascus','mosaic','carbon','facets'],3:['cracks','circuit','runes','lightning','magma','constellation']};
 
 const hsl=(h,s,l,a=1)=>`hsla(${((h%360)+360)%360},${s}%,${l}%,${a})`;
@@ -72,6 +73,18 @@ const P1={
     const gr=g.createRadialGradient(cx,cy-R*.4,2,cx,cy,R*1.1);gr.addColorStop(0,hsl(p.h,60,l+22));gr.addColorStop(1,hsl(p.h,55,l-14));g.fillStyle=gr;g.beginPath();g.arc(cx,cy,R,0,Math.PI);g.closePath();g.fill();g.strokeStyle=hsl(p.h2,70,55);g.lineWidth=1.5;g.stroke();}},
   brush(g,S,r,p,w){g.fillStyle=hsl(p.h,25,24);g.fillRect(0,0,S,S);for(let i=0;i<40;i++){const x=r()*S,y=r()*S,len=120+r()*240,a=(r()-.5)*.8,wd=12+r()*30,col=i%3?hsl(p.h,55,12+r()*14):hsl(p.h2,70,45);
     w(()=>{g.save();g.translate(x,y);g.rotate(a);g.fillStyle=col;g.beginPath();g.moveTo(0,0);for(let k=0;k<=10;k++)g.lineTo(k/10*len,Math.sin(k*.9+i)*wd*.25-wd*(1-Math.abs(k/5-1))*.5);for(let k=10;k>=0;k--)g.lineTo(k/10*len,Math.sin(k*.9+i)*wd*.25+wd*(1-Math.abs(k/5-1))*.5);g.fill();g.restore();});}},
+  // the XM325's Prestige I: bold electric zig-zag bands across a slate plate, bolt stencils and belt markings
+  voltaic(g,S,r,p,w){const TAU=6.283;g.fillStyle=hsl(p.h,22,13);g.fillRect(0,0,S,S);
+    for(let i=0;i<60;i++){const x=r()*S,y=r()*S,R=20+r()*50;w(()=>{g.fillStyle=hsl(p.h,20,9+r()*8,.35);g.beginPath();g.arc(x,y,R,0,TAU);g.fill();});}
+    const seg=S/8;
+    for(let b=0;b<3;b++){const y=b*S/3+r()*S/8,amp=14+r()*14,th=16+r()*8,pts=[...Array(9)].map((_,k)=>[k*seg,y+(k%2?amp:-amp)]);
+      w(()=>{g.lineJoin='miter';g.lineCap='butt';const path=()=>{g.beginPath();pts.forEach(([x,yy],i)=>i?g.lineTo(x,yy):g.moveTo(x,yy));};
+        g.strokeStyle=hsl(p.h,30,6);g.lineWidth=th+8;path();g.stroke();g.strokeStyle=hsl(p.h2,85,52);g.lineWidth=th;path();g.stroke();
+        g.strokeStyle=hsl(p.h2,90,82);g.lineWidth=th*.25;path();g.stroke();});}
+    const bolt=(x,y,k)=>poly(g,[[x,y],[x+9*k,y],[x+4*k,y+11*k],[x+11*k,y+11*k],[x-2*k,y+30*k],[x+2*k,y+16*k],[x-5*k,y+16*k]]);
+    for(let i=0;i<10;i++){const x=r()*S,y=r()*S,k=.8+r()*.7,lit=r()<.5;w(()=>{bolt(x,y,k);g.fillStyle=lit?hsl(p.h2,85,60):hsl(p.h,25,24);g.fill();});}
+    const words=['XM325','LEYDEN','500 RD','RIST RAUCH','HV'];g.textBaseline='middle';
+    for(let i=0;i<8;i++){const x=r()*S,y=r()*S,t=words[Math.floor(r()*words.length)];w(()=>{g.font='bold 22px monospace';g.fillStyle=hsl(p.h,20,30,.8);g.fillText(t,x,y);});}},
 };
 // ---- Prestige II ---------------------------------------------------------------------------------------------------
 const gold=(g,x0,y0,x1,y1)=>{const gr=g.createLinearGradient(x0,y0,x1,y1);gr.addColorStop(0,'#fff0b8');gr.addColorStop(.5,'#c9952f');gr.addColorStop(1,'#ffe39a');return gr;};
@@ -122,6 +135,21 @@ const P2={
     g.strokeStyle=gold(g,0,0,S,S);g.globalAlpha=.6;g.lineWidth=2;for(let i=0;i<S;i+=S/4){g.beginPath();g.moveTo(0,i);g.lineTo(S,i);g.stroke();}g.globalAlpha=1;},
   facets(g,S,r,p){const T=64;for(let y=0;y<S;y+=T)for(let x=0;x<S;x+=T)for(const tri of [[[x,y],[x+T,y],[x,y+T]],[[x+T,y],[x+T,y+T],[x,y+T]]]){g.fillStyle=hsl(p.h+(r()-.5)*30,55+r()*25,30+r()*45);poly(g,tri);g.fill();}
     g.strokeStyle='rgba(255,240,200,.45)';g.lineWidth=1;for(let i=0;i<=S;i+=T){g.beginPath();g.moveTo(i,0);g.lineTo(i,S);g.moveTo(0,i);g.lineTo(S,i);g.moveTo(i,0);g.lineTo(0,i);g.moveTo(S,i);g.lineTo(i,S);g.stroke();}},
+  // the XM325's Prestige II: the Fates' medallions in gilt on dark bronze, three threads spun in each, tied by cords
+  fated(g,S,r,p,w){const TAU=6.283,G=128;g.fillStyle=hsl(p.h,35,12);g.fillRect(0,0,S,S);
+    for(let i=0;i<500;i++){g.fillStyle=hsl(p.h,30,8+r()*12,.4);g.fillRect(r()*S,r()*S,2+r()*3,1);}
+    const gold=(x0,y0,x1,y1)=>{const gr=g.createLinearGradient(x0,y0,x1,y1);gr.addColorStop(0,hsl(p.h2,70,28));gr.addColorStop(.45,hsl(p.h2,85,62));gr.addColorStop(.55,hsl(p.h2,90,78));gr.addColorStop(1,hsl(p.h2,70,30));return gr;};
+    g.lineCap='round';
+    for(let y=0;y<=S;y+=G)for(let x=0;x<=S;x+=G){   // cords between medallions (drawn on every edge, so they tile)
+      g.strokeStyle=gold(x,y-3,x,y+3);g.lineWidth=3;g.beginPath();for(let t=0;t<=G;t+=4)g.lineTo(x+t,y+G/2+Math.sin(t/G*TAU*2)*5);g.stroke();
+      g.strokeStyle=gold(x-3,y,x+3,y);g.beginPath();for(let t=0;t<=G;t+=4)g.lineTo(x+G/2+Math.sin(t/G*TAU*2)*5,y+t);g.stroke();
+      g.fillStyle=hsl(p.h2,80,55);g.beginPath();g.arc(x,y+G/2,4,0,TAU);g.arc(x+G/2,y,4,0,TAU);g.fill();}
+    for(let y=G/2;y<S;y+=G)for(let x=G/2;x<S;x+=G){const R=40,rot=r()*TAU;
+      g.fillStyle=hsl(p.h,40,9);g.beginPath();g.arc(x,y,R+4,0,TAU);g.fill();
+      g.strokeStyle=gold(x-R,y-R,x+R,y+R);g.lineWidth=5;g.beginPath();g.arc(x,y,R,0,TAU);g.stroke();g.lineWidth=1.5;g.beginPath();g.arc(x,y,R-7,0,TAU);g.stroke();
+      for(let k=0;k<24;k++){const a=k/24*TAU;g.lineWidth=2;g.beginPath();g.moveTo(x+Math.cos(a)*(R-6),y+Math.sin(a)*(R-6));g.lineTo(x+Math.cos(a+.1)*(R-2),y+Math.sin(a+.1)*(R-2));g.stroke();}
+      g.lineWidth=3;for(let k=0;k<3;k++){const a0=rot+k*TAU/3;g.beginPath();for(let t=0;t<=1;t+=.04){const a=a0+t*3.2,d=t*(R-12);g.lineTo(x+Math.cos(a)*d,y+Math.sin(a)*d);}g.stroke();}
+      g.fillStyle=hsl(p.h2,90,80);g.beginPath();g.arc(x,y,4,0,TAU);g.fill();}},
 };
 function hslRgb(h,s,l){h=((h%360)+360)%360/360;const f=n=>{const k=(n+h*12)%12,a=s*Math.min(l,1-l);return l-a*Math.max(-1,Math.min(k-3,9-k,1));};return [f(0),f(8),f(4)];}
 export { hslRgb };
@@ -183,6 +211,20 @@ const PM={
     for(let i=0;i<20;i++){let x=r()*S,y=r()*S;const pts=[[x,y]];for(let k=0;k<4+Math.floor(r()*3);k++){x+=(r()-.5)*110;y+=(r()-.5)*110;pts.push([x,y]);}
       w(()=>{g.strokeStyle=glow?'rgba(255,255,255,.65)':hsl(p.h,30,18);g.lineWidth=1.5;g.beginPath();pts.forEach(([a,b],k)=>k?g.lineTo(a,b):g.moveTo(a,b));g.stroke();
         for(const [a,b] of pts){g.fillStyle=glow?'#fff':hsl(p.h,40,30);g.beginPath();g.arc(a,b,glow?4:3,0,6.283);g.fill();}});}},
+  // the XM325's Master: Cobalt Circuit: a cobalt board of 45-degree traces and Leyden-jar capacitor rings (the glow)
+  cobaltcircuit(g,S,r,p,w,glow){const TAU=6.283,G=32,n=rng(p.seed*5+3);g.fillStyle=glow?'#000':hsl(p.h,65,10);g.fillRect(0,0,S,S);
+    if(!glow){for(let y=0;y<S;y+=G)for(let x=0;x<S;x+=G){g.fillStyle=hsl(p.h,55,12+n()*4);g.fillRect(x+1,y+1,G-2,G-2);}
+      g.strokeStyle=hsl(p.h,50,18,.6);g.lineWidth=1;for(let i=0;i<=S;i+=G/2){g.beginPath();g.moveTo(i,0);g.lineTo(i,S);g.moveTo(0,i);g.lineTo(S,i);g.stroke();}}
+    const D=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+    for(let i=0;i<34;i++){let x=Math.floor(r()*16)*G,y=Math.floor(r()*16)*G,d=Math.floor(r()*8);const pts=[[x,y]],steps=3+Math.floor(r()*7);
+      for(let k=0;k<steps;k++){if(r()<.35)d=(d+(r()<.5?1:7))%8;x+=D[d][0]*G;y+=D[d][1]*G;pts.push([x,y]);}
+      const wide=r()<.3;
+      w(()=>{g.lineCap='round';g.lineJoin='round';if(!glow){g.strokeStyle=hsl(p.h,40,5);g.lineWidth=wide?9:6;g.beginPath();pts.forEach(([a,b],j)=>j?g.lineTo(a,b):g.moveTo(a,b));g.stroke();}
+        g.strokeStyle=glow?'rgba(255,255,255,.95)':hsl(p.h2,80,42);g.lineWidth=wide?4:2.4;g.beginPath();pts.forEach(([a,b],j)=>j?g.lineTo(a,b):g.moveTo(a,b));g.stroke();
+        for(const [a,b] of [pts[0],pts.at(-1)]){g.fillStyle=glow?'#fff':hsl(p.h2,70,60);g.beginPath();g.arc(a,b,wide?6:4.5,0,TAU);g.fill();if(!glow){g.fillStyle=hsl(p.h,60,8);g.beginPath();g.arc(a,b,2,0,TAU);g.fill();}}});}
+    for(let i=0;i<6;i++){const x=Math.floor(r()*16)*G+G/2,y=Math.floor(r()*16)*G+G/2;
+      w(()=>{for(let k=0;k<3;k++){g.strokeStyle=glow?`rgba(255,255,255,${.9-k*.25})`:hsl(p.h2,75,55-k*8);g.lineWidth=k?1.5:3;g.beginPath();g.arc(x,y,7+k*6,0,TAU);g.stroke();}
+        g.fillStyle=glow?'#fff':hsl(p.h2,90,80);g.beginPath();g.arc(x,y,3.5,0,TAU);g.fill();});}},
 };
 function blit(g,img,T,S){const c=document.createElement('canvas');c.width=c.height=T;c.getContext('2d').putImageData(img,0,0);g.drawImage(c,0,0,S,S);}
 

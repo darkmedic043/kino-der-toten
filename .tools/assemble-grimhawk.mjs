@@ -44,7 +44,27 @@ const GUNS = {
       ...Object.fromEntries(['he', 'sabot', 'thermite', 'flak', 'shock', 'canister', 'mark'].map(k => ['tag_ro_' + k, [-1, 1.2, 2.1]])) },
     WORLD_PARTS: ['j_gun', 'tag_clip', 'tag_iron_sight', 'tag_ro_grip', 'tag_ro_stock', 'tag_ro_brake'] },
 };
-const { MUZZLE, NEW_BONES, BODY, WORLD_PARTS } = GUNS[GUN];
+// the XM325 on the HK21 (its sight line z 5.14); the belt boxes sit where the HK21's tag_clip does, so they follow its reload
+const XM_HK21_CLIP = [6.5, 0.46, 1.77];
+const XM_BONES = { tag_xm_muzzle: [28.4, 0, 2.19], tag_xm_comp: [28.4, 0, 2.19], tag_xm_sup: [28.4, 0, 2.19], tag_xm_barrel: [18, 0, 2.19],
+  tag_xm_chief: [18, 0, 2.19], tag_xm_fractal: [18, 0, 2.19], tag_xm_cryo: [18, 0, 2.19], tag_xm_grip: [-2.3, 0, -3.5], tag_xm_lucius: [-2.3, 0, -3.5],
+  tag_xm_stock: [-13.5, 0, 2], tag_xm_aegis: [-13.5, 0, 2], tag_xm_vas: [18.2, 0, -1.2], tag_xm_mfs: [17.9, 1.4, 1.25], tag_xm_reflex: [2.7, 0, 5],
+  tag_xm_fastbelt: XM_HK21_CLIP, tag_xm_extbelt: XM_HK21_CLIP, tag_xm_leyden: XM_HK21_CLIP, tag_xm_titan: XM_HK21_CLIP };
+GUNS.xm325 = { DONOR: 'models/t5_weapon_hk21_viewmodel.glb', WORLD_SHIFT: [-9.76, -2.22, 0], MUZZLE: [29.5, 0, 2.19], BODY: 'xm_body',
+  NEW_BONES: XM_BONES, WORLD_PARTS: ['j_gun', 'j_bolt', 'tag_clip', 'tag_iron_sight', 'tag_xm_muzzle', 'tag_xm_barrel', 'tag_xm_grip', 'tag_xm_stock'] };
+// Titan Wield: one XM325 in each hand on the CZ75 dual-wield pair (the knuckles sit within 0.3 of the HK21's on the grip, so
+// no offset). The pistol's slide (j_bolt) would carry the feed latch on every shot and its mag (tag_clip) the belt pouch, so
+// those parts go on the gun bone; the stocks would reach past the camera and the other boxes can't be fitted with Titan.
+// No world model: third person uses the single gun's. Run with '-' for <out_world.glb>.
+const XM_DUAL_DROP = ['tag_clip', 'tag_xm_fastbelt', 'tag_xm_extbelt', 'tag_xm_leyden', 'tag_xm_stock', 'tag_xm_aegis', 'tag_xm_vas'];
+const XM_DUAL_BONES = { ...XM_BONES, tag_iron_sight: [0, 0, 4.5], tag_xm_titan: [6.5, 0, -2.85] };
+GUNS.xm325_rh = { ...GUNS.xm325, DONOR: 'models/t5_weapon_cz75_dw_rh_viewmodel.glb', NEW_BONES: XM_DUAL_BONES, DROP: XM_DUAL_DROP,
+  RENAME: { j_bolt: 'j_gun' }, FLASH: ['tag_flash', 'tag_flash2'], NO_WORLD: true };
+GUNS.xm325_lh = { ...GUNS.xm325_rh, DONOR: 'models/t5_weapon_cz75_dw_lh_viewmodel.glb', PARENT: 'j_gun1',
+  RENAME: { j_gun: 'j_gun1', j_bolt: 'j_gun1' }, FLASH: ['tag_flash1', 'tag_flash3'] };
+// optional: DROP = parts left out; RENAME = part -> donor bone it's weighted to; PARENT = the gun bone new bones hang off;
+// FLASH = the muzzle tags moved to MUZZLE; NO_WORLD = viewmodel only
+const { MUZZLE, NEW_BONES, BODY, WORLD_PARTS, DROP = [], RENAME = {}, PARENT = 'j_gun', FLASH = ['tag_flash'], NO_WORLD } = GUNS[GUN];
 const DONOR = path.join(WEB, GUNS[GUN].DONOR ?? 'models/t5_weapon_viewmodel_m16a1.glb');
 const WORLD_SHIFT = GUNS[GUN].WORLD_SHIFT ?? [-10.5, -2.55, 0];   // the M16's: CoD (-10.5, 0, -2.55), in glTF axes
 const CAMO_SCALE = 9;
@@ -108,7 +128,7 @@ function copyMaterials(src, out, w) {
 
 const parts = readGlb(partsPath), donor = readGlb(DONOR);
 const partMeshes = new Map();   // bone -> mesh index in parts
-for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith('part_')) partMeshes.set(n.name.slice(5), n.mesh);
+for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith('part_') && !DROP.includes(n.name.slice(5))) partMeshes.set(n.name.slice(5), n.mesh);
 
 // ---- viewmodel ---------------------------------------------------------------------------------------------------
 {
@@ -120,7 +140,7 @@ for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith
   for (const i of keep) {
     const n = structuredClone(donor.json.nodes[i]);
     n.children = (n.children ?? []).filter(c => map.has(c)).map(c => map.get(c)); if (!n.children.length) delete n.children;
-    if (n.name === 'tag_flash') n.translation = MUZZLE;
+    if (FLASH.includes(n.name)) n.translation = MUZZLE;
     out.nodes.push(n);
   }
   const sk = donor.json.skins[0];
@@ -129,7 +149,7 @@ for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith
   const ibmStart = (ibmBv.byteOffset ?? 0) + (ibmAcc.byteOffset ?? 0);
   const ibms = Array.from({ length: ibmAcc.count }, (_, k) => Array.from({ length: 16 }, (_, e) => donor.bin.readFloatLE(ibmStart + (k * 16 + e) * 4)));
   const joints = sk.joints.map(j => map.get(j));
-  const jgun = out.nodes.findIndex(n => n.name === 'j_gun'), jgunIbm = ibms[joints.indexOf(jgun)];
+  const jgun = out.nodes.findIndex(n => n.name === PARENT), jgunIbm = ibms[joints.indexOf(jgun)];
   const mul = (a, b) => { const o = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]; return o; };
   for (const [name, t] of Object.entries(NEW_BONES)) {
     if (!partMeshes.has(name)) continue;
@@ -143,7 +163,7 @@ for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith
   const rootIdx = map.get(donor.json.scenes[donor.json.scene ?? 0].nodes.find(r => map.has(r)));
   const jointOf = name => { const ni = out.nodes.findIndex(n => n.name === name); const j = out.skins[0].joints.indexOf(ni); if (j < 0) throw new Error('no joint ' + name); return j; };
   for (const [bone, mi] of partMeshes) {
-    const j = jointOf(bone), prims = [];
+    const j = jointOf(RENAME[bone] ?? bone), prims = [];
     for (const p of parts.json.meshes[mi].primitives) {
       const count = parts.json.accessors[p.attributes.POSITION].count;
       const J = Buffer.alloc(count * 4), W = Buffer.alloc(count * 16);
@@ -163,7 +183,7 @@ for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith
 }
 
 // ---- world model: one static mesh in the donor world model's frame (root tag_weapon, gun shifted) ------------------
-{
+if (!NO_WORLD) {
   const out = { asset: { version: '2.0', generator: 'assemble-' + GUN }, scene: 0, scenes: [{ nodes: [0] }], nodes: [], meshes: [], materials: [], accessors: [], bufferViews: [] };
   const w = writer(), fromParts = copier(parts, out, w);
   copyMaterials(parts, out, w);

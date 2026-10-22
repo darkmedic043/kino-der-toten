@@ -439,5 +439,38 @@
     0
    ]
   ]
+ },
+ {
+  "id": "xm325_zm",
+  "name": "XM325",
+  "cls": "lmg",
+  "max": 10,
+  "styles": [
+   "voltaic",
+   "fated",
+   "cobaltcircuit"
+  ],
+  "names": [
+   "Voltaic",
+   "Fated",
+   "Cobalt Circuit"
+  ],
+  "pal": [
+   [
+    214,
+    192,
+    0
+   ],
+   [
+    26,
+    44,
+    0
+   ],
+   [
+    222,
+    188,
+    0
+   ]
+  ]
  }
 ]
