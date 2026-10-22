@@ -1,11 +1,11 @@
-// The XM325 (xm325_zm): BO7's belt-fed Rist Rauch LMG (1000 rounds a minute, a 60-round belt in a fabric pouch).
+// The XM325 (xm325_zm): BO7's belt-fed Rist Rauch LMG (1000 rounds a minute, a 60-round belt in a hard box).
 // Built by .tools/build-xm325.py + .tools/assemble-grimhawk.mjs --gun xm325 on the HK21's skeleton (its animations
 // drive it; the shot and reload are the HK21's). Its Titan Wield conversion swaps in a pair built on the CZ75 Dual
 // Wield's skeletons (--gun xm325_rh / xm325_lh) and the CZ75 DW's animations: the engine's dualWield alternates the
 // hands and blocks aiming. Light machine gun class, from the Mystery Box.
 //
 // Attachments (weapon-levels attachments.json, ids xm_*; muzzles, barrels, the grip and the stock replace the gun's
-// own tag_xm_muzzle / _barrel / _grip / _stock; belts replace the pouch on tag_clip):
+// own tag_xm_muzzle / _barrel / _grip / _stock; belts replace the box on tag_clip):
 //   xm_comp / xm_sup        RL-7.62 Compensator (less kick) / Monolithic Suppressor
 //   xm_chief / xm_fractal   R-556 Chief / Fractal-LRB barrels (range, less kick)
 //   xm_cryo                 custom Cryo Shroud (barrel): heat builds 35% slower and every hit chills the zombie
@@ -13,8 +13,9 @@
 //   xm_fastbelt / xm_extbelt   50 / 85-round belts
 //   xm_overpressured, xm_ars   stat-only ammo (damage and range; 20% faster fire, more kick and heat)
 //   xm_thermal              custom Thermal Feedback (ammo): damage climbs with barrel heat, up to +50%
-//   xm_leyden               Leyden Spark Belt Fed (BO7's prestige belt): 300 rounds fed from the reserve, no reloads,
-//                           overheats after ~55 rounds of sustained fire (1.9 s lockout); custom: the overheat
+//   xm_leyden               Leyden Spark Belt Fed (BO7's prestige belt, the overheat mag, an early unlock): a 500-round
+//                           canister under the handguard fed from the reserve, no reloads, overheats after ~55 rounds of
+//                           sustained fire (1.9 s lockout), its heat coils glowing as it heats; custom: the overheat
 //                           discharges as lightning chaining through up to six zombies
 //   xm_titan                Titan Wield (stock slot; excludes the underbarrel and mag slots): a second gun in the
 //                           left hand, hip only, 2 x 500-round belts fed from the reserve, 25% slower and 40% weaker per
@@ -32,7 +33,7 @@ const STAT = ['xm_overpressured', 'xm_ars', 'xm_thermal'];   // ammo with no mod
 const MIRROR = [...ATTACHMENT_TAGS, 'tag_xm_muzzle', 'tag_xm_barrel', 'tag_xm_grip', 'tag_iron_sight'];   // shown/hidden on both Titan guns
 const VIEW_OFFSET = [.8, -.9, -5];   // a long gun: pushed out from the eye like the ROC's
 const DUAL_OFFSET = [0, -3.4, -8];   // Titan Wield: the CZ75 pair's pistol grips put each LMG's rear at the eye; held forward at the hips instead
-const V = 1;   // model version (?v=)
+const V = 2;   // model version (?v=)
 const KICK = .0045, COOL_DELAY = .25, COOL = .65;   // camera pitch per shot (rad); heat cools after COOL_DELAY s at COOL per second
 const ARC = 0x8fd0ff, FROST = 0xbfe8ff, PAP_ARC = 0xd88bff;
 // the fields Titan Wield swaps for the CZ75 Dual Wield's (models, animations, handling)
@@ -108,8 +109,9 @@ export function setupXm325(api) {
       if (gun.upgrade) Object.assign(gun.upgrade, want ? looks.dual : looks.singleUp, { name: want ? 'Ephialtes & Otus' : 'Ephialtes' });
       for (const o of [gun, gun.upgrade]) for (const k of DUAL_KEYS) if (o && o[k] === undefined) delete o[k];
     }
-    // the held gun's view still the other look: load it again (once a second at most, after it finished loading)
-    if (inHand() && view?.ready && !!view.leftGun !== titanOn && now() > reequipAt) { reequipAt = now() + 1; view.currentId = null; api.equipView?.(); }
+    // the held gun's view still the other look: load it again (once a second at most, after it finished loading;
+    // wall clock, since the session clock restarts with a new game)
+    if (inHand() && view?.ready && !!view.leftGun !== titanOn && performance.now() > reequipAt) { reequipAt = performance.now() + 1000; view.currentId = null; api.equipView?.(); }
   }
   syncTitan();
   // the left gun gets no hideTags of its own: copy the right gun's shown/hidden tags onto it (same bone names)
@@ -278,8 +280,20 @@ export function setupXm325(api) {
       else f.obj.material.opacity = u;
       if (f.t <= 0) { disposeFx(f); fx.splice(fx.indexOf(f), 1); }
     }
-    hud();
+    hud(); glow();
   });
+  // the Leyden and Titan canisters' heat coils (material xm_heat_glow) glow with the meter and flicker while locked
+  let glowGun = null, glowLeft = null, glowMats = [];
+  function glow() {
+    const g = view?.gun, l = view?.leftGun;
+    if (g !== glowGun || l !== glowLeft) {
+      glowGun = g; glowLeft = l; glowMats = [];
+      for (const root of [g, l]) root?.traverse(o => { for (const m of [o.material].flat()) if (m?.name?.startsWith('xm_heat_glow') && !glowMats.includes(m)) glowMats.push(m); });
+    }
+    if (!glowMats.length) return;
+    const v = !isXm(session.def) ? 0 : locked() ? .7 + .3 * Math.random() : heat;
+    for (const m of glowMats) m.emissiveIntensity = .15 + 7 * v * v;
+  }
   // frost motes rising off chilled zombies
   const glowTex = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);

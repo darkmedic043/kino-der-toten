@@ -944,6 +944,21 @@
       ]
     },
     {
+      "id": "xm_leyden",
+      "name": "Leyden Spark Belt Fed",
+      "slot": "mag",
+      "tags": [
+        "tag_xm_leyden"
+      ],
+      "desc": "The overheat belt (BO7's prestige mag): a 500-round canister under the handguard, fed straight from your reserve so it never reloads, but about 55 rounds of sustained fire overheat it (a 1.9 s lockout) and its coils glow as the heat builds. Custom: when it overheats the stored charge leaps from the gun as lightning that chains through up to six nearby zombies.",
+      "stats": {
+        "clipMul": 8.334
+      },
+      "excludes": [
+        "under"
+      ]
+    },
+    {
       "id": "xm_chief",
       "name": "R-556 Chief Barrel",
       "slot": "barrel",
@@ -1124,18 +1139,6 @@
       "slot": "ammo",
       "tags": [],
       "desc": "Custom: the hotter the barrel, the harder each round hits, up to +50% damage just short of overheating. Sustained fire builds heat on any belt."
-    },
-    {
-      "id": "xm_leyden",
-      "name": "Leyden Spark Belt Fed",
-      "slot": "mag",
-      "tags": [
-        "tag_xm_leyden"
-      ],
-      "desc": "BO7's prestige belt: 300 rounds fed straight from your reserve, so it never reloads, but about 55 rounds of sustained fire overheat it (a 1.9 s lockout). Custom: when it overheats the stored charge leaps from the gun as lightning that chains through up to six nearby zombies.",
-      "stats": {
-        "clipMul": 5
-      }
     },
     {
       "id": "xm_titan",

@@ -5,7 +5,7 @@
 # x = 30.465 - px * .0285, z = 5.738 - py * .024 (bore z 2.19, sight line z 5.14, muzzle x 29.5). Parts are part_<bone>:
 #   j_gun          receiver, skeletal upper handguard, tan lower handguard, rear housing, rails, trigger group
 #   j_bolt         the feed-cover latch and charging handle (moved by the reload)
-#   tag_clip       the fabric belt pouch (60) and its caseless belt (moved by the reload)
+#   tag_clip       the hard belt box (60) and its caseless belt (moved by the reload)
 #   tag_iron_sight front post and rear aperture (removed by an optic, ironSights in attachments.json)
 #   tag_xm_muzzle / _barrel / _grip / _stock   the stock parts, replaced by their attachments
 #   tag_xm_*       the attachments, hidden by tag until fitted
@@ -26,15 +26,16 @@ PARTS.update({k: [] for k in ('j_gun', 'j_bolt', 'tag_clip', 'tag_iron_sight', '
                               'tag_xm_vas', 'tag_xm_mfs', 'tag_xm_reflex', 'tag_xm_lucius', 'tag_xm_aegis') + MAGS})
 M.update(
     # Rist Rauch's two-tone: tan cerakote over aluminium, black polymer furniture, a black fabric belt pouch
-    tan=worn('xm_tan', '#857262', .6, .05, bare='#aeaba4', wear=.35, chips=.25, under='#4a4239', mottle=.35, dirt=.4, rust=.05),
-    black=worn('xm_black', '#1f2022', .55, .15, bare='#7f858b', wear=.45, chips=.2, under='#3a3c3f', mottle=.3, dirt=.35, rust=.08),
-    poly=worn('xm_poly', '#1b1c1e', .72, 0, bare='#4d5054', wear=.3, bare_metal=False, mottle=.35, dirt=.4),
+    tan=worn('xm_tan', '#86735f', .62, .05, bare='#aeaba4', wear=.22, chips=.05, under='#4a4239', mottle=.18, dirt=.1, rust=.02),
+    black=worn('xm_black', '#1f2022', .55, .15, bare='#7f858b', wear=.32, chips=.06, under='#3a3c3f', mottle=.2, dirt=.12, rust=.03),
+    poly=worn('xm_poly', '#1b1c1e', .72, 0, bare='#4d5054', wear=.25, bare_metal=False, mottle=.25, dirt=.18),
+    stip=worn('xm_stip', '#28292c', .95, 0, bare='#3a3c40', wear=.12, grain=5., bare_metal=False, mottle=.5, dirt=.08),   # stippled grip panels
     steel=worn('xm_steel', '#4a4f53', .35, 1, bare='#a0a6ac', wear=.5, dirt=.25, rust=.15),
     gunmetal=worn('xm_gunmetal', '#2b3033', .38, .95, bare='#8e969c', wear=.45, brushed=.7, dirt=.3, rust=.1),
     fabric=worn('xm_fabric', '#18191a', .88, 0, bare='#2c2d2f', wear=.25, bare_metal=False, mottle=.5, dirt=.45),
     rubber=worn('xm_rubber', '#141414', .9, 0, bare='#2a2a2a', wear=.2, bare_metal=False, dirt=.35),
     red=worn('xm_red', '#9c1f17', .5, 0, bare='#a9abad', wear=.35, chips=.4, under='#3e3f40', dirt=.3),
-    round=worn('xm_round', '#2a2b2c', .45, .2, bare='#5c5f62', wear=.3, bare_metal=False, dirt=.2),   # caseless propellant
+    round=worn('xm_round', '#56585b', .4, .45, bare='#8a8e92', wear=.3, dirt=.15),   # caseless propellant
     copper=worn('xm_copper', '#a3602e', .32, 1, bare='#dc9a62', wear=.35, dirt=.2),
     frost=worn('xm_frost', '#cfe3ea', .4, .3, bare='#eef6f8', wear=.3, bare_metal=False, mottle=.4),
     olive=worn('xm_olive', '#5a5c45', .58, .1, bare='#a9aa9c', wear=.45, chips=.45, under='#3c3d36', mottle=.4, dirt=.45, rust=.15),
@@ -46,11 +47,12 @@ M.update(
     green=mat('xm_green_glow', '#002a08', .3, 0, '#3cff6a', 4),   # the front sight base's status light
     blue=mat('xm_blue_glow', '#04203a', .3, 0, '#58c8ff', 6),     # Cryo Shroud coolant, Leyden spark gap
     laser=mat('xm_laser_glow', '#300000', .3, 0, '#ff2018', 10),
+    heat=mat('xm_heat_glow', '#1c0800', .4, 0, '#ff5a14', .15),   # the Leyden / Titan heat coils (xm325.js drives the glow with the heat)
     # the lettering stays out of the bake (glyphs that small lose strokes in the atlas)
     ink_w=mat('xm_ink_white', '#d4d0be', .6, 0), ink_k=mat('xm_ink_black', '#141414', .6, 0),
     ink_r=mat('xm_ink_red', '#e0402a', .6, 0), ink_t=mat('xm_ink_tan', '#b8a48e', .6, 0),
 )
-BAKED = ('tan', 'black', 'poly', 'steel', 'gunmetal', 'fabric', 'rubber', 'red', 'round', 'copper', 'frost', 'olive', 'yellow')
+BAKED = ('tan', 'black', 'poly', 'stip', 'steel', 'gunmetal', 'fabric', 'rubber', 'red', 'round', 'copper', 'frost', 'olive', 'yellow')
 STENCIL = '/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf'
 
 
@@ -94,15 +96,54 @@ def rot_x(bm, a, zc, yc=0.):
     bm.transform(Matrix.Translation((0, yc, zc)) @ Matrix.Rotation(a, 4, 'X') @ Matrix.Translation((0, -yc, -zc))); return bm
 
 
-def belt(part, z0=.18, n=7, ys=(1.12, 1.18, 1.18, 1.1, .95, .8, .66), x0=5.3):
-    """The caseless belt climbing out of the box into the feed window: black propellant blocks with a tapered nose,
-    a steel link band round each, bulging out past the receiver's left face and curving back in."""
-    for k in range(n):
-        z, y = z0 + .44 * k, ys[min(k, len(ys) - 1)]
-        solid('rnd', cylbm(.22, x0, x0 + 1.05, z, y=y, seg=16), M['round'], part=part, bw=.03, seg=1)
-        solid('nose', cylbm(.22, x0 + 1.05, x0 + 1.35, z, y=y, seg=16, r2=.1), M['round'], part=part, bw=0)
-        ring('link', .245, .2, x0 + .3, x0 + .5, M['steel'], part=part, z=z, y=y, seg=16, bw=0)
-        ring('link', .245, .2, x0 + .72, x0 + .9, M['steel'], part=part, z=z, y=y, seg=16, bw=0)
+# the belt off the Gunsmith render: (rear x, front x, z, y) per round, packed side by side up the receiver's left face
+BELT = [(3.83, 6.2, 3.3, 1.08), (3.9, 6.38, 2.8, 1.14), (3.98, 6.45, 2.3, 1.16), (4.08, 6.52, 1.8, 1.16), (4.2, 6.62, 1.3, 1.14),
+        (4.32, 6.72, .8, 1.12), (4.45, 6.82, .3, 1.1), (4.58, 6.92, -.2, 1.08)]
+
+
+def belt(part, rounds=BELT, r=.235):
+    """Caseless rounds (black propellant, three grooves, a domed tail) held side by side by steel links, climbing out
+    of the box along the receiver's left face into the feed tray."""
+    for k, (xa, xb, z, y) in enumerate(rounds):
+        L = xb - xa
+        solid('rnd', cylbm(r, xa + .2, xb, z, y=y, seg=14), M['round'], part=part, bw=.025, seg=1)
+        solid('tail', cylbm(.11, xa, xa + .2, z, y=y, seg=14, r2=r), M['round'], part=part, bw=0)
+        for f in (.42, .56, .7):   # the propellant's grooves
+            solid('groove', cylbm(r * .9, xa + L * f, xa + L * f + .05, z, y=y, seg=14), M['poly'], part=part, bw=0)
+        for f in (.2, .82):   # two links per round, and the strap that joins it to the next
+            xl = xa + L * f
+            solid('link', cylbm(r + .03, xl, xl + .16, z, y=y, seg=14), M['steel'], part=part, bw=.01, seg=1)
+            if k + 1 < len(rounds):
+                y2 = rounds[k + 1][3]
+                solid('strap', boxbm(xl + .02, xl + .14, (y + y2) / 2 + r * .55, (y + y2) / 2 + r * .85, z, rounds[k + 1][2]), M['steel'], part=part, bw=0)
+
+
+def quad(fb, rb, rt, ft):
+    """Bilinear points on a leaning box's side: s 0..1 front to rear, t 0..1 bottom to top."""
+    return lambda s_, t: tuple((1 - s_) * (1 - t) * fb[i] + s_ * (1 - t) * rb[i] + s_ * t * rt[i] + (1 - s_) * t * ft[i] for i in (0, 1))
+
+
+def ytext(body, size, x, y, z, ang, part, m, side=1):
+    """Lettering turned in the side plane by ang degrees (positive reads up and back)."""
+    o = text(body, size, (x, y, z), part=part, m=m, side=side, font=STENCIL)
+    o.data.transform(Matrix.Translation((x, y, z)) @ Matrix.Rotation(math.radians(ang * side), 4, 'Y') @ Matrix.Translation((-x, -y, -z))); return o
+
+
+def disc_ring(name, x, y, z, ro, ri, part, m, d=.05):
+    solid(name, screw(x, y, z, ro, d, seg=28), m, part=part, cuts=[screw(x, y + .02, z, ri, d, seg=28)], bw=.01)
+
+
+def belt_box(part, fb, rb, rt, ft, y0, y1, m='poly', rounds=BELT):
+    """A hard belt box leaning forward in the mag well, the belt leaving it through the open top-rear corner.
+    Returns the face mapper."""
+    Q = quad(fb, rb, rt, ft)
+    top = (rt[0] + .3, rt[1] + .54)   # the chamfer into the top-rear corner
+    mouth = prism([Q(.42, .99), Q(.42, 1.2), Q(1.05, 1.2), Q(1.05, .9), Q(.97, .86)], y0 + .35, y1 + 1)
+    solid('box', prism(fillet([ft, top, rt, rb, fb], .28), y0, y1), M[m], part=part, cuts=[mouth], bw=.12, seg=3)
+    solid('box_lip', prism(fillet([Q(-.03, .93), Q(.18, .97), Q(.17, 1.05), Q(-.04, 1.01)], .05), y0 - .03, y1 + .03), M['tan'], part=part, bw=.03)
+    solid('box_tab', prism(fillet([Q(.84, .82), Q(1.04, .82), Q(1.05, 1.0), Q(.86, 1.0)], .08), y0 - .03, y1 + .03), M['tan'], part=part, bw=.03)
+    belt(part, rounds)
+    return Q
 
 
 # ---------------------------------------------------------------- receiver core (black) and its tan bands
@@ -114,13 +155,11 @@ solid('band_low', prism(fillet([(10.09, .99), (-0.74, .99), (-0.74, -0.14), (10.
 solid('port_door', boxbm(3.0, 6.0, -.9, -.86, 2.4, 2.95), M['steel'], bw=.01)
 for z in [.98 + .12 * k for k in range(10)]:   # the ribbed spring at the window's front edge
     solid('spring', boxbm(7.55, 8.35, .82, .95, z, z + .06), M['steel'], bw=0)
-solid('lbl_ready', boxbm(6.95, 7.5, .4, .44, 1.45, 2.25), M['red'], bw=.01)
-solid('lbl_keep', boxbm(2.4, 3.2, .4, .44, 1.4, 2.3), M['red'], bw=.01)
-text('READY', .09, (7.22, .45, 2.05), m=M['ink_w'], font=STENCIL)
-text('MIL 556', .07, (7.22, .45, 1.75), m=M['ink_w'], font=STENCIL)
-text('KEEP', .1, (2.8, .45, 2.1), m=M['ink_w'], font=STENCIL)
-text('PORT', .1, (2.8, .45, 1.85), m=M['ink_w'], font=STENCIL)
-text('CLEAR', .1, (2.8, .45, 1.6), m=M['ink_w'], font=STENCIL)
+solid('lbl_ready', boxbm(6.3, 7.5, .4, .46, 1.35, 2.05), M['poly'], bw=.02)
+solid('lbl_keep', boxbm(2.45, 3.15, .4, .46, 1.3, 2.3), M['poly'], bw=.02)
+for t, x, z, sz in (('REGISTERED', 6.9, 1.88, .1), ('MILITARY', 6.9, 1.7, .1), ('USE', 6.9, 1.52, .1),
+                    ('KEEP', 2.8, 2.08, .12), ('PORT', 2.8, 1.84, .12), ('CLEAR', 2.8, 1.6, .12)):
+    text(t, sz, (x, .47, z), m=M['ink_r'], font=STENCIL)
 solid('cover_knob', prism(fillet([(0.54, 2.71), (1.68, 2.71), (1.68, 3.1), (0.54, 3.1)], .08), .85, 1.02), M['poly'],
       cuts=[boxbm(x, x + .08, .97, 1.1, 2.6, 3.2) for x in (.75, .95, 1.15, 1.35)], bw=.03)
 solid('knob_sel', screw(0.15, .92, .35, .22, .12, seg=18), M['steel'], bw=.02)
@@ -134,10 +173,12 @@ rail_teeth(-0.3, 8.7, -.38, .38, RAIL - .12, RAIL)
 
 # ---------------------------------------------------------------- upper skeletal handguard (black) with the gas tube
 up = prism(fillet([(23.62, SZ), (23.62, 3.55), (23.4, 3.70), (13.6, 3.70), (13.2, 4.01), (9.37, 4.01), (9.37, SZ)], .12), -.8, .8)
-up_cuts = [prism(rrect_xz(17.92, 22.77, 2.67, 3.34, .18), -2, 2), prism(rrect_xz(13.37, 17.5, 2.67, 3.34, .18), -2, 2),
+up_cuts = [prism(rrect_xz(17.75, 22.5, 2.45, 3.55, .18), -2, 2), prism(rrect_xz(9.9, 17.2, 2.45, 3.55, .18), -2, 2),
            prism(rrect_xz(18.2, 22.5, 3.45, 3.62, .06), -.5, .5), bar(9.6, 3.55, 13.0, 3.55, .06, .75, 2)]
 solid('upper', up, M['black'], cuts=up_cuts, bw=.05, seg=2)
-solid('gas_tube', cylbm(.26, 9.4, 23.5, 3.0, seg=18), M['gunmetal'], bw=.02)
+solid('gas_tube', cylbm(.36, 9.4, 23.5, 3.0, seg=20), M['gunmetal'], bw=.02)
+for x in [9.7 + .26 * k for k in range(53)]:   # the shroud's cooling ribs, seen through the windows
+    solid('rib', cylbm(.41, x, x + .1, 3.0, seg=20), M['gunmetal'], bw=0)
 solid('gas_plug', cylbm(.3, 23.45, 23.75, 3.0, seg=18), M['steel'], bw=.02)
 text('XM325 - 1/8 - 5.56 CASELESS', .085, (11.3, .81, 3.05), m=M['ink_t'], font=STENCIL)
 
@@ -167,18 +208,23 @@ solid('fsb_lamp', boxbm(24.2, 24.48, .55, .6, 1.18, 1.46), M['green'], bw=0)
 solid('fsb_screw', screw(24.9, .56, 2.9, .08, .04, seg=8), M['steel'], bw=0)
 
 # ---------------------------------------------------------------- rear housing (tan), black top cap
-rh = prism(fillet([(-0.46, 4.25), (-1.4, 4.3), (-6.4, 4.42), (-13.14, 4.42), (-13.14, -0.02), (-0.46, -0.02)], .12), -.9, .9)
-rh_cuts = [boxbm(-12.6, -0.6, s * .86, s * 2, 2.33, 2.43) for s in (1, -1)] + \
-          [boxbm(-12.4, -0.7, .86, 2, .94, 1.47), boxbm(-12.4, -0.7, -2, -.86, .94, 1.47)]
-solid('housing', rh, M['tan'], cuts=rh_cuts, bw=.06, seg=2)
-solid('cap', prism(fillet([(-6.59, 4.3), (-10.0, 4.3), (-10.0, 4.6), (-6.8, 4.6)], .1), -.72, .72), M['black'], bw=.05)
+rh = prism(fillet([(-0.46, 4.2), (-1.2, 4.22), (-11.4, 4.22), (-11.4, .7), (-0.46, .7)], .1), -.9, .9)
+rh_cuts = [boxbm(-11.0, -1.0, s * .86, s * 2, 1.45, 1.56) for s in (1, -1)] + \
+          [boxbm(-11.0, -0.8, s * .86, s * 2, z, z + .05) for s in (1, -1) for z in (2.42, 3.55)]
+solid('housing', rh, M['tan'], cuts=rh_cuts, bw=.05, seg=2)
+solid('housing_panel', prism(fillet([(-1.0, 2.5), (-1.0, 3.2), (-1.6, 3.5), (-10.7, 3.5), (-10.7, 2.5)], .1), .85, .95), M['tan'], bw=.03)
+solid('housing_low', prism(fillet([(1.0, -0.1), (1.0, .72), (-10.1, .72), (-10.1, .25), (-2.6, .25), (-2.6, -0.1)], .1), -.62, .62), M['black'], bw=.04)
+solid('cap', prism(fillet([(-6.4, 4.15), (-6.9, 4.55), (-11.3, 4.55), (-11.3, 4.15)], .1), -.72, .72), M['poly'], bw=.05)
 for x in (0.54, -0.46, -5.16, -6.3):   # Rist Rauch's triangular screws
-    solid('tri', screw(x, .9, 1.13, .17, .06, seg=3), M['black'], bw=.01)
-text('R', .5, (-2.65, .91, 3.05), m=M['ink_k'], font=STENCIL)
-text('RIST', .2, (-3.75, .91, 3.2), m=M['ink_k'], font=STENCIL)
-text('RAUCH', .2, (-3.9, .91, 2.9), m=M['ink_k'], font=STENCIL)
-solid('qr', boxbm(-8.0, -7.4, .89, .92, 2.75, 3.35), M['black'], bw=0)
-text('LMG  5.56x45 CASELESS', .09, (-9.5, .92, 3.05), m=M['ink_k'], font=STENCIL)
+    solid('tri', screw(x, .9, 1.06, .17, .06, seg=3), M['black'], bw=.01)
+for x in (-1.63, -4.84, -6.24, -7.66, -9.05):
+    solid('vent', screw(x, .9, 3.82, .06, .03, seg=10), M['bore'], bw=0)
+text('R', .5, (-2.65, .96, 3.0), m=M['ink_t'], font=STENCIL)
+text('RIST', .2, (-3.75, .96, 3.15), m=M['ink_t'], font=STENCIL)
+text('RAUCH', .2, (-3.9, .96, 2.85), m=M['ink_t'], font=STENCIL)
+solid('qr', boxbm(-7.6, -7.2, .94, .97, 2.85, 3.25), M['black'], bw=0)
+text('LMG  5.56x45 CASELESS', .09, (-9.3, .96, 3.05), m=M['ink_t'], font=STENCIL)
+text('XM325  R556  CAL 5.56', .1, (-5.5, .91, 2.0), m=M['ink_t'], font=STENCIL)
 text('RIST RAUCH', .16, (-5.0, -.91, 3.05), m=M['ink_k'], side=-1, font=STENCIL)
 
 # ---------------------------------------------------------------- lower receiver (black), trigger guard, trigger
@@ -212,8 +258,9 @@ solid('rs_knob', screw(-2.15, .45, 4.45, .12, .08, seg=12), M['steel'], part=IS,
 # ---------------------------------------------------------------- stock parts: barrel, flash hider, grip, stock
 BA = 'tag_xm_barrel'
 solid('barrel_in', cylbm(.3, 9.0, 23.6, SZ, seg=20), M['gunmetal'], part=BA, bw=.01)
-solid('barrel', cylbm(.26, 23.5, MUZ + .05, SZ, seg=20), M['gunmetal'], part=BA, bw=.01)
-ring('barrel_step', .32, .2, 25.2, 25.45, M['steel'], part=BA, seg=20, bw=.01)
+solid('barrel', cylbm(.37, 23.5, MUZ + .05, SZ, seg=24), M['gunmetal'], part=BA, bw=.01)
+ring('barrel_step', .42, .3, 25.2, 25.5, M['steel'], part=BA, seg=24, bw=.01)
+ring('barrel_collar', .41, .3, 26.6, 26.85, M['black'], part=BA, seg=6, bw=.01)
 
 MZ = 'tag_xm_muzzle'
 solid('fh', cylbm(.34, MUZ, 29.47, SZ, seg=20), M['steel'], part=MZ,
@@ -231,21 +278,30 @@ solid('grip_logo', screw(-1.55, .57, -1.35, .24, .05, seg=20), M['black'], part=
 text('R', .2, (-1.55, .6, -1.35), part=GR, m=M['ink_t'], font=STENCIL)
 
 ST = 'tag_xm_stock'
-sk = prism(fillet([(-12.2, 4.55), (-14.4, 4.8), (-14.75, 4.55), (-14.75, -0.9), (-14.3, -1.25), (-13.6, -1.25), (-12.3, -0.1), (-12.2, .2)], .2), -.6, .6)
-solid('stock', sk, M['poly'], part=ST, cuts=[prism(rrect_xz(-13.85, -12.86, -0.26, 3.1, .25), -1, 1)], bw=.08, seg=2)
-solid('stock_rod', bar(-13.35, 3.0, -13.35, -0.15, .1, -.08, .08), M['steel'], part=ST, bw=.02)
-solid('buttpad', prism(fillet([(-14.7, 4.7), (-15.19, 4.6), (-15.19, -1.1), (-14.7, -1.2)], .12), -.75, .75), M['rubber'], part=ST,
-      cuts=[boxbm(-15.4, -15.05, -1, 1, z, z + .1) for z in [-0.8 + .32 * k for k in range(17)]], bw=.04)
+sk = prism(fillet([(-10.9, 4.2), (-11.6, 4.48), (-13.5, 4.62), (-14.35, 4.5), (-14.15, 1.0), (-13.95, -1.2), (-13.4, -1.32), (-12.6, -0.6),
+                   (-12.1, -0.05), (-9.9, .1), (-9.9, .45), (-11.25, .55), (-11.25, 3.9)], .18), -.7, .7)
+solid('stock', sk, M['poly'], part=ST, cuts=[prism(rrect_xz(-13.25, -12.85, 1.1, 3.55, .18), -1, 1), prism(rrect_xz(-13.0, -11.6, -0.2, .35, .15), -1, 1),
+      cylbm(.17, -12.5, -12.5 + 2, 3.95, axis='y'), cylbm(.17, -13.1, -13.1 + 2, .62, axis='y')], bw=.08, seg=2)
+solid('buttplate', prism(fillet([(-14.25, 4.55), (-14.65, 4.4), (-14.45, 1.0), (-14.25, -1.25), (-13.95, -1.3), (-14.1, 1.0)], .1), -.78, .78), M['rubber'], part=ST,
+      cuts=[boxbm(-14.9, -14.4, -1, 1, z, z + .1) for z in [-0.9 + .3 * k for k in range(18)]], bw=.03)
+for s_ in (1, -1):
+    solid('loop', bar(-13.85, 4.0, -13.65, -0.9, .12, s_ * .7, s_ * .82), M['steel'], part=ST, bw=.03)
+solid('stock_screw', screw(-11.9, .71, 2.2, .12, .05, seg=10), M['steel'], part=ST, bw=0)
 
-# ---------------------------------------------------------------- the default belt pouch (tag_clip, 60 rounds)
-CL = 'tag_clip'
-solid('pouch', prism(fillet([(10.23, .58), (5.38, -0.14), (6.81, -7.34), (11.43, -6.79)], .35), -.85, .85), M['fabric'], part=CL, bw=.15, seg=3)
-solid('pouch_lip', prism(fillet([(10.3, .7), (5.3, -0.02), (5.42, -0.4), (10.35, .3)], .08), -.9, .9), M['poly'], part=CL, bw=.04)
-solid('pouch_logo', screw(6.95, .86, -1.5, .45, .04, seg=24), M['poly'], part=CL, cuts=[screw(6.95, .89, -1.5, .32, .04, seg=24)], bw=.01)
-solid('pouch_seam', bar(6.0, -1.0, 7.2, -6.9, .05, .84, .9), M['poly'], part=CL, bw=0)
-text('5.56x45MM', .2, (8.6, .87, -3.2), part=CL, m=M['ink_w'], font=STENCIL)
-text('CASELESS', .16, (9.2, .87, -5.6), part=CL, m=M['ink_w'], font=STENCIL)
-belt(CL)
+# ---------------------------------------------------------------- the default belt box (tag_clip, 60 rounds)
+CL = 'tag_clip'   # Rist Rauch's hard polymer box: a stippled panel, the round maker's mark, 5.56x45MM / LMG556-B / CASELESS
+BY0, BY1 = -.72, 1.28   # the box rides proud of the receiver's left face, where the belt climbs
+Q = belt_box(CL, (11.3, -6.17), (7.09, -6.59), (3.97, -.66), (7.82, .78), BY0, BY1)
+panel = [Q(.27, .05), Q(.93, .05), Q(.93, .8), Q(.14, .8), Q(.14, .55), Q(.27, .47)]
+solid('box_stip', prism(fillet(panel, .15), BY1 - .03, BY1 + .015), M['stip'], part=CL, bw=.01)
+(mx, mz), (hx, hz) = Q(.55, .7), Q(.2, .13)
+disc_ring('box_mark', mx, BY1 + .02, mz, .62, .5, CL, M['poly'])
+solid('box_mark_c', screw(mx, BY1 + .03, mz, .3, .04, seg=24), M['poly'], part=CL, bw=.01)
+disc_ring('box_hole', hx, BY1 + .02, hz, .17, .08, CL, M['poly'])
+for body, size, (x, z), dy in (('5.56x45MM', .24, Q(.1, .45), .01), ('LMG556-B', .24, Q(.17, .42), .01), ('CASELESS', .19, Q(.82, .33), .03)):
+    ytext(body, size, x, BY1 + dy, z, 63, CL, M['ink_w'])
+x, z = Q(.5, .5)
+text('RR', .24, (x, BY0 - .02, z), part=CL, m=M['ink_t'], side=-1, font=STENCIL)
 
 # ---------------------------------------------------------------- muzzle attachments
 CP = 'tag_xm_comp'   # RL-7.62 Compensator: a squared-off block with top and side ports
@@ -319,7 +375,7 @@ solid('lucius', lu, M['rubber'], part=LU, cuts=[boxbm(-4, 0, s * .52, s * 1, z, 
 text('LUCIUS', .14, (-2.5, .57, -1.4), part=LU, m=M['ink_w'], font=STENCIL)
 
 AE = 'tag_xm_aegis'    # Aegis-X40: a solid stock with a cheek riser
-ae = prism(fillet([(-12.2, 4.4), (-12.9, 4.5), (-13.4, 5.0), (-15.2, 5.0), (-15.4, 4.6), (-15.4, -1.5), (-14.6, -1.6), (-12.2, 0.1)], .25), -.7, .7)
+ae = prism(fillet([(-11.2, 4.4), (-12.9, 4.5), (-13.4, 5.0), (-15.2, 5.0), (-15.4, 4.6), (-15.4, -1.5), (-14.6, -1.6), (-11.2, 0.7)], .25), -.7, .7)
 solid('aegis', ae, M['poly'], part=AE, cuts=[prism(rrect_xz(-14.6, -13.2, .2, 2.6, .3), .55, 2), prism(rrect_xz(-14.6, -13.2, .2, 2.6, .3), -2, -.55)],
       bw=.12, seg=3)
 solid('aegis_riser', prism(fillet([(-12.9, 4.9), (-15.0, 4.9), (-15.0, 5.3), (-13.3, 5.3)], .15), -.55, .55), M['tan'], part=AE, bw=.08)
@@ -327,71 +383,94 @@ solid('aegis_pad', prism(fillet([(-15.3, 5.0), (-15.85, 4.9), (-15.85, -1.4), (-
 text('AEGIS X40', .16, (-14.0, .71, 3.6), part=AE, m=M['ink_t'], font=STENCIL)
 
 # ---------------------------------------------------------------- magazines (each replaces tag_clip, moved by the reload)
-FB = 'tag_xm_fastbelt'   # Wessi Fast Belt (50): a short rigid box
-solid('fb_box', prism(fillet([(10.3, .5), (5.3, -0.12), (5.9, -4.0), (10.5, -3.7)], .25), -.82, .82), M['tan'], part=FB,
-      cuts=[bar(6.0, z, 10.2, z + .3, .08, .78, 1) for z in (-1.4, -2.2, -3.0)], bw=.1, seg=3)
-solid('fb_lid', prism(fillet([(10.4, .65), (5.2, .0), (5.3, -0.35), (10.45, .25)], .08), -.88, .88), M['black'], part=FB, bw=.04)
-solid('fb_tab', prism(fillet([(10.5, -2.8), (11.1, -2.75), (11.0, -1.8), (10.5, -1.85)], .1), -.3, .3), M['poly'], part=FB, bw=.04)
-text('WESSI 50', .18, (8.2, .83, -0.8), part=FB, m=M['ink_k'], font=STENCIL)
-belt(FB)
+FB = 'tag_xm_fastbelt'   # Wessi Fast Belt (50): a slim short box with triangular panels
+Q = belt_box(FB, (10.6, -4.5), (6.95, -4.85), (3.97, -.66), (7.82, .78), -.6, 1.24)
+for tri in (((.18, .1), (.8, .1), (.8, .36)), ((.18, .2), (.18, .5), (.74, .5)), ((.2, .56), (.86, .56), (.86, .78), (.3, .78))):
+    solid('fb_panel', prism(fillet([Q(*p) for p in tri], .1), 1.17, 1.27), M['black'], part=FB, bw=.02)
+x, z = Q(.08, .45)
+ytext('WESSI 50', .2, x, 1.25, z, 63, FB, M['ink_w'])
 
-EB = 'tag_xm_extbelt'   # Enforcer Extended Belt (85): a long pouch
-solid('eb_pouch', prism(fillet([(10.6, .58), (5.2, -0.14), (6.4, -9.5), (12.0, -9.0)], .4), -1.0, 1.0), M['fabric'], part=EB, bw=.16, seg=3)
-solid('eb_lip', prism(fillet([(10.7, .7), (5.1, -0.02), (5.25, -0.4), (10.75, .3)], .08), -1.04, 1.04), M['poly'], part=EB, bw=.04)
-for z in (-3.0, -6.0):
-    solid('eb_strap', bar(5.5, z + .2, 11.6, z + .6, .5, -1.06, 1.06), M['poly'], part=EB, bw=.04)
-    solid('eb_buckle', boxbm(8.3, 8.9, 1.05, 1.12, z + .1, z + .75), M['steel'], part=EB, bw=.01)
-text('ENFORCER', .2, (8.8, 1.01, -4.5), part=EB, m=M['ink_w'], font=STENCIL)
-text('85', .4, (9.0, 1.01, -7.6), part=EB, m=M['ink_w'], font=STENCIL)
-belt(EB)
+EB = 'tag_xm_extbelt'   # Enforcer Extended Belt (85): a deep box with three straps round it
+Q = belt_box(EB, (12.1, -8.2), (7.4, -8.7), (3.97, -.66), (7.82, .78), -1.0, 1.5)
+for t in (.22, .48, .74):
+    (x0, z0), (x1, z1) = Q(-.03, t), Q(1.03, t)
+    solid('eb_strap', bar(x0, z0, x1, z1, .5, -1.06, 1.56), M['black'], part=EB, bw=.05)
+    xb, zb = Q(.5, t)
+    solid('eb_buckle', prism(fillet([(xb - .3, zb - .32), (xb + .3, zb - .28), (xb + .3, zb + .32), (xb - .3, zb + .28)], .06), 1.55, 1.62), M['steel'], part=EB, bw=.01)
+x, z = Q(.08, .62)
+ytext('ENFORCER', .2, x, 1.51, z, 63, EB, M['ink_w'])
+x, z = Q(.62, .1)
+text('85', .4, (x, 1.51, z), part=EB, m=M['ink_w'], font=STENCIL)
 
-LY = 'tag_xm_leyden'   # Leyden Spark Belt Fed: an ammo can with Leyden jars and a spark gap (it overheats and discharges)
-solid('ly_can', prism(fillet([(5.2, .2), (11.0, .2), (11.0, -5.4), (5.2, -5.4)], .2), -1.0, 1.0), M['olive'], part=LY,
-      cuts=[boxbm(5.6, 10.6, .95, 1.1, z, z + .1) for z in (-0.6, -4.9)], bw=.08, seg=2)
-solid('ly_lid', boxbm(5.1, 11.1, -1.05, 1.05, .05, .38), M['olive'], part=LY, bw=.06)
-solid('ly_plate', boxbm(5.6, 7.0, 1.0, 1.04, -1.5, -0.85), M['yellow'], part=LY, bw=.01)
-text('HV', .3, (6.3, 1.05, -1.18), part=LY, m=M['ink_k'], font=STENCIL)
-text('LEYDEN', .2, (8.4, -1.01, -2.5), part=LY, m=M['ink_w'], side=-1, font=STENCIL)
-for x in (7.6, 9.9):   # two Leyden jars: glass, copper foil on the lower half, a cap and a ball terminal
-    solid('jar', vcyl(.36, x, 1.42, -4.8, -2.3, 20), M['glass'], part=LY, bw=0)
-    solid('foil', vcyl(.37, x, 1.42, -4.8, -3.6, 20), M['copper'], part=LY, bw=.01)
-    solid('jar_cap', vcyl(.39, x, 1.42, -2.35, -2.15, 20), M['poly'], part=LY, bw=.02)
-    solid('jar_rod', vcyl(.04, x, 1.42, -2.15, -1.7, 8), M['copper'], part=LY, bw=0)
-    solid('jar_ball', vcyl(.11, x, 1.42, -1.75, -1.55, 12), M['copper'], part=LY, bw=.04, seg=3)
-    for z in (-4.5, -2.8):
-        solid('jar_strap', boxbm(x - .45, x + .45, 1.0, 1.06, z, z + .15), M['steel'], part=LY, bw=.01)
-solid('gap_l', cylbm(.09, 8.0, 8.6, -1.0, y=1.25, seg=12, r2=.03), M['steel'], part=LY, bw=0)
-solid('gap_r', cylbm(.03, 8.9, 9.5, -1.0, y=1.25, seg=12, r2=.09), M['steel'], part=LY, bw=0)
-solid('gap_arc', cylbm(.045, 8.58, 8.92, -1.0, y=1.25, seg=8), M['blue'], part=LY, bw=0)
-solid('gap_mount', boxbm(7.9, 9.6, 1.0, 1.12, -1.25, -0.75), M['poly'], part=LY, bw=.02)
-solid('coil_core', cylbm(.14, 5.7, 10.6, -0.45, y=1.18, seg=12), M['steel'], part=LY, bw=0)
-for x in [5.9 + .18 * k for k in range(25)]:
-    ring('coil', .22, .13, x, x + .11, M['copper'], part=LY, z=-0.45, y=1.18, seg=14, bw=0)
-belt(LY, z0=.5, n=6, ys=(1.18, 1.18, 1.1, .95, .8, .66))
 
-TW = 'tag_xm_titan'   # Titan Wield: a 500-round drum slung under the handguard, fed through a box into the window
-DZ = -2.85
-notches = [rot_x(boxbm(25.9, 26.75, -.17, .17, DZ + 2.0, DZ + 2.5), math.radians(a), DZ) for a in range(0, 360, 20)]
-panels = []
-for s in (1, -1):
-    for x0, x1 in ((10.4, 14.4), (15.6, 19.6), (20.8, 24.6)):
-        panels.append(prism(rrect_xz(x0, x1, DZ - .7, DZ + .7, .3), s * 1.96, s * 3))
-    for cx in (15.0, 20.2):
-        panels.append(oval(cx, DZ, 1.0, 1.3, 0, s * 1.96, s * 3, n=4))
-solid('tw_drum', cylbm(2.1, 9.0, 25.9, DZ, seg=40), M['poly'], part=TW, cuts=panels, bw=.08, seg=2)
-solid('tw_ring', cylbm(2.2, 25.8, 26.8, DZ, seg=40), M['black'], part=TW, cuts=notches, bw=.04)
-solid('tw_cap', cylbm(1.95, 26.75, 27.3, DZ, seg=40, r2=1.55), M['poly'], part=TW, bw=.06)
-ring('tw_back', 2.15, 1.5, 9.0, 9.5, M['black'], part=TW, z=DZ, seg=40, bw=.03)
-for x in (12.1, 17.3, 22.6):
-    ring('tw_band', 2.13, 1.9, x, x + .25, M['black'], part=TW, z=DZ, seg=40, bw=.01)
-solid('tw_hanger', boxbm(14.0, 20.0, -.45, .45, -0.85, -0.05), M['black'], part=TW, bw=.04)
-solid('tw_box', prism(fillet([(3.7, -0.14), (9.1, -0.14), (9.1, -5.0), (4.4, -5.0), (3.7, -4.3)], .25), -1.25, 1.25), M['poly'], part=TW,
-      cuts=[prism(rrect_xz(4.4, 8.6, z, z + .9, .2), 1.18, 2) for z in (-4.5, -3.2, -1.9)], bw=.1, seg=2)
-solid('tw_box_lid', boxbm(3.6, 9.2, -1.3, 1.3, -0.3, 0.05), M['black'], part=TW, bw=.05)
-solid('tw_chute', prism(fillet([(9.0, -1.4), (10.8, -1.4), (10.8, -4.4), (9.0, -4.4)], .2), -1.1, 1.1), M['black'], part=TW, bw=.06)
-text('TITAN', .3, (6.4, 1.26, -2.75), part=TW, m=M['ink_w'], font=STENCIL)
-text('500', .26, (6.4, 1.26, -4.05), part=TW, m=M['ink_w'], font=STENCIL)
-belt(TW)
+def canister(part, x0, x1, zc, r, label):
+    """BO7's long belt canister slung under the handguard (the Leyden belt, and Titan Wield's): a faceted tube with tan rib
+    bands and two grilled windows on the left over the heat coils (xm_heat_glow, lit by xm325.js as the gun heats),
+    an end cap, and a round feed housing at the rear that turns the belt up into the feed window."""
+    tw = lambda bm: rot_x(bm, math.radians(15), zc)   # a flat facet facing the player
+    wins = [(x0 + 2.9, x0 + 6.5), (x0 + 7.5, x0 + 11.1)]
+    cuts = [prism(rrect_xz(a, b, zc - r * .42, zc + r * .42, .2), r * .74, 3) for a, b in wins]
+    solid('can', tw(cylbm(r, x0, x1, zc, seg=12)), M['poly'], part=part, cuts=cuts, bw=.06, seg=2)
+    for a, b in wins:
+        solid('coil_glow', boxbm(a + .1, b - .1, r * .6, r * .78, zc - r * .36, zc + r * .36), M['heat'], part=part, bw=0)
+        for k in range(int((b - a - .3) / .28)):   # the copper coil seen through the grille
+            x = a + .2 + k * .28
+            solid('coil', boxbm(x, x + .09, r * .7, r * .8, zc - r * .4, zc + r * .4), M['copper'], part=part, bw=0)
+        solid('grille', boxbm(a, b, r * .82, r * .86, zc - .03, zc + .03), M['steel'], part=part, bw=0)
+    for a in (x0 + 1.6, x0 + 6.75, x0 + 11.35, x1 - 1.2):
+        solid('rib', tw(cylbm(r + .07, a, a + .4, zc, seg=12)), M['tan'], part=part, bw=.03)
+    solid('cap', tw(cylbm(r * .96, x1, x1 + .55, zc, seg=12, r2=r * .72)), M['black'], part=part, bw=.05)
+    solid('cap_nut', cylbm(.28, x1 + .5, x1 + .75, zc, seg=6), M['steel'], part=part, bw=.02)
+    solid('hanger', boxbm(x0 + 1, x1 - .6, -.42, .42, zc + r - .15, -0.01), M['black'], part=part, bw=.04)
+    for a in (x0 + 2.2, x1 - 2.4):
+        solid('hanger_pin', screw(a, .43, (zc + r - .01) / 2, .1, .05, seg=10), M['steel'], part=part, bw=0)
+    text(label, .3, ((x0 + x1) / 2, -r * .97, zc), part=part, m=M['ink_w'], side=-1, font=STENCIL)
+    text(label, .24, ((x0 + 11.75 + x1 - 1.2) / 2, r * .97, zc), part=part, m=M['ink_w'], font=STENCIL)
+    # the feed housing: a drum across the gun, the belt neck rising from its top-rear
+    hx, hr = x0 - 1.35, r * 1.22
+    solid('housing', cylbm(hr, hx, hx + 2.5, zc, y=.05, seg=32, axis='y'), M['poly'], part=part, bw=.1, seg=2)
+    solid('housing_box', prism(fillet([(hx, zc + hr), (x0 + .6, zc + hr), (x0 + .6, zc - hr), (hx, zc - hr)], .2), -1.15, 1.25), M['poly'], part=part, bw=.08)
+    disc_ring('housing_ring', hx, 1.3, zc, hr * .8, hr * .66, part, M['tan'])
+    solid('housing_hub', screw(hx, 1.32, zc, hr * .3, .06, seg=6), M['steel'], part=part, bw=.02)
+    solid('neck', prism(fillet([(4.25, -.35), (7.25, .35), (7.25, zc + hr * .5), (4.6, zc + hr * .5)], .15), .5, 1.42), M['black'], part=part,
+          cuts=[prism([(4.4, -.15), (7.1, .5), (7.1, -.3), (4.6, -.9)], .7, 2)], bw=.05)
+    solid('hv_plate', boxbm(hx + .3, hx + 1.3, 1.24, 1.27, zc - hr * .9, zc - hr * .55), M['yellow'], part=part, bw=.01)
+    text('HV', .22, (hx + .8, 1.28, zc - hr * .72), part=part, m=M['ink_k'], font=STENCIL)
+    belt(part, BELT[:8])
+
+
+LY = 'tag_xm_leyden'   # Leyden Spark Belt Fed: the 500-round overheat canister (it locks up hot and discharges)
+canister(LY, 8.3, 23.0, -1.62, 1.25, 'LEYDEN')
+
+TW = 'tag_xm_titan'   # Titan Wield: each gun carries a bigger 500-round canister
+canister(TW, 8.3, 24.6, -1.95, 1.55, 'TITAN')
+
+PREVIEW = argv[argv.index('--preview') + 1] if '--preview' in argv else None
+if PREVIEW:   # quick look without the bake: the unbaked materials in EEVEE, framed like the left-side Gunsmith render
+    os.makedirs(PREVIEW, exist_ok=True)
+    sc = bpy.context.scene; sc.render.engine = 'BLENDER_EEVEE_NEXT' if 'BLENDER_EEVEE_NEXT' in [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties['engine'].enum_items] else 'BLENDER_EEVEE'
+    w = bpy.data.worlds.new('pw'); sc.world = w; w.use_nodes = True; w.node_tree.nodes['Background'].inputs[0].default_value = (.32, .34, .38, 1)
+    for loc, e in (((8, 40, 30), 6000), ((8, -40, 20), 2500), ((-30, 30, 10), 2000), ((40, 30, 0), 2000)):
+        ld = bpy.data.lights.new('l', 'AREA'); ld.energy = e; ld.size = 25
+        lo = bpy.data.objects.new('l', ld); lo.location = loc; COL.objects.link(lo)
+        lo.rotation_euler = (Vector((8, 0, 0)) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler()
+    cam = bpy.data.cameras.new('pc'); cam.type = 'ORTHO'; co = bpy.data.objects.new('pc', cam); COL.objects.link(co); sc.camera = co
+    W, H = 1604 * .0285, 556 * .024   # the Gunsmith render's extent in inches (x 30.465 .. -15.25, z 5.738 .. -7.6)
+    def show(on):
+        for p, obs in PARTS.items():
+            for o in obs: o.hide_render = not (p in on or (p == 'tag_clip' and 'clip' in on))
+    BASE_ON = ('j_gun', 'j_bolt', 'tag_iron_sight', 'tag_xm_muzzle', 'tag_xm_barrel', 'tag_xm_grip', 'tag_xm_stock')
+    looks = [a for a in argv[argv.index('--preview') + 2:] if not a.startswith('--')] or ['tag_clip']
+    for look in looks:
+        show(BASE_ON + tuple(look.split(',')))
+        sc.render.resolution_x, sc.render.resolution_y = 1604, round(1604 * H / W)
+        co.location = (30.465 - W / 2, 60, 5.738 - H / 2); co.rotation_euler = (math.radians(90), 0, math.radians(180)); cam.ortho_scale = W
+        sc.render.filepath = f'{PREVIEW}/left_{look.replace(",", "+")}.png'; bpy.ops.render.render(write_still=True)
+        sc.render.resolution_x, sc.render.resolution_y = 1200, 800
+        co.location = (-26, 30, 14)   # roughly the player's view: behind, left and above
+        co.rotation_euler = (Vector((7, 0, 0)) - co.location).to_track_quat('-Z', 'Y').to_euler(); cam.ortho_scale = 30
+        sc.render.filepath = f'{PREVIEW}/eye_{look.replace(",", "+")}.png'; bpy.ops.render.render(write_still=True)
+    sys.exit(0)
 
 export(OUT, RENDER, 'xm', BAKED, tex=TEX, frame=(7.5, 0, -1.0), ortho=52)
 
