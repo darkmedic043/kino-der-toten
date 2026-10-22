@@ -49,10 +49,10 @@ export function setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 
       value: () => { const s = side2.state(); return `${s.gram} / 3 · ${s.bears} / 3`; }, done: () => { const s = side2.state(); return s.gram >= 3 && s.bears >= 3; } });
     add({ id: 'de-side', label: 'Side quests',
       parts: () => { const a = side.state(), b = side2.state(); return [
-        part('Plates', a.pads.length >= 4 ? 'placed' : a.pads.length ? 'carried' : 'none', 'Pl'), part('Plunger', a.plunger ? 'placed' : 'none', 'Pu'),
+        part('Plates', a.plates ? 'placed' : a.pads.length ? 'carried' : 'none', 'Pl'), part('Plunger', a.plunger ? 'placed' : 'none', 'Pu'),
         part('Plant', a.sprout === 'done' ? 'placed' : a.sprout === 'pot' ? 'none' : 'carried', 'Pn'), part('Clock', b.clock.wallrun ? 'placed' : b.clock.powered ? 'carried' : 'none', 'Cl'),
         part('Skulls', b.skulls.length >= 3 ? 'placed' : b.skulls.length ? 'carried' : 'none', 'Sk'), part('Claws', b.hat ? 'placed' : b.claws.some(x => x) ? 'carried' : 'none', 'Cw')]; },
-      value: () => { const a = side.state(), b = side2.state(); return `${[a.pads.length >= 4, a.plunger, a.sprout === 'done', b.clock.wallrun, b.skulls.length >= 3, b.hat].filter(Boolean).length} / 6`; } });
+      value: () => { const a = side.state(), b = side2.state(); return `${[a.plates > 0, a.plunger, a.sprout === 'done', b.clock.wallrun, b.skulls.length >= 3, b.hat].filter(Boolean).length} / 6`; } });
   }
   // the scoreboard (a core mod) may set up after this map's mod
   if (window.kino?.scoreboard) register();

@@ -1,7 +1,7 @@
 // Der Eisendrache's side Easter eggs (zm_castle_ee_side.gsc, zm_castle_low_grav.gsc), on BO3's spots:
-//   Pressure plates   the four stone plates around the undercroft pyramid (grav_pad_trigger): stand on each for 3 s
-//                     (it sinks and lights). With all four down, every time the gravity drops a power-up appears high
-//                     in the undercroft (low_grav_powerup_spawn), reachable while it's low.
+//   Pressure plates   the four stone plates around the undercroft pyramid (grav_pad_trigger) bring the low gravity
+//                     (lowgrav.js); every time they do, a power-up appears high in the undercroft
+//                     (low_grav_powerup_spawn), reachable while it's low.
 //   The plunger       once the clock tower has struck 9:35 (side2.js), while the gravity is low, wall-run past the four
 //                     undercroft runes (ee_undercroft_wallrun_0-3) eight in a row (two laps), either way round, without
 //                     touching the floor: you're pulled into the past lab
@@ -20,7 +20,7 @@ import * as THREE from 'three';
 import { sfx, music, stopMusic } from './castle-audio.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);
-export const PADS = [W(-1191, 2541, 200), W(-907, 2256, 200), W(-1192, 1972, 200), W(-1476, 2257, 200)];
+export { PADS } from './lowgrav.js';   // (the journal reads them here)
 export const RUNS = [W(-1593, 2240, 480), W(-1193, 1892, 480), W(-845, 2240, 480), W(-1193, 2604, 480)];
 export const SPOT = { powerup: W(-1596, 2264, 392), plungerTo: W(-211, 5086, 168), plunger: W(-76, 5118, 217), plungerBack: W(-1535, 2302, 224),
   potPresent: W(-157, 3328, 197), potPast: W(-158, 4826, 196), gumball: W(-163, 3331, 226), globe: W(-856, 3500, 990) };
@@ -31,10 +31,9 @@ export function setupSide(api, { lowgrav, side2 }) {
   const root = world.root, kino = window.kino, feet = () => player.getFeetPosition();
   const node = n => root.getObjectByName(n);
   const show = (n, on = true) => { const o = node(n); if (o) { o.visible = on; o.updateMatrixWorld(true); } return o; };
-  const st = { pads: new Set(), padT: [0, 0, 0, 0], lowWas: false, runs: [], trip: null, plunger: false, sprout: 'pot', disco: 0, arm: 1 + Math.floor(Math.random() * 7) };
+  const st = { lowWas: false, runs: [], trip: null, plunger: false, sprout: 'pot', disco: 0, arm: 1 + Math.floor(Math.random() * 7) };
   const tex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.4, 'rgba(255,255,255,.3)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
   const glow = (p, color, size) => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); m.position.copy(p); m.scale.setScalar(size); scene.add(m); return m; };
-  const padGlows = PADS.map(p => { const g = glow(p.clone().add(new THREE.Vector3(0, 4, 0)), 0x9fd8ff, 90); g.visible = false; return g; });
   const runGlows = RUNS.map(p => { const g = glow(p, 0x9fd8ff, 50); g.visible = false; return g; });
   const pool = () => kino.lighting?.sources;
   const lights = [];
@@ -109,10 +108,8 @@ export function setupSide(api, { lowgrav, side2 }) {
   host.on('update', dt => {
     if (!dt) return;
     const f = feet(), lg = lowgrav?.state() ?? {};
-    // pressure plates
-    PADS.forEach((p, k) => { if (st.pads.has(k)) return; const on = Math.hypot(f.x - p.x, f.z - p.z) < 50 && Math.abs(f.y - p.y) < 40; st.padT[k] = on ? st.padT[k] + dt : 0;
-      if (st.padT[k] > 3 && !st.padAsked?.[k]) { (st.padAsked ??= {})[k] = true; sync.act('platePress', { k }); } });
-    if (sync.isHost && st.pads.size === 4 && lg.on && !st.lowWas) { const types = Object.keys(data.powerups ?? {}).filter(t => t !== 'fire_sale' || session.power); powerups?.spawn?.(types[Math.floor(Math.random() * types.length)], SPOT.powerup.clone()); }
+    // the plates brought the gravity down: a power-up up high
+    if (sync.isHost && lg.on && !st.lowWas) { const types = Object.keys(data.powerups ?? {}).filter(t => t !== 'fire_sale' || session.power); powerups?.spawn?.(types[Math.floor(Math.random() * types.length)], SPOT.powerup.clone()); }
     st.lowWas = !!lg.on;
     // the plunger wall-run: the four runes in a row, either way round, airborne the whole time
     if (!st.trip && !st.plunger && lg.on && lg.running && side2?.wallrun) {
@@ -127,20 +124,19 @@ export function setupSide(api, { lowgrav, side2 }) {
     if (st.trip) { st.trip.t -= dt; if (st.trip.t <= 0) { st.trip = null; show('CASTLE_EE_plunger_0', false); kino.debug.teleportPlayer([SPOT.plungerBack.x, SPOT.plungerBack.y + 2, SPOT.plungerBack.z]); toast?.('Back in the present', 2); } }
     discoTick(dt);
   });
-  sync.on('platePress', d => { if (st.pads.has(d.k)) return; st.pads.add(d.k); padGlows[d.k].visible = true; audio?.play?.('buy', .4); if (st.pads.size === 4) toast?.('The pyramid hums · watch the undercroft when the gravity drops', 3); });
   if (sync.isHost) sync.act('discoArm', { k: st.arm });
   // the sprout is in its pot from the start
   show('CASTLE_EE_plant_sprout_0');
   host.on('reset', () => {
-    st.pads.clear(); st.padT = [0, 0, 0, 0]; st.padAsked = {}; st.runs = []; st.trip = null; st.sprout = 'pot'; st.sproutBy = null; st.disco = 0;
+    st.runs = []; st.trip = null; st.sprout = 'pot'; st.sproutBy = null; st.disco = 0;
     if (sync.isHost) sync.act('discoArm', { k: 1 + Math.floor(Math.random() * 7) });
-    for (const g of [...padGlows, ...runGlows]) g.visible = false;
+    for (const g of runGlows) g.visible = false;
     for (const s of [...discoLights]) unlight(s); discoLights = []; for (const [z, prev] of dancers) z.ai = prev; dancers.clear();
     for (const n of ['CASTLE_EE_plunger_0', 'CASTLE_EE_plant_past_0', 'CASTLE_EE_plant_grown_0', 'CASTLE_EE_gumball_0']) show(n, false); show('CASTLE_EE_plant_sprout_0');
     if (st.plunger && data.melee?.bowie && bowieModel) { data.melee.bowie = { ...data.melee.bowie, model: bowieModel, damage: 1000 }; if (view) view.currentId = null; }
     st.plunger = false;
   });
 
-  return { state: () => ({ pads: [...st.pads], runs: [...st.runs], trip: st.trip ? +st.trip.t.toFixed(1) : null, plunger: st.plunger, sprout: st.sprout, disco: +st.disco.toFixed(1), arm: st.arm }),
+  return { state: () => ({ pads: lowgrav?.state().pads ?? [], plates: lowgrav?.state().triggered ?? 0, runs: [...st.runs], trip: st.trip ? +st.trip.t.toFixed(1) : null, plunger: st.plunger, sprout: st.sprout, disco: +st.disco.toFixed(1), arm: st.arm }),
     plunger: trip, disco, givePlunger };
 }

@@ -111,8 +111,8 @@ export const JOURNAL = [
       { title: 'Build it', how: 'Build it at any of the three open workbenches.', done: L => !!L.castle?.craft?.state().built.shield, where: L => L.nodes(/^CASTLE_BENCH_open_\d+$/) },
       { title: 'Take it', how: 'Take it from the bench it was built at (again for free if it breaks). H raises it.', done: L => !!window.kino?.rocketShield?.owned, where: L => L.prompts(/Take the Rocket Shield/) },
     ] },
-    { id: 'plates', name: 'Pressure plates', kind: 'SIDE EGG', progress: L => (L.castle?.side?.state().pads.length ?? 0) >= 4 ? 1 : 0, steps: [
-      { title: 'The four plates', how: 'Stand on each of the undercroft pyramid\'s four pressure plates for 3 s. From then on a power-up drops every time the gravity goes low.', where: L => (L.de?.PADS ?? []).filter((p, k) => !L.castle?.side?.state().pads.includes(k)) },
+    { id: 'plates', name: 'Pressure plates', kind: 'SIDE EGG', progress: L => (L.castle?.side?.state().plates ?? 0) > 0 ? 1 : 0, steps: [
+      { title: 'The four plates', how: 'Step on each of the undercroft pyramid\'s four pressure plates: with the fourth the gravity goes low for 50 s, and a power-up appears high in the room. The plates rest 60 s, then work again.', where: L => (L.de?.PADS ?? []).filter((p, k) => !L.castle?.side?.state().pads.includes(k)) },
     ] },
     { id: 'plunger', name: 'Clock tower and the plunger', kind: 'SIDE EGG',
       progress: L => { const a = L.castle?.side?.state(), b = L.castle?.side2?.state(); return !a || !b ? 0 : a.plunger ? 3 : b.clock.wallrun ? 2 : b.clock.powered ? 1 : 0; }, steps: [

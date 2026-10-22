@@ -32,6 +32,7 @@
 // Charged shots: hold fire with a bow to draw (1.6 s full), release to fire; a drawn arrow plays its element's charged form.
 // Testing: kino.castle.bows.state(), .advance(el) (finish the current step), .give(el).
 import * as THREE from 'three';
+import { chargeTaps } from '../../charge-taps.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { CollisionWorld } from '../../collision-world.js';
@@ -344,10 +345,13 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   // crosshair fills over 1.6 s; full is BO3's chargeshotlevel 4, what the storm batteries need) and takes more arrows:
   // 2, or 3 drawn fully (fewer if the quiver runs short, which also caps the draw). There's no reload: the next arrow
   // is nocked from the quiver as the fire clip ends. Sprinting, swapping or going down lets the string go.
+  // Double tap (charge-taps.js, user 2026-10-22): a press soon after a tap nocks the next arrow at once and draws twice
+  // as fast; a press held while the bow isn't ready yet (mid-shot) starts the draw as soon as it is.
   const CHARGE = 1.6, view = api.view, ring = document.createElement('div'); ring.id = 'bow-charge';
   ring.style.cssText = 'position:fixed;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;z-index:3;pointer-events:none;display:none';
   document.body.append(ring);
   let drawing = null, shot = null, lastImpact = null, nockAt = 0;
+  const taps = chargeTaps();
   const bowInHand = () => isBow(session.weapon?.id) && !session.weaponUnavailable && !api.host?.gunBlocked;
   const elOf = id => /^bo3_bow_(\w+)$/.exec(id ?? '')?.[1] ?? 'base';
   const cost = k => (k >= 1 ? 3 : k > 0 ? 2 : 1);
@@ -355,7 +359,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   function startDraw(touch) {
     if (drawing || !canDraw()) return;
     drawing = { t: 0, touch, id: session.weapon.id };
-    if (view.rig?.actions.chargeAnim) { view.mode = 'bowdraw'; view.rig.play('chargeAnim', false, 1, .06); drawing.clip = 'chargeAnim'; }
+    if (view.rig?.actions.chargeAnim) { view.mode = 'bowdraw'; view.rig.play('chargeAnim', false, taps.rate(), .06); drawing.clip = 'chargeAnim'; }
   }
   function letGo() {   // the string goes slack without a shot
     if (!drawing) return; ring.style.display = 'none';
@@ -373,9 +377,10 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     if (window.kino.debug?.shoot?.()) { session.weapon.reserve = Math.max(0, quiver - (cost(k) - 1)); nockAt = session.time + Math.max(.25, (session.def.fireTime ?? .32)); }
     else shot = null;
   }
+  const press = touch => { if (taps.down()) nockAt = Math.min(nockAt || session.time, session.time); startDraw(touch); };   // a double tap nocks at once
   addEventListener('mousedown', e => { if (e.button !== 0 || !api.getState().active || host.keepActive || !bowInHand() || window.kino.operator?.active) return;   // keepActive: a UI is up (the terminal), its clicks aren't shots
-  e.stopImmediatePropagation(); startDraw(false); }, true);
-  addEventListener('mouseup', e => { if (e.button !== 0 || !bowInHand() || (host.keepActive && !drawing)) return; e.stopImmediatePropagation(); if (drawing && !drawing.touch) release(); }, true);
+  e.stopImmediatePropagation(); press(false); }, true);
+  addEventListener('mouseup', e => { if (e.button !== 0 || !bowInHand() || (host.keepActive && !drawing)) return; e.stopImmediatePropagation(); taps.up(); if (drawing && !drawing.touch) release(); }, true);
   // touch: the fire button reaches the engine, not mouse events; while a bow is in hand the engine leaves it to us
   host.holdFire = () => bowInHand() && touchHeld();
   const touchHeld = () => !!view?.input?.fire && !mouseDown;
@@ -389,13 +394,15 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       if (w.mag === 0 && (w.reserve ?? 0) > 0 && session.time >= nockAt) { w.mag = 1; w.reserve--; }
     }
     const t = bowInHand() && touchHeld();
-    if (t && !touchWas) startDraw(true);
-    if (!t && touchWas && drawing?.touch) release();
+    if (t && !touchWas) press(true);
+    if (!t && touchWas) { taps.up(); if (drawing?.touch) release(); }
     touchWas = t;
+    if (!drawing && taps.held && (mouseDown || t) && canDraw()) startDraw(!mouseDown);   // held through the shot: draw once it's ready
     if (!drawing) return;
     if (!bowInHand() || session.weapon.id !== drawing.id || view?.input?.sprint || session.phase === 'reviving') { letGo(); return; }
-    drawing.t += dt; const k = Math.min(1, drawing.t / CHARGE), col = '#' + (Q[elOf(session.weapon.id)]?.color ?? 0xffa040).toString(16).padStart(6, '0');
+    drawing.t += dt * taps.rate(); const k = Math.min(1, drawing.t / CHARGE), col = '#' + (Q[elOf(session.weapon.id)]?.color ?? 0xffa040).toString(16).padStart(6, '0');
     if (drawing.clip === 'chargeAnim' && view.mode === 'bowdraw' && !view.rig.actions.chargeAnim.isRunning()) { drawing.clip = 'chargeLoopAnim'; view.rig.play('chargeLoopAnim', true, 1, .08); }
+    if (drawing.clip === 'chargeAnim' && view.rig?.actions.chargeAnim) view.rig.actions.chargeAnim.timeScale = taps.rate();   // a quick draw pulls the string faster (and normal again if let go of mid-pull)
     ring.style.display = drawing.t > .15 ? 'block' : 'none'; ring.style.background = `conic-gradient(${col} ${k * 360}deg, #ffffff22 0)`; ring.style.webkitMask = ring.style.mask = 'radial-gradient(circle, transparent 17px, #000 18px)';
     if (k >= 1 && !drawing.full) { drawing.full = true; audio?.play?.('buy', .3); }
   });

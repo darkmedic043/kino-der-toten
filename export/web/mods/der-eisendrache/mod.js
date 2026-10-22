@@ -44,6 +44,12 @@ export default async function setup(api) {
     return zones;
   };
   if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes); }
+  // the map nodes this mod moves (Ragnarok parts, levers, the crate lid, clock hands, floaters, Skadi, the claws, the
+  // astroglobe...) set position/rotation and call updateMatrixWorld. The world's optimizeStaticScene turns every map
+  // node's matrixAutoUpdate off, and static-freeze leaves nodes already off alone as self-managed, so those moves never
+  // reached the matrix: the Panzersoldat's Ragnarok body showed at its home spot, not where it died (user, 2026-10-22).
+  // On again for the castle's own nodes: the freeze (made at the end of the load) freezes them and thaws whatever moves.
+  if (world.root) for (const top of world.root.children) if (/^CASTLE_/.test(top.name)) top.traverse(o => { if (!o.isInstancedMesh && !o.isBatchedMesh) o.matrixAutoUpdate = true; });
   setupLook(api);
   const weather = setupWeather(api);   // snow outdoors, flames on the fixtures (weather.js)
   // Der Eisendrache's own zombies (BO3's c_zom_der_zombie_body1-3 + head1-3, .tools/build_castle_zombies.py; git-ignored,
@@ -109,7 +115,7 @@ export default async function setup(api) {
   const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api), traps = setupTraps(api);
   const craft = setupCraftables(api, { traps, pads }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav, pads, traps }), ee = setupEE(api, { bows, traps }), side2 = setupSide2(api, { bows }), side = setupSide(api, { lowgrav, side2 });
   useGameAudio(api.audio);
-  setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupRocketCollision(api);
+  setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupRocketCollision(api); setupCryptBoards(api);
   setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 });   // the Tab scoreboard's tiles
   const bounds = setupBounds(api, { lowgrav });   // after the pads: it watches their flights
   await bows?.ready;   // the spirit wolves too
@@ -604,8 +610,10 @@ function setupUndercroftGate({ world, session }) {
 // The chainlink fences around the pad (p7_proto_fence_chainlink and its posts) had none either (user, 2026-10-21: "the
 // area around the rocket missing collision"; the builder's NO_COLLIDE takes 'chain' for a hanging chain): you walked
 // through them and off the cliff behind the launch pad. Each fence becomes a box around its panel (its long axis from
-// the vertices' spread, at least 8 thick), in the same collider.
-const ROCKET_PIECES = /rocket_a10_(base|mid)|rocket_gantry_bottom/, FENCES = /proto_fence_chainlink/, PAD_AREA = new THREE.Box3(new THREE.Vector3(3500, -2600, 1000), new THREE.Vector3(6500, -1500, 3700));
+// the vertices' spread, at least 8 thick), in the same collider. The gantry's bottom is an open frame (legs and braces)
+// with the pad's Wunderfizz standing inside it: its slab outlines walled the machine in (user, 2026-10-22: "broken
+// collision, not letting me through"), so it collides as its own triangles (20,000 per gantry, those within reach).
+const ROCKET_PIECES = /rocket_a10_(base|mid)|rocket_gantry_bottom/, FRAMES = /rocket_gantry_bottom/, FENCES = /proto_fence_chainlink/, PAD_AREA = new THREE.Box3(new THREE.Vector3(3500, -2600, 1000), new THREE.Vector3(6500, -1500, 3700));
 function hull2(pts) {   // monotone chain over [x, z]
   pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (pts.length < 3) return pts;
   const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
@@ -613,13 +621,14 @@ function hull2(pts) {   // monotone chain over [x, z]
   for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
   return lo.slice(0, -1).concat(up.slice(0, -1));
 }
-function fenceBox(pts, y0, y1, tris) {   // a box around a flat panel's [x, z] points: long axis by their spread
+function fenceBox(pts, y0, y1, tris, thick = 8, pad = 0) {   // a box around a flat panel's [x, z] points: long axis by their spread
   let mx = 0, mz = 0; for (const p of pts) { mx += p[0]; mz += p[1]; } mx /= pts.length; mz /= pts.length;
   let cxx = 0, czz = 0, cxz = 0; for (const p of pts) { const dx = p[0] - mx, dz = p[1] - mz; cxx += dx * dx; czz += dz * dz; cxz += dx * dz; }
   const a = Math.atan2(2 * cxz, cxx - czz) / 2, ux = Math.cos(a), uz = Math.sin(a);
   let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity;
   for (const p of pts) { const dx = p[0] - mx, dz = p[1] - mz, u = dx * ux + dz * uz, w = -dx * uz + dz * ux; u0 = Math.min(u0, u); u1 = Math.max(u1, u); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
-  if (w1 - w0 < 8) { const c = (w0 + w1) / 2; w0 = c - 4; w1 = c + 4; }
+  if (w1 - w0 < thick) { const c = (w0 + w1) / 2; w0 = c - thick / 2; w1 = c + thick / 2; }
+  u0 -= pad; u1 += pad;
   const h = [[u0, w0], [u1, w0], [u1, w1], [u0, w1]].map(([u, w]) => [mx + u * ux - w * uz, mz + u * uz + w * ux]);
   prism(h, y0, y1, tris);
 }
@@ -645,6 +654,18 @@ function setupRocketCollision({ world }) {
         if (y1 - y0 >= 40) { fenceBox(pts, y0, y1, tris); fences++; }   // (the fallen posts lie flat: no wall)
         continue;
       }
+      if (FRAMES.test(name)) {   // as it is: its triangles with a corner within reach
+        const idx = o.geometry.index, n = idx ? idx.count : pos.count, c = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+        let inPad = false; const mine = [];
+        for (let t = 0; t + 2 < n; t += 3) {
+          for (let k = 0; k < 3; k++) c[k].fromBufferAttribute(pos, idx ? idx.getX(t + k) : t + k).applyMatrix4(m4);
+          if (Math.min(c[0].y, c[1].y, c[2].y) > PAD_AREA.max.y) continue;
+          if (!inPad && c.some(q => PAD_AREA.containsPoint(q))) inPad = true;
+          for (const q of c) mine.push(q.x, q.y, q.z);
+        }
+        if (inPad) for (const x of mine) tris.push(x);
+        continue;
+      }
       const slabs = new Map(), step = Math.max(1, Math.floor(pos.count / 6000));
       let inPad = false;
       for (let k = 0; k < pos.count; k += step) {
@@ -663,6 +684,50 @@ function setupRocketCollision({ world }) {
   if (!fences) console.warn('[der-eisendrache] no chainlink fences found at the rocket pad');
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(tris, 3));
   world.dynamic.push({ name: 'rocket', collider: new CollisionWorld(g), box: new THREE.Box3().setFromBufferAttribute(g.attributes.position), enabled: true, window: true });
+  world.collision?.invalidateCache?.();
+}
+
+// ---- The crypt's board floor by the Wrath of the Ancients pedestal (user, 2026-10-22: "fix the collision of the boards
+// near the wrath of ancients"): its raised deck of old planks (p7_zm_ctl_debris_wood_plank_old_*) is 'debris' to the
+// builder (no collision), so you walked on the stone 16 below it, sunk to the shins in the boards. Planks in the crypt
+// whose top stands 8 or more above the floor under them become solid blocks from that floor to their top, their outline
+// grown 5 so the gaps between boards close (player-only: zombies keep the navmesh, shots pass); loose planks lying on
+// the floor elsewhere stay walk-through (they snag). (The planks' own thin triangles first: a capsule that dropped into
+// a gap between them was pushed out sideways through the bench and the wall beside it.) Its four stained-glass
+// windows (glass: no collision either) start just above the benches under them: from a bench you walked out through
+// one and fell out of the map. They get a box each, from 40 below the glass to its top, 36 thick and 14 longer at each
+// end, so it overlaps the wall beside it (a thin one let a player pressing into the corner slip past its end).
+const CRYPT = new THREE.Box3(new THREE.Vector3(-2440, 395, -3480), new THREE.Vector3(-1760, 600, -2530)), BOARDS = /debris_wood_plank_old/, GLASS = /window_stained_glass/;
+function setupCryptBoards({ world }) {
+  if (!world.root || !world.dynamic) return;
+  const tris = [], m4 = new THREE.Matrix4(), im = new THREE.Matrix4(), seen = new Set(), c = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], down = new THREE.Vector3(0, -1, 0);
+  let boards = 0;
+  world.root.updateMatrixWorld(true);
+  world.root.traverse(o => {
+    const name = o.name + ' ' + (o.parent?.name ?? '') + ' ' + (o.geometry?.name ?? ''), glass = GLASS.test(name);
+    if (!o.isMesh || !(glass || BOARDS.test(name))) return;
+    const g = o.geometry, pos = g?.attributes?.position; if (!pos) return;
+    if (!g.boundingBox) g.computeBoundingBox();
+    for (let i = 0; i < (o.isInstancedMesh ? o.count : 1); i++) {
+      m4.copy(o.matrixWorld); if (o.isInstancedMesh) { o.getMatrixAt(i, im); m4.multiply(im); }
+      const bb = g.boundingBox.clone().applyMatrix4(m4), mid = bb.getCenter(new THREE.Vector3());
+      if (!CRYPT.containsPoint(mid)) continue;
+      const key = g.uuid + mid.toArray().map(Math.round).join(); if (seen.has(key)) continue; seen.add(key);
+      if (glass) { const pts = []; for (let k = 0; k < pos.count; k++) { c[0].fromBufferAttribute(pos, k).applyMatrix4(m4); pts.push([c[0].x, c[0].z]); } fenceBox(pts, bb.min.y - 40, bb.max.y, tris, 36, 14); continue; }   // thick and long enough to overlap the walls beside it
+      if (bb.max.y > 450) continue;
+      const hit = world.collision.rayIntersect(new THREE.Ray(new THREE.Vector3(mid.x, bb.max.y + 2, mid.z), down), 0, 200);
+      const floor = hit ? bb.max.y + 2 - hit.distance : bb.min.y;
+      if (floor > bb.max.y - 8) continue;   // lies on the floor
+      const pts = []; for (let k = 0; k < pos.count; k++) { c[0].fromBufferAttribute(pos, k).applyMatrix4(m4); pts.push([c[0].x, c[0].z]); }
+      const h = hull2(pts); if (h.length < 3) continue;
+      let cx = 0, cz = 0; for (const q of h) { cx += q[0]; cz += q[1]; } cx /= h.length; cz /= h.length;
+      prism(h.map(([x, z]) => { const d = Math.hypot(x - cx, z - cz) || 1; return [x + (x - cx) / d * 5, z + (z - cz) / d * 5]; }), floor, bb.max.y, tris);
+      boards++;
+    }
+  });
+  if (!boards) { console.warn('[der-eisendrache] crypt boards not found'); return; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(tris, 3));
+  world.dynamic.push({ name: 'crypt boards', collider: new CollisionWorld(g), box: new THREE.Box3().setFromBufferAttribute(g.attributes.position), enabled: true, window: true });
   world.collision?.invalidateCache?.();
 }
 

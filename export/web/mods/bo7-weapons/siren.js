@@ -18,6 +18,7 @@
 // Pack-a-Punched (Gaze of Circe): zombies the orb passes through and doesn't kill are entranced (held still) for 2 s,
 // and a fully charged orb that shatters sings: zombies near it walk to the spot for 3 s.
 import * as THREE from 'three';
+import { chargeTaps } from '../../charge-taps.js';
 
 const BASE = new URL('./', import.meta.url).href;
 export const SIREN = 'siren_zm';
@@ -135,11 +136,13 @@ export function setupSiren(api) {
   // ---- charging: hold fire, release to shoot --------------------------------------------------------------------
   // The engine leaves the fire button alone with the Siren in hand (host.holdFire); its edges are read from
   // view.input.fire (mouse, touch and pad alike) and the release fires through kino.debug.shoot (the engine's own shot:
-  // ammo, fire clip, sound, then our fire hook launches the orb).
+  // ammo, fire clip, sound, then our fire hook launches the orb). Double tap (charge-taps.js, user 2026-10-22): a
+  // press soon after a tap charges twice as fast; held through the tap's shot, it starts charging when it can.
   const ring = document.createElement('div'); ring.id = 'siren-charge';
   ring.style.cssText = 'position:fixed;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;z-index:3;pointer-events:none;display:none';
   document.body.append(ring);
   let charge = null, was = false;
+  const taps = chargeTaps();
   const chargeTime = () => CHARGE * (has('sr_overclock') ? .5 : 1) * (has('sr_lancet') ? .85 : 1);
   const canCharge = () => inHand() && view?.ready && session.weapon.mag > 0 && session.phase !== 'reviving' && !(session.reloadLeft > 0) && !session.busy
     && !(session.fireLeft > 0) && !session.drinking && !(session.meleeLeft > 0) && (!view.input?.sprint || has('sr_lancet')) && !host.keepActive;
@@ -148,7 +151,7 @@ export function setupSiren(api) {
     const f = () => inHand() || !!prev?.(); f.siren = true; host.holdFire = f;
   }
   claimFire(); host.on('start', claimFire);
-  function startCharge() { charge = { t: 0, full: false, id: session.weapon.id }; wailStart(chargeTime(), has('sr_baffle')); }
+  function startCharge() { charge = { t: 0, full: false, id: session.weapon.id }; wailStart(chargeTime() / taps.rate(), has('sr_baffle')); }
   function cancel() { charge = null; wailStop(); ring.style.display = 'none'; }
   function release() {
     const c = charge; cancel(); if (!c) return;
@@ -158,13 +161,14 @@ export function setupSiren(api) {
   host.on('update', dt => {
     if (host.holdFire && !host.holdFire.siren) claimFire();
     const fire = inHand() && !!view?.input?.fire && api.getState?.().active !== false;
+    if (fire && !was) taps.down(); else if (!fire && was) taps.up();
     if (fire && !was && inHand() && session.weapon.mag === 0 && !(session.reloadLeft > 0)) { weaponSound('empty', m16(session.def)); window.kino.debug?.reload?.(); }
     if (fire && !charge && canCharge()) startCharge();
     if (!fire && was && charge) release();
     was = fire;
     if (!charge) return;
     if (!inHand() || session.weapon.id !== charge.id || session.phase === 'reviving' || session.reloadLeft > 0 || (view.input?.sprint && !has('sr_lancet'))) { cancel(); return; }
-    charge.t += dt; const k = Math.min(1, charge.t / chargeTime()), col = has('sr_resonance') ? '#5ef0ff' : session.def.upgraded ? '#ff6fd0' : '#d9a2ff';
+    charge.t += dt * taps.rate(); const k = Math.min(1, charge.t / chargeTime()), col = has('sr_resonance') ? '#5ef0ff' : session.def.upgraded ? '#ff6fd0' : '#d9a2ff';
     ring.style.display = charge.t > TAP ? 'block' : 'none';
     ring.style.background = `conic-gradient(${col} ${k * 360}deg, #ffffff22 0)`; ring.style.webkitMask = ring.style.mask = 'radial-gradient(circle, transparent 18px, #000 19px)';
     ring.style.filter = k >= 1 ? `drop-shadow(0 0 6px ${col})` : '';
