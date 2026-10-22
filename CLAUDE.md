@@ -25,7 +25,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Journal: every map's Easter eggs step by step, recorded once done, tracking with on-screen markers (JOURNAL.EXE) | `journal.md` |
 | Research: perk and ammo mod augments (Phase 5) | `research.md` |
 | Credits, challenges and the Shop tab (Phase 6) | `shop.md` |
-| The Melon Pass: season pages, tokens, premium (Phase 7) | `pass.md` |
+| The Melon Pass: season pages, tokens, premium (Phase 7); past seasons stay open with shared tokens (`seasons.json`) | `pass.md` |
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
 | Phone/touch support (touch-extras mod, mobile textures, defaults) | `mobile.md` |
 | Porting World at War maps (OpenAssetTools GfxWorld dumper, `build_waw_map.py`, Cheese Cube, Malibu Drive) | `waw-ports.md` |

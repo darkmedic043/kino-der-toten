@@ -1,7 +1,9 @@
 // The Melon Pass tab (roadmap Phase 7, BO6/BO7 style): a main-menu tab (home.js mounts it into #pass-root; the sidebar
 // stays). Pages of 9 rewards + a major reward; spend tier tokens on any reward of an open page, or turn on auto-progress.
-// Rules and store: pass.js. Rewards preview in a drawer (camos on a turning gun, outfits as a portrait).
-import { loadSeason, loadPass, savePass, ensureSeason, seasonEnd, tiersEarned, tokens, pageDone, pageOpen, unlock, autoSpend, buyPremium, buyToken, describe } from './pass.js';
+// Rules and store: pass.js. Rewards preview in a drawer (camos on a turning gun, outfits as a portrait). Past seasons stay
+// open (Marvel Rivals style): a season strip picks which one to view, tokens are shared, and MAKE ACTIVE points
+// auto-progress at a past season.
+import { loadSeasons, loadPass, savePass, rec, isLive, seasonEnd, tiersEarned, unlockedCount, seasonDone, tokens, pageDone, pageOpen, unlock, autoSpend, trackOf, setTrack, buyPremium, buyToken, describe } from './pass.js';
 import { loadCatalog } from '../shop/shop.js';
 import { loadCredits } from '../credits/credits.js';
 import { loadCamos, fillSwatches } from '../weapon-levels/camo.js';
@@ -15,12 +17,13 @@ let mounted=null;
 export async function mountPass(root,{toast,data}){
   if(mounted){mounted.render();return;}
   const base=new URL('mods/',document.baseURI);
-  const [season,catalog,camos,chars,gums]=await Promise.all([loadSeason(new URL('pass/',base)),loadCatalog(new URL('shop/',base)),loadCamos(new URL('weapon-levels/',base)),
+  const [S,catalog,camos,chars,gums]=await Promise.all([loadSeasons(new URL('pass/',base)),loadCatalog(new URL('shop/',base)),loadCamos(new URL('weapon-levels/',base)),
     fetch(new URL('characters/characters.json',base)).then(r=>r.json()),loadGums(new URL('gobblegums/',base)).catch(()=>null)]);
   const thumb=makeThumb({camos,chars}),preview=gunPreview(),rar=catalog.rarities;
-  {const p=loadPass();if(ensureSeason(season,p))savePass(p);}
-  let page=0,sel=null;
-  {const p=loadPass();while(page<season.pages.length-1&&pageDone(season,p,page)&&pageOpen(season,p,page+1))page++;}
+  let season,page=0,sel=null;
+  // open a season on its first page that isn't done
+  function view(s){season=s;page=0;sel=null;const p=loadPass();while(page<season.pages.length-1&&pageDone(season,p,page)&&pageOpen(season,p,page+1))page++;}
+  view(trackOf(S,loadPass()));
   root.classList.add('pass-tab');
   const left=d=>{const s=Math.max(0,(d-Date.now())/1000),dd=Math.floor(s/86400),h=Math.floor(s%86400/3600);return dd?`${dd}d ${h}h`:`${h}h ${Math.floor(s%3600/60)}m`;};
   function rewardThumb(r){
@@ -31,33 +34,39 @@ export async function mountPass(root,{toast,data}){
     return '<div class="pv"></div>';
   }
   function card(entry,p,{major=false}={}){
-    const unlocked=!!p.unlocked[entry.id]||major&&!!p.granted[entry.id],held=unlocked&&entry.premium&&!p.premium,d=describe(entry.reward,{catalog,gums}),r=d.item?.rarity??(major?'legendary':'rare');
-    const state=major?(p.granted[entry.id]?'CLAIMED':'COMPLETE THE PAGE'):held?'HELD · NEEDS PREMIUM':unlocked?'UNLOCKED':'1 TOKEN';
+    const R=rec(p,season),unlocked=!!R.unlocked[entry.id]||major&&!!R.granted[entry.id],held=unlocked&&entry.premium&&!R.premium,d=describe(entry.reward,{catalog,gums}),r=d.item?.rarity??(major?'legendary':'rare');
+    const state=major?(R.granted[entry.id]?'CLAIMED':'COMPLETE THE PAGE'):held?'HELD · NEEDS PREMIUM':unlocked?'UNLOCKED':'1 TOKEN';
     return `<button class="ps-card${major?' major':''}${unlocked?' got':''}${held?' held':''}${sel===entry.id?' sel':''}" data-id="${esc(entry.id)}" style="--r:${rar[r]??'#888'}">${rewardThumb(entry.reward)}
       ${entry.premium?'<span class="ps-prem">PREMIUM</span>':major?'<span class="ps-prem maj">PAGE REWARD</span>':'<span class="ps-prem free">FREE</span>'}<b>${esc(d.title)}</b><small>${esc(d.sub)}</small><span class="ps-st">${state}</span></button>`;
   }
   function render(){
-    const p=loadPass(),pg=season.pages[page],t=tiersEarned(season,p),tk=tokens(season,p),bal=loadCredits().balance,total=season.pages.reduce((a,x)=>a+x.items.length,0);
-    root.innerHTML=`<header class="ps-top" style="--sc:${season.color}">
-        <div><span class="eyebrow">MELON PASS · SEASON ${esc(season.id.slice(1))}</span><h1>${esc(season.name.toUpperCase())}</h1><span class="muted small">Ends in ${left(seasonEnd(season))}</span></div>
-        <div class="ps-tier"><b>TIER ${t}</b><span>/ ${total}</span><div class="bar"><i style="width:${t>=total?100:(100*(p.xp%season.tierXp)/season.tierXp).toFixed(1)}%"></i></div><small>${t>=total?'All tiers earned':`${(p.xp%season.tierXp).toLocaleString()} / ${season.tierXp.toLocaleString()} pass XP to the next tier`}</small></div>
+    const p=loadPass(),R=rec(p,season),pg=season.pages[page],t=tiersEarned(season,p),tk=tokens(S,p),bal=loadCredits().balance,total=season.pages.reduce((a,x)=>a+x.items.length,0);
+    const live=isLive(S,season),active=trackOf(S,p)===season,got=unlockedCount(season,p),xp=R.xp%season.tierXp,cur=S.current,live1=rec(p,cur).xp%cur.tierXp;
+    const date=d=>new Date(d+'T12:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+    root.innerHTML=`${S.list.length>1?`<nav class="ps-seasons">${[...S.list].reverse().map(s=>{const n=unlockedCount(s,p),all=s.pages.reduce((a,x)=>a+x.items.length,0);
+        return `<button data-season="${esc(s.id)}" class="${s===season?'on':''}${seasonDone(s,p)?' done':''}" style="--sc:${s.color}"><small>SEASON ${esc(s.id.slice(1))} · ${isLive(S,s)?'LIVE':'PAST'}${trackOf(S,p)===s?' · ACTIVE':''}</small><b>${esc(s.name)}</b><span>${n} / ${all}${rec(p,s).premium?' · PREMIUM':''}</span></button>`;}).join('')}</nav>`:''}
+      <header class="ps-top" style="--sc:${season.color}">
+        <div><span class="eyebrow">MELON PASS · SEASON ${esc(season.id.slice(1))}${live?'':' · PAST SEASON'}</span><h1>${esc(season.name.toUpperCase())}</h1><span class="muted small">${live?`Ends in ${left(seasonEnd(season))}`:`Ran ${date(season.start)} – ${date(season.end)} · never expires`}</span></div>
+        ${live?`<div class="ps-tier"><b>TIER ${t}</b><span>/ ${total}</span><div class="bar"><i style="width:${(100*xp/season.tierXp).toFixed(1)}%"></i></div><small>${t>=total?`All tiers earned · ${xp.toLocaleString()} / ${season.tierXp.toLocaleString()} pass XP to a bonus token`:`${xp.toLocaleString()} / ${season.tierXp.toLocaleString()} pass XP to the next tier`}</small></div>`
+          :`<div class="ps-tier"><b>${got}</b><span>/ ${total} UNLOCKED</span><div class="bar"><i style="width:${(100*got/total).toFixed(1)}%"></i></div><small>Tokens from ${esc(cur.name)} spend here · ${live1.toLocaleString()} / ${cur.tierXp.toLocaleString()} pass XP to the next</small></div>`}
         <div class="ps-tok"><b>${tk}</b><span>TOKEN${tk===1?'':'S'}</span></div>
         <div class="ps-btns"><label class="ps-auto"><input type="checkbox" data-auto ${p.auto?'checked':''}> AUTO-PROGRESS</label>
-          ${p.premium?'<span class="ps-own">PREMIUM ✓</span>':`<button data-premium${bal<season.premiumPrice?' disabled':''}>PREMIUM · ${season.premiumPrice.toLocaleString()}</button>`}
-          <button data-token${bal<season.tokenPrice?' disabled':''}>BUY A TOKEN · ${season.tokenPrice}</button><span class="muted small">${bal.toLocaleString()} credits</span></div></header>
-      <nav class="ps-pages">${season.pages.map((x,i)=>{const open=pageOpen(season,p,i),done=pageDone(season,p,i),n=x.items.filter(it=>p.unlocked[it.id]).length;
+          ${S.list.length>1?active?'<span class="ps-own act">ACTIVE PASS ✓</span>':'<button data-track>MAKE ACTIVE PASS</button>':''}
+          ${R.premium?'<span class="ps-own">PREMIUM ✓</span>':`<button data-premium${bal<season.premiumPrice?' disabled':''}>PREMIUM · ${season.premiumPrice.toLocaleString()}</button>`}
+          <button data-token${bal<cur.tokenPrice?' disabled':''}>BUY A TOKEN · ${cur.tokenPrice}</button><span class="muted small">${bal.toLocaleString()} credits</span></div></header>
+      <nav class="ps-pages">${season.pages.map((x,i)=>{const open=pageOpen(season,p,i),done=pageDone(season,p,i),n=x.items.filter(it=>R.unlocked[it.id]).length;
         return `<button data-page="${i}" class="${i===page?'on':''}${open?'':' locked'}${done?' done':''}"><small>PAGE ${i+1}</small><b>${esc(x.name)}</b><span>${done?'✓ DONE':open?`${n} / ${x.items.length}`:'🔒'}</span></button>`;}).join('')}</nav>
       <div class="ps-body"><div class="ps-grid">${pg.items.map(it=>card(it,p)).join('')}</div>${card(pg.major,p,{major:true})}<aside class="ps-drawer" id="ps-drawer"></aside></div>
-      <p class="muted small">Every pass tier you earn gives a token. Spend it on any reward on an open page; unlocking all 9 on a page grants its page reward and opens the next page. ${p.premium?'':'Premium rewards can be unlocked without premium (the page still progresses); they are handed over when you buy the premium pass.'} Pass XP comes from kills, rounds survived and challenges.</p>`;
+      <p class="muted small">Every pass tier you earn gives a token. Spend it on any reward on an open page; unlocking all 9 on a page grants its page reward and opens the next page. ${R.premium?'':'Premium rewards can be unlocked without premium (the page still progresses); they are handed over when you buy this season\'s premium pass.'} Pass XP comes from kills, rounds survived and challenges, and always goes to the live season. Seasons never expire: tokens are shared, so they can be spent on any past season, and tiers earned past the live season's last reward still give tokens.${S.list.length>1?' Auto-progress spends on the active pass, then the live season.':''}</p>`;
     fillSwatches(root,cid=>camos.camos.find(c=>c.id===cid));drawer(p);
   }
   function drawer(p){
     const el=root.querySelector('#ps-drawer'),pg=season.pages[page],entry=[...pg.items,pg.major].find(x=>x.id===sel);
     if(!entry){el.innerHTML='<p class="muted small">Pick a reward to preview it.</p>';return;}
-    const major=entry===pg.major,d=describe(entry.reward,{catalog,gums}),open=pageOpen(season,p,page),tk=tokens(season,p),unlocked=!!p.unlocked[entry.id];
+    const R=rec(p,season),major=entry===pg.major,d=describe(entry.reward,{catalog,gums}),open=pageOpen(season,p,page),tk=tokens(S,p),unlocked=!!R.unlocked[entry.id];
     el.innerHTML=`<div class="ps-pv" id="ps-pv"></div><h3>${esc(d.title)}</h3><span class="muted small">${esc(d.sub)}${entry.premium?' · PREMIUM':''}</span>${d.item?`<p>${esc(d.item.desc)}</p>`:d.desc?`<p>${esc(d.desc)}</p>`:''}
-      ${major?`<p class="muted small">${p.granted[entry.id]?'Claimed.':'Unlock all 9 rewards on this page to get it.'}</p>`
-        :unlocked?`<p class="muted small">${entry.premium&&!p.premium?'Unlocked · handed over when you buy the premium pass.':'Unlocked and yours.'}${d.item&&['camo','outfit'].includes(d.item.cat)?` ${d.item.cat==='camo'?'Equip it in the Gunsmith (GLOBAL · SEASON).':d.item.data?.skin?'Pick it under SKINS in Armory → Operator.':'Pick it in Armory → Operator.'}`:d.item?.cat==='perk'?' Buy it at any terminal booth (PERKS).':d.item?' Equip it in the Shop tab.':''}</p>`
+      ${major?`<p class="muted small">${R.granted[entry.id]?'Claimed.':'Unlock all 9 rewards on this page to get it.'}</p>`
+        :unlocked?`<p class="muted small">${entry.premium&&!R.premium?'Unlocked · handed over when you buy the premium pass.':'Unlocked and yours.'}${d.item&&['camo','outfit'].includes(d.item.cat)?` ${d.item.cat==='camo'?'Equip it in the Gunsmith (GLOBAL · SEASON).':d.item.data?.skin?'Pick it under SKINS in Armory → Operator.':'Pick it in Armory → Operator.'}`:d.item?.cat==='perk'?' Buy it at any terminal booth (PERKS).':d.item?' Equip it in the Shop tab.':''}</p>`
         :`<button class="ps-unlock" data-unlock="${esc(entry.id)}"${!open||tk<=0?' disabled':''}>UNLOCK · 1 TOKEN</button><p class="muted small">${!open?'Finish the page before it first.':tk<=0?'No tokens: earn pass tiers by playing, or buy one.':''}</p>`}`;
     const pv=el.querySelector('#ps-pv'),it=d.item;
     if(it?.cat==='camo')preview.show(pv,data.weapons.m16_zm??Object.values(data.weapons)[0],camos.camos.find(c=>c.id===it.data.camo));
@@ -68,16 +77,18 @@ export async function mountPass(root,{toast,data}){
   }
   const report=out=>{const names=(out.granted??[]).map(e=>describe(e.reward,{catalog,gums}).title);toast?.(out.major?`PAGE COMPLETE · ${names.join(' · ')}`:names.length?`Unlocked: ${names.join(' · ')}`:out.held?'Unlocked · held until you buy premium':'Unlocked');};
   root.onclick=e=>{
+    const sb=e.target.closest('[data-season]');if(sb){const s=S.list.find(x=>x.id===sb.dataset.season);if(s&&s!==season){view(s);render();}return;}
+    if(e.target.closest('[data-track]')){const p=loadPass();setTrack(S,p,season);const spent=autoSpend(S,p);savePass(p);toast?.(`${season.name} is the active pass${spent.length?` · auto-progress spent ${spent.length} token${spent.length>1?'s':''}`:''}`);render();return;}
     const pb=e.target.closest('[data-page]');if(pb){page=+pb.dataset.page;sel=null;render();return;}
     const c=e.target.closest('.ps-card');if(c){sel=c.dataset.id;render();return;}
-    const u=e.target.closest('[data-unlock]');if(u&&!u.disabled){const p=loadPass(),r=unlock(season,p,u.dataset.unlock);if(typeof r==='string'){toast?.(r);return;}savePass(p);report(r);
+    const u=e.target.closest('[data-unlock]');if(u&&!u.disabled){const p=loadPass(),r=unlock(S,season,p,u.dataset.unlock);if(typeof r==='string'){toast?.(r);return;}savePass(p);report(r);
       if(pageDone(season,p,page)&&page<season.pages.length-1){page++;sel=null;}render();return;}
     if(e.target.closest('[data-premium]')){const b=e.target.closest('[data-premium]');if(!b.dataset.armed){b.dataset.armed='1';b.textContent='CONFIRM · '+b.textContent;return;}
       const p=loadPass(),r=buyPremium(season,p);if(typeof r==='string'){toast?.(r);return;}savePass(p);toast?.(`Premium pass · ${r.length} held reward${r.length===1?'':'s'} handed over`);render();return;}
     if(e.target.closest('[data-token]')){const b=e.target.closest('[data-token]');if(!b.dataset.armed){b.dataset.armed='1';b.textContent='CONFIRM · '+b.textContent;return;}
-      const p=loadPass(),why=buyToken(season,p);if(why){toast?.(why);return;}const spent=autoSpend(season,p);savePass(p);toast?.(spent.length?'Token bought and spent (auto-progress)':'Token bought');render();}
+      const p=loadPass(),why=buyToken(S,p);if(why){toast?.(why);return;}const spent=autoSpend(S,p);savePass(p);toast?.(spent.length?'Token bought and spent (auto-progress)':'Token bought');render();}
   };
-  root.onchange=e=>{if(e.target.matches('[data-auto]')){const p=loadPass();p.auto=e.target.checked;const spent=autoSpend(season,p);savePass(p);if(spent.length)toast?.(`Auto-progress spent ${spent.length} token${spent.length>1?'s':''}`);render();}};
+  root.onchange=e=>{if(e.target.matches('[data-auto]')){const p=loadPass();p.auto=e.target.checked;const spent=autoSpend(S,p);savePass(p);if(spent.length)toast?.(`Auto-progress spent ${spent.length} token${spent.length>1?'s':''}`);render();}};
   addEventListener('kino-pass',()=>{if(root.offsetParent)render();});
   mounted={render};render();
 }
@@ -91,6 +102,10 @@ export const PASS_CSS=`
 .ps-btns button,.ps-unlock{min-height:40px;padding:8px 14px;border:1px solid #f0c060;background:#f0c06014;color:#f0c060;font:700 11px/1 inherit;letter-spacing:1.5px;cursor:pointer}
 .ps-btns button:disabled,.ps-unlock:disabled{opacity:.4;cursor:default}.ps-btns button[data-armed]{background:#f0c060;color:#111}
 .ps-auto{font-size:10px;letter-spacing:2px;color:var(--text);display:flex;gap:6px;align-items:center}.ps-own{color:#7fd48a;font-weight:700;letter-spacing:2px;font-size:12px}
+.ps-seasons{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.ps-seasons button{flex:none;min-width:170px;min-height:56px;padding:8px 12px;border:1px solid #ffffff1c;border-left:3px solid var(--sc);background:#0007;color:inherit;font:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.ps-seasons button small{font-size:9px;letter-spacing:2px;color:var(--muted)}.ps-seasons button b{font-size:14px;color:var(--sc)}.ps-seasons button span{font-size:10px;color:var(--muted)}
+.ps-seasons button.on{border-color:var(--sc);background:#ffffff0d}.ps-seasons button.done span{color:#7fd48a}.ps-own.act{color:#f0c060}
 .ps-pages{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
 .ps-pages button{flex:none;min-width:118px;min-height:56px;padding:8px 10px;border:1px solid #ffffff1c;background:#0007;color:inherit;font:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px}
 .ps-pages button small{font-size:9px;letter-spacing:2px;color:var(--muted)}.ps-pages button b{font-size:13px}.ps-pages button span{font-size:10px;color:var(--muted)}

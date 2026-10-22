@@ -3,7 +3,8 @@
   export/web/mods/pass/season.json   pages of 9 tier rewards + 1 major reward each
   pass-exclusive items into mods/shop/catalog.json (pass: season id; the Shop never sells them),
   their camos into mods/weapon-levels/camos.json and outfits into mods/characters/characters.json.
-Every reward is unique, exists in the game and is season content: no credits, XP tokens or early unlocks (user, 2026-10-14). Gums are the pass-exclusive ones in gums.json (pass: s1). Re-running replaces this season's entries."""
+Every reward is unique, exists in the game and is season content: no credits, XP tokens or early unlocks (user, 2026-10-14). Gums are the pass-exclusive ones in gums.json (pass: s1). Re-running replaces this season's entries.
+Later seasons get their own file (season-s2.json, ...) listed in mods/pass/seasons.json; past seasons stay playable (pass.md)."""
 import json, os
 W=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','export','web')
 SEASON='s1'

@@ -53,13 +53,13 @@ test('they can be drunk (tracked bottles) and are on sale at the terminal behind
 });
 
 test('a slot claimed before its reward was swapped hands the new item over, once', async () => {
-  const { reconcile, loadPass } = await import('../export/web/mods/pass/pass.js');
+  const { reconcile, loadPass, seasonsFrom } = await import('../export/web/mods/pass/pass.js');
   store.clear();
   localStorage.setItem('kino.mods.shop', JSON.stringify({ owned: ['pass.s1.card.crows', 'pass.s1.camo.scarecrowburlap'] }));
-  const p = { ...loadPass(), season: season.id, granted: { 'p1.1': true, 'p6.9': true, 'p8.7': true, 'p9.9': true, 'p10.1': true } };
-  assert.deepEqual(reconcile(season, p).sort(), ['pass.s1.camo.cropcircle', 'pass.s1.perk.damnade', 'pass.s1.perk.magnet', 'pass.s1.perk.prismatic']);
-  assert.deepEqual(reconcile(season, p), []);
-  assert.deepEqual(reconcile(season, { ...p, season: 'old' }), []);
+  const S = seasonsFrom([season]), p = { ...loadPass(), seasons: { [season.id]: { xp: 0, bought: 0, premium: false, unlocked: {}, granted: { 'p1.1': true, 'p6.9': true, 'p8.7': true, 'p9.9': true, 'p10.1': true } } } };
+  assert.deepEqual(reconcile(S, p).sort(), ['pass.s1.camo.cropcircle', 'pass.s1.perk.damnade', 'pass.s1.perk.magnet', 'pass.s1.perk.prismatic']);
+  assert.deepEqual(reconcile(S, p), []);
+  assert.deepEqual(reconcile(S, { ...p, seasons: { old: p.seasons[season.id] } }), []);
   const owned = JSON.parse(localStorage.getItem('kino.mods.shop')).owned;
   assert.ok(owned.includes('pass.s1.perk.prismatic') && owned.includes('pass.s1.perk.damnade'));
 });

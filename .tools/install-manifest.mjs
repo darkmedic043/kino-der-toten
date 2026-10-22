@@ -20,7 +20,7 @@ const OWN = [
   /^vendor\/jsm\/libs\/basis\/basis_transcoder\.wasm$/,                   // the Basis Universal KTX2 transcoder (Apache-2.0)
   /^mods\/(mods|maps)\.json$/, /^mods\/README\.md$/,
   /^mods\/[^/]+\/mod\.json$/,                                       // every mod's manifest
-  /^mods\/(classes\/classes|characters\/characters|progression\/progression|gobblegums\/gums|prestige\/prestige|research\/research|credits\/credits|shop\/catalog|pass\/season|weapon-levels\/(attachments|camos)|movement\/data|player-health\/data|terminal-booth\/placements|hd-weapons\/hd|map-materials\/(hd|hd-materials|normals)|(gun|event|zombie)-sounds\/sounds|_template\/data|lighting\/fixtures)\.json$/,
+  /^mods\/(classes\/classes|characters\/characters|progression\/progression|gobblegums\/gums|prestige\/prestige|research\/research|credits\/credits|shop\/catalog|pass\/season(s|-s\d+)?|weapon-levels\/(attachments|camos)|movement\/data|player-health\/data|terminal-booth\/placements|hd-weapons\/hd|map-materials\/(hd|hd-materials|normals)|(gun|event|zombie)-sounds\/sounds|_template\/data|lighting\/fixtures)\.json$/,
   /^mods\/terminal-booth\/terminal_booth(_compact)?\.glb$/,        // built in Blender for this fork (.tools/build-terminal-booth.py)
   /^mods\/bo7-weapons\/[^/]+\.glb$/,                               // rebuilt from reference in Blender for this fork (.tools/build-grimhawk.py etc.)
 ];
