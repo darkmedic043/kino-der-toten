@@ -343,3 +343,4 @@
 - 2026-10-22: Kino's dark rooms lifted a touch (preset exposure .96, black .035; the grade's S-curve pulls shadows at 70%).
 - 2026-10-22: XM325 belt mags rebuilt again as stuffed bags (domed, bulging between coyote compression straps with buckles, sagging bottom, creases, sewn ID patch): the first pouch still looked like a box in game (weapons.md).
 - **2026-10-23**: Player wiki at `/wiki/` (wiki.md): 9 topic modules build 213 pages from the game's data files at load (Easter eggs in spoilers), menu rail link, headless checker `.tools/wiki-check.mjs`.
+- **2026-10-23**: Advanced Warfare pack (advanced-warfare.md): 11 guns from BO3 workshop pack 1793220683 via Greyhound (CEL-3, Blunderbuss, Tac-19, Bulldog, OHM, XMG dual wield, M1 Irons, MG Turret, MDL, RW1, Atlas 45) in the box ladder at levels 4-45, PaP models and PaP fire sounds, joined fire+pump clips; all tested on the GPU.

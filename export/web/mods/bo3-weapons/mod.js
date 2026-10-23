@@ -50,7 +50,7 @@ export default async function setup(api){
   const weaponSound=audio.weapon.bind(audio);
   audio.weapon=(kind,def,...rest)=>{
     if(kind==='shot'&&isMod(def)){   // the mod's own fire sounds: a random variant (MR23: its own last shot)
-      const m=MS[modId(def)];if(m?.shots?.length){const last=(session.weapon?.mag??1)<=0&&m.last?.length;const list=last?m.last:m.shots;
+      const m=MS[modId(def)];if(m?.shots?.length){const last=(session.weapon?.mag??1)<=0&&m.last?.length;const list=last?m.last:session.weapon?.upgraded&&m.upShots?.length?m.upShots:m.shots;
         // rapid fire: each shot fades the previous one's tail out (it otherwise stacks up loud: the MR23's sample
         // rings for 1.5 s at 12 shots/s), and a small random pitch/level keeps it from sounding like one loop
         const ctx=audio.ctx;if(prevShot&&ctx){const g=prevShot.g.gain;g.cancelScheduledValues(ctx.currentTime);g.setValueAtTime(g.value,ctx.currentTime);g.linearRampToValueAtTime(0,ctx.currentTime+.12);prevShot.src.stop(ctx.currentTime+.13);prevShot=null;}

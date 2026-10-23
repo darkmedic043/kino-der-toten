@@ -63,8 +63,24 @@ def model(name, out_name=None, rename=None, glow=None, glow_maps=None, light=Fal
 
 def round_list(v, n): return [round(x, n) for x in v]
 
+def read_clips(names):
+    # several clips played back to back as one (the Tac-19's fire + pump: the engine has no rechamber step)
+    parts = [read_seanim(SRC/'xanims'/(n+'.seanim')) for n in names]
+    out, off = {'framerate': parts[0]['framerate'], 'bones': {}, 'notes': []}, 0
+    for a in parts:
+        for bone, tracks in a['bones'].items():
+            o = out['bones'].setdefault(bone, {})
+            for k in ('rot', 'loc'):
+                if tracks.get(k): o.setdefault(k, []).extend((f+off, v) for f, v in tracks[k])
+        out['notes'] += [(f+off, n) for f, n in a['notes']]
+        off += max(a['frames']-1, 1)
+    out['frames'] = off+1
+    return out
+
 def animation(name, gun_bind, loop=False):
-    a = read_seanim(SRC/'xanims'/(name+'.seanim'))
+    if isinstance(name, (list, tuple)):
+        a = read_clips(name); name = name[0]+''.join('_'+n.rsplit('_', 1)[-1] for n in name[1:])
+    else: a = read_seanim(SRC/'xanims'/(name+'.seanim'))
     fps = a['framerate'] or 30
     bones = []
     last = 0
@@ -144,12 +160,15 @@ if glow.exists():
 import random
 GAME = json.loads((ROOT/'export/web/game-data.json').read_text())['weapons']
 SND = SRC/'sounds'/'codolbf'/'weapons'
-all_wavs = {w.stem: w for w in SND.rglob('*.wav')} if SND.is_dir() else {}
+# the Advanced Warfare pack's bank (skye_ports/s1_<gun>/{fire,foley}/wpn_s1_*.wav): its notetracks name the files directly
+SND_ROOTS = [(SND, 'mod/'), (SRC/'sounds'/'skye_ports', 'aw/')]
+all_wavs = {}
+for root, pre in SND_ROOTS:
+    if root.is_dir(): all_wavs.update({w.name.split('.')[0]: (w, pre+str(w.relative_to(root)).split('.')[0]) for w in root.rglob('*.wav')})
 audio_keys = {}
 def snd(stem):
-    w = all_wavs.get(stem)
+    w, key = all_wavs.get(stem, (None, None))
     if not w: return None
-    key = 'mod/' + str(w.relative_to(SND).with_suffix(''))
     out = MOD/'audio'/(key + '.ogg'); out.parent.mkdir(parents=True, exist_ok=True)
     if not out.exists():
         subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', str(w), '-ac', '2', '-c:a', 'libvorbis', '-q:a', '5', str(out)], check=True)
@@ -333,6 +352,62 @@ for el, (nm, col) in ELEMENTS.items():
                      pre='vm_bow_launcher', tpl='crossbow_explosive_zm', drop=drop, noBox=True,
                      stats=dict(clipSize=1, maxAmmo=60, startAmmo=60, damage=1500, minDamage=0, explosionRadius=200, explosionInnerDamage=1500, explosionOuterDamage=400, price=0),
                      roles=MODW[-1]['roles'], ads=MODW[-1]['ads'], shots=MODW[-1]['shots'], glow=col, projectile=f'wpn_t7_zmb_bow_{el}_projectile', offset=[0, -2, 0], element=el))
+# ---- the Advanced Warfare pack (workshop 1793220683, Skye's s1_ ports: models vm_s1_*/wm_s1_*, clips am_s1_<gun>_*,
+# sounds skye_ports/s1_<gun>/; its streamed images need the pack's xpaks hard-linked into BO3's zone folder while
+# Greyhound exports, see docs/fork/weapons.md). Each has its own Pack-a-Punched model (_up).
+def aw(cls, gid, name, up, gun, tpl, stats, glow, single=True, **kw):
+    pre = 'am_s1_'+gun.removesuffix('_turret')
+    roles = dict(idle='idle', fire='fire', adsFire='ads_fire', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='first_raise',
+                 drop='putaway', sprintIn='sprint_in', sprintLoop='sprint_loop', sprintOut='sprint_out')
+    roles.update(kw.pop('roles', {}))
+    mdl = 'vm_s1_'+gun+('' if single else '_rdw')
+    return dict(cls=cls, id='aw_'+gid, name=name, up=up, model=mdl, world='wm_s1_'+gun+('' if single else '_rdw'),
+                upModel=kw.pop('upModel', mdl+'_up'), upWorld=kw.pop('upWorld', 'wm_s1_'+gun+('' if single else '_rdw')+'_up'), pre=pre, tpl=tpl, stats=stats, roles=roles,
+                ads=kw.pop('ads', (pre+'_ads_up', pre+'_ads_down')), shots=['wpn_s1_'+gun+'_shot'], upShots=['wpn_s1_'+gun+'_pap_shot'], glow=glow, **kw)
+MODW += [
+  aw('Shotgun', 'cel3', 'CEL-3 Cauterizer', 'CEL-3 Immolator', 'cel3', 'spas_zm', glow='#ff7a2a',
+     stats=dict(clipSize=20, maxAmmo=120, startAmmo=120, damage=150, minDamage=20, fireTime=.2, pellets=8, automatic=True, fireType='Full Auto', segmentedReload=False, price=2000),
+     roles=dict(lastShot='fire_last', adsLastShot='ads_fire_last', firstRaise='pullout')),
+  aw('Shotgun', 'blunderbuss', 'Blunderbuss', 'Thunderbuss', 'blunderbuss', 'spas_zm', glow='#ffb45a',
+     stats=dict(clipSize=4, maxAmmo=48, startAmmo=48, damage=200, minDamage=25, fireTime=.4, pellets=12, segmentedReload=False, price=1500),
+     roles=dict(adsFire='fire', reloadEmpty='reload', firstRaise='pullout')),
+  # pump action: fire and pump joined into one clip (fireTime covers both), shells one at a time
+  aw('Shotgun', 'tac19', 'Tac-19', 'Tac-19 Hellfire', 'tac19', 'ithaca_zm', glow='#ff4a3a',
+     stats=dict(clipSize=6, maxAmmo=54, startAmmo=54, damage=170, minDamage=20, fireTime=.9, pellets=8, price=1500, segmentedReload=True, reloadAmmoAdd=1, reloadStartAdd=0),
+     roles=dict(fire=('fire', 'pump'), adsFire=('ads_fire', 'ads_pump'), reload='reload_loop', reloadStart='reload_in', reloadEnd='reload_out', reloadEmpty=None, firstRaise='pullout')),
+  aw('Shotgun', 'bulldog', 'Bulldog', 'Bulldog Rabid', 'bulldog', 'spas_zm', glow='#5ad0ff',
+     stats=dict(clipSize=6, maxAmmo=60, startAmmo=60, damage=160, minDamage=20, fireTime=.25, pellets=8, segmentedReload=False, price=1500),
+     roles=dict(reloadEmpty='reload')),
+  aw('Light machine gun', 'ohm', 'Ohm', 'Ohm Overload', 'ohm', 'rpk_zm', glow='#7affd2',
+     stats=dict(clipSize=60, maxAmmo=360, startAmmo=360, damage=130, minDamage=90, fireTime=.085, price=2500),
+     roles=dict(reloadEmpty='reload', firstRaise='pullout')),
+  # arm-mounted exo guns, one per forearm: dual wield (rdw right, ldw left; the fdw clips move both)
+  aw('Light machine gun', 'xmg', 'XMG', 'XMG Exterminator', 'xmg', 'rpk_zm', glow='#ff5a5a', single=False,
+     stats=dict(clipSize=100, maxAmmo=500, startAmmo=500, damage=120, minDamage=85, fireTime=.065, price=3000),
+     roles=dict(idle='rdw_idle', fire='rdw_fire', adsFire='rdw_fire', reload='rdw_reload', reloadEmpty='rdw_reload', rais='fdw_pullout', firstRaise='fdw_pullout',
+                drop='fdw_putaway', sprintIn='fdw_sprint_in', sprintLoop='fdw_sprint_loop', sprintOut='fdw_sprint_out'),
+     ads=('am_s1_xmg_fdw_ads_up', 'am_s1_xmg_fdw_ads_down'),
+     left=dict(model='vm_s1_xmg_ldw', idle='ldw_idle', fire='ldw_fire', reload='ldw_reload'), upLeft='vm_s1_xmg_ldw_up'),
+  aw('Pistol', 'm1_irons', 'M1 Irons', 'M1 Ironclad', 'm1_irons', 'm1911_zm', glow='#ffd36a',
+     stats=dict(clipSize=8, maxAmmo=96, startAmmo=96, damage=350, minDamage=200, fireTime=.18, automatic=False, fireType='Single Shot', price=1000),
+     offset=[-1, 4, 0]),   # its idle holds the revolver ~9 units lower than the Atlas 45's: raise it into view
+  aw('Light machine gun', 'sentry', 'MG Turret', 'MG Fortress', 'sentry_turret', 'rpk_zm', glow='#ffcf5a',
+     stats=dict(clipSize=150, maxAmmo=600, startAmmo=600, damage=135, minDamage=95, fireTime=.06, price=4000),
+     roles={r: 'turret_'+s for r, s in dict(idle='idle', fire='fire', adsFire='fire', reload='reload', reloadEmpty='reload', rais='pullout', firstRaise='pullout',
+                                             drop='putaway', sprintIn='sprint_in', sprintLoop='sprint_loop', sprintOut='sprint_out').items()},
+     ads=('am_s1_sentry_turret_ads_up', 'am_s1_sentry_turret_ads_down')),
+  aw('Launcher', 'mdl', 'MDL', 'MDL Devastator', 'mdl', 'china_lake_zm', glow='#ff9a3a',
+     stats=dict(clipSize=6, maxAmmo=36, startAmmo=36, damage=600, minDamage=0, fireTime=.6, price=2500, segmentedReload=True, reloadAmmoAdd=1, reloadStartAdd=0),
+     roles=dict(reload='reload_loop', reloadStart='reload_in', reloadEnd='reload_out', reloadEmpty=None)),
+  aw('Pistol', 'rw1', 'RW1', 'RW1 Railstorm', 'rw1', 'm1911_zm', glow='#5a9aff',
+     stats=dict(clipSize=1, maxAmmo=40, startAmmo=40, damage=2500, minDamage=1500, fireTime=.3, automatic=False, fireType='Single Shot', price=1200),
+     roles=dict(reloadEmpty='reload', firstRaise='pullout')),
+  aw('Pistol', 'atlas45', 'Atlas 45', 'Atlas 45 Titan', 'atlas45', 'm1911_zm', glow='#ffa04a',
+     stats=dict(clipSize=12, maxAmmo=120, startAmmo=120, damage=150, minDamage=90, fireTime=.12, automatic=False, fireType='Single Shot', price=900),
+     roles=dict(firstRaise='pullout'), upModel='vm_s1_atlas45_rdw_up', upWorld='wm_s1_atlas45_rdw_up'),
+]
+for w in MODW:
+    if w['id'].startswith('aw_'): w['roles'] = {k: v for k, v in w['roles'].items() if v}
 # the mod's attachment models, mounted on the guns' tags by the weapon-levels mod (def.mounts)
 MOUNTS = {}
 for att, mdl, tag in [('reddot', 'reflex_vmgun', 'tag_red_dot'), ('holo', 'eotech_vmgun', 'tag_eotech'),
@@ -347,6 +422,7 @@ PARTS = {'bo3_mr23_tesla': ['tag_sra', 'tag_foregrip', 'j_frontsight'], 'bo3_p90
          'bo3_sa80': ['tag_sra'], 'bo3_smg5_tool': ['tag_sra'], 'bo3_umg_dmz': ['tag_sra', 'tag_foregrip'], 'bo3_m1887': ['tag_sra', 'tag_foregrip'],
          'bo3_mg4_heaven': ['tag_sra', 'tag_foregrip']}
 modsounds = {}
+SOUND_NOTES = ('sndnt#', 'wpn_s1_')   # the codolbf pack's markers carry a prefix; the AW pack's are the sound names
 for w in MODW:
     if not (SRC/'xmodels'/w['model']).exists(): print('skip', w['id']); continue
     view, gm = model(w['model'], rename=w.get('rename'), glow=w['glow'], glow_maps={k: (png(v[0]), v[1], v[2]) for k, v in GLOW_MAPS.items() if png(v[0])}, drop=w.get('drop'))
@@ -355,14 +431,14 @@ for w in MODW:
     A2, T2, notes = {}, {}, set()
     for role, suffix in w['roles'].items():
         role = 'raise' if role == 'rais' else role   # ('raise' is a Python keyword)
-        name = w['pre']+'_'+suffix
-        if not (SRC/'xanims'/(name+'.seanim')).exists(): print('  no anim', name); continue
-        A2[role+'Anim'], T2[role] = animation(name, gb, role in ('idle', 'emptyIdle', 'sprintLoop', 'chargeLoop'))
-        notes |= {n for _, n in read_seanim(SRC/'xanims'/(name+'.seanim'))['notes'] if n.startswith('sndnt#')}
+        names = [w['pre']+'_'+x for x in (suffix if isinstance(suffix, tuple) else (suffix,))]
+        if not all((SRC/'xanims'/(n+'.seanim')).exists() for n in names): print('  no anim', names); continue
+        A2[role+'Anim'], T2[role] = animation(names if len(names) > 1 else names[0], gb, role in ('idle', 'emptyIdle', 'sprintLoop', 'chargeLoop'))
+        notes |= {n for nm in names for _, n in read_seanim(SRC/'xanims'/(nm+'.seanim'))['notes'] if n.startswith(SOUND_NOTES)}
     for name in (w['pre']+'_inspect', w['pre']+'_inspect_full'):   # weapon inspect (hold reload; mods/inspect)
         if (SRC/'xanims'/(name+'.seanim')).exists():
             A2['inspectAnim'], T2['inspect'] = animation(name, gb)
-            notes |= {n for _, n in read_seanim(SRC/'xanims'/(name+'.seanim'))['notes'] if n.startswith('sndnt#')}; break
+            notes |= {n for _, n in read_seanim(SRC/'xanims'/(name+'.seanim'))['notes'] if n.startswith(SOUND_NOTES)}; break
     for key, name in zip(('adsUpAnim', 'adsDownAnim'), w['ads']):
         if (SRC/'xanims'/(name+'.seanim')).exists(): A2[key], _ = animation(name, gb)
     A2.setdefault('emptyIdleAnim', A2['idleAnim']); A2.setdefault('lastShotAnim', A2['fireAnim'])
@@ -385,9 +461,23 @@ for w in MODW:
     up = {**common2, 'name': w['up'], 'clipSize': int(t['clipSize']*1.5), 'maxAmmo': int(t['maxAmmo']*1.5), 'startAmmo': int(t['maxAmmo']*1.5),
           'damage': t['damage']*2.2, 'minDamage': t['minDamage']*2.2}
     for k in ('bo3', 'modWeapon', 'price'): up.pop(k, None)
+    if w.get('left'):   # dual wield (animation.js): the left gun's own clips ride on top of the right's; ADS is off
+        lv, lm = model(w['left']['model'], glow=w['glow'])
+        LA = {'idleAnimLeft': None, 'fireAnimLeft': None, 'reloadAnimLeft': None, 'reloadEmptyAnimLeft': None}
+        for key in list(LA):
+            suf = w['left'].get(key[:-8])
+            LA[key] = suf and (SRC/'xanims'/(w['pre']+'_'+suf+'.seanim')).exists() and animation(w['pre']+'_'+suf, {})[0]
+        LA = {k: v for k, v in LA.items() if v}
+        for d in (common2, up): d.update(dualWield=True, leftModel=lv, leftAnimations=LA)
+        if w.get('upLeft') and (SRC/'xmodels'/w['upLeft']).exists(): up['leftModel'] = model(w['upLeft'], glow=w['glow'])[0]
+    if w.get('upModel') and (SRC/'xmodels'/w['upModel']).exists():   # the pack's own Pack-a-Punched model
+        up['model'] = model(w['upModel'], rename=w.get('rename'), glow=w['glow'], drop=w.get('drop'))[0]
+        uw = w.get('upWorld', w['upModel'])
+        if (SRC/'xmodels'/uw).exists(): up['worldModel'] = model(uw, uw+'_world', rename=w.get('rename'), glow=w['glow'], light=True, drop=w.get('drop'))[0]
     weapons[w['id']] = {'id': w['id'], 'name': w['name'], **common2, 'upgrade': up}
     modsounds[w['id']] = {'shots': [k for k in map(snd, w['shots']) if k], 'last': [k for k in map(snd, w.get('last', [])) if k],
-                          'notes': {n: k for n in sorted(notes) if (k := snd(n[6:]) or snd(n[6:]+'_r') or snd(NOTE_ALIAS.get(n[6:], '')))}}
+                          'notes': {n: k for n in sorted(notes) if (k := snd(st := n.removeprefix('sndnt#')) or snd(st+'_r') or snd(st+'1') or snd(NOTE_ALIAS.get(st, '')))}}
+    if w.get('upShots'): modsounds[w['id']]['upShots'] = [k for k in map(snd, w['upShots']) if k]
     print(w['id'], 'anims', len(A2), 'sounds', len(modsounds[w['id']]['shots']), '+', len(modsounds[w['id']]['notes']), 'notes of', len(notes))
 # ---- operator weapons (mods/operator-weapons), not guns: the Ragnarok DG-4 (BO3's talon spikes, exported from
 # zm_castle with its vm_talon_spike_* clips) on the same arms, as a def for its own ViewWeapon, plus the planted prop

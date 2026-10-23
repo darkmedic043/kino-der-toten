@@ -243,6 +243,11 @@
       "gunsmith": 50
     },
     {
+      "id": "aw_atlas45",
+      "rarity": "uncommon",
+      "level": 4
+    },
+    {
       "id": "bo3_ak117",
       "rarity": "rare",
       "level": 6
@@ -251,6 +256,11 @@
       "id": "bo3_sa80",
       "rarity": "rare",
       "level": 8
+    },
+    {
+      "id": "aw_bulldog",
+      "rarity": "rare",
+      "level": 9
     },
     {
       "id": "bo3_mp7_flanker",
@@ -268,7 +278,17 @@
       "level": 12
     },
     {
+      "id": "aw_m1_irons",
+      "rarity": "rare",
+      "level": 12
+    },
+    {
       "id": "bo3_umg_dmz",
+      "rarity": "rare",
+      "level": 14
+    },
+    {
+      "id": "aw_tac19",
       "rarity": "rare",
       "level": 14
     },
@@ -288,6 +308,11 @@
       "level": 18
     },
     {
+      "id": "aw_blunderbuss",
+      "rarity": "epic",
+      "level": 18
+    },
+    {
       "id": "bo3_f2000_tech",
       "rarity": "epic",
       "level": 19
@@ -296,6 +321,11 @@
       "id": "bo3_uzi_irradiated",
       "rarity": "rare",
       "level": 20
+    },
+    {
+      "id": "aw_ohm",
+      "rarity": "epic",
+      "level": 21
     },
     {
       "id": "bo3_m1014_jellyfish",
@@ -309,6 +339,11 @@
     },
     {
       "id": "bo3_aa12_btf",
+      "rarity": "epic",
+      "level": 25
+    },
+    {
+      "id": "aw_cel3",
       "rarity": "epic",
       "level": 25
     },
@@ -328,6 +363,11 @@
       "level": 28
     },
     {
+      "id": "aw_rw1",
+      "rarity": "epic",
+      "level": 28
+    },
+    {
       "id": "bo3_rpd_ornate",
       "rarity": "epic",
       "level": 30
@@ -336,6 +376,11 @@
       "id": "bo3_m1887",
       "rarity": "rare",
       "level": 31
+    },
+    {
+      "id": "aw_mdl",
+      "rarity": "legendary",
+      "level": 32
     },
     {
       "id": "bo3_mr23_tesla",
@@ -354,6 +399,11 @@
     },
     {
       "id": "bo3_m240_ice",
+      "rarity": "legendary",
+      "level": 36
+    },
+    {
+      "id": "aw_xmg",
       "rarity": "legendary",
       "level": 36
     },
@@ -406,6 +456,11 @@
       "id": "bo3_bow",
       "rarity": "wonder",
       "level": 44
+    },
+    {
+      "id": "aw_sentry",
+      "rarity": "legendary",
+      "level": 45
     },
     {
       "id": "minigun_zm",
