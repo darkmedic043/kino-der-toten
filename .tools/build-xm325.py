@@ -5,7 +5,7 @@
 # x = 30.465 - px * .0285, z = 5.738 - py * .024 (bore z 2.19, sight line z 5.14, muzzle x 29.5). Parts are part_<bone>:
 #   j_gun          receiver, skeletal upper handguard, tan lower handguard, rear housing, rails, trigger group
 #   j_bolt         the feed-cover latch and charging handle (moved by the reload)
-#   tag_clip       the hard belt box (60) and its caseless belt (moved by the reload)
+#   tag_clip       the padded belt pouch (60) and its caseless belt (moved by the reload)
 #   tag_iron_sight front post and rear aperture (removed by an optic, ironSights in attachments.json)
 #   tag_xm_muzzle / _barrel / _grip / _stock   the stock parts, replaced by their attachments
 #   tag_xm_*       the attachments, hidden by tag until fitted
@@ -32,7 +32,7 @@ M.update(
     stip=worn('xm_stip', '#28292c', .95, 0, bare='#3a3c40', wear=.12, grain=5., bare_metal=False, mottle=.5, dirt=.08),   # stippled grip panels
     steel=worn('xm_steel', '#4a4f53', .35, 1, bare='#a0a6ac', wear=.5, dirt=.25, rust=.15),
     gunmetal=worn('xm_gunmetal', '#2b3033', .38, .95, bare='#8e969c', wear=.45, brushed=.7, dirt=.3, rust=.1),
-    fabric=worn('xm_fabric', '#18191a', .88, 0, bare='#2c2d2f', wear=.25, bare_metal=False, mottle=.5, dirt=.45),
+    fabric=worn('xm_fabric', '#1d1e20', .92, 0, bare='#35373b', wear=.22, grain=7., bare_metal=False, mottle=.45, dirt=.35),   # the belt pouches' nylon
     rubber=worn('xm_rubber', '#141414', .9, 0, bare='#2a2a2a', wear=.2, bare_metal=False, dirt=.35),
     red=worn('xm_red', '#9c1f17', .5, 0, bare='#a9abad', wear=.35, chips=.4, under='#3e3f40', dirt=.3),
     round=worn('xm_round', '#56585b', .4, .45, bare='#8a8e92', wear=.3, dirt=.15),   # caseless propellant
@@ -51,6 +51,7 @@ M.update(
     # the lettering stays out of the bake (glyphs that small lose strokes in the atlas)
     ink_w=mat('xm_ink_white', '#d4d0be', .6, 0), ink_k=mat('xm_ink_black', '#141414', .6, 0),
     ink_r=mat('xm_ink_red', '#e0402a', .6, 0), ink_t=mat('xm_ink_tan', '#b8a48e', .6, 0),
+    thread=mat('xm_thread', '#4a4b4e', .85, 0),   # the pouches' stitching
 )
 BAKED = ('tan', 'black', 'poly', 'stip', 'steel', 'gunmetal', 'fabric', 'rubber', 'red', 'round', 'copper', 'frost', 'olive', 'yellow')
 STENCIL = '/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf'
@@ -133,15 +134,95 @@ def disc_ring(name, x, y, z, ro, ri, part, m, d=.05):
     solid(name, screw(x, y, z, ro, d, seg=28), m, part=part, cuts=[screw(x, y + .02, z, ri, d, seg=28)], bw=.01)
 
 
-def belt_box(part, fb, rb, rt, ft, y0, y1, m='poly', rounds=BELT):
-    """A hard belt box leaning forward in the mag well, the belt leaving it through the open top-rear corner.
-    Returns the face mapper."""
+def obox(bm, p, d, L, W, H):
+    """A small box into bm centred on p=(x, y, z), L long along the xz direction d, W wide in xz, H thick in y."""
+    dx, dz = d; nx, nz = -dz, dx; x, y, z = p
+    vs = [bm.verts.new((x + dx * a * L / 2 + nx * b * W / 2, y + c * H / 2, z + dz * a * L / 2 + nz * b * W / 2))
+          for a in (-1, 1) for b in (-1, 1) for c in (-1, 1)]
+    for f in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
+        bm.faces.new([vs[i] for i in f])
+
+
+def loop_tube(pts, r, seg=8):
+    """A round cord along a closed loop of (x, y, z) points (the piping in a pouch's seams)."""
+    bm = bmesh.new(); n = len(pts); rings = []
+    for k in range(n):
+        a, b = Vector(pts[k - 1]), Vector(pts[(k + 1) % n]); t = (b - a).normalized(); up = Vector((0, 1, 0))
+        side = t.cross(up).normalized(); p = Vector(pts[k])
+        rings.append([bm.verts.new(p + r * (math.cos(2 * math.pi * j / seg) * up + math.sin(2 * math.pi * j / seg) * side)) for j in range(seg)])
+    for k in range(n):
+        A, B = rings[k], rings[(k + 1) % n]
+        for j in range(seg):
+            bm.faces.new((A[j], A[(j + 1) % seg], B[(j + 1) % seg], B[j]))
+    return bm
+
+
+def pouch(Q, y0, y1, flat=.74, sag=.12, nu=24, nv=34):
+    """A padded belt pouch over the face mapper Q: rounded corners, flat faces that roll over into a seam at
+    y0 + .2..y1 - .2 of the depth, and a bottom that sags under the rounds' weight. Returns (bmesh, at, border):
+    at(u, v, side) -> (x, y, z) on the surface (u, v in -1..1), and the seam loop's (u, v)."""
+    yc, half = (y0 + y1) / 2, (y1 - y0) / 2; he = half * .55
+    def at(u, v, side=1):
+        m = max(abs(u), abs(v)); n = (abs(u) ** 9 + abs(v) ** 9) ** (1 / 9)
+        k = m / n if n > 1e-9 else 1
+        s_, t = (u * k + 1) / 2, (v * k + 1) / 2
+        x, z = Q(s_, t)
+        z -= sag * math.sin(math.pi * s_) * (1 - t) ** 8
+        f = 0 if m <= flat else ((m - flat) / (1 - flat)) ** 2
+        h = half - (half - he) * f + .03 * math.sin(t * 19 + s_ * 4) * f * (1 - f) * 4   # creases where the fabric rolls over
+        return x, yc + side * h, z
+    U = [-1 + 2 * i / nu for i in range(nu + 1)]; V = [-1 + 2 * j / nv for j in range(nv + 1)]
+    border = [(i, 0) for i in range(nu + 1)] + [(nu, j) for j in range(1, nv + 1)] + \
+             [(i, nv) for i in range(nu - 1, -1, -1)] + [(0, j) for j in range(nv - 1, 0, -1)]
+    bm = bmesh.new(); G = {}
+    for side in (1, -1):
+        for i in range(nu + 1):
+            for j in range(nv + 1):
+                G[side, i, j] = bm.verts.new(at(U[i], V[j], side))
+        for i in range(nu):
+            for j in range(nv):
+                q = [G[side, i, j], G[side, i + 1, j], G[side, i + 1, j + 1], G[side, i, j + 1]]
+                bm.faces.new(q if side > 0 else q[::-1])
+    for k in range(len(border)):   # the gusset joining the two faces' seams
+        (i, j), (i2, j2) = border[k], border[(k + 1) % len(border)]
+        bm.faces.new((G[1, i, j], G[-1, i, j], G[-1, i2, j2], G[1, i2, j2]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm, at, [(U[i], V[j]) for i, j in border]
+
+
+def stitches(at, loop, side=1, dash=.12, gap=.08, name='stitch', part='tag_clip'):
+    """A row of stitches along a closed (u, v) loop on a pouch face."""
+    pts = [at(u, v, side) for u, v in loop]; bm = bmesh.new(); carry = 0.
+    for k in range(len(pts)):
+        a, b = Vector(pts[k]), Vector(pts[(k + 1) % len(pts)]); L = (b - a).length
+        if L < 1e-6: continue
+        d = (b - a) / L; dxz = Vector((d.x, d.z)); dxz = dxz.normalized() if dxz.length > 1e-6 else Vector((1, 0))
+        pos = carry
+        while pos < L:
+            p = a + d * min(pos + dash / 2, L); obox(bm, (p.x, p.y + side * .012, p.z), (dxz.x, dxz.y), dash, .03, .03); pos += dash + gap
+        carry = pos - L
+    return plain(name, bm, M['thread'], part=part)
+
+
+def square_loop(r, n=16):
+    """A closed (u, v) square of half-size r, n points a side."""
+    e = [-r + 2 * r * k / n for k in range(n)]
+    return [(x, -r) for x in e] + [(r, y) for y in e] + [(-x, r) for x in e] + [(-r, -y) for y in e]
+
+
+def belt_box(part, fb, rb, rt, ft, y0, y1, m='fabric', rounds=BELT):
+    """A padded fabric belt pouch hanging forward in the mag well (BO7's soft belt bag), piping in both seams and a row
+    of stitching round the face, a hard collar where it clips on, and the belt leaving it through the open
+    top-rear corner. Returns the face mapper and the pouch surface (at)."""
     Q = quad(fb, rb, rt, ft)
-    top = (rt[0] + .3, rt[1] + .54)   # the chamfer into the top-rear corner
     mouth = prism([Q(.42, .99), Q(.42, 1.2), Q(1.05, 1.2), Q(1.05, .9), Q(.97, .86)], y0 + .35, y1 + 1)
-    solid('box', prism(fillet([ft, top, rt, rb, fb], .28), y0, y1), M[m], part=part, cuts=[mouth], bw=.12, seg=3)
-    solid('box_lip', prism(fillet([Q(-.03, .93), Q(.18, .97), Q(.17, 1.05), Q(-.04, 1.01)], .05), y0 - .03, y1 + .03), M['tan'], part=part, bw=.03)
-    solid('box_tab', prism(fillet([Q(.84, .82), Q(1.04, .82), Q(1.05, 1.0), Q(.86, 1.0)], .08), y0 - .03, y1 + .03), M['tan'], part=part, bw=.03)
+    bm, at, seam = pouch(Q, y0, y1)
+    solid('box', bm, M[m], part=part, cuts=[mouth], bw=.04, seg=2, ang=40)
+    for side in (1, -1):
+        plain('piping', loop_tube([at(u, v, side) for u, v in seam], .065), M[m], part=part, smooth=60)
+    stitches(at, square_loop(.9), part=part)
+    solid('box_lip', prism(fillet([Q(-.03, .93), Q(.18, .97), Q(.17, 1.05), Q(-.04, 1.01)], .05), y0 - .03, y1 + .03), M['poly'], part=part, bw=.03)
+    solid('box_tab', prism(fillet([Q(.84, .82), Q(1.04, .82), Q(1.05, 1.0), Q(.86, 1.0)], .08), y0 - .03, y1 + .03), M['poly'], part=part, bw=.03)
     belt(part, rounds)
     return Q
 
@@ -289,7 +370,7 @@ for s_ in (1, -1):
 solid('stock_screw', screw(-11.9, .71, 2.2, .12, .05, seg=10), M['steel'], part=ST, bw=0)
 
 # ---------------------------------------------------------------- the default belt box (tag_clip, 60 rounds)
-CL = 'tag_clip'   # Rist Rauch's hard polymer box: a stippled panel, the round maker's mark, 5.56x45MM / LMG556-B / CASELESS
+CL = 'tag_clip'   # Rist Rauch's padded belt pouch: a stippled patch, the round maker's mark, 5.56x45MM / LMG556-B / CASELESS
 BY0, BY1 = -.72, 1.28   # the box rides proud of the receiver's left face, where the belt climbs
 Q = belt_box(CL, (11.3, -6.17), (7.09, -6.59), (3.97, -.66), (7.82, .78), BY0, BY1)
 panel = [Q(.27, .05), Q(.93, .05), Q(.93, .8), Q(.14, .8), Q(.14, .55), Q(.27, .47)]
@@ -394,7 +475,7 @@ EB = 'tag_xm_extbelt'   # Enforcer Extended Belt (85): a deep box with three str
 Q = belt_box(EB, (12.1, -8.2), (7.4, -8.7), (3.97, -.66), (7.82, .78), -1.0, 1.5)
 for t in (.22, .48, .74):
     (x0, z0), (x1, z1) = Q(-.03, t), Q(1.03, t)
-    solid('eb_strap', bar(x0, z0, x1, z1, .5, -1.06, 1.56), M['black'], part=EB, bw=.05)
+    solid('eb_strap', bar(x0, z0, x1, z1, .5, -.98, 1.54), M['black'], part=EB, bw=.05)
     xb, zb = Q(.5, t)
     solid('eb_buckle', prism(fillet([(xb - .3, zb - .32), (xb + .3, zb - .28), (xb + .3, zb + .32), (xb - .3, zb + .28)], .06), 1.55, 1.62), M['steel'], part=EB, bw=.01)
 x, z = Q(.08, .62)

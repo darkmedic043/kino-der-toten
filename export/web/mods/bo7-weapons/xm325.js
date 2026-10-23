@@ -33,7 +33,7 @@ const STAT = ['xm_overpressured', 'xm_ars', 'xm_thermal'];   // ammo with no mod
 const MIRROR = [...ATTACHMENT_TAGS, 'tag_xm_muzzle', 'tag_xm_barrel', 'tag_xm_grip', 'tag_iron_sight'];   // shown/hidden on both Titan guns
 const VIEW_OFFSET = [.8, -.9, -5];   // a long gun: pushed out from the eye like the ROC's
 const DUAL_OFFSET = [0, -3.4, -8];   // Titan Wield: the CZ75 pair's pistol grips put each LMG's rear at the eye; held forward at the hips instead
-const V = 2;   // model version (?v=)
+const V = 3;   // model version (?v=)
 const KICK = .0045, COOL_DELAY = .25, COOL = .65;   // camera pitch per shot (rad); heat cools after COOL_DELAY s at COOL per second
 const ARC = 0x8fd0ff, FROST = 0xbfe8ff, PAP_ARC = 0xd88bff;
 // the fields Titan Wield swaps for the CZ75 Dual Wield's (models, animations, handling)
