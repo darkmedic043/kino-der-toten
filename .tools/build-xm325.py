@@ -32,7 +32,8 @@ M.update(
     stip=worn('xm_stip', '#28292c', .95, 0, bare='#3a3c40', wear=.12, grain=5., bare_metal=False, mottle=.5, dirt=.08),   # stippled grip panels
     steel=worn('xm_steel', '#4a4f53', .35, 1, bare='#a0a6ac', wear=.5, dirt=.25, rust=.15),
     gunmetal=worn('xm_gunmetal', '#2b3033', .38, .95, bare='#8e969c', wear=.45, brushed=.7, dirt=.3, rust=.1),
-    fabric=worn('xm_fabric', '#1d1e20', .92, 0, bare='#35373b', wear=.22, grain=7., bare_metal=False, mottle=.45, dirt=.35),   # the belt pouches' nylon
+    fabric=worn('xm_fabric', '#292b2d', .95, 0, bare='#44474b', wear=.3, grain=9., bare_metal=False, mottle=.55, dirt=.4),   # the belt bags' nylon
+    webbing=worn('xm_webbing', '#6b5c47', .92, 0, bare='#8d7c62', wear=.25, grain=12., bare_metal=False, mottle=.35, dirt=.45),   # coyote straps
     rubber=worn('xm_rubber', '#141414', .9, 0, bare='#2a2a2a', wear=.2, bare_metal=False, dirt=.35),
     red=worn('xm_red', '#9c1f17', .5, 0, bare='#a9abad', wear=.35, chips=.4, under='#3e3f40', dirt=.3),
     round=worn('xm_round', '#56585b', .4, .45, bare='#8a8e92', wear=.3, dirt=.15),   # caseless propellant
@@ -53,7 +54,7 @@ M.update(
     ink_r=mat('xm_ink_red', '#e0402a', .6, 0), ink_t=mat('xm_ink_tan', '#b8a48e', .6, 0),
     thread=mat('xm_thread', '#4a4b4e', .85, 0),   # the pouches' stitching
 )
-BAKED = ('tan', 'black', 'poly', 'stip', 'steel', 'gunmetal', 'fabric', 'rubber', 'red', 'round', 'copper', 'frost', 'olive', 'yellow')
+BAKED = ('tan', 'black', 'poly', 'stip', 'steel', 'gunmetal', 'fabric', 'webbing', 'rubber', 'red', 'round', 'copper', 'frost', 'olive', 'yellow')
 STENCIL = '/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf'
 
 
@@ -157,20 +158,30 @@ def loop_tube(pts, r, seg=8):
     return bm
 
 
-def pouch(Q, y0, y1, flat=.74, sag=.12, nu=24, nv=34):
-    """A padded belt pouch over the face mapper Q: rounded corners, flat faces that roll over into a seam at
-    y0 + .2..y1 - .2 of the depth, and a bottom that sags under the rounds' weight. Returns (bmesh, at, border):
-    at(u, v, side) -> (x, y, z) on the surface (u, v in -1..1), and the seam loop's (u, v)."""
-    yc, half = (y0 + y1) / 2, (y1 - y0) / 2; he = half * .55
+def pouch(Q, y0, y1, straps=(), bow=.24, sag=.32, nu=30, nv=44):
+    """A stuffed belt bag over the face mapper Q: domed sides that thin out to a piped seam, sides bowed out and a
+    bottom that sags and fattens where the rounds settle, creases near the seams and under the mouth, and the fabric
+    pinched in under each compression strap (at t in straps). Returns (bmesh, at, border, F):
+    at(u, v, side) -> (x, y, z) on the surface (u, v in -1..1), the seam loop's (u, v), and F(s, t) -> the point
+    on the +y face at the face mapper's (s, t)."""
+    yc, half = (y0 + y1) / 2, (y1 - y0) / 2
     def at(u, v, side=1):
         m = max(abs(u), abs(v)); n = (abs(u) ** 9 + abs(v) ** 9) ** (1 / 9)
         k = m / n if n > 1e-9 else 1
         s_, t = (u * k + 1) / 2, (v * k + 1) / 2
         x, z = Q(s_, t)
-        z -= sag * math.sin(math.pi * s_) * (1 - t) ** 8
-        f = 0 if m <= flat else ((m - flat) / (1 - flat)) ** 2
-        h = half - (half - he) * f + .03 * math.sin(t * 19 + s_ * 4) * f * (1 - f) * 4   # creases where the fabric rolls over
-        return x, yc + side * h, z
+        (ax, az), (bx, bz) = Q(0, t), Q(1, t); L = math.hypot(bx - ax, bz - az); du = ((bx - ax) / L, (bz - az) / L)
+        (ax, az), (bx, bz) = Q(s_, 0), Q(s_, 1); L = math.hypot(bx - ax, bz - az); dv = ((bx - ax) / L, (bz - az) / L)
+        pin = sum(math.exp(-((t - tk) / .05) ** 2) for tk in straps)
+        a = bow * math.sin(math.pi * t) ** .6 * (2 * s_ - 1) * (1 - .35 * pin)          # sides bowed out, drawn in by the straps
+        b = -sag * math.sin(math.pi * s_) ** .7 * (1 - t) ** 2.2                        # the bottom sags
+        x += du[0] * a + dv[0] * b; z += du[1] * a + dv[1] * b
+        r = n if n < 1 else 1
+        dome = .2 + .8 * max(0., 1 - r ** 5) ** .5                                      # stuffed: thin at the seam, full inside
+        fill = 1 + .2 * (1 - t) ** 1.5 - .16 * pin * (1 - r ** 4)                        # fuller at the bottom, pinched by straps
+        f = min(1., max(0., (r - .55) / .45)); g = 4 * f * (1 - f)
+        crease = .05 * math.sin(t * 29 + s_ * 6) * g + .04 * math.sin(s_ * 21 + t * 3) * max(0., (t - .72) / .28) ** 2 * (1 - r ** 6)
+        return x, yc + side * (half * dome * fill + crease), z
     U = [-1 + 2 * i / nu for i in range(nu + 1)]; V = [-1 + 2 * j / nv for j in range(nv + 1)]
     border = [(i, 0) for i in range(nu + 1)] + [(nu, j) for j in range(1, nv + 1)] + \
              [(i, nv) for i in range(nu - 1, -1, -1)] + [(0, j) for j in range(nv - 1, 0, -1)]
@@ -187,7 +198,43 @@ def pouch(Q, y0, y1, flat=.74, sag=.12, nu=24, nv=34):
         (i, j), (i2, j2) = border[k], border[(k + 1) % len(border)]
         bm.faces.new((G[1, i, j], G[-1, i, j], G[-1, i2, j2], G[1, i2, j2]))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    return bm, at, [(U[i], V[j]) for i, j in border]
+    return bm, at, [(U[i], V[j]) for i, j in border], lambda s_, t: at(2 * s_ - 1, 2 * t - 1, 1)
+
+
+def surf_n(at, u, v, side, e=.01):
+    """The outward normal of a pouch face at (u, v)."""
+    a, b = Vector(at(u + e, v, side)), Vector(at(u - e, v, side)); c, d = Vector(at(u, v + e, side)), Vector(at(u, v - e, side))
+    n = (a - b).cross(c - d).normalized()
+    return n if n.y * side > 0 else -n
+
+
+def strap(at, v, part, w=.42, th=.05, buckle_u=-.3, n=26, m='webbing', bm_='poly'):
+    """A webbing strap cinched round a pouch at v, with a side-release buckle on the +y face."""
+    loop = []
+    for side in (1, -1):
+        us = [-.99 + 1.98 * i / n for i in range(n + 1)]
+        for u in (us if side > 0 else us[::-1]):
+            loop.append((Vector(at(u, v, side)), surf_n(at, u, v, side), u, side))
+        u = .99 if side > 0 else -.99   # round the seam
+        p1, p2 = Vector(at(u, v, side)), Vector(at(u, v, -side)); mid = (p1 + p2) / 2
+        o = mid - Vector(at(u * .8, v, 1)) / 2 - Vector(at(u * .8, v, -1)) / 2; o.y = 0; o.normalize()
+        loop.append((mid + o * .12, o, u, 0))
+    bm = bmesh.new(); rings = []
+    for k, (p, nrm, u, side) in enumerate(loop):
+        a, b = Vector(at(u, v + .02, side or 1)), Vector(at(u, v - .02, side or 1)); wd = (a - b); wd -= nrm * wd.dot(nrm); wd.normalize()
+        rings.append([bm.verts.new(p + nrm * (.015 + o) + wd * (w / 2) * sgn) for o, sgn in ((0, -1), (0, 1), (th, 1), (th, -1))])
+    for k in range(len(rings)):
+        A, B = rings[k], rings[(k + 1) % len(rings)]
+        for j in range(4):
+            bm.faces.new((A[j], A[(j + 1) % 4], B[(j + 1) % 4], B[j]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    plain('strap', bm, M[m], part=part, smooth=50)
+    p, nrm = Vector(at(buckle_u, v, 1)), surf_n(at, buckle_u, v, 1)
+    a, b = Vector(at(buckle_u + .05, v, 1)), Vector(at(buckle_u - .05, v, 1)); d = (a - b); d.y = 0; d.normalize()
+    c = p + nrm * (.015 + th + .05)
+    bb = bmesh.new(); obox(bb, (c.x, c.y, c.z), (d.x, d.z), .75, w + .14, .11)   # the buckle: a body, a release tab and the slot bar
+    q = c + Vector((d.x, 0, d.z)) * .48; obox(bb, (q.x, q.y, q.z), (d.x, d.z), .24, w + .02, .07)
+    solid('buckle', bb, M[bm_], part=part, bw=.025)
 
 
 def stitches(at, loop, side=1, dash=.12, gap=.08, name='stitch', part='tag_clip'):
@@ -210,21 +257,42 @@ def square_loop(r, n=16):
     return [(x, -r) for x in e] + [(r, y) for y in e] + [(-x, r) for x in e] + [(-r, -y) for y in e]
 
 
-def belt_box(part, fb, rb, rt, ft, y0, y1, m='fabric', rounds=BELT):
-    """A padded fabric belt pouch hanging forward in the mag well (BO7's soft belt bag), piping in both seams and a row
-    of stitching round the face, a hard collar where it clips on, and the belt leaving it through the open
-    top-rear corner. Returns the face mapper and the pouch surface (at)."""
+def belt_box(part, fb, rb, rt, ft, y0, y1, m='fabric', rounds=BELT, straps=(.15, .79), buckle='poly'):
+    """A stuffed fabric belt bag hanging forward in the mag well (BO7's soft belt bag): piping in both seams, a row of
+    stitching round the face, coyote compression straps with buckles, a hard collar where it clips on, and the belt
+    leaving it through the open top-rear corner. Returns the face mapper Q and F(s, t), the +y face's surface point."""
     Q = quad(fb, rb, rt, ft)
     mouth = prism([Q(.42, .99), Q(.42, 1.2), Q(1.05, 1.2), Q(1.05, .9), Q(.97, .86)], y0 + .35, y1 + 1)
-    bm, at, seam = pouch(Q, y0, y1)
-    solid('box', bm, M[m], part=part, cuts=[mouth], bw=.04, seg=2, ang=40)
+    bm, at, seam, F = pouch(Q, y0, y1, straps)
+    solid('box', bm, M[m], part=part, cuts=[mouth], bw=.03, seg=2, ang=45)
     for side in (1, -1):
-        plain('piping', loop_tube([at(u, v, side) for u, v in seam], .065), M[m], part=part, smooth=60)
-    stitches(at, square_loop(.9), part=part)
+        plain('piping', loop_tube([at(u, v, side) for u, v in seam], .07), M[m], part=part, smooth=60)
+    stitches(at, square_loop(.88), part=part)
+    for t in straps:
+        strap(at, 2 * t - 1, part, bm_=buckle)
     solid('box_lip', prism(fillet([Q(-.03, .93), Q(.18, .97), Q(.17, 1.05), Q(-.04, 1.01)], .05), y0 - .03, y1 + .03), M['poly'], part=part, bw=.03)
     solid('box_tab', prism(fillet([Q(.84, .82), Q(1.04, .82), Q(1.05, 1.0), Q(.86, 1.0)], .08), y0 - .03, y1 + .03), M['poly'], part=part, bw=.03)
     belt(part, rounds)
-    return Q
+    return Q, F
+
+
+def sewn_patch(F, s0, s1, t0, t1, part, m='stip', n=10, th=.05):
+    """A patch sewn flat onto a bag face (velcro ID panel): a thin sheet over the face between (s0, t0) and (s1, t1)."""
+    bm = bmesh.new(); G = {}
+    for k, off in ((0, .005), (1, .005 + th)):
+        for i in range(n + 1):
+            for j in range(n + 1):
+                x, y, z = F(s0 + (s1 - s0) * i / n, t0 + (t1 - t0) * j / n); G[k, i, j] = bm.verts.new((x, y + off, z))
+    for k in (0, 1):
+        for i in range(n):
+            for j in range(n):
+                bm.faces.new([G[k, i, j], G[k, i + 1, j], G[k, i + 1, j + 1], G[k, i, j + 1]])
+    rim = [(i, 0) for i in range(n)] + [(n, j) for j in range(n)] + [(i, n) for i in range(n, 0, -1)] + [(0, j) for j in range(n, 0, -1)]
+    for a in range(len(rim)):
+        (i, j), (i2, j2) = rim[a], rim[(a + 1) % len(rim)]
+        bm.faces.new((G[0, i, j], G[0, i2, j2], G[1, i2, j2], G[1, i, j]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    solid('patch', bm, M[m], part=part, bw=.015, seg=1)
 
 
 # ---------------------------------------------------------------- receiver core (black) and its tan bands
@@ -372,17 +440,18 @@ solid('stock_screw', screw(-11.9, .71, 2.2, .12, .05, seg=10), M['steel'], part=
 # ---------------------------------------------------------------- the default belt box (tag_clip, 60 rounds)
 CL = 'tag_clip'   # Rist Rauch's padded belt pouch: a stippled patch, the round maker's mark, 5.56x45MM / LMG556-B / CASELESS
 BY0, BY1 = -.72, 1.28   # the box rides proud of the receiver's left face, where the belt climbs
-Q = belt_box(CL, (11.3, -6.17), (7.09, -6.59), (3.97, -.66), (7.82, .78), BY0, BY1)
-panel = [Q(.27, .05), Q(.93, .05), Q(.93, .8), Q(.14, .8), Q(.14, .55), Q(.27, .47)]
-solid('box_stip', prism(fillet(panel, .15), BY1 - .03, BY1 + .015), M['stip'], part=CL, bw=.01)
-(mx, mz), (hx, hz) = Q(.55, .7), Q(.2, .13)
-disc_ring('box_mark', mx, BY1 + .02, mz, .62, .5, CL, M['poly'])
-solid('box_mark_c', screw(mx, BY1 + .03, mz, .3, .04, seg=24), M['poly'], part=CL, bw=.01)
-disc_ring('box_hole', hx, BY1 + .02, hz, .17, .08, CL, M['poly'])
-for body, size, (x, z), dy in (('5.56x45MM', .24, Q(.1, .45), .01), ('LMG556-B', .24, Q(.17, .42), .01), ('CASELESS', .19, Q(.82, .33), .03)):
-    ytext(body, size, x, BY1 + dy, z, 63, CL, M['ink_w'])
+Q, F = belt_box(CL, (11.3, -6.17), (7.09, -6.59), (3.97, -.66), (7.82, .78), BY0, BY1)
+sewn_patch(F, .1, .9, .25, .69, CL)
+fy = lambda s_, t: F(s_, t)[1]
+(mx, _, mz), (hx, _, hz) = F(.62, .52), F(.2, .07)
+disc_ring('box_mark', mx, fy(.62, .52) + .06, mz, .62, .5, CL, M['poly'])
+solid('box_mark_c', screw(mx, fy(.62, .52) + .07, mz, .3, .04, seg=24), M['poly'], part=CL, bw=.01)
+disc_ring('box_hole', hx, fy(.2, .07) + .01, hz, .17, .08, CL, M['steel'])   # a drain grommet
+for body, size, (s_, t), dy in (('5.56x45MM', .24, (.23, .3), .06), ('LMG556-B', .24, (.3, .28), .06), ('CASELESS', .19, (.8, .3), .06)):
+    x, y, z = F(s_, t)
+    ytext(body, size, x, y + dy, z, 63, CL, M['ink_w'])
 x, z = Q(.5, .5)
-text('RR', .24, (x, BY0 - .02, z), part=CL, m=M['ink_t'], side=-1, font=STENCIL)
+text('RR', .24, (x, BY0 + BY1 - fy(.5, .5) - .02, z), part=CL, m=M['ink_t'], side=-1, font=STENCIL)   # the -y face mirrors the +y one
 
 # ---------------------------------------------------------------- muzzle attachments
 CP = 'tag_xm_comp'   # RL-7.62 Compensator: a squared-off block with top and side ports
@@ -465,23 +534,17 @@ text('AEGIS X40', .16, (-14.0, .71, 3.6), part=AE, m=M['ink_t'], font=STENCIL)
 
 # ---------------------------------------------------------------- magazines (each replaces tag_clip, moved by the reload)
 FB = 'tag_xm_fastbelt'   # Wessi Fast Belt (50): a slim short box with triangular panels
-Q = belt_box(FB, (10.6, -4.5), (6.95, -4.85), (3.97, -.66), (7.82, .78), -.6, 1.24)
-for tri in (((.18, .1), (.8, .1), (.8, .36)), ((.18, .2), (.18, .5), (.74, .5)), ((.2, .56), (.86, .56), (.86, .78), (.3, .78))):
-    solid('fb_panel', prism(fillet([Q(*p) for p in tri], .1), 1.17, 1.27), M['black'], part=FB, bw=.02)
-x, z = Q(.08, .45)
-ytext('WESSI 50', .2, x, 1.25, z, 63, FB, M['ink_w'])
+Q, F = belt_box(FB, (10.6, -4.5), (6.95, -4.85), (3.97, -.66), (7.82, .78), -.6, 1.24, straps=(.5,))
+sewn_patch(F, .12, .88, .16, .38, FB, m='black')
+x, y, z = F(.14, .58)
+ytext('WESSI 50', .2, x, y + .02, z, 63, FB, M['ink_w'])
 
 EB = 'tag_xm_extbelt'   # Enforcer Extended Belt (85): a deep box with three straps round it
-Q = belt_box(EB, (12.1, -8.2), (7.4, -8.7), (3.97, -.66), (7.82, .78), -1.0, 1.5)
-for t in (.22, .48, .74):
-    (x0, z0), (x1, z1) = Q(-.03, t), Q(1.03, t)
-    solid('eb_strap', bar(x0, z0, x1, z1, .5, -.98, 1.54), M['black'], part=EB, bw=.05)
-    xb, zb = Q(.5, t)
-    solid('eb_buckle', prism(fillet([(xb - .3, zb - .32), (xb + .3, zb - .28), (xb + .3, zb + .32), (xb - .3, zb + .28)], .06), 1.55, 1.62), M['steel'], part=EB, bw=.01)
-x, z = Q(.08, .62)
-ytext('ENFORCER', .2, x, 1.51, z, 63, EB, M['ink_w'])
-x, z = Q(.62, .1)
-text('85', .4, (x, 1.51, z), part=EB, m=M['ink_w'], font=STENCIL)
+Q, F = belt_box(EB, (12.1, -8.2), (7.4, -8.7), (3.97, -.66), (7.82, .78), -1.0, 1.5, straps=(.2, .48, .78), buckle='steel')
+x, y, z = F(.12, .55)
+ytext('ENFORCER', .2, x, y + .02, z, 63, EB, M['ink_w'])
+x, y, z = F(.62, .07)
+text('85', .4, (x, y + .02, z), part=EB, m=M['ink_w'], font=STENCIL)
 
 
 def canister(part, x0, x1, zc, r, label):
