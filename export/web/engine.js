@@ -494,7 +494,7 @@ async function warmShaders(){
     renderer.render=function(s,c){if((s===scene||s===viewScene)&&!targets.has(s))targets.set(s,this.getRenderTarget());return draw.call(this,s,c);};
     // shadow maps too (their depth programs), even where the lighting mod only redraws them on a schedule
     renderer.shadowMap.needsUpdate=true;scene.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});
-    try{renderer.info.reset();renderer.clear();if(mods.renderWorld)mods.renderWorld(scene,camera);else renderer.render(scene,camera);renderer.clearDepth();renderer.render(viewScene,viewCamera);}
+    try{renderer.info.reset();renderer.clear();if(!(mods.renderWorld&&mods.renderWorld(scene,camera,{viewScene,viewCamera,drawView:true}))){if(!mods.renderWorld)renderer.render(scene,camera);renderer.clearDepth();renderer.render(viewScene,viewCamera);}}
     finally{renderer.render=draw;}
     const before=renderer.info.programs.length,hidden=[];
     for(const root of [scene,viewScene])root.traverse(o=>{if(!o.visible&&!o.isLight){hidden.push(o);o.visible=true;}});
@@ -521,7 +521,7 @@ function renderFrame(now){
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
   if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);if(ready&&!NO_STILL)stillSkeletons(scene);}
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
-  update(dt);const t1=performance.now();staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();if(mods.renderWorld)mods.renderWorld(scene,mods.camera??camera);else renderer.render(scene,mods.camera??camera);if(ready&&started&&!mods.hideViewmodel){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
+  update(dt);const t1=performance.now();staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel,viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
   if(playing){const n=renderer.info.programs.length;if(n>programCount)perf.programs(renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1);}else{programCount=renderer.info.programs.length;perf.pause();}
 }
 resumeRendering();

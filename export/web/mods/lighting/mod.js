@@ -20,7 +20,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GradePass, ViewmodelPass, HAZE_SHADER, gradeFor, GRADES } from './grade.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
@@ -626,22 +626,26 @@ class VolumetricPass extends Pass{
 
 // ---- Post-processing (all maps) ----------------------------------------------------------------
 function setupPost(api){
-  const {renderer,scene,camera,host}=api;
-  let composer=null,renderPass=null,volPass=null,gtao=null,bloom=null,builtFor=-1;
+  const {renderer,scene,camera,host,viewScene,viewCamera}=api;
+  let composer=null,renderPass=null,volPass=null,hazePass=null,viewPass=null,gtao=null,bloom=null,grade=null,builtFor=-1;
   const size=()=>{const v=renderer.getSize(new THREE.Vector2());return [Math.max(1,v.x),Math.max(1,v.y)];};
+  // The look (grade.js): the map's preset at Settings → Film look strength, grain by Settings → Film grain.
+  const look=()=>gradeFor(api.map,[0,.5,1][Math.round(settings.filmLook??2)]??1,settings.filmGrain!==false);
+  const applyGrade=g=>{if(grade)grade.set(g);const G=grade?.grade??g;if(hazePass){const u=hazePass.uniforms;u.haze.value.fromArray(G.haze);u.hazeDensity.value=G.hazeDensity;u.hazeStart.value=G.hazeStart;}if(bloom)bloom.strength=.28*(G.bloom??1);};
   function build(q){
     composer?.dispose?.();composer=null;builtFor=q;
     if(q<1)return;
     const [w,h]=size(),target=new THREE.WebGLRenderTarget(w,h,{type:THREE.HalfFloatType,samples:4});
-    target.depthTexture=new THREE.DepthTexture(w,h);   // the volumetric beams read the scene depth
+    target.depthTexture=new THREE.DepthTexture(w,h);   // the volumetric beams, the AO and the haze read the scene depth
     composer=new EffectComposer(renderer,target);composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);
     renderPass=new RenderPass(scene,camera);composer.addPass(renderPass);
     volPass=new VolumetricPass(volScene,camera);composer.addPass(volPass);
-    // Sanitise the HDR frame: a light right against a surface can overflow
-    // half-float to Inf, and the bloom blur smears NaN/Inf into black blocks.
-    composer.addPass(new ShaderPass({uniforms:{tDiffuse:{value:null}},
-      vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader:'uniform sampler2D tDiffuse;varying vec2 vUv;void main(){vec4 c=texture2D(tDiffuse,vUv);if(any(isnan(c))||any(isinf(c)))c=vec4(0.,0.,0.,1.);gl_FragColor=vec4(min(c.rgb,vec3(48.)),c.a);}'}));
+    // Sanitise the HDR frame (a light right against a surface can overflow half-float to Inf, and the bloom blur
+    // smears NaN/Inf into black blocks) and add the map's depth haze. This is the chain's first swap pass, so the
+    // read buffer is always the target the scene and its depth were just drawn into (the composer alternates them).
+    hazePass=new ShaderPass(HAZE_SHADER);const hazeRender=hazePass.render.bind(hazePass);
+    hazePass.render=(r,wb,rb,...a)=>{const u=hazePass.uniforms,cam=renderPass.camera;u.tDepth.value=rb.depthTexture;u.cameraNear.value=cam.near;u.cameraFar.value=cam.far;hazeRender(r,wb,rb,...a);};
+    composer.addPass(hazePass);
     if(q>=3){gtao=new GTAOPass(scene,camera,w,h);gtao.output=GTAOPass.OUTPUT.Default;gtao.blendIntensity=1;
       gtao.updateGtaoMaterial({radius:28,distanceExponent:1.5,thickness:12,scale:1,samples:q>=3?16:10,distanceFallOff:1});
       gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:4,rings:2,samples:q>=3?16:8});
@@ -656,18 +660,28 @@ function setupPost(api){
       gtao.render=(...args)=>{const d=sceneTarget?.depthTexture;if(d){gtao.gtaoMaterial.uniforms.tDepth.value=d;gtao.pdMaterial.uniforms.tDepth.value=d;}aoRender(...args);};
       composer.addPass(gtao);
     }else gtao=null;
+    // The first-person weapon joins the frame here, after the AO (its depth is in the view camera's projection,
+    // which the AO must not read) and before bloom and the grade, so it glows, is graded and vignetted with the world.
+    viewPass=new ViewmodelPass(viewScene,viewCamera);viewPass.enabled=false;composer.addPass(viewPass);
     bloom=new UnrealBloomPass(new THREE.Vector2(w,h),.28,.32,1.05);composer.addPass(bloom);
-    composer.addPass(new OutputPass());
+    grade=new GradePass();composer.addPass(grade);applyGrade(look());   // tone mapping, the colour grade and sRGB (replaces OutputPass)
   }
+  window.kino.post={get:()=>grade?.grade,set:applyGrade,reset:()=>applyGrade(look()),gradeFor,GRADES};   // live tuning: kino.post.set({contrast:1.3})
   const resize=()=>{if(!composer)return;const [w,h]=size();composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);};
   addEventListener('resize',()=>setTimeout(resize,200));
-  onSettingsChange((s,key)=>{if(key==='graphics'||key===null)build(quality());if(key==='renderScale')setTimeout(resize,50);});
+  onSettingsChange((s,key)=>{if(key==='graphics'||key===null)build(quality());if(key==='renderScale')setTimeout(resize,50);if(key==='filmLook'||key==='filmGrain')applyGrade(look());});
   build(quality());
-  host.renderWorld=(sceneToDraw,cam)=>{
+  // opts.drawView: draw the viewmodel (opts.viewScene/viewCamera, default the engine's) inside the chain; returns
+  // true when it did, so the engine skips its own draw.
+  host.renderWorld=(sceneToDraw,cam,opts)=>{
+    // new meshes are tagged before their first draw: tagged a second later (the old sweep), every effect, zombie or
+    // dropped gun compiled its shader twice, once without LIGHT_CLAMP (each compile is a freeze on Windows/D3D11)
+    window.kino.lighting?.tag?.(scene);
     if(builtFor!==quality())build(quality());
-    if(!composer){renderer.render(sceneToDraw,cam);return;}
+    if(!composer){renderer.render(sceneToDraw,cam);return false;}
     renderPass.camera=cam;volPass.camera=cam;if(gtao)gtao.camera=cam;
+    viewPass.enabled=!!opts?.drawView;if(opts?.viewScene){viewPass.viewScene=opts.viewScene;viewPass.viewCamera=opts.viewCamera??viewCamera;}
     const [w,h]=size();if(composer.renderTarget1.width!==Math.floor(w*renderer.getPixelRatio()))resize();
-    composer.render();
+    composer.render();return viewPass.enabled;
   };
 }

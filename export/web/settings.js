@@ -4,7 +4,7 @@
 const KEY='kino.settings';
 // Phones start on Low graphics without HD textures (the lighting and HD texture work is heavy there); a saved choice wins.
 const COARSE=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,gunMotion:1,casinoFx:2,renderScale:1,graphics:COARSE?0:2,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,fpsCap:COARSE?30:0,padSensitivity:1,padGlyphs:0,padVibration:true,padTriggers:true,padLightbar:true,binds:{}};
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,gunMotion:1,casinoFx:2,renderScale:1,graphics:COARSE?0:2,filmLook:2,filmGrain:true,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,fpsCap:COARSE?30:0,padSensitivity:1,padGlyphs:0,padVibration:true,padTriggers:true,padLightbar:true,binds:{}};
 // Rebindable actions and the key each game page listens for. game-menu.js
 // translates a rebound key into its default so the game code stays unchanged.
 export const ACTIONS=[
@@ -47,6 +47,8 @@ const FIELDS=[
   {key:'music',tab:'audio',label:'Background music',type:'toggle',hint:'Ambient soundtrack; Easter-egg songs always play'},
   {key:'renderScale',tab:'graphics',label:'Render resolution',type:'range',min:.5,max:1.5,step:.05,format:v=>Math.round(v*100)+'%',hint:'Lower it for more FPS'},
   {key:'graphics',tab:'graphics',label:'Graphics quality',type:'range',min:0,max:3,step:1,format:v=>['Low','Medium','High','Ultra'][v]??v,hint:'Medium: bloom and light beams. High: + light shadows. Ultra: + ambient occlusion (heavy). Lower it for more FPS'},
+  {key:'filmLook',tab:'graphics',label:'Film look',type:'range',min:0,max:2,step:1,format:v=>['Off','Light','Full'][Math.round(v)]??'Full',hint:'The colour grade: deep blacks, cool shadows and warm light, a vignette and a little sharpening, as in Black Ops 3. Needs Medium graphics or higher'},
+  {key:'filmGrain',tab:'graphics',label:'Film grain',type:'toggle',hint:'Fine animated grain over the picture (part of the film look)'},
   {key:'daytime',tab:'graphics',label:'Daytime (Kino)',type:'toggle',hint:'Sunlight and sky; off for the original night'},
   {key:'hdTextures',tab:'graphics',label:'HD textures',type:'toggle',hint:'AI-upscaled map textures (Kino). Uses more video memory'},
   {key:'showFps',tab:'gameplay',label:'Show FPS counter',type:'toggle'},
