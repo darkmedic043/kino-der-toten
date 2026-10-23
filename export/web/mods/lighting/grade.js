@@ -33,7 +33,7 @@ export const NEUTRAL={
 // Moon harsh with heavier aberration, the factory grey-green steel.
 export const GRADES={
   default:{black:.04,contrast:1.3,saturation:1.04,vibrance:.3,shadowTint:[.84,.92,1.16],highlightTint:[1.12,1.03,.9],vignette:.46,chroma:.0015,sharpen:.25,grain:.03,bloom:1.25},
-  kino:{exposure:.92,black:.045,contrast:1.32,shadowTint:[.84,.92,1.1],highlightTint:[1.14,1.04,.86],vibrance:.3,warmth:.02,bloom:1.35},
+  kino:{exposure:.96,black:.035,contrast:1.3,shadowTint:[.84,.92,1.1],highlightTint:[1.14,1.04,.86],vibrance:.3,warmth:.02,bloom:1.35},
   'der-eisendrache':{exposure:.86,black:.045,contrast:1.34,saturation:.98,vibrance:.34,shadowTint:[.76,.87,1.22],highlightTint:[1.14,1.03,.88],vignette:.5,bloom:1.4,haze:[.06,.08,.12],hazeDensity:.00022,hazeStart:400},
   moon:{exposure:.95,black:.045,contrast:1.34,saturation:.92,vibrance:.22,shadowTint:[.82,.9,1.16],highlightTint:[1.06,1.03,.98],vignette:.52,chroma:.003,grain:.034},
   'the-giant':{exposure:.92,black:.045,contrast:1.32,saturation:.94,vibrance:.3,shadowTint:[.82,.94,1.08],highlightTint:[1.12,1.04,.9],vignette:.46,bloom:1.3,haze:[.05,.06,.07],hazeDensity:.0002,hazeStart:300},
@@ -104,7 +104,8 @@ void main(){
   // to sRGB, then the curve: crushed blacks and a cubic S around mid grey (keeps 0 and 1 in place)
   c=sRGBTransferOETF(vec4(max(c,0.),1.)).rgb;
   c=max((c-black)/(1.-black),0.);
-  c+=(contrast-1.)*(c-.5)*(1.-4.*(c-.5)*(c-.5));
+  // S-curve; the shadow half pulls at 70% so dark rooms keep their detail (the theatre lost it at full strength)
+  c+=(contrast-1.)*mix(vec3(.7),vec3(1.),step(.5,c))*(c-.5)*(1.-4.*(c-.5)*(c-.5));
   // fine grain, heavier in the shadows
   if(grain>0.){float n=hash(gl_FragCoord.xy+fract(time*vec2(7.13,3.71))*1e3)-.5;c+=n*grain*mix(1.6,.5,l);}
   gl_FragColor=vec4(clamp(c,0.,1.),1.);
