@@ -342,3 +342,4 @@
 - 2026-10-22: Post-processing colour grade (film look: crushed blacks, S-curve, cool shadows/warm highlights, vibrance, vignette, chromatic aberration, sharpen, grain, depth haze) and the viewmodel drawn inside the composer so the gun is graded and bloomed with the world; Settings → Film look / Film grain, presets per map (lighting.md).
 - 2026-10-22: Kino's dark rooms lifted a touch (preset exposure .96, black .035; the grade's S-curve pulls shadows at 70%).
 - 2026-10-22: XM325 belt mags rebuilt again as stuffed bags (domed, bulging between coyote compression straps with buckles, sagging bottom, creases, sewn ID patch): the first pouch still looked like a box in game (weapons.md).
+- **2026-10-23**: Player wiki at `/wiki/` (wiki.md): 9 topic modules build 213 pages from the game's data files at load (Easter eggs in spoilers), menu rail link, headless checker `.tools/wiki-check.mjs`.
