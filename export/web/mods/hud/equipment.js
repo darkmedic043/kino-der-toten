@@ -44,7 +44,7 @@ export function setupEquipmentHud({host,session,data}){
   let last='';
   function set(k,icon,count){const s=slot(k);s.hidden=!icon;if(!icon)return;s.querySelector('i').style.backgroundImage=icons[icon]?`url(${icons[icon]})`:'';s.querySelector('b').textContent=count;s.classList.toggle('empty',!count);}
   host.on('update',()=>{
-    const t=window.kino?.tactical,tac=t?.id&&t.count?[t.id,t.count]:session.monkeysOwned||session.monkeys>0?['zombie_cymbal_monkey',session.monkeys]:[null,0];
+    const t=window.kino?.tactical,tac=t?.id?[t.id,t.count]:session.monkeysOwned||session.monkeys>0?['zombie_cymbal_monkey',session.monkeys]:[null,0];   // a tactical once held keeps its slot at 0 (greyed) until a Max Ammo refills it
     const key=[session.grenades,...tac,session.claymoresOwned,session.claymores,Object.keys(icons).length].join();if(key===last)return;last=key;
     set('lethal','frag',session.grenades);set('tactical',tac[0],tac[1]);set('mine',session.claymoresOwned?'claymore_zm':null,session.claymores);
   });

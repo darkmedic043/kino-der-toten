@@ -3,9 +3,12 @@
 // into BO7-shaped containers and restyles them (hud.css):
 //   bottom left  · player card: portrait, level badge, name, HP, segmented health bar, points (room left for
 //                  self-revives and other slots later, the user's plan)
-//   bottom right · ammo, then a dial with the gun's silhouette, a magazine arc and lethal/tactical/mine on top;
-//                  bubbles joined to the dial: the class ability at its upper right, the operator weapon
-//                  (operator-weapons) at its lower right; gobblegums stacked vertically above the dial
+//   bottom right · ammo, then a dial with the gun's silhouette, a magazine arc, the weapon slot's number at its
+//                  left (pips for the 2 slots, 3 with Mule Kick), a dark band above it holding lethal/tactical/mine,
+//                  and under the gun the ammo mod's icon and the Pack-a-Punch level (user, 2026-10-24, from a BO7
+//                  screenshot); bubbles attached to the dial's right edge like BO7's field upgrade: the class ability
+//                  at its upper right, the operator weapon (operator-weapons) at its lower right, key badge below;
+//                  gobblegums stacked vertically above the dial
 //   bottom centre · perks, with power-up timers above them
 //   top right    · the round
 // Load it last (mods.json): the nodes it adopts must exist. Touch devices keep the classic layout (touch-extras
@@ -30,8 +33,8 @@ export default async function setup(api){
   const right=make('bo7-right',`<div class="ammo"><div class="wname"></div><div class="count"></div><div class="reload"></div></div>
     <div class="dial"><svg class="ring" viewBox="0 0 160 160"><circle class="track" cx="80" cy="80" r="74"/><path class="mag-track"/><path class="mag"/>
       <circle class="inner" cx="80" cy="80" r="62"/></svg>
-      <svg class="links" viewBox="0 0 164 164"><rect class="l-ability" x="74" y="-7" width="22" height="14" rx="3" transform="translate(82 82) rotate(-30)"/><rect class="l-operator" x="74" y="-7" width="22" height="14" rx="3" transform="translate(82 82) rotate(30)"/></svg>
-      <img class="gun" alt=""><div class="eq"></div><div class="gums"></div>
+      <img class="gun" alt=""><div class="slotno"><b></b><span class="pips"></span></div>
+      <div class="eq"></div><div class="foot"><div class="amod"><svg viewBox="0 0 24 24"></svg><small></small></div><div class="pap"></div></div><div class="gums"></div>
       <div class="sat ability"><svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg></div>
       <div class="sat operator"><svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg></div></div>`);
   const perks=make('bo7-perks','<div class="fx"></div><div class="row"></div>');
@@ -45,6 +48,19 @@ export default async function setup(api){
   const arc=(a0,a1,r=74)=>{const p=a=>[80+r*Math.cos(a*Math.PI/180),80+r*Math.sin(a*Math.PI/180)].map(v=>v.toFixed(2));
     const [x0,y0]=p(a0),[x1,y1]=p(a1);return `M${x0} ${y0}A${r} ${r} 0 ${a1-a0>180?1:0} 1 ${x1} ${y1}`;};
   const ARC0=-150,ARC1=-30;q(right,'.mag-track').setAttribute('d',arc(ARC0,ARC1));
+
+  // ---- ammo mod icons (ammo-mods): one simple glyph per mod, drawn in the mod's colour -----------------------------
+  const MOD_ICONS={
+    cryo:'M12 2v20M2 12h20M5 5l14 14M19 5L5 19M12 5l-2.5-2M12 5l2.5-2M12 19l-2.5 2M12 19l2.5 2M5 12l-2-2.5M5 12l-2 2.5M19 12l2-2.5M19 12l2 2.5',
+    napalm:'M12 2c1.5 4 5.5 6.5 5.5 11.5a5.5 5.5 0 0 1-11 0c0-2.5 1.2-4 2.5-5.2 0 2.2 1 3.4 2.3 3.6-.3-3.4-.8-6.4.7-9.9z',
+    deadwire:'M13.5 2 4.5 14h7l-1 8 9-12h-7z',
+    fireworks:'M12 3v4.5M12 16.5V21M3 12h4.5M16.5 12H21M5.6 5.6l3.2 3.2M15.2 15.2l3.2 3.2M5.6 18.4l3.2-3.2M15.2 8.8l3.2-3.2M12 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 1 0 0-3',
+    shadowrift:'M12 12a1.5 1.5 0 1 0 3 0 3.5 3.5 0 1 1-7 0 5.5 5.5 0 1 0 11 0 7.5 7.5 0 1 1-15 0 9.5 9.5 0 1 0 19 0',
+    lightmend:'M12 5v14M5 12h14M12 2.5l1.2 2.3M12 2.5l-1.2 2.3M21.5 12l-2.3 1.2M21.5 12l-2.3-1.2M2.5 12l2.3 1.2M2.5 12l2.3-1.2M12 21.5l1.2-2.3M12 21.5l-1.2-2.3',
+    shatter:'M12 2.5 20.5 7v10L12 21.5 3.5 17V7zM12 12l-4-6.5M12 12l5.5 7.5M12 12l-7 3.5M12 12l6-1',
+    brainrot:'M12 3a7 7 0 0 0-7 7c0 3 2 4 2 6.5h10c0-2.5 2-3.5 2-6.5a7 7 0 0 0-7-7zM9 16.5v4M12 16.5v4M15 16.5v4M9 10.5a1 1 0 1 0 0 .1M15 10.5a1 1 0 1 0 0 .1',
+  };
+  const ROMAN=['','I','II','III','IV','V'];
 
   // ---- adopt the existing HUD nodes ------------------------------------------------------------------------------
   // [node getter, new parent]. Re-checked twice a second: some mods place their node late or move it again
@@ -89,11 +105,15 @@ export default async function setup(api){
     const frac=def?.clipSize?Math.max(0,Math.min(1,w.mag/def.clipSize)):0;
     const lv=($('progression-hud')?.querySelector('.lvl')?.textContent??'').replace(/\D+/g,''),nm=$('hud-portrait')?.querySelector('span')?.textContent??'';
     const rt=$('round')?.textContent??'',rn=/^I+$/.test(rt)?String(rt.length):rt;   // BO1 tallies (I–IIIII) shown as digits
-    const key=[Math.ceil(session.health),frac.toFixed(3),lv,nm,rn,w?.upgraded,op].join('|');if(key===last)return;last=key;right.classList.toggle('op',op);
+    const am=def&&w.ammoMod?.id?w.ammoMod:null,pap=def?(w.papLevel??(w.upgraded?1:0)):0,slots=session.weaponSlots??2,slot=def?session.slot+1:0;   // papLevel: Pack-a-Punch tiers, when they come
+    const key=[Math.ceil(session.health),frac.toFixed(3),lv,nm,rn,w?.upgraded,op,am?.id,am?.tier,pap,slot,slots].join('|');if(key===last)return;last=key;right.classList.toggle('op',op);
     q(left,'.hp b').textContent=Math.ceil(session.health);q(left,'.lv').textContent=lv;if(master&&lv){const lc=masterLook(+lv);q(left,'.lv').style.background=lc.color;q(left,'.lv').title='Prestige Master · '+lc.title;}q(left,'.nm').textContent=nm;
     left.classList.toggle('low',session.health<session.maxHealth*.35);
     q(right,'.mag').setAttribute('d',frac>0?arc(ARC0,ARC0+(ARC1-ARC0)*frac):'');right.classList.toggle('empty',def&&w.mag===0);
     right.classList.toggle('pap',!!w?.upgraded);
+    {const el=q(right,'.slotno');el.hidden=!slot;q(el,'b').textContent=slot;q(el,'.pips').innerHTML=Array.from({length:slots},(_,i)=>`<i${i+1===slot?' class="on"':''}></i>`).join('');}
+    {const el=q(right,'.amod'),m=am&&window.kino.ammoMods?.MODS?.find(x=>x.id===am.id);el.hidden=!am;if(am){el.style.color=m?.color??'#fff';el.title=m?.name??am.id;q(el,'path')?.remove();const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',MOD_ICONS[am.id]??'M12 4a8 8 0 1 0 0 16 8 8 0 1 0 0-16');q(el,'svg').append(p);q(el,'small').textContent=ROMAN[am.tier]??am.tier;}}
+    {const el=q(right,'.pap');el.hidden=!pap;el.textContent=ROMAN[pap]??pap;}
     q(round,'.n').textContent=rn;round.classList.toggle('text',!/^\d+$/.test(rn));   // Moon's No Man's Land: a status line, not a number
   });
   host.on('reset',()=>{last='';});
