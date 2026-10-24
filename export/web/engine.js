@@ -215,10 +215,12 @@ function shoot(hand='right',pressed=primaryPressed){
   for(let i=0;i<pellets;i++){
     const direction=forward.clone();if(pellets>1||!aiming()){const spread=(pellets>1?(session.def.pelletSpread??.055):(session.def.hipSpread??.012))*(session.perks.has('specialty_deadshot')?.5:1);/* Deadshot Daiquiri: half the hip-fire spread */direction.x+=(Math.random()-.5)*spread;direction.y+=(Math.random()-.5)*spread;direction.z+=(Math.random()-.5)*spread;direction.normalize();}
     const ray=new THREE.Ray(camera.position.clone(),direction),wall=world.raycast(ray,1,reach),target=enemies.rayHit(ray,wall?.distance??reach);
-    map.onShot?.(ray,Math.min(wall?.distance??reach,target?.distance??reach),'bullet');
-    mods.emit('shot',{origin:ray.origin,direction,distance:Math.min(wall?.distance??reach,target?.distance??reach),hit:!!target,def:session.def});   // per pellet, for mods (tracers)
+    const pierce=session.def.pierce??0,stop=pierce&&target?wall?.distance??reach:Math.min(wall?.distance??reach,target?.distance??reach);   // a piercing bullet (def.pierce: zombies it goes on through, the RW1) stops at the wall
+    map.onShot?.(ray,stop,'bullet');
+    mods.emit('shot',{origin:ray.origin,direction,distance:stop,hit:!!target,def:session.def});   // per pellet, for mods (tracers)
     lastShot={origin:ray.origin.toArray(),direction:direction.toArray(),wallDistance:wall?.distance??null,target:target?{id:target.z.id,head:target.head,distance:target.distance}:null};
-    if(target){const d=target.distance>session.def.range?session.def.minDamage:session.def.damage;enemies.hurt(target.z,d*(target.head?Math.max(1,session.def.headMultiplier):1),target.head,false,session.def.explosionRadius?'explosion':'bullet');}
+    if(target)for(let t=target,left=pierce,through=pierce&&new Set();t;t=left-->0?(through.add(t.z),enemies.rayHit(ray,wall?.distance??reach,through)):null){
+      const d=t.distance>session.def.range?session.def.minDamage:session.def.damage;enemies.hurt(t.z,d*(t.head?Math.max(1,session.def.headMultiplier):1),t.head,false,session.def.explosionRadius?'explosion':'bullet');}
     else if(wall)effect(wall.position,0xb8a388,3);
     if(session.def.explosionRadius&&(target||wall)){
       const p=target?.point??wall.position,radius=session.def.explosionRadius;

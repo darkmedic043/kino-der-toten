@@ -205,9 +205,10 @@ export class Enemies {
       if(this.dead.length>12){const old=this.dead.shift();old.root.removeFromParent();old.rig.mixer.uncacheRoot(old.root);disposeSkeletons(old.root);}
     }else if(score)this.session.scoreHit(false);
   }
-  rayHit(ray,far){
+  rayHit(ray,far,skip){   // skip: zombies a piercing bullet has already gone through (engine.js def.pierce)
     let best=null;
     for(const z of this.list){
+      if(skip?.has(z))continue;
       const base=z.root.position,headPos=this.headPosition(z);
       // z.hit {r, h, head}: a bigger enemy's body box half-width, height and head radius (the Panzersoldat)
       const headPoint=ray.intersectSphere(new THREE.Sphere(headPos,z.hit?.head??(z.kind==='dog'?12:10)),new THREE.Vector3()),hr=z.hit?.r??18;

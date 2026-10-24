@@ -30,6 +30,8 @@ export async function prepare(data){
   const MS=built.sounds?.mod??{};
   for(const [id,w] of Object.entries(built.weapons))if(w.akimboOf&&MS[id]&&MS[w.akimboOf])MS[w.akimboOf].notes={...MS[id].notes,...MS[w.akimboOf].notes};
   Object.assign(data.weapons,built.weapons);
+  // the RW1 railgun's slug goes through every zombie in line up to the wall (engine.js def.pierce; user request 2026-10-24)
+  for(const d of [data.weapons.aw_rw1,data.weapons.aw_rw1?.upgrade])if(d)d.pierce=99;
   data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons).filter(id=>!built.weapons[id].noBox)])];   // noBox: quest weapons (Der Eisendrache's bow)
 }
 
