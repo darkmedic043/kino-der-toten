@@ -31,12 +31,13 @@ export default async function setup(api){
   const left=make('bo7-left',`<div class="pf"></div><div class="info"><div class="who"><span class="lv"></span><span class="nm"></span></div>
     <div class="hp"><b></b> HP</div><div class="bar"></div><div class="xp"></div><div class="pts">${ESSENCE}</div></div><div class="extra"></div>`);
   const right=make('bo7-right',`<div class="ammo"><div class="wname"></div><div class="count"></div><div class="reload"></div></div>
-    <div class="dial"><svg class="ring" viewBox="0 0 160 160"><circle class="track" cx="80" cy="80" r="74"/><path class="mag-track"/><path class="mag"/>
-      <circle class="inner" cx="80" cy="80" r="62"/></svg>
-      <img class="gun" alt=""><div class="slotno"><b></b><span class="pips"></span></div>
-      <div class="eq"></div><div class="foot"><div class="amod"><svg viewBox="0 0 24 24"></svg><small></small></div><div class="pap"></div></div><div class="gums"></div>
-      <div class="sat ability"><svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg></div>
-      <div class="sat operator"><svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg></div></div>`);
+    <div class="dial"><div class="disc"></div><svg class="ring" viewBox="0 0 160 160"><circle class="track" cx="80" cy="80" r="74"/><path class="mag-track"/><path class="mag"/><g class="spokes"></g></svg>
+      <div class="bar"></div><img class="gun" alt=""><div class="slotno"><b></b><span class="pips"></span></div>
+      <div class="foot"><div class="amod"><svg viewBox="0 0 24 24"></svg><small></small></div><div class="pap"></div></div>
+      <div class="eq"></div>
+      <div class="sat ability" data-dir="-30"><div class="disc"></div><svg class="ring" viewBox="0 0 100 100"><path class="arc-track"/><path class="arc"/></svg></div>
+      <div class="sat operator" data-dir="30"><div class="disc"></div><svg class="ring" viewBox="0 0 100 100"><path class="arc-track"/><path class="arc"/></svg></div>
+      <div class="gums"></div></div>`);
   const perks=make('bo7-perks','<div class="fx"></div><div class="row"></div>');
   const round=make('bo7-round','<span class="lbl">ROUND</span><b class="n"></b><span class="rem"></span>');
   const q=(el,s)=>el.querySelector(s);
@@ -48,6 +49,16 @@ export default async function setup(api){
   const arc=(a0,a1,r=74)=>{const p=a=>[80+r*Math.cos(a*Math.PI/180),80+r*Math.sin(a*Math.PI/180)].map(v=>v.toFixed(2));
     const [x0,y0]=p(a0),[x1,y1]=p(a1);return `M${x0} ${y0}A${r} ${r} 0 ${a1-a0>180?1:0} 1 ${x1} ${y1}`;};
   const ARC0=-150,ARC1=-30;q(right,'.mag-track').setAttribute('d',arc(ARC0,ARC1));
+  // radial spokes (the dial is cut into segments as in BO7): the equipment wedge above between -135/-45 degrees, the
+  // Pack-a-Punch segment below between 65/115, ticks at the top and bottom
+  q(right,'.spokes').innerHTML=[[-135,70,98],[-45,70,98],[65,70,90],[115,70,90],[-90,76,84],[90,64,74]].map(([a,r0,r1])=>{const c=Math.cos(a*Math.PI/180),s=Math.sin(a*Math.PI/180);
+    return `<line x1="${(80+r0*c).toFixed(1)}" y1="${(80+r0*s).toFixed(1)}" x2="${(80+r1*c).toFixed(1)}" y2="${(80+r1*s).toFixed(1)}"/>`;}).join('');
+  // the bubbles' arcs run round their outer side (230 degrees facing away from the dial), the charge filling clockwise
+  const arcAt=(a0,a1,r=45)=>{const p=a=>[50+r*Math.cos(a*Math.PI/180),50+r*Math.sin(a*Math.PI/180)].map(v=>v.toFixed(2));
+    const [x0,y0]=p(a0),[x1,y1]=p(a1);return a1-a0<=0?'':`M${x0} ${y0}A${r} ${r} 0 ${a1-a0>180?1:0} 1 ${x1} ${y1}`;};
+  for(const sat of right.querySelectorAll('.sat')){const d=+sat.dataset.dir;q(sat,'.arc-track').setAttribute('d',arcAt(d-115,d+115));}
+  function setArc(sat,frac,hot){const d=+sat.dataset.dir,f=Math.max(0,Math.min(1,frac||0)),k=f.toFixed(3)+(hot?'h':'');if(sat._arc===k)return;sat._arc=k;
+    q(sat,'.arc').setAttribute('d',arcAt(d-115,d-115+230*f));sat.classList.toggle('full',f>=.999);sat.classList.toggle('hot',!!hot);}
 
   // ---- ammo mod icons (ammo-mods): one simple glyph per mod, drawn in the mod's colour -----------------------------
   const MOD_ICONS={
@@ -106,6 +117,10 @@ export default async function setup(api){
     const lv=($('progression-hud')?.querySelector('.lvl')?.textContent??'').replace(/\D+/g,''),nm=$('hud-portrait')?.querySelector('span')?.textContent??'';
     const rt=$('round')?.textContent??'',rn=/^I+$/.test(rt)?String(rt.length):rt;   // BO1 tallies (I–IIIII) shown as digits
     const am=def&&w.ammoMod?.id?w.ammoMod:null,pap=def?(w.papLevel??(w.upgraded?1:0)):0,slots=session.weaponSlots??2,slot=def?session.slot+1:0;   // papLevel: Pack-a-Punch tiers, when they come
+    {const cs=$('class-skill'),ow=$('operator-weapon');   // the bubbles' outer arcs follow their own meters
+      setArc(q(right,'.ability'),cs?cs.classList.contains('cooling')?1-parseFloat(cs.style.getPropertyValue('--p'))/100:cs.classList.contains('locked')?0:1:0,cs?.classList.contains('active'));
+      const f=ow?.querySelector('.fill'),of=f?1-parseFloat(f.getAttribute('stroke-dashoffset'))/parseFloat(f.getAttribute('stroke-dasharray')):0;
+      setArc(q(right,'.operator'),ow&&!ow.classList.contains('empty')?of:0,ow?.classList.contains('active')||ow?.classList.contains('ready'));}
     const key=[Math.ceil(session.health),frac.toFixed(3),lv,nm,rn,w?.upgraded,op,am?.id,am?.tier,pap,slot,slots].join('|');if(key===last)return;last=key;right.classList.toggle('op',op);
     q(left,'.hp b').textContent=Math.ceil(session.health);q(left,'.lv').textContent=lv;if(master&&lv){const lc=masterLook(+lv);q(left,'.lv').style.background=lc.color;q(left,'.lv').title='Prestige Master · '+lc.title;}q(left,'.nm').textContent=nm;
     left.classList.toggle('low',session.health<session.maxHealth*.35);

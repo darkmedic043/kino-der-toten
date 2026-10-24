@@ -40,8 +40,8 @@ body.bo7-hud #moon-hud #equipment{right:420px;bottom:40px}
 #bo7-left .extra{display:flex;gap:8px;align-self:flex-end}   /* reserved: self-revives and other slots later */
 
 /* ---- bottom right: ammo · weapon dial · ability ---------------------------------------------------------- */
-#bo7-right{right:26px;bottom:22px;display:flex;align-items:flex-end;gap:14px}
-#bo7-right .ammo{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:84px;min-width:110px}
+#bo7-right{right:26px;bottom:22px;display:flex;align-items:flex-end;gap:34px}
+#bo7-right .ammo{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:94px;min-width:110px}
 #bo7-right .wname{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
 #bo7-right #weapon-name{font:600 15px/1 var(--bo7-font);letter-spacing:1.5px;text-transform:uppercase;color:#d8d3c8}
 #bo7-right.pap #weapon-name{color:#c79bff}
@@ -55,48 +55,55 @@ body.bo7-hud #moon-hud #equipment{right:420px;bottom:40px}
 #bo7-right.empty #mag{color:#ff5a48}
 #bo7-right #reload-label{height:auto;min-height:14px;margin-top:4px;font:600 12px/1 var(--bo7-font);letter-spacing:2px;color:#e7c46a}
 
-/* the dial (user, 2026-10-24: closer to BO7's): the gun inside a big ring, the magazine arc across the top, a dark
-   band above it holding the equipment, the weapon slot's number at its left, and the ammo mod + Pack-a-Punch level
-   under the gun. It leaves room at its right for the two bubbles attached to it, and below for the lower one. */
-#bo7-right .dial{position:relative;width:180px;height:180px;margin:0 66px 40px 0}
-#bo7-right .dial .ring{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-#bo7-right .dial .track{fill:none;stroke:#ffffff26;stroke-width:1.5}
-#bo7-right .dial .inner{fill:#00000066;stroke:#ffffff14;stroke-width:1}
+/* the dial (user, 2026-10-24, from a BO7 screenshot): a dark meshed disc cut by radial spokes, the gun big on a
+   horizontal bar across it, the magazine arc across the top, the equipment in a wedge above (tactical left, lethal
+   right, the mine between), the weapon slot's number at the bar's left end, the ammo mod at the lower left and the
+   Pack-a-Punch level in the bottom segment. The two bubbles at its right share the disc's look and overlap the ring. */
+#bo7-right .dial{position:relative;width:180px;height:180px;margin:0 70px 50px 0}
+#bo7-right .disc{position:absolute;inset:6px;border-radius:50%;background:radial-gradient(#ffffff12 .7px,transparent 1px) 0 0/5px 5px,radial-gradient(circle at 50% 40%,#1b1c20e8,#08080ae8 72%)}
+#bo7-right .dial>.ring{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+#bo7-right .dial .track{fill:none;stroke:#ffffff3a;stroke-width:1.5}
+#bo7-right .dial .spokes line{stroke:#ffffff3a;stroke-width:1.5}
 #bo7-right .dial .mag-track{fill:none;stroke:#ffffff22;stroke-width:6}
-#bo7-right .dial .mag{fill:none;stroke:#f08a24;stroke-width:6;filter:drop-shadow(0 0 4px #f08a2488);transition:d .08s}
+#bo7-right .dial .mag{fill:none;stroke:#f08a24;stroke-width:6;stroke-dasharray:3 1.2;filter:drop-shadow(0 0 4px #f08a2488);transition:d .08s}
 #bo7-right.pap .dial .mag{stroke:#b06bff;filter:drop-shadow(0 0 4px #b06bff99)}
-#bo7-right .dial .gun{position:absolute;left:54%;top:50%;width:134px;transform:translate(-50%,-50%);opacity:0;transition:opacity .15s;filter:drop-shadow(0 1px 3px #000c)}
+/* the gun on its bar: the bar runs past the ring on the left (the slot number sits there) and under the bubbles */
+#bo7-right .dial .bar{position:absolute;left:-34px;right:-2px;top:50%;height:66px;transform:translateY(-50%);background:linear-gradient(90deg,#08080ae0,#0e0e11d0 60%,#0e0e1100);clip-path:polygon(10px 0,100% 0,100% 100%,0 100%)}
+#bo7-right .dial .gun{position:absolute;left:52%;top:50%;width:172px;transform:translate(-50%,-50%);opacity:0;transition:opacity .15s;filter:drop-shadow(0 2px 2px #000c)}
 #bo7-right.op .dial .gun{opacity:0!important}
-/* the weapon slot: its number left of the gun, a pip per slot (2, or 3 with Mule Kick) under it */
-#bo7-right .slotno{position:absolute;left:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:3px}
+#bo7-right .slotno{position:absolute;left:-26px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:3px}
 #bo7-right .slotno[hidden]{display:none}
 #bo7-right .slotno b{font:italic 700 20px/1 var(--bo7-font);color:#e4dfd3}
 #bo7-right .slotno .pips{display:flex;gap:3px}
 #bo7-right .slotno .pips i{width:5px;height:5px;border-radius:1px;background:#ffffff3a;transform:skewX(-12deg)}
 #bo7-right .slotno .pips i.on{background:#f08a24;box-shadow:0 0 4px #f08a2488}
 #bo7-right.pap .slotno .pips i.on{background:#b06bff;box-shadow:0 0 4px #b06bff99}
-/* the equipment band above the dial: lethal at the left, tactical at the right (the mine between them when owned),
-   each with its count beside the icon and its key badge below, as in BO7 */
-#bo7-right .dial .eq{position:absolute;left:6px;right:6px;top:-36px;height:38px;padding:0 40px 0 14px;display:flex;align-items:center;
-  background:linear-gradient(#1c1c1ec8,#0b0b0cb8);clip-path:polygon(0 0,100% 0,91% 100%,9% 100%);box-shadow:inset 0 1px 0 #ffffff1a}
+/* the equipment wedge above the dial, its sides on the -135/-45 degree spokes: tactical at the left (only once one is
+   held), lethal at the right, the mine between; count right of each icon, key badge beside/below */
+#bo7-right .dial .eq{position:absolute;left:-11px;right:-11px;top:-42px;height:42px;padding:0 64px 0 34px;display:flex;align-items:center}
+#bo7-right .dial .eq::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(#202124d4,#0b0b0ccc);clip-path:polygon(0 0,100% 0,79.2% 100%,20.8% 100%);box-shadow:inset 0 1px 0 #ffffff1a}   /* the wedge is a pseudo-element so the key badges aren't clipped */
 #bo7-right .dial .eq:not(:has(.slot:not([hidden]))){display:none}
-#bo7-right #equip-hud{position:static;display:flex;justify-content:space-between;width:100%;right:auto;bottom:auto}
+#bo7-right #equip-hud{position:static;display:flex;gap:14px;width:100%;right:auto;bottom:auto}
 #bo7-right #equip-hud .slot{width:26px;height:26px}
-#bo7-right #equip-hud .slot[data-k="mine"]{order:1}#bo7-right #equip-hud .slot[data-k="tactical"]{order:2}
+#bo7-right #equip-hud .slot[data-k="tactical"]{order:0}#bo7-right #equip-hud .slot[data-k="mine"]{order:1;margin-left:auto}#bo7-right #equip-hud .slot[data-k="lethal"]{order:2;margin-left:auto}
 #bo7-right #equip-hud .slot[hidden]{display:none}
 #bo7-right #equip-hud i{filter:grayscale(1) brightness(1.7);opacity:.9}
 #bo7-right #equip-hud .empty i{opacity:.25}
 #bo7-right #equip-hud b{font:600 15px/1 var(--bo7-font);right:auto;left:30px;bottom:auto;top:1px;color:#ece8de}
 #bo7-right #equip-hud .empty b{color:#8a8173}
-#bo7-right #equip-hud kbd{top:auto;bottom:-15px;padding:1px 4px;border:1px solid #ffffffaa;border-radius:2px;background:#000c;font:700 9px/1 var(--bo7-font);color:#fff}
-body.bo7-hud.using-pad #bo7-right #equip-hud kbd{top:auto!important;bottom:-18px}
-/* under the gun: the ammo mod's icon (its colour, tier numeral beside it) at the lower left, the Pack-a-Punch level at the bottom */
+#bo7-right #equip-hud kbd{padding:1px 4px;border:1px solid #ffffffaa;border-radius:2px;background:#000c;font:700 9px/1 var(--bo7-font);color:#fff;transform:none}
+#bo7-right #equip-hud .slot[data-k="tactical"] kbd{left:-24px;top:auto;bottom:-4px}
+#bo7-right #equip-hud .slot[data-k="lethal"] kbd{left:44px;top:auto;bottom:-4px}
+#bo7-right #equip-hud .slot[data-k="mine"] kbd{left:50%;transform:translateX(-50%);top:auto;bottom:-16px}
+body.bo7-hud.using-pad #bo7-right #equip-hud kbd{top:auto!important;width:16px;height:16px}
+/* under the gun: the ammo mod's icon (its colour, tier numeral beside it) outside the ring at the lower left, the
+   Pack-a-Punch level in the bottom segment */
 #bo7-right .dial .foot{position:absolute;inset:0;pointer-events:none}
-#bo7-right .amod{position:absolute;left:14px;bottom:10px;width:30px;height:30px;border-radius:50%;background:#0b0b0cd0;border:1.5px solid currentColor;box-shadow:0 0 6px color-mix(in srgb,currentColor 50%,transparent)}
+#bo7-right .amod{position:absolute;left:-4px;bottom:-4px;width:30px;height:30px;border-radius:50%;background:#0b0b0cd0;border:1.5px solid currentColor;box-shadow:0 0 6px color-mix(in srgb,currentColor 50%,transparent)}
 #bo7-right .amod svg{position:absolute;inset:4px;width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 2px currentColor)}
 #bo7-right .amod small{position:absolute;left:100%;bottom:0;margin-left:3px;font:700 11px/1 var(--bo7-font);color:currentColor;letter-spacing:.5px}
 #bo7-right .amod[hidden],#bo7-right .pap[hidden]{display:none}
-#bo7-right .dial .pap{position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);font:700 20px/1 var(--bo7-font);letter-spacing:2px;color:#c79bff;text-shadow:0 0 8px #b06bff88,0 1px 3px #000}
+#bo7-right .dial .pap{position:absolute;left:50%;bottom:-26px;transform:translateX(-50%);font:700 20px/1 var(--bo7-font);letter-spacing:2px;color:#c79bff;text-shadow:0 0 8px #b06bff88,0 1px 3px #000}
 #bo7-right #ammo-mod-tag{display:none}   /* the mod is an icon under the gun now */
 /* gobblegums: a vertical stack above the dial */
 /* hugging the right edge, well above the weapon cluster (user, 2026-10-14) */
@@ -108,25 +115,31 @@ body.bo7-hud.using-pad #bo7-right #equip-hud kbd{top:auto!important;bottom:-18px
 #bo7-right #gum-hud .name{font-weight:600;font-size:14px;white-space:nowrap}
 #bo7-right #gum-hud .keys{font-size:11px;white-space:nowrap}
 #bo7-right #gum-hud .act{align-items:flex-end;white-space:nowrap;order:-1;margin-bottom:4px}
-/* bubbles attached to the dial (user, 2026-10-16; 2026-10-24: like BO7's field upgrade, overlapping the ring, key
-   badge at the lower right since the two are stacked): the class ability at its upper right, the operator weapon at its lower right, at -30 / +30 degrees */
-#bo7-right .sat{position:absolute;width:92px;height:92px;display:grid;place-items:center;transform:translate(-50%,-50%)}
-#bo7-right .sat.ability{left:196px;top:34px}
-#bo7-right .sat.operator{left:196px;top:146px}
+/* bubbles merged into the dial (user, 2026-10-16; 2026-10-24: like BO7's field upgrade): the class ability at its
+   upper right, the operator weapon at its lower right, at -30 / +30 degrees, the same meshed disc overlapping the
+   ring by 10 px, their meter as an orange arc round the outer side (segmented like the magazine arc) */
+#bo7-right .sat{position:absolute;width:100px;height:100px;display:grid;place-items:center;transform:translate(-50%,-50%)}
+#bo7-right .sat.ability{left:200px;top:22px}
+#bo7-right .sat.operator{left:200px;top:158px}
 #bo7-right .ability:not(:has(#class-skill)){display:none}
+#bo7-right .sat .disc{inset:3px;background:radial-gradient(#ffffff10 .7px,transparent 1px) 0 0/5px 5px,radial-gradient(circle at 45% 40%,#1a1b1fe6,#09090be6 72%)}
 #bo7-right .sat .ring{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-#bo7-right .sat .ring circle{fill:#0b0b0cd6;stroke:#ffffff55;stroke-width:3}
-#bo7-right .sat:has(.ready,.active) .ring circle{stroke:#f08a24;filter:drop-shadow(0 0 5px #f08a2488)}
-#bo7-right .sat:has(#class-skill.active) .ring circle{stroke:#f08a24;filter:drop-shadow(0 0 5px #f08a2488)}
-#bo7-right #class-skill{position:relative;right:auto;bottom:auto;margin:0;transform:scale(1.12)}
-#bo7-right #class-skill kbd{left:auto;right:-16px;transform:none;top:auto;bottom:2px;padding:1px 5px;border:1px solid #ffffffaa;border-radius:2px;background:#000c;font:700 10px/1 var(--bo7-font);color:#fff}
-#bo7-right #class-skill small{top:-24px;bottom:auto;font:600 10px/1 var(--bo7-font)}
-#bo7-right #operator-weapon{position:relative;right:auto;bottom:auto;transform:scale(1.2)}
-#bo7-right #operator-weapon .bg{fill:transparent;stroke:#ffffff1a}
-#bo7-right #operator-weapon kbd{left:auto;right:-14px;transform:none;top:auto;bottom:4px;padding:1px 5px;border:1px solid #ffffffaa;border-radius:2px;background:#000c;font:700 9px/1 var(--bo7-font);color:#fff}
+#bo7-right .sat .arc-track{fill:none;stroke:#ffffff26;stroke-width:5}
+#bo7-right .sat .arc{fill:none;stroke:#f08a24;stroke-width:5;stroke-dasharray:3 1.2;filter:drop-shadow(0 0 3px #f08a2466)}
+#bo7-right .sat.full .arc,#bo7-right .sat.hot .arc{filter:drop-shadow(0 0 6px #f08a24cc)}
+#bo7-right .sat.hot .arc{stroke:#ffb15a}
+#bo7-right #class-skill{position:relative;right:auto;bottom:auto;margin:0;transform:scale(1.15)}
+#bo7-right #class-skill kbd{top:-22px;bottom:auto;padding:1px 5px;border:1px solid #ffffffaa;border-radius:2px;background:#000c;font:700 10px/1 var(--bo7-font);color:#fff}
+#bo7-right #class-skill small{top:auto;bottom:-24px;font:600 10px/1 var(--bo7-font)}
+#bo7-right #operator-weapon{position:relative;right:auto;bottom:auto;transform:scale(1.15)}
+#bo7-right #operator-weapon .bg{fill:none;stroke:none}
+#bo7-right #operator-weapon .fill{display:none}   /* the bubble's own arc shows the charge */
+#bo7-right #operator-weapon .ic{width:40px;height:40px;padding:6px;box-sizing:border-box;border-radius:50%;background:color-mix(in srgb,var(--op) 32%,#0a0a0b);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--op) 70%,transparent)}
+#bo7-right #operator-weapon kbd{top:auto;bottom:-14px;padding:1px 5px;border:1px solid #ffffffaa;border-radius:2px;background:#000c;font:700 9px/1 var(--bo7-font);color:#fff}
 #bo7-right #operator-weapon small{bottom:auto;top:-22px;font:600 9px/1 var(--bo7-font)}
 #bo7-right #operator-weapon b{font:700 15px/1 var(--bo7-font)}
-body.bo7-hud.using-pad #bo7-right :is(#class-skill,#operator-weapon) kbd{top:auto!important;bottom:0}
+body.bo7-hud.using-pad #bo7-right #class-skill kbd{top:-24px!important}
+body.bo7-hud.using-pad #bo7-right #operator-weapon kbd{top:auto!important;bottom:-16px}
 
 /* ---- bottom centre: perks, power-up timers above them ------------------------------------------------------ */
 #bo7-perks{left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px}

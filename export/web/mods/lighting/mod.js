@@ -253,8 +253,9 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
   // Point-light pool (cheap, many sources).
   // The live light budget grows with quality (every light is paid for per pixel,
   // and changing the count recompiles shaders, so it only changes with the setting).
-  // With the baked volume only spotlights, fire and the box lamp are live, so far fewer slots.
-  const poolSize=q=>volume?(q>=3?8:q>=2?6:5):(q>=3?20:q>=2?14:q>=1?10:8);
+  // With the baked volume only spotlights, fire and the box lamp are live, so far fewer slots (2026-10-24: two more
+  // on High/Ultra, since the spot fixtures without a shadow slot now light from the pool too).
+  const poolSize=q=>volume?(q>=3?10:q>=2?8:q>=1?6:5):(q>=3?20:q>=2?14:q>=1?10:8);
   // With the baked volume, only these stay dynamic: spotlights (beams, shadows),
   // flickering fire, the box lamp. Everything else is in the bake.
   const dynamicOnly=s=>!!s.spot||!!s.dynamic||['fire','box','boxbeam','sun','off'].includes(s.kind);
@@ -489,9 +490,13 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
       const score=s=>level(s)?s.intensity*s.radius/Math.max(80,s.position.distanceTo(eye)):0;
       const ranked=sources.map(s=>({s,score:score(s)})).filter(r=>r.score>0).sort((a,b)=>b.score-a.score);
       if(pool.length!==poolSize(q))resizePool(poolSize(q));
-      assignPool(ranked.filter(r=>(!r.s.spot||q<2)&&(!volume||dynamicOnly(r.s))));
       const nSpots=q>=3?3:q>=2?1:0;
-      assign(spots,ranked.filter(r=>r.s.spot).slice(0,nSpots));
+      assign(spots,ranked.filter(r=>r.s.spot),nSpots);
+      // Spot fixtures not holding a shadow slot light from the pool (2026-10-24: before, High/Ultra had only the one
+      // or three shadow spots live out of Kino's 72, so each hanging lamp popped on as it became the nearest and off
+      // again a few steps later). A fixture fading out of its shadow slot is free for the pool, so the two crossfade.
+      const held=new Set(spots.flatMap(l=>[l.userData.next,l.userData.fadeOut?null:l.userData.source]).filter(Boolean));
+      assignPool(ranked.filter(r=>!held.has(r.s)&&(!volume||dynamicOnly(r.s))));
       // Shadow settings change only with the quality level (each change recompiles shaders).
       const size=q>=3?2048:1024,cast=q>=2;
       spots.forEach((l,i)=>{const on=cast&&i<nSpots;if(l.castShadow!==on)l.castShadow=on;if(l.shadow.mapSize.x!==size){l.shadow.mapSize.set(size,size);l.shadow.map?.dispose();l.shadow.map=null;}});
@@ -501,9 +506,13 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
       // Handover: fade the old light out, then the new one in (about 1 s total), so lights never pop.
       if(u.next&&l.intensity<2){u.source=u.next;u.next=null;}
       const s=u.source,target=s&&!u.next&&!u.fadeOut?Math.min(s.intensity*560,s.cap)*level(s)*(s.weight??1):0;if(s){l.position.copy(s.position);l.target.position.copy(s.position).add(s.dir??down);l.angle=s.angle??1.3;l.color.copy(s.color);l.distance=s.radius;}{const step=(target-l.intensity)*Math.min(1,dt*(u.next?2.5:1.1)),limit=Math.max(1,dt*900);l.intensity+=THREE.MathUtils.clamp(step,-limit,limit);}}   // eased and rate-limited: no visible jumps
-    for(const l of spots){const s=l.userData.source,target=s?Math.min(Math.min(9,s.intensity)*720,s.cap*1.6)*level(s):0;
+    for(const l of spots){const u=l.userData;
+      // Handover as in the pool: the old light fades out, then the new one in (a swap used to drop to 0 at once).
+      if(u.next&&l.intensity<2){u.source=u.next;u.next=null;u.fadeOut=false;}
+      if(u.fadeOut&&!u.next&&l.intensity<2){u.source=null;u.fadeOut=false;}
+      const s=u.source,target=s&&!u.next&&!u.fadeOut?Math.min(Math.min(9,s.intensity)*720,s.cap*1.6)*level(s):0;
       if(s){l.position.copy(s.position);l.target.position.copy(s.spot.target);l.color.copy(s.color);l.distance=s.radius*1.6;l.angle=Math.min(1.2,s.spot.angle);l.shadow.camera.far=l.distance;}
-      l.intensity+=(target-l.intensity)*Math.min(1,dt*6);}   // never toggle .visible: that recompiles every lit shader
+      {const step=(target-l.intensity)*Math.min(1,dt*2.5),limit=Math.max(1,dt*2500);l.intensity+=THREE.MathUtils.clamp(step,-limit,limit);}}   // never toggle .visible: that recompiles every lit shader
     // Shadows: the world is static, so refresh at 30 Hz on High and every frame on Ultra.
     if(q>=2&&frame%(q>=3?2:3)===0)for(const l of spots)l.shadow.needsUpdate=true;
     if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);singlePass(scene);}
@@ -584,11 +593,22 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
     // Lights no longer wanted at all fade out and free their slot.
     for(const l of pool){const u=l.userData;if(u.fadeOut&&!u.next&&l.intensity<2){u.source=null;u.fadeOut=false;}}
   }
-  function assign(lights,ranked){
-    const chosen=new Set(ranked.map(r=>r.s));
-    for(const l of lights)if(l.userData.source&&!chosen.has(l.userData.source))l.userData.source=null;
-    const taken=new Set(lights.map(l=>l.userData.source).filter(Boolean));
-    for(const {s} of ranked)if(!taken.has(s)){const l=lights.find(l=>!l.userData.source);if(!l)break;l.userData.source=s;l.intensity=0;taken.add(s);}
+  // Shadow spots (2026-10-24): the first n lights are in use; a source keeps its slot until a candidate clearly
+  // outscores it (x1.4), and a change is a fade-out then fade-in (userData.next / fadeOut, as in the pool).
+  function assign(lights,ranked,n){
+    const score=new Map(ranked.map(r=>[r.s,r.score])),active=lights.slice(0,n),near=new Set(ranked.slice(0,n+2).map(r=>r.s));
+    for(const l of lights.slice(n)){const u=l.userData;if(u.source&&!u.fadeOut){u.fadeOut=true;u.next=null;}}   // quality dropped: these go dark
+    for(const l of active){const u=l.userData;if(u.source&&!u.next&&!near.has(u.source))u.fadeOut=true;}   // fell well down the ranking (or dark)
+    const busy=new Set(active.flatMap(l=>[l.userData.source,l.userData.next]).filter(Boolean));
+    for(const {s,score:sc} of ranked.slice(0,n)){
+      if(busy.has(s))continue;
+      let slot=active.find(l=>!l.userData.source&&!l.userData.next)??active.find(l=>l.userData.fadeOut&&!l.userData.next);
+      if(!slot){const weakest=active.filter(l=>!l.userData.next).sort((a,b)=>(score.get(a.userData.source)??0)-(score.get(b.userData.source)??0))[0];
+        if(weakest&&(score.get(weakest.userData.source)??0)*1.4<sc)slot=weakest;}
+      if(!slot)continue;
+      if(slot.userData.source){slot.userData.next=s;slot.userData.fadeOut=true;}else{slot.userData.source=s;slot.userData.fadeOut=false;}
+      busy.add(s);
+    }
   }
   window.kino.lighting={sources,pool,spots,beams,volScene,shafts:baked,tag:tagShadows,volume};
   if(baking)(async()=>{const t0=performance.now();
