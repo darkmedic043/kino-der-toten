@@ -364,6 +364,10 @@ def aw(cls, gid, name, up, gun, tpl, stats, glow, single=True, **kw):
     return dict(cls=cls, id='aw_'+gid, name=name, up=up, model=mdl, world=kw.pop('world', 'wm_s1_'+gun+('' if single else '_rdw')),
                 upModel=kw.pop('upModel', mdl+'_up'), upWorld=kw.pop('upWorld', 'wm_s1_'+gun+('' if single else '_rdw')+'_up'), pre=pre, tpl=tpl, stats=stats, roles=roles,
                 ads=kw.pop('ads', (pre+'_ads_up', pre+'_ads_down')), shots=['wpn_s1_'+gun+'_shot'], upShots=['wpn_s1_'+gun+'_pap_shot'], glow=glow, **kw)
+# the AW guns' custom attachments (weapon-levels attachments.json aw_*, effects in mods/bo3-weapons/aw.js)
+AW_CUSTOM = {'aw_xmg': ['aw_bulwark', 'aw_overclock'], 'aw_ohm': ['aw_hotswap'], 'aw_rw1': ['aw_arcrail'], 'aw_cel3': ['aw_ignition'],
+             'aw_blunderbuss': ['aw_ignition'], 'aw_tac19': ['aw_concussive'], 'aw_bulldog': ['aw_concussive'], 'aw_atlas45': ['aw_lastword'],
+             'aw_m1_irons': ['aw_lastword'], 'aw_atlas45_dw': ['aw_lastword'], 'aw_m1_irons_dw': ['aw_lastword']}
 DW_ROLES = dict(idle='rdw_idle', fire='rdw_fire', adsFire='rdw_fire', reload='rdw_reload', reloadEmpty='rdw_reload_empty', rais='fdw_pullout', firstRaise='fdw_pullout',
                 drop='fdw_putaway', sprintIn='fdw_sprint_in', sprintLoop='fdw_sprint_loop', sprintOut='fdw_sprint_out')
 MODW += [
@@ -505,7 +509,7 @@ for w in MODW:
         mounts['grip'] = {'model': model(w['grip']['model'], 'attach_'+w['grip']['model'])[0], 'tag': w['grip']['tag']}
         GA, GT = clipset(w, w['grip']['roles'], notes)
         attach_anims['grip'] = {'animations': fill(GA), **times(GT)}
-    common2 = {**t, 'hideTags': PARTS.get(w['id'], []), 'mounts': mounts, 'statAttachments': ['extmag'], 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands, 'animations': A2, 'model': view, 'worldModel': world_url, 'lazyWorld': True,
+    common2 = {**t, 'hideTags': PARTS.get(w['id'], []), 'mounts': mounts, 'statAttachments': ['extmag', *AW_CUSTOM.get(w['id'], [])], 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands, 'animations': A2, 'model': view, 'worldModel': world_url, 'lazyWorld': True,
                'bo3': True, 'modWeapon': True, **({'noBox': True} if w.get('noBox') else {}), **({'scope': 'reflex'} if w['id'] in BUILT_IN_SIGHT else {}), 'glow': w['glow'], 'arc': w.get('arc', False), **({'element': w['element']} if w.get('element') else {}), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls'],
                # parts that are always on (the AS50's scope is its own model): mounted like attachments (mods/weapon-levels/mounts.js)
                'fixedParts': [{'model': model(mdl, 'part_'+mdl)[0], 'tag': tag} for mdl, tag in w.get('fixed', []) if (SRC/'xmodels'/mdl).exists()],

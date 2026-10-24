@@ -1158,6 +1158,55 @@
         "under",
         "mag"
       ]
+    },
+    {
+      "id": "aw_bulwark",
+      "name": "Bulwark Plating",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom: armour plates that slide over the arm rigs when you lock down. Braced in lockdown you take 60% less damage (an amber shield edge shows it's up)."
+    },
+    {
+      "id": "aw_overclock",
+      "name": "Overclock Servos",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: the arm guns' feed motors run past their limit while braced. Locked down, the XMG fires 40% faster."
+    },
+    {
+      "id": "aw_hotswap",
+      "name": "Hot-Swap Loader",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: an autoloader in the fold. Switching between LMG and shotgun forms fills the new form's magazine from its reserve, so a form swap doubles as a reload."
+    },
+    {
+      "id": "aw_arcrail",
+      "name": "Arc Rail",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom: an overcharged rail. Every hit throws lightning on to the 2 nearest zombies for half the shot's damage."
+    },
+    {
+      "id": "aw_ignition",
+      "name": "Ignition Coil",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: a coil that superheats each shot. Hits set zombies on fire, burning for 40% of the hit's damage a second for 3 s."
+    },
+    {
+      "id": "aw_concussive",
+      "name": "Concussive Slugs",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: heavy blunt slugs. Hits stagger zombies to half speed for 2.5 s."
+    },
+    {
+      "id": "aw_lastword",
+      "name": "Last Word",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: a marked final round. The last round in every magazine hits for triple damage."
     }
   ],
   "ironSights": {
