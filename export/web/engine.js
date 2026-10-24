@@ -46,6 +46,20 @@ const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null;
 // looks the same here. Swept once a second over both scenes for materials that appear later (was lighting-mod only).
 let singlePassTimer=0,programCount=0;
 const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
+// First draws (2026-10-24, user: freezes while playing and shooting; RTX 4070 Ti Super, ANGLE on D3D11). A program drawn
+// for the first time with another vertex layout or into another kind of render target can make the driver build a new GPU
+// pipeline (on D3D11 also an ANGLE shader variant) inside the GPU process: frames stop for up to seconds while no page
+// code runs, so it shows in no CPU timing. Counted per frame (program x layout x target format) for the perf log's hitches.
+let lastFirstDraws=0,lastFirstNames=[];
+const firstDraw={n:0,names:[],seen:new WeakMap(),layouts:new Map(),geo:new WeakMap(),targets:new Map(),rt:new WeakMap()};
+{const fd=firstDraw,direct=renderer.renderBufferDirect,sig=a=>a?(a.isInterleavedBufferAttribute?a.data.array:a.array)?.constructor.name+a.itemSize+(a.normalized?'n':'')+(a.isInstancedBufferAttribute||a.data?.isInstancedInterleavedBuffer?'i':''):'',
+  layout=g=>{let id=fd.geo.get(g);if(id===undefined){const k=Object.keys(g.attributes).sort().map(n=>n+':'+sig(g.attributes[n])).join();id=fd.layouts.get(k);if(id===undefined)fd.layouts.set(k,id=fd.layouts.size);fd.geo.set(g,id);}return id;},
+  target=t=>{if(!t)return 0;let id=fd.rt.get(t);if(id===undefined){const k=[t.texture?.format,t.texture?.type,t.samples,t.textures?.length,t.depthBuffer,t.isWebGLCubeRenderTarget].join();id=fd.targets.get(k);if(id===undefined)fd.targets.set(k,id=fd.targets.size+1);fd.rt.set(t,id);}return id;};
+  renderer.renderBufferDirect=function(camera,scene,geometry,material,object,group){direct.call(this,camera,scene,geometry,material,object,group);
+    const program=this.properties.get(material).currentProgram;if(!program||!geometry)return;
+    let seen=fd.seen.get(program);if(!seen)fd.seen.set(program,seen=new Set());const key=layout(geometry)*64+target(this.getRenderTarget());
+    if(!seen.has(key)){seen.add(key);fd.n++;if(fd.names.length<3)fd.names.push(String(material.name||material.type).slice(0,24));}};}
+const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw');   // A/B switch for warmShaders' draw pass
 const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
 let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.6;renderer.autoClear=false;
@@ -501,7 +515,22 @@ async function warmShaders(){
     const before=renderer.info.programs.length,hidden=[];
     for(const root of [scene,viewScene])root.traverse(o=>{if(!o.visible&&!o.isLight){hidden.push(o);o.visible=true;}});
     try{for(const [s,target] of targets){const previous=renderer.getRenderTarget();renderer.setRenderTarget(target);
-      try{await renderer.compileAsync(s,s===viewScene?viewCamera:camera);}finally{renderer.setRenderTarget(previous);}}}
+      try{await renderer.compileAsync(s,s===viewScene?viewCamera:camera);}finally{renderer.setRenderTarget(previous);}}
+    // Compiling isn't the whole cost: the driver finishes a program's GPU pipeline on its first draw with each vertex layout
+    // and target format (on Windows/D3D11, ANGLE compiles a shader variant then, freezing for up to seconds), so the hidden
+    // objects and the whole map (culling off) are drawn once into each scene's target too. Hidden objects' textures that
+    // aren't on the GPU yet are swapped for a 1x1 stand-in (a 2D texture swap doesn't change the program), so cached
+    // weapons don't fill video memory. ?noWarmDraw skips it (A/B).
+    if(!NO_WARM_DRAW){const swapped=[],culled=[],blank=new Map(),t1=performance.now(),seen=new Set();
+      const stand=tex=>{const k=tex.channel+'/'+tex.colorSpace;let b=blank.get(k);if(!b){b=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);b.channel=tex.channel;b.colorSpace=tex.colorSpace;b.needsUpdate=true;blank.set(k,b);}return b;};
+      for(const h of hidden)h.traverse(o=>{for(const m of [o.material].flat())if(m&&!seen.has(m)){seen.add(m);for(const k of Object.keys(m)){const v=m[k];
+        if(k!=='envMap'&&v?.isTexture&&!v.isCubeTexture&&!v.isRenderTargetTexture&&!v.isData3DTexture&&!v.isDataArrayTexture&&!v.isVideoTexture&&!renderer.properties.get(v).__webglTexture){swapped.push([m,k,v]);m[k]=stand(v);}}}});
+      for(const root of [scene,viewScene])root.traverse(o=>{if(o.frustumCulled){culled.push(o);o.frustumCulled=false;}});
+      const previous=renderer.getRenderTarget(),n0=firstDraw.n;
+      try{for(const [s,target] of targets){renderer.setRenderTarget(target);renderer.render(s,s===viewScene?viewCamera:camera);}}
+      finally{renderer.setRenderTarget(previous);for(const o of culled)o.frustumCulled=true;for(const [m,k,v] of swapped)m[k]=v;for(const b of blank.values())b.dispose();}
+      console.info('[warm-shaders] drew',firstDraw.n-n0,'new program/layout/target pairs,',swapped.length,'textures stood in, in',Math.round(performance.now()-t1),'ms');}
+    }
     finally{for(const o of hidden)o.visible=false;}
     // the gun and arms in hand are first drawn when play starts: upload their textures now (only these: every cached
     // weapon's would fill video memory), or the first played frames stall on them (67 ms each on the host)
@@ -510,6 +539,7 @@ async function warmShaders(){
     // compiles: the driver does the work when a program is first used (link check, uniform lookup), which was a 360 ms
     // first played frame. Using each program here (getUniforms/getAttributes) moves that wait behind the loading screen.
     for(const program of renderer.info.programs){try{program.getUniforms();program.getAttributes();}catch{}}
+    programCount=renderer.info.programs.length;   // compiled while loading, not mid-game
     console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects, in',Math.round(performance.now()-t0),'ms');
   }catch(error){console.warn('[warm-shaders]',error);}
   finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
@@ -524,6 +554,7 @@ function renderFrame(now){
   if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);if(ready&&!NO_STILL)stillSkeletons(scene);}
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
   update(dt);const t1=performance.now();staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel,viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
-  if(playing){const n=renderer.info.programs.length;if(n>programCount)perf.programs(renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1);}else{programCount=renderer.info.programs.length;perf.pause();}
+  if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames]);}else{programCount=renderer.info.programs.length;perf.pause();}
+  lastFirstDraws=firstDraw.n;lastFirstNames=firstDraw.names;firstDraw.n=0;firstDraw.names=[];   // hitches carry the previous frame's first draws (a GPU stall delays the next frame)
 }
 resumeRendering();

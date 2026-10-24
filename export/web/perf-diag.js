@@ -14,8 +14,8 @@ const heapMb = () => performance.memory ? performance.memory.usedJSHeapSize / 1e
 export function createPerfDiag({ send, context }) {
   const off = new URLSearchParams(location.search).has('noPerfLog');
   let sends = 0, last = 0, windowStart = performance.now(), lastHeap = heapMb(), w = fresh(), session = freshSession();
-  function fresh() { return { gaps: [], upd: [], ren: [], hist: EDGES.map(() => 0).concat(0), hitches: [], gc: 0, gcMb: 0, longN: 0, longMs: 0, longMax: 0, heapMax: 0, mods: new Map(), progs: [] }; }
-  function freshSession() { return { frames: 0, ms: 0, hist: EDGES.map(() => 0).concat(0), hitches: 0, worst: 0, gc: 0, longN: 0, longMs: 0 }; }
+  function fresh() { return { gaps: [], upd: [], ren: [], hist: EDGES.map(() => 0).concat(0), hitches: [], gc: 0, gcMb: 0, longN: 0, longMs: 0, longMax: 0, heapMax: 0, mods: new Map(), progs: [], fd: 0 }; }
+  function freshSession() { return { frames: 0, ms: 0, hist: EDGES.map(() => 0).concat(0), hitches: 0, worst: 0, gc: 0, longN: 0, longMs: 0, fd: 0 }; }
   const bucket = ms => { let i = 0; while (i < EDGES.length && ms > EDGES[i]) i++; return i; };
 
   // Long tasks: main-thread work over 50 ms (ours, the browser's or a GC), counted whether or not a frame was playing.
@@ -41,7 +41,7 @@ export function createPerfDiag({ send, context }) {
         upd: [r1(sum(upd) / n), r1(pct(upd, .95)), r1(upd[n - 1])],   // game logic + mods: avg/p95/max ms
         ren: [r1(sum(ren) / n), r1(pct(ren, .95)), r1(ren[n - 1])],   // render submission (CPU side): avg/p95/max ms
         hist: w.hist, hitches: w.hitches.slice(0, 8), gc: [w.gc, Math.round(w.gcMb)], long: [w.longN, Math.round(w.longMs), Math.round(w.longMax)],
-        heap: lastHeap == null ? null : Math.round(lastHeap), heapMax: Math.round(w.heapMax), mods, progs: w.progs.slice(0, 8),
+        heap: lastHeap == null ? null : Math.round(lastHeap), heapMax: Math.round(w.heapMax), mods, progs: w.progs.slice(0, 8), fd: w.fd,
       });
     }
     windowStart = now; w = fresh();
@@ -60,6 +60,7 @@ export function createPerfDiag({ send, context }) {
         if (gap > HITCH_MS) {
           session.hitches++;
           // what the hitch frame looked like: when, interval, its update/render ms, heap freed just before it (MB), extra
+          // (engine.js: first draws in the frame before and in this one, then the first few of those materials' names)
           if (w.hitches.length < 8) w.hitches.push([r1((now - windowStart) / 1000), Math.round(gap), r1(updMs), r1(renMs), Math.round(gcMb), ...(extra ? [extra] : [])]);
         }
       }
@@ -67,6 +68,8 @@ export function createPerfDiag({ send, context }) {
     },
     // shader programs compiled during play (each one a stall on its first frame): names, kept to the first 8 a window
     programs(names) { session.programs = (session.programs ?? 0) + names.length; for (const n of names) if (w.progs.length < 8) w.progs.push(String(n).slice(0, 40)); },
+    // first draws this frame (program x vertex layout x target format, engine.js firstDraw): each may build a GPU pipeline
+    firstDraws(n) { w.fd += n; session.fd += n; },
     // the game paused or the window was hidden: the next frame's interval isn't a played one
     pause() { last = 0; },
     // a mod's 'update' handler took ms (mod-loader.js reports these while profiling)
@@ -74,7 +77,7 @@ export function createPerfDiag({ send, context }) {
     end() {
       if (!session.frames) return;
       post('perfEnd', { ...context(), frames: session.frames, fps: r1(session.frames / (session.ms / 1000)), minutes: r1(session.ms / 60000), hist: session.hist,
-        hitches: session.hitches, worst: Math.round(session.worst), gc: session.gc, programs: session.programs ?? 0, long: [session.longN, Math.round(session.longMs)] });
+        hitches: session.hitches, worst: Math.round(session.worst), gc: session.gc, programs: session.programs ?? 0, fd: session.fd, long: [session.longN, Math.round(session.longMs)] });
       session = freshSession();
     },
   };
