@@ -53,6 +53,7 @@ body.bo7-hud #moon-hud #equipment{right:420px;bottom:40px}
 #bo7-right #ammo>span:first-of-type{display:none}
 #bo7-right #reserve{grid-column:2;grid-row:2;align-self:end;font:600 21px/1 var(--bo7-font);color:var(--bo7-dim)}
 #bo7-right.empty #mag{color:#ff5a48}
+#bo7-right #mag.dual{font-size:54px;letter-spacing:-2px}   /* dual wield: left · right gun (engine.js) */
 #bo7-right #reload-label{height:auto;min-height:14px;margin-top:4px;font:600 12px/1 var(--bo7-font);letter-spacing:2px;color:#e7c46a}
 
 /* the dial (user, 2026-10-24, from a BO7 screenshot): a dark meshed disc cut by radial spokes, the gun big on a

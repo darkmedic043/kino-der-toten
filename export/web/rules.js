@@ -10,6 +10,17 @@ export function roundPopulation(round, rules = {}, players=1) {
   const max=(rules.zombie_max_ai??24)+Math.trunc((players===1?.5:players-1)*(rules.zombie_ai_per_player??6)*multiplier);
   return Math.trunc(max*([0,.25,.3,.5,.7,.9][round]??1));
 }
+// Dual wield (not upstream): each gun has its own mag. weapon.mag stays the pair's total (what every refill, mod and
+// HUD reads) and weapon.magL is the left gun's share; the right gun holds the rest. The left gun's mag is half the clip
+// (rounded down), and ammo added to the total tops the right gun up first, then the left. firesBoth: the XMG's trigger
+// fires both guns together (its aim button is lockdown), the other dual guns fire one per trigger.
+export const firesBoth=def=>!!(def?.dualWield&&def.lockdown);
+export function dualMags(w,def){
+  if(!w||!def?.dualWield)return null;
+  const half=Math.floor(def.clipSize/2),right=def.clipSize-half;
+  let left=Math.max(0,Math.min(w.magL??Math.floor(w.mag/2),half,w.mag));if(w.mag-left>right)left=Math.min(half,w.mag-right);
+  w.magL=left;return {left,right:w.mag-left};
+}
 export function makeWeapon(def, full=false) {
   return {id:def.id,mag:def.clipSize,reserve:full?def.maxAmmo:def.startAmmo,upgraded:false};
 }
@@ -53,7 +64,7 @@ export class Session {
   reset() {
     this.time=0;this.round=1;this.countdown=6;this.phase='preparing';this.health=100;
     this.points=this.data.rules.zombie_score_start_1p??500;this.kills=0;this.headshots=0;this.shots=0;this.hits=0;
-    this.inventory=[makeWeapon(this.data.weapons.m1911_zm)];this.slot=0;this.reloadLeft=0;this.reloadStage=null;this.reloadSerial=0;this.reloadDuration=0;this.fireLeft=0;
+    this.inventory=[makeWeapon(this.data.weapons.m1911_zm)];this.slot=0;this.reloadLeft=0;this.reloadStage=null;this.reloadSerial=0;this.reloadDuration=0;this.fireLeft=0;this.fireLeftL=0;this.hand='right';
     this.perks=new Set();this.boughtPerks=new Set();this.flags=new Set(['always_on']);this.openDoors=new Set();this.power=false;this.revives=0;
     this.effects={};this.damageTime=-100;this.grenades=4;this.meleeLeft=0;this.spawned=0;this.killed=0;
     this.bowie=false;this.totalScore=this.points;this.drops=new PowerupDirector(this);this.drinking=null;this.drinkLeft=0;
@@ -81,7 +92,7 @@ export class Session {
   }
   update(dt){
     if(this.phase==='gameover')return;
-    this.time+=dt;this.fireLeft=Math.max(0,this.fireLeft-dt);this.meleeLeft=Math.max(0,this.meleeLeft-dt);
+    this.time+=dt;this.fireLeft=Math.max(0,this.fireLeft-dt);this.fireLeftL=Math.max(0,(this.fireLeftL??0)-dt);this.meleeLeft=Math.max(0,this.meleeLeft-dt);
     this.drops.observe(this);
     if(this.drinking){this.drinkLeft=Math.max(0,this.drinkLeft-dt);if(!this.drinkLeft){this.perks.add(this.drinking);this.drinking=null;this.health=this.maxHealth;}}
     let reloadDt=dt;
@@ -92,8 +103,18 @@ export class Session {
     if(this.phase==='preparing'){this.countdown-=dt;if(this.countdown<=0){this.phase='fighting';this.lastEvent=this.dogRound?'Fetch their souls':'Round '+this.round;}}
   }
   fire(){
-    if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||this.reloadLeft>0||this.fireLeft>0||this.weapon.mag===0)return false;
-    this.weapon.mag--;this.shots++;this.fireLeft=this.def.fireTime/(this.perks.has('specialty_rof')?1.33:1);return true;
+    if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||this.reloadLeft>0||this.fireLeft>0||this.handMag()===0)return false;
+    if(this.hand==='left'&&this.def.dualWield)this.weapon.magL--;
+    this.weapon.mag--;this.shots++;this.fireLeft=this.def.fireTime*(firesBoth(this.def)?2:1)/(this.perks.has('specialty_rof')?1.33:1);return true;
+  }
+  // rounds in one gun of a dual pair (the whole mag otherwise)
+  handMag(hand=this.hand){const m=dualMags(this.weapon,this.def);return m?m[hand==='left'?'left':'right']:this.weapon.mag;}
+  // Fires the left gun of a dual pair: its cooldown (fireLeftL) stands in as fireLeft for the call, so fire() and the
+  // mods that wrap it (fire-rate boosts adjust fireLeft after a shot) time that gun.
+  fireHand(hand){
+    if(hand!=='left'||!this.def.dualWield)return this.fire();
+    this.hand='left';[this.fireLeft,this.fireLeftL]=[this.fireLeftL??0,this.fireLeft];
+    try{return this.fire();}finally{this.hand='right';[this.fireLeft,this.fireLeftL]=[this.fireLeftL,this.fireLeft];}
   }
   reload(){
     if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||this.reloadLeft>0||this.weapon.reserve<=0||this.weapon.mag>=this.def.clipSize)return false;
@@ -114,7 +135,7 @@ export class Session {
   }
   interruptReload(){if(this.def.segmentedReload&&this.reloadLeft>0&&this.weapon.mag>0)this.reloadInterrupted=true;}
   cancelReload(){this.reloadLeft=0;this.reloadStage=null;}
-  switchWeapon(slot){if(this.drinking||this.meleeLeft>0||this.inventory.length<2)return;this.slot=(slot??(this.slot+1))%this.inventory.length;this.cancelReload();this.fireLeft=Math.max(.2,this.def.raiseTime??0);}
+  switchWeapon(slot){if(this.drinking||this.meleeLeft>0||this.inventory.length<2)return;this.slot=(slot??(this.slot+1))%this.inventory.length;this.cancelReload();this.fireLeftL=this.fireLeft=Math.max(.2,this.def.raiseTime??0);}
   drink(perk){
     const d=this.data.perkDrinks?.[perk];if(!d||this.drinking||this.perks.has(perk)||this.phase==='gameover'||this.phase==='reviving')return false;
     this.cancelReload();this.drinking=perk;this.drinkLeft=d.raiseTime+d.dropTime;return true;

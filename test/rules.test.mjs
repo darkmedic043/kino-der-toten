@@ -69,3 +69,13 @@ test('perks cost 2500 plus 500 per bought perk held; free perks do not count',()
   s.drinking=null;s.perks.add('specialty_quickrevive');assert.equal(s.perkPrice,3500);   // a free perk (gobblegum, Easter egg) leaves the price alone
   s.clearPerks();s.perks.add('specialty_armorvest');assert.equal(s.perkPrice,2500);       // lost on going down, then given free: not bought any more
 });
+test('dual wield guns fire independently, each from its own half of the mag', () => {
+ const s=new Session(data,()=>0);s.inventory=[{id:'cz75dw_zm',mag:24,reserve:100,upgraded:false}];s.slot=0;s.phase='fighting';
+ assert.deepEqual([s.handMag('left'),s.handMag('right')],[12,12]);
+ assert(s.fireHand('left'));assert(!s.fireHand('left'));assert(s.fireHand('right'));   // separate cooldowns
+ assert.deepEqual([s.handMag('left'),s.handMag('right'),s.weapon.mag],[11,11,22]);
+ for(let i=0;i<20;i++){s.update(1);s.fireHand('left');}
+ assert.equal(s.handMag('left'),0);assert(!s.fireHand('left'));s.update(1);assert(s.fireHand('right'));   // the right still has rounds
+ s.weapon.mag=24;assert.deepEqual([s.handMag('left'),s.handMag('right')],[12,12]);   // a refill of the total fills both
+ s.weapon.mag=10;s.weapon.magL=0;assert(s.reload());s.update(5);assert.deepEqual([s.handMag('left'),s.handMag('right'),s.weapon.mag],[12,12,24]);
+});

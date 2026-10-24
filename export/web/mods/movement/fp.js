@@ -294,8 +294,10 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     if(restoreArm())view.pivot.updateMatrixWorld(true);   // (the matrices must follow the bones put back)
     const handMode=view.mode==='idle'||view.mode==='sprint'||view.mode==='sprintIn'||view.mode==='sprintOut'||view.mode==='fire';
     // ---- dual wield: each arm's own motion (see DUAL above)
-    if(def?.dualWield){const shots=session.shots??0;   // the gun that fired kicks (the engine's hand choice: odd shots are the left's)
-      if(dual.lastShots>=0&&shots>dual.lastShots){const D=dual.sides[shots%2?1:0],k=(.6+w*.5)*str;D.kickP.v+=18*k;D.kickZ.v+=14*k;}dual.lastShots=shots;}
+    if(def?.dualWield){const shots=session.shots??0;   // the gun that fired kicks (session.lastHand; the XMG fires both in one frame)
+      if(dual.lastShots>=0&&shots>dual.lastShots){const k=(.6+w*.5)*str;
+        for(const D of shots-dual.lastShots>1?dual.sides:[dual.sides[session.lastHand==='left'?1:0]]){D.kickP.v+=18*k;D.kickZ.v+=14*k;}}
+      dual.lastShots=shots;}
     else dual.lastShots=-1;
     dual.w=ease(dual.w,def?.dualWield&&flags.hand&&str>0&&handMode&&!mt&&!window.kino.inspect?.state?1:0,8);
     if(dual.w>.01){

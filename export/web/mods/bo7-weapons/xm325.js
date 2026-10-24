@@ -1,8 +1,8 @@
 // The XM325 (xm325_zm): BO7's belt-fed Rist Rauch LMG (1000 rounds a minute, a 60-round belt in a hard box).
 // Built by .tools/build-xm325.py + .tools/assemble-grimhawk.mjs --gun xm325 on the HK21's skeleton (its animations
 // drive it; the shot and reload are the HK21's). Its Titan Wield conversion swaps in a pair built on the CZ75 Dual
-// Wield's skeletons (--gun xm325_rh / xm325_lh) and the CZ75 DW's animations: the engine's dualWield alternates the
-// hands and blocks aiming. Light machine gun class, from the Mystery Box.
+// Wield's skeletons (--gun xm325_rh / xm325_lh) and the CZ75 DW's animations: the engine's dualWield gives each hand
+// its own trigger (fire / aim button) and half the belt, and blocks aiming. Light machine gun class, from the Mystery Box.
 //
 // Attachments (weapon-levels attachments.json, ids xm_*; muzzles, barrels, the grip and the stock replace the gun's
 // own tag_xm_muzzle / _barrel / _grip / _stock; belts replace the box on tag_clip):

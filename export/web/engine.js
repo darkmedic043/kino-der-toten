@@ -12,6 +12,7 @@ import { PlayerController } from './player-controller.js';
 import { ViewWeapon } from './animation.js';
 import { Enemies } from './enemies.js';
 import { KinoSession } from './kino-session.js';
+import { firesBoth } from './rules.js';
 import { GameAudio } from './audio.js';
 import { Powerups } from './powerups.js';
 import { PerkDrink } from './perk-drink.js';
@@ -73,7 +74,7 @@ const camera=new THREE.PerspectiveCamera(78,innerWidth/innerHeight,1,30000);came
 const viewScene=new THREE.Scene(),viewCamera=new THREE.PerspectiveCamera(51,innerWidth/innerHeight,.01,200);   // BO1 cg_fov 65 on 4:3 = 50.9° vertical; wider showed the viewmodels unseen, stretched rear faces
 viewScene.add(new THREE.AmbientLight(0xe1d9c7,2.8));const vl=new THREE.DirectionalLight(0xffefc8,2);vl.position.set(0,4,2);viewScene.add(vl);
 const muzzle=new THREE.PointLight(0xffc276,0,240,1);scene.add(muzzle);
-let entry,map,data,world,session,player,enemies,view,powerups,perkDrink,mysteryBox,features,ready=false,active=false,started=false,primary=false,primaryPressed=false,ads=false;
+let entry,map,data,world,session,player,enemies,view,powerups,perkDrink,mysteryBox,features,ready=false,active=false,started=false,primary=false,primaryPressed=false,ads=false,leftPressed=false,lastTouchAim=false;
 let prompt=null,promptText='',toastUntil=0,announcementUntil=0,hitUntil=0,flashUntil=0;
 let lastPhase='',lastRound=0,frameTime=0,frameCount=0,fps=0,debugVisible=false,repairLeft=0,burstLeft=0;
 const particles=[],grenades=[];
@@ -137,7 +138,7 @@ renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDef
 renderer.domElement.addEventListener('webglcontextrestored',()=>{diag('contextrestored');if(textureMemoryStats().released){location.reload();return;}/* freed images can't be re-uploaded: start fresh */contextLost=false;$('start').disabled=!ready;$('menu-status').textContent='Graphics restored · click to resume';resumeRendering();});
 addEventListener('blur',()=>{keys.clear();primary=false;ads=false;if(started&&active&&!padOnly()){setActive(false);document.exitPointerLock?.();}});
 addEventListener('mousemove',e=>{if(!active||document.pointerLockElement!==renderer.domElement)return;const sensitivity=(ads?.0012*settings.adsSensitivity:.002)*settings.sensitivity;camera.rotation.y-=e.movementX*sensitivity;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-e.movementY*sensitivity*(settings.invertY?-1:1),-1.5,1.5);});
-addEventListener('mousedown',e=>{if(!active||e.sourceCapabilities?.firesTouchEvents||e.target.closest?.('#touch-controls'))return;if(e.button===0){mousePrimary=primary=true;primaryPressed=true;}if(e.button===2)mouseAim=ads=true;});
+addEventListener('mousedown',e=>{if(!active||e.sourceCapabilities?.firesTouchEvents||e.target.closest?.('#touch-controls'))return;if(e.button===0){mousePrimary=primary=true;primaryPressed=true;}if(e.button===2){mouseAim=ads=true;leftPressed=true;}});
 addEventListener('mouseup',e=>{if(e.sourceCapabilities?.firesTouchEvents)return;if(e.button===0)mousePrimary=primary=false;if(e.button===2)mouseAim=ads=false;});
 addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('keydown',e=>{
@@ -191,17 +192,20 @@ function collect(type){
   if(type==='carpenter'){for(const b of world.barriers)world.setBoards(b,map.boardCount(b));audio.event('powerup/carpenter/end/end_00',.7);}
   map.onPowerup?.(type);
 }
-const blocked=()=>!!map?.blocked?.()||!!mods.gunBlocked;   // gunBlocked: a mod has put the gun away (operator weapons)
 // dual wield has no aim, except the XMG's lockdown (def.lockdown: mods/bo3-weapons/aw.js poses it)
 const aiming=()=>ads&&(!session.def.dualWield||!!session.def.lockdown);
-function shoot(){
+const blocked=()=>!!map?.blocked?.()||!!mods.gunBlocked;   // gunBlocked: a mod has put the gun away (operator weapons)
+// hand: which gun of a dual pair fires (each has its own trigger and mag, rules.js dualMags); pressed: its trigger was
+// just pulled (an empty gun then clicks and reloads both)
+function shoot(hand='right',pressed=primaryPressed){
   if(!active||blocked()||!view.ready||view.mode==='raise'||session.busy||session.weaponUnavailable)return false;
   if(session.reloadLeft>0&&session.def.segmentedReload&&session.weapon.mag>0){session.interruptReload();reloadShot=true;return false;}
-  if(!session.fire()){if(session.weapon.mag===0&&primaryPressed){audio.weapon('empty',session.def);reload();}return false;}
-  view.shoot({ads:aiming()&&!session.def.dualWield,empty:session.weapon.mag===0,hand:session.def.dualWield&&session.shots%2?'left':'right'});audio.weapon('shot',session.def);muzzle.position.copy(camera.position);muzzle.intensity=160;camera.rotation.x=Math.min(1.48,camera.rotation.x+(ads?.008:.015));
+  if(!session.fireHand(hand)){if(session.handMag(hand)===0&&pressed&&(!firesBoth(session.def)||session.weapon.mag===0)){audio.weapon('empty',session.def);reload();}return false;}
+  session.lastHand=session.def.dualWield?hand:'right';   // for mods (movement/fp.js kicks that arm)
+  view.shoot({ads:aiming()&&!session.def.dualWield,empty:session.handMag(hand)===0,hand:session.lastHand});audio.weapon('shot',session.def);muzzle.position.copy(camera.position);muzzle.intensity=160;camera.rotation.x=Math.min(1.48,camera.rotation.x+(aiming()?.008:.015));
   const forward=camera.getWorldDirection(new THREE.Vector3()),base=session.def.baseId??session.weapon.id;
   if(map.fire?.(session.def,forward))return true;   // a map's own weapons (Moon's Wave Gun / Zap Guns)
-  for(const f of mods.fireHooks??[])if(f(session.def,forward,{ads}))return true;   // a mod's own projectiles (bo7-weapons: the Grimhawk)
+  for(const f of mods.fireHooks??[])if(f(session.def,forward,{ads:aiming()}))return true;   // a mod's own projectiles (bo7-weapons: the Grimhawk)
   if(base==='thundergun_zm'){
     for(const z of [...enemies.list]){const d=z.root.position.clone().add(new THREE.Vector3(0,40,0)).sub(camera.position);if(d.length()<600&&d.normalize().dot(forward)>.65&&world.lineClear(camera.position,z.root.position.clone().add(new THREE.Vector3(0,40,0))))enemies.hurt(z,100000,false,false,'thunder');}
     effect(camera.position.clone().addScaledVector(forward,100),0xb9d8e5,22);return true;
@@ -209,7 +213,7 @@ function shoot(){
   if(session.def.projectileSpeed>0){features.shoot(session.def,forward);return true;}
   const pellets=Math.max(1,session.def.pellets),reach=map.shotRange??8000;
   for(let i=0;i<pellets;i++){
-    const direction=forward.clone();if(pellets>1||!ads){const spread=(pellets>1?(session.def.pelletSpread??.055):(session.def.hipSpread??.012))*(session.perks.has('specialty_deadshot')?.5:1);/* Deadshot Daiquiri: half the hip-fire spread */direction.x+=(Math.random()-.5)*spread;direction.y+=(Math.random()-.5)*spread;direction.z+=(Math.random()-.5)*spread;direction.normalize();}
+    const direction=forward.clone();if(pellets>1||!aiming()){const spread=(pellets>1?(session.def.pelletSpread??.055):(session.def.hipSpread??.012))*(session.perks.has('specialty_deadshot')?.5:1);/* Deadshot Daiquiri: half the hip-fire spread */direction.x+=(Math.random()-.5)*spread;direction.y+=(Math.random()-.5)*spread;direction.z+=(Math.random()-.5)*spread;direction.normalize();}
     const ray=new THREE.Ray(camera.position.clone(),direction),wall=world.raycast(ray,1,reach),target=enemies.rayHit(ray,wall?.distance??reach);
     map.onShot?.(ray,Math.min(wall?.distance??reach,target?.distance??reach),'bullet');
     mods.emit('shot',{origin:ray.origin,direction,distance:Math.min(wall?.distance??reach,target?.distance??reach),hit:!!target,def:session.def});   // per pellet, for mods (tracers)
@@ -337,11 +341,15 @@ function update(dt){
       if((!sprint||mods.sprintFire?.())&&session.phase!=='reviving'&&!mods.holdFire?.()&&(primaryPressed||(primary&&session.def.automatic)||burstLeft>0||reloadShot)){   // holdFire: a mod handles the fire button (bows: hold to draw on touch)
         if(shoot()){reloadShot=false;if(burstLeft>0)burstLeft--;else if(session.def.fireType==='3-Round Burst')burstLeft=2;}
       }
-      primaryPressed=false;
+      // dual wield: the aim button is the left gun's trigger
+      if(touch.aim&&!lastTouchAim)leftPressed=true;lastTouchAim=!!touch.aim;
+      if(session.def.dualWield&&!firesBoth(session.def)&&(!sprint||mods.sprintFire?.())&&session.phase!=='reviving'&&!mods.holdFire?.()&&(leftPressed||(ads&&session.def.automatic)))shoot('left',leftPressed);
+      primaryPressed=false;leftPressed=false;
       enemies.update(dt,player.getFeetPosition());
       features.update(dt);
       if(reloadHeld&&performance.now()-reloadHeld>350){reloadHeld=0;mods.emit('inspect');}
       mods.emit('update',dt);
+        if(firesBoth(session.def))shoot('left');   // the XMG: one trigger, both guns
       repairLeft=Math.max(0,repairLeft-dt);findPrompt();if((keys.has('KeyF')||keys.has('KeyE')||touch.use)&&prompt?.barrier)repair(prompt.barrier);
       if((session.round!==lastRound||session.phase!==lastPhase)&&map.announceRounds?.()!==false){if(session.phase==='fighting'){announce(session.dogRound?'Fetch their souls':'Round '+session.round,session.dogRound?'HELLHOUNDS':'SURVIVE');audio.play(session.dogRound?'dog_round':'round');if(session.dogRound)audio.play('dog_announce');}else if(session.phase==='preparing'&&session.round>1){announce('Round survived','RELOAD. REBUILD. PREPARE.');audio.play('round_end');}lastRound=session.round;lastPhase=session.phase;}
       mysteryBox.update(dt);
@@ -363,7 +371,7 @@ function hud(){   // (2026-10-17) text and style written only when they change: 
 
   const s=session,w=s.weapon;
   const rt=map.roundText?.();T('round',rt?.round??(s.round<=5?'I'.repeat(s.round):String(s.round)));T('remaining',rt?.remaining??(s.phase==='preparing'?'STARTS IN '+Math.max(0,Math.ceil(s.countdown)):(s.total-s.killed)+' REMAINING'));
-  T('points',s.points.toLocaleString());T('mag',s.weaponUnavailable?'—':w.mag);T('reserve',s.weaponUnavailable?'—':w.reserve);T('weapon-name',s.weaponUnavailable?(s.pack?'Weapon in Pack-a-Punch':'No weapon'):s.def.name);T('grenades','G · '+s.grenades+' GRENADES'+(s.claymoresOwned?'  |  4 · '+s.claymores+' CLAYMORES':'')+(s.monkeysOwned?'  |  X · '+s.monkeys+' MONKEYS':''));T('reload-label',s.weaponUnavailable?'':s.reloadLeft>0?'RELOADING':w.mag===0?'R TO RELOAD':s.weapon.upgraded&&data.weapons[w.id].upgrade?.attachment?'5 · SWITCH ATTACHMENT':'');
+  T('points',s.points.toLocaleString());T('mag',s.weaponUnavailable?'—':s.def.dualWield?s.handMag('left')+' · '+s.handMag('right'):w.mag);$('mag')?.classList.toggle('dual',!!s.def.dualWield&&!s.weaponUnavailable);T('reserve',s.weaponUnavailable?'—':w.reserve);T('weapon-name',s.weaponUnavailable?(s.pack?'Weapon in Pack-a-Punch':'No weapon'):s.def.name);T('grenades','G · '+s.grenades+' GRENADES'+(s.claymoresOwned?'  |  4 · '+s.claymores+' CLAYMORES':'')+(s.monkeysOwned?'  |  X · '+s.monkeys+' MONKEYS':''));T('reload-label',s.weaponUnavailable?'':s.reloadLeft>0?'RELOADING':w.mag===0?'R TO RELOAD':s.weapon.upgraded&&data.weapons[w.id].upgrade?.attachment?'5 · SWITCH ATTACHMENT':'');
   if(touchControls.mode){T('grenades',$('grenades').textContent.replace('G · ','').replace('4 · ','').replace('X · ',''));T('reload-label',$('reload-label').textContent.replace('R TO RELOAD','TAP RELOAD').replace('5 · SWITCH ATTACHMENT','TAP ALT FIRE'));}
   $('health-fill').style.width=(100*s.health/s.maxHealth)+'%';T('health-label',Math.ceil(s.health)+' / '+s.maxHealth);
   $('hurt').style.opacity=s.health<s.maxHealth?(1-s.health/s.maxHealth)*.8:0;$('hitmarker').style.opacity=hitUntil>s.time?1:0;$('flash').style.opacity=Math.max(0,flashUntil-s.time);
