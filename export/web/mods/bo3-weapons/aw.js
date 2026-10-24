@@ -7,17 +7,22 @@
 //   fold-in and fold-out clips (no lockdown idle or fire), so they ride on top of whatever plays as additive
 //   layers held at the blend's point, the fire clips still kicking underneath. Braced, you are rooted in place: no
 //   walking, sprinting or jumping until you let go of aim.
-// - Custom attachments (weapon-levels attachments.json aw_*, given per gun by AW_CUSTOM in .tools/build_bo3_weapons.py):
+// - Gunsmith kits (weapon-levels attachments.json: aws_* shared, aw_* per gun; lists in AW_CUSTOM, .tools/build_bo3_weapons.py).
+//   Most are plain stats; the ones with behaviour live here ("hits" = the gun's bullets, or the MDL's blasts for 4 s
+//   after it fires):
 //   aw_bulwark    XMG: 60% less damage taken while locked down (an amber edge on the screen)
 //   aw_overclock  XMG: 40% faster fire while locked down
+//   aw_seismic    XMG: locked down, hits stagger like Concussive Slugs
 //   aw_hotswap    OHM: a form swap fills the new form's magazine from its reserve
 //   aw_arcrail    RW1: hits arc to the 2 nearest zombies for half damage
-//   aw_ignition   CEL-3, Blunderbuss: hits burn for 40% of the hit a second, 3 s
-//   aw_concussive Tac-19, Bulldog: hits slow zombies to half speed, 2.5 s
+//   aw_ignition   hits burn for 40% of the hit a second, 3 s (aw_incendiary: the MDL's blasts, 30%)
+//   aw_concussive hits slow zombies to half speed, 2.5 s
 //   aw_lastword   Atlas 45, M1 Irons (and akimbo): the last round in a magazine hits for triple
+//   aws_tracker   hits tag the zombie (a red marker) for 4 s: tagged zombies take 20% more from your hits
+//   aws_scavenger a kill puts 2 free rounds back in the magazine
 import * as THREE from 'three';
 
-const ARC=0x8fb4ff,EMBER=0xff7a2a,GOLD=0xffd36a,DAZE=0xcfe4ff;
+const ARC=0x8fb4ff,EMBER=0xff7a2a,GOLD=0xffd36a,DAZE=0xcfe4ff,MARK=0xff2a2a;
 
 export function setupAw(api){
   const {host,session,view,player,enemies,scene,world,data}=api;
@@ -54,7 +59,7 @@ export function setupAw(api){
     acts.in.setEffectiveWeight(falling||lock===0?0:1);acts.out.setEffectiveWeight(falling&&lock>0?1:0);
     acts.in.time=lock*din;acts.out.time=(1-lock)*dout;
   });
-  host.on('reset',()=>{lock=0;falling=false;frozen=false;for(const z of [...burning.keys()])burning.delete(z);for(const z of [...dazed])undaze(z);for(const f of fx.splice(0))dispose(f);});
+  host.on('reset',()=>{lock=0;falling=false;frozen=false;for(const z of [...burning.keys()])burning.delete(z);for(const z of [...dazed])undaze(z);for(const z of [...marked.keys()])unmark(z);for(const f of fx.splice(0))dispose(f);});
 
   // Locked down you stay put: no speed (layered over the other speed getters, like the Siren's Soma-81), and the
   // controller input loses its move, sprint and jump. That wrap goes on at the first frame, outside every mod's
@@ -80,18 +85,33 @@ export function setupAw(api){
   edge.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;box-shadow:inset 0 0 90px 18px #ffb43a88;border:2px solid #ffb43a55';
   document.body.append(edge);
 
-  // ---- bullet hits: Last Word, Ignition Coil, Concussive Slugs, Arc Rail ----
+  // ---- hits ----
+  let blastUntil=0;   // the MDL's grenades count as its hits for a while after it fires
+  (host.fireHooks??=[]).push(def=>{if((def.baseId??def.id)==='aw_mdl')blastUntil=now()+4;return false;});   // grenades skip the 'shot' event
   const hurt=enemies.hurt.bind(enemies);
   enemies.hurt=(z,damage,head,...rest)=>{
-    if(rest[1]!=='bullet'||host.remoteDamage||!alive(z))return hurt(z,damage,head,...rest);
+    if(host.remoteDamage||!alive(z))return hurt(z,damage,head,...rest);
+    const t=now(),cause=rest[1];
+    if(z.awMark?.until>t)damage*=1.2;   // Tracker
+    const gunHit=cause==='bullet'||(cause==='explosion'&&t<blastUntil&&session.weapon?.id==='aw_mdl');
+    if(!gunHit)return hurt(z,damage,head,...rest);
     const a=atts(),at=z.root.position.clone().add(new THREE.Vector3(0,45,0));
     if(a.includes('aw_lastword')&&session.weapon.mag===0){damage*=3;burst(at,GOLD,10,60);}
     if(a.includes('aw_ignition'))ignite(z,damage*.4);
-    if(a.includes('aw_concussive'))daze(z,at);
+    if(a.includes('aw_incendiary'))ignite(z,damage*.3);
+    if(a.includes('aw_concussive')||(a.includes('aw_seismic')&&braced('aw_seismic')))daze(z,at);
+    if(a.includes('aws_tracker'))mark(z,t);
     const r=hurt(z,damage,head,...rest);
     if(a.includes('aw_arcrail'))arc(z,at,damage*.5);
+    if(a.includes('aws_scavenger')&&!alive(z)){const w=session.weapon,clip=session.def.clipSize;if(w&&w.mag<clip){w.mag=Math.min(clip,w.mag+2);burst(at,GOLD,3,30,2.5);}}
     return r;
   };
+  const marked=new Map();   // zombie -> its marker sprite
+  function mark(z,t){
+    z.awMark={until:t+4};
+    if(!marked.has(z)){const s=new THREE.Sprite(sprite.clone());s.material.color.setHex(MARK);s.scale.setScalar(7);scene.add(s);marked.set(z,s);}
+  }
+  function unmark(z){const s=marked.get(z);if(s){s.removeFromParent();s.material.dispose();}marked.delete(z);if(z.awMark)z.awMark=null;}
   function arc(z,from,dmg){
     const near=enemies.list.filter(o=>o!==z&&alive(o)).map(o=>({o,d:o.root.position.distanceTo(z.root.position)})).filter(({d})=>d<260).sort((x,y)=>x.d-y.d);
     let n=0;
@@ -140,9 +160,13 @@ export function setupAw(api){
       if(b.left<=0)burning.delete(z);
     }
     for(const z of dazed)if(!alive(z)||t>=z.awDaze.until)undaze(z);
+    for(const [z,s] of marked){
+      if(!alive(z)||!(z.awMark?.until>t)){unmark(z);continue;}
+      s.position.copy(enemies.headPosition?.(z)??z.root.position).y+=16;s.material.opacity=.65+.35*Math.sin(t*9);
+    }
     for(let i=fx.length-1;i>=0;i--){const f=fx[i];f.t-=dt;
       if(f.t<=0){dispose(f);fx.splice(i,1);continue;}
       f.obj.material.opacity=f.t/f.life;if(f.vel){f.obj.position.addScaledVector(f.vel,dt);f.vel.y+=20*dt;}}
   });
-  window.kino.aw={get lock(){return lock;},get frozen(){return frozen;},burning,dazed};
+  window.kino.aw={get lock(){return lock;},get frozen(){return frozen;},burning,dazed,marked};
 }

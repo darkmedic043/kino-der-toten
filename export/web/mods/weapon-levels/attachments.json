@@ -1160,18 +1160,32 @@
       ]
     },
     {
+      "id": "aws_brake",
+      "name": "Muzzle Brake",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Vents the blast sideways: 15% more range and steadier hip fire.",
+      "stats": {
+        "rangeMul": 1.15,
+        "hipSpreadMul": 0.9
+      }
+    },
+    {
+      "id": "aws_quickdraw",
+      "name": "Quickdraw",
+      "slot": "grip",
+      "tags": [],
+      "desc": "An exo-linked grip: 15% faster reloads.",
+      "stats": {
+        "reloadMul": 0.85
+      }
+    },
+    {
       "id": "aw_bulwark",
       "name": "Bulwark Plating",
       "slot": "stock",
       "tags": [],
       "desc": "Custom: armour plates that slide over the arm rigs when you lock down. Braced in lockdown you take 60% less damage (an amber shield edge shows it's up)."
-    },
-    {
-      "id": "aw_overclock",
-      "name": "Overclock Servos",
-      "slot": "ammo",
-      "tags": [],
-      "desc": "Custom: the arm guns' feed motors run past their limit while braced. Locked down, the XMG fires 40% faster."
     },
     {
       "id": "aw_hotswap",
@@ -1207,6 +1221,149 @@
       "slot": "ammo",
       "tags": [],
       "desc": "Custom: a marked final round. The last round in every magazine hits for triple damage."
+    },
+    {
+      "id": "aw_incendiary",
+      "name": "Incendiary Payload",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: thermite in every grenade. Zombies caught in a blast burn for 30% of the blast damage a second for 3 s."
+    },
+    {
+      "id": "aws_rifling",
+      "name": "Advanced Rifling",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "A precision-cut barrel: 30% more range and 5% more damage.",
+      "stats": {
+        "rangeMul": 1.3,
+        "damageMul": 1.05
+      }
+    },
+    {
+      "id": "aws_foregrip",
+      "name": "Foregrip",
+      "slot": "under",
+      "tags": [],
+      "desc": "A vertical grip: hip fire spreads 30% less.",
+      "stats": {
+        "hipSpreadMul": 0.7
+      }
+    },
+    {
+      "id": "aws_tracker",
+      "name": "Tracker",
+      "slot": "laser",
+      "tags": [],
+      "desc": "Custom: a tracking laser. Every hit tags the zombie with a red marker for 4 s, and tagged zombies take 20% more damage from everything you throw at them."
+    },
+    {
+      "id": "aws_rapid",
+      "name": "Rapid Fire",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "A tuned trigger group: 25% faster fire, a little wider hip fire.",
+      "stats": {
+        "fireMul": 1.25,
+        "hipSpreadMul": 1.1
+      }
+    },
+    {
+      "id": "aw_overclock",
+      "name": "Overclock Servos",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: the arm guns' feed motors run past their limit while braced. Locked down, the XMG fires 40% faster."
+    },
+    {
+      "id": "aw_seismic",
+      "name": "Seismic Brace",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom: the arm rigs hammer into the floor when you lock down. Braced, every hit staggers the zombie to half speed for 2.5 s."
+    },
+    {
+      "id": "aw_capacitor",
+      "name": "Capacitor Drum",
+      "slot": "mag",
+      "tags": [],
+      "desc": "A 100-round drum on the LMG form, 25% slower to reload.",
+      "stats": {
+        "clipMul": 1.667,
+        "reloadMul": 1.25
+      }
+    },
+    {
+      "id": "aw_railcap",
+      "name": "Rail Capacitor",
+      "slot": "stock",
+      "tags": [],
+      "desc": "A bigger charge bank: 30% more damage per shot, 20% slower between shots.",
+      "stats": {
+        "damageMul": 1.3,
+        "fireMul": 0.8
+      }
+    },
+    {
+      "id": "aw_overdrive",
+      "name": "Plasma Overdrive",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "The heat sink runs open: 25% faster fire, 20% wider spread.",
+      "stats": {
+        "fireMul": 1.25,
+        "hipSpreadMul": 1.2
+      }
+    },
+    {
+      "id": "aw_grapeshot",
+      "name": "Grapeshot",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Heavier shot: 20% more damage, 25% less range.",
+      "stats": {
+        "damageMul": 1.2,
+        "rangeMul": 0.75
+      }
+    },
+    {
+      "id": "aws_silencer",
+      "name": "Silencer",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Suppressed, at 10% less range.",
+      "stats": {
+        "suppressed": true,
+        "rangeMul": 0.9
+      }
+    },
+    {
+      "id": "aws_stabilizer",
+      "name": "Stabilizer",
+      "slot": "stock",
+      "tags": [],
+      "desc": "A gyro-stabilised stock: hip fire spreads 20% less.",
+      "stats": {
+        "hipSpreadMul": 0.8
+      }
+    },
+    {
+      "id": "aws_scavenger",
+      "name": "Scavenger Feed",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom: a reclaiming feed. Every kill with the gun puts 2 rounds straight back in the magazine (free, up to a full mag)."
+    },
+    {
+      "id": "aws_autoburst",
+      "name": "Auto Burst",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "A converted trigger: hold to keep firing, 10% slower.",
+      "stats": {
+        "auto": true,
+        "fireMul": 0.9
+      }
     }
   ],
   "ironSights": {

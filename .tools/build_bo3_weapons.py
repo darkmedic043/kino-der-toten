@@ -364,10 +364,20 @@ def aw(cls, gid, name, up, gun, tpl, stats, glow, single=True, **kw):
     return dict(cls=cls, id='aw_'+gid, name=name, up=up, model=mdl, world=kw.pop('world', 'wm_s1_'+gun+('' if single else '_rdw')),
                 upModel=kw.pop('upModel', mdl+'_up'), upWorld=kw.pop('upWorld', 'wm_s1_'+gun+('' if single else '_rdw')+'_up'), pre=pre, tpl=tpl, stats=stats, roles=roles,
                 ads=kw.pop('ads', (pre+'_ads_up', pre+'_ads_down')), shots=['wpn_s1_'+gun+'_shot'], upShots=['wpn_s1_'+gun+'_pap_shot'], glow=glow, **kw)
-# the AW guns' custom attachments (weapon-levels attachments.json aw_*, effects in mods/bo3-weapons/aw.js)
-AW_CUSTOM = {'aw_xmg': ['aw_bulwark', 'aw_overclock'], 'aw_ohm': ['aw_hotswap'], 'aw_rw1': ['aw_arcrail'], 'aw_cel3': ['aw_ignition'],
-             'aw_blunderbuss': ['aw_ignition'], 'aw_tac19': ['aw_concussive'], 'aw_bulldog': ['aw_concussive'], 'aw_atlas45': ['aw_lastword'],
-             'aw_m1_irons': ['aw_lastword'], 'aw_atlas45_dw': ['aw_lastword'], 'aw_m1_irons_dw': ['aw_lastword']}
+# the AW guns' Gunsmith kits (weapon-levels attachments.json aws_* shared, aw_* custom; effects in mods/bo3-weapons/aw.js).
+# Unlock order follows the catalogue, not these lists.
+AW_KIT = ['aws_brake', 'aws_silencer', 'aws_rifling', 'aws_rapid', 'aws_tracker', 'aws_scavenger', 'aws_quickdraw']
+AW_LONG = ['aws_foregrip', 'aws_stabilizer']   # not on the pistols
+AW_CUSTOM = {'aw_xmg': AW_KIT + AW_LONG + ['aw_bulwark', 'aw_overclock', 'aw_seismic'],
+             'aw_ohm': AW_KIT + AW_LONG + ['aw_hotswap', 'aw_capacitor'],
+             'aw_sentry': AW_KIT + AW_LONG + ['aw_ignition', 'aw_concussive'],
+             'aw_cel3': AW_KIT + AW_LONG + ['aw_ignition', 'aw_overdrive'],
+             'aw_blunderbuss': AW_KIT + AW_LONG + ['aw_ignition', 'aw_grapeshot', 'aws_autoburst'],
+             'aw_tac19': AW_KIT + AW_LONG + ['aw_concussive', 'aw_ignition', 'aws_autoburst'],
+             'aw_bulldog': AW_KIT + AW_LONG + ['aw_concussive', 'aw_ignition', 'aws_autoburst'],
+             'aw_rw1': AW_KIT + ['aw_arcrail', 'aw_railcap', 'aw_concussive'],
+             'aw_mdl': ['aws_rapid', 'aws_quickdraw', 'aws_stabilizer', 'aws_tracker', 'aw_incendiary', 'aw_concussive'],
+             **{g: AW_KIT + ['aw_lastword', 'aw_concussive', 'aws_autoburst'] for g in ('aw_atlas45', 'aw_m1_irons', 'aw_atlas45_dw', 'aw_m1_irons_dw')}}
 DW_ROLES = dict(idle='rdw_idle', fire='rdw_fire', adsFire='rdw_fire', reload='rdw_reload', reloadEmpty='rdw_reload_empty', rais='fdw_pullout', firstRaise='fdw_pullout',
                 drop='fdw_putaway', sprintIn='fdw_sprint_in', sprintLoop='fdw_sprint_loop', sprintOut='fdw_sprint_out')
 MODW += [

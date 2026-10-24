@@ -49,16 +49,41 @@ User: "build the other stuff please" (everything that was listed as not built).
 
 ## Custom attachments (2026-10-23)
 
-Stat-only Gunsmith attachments of our own (no model, `tags: []`), catalogue ids `aw_*` at the end of `weapon-levels/attachments.json`, given per gun by `AW_CUSTOM` in `.tools/build_bo3_weapons.py` (added to `statAttachments` after `extmag`; unlocked in catalogue order on each gun's track). Effects in `mods/bo3-weapons/aw.js`, which reads the equipped list from the base def (`data.weapons[id].attachments`; the OHM's shotgun form has none of its own).
+Gunsmith attachments of our own (no model, `tags: []`) at the end of `weapon-levels/attachments.json`: `aws_*` are a shared AW kit, `aw_*` belong to one or a few guns. `AW_CUSTOM` in `.tools/build_bo3_weapons.py` gives each gun its list (added to `statAttachments` after `extmag`; unlocked in catalogue order on each gun's track, levels 2-28). Effects that aren't plain stats live in `mods/bo3-weapons/aw.js`, which reads the equipped list from the base def (`data.weapons[id].attachments`; the OHM's shotgun form has none of its own).
+
+**Why the count looked small:** `gunsmith.js available()` pads every gun with `generic` catalogue entries up to `padTo` (8), so the first 7 customs only replaced pads and every AW gun still showed 8. The kits push them past the pad: XMG 13, OHM 13, Sentry 12, CEL-3 12, Blunderbuss 13, Tac-19 15 (its red dot and grip mounts), Bulldog 13, RW1 10 (one-round gun: mag-slot entries drop), MDL 8, Atlas 45 / M1 Irons and their akimbos 11 (measured with `available()` on the GPU page).
+
+Shared kit (`AW_KIT` on every gun but the MDL; `AW_LONG` adds Foregrip and Stabilizer to all but the pistols and RW1):
+
+| Id | Name | Slot | Effect |
+|---|---|---|---|
+| `aws_brake` | Muzzle Brake | muzzle | range x1.15, hip spread x0.9 |
+| `aws_silencer` | Silencer | muzzle | suppressed, range x0.9 |
+| `aws_rifling` | Advanced Rifling | barrel | range x1.3, damage x1.05 |
+| `aws_rapid` | Rapid Fire | ammo | fire rate x1.25, hip spread x1.1 |
+| `aws_tracker` | Tracker | laser | hits tag the zombie for 4 s (`z.awMark`, a pulsing red glow sprite above the head); tagged zombies take x1.2 from the local player's `enemies.hurt` calls (burn ticks and arcs go through the inner hurt, so not those) |
+| `aws_scavenger` | Scavenger Feed | mag | a kill puts 2 rounds back in the mag (up to the clip, not from the reserve) |
+| `aws_quickdraw` | Quickdraw | grip | reload x0.85 |
+| `aws_foregrip` | Foregrip | under | hip spread x0.7 |
+| `aws_stabilizer` | Stabilizer | stock | hip spread x0.8 |
+| `aws_autoburst` | Auto Burst | ammo | makes a semi-auto gun automatic (`automatic`, `fireType`), fire rate x0.9 (Blunderbuss, Tac-19, Bulldog, the pistols) |
+
+Per-gun customs:
 
 | Id | Name | Slot | Guns | Effect |
 |---|---|---|---|---|
 | `aw_bulwark` | Bulwark Plating | stock | XMG | locked down: damage taken x (1 - 0.6 lock) via `beforeDamage`; an amber screen edge (DOM div) fades in with `lock` |
 | `aw_overclock` | Overclock Servos | ammo | XMG | fully locked: `session.fire` wrap divides `fireLeft` by 1.4 (40% faster) |
+| `aw_seismic` | Seismic Brace | under | XMG | locked down (`braced()`): hits stagger like Concussive Slugs |
 | `aw_hotswap` | Hot-Swap Loader | ammo | OHM | after a form swap the new form's mag is topped up from its reserve |
+| `aw_capacitor` | Capacitor Drum | mag | OHM | clip x1.667, reload x1.25 |
 | `aw_arcrail` | Arc Rail | barrel | RW1 | each bullet hit arcs to the 2 nearest zombies within 260 (line of sight) for half the hit, cause `explosion` (so it doesn't chain) |
-| `aw_ignition` | Ignition Coil | ammo | CEL-3, Blunderbuss | hits burn for 40% of the hit per second for 3 s (ticks every 0.5 s, cause `flame`; refreshes, keeps the highest rate) with rising embers |
-| `aw_concussive` | Concussive Slugs | ammo | Tac-19, Bulldog | hits halve `z.speed` and the rig's mixer timeScale for 2.5 s (ratio-based, so it stacks safely with the XM325's chill) |
+| `aw_railcap` | Rail Capacitor | stock | RW1 | damage x1.3, fire rate x0.8 |
+| `aw_ignition` | Ignition Coil | ammo | CEL-3, Blunderbuss, Sentry, Tac-19, Bulldog | hits burn for 40% of the hit per second for 3 s (ticks every 0.5 s, cause `flame`; refreshes, keeps the highest rate) with rising embers |
+| `aw_incendiary` | Incendiary Payload | ammo | MDL | the same burn at 30% for the MDL's blasts |
+| `aw_overdrive` | Plasma Overdrive | barrel | CEL-3 | fire rate x1.25, hip spread x1.2 |
+| `aw_grapeshot` | Grapeshot | barrel | Blunderbuss | damage x1.2, range x0.75 |
+| `aw_concussive` | Concussive Slugs | ammo | Tac-19, Bulldog, Sentry, RW1, MDL, pistols | hits halve `z.speed` and the rig's mixer timeScale for 2.5 s (ratio-based, so it stacks safely with the XM325's chill) |
 | `aw_lastword` | Last Word | ammo | Atlas 45, M1 Irons and both akimbos | a hit while the mag reads 0 (the last round) deals triple, with a gold spark burst |
 
-The hit effects wrap `enemies.hurt` for cause `bullet` only, and skip `host.remoteDamage` (a co-op partner's hits). FX: arcs are additive lines, embers additive sprites with a soft radial canvas texture (one of each in `host.warmObjects`). Tested on the GPU (2026-10-23): locked XMG with W + Space held moves 0 units, speed 0, a 100 damage hit becomes 40, `fireLeft` 0.065 -> 0.0464, all back after release; Arc Rail 50 to each neighbour; Ignition 40/s for 3 s; Concussive 55 -> 27.5 -> 55; Last Word 300 on the last round; Hot-Swap back to the LMG with 5 in the mag -> 60 (reserve 360 -> 305).
+The hit effects wrap `enemies.hurt` for the gun's hits: cause `bullet`, or cause `explosion` while the MDL is held and within 4 s of it firing (its grenades go through `features.shoot`, which emits no `shot` event, so aw.js records the time from a `host.fireHooks` entry that returns false). Partners' hits (`host.remoteDamage`) are skipped. FX: arcs are additive lines, embers and tracker tags additive sprites with a soft radial canvas texture (one of each in `host.warmObjects`). Tested on the GPU (2026-10-23): locked XMG with W + Space held moves 0 units, speed 0, a 100 damage hit becomes 40, `fireLeft` 0.065 -> 0.0464, all back after release; Arc Rail 50 to each neighbour; Ignition 40/s for 3 s; Concussive 55 -> 27.5 -> 55; Last Word 300 on the last round; Hot-Swap back to the LMG with 5 in the mag -> 60 (reserve 360 -> 305); Tracker 100 then 120, tag gone after 4.5 s; Scavenger kill with 3 in the mag -> 5; Seismic dazes only once `lock` is 1; Incendiary off before the MDL fires, then 30/s; Auto Burst makes the Tac-19 automatic.
