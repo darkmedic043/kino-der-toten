@@ -120,6 +120,17 @@ const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo',
   'animations','raiseTime','dropTime','sprintInTime','sprintLoopTime','sprintOutTime','reloadStartTime','reloadEndTime'];   // the last row: attachments with their own clips (attachClips)
 function snapshot(obj){if(!pristine.has(obj)){const s={};for(const k of STAT_FIELDS)s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);pristine.set(obj,s);}return pristine.get(obj);}
 function restore(obj){const s=snapshot(obj);for(const k of STAT_FIELDS){if(s[k]===undefined)delete obj[k];else obj[k]=structuredClone(s[k]);}}
+// The Akimbo attachment (akimbo.js): obj.akimbo holds what the folded dual-wield pair does differently (models, clips,
+// magazine, name). wearLook puts it on before the other stats; restoreLook takes it off again (its own snapshot,
+// since the look reaches fields outside STAT_FIELDS). obj.akimboOn tells the viewmodel code (mod.js) which is worn.
+const single=new WeakMap();
+function restoreLook(obj){
+  if(!obj?.akimbo)return;
+  if(!single.has(obj)){const s={};for(const k of Object.keys(obj.akimbo))s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);single.set(obj,s);}
+  for(const [k,v] of Object.entries(single.get(obj))){if(v===undefined)delete obj[k];else obj[k]=structuredClone(v);}
+  obj.akimboOn=false;
+}
+function wearLook(obj,list){if(obj?.akimbo&&list.some(a=>a?.akimbo)){Object.assign(obj,structuredClone(obj.akimbo));obj.akimboOn=true;}}
 
 // Tags an attachment shows on this gun: the first of its alternative tags the
 // model has (the Galil carries both the Elbit and PKA reflex sights), plus
@@ -187,8 +198,9 @@ function foldIronSights(obj,list,cat,id){
 // A copy of the weapon's pristine definition with the given attachments
 // applied: for stat previews in the Gunsmith (doesn't touch the game data).
 export function previewDef(cat,def,id,ids){
-  const base=structuredClone(pristine.has(def)?{...def,...pristine.get(def)}:def);
+  const base=structuredClone(pristine.has(def)?{...def,...single.get(def),...pristine.get(def)}:def);
   const list=ids.map(a=>cat.attachments.find(x=>x.id===a)).filter(Boolean);
+  wearLook(base,list);
   applyStats(base,list,cat,shownTags(base,list,cat));
   foldIronSights(base,list,cat,id);
   return base;
@@ -209,10 +221,11 @@ function attachClips(obj,list){
 export function applyAttachments(cat,weapons,profile){
   for(const [id,def] of Object.entries(weapons)){
     if(!def||typeof def!=='object')continue;
-    restore(def);if(def.upgrade)restore(def.upgrade);
+    restore(def);restoreLook(def);if(def.upgrade){restore(def.upgrade);restoreLook(def.upgrade);}
     const ids=equipped(cat,def,id,profile);
     if(!ids.length)continue;
     const list=ids.map(a=>cat.attachments.find(x=>x.id===a));
+    wearLook(def,list);if(def.upgrade)wearLook(def.upgrade,list);
     const shown=shownTags(def,list,cat);
     applyStats(def,list,cat,shown);foldIronSights(def,list,cat,id);attachClips(def,list);
     if(def.upgrade){const keep=def.upgrade.attachment;applyStats(def.upgrade,list.filter(a=>!a.underbarrel),cat,shown);foldIronSights(def.upgrade,list,cat,id);attachClips(def.upgrade,list);if(keep)def.upgrade.attachment=keep;}

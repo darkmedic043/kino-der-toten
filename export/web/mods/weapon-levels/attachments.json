@@ -16,7 +16,8 @@
     "barrel": "Barrel",
     "stock": "Stock",
     "grip": "Rear Grip",
-    "ammo": "Ammo"
+    "ammo": "Ammo",
+    "akimbo": "Akimbo"
   },
   "mountTags": [
     "tag_scope_rail",
@@ -1157,6 +1158,18 @@
       "excludes": [
         "under",
         "mag"
+      ]
+    },
+    {
+      "id": "akimbo",
+      "name": "Akimbo",
+      "slot": "akimbo",
+      "tags": [],
+      "akimbo": true,
+      "desc": "A second gun in your off hand, fired in turn: twice the magazine and the faster dual-wield handling, but no aiming down sights. No optics or underbarrels.",
+      "excludes": [
+        "optic",
+        "under"
       ]
     },
     {

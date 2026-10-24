@@ -41,6 +41,7 @@ const ARC = 0x8fd0ff, FROST = 0xbfe8ff, PAP_ARC = 0xd88bff;
 const DUAL_KEYS = ['model', 'leftModel', 'animations', 'leftAnimations', 'dualWield', 'sprintOffset', 'sprintRotation', 'raiseTime', 'dropTime', 'sprintInTime', 'sprintLoopTime', 'sprintOutTime', 'viewOffset', 'notetrackSounds'];
 
 export function prepareXm325(data) {
+  // the CZ75 pair is still its own gun here: weapon-levels folds it into the CZ75's Akimbo attachment later (akimbo.js)
   const hk = data.weapons.hk21_zm, cz = data.weapons.cz75dw_zm;
   if (!hk) { console.warn('[bo7-weapons] no HK21 to build the XM325 on'); return; }
   const model = BASE + `xm325_view.glb?v=${V}`, world = BASE + `xm325_world.glb?v=${V}`;

@@ -11,7 +11,11 @@ import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress, camoT
 import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, grantMasterXp, canPrestigeWeapon, RULES as PRESTIGE } from '../prestige/prestige.js';
 import { openGunsmith } from './gunsmith-view.js';
 import { previewDef } from './gunsmith.js';
+import { foldAkimbo } from './akimbo.js';
 import { loadCatalog, applyAttachments, grantWeaponXp, weaponProgress, xpToNext, maxLevel, available, renderGunsmith, GUNSMITH_CSS, migrateWeaponLevels, nextUnlock } from './gunsmith.js';
+
+// dual-wield pairs fold into their single gun's Akimbo attachment before anything reads the weapon list
+export function prepare(data){return foldAkimbo(data);}
 
 export default async function setup(api){
   const {data,session,host,view,audio}=api;
@@ -55,10 +59,16 @@ export default async function setup(api){
   const equip=view.equip.bind(view);
   view.equip=async(def,...rest)=>{
     // an attachment that swaps the clips (gunsmith.js attachClips) needs the rig rebuilt: the view is keyed by id
-    const clips=def?.attachAnims?JSON.stringify(def.animations):'';if(clips!==view.clipSet){view.clipSet=clips;view.currentId=null;}
+    // so does the Akimbo attachment (akimbo.js: same id, a second gun)
+    const clips=(def?.attachAnims?JSON.stringify(def.animations):'')+(def?.akimboOn?'|akimbo':'');if(clips!==view.clipSet){view.clipSet=clips;view.currentId=null;}
     const r=await equip(def,...rest);
     const hidden=new Set(def?.hideTags??[]);
     view.gun?.traverse(o=>{if(o.isBone&&o.scale.x<1e-3&&attachmentTags.has(o.name)&&!hidden.has(o.name))o.scale.setScalar(1);});
+    // the engine hides tags on the right gun only: the off-hand gun copies its attachment bones (BO1's left models
+    // number theirs one up: tag_long_barrel1, tag_flash3 for tag_flash2)
+    if(def?.akimboOn&&view.leftGun&&view.gun)view.gun.traverse(b=>{if(!b.isBone||!(attachmentTags.has(b.name)||hidden.has(b.name)))return;
+      const o=[b.name,b.name+'1',b.name.replace(/\d+$/,d=>+d+1)].map(n=>view.leftGun.getObjectByName(n)).find(x=>x?.isBone);
+      if(o){o.scale.copy(b.scale);o.updateMatrix();}});
     flamer.placePilot();
     mountParts(def);
     applyCamo(view.gun,papLook(session.weapon)?PAP_CAMO:camoById(data.weapons[session.weapon?.id]?.camo));

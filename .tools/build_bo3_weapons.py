@@ -378,7 +378,9 @@ AW_CUSTOM = {'aw_xmg': AW_KIT + AW_LONG + ['aw_bulwark', 'aw_overclock', 'aw_sei
              'aw_bulldog': AW_KIT + AW_LONG + ['aw_concussive', 'aw_ignition', 'aws_autoburst'],
              'aw_rw1': AW_KIT + ['aw_arcrail', 'aw_railcap', 'aw_concussive'],
              'aw_mdl': ['aws_rapid', 'aws_quickdraw', 'aws_stabilizer', 'aws_tracker', 'aw_incendiary', 'aw_concussive'],
-             **{g: AW_KIT + ['aw_lastword', 'aw_concussive', 'aws_autoburst'] for g in ('aw_atlas45', 'aw_m1_irons', 'aw_atlas45_dw', 'aw_m1_irons_dw')}}
+             **{g: AW_KIT + ['aw_lastword', 'aw_concussive', 'aws_autoburst', 'akimbo'] for g in ('aw_atlas45', 'aw_m1_irons')}}
+# the akimbo pairs are not guns of their own: the weapon-levels mod folds each into its single gun as the Akimbo attachment (akimbo.js)
+AKIMBO_OF = {'aw_atlas45_dw': 'aw_atlas45', 'aw_m1_irons_dw': 'aw_m1_irons'}
 DW_ROLES = dict(idle='rdw_idle', fire='rdw_fire', adsFire='rdw_fire', reload='rdw_reload', reloadEmpty='rdw_reload_empty', rais='fdw_pullout', firstRaise='fdw_pullout',
                 drop='fdw_putaway', sprintIn='fdw_sprint_in', sprintLoop='fdw_sprint_loop', sprintOut='fdw_sprint_out')
 MODW += [
@@ -554,6 +556,7 @@ for w in MODW:
         up['attachment'] = {**common2['attachment'], 'model': up['model'], 'worldModel': up['worldModel'], 'clipSize': int(ta['clipSize']*1.5), 'maxAmmo': int(ta['maxAmmo']*1.5),
                             'startAmmo': int(ta['maxAmmo']*1.5), 'damage': ta['damage']*2.2, 'minDamage': ta['minDamage']*2.2}
     weapons[w['id']] = {'id': w['id'], 'name': w['name'], **common2, **({'upgrade': up} if w.get('up') else {})}   # up=None: Pack-a-Punch refuses it
+    if w['id'] in AKIMBO_OF: weapons[w['id']].update(akimboOf=AKIMBO_OF[w['id']], noBox=True)
     modsounds[w['id']] = {'shots': [k for k in map(snd, w['shots']) if k], 'last': [k for k in map(snd, w.get('last', [])) if k],
                           'notes': {n: k for n in sorted(notes) if (k := snd(st := n.removeprefix('sndnt#')) or snd(st+'_r') or snd(st+'1') or snd(NOTE_ALIAS.get(st, '')))}}
     if w.get('upShots'): modsounds[w['id']]['upShots'] = [k for k in map(snd, w['upShots']) if k]

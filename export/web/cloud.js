@@ -1,6 +1,7 @@
 // Account sync (not part of upstream). Progress always lives in localStorage;
 // when signed in it is mirrored to the server (/api/profile), newest copy wins.
 // Tracked keys are caught at localStorage.setItem, so game code needs no changes.
+import { mergeAkimboSaves } from './mods/weapon-levels/akimbo.js';
 
 const TRACKED=/^kino\.(mods\.progression|mods\.classes|mods\.career|mods\.gobblegums|mods\.bank|mods\.armory|mods\.radio|mods\.journal|mods\.terminal|mods\.prestige|mods\.research|mods\.credits|mods\.shop|mods\.pass|settings|best(\..+)?)$/;
 const STAMP='kino.cloud.updatedAt';
@@ -28,6 +29,12 @@ if(store){
   const original=Storage.prototype.setItem;
   Storage.prototype.setItem=function(k,v){original.call(this,k,v);if(this===store&&!pulling&&TRACKED.test(k))dirty();};
   addEventListener('pagehide',()=>{if(pushTimer){clearTimeout(pushTimer);push();}});
+  migrate();
+}
+// Saves from before a change of weapon ids are rewritten in place (and pushed): dual-wield pairs became their single
+// gun's Akimbo attachment (2026-10-23), so a pair's levels, camo progress and stats move onto the single gun.
+function migrate(){
+  for(const k of Object.keys(snapshot().keys)){const v=mergeAkimboSaves(k,store.getItem(k));if(v!=null)store.setItem(k,v);}
 }
 
 // Newest wins: server copy replaces local keys, or local progress is uploaded.
@@ -45,6 +52,7 @@ async function sync(){
   if(remote.keys&&(remote.updatedAt??0)>local.updatedAt){
     pulling=true;
     try{for(const [k,v] of Object.entries(remote.keys))rawSet(k,v);mergeRewards(local.keys);rawSet(STAMP,String(remote.updatedAt));}finally{pulling=false;}
+    migrate();
     dispatchEvent(new Event('kino-cloud-pulled'));
   }else if(local.updatedAt>(remote.updatedAt??-1)||!remote.keys){
     if(remote.keys){pulling=true;try{mergeRewards(remote.keys);}finally{pulling=false;}}

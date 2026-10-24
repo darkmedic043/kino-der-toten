@@ -54,7 +54,7 @@ const NOTES = {
   cheese_gun: 'Cheese Cube Unlimited\'s own gun, sold on two of the map\'s walls in place of the MP40. It hits for 250 at any range and is always in the Swiss Cheese camo.',
   crossbow_explosive_zm: 'Its bolts stick in whatever they hit, then explode.',
   knife_ballistic_zm: 'Fires its blade.',
-  cz75dw_zm: 'Two CZ75s, one in each hand.',
+  cz75_zm: 'Its Akimbo attachment puts a second CZ75 in your other hand.',
 };
 const SPOILERS = {
   bo3_wrath_ancients: ['How to get it', 'Get kills near each of the castle\'s three dragon heads (8 in each dragon\'s area) to feed it. When all three are fed, the bow appears in a red glow in the Family Crypt in the undercroft chapel. You can take it once a game, for free.'],
@@ -97,6 +97,7 @@ export default {
         if (mod.prepare) data = (await mod.prepare(data, { id, url: new URL(ctx.url(`mods/${id}/`)) })) ?? data;
       } catch (e) { console.info('[wiki] weapons: no', id, e?.message); }
     }
+    try { (await ctx.load('mods/weapon-levels/akimbo.js')).foldAkimbo(data); } catch (e) { console.info('[wiki] weapons: no akimbo fold', e?.message); }   // dual-wield pairs are the Akimbo attachment
     try { loader.resolveWeapons(data); } catch {}
     const W = data.weapons;
     if (W.mp40_zm) W.cheese_gun = { ...structuredClone(W.mp40_zm), id: 'cheese_gun', baseId: 'mp40_zm', name: 'Cheese Gun', price: 1000, damage: 250, minDamage: 250, clipSize: 30, startAmmo: 210, maxAmmo: 210 };

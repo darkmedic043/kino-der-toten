@@ -26,6 +26,9 @@ export async function prepare(data){
   const r=await fetch(BASE+'weapons.json').catch(()=>null);
   if(!r?.ok){console.info('[bo3-weapons] not built: run .tools/build_bo3_weapons.py');return;}
   built=await r.json();
+  // akimbo pairs (akimboOf) become their single gun's Akimbo attachment (weapon-levels akimbo.js): the single gun plays both sets of foley
+  const MS=built.sounds?.mod??{};
+  for(const [id,w] of Object.entries(built.weapons))if(w.akimboOf&&MS[id]&&MS[w.akimboOf])MS[w.akimboOf].notes={...MS[id].notes,...MS[w.akimboOf].notes};
   Object.assign(data.weapons,built.weapons);
   data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons).filter(id=>!built.weapons[id].noBox)])];   // noBox: quest weapons (Der Eisendrache's bow)
 }

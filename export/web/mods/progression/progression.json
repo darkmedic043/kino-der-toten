@@ -171,12 +171,6 @@
       "gunsmith": 28
     },
     {
-      "id": "cz75dw_zm",
-      "rarity": "epic",
-      "kit": true,
-      "gunsmith": 29
-    },
-    {
       "id": "python_zm",
       "rarity": "rare",
       "kit": true,
@@ -298,11 +292,6 @@
       "level": 15
     },
     {
-      "id": "aw_atlas45_dw",
-      "rarity": "rare",
-      "level": 16
-    },
-    {
       "id": "bo3_spas12_irradiated",
       "rarity": "epic",
       "level": 17
@@ -335,11 +324,6 @@
     {
       "id": "bo3_m1014_jellyfish",
       "rarity": "rare",
-      "level": 22
-    },
-    {
-      "id": "aw_m1_irons_dw",
-      "rarity": "epic",
       "level": 22
     },
     {
