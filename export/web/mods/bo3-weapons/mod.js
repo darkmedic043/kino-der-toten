@@ -15,6 +15,7 @@
 // flux and impact per arc, reload foley on the animation's notetracks, the idle hum.
 import * as THREE from 'three';
 import { applyGlow, tickGlow } from './glow.js';
+import { setupAw } from './aw.js';
 
 const BASE=new URL('./',import.meta.url).href;
 const TUNE={base:{first:1000,aim:70,arc:300,kills:10},pap:{first:1200,aim:90,arc:420,kills:24}};
@@ -210,4 +211,5 @@ export default async function setup(api){
   });
   host.on('reset',()=>{pending.length=0;setHum(false);});
   window.kino.bo3={fire,arcs,pending,play,sounds:S};
+  setupAw(api);   // the Advanced Warfare guns' form swap and lockdown
 }

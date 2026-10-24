@@ -116,7 +116,8 @@ export function grantWeaponXp(cat,def,id,profile,amount){
   return unlockedAttachments(cat,def,id,profile).slice(before);
 }
 
-const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','suppressed','automatic','fireType','attachments','attachment','mounted'];
+const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','suppressed','automatic','fireType','attachments','attachment','mounted',
+  'animations','raiseTime','dropTime','sprintInTime','sprintLoopTime','sprintOutTime','reloadStartTime','reloadEndTime'];   // the last row: attachments with their own clips (attachClips)
 function snapshot(obj){if(!pristine.has(obj)){const s={};for(const k of STAT_FIELDS)s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);pristine.set(obj,s);}return pristine.get(obj);}
 function restore(obj){const s=snapshot(obj);for(const k of STAT_FIELDS){if(s[k]===undefined)delete obj[k];else obj[k]=structuredClone(s[k]);}}
 
@@ -193,6 +194,17 @@ export function previewDef(cat,def,id,ids){
   return base;
 }
 
+// Attachments that bring their own clips (imported AW guns, def.attachAnims {attId: {animations, ...times}}: the
+// Tac-19's foregrip swaps in its grip clip set, the red dot its own aim clips). A second form on the same model
+// (def.attachment.altForm, the OHM's shotgun) keeps the fitted parts and takes the aim clips it shares.
+function attachClips(obj,list){
+  for(const a of list){const x=obj.attachAnims?.[a.id];if(!x)continue;const {animations,...times}=x;
+    obj.animations={...obj.animations,...animations};Object.assign(obj,times);}
+  const alt=obj.attachment;
+  if(alt?.altForm){Object.assign(alt,{mounted:obj.mounted,hideTags:obj.hideTags,scope:obj.scope,adsFov:obj.adsFov});
+    alt.animations={...alt.animations,adsUpAnim:obj.animations.adsUpAnim,adsDownAnim:obj.animations.adsDownAnim};}
+}
+
 // Rewrite weapon definitions from the profile. Safe to call repeatedly.
 export function applyAttachments(cat,weapons,profile){
   for(const [id,def] of Object.entries(weapons)){
@@ -202,8 +214,8 @@ export function applyAttachments(cat,weapons,profile){
     if(!ids.length)continue;
     const list=ids.map(a=>cat.attachments.find(x=>x.id===a));
     const shown=shownTags(def,list,cat);
-    applyStats(def,list,cat,shown);foldIronSights(def,list,cat,id);
-    if(def.upgrade){const keep=def.upgrade.attachment;applyStats(def.upgrade,list.filter(a=>!a.underbarrel),cat,shown);foldIronSights(def.upgrade,list,cat,id);if(keep)def.upgrade.attachment=keep;}
+    applyStats(def,list,cat,shown);foldIronSights(def,list,cat,id);attachClips(def,list);
+    if(def.upgrade){const keep=def.upgrade.attachment;applyStats(def.upgrade,list.filter(a=>!a.underbarrel),cat,shown);foldIronSights(def.upgrade,list,cat,id);attachClips(def.upgrade,list);if(keep)def.upgrade.attachment=keep;}
     const ub=list.find(a=>a.underbarrel);
     if(ub)def.attachment=underbarrel(ub.underbarrel,def,weapons,id,shown);
   }

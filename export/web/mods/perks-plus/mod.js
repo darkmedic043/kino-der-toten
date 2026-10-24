@@ -52,8 +52,8 @@ export default function setup(api) {
   if (audio?.manifest) for (const [id, url] of Object.entries(STINGS)) audio.manifest[id] ??= { url };
   const has = id => session.perks?.has(id);
   for (const [key, factor] of [['moveSpeed', 209 / 190], ['sprintSpeed', 330 / 285]]) {
-    let base = player[key];
-    Object.defineProperty(player, key, { configurable: true, get: () => base * (has('specialty_longersprint') ? factor : 1) * (window.kino?.bo7Perks?.speedMul?.() ?? 1), set: v => { base = v; } });   // bo7Perks: Melee Macchiato's Stick 'n Move
+    const d = Object.getOwnPropertyDescriptor(player, key); let base = player[key];   // chained: earlier mods' getters (Siren, Havoc, AW lockdown) stay in
+    Object.defineProperty(player, key, { configurable: true, get: () => (d?.get ? d.get() : base) * (has('specialty_longersprint') ? factor : 1) * (window.kino?.bo7Perks?.speedMul?.() ?? 1), set: v => { if (d?.set) d.set(v); else base = v; } });   // bo7Perks: Melee Macchiato's Stick 'n Move
   }
   host.on('beforeEnemyDamage', e => { if (e.head && e.cause === 'bullet' && !e.melee && has('specialty_deadshot')) e.amount *= 1.25; });
   setupBo7Perks({ host, session, player, enemies, scene, camera, audio, world, powerups, announce, toast });

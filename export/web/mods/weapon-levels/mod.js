@@ -54,6 +54,8 @@ export default async function setup(api){
   host.on('update',()=>wrapDrops(session.drops));
   const equip=view.equip.bind(view);
   view.equip=async(def,...rest)=>{
+    // an attachment that swaps the clips (gunsmith.js attachClips) needs the rig rebuilt: the view is keyed by id
+    const clips=def?.attachAnims?JSON.stringify(def.animations):'';if(clips!==view.clipSet){view.clipSet=clips;view.currentId=null;}
     const r=await equip(def,...rest);
     const hidden=new Set(def?.hideTags??[]);
     view.gun?.traverse(o=>{if(o.isBone&&o.scale.x<1e-3&&attachmentTags.has(o.name)&&!hidden.has(o.name))o.scale.setScalar(1);});

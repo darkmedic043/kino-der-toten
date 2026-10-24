@@ -178,11 +178,13 @@ function collect(type){
   map.onPowerup?.(type);
 }
 const blocked=()=>!!map?.blocked?.()||!!mods.gunBlocked;   // gunBlocked: a mod has put the gun away (operator weapons)
+// dual wield has no aim, except the XMG's lockdown (def.lockdown: mods/bo3-weapons/aw.js poses it)
+const aiming=()=>ads&&(!session.def.dualWield||!!session.def.lockdown);
 function shoot(){
   if(!active||blocked()||!view.ready||view.mode==='raise'||session.busy||session.weaponUnavailable)return false;
   if(session.reloadLeft>0&&session.def.segmentedReload&&session.weapon.mag>0){session.interruptReload();reloadShot=true;return false;}
   if(!session.fire()){if(session.weapon.mag===0&&primaryPressed){audio.weapon('empty',session.def);reload();}return false;}
-  view.shoot({ads:ads&&!session.def.dualWield,empty:session.weapon.mag===0,hand:session.def.dualWield&&session.shots%2?'left':'right'});audio.weapon('shot',session.def);muzzle.position.copy(camera.position);muzzle.intensity=160;camera.rotation.x=Math.min(1.48,camera.rotation.x+(ads?.008:.015));
+  view.shoot({ads:aiming()&&!session.def.dualWield,empty:session.weapon.mag===0,hand:session.def.dualWield&&session.shots%2?'left':'right'});audio.weapon('shot',session.def);muzzle.position.copy(camera.position);muzzle.intensity=160;camera.rotation.x=Math.min(1.48,camera.rotation.x+(ads?.008:.015));
   const forward=camera.getWorldDirection(new THREE.Vector3()),base=session.def.baseId??session.weapon.id;
   if(map.fire?.(session.def,forward))return true;   // a map's own weapons (Moon's Wave Gun / Zap Guns)
   for(const f of mods.fireHooks??[])if(f(session.def,forward,{ads}))return true;   // a mod's own projectiles (bo7-weapons: the Grimhawk)
@@ -315,7 +317,7 @@ function update(dt){
       const crawl=40/Math.max(1,player.crouchSpeed??player.moveSpeed);
       if(!map.prePlayer?.(dt))player.update(dt,session.phase==='reviving'?{forward:forward*crawl,strafe:strafe*crawl,crouch:true}:{forward,strafe,sprint,crouch:keys.has('ControlLeft')||keys.has('ControlRight')||keys.has('KeyC')||touch.crouch,jump:keys.has('Space'),jumpPressed:touch.jump});
       if(world.bounds&&player.getFeetPosition().y<world.bounds.min.y-600){player.respawn();toast('You fell out of the map');}
-      view.update(dt,{moving,sprint,ads:ads&&!session.def.dualWield,reloading:session.reloadLeft>0,empty:session.weapon.mag===0,time:session.time});
+      view.update(dt,{moving,sprint,ads:aiming(),reloading:session.reloadLeft>0,empty:session.weapon.mag===0,time:session.time});
       view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();view.input={sprint,ads,fire:primary};   // this frame's input, for mods (inspect cancels on sprint/aim; operator weapons read touch/pad fire)
       perkDrink.update(dt,session);
       if((!sprint||mods.sprintFire?.())&&session.phase!=='reviving'&&!mods.holdFire?.()&&(primaryPressed||(primary&&session.def.automatic)||burstLeft>0||reloadShot)){   // holdFire: a mod handles the fire button (bows: hold to draw on touch)
@@ -339,7 +341,7 @@ function update(dt){
       for(const p of [...particles]){p.life-=dt;p.velocity.y-=200*dt;p.mesh.position.addScaledVector(p.velocity,dt);if(p.life<=0){p.mesh.removeFromParent();p.mesh.geometry.dispose();p.mesh.material.dispose();particles.splice(particles.indexOf(p),1);}}
     }
   }
-  muzzle.intensity=Math.max(0,muzzle.intensity-dt*2200);camera.fov=THREE.MathUtils.damp(camera.fov,(ads&&!session.def.dualWield&&!session.drinking&&!session.meleeLeft&&!session.reloadLeft?(session.def.adsFov||56)*settings.fov/78:settings.fov)+(mods.fovOffset??0),12,dt);   // mods.fovOffset: the movement mod's sprint/slide kickcamera.updateProjectionMatrix();
+  muzzle.intensity=Math.max(0,muzzle.intensity-dt*2200);camera.fov=THREE.MathUtils.damp(camera.fov,(aiming()&&!session.drinking&&!session.meleeLeft&&!session.reloadLeft?(session.def.adsFov||56)*settings.fov/78:settings.fov)+(mods.fovOffset??0),12,dt);   // mods.fovOffset: the movement mod's sprint/slide kickcamera.updateProjectionMatrix();
   hud();
 }
 const T=(id,v)=>{v=String(v);const el=$(id);if(el&&el.textContent!==v)el.textContent=v;};

@@ -472,5 +472,83 @@
     0
    ]
   ]
+ },
+ {
+  "id": "aw_cel3",
+  "name": "CEL-3 Cauterizer",
+  "cls": "shotgun",
+  "max": 3
+ },
+ {
+  "id": "aw_blunderbuss",
+  "name": "Blunderbuss",
+  "cls": "shotgun",
+  "max": 2
+ },
+ {
+  "id": "aw_tac19",
+  "name": "Tac-19",
+  "cls": "shotgun",
+  "max": 4
+ },
+ {
+  "id": "aw_bulldog",
+  "name": "Bulldog",
+  "cls": "shotgun",
+  "max": 3
+ },
+ {
+  "id": "aw_ohm",
+  "name": "Ohm",
+  "cls": "lmg",
+  "max": 4
+ },
+ {
+  "id": "aw_xmg",
+  "name": "XMG",
+  "cls": "lmg",
+  "max": 3
+ },
+ {
+  "id": "aw_m1_irons",
+  "name": "M1 Irons",
+  "cls": "pistol",
+  "max": 2
+ },
+ {
+  "id": "aw_sentry",
+  "name": "MG Turret",
+  "cls": "lmg",
+  "max": 2
+ },
+ {
+  "id": "aw_mdl",
+  "name": "MDL",
+  "cls": "launcher",
+  "max": 2
+ },
+ {
+  "id": "aw_rw1",
+  "name": "RW1",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "aw_atlas45",
+  "name": "Atlas 45",
+  "cls": "pistol",
+  "max": 2
+ },
+ {
+  "id": "aw_m1_irons_dw",
+  "name": "M1 Irons Akimbo",
+  "cls": "pistol",
+  "max": 2
+ },
+ {
+  "id": "aw_atlas45_dw",
+  "name": "Atlas 45 Akimbo",
+  "cls": "pistol",
+  "max": 2
  }
 ]

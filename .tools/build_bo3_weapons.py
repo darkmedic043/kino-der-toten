@@ -360,10 +360,12 @@ def aw(cls, gid, name, up, gun, tpl, stats, glow, single=True, **kw):
     roles = dict(idle='idle', fire='fire', adsFire='ads_fire', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='first_raise',
                  drop='putaway', sprintIn='sprint_in', sprintLoop='sprint_loop', sprintOut='sprint_out')
     roles.update(kw.pop('roles', {}))
-    mdl = 'vm_s1_'+gun+('' if single else '_rdw')
-    return dict(cls=cls, id='aw_'+gid, name=name, up=up, model=mdl, world='wm_s1_'+gun+('' if single else '_rdw'),
+    mdl = kw.pop('model', 'vm_s1_'+gun+('' if single else '_rdw'))
+    return dict(cls=cls, id='aw_'+gid, name=name, up=up, model=mdl, world=kw.pop('world', 'wm_s1_'+gun+('' if single else '_rdw')),
                 upModel=kw.pop('upModel', mdl+'_up'), upWorld=kw.pop('upWorld', 'wm_s1_'+gun+('' if single else '_rdw')+'_up'), pre=pre, tpl=tpl, stats=stats, roles=roles,
                 ads=kw.pop('ads', (pre+'_ads_up', pre+'_ads_down')), shots=['wpn_s1_'+gun+'_shot'], upShots=['wpn_s1_'+gun+'_pap_shot'], glow=glow, **kw)
+DW_ROLES = dict(idle='rdw_idle', fire='rdw_fire', adsFire='rdw_fire', reload='rdw_reload', reloadEmpty='rdw_reload_empty', rais='fdw_pullout', firstRaise='fdw_pullout',
+                drop='fdw_putaway', sprintIn='fdw_sprint_in', sprintLoop='fdw_sprint_loop', sprintOut='fdw_sprint_out')
 MODW += [
   aw('Shotgun', 'cel3', 'CEL-3 Cauterizer', 'CEL-3 Immolator', 'cel3', 'spas_zm', glow='#ff7a2a',
      stats=dict(clipSize=20, maxAmmo=120, startAmmo=120, damage=150, minDamage=20, fireTime=.2, pellets=8, automatic=True, fireType='Full Auto', segmentedReload=False, price=2000),
@@ -374,20 +376,32 @@ MODW += [
   # pump action: fire and pump joined into one clip (fireTime covers both), shells one at a time
   aw('Shotgun', 'tac19', 'Tac-19', 'Tac-19 Hellfire', 'tac19', 'ithaca_zm', glow='#ff4a3a',
      stats=dict(clipSize=6, maxAmmo=54, startAmmo=54, damage=170, minDamage=20, fireTime=.9, pellets=8, price=1500, segmentedReload=True, reloadAmmoAdd=1, reloadStartAdd=0),
-     roles=dict(fire=('fire', 'pump'), adsFire=('ads_fire', 'ads_pump'), reload='reload_loop', reloadStart='reload_in', reloadEnd='reload_out', reloadEmpty=None, firstRaise='pullout')),
+     roles=dict(fire=('fire', 'pump'), adsFire=('ads_fire', 'ads_pump'), reload='reload_loop', reloadStart='reload_in', reloadEnd='reload_out', reloadEmpty=None, firstRaise='pullout'),
+     sight=dict(tag='tag_weapon', offset=[8, 0, 15.5]),
+     # its grip variant: a vertical foregrip (BO3's Man-O-War grip) on the pump, and the grip_* clip set with it
+     grip=dict(model='attach_t7_ar_talon_foregrip_01_view', tag='tag_foregrip',
+               roles=dict(idle='grip_idle', fire=('grip_fire', 'grip_pump'), adsFire=('grip_ads_fire', 'grip_ads_pump'), reload='grip_reload_loop', reloadStart='grip_reload_in',
+                          reloadEnd='grip_reload_out', rais='grip_pullout', firstRaise='grip_pullout', drop='grip_putaway', sprintIn='grip_sprint_in',
+                          sprintLoop='grip_sprint_loop', sprintOut='grip_sprint_out'))),
   aw('Shotgun', 'bulldog', 'Bulldog', 'Bulldog Rabid', 'bulldog', 'spas_zm', glow='#5ad0ff',
      stats=dict(clipSize=6, maxAmmo=60, startAmmo=60, damage=160, minDamage=20, fireTime=.25, pellets=8, segmentedReload=False, price=1500),
      roles=dict(reloadEmpty='reload')),
+  # alt: its shotgun form (the engine's attachment toggle, key 5), the gun folding open between them
   aw('Light machine gun', 'ohm', 'Ohm', 'Ohm Overload', 'ohm', 'rpk_zm', glow='#7affd2',
      stats=dict(clipSize=60, maxAmmo=360, startAmmo=360, damage=130, minDamage=90, fireTime=.085, price=2500),
-     roles=dict(reloadEmpty='reload', firstRaise='pullout')),
+     roles=dict(reloadEmpty='reload', firstRaise='pullout'), sight=dict(tag='tag_sight_on', offset=[-4, 0, 0]),
+     alt=dict(name='Shotgun', tpl='spas_zm', into='to_shotty', out='out_shotty',
+              stats=dict(clipSize=6, maxAmmo=48, startAmmo=48, damage=150, minDamage=25, fireTime=.45, pellets=8, automatic=False, fireType='Single Shot', segmentedReload=False),
+              roles=dict(idle='shotty_idle', fire='shotty_fire', adsFire='shotty_ads_fire', reload='shotty_reload', rais='shotty_pullout', firstRaise='shotty_pullout',
+                         drop='shotty_putaway', sprintIn='shotty_sprint_in', sprintLoop='shotty_sprint_loop', sprintOut='shotty_sprint_out'))),
   # arm-mounted exo guns, one per forearm: dual wield (rdw right, ldw left; the fdw clips move both)
   aw('Light machine gun', 'xmg', 'XMG', 'XMG Exterminator', 'xmg', 'rpk_zm', glow='#ff5a5a', single=False,
      stats=dict(clipSize=100, maxAmmo=500, startAmmo=500, damage=120, minDamage=85, fireTime=.065, price=3000),
      roles=dict(idle='rdw_idle', fire='rdw_fire', adsFire='rdw_fire', reload='rdw_reload', reloadEmpty='rdw_reload', rais='fdw_pullout', firstRaise='fdw_pullout',
                 drop='fdw_putaway', sprintIn='fdw_sprint_in', sprintLoop='fdw_sprint_loop', sprintOut='fdw_sprint_out'),
      ads=('am_s1_xmg_fdw_ads_up', 'am_s1_xmg_fdw_ads_down'),
-     left=dict(model='vm_s1_xmg_ldw', idle='ldw_idle', fire='ldw_fire', reload='ldw_reload'), upLeft='vm_s1_xmg_ldw_up'),
+     left=dict(model='vm_s1_xmg_ldw', idle='ldw_idle', fire='ldw_fire', reload='ldw_reload'), upLeft='vm_s1_xmg_ldw_up',
+     lockdown=('fdw_to_lockdown', 'fdw_out_lockdown')),   # aiming locks the guns down (mods/bo3-weapons/aw.js)
   aw('Pistol', 'm1_irons', 'M1 Irons', 'M1 Ironclad', 'm1_irons', 'm1911_zm', glow='#ffd36a',
      stats=dict(clipSize=8, maxAmmo=96, startAmmo=96, damage=350, minDamage=200, fireTime=.18, automatic=False, fireType='Single Shot', price=1000),
      offset=[-1, 4, 0]),   # its idle holds the revolver ~9 units lower than the Atlas 45's: raise it into view
@@ -401,10 +415,21 @@ MODW += [
      roles=dict(reload='reload_loop', reloadStart='reload_in', reloadEnd='reload_out', reloadEmpty=None)),
   aw('Pistol', 'rw1', 'RW1', 'RW1 Railstorm', 'rw1', 'm1911_zm', glow='#5a9aff',
      stats=dict(clipSize=1, maxAmmo=40, startAmmo=40, damage=2500, minDamage=1500, fireTime=.3, automatic=False, fireType='Single Shot', price=1200),
-     roles=dict(reloadEmpty='reload', firstRaise='pullout')),
+     roles=dict(reloadEmpty='reload', firstRaise='pullout'), sight=dict(tag='tag_weapon', offset=[8, 0, 10.5])),
   aw('Pistol', 'atlas45', 'Atlas 45', 'Atlas 45 Titan', 'atlas45', 'm1911_zm', glow='#ffa04a',
      stats=dict(clipSize=12, maxAmmo=120, startAmmo=120, damage=150, minDamage=90, fireTime=.12, automatic=False, fireType='Single Shot', price=900),
      roles=dict(firstRaise='pullout'), upModel='vm_s1_atlas45_rdw_up', upWorld='wm_s1_atlas45_rdw_up'),
+  # akimbo pistols (rdw right, ldw left, fdw both). The pack has no plain left Atlas: the single one's bones get the _le names
+  aw('Pistol', 'm1_irons_dw', 'M1 Irons Akimbo', 'M1 Ironclads', 'm1_irons', 'm1911_zm', glow='#ffd36a', single=False,
+     stats=dict(clipSize=16, maxAmmo=160, startAmmo=160, damage=350, minDamage=200, fireTime=.12, automatic=False, fireType='Single Shot', price=2000),
+     roles=DW_ROLES, ads=('am_s1_m1_irons_fdw_ads_up', 'am_s1_m1_irons_fdw_ads_down'),
+     left=dict(model='vm_s1_m1_irons_ldw', idle='ldw_idle', fire='ldw_fire', reload='ldw_reload')),
+  aw('Pistol', 'atlas45_dw', 'Atlas 45 Akimbo', 'Atlas 45 Titans', 'atlas45', 'm1911_zm', glow='#ffa04a', single=False,
+     stats=dict(clipSize=24, maxAmmo=240, startAmmo=240, damage=150, minDamage=90, fireTime=.08, automatic=False, fireType='Single Shot', price=1800),
+     roles=DW_ROLES, ads=('am_s1_atlas45_fdw_ads_up', 'am_s1_atlas45_fdw_ads_down'), model='vm_s1_atlas45', world='wm_s1_atlas45',
+     upModel='vm_s1_atlas45_rdw_up', upWorld='wm_s1_atlas45_rdw_up',
+     left=dict(model='vm_s1_atlas45', out='vm_s1_atlas45_ldw', suffix='_le', idle='ldw_idle', fire='ldw_fire', reload='ldw_reload', reloadEmpty='ldw_reload_empty'),
+     upLeft='vm_s1_atlas45_ldw_up'),
 ]
 for w in MODW:
     if w['id'].startswith('aw_'): w['roles'] = {k: v for k, v in w['roles'].items() if v}
@@ -423,28 +448,44 @@ PARTS = {'bo3_mr23_tesla': ['tag_sra', 'tag_foregrip', 'j_frontsight'], 'bo3_p90
          'bo3_mg4_heaven': ['tag_sra', 'tag_foregrip']}
 modsounds = {}
 SOUND_NOTES = ('sndnt#', 'wpn_s1_')   # the codolbf pack's markers carry a prefix; the AW pack's are the sound names
+def clip_notes(names): return {n for nm in names for _, n in read_seanim(SRC/'xanims'/(nm+'.seanim'))['notes'] if n.startswith(SOUND_NOTES)}
+def clipset(w, roles, notes):
+    # one clip per role ('fire': ('fire', 'pump') joins clips back to back); returns the animations and their lengths
+    A, T = {}, {}
+    for role, suffix in roles.items():
+        role = 'raise' if role == 'rais' else role   # ('raise' is a Python keyword)
+        names = [w['pre']+'_'+x for x in (suffix if isinstance(suffix, tuple) else (suffix,))]
+        if not all((SRC/'xanims'/(n+'.seanim')).exists() for n in names): print('  no anim', names); continue
+        A[role+'Anim'], T[role] = animation(names if len(names) > 1 else names[0], {}, role in ('idle', 'emptyIdle', 'sprintLoop', 'chargeLoop'))
+        notes |= clip_notes(names)
+    return A, T
+def fill(A):
+    A.setdefault('emptyIdleAnim', A['idleAnim']); A.setdefault('lastShotAnim', A['fireAnim'])
+    A.setdefault('adsFireAnim', A['fireAnim']); A.setdefault('adsLastShotAnim', A['adsFireAnim'])
+    A.setdefault('reloadEmptyAnim', A['reloadAnim']); A['quickRaiseAnim'] = A['raiseAnim']; A['quickDropAnim'] = A['dropAnim']
+    return A
+def times(T):
+    t = dict(raiseTime=T['raise'], dropTime=T['drop'], sprintInTime=T.get('sprintIn'), sprintLoopTime=T.get('sprintLoop'), sprintOutTime=T.get('sprintOut'),
+             reloadTime=T['reload'], reloadEmptyTime=T.get('reloadEmpty', T['reload']), reloadStartTime=T.get('reloadStart'), reloadEndTime=T.get('reloadEnd'))
+    return {k: v for k, v in t.items() if v is not None}
+def tpl_fields(tpl): return {k: v for k, v in GAME[tpl].items() if k not in ('animations', 'upgrade', 'sounds', 'notetrackSounds', 'hideTags', 'model', 'worldModel', 'id', 'name')}
 for w in MODW:
     if not (SRC/'xmodels'/w['model']).exists(): print('skip', w['id']); continue
     view, gm = model(w['model'], rename=w.get('rename'), glow=w['glow'], glow_maps={k: (png(v[0]), v[1], v[2]) for k, v in GLOW_MAPS.items() if png(v[0])}, drop=w.get('drop'))
     world_url = model(w.get('world', w['model']), (w.get('world') or w['model'])+'_world', rename=w.get('rename'), glow=w['glow'], light=True, drop=w.get('drop'))[0]
     gb = {b['name']: b['lpos'] for b in gm['bones'] if 'lpos' in b and b['parent'] >= 0}
-    A2, T2, notes = {}, {}, set()
-    for role, suffix in w['roles'].items():
-        role = 'raise' if role == 'rais' else role   # ('raise' is a Python keyword)
-        names = [w['pre']+'_'+x for x in (suffix if isinstance(suffix, tuple) else (suffix,))]
-        if not all((SRC/'xanims'/(n+'.seanim')).exists() for n in names): print('  no anim', names); continue
-        A2[role+'Anim'], T2[role] = animation(names if len(names) > 1 else names[0], gb, role in ('idle', 'emptyIdle', 'sprintLoop', 'chargeLoop'))
-        notes |= {n for nm in names for _, n in read_seanim(SRC/'xanims'/(nm+'.seanim'))['notes'] if n.startswith(SOUND_NOTES)}
+    notes = set()
+    A2, T2 = clipset(w, w['roles'], notes)
     for name in (w['pre']+'_inspect', w['pre']+'_inspect_full'):   # weapon inspect (hold reload; mods/inspect)
         if (SRC/'xanims'/(name+'.seanim')).exists():
             A2['inspectAnim'], T2['inspect'] = animation(name, gb)
             notes |= {n for _, n in read_seanim(SRC/'xanims'/(name+'.seanim'))['notes'] if n.startswith(SOUND_NOTES)}; break
     for key, name in zip(('adsUpAnim', 'adsDownAnim'), w['ads']):
         if (SRC/'xanims'/(name+'.seanim')).exists(): A2[key], _ = animation(name, gb)
-    A2.setdefault('emptyIdleAnim', A2['idleAnim']); A2.setdefault('lastShotAnim', A2['fireAnim'])
-    A2.setdefault('adsFireAnim', A2['fireAnim']); A2.setdefault('adsLastShotAnim', A2['adsFireAnim'])
-    A2.setdefault('reloadEmptyAnim', A2['reloadAnim']); A2['quickRaiseAnim'] = A2['raiseAnim']; A2['quickDropAnim'] = A2['dropAnim']
-    t = {k: v for k, v in GAME[w['tpl']].items() if k not in ('animations', 'upgrade', 'sounds', 'notetrackSounds', 'hideTags', 'model', 'worldModel', 'id', 'name')}
+    fill(A2)
+    if w.get('lockdown'):   # the XMG's lockdown: its fold-in and fold-out clips, posed while aiming (mods/bo3-weapons/aw.js)
+        for key, suf in zip(('lockdownInAnim', 'lockdownOutAnim'), w['lockdown']): A2[key], _ = animation(w['pre']+'_'+suf, {})
+    t = tpl_fields(w['tpl'])
     t.update(w['stats'])
     t.update(raiseTime=T2['raise'], dropTime=T2['drop'], sprintInTime=T2['sprintIn'], sprintLoopTime=T2['sprintLoop'], sprintOutTime=T2['sprintOut'],
              reloadTime=T2['reload'], reloadEmptyTime=T2.get('reloadEmpty', T2['reload']))
@@ -453,16 +494,30 @@ for w in MODW:
     # guns with their own sight built in take no optic mounts (the G18's tag_eotech sits behind the slide and its
     # tag_red_dot inside the built-in holo, so a mounted sight floated off the gun)
     mounts = {k: v for k, v in MOUNTS.items() if v['tag'] in {b['name'] for b in gm['bones']} and not (w['id'] in BUILT_IN_SIGHT and k in ('reddot', 'holo', 'reflex2x'))}
+    # attachments that bring their own clips (gunsmith.js def.attachAnims): the AW guns' red dot (no rail tag: BO3's reflex
+    # placed by an offset from a bone) with its own aim clips, and the Tac-19's foregrip with its grip clip set
+    attach_anims = {}
+    if w.get('sight') and 'reddot' in MOUNTS:
+        mounts['reddot'] = {**MOUNTS['reddot'], **w['sight']}
+        ads = [w['pre']+'_reddot_ads_'+d for d in ('up', 'down')]
+        if all((SRC/'xanims'/(n+'.seanim')).exists() for n in ads): attach_anims['reddot'] = {'animations': {'adsUpAnim': animation(ads[0], {})[0], 'adsDownAnim': animation(ads[1], {})[0]}}
+    if w.get('grip') and (SRC/'xmodels'/w['grip']['model']).exists():
+        mounts['grip'] = {'model': model(w['grip']['model'], 'attach_'+w['grip']['model'])[0], 'tag': w['grip']['tag']}
+        GA, GT = clipset(w, w['grip']['roles'], notes)
+        attach_anims['grip'] = {'animations': fill(GA), **times(GT)}
     common2 = {**t, 'hideTags': PARTS.get(w['id'], []), 'mounts': mounts, 'statAttachments': ['extmag'], 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands, 'animations': A2, 'model': view, 'worldModel': world_url, 'lazyWorld': True,
                'bo3': True, 'modWeapon': True, **({'noBox': True} if w.get('noBox') else {}), **({'scope': 'reflex'} if w['id'] in BUILT_IN_SIGHT else {}), 'glow': w['glow'], 'arc': w.get('arc', False), **({'element': w['element']} if w.get('element') else {}), 'viewOffset': w.get('offset', [3, -4, 0]), 'weaponClass': w['cls'],
                # parts that are always on (the AS50's scope is its own model): mounted like attachments (mods/weapon-levels/mounts.js)
-               'fixedParts': [{'model': model(mdl, 'part_'+mdl)[0], 'tag': tag} for mdl, tag in w.get('fixed', []) if (SRC/'xmodels'/mdl).exists()]}
+               'fixedParts': [{'model': model(mdl, 'part_'+mdl)[0], 'tag': tag} for mdl, tag in w.get('fixed', []) if (SRC/'xmodels'/mdl).exists()],
+               **({'attachAnims': attach_anims} if attach_anims else {}), **({'lockdown': True} if w.get('lockdown') else {})}
     if w.get('projectile'): common2['projectileModel'] = model(w['projectile'], 'part_'+w['projectile'])[0]   # fired as the rocket
     up = {**common2, 'name': w['up'], 'clipSize': int(t['clipSize']*1.5), 'maxAmmo': int(t['maxAmmo']*1.5), 'startAmmo': int(t['maxAmmo']*1.5),
           'damage': t['damage']*2.2, 'minDamage': t['minDamage']*2.2}
     for k in ('bo3', 'modWeapon', 'price'): up.pop(k, None)
     if w.get('left'):   # dual wield (animation.js): the left gun's own clips ride on top of the right's; ADS is off
-        lv, lm = model(w['left']['model'], glow=w['glow'])
+        lw = w['left']   # suffix: a single gun's bones renamed as the left hand's (lw['out'] names the copy)
+        rn = lw.get('suffix') and {b['name']: b['name']+lw['suffix'] for b in SEM.read_semodel(SRC/'xmodels'/lw['model']/(lw['model']+'_LOD0.semodel'))['bones']}
+        lv, lm = model(lw['model'], lw.get('out'), rename=rn or None, glow=w['glow'])
         LA = {'idleAnimLeft': None, 'fireAnimLeft': None, 'reloadAnimLeft': None, 'reloadEmptyAnimLeft': None}
         for key in list(LA):
             suf = w['left'].get(key[:-8])
@@ -474,6 +529,15 @@ for w in MODW:
         up['model'] = model(w['upModel'], rename=w.get('rename'), glow=w['glow'], drop=w.get('drop'))[0]
         uw = w.get('upWorld', w['upModel'])
         if (SRC/'xmodels'/uw).exists(): up['worldModel'] = model(uw, uw+'_world', rename=w.get('rename'), glow=w['glow'], light=True, drop=w.get('drop'))[0]
+    if w.get('alt'):   # a second form on the same model (the OHM's shotgun): def.attachment, entered and left through its own clips
+        al = w['alt']; A3, T3 = clipset(w, al['roles'], notes); fill(A3)
+        A3['attachInAnim'], _ = animation(w['pre']+'_'+al['into'], {}); A2['attachOutAnim'], _ = animation(w['pre']+'_'+al['out'], {})
+        notes |= clip_notes([w['pre']+'_'+al['into'], w['pre']+'_'+al['out']])
+        ta = {**tpl_fields(al['tpl']), **al['stats'], **times(T3)}; ta.pop('price', None)
+        drop = ('attachAnims', 'statAttachments', 'mounts', 'price')
+        common2['attachment'] = {**{k: v for k, v in common2.items() if k not in drop}, **ta, 'name': al['name'], 'animations': A3, 'altForm': True}
+        up['attachment'] = {**common2['attachment'], 'model': up['model'], 'worldModel': up['worldModel'], 'clipSize': int(ta['clipSize']*1.5), 'maxAmmo': int(ta['maxAmmo']*1.5),
+                            'startAmmo': int(ta['maxAmmo']*1.5), 'damage': ta['damage']*2.2, 'minDamage': ta['minDamage']*2.2}
     weapons[w['id']] = {'id': w['id'], 'name': w['name'], **common2, 'upgrade': up}
     modsounds[w['id']] = {'shots': [k for k in map(snd, w['shots']) if k], 'last': [k for k in map(snd, w.get('last', [])) if k],
                           'notes': {n: k for n in sorted(notes) if (k := snd(st := n.removeprefix('sndnt#')) or snd(st+'_r') or snd(st+'1') or snd(NOTE_ALIAS.get(st, '')))}}

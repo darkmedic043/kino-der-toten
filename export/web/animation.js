@@ -117,7 +117,9 @@ export class ViewWeapon {
     }
     this.aim=0;this.recoil=0;this.meleeLeft=0;this.meleeType=null;this.sprintBlend=0;this.applyAim();
     this.rig.play('idleAnim',true,1,0);this.rig.update(0);
-    this.mode=this.rig.play('raiseAnim',false,this.clipSpeed('raiseAnim',def.raiseTime),.04)?'raise':'idle';
+    // raiseWith: a one-off clip in place of the raise (a weapon's form change, mods/bo3-weapons/aw.js)
+    const swap=this.raiseWith;this.raiseWith=null;
+    this.mode=(swap&&this.rig.play(swap,false,1,.04))||this.rig.play('raiseAnim',false,this.clipSpeed('raiseAnim',def.raiseTime),.04)?'raise':'idle';
     this.root.traverse(o=>{o.frustumCulled=false;});
     this.ready=true;this.pivot.visible=true;
   }
