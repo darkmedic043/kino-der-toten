@@ -305,10 +305,14 @@ function thumb(id){
         await poseIdle(model,def);
         for(const tag of def.hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
         if(def.glow)tickGlow(applyGlow(model,def.glow,{depthTest:true}),1);   // BO3 mod guns' lights, as in game
-        const pivot=new THREE.Group();pivot.add(model);pivot.rotation.set(.12,-.35,0);thumbScene.add(pivot);pivot.updateMatrixWorld(true);
-        const box=new THREE.Box3().setFromObject(pivot),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
-        pivot.position.sub(center);const span=Math.max(size.x/thumbCamera.aspect,size.y,size.z*.6);
-        thumbCamera.position.set(0,0,span/(2*Math.tan(THREE.MathUtils.degToRad(thumbCamera.fov/2)))*1.08);thumbCamera.lookAt(0,0,0);
+        // framed from the gun's own box turned with the pivot: every corner must fit the view, the near ones included
+        // (a long barrel turned toward the camera was cut off when only the box's middle was fitted)
+        const pivot=new THREE.Group();pivot.add(model);thumbScene.add(pivot);pivot.updateMatrixWorld(true);
+        const box=new THREE.Box3().setFromObject(pivot),center=box.getCenter(new THREE.Vector3());
+        pivot.rotation.set(.12,-.35,0);center.applyEuler(pivot.rotation);pivot.position.sub(center);pivot.updateMatrixWorld(true);
+        const tv=Math.tan(THREE.MathUtils.degToRad(thumbCamera.fov/2)),th=tv*thumbCamera.aspect,c=new THREE.Vector3();let dist=0;
+        for(let i=0;i<8;i++){c.set(i&1?box.max.x:box.min.x,i&2?box.max.y:box.min.y,i&4?box.max.z:box.min.z).applyMatrix4(pivot.matrixWorld);dist=Math.max(dist,c.z+Math.abs(c.x)/th,c.z+Math.abs(c.y)/tv);}
+        thumbCamera.position.set(0,0,dist*1.04);thumbCamera.lookAt(0,0,0);
         thumbRenderer.render(thumbScene,thumbCamera);url=thumbRenderer.domElement.toDataURL('image/png');pivot.removeFromParent();
       }
     }catch(error){console.warn('thumbnail',id,error);}

@@ -61,6 +61,12 @@ def model(name, out_name=None, rename=None, glow=None, glow_maps=None, light=Fal
     print('model', out.name, f'{out.stat().st_size/1e6:.1f} MB')
     return WEB+'models/'+out.name+ver(out), sem
 
+def solid(name, fallback):
+    # the AW pack's world models came out of the export empty (no surfaces streamed in): use the viewmodel's
+    # geometry instead, as the other mod guns do (<vm>_world.glb)
+    p = SRC/'xmodels'/name/(name+'_LOD0.semodel')
+    return name if p.exists() and SEM.read_semodel(p)['meshes'] else fallback
+
 def round_list(v, n): return [round(x, n) for x in v]
 
 def read_clips(names):
@@ -489,7 +495,7 @@ def tpl_fields(tpl): return {k: v for k, v in GAME[tpl].items() if k not in ('an
 for w in MODW:
     if not (SRC/'xmodels'/w['model']).exists(): print('skip', w['id']); continue
     view, gm = model(w['model'], rename=w.get('rename'), glow=w['glow'], glow_maps={k: (png(v[0]), v[1], v[2]) for k, v in GLOW_MAPS.items() if png(v[0])}, drop=w.get('drop'))
-    world_url = model(w.get('world', w['model']), (w.get('world') or w['model'])+'_world', rename=w.get('rename'), glow=w['glow'], light=True, drop=w.get('drop'))[0]
+    world_url = model(solid(w.get('world', w['model']), w['model']), (w.get('world') or w['model'])+'_world', rename=w.get('rename'), glow=w['glow'], light=True, drop=w.get('drop'))[0]
     gb = {b['name']: b['lpos'] for b in gm['bones'] if 'lpos' in b and b['parent'] >= 0}
     notes = set()
     A2, T2 = clipset(w, w['roles'], notes)
@@ -545,7 +551,7 @@ for w in MODW:
     if w.get('upModel') and (SRC/'xmodels'/w['upModel']).exists():   # the pack's own Pack-a-Punched model
         up['model'] = model(w['upModel'], rename=w.get('rename'), glow=w['glow'], drop=w.get('drop'))[0]
         uw = w.get('upWorld', w['upModel'])
-        if (SRC/'xmodels'/uw).exists(): up['worldModel'] = model(uw, uw+'_world', rename=w.get('rename'), glow=w['glow'], light=True, drop=w.get('drop'))[0]
+        if (SRC/'xmodels'/uw).exists(): up['worldModel'] = model(solid(uw, w['upModel']), uw+'_world', rename=w.get('rename'), glow=w['glow'], light=True, drop=w.get('drop'))[0]
     if w.get('alt'):   # a second form on the same model (the OHM's shotgun): def.attachment, entered and left through its own clips
         al = w['alt']; A3, T3 = clipset(w, al['roles'], notes); fill(A3)
         A3['attachInAnim'], _ = animation(w['pre']+'_'+al['into'], {}); A2['attachOutAnim'], _ = animation(w['pre']+'_'+al['out'], {})
