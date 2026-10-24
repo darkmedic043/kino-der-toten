@@ -295,7 +295,10 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     const handMode=view.mode==='idle'||view.mode==='sprint'||view.mode==='sprintIn'||view.mode==='sprintOut'||view.mode==='fire';
     // ---- dual wield: each arm's own motion (see DUAL above)
     if(def?.dualWield){const shots=session.shots??0;   // the gun that fired kicks (session.lastHand; the XMG fires both in one frame)
-      if(dual.lastShots>=0&&shots>dual.lastShots){const k=(.6+w*.5)*str;
+      // a fast automatic pair (the XMG, Titan Wield) kicks less per shot, or the soft per-gun springs pile the kicks up and
+      // the guns climb and stay up while firing (2026-10-24, user); braced in the XMG's lockdown, less again
+      const iv=(def.fireTime??.3)*(def.lockdown?2:1),fast=def.automatic?Math.min(1,(iv/.35)**2):1,braced=1-.7*(window.kino.aw?.lock??0);
+      if(dual.lastShots>=0&&shots>dual.lastShots){const k=(.6+w*.5)*str*fast*braced;
         for(const D of shots-dual.lastShots>1?dual.sides:[dual.sides[session.lastHand==='left'?1:0]]){D.kickP.v+=18*k;D.kickZ.v+=14*k;}}
       dual.lastShots=shots;}
     else dual.lastShots=-1;

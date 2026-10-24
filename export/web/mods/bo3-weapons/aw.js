@@ -11,7 +11,7 @@
 //   Most are plain stats; the ones with behaviour live here ("hits" = the gun's bullets, or the MDL's blasts for 4 s
 //   after it fires):
 //   aw_bulwark    XMG: 60% less damage taken while locked down (an amber edge on the screen)
-//   aw_overclock  XMG: 40% faster fire while locked down
+//   aw_overclock  XMG: 40% faster fire while locked down (on top of lockdown's own 25%)
 //   aw_seismic    XMG: locked down, hits stagger like Concussive Slugs
 //   aw_hotswap    OHM: a form swap fills the new form's magazine from its reserve
 //   aw_arcrail    RW1: hits arc to the 2 nearest zombies for half damage
@@ -80,7 +80,8 @@ export function setupAw(api){
   const braced=id=>lock>0&&!falling&&view.def?.lockdown&&has(id);
   host.on('beforeDamage',e=>{if(braced('aw_bulwark'))e.amount*=1-.6*lock;});
   const fire=session.fire.bind(session);
-  session.fire=(...args)=>{const ok=fire(...args);if(ok&&lock>=1&&braced('aw_overclock'))session.fireLeft/=1.4;return ok;};
+  // fully locked down the XMG fires 25% faster (user, 2026-10-24); Overclock Servos stack another 40% on top
+  session.fire=(...args)=>{const ok=fire(...args);if(ok&&lock>=1&&!falling&&view.def?.lockdown)session.fireLeft/=1.25*(braced('aw_overclock')?1.4:1);return ok;};
   const edge=document.createElement('div');
   edge.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;box-shadow:inset 0 0 90px 18px #ffb43a88;border:2px solid #ffb43a55';
   document.body.append(edge);

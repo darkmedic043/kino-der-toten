@@ -202,7 +202,7 @@ function shoot(hand='right',pressed=primaryPressed){
   if(session.reloadLeft>0&&session.def.segmentedReload&&session.weapon.mag>0){session.interruptReload();reloadShot=true;return false;}
   if(!session.fireHand(hand)){if(session.handMag(hand)===0&&pressed&&(!firesBoth(session.def)||session.weapon.mag===0)){audio.weapon('empty',session.def);reload();}return false;}
   session.lastHand=session.def.dualWield?hand:'right';   // for mods (movement/fp.js kicks that arm)
-  view.shoot({ads:aiming()&&!session.def.dualWield,empty:session.handMag(hand)===0,hand:session.lastHand});audio.weapon('shot',session.def);muzzle.position.copy(camera.position);muzzle.intensity=160;camera.rotation.x=Math.min(1.48,camera.rotation.x+(aiming()?.008:.015));
+  view.shoot({ads:aiming()&&!session.def.dualWield,empty:session.handMag(hand)===0,hand:session.lastHand});audio.weapon('shot',session.def);muzzle.position.copy(camera.position);muzzle.intensity=160;{const d=session.def;camera.rotation.x=Math.min(1.48,camera.rotation.x+(aiming()?.008*(d.adsRecoilScale??d.recoilScale??1):.015*(d.recoilScale??1)));}   // def.recoilScale/adsRecoilScale: a gun's own camera climb (the XMG)
   const forward=camera.getWorldDirection(new THREE.Vector3()),base=session.def.baseId??session.weapon.id;
   if(map.fire?.(session.def,forward))return true;   // a map's own weapons (Moon's Wave Gun / Zap Guns)
   for(const f of mods.fireHooks??[])if(f(session.def,forward,{ads:aiming()}))return true;   // a mod's own projectiles (bo7-weapons: the Grimhawk)

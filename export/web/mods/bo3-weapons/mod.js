@@ -32,6 +32,8 @@ export async function prepare(data){
   Object.assign(data.weapons,built.weapons);
   // the RW1 railgun's slug goes through every zombie in line up to the wall (engine.js def.pierce; user request 2026-10-24)
   for(const d of [data.weapons.aw_rw1,data.weapons.aw_rw1?.upgrade])if(d)d.pierce=99;
+  // the XMG's camera climb (engine.js recoilScale): light at the hip, almost none braced in lockdown (user, 2026-10-24: it climbed ~13 degrees a second)
+  for(const d of [data.weapons.aw_xmg,data.weapons.aw_xmg?.upgrade])if(d)Object.assign(d,{recoilScale:.35,adsRecoilScale:.08});
   data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons).filter(id=>!built.weapons[id].noBox)])];   // noBox: quest weapons (Der Eisendrache's bow)
 }
 
