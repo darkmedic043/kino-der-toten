@@ -80,8 +80,7 @@ body.bo7-hud #moon-hud #equipment{right:420px;bottom:40px}
 #bo7-right.pap .slotno .pips i.on{background:#b06bff;box-shadow:0 0 4px #b06bff99}
 /* the equipment wedge above the dial, its sides on the -135/-45 degree spokes: tactical at the left (only once one is
    held), lethal at the right, the mine between; count right of each icon, key badge beside/below */
-#bo7-right .dial .eq{position:absolute;left:-11px;right:-11px;top:-42px;height:42px;padding:0 64px 0 34px;display:flex;align-items:center}
-#bo7-right .dial .eq::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(#202124d4,#0b0b0ccc);clip-path:polygon(0 0,100% 0,79.2% 100%,20.8% 100%);box-shadow:inset 0 1px 0 #ffffff1a}   /* the wedge is a pseudo-element so the key badges aren't clipped */
+#bo7-right .dial .eq{position:absolute;left:-6px;right:-6px;top:-44px;height:42px;padding:0 40px 0 10px;display:flex;align-items:center}   /* no backdrop: the lethal floats at the dial's upper right, the tactical at its upper left */
 #bo7-right .dial .eq:not(:has(.slot:not([hidden]))){display:none}
 #bo7-right #equip-hud{position:static;display:flex;gap:14px;width:100%;right:auto;bottom:auto}
 #bo7-right #equip-hud .slot{width:26px;height:26px}

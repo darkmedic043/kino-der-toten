@@ -49,7 +49,7 @@ export default async function setup(api){
   const arc=(a0,a1,r=74)=>{const p=a=>[80+r*Math.cos(a*Math.PI/180),80+r*Math.sin(a*Math.PI/180)].map(v=>v.toFixed(2));
     const [x0,y0]=p(a0),[x1,y1]=p(a1);return `M${x0} ${y0}A${r} ${r} 0 ${a1-a0>180?1:0} 1 ${x1} ${y1}`;};
   const ARC0=-150,ARC1=-30;q(right,'.mag-track').setAttribute('d',arc(ARC0,ARC1));
-  // radial spokes (the dial is cut into segments as in BO7): the equipment wedge above between -135/-45 degrees, the
+  // radial spokes (the dial is cut into segments as in BO7): the equipment above between -135/-45 degrees (no backdrop, 2026-10-24: lethal at the right, tactical at the left), the
   // Pack-a-Punch segment below between 65/115, ticks at the top and bottom
   q(right,'.spokes').innerHTML=[[-135,70,98],[-45,70,98],[65,70,90],[115,70,90],[-90,76,84],[90,64,74]].map(([a,r0,r1])=>{const c=Math.cos(a*Math.PI/180),s=Math.sin(a*Math.PI/180);
     return `<line x1="${(80+r0*c).toFixed(1)}" y1="${(80+r0*s).toFixed(1)}" x2="${(80+r1*c).toFixed(1)}" y2="${(80+r1*s).toFixed(1)}"/>`;}).join('');
