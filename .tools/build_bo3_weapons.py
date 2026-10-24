@@ -334,8 +334,9 @@ MODW = [
   # Der Eisendrache's Wrath of the Ancients (BO3's own bow, wpn_t7_zmb_bow_base_*, exported from zm_castle; the
   # vm_bow_launcher_* clips): a quest weapon (mods/der-eisendrache), not in the Mystery Box. Fire looses the arrow;
   # bows.js plays draw / draw_loop / draw_cancel (chargeAnim...) while the shot is held and nocks the next arrow itself
-  # (no reload); the arrow explodes on impact like the crossbow.
-  dict(cls='Wonder weapon', id='bo3_wrath_ancients', name='Wrath of the Ancients', up="Wrath of the Ancients", model='wpn_t7_zmb_bow_base_view', world='wpn_t7_zmb_bow_base_world',
+  # (no reload); the arrow explodes on impact like the crossbow. As in BO3, it and its four upgrades can't be
+  # Pack-a-Punched (up=None: no upgrade entry, so the machine, gums and perks that upgrade guns all skip them).
+  dict(cls='Wonder weapon', id='bo3_wrath_ancients', name='Wrath of the Ancients', up=None, model='wpn_t7_zmb_bow_base_view', world='wpn_t7_zmb_bow_base_world',
        pre='vm_bow_launcher', tpl='crossbow_explosive_zm', drop=r'rune|storm|demon|wolf', noBox=True,
        stats=dict(clipSize=1, maxAmmo=60, startAmmo=60, damage=1100, minDamage=0, explosionRadius=180, explosionInnerDamage=1100, explosionOuterDamage=250, price=0),
        roles=dict(idle='idle', fire='fire', reload='draw', charge='draw', chargeLoop='draw_loop', chargeCancel='draw_cancel', rais='pullout', firstRaise='first_raise', drop='putaway', sprintIn='sprint_in', sprintLoop='sprint_loop', sprintOut='sprint_out'),
@@ -348,7 +349,7 @@ ELEMENTS = {'storm': ('Storm Bow', '#7fd0ff'), 'rune': ('Fire Bow', '#ff6a1a'), 
 for el, (nm, col) in ELEMENTS.items():
     others = [o for o in ELEMENTS if o != el]
     drop = '|'.join([f'bow_{o}_(missile|missle)' for o in ['base'] + others] + [f'bow_{o}_(crystals|rocks|arches)' for o in others])
-    MODW.append(dict(cls='Wonder weapon', id=f'bo3_bow_{el}', name=nm, up=nm, model=f'wpn_t7_zmb_bow_{el}_view', world=f'wpn_t7_zmb_bow_{el}_world',
+    MODW.append(dict(cls='Wonder weapon', id=f'bo3_bow_{el}', name=nm, up=None, model=f'wpn_t7_zmb_bow_{el}_view', world=f'wpn_t7_zmb_bow_{el}_world',
                      pre='vm_bow_launcher', tpl='crossbow_explosive_zm', drop=drop, noBox=True,
                      stats=dict(clipSize=1, maxAmmo=60, startAmmo=60, damage=1500, minDamage=0, explosionRadius=200, explosionInnerDamage=1500, explosionOuterDamage=400, price=0),
                      roles=MODW[-1]['roles'], ads=MODW[-1]['ads'], shots=MODW[-1]['shots'], glow=col, projectile=f'wpn_t7_zmb_bow_{el}_projectile', offset=[0, -2, 0], element=el))
@@ -525,7 +526,7 @@ for w in MODW:
                'fixedParts': [{'model': model(mdl, 'part_'+mdl)[0], 'tag': tag} for mdl, tag in w.get('fixed', []) if (SRC/'xmodels'/mdl).exists()],
                **({'attachAnims': attach_anims} if attach_anims else {}), **({'lockdown': True} if w.get('lockdown') else {})}
     if w.get('projectile'): common2['projectileModel'] = model(w['projectile'], 'part_'+w['projectile'])[0]   # fired as the rocket
-    up = {**common2, 'name': w['up'], 'clipSize': int(t['clipSize']*1.5), 'maxAmmo': int(t['maxAmmo']*1.5), 'startAmmo': int(t['maxAmmo']*1.5),
+    up = {**common2, 'name': w.get('up'), 'clipSize': int(t['clipSize']*1.5), 'maxAmmo': int(t['maxAmmo']*1.5), 'startAmmo': int(t['maxAmmo']*1.5),
           'damage': t['damage']*2.2, 'minDamage': t['minDamage']*2.2}
     for k in ('bo3', 'modWeapon', 'price'): up.pop(k, None)
     if w.get('left'):   # dual wield (animation.js): the left gun's own clips ride on top of the right's; ADS is off
@@ -552,7 +553,7 @@ for w in MODW:
         common2['attachment'] = {**{k: v for k, v in common2.items() if k not in drop}, **ta, 'name': al['name'], 'animations': A3, 'altForm': True}
         up['attachment'] = {**common2['attachment'], 'model': up['model'], 'worldModel': up['worldModel'], 'clipSize': int(ta['clipSize']*1.5), 'maxAmmo': int(ta['maxAmmo']*1.5),
                             'startAmmo': int(ta['maxAmmo']*1.5), 'damage': ta['damage']*2.2, 'minDamage': ta['minDamage']*2.2}
-    weapons[w['id']] = {'id': w['id'], 'name': w['name'], **common2, 'upgrade': up}
+    weapons[w['id']] = {'id': w['id'], 'name': w['name'], **common2, **({'upgrade': up} if w.get('up') else {})}   # up=None: Pack-a-Punch refuses it
     modsounds[w['id']] = {'shots': [k for k in map(snd, w['shots']) if k], 'last': [k for k in map(snd, w.get('last', [])) if k],
                           'notes': {n: k for n in sorted(notes) if (k := snd(st := n.removeprefix('sndnt#')) or snd(st+'_r') or snd(st+'1') or snd(NOTE_ALIAS.get(st, '')))}}
     if w.get('upShots'): modsounds[w['id']]['upShots'] = [k for k in map(snd, w['upShots']) if k]

@@ -267,7 +267,7 @@ const shop={
     if(session.points<cost){toast('Not enough points');return false;}
     if(!mysteryBox.start(e))return false;session.spend(cost);return true;
   },
-  packPrompt(needPower=false){return needPower&&!session.power?'The power must be activated':session.pack?(session.time>=session.pack.readyAt?'Take '+data.weapons[session.pack.weapon.id].upgrade.name+' · '+Math.ceil(session.pack.expires-session.time)+'s':'Upgrading weapon…'):session.weapon.upgraded?'Weapon already upgraded':'Pack-a-Punch · 5000';},
+  packPrompt(needPower=false){return needPower&&!session.power?'The power must be activated':session.pack?(session.time>=session.pack.readyAt?'Take '+data.weapons[session.pack.weapon.id].upgrade.name+' · '+Math.ceil(session.pack.expires-session.time)+'s':'Upgrading weapon…'):session.weapon.upgraded?'Weapon already upgraded':data.weapons[session.weapon.id]?.upgrade?'Pack-a-Punch · 5000':'This weapon can\'t be upgraded';},
   usePack(){
     if(session.pack){if(!session.takePack())return false;equipView();toast(session.def.name);return true;}
     if(!session.beginPack())return false;ads=false;primary=false;burstLeft=0;reloadShot=false;audio.play('packapunch');toast('Upgrading… retrieve your weapon when it is ready.');return true;

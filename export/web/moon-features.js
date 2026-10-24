@@ -107,7 +107,7 @@ export class MoonFeatures {
       if(!this.box.available(t.e))return '';
       const roll=this.box.at(t.e);return roll?roll.ready&&!roll.teddy?'Take '+this.box.data.weapons[roll.weapon].name:roll.teddy?'The box is moving…':'Mystery Box rolling…':'Mystery Box · '+(s.effects.fire_sale>s.time?10:950);
     }
-    if(t.kind==='pack')return s.pack?s.time>=s.pack.readyAt?'Retrieve '+s.def.name+' · Pack-a-Punch':'Upgrading weapon…':s.weapon.upgraded?'Weapon already upgraded':'Pack-a-Punch · 5000';
+    if(t.kind==='pack')return s.pack?s.time>=s.pack.readyAt?'Retrieve '+s.def.name+' · Pack-a-Punch':'Upgrading weapon…':s.weapon.upgraded?'Weapon already upgraded':s.def.upgrade?'Pack-a-Punch · 5000':'This weapon can\'t be upgraded';
     if(t.kind==='hacker')return t.e.id===q.hackerId&&!s.hacker?'Take Hacker · replaces P.E.S.':'';
     if(t.kind==='digger')return q.diggers[t.id].phase!=='idle'?(s.hacker?'Hold F · Retract excavator ':'Hacker required · Excavator ')+DIGGERS[t.id].name:'';
     if(t.kind==='bowie')return s.bowie?'Bowie Knife equipped':'Bowie Knife · 3000';
