@@ -1017,6 +1017,7 @@ function setupPanzer(api) {
   // armour
   host.on('beforeEnemyDamage', e => {
     const z = e.enemy; if (z?.kind !== 'panzer' || !sync.isHost) return;
+    if (e.cause === 'operator') return;   // operator weapons kill outright, faceplate or not (user, 2026-10-24)
     if (z.state === 'arrive' || z.state === 'takeoff') { e.amount = 0; return; }
     let amount = e.amount * (e.cause === 'explosion' ? .5 : 1);
     if (e.head && z.face > 0) {

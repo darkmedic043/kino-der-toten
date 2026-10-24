@@ -9,7 +9,7 @@
 //     holds it in the air; picking the spikes up again (either button) or running out of power slams them all down
 //     dead. Planted, it drains 10% a second.
 //   - held, the power drains 2.5% a second (40 s).
-// The Panzersoldat isn't lifted: a slam does it 1500 damage. Kills are the player's (points as usual), cause 'operator'.
+// The Panzersoldat isn't lifted, but a slam kills it like any zombie (user, 2026-10-24: operator weapons deal infinite damage). Kills are the player's (points as usual), cause 'operator'.
 import { ViewWeapon, loadModel } from '../../animation.js';
 import { disposeSkeletons } from '../../runtime-assets.js';
 
@@ -76,7 +76,7 @@ export function setupRagnarok(api,operator){
       shock(at,r*1.4);ctx.drain(.12);audio.play('explosion',.8);
       for(const z of [...enemies.list]){
         const p=z.root.position,d=Math.hypot(p.x-at.x,p.z-at.z);if(Math.abs(p.y-at.y)>140||d>r*2)continue;
-        if(z.kind==='panzer'){if(d<r)enemies.hurt(z,1500,false,false,'operator');continue;}
+        if(z.kind==='panzer'){if(d<r)enemies.hurt(z,1e9,false,false,'operator');continue;}
         if(d<r){enemies.hurt(z,1e9,false,false,'operator');continue;}
         const away=new THREE.Vector3(p.x-at.x,0,p.z-at.z).normalize().multiplyScalar(60*(1-d/(r*2)));thrown.push({z,v:away,t:.35});   // thrown back, out of their stride
       }

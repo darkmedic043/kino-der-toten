@@ -270,7 +270,7 @@ export function setupEE(api, { bows, traps }) {
     if (!z?.boss || !sync.isHost) return hurt(z, amount, head, melee, cause, score);
     const b = st.boss; if (!b || b.state === 'dying') return;
     if (b.state !== 'stunned') { if (Math.random() < .2) audio?.play?.('hit', .2); return; }
-    b.hp -= Math.min(2000, amount) * (head ? 2 : 1); b.bar.update(); if (b.hp <= 0) nextPhase();
+    b.hp -= (cause === 'operator' ? amount : Math.min(2000, amount)) * (head ? 2 : 1); b.bar.update(); if (b.hp <= 0) nextPhase();   // operator weapons aren't capped (user, 2026-10-24)
   };
   const nuke = enemies.nuke.bind(enemies);
   enemies.nuke = onDeath => { const b = st.boss?.z, i = b ? enemies.list.indexOf(b) : -1; if (i >= 0) enemies.list.splice(i, 1); const r = nuke(onDeath); if (i >= 0) enemies.list.push(b); return r; };
