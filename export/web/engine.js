@@ -60,7 +60,7 @@ const firstDraw={n:0,names:[],seen:new WeakMap(),layouts:new Map(),geo:new WeakM
     const program=this.properties.get(material).currentProgram;if(!program||!geometry)return;
     let seen=fd.seen.get(program);if(!seen)fd.seen.set(program,seen=new Set());const key=layout(geometry)*64+target(this.getRenderTarget());
     if(!seen.has(key)){seen.add(key);fd.n++;if(fd.names.length<3)fd.names.push(String(material.name||material.type).slice(0,24));}};}
-const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw');   // A/B switch for warmShaders' draw pass
+const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait');   // A/B switch for warmShaders' draw pass
 const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
 let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.6;renderer.autoClear=false;
@@ -480,7 +480,7 @@ try{
     if(instanceCull.meshes){console.info('[instance-cull]',instanceCull.sources,'meshes into',instanceCull.meshes,'batches,',instanceCull.instances,'instances in',instanceCull.buildMs,'ms');
       await paint();await renderer.compileAsync(scene,camera).catch(()=>{});}   // batched props need their own shader variants: compile them behind the loading screen
   }
-  if(!perfOff.has('noWarm')){progress('Preparing shaders',99);await paint();await warmShaders();
+  if(!perfOff.has('noWarm')){progress('Preparing shaders',99);await paint();await warmShaders(true);
     // mods keep adjusting materials for a moment after loading (the lighting mod tags late materials on a 1 s sweep,
     // which changes their program): compile those too while the player is still on the start screen (cheap: programs
     // already built are reused)
@@ -505,7 +505,18 @@ try{
 // including hidden ones (made visible just for the compile; lights stay as they are, since toggling a light
 // recompiles every shader). compile doesn't upload textures, so hidden weapons don't fill video memory.
 // ?noWarm skips it.
-async function warmShaders(){
+// Waits until the GPU has run everything queued so far (a WebGL2 fence, polled). The warm-up only queues its draws: on
+// Windows/D3D11 the GPU process then builds the real shaders while working through them, seconds of work that finished
+// after the loading screen had gone (2026-10-24, user on an RTX 4070 Ti Super: 0.5-1.7 s freezes in the first seconds of
+// play with the page idle and no first draws left). Gives up after max ms.
+async function gpuIdle(max=60000){
+  const gl=renderer.getContext();if(!gl.fenceSync)return 0;
+  const t=performance.now(),sync=gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0);gl.flush();
+  try{while(performance.now()-t<max){const r=gl.clientWaitSync(sync,0,0);if(r!==gl.TIMEOUT_EXPIRED)break;await new Promise(r=>setTimeout(r,25));}}
+  finally{gl.deleteSync(sync);}
+  return performance.now()-t;
+}
+async function warmShaders(waitGpu=false){
   const t0=performance.now(),targets=new Map(),draw=renderer.render,later=new THREE.Group();
   renderer.setAnimationLoop(null);   // no frame may draw the unhidden objects or move the render target meanwhile
   try{
@@ -551,6 +562,7 @@ async function warmShaders(){
     for(const program of renderer.info.programs){try{program.getUniforms();program.getAttributes();}catch{}}
     programCount=renderer.info.programs.length;   // compiled while loading, not mid-game
     console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects, in',Math.round(performance.now()-t0),'ms');
+    if(waitGpu&&!NO_GPU_WAIT){const ms=Math.round(await gpuIdle());console.info('[warm-shaders] GPU caught up in',ms,'ms');diag('gpuWait',{ms});}   // the loading screen stays meanwhile
   }catch(error){console.warn('[warm-shaders]',error);}
   finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
 }
