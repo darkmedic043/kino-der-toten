@@ -138,7 +138,12 @@ export default async function setup(api){
   let hudT=0;host.on('update',dt=>{if((hudT-=dt)<=0){hudT=.15;hud();}});
   hud();
 
-  kino.operator={register,give,take,use,putAway,addCharge,defs,
+  // operator weapons kill any zombie in one hit; bosses (the Panzersoldat, z.boss like the Keeper) take a share of their
+  // health instead (user, 2026-10-25: "shouldnt work on bosses, make it balanced around bosses, just does alot of damge").
+  // z.boss enemies keep 1e9 health, so their share is of BOSS_HP (their own hooks cap it further: the Keeper's 3000 a hit).
+  const BOSS_HP=20000,isBoss=z=>!!z?.boss||z?.kind==='panzer';
+  const damage=(z,share)=>isBoss(z)?share*(z.boss?BOSS_HP:z.maxHealth??BOSS_HP):1e9;
+  kino.operator={register,give,take,use,putAway,addCharge,defs,damage,isBoss,
     get current(){return st.def?.id??null;},get handle(){return st.active;},get charge(){return st.charge;},get active(){return !!st.active;},get power(){return st.power;}};
   setupRagnarok(api,kino.operator);
   setupAnnihilator(api,kino.operator);   // The Giant's Fly Trap prize; the cheat console elsewhere

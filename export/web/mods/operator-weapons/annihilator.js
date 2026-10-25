@@ -5,19 +5,19 @@
 // Behaviour after BO3's zombies version (Call of Duty wiki: 18 shots, ~2000 damage, a one-shot headshot kill up to
 // round 24, kills disintegrate the zombie, 67 RPM single action, pistol-whip 100):
 //   - left mouse fires: a hitscan round that goes through every zombie in its path up to a wall (PIERCE of them);
-//     Every hit kills (user, 2026-10-24: "every operator weapon should deal infinite damage"; BO3's was 2000 body,
-//     4000 head), the Panzersoldat too.
+//     Every hit kills a zombie (user, 2026-10-24; BO3's was 2000 body, 4000 head); a boss takes 12% of its health a
+//     shot (operator.damage: about 8 body shots for a Panzersoldat, under half the meter).
 //     After each shot the hammer is cocked again (the rechamber clip), about 0.95 s a shot.
 //   - right mouse aims down the sight (BO3's ads_base_up pose, the camera zooms like a gun's ADS); aimed in, the sight's
 //     see-through reticle replaces the HUD crosshair (fixAnnihilatorMaterials).
-//   - melee (V) pistol-whips, also a kill.
+//   - melee (V) pistol-whips: a kill, 2% of a boss's health.
 //   - the meter is its ammo: 18 shots to empty (no drain over time). 50 kills charge it.
 //   - a kill disintegrates the zombie (gone in a burst of gore, BO3's gib sound), except under Insta-Kill as in BO3.
 // Kills are the player's (points as usual), cause 'operator'.
 import { ViewWeapon, loadModel } from '../../animation.js';
 import { disposeSkeletons } from '../../runtime-assets.js';
 
-const SHOTS = 18, KILL = 1e9, PIERCE = 8, RANGE = 8000, ADS_FOV = 56 / 78;
+const SHOTS = 18, BOSS_SHOT = .12, BOSS_WHIP = .02, PIERCE = 8, RANGE = 8000, ADS_FOV = 56 / 78;
 // notetrack aliases (BO3's alias table isn't exportable) -> the bank's files
 const NOTE = { fly_annihilator_rechamber: 'fly_anni_rechamber_02', fly_annihilator_rechamber_ads: 'fly_anni_rechamber_ads_01',
   fly_annihilator_first_raise: 'annihilator_first_raise' };
@@ -114,7 +114,7 @@ export function setupAnnihilator(api, operator) {
       for (const h of hits) {
         const z = h.z; if (!enemies.list.includes(z)) continue;
         const insta = session.effects?.insta_kill > session.time;
-        enemies.hurt(z, KILL, h.head, false, 'operator');
+        enemies.hurt(z, operator.damage(z, BOSS_SHOT), h.head, false, 'operator');
         if (!enemies.list.includes(z) && !insta) disintegrate(z, h.point);
         else globalThis.kino?.fx?.blood?.(h.point.toArray(), 1.2);
       }
@@ -159,7 +159,7 @@ export function setupAnnihilator(api, operator) {
           const f = camera.getWorldDirection(new THREE.Vector3()); f.y = 0; f.normalize();
           let best = null, bd = 70;
           for (const z of enemies.list) { const p = z.root.position, o = new THREE.Vector3(p.x - camera.position.x, 0, p.z - camera.position.z), dd = o.length(); if (dd < bd && o.normalize().dot(f) > .5) { best = z; bd = dd; } }
-          if (best) { enemies.hurt(best, KILL, false, true, 'operator'); audio.play('knife', .6); }
+          if (best) { enemies.hurt(best, operator.damage(best, BOSS_WHIP), false, true, 'operator'); audio.play('knife', .6); }
         }
       }
       if (vw?.ready) {

@@ -1017,8 +1017,8 @@ function setupPanzer(api) {
   // armour
   host.on('beforeEnemyDamage', e => {
     const z = e.enemy; if (z?.kind !== 'panzer' || !sync.isHost) return;
-    if (e.cause === 'operator') return;   // operator weapons kill outright, faceplate or not (user, 2026-10-24)
     if (z.state === 'arrive' || z.state === 'takeoff') { e.amount = 0; return; }
+    const op = e.cause === 'operator';   // operator weapons already deal a share of its health: no armour scaling, the faceplate still soaks headshots
     let amount = e.amount * (e.cause === 'explosion' ? .5 : 1);
     if (e.head && z.face > 0) {
       z.face -= amount; e.amount = 0;
@@ -1033,7 +1033,7 @@ function setupPanzer(api) {
     // back: the power-supply cap
     const back = !e.melee && e.cause === 'bullet' && player?.getFeetPosition && fwd(z).dot(player.getFeetPosition().clone().sub(z.root.position).setY(0).normalize()) < -.3;
     if (back && !z.capOff) { z.cap -= amount; e.amount = amount * .25; if (z.cap <= 0) { z.capOff = true; launch(z, assets.cap, 'tag_powersupply'); z.state = 'busy'; play(z, 'powercore_pain', false); z.busyUntil = z.t + (assets.index.powercore_pain?.duration ?? 2); z.busy = null; } return; }
-    e.amount = amount * (back && z.capOff ? 2 : .25);
+    e.amount = amount * (op ? 1 : back && z.capOff ? 2 : .25);
   });
   // rounds
   let lastRound = 0;
