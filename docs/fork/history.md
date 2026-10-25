@@ -359,3 +359,4 @@
 - **2026-10-24**: XMG feel (user: guns moving up while firing, lockdown the same): dual-gun kicks no longer pile up on fast automatics (fp.js), the camera climb is per gun (`recoilScale`, XMG .35 hip / .08 locked), and lockdown fires 25% faster (advanced-warfare.md).
 - **2026-10-24**: still freezing in the first seconds of Kino with no first draws left: the load-time shader warm-up now waits (WebGL2 fence) until the GPU has worked through its queue before the loading screen goes (performance.md "First-draw stalls").
 - **2026-10-24**: Operator weapons deal infinite damage: Annihilator and Ragnarok hits kill anything, through the Panzersoldat's armour and past the Keeper's per-hit cap (gameplay.md).
+- **2026-10-25**: Operator weapons are balanced around bosses: zombies still die in one hit, the Panzersoldat and the Keeper take a share of their health (Annihilator 12% a shot, Ragnarok slam 25%; gameplay.md).
