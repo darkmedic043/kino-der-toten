@@ -285,6 +285,11 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
   // One pass looks the same on flat glass and decals. Swept every second: map-materials makes decals transparent later.
   function singlePass(root){root.traverse(o=>{if(o.material)for(const x of [o.material].flat())if(x?.transparent&&x.side===THREE.DoubleSide&&!x.forceSinglePass)x.forceSinglePass=true;});}
   tagShadows(scene);singlePass(scene);let tagTimer=0;
+  // (2026-10-25) the per-frame tag walks the scene only after something was added to it (Object3D.add is hooked once
+  // per page): the walk itself cost ~0.3-0.5 ms a frame on Kino's 5,000 objects, and a mesh is only ever tagged once
+  let sceneDirty=true;
+  if(!THREE.Object3D.prototype.__tagDirty){const add=THREE.Object3D.prototype.add;THREE.Object3D.prototype.add=function(...o){window.kino?.lighting?.dirty?.();return add.apply(this,o);};THREE.Object3D.prototype.__tagDirty=true;}
+  const tagNew=root=>{if(root!==scene){tagShadows(root);return;}if(!sceneDirty)return;sceneDirty=false;tagShadows(scene);};
   // the engine's shader warm-up: tag what arrived since (the sweep below only runs during play, so late meshes changed
   // program on the first played frame)
   host.on('warm',()=>{tagShadows(scene);singlePass(scene);});
@@ -610,7 +615,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
       busy.add(s);
     }
   }
-  window.kino.lighting={sources,pool,spots,beams,volScene,shafts:baked,tag:tagShadows,volume};
+  window.kino.lighting={sources,pool,spots,beams,volScene,shafts:baked,tag:tagNew,dirty:()=>{sceneDirty=true;},volume};
   if(baking)(async()=>{const t0=performance.now();
     const r=await bakeVolume({scene,sources,exclude:dynamicOnly,cell:32,onProgress:(i,n)=>{if(i%10===0)console.info('[bake] slice',i,'/',n);}});
     window.kino.lighting.bakeResult=r;console.info('[bake] done in',Math.round((performance.now()-t0)/1000),'s',r.meta.dims.join('x'));})();

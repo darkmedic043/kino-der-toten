@@ -72,6 +72,7 @@ const keyLight=new THREE.DirectionalLight(0xffdfb1,1.5);keyLight.position.set(.4
 const fill=new THREE.DirectionalLight(0x8cabc9,.7);fill.position.set(-1,.5,-.5);scene.add(fill);
 const camera=new THREE.PerspectiveCamera(78,innerWidth/innerHeight,1,30000);camera.rotation.order='YXZ';
 const viewScene=new THREE.Scene(),viewCamera=new THREE.PerspectiveCamera(51,innerWidth/innerHeight,.01,200);   // BO1 cg_fov 65 on 4:3 = 50.9° vertical; wider showed the viewmodels unseen, stretched rear faces
+viewScene.matrixAutoUpdate=false;   // (2026-10-25) the root never moves; composing it each frame forced the whole view tree through the walk (skipHidden below)
 viewScene.add(new THREE.AmbientLight(0xe1d9c7,2.8));const vl=new THREE.DirectionalLight(0xffefc8,2);vl.position.set(0,4,2);viewScene.add(vl);
 const muzzle=new THREE.PointLight(0xffc276,0,240,1);scene.add(muzzle);
 let entry,map,data,world,session,player,enemies,view,powerups,perkDrink,mysteryBox,features,ready=false,active=false,started=false,primary=false,primaryPressed=false,ads=false,leftPressed=false,lastTouchAim=false;
@@ -567,15 +568,19 @@ async function warmShaders(waitGpu=false){
   finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
 }
 renderer.info.autoReset=false;
+// (2026-10-25) a hidden top-level view object (a mod's spare ViewWeapon, the stand-ins: ~1,500 bones on Kino) is left out of
+// the view scene's matrix walk until it is shown again; a forced update (fp.js on the live pivot) still goes through
+function skipHidden(force){if(force||this.visible)THREE.Object3D.prototype.updateMatrixWorld.call(this,force);}   // a declaration: the frame loop starts from the load sequence before the module reaches this line
 function renderFrame(now){
   if(document.hidden||contextLost)return;
   const interval=settings.fpsCap>0?(active?1000/settings.fpsCap:200):0;   // the frame rate cap setting (frames a second, 0 = none; 30 by default on phones)
   if(lastRendered&&now-lastRendered<interval-1)return;
   lastRendered=now;const dt=Math.min((now-previous)/1000,.06);previous=now;frameTime+=dt;frameCount++;renderedFrames++;
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
-  if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);if(ready&&!NO_STILL)stillSkeletons(scene);}
+  if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);if(ready&&!NO_STILL){stillSkeletons(scene);hideBones(scene);}for(const c of viewScene.children)if(!Object.hasOwn(c,'updateMatrixWorld'))c.updateMatrixWorld=skipHidden;}   // (2026-10-25) hideBones each second too: the zombies' ~2,600 bones left projectObject's walk
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
-  update(dt);const t1=performance.now();staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel,viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
+  update(dt);const t1=performance.now();staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
+  const viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
   if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames]);}else{programCount=renderer.info.programs.length;perf.pause();}
   lastFirstDraws=firstDraw.n;lastFirstNames=firstDraw.names;firstDraw.n=0;firstDraw.names=[];   // hitches carry the previous frame's first draws (a GPU stall delays the next frame)
 }

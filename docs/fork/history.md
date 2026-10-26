@@ -360,3 +360,4 @@
 - **2026-10-24**: still freezing in the first seconds of Kino with no first draws left: the load-time shader warm-up now waits (WebGL2 fence) until the GPU has worked through its queue before the loading screen goes (performance.md "First-draw stalls").
 - **2026-10-24**: Operator weapons deal infinite damage: Annihilator and Ragnarok hits kill anything, through the Panzersoldat's armour and past the Keeper's per-hit cap (gameplay.md).
 - **2026-10-25**: Operator weapons are balanced around bosses: zombies still die in one hit, the Panzersoldat and the Keeper take a share of their health (Annihilator 12% a shot, Ragnarok slam 25%; gameplay.md).
+- **2026-10-25**: CPU pass on Kino: still rigs compare bone world matrices before updating, the lighting tag walks the scene only after additions, zombie bones are hidden from projectObject, hidden viewmodels skip the view scene matrix walk; 17.9 → 16.0 ms a frame on the host (performance.md).
