@@ -385,7 +385,7 @@ function build() {
   </div>`;
   document.body.append(root);
   const $ = s => root.querySelector(s);
-  const win = $('[data-win=perks]'), exWin = $('[data-win=exfil]'), exBody = $('.exf'), exIcon = $('[data-app=exfil]');
+  const win = $('[data-win=perks]'), exWin = $('[data-win=exfil]'), exBody = $('[data-win=exfil] .exf'), exIcon = $('[data-app=exfil]');
   const stWin = $('[data-win=stark]'), stBody = $('.stk'); let stState = '', stMsg = ['', ''], stShown = 0;
   const arWin = $('[data-win=arsenal]'), arBody = $('.ars'); let arState = '', arMsg = ['', ''];
   const gmWin = $('[data-win=gums]'), gmStrip = $('.strip'), gmSide = $('.gum .side'); let gmState = '', gmMsg = ['', ''], gmSpin = false, gmWon = null, gmPending = null;   // gmPending: a gum rolled into a full hand, waiting for swap or keep
@@ -407,7 +407,7 @@ function build() {
     if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden || !rdWin.hidden || !tkWin.hidden) closeApp(); else close(); return; }
     if (!rdWin.hidden) { if (e.code === 'Space') { e.preventDefault(); radioDo('toggle'); } return; }
     if (!gmWin.hidden) { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); gumRoll(); } return; }
-    if (!arWin.hidden || !stWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden) return;
+    if (!arWin.hidden || !stWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden || !tkWin.hidden) return;
     if (!exWin.hidden) { if (e.code === 'Enter') { e.preventDefault(); callExfil(); } return; }
     if (win.hidden) { if (e.code === 'Enter') { e.preventDefault(); openApp('perks'); } return; }
     if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); buy(shown); return; }
