@@ -62,7 +62,8 @@ const firstDraw={n:0,names:[],seen:new WeakMap(),layouts:new Map(),geo:new WeakM
     if(!seen.has(key)){seen.add(key);fd.n++;if(fd.names.length<3)fd.names.push(String(material.name||material.type).slice(0,24));}};}
 const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait');   // A/B switch for warmShaders' draw pass
 const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
-let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer;
+let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer,leaving=false;
+let timerExt=null,gpuQ=[];try{timerExt=new URLSearchParams(location.search).has('noGpuTimer')?null:renderer.getContext().getExtension('EXT_disjoint_timer_query_webgl2');}catch{}   // (2026-10-27) GPU time per frame for the perf log (gpuBegin/gpuEnd)
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.6;renderer.autoClear=false;
 document.body.prepend(renderer.domElement);
 installGameMenu({renderer,audio,pixelRatio:Math.min(devicePixelRatio,profile.mobile?1:1.5),started:()=>started&&session?.phase!=='gameover'});
@@ -108,11 +109,11 @@ function diag(ev,extra={}){
   if(diagSent++>120)return;
   try{if(!diagGpu){const gl=renderer.getContext(),d=gl.getExtension('WEBGL_debug_renderer_info');diagGpu=d?gl.getParameter(d.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);}}catch{}
   try{navigator.sendBeacon('/api/client-log',JSON.stringify({ev,page:location.pathname+location.search,t:+((performance.now()-diagT0)/1000).toFixed(1),gpu:diagGpu,ua:navigator.userAgent,
-    heap:performance.memory?Math.round(performance.memory.usedJSHeapSize/1e6):null,frames:renderedFrames,calls:renderer.info?.render?.calls,ready,...extra}));}catch{}
+    heap:performance.memory?Math.round(performance.memory.usedJSHeapSize/1e6):null,lim:performance.memory?Math.round(performance.memory.jsHeapSizeLimit/1e6):null,frames:renderedFrames,calls:renderer.info?.render?.calls,ready,...extra}));}catch{}
 }
 // play-time frame timing (perf-diag.js): 10 s summaries while playing, one for the session when the page goes away
 const perf=createPerfDiag({context:()=>({q:settings.graphics,scale:settings.renderScale,cap:settings.fpsCap,px:renderer.domElement.width+'x'+renderer.domElement.height,
-  calls:renderer.info?.render?.calls,tris:renderer.info?.render?.triangles,zombies:enemies?.list?.length??0,round:session?.round,coop:!!globalThis.kino?.coop?.code})});mods.perf=perf;
+  calls:renderer.info?.render?.calls,tris:renderer.info?.render?.triangles,tex:renderer.info?.memory?.textures,zombies:enemies?.list?.length??0,round:session?.round,coop:!!globalThis.kino?.coop?.code})});mods.perf=perf;
 addEventListener('pagehide',()=>perf.end());
 {const beat=setInterval(()=>{diag('beat',{label:$('load-label')?.textContent});if(ready&&performance.now()-diagT0>0&&(diag.readyAt??=performance.now())&&performance.now()-diag.readyAt>20000)clearInterval(beat);},2000);}
 addEventListener('error',e=>diag('error',{message:String(e.message).slice(0,300),src:e.filename?.split('/').pop(),line:e.lineno}));
@@ -135,7 +136,13 @@ function suspendRendering(){perf.pause();renderer.setAnimationLoop(null);if(read
 function resumeRendering(){previous=performance.now();lastRendered=0;if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendRendering();else resumeRendering();});
 addEventListener('pagehide',suspendRendering);addEventListener('pageshow',resumeRendering);
-renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();diag('contextlost');contextLost=true;suspendRendering();$('start').disabled=true;$('menu-status').textContent='Graphics paused. Waiting for the browser to restore the game…';});
+// (2026-10-27) Leaving the page (Rind loads every match in the same window; the menu link too): give the GPU memory back now.
+// A navigated-away document keeps its WebGL context, textures and JS heap until the browser gets round to collecting it,
+// and the next match then loads beside the old one (a reload began with 2.7 GB of the old heap still there and froze for
+// minutes). Losing the context frees everything on the GPU side at once; the old objects become plain garbage.
+addEventListener('pagehide',e=>{if(e.persisted||leaving)return;leaving=true;contextLost=true;renderer.setAnimationLoop(null);
+  try{for(const q of gpuQ)renderer.getContext().deleteQuery(q.q);gpuQ=[];renderer.dispose();renderer.forceContextLoss();}catch{}});
+renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();if(leaving)return;diag('contextlost');contextLost=true;suspendRendering();$('start').disabled=true;$('menu-status').textContent='Graphics paused. Waiting for the browser to restore the game…';});
 renderer.domElement.addEventListener('webglcontextrestored',()=>{diag('contextrestored');if(textureMemoryStats().released){location.reload();return;}/* freed images can't be re-uploaded: start fresh */contextLost=false;$('start').disabled=!ready;$('menu-status').textContent='Graphics restored · click to resume';resumeRendering();});
 addEventListener('blur',()=>{keys.clear();primary=false;ads=false;if(started&&active&&!padOnly()){setActive(false);document.exitPointerLock?.();}});
 addEventListener('mousemove',e=>{if(!active||document.pointerLockElement!==renderer.domElement)return;const sensitivity=(ads?.0012*settings.adsSensitivity:.002)*settings.sensitivity;camera.rotation.y-=e.movementX*sensitivity;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-e.movementY*sensitivity*(settings.invertY?-1:1),-1.5,1.5);});
@@ -570,6 +577,18 @@ async function warmShaders(waitGpu=false){
 renderer.info.autoReset=false;
 // (2026-10-25) a hidden top-level view object (a mod's spare ViewWeapon, the stand-ins: ~1,500 bones on Kino) is left out of
 // the view scene's matrix walk until it is shown again; a forced update (fp.js on the live pivot) still goes through
+// (2026-10-27) GPU time of a frame's draws (EXT_disjoint_timer_query_webgl2, when the browser has it), read back a few frames
+// later and sent with the perf log: with the frame interval after it, it tells a GPU-side stall (long GPU time, idle main
+// thread) from a CPU one. At most 6 queries wait at a time; one result is polled a frame. ?noGpuTimer turns it off.
+function gpuBegin(on){if(!on||!timerExt||gpuQ.length>=6)return null;const gl=renderer.getContext(),q=gl.createQuery();gl.beginQuery(timerExt.TIME_ELAPSED_EXT,q);return q;}
+function gpuEnd(q,now){if(!timerExt)return;const gl=renderer.getContext();if(q){gl.endQuery(timerExt.TIME_ELAPSED_EXT);}
+  const last=gpuQ[gpuQ.length-1];if(last&&last.next==null&&last.now!==now)last.next=now;   // the interval after a frame is known at the next one
+  if(q)gpuQ.push({q,now,next:null});
+  const o=gpuQ[0];if(!o||o.next==null)return;
+  try{if(!gl.getQueryParameter(o.q,gl.QUERY_RESULT_AVAILABLE))return;
+    const ok=!gl.getParameter(timerExt.GPU_DISJOINT_EXT),ns=ok?gl.getQueryParameter(o.q,gl.QUERY_RESULT):0;gl.deleteQuery(o.q);gpuQ.shift();
+    if(ok)perf.gpu?.(ns/1e6,o.next-o.now);}
+  catch{timerExt=null;}}
 function skipHidden(force){if(force||this.visible)THREE.Object3D.prototype.updateMatrixWorld.call(this,force);}   // a declaration: the frame loop starts from the load sequence before the module reaches this line
 function renderFrame(now){
   if(document.hidden||contextLost)return;
@@ -579,8 +598,9 @@ function renderFrame(now){
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
   if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);if(ready&&!NO_STILL){stillSkeletons(scene);hideBones(scene);}for(const c of viewScene.children)if(!Object.hasOwn(c,'updateMatrixWorld'))c.updateMatrixWorld=skipHidden;}   // (2026-10-25) hideBones each second too: the zombies' ~2,600 bones left projectObject's walk
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
-  update(dt);const t1=performance.now();staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
+  update(dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
   const viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
+  gpuEnd(gq,now);
   if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames]);}else{programCount=renderer.info.programs.length;perf.pause();}
   lastFirstDraws=firstDraw.n;lastFirstNames=firstDraw.names;firstDraw.n=0;firstDraw.names=[];   // hitches carry the previous frame's first draws (a GPU stall delays the next frame)
 }
