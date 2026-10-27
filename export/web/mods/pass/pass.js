@@ -34,9 +34,9 @@ export async function loadSeason(base=import.meta.url){return (await loadSeasons
 const blank=()=>({xp:0,bought:0,premium:false,unlocked:{},granted:{}});
 export function loadPass(){
   let p;try{p=JSON.parse(localStorage.getItem(PASS_KEY));}catch{}p=p&&typeof p==='object'?p:{};
-  const seasons={};for(const [id,r] of Object.entries(p.seasons??{}))seasons[id]={xp:+r.xp||0,bought:+r.bought||0,premium:!!r.premium,unlocked:{...r.unlocked},granted:{...r.granted}};
+  const seasons={};for(const [id,r] of Object.entries(p.seasons??{})){seasons[id]={xp:+r.xp||0,bought:+r.bought||0,premium:!!r.premium,unlocked:{...r.unlocked},granted:{...r.granted}};if(Number.isFinite(r.earned))seasons[id].earned=r.earned;}
   if(p.season&&!seasons[p.season])seasons[p.season]={xp:+p.xp||0,bought:+p.bought||0,premium:!!p.premium,unlocked:{...p.unlocked},granted:{...p.granted}};   // v1: one flat season
-  return {v:2,auto:p.auto??true,track:p.track??null,seasons,boosts:{passXp:0,weaponXp:0,researchXp:0,...p.boosts},gums:Array.isArray(p.gums)?p.gums:[],archive:Array.isArray(p.archive)?p.archive:[]};
+  return {v:2,auto:p.auto??true,track:p.track??null,seasons,boosts:{passXp:0,weaponXp:0,researchXp:0,...p.boosts},gums:Array.isArray(p.gums)?p.gums:[],archive:Array.isArray(p.archive)?p.archive:[],forfeit:+p.forfeit||0};
 }
 export function savePass(p){try{localStorage.setItem(PASS_KEY,JSON.stringify(p));}catch{}window.dispatchEvent?.(new CustomEvent('kino-pass'));}
 
@@ -46,12 +46,27 @@ export const isLive=(S,season)=>season.id===S.current.id;
 export const seasonEnd=season=>new Date(season.end+'T23:59:59');
 export const allItems=season=>season.pages.flatMap((pg,pi)=>pg.items.map(it=>({...it,page:pi})));
 const tierCount=season=>season.pages.reduce((a,pg)=>a+pg.items.length,0);
-const tiersRaw=(season,p)=>Math.floor((p.seasons[season.id]?.xp??0)/season.tierXp);   // past the last reward too: those are bonus tokens
+const tiersRaw=(season,p)=>Math.floor((p.seasons[season.id]?.xp??0)/season.tierXp);   // past the last reward too
 export const tiersEarned=(season,p)=>Math.min(tierCount(season),tiersRaw(season,p));
 export const unlockedCount=(season,p)=>Object.keys(p.seasons[season.id]?.unlocked??{}).length;
-// The shared pool: every season's tiers and bought tokens, less every unlock. Never below 0: tierXp rose (1,500 -> 2,500),
+// Tokens a season's pass XP has given (`earned`, kept in the save since 2026-10-26: a tier only gives one while it's needed,
+// see addXp). Older saves count their tiers, up to the season's reward count (the bonus tokens past it are gone).
+const earnedOf=(season,p)=>p.seasons[season.id]?.earned??Math.min(tierCount(season),tiersRaw(season,p));
+// The shared pool: every season's earned and bought tokens, less every unlock. Never below 0: tierXp rose (1,500 -> 2,500),
 // so a save could have unlocked more than it now earns; it earns back first.
-export const tokens=(S,p)=>Math.max(0,S.list.reduce((a,s)=>a+tiersRaw(s,p)+(p.seasons[s.id]?.bought??0)-unlockedCount(s,p),0));
+export const tokens=(S,p)=>Math.max(0,S.list.reduce((a,s)=>a+earnedOf(s,p)+(p.seasons[s.id]?.bought??0)-unlockedCount(s,p),0)-(p.forfeit??0));
+// rewards still locked: in one season, and in every season that's out
+export const lockedCount=(season,p)=>tierCount(season)-season.pages.reduce((a,pg)=>a+pg.items.filter(it=>p.seasons[season.id]?.unlocked[it.id]).length,0);
+const lockedAll=(S,p)=>S.list.reduce((a,s)=>a+lockedCount(s,p),0);
+// No hoarding (2026-10-26, user: "you cant earn tokens after fully completing a pass… no more extra tokens so people dont
+// horde for the next pass"): pass XP gives a token only while the pool can't yet pay for the rest of the live season, so a
+// finished pass gives nothing more, and nothing piles up for the next one. Tiers past the last reward still give a token
+// when the pool falls short (it went on a past season). A token can be bought only while something is left to spend it on.
+export const tokensNeeded=(S,p)=>tokens(S,p)<lockedCount(S.current,p);
+export const canBuyToken=(S,p)=>tokens(S,p)<lockedAll(S,p);
+// Tokens beyond every reward still locked (bought before the pass was done, or bonus tokens in an old save) are dropped
+// (`forfeit`), so a finished pass wraps up with none left to carry into the next season. Returns how many went.
+export function wrapUp(S,p){const x=tokens(S,p)-lockedAll(S,p);if(x>0)p.forfeit=(p.forfeit??0)+x;return Math.max(0,x);}
 const isUnlocked=(season,p,id)=>!!p.seasons[season.id]?.unlocked[id];
 export const pageDone=(season,p,pi)=>season.pages[pi].items.every(it=>isUnlocked(season,p,it.id));
 export const pageOpen=(season,p,pi)=>pi===0||pageDone(season,p,pi-1);
@@ -84,7 +99,7 @@ export function unlock(S,season,p,id){
   const R=rec(p,season);R.unlocked[id]=true;const out={granted:[],held:false,major:null,season};
   if(!it.premium||R.premium){if(give(season,p,it))out.granted.push(it);}else out.held=true;
   if(pageDone(season,p,it.page)){const m=season.pages[it.page].major;if(give(season,p,m)){out.granted.push(m);out.major=m;}}
-  return out;
+  wrapUp(S,p);return out;
 }
 // The pass auto-progress spends on: a past season the player made active (until the next season goes live), else the live one.
 export function trackOf(S,p){return p.track?.live===S.current.id&&S.list.find(s=>s.id===p.track.id)||S.current;}
@@ -106,9 +121,13 @@ export function buyPremium(season,p){
   return out;
 }
 // A tier skip at the live season's price; the token joins the shared pool.
-export function buyToken(S,p){const s=S.current,c=loadCredits();if(!change(c,-s.tokenPrice,`Melon Pass ${s.name}: tier token`))return `Not enough credits (${s.tokenPrice} needed)`;saveCredits(c);rec(p,s).bought++;return null;}
-// Pass XP, always into the live season. Returns how many tiers (tokens) it crossed.
-export function addXp(S,p,n){const s=S.current,before=tiersRaw(s,p);rec(p,s).xp+=Math.max(0,Math.round(n));return tiersRaw(s,p)-before;}
+export function buyToken(S,p){const s=S.current;if(!canBuyToken(S,p))return 'Your tokens already cover every reward left';const c=loadCredits();if(!change(c,-s.tokenPrice,`Melon Pass ${s.name}: tier token`))return `Not enough credits (${s.tokenPrice} needed)`;saveCredits(c);rec(p,s).bought++;return null;}
+// Pass XP, always into the live season. Returns how many tokens it gave: one per tier crossed while one is needed.
+export function addXp(S,p,n){
+  const s=S.current,R=rec(p,s),before=tiersRaw(s,p);R.earned=earnedOf(s,p);R.xp+=Math.max(0,Math.round(n));
+  let got=0;for(let i=tiersRaw(s,p)-before;i>0&&tokensNeeded(S,p);i--){R.earned++;got++;}
+  wrapUp(S,p);return got;
+}
 
 // what a reward is, for the UI: {title, sub, kind}
 export function describe(r,{catalog,gums}={}){

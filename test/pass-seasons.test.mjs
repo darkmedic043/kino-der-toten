@@ -66,11 +66,33 @@ test('auto-progress spends on the active pass, then the live one; a new live sea
   assert.equal(P.trackOf(T, p).id, 's3');
 });
 
-test('tiers past the live season\'s last reward still give tokens; premium is per season', () => {
+test('no hoarding: tokens stop once the pool covers the live season; a finished pass gives none', () => {
+  store.clear();
+  const S = P.seasonsFrom([s1, next('s2', '2026-10-20')], '2026-10-22'), [a, b] = S.list, p = P.loadPass();
+  p.auto = false;
+  assert.equal(P.addXp(S, p, 95 * b.tierXp), 90);   // 95 tiers, but the live pass only has 90 rewards
+  assert.equal(P.tiersEarned(b, p), 90); assert.equal(P.tokens(S, p), 90); assert.ok(!P.tokensNeeded(S, p));
+  P.unlock(S, a, p, 'p1.1');   // one spent on a past season: the next tier past the end makes it up, and only that one
+  assert.equal(P.addXp(S, p, 3 * b.tierXp), 1); assert.equal(P.tokens(S, p), 90);
+  // an old save with bonus tokens counts only up to the reward count
+  const q = { ...P.loadPass(), seasons: { s2: { ...structuredClone(P.rec(p, b)), earned: undefined, xp: 108 * b.tierXp, unlocked: {} } } };
+  delete q.seasons.s2.earned; assert.equal(P.tokens(S, q), 90);
+  // a finished pass: nothing more from XP, and no token purchase once every reward left is paid for
+  for (const pg of b.pages) for (const it of pg.items) P.rec(p, b).unlocked[it.id] = true;
+  P.rec(p, b).earned = 90; for (const pg of a.pages) for (const it of pg.items) P.rec(p, a).unlocked[it.id] = true;
+  assert.ok(P.seasonDone(b, p)); assert.equal(P.addXp(S, p, 10 * b.tierXp), 0);
+  assert.equal(P.buyToken(S, p), 'Your tokens already cover every reward left');
+  // spare tokens (bought before the end) are dropped when the pass wraps up, and stay gone when a new season comes out
+  P.rec(p, a).earned = 90; P.rec(p, b).bought = 4; assert.equal(P.tokens(S, p), 4); assert.equal(P.wrapUp(S, p), 4); assert.equal(P.tokens(S, p), 0);
+  const T = P.seasonsFrom([s1, next('s2', '2026-10-20'), next('s3', '2026-12-01')], '2026-12-02');
+  assert.equal(P.tokens(T, p), 0); assert.ok(P.canBuyToken(T, p));
+  P.savePass(p); const back = P.loadPass(); assert.equal(back.forfeit, 4); assert.equal(back.seasons.s2.earned, 90); assert.equal(P.tokens(S, back), 0);
+});
+
+test('premium is per season', () => {
   store.clear();
   const S = P.seasonsFrom([s1, next('s2', '2026-10-20')], '2026-10-22'), [a, b] = S.list, p = P.loadPass();
   P.rec(p, b).xp = 95 * b.tierXp;
-  assert.equal(P.tiersEarned(b, p), 90); assert.equal(P.tokens(S, p), 95);
   const c = loadCredits(); change(c, 5000, 'test'); saveCredits(c);
   p.auto = false; P.unlock(S, a, p, 'p1.3');   // premium reward: held
   assert.ok(!p.seasons.s1.granted['p1.3']);

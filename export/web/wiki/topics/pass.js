@@ -42,11 +42,11 @@ export default {
         `<h2>Free and premium</h2>`+c.md(`Some tier rewards are **premium**. Premium is bought once per season with credits (${ctx.num(live.premiumPrice)} for ${live.name}).
 
 You can spend a token on a premium reward without premium. It still counts toward finishing the page, and the reward is **held for you**. Buying premium later hands over every held reward at once. Page rewards are free for everyone.`)+
-        `<h2>After the last tier</h2>`+c.md(`Pass XP keeps counting once you have earned all ${tiers} tiers of the live season. Every further ${ctx.num(live.tierXp)} XP still gives a token, announced as a **BONUS PASS TOKEN**. You can spend these on past seasons.`)+
+        `<h2>When a pass is finished</h2>`+c.md(`Tokens stop as soon as the ones you hold can pay for every reward still locked in the live season. A finished pass gives no more tokens, and you can't stockpile them for the next season. If you spent tokens on a past season, tiers past the last of the ${tiers} still give a **BONUS PASS TOKEN** (one ${ctx.num(live.tierXp)} XP each) until the live pass is covered again. Tier skips can be bought only while some reward is left to spend them on.`)+
         `<h2>Past seasons never expire</h2>`+c.md(`When a new season goes live, the old one stays open for good, like Marvel Rivals' battle passes:
 
 - **One token pool.** Tokens from every season go into one shared count, and you can spend any of them on any season.
-- **Pass XP always goes to the live season.** Past seasons are finished with tokens: bonus tokens, spare tokens and tier skips.
+- **Pass XP always goes to the live season.** Past seasons are finished with tokens: spare tokens and tier skips.
 - **Premium is per season.** A past season's premium can still be bought, at its own price, and it hands over that season's held rewards.
 - **Active pass.** Pick a past season with MAKE ACTIVE PASS and auto-progress spends on it first, then on the live season. When the next season goes live, the active pass resets to it.
 - Rewards you own stay yours forever.`)+
