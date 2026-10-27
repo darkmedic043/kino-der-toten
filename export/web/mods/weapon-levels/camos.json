@@ -368,7 +368,7 @@
       "mix": 0.95
     }
   ],
-  "_altNote": "alt: weapon id -> {challenge: replacement}, for guns that can't do a challenge (no headshots from a Thundergun blast); progress counts on the replacement",
+  "_altNote": "alt: weapon id -> {challenge: replacement}, for guns that can't do a challenge (no headshots from a Thundergun blast, or from launchers and explosive bolts, whose kills are nearly all blasts); progress counts on the replacement",
   "alt": {
     "thundergun_zm": {
       "headshots": "crowd"
@@ -383,6 +383,42 @@
       "headshots": "crowd"
     },
     "microwavegundw_zm": {
+      "headshots": "crowd"
+    },
+    "havoc_zm": {
+      "headshots": "crowd"
+    },
+    "m72_law_zm": {
+      "headshots": "crowd"
+    },
+    "china_lake_zm": {
+      "headshots": "crowd"
+    },
+    "bo3_rpg_dragon": {
+      "headshots": "crowd"
+    },
+    "aw_mdl": {
+      "headshots": "crowd"
+    },
+    "crossbow_explosive_zm": {
+      "headshots": "crowd"
+    },
+    "bo3_bow": {
+      "headshots": "crowd"
+    },
+    "bo3_wrath_ancients": {
+      "headshots": "crowd"
+    },
+    "bo3_bow_storm": {
+      "headshots": "crowd"
+    },
+    "bo3_bow_rune": {
+      "headshots": "crowd"
+    },
+    "bo3_bow_wolf": {
+      "headshots": "crowd"
+    },
+    "bo3_bow_demon": {
       "headshots": "crowd"
     }
   }
