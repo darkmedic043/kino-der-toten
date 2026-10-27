@@ -33,7 +33,7 @@ const LOOK = {   // the UGX shots average sRGB (33, 48, 53): a teal-grey overcas
 };
 const FIRE = { range: 620, decay: 1.5, color: 0xff9c4e, intensity: 1500, pool: 6 };
 const LAMP = { range: 760, decay: 1.4, color: 0xcfe0ea, labColor: 0x9fdcea, intensity: 1100, labIntensity: 1600, pool: 4 };
-const GLOW = { lamp: { size: 90, color: [.8, .9, 1.0], gain: .75 }, lab: { size: 44, color: [.5, .9, 1.0], gain: 1.1 }, through: 300, throughLab: 30 };   // additive discs in the lit windows and on the lab's fixtures; through: a disc still shows when the line of sight is blocked within this many units of it (window frames, glass)
+const GLOW = { lamp: { size: 90, color: [.8, .9, 1.0], gain: .75 }, lab: { size: 44, color: [.5, .9, 1.0], gain: 1.1 }, through: 300, throughLab: 30, pull: 30, pullLab: 10 };   // additive discs in the lit windows and on the lab's fixtures; depth-tested; pull: drawn this much toward the camera to clear the fixture; through: the line-of-sight fade still shows a disc when the ray is blocked within this many units of it (window frames, glass)
 // per fx note: flame sprite size, how hot (white core), sub-flames, smoke puffs, embers
 const KINDS = {   // kind: the mods/fx/flames.js kind (its glow and aspect)
   fire1: { kind: 'fire', size: 44, hot: 1, sub: 4, smoke: 6, embers: 8 }, fire_long: { kind: 'fire', size: 60, hot: 1, sub: 5, smoke: 7, embers: 10 }, fire2: { kind: 'fire', size: 50, hot: 1, sub: 4, smoke: 6, embers: 8 },
@@ -164,12 +164,17 @@ export function setupAtmosphere(api) {
   const fire = createFlames({ scene, renderer, low, name: 'nuketown_fire', fade: 5000 });
   const stub = () => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, -1e6, 0], 3)); return g; };
   const glowMat = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, fog: false,
+    transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false,
     uniforms: { px: { value: 1 }, flick: { value: 1 }, cLamp: { value: new THREE.Vector3(...GLOW.lamp.color).multiplyScalar(GLOW.lamp.gain) }, cLab: { value: new THREE.Vector3(...GLOW.lab.color).multiplyScalar(GLOW.lab.gain) } },
-    vertexShader: `attribute float size, kind, occ; uniform float px; varying float vKind, vA;
+    vertexShader: `#define PULL_LAMP ${GLOW.pull.toFixed(1)}
+      #define PULL_LAB ${GLOW.pullLab.toFixed(1)}
+      attribute float size, kind, occ; uniform float px; varying float vKind, vA;
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float d = max(20.0, -mv.z);
         vKind = kind; vA = (1.0 - smoothstep(900.0, 4000.0, d) * 0.8) * occ;
-        gl_PointSize = min(size * 640.0 * px / d, 220.0 * px); gl_Position = projectionMatrix * mv; }`,
+        gl_PointSize = min(size * 640.0 * px / d, 220.0 * px);
+        // depth-tested, but drawn a little toward the camera so the disc clears the fixture it sits on
+        float L = length(mv.xyz); mv.xyz *= max(L - min(mix(PULL_LAMP, PULL_LAB, kind), L * 0.5), 1.0) / L;
+        gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `uniform float flick; uniform vec3 cLamp, cLab; varying float vKind, vA;
       void main(){ vec2 p = (gl_PointCoord - 0.5) * 2.0; float r = length(p); if (r > 1.0) discard;
         float a = pow(1.0 - r, 1.6) * vA, core = smoothstep(0.4, 0.0, r);
