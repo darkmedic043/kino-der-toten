@@ -87,7 +87,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     k:{yaw:[[90,14],[70,11]],pitch:[[90,14],[74,12]],sway:[[80,12],[62,10]],kickP:[[60,9],[60,9]],kickZ:[[50,8],[50,8]]}};   // (the per-gun kicks: softer springs than the common ones, so a shot shows)
   const dual={w:0,lastShots:-1,camQ:new THREE.Quaternion(),camQi:new THREE.Quaternion(),sides:['ri','le'].map((side,i)=>({side,i,sign:i?-1:1,tag:i?'tag_weapon1':'tag_weapon',
     yaw:spring(...DUAL.k.yaw[i]),pitch:spring(...DUAL.k.pitch[i]),sway:spring(...DUAL.k.sway[i]),kickP:spring(...DUAL.k.kickP[i]),kickZ:spring(...DUAL.k.kickZ[i]),
-    off:new THREE.Vector3(),rot:new THREE.Euler(),M:new THREE.Matrix4(),tmpM:new THREE.Matrix4(),tagM:new THREE.Matrix4(),q:new THREE.Quaternion(),qw:new THREE.Quaternion(),p:new THREE.Vector3(),wq:new THREE.Quaternion(),sc:new THREE.Vector3()}))};
+    off:new THREE.Vector3(),rot:new THREE.Euler(),M:new THREE.Matrix4(),tmpM:new THREE.Matrix4(),tagM:new THREE.Matrix4(),q:new THREE.Quaternion(),qw:new THREE.Quaternion(),p:new THREE.Vector3(),err:new THREE.Vector3(),wq:new THREE.Quaternion(),sc:new THREE.Vector3()}))};
   function measureUnder(def){   // once per weapon and attachment set, at idle: the part's extent in the gun's frame
     under.kind=null;const ids=(def?.attachments??'').split('+'),kind=Object.keys(UNDER).find(k=>ids.includes(k));if(!kind||!view.gun)return;
     const r=view.root,g=r.getObjectByName('j_gun')??r.getObjectByName('tag_weapon');if(!g)return;
@@ -325,10 +325,12 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
         wr.getWorldPosition(D.p);wr.getWorldQuaternion(D.wq);
         D.qw.copy(dual.camQ).multiply(D.q.setFromEuler(D.rot)).multiply(dual.camQi);D.off.applyQuaternion(dual.camQ);
         D.M.makeRotationFromQuaternion(D.qw);D.M.setPosition(tmp.s.copy(D.p).add(D.off).sub(tmp.e.copy(D.p).applyQuaternion(D.qw)));
-        // the gun: its tag moves rigidly
+        // the arm reaches the moved wrist; where the arm can't reach (a sprint pose past its length) the gun goes where the
+        // wrist actually got to, or it slid out of the hand (2026-10-27, user: the Atlas pair "moving on their own")
+        reachArm(D.side,D.err.copy(D.p).add(D.off),1,false);
+        D.err.negate().add(wr.getWorldPosition(tmp.w));D.M.elements[12]+=D.err.x;D.M.elements[13]+=D.err.y;D.M.elements[14]+=D.err.z;
+        // the gun: its tag moves rigidly with the wrist; the hand turns with the gun
         D.tagM.multiplyMatrices(D.M,tag.matrixWorld);D.tmpM.copy(tag.parent.matrixWorld).invert().multiply(D.tagM);D.tmpM.decompose(tag.position,tag.quaternion,D.sc);
-        // the arm reaches the moved wrist, the hand turns with the gun
-        reachArm(D.side,tmp.w.copy(D.p).add(D.off),1,false);
         wr.parent.getWorldQuaternion(tmp.pq);wr.quaternion.copy(tmp.pq.invert().multiply(D.wq.premultiply(D.qw)));
         view.pivot.updateMatrixWorld(true);
         sealArm();
