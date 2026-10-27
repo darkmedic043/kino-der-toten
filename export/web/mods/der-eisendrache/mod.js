@@ -931,6 +931,10 @@ function setupPanzer(api) {
     if (!z.target || (z.retarget = (z.retarget ?? 0) - dt) <= 0) { z.retarget = 1; z.target = sync.nearest(z.root.position) ?? { id: sync.me, pos: pl }; }
     const tgt = sync.players().find(q => q.id === z.target.id) ?? { id: sync.me, pos: pl };
     const damage = n => sync.hitPlayer(tgt.id, n);
+    // every hit (each flame tick, each cannon round, the claw) checks the target where they are now, through no wall:
+    // the attacks run for seconds and only the start was checked, so stepping behind a wall still got you hit (user, 2026-10-27)
+    const reach = range => { const q = sync.players().find(o => o.id === tgt.id)?.pos; if (!q || pos.distanceTo(q) > range) return null;
+      return world.lineClear(pos.clone().add(new THREE.Vector3(0, 70, 0)), q.clone().add(new THREE.Vector3(0, 40, 0))) ? q : null; };
     const pos = z.root.position, tp = tgt.pos, dist = pos.distanceTo(tp);
     if (z.state === 'arrive') {   // drop in on the jetpack
       const k = Math.min(1, z.t / 2.2); pos.lerpVectors(z.ground.clone().add(new THREE.Vector3(0, 700, 0)), z.ground, 1 - (1 - k) ** 2); face(z, tp);
@@ -947,9 +951,9 @@ function setupPanzer(api) {
     const eye = tp.clone().add(new THREE.Vector3(0, 40, 0)), from = pos.clone().add(new THREE.Vector3(0, 70, 0)), seen = world.lineClear(from, eye);
     face(z, tp);
     // attacks
-    if (seen && dist < 95 && z.cool.melee <= 0) return busy(z, Math.random() < .5 ? 'melee_a' : 'melee_b', null, { at: .55, hit: () => { if (pos.distanceTo(tp) < 110) damage(70 * clawHat()); } }, 1.8);
-    if (seen && dist < 260 && z.cool.ft <= 0) return busy(z, 'ft_sweep', dt2 => { const to = tp.clone().sub(pos).setY(0).normalize(); if (pos.distanceTo(tp) < 300 && to.dot(fwd(z)) > .7) damage(70 * dt2 * clawHat()); flame(z); }, null, 4.5);
-    if (seen && dist > 300 && dist < 1100 && z.cool.gun <= 0) return busy(z, 'chaingun_fire', dt2 => { z.gunT = (z.gunT ?? 0) - dt2; if (z.gunT <= 0) { z.gunT = .12; tracer(z, eye); if (Math.random() < .3) damage(6); } }, null, 7, 2.2);
+    if (seen && dist < 95 && z.cool.melee <= 0) return busy(z, Math.random() < .5 ? 'melee_a' : 'melee_b', null, { at: .55, hit: () => { if (reach(110)) damage(70 * clawHat()); } }, 1.8);
+    if (seen && dist < 260 && z.cool.ft <= 0) return busy(z, 'ft_sweep', dt2 => { const q = reach(300), to = q && q.clone().sub(pos).setY(0).normalize(); if (q && to.dot(fwd(z)) > .7) damage(70 * dt2 * clawHat()); flame(z); }, null, 4.5);
+    if (seen && dist > 300 && dist < 1100 && z.cool.gun <= 0) return busy(z, 'chaingun_fire', dt2 => { z.gunT = (z.gunT ?? 0) - dt2; if (z.gunT <= 0) { z.gunT = .12; const q = reach(1200); tracer(z, q ? q.clone().add(new THREE.Vector3(0, 40, 0)) : eye); if (q && Math.random() < .3) damage(6); } }, null, 7, 2.2);
     // move along the navmesh
     z.repath -= dt;
     if (z.repath <= 0) {
@@ -993,6 +997,7 @@ function setupPanzer(api) {
   function tracer(z, to) {
     const tag = z.root.getObjectByName('tag_gun_barrel1') ?? z.root.getObjectByName('j_wrist_le'); if (!tag) return;
     const a = tag.getWorldPosition(V()), b = to.clone().add(new THREE.Vector3((Math.random() - .5) * 40, (Math.random() - .5) * 30, (Math.random() - .5) * 40));
+    const dir = b.clone().sub(a), len = dir.length(), wall = len > 1 && world.raycast(new THREE.Ray(a, dir.normalize()), 1, len); if (wall?.position) b.copy(wall.position);   // stops at the wall
     const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), tracerMat); scene.add(l); fx.push({ o: l, life: .06 });
     audio?.play?.('shot', .25);
     const spin = z.root.getObjectByName('tag_gun_spin'); if (spin) spin.rotateX(.9);

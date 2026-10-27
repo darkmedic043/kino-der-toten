@@ -1,8 +1,8 @@
 // Der Eisendrache's craftables (zm_castle_craftables.gsc) and the rocket shield. Parts are the builder's
 // CASTLE_PART_<craftable>_<part>_<k> models (every candidate spot, hidden); benches CASTLE_BENCH_spike (the undercroft
 // table) and CASTLE_BENCH_open_<k> (the three open workbenches); the shield's recharges CASTLE_SHIELDCHARGE_<k>.
-//   Ragnarok DG-4 (gravityspike): built at its own table, then taken as the operator weapon (mods/operator-weapons),
-//   charged. Its parts come as in BO3:
+//   Ragnarok DG-4 (gravityspike): built at its own table (or an open bench once its shield is built and taken), then
+//   taken as the operator weapon (mods/operator-weapons), charged. Its parts come as in BO3:
 //     body   - dropped where a Panzersoldat dies (zm_castle_mechz.gsc notifies its death origin), until it's taken
 //     handle - when the Death Ray has finished a run it hangs in the air at one of its two spots (BO3's), out of
 //              reach on foot: fly past it on the launch pad whose flight comes nearest and it's grabbed in flight
@@ -28,8 +28,11 @@ export function setupCraftables(api, { traps, pads }) {
   const { world, session, host, player, camera, scene, enemies, audio, toast, announce, data, viewScene, view, sync } = api;
   const root = world.root, kino = window.kino;
   const at = o => o.getWorldPosition(new THREE.Vector3());
-  // a map node moved or shown at runtime (the static map's matrices are frozen: update them by hand)
-  const moveTo = (o, p) => { o.parent.updateMatrixWorld(true); o.position.copy(o.parent.worldToLocal(p.clone())); o.updateMatrixWorld(true); };
+  // a map node moved or shown at runtime (the static map's matrices are frozen: update them by hand). updateMatrix()
+  // too: a frozen node (static-freeze) has matrixAutoUpdate off until the freeze notices the move a frame or two later,
+  // so updateMatrixWorld alone left its matrix at home and the pickup spot, read from it at once, stayed at the part's
+  // fixed spot: the Panzersoldat's Ragnarok body couldn't be taken where it died (user, 2026-10-27)
+  const moveTo = (o, p) => { o.parent.updateMatrixWorld(true); o.position.copy(o.parent.worldToLocal(p.clone())); o.updateMatrix(); o.updateMatrixWorld(true); };
   const spots = {}; root.traverse(o => { const m = /^CASTLE_PART_(spike|shield)_([a-z]+)_(\d+)$/.exec(o.name); if (m) (spots[m[1] + ':' + m[2]] ??= []).push(o); });
   const places = new Map(), homes = new Map(); for (const list of Object.values(spots)) for (const o of list) homes.set(o, o.position.clone());
   const benchSpike = root.getObjectByName('CASTLE_BENCH_spike'), benches = []; root.traverse(o => { if (/^CASTLE_BENCH_open_\d+$/.test(o.name)) benches.push(o); });
@@ -44,7 +47,7 @@ export function setupCraftables(api, { traps, pads }) {
     if (p) moveTo(o, p); places.get(o)?.copy(at(o)); o.visible = true; o.updateMatrixWorld(true); st.shown.set(cr + ':' + part, o);
   }
   function reset() {
-    for (const [o, h] of homes) { o.visible = false; o.position.copy(h); o.updateMatrixWorld(true); places.get(o)?.copy(at(o)); }
+    for (const [o, h] of homes) { o.visible = false; o.position.copy(h); o.updateMatrix(); o.updateMatrixWorld(true); places.get(o)?.copy(at(o)); }
     st.have.spike.clear(); st.have.shield.clear(); st.built.spike = false; st.built.shield = null; st.shown.clear(); st.firstPanzer = false; st.armed = 0;
     if (sync.isHost) { const pick = {}; for (const part of CRAFT.shield.parts) { const n = spots['shield:' + part]?.length ?? 0; if (n) pick[part] = Math.floor(Math.random() * n); } sync.act('craftSpots', pick); }   // the host picks the shield parts' spots
   }
@@ -53,7 +56,7 @@ export function setupCraftables(api, { traps, pads }) {
   sync.on('partPick', (d, ctx) => { const o = st.shown.get(d.key); if (!o) return; const [cr, part] = d.key.split(':'); o.visible = false; st.shown.delete(d.key); st.have[cr].add(part); if (ctx.mine) audio?.play?.('buy', .5); toast?.(`${CRAFT[cr].name} part · ${st.have[cr].size}/${CRAFT[cr].parts.length}`, 2.5); });
   sync.on('partDrop', d => { const o = spots[d.key]?.[d.k]; if (!o || st.shown.has(d.key)) return; const [cr, part] = d.key.split(':'); show(cr, part, o, d.p ? sync.v(d.p) : null); if (d.msg) toast?.(d.msg, 3); });
   sync.on('build', (d, ctx) => {
-    if (d.cr === 'spike') { if (st.built.spike) return; st.built.spike = true; announce?.('RAGNAROK DG-4', 'BUILT', 2.5); }
+    if (d.cr === 'spike') { if (st.built.spike) return; st.built.spike = benches[d.bench] ?? benchSpike ?? true; announce?.('RAGNAROK DG-4', 'BUILT', 2.5); }
     else { if (st.built.shield) return; st.built.shield = benches[d.bench] ?? null; announce?.('ROCKET SHIELD', 'BUILT', 2.5); }
     if (ctx.mine) audio?.play?.('buy', .7);
   });
@@ -73,23 +76,30 @@ export function setupCraftables(api, { traps, pads }) {
       },
     });
   }
+  // the Ragnarok builds at its table in the undercroft or at any open bench whose shield has nothing left to do there
+  // (user, 2026-10-27: with every part in hand the open benches only ever offered the shield), and is taken where it
+  // was built. At an open bench the shield comes first: build it, take it, then the Ragnarok.
+  const spikeHere = b => st.built.spike ? st.built.spike === b && !!kino.operator && kino.operator.current !== 'ragnarok' : st.have.spike.size === 3;
+  const shieldHere = b => st.built.shield ? st.built.shield === b && !shield?.owned : st.have.shield.size === 3;
+  const spikeUse = b => {
+    if (!st.built.spike) { if (st.have.spike.size < 3) return false; sync.act('build', { cr: 'spike', bench: benches.indexOf(b) }); return true; }
+    if (!spikeHere(b)) return false;
+    kino.operator.give('ragnarok', { full: true }); kino.armory?.found('ragnarok'); return true;
+  };
   if (benchSpike) world.addInteraction({
     position: at(benchSpike),
-    text: () => st.built.spike ? (kino.operator?.current === 'ragnarok' ? '' : 'Take the Ragnarok DG-4')
-      : st.have.spike.size === 3 ? 'Build the Ragnarok DG-4' : `Ragnarok DG-4 · ${st.have.spike.size}/3 parts`,
-    use() {
-      if (!st.built.spike) { if (st.have.spike.size < 3) return false; sync.act('build', { cr: 'spike' }); return true; }
-      if (kino.operator?.current === 'ragnarok' || !kino.operator) return false;
-      kino.operator.give('ragnarok', { full: true }); kino.armory?.found('ragnarok'); return true;
-    },
+    hidden: () => st.built.spike && !spikeHere(benchSpike),
+    text: () => st.built.spike ? 'Take the Ragnarok DG-4' : st.have.spike.size === 3 ? 'Build the Ragnarok DG-4' : `Ragnarok DG-4 · ${st.have.spike.size}/3 parts`,
+    use: () => spikeUse(benchSpike),
   });
   for (const b of benches) world.addInteraction({
     position: at(b),
-    text: () => st.built.shield ? (st.built.shield === b && !shield?.owned ? 'Take the Rocket Shield' : '')
-      : st.have.shield.size === 3 ? 'Build the Rocket Shield' : `Rocket Shield · ${st.have.shield.size}/3 parts`,
+    hidden: () => !shieldHere(b) && !spikeHere(b) && !!st.built.shield,
+    text: () => shieldHere(b) ? (st.built.shield ? 'Take the Rocket Shield' : 'Build the Rocket Shield')
+      : spikeHere(b) ? (st.built.spike ? 'Take the Ragnarok DG-4' : 'Build the Ragnarok DG-4') : `Rocket Shield · ${st.have.shield.size}/3 parts`,
     use() {
-      if (!st.built.shield) { if (st.have.shield.size < 3) return false; sync.act('build', { cr: 'shield', bench: benches.indexOf(b) }); return true; }
-      if (st.built.shield !== b || shield?.owned) return false;
+      if (!shieldHere(b)) return spikeHere(b) && spikeUse(b);
+      if (!st.built.shield) { sync.act('build', { cr: 'shield', bench: benches.indexOf(b) }); return true; }
       takeShield(); return true;
     },
   });
@@ -177,7 +187,7 @@ export function setupCraftables(api, { traps, pads }) {
   reset();
 
   return {
-    state: () => ({ have: { spike: [...st.have.spike], shield: [...st.have.shield] }, built: { spike: st.built.spike, shield: !!st.built.shield }, shown: [...st.shown.keys()],
+    state: () => ({ have: { spike: [...st.have.spike], shield: [...st.have.shield] }, built: { spike: !!st.built.spike, shield: !!st.built.shield }, shown: [...st.shown.keys()],
       armed: Math.max(0, Math.round(st.armed - session.time)), shield: shield?.state() ?? null }),
     give(cr) { for (const p of CRAFT[cr]?.parts ?? []) st.have[cr].add(p); for (const k of [...st.shown.keys()]) if (k.startsWith(cr + ':')) { st.shown.get(k).visible = false; st.shown.delete(k); } },   // testing: every part of a craftable
     takeShield, raise: () => shield?.raise(), lower: () => shield?.lower(), handleDrop,

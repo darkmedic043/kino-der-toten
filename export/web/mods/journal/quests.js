@@ -102,7 +102,7 @@ export const JOURNAL = [
       { title: 'The spikes', how: 'The first Panzersoldat to die drops them.', done: L => { const s = L.castle?.craft?.state(); return !!s && (s.built.spike || s.have.spike.includes('body')); }, where: L => L.prompts(/Pick up the spikes/) },
       { title: 'The handle', how: 'Run the Death Ray: when it finishes, the handle falls from one of the Tesla coils.', done: L => { const s = L.castle?.craft?.state(); return !!s && (s.built.spike || s.have.spike.includes('handle')); }, where: L => L.prompts(/Pick up the handle|Activate the Death Ray/) },
       { title: 'The guards', how: 'During a rocket test fire, pull the wall switch at the rocket pad, then within 20 s the lever on the landing pad\'s console. The guards drop beside it.', done: L => { const s = L.castle?.craft?.state(); return !!s && (s.built.spike || s.have.spike.includes('guards')); }, where: L => L.prompts(/Pull the switch|Pull the lever|Pick up the guards/) },
-      { title: 'Build it', how: 'Build it at its table in the undercroft.', done: L => !!L.castle?.craft?.state().built.spike, where: L => L.nodes(/^CASTLE_BENCH_spike$/) },
+      { title: 'Build it', how: 'Build it at its table in the undercroft, or at any workbench once the shield there is built and taken.', done: L => !!L.castle?.craft?.state().built.spike, where: L => L.nodes(/^CASTLE_BENCH_(spike|open_\d+)$/) },
       { title: 'Take it', how: 'Take it from the table: it fills your operator weapon slot (Y).', done: L => window.kino?.operator?.current === 'ragnarok', where: L => L.nodes(/^CASTLE_BENCH_spike$/) },
     ] },
     { id: 'shield', name: 'Rocket Shield', kind: 'BUILDABLE', steps: [
