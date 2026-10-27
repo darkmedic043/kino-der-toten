@@ -1,0 +1,25 @@
+{
+  "_comment": "Nuketown Remastered 1.2 (UGX, BO2 Nuketown with a bunker lab). Per-map settings for build_waw_map.py; coordinates are CoD units (x, y, z up). Zones are plain names (yellow, yellow_back, lab_zone4...) so compactZones joins them; initial_zone/initial/start_zone are the start. Its doors are rotating_door, zombie_debris and zombie_door triggers; the Mystery Box trigger is lukkie_treasure_chests.",
+  "instanceProps": true,
+  "cellSize": 2048,
+  "collisionMargin": 600,
+  "compactZones": true,
+  "startZones": ["initial_zone", "initial", "start_zone"],
+  "doorModels": true,
+  "doorTriggers": ["rotating_door"],
+  "boxTrigger": "lukkie_treasure_chests",
+  "powerSwitch": "pf5006_auto339",
+  "playerSpawnCount": 4,
+  "entityMeshes": [
+    "bunker_door_clip", "pap_door", "elevator_door", "elevator_clip", "pap_key_elevator", "paper_floor", "pick_files",
+    "rock_blockers", "vent", "solo_delete", "lab2_clip", "qr_clip", "vending_revive_block", "knife_bowie_chalk",
+    "green_door_bottom", "yellow_house_door", "yellow_back_left", "yellow_back_right", "auto229", "auto232", "auto234", "auto249"
+  ],
+  "entityProps": [
+    "bunker_door", "bunker_door_moveto", "rock_blockers", "truck_replace", "getaway_car", "getaway_car_parachute", "nt_camera_rocket",
+    "key", "pap_key", "pap_skull", "tool1", "tool2", "tool3", "bunker_generator", "radio_vent", "pf5006_auto346",
+    "rake_hidings", "hidings_shield", "shield1", "shield2", "rake_part1", "rake_part2", "rake_part3", "electric_water_trap_lights",
+    "pf3059_auto1", "auto255", "auto256", "auto258", "auto339", "auto342", "auto343", "auto345", "auto347", "auto349",
+    "pf5006_auto340", "pf5006_auto343", "pf5006_auto347", "vending_electric_cherry", "pf5006_auto141", "auto140", "auto164"
+  ]
+}

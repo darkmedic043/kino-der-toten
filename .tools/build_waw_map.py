@@ -15,8 +15,13 @@ import collections, json, math, pathlib, re, struct, subprocess, sys, tempfile
 SKIP_MATERIAL = re.compile(r'sky|clip|trigger|nodraw|caulk|portal|hint|origin', re.I)
 # Wall weapons the map names -> weapons this game has (the map's own are not in the game)
 WEAPON_MAP = {'kap40': 'bo3_g18_death', 'pdw': 'bo3_mp7_flanker', 'cheese_gun': 'mp40_zm', 'm1927': 'bo3_tommy_modern',
-              'm27': 'bo3_sa80', 'aek': 'bo3_ak117', 'an94': 'bo3_f2000_tech'}
-PERK_MAP = {'specialty_armorvest': 'jugg', 'specialty_quickrevive': 'revive', 'specialty_fastreload': 'speedcola', 'specialty_rof': 'doubletap'}
+              'm27': 'bo3_sa80', 'aek': 'bo3_ak117', 'an94': 'bo3_f2000_tech',
+              # Nuketown Remastered's Battlefield wall guns, as this game's nearest BO1/BO3 guns
+              'fs_m14': 'm14_zm', 'fs_m16a2': 'm16_zm', 'fs_olympia': 'rottweil72_zm', 'bf3_pdwr': 'bo3_mp7_flanker', 'bf3_pp2000': 'pm63_zm',
+              'bf4_shorty': 'ithaca_zm', 'bfh_hcar': 'hk21_zm'}
+PERK_MAP = {'specialty_armorvest': 'jugg', 'specialty_quickrevive': 'revive', 'specialty_fastreload': 'speedcola', 'specialty_rof': 'doubletap',
+            # the BO1 perks (perks-plus); the BO1/BO2 vending triggers (zombie_vending_bo1/_bo2) name them this way
+            'specialty_bulletaccuracy': 'deadshot', 'specialty_extraammo': 'mulekick', 'specialty_detectexplosive': 'phd', 'specialty_longersprint': 'staminup'}
 
 def g(p):  # CoD (x, y, z up) -> glTF (x, z, -y)
     return (p[0], p[2], -p[1])
@@ -337,6 +342,20 @@ def main():
         zone_z.setdefault(z, []).append(o[2])
     zone_z = {z: sum(v) / len(v) for z, v in zone_z.items()}
     nearest_zone = lambda z: min(zone_z, key=lambda k: abs(zone_z[k] - z)) if zone_z else 'start'
+    # info_volumes name every zone, spawners or not (Nuketown's lab_zone1/5/6 have none); a flagless door takes the
+    # zone whose volume holds its trigger (the zone it is bought from: opening it changes nothing), else the nearest by height
+    volumes = []
+    for e in ents:
+        mi = int(e['model'][1:]) if e.get('classname') == 'info_volume' and e.get('targetname') and e.get('model', '').startswith('*') else -1
+        if mi in brush and 'mins' in brush[mi]:
+            o = vec(e.get('origin') or '0 0 0')
+            volumes.append((zid(e['targetname']), [brush[mi]['mins'][k] + o[k] for k in range(3)], [brush[mi]['maxs'][k] + o[k] for k in range(3)]))
+    known_zones = set(zone_z) | {z for z, _, _ in volumes}
+    def volume_zone(p):
+        for z, lo, hi in volumes:
+            if all(lo[k] - 1 <= p[k] <= hi[k] + 1 for k in range(3)):
+                return z
+        return None
 
     # doors: a trigger's `target` names script_brushmodels whose surfaces become the DOOR mesh
     by_target = collections.defaultdict(list)
@@ -344,11 +363,16 @@ def main():
         if e.get('classname') == 'script_brushmodel' and e.get('targetname'):
             by_target[e['targetname']].append(e)
     door_surfaces, doors, door_targets = set(), [], {}
+    # cfg 'doorTriggers': extra trigger targetnames that are doors (Nuketown's rotating_door script)
+    door_trigs = ('zombie_door', 'zombie_debris') + tuple(cfg.get('doorTriggers', []))
+    # a trigger without a flag takes the flag of another trigger on the same door (Nuketown's bunker_door_a)
+    target_flags = {e['target']: e['script_flag'] for e in ents if e.get('targetname') in door_trigs and e.get('target') and e.get('script_flag')}
     for e in ents:
-        if e.get('targetname') not in ('zombie_door', 'zombie_debris'):
+        if e.get('targetname') not in door_trigs:
             continue
-        flag = e.get('script_flag', '')
-        zone_id = zid(flag.replace('enter_', '')) if flag.startswith('enter_zone') else nearest_zone(vec(e['origin'])[2])
+        flag = e.get('script_flag') or target_flags.get(e.get('target'), '')
+        # script_flag enter_<zone>: the zone it opens (enter_zone_x, or any spawner zone's name, Nuketown's enter_yellow_back)
+        zone_id = zid(flag[6:]) if flag.startswith('enter_zone') or (flag.startswith('enter_') and zid(flag[6:]) in known_zones) else volume_zone(vec(e['origin'])) or nearest_zone(vec(e['origin'])[2])
         # cfg 'doorModels': several triggers may buy one door (each opens its own zone): one door, every zone in extras
         if cfg.get('doorModels') and e.get('target') in door_targets:
             door_targets[e['target']][3]['zones'].append(zone_id)
@@ -422,8 +446,10 @@ def main():
         pieces = [s for s in surfaces if s['idx'] in wanted]
         prims = surfaces_to_prims(b, pieces, flip) if pieces else []
         if cfg.get('doorModels'):   # the door's script_model pieces too (gates, double doors, the cars across the drive)
+            # ...and the models the door's clip brushes point at (Nuketown's rotating doors: trigger -> clip -> door model)
+            piece_targets = {p.get('target') for p in by_target.get(info['target'], []) if p.get('target')}
             for e in ents:
-                if e.get('classname') == 'script_model' and e.get('targetname') == info['target']:
+                if e.get('classname') == 'script_model' and (e.get('targetname') == info['target'] or e.get('targetname') in piece_targets):
                     path = dump / 'model_export' / (e['model'] + '_lod0.glb')
                     if path.exists():
                         R = rot(vec(e.get('angles')))
@@ -444,9 +470,11 @@ def main():
             b.add_mesh_node(f'DOOR_{zone_id}_{cost}', prims, extras=extras or None)
 
     # markers
-    for e in ents:   # cfg 'playerSpawn': the structs (by targetname) to start at instead of initial_spawn_points
-        if e.get('targetname') == cfg.get('playerSpawn', 'initial_spawn_points'):
-            b.add_marker('PLAYER_SPAWN', vec(e['origin']), vec(e.get('angles'))[1])
+    # cfg 'playerSpawn': the structs (by targetname) to start at instead of initial_spawn_points; cfg 'playerSpawnCount':
+    # only the first n of them (Nuketown's structs 5-8 are a second start its script uses later)
+    starts = [e for e in ents if e.get('targetname') == cfg.get('playerSpawn', 'initial_spawn_points')]
+    for e in starts[:cfg.get('playerSpawnCount') or None]:
+        b.add_marker('PLAYER_SPAWN', vec(e['origin']), vec(e.get('angles'))[1])
     # cfg 'teleports': [{name, from, to, cost, cooldown, power}] one-way TELEPORT_<name> at the `from` entity, TPDEST_<name>
     # at the `to` struct
     named_ent = {e['targetname']: e for e in ents if e.get('targetname')}
@@ -529,13 +557,13 @@ def main():
         t = e.get('targetname')
         if t == 'weapon_upgrade' and e.get('zombie_weapon_upgrade') in WEAPON_MAP:
             b.add_marker('WALLBUY_' + WEAPON_MAP[e['zombie_weapon_upgrade']], vec(e['origin']), vec(e.get('angles'))[1])
-        elif t == 'zombie_vending' and e.get('script_noteworthy') in PERK_MAP:
+        elif (t or '').startswith('zombie_vending') and t != 'zombie_vending_upgrade' and e.get('script_noteworthy') in PERK_MAP:   # zombie_vending, _bo1, _bo2
             o, yaw = site(e)
             b.add_marker('PERK_' + PERK_MAP[e['script_noteworthy']], o, yaw)
         elif t == 'zombie_vending_upgrade':
             o, yaw = site(e)
             b.add_marker('PAP', o, yaw)
-        elif t == 'treasure_chest_use':
+        elif t == 'treasure_chest_use' or (cfg.get('boxTrigger') and t == cfg['boxTrigger']):   # cfg 'boxTrigger': the map's own box trigger name
             o, yaw = site(e)
             b.add_marker('BOX_start' if e.get('script_noteworthy') == 'start_chest' else 'BOX', o, yaw)
 
@@ -547,7 +575,7 @@ def main():
                 continue
             R = rot(vec(e.get('angles')))
             inst = {'origin': vec(e['origin']), 'axis': [[R[0][c], R[1][c], R[2][c]] for c in range(3)], 'scale': float(e.get('modelscale', 1) or 1)}
-            prims = load_static_glb(b, path, inst, flip)
+            prims = load_static_glb(b, path, inst, flip, skinned=True)
             if prims:
                 b.add_mesh_node('ENT_' + e['targetname'], prims)
     if cfg.get('powerSwitch'):
@@ -567,6 +595,8 @@ def main():
                 row[key] = e[k]
         if e.get('angles'):
             row['angles'] = vec(e['angles'])
+        if e.get('classname') == 'light':   # the map's placed lights, for a map mod to re-create (colour 0-1, radius in units)
+            row['light'] = {'color': vec(e.get('_color', '1 1 1')), 'radius': float(e.get('radius', 0) or 0), 'intensity': float(e.get('intensity', 1) or 1), 'def': e.get('def', '')}
         mi = int(e['model'][1:]) if e.get('model', '').startswith('*') else None
         if mi in brush and 'mins' in brush[mi]:
             lo, hi = brush[mi]['mins'], brush[mi]['maxs']
@@ -604,11 +634,11 @@ def node_matrix(n):
          [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]]
     return [[R[i][0] * s[0], R[i][1] * s[1], R[i][2] * s[2], t[i]] for i in range(3)] + [[0, 0, 0, 1]]
 
-def load_static_glb(b, path, inst, flip, geo=None):
+def load_static_glb(b, path, inst, flip, geo=None, skinned=False):
     raw = path.read_bytes()
     jl = struct.unpack('<I', raw[12:16])[0]
     j = json.loads(raw[20:20 + jl])
-    if j.get('skins'):
+    if j.get('skins') and not skinned:  # entity props may be rigged (Nuketown's generators, key, shield): bind pose as placed
         return []
     bin_off = 20 + jl + 8
     def accessor(i):

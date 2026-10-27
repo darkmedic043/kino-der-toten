@@ -30,7 +30,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Player wiki at `/wiki/` (topic modules built from game data, menu link, checker `.tools/wiki-check.mjs`) | `wiki.md` |
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
 | Phone/touch support (touch-extras mod, mobile textures, defaults) | `mobile.md` |
-| Porting World at War maps (OpenAssetTools GfxWorld dumper, `build_waw_map.py`, Cheese Cube, Malibu Drive) | `waw-ports.md` |
+| Porting World at War maps (OpenAssetTools GfxWorld dumper, `build_waw_map.py`, Cheese Cube, Malibu Drive, Nuketown with its quest mod `mods/nuketown`) | `waw-ports.md` |
 | Custom-map hooks, scoreboard (Tab), moving platforms | `mods/README.md` (end) and `waw-ports.md` |
 | Session history log | `history.md` |
 

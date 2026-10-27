@@ -1,0 +1,5 @@
+{
+  "name": "Nuketown extras",
+  "description": "Nuketown Remastered (UGX World at War map ported by .tools/build_waw_map.py): its night look (fog, grade, fires, interior lights, falling ash, the nuke column) and its gameplay scripts (two power levers, the bunker generators, Pack-a-Punch access, the free perk). Only active on that map.",
+  "script": "mod.js"
+}

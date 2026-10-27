@@ -37,6 +37,7 @@ export const GRADES={
   'der-eisendrache':{exposure:.86,black:.045,contrast:1.34,saturation:.98,vibrance:.34,shadowTint:[.76,.87,1.22],highlightTint:[1.14,1.03,.88],vignette:.5,bloom:1.4,haze:[.06,.08,.12],hazeDensity:.00022,hazeStart:400},
   moon:{exposure:.95,black:.045,contrast:1.34,saturation:.92,vibrance:.22,shadowTint:[.82,.9,1.16],highlightTint:[1.06,1.03,.98],vignette:.52,chroma:.003,grain:.034},
   'the-giant':{exposure:.92,black:.045,contrast:1.32,saturation:.94,vibrance:.3,shadowTint:[.82,.94,1.08],highlightTint:[1.12,1.04,.9],vignette:.46,bloom:1.3,haze:[.05,.06,.07],hazeDensity:.0002,hazeStart:300},
+  nuketown:{exposure:1,black:.02,contrast:1.18,saturation:1,vibrance:.25,shadowTint:[.94,1,1.06],highlightTint:[1.02,1.02,.98],vignette:.4,bloom:1.45,grain:.04,haze:[.052,.072,.078],hazeDensity:.00026,hazeStart:250},   // UGX Nuketown Remastered: teal-grey overcast, thick haze (mods/nuketown/atmosphere.js)
   'cheese-cube':{vignette:.32,contrast:1.18,black:.025},
   sandbox:{vignette:.32,contrast:1.18,black:.025},
 };

@@ -167,6 +167,32 @@
       "mergeStatic": true,
       "mergeExclude": "^ENT_",
       "batchMeshes": true
+    },
+    {
+      "id": "nuketown",
+      "image": "mods/maps/thumbs/nuketown.jpg",
+      "title": "Nuketown",
+      "description": "Nuketown Remastered (UGX, World at War), ported from its compiled zones: Black Ops II's Nuketown Zombies with its houses, the bunker lab under the test site, ten perks, the Mystery Box and Pack-a-Punch. Work in progress.",
+      "modes": [
+        "zombies",
+        "explore"
+      ],
+      "dir": "mods/maps/nuketown/",
+      "model": "nuketown.glb?v=2",
+      "scale": 1,
+      "background": "#425a62",
+      "exposure": 1.0,
+      "fog": 0.00045,
+      "nearbySpawns": true,
+      "stairSmoothing": true,
+      "player": {
+        "slopeStick": true
+      },
+      "doorMargin": 40,
+      "doorHeadroom": 80,
+      "mergeStatic": true,
+      "mergeExclude": "^ENT_",
+      "batchMeshes": true
     }
   ]
 }
