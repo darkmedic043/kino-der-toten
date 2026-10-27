@@ -146,7 +146,10 @@ renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDef
 renderer.domElement.addEventListener('webglcontextrestored',()=>{diag('contextrestored');if(textureMemoryStats().released){location.reload();return;}/* freed images can't be re-uploaded: start fresh */contextLost=false;$('start').disabled=!ready;$('menu-status').textContent='Graphics restored · click to resume';resumeRendering();});
 addEventListener('blur',()=>{keys.clear();primary=false;ads=false;if(started&&active&&!padOnly()){setActive(false);document.exitPointerLock?.();}});
 addEventListener('mousemove',e=>{if(!active||document.pointerLockElement!==renderer.domElement)return;const sensitivity=(ads?.0012*settings.adsSensitivity:.002)*settings.sensitivity;camera.rotation.y-=e.movementX*sensitivity;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-e.movementY*sensitivity*(settings.invertY?-1:1),-1.5,1.5);});
-addEventListener('mousedown',e=>{if(!active||e.sourceCapabilities?.firesTouchEvents||e.target.closest?.('#touch-controls'))return;if(e.button===0){mousePrimary=primary=true;primaryPressed=true;}if(e.button===2){mouseAim=ads=true;leftPressed=true;}});
+// mouseHands: the last trigger was a real mouse (the controller mod's clicks are synthetic): on a dual pair the left button
+// fires the left gun and the right button the right one; a pad (R2/L2) and touch keep fire = right gun, aim = left gun
+let mouseHands=false;
+addEventListener('mousedown',e=>{if(!active||e.sourceCapabilities?.firesTouchEvents||e.target.closest?.('#touch-controls'))return;mouseHands=e.isTrusted;if(e.button===0){mousePrimary=primary=true;primaryPressed=true;}if(e.button===2){mouseAim=ads=true;leftPressed=true;}});
 addEventListener('mouseup',e=>{if(e.sourceCapabilities?.firesTouchEvents)return;if(e.button===0)mousePrimary=primary=false;if(e.button===2)mouseAim=ads=false;});
 addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('keydown',e=>{
@@ -204,7 +207,7 @@ function collect(type){
 const aiming=()=>ads&&(!session.def.dualWield||!!session.def.lockdown);
 const blocked=()=>!!map?.blocked?.()||!!mods.gunBlocked;   // gunBlocked: a mod has put the gun away (operator weapons)
 // hand: which gun of a dual pair fires (each has its own trigger and mag, rules.js dualMags); pressed: its trigger was
-// just pulled (an empty gun then clicks and reloads both)
+// just pulled (an empty gun then clicks and reloads: itself, and the other gun too unless that one is full)
 function shoot(hand='right',pressed=primaryPressed){
   if(!active||blocked()||!view.ready||view.mode==='raise'||session.busy||session.weaponUnavailable)return false;
   if(session.reloadLeft>0&&session.def.segmentedReload&&session.weapon.mag>0){session.interruptReload();reloadShot=true;return false;}
@@ -225,7 +228,7 @@ function shoot(hand='right',pressed=primaryPressed){
     const ray=new THREE.Ray(camera.position.clone(),direction),wall=world.raycast(ray,1,reach),target=enemies.rayHit(ray,wall?.distance??reach);
     const pierce=session.def.pierce??0,stop=pierce&&target?wall?.distance??reach:Math.min(wall?.distance??reach,target?.distance??reach);   // a piercing bullet (def.pierce: zombies it goes on through, the RW1) stops at the wall
     map.onShot?.(ray,stop,'bullet');
-    mods.emit('shot',{origin:ray.origin,direction,distance:stop,hit:!!target,def:session.def});   // per pellet, for mods (tracers)
+    mods.emit('shot',{origin:ray.origin,direction,distance:stop,hit:!!target,def:session.def,hand:session.def.dualWield?hand:undefined});   // per pellet, for mods (tracers)
     lastShot={origin:ray.origin.toArray(),direction:direction.toArray(),wallDistance:wall?.distance??null,target:target?{id:target.z.id,head:target.head,distance:target.distance}:null};
     if(target)for(let t=target,left=pierce,through=pierce&&new Set();t;t=left-->0?(through.add(t.z),enemies.rayHit(ray,wall?.distance??reach,through)):null){
       const d=t.distance>session.def.range?session.def.minDamage:session.def.damage;enemies.hurt(t.z,d*(t.head?Math.max(1,session.def.headMultiplier):1),t.head,false,session.def.explosionRadius?'explosion':'bullet');}
@@ -241,7 +244,8 @@ function shoot(hand='right',pressed=primaryPressed){
 }
 function warmViewAudio(){if(view?.ready)audio.warmWeapon(session.def,Object.values(view.rig.data).flatMap(d=>(d.notifies??[]).map(n=>n.name)));}
 async function equipView(){reloadShot=false;await view.equip(map?.viewDef?.(session.def)??session.def);warmViewAudio();}
-function reload(){if(!view.ready)return;const empty=session.weapon.mag===0;if(session.reload()){burstLeft=0;ads=false;lastReloadSerial=session.reloadSerial;view.reload(empty,session.reloadDuration,session.reloadStage);}}
+function reload(){if(!view.ready)return;if(session.reload()){burstLeft=0;ads=false;lastReloadSerial=session.reloadSerial;view.reload(session.reloadEmpty,session.reloadDuration,session.reloadStage,session.reloadHand);}}   // reloadHand: a dual pair's gun(s) that reload
+const dualSwap=()=>mouseHands&&session.def.dualWield&&!firesBoth(session.def);
 function melee(){
   if(!active||session.busy||session.weaponUnavailable||blocked()||!view.ready)return false;
   const charge=!!meleeTarget(),type=session.bowie?'bowie':'knife',strike=view.melee(type,charge);
@@ -337,7 +341,7 @@ function update(dt){
     session.update(dt);
     if(session.phase!=='gameover'){
       resolveMelee();
-      if(session.reloadLeft>0&&session.reloadSerial!==lastReloadSerial){lastReloadSerial=session.reloadSerial;view.reload(false,session.reloadDuration,session.reloadStage);}
+      if(session.reloadLeft>0&&session.reloadSerial!==lastReloadSerial){lastReloadSerial=session.reloadSerial;view.reload(false,session.reloadDuration,session.reloadStage,session.reloadHand);}
       const pad=globalThis.kino?.gamepad?.move;   // controller analog stick (mods/controller)
       const forward=Number(keys.has('KeyW'))-Number(keys.has('KeyS'))+touch.forward+(pad?.forward??0),strafe=Number(keys.has('KeyD'))-Number(keys.has('KeyA'))+touch.strafe+(pad?.strafe??0);
       const moving=Math.hypot(forward,strafe)>.01,sprint=((keys.has('ShiftLeft')||keys.has('ShiftRight'))&&moving||touch.sprint||pad?.sprint&&moving)&&!globalThis.kino?.movement?.state?.sliding&&!globalThis.kino?.movement?.state?.diving&&!ads&&!session.reloadLeft&&!session.meleeLeft&&!session.drinking;
@@ -349,17 +353,17 @@ function update(dt){
       view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();view.input={sprint,ads,fire:primary};   // this frame's input, for mods (inspect cancels on sprint/aim; operator weapons read touch/pad fire)
       perkDrink.update(dt,session);
       if((!sprint||mods.sprintFire?.())&&session.phase!=='reviving'&&!mods.holdFire?.()&&(primaryPressed||(primary&&session.def.automatic)||burstLeft>0||reloadShot)){   // holdFire: a mod handles the fire button (bows: hold to draw on touch)
-        if(shoot()){reloadShot=false;if(burstLeft>0)burstLeft--;else if(session.def.fireType==='3-Round Burst')burstLeft=2;}
+        if(shoot(dualSwap()?'left':'right')){reloadShot=false;if(burstLeft>0)burstLeft--;else if(session.def.fireType==='3-Round Burst')burstLeft=2;}
+        if(firesBoth(session.def))shoot('left');   // the XMG: one trigger, both guns
       }
-      // dual wield: the aim button is the left gun's trigger
+      // dual wield: the aim button is the other gun's trigger (the left one, or the right one with a mouse)
       if(touch.aim&&!lastTouchAim)leftPressed=true;lastTouchAim=!!touch.aim;
-      if(session.def.dualWield&&!firesBoth(session.def)&&(!sprint||mods.sprintFire?.())&&session.phase!=='reviving'&&!mods.holdFire?.()&&(leftPressed||(ads&&session.def.automatic)))shoot('left',leftPressed);
+      if(session.def.dualWield&&!firesBoth(session.def)&&(!sprint||mods.sprintFire?.())&&session.phase!=='reviving'&&!mods.holdFire?.()&&(leftPressed||(ads&&session.def.automatic)))shoot(dualSwap()?'right':'left',leftPressed);
       primaryPressed=false;leftPressed=false;
       enemies.update(dt,player.getFeetPosition());
       features.update(dt);
       if(reloadHeld&&performance.now()-reloadHeld>350){reloadHeld=0;mods.emit('inspect');}
       mods.emit('update',dt);
-        if(firesBoth(session.def))shoot('left');   // the XMG: one trigger, both guns
       repairLeft=Math.max(0,repairLeft-dt);findPrompt();if((keys.has('KeyF')||keys.has('KeyE')||touch.use)&&prompt?.barrier)repair(prompt.barrier);
       if((session.round!==lastRound||session.phase!==lastPhase)&&map.announceRounds?.()!==false){if(session.phase==='fighting'){announce(session.dogRound?'Fetch their souls':'Round '+session.round,session.dogRound?'HELLHOUNDS':'SURVIVE');audio.play(session.dogRound?'dog_round':'round');if(session.dogRound)audio.play('dog_announce');}else if(session.phase==='preparing'&&session.round>1){announce('Round survived','RELOAD. REBUILD. PREPARE.');audio.play('round_end');}lastRound=session.round;lastPhase=session.phase;}
       mysteryBox.update(dt);

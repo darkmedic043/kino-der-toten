@@ -31,7 +31,7 @@ export function makeClip(root, data, locomotion=false){
   return new THREE.AnimationClip(data.name,Math.max(1/data.fps,data.duration),tracks);
 }
 export class Rig {
-  constructor(root,onNotify=()=>{}){this.root=root;this.mixer=new THREE.AnimationMixer(root);this.actions={};this.data={};this.current=null;this.onNotify=onNotify;this.elapsed=0;}
+  constructor(root,onNotify=()=>{}){this.root=root;this.mixer=new THREE.AnimationMixer(root);this.actions={};this.data={};this.current=null;this.onNotify=onNotify;this.elapsed=0;this.side=null;this.sideElapsed=0;this.sideQuiet=false;}
   add(key,data,locomotion=false){this.data[key]=data;this.actions[key]=this.mixer.clipAction(makeClip(this.root,data,locomotion));}
   play(key,loop=true,speed=1,fade=.1){
     const a=this.actions[key];if(!a)return false;if(this.current===key&&loop)return true;
@@ -41,9 +41,20 @@ export class Rig {
     a.stop().reset().setEffectiveWeight(1).setLoop(loop?THREE.LoopRepeat:THREE.LoopOnce,loop?Infinity:1);
     a.clampWhenFinished=!loop;a.timeScale=speed;if(fade)a.fadeIn(fade);a.play();this.current=key;this.elapsed=-1e-6;return true;
   }
+  // a second slot on the same mixer (dual wield: the left gun's clips run beside the right gun's, on their own bones);
+  // quiet: its notetracks stay silent (both guns reloading: the right clip's notes carry the sounds)
+  playSide(key,loop=true,speed=1,fade=.1,quiet=false){
+    const a=this.actions[key];if(!a)return false;if(this.side===key&&loop&&a.isRunning())return true;
+    const old=this.actions[this.side];if(old&&old!==a){if(fade)old.fadeOut(fade);else old.stop();}
+    a.stop().reset().setEffectiveWeight(1).setLoop(loop?THREE.LoopRepeat:THREE.LoopOnce,loop?Infinity:1);
+    a.clampWhenFinished=!loop;a.timeScale=speed;if(fade)a.fadeIn(fade);a.play();this.side=key;this.sideElapsed=-1e-6;this.sideQuiet=quiet;return true;
+  }
+  stopSide(fade=.1){const a=this.actions[this.side];if(a){if(fade)a.fadeOut(fade);else a.stop();}this.side=null;}
   update(dt){
     const action=this.actions[this.current],data=this.data[this.current],before=this.elapsed;
     if(action){this.elapsed+=dt*action.timeScale;for(const n of data.notifies??[])if(n.time>before&&n.time<=this.elapsed)this.onNotify(n.name,this.current);}
+    const side=this.actions[this.side];
+    if(side&&!this.sideQuiet){const b=this.sideElapsed;this.sideElapsed+=dt*side.timeScale;for(const n of this.data[this.side].notifies??[])if(n.time>b&&n.time<=this.sideElapsed)this.onNotify(n.name,this.side);}
     this.mixer.update(dt);
   }
 }
@@ -63,11 +74,31 @@ export class ViewWeapon {
       def.leftModel?loadModel(def.leftModel):Promise.resolve(null),
       ...Object.values(this.data.melee).map(d=>loadModel(d.model))]);
     const entries=await Promise.all(Object.entries(def.animations).map(async([key,url])=>[key,await loadAnimation(url)]));
+    let leftBones=null;
     if(def.leftAnimations){
       const left=new Map(await Promise.all(Object.entries(def.leftAnimations).filter(([key])=>key.endsWith('AnimLeft')).map(async([key,url])=>[key,await loadAnimation(url)])));
-      const right=new Map(entries),combine=(a,b,name)=>a&&b?{...a,name,duration:Math.max(a.duration,b.duration),bones:[...a.bones,...b.bones.filter(n=>!a.bones.some(r=>r.name===n.name))]}:a;
-      for(const [key,clip]of right){const l=(key.startsWith('reload')?left.get('reloadAnimLeft'):left.get('idleAnimLeft'));if(l&&['idleAnim','fireAnim','lastShotAnim','reloadAnim','reloadEmptyAnim'].includes(key))entries.push([key,combine(clip,l,clip.name+'-dual')]);}
-      if(left.has('fireAnimLeft'))entries.push(['leftFireAnim',combine(left.get('fireAnimLeft'),right.get('idleAnim'),'dual-left-fire')]);
+      const right=new Map(entries),li=left.get('idleAnimLeft'),ri=right.get('idleAnim');
+      // Each gun its own layer (2026-10-26, user: firing one gun snapped the other back to its idle): the right clips
+      // play on the rig's main slot cut to the right side's bones, the left clips (leftAnimations *AnimLeft) on its side
+      // slot cut to the bones the left idle moves and the right idle doesn't. Clips that hold both guns (raise, drop,
+      // sprint, melee) still play alone: the side slot stands down while one is on (leftCover).
+      // def.dualFireKick scales a fire clip's swing about its first frame, def.dualFireTime is the time it takes (the AW
+      // akimbo Atlas's authored shot flips the gun 25° and floats it back down over half a second).
+      if(li&&ri){
+        leftBones=new Set(li.bones.map(b=>b.name));for(const b of ri.bones)leftBones.delete(b.name);
+        const only=(clip,keep,name)=>({...clip,name,bones:clip.bones.filter(b=>keep(b.name))}),fire=/^(ads)?(fire|lastShot)Anim$/i;
+        const soften=(clip,k)=>k==null||k===1?clip:{...clip,bones:clip.bones.map(b=>({...b,
+          ...(b.pos&&{pos:{...b.pos,values:b.pos.values.map((v,i)=>b.pos.values[i%3]+(v-b.pos.values[i%3])*k)}}),
+          ...(b.rot&&{rot:{...b.rot,values:(()=>{const q0=new THREE.Quaternion().fromArray(b.rot.values),q=new THREE.Quaternion(),out=[];
+            for(let i=0;i<b.rot.values.length;i+=4)out.push(...q.fromArray(b.rot.values,i).slerp(q0,1-k).toArray());return out;})()}})}))};
+        const SIDED=['idleAnim','emptyIdleAnim','fireAnim','lastShotAnim','adsFireAnim','adsLastShotAnim','reloadAnim','reloadEmptyAnim'];
+        for(let i=0;i<entries.length;i++){const [key,clip]=entries[i];if(SIDED.includes(key))entries[i]=[key,soften(only(clip,n=>!leftBones.has(n),clip.name+'-r'),fire.test(key)?def.dualFireKick:null)];}
+        for(const [key,src] of [['idleAnim','idleAnimLeft'],['fireAnim','fireAnimLeft'],['lastShotAnim','lastShotAnimLeft'],['reloadAnim','reloadAnimLeft'],['reloadEmptyAnim','reloadEmptyAnimLeft']]){
+          const clip=left.get(src);if(clip)entries.push(['L:'+key,soften(only(clip,n=>leftBones.has(n),clip.name+'-l'),fire.test(key)?def.dualFireKick:null)]);}
+      }
+      const combine=(a,b,name)=>a&&b?{...a,name,duration:Math.max(a.duration,b.duration),bones:[...a.bones,...b.bones.filter(n=>!a.bones.some(r=>r.name===n.name))]}:a;
+      if(!leftBones)for(const [key,clip]of right){const l=(key.startsWith('reload')?left.get('reloadAnimLeft'):left.get('idleAnimLeft'));if(l&&['idleAnim','fireAnim','lastShotAnim','reloadAnim','reloadEmptyAnim'].includes(key))entries.push([key,combine(clip,l,clip.name+'-dual')]);}
+      if(!leftBones&&left.has('fireAnimLeft'))entries.push(['leftFireAnim',combine(left.get('fireAnimLeft'),right.get('idleAnim'),'dual-left-fire')]);
     }
     const meleeEntries=await Promise.all(Object.entries(this.data.melee).flatMap(([type,d])=>
       Object.entries(d.animations).filter(([k])=>k.startsWith('melee')).map(async([key,url])=>[type+':'+key,await loadAnimation(url)])));
@@ -107,6 +138,7 @@ export class ViewWeapon {
     this.root.matrixAutoUpdate=false;this.root.matrix.copy(cameraBasis);this.pivot.add(this.root);
     this.rig=new Rig(this.root,(name)=>this.onSound(name,this.meleeType?this.data.melee[this.meleeType]:this.def));
     for(const [key,clip] of [...entries,...meleeEntries])this.rig.add(key,clip);
+    this.leftBones=leftBones;this.leftCover=new Set(leftBones?Object.keys(this.rig.data).filter(k=>!k.startsWith('L:')&&this.rig.data[k].bones.some(b=>leftBones.has(b.name))):[]);   // clips that hold both guns
     // ADS is a separate native animation of tag_torso. Its first frame also
     // defines each gun's HIP pose; the arms' bind torso is only right for M1911.
     const aimData=entries.find(([key])=>key==='adsUpAnim')?.[1];
@@ -134,11 +166,21 @@ export class ViewWeapon {
   shoot({ads=false,empty=false,hand='right'}={}){
     if(!this.ready||this.meleeLeft>0)return;
     let key=ads?(empty?'adsLastShotAnim':'adsFireAnim'):(empty?'lastShotAnim':'fireAnim');
-    if(hand==='left'&&this.rig.actions.leftFireAnim)key='leftFireAnim';
-    if(!this.rig.actions[key])key='fireAnim';this.recoil=1;this.mode='fire';this.rig.play(key,false,1,0);
+    const r=this.rig,speed=k=>this.def.dualWield&&this.def.dualFireTime?this.clipSpeed(k,this.def.dualFireTime):1;
+    if(hand==='left'&&this.leftBones){   // the left gun's own slot; a clip holding both guns (sprint) gives way to the idle
+      const lk=empty&&r.actions['L:lastShotAnim']?'L:lastShotAnim':'L:fireAnim';if(!r.actions[lk])return;
+      if(this.leftCover.has(r.current)){r.play('idleAnim',true,1,0);this.mode='idle';}
+      this.recoil=1;r.playSide(lk,false,speed(lk),0);return;}
+    if(hand==='left'&&r.actions.leftFireAnim)key='leftFireAnim';
+    if(!r.actions[key])key='fireAnim';this.recoil=1;this.mode='fire';r.play(key,false,speed(key),0);
   }
-  reload(empty,duration,stage='magazine'){
-    if(!this.ready)return;const key=stage==='start'?'reloadStartAnim':stage==='end'?'reloadEndAnim':empty&&this.rig.actions.reloadEmptyAnim?'reloadEmptyAnim':'reloadAnim';
+  // hand (dual wield, rules.js reloadHand): 'left' or 'right' reloads that gun alone, the other one carries on
+  reload(empty,duration,stage='magazine',hand=null){
+    if(!this.ready)return;this.reloadHand=hand;
+    if(this.leftBones&&hand){const r=this.rig,lk=empty&&r.actions['L:reloadEmptyAnim']?'L:reloadEmptyAnim':'L:reloadAnim';
+      if(hand!=='right')r.playSide(lk,false,this.clipSpeed(lk,duration),.06,hand==='both');
+      if(hand==='left'){if(this.leftCover.has(r.current)||this.mode==='reload'){r.play('idleAnim',true,1,.06);this.mode='idle';}return;}}
+    const key=stage==='start'?'reloadStartAnim':stage==='end'?'reloadEndAnim':empty&&this.rig.actions.reloadEmptyAnim?'reloadEmptyAnim':'reloadAnim';
     this.mode='reload';this.aim=0;this.rig.play(key,false,this.clipSpeed(key,duration),.06);
   }
   melee(type='knife',charge=false){
@@ -168,6 +210,8 @@ export class ViewWeapon {
     if(['idle','fire'].includes(this.mode)&&sprint){this.mode='sprintIn';if(!this.rig.play(sprintKey('In'),false,this.clipSpeed(sprintKey('In'),this.def.sprintInTime),.06)){this.mode='sprint';this.rig.play(this.rig.actions[sprintKey('Loop')]?sprintKey('Loop'):'idleAnim');}}
     if(['sprint','sprintIn'].includes(this.mode)&&!sprint){this.mode='sprintOut';if(!this.rig.play(sprintKey('Out'),false,this.clipSpeed(sprintKey('Out'),this.def.sprintOutTime),.04))this.mode='idle';}
     if(this.mode==='idle')this.rig.play(empty&&this.rig.actions.emptyIdleAnim?'emptyIdleAnim':'idleAnim',true,1,.06);
+    if(this.leftBones){const r=this.rig,a=r.actions[r.side];   // the left gun's slot: off under a clip that holds both, else its idle between shots and reloads
+      if(this.leftCover.has(r.current)){if(r.side)r.stopSide(.06);}else if(!a?.isRunning())r.playSide('L:idleAnim',true,1,.06);}
     const aiming=ads&&['idle','fire'].includes(this.mode);
     this.aim=THREE.MathUtils.clamp(this.aim+(aiming?dt/Math.max(.01,this.def.adsInTime):-dt/Math.max(.01,this.def.adsOutTime)),0,1);
     this.applyAim(!['idle','fire'].includes(this.mode));

@@ -77,5 +77,9 @@ test('dual wield guns fire independently, each from its own half of the mag', ()
  for(let i=0;i<20;i++){s.update(1);s.fireHand('left');}
  assert.equal(s.handMag('left'),0);assert(!s.fireHand('left'));s.update(1);assert(s.fireHand('right'));   // the right still has rounds
  s.weapon.mag=24;assert.deepEqual([s.handMag('left'),s.handMag('right')],[12,12]);   // a refill of the total fills both
- s.weapon.mag=10;s.weapon.magL=0;assert(s.reload());s.update(5);assert.deepEqual([s.handMag('left'),s.handMag('right'),s.weapon.mag],[12,12,24]);
+ s.weapon.mag=10;s.weapon.magL=0;assert(s.reload());assert.equal(s.reloadHand,'both');s.update(5);assert.deepEqual([s.handMag('left'),s.handMag('right'),s.weapon.mag],[12,12,24]);
+ // one gun empty, the other full: only the empty one reloads, and the full one keeps firing meanwhile
+ s.weapon.mag=12;s.weapon.magL=0;assert(s.reload());assert.equal(s.reloadHand,'left');assert(s.reloadEmpty);
+ assert(!s.fireHand('left'));assert(s.fireHand('right'));s.update(5);assert.deepEqual([s.handMag('left'),s.handMag('right'),s.weapon.mag],[12,11,23]);
+ assert(s.reload());assert.equal(s.reloadHand,'right');assert(!s.reloadEmpty);assert(!s.fireHand('right'));s.update(5);assert.deepEqual([s.handMag('left'),s.handMag('right')],[12,12]);
 });

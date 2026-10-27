@@ -237,7 +237,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     const ease=(x,to,rate)=>x+(to-x)*Math.min(1,dt*rate);
     s.slide=ease(s.slide,state.sliding?1:0,state.sliding?12:6);
     s.dive=ease(s.dive,state.diving?1:0,state.diving?10:5);
-    s.reload=ease(s.reload??0,session.reloadLeft>0&&view.mode==='reload'?1:0,session.reloadLeft>0?9:6);   // reloads bring the gun in and turn it toward you (BO7)
+    s.reload=ease(s.reload??0,session.reloadLeft>0&&view.mode==='reload'&&(view.reloadHand??'both')==='both'?1:0,session.reloadLeft>0?9:6);   // reloads bring the gun in and turn it toward you (BO7); not when one of two dual guns reloads alone
     const mt=state.mantling,mk=mt?Math.sin(Math.min(1,mt.t)*Math.PI):0;   // up and back down over the climb
     s.mantle=ease(s.mantle,mt?1:0,mt?14:7);
     s.kick=Math.max(0,s.kick-dt*3.5);

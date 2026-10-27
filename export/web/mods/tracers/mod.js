@@ -11,7 +11,7 @@ import * as THREE from 'three';
 
 const LIFE = .07, POOL = 64, COLOR = 0xffd79a, OPACITY = .9, PX = .004, MIN_W = .15;
 
-export default function setup({ host, scene, camera, view }) {
+export default function setup({ host, scene, camera, view, viewCamera }) {
   const base = new THREE.BoxGeometry(1, 1, 1).translate(0, 0, -.5);   // tail at the origin, head forward (-z)
   const basePos = base.attributes.position.array.slice();
   const pool = Array.from({ length: POOL }, () => {
@@ -30,6 +30,28 @@ export default function setup({ host, scene, camera, view }) {
   const state = { enabled: true, life: LIFE, get live() { const now = performance.now(); return pool.filter(m => m.visible && now - m.userData.born < state.life * 1000).length; } };
   (window.kino ??= {}).tracers = state;
   const fwd = new THREE.Vector3(0, 0, -1), q = new THREE.Quaternion(), right = new THREE.Vector3(), up = new THREE.Vector3(), eye = new THREE.Vector3();
+  // dual wield: the line leaves the gun that fired (e.hand), at its flash tag seen from the view camera, carried over to the world camera
+  // (the imported AW guns' flash tags sit at the gun's root: then the middle of the gun's front face, found once, stands in)
+  const flashTags = new WeakMap(), tag = new THREE.Vector3();
+  const front = (gun, at) => {
+    const inv = at.matrixWorld.clone().invert(), p = new THREE.Vector3(), pts = [];
+    gun.traverse(m => { if (!m.isMesh || !m.visible) return; for (let i = 0, n = m.geometry.attributes.position.count; i < n; i++) { m.getVertexPosition(i, p); if (m.isSkinnedMesh) m.applyBoneTransform(i, p); pts.push(p.applyMatrix4(m.matrixWorld).applyMatrix4(inv).clone()); } });
+    const max = Math.max(...pts.map(v => v.x)), near = pts.filter(v => v.x > max - 1.5);
+    return near.length ? near.reduce((a, v) => a.add(v), new THREE.Vector3()).divideScalar(near.length) : null;
+  };
+  const flashOf = gun => {
+    if (!gun) return null;
+    if (!flashTags.has(gun)) { let f = null; gun.traverse(n => { if (!f && /^tag_flash/i.test(n.name)) f = n; });
+      flashTags.set(gun, f && (f.position.length() > 5 ? { f } : { f: f.parent, local: front(gun, f.parent) })); }
+    return flashTags.get(gun);
+  };
+  const muzzle = hand => {
+    const m = viewCamera && flashOf(hand === 'left' ? view?.leftGun : view?.gun); if (!m) return null;
+    if (m.local) tag.copy(m.local).applyMatrix4(m.f.matrixWorld); else m.f.getWorldPosition(tag);
+    tag.applyMatrix4(viewCamera.matrixWorldInverse); if (tag.z > -1) return null;
+    const k = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / Math.tan(THREE.MathUtils.degToRad(viewCamera.fov) / 2) * 26 / -tag.z;
+    return { x: tag.x * k, y: tag.y * k };
+  };
   const spray = def => !!(def?.flamethrower || def?.freeze || /^freezegun/.test(def?.baseId ?? def?.id ?? ''));
 
   host.on('shot', e => {
@@ -37,7 +59,8 @@ export default function setup({ host, scene, camera, view }) {
     // the muzzle: down and right of the eye at the hip, nearly centred in ADS
     const aim = view?.aim ?? 0; camera.getWorldPosition(eye);
     right.setFromMatrixColumn(camera.matrixWorld, 0); up.setFromMatrixColumn(camera.matrixWorld, 1);
-    const from = eye.clone().addScaledVector(e.direction, 26).addScaledVector(right, 6 * (1 - aim)).addScaledVector(up, -5 + 2.5 * aim);
+    const at = e.hand ? muzzle(e.hand) : null;
+    const from = eye.clone().addScaledVector(e.direction, 26).addScaledVector(right, at ? at.x : 6 * (1 - aim)).addScaledVector(up, at ? at.y : -5 + 2.5 * aim);
     const end = e.origin.clone().addScaledVector(e.direction, e.distance), dir = end.clone().sub(from), dist = dir.length(); if (dist < 30) return;
     dir.divideScalar(dist);
     const m = pool[next]; next = (next + 1) % POOL;

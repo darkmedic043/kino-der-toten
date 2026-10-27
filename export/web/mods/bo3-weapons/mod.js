@@ -34,6 +34,9 @@ export async function prepare(data){
   for(const d of [data.weapons.aw_rw1,data.weapons.aw_rw1?.upgrade])if(d)d.pierce=99;
   // the XMG's camera climb (engine.js recoilScale): light at the hip, almost none braced in lockdown (user, 2026-10-24: it climbed ~13 degrees a second)
   for(const d of [data.weapons.aw_xmg,data.weapons.aw_xmg?.upgrade])if(d)Object.assign(d,{recoilScale:.35,adsRecoilScale:.08});
+  // the akimbo Atlas's fire clips flip each gun 25 degrees and bring it back over half a second, so the pair floated
+  // (user, 2026-10-26): half the kick (animation.js dualFireKick), the whole clip played in 0.3 s (dualFireTime)
+  for(const d of [data.weapons.aw_atlas45_dw,data.weapons.aw_atlas45_dw?.upgrade])if(d)Object.assign(d,{dualFireKick:.5,dualFireTime:.3});
   data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons).filter(id=>!built.weapons[id].noBox)])];   // noBox: quest weapons (Der Eisendrache's bow)
 }
 

@@ -93,8 +93,8 @@ export default function setup(api) {
   let drum = null;
   if (view) {
     const reloadView = view.reload.bind(view);
-    view.reload = (empty, duration, stage = 'magazine') => {
-      if (!drumFitted() || stage !== 'magazine' || !view.ready) { drum = null; return reloadView(empty, duration, stage); }
+    view.reload = (empty, duration, stage = 'magazine', hand = null) => {
+      if (!drumFitted() || stage !== 'magazine' || !view.ready) { drum = null; return reloadView(empty, duration, stage, hand); }
       view.mode = 'reload'; view.aim = 0; view.rig.play('idleAnim', true, 1, .12);
       const clip = view.gun?.getObjectByName('tag_clip');
       // the arm's idle pose: the mixer doesn't rewrite these bones every frame, so the IK starts from it each frame and

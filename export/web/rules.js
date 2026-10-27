@@ -103,7 +103,7 @@ export class Session {
     if(this.phase==='preparing'){this.countdown-=dt;if(this.countdown<=0){this.phase='fighting';this.lastEvent=this.dogRound?'Fetch their souls':'Round '+this.round;}}
   }
   fire(){
-    if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||this.reloadLeft>0||this.fireLeft>0||this.handMag()===0)return false;
+    if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||(this.reloadLeft>0&&!this.reloadSpares(this.hand))||this.fireLeft>0||this.handMag()===0)return false;
     if(this.hand==='left'&&this.def.dualWield)this.weapon.magL--;
     this.weapon.mag--;this.shots++;this.fireLeft=this.def.fireTime*(firesBoth(this.def)?2:1)/(this.perks.has('specialty_rof')?1.33:1);return true;
   }
@@ -118,7 +118,10 @@ export class Session {
   }
   reload(){
     if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||this.reloadLeft>0||this.weapon.reserve<=0||this.weapon.mag>=this.def.clipSize)return false;
-    this.reloadEmpty=this.weapon.mag===0;this.reloadInterrupted=false;
+    // dual wield: only the guns that aren't full reload (reloadHand 'left', 'right' or 'both'), the other one keeps firing
+    const m=!this.def.segmentedReload&&dualMags(this.weapon,this.def),half=Math.floor(this.def.clipSize/2);
+    this.reloadHand=m?(m.left<half&&m.right<this.def.clipSize-half?'both':m.left<half?'left':'right'):null;
+    this.reloadEmpty=m&&this.reloadHand!=='both'?m[this.reloadHand]===0:this.weapon.mag===0;this.reloadInterrupted=false;
     this.setReloadStage(this.def.segmentedReload?(this.def.reloadStartTime>0?'start':'shell'):'magazine');return true;
   }
   setReloadStage(stage){
@@ -129,12 +132,17 @@ export class Session {
   finishReloadStage(){
     const stage=this.reloadStage,d=this.def;
     const add=stage==='start'?d.reloadStartAdd:stage==='shell'?Math.max(1,d.reloadAmmoAdd):stage==='magazine'?d.clipSize:0;
-    const amount=Math.min(add,d.clipSize-this.weapon.mag,this.weapon.reserve);this.weapon.mag+=amount;this.weapon.reserve-=amount;
+    const m=stage==='magazine'&&this.reloadHand&&this.reloadHand!=='both'&&dualMags(this.weapon,d),half=Math.floor(d.clipSize/2);
+    // one gun of a pair: only its own mag fills (the left's share is raised itself, the total would top the right up first)
+    const amount=Math.min(add,m?(this.reloadHand==='left'?half-m.left:d.clipSize-half-m.right):d.clipSize-this.weapon.mag,this.weapon.reserve);
+    if(m&&this.reloadHand==='left')this.weapon.magL=m.left+amount;this.weapon.mag+=amount;this.weapon.reserve-=amount;
     if(stage==='end'||stage==='magazine'){this.cancelReload();return;}
     this.setReloadStage(this.reloadInterrupted||this.weapon.mag===d.clipSize||this.weapon.reserve===0?'end':'shell');
   }
   interruptReload(){if(this.def.segmentedReload&&this.reloadLeft>0&&this.weapon.mag>0)this.reloadInterrupted=true;}
-  cancelReload(){this.reloadLeft=0;this.reloadStage=null;}
+  cancelReload(){this.reloadLeft=0;this.reloadStage=null;this.reloadHand=null;}
+  // the gun of a dual pair that isn't reloading may fire meanwhile
+  reloadSpares(hand){return !!this.reloadHand&&this.reloadHand!=='both'&&this.reloadHand!==(hand==='left'?'left':'right');}
   switchWeapon(slot){if(this.drinking||this.meleeLeft>0||this.inventory.length<2)return;this.slot=(slot??(this.slot+1))%this.inventory.length;this.cancelReload();this.fireLeftL=this.fireLeft=Math.max(.2,this.def.raiseTime??0);}
   drink(perk){
     const d=this.data.perkDrinks?.[perk];if(!d||this.drinking||this.perks.has(perk)||this.phase==='gameover'||this.phase==='reviving')return false;
