@@ -1,0 +1,5 @@
+{
+  "name": "Loot",
+  "description": "BO6/BO7-style world loot: 3D pickups (ammo cans, gold zombie-dollar signs, grenades, perk bottles, weapons in a beam of their rarity colour) for Vulture Aid's drops and T.E.D.D.'s reward chests. Melee the Mystery Box while a weapon is on offer to knock it out onto the floor.",
+  "script": "mod.js"
+}

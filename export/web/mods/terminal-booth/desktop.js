@@ -16,6 +16,8 @@
 //   cooldown after each song; opts.radio() -> status, opts.radioAct(action, arg).
 // ARMORY.EXE (mods/armory, above BANK): tabs of special gear bought off its home map (operator weapons, shields,
 //   scorestreaks later); opts.armory() -> status, opts.armoryBuy(id) -> true | 'reason'.
+// TASKS.EXE (mods/tedd-tasks, under GUMS): T.E.D.D.'s timed tasks (BO7). From round 9 an offer waits here; START pays
+//   for it, the HUD tracks it, and the reward chest lands in front of this terminal. opts.tasks() -> status, opts.taskAct(action).
 // JOURNAL.EXE (mods/journal, top of the right column): every map's Easter eggs step by step, recorded once done;
 //   TRACK puts the current step on the HUD with markers. opts.journal() -> status, opts.journalTrack(map, quest | null).
 // Home screen (2026-10-17, user): the icons sit on a phone-style cell grid (cells of at least 108x112 px, stretched to fill
@@ -292,6 +294,10 @@ const RADIO_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-render
 const JOURNAL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <path d="M6 4h17l3 3v21H6z" fill="none" stroke="#7dffa6" stroke-width="2"/><rect x="9" y="4" width="2" height="24"/>
   <rect x="14" y="10" width="9" height="2"/><rect x="14" y="15" width="9" height="2"/><rect x="14" y="20" width="6" height="2"/><path d="M21 24l3-3 3 3-3 3z" fill="#ffd36b"/></svg>`;
+const TASKS_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
+  <rect x="15" y="2" width="2" height="4"/><rect x="13" y="1" width="6" height="2"/><rect x="6" y="6" width="20" height="16"/><rect x="9" y="10" width="5" height="4" fill="#031208"/>
+  <rect x="18" y="10" width="5" height="4" fill="#031208"/><rect x="11" y="11" width="2" height="2"/><rect x="20" y="11" width="2" height="2"/><rect x="10" y="17" width="12" height="2" fill="#031208"/>
+  <rect x="3" y="11" width="3" height="6"/><rect x="26" y="11" width="3" height="6"/><rect x="11" y="23" width="10" height="3"/><rect x="8" y="26" width="16" height="4"/></svg>`;
 const EXFIL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <rect x="4" y="6" width="24" height="2"/><rect x="15" y="8" width="2" height="3"/><rect x="9" y="11" width="15" height="7"/><rect x="6" y="13" width="3" height="3"/>
   <rect x="2" y="12" width="4" height="2"/><rect x="11" y="12" width="5" height="3" fill="#031208"/><rect x="11" y="19" width="2" height="3"/><rect x="20" y="19" width="2" height="3"/>
@@ -321,6 +327,7 @@ function build() {
         <button class="app" data-app="arsenal"><div class="sq">${ARSENAL_ICON}</div><span>ARSENAL</span></button>
         <button class="app" data-app="stark"><div class="sq">${STARK_ICON}</div><span>STARK</span></button>
         <button class="app" data-app="gums"><div class="sq">${GUMS_ICON}</div><span>GUMS</span></button>
+        <button class="app off" data-app="tasks"><div class="sq">${TASKS_ICON}</div><span>TASKS</span></button>
         <button class="app" data-app="radio"><div class="sq">${RADIO_ICON}</div><span>RADIO</span></button>
         <button class="app" data-app="journal"><div class="sq">${JOURNAL_ICON}</div><span>JOURNAL</span></button>
         <button class="app" data-app="armory"><div class="sq">${ARMORY_ICON}</div><span>ARMORY</span></button>
@@ -365,6 +372,10 @@ function build() {
         <div class="title"><span>BANK.EXE · MELON SAVINGS &amp; LOAN</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="bnk"></div>
       </div>
+      <div class="win" data-win="tasks" hidden>
+        <div class="title"><span>TASKS.EXE · T.E.D.D.</span><span class="grow"></span><button data-close title="Close">×</button></div>
+        <div class="exf tsk"></div>
+      </div>
       <div class="win" data-win="exfil" hidden>
         <div class="title"><span>EXFIL.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="exf"></div>
@@ -384,6 +395,7 @@ function build() {
   const rdWin = $('[data-win=radio]'), rdLib = $('.rad .lib'), rdQ = $('.rad .q'), rdNp = $('.rad .np'), rdVol = $('.rad .vol'); let rdState = '', rdMsg = ['', ''];
   const amWin = $('[data-win=armory]'), amBody = $('.arm'); let amState = '', amMsg = ['', ''], amTab = 'operators', amShown = 0;
   const bkWin = $('[data-win=bank]'), bkBody = $('.bnk'), bkIcon = $('[data-app=bank]'); let bkState = '', bkMsg = ['', ''];
+  const tkWin = $('[data-win=tasks]'), tkBody = $('.tsk'), tkIcon = $('[data-app=tasks]'); let tkState = '', tkMsg = '';
   let opts = null, shown = 0, clock = 0, lastState = '';
 
   // Keep the game from seeing key presses and clicks while the desktop is up. Key releases still go through, so a
@@ -392,7 +404,7 @@ function build() {
   for (const t of ['click', 'mousedown', 'mouseup', 'pointerdown', 'wheel', 'contextmenu']) root.addEventListener(t, e => e.stopPropagation());
 
   function key(e) {
-    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden || !rdWin.hidden) closeApp(); else close(); return; }
+    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden || !rdWin.hidden || !tkWin.hidden) closeApp(); else close(); return; }
     if (!rdWin.hidden) { if (e.code === 'Space') { e.preventDefault(); radioDo('toggle'); } return; }
     if (!gmWin.hidden) { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); gumRoll(); } return; }
     if (!arWin.hidden || !stWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden) return;
@@ -443,7 +455,8 @@ function build() {
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
   }
   function openApp(name) {
-    bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = true;
+    bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = tkWin.hidden = true;
+    if (name === 'tasks') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; tkState = ''; tkMsg = ''; tkWin.hidden = false; drawTasks(); $('.open').textContent = '[TASKS.EXE]'; opts.onApp?.(name); return; }
     if (name === 'radio') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; rdState = ''; rdMsg = ['', '']; rdWin.hidden = false; drawRadio(); $('.open').textContent = '[RADIO.EXE]'; opts.onApp?.(name); return; }
     if (name === 'journal') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; jnState = ''; jnMsg = ''; jnWin.hidden = false; drawJournal(); $('.open').textContent = '[JOURNAL.EXE]'; opts.onApp?.(name); return; }
     if (name === 'armory') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; amState = ''; amMsg = ['', '']; amWin.hidden = false; drawArmory(); $('.open').textContent = '[ARMORY.EXE]'; opts.onApp?.(name); return; }
@@ -458,7 +471,7 @@ function build() {
     say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
     opts.onApp?.(name); grid.querySelector(`[data-i="${shown}"]`)?.focus({ preventScroll: true });
   }
-  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = true; $('.open').textContent = ''; }
+  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = tkWin.hidden = true; $('.open').textContent = ''; }
   // ---- STARK.EXE: the Iron Man armors (mods/stark) ---------------------------------------------------------------
   const MARK = { mk1: 'I', mk3: 'III', mk4: 'IV', mk5: 'V', mk6: 'VI', wm: 'WM', mk16: 'XVI', mk33: 'XXXIII', mk42: 'XLII' };
   function starkDo(action, id) {
@@ -754,6 +767,33 @@ function build() {
     keepScroll(bkBody).innerHTML = body + msg;
     for (const b of bkBody.querySelectorAll('[data-act]')) b.addEventListener('click', () => bankDo(b.dataset.act, b.dataset.n === 'max' ? 'max' : +b.dataset.n || 0));
   }
+  // ---- TASKS.EXE: T.E.D.D.'s timed tasks (mods/tedd-tasks) --------------------------------------------------------
+  function drawTasks() {
+    const st = opts?.tasks?.() ?? null, key = JSON.stringify(st) + tkMsg;
+    tkIcon.classList.toggle('off', !st?.offer && !st?.run); tkIcon.classList.toggle('live', !!st?.offer);
+    if (tkWin.hidden || key === tkState) return; tkState = key;
+    if (!st) { tkBody.innerHTML = '<h2>T.E.D.D.</h2><div class="state no">TASKS.EXE IS NOT INSTALLED</div>'; return; }
+    const tierRow = (t, count) => `<dt>RATINGS</dt><dd>${t.tiers.map((v, i) => `<span style="color:${st.tiers[i].color}${count !== undefined && count >= v ? ';text-decoration:underline' : ''}">${st.tiers[i].name} ${v}</span>`).join(' · ')}</dd>`;
+    const when = `<dt>OFFERS</dt><dd>FROM ROUND ${st.first}, THEN EVERY ${st.gap[0]}-${st.gap[1]} ROUNDS</dd>`;
+    const prize = `<ul><li>Bronze: points, ammo, a grenade</li><li>Silver: more, plus a weapon from your Mystery Box list, maybe a power-up</li><li>Gold: a rarer weapon from your list and a power-up</li><li>Legendary: the best of your list, a power-up and a free perk</li></ul>`;
+    const lastLine = st.last ? `<dt>LAST TASK</dt><dd>${esc(st.last.name)} · ${st.last.tier >= 0 ? `<span style="color:${st.tiers[st.last.tier].color}">${st.tiers[st.last.tier].name}</span>` : 'FAILED'} (${st.last.count})</dd>` : '';
+    const msgLine = tkMsg ? `<div class="msg bad">${esc(tkMsg)}</div>` : '';
+    keepScroll(tkBody).innerHTML = st.run
+      ? `<h2>${esc(st.run.name)}</h2><div class="state go">TASK RUNNING · ${Math.floor(st.run.left / 60)}:${String(Math.floor(st.run.left % 60)).padStart(2, '0')} LEFT</div>
+         <p>${esc(st.run.text)}</p><dl><dt>${esc(st.run.unit)}</dt><dd>${st.run.count}</dd>${tierRow(st.run, st.run.count)}</dl>
+         <ul><li>Your reward chest lands in front of this terminal when time runs out (or at Legendary)</li></ul>`
+      : st.offer
+      ? `<h2>${esc(st.offer.name)}</h2><div class="state go">T.E.D.D. HAS A TASK FOR YOU</div>
+         <p>${esc(st.offer.text)}</p><dl><dt>TIME</dt><dd>${Math.floor(st.duration / 60)}:${String(st.duration % 60).padStart(2, '0')}</dd>${tierRow(st.offer)}<dt>PRICE</dt><dd>${st.price.toLocaleString()} PTS</dd>${when}</dl>
+         ${prize}<button class="buy call"${st.points < st.price ? ' disabled' : ''}>START TASK · ${st.price.toLocaleString()}</button>${msgLine}`
+      : `<h2>T.E.D.D.</h2><div class="state no">NO TASK RIGHT NOW</div>
+         <dl><dt>NEXT TASK</dt><dd>${st.next > st.round ? 'START OF ROUND ' + st.next : 'SOON'}</dd><dt>PRICE THEN</dt><dd>${(500 + 500 * Math.floor(Math.max(st.round, st.next) / 10)).toLocaleString()} PTS</dd>${when}${lastLine}</dl>${prize}`;
+    tkBody.querySelector('.call:not([disabled])')?.addEventListener('click', () => {
+      const r = opts.taskAct?.('start') ?? 'TASKS.EXE is not installed';
+      if (r === true) { close(); return; }
+      tkMsg = String(r).toUpperCase(); drawTasks();
+    });
+  }
   // ---- EXFIL.EXE --------------------------------------------------------------------------------------------
   const exfilStatus = () => opts?.exfil?.() ?? { available: false, reason: 'Exfil is not installed' };
   function drawExfil() {
@@ -789,7 +829,7 @@ function build() {
     const state = PERKS.map(p => blocked(p)).join() + opts.points();
     if (!win.hidden && state !== lastState) { renderGrid(); select(shown); }
     lastState = state;
-    drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory(); drawJournal(); drawRadio();
+    drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory(); drawJournal(); drawRadio(); drawTasks();
     $('[data-app=stark]').classList.toggle('off', !opts.stark?.()?.unlocked);
     $('.exlive').hidden = !exIcon.classList.contains('live');
   }
@@ -809,7 +849,7 @@ function build() {
   const desk = $('.desk'), appsEl = $('.apps'), cellsEl = $('.cells'), apps = [...appsEl.querySelectorAll('.app')];
   const PAD = 20, ICON_W = 96, ICON_H = 110, MIN_W = 108, MIN_H = 112, STORE = 'kino.mods.terminal';
   // default: shop apps down the left column, map apps up the right column (negative = from the far edge)
-  const HOME = { perks: [0, 0], arsenal: [0, 1], stark: [0, 2], gums: [0, 3], journal: [-1, -4], armory: [-1, -3], bank: [-1, -2], exfil: [-1, -1], radio: [-1, -5] };
+  const HOME = { perks: [0, 0], arsenal: [0, 1], stark: [0, 2], gums: [0, 3], tasks: [0, 4], journal: [-1, -4], armory: [-1, -3], bank: [-1, -2], exfil: [-1, -1], radio: [-1, -5] };
   let home = { cols: 1, rows: 1, cw: MIN_W, ch: MIN_H, key: '' }, cells = {}, drag = null, swallowClick = false;
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) ?? {}; } catch { return {}; } };
   const save = layout => { try { const d = load(); d.layout = { ...(d.layout ?? {}), [home.key]: layout }; localStorage.setItem(STORE, JSON.stringify(d)); } catch {} };

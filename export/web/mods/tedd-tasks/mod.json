@@ -1,0 +1,5 @@
+{
+  "name": "T.E.D.D. Tasks",
+  "description": "Black Ops 7's timed tasks at the terminal (TASKS.EXE): from round 9, then every 4-6 rounds, T.E.D.D. offers a 2-minute task (500 points, +500 every 10 rounds). Bronze to Legendary ratings pay out a loot chest at the terminal; weapons come from your own Mystery Box list, a free perk only at Legendary.",
+  "script": "mod.js"
+}

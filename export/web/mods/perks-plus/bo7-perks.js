@@ -85,9 +85,11 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
 
   // ======================================== Vulture Aid ========================================
   // Kills sometimes leave a vulture drop (ammo or points, BO2 style; BO6/7's Essence is points here) that only you
-  // pick up, automatically when you walk near it.
+  // pick up, automatically when you walk near it. Drawn as 3D loot by mods/loot when it's loaded (the glow sprites otherwise).
   const drops = [], clouds = [];
   function drop(at, kind, amount = 0) {
+    const loot = window.kino?.loot;   // 3D drops (mods/loot): an ammo can, a gold $ sign, a grenade
+    if (loot) { const d = { kind, amount }; loot.spawn(kind === 'big' ? 'points' : kind, at.clone(), { big: kind === 'big', life: 20, reach: 60 + stat('va.reach'), keep: () => has(VA), onPick: () => pickup(d) }); return; }
     const color = kind === 'ammo' ? 0x9cff4f : kind === 'grenade' ? 0xffd34f : kind === 'big' ? 0xff4fd0 : 0xff9a3d;
     const s = sprite(color, kind === 'big' ? 34 : 22); s.position.copy(at).y += 14; scene.add(s);
     drops.push({ s, kind, amount, until: now() + 20, base: s.position.y });
