@@ -5,7 +5,9 @@
 //   Used by: Vulture Aid's drops (mods/perks-plus/bo7-perks.js), the T.E.D.D. reward chest (mods/tedd-tasks), and the
 //   Mystery Box: melee the box while a weapon is on offer and the weapon is knocked out onto the floor in front of it
 //   (picked up later with F, or left for 90 s), instead of taking it straight into your hands.
-// Loot is local to the player it drops for (like box rolls and Vulture drops), so in co-op each player sees their own.
+// Loot is local to the player it drops for (like box rolls and Vulture drops), so in co-op each player sees their own;
+// the one exception is a weapon knocked out of the Mystery Box, which everyone sees and anyone can take (`shared`: the
+// host hands it to the first player who asks, over the multiplayer mod's relay: lootdrop / lootclaim / loottake).
 // window.kino.loot: {
 //   spawn(kind, at, opts) -> item       kind: 'ammo' | 'points' | 'grenade' | 'weapon' | 'perk' | 'powerup'
 //       opts: {amount, id (weapon / perk / power-up type), life (s), reach, from (Vector3: arc out of here), onPick(item)
@@ -120,7 +122,7 @@ export default async function setup(api) {
     const disc = new THREE.Mesh(discGeo, discMat(c)); disc.scale.setScalar(tall ? 60 : 34); disc.position.y = .6; root.add(disc);
     if (tall) root.add(new THREE.Mesh(beamGeo, beamMat(c)));
     root.traverse(o => { if (o.isMesh) o.castShadow = false; });
-    const item = { kind, root, body, opts, rarity, born: session.time, life: opts.life ?? LIFE[kind] ?? 30, spin: Math.random() * 6, prompt: tall, vel: null, ground: at.y };
+    const item = { kind, root, body, opts, rarity, born: session.time, life: opts.life ?? LIFE[kind] ?? 30, spin: Math.random() * 6, prompt: tall, vel: null, ground: at.y, at: at.clone() };
     if (opts.from) {   // thrown out of a chest or box: arc from there to `at`
       const from = opts.from.clone(), up = 220 + Math.random() * 60, T = (up + Math.sqrt(up * up + 2 * GRAVITY * Math.max(0, from.y - at.y))) / GRAVITY;
       item.vel = new THREE.Vector3((at.x - from.x) / T, up, (at.z - from.z) / T); root.position.copy(from);
@@ -207,7 +209,7 @@ export default async function setup(api) {
       if (d > 120 || look.dot(to.normalize()) < .55) continue;
       const weapon = mysteryBox.take(b.entity); if (!weapon) return;
       const dir = eye.clone().sub(at).setY(0).normalize(), land = at.clone().addScaledVector(dir, 55); land.y = floorAt(land);
-      spawn('weapon', land, { id: weapon, from: at.clone().setY(at.y + 40) });
+      share(spawn('weapon', land, { id: weapon, from: at.clone().setY(at.y + 40) }), at.clone().setY(at.y + 40));
       audio?.knife?.('hit', false); toast(nameOf(weapon) + ' knocked out · F to take', 2.5);
       return;
     }
@@ -231,10 +233,43 @@ export default async function setup(api) {
     use() {
       const t = current?.target; if (!t) return false;
       if (chests.includes(t)) { openChest(t); return true; }
+      if (t.nid && online()) return claim(t);
       if (pick(t)) { remove(t); return true; }
       return false;
     },
   });
+
+  // ---- shared drops (co-op): a weapon knocked out of the box is everyone's; the host settles who got it first
+  let net = null; const taken = new Set(), online = () => (hook(), !!net?.id);
+  let nidN = 0;
+  function share(item, from) {
+    if (!item || !online()) return;
+    item.nid = net.id + ':' + (++nidN);
+    net.send('all', { t: 'lootdrop', nid: item.nid, kind: item.kind, id: item.opts.id, at: item.at.toArray(), from: from.toArray() });
+  }
+  function claim(item) {
+    if (item.claimed > session.time - 1) return true;   // asked already; the answer is on its way
+    if (item.kind === 'weapon' && (session.pack?.weapon === session.weapon || session.busy)) { toast('Can\'t take it right now'); return false; }
+    item.claimed = session.time;
+    if (net.isHost) settle(item.nid, net.id); else net.send('host', { t: 'lootclaim', nid: item.nid });
+    return true;
+  }
+  function settle(nid, by) {   // the host: the first claim wins
+    if (taken.has(nid)) return; taken.add(nid);
+    net.send('all', { t: 'loottake', nid, by }); took(nid, by);
+  }
+  function took(nid, by) {
+    const item = items.find(it => it.nid === nid); if (!item) return;
+    if (by === net.id) pick(item); else toast((net.players.get(by)?.name ?? 'A teammate') + ' took the ' + nameOf(item.opts.id), 2);
+    remove(item);
+  }
+  function hook() {   // the multiplayer mod makes kino.coop after this mod's setup
+    if (net || !window.kino?.coop) return; net = window.kino.coop;
+    net.on('lootdrop', m => { if (!Array.isArray(m.at)) return; const it = spawn(m.kind ?? 'weapon', new THREE.Vector3().fromArray(m.at), { id: m.id, from: Array.isArray(m.from) ? new THREE.Vector3().fromArray(m.from) : undefined }); if (it) it.nid = m.nid; });
+    net.on('lootclaim', (m, from) => { if (net.isHost && m.nid) settle(m.nid, from); });
+    net.on('loottake', m => took(m.nid, m.by));
+  }
+  host.on('update', hook);
 
   // ---- every frame
   host.on('update', dt => {
@@ -264,7 +299,7 @@ export default async function setup(api) {
       if (c.opened) { c.open = Math.min(1, c.open + dt * 2.5); lid.rotation.x = -c.open * 1.9; if ((c.gone = (c.gone ?? 0) + dt) > 12) { c.root.removeFromParent(); chests.splice(i, 1); } }
     }
   });
-  host.on('reset', () => { for (const it of [...items]) remove(it); for (const c of chests) c.root.removeFromParent(); chests.length = 0; });
+  host.on('reset', () => { taken.clear(); for (const it of [...items]) remove(it); for (const c of chests) c.root.removeFromParent(); chests.length = 0; });
 
   // ---- weapons and perks for rewards
   function pickWeapon(rarities) {
