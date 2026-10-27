@@ -22,6 +22,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { GradePass, ViewmodelPass, HAZE_SHADER, gradeFor, GRADES } from './grade.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { createFlames, fireFlicker } from '../fx/flames.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
@@ -265,6 +266,14 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
     while(pool.length>n){const l=pool.pop();scene.remove(l,l.target);l.dispose();}
   }
   resizePool(poolSize(quality()));
+  // the map's fire lights (Kino: fire_flicker, the lobby fireplace, the stage and the alley) get real flames at the
+  // fire under them (mods/fx/flames.js); their flicker is the flames' own curve (2026-10-27)
+  const fire=createFlames({scene,renderer,low:quality()<1,name:'map_fire'});
+  // the flame sits on the top surface under the light (the lobby's light is at the floor inside its debris pile: a ray
+  // from 120 above finds the top of the pile rather than the floor under it)
+  for(const s of sources)if(s.kind==='fire'){const hit=world.raycast?.(new THREE.Ray(s.position.clone().add(new THREE.Vector3(0,120,0)),new THREE.Vector3(0,-1,0)),0,140);
+    const at=s.position.clone();if(hit)at.y+=120-hit.distance+2;s.flame=fire.add(at,'fire',{size:s.fireSize??64});}
+  fire.build();
   // Shadow-casting spots (expensive, the nearest few).
   const SPOTS=4;
   const spots=[...Array(SPOTS)].map(()=>{
@@ -480,7 +489,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
     boxBeam=beams.at(-1);boxBeam.base=base;boxBeam.lastKey='';
   }
   let timer=0,t=0,frame=0;
-  const level=s=>s.kind==='off'?0:s.kind==='box'?(session.power&&world.activeBox?.id===s.box?1:0):s.kind==='boxbeam'?1:s.kind==='sun'?(day()?1:0):s.kind==='power'?(session.power?1:0):s.kind==='fire'?.85+Math.sin(t*23+s.position.x)*.1+Math.random()*.12:1;
+  const level=s=>s.kind==='off'?0:s.kind==='box'?(session.power&&world.activeBox?.id===s.box?1:0):s.kind==='boxbeam'?1:s.kind==='sun'?(day()?1:0):s.kind==='power'?(session.power?1:0):s.kind==='fire'?fireFlicker(t,s.flame?.seed??s.position.x)*1.08:1;
   const tick=dt=>{
     t+=dt;timer-=dt;frame++;const q=quality();
     applyDay(q);const isDay=day();
@@ -543,6 +552,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
       boxBeam.s.kind=world.boxBeam.parent&&!world.fireSale?'boxbeam':'off';
     }
     for(const m of bulbs)m.emissiveIntensity+=((session.power?2.6:0)-m.emissiveIntensity)*Math.min(1,dt*3);
+    fire.update(dt,{fog:scene.fog});
     if(halos.material){const target=session.power?.55+Math.sin(t*7.3)*.04+Math.sin(t*11.1)*.03:0;halos.material.opacity+=(target-halos.material.opacity)*Math.min(1,dt*3);}
   };
   host.on('update',tick);

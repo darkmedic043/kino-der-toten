@@ -11,6 +11,7 @@ import { useGameAudio } from './castle-audio.js';
 import { createSync } from './sync.js';
 import { setupTab } from './tab.js';
 import { setupWeather } from './weather.js';
+import { fireFlicker } from '../fx/flames.js';
 import { mergeProps, instanceProps } from './merge-props.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
@@ -496,7 +497,7 @@ function setupLook({ scene, world, session, host, camera }) {
     for (const l of pool) {
       const goal = l.userData.lamp && !l.userData.leaving ? want : 0;
       l.userData.level += (goal - l.userData.level) * Math.min(1, dt * (goal ? 2.5 : 5));
-      const f = l.userData.fire; l.intensity = l.userData.level * (f == null ? 1 : .86 + .09 * Math.sin(T * 9.1 + f) + .05 * Math.sin(T * 23.7 + f * 2.0));   // a flame's flicker
+      const f = l.userData.fire; l.intensity = l.userData.level * (f == null ? 1 : fireFlicker(T, f) * 1.08);   // a flame's flicker (the curve the flames themselves use)
     }
   });
 }
