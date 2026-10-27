@@ -281,11 +281,19 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     // mantle: gun drops away to the right
     // (pitched down around the camera rather than moved, so the left shoulder stays in reach of the ledge)
     const g=Math.max(s.mantle*.85,mk)*hp;P.x+=1.2*g;P.y+=-1.2*g;R.x+=-.95*g;R.z+=-.35*g;R.y+=.18*g;
+    // a weapon's own shake (2026-10-27, the Siren's charge): kino.fpMotion.shake 0..1, set each frame by the weapon's mod.
+    // Unstable rather than a steady buzz (user: "make it seem more like its unstable"): a tremble of unrelated sines at
+    // 7-18 Hz that surges and fades, plus random jolts (more often and harder as the shake grows) through the kick springs
+    const shT=performance.now()/1000,shN=(a,b,c)=>Math.sin(shT*a)*.6+Math.sin(shT*b+1.3)*.3+Math.sin(shT*c+2.1)*.1;
+    const shk=(window.kino.fpMotion.shake??0)*str*(1-.6*aim)*(1+.6*Math.sin(shT*4.7)*Math.sin(shT*1.9+.7));
+    if(shk>0&&Math.random()<dt*(1+6*shk)){const j=(.4+Math.random()*.8)*shk;s.kickY.v+=(Math.random()-.5)*9*j;s.kickP.v+=(Math.random()-.35)*4*j;s.kickZ.v+=(Math.random()-.5)*3*j;}
+    if(shk>0){P.x+=shN(53,71,97)*.22*shk;P.y+=shN(61,83,109)*.18*shk;R.x+=shN(47,67,113)*.014*shk;R.y+=shN(43,73,101)*.01*shk;R.z+=shN(59,79,103)*.02*shk;}
     // the camera: a share of the same motion, so the whole view sways with the gun (the movement mod applies it)
     // (the sprint's roll and nod halved on 2026-10-19, user: "screen shake seems a bit excessive")
     cam.roll=rl*.35*hipR+bobRoll*.3+.07*s.slide+.14*s.dive-.1*k+Math.sin(ph)*.005*sw-sx*.03*hipR;
     cam.pitch=lf*-.0025*hip+kp*.0045+Math.cos(ph*2)*.0018*sw+sy*.012*hip+.03*s.slide-.06*s.dive+.05*k;
     cam.fov=(5*s.sprintBlend*hp+3*s.slide+2*s.dive)*str;   // (the camera keeps the slide and dive cant while aiming; the gun is on the sights)
+    if(shk>0){cam.roll+=shN(41,89,107)*.0016*shk;cam.pitch+=shN(37,77,113)*.0012*shk;}
     if(!flags.cam)cam.roll=cam.pitch=cam.fov=0;
     if(!Number.isFinite(cam.roll+cam.pitch+cam.fov)){cam.roll=cam.pitch=cam.fov=0;}
     if(!Number.isFinite(P.x+P.y+P.z+R.x+R.y+R.z)){for(const k in base){s[k].x=0;s[k].v=0;}s.bobAmp=0;s.exert=0;P.set(0,0,0);R.set(0,0,0);}   // never let a bad frame stick

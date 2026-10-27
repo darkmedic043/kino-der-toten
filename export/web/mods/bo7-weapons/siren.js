@@ -151,8 +151,10 @@ export function setupSiren(api) {
     const f = () => inHand() || !!prev?.(); f.siren = true; host.holdFire = f;
   }
   claimFire(); host.on('start', claimFire);
+  // the gun shakes as the charge builds (2026-10-27, user: "make it shake abit when charging more"), through fp.js
+  const shake = v => { if (window.kino.fpMotion) window.kino.fpMotion.shake = v; };
   function startCharge() { charge = { t: 0, full: false, id: session.weapon.id }; wailStart(chargeTime() / taps.rate(), has('sr_baffle')); }
-  function cancel() { charge = null; wailStop(); ring.style.display = 'none'; }
+  function cancel() { charge = null; wailStop(); ring.style.display = 'none'; shake(0); }
   function release() {
     const c = charge; cancel(); if (!c) return;
     shotK = c.t < TAP ? 0 : Math.min(1, c.t / chargeTime());
@@ -173,6 +175,7 @@ export function setupSiren(api) {
     ring.style.background = `conic-gradient(${col} ${k * 360}deg, #ffffff22 0)`; ring.style.webkitMask = ring.style.mask = 'radial-gradient(circle, transparent 18px, #000 19px)';
     ring.style.filter = k >= 1 ? `drop-shadow(0 0 6px ${col})` : '';
     if (k >= 1 && !charge.full) { charge.full = true; fullPing(has('sr_baffle')); }
+    shake(charge.t > TAP ? .1 + .7 * k * k + (charge.full ? .2 : 0) : 0);
   });
   host.on('reset', () => { cancel(); was = false; for (const o of [...live]) remove(o); for (const f of fx) f.obj.removeFromParent(); fx.length = echoes.length = songs.length = 0; });
 
