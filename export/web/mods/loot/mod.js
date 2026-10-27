@@ -1,7 +1,7 @@
 // World loot (BO6/BO7 style, fork 2026-10-26). Things you pick up off the floor are real 3D items instead of glowing
-// orbs: an ammo can, a gold zombie-dollar sign, a frag grenade, a perk bottle, or a weapon floating in a beam of its
+// orbs: an ammo can, a gold zombie-dollar sign, a frag grenade, a perk bottle, or a weapon lying in a beam of its
 // rarity colour. Small items (ammo, points, grenades) are collected by walking over them; weapons, perk bottles and
-// chests take F. Items pop out with an arc, bob and spin, blink for their last 5 s, then go.
+// chests take F. Items pop out with an arc (or drop) onto the floor and lie there, blink for their last 5 s, then go.
 //   Used by: Vulture Aid's drops (mods/perks-plus/bo7-perks.js), the T.E.D.D. reward chest (mods/tedd-tasks), and the
 //   Mystery Box: melee the box while a weapon is on offer and the weapon is knocked out onto the floor in front of it
 //   (picked up later with F, or left for 90 s), instead of taking it straight into your hands.
@@ -20,6 +20,7 @@
 import * as THREE from 'three';
 import { rarityOf as rarityIn } from '../../profile.js';
 import { PERKS, perkUnlocked } from '../terminal-booth/desktop.js';
+import { objectBox } from '../../skinned-bounds.js';
 
 const GRAVITY = 900, BLINK = 5, RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'wonder'];
 const LIFE = { ammo: 30, points: 30, grenade: 30, weapon: 90, perk: 120 };
@@ -100,7 +101,7 @@ export default async function setup(api) {
   // ---- placing things on the floor
   const down = new THREE.Vector3(0, -1, 0);
   function floorAt(p) {
-    const hit = world.raycast?.(new THREE.Ray(p.clone().add(new THREE.Vector3(0, 50, 0)), down), 0, 260);
+    const hit = world.raycast?.(new THREE.Ray(p.clone().add(new THREE.Vector3(0, 50, 0)), down), 0, 650);
     return hit?.position ? hit.position.y : p.y;
   }
 
@@ -113,20 +114,27 @@ export default async function setup(api) {
     if (kind === 'weapon') {
       rarity ??= rarityOf(opts.id); c = color(rarity);
       const shown = mysteryBox?.display?.(opts.id);   // the box's pooled, warmed display copy; goes back to the pool when removed
-      if (shown) { shown.position.set(0, 0, 0); body.add(shown); body.userData.shown = shown; }
-      body.position.y = 30;
+      if (shown) {   // laid on its side on the floor: turned about its long axis, resting on its own thickness
+        shown.position.set(0, 0, 0); const tilt = new THREE.Group(); tilt.add(shown); body.add(tilt); body.userData.shown = shown;
+        const s = objectBox(shown).getSize(new THREE.Vector3()), long = s.x >= s.z;
+        if (long) tilt.rotation.x = Math.PI / 2; else tilt.rotation.z = Math.PI / 2;
+        body.position.y = (long ? s.z : s.x) / 2 + .3;
+      }
     } else if (kind === 'perk') {
-      const p = PERKS.find(x => x.id === opts.id); c = p?.color ?? '#ffffff'; body.add(look('perk', c)); body.position.y = 4;
-    } else { body.add(LOOKS[kind]().clone(true)); body.position.y = 2; if (opts.big) body.scale.setScalar(1.5); }
+      const p = PERKS.find(x => x.id === opts.id); c = p?.color ?? '#ffffff'; body.add(look('perk', c));
+    } else { body.add(LOOKS[kind]().clone(true)); if (opts.big) body.scale.setScalar(1.5); }
+    body.rotation.y = Math.random() * Math.PI * 2;
     const tall = kind === 'weapon' || kind === 'perk';
     const disc = new THREE.Mesh(discGeo, discMat(c)); disc.scale.setScalar(tall ? 60 : 34); disc.position.y = .6; root.add(disc);
     if (tall) root.add(new THREE.Mesh(beamGeo, beamMat(c)));
     root.traverse(o => { if (o.isMesh) o.castShadow = false; });
-    const item = { kind, root, body, opts, rarity, born: session.time, life: opts.life ?? LIFE[kind] ?? 30, spin: Math.random() * 6, prompt: tall, vel: null, ground: at.y, at: at.clone() };
+    // everything rests on the floor under `at` (a zombie's feet can be on a ledge or mid-hop; `opts.exact` keeps at.y)
+    const ground = opts.exact ? at.y : floorAt(at);
+    const item = { kind, root, body, opts, rarity, born: session.time, life: opts.life ?? LIFE[kind] ?? 30, prompt: tall, vel: null, ground, at: at.clone().setY(ground) };
     if (opts.from) {   // thrown out of a chest or box: arc from there to `at`
       const from = opts.from.clone(), up = 220 + Math.random() * 60, T = (up + Math.sqrt(up * up + 2 * GRAVITY * Math.max(0, from.y - at.y))) / GRAVITY;
       item.vel = new THREE.Vector3((at.x - from.x) / T, up, (at.z - from.z) / T); root.position.copy(from);
-    } else root.position.copy(at);
+    } else { root.position.copy(at); if (at.y > ground + 1) item.vel = new THREE.Vector3(); }   // falls the rest of the way
     scene.add(root); items.push(item); return item;
   }
   function remove(item) {
@@ -286,8 +294,8 @@ export default async function setup(api) {
       const age = now - it.born, left = it.life - age;
       if (left <= 0 || (it.opts.keep && !it.opts.keep())) { remove(it); continue; }
       it.root.visible = left > BLINK || Math.floor(left * 6) % 2 === 0;
-      it.spin += dt * (it.kind === 'weapon' ? .8 : 1.6);
-      it.body.rotation.y = it.spin; it.body.position.y = (it.kind === 'weapon' ? 30 : it.kind === 'perk' ? 4 : 2) + Math.sin(age * 3 + i) * 2.2;
+      if (it.vel) it.body.rotation.y += dt * 6;   // tumbles in the air, lies still once down
+      else if (it.kind === 'points') it.body.rotation.y += dt * 1.2;   // the $ stands on the floor, turning slowly so it reads from every side
       if (!it.prompt && !it.vel) {
         const reach = it.opts.reach ?? 60, dx = p.x - f.x, dz = p.z - f.z;
         if (dx * dx + dz * dz < reach * reach && Math.abs(p.y - f.y) < 80 && session.phase !== 'reviving' && pick(it)) remove(it);
