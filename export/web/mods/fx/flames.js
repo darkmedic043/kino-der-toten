@@ -35,10 +35,16 @@ const GLSL_NOISE = /* glsl */`
   float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
     return mix(mix(hash21(i), hash21(i + vec2(1, 0)), f.x), mix(hash21(i + vec2(0, 1)), hash21(i + vec2(1, 1)), f.x), f.y); }
   float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * vnoise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return v; }`;
-// a view-aligned quad anchored at its instance point: vertex xy in [-0.5,0.5]×[0,1] (uv.y up from the base)
+// a quad anchored at its instance point, standing up along world Y and turned about it to face the camera (an axial
+// billboard: a flame seen from above foreshortens on its candle instead of lying across the shelf behind it, which a
+// screen-aligned quad did); only when seen almost straight down does it lean back toward the screen so it doesn't vanish.
+// vertex xy in [-0.5,0.5]×[0,1] (uv.y up from the base)
 const GLSL_BILLBOARD = /* glsl */`
   vec4 billboard(vec3 at, vec2 wh, vec2 corner, float yBase){ vec4 mv = modelViewMatrix * vec4(at, 1.0);
-    mv.xy += vec2(corner.x * wh.x, (corner.y - yBase) * wh.y); return mv; }`;
+    vec3 toP = normalize(mv.xyz), up = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+    float steep = abs(dot(up, toP)); up = normalize(mix(up, vec3(0.0, 1.0, 0.0), smoothstep(0.7, 0.97, steep)));
+    vec3 right = normalize(cross(toP, up));
+    mv.xyz += right * (corner.x * wh.x) + up * ((corner.y - yBase) * wh.y); return mv; }`;
 
 const quad = () => {
   const g = new THREE.InstancedBufferGeometry();
