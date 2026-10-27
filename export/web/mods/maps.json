@@ -178,7 +178,7 @@
         "explore"
       ],
       "dir": "mods/maps/nuketown/",
-      "model": "nuketown.glb?v=2",
+      "model": "nuketown.glb?v=4",
       "scale": 1,
       "background": "#425a62",
       "exposure": 1.0,
@@ -190,6 +190,8 @@
       },
       "doorMargin": 40,
       "doorHeadroom": 80,
+      "traversalDrop": 64,
+      "zombieWalls": true,
       "mergeStatic": true,
       "mergeExclude": "^ENT_",
       "batchMeshes": true

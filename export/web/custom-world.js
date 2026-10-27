@@ -156,9 +156,14 @@ export class CustomWorld {
     // TRAVERSE markers (extras.to: the far end; World at War ports: the AI's fence hops, climbs and jump-downs) become
     // one-way off-mesh links: a path may cross there, and a zombie hops the gap like a narrow doorway (enemies.js)
     // path() marks the point a link ends at (`hop`), and enemies.js walks a zombie straight to it
-    this.traversals=markers.filter(m=>m.type==='TRAVERSE'&&Array.isArray(m.extras.to)).map(m=>({from:m.position.clone(),to:new THREE.Vector3(...m.extras.to),both:!!m.extras.both}));
-    const offMeshConnections=markers.filter(m=>m.type==='TRAVERSE'&&Array.isArray(m.extras.to)).map((m,i)=>({startPosition:{x:m.position.x,y:m.position.y,z:m.position.z},
-      endPosition:{x:m.extras.to[0],y:m.extras.to[1],z:m.extras.to[2]},radius:60,bidirectional:!!m.extras.both,userId:i}));   // 60: a hop starts at the wall, where the navmesh is eroded back
+    this.traversals=markers.filter(m=>m.type==='TRAVERSE'&&Array.isArray(m.extras.to)).map(m=>({from:m.position.clone(),to:new THREE.Vector3(...m.extras.to),both:!!m.extras.both,over:m.extras.over??null}));   // over: [t, top] of the props it crosses (enemies.js hopOver)
+    // map entry traversalDrop (scene units): both ends drop onto the ground below, up to that far, as CoD drops its path
+    // nodes (Nuketown's float about 33 over it, and Detour only links an end within 18 of the navmesh: 118 of its 132
+    // links were never wired, and with the fences in the navmesh the yards were cut off)
+    if(this.entry.traversalDrop){const down=new THREE.Vector3(0,-1,0);
+      for(const t of this.traversals)for(const p of [t.from,t.to]){const h=this.collision.rayIntersect(new THREE.Ray(new THREE.Vector3(p.x,p.y+2,p.z),down),0,this.entry.traversalDrop+2);if(h)p.y+=2-h.distance;}}
+    const offMeshConnections=this.traversals.map((t,i)=>({startPosition:{x:t.from.x,y:t.from.y,z:t.from.z},
+      endPosition:{x:t.to.x,y:t.to.y,z:t.to.z},radius:60,bidirectional:t.both,userId:i}));   // 60: a hop starts at the wall, where the navmesh is eroded back
     // map entry navHeight: the headroom a zombie needs (70; Malibu Drive 60: some of its passages leave 71, lost to rounding)
     const nav=generateTiledNavMesh(positions,indices,{offMeshConnections,cs,ch,tileSize:32,walkableSlopeAngle:48,walkableHeight:Math.ceil((this.entry.navHeight??70)/ch),walkableClimb:Math.floor(18/ch),walkableRadius:Math.max(1,Math.round(14/cs)),
       maxEdgeLen:Math.round(48/cs),maxSimplificationError:1.3,minRegionArea:8,mergeRegionArea:20,maxVertsPerPoly:6,detailSampleDist:6,detailSampleMaxError:1});
@@ -408,8 +413,8 @@ export class CustomWorld {
   // long routes on big maps (Malibu Drive) run past Detour's default 256 path polygons and came back cut short: zombies
   // walked to the end of a partial path and stood there
   path(a,b){const r=this.query.computePath({x:a.x,y:a.y,z:a.z},{x:b.x,y:b.y,z:b.z},{maxPathPolys:4096,maxStraightPathPoints:1024});if(!r.success)return [];
-    const pts=r.path.map(p=>new THREE.Vector3(p.x,p.y,p.z)),T=this.traversals;
-    if(T?.length)for(let i=1;i<pts.length;i++){const p=pts[i-1],q=pts[i];if(T.some(t=>p.distanceTo(t.from)<40&&q.distanceTo(t.to)<40||t.both&&p.distanceTo(t.to)<40&&q.distanceTo(t.from)<40))q.hop=true;}   // an off-mesh link's far end
+    const pts=r.path.map(p=>new THREE.Vector3(p.x,p.y,p.z)),T=this.traversals,reach=this.entry.zombieWalls?72:40;
+    if(T?.length)for(let i=1;i<pts.length;i++){const p=pts[i-1],q=pts[i],t=T.find(t=>p.distanceTo(t.from)<40&&q.distanceTo(t.to)<reach||t.both&&p.distanceTo(t.to)<40&&q.distanceTo(t.from)<reach);if(t)q.hop=t;}   // an off-mesh link's far end (hop: the traversal; with zombieWalls up to 72 away: Recast lands it on the nearest polygon, Nuketown's porch 51 away)
     return pts;}
   raycast(ray,near=0,far=Infinity,windows=false){let hit=this.collision.rayIntersect(ray,near,far);
     for(const m of this.movers??[]){if(m.disabled)continue;const r=new THREE.Ray(ray.origin.clone().sub(m.offset),ray.direction),h=m.collider.rayIntersect(r,near,hit?Math.min(hit.distance,far):far);if(h){h.position.add(m.offset);h.point.add(m.offset);hit=h;}}for(const d of this.dynamic){if(!d.enabled||!d.collider||(!windows&&d.window))continue;const h=d.collider.rayIntersect(ray,near,hit?Math.min(hit.distance,far):far);if(h)hit=h;}return hit;}

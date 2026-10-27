@@ -4,6 +4,8 @@ import { Rig, loadModel, loadAnimation } from './animation.js';
 import { zombieHealth } from './rules.js';
 import { disposeSkeletons } from './runtime-assets.js';
 
+const DOWN=new THREE.Vector3(0,-1,0);
+
 export class Enemies {
   constructor(scene,world,data,session,{damage,kill,hit,sound}){Object.assign(this,{scene,world,data,session,onDamage:damage,onKill:kill,onHit:hit,onSound:sound});this.list=[];this.dead=[];this.nextSpawn=0;this.serial=0;this.templates=[];this.anims={};}
   async load(){
@@ -57,7 +59,9 @@ export class Enemies {
     return true;
   }
   update(dt,player){
-    const s=this.session;
+    // map entry zombieWalls (custom maps): traversals arc over what is in their way, and the shortcut steps below (the
+    // headway rescue, the step off the navmesh) only go where a line at knee and chest height is clear of walls and clip
+    const s=this.session,walls=!!this.world.entry?.zombieWalls;
     if(this.autoSpawn!==false&&s.phase==='fighting'&&s.spawned<s.total&&this.list.length<24){
       this.nextSpawn-=dt;
       if(this.nextSpawn<=0){
@@ -111,7 +115,7 @@ export class Enemies {
       const freeWalk=!!(this.freeMode&&z.free);
       if(freeWalk)this.walkFree(z,goal,dt);
       else{z.repath-=dt;
-      if(z.repath<=0&&!z.path[z.pathIndex]?.hop){z.path=this.world.path(z.root.position,goal);z.pathIndex=1;z.repath=.55+(z.id%5)*.07;}}   // no replanning mid-hop
+      if(z.repath<=0&&!z.hop&&!z.path[z.pathIndex]?.hop){z.path=this.world.path(z.root.position,goal);z.pathIndex=1;z.repath=.55+(z.id%5)*.07;}}   // no replanning mid-hop
       // held in place: under 12 units of headway in 1.2 s while chasing with a path (navmesh snapping keeps a zombie on its
       // own patch where the navmesh breaks into fragments, a spiral stair's steps; each replan sends it back to the first
       // corner): step to the first path point more than 25 away, if within 130 (the hotel spiral needs 118; crowds stall too: a short shuffle at worst)
@@ -119,18 +123,21 @@ export class Enemies {
         z.progT=(z.progT??0)+dt;z.progAt??=z.root.position.clone();
         if(z.progT>1.2){
           if(z.root.position.distanceTo(z.progAt)<12&&dist>100){const far=z.path.slice(z.pathIndex).find(p=>p.distanceTo(z.root.position)>25);
-            if(far&&Math.hypot(far.x-z.root.position.x,far.z-z.root.position.z)<130){z.root.position.copy(far);z.pathIndex=z.path.indexOf(far)+1;}}
+            if(far&&Math.hypot(far.x-z.root.position.x,far.z-z.root.position.z)<130){
+              if(!walls||this.walkClear(z.root.position,far)){z.root.position.copy(far);z.pathIndex=z.path.indexOf(far)+1;}
+              else{z.pathIndex=z.path.indexOf(far);this.hopOver(z,far,dt);}}}   // pinned against a wall the navmesh steps over: climb it
           z.progAt.copy(z.root.position);z.progT=0;
         }
       }
-      const target=freeWalk?null:z.path[z.pathIndex];
-      if(target?.hop){   // a traversal (custom maps' off-mesh links: fence hops, climbs, jump-downs): straight to its end, off the navmesh
-        const d=target.clone().sub(z.root.position),len=d.length();
-        if(len<8){z.root.position.copy(target);z.pathIndex++;}else{z.root.position.addScaledVector(d,Math.min(1,z.speed*1.2*dt/len));z.root.rotation.y=Math.atan2(-d.z,d.x);}
+      const target=freeWalk?null:z.hop?.to??z.path[z.pathIndex];
+      if(target?.hop||z.hop){   // a traversal (custom maps' off-mesh links: fence hops, climbs, jump-downs): straight to its end, off the navmesh
+        if(walls)this.hopOver(z,target,dt);
+        else{const d=target.clone().sub(z.root.position),len=d.length();
+          if(len<8){z.root.position.copy(target);z.pathIndex++;}else{z.root.position.addScaledVector(d,Math.min(1,z.speed*1.2*dt/len));z.root.rotation.y=Math.atan2(-d.z,d.x);}}
         z.blockT=0;
       }else if(target){
         const delta=target.clone().sub(z.root.position),horizontal=Math.hypot(delta.x,delta.z);
-        if(horizontal<10){z.pathIndex++;}
+        if(horizontal<10){z.pathIndex++;z.wallHits=0;}
         else{
           const next=z.root.position.clone().addScaledVector(delta,Math.min(1,z.speed*dt/horizontal));
           for(const other of this.list){if(other===z||other.state==='barricade')continue;const sep=next.clone().sub(other.root.position);sep.y=0;const d=sep.length();if(d<29&&d>.01)next.addScaledVector(sep,(29-d)/d*dt*2);}
@@ -138,7 +145,11 @@ export class Enemies {
           if(safe&&safe.distanceTo(next)<38){z.root.position.copy(safe);z.blockT=0;}
           else{   // the straight step leaves the navmesh (a doorway only a few cells wide): after a moment hop to the path point
             z.blockT=(z.blockT??0)+dt;
-            if(z.blockT>.5&&horizontal<130){z.root.position.copy(target);z.blockT=0;z.pathIndex++;}
+            if(z.blockT>.5&&horizontal<130){
+              if(!walls||this.walkClear(z.root.position,target)){z.root.position.copy(target);z.pathIndex++;}
+              else if((z.wallHits=(z.wallHits??0)+1)<2)z.repath=0;   // a wall between: plan again from here
+              else{z.wallHits=0;this.hopOver(z,target,dt);}   // the same corner again (a low wall the navmesh steps over): climb it
+              z.blockT=0;}
           }
           z.root.rotation.y=Math.atan2(-delta.z,delta.x);
         }
@@ -159,6 +170,38 @@ export class Enemies {
     }
     for(const d of [...this.dead]){d.life-=dt;d.rig.update(dt);if(d.life<2)d.root.position.y-=dt*24;if(d.life<=0){d.root.removeFromParent();d.rig.mixer.uncacheRoot(d.root);disposeSkeletons(d.root);this.dead.splice(this.dead.indexOf(d),1);}}
     if(this.autoRounds!==false&&s.phase==='fighting'&&s.spawned>=s.total&&this.list.length===0){if(s.dogRound)this.onKill?.(null,'full_ammo',this.lastDogDeath??player);s.nextRound();this.nextSpawn=0;this.lastDogDeath=null;}
+  }
+  // zombieWalls: nothing solid (map, doors, clip) on the line between two feet positions at knee or chest height
+  walkClear(a,b,heights=[24,50]){
+    const clip=this.world.clipCollision;
+    for(const h of heights){const p=a.clone(),q=b.clone();p.y+=h;q.y+=h;if(!this.world.lineClear(p,q))return false;
+      if(clip){const v=q.clone().sub(p),d=v.length();if(d>1&&clip.rayIntersect(new THREE.Ray(p,v.normalize()),0,d))return false;}}
+    return true;
+  }
+  // zombieWalls: a traversal as an arc over whatever stands in its way (a fence, a ledge's lip) instead of a straight
+  // line through it. The obstacle profile is read once per hop: the surface under points every ~3 units along it (map
+  // and doors, rays down from 90 over the line); the arc clears the highest by 6 and never dips below the profile.
+  hopOver(z,target,dt){
+    const pos=z.root.position;let h=z.hop;
+    if(h?.to!==target){
+      const from=pos.clone(),len=Math.max(1,from.distanceTo(target)),n=Math.min(60,Math.max(4,Math.ceil(len/3))),floor=[];let arc=0;
+      const lift=(t,y,ly)=>{const k=Math.min(Math.max(t,.1),.9);if(y>ly)arc=Math.max(arc,(y-ly+6)/(4*k*(1-k)));};
+      for(let i=0;i<=n;i++){
+        const t=i/n,p=from.clone().lerp(target,t),hit=this.world.raycast(new THREE.Ray(new THREE.Vector3(p.x,p.y+90,p.z),DOWN),0,110),y=hit?p.y+90-hit.distance:-Infinity;
+        floor.push(y);if(i>0&&i<n)lift(t,y,p.y);
+      }
+      // props with no collision of their own (Nuketown's fences: full clip, far taller, stands in for them): the top the
+      // builder measured across the link (extras.over), the right way round
+      const tr=target.hop,o=tr?.over;
+      if(o){const t=target.distanceTo(tr.to)<=target.distanceTo(tr.from)?o[0]:1-o[0];lift(t,o[1],from.y+(target.y-from.y)*t);}
+      h=z.hop={to:target,from,len,arc:Math.min(arc,110),floor,t:0};
+    }
+    h.t=Math.min(1,h.t+z.speed*1.2*dt/h.len);
+    if(h.t>=1){pos.copy(target);z.pathIndex++;z.hop=null;return;}
+    pos.lerpVectors(h.from,target,h.t);
+    const f=h.t*(h.floor.length-1),i=Math.floor(f),under=Math.max(h.floor[i],h.floor[Math.min(i+1,h.floor.length-1)]);
+    pos.y=Math.max(pos.y+4*h.arc*h.t*(1-h.t),under+1);
+    z.root.rotation.y=Math.atan2(-(target.z-h.from.z),target.x-h.from.x);
   }
   // Free walking on a platform: straight toward the goal, staying on whatever surface is underfoot (moving platforms carry them).
   walkFree(z,goal,dt){

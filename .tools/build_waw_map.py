@@ -454,7 +454,7 @@ def main():
                     if path.exists():
                         R = rot(vec(e.get('angles')))
                         prims += load_static_glb(b, path, {'origin': vec(e['origin']), 'axis': [[R[0][c], R[1][c], R[2][c]] for c in range(3)],
-                                                           'scale': float(e.get('modelscale', 1) or 1)}, flip)
+                                                           'scale': float(e.get('modelscale', 1) or 1)}, flip, skinned=cfg.get('skinnedProps', False))
         if prims:
             extras = {'zone': zone_id, 'zones': info['zones']} if cfg.get('doorModels') else {}
             # the game's own blocker: the door brush models' clip-map brushes (relative to each piece's origin; a full
@@ -534,8 +534,13 @@ def main():
                     if c2 is not b2 and c2 is not a and math.dist(b2[1], c2[0]) < 90 and math.dist(a[0], c2[1]) > 40:
                         chained.append((a[0], c2[1], a[2] + '+' + b2[2] + '+' + c2[2]))
     trav = 0
-    for frm, to, anim in links + chained:
-        b.add_marker(f'TRAVERSE_{trav}', frm, 0, {'to': [round(c, 3) for c in g(to)], 'anim': anim})
+    # cfg clipNav: each link also records the top of the props across it ('over': [t, top], enemies.js hopOver)
+    over = link_obstacles(dump, obj_base, [(frm, to) for frm, to, _ in links + chained]) if cfg.get('clipNav') else []
+    for k, (frm, to, anim) in enumerate(links + chained):
+        extras = {'to': [round(c, 3) for c in g(to)], 'anim': anim}
+        if k < len(over) and over[k]:
+            extras['over'] = over[k]
+        b.add_marker(f'TRAVERSE_{trav}', frm, 0, extras)
         trav += 1
     # cfg 'traversals' [{from, to, both?, note}] (CoD units): extra links where the navmesh can't follow the map (Malibu's
     # spiral stair up from the beach: its wedge steps are narrower than the navmesh cells); both: two-way
@@ -568,6 +573,17 @@ def main():
             b.add_marker('BOX_start' if e.get('script_noteworthy') == 'start_chest' else 'BOX', o, yaw)
 
     # script_model props a mod needs (cfg['entityProps'] targetnames): placed like static models, as ENT_<targetname>
+    # ...and unnamed script_models of cfg['entityModels'] (decor no script touches, e.g. Nuketown's spare tool chests), as prop_<model>
+    for e in ents:
+        if e.get('classname') == 'script_model' and not e.get('targetname') and e.get('model') in set(cfg.get('entityModels', [])):
+            path = dump / 'model_export' / (e['model'] + '_lod0.glb')
+            if not path.exists():
+                continue
+            R = rot(vec(e.get('angles')))
+            inst = {'origin': vec(e['origin']), 'axis': [[R[0][c], R[1][c], R[2][c]] for c in range(3)], 'scale': float(e.get('modelscale', 1) or 1)}
+            prims = load_static_glb(b, path, inst, flip, skinned=True)
+            if prims:
+                b.add_mesh_node('prop_' + e['model'], prims)
     for e in ents:
         if e.get('classname') == 'script_model' and e.get('targetname') in set(cfg.get('entityProps', [])):
             path = dump / 'model_export' / (e['model'] + '_lod0.glb')
@@ -604,7 +620,7 @@ def main():
             row['bounds'] = [[round(min(c[i] for c in corners), 1) for i in range(3)], [round(max(c[i] for c in corners), 1) for i in range(3)]]
         named.append(row)
     (out / 'entities.json').write_text(json.dumps(named, separators=(',', ':')))
-    # placed static models (props; skinned models such as characters are skipped)
+    # placed static models (props; skinned models such as characters are skipped unless cfg 'skinnedProps')
     placed = 0
     if cfg.get('instanceProps'):
         placed = instanced_props(b, dump, obj_base, cfg, flip, world_surfaces, ents, brush)
@@ -612,7 +628,7 @@ def main():
         path = dump / 'model_export' / (inst['model'] + '_lod0.glb')
         if not path.exists() or inst['model'].startswith(('char_', 'viewmodel_', 'weapon_')):
             continue
-        prims = load_static_glb(b, path, inst, flip)
+        prims = load_static_glb(b, path, inst, flip, skinned=cfg.get('skinnedProps', False))
         if prims:
             b.add_mesh_node('prop_' + inst['model'], prims)
             placed += 1
@@ -817,11 +833,99 @@ def spiral_links(cm, spirals):
         print(f"spiral stair at {sp['center']}: {len(tops)} steps, {len(picks) - 1} links ({round(tops[0][2])}-{round(tops[-1][2])})")
     return out
 
-def clipmap_collision(cm, keep, flip, col_mesh):
+def link_obstacles(dump, obj_base, segs, band=90, reach=2, overhead=45):
+    """For each AI traversal (CoD from, to): the top (CoD z) of the placed static models across its line (within `reach`
+    of its vertical plane, up to `band` over it; parts starting `overhead` over the line pass over a zombie's head: the
+    nodes float about 33 over the ground) and where along it (t), as [t, z]; None when nothing stands in the way. The fences
+    Nuketown's hops cross have no collision of their own (full clip stands in for it, much taller than the fence), so
+    this is the height a zombie's vault has to clear (enemies.js hopOver, map entry zombieWalls)."""
+    out = [None] * len(segs)
+    smp = pathlib.Path(str(obj_base) + '.smodels.json')
+    if not segs or not smp.exists():
+        return out
+    cache = {}
+    def model(name):   # (local radius, triangles in CoD-local space) of a model's lod0 export
+        if name not in cache:
+            cache[name] = None
+            path = dump / 'model_export' / (name + '_lod0.glb')
+            if path.exists():
+                raw = path.read_bytes(); jl = struct.unpack('<I', raw[12:16])[0]; j = json.loads(raw[20:20 + jl]); off0 = 20 + jl + 8
+                def acc(i):
+                    a = j['accessors'][i]; v = j['bufferViews'][a['bufferView']]
+                    n = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4}[a['type']]; fmt = {5126: 'f', 5125: 'I', 5123: 'H', 5121: 'B'}[a['componentType']]
+                    size = struct.calcsize(fmt) * n; stride = v.get('byteStride') or size; off = off0 + v.get('byteOffset', 0) + a.get('byteOffset', 0)
+                    return [struct.unpack_from('<' + fmt * n, raw, off + k * stride) for k in range(a['count'])]
+                world = {}
+                def walk(i, parent):
+                    world[i] = mat_mul(parent, node_matrix(j['nodes'][i]))
+                    for c in j['nodes'][i].get('children', []):
+                        walk(c, world[i])
+                for r in j['scenes'][j.get('scene', 0)]['nodes']:
+                    walk(r, [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+                tris = []
+                for i, m in world.items():
+                    if 'mesh' not in j['nodes'][i]:
+                        continue
+                    for prim in j['meshes'][j['nodes'][i]['mesh']]['primitives']:
+                        if 'POSITION' not in prim['attributes'] or 'indices' not in prim:
+                            continue
+                        pts = [tuple(sum(m[r][k] * (p[k] if k < 3 else 1) for k in range(4)) for r in range(3)) for p in acc(prim['attributes']['POSITION'])]
+                        pts = [(p[0], -p[2], p[1]) for p in pts]   # glTF-local (Y up) -> CoD-local (Z up)
+                        flat = [x[0] for x in acc(prim['indices'])]
+                        tris.extend((pts[flat[k]], pts[flat[k + 1]], pts[flat[k + 2]]) for k in range(0, len(flat) - 2, 3))
+                if tris:
+                    cache[name] = (max(math.sqrt(sum(c * c for c in p)) for t in tris for p in t), tris)
+        return cache[name]
+    def d_seg(p, a, b):   # 2D point-segment distance and the segment parameter
+        dx, dy = b[0] - a[0], b[1] - a[1]; L = dx * dx + dy * dy
+        t = 0 if L == 0 else max(0, min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L))
+        return math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy), t
+    def cut(a, b, tri):   # where the triangle meets the vertical plane through a-b, within the link: [(t, z)...]
+        dx, dy = b[0] - a[0], b[1] - a[1]; L = math.hypot(dx, dy) or 1; nx, ny = -dy / L, dx / L
+        d = [(p[0] - a[0]) * nx + (p[1] - a[1]) * ny for p in tri]
+        pts = [p for p, e in zip(tri, d) if abs(e) <= reach]
+        for k in range(3):
+            i, j = k, (k + 1) % 3
+            if (d[i] > 0) != (d[j] > 0) and d[i] != d[j]:
+                f = d[i] / (d[i] - d[j]); pts.append(tuple(tri[i][c] + (tri[j][c] - tri[i][c]) * f for c in range(3)))
+        return [(t, p[2]) for p in pts for t in [((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (L * L)] if -.02 <= t <= 1.02]
+    places = json.load(open(smp))['models']
+    for n, (a, b) in enumerate(segs):
+        best, rel = None, -1e9
+        for inst in places:
+            name = inst['model'].lstrip(',')
+            if name.startswith(('char_', 'viewmodel_', 'weapon_')):
+                continue
+            o, sc = inst['origin'], inst.get('scale', 1) or 1
+            dist, _ = d_seg(o, a, b)
+            if dist > 400 or o[2] > max(a[2], b[2]) + band + 400:
+                continue
+            mdl = model(name)
+            if not mdl or dist > mdl[0] * sc + reach or o[2] - mdl[0] * sc > max(a[2], b[2]) + band:
+                continue
+            ax = inst['axis']
+            for tri in mdl[1]:
+                w = [tuple(o[i] + sc * (p[0] * ax[0][i] + p[1] * ax[1][i] + p[2] * ax[2][i]) for i in range(3)) for p in tri]
+                hit = cut(a, b, w)
+                if not hit:
+                    continue
+                t = sum(h[0] for h in hit) / len(hit); lz = a[2] + max(0, min(1, t)) * (b[2] - a[2])
+                lo, hi = min(h[1] for h in hit), max(h[1] for h in hit)
+                if lo > lz + overhead or hi < lz - 60:   # over a zombie's head (a porch roof, branches), or far below
+                    continue
+                if min(hi, lz + band) - lz > rel:
+                    rel = min(hi, lz + band) - lz; best = [round(max(0, min(1, t)), 3), round(lz + rel, 1)]
+        out[n] = best
+    return out
+
+def clipmap_collision(cm, keep, flip, col_mesh, clip_nav=False):
     """COL_world (stops the player and shapes the navmesh): solid and glass brushes, the terrain, the colliding static
     models. CLIP_world: player clip, with or without monster clip (the player only: bullets and zombies pass, as in the
     game, so zombies coming over the driveway's edge can be shot). PCOL_vehicles: cars (the player and bullets, not the
-    navmesh). NCOL_clip: monster clip only (the navmesh only)."""
+    navmesh). NCOL_clip: monster clip only (the navmesh only).
+    clip_nav (cfg 'clipNav'): tall full clip (player and monster) also goes into NCOL_clip, so the navmesh stops at it
+    too. Nuketown's fences, cars, bus, trees and rubble have no collision model of their own: the mapper's full clip is
+    their only collision, and without it the zombies walked straight through them (they cross by the traversals)."""
     CP, CT, PP, PT, NP, NT, VP, VT = [], [], [], [], [], [], [], []
     def add(P, T, pts, tris):
         base = len(P); P.extend(g(v) for v in pts)
@@ -846,6 +950,8 @@ def clipmap_collision(cm, keep, flip, col_mesh):
             add(CP, CT, pts, tris); counts['solid'] += 1
         elif ct & PLAYERCLIP:
             add(PP, PT, pts, tris); counts['player clip'] += 1
+            if clip_nav and ct & MONSTERCLIP:
+                add(NP, NT, pts, tris); counts['full clip in the navmesh'] += 1
         else:
             add(NP, NT, pts, tris); counts['monster clip'] += 1
     V, mats = cm['verts'], cm['materials']
@@ -877,6 +983,8 @@ def clipmap_collision(cm, keep, flip, col_mesh):
             tris.append(t)
         if tris:
             add(P, T, pts, tris)
+            if clip_nav and full:
+                add(NP, NT, pts, tris)
         if ramps:
             add(CP, CT, pts, ramps)
         counts['terrain tris'] += len(pts) // 3
@@ -951,7 +1059,8 @@ def instanced_props(b, dump, obj_base, cfg, flip, world_surfaces, ents, brush):
         if not path.exists():
             continue
         geo = []
-        prims = load_static_glb(b, path, ident, flip, geo)
+        # cfg 'skinnedProps': rigged static models drawn in their bind pose (Nuketown: 28 models, 134 placements, mostly BO2 ports)
+        prims = load_static_glb(b, path, ident, flip, geo, skinned=cfg.get('skinnedProps', False))
         if not prims:
             continue
         b.meshes.append({'name': name, 'primitives': prims}); mesh_i = len(b.meshes) - 1
@@ -997,7 +1106,7 @@ def instanced_props(b, dump, obj_base, cfg, flip, world_surfaces, ents, brush):
     if cm_path.exists() and cfg.get('clipCollision', True):
         # the game's own collision (the clipMap, dumped by .tools/oat/ClipMapDumperT4.cpp): exact where the name
         # heuristics below guess
-        clipmap_collision(json.load(open(cm_path)), inside if areas else (lambda x, y: True), flip, col_mesh)
+        clipmap_collision(json.load(open(cm_path)), inside if areas else (lambda x, y: True), flip, col_mesh, cfg.get('clipNav', False))
         return instances
     for s in world_surfaces:
         if SKIP_MATERIAL.search(s['mat']) or re.search(r'water|decal', s['mat'], re.I):   # terrain stays (its materials are named grass)

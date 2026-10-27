@@ -11,9 +11,13 @@
 //   - A free perk bottle in the closet beside the yellow house's back (free_maxammo), lava that burns, the hell portals
 //     that bring the player back up to the street, the original's zone links (blue back opens construction, brady back
 //     opens brady) and its round-start lines (sounds/round_start_0N.ogg, ripped with the map so git-ignored).
+//   - Falling perks (perks.js): six machines come down from the sky once called, onto crate piles.
+//   - The map's own zombies (characters.js): BO2 Nuketown's hazmat, soldier and civilian zombies.
 import * as THREE from 'three';
 import { CollisionWorld } from '../../collision-world.js';
 import { setupAtmosphere } from './atmosphere.js';
+import { setupPerkDrops, mapSound } from './perks.js';
+import { setupZombies } from './characters.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const DEG = Math.PI / 180;
@@ -32,13 +36,14 @@ const FREE_PERK = V(1153, 1672, -1278);
 const LAVA = [[[-560, 953, 2456], [-243, 993, 2809]], [[-299, 977, 2408], [66, 1014, 2703]], [[-491, 890, 2942], [38, 945, 3421]]];   // the three lava_damage triggers
 const PORTALS = [V(-1166, 1324, 1828), V(-662, 1055, 3267), V(-207, 1091, 3181), V(-1883, 1092, 2441)];
 const ZONE_LINKS = { blueback: 'construction', bradyback: 'brady' };   // zone opened -> zone that opens with it (the original's enter_* flags)
-const ROUND_LINES = 4;
+const ROUND_LINES = 4, ROUND_LINE_GAIN = .5;   // round-start lines: gain into the master (.42 x the volume setting)
 
 export default function setup(api) {
   if (api.map?.id !== 'nuketown') return;
   try { setupAtmosphere(api); } catch (e) { console.warn('[nuketown] atmosphere', e); }
   try { setupQuest(api); } catch (e) { console.warn('[nuketown] quest', e); }
   try { setupSounds(api); } catch (e) { console.warn('[nuketown] sounds', e); }
+  try { const z = setupZombies(api); if (globalThis.kino?.nuketown) globalThis.kino.nuketown.zombies = z; } catch (e) { console.warn('[nuketown] zombies', e); }
 }
 
 // ---- scene helpers: the builder bakes every ENT_ prop in world space under a node with no transform (several nodes can
@@ -215,19 +220,23 @@ function setupQuest(api) {
       }
     }
   });
-  const found = { lever: lever.length, generators: genGroups.length, bunkerDoor: bunkerDoor.length, tools: tools.map(t => t.nodes.length), elevator: elevator.length, elevatorDoor: elevatorDoor.length, papSkull: papSkull.length, papDoor: papDoor.length, power: !!power };
+  let perks = null;
+  try { perks = setupPerkDrops(api, { nodesOf, show }); } catch (e) { console.warn('[nuketown] perks', e); }
+  const found = { lever: lever.length, generators: genGroups.length, bunkerDoor: bunkerDoor.length, tools: tools.map(t => t.nodes.length), elevator: elevator.length, elevatorDoor: elevatorDoor.length, papSkull: papSkull.length, papDoor: papDoor.length, power: !!power, crates: perks?.drops.map(d => d.crateNodes.length) };
   console.log('[nuketown] quest nodes', JSON.stringify(found));
-  globalThis.kino && (globalThis.kino.nuketown = { st, found, setBunker, setElevator, setSkull, openPap, placePerk, reset });
+  globalThis.kino && (globalThis.kino.nuketown = { st, found, setBunker, setElevator, setSkull, openPap, placePerk, reset, perks });
 }
 
 // the four round-start lines: at the first round and a few seconds after every round end
 function setupSounds(api) {
-  const { host, map } = api;
-  const base = (map.dir ?? '').replace(/\/?$/, '/') + 'sounds/';
+  const { host } = api;
+  const play = mapSound(api);
   let last = -1, timer = 0;
+  // through the game's mixer (master volume applies); the lines are mastered to 0 dB peaks, so they sit well below
+  // the game's own sounds (a plain Audio at .85 skipped the mixer and was about 12 dB over them)
   const line = () => {
     let i; do { i = Math.floor(Math.random() * ROUND_LINES); } while (i === last && ROUND_LINES > 1);
-    last = i; const a = new Audio(base + 'round_start_0' + i + '.ogg'); a.volume = .85; a.play().catch(() => {});
+    last = i; play('round_start_0' + i, ROUND_LINE_GAIN);
   };
   host.on('start', () => { clearTimeout(timer); timer = setTimeout(line, 1500); });
   host.on('roundEnd', () => { clearTimeout(timer); timer = setTimeout(line, 4000); });
