@@ -141,11 +141,16 @@ export class Enemies {
         else{
           const next=z.root.position.clone().addScaledVector(delta,Math.min(1,z.speed*dt/horizontal));
           for(const other of this.list){if(other===z||other.state==='barricade')continue;const sep=next.clone().sub(other.root.position);sep.y=0;const d=sep.length();if(d<29&&d>.01)next.addScaledVector(sep,(29-d)/d*dt*2);}
-          const safe=this.world.closest(next,{x:22,y:36,z:22});
+          let safe=this.world.closest(next,{x:22,y:36,z:22});
+          const gain=q=>horizontal-Math.hypot(q.x-target.x,q.z-target.z),want=Math.min(horizontal,z.speed*dt);
+          if(safe&&gain(safe)<want*.5)   // the snap held it on the ledge it stands on (a curb 15 above the street is the nearest polygon in 3D, Nuketown's spawn_1): try the surface a step below or above
+            for(const dy of [-24,24]){const q=this.world.closest({x:next.x,y:next.y+dy,z:next.z},{x:22,y:16,z:22});if(q&&gain(q)>Math.max(gain(safe),want*.5)&&Math.abs(q.y-z.root.position.y)<30){safe=q;break;}}
           if(safe&&safe.distanceTo(next)<38){z.root.position.copy(safe);z.blockT=0;}
           else{   // the straight step leaves the navmesh (a doorway only a few cells wide): after a moment hop to the path point
             z.blockT=(z.blockT??0)+dt;
-            if(z.blockT>.5&&horizontal<130){
+            const on=z.blockT>.3&&horizontal>=130&&this.world.closest(z.root.position,{x:80,y:60,z:80});   // standing off the navmesh (a spawn point beside it, Nuketown's spawn_16 34 away): walk onto it
+            if(on&&Math.hypot(on.x-z.root.position.x,on.z-z.root.position.z)>8&&(!walls||this.walkClear(z.root.position,on))){const d=on.clone().sub(z.root.position);z.root.position.addScaledVector(d,Math.min(1,z.speed*dt/d.length()));}
+            else if(z.blockT>.5&&horizontal<130){
               if(!walls||this.walkClear(z.root.position,target)){z.root.position.copy(target);z.pathIndex++;}
               else if((z.wallHits=(z.wallHits??0)+1)<2)z.repath=0;   // a wall between: plan again from here
               else{z.wallHits=0;this.hopOver(z,target,dt);}   // the same corner again (a low wall the navmesh steps over): climb it

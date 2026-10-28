@@ -12,6 +12,7 @@
 
 const n = v => [v].flat().filter(Boolean);
 const mq = L => L.malibu?.()?.quests?.flags?.();   // Malibu Drive's quest flags (malibu-drive/quests.js)
+const nt = L => globalThis.kino?.nuketown?.state?.();   // Nuketown's quest state (nuketown/mod.js)
 const at = (L, name) => { const k = L.malibu?.()?.kit, e = k?.one(name); return e ? [k.center(e)] : []; };   // a Malibu entity's spot
 const bowStage = (L, el) => {   // Der Eisendrache bow quest -> steps done: start, arrow, its own steps, place, souls, take
   const s = L.castle?.bows?.state()?.[el], Q = L.castle?.bows?.sites?.[el]; if (!s || !Q) return 0;
@@ -238,6 +239,28 @@ export const JOURNAL = [
     ] },
     { id: 'jail', name: 'The police jail', kind: 'MAP QUEST', progress: L => mq(L)?.cellOpen ? 1 : 0, steps: [
       { title: 'The key', how: 'One of three keys around the station opens the cell (it closes with another use, and the key comes back after a round).', where: L => L.prompts(/Pick up the key|Cell door/).slice(0, 2) },
+    ] },
+  ] },
+  { map: 'nuketown', title: 'Nuketown', quests: [
+    { id: 'nt-pap', name: 'Into the lab', kind: 'MAIN QUEST', progress: L => { const s = nt(L); if (!s) return 0;
+      return s.pap ? 6 : s.placed || s.skull ? 5 : s.elevator ? 4 : s.tools.every(t => t.got) && s.power ? 3 : s.power ? 2 : s.bunker ? 1 : 0; }, steps: [
+      { title: 'The transformers', how: 'Shoot the three transformers out in the streets: with all three blown, the bunker door swings open onto the lab.', where: L => nt(L)?.transformers ?? [] },
+      { title: 'The power', how: 'Down in the lab, pull the second lever first, then the power switch.', where: L => nt(L)?.lever2 ? L.power() : L.prompts(/Pull the lever/) },
+      { title: 'The tools', how: 'Pick up the screwdriver, the wire cutters and the hammer lying around the lab.', where: L => L.prompts(/^Take the (screwdriver|wire cutters|hammer)/) },
+      { title: 'The panels', how: 'With the power on, repair the three panels of the key elevator, each with its own tool: the elevator lifts the skull key out of the pit.', where: L => L.prompts(/^Repair the panel/) },
+      { title: 'The skull key', how: 'Take the skull from the elevator.', where: L => L.prompts(/Take the skull/) },
+      { title: 'Hell', how: 'Place the skull at the sealed alcove in hell: a skull rises for 20 s, then the books and wall in front of Pack-a-Punch fall.', where: L => { const s = nt(L); return s?.placed ? [s.papAt] : L.prompts(/Place the skull/); } },
+    ] },
+    { id: 'nt-perks', name: 'Falling perks', kind: 'MAP QUEST', steps: [
+      ...[['specialty_quickrevive', 'Quick Revive', 'Its trigger covers the spawn.'], ['specialty_rof', 'Double Tap', 'Walk into its trigger.'],
+        ['specialty_fastreload', 'Speed Cola', 'Walk into its trigger.'], ['specialty_additionalprimaryweapon', 'Mule Kick', 'Walk into its trigger (a small one).'],
+        ['specialty_flakjacket', 'PhD Flopper', 'Walk into its trigger.'], ['specialty_deadshot', 'Deadshot', 'Walk into its trigger (a small one).']]
+        .map(([perk, name, how]) => ({ title: name, how: `${how} The machine is called in: 10 s later it falls burning from the sky onto its crate pile (one at a time; the others wait their turn).`,
+          done: L => !!nt(L)?.perks.find(d => d.perk === perk)?.landed,
+          where: L => { const d = nt(L)?.perks.find(d => d.perk === perk); return d && !d.called ? [d.at] : []; } })),
+    ] },
+    { id: 'nt-free-perk', name: 'The closet', kind: 'SIDE EGG', steps: [
+      { title: 'A free perk', how: 'A perk bottle waits in the closet beside the yellow house\'s back: drink it.', done: L => !!nt(L)?.freePerk, where: L => { const s = nt(L); return s && !s.freePerk ? [s.freePerkAt] : []; } },
     ] },
   ] },
 ];

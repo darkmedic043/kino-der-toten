@@ -151,6 +151,74 @@
     "model": "terminal_booth_compact.glb",
     "note": "the driveway (start zone): against the low white wall on the roundabout's north side, facing the Bifrost landing (the summon pad is 196 away). The driveway has no tall walls; found by a scan for low walls (10 and 22 high) with 80 clear in front"
    }
+  ],
+  "nuketown": [
+   {
+    "position": [
+     -634,
+     1706,
+     -846
+    ],
+    "yaw": -20,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "the green house, ground floor: on the back room's wood-trimmed wall, facing the front (the green door is 220 away). Found by a flat-wall scan (collision and rendered wall agree within 6 over 54 wide and 100 high, level floor, 110+ clear in front, no prompt, window, perk spot or box within 110); light: false as on Der Eisendrache (each booth light costs every pixel)"
+   },
+   {
+    "position": [
+     842,
+     1688,
+     -402
+    ],
+    "yaw": 105,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "the yellow house, ground floor: on the kitchen wall, facing the front room (its doors are 220 away). Found by a flat-wall scan (collision and rendered wall agree within 6 over 54 wide and 100 high, level floor, 110+ clear in front, no prompt, window, perk spot or box within 110); light: false as on Der Eisendrache (each booth light costs every pixel)"
+   },
+   {
+    "position": [
+     -727,
+     1699,
+     -484
+    ],
+    "yaw": -20,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "the green house's front yard: on its green siding, facing the street (the nearest window is 145 away). Found by a flat-wall scan (collision and rendered wall agree within 6 over 54 wide and 100 high, level floor, 110+ clear in front, no prompt, window, perk spot or box within 110); light: false as on Der Eisendrache (each booth light costs every pixel)"
+   },
+   {
+    "position": [
+     876,
+     1689,
+     1296
+    ],
+    "yaw": 180,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "the back yard behind the hedge: on the white house's siding, facing the yard. Found by a flat-wall scan (collision and rendered wall agree within 6 over 54 wide and 100 high, level floor, 110+ clear in front, no prompt, window, perk spot or box within 110); light: false as on Der Eisendrache (each booth light costs every pixel)"
+   },
+   {
+    "position": [
+     -1818,
+     1385,
+     -1067
+    ],
+    "yaw": -65,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "the bunker lab, the first room down the bunker stairs, in the wall's shallow alcove (11 deep, about 75 wide). Moved 100 along the wall from the scan's first pick, where a corrugated metal sheet leaning on the wall (a BatchedMesh instance, hidden from far away by instance culling) held the booth 20 off the wall. Found by a flat-wall scan (collision and rendered wall agree within 6 over 54 wide and 100 high, level floor, 110+ clear in front, no prompt, window, perk spot or box within 110); light: false as on Der Eisendrache (each booth light costs every pixel)"
+   },
+   {
+    "position": [
+     -2222,
+     1386,
+     -122
+    ],
+    "yaw": -20,
+    "model": "terminal_booth_compact.glb",
+    "light": false,
+    "note": "the bunker lab, the room with the wire cutters (on its two-tone wall, 250 from them). Found by a flat-wall scan (collision and rendered wall agree within 6 over 54 wide and 100 high, level floor, 110+ clear in front, no prompt, window, perk spot or box within 110); light: false as on Der Eisendrache (each booth light costs every pixel)"
+   }
   ]
  }
 }

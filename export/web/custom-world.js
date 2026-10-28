@@ -271,9 +271,10 @@ export class CustomWorld {
     }
     // The upstream Mystery Box reads its locations from map entities, so each
     // BOX marker gets the same stand-in entities Kino's boxes have.
+    // A map entry's boxYaw (degrees) turns every box, like perkYaw the machines (Nuketown: both 270).
     const boxes=markers.filter(m=>m.type==='BOX');
     for(const [i,m] of boxes.entries()){
-      const prefix='custom_box_'+i,group=new THREE.Group();group.position.copy(m.position);group.rotation.y=m.yaw+FACE;this.scene.add(group);
+      const prefix='custom_box_'+i,group=new THREE.Group();group.position.copy(m.position);group.rotation.y=m.yaw+FACE+(entry.boxYaw??0)*Math.PI/180;this.scene.add(group);
       const location={id:prefix,kind:'box',targetname:'treasure_chest_use',script_noteworthy:prefix,start:m.arg.startsWith('start')||!!m.extras.start,prefix,position:m.position.clone().addScaledVector(up,22).toArray(),group};
       this.boxLocations.push(location);this.interactions.push(location);
       this.data.entities.push({id:prefix+'_org',targetname:prefix+'_org',position:m.position.clone().addScaledVector(up,3).toArray(),yaw:group.rotation.y+Math.PI/2},{id:prefix+'_lid',targetname:prefix+'_lid'});
@@ -281,7 +282,7 @@ export class CustomWorld {
         const [box,lid,rubble]=await Promise.all([loadModel(models.zombie_treasure_box),loadModel(models.zombie_treasure_box_lid),loadModel(models.zombie_coast_bearpile)]);
         if(box)group.add(box);
         const lidRoot=lid??new THREE.Group();lidRoot.position.set(0,18,12);group.add(lidRoot);this.entities.set(prefix+'_lid',lidRoot);
-        location.box=group;location.rubble=rubble;if(rubble){rubble.position.copy(m.position);rubble.rotation.y=m.yaw;this.scene.add(rubble);}
+        location.box=group;location.rubble=rubble;if(rubble){rubble.position.copy(m.position);rubble.rotation.y=group.rotation.y-FACE;this.scene.add(rubble);}
       })());
     }
     this.buildTraps(markers,place,tasks);this.buildTeleporters(markers);this.buildEggs(markers);

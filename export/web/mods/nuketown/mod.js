@@ -13,11 +13,13 @@
 //     opens brady) and its round-start lines (sounds/round_start_0N.ogg, ripped with the map so git-ignored).
 //   - Falling perks (perks.js): six machines come down from the sky once called, onto crate piles.
 //   - The map's own zombies (characters.js): BO2 Nuketown's hazmat, soldier and civilian zombies.
+//   - Tab tiles (tab.js) and the journal's Nuketown quests (journal/quests.js) read kino.nuketown.state().
 import * as THREE from 'three';
 import { CollisionWorld } from '../../collision-world.js';
 import { setupAtmosphere } from './atmosphere.js';
 import { setupPerkDrops, mapSound } from './perks.js';
 import { setupZombies } from './characters.js';
+import { setupTab } from './tab.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const DEG = Math.PI / 180;
@@ -25,6 +27,9 @@ const LEVER2 = { at: V(-2226, 1446, -1471), yaw: 27.8 };
 const GENERATOR_COUNT = 3;
 // the door swings from its entity origin to bunker_door_moveto (yaw 340 -> 128.3); its clip is a box in entities.json
 const BUNKER = { origin: V(-1383, 1706, -1232), to: V(-1280, 1706, -1432), turn: (128.304 - 340 + 360) * DEG, clip: [[-1442, 1695, -1256], [-1369, 1945, -1224]], time: 2.2 };
+// the shaft behind the bunker door drops 306 units into the lab tunnel (no ladder in the original): a landing at its
+// foot takes no fall damage
+const SHAFT = [[-1440, 1370, -1345], [-1340, 1420, -1240]];
 const TOOLS = [
   { node: 'tool1', name: 'screwdriver', at: V(-1528, 1381, 703), panel: V(-1390, 1380, 772) },
   { node: 'tool2', name: 'wire cutters', at: V(-1943, 1384, -3), panel: V(-1667, 1380, 840) },
@@ -181,7 +186,7 @@ function setupQuest(api) {
     const loot = globalThis.kino?.loot; if (!loot?.spawn) return;
     if (perkItem) { try { loot.remove(perkItem); } catch {} perkItem = null; }
     const perk = loot.freePerk?.(); if (!perk) return;
-    perkItem = loot.spawn('perk', FREE_PERK.clone(), { id: perk.id, life: 1e9, onPick: () => { perkItem = null; } });
+    perkItem = loot.spawn('perk', FREE_PERK.clone(), { id: perk.id, life: 1e9, onPick: () => { perkItem = null; setFlag('free_perk'); } });
   };
   const zoneTick = () => {
     const active = world.activeZones?.(session); if (!active) return;
@@ -199,6 +204,7 @@ function setupQuest(api) {
   };
   reset();
   host.on('reset', reset);
+  host.on('fall', e => { const p = e.position; if (SHAFT[0].every((lo, a) => lo <= p.getComponent(a) && p.getComponent(a) <= SHAFT[1][a])) e.amount = 0; });
   host.on('start', () => { placePerk(); });
   host.on('update', dt => {
     const s = session;
@@ -224,7 +230,17 @@ function setupQuest(api) {
   try { perks = setupPerkDrops(api, { nodesOf, show }); } catch (e) { console.warn('[nuketown] perks', e); }
   const found = { lever: lever.length, generators: genGroups.length, bunkerDoor: bunkerDoor.length, tools: tools.map(t => t.nodes.length), elevator: elevator.length, elevatorDoor: elevatorDoor.length, papSkull: papSkull.length, papDoor: papDoor.length, power: !!power, crates: perks?.drops.map(d => d.crateNodes.length) };
   console.log('[nuketown] quest nodes', JSON.stringify(found));
-  globalThis.kino && (globalThis.kino.nuketown = { st, found, setBunker, setElevator, setSkull, openPap, placePerk, reset, perks });
+  // the quest's progress for the Tab tiles (tab.js) and the journal (journal/quests.js); `at` fields are marker spots
+  const state = () => ({
+    lever2: flag('lever2'), power: !!session.power, lever: LEVER2.at,
+    generators: st.generators, generatorCount: GENERATOR_COUNT, bunker: st.generators >= GENERATOR_COUNT, transformers: genGroups.filter(g => !g.down).map(g => g.centre),
+    tools: tools.map(t => ({ name: t.name, at: t.at, panel: t.panel, got: flag('got_' + t.node), fixed: flag('fixed_' + t.node) })),
+    elevator: flag('elevator'), skull: flag('skull'), placed: flag('placed'), pap: !world.papLocked, papAt: PAP.trig,
+    freePerk: flag('free_perk'), freePerkAt: FREE_PERK,
+    perks: perks?.drops.map(d => ({ perk: d.perk, called: d.called, landed: d.landed, at: d.at ?? V((d.box[0][0] + d.box[1][0]) / 2, d.box[0][1], (d.box[0][2] + d.box[1][2]) / 2) })) ?? [],
+  });
+  globalThis.kino && (globalThis.kino.nuketown = { st, found, state, setBunker, setElevator, setSkull, openPap, placePerk, reset, perks });
+  try { setupTab(api, state); } catch (e) { console.warn('[nuketown] tab', e); }
 }
 
 // the four round-start lines: at the first round and a few seconds after every round end

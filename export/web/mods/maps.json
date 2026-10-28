@@ -178,12 +178,14 @@
         "explore"
       ],
       "dir": "mods/maps/nuketown/",
-      "model": "nuketown.glb?v=4",
+      "model": "nuketown.glb?v=8",
       "scale": 1,
       "background": "#425a62",
       "exposure": 1.0,
       "fog": 0.00045,
       "nearbySpawns": true,
+      "perkYaw": 270,
+      "boxYaw": 270,
       "stairSmoothing": true,
       "player": {
         "slopeStick": true

@@ -63,8 +63,9 @@ def read_obj(path):
 PLACEHOLDER = {'blank_override', '$white', 'white'}
 
 class Builder:
-    def __init__(self, dump, max_tex):
+    def __init__(self, dump, max_tex, mod_dump=None):
         self.dump, self.max_tex = pathlib.Path(dump), max_tex
+        self.mod_dump = mod_dump   # cfg 'modDump': the mod.ff dump, searched after the map's for materials and images
         self.bin = bytearray(); self.views, self.accessors = [], []
         self.images, self.textures, self.materials, self.meshes, self.nodes = [], [], [], [], []
         self.tex_index, self.mat_index = {}, {}
@@ -78,6 +79,8 @@ class Builder:
             # terrain blends (`*11n_7n`: two layers mixed, sometimes with a leading comma) are dumped under
             # materials/generated/ with `*` as `_`; their first colorMap is the base layer
             path = self.dump / 'materials' / 'generated' / (name.lstrip(',').replace('*', '_') + '.json')
+        if not path.exists() and self.mod_dump:
+            path = self.mod_dump / 'materials' / (name + '.json')
         info = {'image': None, 'alpha': 'OPAQUE', 'layer': None}
         if not path.exists():
             return info
@@ -115,6 +118,8 @@ class Builder:
         if image in self.tex_index:
             return self.tex_index[image]
         src = self.dump / 'images' / (image + '.dds')
+        if not src.exists() and self.mod_dump:
+            src = self.mod_dump / 'images' / (image + '.dds')
         idx = None
         if src.exists():
             out = self.tmp / (re.sub(r'[^A-Za-z0-9_.-]', '_', image) + '.webp')
@@ -326,7 +331,11 @@ def main():
             if fit:
                 s['vt'][k] = tuple(f[0] * x + f[1] * y + f[2] for f in fit)
         print(f"clipped {s['mat']} to the map footprint")
-    b = Builder(dump, max_tex)
+    mod_dump = (dump / cfg['modDump']).resolve() if cfg.get('modDump') else None
+    def model_glb(name):   # the map's model, else the mod.ff's (models only scripts use, e.g. a setmodel swap)
+        p = dump / 'model_export' / (name + '_lod0.glb')
+        return mod_dump / 'model_export' / (name + '_lod0.glb') if not p.exists() and mod_dump else p
+    b = Builder(dump, max_tex, mod_dump)
     out.mkdir(parents=True, exist_ok=True)
 
     # zones: <zone>_spawners_rise structs. 'start_zone' is 'start'. cfg 'compactZones': ids without the zone_ prefix and
@@ -557,7 +566,11 @@ def main():
     models = {e['targetname']: e for e in ents if e.get('classname') == 'script_model' and e.get('targetname')}
     def site(e):  # the machine model the trigger points at, else the trigger
         m = models.get(e.get('target', ''))
-        return (vec((m or e)['origin']), vec((m or e).get('angles'))[1])
+        a = vec((m or e).get('angles'))
+        # WaW's machines face their local -Y (the trigger and jingle origin sit there; maps.json perkYaw 270 turns the
+        # engine's machines to match); BO1 ports stood up by a roll of 90 (Nuketown's Mule Kick, Deadshot, PhD,
+        # Stamin-Up) face local +X, 90 degrees further round
+        return (vec((m or e)['origin']), a[1] + (90 if m and abs(abs(a[2]) - 90) < 10 else 0))
     for e in ents:
         t = e.get('targetname')
         if t == 'weapon_upgrade' and e.get('zombie_weapon_upgrade') in WEAPON_MAP:
@@ -584,9 +597,11 @@ def main():
             prims = load_static_glb(b, path, inst, flip, skinned=True)
             if prims:
                 b.add_mesh_node('prop_' + e['model'], prims)
+    # cfg 'entitySwap' {targetname: model}: the model a level script setmodel()s onto it at load (Nuketown's truck_replace,
+    # whose placed low LOD has broken UVs, becomes nuketown_big_truck from the mod.ff)
     for e in ents:
         if e.get('classname') == 'script_model' and e.get('targetname') in set(cfg.get('entityProps', [])):
-            path = dump / 'model_export' / (e['model'] + '_lod0.glb')
+            path = model_glb(cfg.get('entitySwap', {}).get(e['targetname'], e['model']))
             if not path.exists():
                 continue
             R = rot(vec(e.get('angles')))
@@ -918,7 +933,7 @@ def link_obstacles(dump, obj_base, segs, band=90, reach=2, overhead=45):
         out[n] = best
     return out
 
-def clipmap_collision(cm, keep, flip, col_mesh, clip_nav=False):
+def clipmap_collision(cm, keep, flip, col_mesh, clip_nav=False, holes=()):
     """COL_world (stops the player and shapes the navmesh): solid and glass brushes, the terrain, the colliding static
     models. CLIP_world: player clip, with or without monster clip (the player only: bullets and zombies pass, as in the
     game, so zombies coming over the driveway's edge can be shot). PCOL_vehicles: cars (the player and bullets, not the
@@ -1030,6 +1045,10 @@ def clipmap_collision(cm, keep, flip, col_mesh, clip_nav=False):
         car = bool(VEHICLE.search(sm['model']) or re.search(r'semi|police|fire_truck|news_van|pickup|sportscar|sedan|_cart', sm['model'], re.I))   # _cart: Malibu's metal carts parked across the city2 doorway
         for pts, tris in surfs:
             placed = [[o[r] + sum(M[r][k] * v[k] for k in range(3)) for r in range(3)] for v in pts]
+            if holes:   # cfg collisionHoles [[min], [max]] (CoD): drop the triangles centred inside (Nuketown's bunker
+                # model has a simplified hull sealing its doorway; the original walks through it to the lab shaft)
+                inside = lambda c: any(all(lo[a] <= c[a] <= hi[a] for a in range(3)) for lo, hi in holes)
+                tris = [t for t in tris if not inside([sum(placed[i][a] for i in t) / 3 for a in range(3)])]
             add(VP if car else CP, VT if car else CT, placed, [(a, d, c) for a, c, d in tris] if mirrored else tris)
         counts['vehicles' if car else 'static models'] += 1
     col_mesh('COL_world', CP, CT)
@@ -1106,7 +1125,7 @@ def instanced_props(b, dump, obj_base, cfg, flip, world_surfaces, ents, brush):
     if cm_path.exists() and cfg.get('clipCollision', True):
         # the game's own collision (the clipMap, dumped by .tools/oat/ClipMapDumperT4.cpp): exact where the name
         # heuristics below guess
-        clipmap_collision(json.load(open(cm_path)), inside if areas else (lambda x, y: True), flip, col_mesh, cfg.get('clipNav', False))
+        clipmap_collision(json.load(open(cm_path)), inside if areas else (lambda x, y: True), flip, col_mesh, cfg.get('clipNav', False), cfg.get('collisionHoles', ()))
         return instances
     for s in world_surfaces:
         if SKIP_MATERIAL.search(s['mat']) or re.search(r'water|decal', s['mat'], re.I):   # terrain stays (its materials are named grass)

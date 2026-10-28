@@ -45,6 +45,51 @@ const SWAP=.25;
 const LIGHT_CLAMP='3.2';
 // Light beams live in their own scene, drawn by the volumetric pass (setupPost).
 const volScene=new THREE.Scene();
+// Volumetric beams: each beam is a slightly oversized cone drawn back faces
+// only; for every pixel the shader marches the view ray through the cone and
+// integrates a smooth density (Gaussian across the beam, fading along it,
+// stirred by drifting noise that reads as dust in the light), stopping at the
+// scene depth so beams end softly on walls and floors. There is no visible
+// surface, so no edge lines or rims, and it works from inside a beam.
+const beamMaterial=()=>new THREE.ShaderMaterial({transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,side:THREE.BackSide,
+  uniforms:{color:{value:new THREE.Color()},strength:{value:0},time:{value:0},apex:{value:new THREE.Vector3()},axis:{value:new THREE.Vector3()},
+    len:{value:1},rTop:{value:1},rBot:{value:1},depthTex:{value:null},resolution:{value:new THREE.Vector2(1,1)},near:{value:1},far:{value:1},camForward:{value:new THREE.Vector3()}},
+  vertexShader:`varying vec3 vWorld;void main(){vec4 wp=modelMatrix*vec4(position,1.);vWorld=wp.xyz;gl_Position=projectionMatrix*viewMatrix*wp;}`,
+  fragmentShader:`#include <packing>
+    uniform vec3 color,apex,axis,camForward;uniform float strength,time,len,rTop,rBot,near,far;uniform sampler2D depthTex;uniform vec2 resolution;varying vec3 vWorld;
+    float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+    float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
+      return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+                 mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
+    void main(){
+      if(strength<=0.)discard;
+      vec3 toFrag=vWorld-cameraPosition;float tExit=length(toFrag);vec3 rd=toFrag/tExit;
+      float d=texture2D(depthTex,gl_FragCoord.xy/resolution).x;
+      float sceneT=d>=1.?1e9:-perspectiveDepthToViewZ(d,near,far)/max(dot(rd,camForward),1e-3);
+      float tEnd=min(tExit,sceneT),tStart=max(0.,tExit-(len+2.5*rBot));
+      if(tEnd<=tStart)discard;
+      float jitter=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715)))+time*.61803);
+      const int STEPS=28;float stepL=(tEnd-tStart)/float(STEPS),acc=0.;
+      for(int i=0;i<STEPS;i++){
+        vec3 p=cameraPosition+rd*(tStart+(float(i)+jitter)*stepL),v=p-apex;float h=dot(v,axis);
+        if(h<0.||h>len)continue;float u=h/len,R=mix(rTop,rBot,u),q=length(v-axis*h)/R;if(q>1.3)continue;
+        float across=exp(-q*q*4.2),along=smoothstep(0.,.12,u)*(1.-smoothstep(.55,1.,u))/(1.+1.4*u);
+        float dust=.55+.9*noise(p*.018+vec3(0.,time*.05,time*.02))*noise(p*.05-vec3(time*.03,0.,0.));
+        acc+=across*along*dust*stepL;}
+      // Forward scattering: dusty light glows brightest when you look back toward its source.
+      float phase=mix(.7,1.45,pow(max(-dot(rd,axis),0.),4.));
+      gl_FragColor=vec4(color*strength*phase*acc/max(rBot*.7,12.),1.);}`});
+// One volumetric beam (no dust): a cone from `top` along `dir`, `len` long, radius `tip` at the top and `r` at the end.
+// Shared by Kino's fixtures and other maps' lights (window.kino.volumeBeam, e.g. mods/nuketown/atmosphere.js); the
+// caller drives uniforms.strength / time and the mesh's visibility, and removes it from volScene when done.
+function beamCone(top,dir,len,r,color,{tip=.5,warmth=.3}={}){
+  tip=Math.min(tip,r*.9);const axis=dir.clone().normalize();
+  // Bounding cone, a little larger than the beam so the soft falloff fits inside.
+  const g=new THREE.CylinderGeometry(tip*1.3+4,r*1.35,len*1.04,24,1,false).translate(0,-len*.52,0);
+  const mesh=new THREE.Mesh(g,beamMaterial());mesh.position.copy(top);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),axis);
+  const u=mesh.material.uniforms;u.color.value.copy(color).lerp(new THREE.Color('#fff'),warmth);u.apex.value.copy(top);u.axis.value.copy(axis);u.len.value=len;u.rTop.value=tip;u.rBot.value=r;
+  volScene.add(mesh);return mesh;
+}
 let VM=null;   // the first-person weapon's lights (set up in setup())
 const FIXTURES={
   zombie_theater_chandelier1_off:{color:'#ffd49a',intensity:14,radius:1700,drop:120,power:true,spot:{angle:.95,down:true,beam:.9}},
@@ -62,6 +107,7 @@ const quality=()=>Math.min(coarse?1:3,THREE.MathUtils.clamp(Math.round(settings.
 export default async function setup(api){
   const {scene,camera,session,data,host,renderer}=api;
   const kino=!api.map||api.map.id==='kino';   // the engine passes every map's entry, Kino's included
+  if(window.kino)window.kino.volumeBeam=beamCone;   // for other maps' lights (drawn by the volumetric pass, Medium and up)
   // Light fixtures placed in the static map (chandeliers, sconces, hanging lamps,
   // mirror bulbs, stage lamps...), baked from kino.gltf's nodes.
   const fixtures=kino?await fetch(new URL('fixtures.json',import.meta.url)).then(r=>r.ok?r.json():[]).catch(()=>[]):[];
@@ -379,50 +425,12 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
 
   // Light beams: soft additive cones with drifting dust.
   const beams=[];
-  // Volumetric beams: each beam is a slightly oversized cone drawn back faces
-  // only; for every pixel the shader marches the view ray through the cone and
-  // integrates a smooth density (Gaussian across the beam, fading along it,
-  // stirred by drifting noise that reads as dust in the light), stopping at the
-  // scene depth so beams end softly on walls and floors. There is no visible
-  // surface, so no edge lines or rims, and it works from inside a beam.
-  const beamMaterial=()=>new THREE.ShaderMaterial({transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,side:THREE.BackSide,
-    uniforms:{color:{value:new THREE.Color()},strength:{value:0},time:{value:0},apex:{value:new THREE.Vector3()},axis:{value:new THREE.Vector3()},
-      len:{value:1},rTop:{value:1},rBot:{value:1},depthTex:{value:null},resolution:{value:new THREE.Vector2(1,1)},near:{value:1},far:{value:1},camForward:{value:new THREE.Vector3()}},
-    vertexShader:`varying vec3 vWorld;void main(){vec4 wp=modelMatrix*vec4(position,1.);vWorld=wp.xyz;gl_Position=projectionMatrix*viewMatrix*wp;}`,
-    fragmentShader:`#include <packing>
-      uniform vec3 color,apex,axis,camForward;uniform float strength,time,len,rTop,rBot,near,far;uniform sampler2D depthTex;uniform vec2 resolution;varying vec3 vWorld;
-      float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
-      float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
-        return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
-                   mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
-      void main(){
-        if(strength<=0.)discard;
-        vec3 toFrag=vWorld-cameraPosition;float tExit=length(toFrag);vec3 rd=toFrag/tExit;
-        float d=texture2D(depthTex,gl_FragCoord.xy/resolution).x;
-        float sceneT=d>=1.?1e9:-perspectiveDepthToViewZ(d,near,far)/max(dot(rd,camForward),1e-3);
-        float tEnd=min(tExit,sceneT),tStart=max(0.,tExit-(len+2.5*rBot));
-        if(tEnd<=tStart)discard;
-        float jitter=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715)))+time*.61803);
-        const int STEPS=28;float stepL=(tEnd-tStart)/float(STEPS),acc=0.;
-        for(int i=0;i<STEPS;i++){
-          vec3 p=cameraPosition+rd*(tStart+(float(i)+jitter)*stepL),v=p-apex;float h=dot(v,axis);
-          if(h<0.||h>len)continue;float u=h/len,R=mix(rTop,rBot,u),q=length(v-axis*h)/R;if(q>1.3)continue;
-          float across=exp(-q*q*4.2),along=smoothstep(0.,.12,u)*(1.-smoothstep(.55,1.,u))/(1.+1.4*u);
-          float dust=.55+.9*noise(p*.018+vec3(0.,time*.05,time*.02))*noise(p*.05-vec3(time*.03,0.,0.));
-          acc+=across*along*dust*stepL;}
-        // Forward scattering: dusty light glows brightest when you look back toward its source.
-        float phase=mix(.7,1.45,pow(max(-dot(rd,axis),0.),4.));
-        gl_FragColor=vec4(color*strength*phase*acc/max(rBot*.7,12.),1.);}`});
   const moteTexture=(()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d'),r=g.createRadialGradient(16,16,0,16,16,16);
     r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(.4,'rgba(255,255,255,.35)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,32,32);return new THREE.CanvasTexture(c);})();
   const dustTime={value:0};   // shared by every beam's dust shader
   function makeBeam(src,top,dir,len,r,color,strength,warmth=.3,tip=.5){
-    tip=Math.min(tip,r*.9);const axis=dir.clone().normalize();
-    // Bounding cone, a little larger than the beam so the soft falloff fits inside.
-    const g=new THREE.CylinderGeometry(tip*1.3+4,r*1.35,len*1.04,24,1,false).translate(0,-len*.52,0);
-    const mesh=new THREE.Mesh(g,beamMaterial());mesh.position.copy(top);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),axis);
-    const u=mesh.material.uniforms;u.color.value.copy(color).lerp(new THREE.Color('#fff'),warmth);u.apex.value.copy(top);u.axis.value.copy(axis);u.len.value=len;u.rTop.value=tip;u.rBot.value=r;
-    volScene.add(mesh);
+    tip=Math.min(tip,r*.9);
+    const mesh=beamCone(top,dir,len,r,color,{tip,warmth});
     const axisQ=mesh.quaternion.clone();
     // Dust drifting inside the beam.
     // Each mote drifts down the beam and around its axis as a function of time alone, so the vertex shader places it

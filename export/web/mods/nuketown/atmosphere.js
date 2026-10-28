@@ -33,8 +33,13 @@ const LOOK = {   // the UGX shots average sRGB (33, 48, 53): a teal-grey overcas
 };
 const FIRE = { range: 620, decay: 1.5, color: 0xff9c4e, intensity: 1500, pool: 6 };
 const LAMP = { range: 760, decay: 1.4, color: 0xcfe0ea, labColor: 0x9fdcea, intensity: 1100, labIntensity: 1600, pool: 4 };
-const GLOW = { lamp: { size: 90, color: [.8, .9, 1.0], gain: .75 }, lab: { size: 44, color: [.5, .9, 1.0], gain: 1.1 }, through: 300, throughLab: 30, pull: 30, pullLab: 10 };   // additive discs in the lit windows and on the lab's fixtures; depth-tested; pull: drawn this much toward the camera to clear the fixture; through: the line-of-sight fade still shows a disc when the ray is blocked within this many units of it (window frames, glass)
+const GLOW = { lamp: { size: 150, color: [.8, .9, 1.0], gain: .75 }, lab: { size: 90, color: [.5, .9, 1.0], gain: 1.1 }, core: 2.6, halo: .55, through: 300, throughLab: 30, pull: 30, pullLab: 10 };   // additive discs in the lit windows and on the lab's fixtures; depth-tested; pull: drawn this much toward the camera to clear the fixture; through: the line-of-sight fade still shows a disc when the ray is blocked within this many units of it (window frames, glass)
 // per fx note: flame sprite size, how hot (white core), sub-flames, smoke puffs, embers
+// light shafts through the haze (the lighting mod's volumetric cones, kino.volumeBeam; Medium and up): from the god-ray
+// markers (godray1: lit windows and rooms, aimed by the struct's angles) and down from the fixtures on walls and ceilings.
+// r: end radius per unit of length; far: hidden beyond this distance from the camera
+const BEAM = { window: { color: 0xc4dceb, strength: 1.6, r: .36, tip: 14, max: 340 }, lamp: { color: 0xd2e6f2, strength: 2, r: .5, tip: 16, max: 380 },
+  lab: { color: 0x9fdcea, strength: 2.4, r: .5, tip: 16, max: 360 }, far: 2600 };
 const KINDS = {   // kind: the mods/fx/flames.js kind (its glow and aspect)
   fire1: { kind: 'fire', size: 44, hot: 1, sub: 4, smoke: 6, embers: 8 }, fire_long: { kind: 'fire', size: 60, hot: 1, sub: 5, smoke: 7, embers: 10 }, fire2: { kind: 'fire', size: 50, hot: 1, sub: 4, smoke: 6, embers: 8 },
   hell_fire: { kind: 'fire', size: 72, hot: 1, sub: 6, smoke: 8, embers: 14 }, fire_pipe: { kind: 'torch', size: 24, hot: .9, sub: 2, smoke: 3, embers: 4 }, spawned_fire: { kind: 'fire', size: 54, hot: 1, sub: 4, smoke: 6, embers: 8 },
@@ -171,15 +176,17 @@ export function setupAtmosphere(api) {
       attribute float size, kind, occ; uniform float px; varying float vKind, vA;
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float d = max(20.0, -mv.z);
         vKind = kind; vA = (1.0 - smoothstep(900.0, 4000.0, d) * 0.8) * occ;
-        gl_PointSize = min(size * 640.0 * px / d, 220.0 * px);
+        gl_PointSize = min(size * 640.0 * px / d, 360.0 * px);
         // depth-tested, but drawn a little toward the camera so the disc clears the fixture it sits on
         float L = length(mv.xyz); mv.xyz *= max(L - min(mix(PULL_LAMP, PULL_LAB, kind), L * 0.5), 1.0) / L;
         gl_Position = projectionMatrix * mv; }`,
+    // a bulb, not a disc: a small hot core (over the bloom threshold, so the post chain flares it) in a halo that falls
+    // off like light scattered in fog (1 / (1 + r^2)) and fades out before the sprite's edge, so no rim shows
     fragmentShader: `uniform float flick; uniform vec3 cLamp, cLab; varying float vKind, vA;
       void main(){ vec2 p = (gl_PointCoord - 0.5) * 2.0; float r = length(p); if (r > 1.0) discard;
-        float a = pow(1.0 - r, 1.6) * vA, core = smoothstep(0.4, 0.0, r);
-        vec3 col = mix(cLamp, cLab * flick, vKind) * (a + core * 0.35);
-        gl_FragColor = vec4(col, a);
+        float core = exp(-r * r * 90.0) * ${GLOW.core.toFixed(2)}, halo = ${GLOW.halo.toFixed(2)} / (1.0 + r * r * 60.0) * (1.0 - smoothstep(0.45, 1.0, r));
+        vec3 col = mix(cLamp, cLab * flick, vKind) * (core + halo) * vA;
+        gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -190,7 +197,7 @@ export function setupAtmosphere(api) {
   // ---- light pools (fixed counts)
   const firePool = Array.from({ length: low ? 2 : FIRE.pool }, () => { const l = new THREE.PointLight(FIRE.color, 0, FIRE.range, FIRE.decay); l.position.set(0, -1e5, 0); l.userData.ph = Math.random() * 100; scene.add(l); return l; });
   const lampPool = Array.from({ length: low ? 2 : LAMP.pool }, () => { const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); scene.add(l); return l; });
-  const fires = [], lamps = [], glows = [];   // {p, lab}; glows: {p, kind, n?, vis, occ}
+  const fires = [], lamps = [], glows = [], shaftSrc = [], shafts = [];   // {p, lab}; glows: {p, kind, n?, vis, occ}
   // `dyn_lights` is the map's light-pool decal material (textured quads under every fixture, on floors, walls and
   // ceilings; there is no tube mesh, and the streetlight heads have no marker at all). Every cluster of its quads is a
   // lamp source; the wall- and ceiling-facing ones (the lab's panels and ceiling fixtures, a few porch lights) also
@@ -207,7 +214,10 @@ export function setupAtmosphere(api) {
       const q = seen.find(q => q.p.distanceTo(a) < 140); if (q) { q.n.add(nrm); q.k++; } else seen.push({ p: a.clone(), n: nrm.clone(), k: 1 });
     }
     for (const q of seen) { const lab = q.p.y < LAB_Y, n = q.n.divideScalar(q.k); if (n.lengthSq() > .01) n.normalize(); else n.set(0, 1, 0);
-      lamps.push({ p: q.p.clone().setY(q.p.y - 16), lab }); if (n.y < .4) glows.push({ p: q.p.clone().addScaledVector(n, 6), kind: lab ? 1 : 0, n, vis: 1, occ: 1 }); }
+      lamps.push({ p: q.p.clone().setY(q.p.y - 16), lab }); if (n.y >= .4) continue;
+      glows.push({ p: q.p.clone().addScaledVector(n, 6), kind: lab ? 1 : 0, n, vis: 1, occ: 1 });
+      // ceiling fixtures shine straight down, wall ones out and down
+      shaftSrc.push({ top: q.p.clone().addScaledVector(n, n.y < -.6 ? 4 : 10), dir: n.y < -.6 ? V3(0, -1, 0) : V3(n.x * .6, -1, n.z * .6), kind: lab ? 'lab' : 'lamp' }); }
   }
   // the pools glow cold and the lab's stutter (a world-y band: the outdoor decals share the merged material)
   const flickU = { value: 1 };
@@ -221,6 +231,22 @@ export function setupAtmosphere(api) {
     mat.customProgramCacheKey = () => 'nuketown-dyn-lights'; mat.needsUpdate = true;   // at load, before the warm pass compiles it
   }
   for (const m of lava) { m.emissive.setHex(0xff3c08); m.emissiveIntensity = 1.3; }
+
+  // ---- light shafts (once the fx structs are in): each runs to the first surface along its aim, up to BEAM.max
+  function buildShafts() {
+    const make = window.kino?.volumeBeam; if (!make || low || !world?.raycast) return;
+    const r = new THREE.Ray(), up = V3(0, 1, 0), seen = [];
+    for (const s of shaftSrc) {
+      const B = BEAM[s.kind], dir = s.dir.normalize(); let top = s.top;
+      if (s.ceiling) { const h = world.raycast(r.set(top, up), 0, 160); if (!h) continue; top = top.clone().setY(top.y + h.distance - 4); }   // lab lights hang under a fixture
+      if (seen.some(q => q.distanceTo(top) < 40)) continue; seen.push(top);
+      const hit = world.raycast(r.set(top.clone().addScaledVector(dir, 6), dir), 0, B.max), len = hit ? hit.distance + 6 : B.max;
+      if (len < 60) continue;
+      const mesh = make(top, dir, len, Math.max(B.tip * 1.5, len * B.r), new THREE.Color(B.color), { tip: B.tip, warmth: .1 });
+      mesh.name = 'nuketown_shaft'; mesh.visible = false; mesh.material.uniforms.strength.value = 0;
+      shafts.push({ mesh, B, lab: s.kind === 'lab', mid: top.clone().addScaledVector(dir, len / 2), len });
+    }
+  }
 
   // ---- the map's fx structs
   const dir = (map?.dir ?? '').replace(/\/?$/, '/');
@@ -238,10 +264,12 @@ export function setupAtmosphere(api) {
       if (r.class === 'script_struct' && r.name === 'fx') {
         if (KINDS[r.note]) addFire(o, r.note);
         else if (r.note === 'emb1') floating.push(V3(o[0], o[1] - 60, o[2]));   // embers hanging in the air
-        else if (r.note === 'godray1') { const lab = o[1] < LAB_Y; lamps.push({ p: V3(o[0], o[1] - 22, o[2]), lab }); glows.push({ p: V3(o[0], o[1] - 20, o[2]), kind: lab ? 1 : 0, vis: 1, occ: 1 }); }   // lit windows and the truck's lights
+        else if (r.note === 'godray1') {   // lit windows and rooms: a light and a shaft along the fx's aim (no disc: the marker floats mid-room)
+          const lab = o[1] < LAB_Y, [p, y] = (r.angles ?? [60, r.yaw ?? 0]).map(a => a * Math.PI / 180);
+          lamps.push({ p: V3(o[0], o[1] - 22, o[2]), lab }); shaftSrc.push({ top: V3(o[0], o[1], o[2]), dir: V3(Math.cos(p) * Math.cos(y), -Math.sin(p), -Math.cos(p) * Math.sin(y)), kind: lab ? 'lab' : 'window' }); }
         else if (r.note === 'lightning1') bolts.push(new THREE.Vector2(o[0], o[2]));
       } else if (r.name === 'spawned_fire') addFire(o, 'spawned_fire');
-      else if (r.light && o[1] < LAB_Y) { lamps.push({ p: V3(o[0], o[1], o[2]), lab: true }); glows.push({ p: V3(o[0], o[1], o[2]), kind: 1, vis: 1, occ: 1 }); }
+      else if (r.light && o[1] < LAB_Y) { lamps.push({ p: V3(o[0], o[1], o[2]), lab: true }); shaftSrc.push({ top: V3(o[0], o[1], o[2]), dir: V3(0, -1, 0), kind: 'lab', ceiling: true }); }
     }
     const gp = [], gs = [], gk = [], go = [];
     for (const g of glows) { gp.push(g.p.x, g.p.y, g.p.z); gs.push(g.kind ? GLOW.lab.size : GLOW.lamp.size); gk.push(g.kind); go.push(1); }
@@ -249,11 +277,12 @@ export function setupAtmosphere(api) {
     for (const p of floating) fire.add(p, 'fire', { size: 160, sub: 0, smoke: 0, glow: 0, embers: low ? 8 : 24, float: true });
     fire.build();
     if (gp.length) set(glow, { position: gp, size: [gs, 1], kind: [gk, 1], occ: [go, 1] });
-    S.counts = { ...fire.state(), glows: glows.length, fires: fires.length, lamps: lamps.length };
+    buildShafts();
+    S.counts = { ...fire.state(), glows: glows.length, fires: fires.length, lamps: lamps.length, shafts: shafts.length };
   }).catch(e => console.warn('[nuketown] atmosphere entities', e));
 
   // ---- per frame
-  const nukeV = new THREE.Vector2(), eye = new THREE.Vector3(), ray = new THREE.Ray(), gdir = new THREE.Vector3();
+  const nukeV = new THREE.Vector2(), eye = new THREE.Vector3(), ray = new THREE.Ray(), gdir = new THREE.Vector3(), _v = new THREE.Vector3();
   // line of sight to each glow: hidden behind a building or the lab's ceiling, kept when only glass or a frame is in the way
   const seeGlows = () => { if (!world?.raycast) return; for (const g of glows) { gdir.subVectors(g.p, eye); const d = gdir.length(); gdir.divideScalar(d || 1);
     const behind = g.n && gdir.dot(g.n) > 0; const hit = behind || d < 40 ? null : world.raycast(ray.set(eye, gdir), 0, d);
@@ -292,6 +321,12 @@ export function setupAtmosphere(api) {
     ashMat.uniforms.time.value = S.time; ashMat.uniforms.cam.value.copy(eye); ashMat.uniforms.px.value = pxv; ashMat.uniforms.fogColor.value.copy(fogC); ashMat.uniforms.fogDensity.value = fogD; ashMat.uniforms.flash.value = flash;
     fire.update(dt, { fog: scene.fog, flash });
     glowMat.uniforms.px.value = pxv; glowMat.uniforms.flick.value = S.flick;
+    for (const b of shafts) { const u = b.mesh.material.uniforms, near = b.mid.distanceTo(eye) < BEAM.far + b.len / 2; b.mesh.visible = near; if (!near) continue;
+      // inside a cone the view ray runs down its whole length and the beam blows out to white (a window shaft down the
+      // green house's stairwell): fade it out as the eye nears the axis, to 15% on it
+      const d = _v.subVectors(eye, u.apex.value), t = d.dot(u.axis.value), r = u.rTop.value + (u.rBot.value - u.rTop.value) * Math.min(1, Math.max(0, t / u.len.value));
+      const inside = t > -40 && t < u.len.value + 40 ? 1 - Math.min(1, Math.max(0, (d.addScaledVector(u.axis.value, -t).length() - r * .5) / (r + 40))) : 0;
+      u.time.value = S.time; u.strength.value = b.B.strength * (b.lab ? S.flick : 1) * (1 + flash * .6) * (1 - .85 * inside * inside * (3 - 2 * inside)); }
     // light pools
     if ((S.pick -= dt) <= 0) { S.pick = .5; pick(firePool, fires, 0); pick(lampPool, lamps, 0); for (const l of lampPool) l.color.setHex(l.userData.src?.lab ? LAMP.labColor : LAMP.color); seeGlows(); }
     const occA = glow.geometry.attributes.occ;
@@ -307,6 +342,6 @@ export function setupAtmosphere(api) {
   if (window.kino) window.kino.nukeAtmo = {
     state: () => ({ ...S.counts, pools: [firePool.length, lampPool.length], roof: !!roof, flash: S.flash, flick: S.flick, dyn: dyn.length, lava: lava.length, bolts: bolts.length }),
     lightning: () => { S.nextBolt = 0; }, set: (k, v) => { if (k in skyMat.uniforms) { const t = skyMat.uniforms[k].value; if (t?.set && Array.isArray(v)) t.set(...v); else skyMat.uniforms[k].value = v; } else if (k in LOOK) Object.assign(LOOK[k], v); },
-    LOOK, FIRE, LAMP, ASH, GLOW, mats: { skyMat, ashMat, glowMat }, fire, pools: { firePool, lampPool }, sources: { fires, lamps, glows },
+    LOOK, FIRE, LAMP, ASH, GLOW, BEAM, mats: { skyMat, ashMat, glowMat }, fire, pools: { firePool, lampPool }, sources: { fires, lamps, glows, shafts },
   };
 }

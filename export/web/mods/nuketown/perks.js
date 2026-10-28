@@ -68,7 +68,10 @@ export function setupPerkDrops(api, { nodesOf, show }) {
       if (d.it && !d.machine) {
         const at = d.it.position.clone().add(V(0, -40, 0));
         d.machine = scene?.children.find(o => !o.isLight && o.position.distanceToSquared(at) < 4) ?? null;
-        if (d.machine) { d.home = d.machine.position.clone(); d.machine.matrixAutoUpdate = true; if (!d.landed) d.machine.visible = false; }
+        if (d.machine) {
+          d.home = d.machine.position.clone(); d.machine.matrixAutoUpdate = true; if (!d.landed) d.machine.visible = false;
+          d.machine.rotation.y += Math.PI / 2;   // the original lands each machine at its struct's angles + (0, 90, 0)
+        }
       }
       if (!d.it || !d.machine) missing++;
     }
