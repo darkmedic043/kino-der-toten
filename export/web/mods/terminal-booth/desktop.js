@@ -3,7 +3,7 @@
 // perk in the game, whether or not this map has its machine (perks bought here work on any map).
 // openDesktop(opts) builds it once and shows it; Esc or LOG OFF closes.
 // EXFIL (bottom right, greyed out when no exfil window is open) shows the exfil status and calls it in.
-//   opts: {owned(perk), onMap(perk), needsPower(perk), power(), price(perk), points(), buy(perk) -> true | 'reason',
+//   opts: {owned(perk), perkGate() -> {held, need}, onMap(perk), needsPower(perk), power(), price(perk), points(), buy(perk) -> true | 'reason',
 //          exfil() -> status (mods/exfil), callExfil() -> true | 'reason', arsenal() -> status (mods/ammo-mods),
 //          buyMod(id) / upgradeMod() -> true | 'reason', onOpen(), onClose(), onApp(name)}
 // ARSENAL (under PERKS) sells ammo mods for the gun in hand once the power is on.
@@ -420,12 +420,15 @@ function build() {
     ? `<img class="art" src="${p.icon}" alt="" draggable="false" data-fallback="${p.fallback ?? ''}" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else this.replaceWith(Object.assign(document.createElement('div'),{className:'badge',style:'background:${p.color}',textContent:'${p.badge}'}))">`
     : `<div class="badge" style="background:${p.color}">${p.badge}</div>`;
   // why a perk can't be bought right now ('' when it can)
-  const blocked = p => opts.owned(p) ? 'owned' : !perkUnlocked(p) ? 'pass' : opts.needsPower(p) && !opts.power() ? 'power' : '';
+  // PERKS.EXE opens once you hold 4 perks from the machines (the map's machine count when it has fewer) (user, 2026-10-27)
+  const gate = () => opts.perkGate?.() ?? { held: 0, need: 0 }, gated = () => { const g = gate(); return g.held < g.need; };
+  const gateMsg = () => { const g = gate(); return `ACCESS DENIED · HOLD ${g.need} PERKS FIRST (${g.held}/${g.need}) · BUY THEM FROM THE MACHINES`; };
+  const blocked = p => opts.owned(p) ? 'owned' : gated() ? 'gate' : !perkUnlocked(p) ? 'pass' : opts.needsPower(p) && !opts.power() ? 'power' : '';
 
   function renderGrid() {
     keepScroll(grid).innerHTML = PERKS.map((p, i) => {
       const why = blocked(p);
-      return `<button class="tile ${why === 'power' || why === 'pass' ? 'locked' : ''} ${why === 'owned' ? 'owned' : ''}" data-i="${i}" title="${esc(p.name)}">${art(p)}<span class="tag">${why === 'power' ? 'NO POWER' : why === 'pass' ? 'MELON PASS' : ''}</span></button>`;
+      return `<button class="tile ${why === 'power' || why === 'pass' || why === 'gate' ? 'locked' : ''} ${why === 'owned' ? 'owned' : ''}" data-i="${i}" title="${esc(p.name)}">${art(p)}<span class="tag">${why === 'power' ? 'NO POWER' : why === 'pass' ? 'MELON PASS' : why === 'gate' ? 'LOCKED' : ''}</span></button>`;
     }).join('');
     for (const t of grid.children) {
       t.addEventListener('mouseenter', () => select(+t.dataset.i)); t.addEventListener('focus', () => select(+t.dataset.i));
@@ -435,10 +438,10 @@ function build() {
   function select(i) {
     shown = i; const p = PERKS[i], why = blocked(p), price = opts.price(p), short = !why && opts.points() < price;
     for (const t of grid.children) t.classList.toggle('on', +t.dataset.i === i);
-    const label = why === 'owned' ? 'OWNED' : why === 'pass' ? 'LOCKED · MELON PASS REWARD' : why === 'power' ? 'NEEDS POWER' : short ? 'NOT ENOUGH POINTS' : `BUY · ${price.toLocaleString()}`;
+    const label = why === 'owned' ? 'OWNED' : why === 'gate' ? `LOCKED · HOLD ${gate().need} PERKS (${gate().held}/${gate().need})` : why === 'pass' ? 'LOCKED · MELON PASS REWARD' : why === 'power' ? 'NEEDS POWER' : short ? 'NOT ENOUGH POINTS' : `BUY · ${price.toLocaleString()}`;
     detail.innerHTML = `<div class="head"><div class="big">${art(p)}</div><div>
         <h2>${esc(p.name.toUpperCase())}</h2><div class="blurb">${esc(p.blurb)}</div><div class="price">${price.toLocaleString()} PTS</div></div></div>
-      <button class="buy ${why === 'power' || why === 'pass' ? 'locked' : ''}" ${why || short ? 'disabled' : ''}>${label}</button>
+      <button class="buy ${why === 'power' || why === 'pass' || why === 'gate' ? 'locked' : ''}" ${why || short ? 'disabled' : ''}>${label}</button>
       <div class="status"><span>${opts.onMap(p) ? 'MACHINE ON THIS MAP' : 'NO MACHINE ON THIS MAP · TERMINAL ONLY'}</span></div>
       <h3>WHAT IT DOES</h3><ul>${p.effects.map(e => `<li>${esc(e)}</li>`).join('')}</ul>
       ${p.note ? `<div class="note">* ${esc(p.note)}</div>` : ''}`;
@@ -448,6 +451,7 @@ function build() {
   function buy(i) {
     const p = PERKS[i], why = blocked(p);
     if (why === 'owned') return say(`${p.name.toUpperCase()} ALREADY INSTALLED`, 'bad');
+    if (why === 'gate') return say(gateMsg(), 'bad');
     if (why === 'power') return say('ACCESS DENIED · RESTORE MAINS POWER', 'bad');
     if (why === 'pass') return say('LOCKED · UNLOCK IT IN THE MELON PASS (PASS TAB)', 'bad');
     const r = opts.buy(p);
@@ -468,7 +472,7 @@ function build() {
     if (name === 'exfil') { win.hidden = arWin.hidden = stWin.hidden = true; exState = ''; drawExfil(); exWin.hidden = false; $('.open').textContent = '[EXFIL.EXE]'; opts.onApp?.(name); return; }
     if (name !== 'perks') return;
     exWin.hidden = arWin.hidden = stWin.hidden = true;
-    say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
+    if (gated()) say(gateMsg(), 'bad'); else say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
     opts.onApp?.(name); grid.querySelector(`[data-i="${shown}"]`)?.focus({ preventScroll: true });
   }
   function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = tkWin.hidden = true; $('.open').textContent = ''; }
@@ -826,8 +830,9 @@ function build() {
     $('.pts').textContent = (opts.points() ?? 0).toLocaleString() + ' PTS';
     $('.clock').textContent = new Date().toTimeString().slice(0, 5);
     // the game runs underneath: redraw the shop when a drink finishes, the power comes on or the points change
-    const state = PERKS.map(p => blocked(p)).join() + opts.points();
-    if (!win.hidden && state !== lastState) { renderGrid(); select(shown); }
+    const state = PERKS.map(p => blocked(p)).join() + opts.points() + JSON.stringify(gate());
+    $('[data-app=perks]').classList.toggle('off', gated());
+    if (!win.hidden && state !== lastState) { const was = lastState.includes('gate'); renderGrid(); select(shown); if (gated()) say(gateMsg(), 'bad'); else if (was) say('> SELECT A PERK'); }
     lastState = state;
     drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory(); drawJournal(); drawRadio(); drawTasks();
     $('[data-app=stark]').classList.toggle('off', !opts.stark?.()?.unlocked);

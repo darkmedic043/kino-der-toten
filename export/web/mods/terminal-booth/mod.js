@@ -450,6 +450,7 @@ export default async function setup(api){
       desk=openDesktop({
         onMap:p=>onMap.has(p.id),
         owned:p=>!!session.perks?.has(p.id),
+        perkGate:()=>({held:session.perks?.size??0,need:Math.min(4,onMap.size)}),   // PERKS.EXE opens at 4 perks held
         needsPower:p=>p.id!==QR,
         price:priceOf,buy,
         exfil:()=>window.kino.exfil?.status(),callExfil:()=>window.kino.exfil?.start()??'Exfil is not installed',
