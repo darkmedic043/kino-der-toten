@@ -92,14 +92,17 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
   linkBtn.textContent='ENABLE DUALSENSE FEATURES';linkBtn.title='Adaptive triggers, light bar, player LEDs and rumble over WebHID. The browser remembers the choice.';
   (document.getElementById('open-settings')?.parentElement??document.getElementById('restart'))?.after(linkBtn);
   linkBtn.addEventListener('click',async e=>{e.stopPropagation();linkBtn.disabled=true;
-    const ok=await link.connect({interactive:true});linkBtn.disabled=false;
+    const ok=await link.connect({interactive:true});linkBtn.disabled=false;if(ok)try{localStorage.setItem('dsLinkOptIn','1');}catch{}
     api.toast?.(ok?'DualSense connected · adaptive triggers and light bar on':'DualSense not linked (Chrome, Edge or Rind needed; Linux needs hidraw access)',4);});
   link.onchange=on=>{pad.native=on;linkBtn.hidden=on||!showLinkButton();natKey='';renderHints();};
   // (not in split screen: WebHID can't tell which DualSense is this player's, so both copies would drive the same one)
   const showLinkButton=()=>!!info&&isDualSense(info)&&DualSenseLink.supported()&&!link.connected&&!seat();
   // Already granted (an earlier click, or Rind's permission handler): link without asking.
+  // Only after the player clicked the button once: opening the DualSense over WebHID (and, on Bluetooth, switching it to the full
+  // report set) can make it vanish from the browser's Gamepad API on Windows, so it must never happen unasked.
+  const optedIn=()=>{try{return localStorage.getItem('dsLinkOptIn')==='1';}catch{return false;}};
   let autoTried=false;
-  async function autoLink(){if(autoTried||!showLinkButton())return;autoTried=true;if((await DualSenseLink.granted()).length)await link.connect();linkBtn.hidden=!showLinkButton();}
+  async function autoLink(){if(autoTried||!showLinkButton()||!optedIn())return;autoTried=true;if((await DualSenseLink.granted()).length)await link.connect();linkBtn.hidden=!showLinkButton();}
   if(DualSenseLink.supported()){navigator.hid.addEventListener('disconnect',e=>{if(e.device===link.device)link.drop();});
     navigator.hid.addEventListener('connect',()=>{autoTried=false;autoLink();});}
   addEventListener('pagehide',()=>{link.close();});

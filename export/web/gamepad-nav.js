@@ -15,7 +15,8 @@ if(typeof EventTarget!=='undefined'&&!EventTarget.prototype.addEventListener.__p
 }
 const CONTROLS='button,a[href],input:not([type=hidden]),select,textarea,[role=tab],[tabindex]:not([tabindex="-1"])';
 const DEFAULT_TABS='#tabs,.settings-tabs,#armory-nav,[role=tablist],#map-filter';
-const CSS=`#pad-ring{position:fixed;left:0;top:0;z-index:2147483000;pointer-events:none;box-sizing:border-box;border:2px solid #8fdc73;border-radius:6px;background:#8fdc7318;box-shadow:0 0 0 4px #8fdc7326,0 0 18px #8fdc7355;opacity:0;transition:transform .14s cubic-bezier(.2,.8,.2,1),width .14s cubic-bezier(.2,.8,.2,1),height .14s cubic-bezier(.2,.8,.2,1),opacity .15s}
+const CSS=`body.using-pad,body.using-pad *{cursor:none!important}
+#pad-ring{position:fixed;left:0;top:0;z-index:2147483000;pointer-events:none;box-sizing:border-box;border:2px solid #8fdc73;border-radius:6px;background:#8fdc7318;box-shadow:0 0 0 4px #8fdc7326,0 0 18px #8fdc7355;opacity:0;transition:transform .14s cubic-bezier(.2,.8,.2,1),width .14s cubic-bezier(.2,.8,.2,1),height .14s cubic-bezier(.2,.8,.2,1),opacity .15s}
 #pad-ring.on{opacity:1}#pad-ring.press{animation:pad-press .18s ease-out}
 @keyframes pad-press{50%{background:#8fdc7355;box-shadow:0 0 0 7px #8fdc7340,0 0 26px #8fdc7388}}
 #pad-nav-hint{position:fixed;right:18px;bottom:14px;z-index:40;display:none;gap:14px;align-items:center;font:600 9px/1 Arial,Helvetica,sans-serif;letter-spacing:1.5px;color:#b9b2a0;text-shadow:0 1px 3px #000;pointer-events:none}
