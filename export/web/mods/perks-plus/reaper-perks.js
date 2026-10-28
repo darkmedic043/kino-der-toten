@@ -501,8 +501,8 @@ export function setupReaperPerks(api, catalogue, base) {
     }
     // Change Chews: the element turns over when you fall below 40%
     if (has('changechews')) { const low = session.health < session.maxHealth * .4; if (low && !wasLow) { element = (element + 1) % 4; toast?.('Change Chews · ' + ELEMENTS[element][0], 1.5); } wasLow = low; }
-    // Dam-A-Nade: a full belt of lethals when you drink it (5, 6 with Bandolier)
-    if (has('damnade') && !session.rpNade) { session.rpNade = true; session.grenades = Math.max(session.grenades ?? 0, nadeMax()); }
+    // Dam-A-Nade: a full belt of lethals when you drink it (5, 6 with Bandolier), and the extra tacticals it adds
+    if (has('damnade') && !session.rpNade) { session.rpNade = true; session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(tacticalBonus()); }
     // Dying Wish: the end
     if (dyingUntil && t >= dyingUntil) { dyingUntil = 0; sound('dyingwish', 'end'); if (up('dyingwish')) session.health = session.maxHealth; }
     // Electric Cherry
@@ -668,12 +668,16 @@ export function setupReaperPerks(api, catalogue, base) {
   // ---- Dam-A-Nade (switched on): explosives x1.5, one more lethal (5) and tactical, lethals refill and a tactical comes
   //      back when each round starts (Max Ammo fills both). Augments (dn.*): damage, stun (s frozen), burn, shrapnel (explosive
   //      kills explode), lethal / tactical (+n carried), scav (explosive kills give a grenade back), resupply (full tactical).
+  //      The tactical bonus is added to the item's own max (3, 4 with its Extra Monkey / Device / QED equipment augment), so
+  //      every top-up (pickup, Max Ammo, Equip Mint) fills the bigger slot: Monkey Bombs with Extra Monkey + Extra Tactical = 6.
   const nadeMax = () => 5 + stat('dn.lethal');
-  const tacticalMax = () => 4 + stat('dn.tactical');   // 3 Monkey Bombs / Gersh / QED, +1
+  const tacticalBonus = () => has('damnade') ? 1 + stat('dn.tactical') : 0;
+  { const monkeyMax = session.monkeyMax?.bind(session); if (monkeyMax) session.monkeyMax = () => monkeyMax() + tacticalBonus(); }   // Gersh/QED: moon-equipment's maxOf
+  const tacticalMax = () => { const t = window.kino?.tactical; return t?.id ? t.max?.() ?? 3 + tacticalBonus() : session.monkeyMax?.() ?? 3 + tacticalBonus(); };
   function tacticalBack(n) {
     const t = window.kino?.tactical;
-    if (t?.id) t.count = Math.min(tacticalMax(), (t.count ?? 0) + n);
-    else if (session.monkeysOwned) session.monkeys = Math.min(tacticalMax(), (session.monkeys ?? 0) + n);
+    if (t?.id) t.count = Math.max(t.count ?? 0, Math.min(tacticalMax(), (t.count ?? 0) + n));
+    else if (session.monkeysOwned) session.monkeys = Math.max(session.monkeys ?? 0, Math.min(tacticalMax(), (session.monkeys ?? 0) + n));
   }
   { const next = session.nextRound?.bind(session);   // the round-end +2 grenades caps at 4: keep a Dam-A-Nade belt's 5th and 6th
     if (next) session.nextRound = (...a) => { const before = session.grenades ?? 0, r = next(...a); if (has('damnade')) session.grenades = Math.max(session.grenades ?? 0, Math.min(before, nadeMax())); return r; }; }
@@ -752,5 +756,5 @@ export function setupReaperPerks(api, catalogue, base) {
     } }); };
   addCheat();
   const magnet = setupMagnet(api, { has, stat, feet, now, zh, near, hurt, slow, ring, fx, chip, toast });
-  window.kino.reaperPerks = { ids, has, up, upgraded, give, catalogue, raiseWall, walls, nadeMax, tacticalMax, magnet, get armour() { return armour; }, get momentum() { return momentum; }, get wolf() { return !!wolf; } };
+  window.kino.reaperPerks = { ids, has, up, upgraded, give, catalogue, raiseWall, walls, nadeMax, tacticalMax, tacticalBonus, magnet, get armour() { return armour; }, get momentum() { return momentum; }, get wolf() { return !!wolf; } };
 }

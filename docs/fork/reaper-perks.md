@@ -44,14 +44,14 @@ Magnet Margarita (user, 2026-10-19): "implements magnet margarita? havbe it be i
 
 ### Dam-A-Nade (implemented)
 
-- **Base**: explosions (`cause` explosion / grenade) deal x1.5; you carry 5 lethals (one more than 4, filled when you drink it) and one more tactical (4 Monkey Bombs, Gersh Devices or QEDs); when each round starts (the countdown ends; user, 2026-10-18: it was at the round's end) your lethals refill and one tactical comes back, and the round-end +2 grenades no longer cuts a 5- or 6-grenade belt back to 4; Max Ammo fills both to the bigger limits.
+- **Base**: explosions (`cause` explosion / grenade) deal x1.5; you carry 5 lethals (one more than 4, filled when you drink it) and one more tactical, added to the item's own limit (3, or 4 with its Extra Monkey / Extra Device / Extra QED equipment augment; `tacticalBonus()` goes into `session.monkeyMax()` and moon-equipment's `maxOf`, so pickups, Max Ammo and Equip Mint fill the bigger slot, and drinking the perk adds the extra ones; 2026-10-28); when each round starts (the countdown ends; user, 2026-10-18: it was at the round's end) your lethals refill and one tactical comes back, and the round-end +2 grenades no longer cuts a 5- or 6-grenade belt back to 4; Max Ammo fills both to the bigger limits.
 - **Research track** (`dn.*`):
 
 | # | Augment | Kind | Effect |
 |---|---|---|---|
 | 1 | Bandolier | Minor | One more lethal (6) |
 | 2 | Concussion | Major | Explosives freeze the zombies they don't kill for 2 s |
-| 3 | Extra Tactical | Minor | One more tactical (5) |
+| 3 | Extra Tactical | Minor | One more tactical on top of the perk's +1: 5, or 6 with the item's Extra augment |
 | 4 | Chain Reaction | Major | Explosive kills explode: 0.3 zh within 110 (cause `shrapnel`, so they don't chain or take the x1.5) |
 | 5 | Recycler | Minor | 8% of explosive kills give a grenade back |
 | 6 | Incendiary | Major | Explosives set the zombies they don't kill burning (4 s, 0.15 zh/s) |
