@@ -679,7 +679,18 @@ function setupPost(api){
     // smears NaN/Inf into black blocks) and add the map's depth haze. This is the chain's first swap pass, so the
     // read buffer is always the target the scene and its depth were just drawn into (the composer alternates them).
     hazePass=new ShaderPass(HAZE_SHADER);const hazeRender=hazePass.render.bind(hazePass);
-    hazePass.render=(r,wb,rb,...a)=>{const u=hazePass.uniforms,cam=renderPass.camera;u.tDepth.value=rb.depthTexture;u.cameraNear.value=cam.near;u.cameraFar.value=cam.far;hazeRender(r,wb,rb,...a);};
+    hazePass.render=(r,wb,rb,...a)=>{const u=hazePass.uniforms,cam=renderPass.camera;u.tDepth.value=rb.depthTexture;u.cameraNear.value=cam.near;u.cameraFar.value=cam.far;
+      u.heatK.value=renderHeat(r,rb,cam)?1:0;hazeRender(r,wb,rb,...a);};
+    // The fires' heat shimmer (mods/fx/flames.js): kino.heatScene drawn with the frame's camera into a half-size offset
+    // map, occluded by the frame's depth; the haze pass bends the frame by it.
+    const heatRT=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,depthBuffer:false});
+    const renderHeat=(r,rb,cam)=>{const hs=window.kino.heatScene,hu=window.kino.heat;if(!hs||!hu||!hs.children.some(m=>m.geometry.instanceCount>0))return false;
+      const W=Math.max(1,rb.width>>1),H=Math.max(1,rb.height>>1);if(heatRT.width!==W||heatRT.height!==H)heatRT.setSize(W,H);
+      hu.tDepth.value=rb.depthTexture;hu.near.value=cam.near;hu.far.value=cam.far;hu.res.value.set(W,H);
+      const old=r.getRenderTarget(),cc=r.getClearColor(heatClear),ca=r.getClearAlpha(),ac=r.autoClear;
+      r.setRenderTarget(heatRT);r.setClearColor(0x000000,0);r.autoClear=true;r.render(hs,cam);
+      r.setClearColor(cc,ca);r.autoClear=ac;r.setRenderTarget(old);hazePass.uniforms.tHeat.value=heatRT.texture;return true;};
+    const heatClear=new THREE.Color();
     composer.addPass(hazePass);
     if(q>=3){gtao=new GTAOPass(scene,camera,w,h);gtao.output=GTAOPass.OUTPUT.Default;gtao.blendIntensity=1;
       gtao.updateGtaoMaterial({radius:28,distanceExponent:1.5,thickness:12,scale:1,samples:q>=3?16:10,distanceFallOff:1});

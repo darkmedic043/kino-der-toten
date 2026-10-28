@@ -145,12 +145,13 @@ export class GradePass extends Pass{
 // the big rooms and the valley their layers. Also the HDR sanitiser (NaN/Inf → black, clamp),
 // which used to be its own pass.
 export const HAZE_SHADER={
-  uniforms:{tDiffuse:{value:null},tDepth:{value:null},cameraNear:{value:1},cameraFar:{value:1000},haze:{value:new THREE.Vector3()},hazeDensity:{value:0},hazeStart:{value:0}},
+  uniforms:{tDiffuse:{value:null},tDepth:{value:null},tHeat:{value:null},heatK:{value:0},cameraNear:{value:1},cameraFar:{value:1000},haze:{value:new THREE.Vector3()},hazeDensity:{value:0},hazeStart:{value:0}},
   vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-  fragmentShader:/* glsl */`uniform sampler2D tDiffuse,tDepth;uniform float cameraNear,cameraFar,hazeDensity,hazeStart;uniform vec3 haze;varying vec2 vUv;
+  fragmentShader:/* glsl */`uniform sampler2D tDiffuse,tDepth,tHeat;uniform float cameraNear,cameraFar,hazeDensity,hazeStart,heatK;uniform vec3 haze;varying vec2 vUv;
 #include <packing>
-void main(){vec4 c=texture2D(tDiffuse,vUv);if(any(isnan(c))||any(isinf(c)))c=vec4(0.,0.,0.,1.);c.rgb=min(c.rgb,vec3(48.));
-  if(hazeDensity>0.){float z=-perspectiveDepthToViewZ(texture2D(tDepth,vUv).x,cameraNear,cameraFar);
+void main(){vec2 uv=vUv+texture2D(tHeat,vUv).rg*heatK;   // heat shimmer over the fires (mods/fx/flames.js heat layer, rendered by the lighting mod)
+  vec4 c=texture2D(tDiffuse,uv);if(any(isnan(c))||any(isinf(c)))c=vec4(0.,0.,0.,1.);c.rgb=min(c.rgb,vec3(48.));
+  if(hazeDensity>0.){float z=-perspectiveDepthToViewZ(texture2D(tDepth,uv).x,cameraNear,cameraFar);
     float f=1.-exp(-max(z-hazeStart,0.)*hazeDensity);c.rgb=mix(c.rgb,haze,f*(1.-step(cameraFar*.98,z)*.6));}   // the sky (at far) takes less, it is already its own colour
   gl_FragColor=c;}`};
 
