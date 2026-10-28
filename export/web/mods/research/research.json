@@ -1,7 +1,16 @@
 {
- "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Mule Kick and Shatter Blast aren't in BO7, so theirs are the fork's). Every perk and ammo mod has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) and Magnet Margarita (2026-10-19) have the fork's own tracks; their mod's double-buy upgrades are Majors (Afterglow, Demolition Expert, Attraction).",
+ "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Mule Kick and Shatter Blast aren't in BO7, so theirs are the fork's). Every perk, ammo mod and piece of equipment has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) and Magnet Margarita (2026-10-19) have the fork's own tracks; their mod's double-buy upgrades are Majors (Afterglow, Demolition Expert, Attraction). Equipment (2026-10-28, user): every tactical and lethal has the fork's own track (effect keys frag.*, clay.*, monkey.*, gersch.*, qed.*, read through window.kino.equipAug by the code that throws or places it); they work whenever equipped (they only act when you use the item), and research XP is x activeMul while you carry it.",
  "unlockLevel": 11,
- "trackCost": [6000, 9000, 12000, 15000, 18000, 24000, 30000, 36000],
+ "trackCost": [
+  6000,
+  9000,
+  12000,
+  15000,
+  18000,
+  24000,
+  30000,
+  36000
+ ],
  "xp": {
   "kill": 10,
   "headshot": 5,
@@ -1236,7 +1245,7 @@
     {
      "name": "Extra Tactical",
      "kind": "minor",
-     "desc": "Carry one more tactical (5 Monkey Bombs, Gersh Devices or QEDs).",
+     "desc": "Carry one more tactical, on top of Dam-A-Nade's own +1. Stacks with your tactical's Extra augment (Extra Monkey, Extra Device, Extra QED): up to 6.",
      "effects": {
       "dn.tactical": 1
      },
@@ -2111,6 +2120,415 @@
       }
      },
      "id": "a.shatter.chaindetonation"
+    }
+   ]
+  },
+  {
+   "id": "frag_grenade_zm",
+   "name": "Frag Grenade",
+   "kind": "equipment",
+   "group": "lethal",
+   "color": "#c9a45c",
+   "augments": [
+    {
+     "name": "Heavy Payload",
+     "kind": "minor",
+     "desc": "Grenades blast 25% wider.",
+     "effects": {
+      "frag.radius": 0.25
+     },
+     "id": "e.frag.heavypayload"
+    },
+    {
+     "name": "Cluster Charge",
+     "kind": "major",
+     "desc": "Every grenade scatters 3 bomblets that go off a moment after the blast, each with 40% of its damage.",
+     "effects": {
+      "frag.cluster": 3
+     },
+     "id": "e.frag.clustercharge"
+    },
+    {
+     "name": "Danger Close",
+     "kind": "minor",
+     "desc": "Your own grenades hurt you 75% less.",
+     "effects": {
+      "frag.self": 0.75
+     },
+     "id": "e.frag.dangerclose"
+    },
+    {
+     "name": "Semtex",
+     "kind": "major",
+     "desc": "Grenades stick to the first zombie they hit.",
+     "effects": {
+      "frag.sticky": 1
+     },
+     "id": "e.frag.semtex"
+    },
+    {
+     "name": "Recycler",
+     "kind": "minor",
+     "desc": "A grenade that kills 3 or more zombies is given back.",
+     "effects": {
+      "frag.recycle": 3
+     },
+     "id": "e.frag.recycler"
+    },
+    {
+     "name": "Concussion",
+     "kind": "major",
+     "desc": "Zombies the blast doesn't kill are stunned for 3s.",
+     "effects": {
+      "frag.stun": 3
+     },
+     "id": "e.frag.concussion"
+    },
+    {
+     "name": "Shrapnel",
+     "kind": "minor",
+     "desc": "Zombies the blast doesn't kill bleed 5% of their max health a second for 4s.",
+     "effects": {
+      "frag.bleed": 0.05
+     },
+     "id": "e.frag.shrapnel"
+    },
+    {
+     "name": "Incendiary",
+     "kind": "major",
+     "desc": "The blast leaves a fire for 5s that burns zombies in it for 10% of their max health a second.",
+     "effects": {
+      "frag.fire": 0.1
+     },
+     "id": "e.frag.incendiary"
+    }
+   ]
+  },
+  {
+   "id": "claymore_zm",
+   "name": "Claymores",
+   "kind": "equipment",
+   "group": "lethal",
+   "color": "#8fae5a",
+   "augments": [
+    {
+     "name": "Wide Angle",
+     "kind": "minor",
+     "desc": "Claymores notice zombies 40% farther away and across a wider arc.",
+     "effects": {
+      "clay.wide": 0.4
+     },
+     "id": "e.clay.wideangle"
+    },
+    {
+     "name": "Double Charge",
+     "kind": "major",
+     "desc": "A claymore re-arms once after it goes off.",
+     "effects": {
+      "clay.rearm": 1
+     },
+     "id": "e.clay.doublecharge"
+    },
+    {
+     "name": "Extra Claymore",
+     "kind": "minor",
+     "desc": "Carry 3 claymores (refilled each round).",
+     "effects": {
+      "clay.extra": 1
+     },
+     "id": "e.clay.extraclaymore"
+    },
+    {
+     "name": "Shaped Charge",
+     "kind": "major",
+     "desc": "Claymore blasts deal double damage, plus 15% of each zombie's max health.",
+     "effects": {
+      "clay.dmg": 1,
+      "clay.pct": 0.15
+     },
+     "id": "e.clay.shapedcharge"
+    },
+    {
+     "name": "Hair Trigger",
+     "kind": "minor",
+     "desc": "Claymores arm the moment they're down and go off as soon as they're tripped.",
+     "effects": {
+      "clay.quick": 1
+     },
+     "id": "e.clay.hairtrigger"
+    },
+    {
+     "name": "Tripwire Shock",
+     "kind": "major",
+     "desc": "The blast stuns every zombie within 250 for 3s.",
+     "effects": {
+      "clay.stun": 3
+     },
+     "id": "e.clay.tripwireshock"
+    },
+    {
+     "name": "Bounty",
+     "kind": "minor",
+     "desc": "+40 points for every zombie a claymore kills.",
+     "effects": {
+      "clay.bounty": 40
+     },
+     "id": "e.clay.bounty"
+    },
+    {
+     "name": "Proximity Field",
+     "kind": "major",
+     "desc": "Claymores trigger on zombies from any side and blast 30% wider.",
+     "effects": {
+      "clay.omni": 1,
+      "clay.radius": 0.3
+     },
+     "id": "e.clay.proximityfield"
+    }
+   ]
+  },
+  {
+   "id": "zombie_cymbal_monkey",
+   "name": "Monkey Bombs",
+   "kind": "equipment",
+   "group": "tactical",
+   "color": "#d8b04a",
+   "augments": [
+    {
+     "name": "Long Act",
+     "kind": "minor",
+     "desc": "Monkeys play 40% longer.",
+     "effects": {
+      "monkey.long": 0.4
+     },
+     "id": "e.monkey.longact"
+    },
+    {
+     "name": "Big Finale",
+     "kind": "major",
+     "desc": "The explosion deals triple damage, blasts 50% wider and hits for 25% of each zombie's max health.",
+     "effects": {
+      "monkey.boom": 2,
+      "monkey.radius": 0.5,
+      "monkey.pct": 0.25
+     },
+     "id": "e.monkey.bigfinale"
+    },
+    {
+     "name": "Wide Audience",
+     "kind": "minor",
+     "desc": "Monkeys lure zombies from 50% farther away.",
+     "effects": {
+      "monkey.reach": 0.5
+     },
+     "id": "e.monkey.wideaudience"
+    },
+    {
+     "name": "Cymbal Crash",
+     "kind": "major",
+     "desc": "Every crash of the cymbals (once a second) shocks zombies within 120 for 8% of their max health.",
+     "effects": {
+      "monkey.crash": 0.08
+     },
+     "id": "e.monkey.cymbalcrash"
+    },
+    {
+     "name": "Extra Monkey",
+     "kind": "minor",
+     "desc": "Carry 4 Monkey Bombs.",
+     "effects": {
+      "monkey.extra": 1
+     },
+     "id": "e.monkey.extramonkey"
+    },
+    {
+     "name": "Captive Audience",
+     "kind": "major",
+     "desc": "Zombies within 300 of a playing monkey take 30% more damage from everything.",
+     "effects": {
+      "monkey.audience": 0.3
+     },
+     "id": "e.monkey.captiveaudience"
+    },
+    {
+     "name": "Encore",
+     "kind": "minor",
+     "desc": "35% chance a thrown monkey comes back to you.",
+     "effects": {
+      "monkey.encore": 0.35
+     },
+     "id": "e.monkey.encore"
+    },
+    {
+     "name": "Showstopper",
+     "kind": "major",
+     "desc": "An explosion that kills 5 or more zombies drops a power-up.",
+     "effects": {
+      "monkey.drop": 5
+     },
+     "id": "e.monkey.showstopper"
+    }
+   ]
+  },
+  {
+   "id": "zombie_black_hole_bomb",
+   "name": "Gersh Device",
+   "kind": "equipment",
+   "group": "tactical",
+   "color": "#9a66ff",
+   "augments": [
+    {
+     "name": "Event Horizon",
+     "kind": "minor",
+     "desc": "Drags zombies in from 30% farther.",
+     "effects": {
+      "gersch.reach": 0.3
+     },
+     "id": "e.gersch.eventhorizon"
+    },
+    {
+     "name": "Collapse",
+     "kind": "major",
+     "desc": "When it closes it implodes, hitting zombies within 350 for 50% of their max health.",
+     "effects": {
+      "gersch.collapse": 0.5
+     },
+     "id": "e.gersch.collapse"
+    },
+    {
+     "name": "Stable Orbit",
+     "kind": "minor",
+     "desc": "Stays open 4s longer.",
+     "effects": {
+      "gersch.long": 4
+     },
+     "id": "e.gersch.stableorbit"
+    },
+    {
+     "name": "Twin Singularity",
+     "kind": "major",
+     "desc": "Opens a second black hole beside the first.",
+     "effects": {
+      "gersch.twin": 1
+     },
+     "id": "e.gersch.twinsingularity"
+    },
+    {
+     "name": "Extra Device",
+     "kind": "minor",
+     "desc": "Carry 4 Gersh Devices.",
+     "effects": {
+      "gersch.extra": 1
+     },
+     "id": "e.gersch.extradevice"
+    },
+    {
+     "name": "Gravity Well",
+     "kind": "major",
+     "desc": "Zombies within twice its range are slowed by 50%.",
+     "effects": {
+      "gersch.slow": 0.5
+     },
+     "id": "e.gersch.gravitywell"
+    },
+    {
+     "name": "Mass Harvest",
+     "kind": "minor",
+     "desc": "+30 points for every zombie it swallows.",
+     "effects": {
+      "gersch.points": 30
+     },
+     "id": "e.gersch.massharvest"
+    },
+    {
+     "name": "Safe Passage",
+     "kind": "major",
+     "desc": "Walking in takes you to the spot farthest from zombies, refills your magazine and makes you untouchable for 3s.",
+     "effects": {
+      "gersch.safe": 3
+     },
+     "id": "e.gersch.safepassage"
+    }
+   ]
+  },
+  {
+   "id": "zombie_quantum_bomb",
+   "name": "QED",
+   "kind": "equipment",
+   "group": "tactical",
+   "color": "#83c7ff",
+   "augments": [
+    {
+     "name": "Loaded Dice",
+     "kind": "minor",
+     "desc": "A bad outcome is rerolled 40% of the time.",
+     "effects": {
+      "qed.reroll": 0.4
+     },
+     "id": "e.qed.loadeddice"
+    },
+    {
+     "name": "Quantum Blast",
+     "kind": "major",
+     "desc": "Every QED also hits zombies within 300 for 50% of their max health.",
+     "effects": {
+      "qed.blast": 0.5
+     },
+     "id": "e.qed.quantumblast"
+    },
+    {
+     "name": "Extra QED",
+     "kind": "minor",
+     "desc": "Carry 4 QEDs.",
+     "effects": {
+      "qed.extra": 1
+     },
+     "id": "e.qed.extraqed"
+    },
+    {
+     "name": "Superposition",
+     "kind": "major",
+     "desc": "Two outcomes per throw.",
+     "effects": {
+      "qed.double": 1
+     },
+     "id": "e.qed.superposition"
+    },
+    {
+     "name": "Entanglement",
+     "kind": "minor",
+     "desc": "A bad outcome gives the QED back.",
+     "effects": {
+      "qed.refund": 1
+     },
+     "id": "e.qed.entanglement"
+    },
+    {
+     "name": "Jackpot",
+     "kind": "major",
+     "desc": "Point outcomes are tripled and a free perk also refills your health and ammo.",
+     "effects": {
+      "qed.jackpot": 2
+     },
+     "id": "e.qed.jackpot"
+    },
+    {
+     "name": "Stabiliser",
+     "kind": "minor",
+     "desc": "The Magazine Emptied and Perk Disruption outcomes can't happen.",
+     "effects": {
+      "qed.stable": 1
+     },
+     "id": "e.qed.stabiliser"
+    },
+    {
+     "name": "Collapse the Wave",
+     "kind": "major",
+     "desc": "Bad outcomes never happen.",
+     "effects": {
+      "qed.pure": 1
+     },
+     "id": "e.qed.collapsethewave"
     }
    ]
   }

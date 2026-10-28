@@ -345,7 +345,7 @@ function openLoadoutGunsmith(id,onClose){
 loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;{const st=loadProfile();if(migrateWeaponLevels(c,weapons,st)){saveProfile(st);profile.weaponXp=st.weaponXp;}}   // 30-level track: old saves keep their attachments
   const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
 // One starting slot, pistols only; the Mystery Box card edits what the box can give you.
-const slots=[{key:'primary',label:'STARTING PISTOL'},{key:'box',label:'MYSTERY BOX'},{key:'tactical',label:'TACTICAL'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
+const slots=[{key:'primary',label:'STARTING PISTOL'},{key:'box',label:'MYSTERY BOX'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
 let activeSlot='primary',focus=null;
 const weaponList=()=>config.weapons.filter(w=>weapons[w.id]).map(w=>({...w,level:unlockLevel(w)}));
 const pistolList=()=>weaponList().filter(w=>isPistol(weapons[w.id]));
@@ -454,13 +454,13 @@ function renderPicker(u,l){
   }
   if(isTac)renderTactical(current,true);else renderDetail(current,isWeapon,true,1);
 }
-// Tactical slot: Monkey Bombs, Gersh Device, QED (the latter two from the moon-equipment mod)
+// Tacticals (box list only since 2026-10-28): Monkey Bombs, Gersh Device, QED (the latter two from the moon-equipment mod)
 const tacById=Object.fromEntries((config.tactical??[]).map(t=>[t.id,t]));
 const tacList=()=>(config.tactical??[]).filter(t=>data.equipment?.[t.id]);
 function renderTactical(id,unlocked){
   const el=$('detail');
   if(!id){el.innerHTML='<h2>None</h2><p class="muted">Start without a tactical. You can still buy or find one in game.</p>';return;}
-  const t=tacById[id];el.innerHTML=`<div class="thumb"></div><span class="eyebrow">TACTICAL</span><h2>${esc(t.name)}</h2><p>${esc(t.description)}</p><p>3 per game · X to throw · Max Ammo refills them</p><p class="muted">Unlocks at level ${t.level}${unlocked?'':' · locked'}</p>`;
+  const t=tacById[id];el.innerHTML=`<div class="thumb"></div><span class="eyebrow">TACTICAL</span><h2>${esc(t.name)}</h2><p>${esc(t.description)}</p><p>Mystery Box only · 3 per pickup · X to throw · Max Ammo refills them</p><p class="muted">Unlocks at level ${t.level}${unlocked?'':' · locked'}</p>`;
   fillThumb(el.querySelector('.thumb'),id);
 }
 const rarityLine=id=>{const r=rarityById[rarityOf(config,id)];return r?`<b class="rar-text" style="--r:${r.color}">${esc(r.name)}</b> · `:'';};

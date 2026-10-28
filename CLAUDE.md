@@ -24,7 +24,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Gobblegums (pack ladder, GUMS terminal app, effects) | `gobblegums.md` |
 | Reaper Collection perks: Prismatic Punch, Dam-A-Nade and Magnet Margarita implemented (Melon Pass unlocks, research augments; Magnet Margarita's power-up stash is on the command wheel, `mods/command-wheel`, hold U); the other 42 working but switched off (cheat `reaper`; one section each, `perks-plus/reaper-perks.js/.json`) | `reaper-perks.md` (mirrored in the Helm note "Perks", `c3fac4fc0b`: when the user asks, re-copy the whole file into it with a PATCH to `127.0.0.1:7690/api/notes/c3fac4fc0b`, `{content, force:true}`, owner token from `~/.config/helm/config.json`; too big for note_write) |
 | Journal: every map's Easter eggs step by step, recorded once done, tracking with on-screen markers (JOURNAL.EXE) | `journal.md` |
-| Research: perk and ammo mod augments (Phase 5) | `research.md` |
+| Research: perk, ammo mod and equipment augments (Phase 5; tabs PERKS / AMMO MODS / EQUIPMENT), one lethal slot (Claymores replace grenades) | `research.md` |
 | Credits, challenges and the Shop tab (Phase 6) | `shop.md` |
 | The Melon Pass: season pages, tokens, premium (Phase 7); past seasons stay open with shared tokens (`seasons.json`) | `pass.md` |
 | Player wiki at `/wiki/` (topic modules built from game data, menu link, checker `.tools/wiki-check.mjs`) | `wiki.md` |

@@ -82,7 +82,7 @@ export async function createMap(ctx,entry){
       if(e.kind==='egg')text=world.eggs.get(e.egg).items[e.item].found?'':'Inspect';
       if(e.kind==='trap'){const t=world.traps.get(e.trap),label=t.kind==='fire'?'fire':'electric';text=t.power&&!s.power?'The power must be activated':t.activeUntil>s.time?'Trap active':t.readyAt>s.time?'Trap cooling down · '+Math.ceil(t.readyAt-s.time)+'s':'Activate '+label+' trap · '+t.cost;}
       if(e.kind==='teleport'){const tp=world.teleporters[e.teleporter];text=tp.power&&!s.power?'The power must be activated':tp.locked?tp.lockedText:teleportPending?'Teleporting…':returnTrip?'The teleporter will bring you back':tp.readyAt>s.time?'Teleporter cooling down · '+Math.ceil(tp.readyAt-s.time)+'s':'Teleport'+(tp.cost?' · '+tp.cost:'');}
-      if(e.kind==='claymore')text=s.claymoresOwned?'Claymores equipped · 4 to place':'Claymores · 1000';
+      if(e.kind==='claymore')text=s.claymoresOwned?'Claymores equipped · G to place':'Claymores · 1000 · replaces your grenades';
       if(e.kind==='box')text=shop.boxPrompt(e);
       if(e.kind==='pap')text=world.papLocked?world.papLockedText??'Pack-a-Punch is sealed':shop.packPrompt(true);   // papLocked: set by a map script
       if(e.kind==='custom')text=e.text?.()??'';
@@ -111,7 +111,7 @@ export async function createMap(ctx,entry){
         if(teleportPending||returnTrip||tp.readyAt>s.time)return false;if(tp.cost&&!shop.pay(tp.cost))return false;
         teleportPending={tp,at:s.time+1.6};tp.readyAt=s.time+tp.cooldown;ctx.toast('Teleporting…');audio.play('buy');return true;
       }
-      if(e.kind==='claymore'){const ok=s.buyClaymores();if(ok){audio.play('buy');ctx.toast('Claymores · press 4 to place');}else if(!s.claymoresOwned)ctx.toast('Not enough points');return ok;}
+      if(e.kind==='claymore'){const ok=s.buyClaymores();if(ok){audio.play('buy');ctx.toast('Claymores · press G to place (your lethal now)');}else if(!s.claymoresOwned)ctx.toast('Not enough points');return ok;}
       if(e.kind==='box')return shop.useBox(e);
       if(e.kind==='pap')return world.papLocked?false:shop.usePack();
       return false;

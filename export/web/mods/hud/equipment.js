@@ -1,5 +1,6 @@
 // Bottom-right equipment cluster: lethal and tactical side by side as greyed
-// icons with counts, claymores beside them. Replaces the game's "G · 4 GRENADES"
+// icons with counts. One lethal slot (2026-10-28): it shows the Claymores while
+// they are held (they replace the frags); the old mine slot stays hidden. Replaces the game's "G · 4 GRENADES"
 // text line. Icons are rendered once from each item's world model; Kino ships
 // no frag grenade model, so that one is drawn.
 import * as THREE from 'three';
@@ -46,6 +47,7 @@ export function setupEquipmentHud({host,session,data}){
   host.on('update',()=>{
     const t=window.kino?.tactical,tac=t?.id?[t.id,t.count]:session.monkeysOwned||session.monkeys>0?['zombie_cymbal_monkey',session.monkeys]:[null,0];   // a tactical once held keeps its slot at 0 (greyed) until a Max Ammo refills it
     const key=[session.grenades,...tac,session.claymoresOwned,session.claymores,Object.keys(icons).length].join();if(key===last)return;last=key;
-    set('lethal','frag',session.grenades);set('tactical',tac[0],tac[1]);set('mine',session.claymoresOwned?'claymore_zm':null,session.claymores);
+    if(session.claymoresOwned)set('lethal','claymore_zm',session.claymores);else set('lethal','frag',session.grenades);
+    set('tactical',tac[0],tac[1]);set('mine',null);
   });
 }

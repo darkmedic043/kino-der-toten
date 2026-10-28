@@ -293,8 +293,9 @@ export default {
             ['Unlock', `Player level ${e.level}`], ['Get it', where.join('<br>')],
           ] }) + c.md(`${e.description}.`) +
             c.md(e.kind === 'Tactical'
-              ? `Tacticals go in your loadout's tactical slot, which opens at player level ${prog.tacticalLevel ?? 6}. Press **X** to throw one.`
-              : 'Lethals go in your loadout\'s lethal slot.') +
+              ? 'Tacticals come only from the Mystery Box (switch them on in your box list). You carry one kind at a time: a new one replaces the old. Press **X** to throw one.'
+              : 'Lethals share one slot: Frag Grenades and Claymores replace each other. Press **G** to throw a grenade or place a claymore.') +
+            c.md('Each tactical and lethal has a track of 8 research augments (ARMORY → RESEARCH → EQUIPMENT).') +
             (eid === 'zombie_black_hole_bomb' ? c.md('Walk into the black hole yourself and it teleports you.') : '');
         },
       });

@@ -508,7 +508,6 @@
       "level": 19
     }
   ],
-  "tacticalLevel": 6,
   "tactical": [
     {
       "id": "zombie_cymbal_monkey",
@@ -536,14 +535,14 @@
     {
       "id": "frag_grenade_zm",
       "name": "Frag Grenade",
-      "description": "Refills your grenades to 4",
+      "description": "4 grenades in your lethal slot (replaces Claymores)",
       "level": 1,
       "rarity": "common"
     },
     {
       "id": "claymore_zm",
       "name": "Claymores",
-      "description": "2 claymores, refilled each round",
+      "description": "2 claymores, refilled each round; they take the lethal slot (replace your grenades)",
       "level": 1,
       "rarity": "uncommon"
     }

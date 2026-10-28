@@ -40,3 +40,10 @@ test('Three reels occupy distinct rooms and require collection before projection
   for(const reel of e.reels){assert(e.take(reel.entity.id));assert(!e.take(reel.entity.id));assert(e.install());assert(!e.install());}
   assert.equal(e.installed.size,3);assert(e.reels.every(r=>r.collected));e.reset();assert.equal(e.installed.size,0);assert(e.reels.every(r=>!r.collected));assert(e.chooseRoom().targetname.startsWith('ee_teleport_player'));
 });
+test('Claymores and frag grenades share one lethal slot',()=>{
+  const s=fresh();assert(s.grenades>0);s.points=1000;assert(s.buyClaymores());
+  assert.equal(s.grenades,0);s.grenades=4;assert.equal(s.grenades,0);   // grenade writes are dropped while Claymores are held
+  s.giveFrags(4);assert(!s.claymoresOwned);assert.equal(s.claymores,0);assert.equal(s.grenades,4);
+  s.giveClaymores();assert(s.claymoresOwned);assert.equal(s.claymores,2);assert.equal(s.grenades,0);
+  s.reset();assert(!s.claymoresOwned);assert(s.grenades>0);
+});

@@ -43,8 +43,8 @@ export default {
       wheel: 'Only with the perk that stores power-ups.',
       gumChew: 'Uses the gobblegum shown on the HUD.',
       gumNext: 'Cycles your gobblegums.',
-      claymore: 'Once you have bought claymores.',
-      grenade: 'Hold to cook.',
+      claymore: 'Once you have claymores (G places them too).',
+      grenade: 'Hold to cook. With claymores in your lethal slot, places one.',
     };
 
     const pages = [];
@@ -208,7 +208,7 @@ Exfil needs a terminal, so it is not on ${M('Moon')} or ${M('Cheese Cube Unlimit
     pages.push(page('The HUD', G.survive, 'What the screen shows', c => md(`On a computer the HUD follows the Black Ops 7 layout:
 
 - **Bottom left**: your character's portrait, level, name and health (in segments, red when low), your XP bar and your **points**.
-- **Bottom right**: the gun's name, its weapon level and ammo mod, the ammo in the magazine and in reserve, and a dial with the gun's outline and a magazine ring (purple when Pack-a-Punched). Your grenades, tactical and claymores sit on top of it. Your class's action skill and your operator weapon are the two bubbles beside it, filling as they charge. Gobblegums are stacked along the right edge.
+- **Bottom right**: the gun's name, its weapon level and ammo mod, the ammo in the magazine and in reserve, and a dial with the gun's outline and a magazine ring (purple when Pack-a-Punched). Your lethal (grenades or claymores) and tactical sit on top of it. Your class's action skill and your operator weapon are the two bubbles beside it, filling as they charge. Gobblegums are stacked along the right edge.
 - Perk icons, the round number, power-up timers and a ring that shows where damage came from.
 - Hold **Tab** for the scoreboard (kills, downs, revives and points of every player).
 
@@ -293,7 +293,7 @@ Some maps change the rules: ${M('Moon')} has low gravity outside the base, and $
     pages.push(page('Main menu', G.menus, 'The tabs and what they hold', c => md(`The main menu is where you pick a map and set up your character between games. Your rank card shows your level and XP.
 
 - **PLAY**: the map browser. Filter by **Zombies** or **Explore**, pick a map and press **PLAY ZOMBIES**, **HOST CO-OP GAME** or **EXPLORE THE MAP** (walk around the map freely, with no zombies). Your best round on the map is shown. **JOIN CO-OP** takes a room code. See ${T('maps')}.
-- **ARMORY**: your **Loadout** (starting pistol, tactical and Mystery Box list), **Weapons** (levels, attachments and camos), **Gobblegums**, **Research**, **Classes** and your **Operator**. See ${T('weapons')}, ${T('gobblegums')}, ${T('classes')} and ${T('operators')}.
+- **ARMORY**: your **Loadout** (starting pistol, bonuses and Mystery Box list), **Weapons** (levels, attachments and camos), **Gobblegums**, **Research**, **Classes** and your **Operator**. See ${T('weapons')}, ${T('gobblegums')}, ${T('classes')} and ${T('operators')}.
 - **SHOP**: spend credits. See ${T('progression')}.
 - **PASS**: the Melon Pass seasons and their rewards. See ${T('pass')}.
 - **CAREER**: your lifetime stats.

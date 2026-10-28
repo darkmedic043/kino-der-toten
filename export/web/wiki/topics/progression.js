@@ -116,12 +116,11 @@ export default {
       const lv=[...rows.keys()].sort((a,b)=>a-b);
       const kitCount=cfg.weapons.filter(w=>w.kit&&wname(w.id)).length;
       const minTier=cfg.box?.minPerTier??{};
-      return c.md(`Leveling up unlocks weapons, passive **bonuses**, **tactical** equipment and extra loadout slots. Unlocks follow the **highest level you have ever reached**, so a ${ml('progression',ctx.slug('Prestige'),'prestige')} (back to level 1) locks nothing again.`)+
+      return c.md(`Leveling up unlocks weapons, passive **bonuses**, **tactical** equipment and a second bonus slot. Unlocks follow the **highest level you have ever reached**, so a ${ml('progression',ctx.slug('Prestige'),'prestige')} (back to level 1) locks nothing again.`)+
         `<h2>Your loadout</h2>`+c.md(`Set it up in the main menu, under ARMORY → LOADOUT:
 
 - **Starting weapon**: one slot, pistols only. If the pistol you picked isn't unlocked, you start with the M1911.
 - **Bonuses**: one slot, two from level ${cfg.secondBonusLevel}.
-- **Tactical**: from level ${cfg.tacticalLevel}, start each game with your chosen tactical.
 - **Mystery Box list**: every unlocked weapon, tactical and lethal can be switched on or off for your Mystery Box. Each weapon rarity keeps a few switched on (${Object.entries(minTier).map(([r,n])=>`${n} ${rar[r]?.name??r}`).join(', ')}).`)+
         `<h2>Starting bonuses</h2>`+c.table(['Bonus','Level','Effect'],cfg.bonuses.map(b=>[`<b>${ctx.esc(b.name)}</b>`,b.level,ctx.esc(b.description)]),{cls:'compact'})+
         `<h2>Unlocks by level</h2>`+c.md(`The ${kitCount} weapons of the starting kit are yours from level 1. Each one's **Gunsmith** (weapon levels, attachments and camos; see ${ml('weapons',null,'Weapons')}) opens at a later level. Every other weapon unlocks at its level, Gunsmith included, and joins your Mystery Box list. Rarities are the Mystery Box tiers.`)+

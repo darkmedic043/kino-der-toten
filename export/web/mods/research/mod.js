@@ -24,11 +24,12 @@ export default async function setup(api){
   const heal=n=>{session.health=Math.min(session.maxHealth,session.health+n);};
 
   // ---- the equipped augments (locked in at match start) -------------------------------------------------------
-  let perkFx={},ammoFx={},list=[];
+  let perkFx={},ammoFx={},eqFx={},list=[];
   function lockIn(){
-    perkFx={};ammoFx={};list=equippedAugments(cfg,loadResearch());
+    perkFx={};ammoFx={};eqFx={};list=equippedAugments(cfg,loadResearch());
     for(const a of list){
       if(a.itemKind==='perk'){const f=perkFx[a.item]??={};for(const [k,v] of Object.entries(a.effects))f[k]=(f[k]??0)+v;}
+      else if(a.itemKind==='equipment')for(const [k,v] of Object.entries(a.effects))eqFx[k]=(eqFx[k]??0)+v;
       else (ammoFx[a.item]??=[]).push(a.effects);
     }
   }
@@ -37,7 +38,10 @@ export default async function setup(api){
   const stat=k=>{let v=0;for(const [item,f] of Object.entries(perkFx))if(f[k]&&has(item))v+=f[k];return v;};
 
   // ---- research XP (kept in memory during the match, saved 1.5 s after the last gain, on completion and on unload) --
-  const isActive=item=>has(item)||session.weapon?.ammoMod?.id===item;
+  // equipment is active while you carry it (the lethal slot's frags or Claymores, the tactical slot's item)
+  const carries=id=>id==='frag_grenade_zm'?!session.claymoresOwned&&session.grenades>0:id==='claymore_zm'?!!session.claymoresOwned
+    :id==='zombie_cymbal_monkey'?!!session.monkeysOwned||session.monkeys>0:window.kino.tactical?.id===id||session.equipment===id;
+  const isActive=item=>has(item)||session.weapon?.ammoMod?.id===item||carries(item);
   let R=loadResearch(),saveT=null;
   host.on('start',()=>{R=loadResearch();});
   function earn(xp){
@@ -207,6 +211,41 @@ export default async function setup(api){
       if(fx.pool&&api.scene){const mesh=new THREE.Mesh(new THREE.CircleGeometry(100,24),new THREE.MeshBasicMaterial({color:0xff6a1a,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}));
         mesh.rotation.x=-Math.PI/2;mesh.position.copy(at).addScaledVector(up,1.5);api.scene.add(mesh);pools.push({mesh,at,until:t()+4,tick:.5,k:fx.pool});}
     }
+  });
+
+  // ---- equipment augments (frag.*, clay.*, monkey.*, gersch.*, qed.*) ---------------------------------------------------
+  // They work whenever equipped (they only act when the item is used). The code that throws or places the item reads the
+  // numbers with window.kino.equipAug(key) and uses these helpers for the shared effects.
+  const eq=k=>eqFx[k]??0;
+  window.kino.equipAug=eq;
+  const maxHp=z=>z.maxHealth??full();
+  const alive=z=>enemies.list.includes(z)&&z.health>0;
+  const stun=(z,sec)=>{const a=z.amod??={};a.base??=z.speed;a.stunUntil=Math.max(a.stunUntil??0,t()+sec);a.frozen=false;};   // the ammo-mods mod holds stunned zombies in place
+  const slow=(z,k,sec)=>{const a=z.amod??={};a.base??=z.speed;a.slow=Math.max(a.slowUntil>t()?a.slow??0:0,k);a.slowUntil=Math.max(a.slowUntil??0,t()+sec);};
+  let bleeds=[],fires=[];
+  window.kino.equipFx={
+    stun,slow,alive,maxHp,
+    // zombies within r of at that are still standing
+    near:(at,r)=>enemies.list.filter(z=>z.health>0&&z.root.position.distanceTo(at)<r),
+    pct:(z,k,cause='explosion')=>{if(alive(z)&&k>0)enemies.hurt(z,maxHp(z)*k,false,false,cause);},
+    bleed:(z,k,sec)=>{bleeds.push({z,k,until:t()+sec,tick:1});},
+    fire:(at,k,sec,r=110)=>{if(!api.scene)return;const mesh=new THREE.Mesh(new THREE.CircleGeometry(r,24),new THREE.MeshBasicMaterial({color:0xff6a1a,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}));
+      mesh.rotation.x=-Math.PI/2;mesh.position.copy(at).addScaledVector(up,1.5);api.scene.add(mesh);fires.push({mesh,at:at.clone(),r,until:t()+sec,tick:.5,k});},
+    drop:at=>{const types=['full_ammo','double_points','insta_kill','carpenter','nuke'];api.powerups?.spawn?.(types[Math.floor(Math.random()*types.length)],at.clone());},
+    points:n=>{if(n>0)session.addPoints(Math.round(n));},
+  };
+  host.on('reset',()=>{bleeds=[];for(const f of fires){f.mesh.removeFromParent();f.mesh.geometry.dispose();f.mesh.material.dispose();}fires=[];});
+  host.on('update',dt=>{
+    if(!dt)return;const now=t();
+    bleeds=bleeds.filter(b=>{if(b.until<=now||!alive(b.z))return false;if((b.tick-=dt)<=0){b.tick=1;enemies.hurt(b.z,maxHp(b.z)*b.k,false,false,'explosion');}return true;});
+    fires=fires.filter(p=>{if(p.until<=now){p.mesh.removeFromParent();p.mesh.geometry.dispose();p.mesh.material.dispose();return false;}
+      if((p.tick-=dt)<=0){p.tick=.5;for(const z of [...enemies.list])if(z.health>0&&z.root.position.distanceTo(p.at)<p.r){enemies.hurt(z,maxHp(z)*p.k*.5,false,false,'explosion');window.kino.fx?.burn?.(z.root.position.clone().addScaledVector(up,40));}}
+      p.mesh.material.opacity=.35*Math.min(1,(p.until-now)/1)*(.85+Math.random()*.15);return true;});
+  });
+  // Captive Audience: zombies near a playing monkey take more damage from everything
+  host.on('beforeEnemyDamage',e=>{
+    const k=eq('monkey.audience'),z=e.enemy;if(!k||!z||host.remoteDamage)return;
+    if((api.features?.projectiles??[]).some(p=>p.monkey&&p.stuck&&p.life>0&&p.mesh.position.distanceTo(z.root.position)<300))e.amount*=1+k;
   });
 
   // ---- pause menu: the active research and the augments locked in for this match ------------------------------------

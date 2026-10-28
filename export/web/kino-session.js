@@ -2,7 +2,16 @@ import { Session } from './rules.js';
 
 // Kino-only inventory rules; Moon keeps its separate progression state.
 export class KinoSession extends Session {
-  reset(){super.reset();this.pack=null;this.claymoresOwned=false;this.claymores=0;this.monkeysOwned=false;this.monkeys=0;this.equipmentLeft=0;this.attachmentMode=false;}
+  // One lethal slot (2026-10-28, user: "claymores will now replace grenades when grabbed, and that slot will be referred to
+  // as lethals"): while Claymores are held there are no frag grenades (reads 0, writes are dropped), and taking frags back
+  // gives up the Claymores (giveFrags). Augments can raise the counts (kino.equipAug, the research mod).
+  get grenades(){return this.claymoresOwned?0:this._nades??0;}
+  set grenades(v){if(!this.claymoresOwned)this._nades=v;}
+  claymoreMax(){return 2+(globalThis.kino?.equipAug?.('clay.extra')??0);}
+  monkeyMax(){return 3+(globalThis.kino?.equipAug?.('monkey.extra')??0);}
+  giveClaymores(){this.claymoresOwned=true;this._nades=0;this.claymores=this.claymoreMax();return true;}
+  giveFrags(n=4){this.claymoresOwned=false;this.claymores=0;this._nades=n;return true;}
+  reset(){this.claymoresOwned=false;super.reset();this.pack=null;this.claymoresOwned=false;this.claymores=0;this.monkeysOwned=false;this.monkeys=0;this.equipmentLeft=0;this.attachmentMode=false;}
   get def(){
     const w=this.weapon,d=this.data.weapons[w.id],base=w.upgraded?{...d,...d.upgrade,id:w.id,upgraded:true}:d;
     if(w.lost)return {...base,name:'No weapon',clipSize:0,maxAmmo:0};
@@ -38,14 +47,14 @@ export class KinoSession extends Session {
     this.leaveAttachment();const w=this.pack.weapon;w.upgraded=true;this.slot=this.inventory.indexOf(w);this.pack=null;
     w.mag=this.def.clipSize;w.reserve=this.def.maxAmmo;this.cancelReload();this.fireLeft=this.def.raiseTime??.4;return true;
   }
-  buyClaymores(){if(this.busy||this.claymoresOwned||!this.spend(1000))return false;this.claymoresOwned=true;this.claymores=2;return true;}
-  giveMonkeys(){if(this.busy)return false;this.monkeysOwned=true;this.monkeys=3;return true;}
+  buyClaymores(){if(this.busy||this.claymoresOwned||!this.spend(1000))return false;return this.giveClaymores();}
+  giveMonkeys(){if(this.busy)return false;this.monkeysOwned=true;this.monkeys=this.monkeyMax();return true;}
   useEquipment(kind){if(!['claymores','monkeys'].includes(kind)||this.busy||this[kind]<=0)return false;this[kind]--;this.equipmentLeft=.8;this.cancelReload();return true;}
-  nextRound(){super.nextRound();if(this.claymoresOwned)this.claymores=Math.min(2,this.claymores+2);}
+  nextRound(){super.nextRound();if(this.claymoresOwned)this.claymores=Math.max(this.claymores,this.claymoreMax());}
   powerup(type){
     super.powerup(type);
     if(type==='full_ammo'){
-      if(this.claymoresOwned)this.claymores=2;if(this.monkeysOwned)this.monkeys=3;
+      if(this.claymoresOwned)this.claymores=this.claymoreMax();if(this.monkeysOwned)this.monkeys=Math.max(this.monkeys,this.monkeyMax());
       for(const w of this.inventory){const a=this.data.weapons[w.id].upgrade?.attachment;if(w.upgraded&&a&&w.attachmentAmmo)w.attachmentAmmo.reserve=a.maxAmmo;}
       if(this.attachmentMode){this.weapon.primaryAmmo.reserve=this.data.weapons[this.weapon.id].upgrade.maxAmmo;this.weapon.reserve=this.def.maxAmmo;}
     }

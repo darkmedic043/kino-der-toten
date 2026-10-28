@@ -10,6 +10,8 @@
 // pull-pin clip and carries the item in the hand), its own mesh hidden and the
 // item's model in its place. The frag model comes from the BO1 build
 // (wonder-weapons); without it the game's own instant grenade is used.
+// One lethal slot (2026-10-28): while Claymores are held, G places a claymore instead (no frags).
+// Frag augments (research mod, window.kino.equipAug): frag.radius, cluster, self, sticky, recycle, stun, bleed, fire.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -36,8 +38,12 @@ export default async function setup(api){
     return session.monkeys>0?'zombie_cymbal_monkey':null;
   }
 
+  const aug=k=>window.kino.equipAug?.(k)??0,efx=()=>window.kino.equipFx;
   addEventListener('keydown',e=>{
     if(!['KeyG','KeyX'].includes(e.code))return;
+    if(e.code==='KeyG'&&session.claymoresOwned){   // the lethal slot holds Claymores: G places one
+      e.stopImmediatePropagation();if(e.repeat||held)return;
+      const st=api.getState();if(st.active&&!session.busy&&session.phase!=='reviving')features.placeClaymore?.();return;}
     const id=available(e.code);if(!id)return;            // nothing to throw: let the game handle it
     e.stopImmediatePropagation();if(e.repeat||held)return;
     const st=api.getState();if(!st.active||session.busy||session.phase==='reviving'||session.weaponUnavailable)return;
@@ -112,14 +118,25 @@ export default async function setup(api){
       const fuse=Math.max(.05,(frag.fuseTime??3.5)-(session.time-h.pinAt));
       const mesh=fragMesh?fragMesh.clone(true):new THREE.Mesh(new THREE.SphereGeometry(3.5,8,6),new THREE.MeshStandardMaterial({color:0x4a5039,roughness:.8}));
       const dir=camera.getWorldDirection(new THREE.Vector3());mesh.position.copy(camera.position).addScaledVector(dir,12);scene.add(mesh);
-      frags.push({mesh,velocity:dir.multiplyScalar(560).add(new THREE.Vector3(0,150,0)),life:fuse,spin:new THREE.Vector3(Math.random()*9,Math.random()*9,0)});
+      frags.push({mesh,velocity:dir.multiplyScalar(560).add(new THREE.Vector3(0,150,0)),life:fuse,spin:new THREE.Vector3(Math.random()*9,Math.random()*9,0),sticky:aug('frag.sticky')>0});
     }else if(h.id==='zombie_cymbal_monkey'){session.equipmentLeft=0;features.throwMonkey?.();session.equipmentLeft=99;}
     else{tac().launch?.(h.id);const t=tac();if(t.count<=0)t.id=null;}
   }
-  function explode(at,inHandBlast){
-    features.effect?.(at,0xffb347,30);audio.play('explosion');
-    for(const z of [...enemies.list]){const d=z.root.position.distanceTo(at);if(d<300&&world.lineClear(at,z.root.position.clone().add(new THREE.Vector3(0,30,0))))enemies.hurt(z,Math.max(75,1500*(1-d/300)),false,false,'explosion');}
-    const d=inHandBlast?0:camera.position.distanceTo(at);if(d<160&&!session.perks?.has('specialty_flakjacket'))api.damage(inHandBlast?260:180*(1-d/160));   // PhD Flopper: no self-inflicted explosive damage
+  // mini: a Cluster Charge bomblet (smaller, 40% damage, no further bomblets or after-effects)
+  function explode(at,inHandBlast,mini=false){
+    features.effect?.(at,0xffb347,mini?16:30);audio.play('explosion');
+    const R=(mini?150:300)*(1+aug('frag.radius')),k=mini?.4:1,caught=[];
+    for(const z of [...enemies.list]){const d=z.root.position.distanceTo(at);if(d<R&&world.lineClear(at,z.root.position.clone().add(new THREE.Vector3(0,30,0)))){caught.push(z);enemies.hurt(z,k*Math.max(75,1500*(1-d/R)),false,false,'explosion');}}
+    const d=inHandBlast?0:camera.position.distanceTo(at);if(d<160&&!session.perks?.has('specialty_flakjacket'))api.damage((inHandBlast?260:180*(1-d/160))*k*(1-Math.min(1,aug('frag.self'))));   // PhD Flopper: no self-inflicted explosive damage
+    if(mini)return;
+    const fx=efx(),alive=caught.filter(z=>enemies.list.includes(z)),kills=caught.length-alive.length;
+    if(aug('frag.recycle')&&kills>=aug('frag.recycle')&&!session.claymoresOwned){session.grenades++;api.toast?.('Recycler · grenade returned');}
+    if(fx){for(const z of alive){if(aug('frag.stun'))fx.stun(z,aug('frag.stun'));if(aug('frag.bleed'))fx.bleed(z,aug('frag.bleed'),4);}
+      if(aug('frag.fire')){const down=world.raycast(new THREE.Ray(at.clone(),new THREE.Vector3(0,-1,0)),0,200);fx.fire(down?at.clone().setY(at.y-down.distance):at,aug('frag.fire'),5,R*.4);}}
+    for(let i=0;i<aug('frag.cluster');i++){   // bomblets scatter from the blast and go off a moment later
+      const a=Math.random()*Math.PI*2,sp=180+Math.random()*120,mesh=new THREE.Mesh(new THREE.SphereGeometry(2,6,4),new THREE.MeshStandardMaterial({color:0x4a5039,roughness:.8}));
+      mesh.position.copy(at).add(new THREE.Vector3(0,8,0));scene.add(mesh);
+      frags.push({mesh,velocity:new THREE.Vector3(Math.cos(a)*sp,220+Math.random()*80,Math.sin(a)*sp),life:.6+Math.random()*.4,spin:new THREE.Vector3(9,9,0),mini:true});}
   }
 
   host.on('reset',()=>{held=null;for(const f of frags)f.mesh.removeFromParent();frags.length=0;});
@@ -137,10 +154,17 @@ export default async function setup(api){
       }
     }
     for(const g of [...frags]){
-      g.life-=dt;g.velocity.y-=650*dt;const travel=g.velocity.clone().multiplyScalar(dt),hit=world.raycast(new THREE.Ray(g.mesh.position.clone(),travel.clone().normalize()),0,travel.length()+4);
+      g.life-=dt;
+      if(g.stuckTo){   // Semtex: rides on the zombie (stays where it was if the zombie dies)
+        if(enemies.list.includes(g.stuckTo))g.mesh.position.copy(g.stuckTo.root.position).add(g.stuckOff);
+        if(g.life<=0){explode(g.mesh.position.clone(),false);g.mesh.removeFromParent();frags.splice(frags.indexOf(g),1);}
+        continue;}
+      if(g.sticky){const p=g.mesh.position,z=enemies.list.find(z=>z.health>0&&Math.abs(z.root.position.y+45-p.y)<55&&Math.hypot(z.root.position.x-p.x,z.root.position.z-p.z)<22);
+        if(z){g.stuckTo=z;g.stuckOff=p.clone().sub(z.root.position);continue;}}
+      g.velocity.y-=650*dt;const travel=g.velocity.clone().multiplyScalar(dt),hit=world.raycast(new THREE.Ray(g.mesh.position.clone(),travel.clone().normalize()),0,travel.length()+4);
       if(hit){if(g.velocity.length()>120)window.kino.eventSounds?.bounce?.(g.mesh.position);g.velocity.y=Math.abs(g.velocity.y)*.4;g.velocity.x*=-.4;g.velocity.z*=-.4;g.spin.multiplyScalar(.5);}else g.mesh.position.add(travel);
       g.mesh.rotation.x+=g.spin.x*dt;g.mesh.rotation.y+=g.spin.y*dt;
-      if(g.life<=0){explode(g.mesh.position.clone(),false);g.mesh.removeFromParent();frags.splice(frags.indexOf(g),1);}
+      if(g.life<=0){explode(g.mesh.position.clone(),false,g.mini);g.mesh.removeFromParent();if(g.mini){g.mesh.geometry.dispose();g.mesh.material.dispose();}frags.splice(frags.indexOf(g),1);}
     }
   });
 }

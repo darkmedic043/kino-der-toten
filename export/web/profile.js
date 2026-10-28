@@ -56,7 +56,7 @@ export function validLoadout(config,profile,weapons){
   const u=unlocks(config,unlockLvl(profile),weapons),l=profile.loadout;
   const primary=u.weapons.includes(l.primary)&&(!weapons||isPistol(weapons[l.primary]))?l.primary:'m1911_zm';
   const bonuses=[...new Set(l.bonuses)].filter(id=>u.bonuses.includes(id)).slice(0,u.bonusSlots);
-  const tactical=u.tacticalSlot&&u.tactical.includes(l.tactical)?l.tactical:'';
+  const tactical='';   // no loadout tactical (2026-10-28, user): tacticals come only from the Mystery Box
   return {primary,secondary:'',tactical,bonuses};
 }
 

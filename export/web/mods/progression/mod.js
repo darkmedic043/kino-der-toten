@@ -37,8 +37,7 @@ export default async function setup(api){
     session.inventory=[makeWeapon(data.weapons[active.primary],full)];   // one starting slot, a pistol
     session.slot=0;
     if(active.bonuses.has('deep_pockets'))session.points+=bonuses.deep_pockets.value;
-    // the loadout's tactical (Monkey Bombs, or the Gersh/QED from the moon-equipment mod)
-    if(l.tactical==='zombie_cymbal_monkey')session.giveMonkeys?.();else if(l.tactical)window.kino.tactical?.give?.(l.tactical,true);
+    // no loadout tactical any more (2026-10-28, user): tacticals come only from the Mystery Box
   }
   host.on('reset',applyLoadout);
   applyLoadout();await api.equipView();
@@ -53,8 +52,9 @@ export default async function setup(api){
   Object.defineProperty(window.kino,'boxList',{configurable:true,get:()=>({...boxFilter(config,profile,data),owned})});
   const giveWeapon=session.giveWeapon.bind(session);
   session.giveWeapon=(id,...rest)=>{
-    if(id==='frag_grenade_zm'){session.grenades=4;return true;}
-    if(id==='claymore_zm'){session.claymoresOwned=true;session.claymores=2;return true;}
+    // one lethal slot: frags and Claymores replace each other (kino-session.js giveFrags/giveClaymores)
+    if(id==='frag_grenade_zm'){if(session.giveFrags)session.giveFrags(4);else session.grenades=4;return true;}
+    if(id==='claymore_zm'){if(session.giveClaymores)session.giveClaymores();else{session.claymoresOwned=true;session.claymores=2;}return true;}
     return giveWeapon(id,...rest);
   };
   if(api.mysteryBox?.models)for(const id of ['frag_grenade_zm','claymore_zm'])if(data.equipment?.[id]?.worldModel&&!api.mysteryBox.models[id])

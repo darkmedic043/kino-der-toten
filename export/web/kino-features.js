@@ -6,6 +6,7 @@ import { disposeSkeletons } from './runtime-assets.js';
 import { poseIdle } from './mods/bo3-weapons/pose.js';
 
 const up=new THREE.Vector3(0,1,0),v=a=>new THREE.Vector3(...a);
+const aug=k=>window.kino?.equipAug?.(k)??0;   // equipment augments (research mod)
 export class KinoFeatures {
   constructor({scene,world,data,session,enemies,player,camera,audio,effect,damage,toast}){
     Object.assign(this,{scene,world,data,session,enemies,player,camera,audio,effect,damage,toast});
@@ -45,26 +46,42 @@ export class KinoFeatures {
     const floor=this.world.raycast(new THREE.Ray(guess,up.clone().negate()),0,70);
     if(!floor||!this.session.useEquipment('claymores'))return false;
     const def=this.data.equipment.claymore_zm,mesh=this.model(def.projectileModel);mesh.position.copy(floor.position).addScaledVector(up,2);mesh.rotation.y=Math.atan2(-forward.z,forward.x);this.scene.add(mesh);
-    this.mines.push({mesh,forward,def,armedAt:this.session.time+.8,detonateAt:0});this.audio.play('buy');return true;
+    this.mines.push({mesh,forward,def,armedAt:this.session.time+(aug('clay.quick')?0:.8),detonateAt:0,rearms:aug('clay.rearm')});this.audio.play('buy');return true;
   }
   throwMonkey(){
     if(this.events.room||!this.session.useEquipment('monkeys'))return false;
-    const def=this.data.equipment.zombie_cymbal_monkey,mesh=this.model(def.projectileModel);mesh.position.copy(this.camera.position);this.scene.add(mesh);
+    let def=this.data.equipment.zombie_cymbal_monkey;const mesh=this.model(def.projectileModel);mesh.position.copy(this.camera.position);this.scene.add(mesh);
+    if(def.explosionRadius&&(aug('monkey.boom')||aug('monkey.radius'))){const k=1+aug('monkey.boom');def={...def,explosionRadius:def.explosionRadius*(1+aug('monkey.radius')),explosionInnerDamage:def.explosionInnerDamage*k,explosionOuterDamage:def.explosionOuterDamage*k};}
     let rig;if(this.monkeyAnimation){rig=new Rig(mesh);rig.add('cymbals',this.monkeyAnimation);}
-    this.projectiles.push({mesh,def,rig,velocity:this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(480).addScaledVector(up,150),life:def.fuseTime,gravity:650,monkey:true,stuck:false});return true;
+    this.projectiles.push({mesh,def,rig,velocity:this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(480).addScaledVector(up,150),life:def.fuseTime*(1+aug('monkey.long')),gravity:650,monkey:true,stuck:false,crash:1});return true;
   }
   lureTarget(z){
     if(z.kind==='dog')return null;
-    let nearest=null,distance=1536;
-    for(const p of this.projectiles){if(!p.stuck||!(p.monkey||p.def.lure)||p.life<=0)continue;const d=z.root.position.distanceTo(p.mesh.position);if(d<distance){nearest=p.mesh.position;distance=d;}}
+    let nearest=null,distance=Infinity;const reach=1536*(1+aug('monkey.reach'));   // Wide Audience (research)
+    for(const p of this.projectiles){if(!p.stuck||!(p.monkey||p.def.lure)||p.life<=0)continue;const d=z.root.position.distanceTo(p.mesh.position);if(d<distance&&d<(p.monkey?reach:1536)){nearest=p.mesh.position;distance=d;}}
     return nearest;
   }
   blast(position,def,{playerDamage=true,score=true}={}){
     const radius=def.explosionRadius??200;
     this.effect(position,def.id==='ray_gun_zm'?0x8df565:0xffb347,25);this.audio.play('explosion',.6);
-    for(const z of [...this.enemies.list]){const point=z.root.position.clone().addScaledVector(up,25),d=point.distanceTo(position);if(d<radius&&this.world.lineClear(position,point))this.enemies.hurt(z,THREE.MathUtils.lerp(def.explosionInnerDamage,def.explosionOuterDamage,d/radius),false,false,'explosion',score);}
+    const caught=[];
+    for(const z of [...this.enemies.list]){const point=z.root.position.clone().addScaledVector(up,25),d=point.distanceTo(position);if(d<radius&&this.world.lineClear(position,point))caught.push(z),this.enemies.hurt(z,THREE.MathUtils.lerp(def.explosionInnerDamage,def.explosionOuterDamage,d/radius),false,false,'explosion',score);}
     const feet=this.player.getFeetPosition().addScaledVector(up,30),distance=feet.distanceTo(position);
     if(playerDamage&&!this.session.perks?.has('specialty_flakjacket')&&distance<radius&&this.world.lineClear(position,feet))this.damage(Math.min(180,def.explosionInnerDamage)*(1-distance/radius));
+    return caught;   // the zombies it reached (those gone from enemies.list were killed)
+  }
+  // a monkey's or claymore's blast plus its equipment augments (research mod: window.kino.equipAug / equipFx)
+  equipBlast(position,def,kind){
+    const caught=this.blast(position,def),fx=window.kino?.equipFx,alive=caught.filter(z=>this.enemies.list.includes(z)),kills=caught.length-alive.length;
+    if(kind==='claymore'){
+      if(fx&&aug('clay.pct'))for(const z of alive)fx.pct(z,aug('clay.pct'));
+      if(fx&&aug('clay.stun'))for(const z of fx.near(position,250))fx.stun(z,aug('clay.stun'));
+      if(fx&&aug('clay.bounty')&&kills)fx.points(aug('clay.bounty')*kills);
+    }else{
+      if(fx&&aug('monkey.pct'))for(const z of alive)fx.pct(z,aug('monkey.pct'));
+      if(fx&&aug('monkey.drop')&&kills>=aug('monkey.drop'))fx.drop(position.clone());
+      if(Math.random()<aug('monkey.encore')){const s=this.session;s.monkeysOwned=true;s.monkeys=Math.min((s.monkeys??0)+1,s.monkeyMax?.()??3);this.toast('Encore · the monkey came back');}
+    }
   }
   activateTurret(e){
     if(!this.session.power||this.session.busy||this.turrets.some(t=>t.id===e.id&&t.until>this.session.time))return false;
@@ -74,13 +91,13 @@ export class KinoFeatures {
     this.audio.play('buy');this.toast('Automatic turret active · 30 seconds');return true;
   }
   prompt(e){
-    if(e.targetname==='claymore_purchase')return this.session.claymoresOwned?'Claymores equipped · 4 to place':'Claymores · 1000';
+    if(e.targetname==='claymore_purchase')return this.session.claymoresOwned?'Claymores equipped · G to place':'Claymores · 1000 · replaces your grenades';
     if(e.script_noteworthy==='auto_turret_trigger')return !this.session.power?'The power must be activated':this.turrets.some(t=>t.id===e.id&&t.until>this.session.time)?'Automatic turret active':'Activate automatic turret · 1500';
     if(e.targetname?.startsWith('trigger_movie_reel_'))return this.events.available(e.id)?'Take film reel':null;
     if(e.targetname==='trigger_change_projector_reels')return this.events.carried?'Load film reel into projector':`Film reels · ${this.events.installed.size} / 3 projected`;
   }
   interact(e){
-    if(e.targetname==='claymore_purchase'){const ok=this.session.buyClaymores();if(ok){this.audio.play('buy');this.toast('Claymores · press 4 to place');}return ok;}
+    if(e.targetname==='claymore_purchase'){const ok=this.session.buyClaymores();if(ok){this.audio.play('buy');this.toast('Claymores · press G to place (your lethal now)');}return ok;}
     if(e.script_noteworthy==='auto_turret_trigger')return this.activateTurret(e);
     if(e.targetname?.startsWith('trigger_movie_reel_')){const ok=this.events.take(e.id);if(ok){this.toast('Film reel found. Bring it to the projection room.');this.audio.play('buy');}return ok;}
     if(e.targetname==='trigger_change_projector_reels'){const ok=this.events.install();if(ok){this.audio.play('buy');this.toast(`Film ${this.events.film} playing · ${this.events.installed.size} / 3 reels projected`,5);}return ok;}
@@ -91,6 +108,7 @@ export class KinoFeatures {
     for(const p of [...this.projectiles]){
       p.life-=dt;
       if(p.stuck&&p.rig){p.rig.play('cymbals');p.rig.update(dt);}
+      if(p.stuck&&p.monkey&&p.life>0&&aug('monkey.crash')&&(p.crash-=dt)<=0){p.crash=1;const fx=window.kino?.equipFx;if(fx){this.effect(p.mesh.position.clone().addScaledVector(up,10),0x9fd8ff,6);for(const z of fx.near(p.mesh.position,120))fx.pct(z,aug('monkey.crash'),'explosion');}}   // Cymbal Crash
       if(p.stuck&&p.target&&this.enemies.list.includes(p.target))p.mesh.position.copy(p.target.root.position).add(p.offset);
       if(!p.stuck){
         p.velocity.y-=p.gravity*dt;const travel=p.velocity.clone().multiplyScalar(dt),distance=travel.length(),direction=travel.clone().normalize(),ray=new THREE.Ray(p.mesh.position.clone(),direction);
@@ -110,12 +128,17 @@ export class KinoFeatures {
       if(p.stuck&&p.def.id==='knife_ballistic_zm'&&p.mesh.position.distanceTo(this.player.getFeetPosition().addScaledVector(up,30))<55){
         const w=s.inventory.find(w=>w.id===p.def.id&&!w.lost);if(w){const d=w.upgraded?this.data.weapons[w.id].upgrade:this.data.weapons[w.id];if(w.reserve<d.maxAmmo){w.reserve++;this.remove(p,this.projectiles);this.toast('Blade recovered');continue;}}
       }
-      if(p.life<=0){if(p.def.explosionRadius)this.blast(p.mesh.position,p.def);this.remove(p,this.projectiles);}
+      if(p.life<=0){if(p.def.explosionRadius){if(p.monkey)this.equipBlast(p.mesh.position.clone(),p.def,'monkey');else this.blast(p.mesh.position,p.def);}else if(p.monkey&&Math.random()<aug('monkey.encore')){s.monkeys=Math.min((s.monkeys??0)+1,s.monkeyMax?.()??3);this.toast('Encore · the monkey came back');}this.remove(p,this.projectiles);}
     }
     for(const mine of [...this.mines]){
-      if(mine.detonateAt&&s.time>=mine.detonateAt){this.blast(mine.mesh.position.clone().addScaledVector(up,15),mine.def);this.remove(mine,this.mines);continue;}
+      if(mine.detonateAt&&s.time>=mine.detonateAt){
+        const k=1+aug('clay.dmg'),r=1+aug('clay.radius'),def=k===1&&r===1?mine.def:{...mine.def,explosionRadius:(mine.def.explosionRadius??200)*r,explosionInnerDamage:mine.def.explosionInnerDamage*k,explosionOuterDamage:mine.def.explosionOuterDamage*k};
+        this.equipBlast(mine.mesh.position.clone().addScaledVector(up,15),def,'claymore');
+        if(mine.rearms>0){mine.rearms--;mine.detonateAt=0;mine.armedAt=s.time+(aug('clay.quick')?.3:1.5);}else this.remove(mine,this.mines);   // Double Charge
+        continue;}
       if(s.time<mine.armedAt||mine.detonateAt)continue;
-      for(const z of this.enemies.list){const d=z.root.position.clone().sub(mine.mesh.position),distance=d.length();if(distance<96&&d.dot(mine.forward)>20&&d.normalize().dot(mine.forward)>Math.cos(70*Math.PI/180)&&this.world.lineClear(mine.mesh.position.clone().addScaledVector(up,12),z.root.position.clone().addScaledVector(up,25))){mine.detonateAt=s.time+.4;this.audio.play('empty');break;}}
+      const wide=aug('clay.wide'),omni=aug('clay.omni')>0,reach=96*(1+wide),cone=Math.cos(Math.min(89,70+50*wide)*Math.PI/180);   // Wide Angle / Proximity Field
+      for(const z of this.enemies.list){const d=z.root.position.clone().sub(mine.mesh.position),distance=d.length();if(distance<reach&&(omni||d.dot(mine.forward)>20&&d.normalize().dot(mine.forward)>cone)&&this.world.lineClear(mine.mesh.position.clone().addScaledVector(up,12),z.root.position.clone().addScaledVector(up,25))){mine.detonateAt=s.time+(aug('clay.quick')?.05:.4);this.audio.play('empty');break;}}
     }
     for(const turret of this.turrets){
       if(s.time>=turret.until){if(turret.mesh)turret.mesh.rotation.y=turret.yaw;continue;}
