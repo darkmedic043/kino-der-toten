@@ -95,7 +95,17 @@ export async function createKit(api) {
   const rigs = new Set();
   const figure = async (name, anim, { position, yaw = 0, attach = [] } = {}) => {
     const o = await model(name); if (!o) return null;
-    for (const a of attach) { const part = await model(a); if (part) o.add(part); }
+    // attached parts (Quicksilver's head and legs, Cap's shield) carry their own partial skeletons: their bones' local
+    // tracks were played about the part's root, so the head hung at his hands. Skin them to the body's bones instead, and
+    // hang the part's own bones (the face's) under the body bone they belong to
+    const body = new Map(); o.traverse(c => { if (c.isBone && !body.has(c.name)) body.set(c.name, c); });
+    for (const a of attach) {
+      const part = await model(a); if (!part) continue;
+      o.add(part);
+      const own = []; part.traverse(c => { if (c.isBone && !body.has(c.name) && body.has(c.parent?.name)) own.push(c); });
+      for (const b of own) body.get(b.parent.name).add(b);
+      part.traverse(c => { if (c.isSkinnedMesh) c.bind(new THREE.Skeleton(c.skeleton.bones.map(b => body.get(b.name) ?? b), c.skeleton.boneInverses), c.bindMatrix); });
+    }
     if (position) o.position.copy(position);
     o.rotation.y = yaw; o.name = 'malibu_' + name;
     o.traverse(c => { if (c.isMesh) { c.frustumCulled = false; c.castShadow = false; } });
