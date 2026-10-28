@@ -102,9 +102,19 @@ export class ViewWeapon {
     }
     const meleeEntries=await Promise.all(Object.entries(this.data.melee).flatMap(([type,d])=>
       Object.entries(d.animations).filter(([k])=>k.startsWith('melee')).map(async([key,url])=>[type+':'+key,await loadAnimation(url)])));
-    if(token!==this.token){for(const model of [hands,gun,leftGun,...knives])disposeSkeletons(model);return;}
+    // The knife on an imported rig (a BO3 weapon's own arms, def.handsModel): those arms have no tag_knife_attach and the
+    // gun no knife clip, so BO1's T5 knife clip played on BO3's bones (another bind pose, 2.2x the scale): a huge skewed
+    // sleeve swung through the camera and no knife (2026-10-28). As BO3 itself does, the knife is its own viewmodel here:
+    // BO1's arms (the operator's arm set, mods/characters prepare; a character's own arms re-skin onto them, fp-arms.js)
+    // with the knives on their own rig under the pivot, shown in place of the gun's rig for the swing (the gun is off the
+    // screen in that clip anyway). A rig with its own melee clip (def.melee) or a knife tag keeps knifing itself.
+    const t5Url=this.data.characters.viewmodel_usa_pow_arms??this.data.characters.viewhands_usmc;
+    const knifeModels=def.handsModel&&!def.melee&&t5Url&&hands&&!hands.getObjectByName('tag_knife_attach')&&Object.keys(this.data.melee).length
+      ?await Promise.all([loadModel(t5Url),...Object.values(this.data.melee).map(d=>loadModel(d.model))]):null;
+    if(token!==this.token){for(const model of [hands,gun,leftGun,...knives,...(knifeModels??[])])disposeSkeletons(model);return;}
     if(this.rig)this.rig.mixer.uncacheRoot(this.rig.root);
-    disposeSkeletons(this.root);
+    if(this.meleeRig)this.meleeRig.mixer.uncacheRoot(this.meleeRig.root);
+    disposeSkeletons(this.root);disposeSkeletons(this.meleeRoot);
     if(!hands||!gun)throw new Error('Missing viewmodel for '+def.id);
     this.def=def;this.pivot.clear();this.pivot.position.set(0,0,0);this.pivot.rotation.set(0,0,0);
     // Assemble outside the scene. Using matrixWorld under the previous gun's
@@ -136,8 +146,18 @@ export class ViewWeapon {
     this.hiddenTags=[];
     for(const name of def.hideTags??[]){const bone=gun.getObjectByName(name);if(bone){bone.scale.setScalar(.000001);this.hiddenTags.push(name);}}
     this.root.matrixAutoUpdate=false;this.root.matrix.copy(cameraBasis);this.pivot.add(this.root);
-    this.rig=new Rig(this.root,(name)=>this.onSound(name,this.meleeType?this.data.melee[this.meleeType]:this.def));
-    for(const [key,clip] of [...entries,...meleeEntries])this.rig.add(key,clip);
+    const sound=(name)=>this.onSound(name,this.meleeType?this.data.melee[this.meleeType]:this.def);
+    this.rig=new Rig(this.root,sound);
+    this.meleeRoot=null;this.meleeRig=null;this.meleeHands=null;   // the knife rig (see knifeModels above)
+    if(knifeModels){const [t5,...kn]=knifeModels,kv=t5.getObjectByName('tag_view'),kt=t5.getObjectByName('tag_knife_attach');
+      if(kv&&kt){const root=new THREE.Group();root.add(t5);kv.userData.animationAnchor=true;root.updateMatrixWorld(true);
+        const kb=new THREE.Matrix4().multiplyMatrices(basis,kv.matrixWorld.clone().invert());
+        this.knives={};Object.keys(this.data.melee).forEach((type,i)=>{attach(kn[i],kt,'tag_knife');kn[i].visible=false;this.knives[type]=kn[i];});
+        root.matrixAutoUpdate=false;root.matrix.copy(kb);root.visible=false;this.pivot.add(root);
+        this.meleeRoot=root;this.meleeHands=t5;this.meleeRig=new Rig(root,sound);for(const [key,clip] of meleeEntries)this.meleeRig.add(key,clip);
+        root.traverse(o=>{o.frustumCulled=false;});}
+      else for(const m of knifeModels)disposeSkeletons(m);}
+    for(const [key,clip] of [...entries,...(this.meleeRig?[]:meleeEntries)])this.rig.add(key,clip);
     this.leftBones=leftBones;this.leftCover=new Set(leftBones?Object.keys(this.rig.data).filter(k=>!k.startsWith('L:')&&this.rig.data[k].bones.some(b=>leftBones.has(b.name))):[]);   // clips that hold both guns
     // ADS is a separate native animation of tag_torso. Its first frame also
     // defines each gun's HIP pose; the arms' bind torso is only right for M1911.
@@ -190,20 +210,22 @@ export class ViewWeapon {
       this.meleeType=null;this.meleeLeft=duration;this.mode='melee';this.aim=0;this.rig.play(key,false,this.clipSpeed(key,duration),0);
       return {duration,delay:charge?d.meleeChargeDelay:d.meleeDelay,damage:d.meleeDamage};
     }
-    const def=this.data.melee[type],key=type+':'+(charge?'meleeChargeAnim':'meleeAnim');
-    const duration=Math.max(charge?def.chargeTime:def.time,this.rig.data[key].duration);
+    const def=this.data.melee[type],key=type+':'+(charge?'meleeChargeAnim':'meleeAnim'),r=this.meleeRig??this.rig;
+    const duration=Math.max(charge?def.chargeTime:def.time,r.data[key].duration);
     this.meleeType=type;this.meleeLeft=duration;this.mode='melee';this.aim=0;
     for(const [k,model] of Object.entries(this.knives))model.visible=k===type;
-    this.rig.play(key,false,this.clipSpeed(key,duration),0);
+    if(this.meleeRig){this.root.visible=false;this.meleeRoot.visible=true;}   // the knife rig in place of the gun's for the swing
+    r.play(key,false,duration>0?(r.data[key]?.duration??duration)/duration:1,0);
     return {duration,delay:charge?def.chargeDelay:def.delay,damage:def.damage};
   }
   update(dt,{moving=false,sprint=false,ads=false,reloading=false,empty=false,time=0}={}){
     if(!this.ready)return;
-    this.rig.update(dt);this.meleeLeft=Math.max(0,this.meleeLeft-dt);
+    this.rig.update(dt);this.meleeRig?.update(dt);this.meleeLeft=Math.max(0,this.meleeLeft-dt);
     const action=this.rig.actions[this.rig.current],finished=!action?.isRunning();
     // sprintPose (mods/movement/fp.js): no sprint clips; the idle grip keeps playing and the motion layer poses the sprint
     const sprintKey=phase=>{if(this.sprintPose)return 'sprintPoseAnim';const key='sprint'+phase+(empty?'Empty':'')+'Anim';return this.rig.actions[key]?key:'sprint'+phase+'Anim';};
-    if(this.mode==='melee'&&this.meleeLeft===0){for(const model of Object.values(this.knives))model.visible=false;this.meleeType=null;this.mode='idle';}
+    if(this.mode==='melee'&&this.meleeLeft===0){for(const model of Object.values(this.knives))model.visible=false;this.meleeType=null;this.mode='idle';
+      if(this.meleeRoot){this.meleeRoot.visible=false;this.root.visible=true;}}
     if(this.mode==='reload'&&!reloading)this.mode='idle';
     if(['fire','raise','sprintOut'].includes(this.mode)&&finished)this.mode='idle';
     if(this.mode==='sprintIn'&&finished){this.mode='sprint';this.rig.play(sprintKey('Loop'),true,this.clipSpeed(sprintKey('Loop'),this.def.sprintLoopTime),.04);}
@@ -220,12 +242,12 @@ export class ViewWeapon {
     this.pivot.position.set(Math.sin(time*(sprint?13:9))*bob,Math.cos(time*(sprint?26:18))*bob*.7,this.recoil*.25);
     this.pivot.rotation.set(this.recoil*.012,0,0);
     // def.viewOffset [x,y,z] (view space): where the weapon rests at the hip (e.g. BO3 guns sit lower, in the corner); gone in ADS
-    if(this.def.viewOffset)this.pivot.position.add(new THREE.Vector3(...this.def.viewOffset).multiplyScalar(1-this.aim));
+    if(this.def.viewOffset&&!this.meleeRoot?.visible)this.pivot.position.add(new THREE.Vector3(...this.def.viewOffset).multiplyScalar(1-this.aim));   // (BO1's knife rig sits where BO1's arms do)
     // Ray Gun uses authored weapon offsets in place of sprint XAnims.
     const offsetSprint=sprint&&!this.rig.actions.sprintLoopAnim&&this.mode==='sprint'&&!this.sprintPose;   // (sprintPose: the motion layer's pose instead)
     this.sprintBlend=THREE.MathUtils.damp(this.sprintBlend,offsetSprint?1:0,16,dt);
     if(this.sprintBlend>.001){this.pivot.position.addScaledVector(new THREE.Vector3(...this.def.sprintOffset),this.sprintBlend);const r=this.def.sprintRotation;this.pivot.rotation.set(r[0]*this.sprintBlend,r[1]*this.sprintBlend,r[2]*this.sprintBlend);}
-    this.root.updateMatrixWorld(true);
+    this.root.updateMatrixWorld(true);if(this.meleeRoot?.visible)this.meleeRoot.updateMatrixWorld(true);
   }
   snapshot(){
     const position=name=>this.root?.getObjectByName(name)?.getWorldPosition(new THREE.Vector3()).toArray();

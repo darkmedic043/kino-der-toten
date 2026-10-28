@@ -161,7 +161,7 @@ export default async function setup(api){
   let lastViewRoot=null;
   host.on('update',()=>{const root=api.view?.root;if(!root||root===lastViewRoot)return;lastViewRoot=root;const tint=entry.handsTint;if(!tint||window.kino.fpArms)return;
     const keys=Object.keys(tint).sort((a,b)=>b.length-a.length);
-    root.traverse(o=>{if(!o.isSkinnedMesh)return;for(const m of [o.material].flat()){if(!m||m.userData.handsTinted)continue;const name=(m.name??'').toLowerCase();if(!/viewarm|viewhand|hands|arm|glove|sleeve/.test(name))continue;
+    for(const r of [root,api.view.meleeRoot])r?.traverse(o=>{if(!o.isSkinnedMesh)return;for(const m of [o.material].flat()){if(!m||m.userData.handsTinted)continue;const name=(m.name??'').toLowerCase();if(!/viewarm|viewhand|hands|arm|glove|sleeve/.test(name))continue;
       const k=keys.find(k=>k!=='*'&&name.includes(k.toLowerCase()))??(keys.includes('*')?'*':keys[0]);if(!k)continue;
       m.userData.handsTinted=true;m.color.set(tint[k]);if(entry.handsFlat){m.map=null;m.roughness=.65;}m.needsUpdate=true;}});});
   host.on('reset',()=>{heldKey='x';});

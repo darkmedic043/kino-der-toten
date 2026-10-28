@@ -405,7 +405,7 @@ export class FirstPersonArms {
     return skeleton;
   }
   // Called every frame with the active viewmodel; cheap once a rig is attached.
-  sync(view){if(this.ok&&view?.hands)this.attach(view.hands);}
+  sync(view){if(!this.ok)return;if(view?.hands)this.attach(view.hands);if(view?.meleeHands)this.attach(view.meleeHands);}   // (meleeHands: BO1's arms knifing for an imported rig, animation.js)
   dispose(){}
 }
 
@@ -422,4 +422,5 @@ export class ArmSetArms extends FirstPersonArms {
     // The whole upper arm stays (the set is made for first person) and the set's materials are already toned for the viewmodel.
     super(scene,{scene:arms},{id:id+':arms',yaw:-90,fpArmsArm:'^j_shoulder_(ri|le)$',fpArmsUpper:true,fpArmsTone:1});
   }
+  sync(view){if(this.ok&&view?.hands)this.attach(view.hands);}   // not the knife rig: BO1's arms there are the arm set already
 }
