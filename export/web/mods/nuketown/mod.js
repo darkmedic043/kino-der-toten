@@ -182,11 +182,19 @@ function setupQuest(api) {
 
   // ---- the free perk (a loot bottle), zone links, lava, portals
   let perkItem = null;
+  const perkDoor = [...world.doors?.values?.() ?? []].filter(d => d.cost >= 3000 && d.box).sort((a, b) => a.box.distanceToPoint(FREE_PERK) - b.box.distanceToPoint(FREE_PERK))[0] ?? null;
   const placePerk = () => {
     const loot = globalThis.kino?.loot; if (!loot?.spawn) return;
     if (perkItem) { try { loot.remove(perkItem); } catch {} perkItem = null; }
     const perk = loot.freePerk?.(); if (!perk) return;
-    perkItem = loot.spawn('perk', FREE_PERK.clone(), { id: perk.id, life: 1e9, onPick: () => { perkItem = null; setFlag('free_perk'); } });
+    // the bottle sits in a rock alcove behind the 3000 door; the rocks round it can be climbed, so it is only taken once
+    // that door is bought (an onPick replaces the loot mod's own pickup, so the drink is given here)
+    let warned = -1e9;
+    perkItem = loot.spawn('perk', FREE_PERK.clone(), { id: perk.id, life: 1e9, onPick: () => {
+      if (perkDoor && !world.isOpen(perkDoor, session)) { if (session.time - warned > 4) { warned = session.time; toast('Open the door to take the free perk', 2.5); } return false; }
+      if (!loot.givePerk?.(perk.id)) return false;
+      perkItem = null; setFlag('free_perk'); return true;
+    } });
   };
   const zoneTick = () => {
     const active = world.activeZones?.(session); if (!active) return;

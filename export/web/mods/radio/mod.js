@@ -13,7 +13,7 @@
 // window.kino.radio: {status(), act(action, arg) -> true | 'reason', heard(key)}; the desktop draws it (desktop.js).
 import { settings } from '../../settings.js';
 
-const KEY = 'kino.mods.radio', COOLDOWN = 180;   // seconds a song rests after it ends
+const KEY = 'kino.mods.radio', COOLDOWN = 60;   // seconds a song rests after it ends
 export const SONGS = [
   { id: '115', title: '115', artist: 'Elena Siegman', map: 'kino', mapName: 'Kino der Toten', egg: 'The three meteor fragments', url: 'audio/115.ogg', keys: ['115'] },
   { id: 'coming_home', title: 'Coming Home', artist: 'Elena Siegman', map: 'moon', mapName: 'Moon', egg: 'All three hidden recordings', moonKey: 'moon/mus/zombie/moon/coming_home', keys: ['moon/mus/zombie/moon/coming_home'] },
@@ -41,6 +41,13 @@ export default function setup(api) {
   const level = () => (audio?.enabled === false ? 0 : Math.max(0, Math.min(1, (settings.volume ?? 1) * load().volume)));
   setInterval(() => { el.volume = level(); }, 300);   // the game's mute and volume apply while playing
 
+  // the whole file first: streamed through the tunnel, a song stalled or stopped partway when a range request failed
+  const files = new Map();   // url -> blob url
+  async function whole(url) {
+    if (files.has(url)) return files.get(url);
+    try { const r = await fetch(url); if (!r.ok) throw new Error(r.status); const b = URL.createObjectURL(await r.blob()); files.set(url, b); return b; }
+    catch (e) { console.warn('[radio] streaming', url, e); return url; }
+  }
   async function urlOf(s) {
     if (s.url) return s.url;
     if (audio?.manifest?.[s.moonKey]?.url) return audio.manifest[s.moonKey].url;   // on Moon its manifest is the game's
@@ -75,7 +82,8 @@ export default function setup(api) {
   async function start(id) {
     const s = BY_ID[id]; const url = await urlOf(s); if (!url) { toast?.('RADIO · that song is not installed', 2); return false; }
     st.now = { id, startedAt: Date.now() }; st.paused = false;
-    el.src = url; el.currentTime = 0; el.volume = level(); duck();
+    const src = await whole(url); if (st.now?.id !== id) return false;   // replaced or stopped while it loaded
+    el.src = src; el.currentTime = 0; el.volume = level(); duck();
     try { await el.play(); } catch (e) { console.warn('[radio]', e); }
     return true;
   }
@@ -89,6 +97,13 @@ export default function setup(api) {
     st.now = null; unduck();
   }
   el.addEventListener('ended', ended);
+  // Nothing but the player pauses the song: if it stops by itself (the browser, a decode error) it picks up where it was
+  el.addEventListener('pause', () => { if (st.now && !st.paused && !el.ended) setTimeout(resume, 300); });
+  el.addEventListener('error', () => {   // reload it at the same spot, a few times a song
+    if (!st.now || !el.getAttribute('src') || (st.now.retries = (st.now.retries ?? 0) + 1) > 3) return;
+    const t = el.currentTime; el.load(); el.currentTime = t; resume();
+  });
+  function resume() { if (st.now && !st.paused && el.paused && el.src) el.play().catch(() => {}); }
   host.on('reset', () => { heardThisGame.clear(); if (st.now) { el.pause(); st.now = null; } st.queue.length = 0; unduck(); });
 
   function act(a, arg) {

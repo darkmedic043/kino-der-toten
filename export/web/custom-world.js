@@ -134,6 +134,16 @@ export class CustomWorld {
       // extras.clip [min, max]: the game's own blocker for the door (World at War: its brush models' clip, often a full
       // clip far taller than the visible pieces, which could be jumped or mantled over)
       if(Array.isArray(m.extras.clip))plug.union(new THREE.Box3(new THREE.Vector3(...m.extras.clip[0]),new THREE.Vector3(...m.extras.clip[1])));
+      // the headroom stops at a floor above the door (Nuketown's green house: its downstairs doors' blocks stood 50 up
+      // through the deck and the rooms upstairs, an invisible wall there until the door was bought)
+      if(up){
+        const c=box.getCenter(new THREE.Vector3()),wide=size.x>=size.z;let top=plug.max.y;
+        for(const f of[-.45,0,.45]){
+          const o=new THREE.Vector3(c.x+(wide?size.x*f:0),box.max.y+1,c.z+(wide?0:size.z*f)),hit=this.collision.rayIntersect(new THREE.Ray(o,new THREE.Vector3(0,1,0)),0,top-o.y);
+          if(hit)top=Math.min(top,o.y+hit.distance);
+        }
+        plug.max.y=Math.max(box.max.y,top);
+      }
       // pieces with a `move` property [x, y, z] (scene units; the BO3 map builder writes BO3's script_vector) slide that far
       // when the door opens, then disappear; without one the door disappears at once
       // (2026-10-17) a BO3 door prop is a mesh per material (a sliding door 10-17 draws, Der Eisendrache ~90 a view):

@@ -16,6 +16,7 @@
 //   chest(at, yaw, rarity, list, opts)  a closed chest (rarity id or '#rrggbb'); F opens it and scatters `list`
 //   pickWeapon(rarities)                a weapon from the player's own Mystery Box list (kino.boxList) of those rarities
 //   freePerk() -> perk | null           a random perk the player doesn't have (unlocked, sold by the terminal)
+//   givePerk(id) -> bool                 the free drink itself (for an onPick that adds its own conditions)
 //   rarityOf(id), color(rarity), items }
 import * as THREE from 'three';
 import { rarityOf as rarityIn } from '../../profile.js';
@@ -332,5 +333,5 @@ export default async function setup(api) {
     return ok.length ? ok[Math.floor(Math.random() * ok.length)] : null;
   }
 
-  window.kino.loot = { spawn, scatter, chest, pickWeapon, freePerk, rarityOf, color, items, chests, remove };
+  window.kino.loot = { spawn, scatter, chest, pickWeapon, freePerk, givePerk, rarityOf, color, items, chests, remove };
 }

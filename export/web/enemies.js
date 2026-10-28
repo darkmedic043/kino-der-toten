@@ -5,6 +5,25 @@ import { zombieHealth } from './rules.js';
 import { disposeSkeletons } from './runtime-assets.js';
 
 const DOWN=new THREE.Vector3(0,-1,0);
+// Steering: a zombie's heading turns at a capped rate (easing in over the last few degrees) instead of snapping to
+// each new direction; yaw convention atan2(-dz, dx) (forward is +X).
+const wrapAngle=a=>a-Math.PI*2*Math.round(a/(Math.PI*2));
+const yawTo=(from,to)=>Math.atan2(-(to.z-from.z),to.x-from.x);
+function turnYaw(from,to,rate,dt){const d=wrapAngle(to-from);return from+Math.sign(d)*Math.min(Math.abs(d),rate*dt,Math.abs(d)*Math.min(1,dt*9));}
+const turnRate=z=>z.kind==='dog'?9:2.4+z.speed/55;   // rad/s: a shambler about 3, a sprinter about 6
+// BO1's traversal clips (mods/zombie-rise; vaults in order of preference) and their root motion (`delta`, x forward and
+// z up per key, from .tools/xanim_to_json.mjs) as curves of the clip's time 0..1: f forward share, u rise share
+const VAULTS=['ai_zombie_traverse_v5','ai_zombie_traverse_v7','ai_zombie_traverse_v1'];
+function deltaCurve(d){
+  if(d._curve)return d._curve;const {frames,values}=d.delta,n=frames.length,end=Math.max(1,frames[n-1]);
+  const fwd=values[(n-1)*3]||1,up=values[(n-1)*3+2],t=[],f=[],u=[];
+  for(let i=0;i<n;i++){t.push(frames[i]/end);f.push(Math.max(0,values[i*3]/fwd));u.push(Math.abs(up)>5?values[i*3+2]/up:0);}
+  // where the move happens along the clip's forward travel: a drop's fall starts, a climb leaves the ground (the vault's
+  // top is about half way)
+  const k=u.findIndex(x=>x>.05);
+  return d._curve={t,f,u,fwd,up,at:Math.abs(up)>5&&k>=0?f[k]:.45};
+}
+function curveAt(c,a,k){const t=c.t;let i=1;while(i<t.length-1&&t[i]<k)i++;const w=Math.min(1,Math.max(0,(k-t[i-1])/((t[i]-t[i-1])||1)));return a[i-1]+(a[i]-a[i-1])*w;}
 
 export class Enemies {
   constructor(scene,world,data,session,{damage,kill,hit,sound}){Object.assign(this,{scene,world,data,session,onDamage:damage,onKill:kill,onHit:hit,onSound:sound});this.list=[];this.dead=[];this.nextSpawn=0;this.serial=0;this.templates=[];this.anims={};}
@@ -84,20 +103,25 @@ export class Enemies {
       if(z.growl<0){this.onSound?.('growl',z.root.position);z.growl=6+s.random()*7;}
       if(z.state==='rising'){   // up out of the ground over the clip's first three quarters, facing the player
         z.riseT+=dt;const k=Math.min(1,z.riseT/z.rise.dur),e=1-(1-Math.min(1,k/.75))**2;z.root.position.y=z.rise.y-50*(1-e);
-        z.root.rotation.y=Math.atan2(-(player.z-z.root.position.z),player.x-z.root.position.x);
+        z.root.rotation.y=turnYaw(z.root.rotation.y,yawTo(z.root.position,player),2.5,dt);
         if(k>=1){z.state='chase';z.repath=0;z.rig.play('walk');}
         continue;
       }
       if(z.state==='barricade'){
-        z.root.rotation.y=Math.atan2(-(z.barrier.inside.z-z.root.position.z),z.barrier.inside.x-z.root.position.x);
+        z.root.rotation.y=turnYaw(z.root.rotation.y,yawTo(z.root.position,z.barrier.inside),4,dt);
         z.tearLeft-=dt;
         if(z.barrier.count>0){z.rig.play('attack');if(z.tearLeft<=0){this.world.setBoards(z.barrier,z.barrier.count-1);z.tearLeft=1.1;this.onSound?.('board',z.root.position);}}
-        else{z.state='entering';z.enterFrom=z.root.position.clone();z.enterTime=0;z.rig.play('walk');}
+        else{z.state='entering';z.enterFrom=z.root.position.clone();z.enterTime=0;
+          // over the sill with BO1's window vault when the clips are built (mods/zombie-rise), else a little hop
+          const v=this.hopClip(z,0,40),rate=Math.min(1.8,Math.max(1,.85+z.speed/220));
+          if(v){if(!z.rig.actions[v])z.rig.add(v,this.anims[v],true);z.rig.play(v,false,rate,.15);z.enter={c:deltaCurve(this.anims[v]),dur:this.anims[v].duration/rate};}
+          else{z.enter=null;z.rig.play('walk');}}
         continue;
       }
       if(z.state==='entering'){
-        z.enterTime+=dt;const t=Math.min(1,z.enterTime/1.2);z.root.position.lerpVectors(z.enterFrom,z.barrier.inside,t);z.root.position.y+=Math.sin(t*Math.PI)*12;
-        if(t===1){z.state='chase';z.repath=0;}continue;
+        const e=z.enter;z.enterTime+=dt;const t=Math.min(1,z.enterTime/(e?.dur??1.2));
+        z.root.position.lerpVectors(z.enterFrom,z.barrier.inside,e?curveAt(e.c,e.c.f,t):t);if(!e)z.root.position.y+=Math.sin(t*Math.PI)*12;
+        if(t===1){z.state='chase';z.repath=0;if(e)z.rig.play('walk',true,1,.2);z.enter=null;}continue;
       }
       // targetFor (optional, co-op) picks which player this zombie chases.
       const victim=this.targetFor?.(z,player)??{position:player},tp=victim.position;
@@ -105,11 +129,15 @@ export class Enemies {
       const dist=z.root.position.distanceTo(tp),at=z.root.position.clone().add(new THREE.Vector3(0,z.kind==='dog'?25:45,0)),eye=tp.clone().add(new THREE.Vector3(0,40,0));
       if(z.state==='attack'){
         z.attackLeft-=dt;
-        if(!z.attackDealt&&z.attackLeft<.62){z.attackDealt=true;if(!lure&&dist<76&&this.world.lineClear(at,eye))this.onDamage(z.kind==='dog'?40:z.kind==='nova'?45:50,z,victim);}
+        const face=yawTo(z.root.position,tp);
+        if(!z.attackDealt)z.root.rotation.y=turnYaw(z.root.rotation.y,face,turnRate(z)*.6,dt);   // tracks the victim through the wind-up only: a player who circles it in time dodges the swipe
+        if(!z.attackDealt&&z.attackLeft<.62){z.attackDealt=true;if(!lure&&dist<76&&Math.abs(wrapAngle(face-z.root.rotation.y))<1.3&&this.world.lineClear(at,eye))this.onDamage(z.kind==='dog'?40:z.kind==='nova'?45:50,z,victim);}
         if(z.attackLeft<=0){z.state='chase';z.rig.play('walk');}continue;
       }
-      if(!lure&&dist<62&&Math.abs(z.root.position.y-tp.y)<50&&(victim.id?!victim.down:s.phase!=='reviving')&&this.world.lineClear(at,eye)){
-        z.state='attack';z.attackLeft=1.15;z.attackDealt=false;z.rig.play('attack',false);continue;
+      if(!lure&&!z.hop&&dist<62&&Math.abs(z.root.position.y-tp.y)<50&&(victim.id?!victim.down:s.phase!=='reviving')&&this.world.lineClear(at,eye)){
+        const off=wrapAngle(yawTo(z.root.position,tp)-z.root.rotation.y);
+        if(Math.abs(off)>.9){z.root.rotation.y=turnYaw(z.root.rotation.y,z.root.rotation.y+off,turnRate(z),dt);z.moveYaw=z.root.rotation.y;z.vel=(z.vel??0)*(1-Math.min(1,dt*6));continue;}   // turn to face it first
+        z.state='attack';z.vel=0;z.attackLeft=1.15;z.attackDealt=false;z.rig.play('attack',false);continue;
       }
       if(!this.freeMode)z.free=false;
       const freeWalk=!!(this.freeMode&&z.free);
@@ -133,18 +161,28 @@ export class Enemies {
       if(target?.hop||z.hop){   // a traversal (custom maps' off-mesh links: fence hops, climbs, jump-downs): straight to its end, off the navmesh
         if(walls)this.hopOver(z,target,dt);
         else{const d=target.clone().sub(z.root.position),len=d.length();
-          if(len<8){z.root.position.copy(target);z.pathIndex++;}else{z.root.position.addScaledVector(d,Math.min(1,z.speed*1.2*dt/len));z.root.rotation.y=Math.atan2(-d.z,d.x);}}
-        z.blockT=0;
+          if(len<8){z.root.position.copy(target);z.pathIndex++;}else{z.root.position.addScaledVector(d,Math.min(1,z.speed*1.2*dt/len));z.root.rotation.y=turnYaw(z.root.rotation.y,Math.atan2(-d.z,d.x),turnRate(z)*1.5,dt);}}
+        z.blockT=0;z.moveYaw=z.root.rotation.y;
       }else if(target){
         const delta=target.clone().sub(z.root.position),horizontal=Math.hypot(delta.x,delta.z);
-        if(horizontal<10){z.pathIndex++;z.wallHits=0;}
+        // round corners: move on to the next path point a little early (not before a traversal, whose start must be reached)
+        const after=z.path[z.pathIndex+1];
+        if(horizontal<10||(after&&!after.hop&&horizontal<24)){z.pathIndex++;z.wallHits=0;}
         else{
-          const next=z.root.position.clone().addScaledVector(delta,Math.min(1,z.speed*dt/horizontal));
+          // steer: the walking direction turns toward the path point at a capped rate (faster than the body, so it holds the
+          // navmesh), the pace drops in a sharp turn, and speed builds up and dies down instead of switching on and off
+          const want=Math.atan2(-delta.z,delta.x),rate=turnRate(z);
+          z.moveYaw=z.moveYaw==null?z.root.rotation.y:turnYaw(z.moveYaw,want,rate*1.7,dt);
+          if(horizontal<40)z.moveYaw=want;   // close in, aim straight (no orbiting a point it can't turn onto)
+          const err=Math.abs(wrapAngle(want-z.moveYaw)),pace=Math.max(.3,Math.cos(Math.min(err,1.4)));
+          z.vel=(z.vel??0)+(z.speed*pace-(z.vel??0))*Math.min(1,dt*(z.vel>z.speed*pace?6:3));
+          const stepLen=Math.min(horizontal,z.vel*dt),k=stepLen/horizontal;
+          const next=z.root.position.clone();next.x+=Math.cos(z.moveYaw)*stepLen;next.z-=Math.sin(z.moveYaw)*stepLen;next.y+=delta.y*k;
           for(const other of this.list){if(other===z||other.state==='barricade')continue;const sep=next.clone().sub(other.root.position);sep.y=0;const d=sep.length();if(d<29&&d>.01)next.addScaledVector(sep,(29-d)/d*dt*2);}
           let safe=this.world.closest(next,{x:22,y:36,z:22});
-          const gain=q=>horizontal-Math.hypot(q.x-target.x,q.z-target.z),want=Math.min(horizontal,z.speed*dt);
-          if(safe&&gain(safe)<want*.5)   // the snap held it on the ledge it stands on (a curb 15 above the street is the nearest polygon in 3D, Nuketown's spawn_1): try the surface a step below or above
-            for(const dy of [-24,24]){const q=this.world.closest({x:next.x,y:next.y+dy,z:next.z},{x:22,y:16,z:22});if(q&&gain(q)>Math.max(gain(safe),want*.5)&&Math.abs(q.y-z.root.position.y)<30){safe=q;break;}}
+          const gain=q=>horizontal-Math.hypot(q.x-target.x,q.z-target.z),wantStep=stepLen*Math.cos(err);
+          if(safe&&wantStep>.5&&gain(safe)<wantStep*.5)   // the snap held it on the ledge it stands on (a curb 15 above the street is the nearest polygon in 3D, Nuketown's spawn_1): try the surface a step below or above
+            for(const dy of [-24,24]){const q=this.world.closest({x:next.x,y:next.y+dy,z:next.z},{x:22,y:16,z:22});if(q&&gain(q)>Math.max(gain(safe),wantStep*.5)&&Math.abs(q.y-z.root.position.y)<30){safe=q;break;}}
           if(safe&&safe.distanceTo(next)<38){z.root.position.copy(safe);z.blockT=0;}
           else{   // the straight step leaves the navmesh (a doorway only a few cells wide): after a moment hop to the path point
             z.blockT=(z.blockT??0)+dt;
@@ -156,7 +194,7 @@ export class Enemies {
               else{z.wallHits=0;this.hopOver(z,target,dt);}   // the same corner again (a low wall the navmesh steps over): climb it
               z.blockT=0;}
           }
-          z.root.rotation.y=Math.atan2(-delta.z,delta.x);
+          z.root.rotation.y=turnYaw(z.root.rotation.y,z.moveYaw,rate,dt);
         }
       }
       // On a custom map with gaps (parkour, moving platforms) a zombie that stops making progress is put back on the
@@ -186,32 +224,73 @@ export class Enemies {
   // zombieWalls: a traversal as an arc over whatever stands in its way (a fence, a ledge's lip) instead of a straight
   // line through it. The obstacle profile is read once per hop: the surface under points every ~3 units along it (map
   // and doors, rays down from 90 over the line); the arc clears the highest by 6 and never dips below the profile.
+  // The traversal clip for a hop (dy: the far end's height over the near one, top: what is in the way, over the straight
+  // line): a vault over a fence or sill, a jump down, the climb up a ledge; null for dogs and crawlers, a hop with
+  // nothing to get over, or when the clips aren't built
+  hopClip(z,dy,top){
+    if(z.kind!=='zombie')return null;const a=this.anims,has=k=>a[k]?.delta?k:null;
+    if(dy<-30)return has(-dy<56?'ai_zombie_jump_down_40':-dy<84?'ai_zombie_jump_down_72':'ai_zombie_jump_down_96');
+    if(dy>40)return has('ai_zombie_jump_up_2_climb');
+    if(top>10){const v=VAULTS.filter(has);return v.length?v[z.id%v.length]:null;}
+    return null;
+  }
   hopOver(z,target,dt){
     const pos=z.root.position;let h=z.hop;
     if(h?.to!==target){
-      const from=pos.clone(),len=Math.max(1,from.distanceTo(target)),n=Math.min(60,Math.max(4,Math.ceil(len/3))),floor=[];let arc=0;
-      const lift=(t,y,ly)=>{const k=Math.min(Math.max(t,.1),.9);if(y>ly)arc=Math.max(arc,(y-ly+6)/(4*k*(1-k)));};
+      const from=pos.clone(),len=Math.max(1,from.distanceTo(target)),n=Math.min(60,Math.max(4,Math.ceil(len/3))),floor=[],dy=target.y-from.y;
+      let arc=0,top=0,topT=.5,edgeT=null;
+      const lift=(t,y,ly)=>{const k=Math.min(Math.max(t,.1),.9);if(y>ly){arc=Math.max(arc,(y-ly+6)/(4*k*(1-k)));if(y-ly>top){top=y-ly;topT=t;}}};
       for(let i=0;i<=n;i++){
         const t=i/n,p=from.clone().lerp(target,t),hit=this.world.raycast(new THREE.Ray(new THREE.Vector3(p.x,p.y+90,p.z),DOWN),0,110),y=hit?p.y+90-hit.distance:-Infinity;
         floor.push(y);if(i>0&&i<n)lift(t,y,p.y);
+        if(edgeT==null&&i>0&&isFinite(y)&&(dy<-30?y<from.y-20:dy>40&&y>from.y+20))edgeT=t;
       }
       // props with no collision of their own (Nuketown's fences: full clip, far taller, stands in for them): the top the
       // builder measured across the link (extras.over), the right way round
       const tr=target.hop,o=tr?.over;
       if(o){const t=target.distanceTo(tr.to)<=target.distanceTo(tr.from)?o[0]:1-o[0];lift(t,o[1],from.y+(target.y-from.y)*t);}
       h=z.hop={to:target,from,len,arc:Math.min(arc,110),floor,t:0};
+      // with a clip: walk up to the obstacle, play the clip (its own forward and up motion, stretched to fit), walk on
+      const key=this.hopClip(z,dy,top);
+      if(key){
+        const d=this.anims[key],c=deltaCurve(d),run=Math.max(1,Math.hypot(target.x-from.x,target.z-from.z)),cf=Math.min(run,Math.max(20,c.fwd));
+        const at=(dy<-30||dy>40?edgeT??(dy<0?.5:.3):topT)*run;
+        const rate=Math.min(1.8,Math.max(1,.85+z.speed/220))*(dy>40?1.5:1);
+        if(!z.rig.actions[key])z.rig.add(key,d,true);
+        Object.assign(h,{key,c,run,cf,a:Math.min(Math.max(0,at-c.at*cf),run-cf),dur:d.duration/rate,rate,s:0,phase:0,k:0,climb:Math.max(0,top-40)});
+      }
     }
+    if(h.key)return this.hopClipStep(z,h,target,dt);
     h.t=Math.min(1,h.t+z.speed*1.2*dt/h.len);
     if(h.t>=1){pos.copy(target);z.pathIndex++;z.hop=null;return;}
     pos.lerpVectors(h.from,target,h.t);
     const f=h.t*(h.floor.length-1),i=Math.floor(f),under=Math.max(h.floor[i],h.floor[Math.min(i+1,h.floor.length-1)]);
     pos.y=Math.max(pos.y+4*h.arc*h.t*(1-h.t),under+1);
-    z.root.rotation.y=Math.atan2(-(target.z-h.from.z),target.x-h.from.x);
+    z.root.rotation.y=turnYaw(z.root.rotation.y,Math.atan2(-(target.z-h.from.z),target.x-h.from.x),turnRate(z)*1.5,dt);z.moveYaw=z.root.rotation.y;
+  }
+  // A hop with a clip: phase 0 walks to where the clip starts (h.a along the link), 1 plays it, 2 walks off the end
+  hopClipStep(z,h,target,dt){
+    const pos=z.root.position,{from,run,c}=h;
+    const floorAt=(s,ref)=>{const f=h.floor[Math.round(Math.min(1,s/run)*(h.floor.length-1))];return isFinite(f)&&Math.abs(f-ref)<30?f:ref;};
+    if(h.phase===0){h.s=Math.min(h.a,h.s+z.speed*dt);if(h.s>=h.a){h.phase=1;h.y0=pos.y;h.y1=floorAt(h.a+h.cf,target.y);z.rig.play(h.key,false,h.rate,.15);}}
+    if(h.phase===1){
+      h.k=Math.min(1,h.k+dt/h.dur);const f=curveAt(c,c.f,h.k);h.s=h.a+h.cf*f;
+      // a drop or climb follows the clip's own rise and fall; a vault stays level (the body clears a sill of about 40 in
+      // the pose itself) and is lifted only over anything taller
+      const y=Math.abs(c.up)>5?h.y0+(h.y1-h.y0)*curveAt(c,c.u,h.k):h.y0+(h.y1-h.y0)*f;
+      pos.lerpVectors(from,target,h.s/run);pos.y=y+h.climb*Math.sin(Math.PI*Math.min(1,Math.max(0,(f-.1)/.8)));
+      if(h.k>=1){h.phase=2;z.rig.play('walk',true,1,.2);}
+    }else{
+      if(h.phase===2)h.s=Math.min(run,h.s+z.speed*dt);
+      pos.lerpVectors(from,target,h.s/run);pos.y=floorAt(h.s,h.phase===0?from.y:target.y);
+      if(h.phase===2&&h.s>=run){pos.copy(target);z.pathIndex++;z.hop=null;}
+    }
+    z.root.rotation.y=turnYaw(z.root.rotation.y,Math.atan2(-(target.z-from.z),target.x-from.x),turnRate(z)*2,dt);z.moveYaw=z.root.rotation.y;
   }
   // Free walking on a platform: straight toward the goal, staying on whatever surface is underfoot (moving platforms carry them).
   walkFree(z,goal,dt){
     const pos=z.root.position,dx=goal.x-pos.x,dz=goal.z-pos.z,h=Math.hypot(dx,dz);
-    z.root.rotation.y=Math.atan2(-dz,dx);
+    z.root.rotation.y=turnYaw(z.root.rotation.y,Math.atan2(-dz,dx),turnRate(z),dt);z.moveYaw=z.root.rotation.y;
     if(z.leap){   // a hop across a gap: an arc to the landing spot
       const l=z.leap;l.t+=dt/l.dur;const k=Math.min(1,l.t);
       pos.lerpVectors(l.from,l.to,k);pos.y+=Math.sin(k*Math.PI)*34;

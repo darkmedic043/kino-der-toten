@@ -263,6 +263,8 @@ export function toJsonClip(source, parsed) {
       name: notify.name,
       time: Number((notify.frame / parsed.fps).toFixed(4)),
     })),
+    // the root motion (x forward, y left, z up per key): enemies.js follows it on traversals
+    ...(parsed.delta?.trans ? { delta: roundTrack(parsed.delta.trans, 2) } : {}),
     bones: parsed.bones.map((bone) => ({
       name: bone.name,
       rot: roundTrack(bone.rot, 5),
