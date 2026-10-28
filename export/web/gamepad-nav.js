@@ -15,7 +15,9 @@ if(typeof EventTarget!=='undefined'&&!EventTarget.prototype.addEventListener.__p
 }
 const CONTROLS='button,a[href],input:not([type=hidden]),select,textarea,[role=tab],[tabindex]:not([tabindex="-1"])';
 const DEFAULT_TABS='#tabs,.settings-tabs,#armory-nav,[role=tablist],#map-filter';
-const CSS=`.pad-focus{outline:2px solid #8fdc73!important;outline-offset:3px!important;box-shadow:0 0 0 5px #8fdc7340!important}
+const CSS=`#pad-ring{position:fixed;left:0;top:0;z-index:2147483000;pointer-events:none;box-sizing:border-box;border:2px solid #8fdc73;border-radius:6px;background:#8fdc7318;box-shadow:0 0 0 4px #8fdc7326,0 0 18px #8fdc7355;opacity:0;transition:transform .14s cubic-bezier(.2,.8,.2,1),width .14s cubic-bezier(.2,.8,.2,1),height .14s cubic-bezier(.2,.8,.2,1),opacity .15s}
+#pad-ring.on{opacity:1}#pad-ring.press{animation:pad-press .18s ease-out}
+@keyframes pad-press{50%{background:#8fdc7355;box-shadow:0 0 0 7px #8fdc7340,0 0 26px #8fdc7388}}
 #pad-nav-hint{position:fixed;right:18px;bottom:14px;z-index:40;display:none;gap:14px;align-items:center;font:600 9px/1 Arial,Helvetica,sans-serif;letter-spacing:1.5px;color:#b9b2a0;text-shadow:0 1px 3px #000;pointer-events:none}
 body.using-pad #pad-nav-hint{display:flex}#pad-nav-hint i{display:inline-block;width:16px;height:16px;margin-right:5px;vertical-align:middle;background:center/contain no-repeat}`;
 const REPEAT_FIRST=400,REPEAT=110;
@@ -30,6 +32,9 @@ export class GamepadNav{
     if(typeof document!=='undefined'){
       if(!document.getElementById('pad-nav-css')){const st=document.createElement('style');st.id='pad-nav-css';st.textContent=CSS;document.head.append(st);}
       if(hint&&!document.getElementById('pad-nav-hint')){const h=document.createElement('div');h.id='pad-nav-hint';document.body.append(h);this.hintEl=h;}
+      this.ring=document.getElementById('pad-ring')||Object.assign(document.createElement('div'),{id:'pad-ring'});document.body.append(this.ring);
+      let q=0;new MutationObserver(()=>{if(!q)q=requestAnimationFrame(()=>{q=0;this.reacquire();});}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden','class','disabled']});
+      const track=()=>{requestAnimationFrame(track);this.place();};requestAnimationFrame(track);
       for(const t of ['mousemove','mousedown','keydown'])addEventListener(t,e=>{if(e.isTrusted&&!e.remapped)this.clear();},true);
     }
   }
@@ -48,14 +53,37 @@ export class GamepadNav{
     }
     return out;
   }
+  // A button's identity, to find it again after the page rebuilt that part of itself.
+  keyOf(el){
+    const own=el.id||[...el.attributes].filter(a=>a.name.startsWith('data-')).map(a=>a.name+'='+a.value).join('&');
+    if(own)return own;const up=el.parentElement?.closest('[id]');
+    return (up?up.id:'')+'>'+el.tagName+':'+el.textContent.trim().slice(0,30)+'#'+[...(el.parentElement?.children??[])].indexOf(el);
+  }
+  place(){
+    const r=this.ring,el=this.current;if(!r)return;
+    if(!el||!el.isConnected||!document.body.classList.contains('using-pad')){r.classList.remove('on');return;}
+    const b=el.getBoundingClientRect(),p=3;if(!b.width){r.classList.remove('on');return;}
+    r.style.width=b.width+p*2+'px';r.style.height=b.height+p*2+'px';r.style.transform=`translate(${b.left-p}px,${b.top-p}px)`;
+    r.style.borderRadius=(parseFloat(getComputedStyle(el).borderRadius)||5)+p+'px';r.classList.add('on');
+  }
+  flash(){const r=this.ring;if(!r)return;r.classList.remove('press');void r.offsetWidth;r.classList.add('press');}
+  // The page rebuilt itself: keep the highlight on the same button, or the nearest one to where it was.
+  reacquire(){
+    if(!this.current||!document.body.classList.contains('using-pad'))return;
+    if(this.current.isConnected&&visible(this.current)){this.lastRect=this.current.getBoundingClientRect();return;}
+    const list=this.candidates();if(!list.length)return;
+    const same=list.find(e=>this.keyOf(e)===this.currentKey);if(same){this.current=same;return;}
+    if(this.lastRect){const [x,y]=centre(this.lastRect),d=e=>{const [p,q]=centre(e.getBoundingClientRect());return Math.hypot(p-x,q-y);};this.focus(list.reduce((a,b)=>d(a)<=d(b)?a:b));}
+  }
   focus(el){
     if(this.current===el)return;
-    this.current?.classList.remove('pad-focus');this.current=el;if(!el)return;
-    el.classList.add('pad-focus');document.body.classList.add('using-pad');
+    this.current?.classList.remove('pad-focus');this.current=el;this.currentKey=el?this.keyOf(el):null;if(!el)return;
+    el.classList.add('pad-focus');
+    document.body.classList.add('using-pad');
     try{el.focus({preventScroll:true});}catch{}
     el.scrollIntoView?.({block:'nearest',inline:'nearest'});
   }
-  clear(){if(this.current){this.current.classList.remove('pad-focus');this.current=null;}}
+  clear(){this.current?.classList.remove('pad-focus');this.current=null;this.ring?.classList.remove('on');}
   // The element to start from when nothing is focused: the page's choice, else the top-left candidate.
   start(){
     const init=typeof this.initial==='function'?this.initial():this.initial;
@@ -64,6 +92,7 @@ export class GamepadNav{
     if(el)this.focus(el);return !!el;
   }
   move(dir){
+    if(this.current&&!this.candidates().includes(this.current)){const same=this.candidates().find(e=>this.keyOf(e)===this.currentKey);if(same)this.current=same;}
     if(!this.current||!visible(this.current)||!this.candidates().includes(this.current)){this.clear();return this.start();}
     const from=this.current.getBoundingClientRect(),[fx,fy]=centre(from);
     const dx=dir==='left'?-1:dir==='right'?1:0,dy=dir==='up'?-1:dir==='down'?1:0;
@@ -86,7 +115,7 @@ export class GamepadNav{
   activate(){
     const el=this.current;if(!el||!visible(el))return this.start();
     if(el.matches('input[type=range]'))return true;   // adjusted with left/right
-    el.click();return true;
+    this.flash();el.click();return true;
   }
   // Left/right on a slider: a step; on anything else, a move.
   adjust(delta){
@@ -117,7 +146,7 @@ export class GamepadNav{
     if(once('b',s.b)){did=true;this.back();}
     if(once('lb',s.lb)){did=true;this.cycle(0,-1);}if(once('rb',s.rb)){did=true;this.cycle(0,1);}
     if(once('lt',s.lt)){did=true;this.cycle(1,-1);}if(once('rt',s.rt)){did=true;this.cycle(1,1);}
-    if(once('start',s.start)){did=true;this.onStart?.();}
+    if(once('start',s.start)){did=true;this.flash();this.onStart?.();}
     if(did)document.body.classList.add('using-pad');
     return did;
   }
