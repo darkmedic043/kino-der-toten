@@ -21,6 +21,7 @@ import { identify, isDualSense, glyphUrl, glyph, label, INDEX } from './glyphs.j
 import { DualSenseLink, trigger, PLAYER_LEDS } from './dualsense.js';
 import { GamepadNav, padState } from '../../gamepad-nav.js';
 import { seat, seatPad } from '../../seat.js';
+import { createAimAssist } from './aim-assist.js';
 
 const DEAD=.15;
 // button index -> key. 8 = Back/Create/View, 12-15 = D-pad, 17 = touchpad press / Xbox Share (hold: scoreboard).
@@ -37,6 +38,8 @@ const MELON=[.42,.85,.3];
 
 export default async function setup(api){
   const {host,camera,renderer,session}=api;
+  const assist=createAimAssist(api);let aaScale=1;
+  (window.kino??={}).aimAssist=assist.state;
   const pad=(window.kino??={}).gamepad={move:{forward:0,strafe:0,sprint:false},connected:false,last:0,brand:'generic',kind:'generic',name:'',native:false,
     glyph:(button,size)=>glyph(pad.brand,button,size),label:button=>label(pad.brand,button),button:i=>INDEX[i]};
   // Sent to the page body like a real key press: dispatched on window itself, the game's own
@@ -201,9 +204,11 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
     const rate=3.4*(settings.sensitivity??1)*(settings.padSensitivity??1)*(ads?.5*(settings.adsSensitivity??1):1);
     const curve=v=>v*Math.abs(v);
     if(!window.kino?.lookHold){   // a radial picker (the Gambler's ante wheel) is reading the stick
-      camera.rotation.y-=curve(rx)*rate*dt;
-      camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x-curve(ry)*rate*.75*dt*(settings.invertY?-1:1)));
-    }
+      camera.rotation.y-=curve(rx)*rate*aaScale*dt;
+      camera.rotation.x=Math.max(-1.5,Math.min(1.5,camera.rotation.x-curve(ry)*rate*aaScale*.75*dt*(settings.invertY?-1:1)));
+      // aim assist (aim-assist.js): slowdown over a target, tracking while moving, the ADS snap; Deadshot aims at the head
+      aaScale=assist.step(session.phase==='reviving'?0:dt,{level:settings.padAimAssist??1,ads:!!b[AIM],moving:Math.hypot(lx,ly),turning:Math.hypot(rx,ry)});
+    }else aaScale=1;
     // Triggers: fire and aim (mouse buttons). Buttons: their keys, held as long as the button.
     hold(FIRE,0,b[FIRE]);hold(AIM,2,b[AIM]);
     for(const [i,code] of Object.entries(KEYS))hold(+i,code,b[+i]);
@@ -221,5 +226,5 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
     prev=b;
   }
   requestAnimationFrame(frame);
-  host.on('reset',()=>{release();flashColor=null;});
+  host.on('reset',()=>{release();flashColor=null;assist.reset();});
 }

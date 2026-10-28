@@ -267,7 +267,8 @@ Some maps add their own keys: on ${M('Moon')} **P** puts the P.E.S. helmet on an
         md(`- The menus work with a controller too: the left stick or D-pad moves, A/Cross selects, B/Circle goes back, and the bumpers switch tabs.
 - Gobblegums stay on the keyboard (N and J).
 - **DualSense**: in Chrome or Edge, press **ENABLE DUALSENSE FEATURES** in the pause menu once to get adaptive triggers that push back on each gun, a light bar that shows your health and player lights for your perks. Xbox controllers get rumble in the triggers.
-- Look sensitivity, vibration and the trigger effects are in **Settings, Controls**.`);
+- **Aim assist**: the right stick slows down over a zombie, follows it a little while you move, and pulling the aim trigger with one near the crosshair snaps onto it. It aims at the chest; with **Deadshot Daiquiri** it aims at the head. Set it to Off, Standard or Strong in **Settings, Controls**.
+- Look sensitivity, aim assist, vibration and the trigger effects are in **Settings, Controls**.`);
     }));
 
     pages.push(page('Movement', G.controls, 'Sprint, slide, dive, mantle', c => md(`Movement follows the newer Black Ops games.
@@ -325,7 +326,7 @@ Some maps change the rules: ${M('Moon')} has low gravity outside the base, and $
 - **Weapon motion**: 0% to 150%. Scales how much the gun sways, bobs and kicks in your hands. Lower it if the motion makes you uncomfortable.
 - **Head bob**: on or off.
 - **Key bindings**: change any key (see ${B('Keyboard and mouse')}).
-- Controller look sensitivity, button icons, vibration, adaptive triggers and the DualSense lights (see ${B('Controller')}).
+- Controller look sensitivity, aim assist, button icons, vibration, adaptive triggers and the DualSense lights (see ${B('Controller')}).
 
 ## Audio
 

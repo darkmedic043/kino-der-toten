@@ -7,7 +7,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Area | File |
 |---|---|
 | Hosting, tunnel, Discord auth, cache headers, test browsers | `setup.md` |
-| Main menu, profile, mod loader, settings, keybinds, controller (native DualSense/Xbox, glyphs, menu navigation) | `core.md` |
+| Main menu, profile, mod loader, settings, keybinds, controller (native DualSense/Xbox, glyphs, menu navigation, aim assist with Deadshot head aim) | `core.md` |
 | Custom maps (`CustomWorld`, markers, navmesh, traps, teleporters) | `custom-maps.md` |
 | Characters, motion model, procedural rig, FP arms, portraits | `characters.md` |
 | Lighting mod, baked irradiance volume, beams, sun, viewmodel light, mystery box map bulbs, Moon lighting, the post chain (colour grade / film look `grade.js`, depth haze, viewmodel drawn inside the composer) | `lighting.md` |

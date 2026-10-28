@@ -57,7 +57,7 @@ export const PERKS = [
     note: 'Falls start to hurt past 128 units (about two player heights), so a dive on flat ground doesn\'t flop.' },
   { id: 'specialty_deadshot', name: 'Deadshot Daiquiri', price: 1500, color: '#9da8ac', badge: 'DS', icon: OWN + 'deadshot.webp',
     blurb: 'Aim for the head.',
-    effects: ['Hip-fire spread halved', 'Headshots deal 25% more damage'] },
+    effects: ['Hip-fire spread halved', 'Headshots deal 25% more damage', 'Controller aim assist aims at the head'] },
   { id: 'specialty_additionalprimaryweapon', name: 'Mule Kick', price: 4000, color: '#82a86c', badge: 'MK', icon: OWN + 'mulekick.webp',
     blurb: 'Carry one more gun.',
     effects: ['A third weapon slot'], note: 'Go down and you lose the third weapon with the perk.' },
