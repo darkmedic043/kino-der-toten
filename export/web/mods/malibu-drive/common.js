@@ -95,12 +95,19 @@ export async function createKit(api) {
   const rigs = new Set();
   const figure = async (name, anim, { position, yaw = 0, attach = [] } = {}) => {
     const o = await model(name); if (!o) return null;
-    // attached parts (Quicksilver's head and legs, Cap's shield) carry their own partial skeletons: their bones' local
-    // tracks were played about the part's root, so the head hung at his hands. Skin them to the body's bones instead, and
-    // hang the part's own bones (the face's) under the body bone they belong to
+    // attached parts, as GSC's Attach(model, tag): 'name@tag' is rigid on that bone (Cap's back shield on j_spine4); a
+    // bare name is skinned to the body (attach(model, "", true): Quicksilver's head and legs). Those carry their own
+    // partial skeletons, whose local tracks played about the part's root (the head hung at his hands): they are skinned
+    // to the body's bones instead, and the part's own bones (the face's) hang under the body bone they belong to
     const body = new Map(); o.traverse(c => { if (c.isBone && !body.has(c.name)) body.set(c.name, c); });
     for (const a of attach) {
-      const part = await model(a); if (!part) continue;
+      const [partName, tag] = a.split('@');
+      const part = await model(partName); if (!part) continue;
+      if (tag && body.has(tag)) {
+        // bone frames are in the game's z-up axes (tag_origin turns the rig y-up); the part's mesh is already y-up
+        if (body.has('tag_origin')) part.quaternion.copy(body.get('tag_origin').quaternion).invert();
+        body.get(tag).add(part); continue;
+      }
       o.add(part);
       const own = []; part.traverse(c => { if (c.isBone && !body.has(c.name) && body.has(c.parent?.name)) own.push(c); });
       for (const b of own) body.get(b.parent.name).add(b);
@@ -110,6 +117,10 @@ export async function createKit(api) {
     o.rotation.y = yaw; o.name = 'malibu_' + name;
     o.traverse(c => { if (c.isMesh) { c.frustumCulled = false; c.castShadow = false; } });
     if (anim) {
+      // World at War's xanims store bone translations as offsets from the bind pose (j_mainroot ~0 against its 37 high
+      // bind, Spider-Man's knees 0 against 17.5, Rhodes's neck -0.8 against 8.8): read as absolute they sank every body
+      // into its hips, folded Spider-Man's legs and pulled Rhodes's head into his chest. makeClip adds bindPosition back
+      o.traverse(c => { if (c.isBone && !c.userData.bindPosition) c.userData.bindPosition = c.position.clone(); });
       const data = await loadAnimation(dir + 'anims/' + anim + '.json').catch(() => null);
       if (data) { const rig = new Rig(o); rig.add('a', data); rig.play('a', true); o.userData.rig = rig; rigs.add(rig); }
     }

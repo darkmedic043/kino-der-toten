@@ -11,7 +11,7 @@ export const HEROES = [
   { id: 'banner', hud: 'hud_banner', name: 'Bruce Banner', color: 2, hp: 150, speed: 1, hands: 'viewhands_banner', figure: 'hulk', anim: 'full_body_hulk', spawn: 'hulk_spawn', statue: 'malibu_gold_statue_1', gear: [] },
   { id: 'widow', hud: 'hud_black_widow', name: 'Black Widow', color: 0, hp: 300, speed: 1.3, hands: 'black_widow_viewhands', figure: 'black_widow_0', anim: 'full_body_widow', spawn: 'widow_spawn', statue: 'malibu_gold_statue_2', gear: ['malibu_widow_pistols'] },
   { id: 'hawkeye', hud: 'hud_hawkeye', name: 'Hawkeye', color: 6, hp: 350, speed: 1.2, hands: 'viewhands_hawkeye', figure: 'hawkeye_full_body', anim: 'full_body_hawkeye', spawn: 'hawkeye_spawn', statue: 'malibu_gold_statue_2', gear: [], found: 'bows' },
-  { id: 'cap', hud: 'hud_cap', name: 'Captain America', color: 4, hp: 400, speed: 1.2, hands: 'viewhands_cap', figure: 'captain_america', attach: ['backmodel_cap_shield'], anim: 'full_body_cap', spawn: 'cap_spawn', statue: 'malibu_gold_statue_1', gear: [], found: 'shield' },
+  { id: 'cap', hud: 'hud_cap', name: 'Captain America', color: 4, hp: 400, speed: 1.2, hands: 'viewhands_cap', figure: 'captain_america', attach: ['backmodel_cap_shield@j_spine4'], anim: 'full_body_cap', spawn: 'cap_spawn', statue: 'malibu_gold_statue_1', gear: [], found: 'shield' },
   { id: 'thor', hud: 'hud_thor', name: 'Thor', color: 3, hp: 400, speed: 1.2, hands: 'viewhands_thor', figure: 'thor_full_body_model', anim: 'full_body_thor', spawn: 'thor_spawn', statue: 'malibu_gold_statue_1', gear: [], found: 'hammer' },
   { id: 'quicksilver', hud: 'hud_quicksilver', name: 'Quicksilver', color: 5, hp: 120, speed: 1.5, hands: 'viewhands_quicksilver', figure: 'quicksilver_torso', attach: ['quicksilver_legs', 'quicksilver_head'], anim: 'full_body_mk42', spawn: 'quicksilver_spawn', statue: 'malibu_gold_lion', gear: [] },
   { id: 'scarlet', hud: 'hud_scarlet', name: 'Scarlet Witch', color: 1, hp: 150, speed: 1.2, hands: 'viewhands_scarlet_witch', figure: 'scarlet_witch_0', anim: 'full_body_scarlet', spawn: 'scarlet_spawn', statue: 'malibu_gold_statue_2', gear: ['malibu_scarlet_witch'] },
@@ -119,8 +119,9 @@ export function setupHeroes(kit) {
       if (f.statue) f.statue.visible = busy;
     }
   };
-  // the full-body idles are authored about the character's origin with the body lowered (30-45 below it for most):
-  // sample the feet through the loop and lift the figure so the lowest foot stands on the floor
+  // the full-body idles stand on the character's origin once their translations are read as bind offsets (kit.figure;
+  // read as absolute they sank every body 30-45 into its hips), give or take a crouch or a raised foot: sample the feet
+  // through the loop and lift the figure so the lowest foot stands on the floor
   const onFloor = (fig, floorY) => {
     const rig = fig.userData.rig; if (!rig) return;
     const feet = []; fig.traverse(c => { if (c.isBone && /^j_(ball|ankle)_(le|ri)$/.test(c.name)) feet.push(c); });
