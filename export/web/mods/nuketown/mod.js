@@ -41,6 +41,17 @@ const FREE_PERK = V(1153, 1672, -1278);
 const LAVA = [[[-560, 953, 2456], [-243, 993, 2809]], [[-299, 977, 2408], [66, 1014, 2703]], [[-491, 890, 2942], [38, 945, 3421]]];   // the three lava_damage triggers
 const PORTALS = [V(-1166, 1324, 1828), V(-662, 1055, 3267), V(-207, 1091, 3181), V(-1883, 1092, 2441)];
 const ZONE_LINKS = { blueback: 'construction', bradyback: 'brady' };   // zone opened -> zone that opens with it (the original's enter_* flags)
+// the water spouts (_watershoot.gsc): stand on one for 3 s and it throws the player up its shaft, then carries them along the
+// original's script_origin chain onto the floor above and opens that area (script_flag enter_brady / enter_blue_back).
+// `trig` is the water_shoot trigger, `top` the bottom of the end-spot trigger; the lab's comes up in the Brady house, hell's
+// at the blue house's back
+const SPOUTS = [
+  { trig: [[-905, 1432, 464], [-816, 1440, 569]], top: 1660, zones: ['brady', 'bradyback'],
+    path: [[-855, 1696, 533], [-854, 1716, 552], [-852, 1728, 575], [-851, 1732, 600], [-850, 1730, 623], [-850, 1721, 642], [-850, 1704, 653]] },
+  { trig: [[-1716, 1304, 1850], [-1633, 1312, 1934]], top: 1688, zones: ['blueback'],
+    path: [[-1661, 1739, 1880], [-1646, 1762, 1880], [-1618, 1780, 1880], [-1579, 1790, 1880], [-1542, 1780, 1880], [-1513, 1753, 1880], [-1489, 1709, 1880]] },
+].map(q => ({ ...q, centre: V((q.trig[0][0] + q.trig[1][0]) / 2, q.trig[1][1], (q.trig[0][2] + q.trig[1][2]) / 2), path: q.path.map(a => V(...a)) }));
+const SPOUT = { prepare: 3, speed: 900, step: .2, cooldown: 3, safe: 1.5 };
 const ROUND_LINES = 4, ROUND_LINE_GAIN = .5;   // round-start lines: gain into the master (.42 x the volume setting)
 
 export default async function setup(api) {
@@ -207,8 +218,54 @@ function setupQuest(api) {
     for (const [from, to] of Object.entries(ZONE_LINKS)) if (active.has?.(from) || (Array.isArray(active) && active.includes(from))) session.flags?.add('zone:' + to);
   };
 
+  // ---- the water spouts (SPOUTS): a phase machine for the local player, `prep` (rumble and spray) -> `up` -> `carry`
+  const sound = mapSound(api);
+  let spoutAudio = null;
+  const stopSpoutAudio = () => { try { spoutAudio?.pause(); } catch {} spoutAudio = null; };
+  const spray = (q, y, count = 8) => host.emit?.('effect', { position: V(q.centre.x, y, q.centre.z), color: new THREE.Color(.75, .9, 1), count });
+  const place = at => player.reset ? player.reset(at, { eye: false, resolve: false }) : player.setPosition(at);
+  const spoutTick = (dt, p) => {
+    st.spoutSafe -= dt; st.spoutWait -= dt;
+    const fp = globalThis.kino?.fpMotion;
+    let sp = st.spout;
+    if (!sp) {
+      if (st.spoutWait > 0 || session.phase === 'reviving' || session.phase === 'gameover') return;
+      const q = SPOUTS.find(q => inBox(p, q.trig, 6, 60)); if (!q) return;
+      sp = st.spout = { q, phase: 'prep', t: 0, fx: 0 };
+      stopSpoutAudio(); spoutAudio = sound('watershoot_prepare', .9); toast('The water spout is building up: stay on it', 3);
+    }
+    const q = sp.q; sp.t += dt; sp.fx -= dt;
+    if (sp.phase === 'prep') {
+      if (fp) fp.shake = .4 * Math.min(1, sp.t);
+      if (sp.fx <= 0) { sp.fx = .1; spray(q, q.centre.y + 4, 6 + sp.t * 4); }
+      if (!inBox(p, q.trig, 20, 60) || session.phase === 'reviving') { st.spout = null; st.spoutWait = 1; stopSpoutAudio(); if (fp) fp.shake = 0; return; }
+      if (sp.t < SPOUT.prepare) return;
+      Object.assign(sp, { phase: 'up', t: 0, from: p.clone() });
+      stopSpoutAudio(); spoutAudio = sound('watershoot_loop', .9);
+    }
+    st.spoutSafe = SPOUT.safe;
+    if (sp.phase === 'up') {
+      // straight up the shaft, drawn toward its middle, at SPOUT.speed
+      const rise = (q.top - sp.from.y) / SPOUT.speed, k = Math.min(1, sp.t / rise), c = Math.min(1, sp.t / .25);
+      place(V(sp.from.x + (q.centre.x - sp.from.x) * c, sp.from.y + (q.top - sp.from.y) * k, sp.from.z + (q.centre.z - sp.from.z) * c));
+      if (fp) fp.shake = .6 * (1 - k);
+      if (sp.fx <= 0) { sp.fx = .05; spray(q, sp.from.y + (q.top - sp.from.y) * k - 30, 14); }
+      if (k >= 1) Object.assign(sp, { phase: 'carry', t: 0, from: V(q.centre.x, q.top, q.centre.z) });
+      return;
+    }
+    // over the lip along the original's points, SPOUT.step seconds each
+    const i = Math.floor(sp.t / SPOUT.step), f = sp.t / SPOUT.step - i;
+    if (i < q.path.length) { const a = i ? q.path[i - 1] : sp.from; place(a.clone().lerp(q.path[i], f)); return; }
+    player.setPosition(q.path.at(-1).clone().add(V(0, 2, 0)));
+    for (const z of q.zones) session.flags?.add('zone:' + z);
+    st.spout = null; st.spoutWait = SPOUT.cooldown; if (fp) fp.shake = 0;
+    const a = spoutAudio; setTimeout(() => { if (a === spoutAudio) stopSpoutAudio(); }, 1500);
+  };
+
   const reset = () => {
-    Object.assign(st, { generators: 0, bunkerT: null, fixed: 0, elevatorT: null, skullT: null, lava: 0, portal: 0, zone: 0 });
+    if (st.spout && globalThis.kino?.fpMotion) globalThis.kino.fpMotion.shake = 0;
+    stopSpoutAudio();
+    Object.assign(st, { spout: null, spoutWait: 0, spoutSafe: 0, generators: 0, bunkerT: null, fixed: 0, elevatorT: null, skullT: null, lava: 0, portal: 0, zone: 0 });
     show(generators, true); setBunker(0); setLever(false);
     for (const t of tools) show(t.nodes, true);
     setElevator(0); show(nodesOf(root, 'pap_key'), true); show(papSkull, false); for (const n of papSkull) { n.position.set(0, 0, 0); moved(n); }
@@ -218,7 +275,7 @@ function setupQuest(api) {
   };
   reset();
   host.on('reset', reset);
-  host.on('fall', e => { const p = e.position; if (SHAFT[0].every((lo, a) => lo <= p.getComponent(a) && p.getComponent(a) <= SHAFT[1][a])) e.amount = 0; });
+  host.on('fall', e => { const p = e.position; if (st.spoutSafe > 0 || SHAFT[0].every((lo, a) => lo <= p.getComponent(a) && p.getComponent(a) <= SHAFT[1][a])) e.amount = 0; });
   host.on('start', () => { placePerk(); });
   host.on('update', dt => {
     const s = session;
@@ -228,6 +285,7 @@ function setupQuest(api) {
     if (!flag('lever2') && s.power) setFlag('lever2');   // a cheat or the engine turned it on: keep the lever in step
     const p = player?.getFeetPosition?.(); if (!p) return;
     st.zone += dt; if (st.zone > 1) { st.zone = 0; zoneTick(); }
+    spoutTick(dt, p);
     st.lava += dt;
     if (st.lava > .3) { st.lava = 0; if (LAVA.some(b => inBox(p, b, 0, 90))) { damage?.(50); } }
     st.portal -= dt;
