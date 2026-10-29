@@ -27,8 +27,8 @@ const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const NUKE = V3(501, -102, -9854);                                            // the gsc's nuke cloud origin (game space)
 const PLAY = new THREE.Box3(V3(-2800, 800, -2000), V3(1400, 2700, 3600));      // the playable map for the roof map (world.bounds spans the far terrain)
 const LAB_Y = 1600;                                                            // below: the lab and hell (the lab's tubes stutter, the streetlights don't)
-const LOOK = {   // the UGX shots average sRGB (33, 48, 53): a teal-grey overcast, the houses lit flat by the sky
-  ambient: { color: 0x5f7d86, on: 1.0, off: .85 }, hemi: { sky: 0x6a98a4, ground: 0x263230, intensity: 1.25 },
+const LOOK = {   // the UGX shots average sRGB (33, 48, 53), the user's gameplay video (2026-10-29) a bright overcast sky over a dark teal-grey street: the houses lit flat by the sky
+  ambient: { color: 0x6b8088, on: 1.0, off: .85 }, hemi: { sky: 0x7aa0aa, ground: 0x263230, intensity: 1.25 },
   key: { color: 0xa0c4cf, intensity: 1.1, dir: V3(-.3, 1, .45) }, fill: { color: 0x3a5660, intensity: .4 },
 };
 const FIRE = { range: 620, decay: 1.5, color: 0xff9c4e, intensity: 1500, pool: 6 };
@@ -66,8 +66,8 @@ export function setupAtmosphere(api) {
   // ---- sky dome
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, depthTest: true, fog: false,   // seen from inside: FrontSide culls the whole dome
-    uniforms: { time: { value: 0 }, flash: { value: 0 }, flashDir: { value: S.flashDir }, horizon: { value: new THREE.Color(0x425a62) },
-      zenith: { value: new THREE.Color(.028, .04, .046) }, cloudLo: { value: new THREE.Color(.04, .055, .06) }, cloudHi: { value: new THREE.Color(.12, .145, .15) },
+    uniforms: { time: { value: 0 }, flash: { value: 0 }, flashDir: { value: S.flashDir }, horizon: { value: new THREE.Color(0x84a9b2) },   // horizon = the map's fog colour each frame; a bright pale cyan overcast with dark cloud masses, after the user's gameplay video (2026-10-29)
+      zenith: { value: new THREE.Color(.04, .06, .07) }, cloudLo: { value: new THREE.Color(.015, .022, .026) }, cloudHi: { value: new THREE.Color(.1, .14, .16) },
       moonDir: { value: LOOK.key.dir.clone().normalize() }, nukeDir: { value: new THREE.Vector2(0, -1) }, nukeAng: { value: new THREE.Vector2(.14, .45) } },
     vertexShader: `varying vec3 vDir;
       void main(){ vDir = position; vec4 p = projectionMatrix * vec4(mat3(modelViewMatrix) * position, 1.0); gl_Position = vec4(p.xy, p.w * 0.99999, p.w); }`,
@@ -83,7 +83,7 @@ export function setupAtmosphere(api) {
         if (el > 0.0) {                                                            // a cloud deck, projected from a plane overhead
           vec2 uv = d.xz / (el + 0.12) * 0.7 + time * vec2(0.011, 0.004);
           float n = fbm(uv * 1.3 + 0.4 * fbm(uv * 2.4 - time * 0.008));
-          den = smoothstep(0.22, 0.72, n) * smoothstep(0.0, 0.14, el);
+          den = smoothstep(0.38, 0.66, n) * smoothstep(0.0, 0.14, el);   // hard-edged dark masses against the bright overcast (2026-10-29, the video)
           col = mix(col, mix(cloudLo, cloudHi, smoothstep(0.25, 0.85, n)), den * 0.95);
         }
         float mu = max(dot(d, moonDir), 0.0);                                      // a faint moon behind the deck (where the key light comes from)

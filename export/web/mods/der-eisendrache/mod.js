@@ -60,7 +60,7 @@ export default async function setup(api) {
   // ?bo1Zombies keeps the BO1 ones.
   if (!new URLSearchParams(location.search).has('bo1Zombies') && api.enemies) {
     const Z = n => loadModel(new URL(`zombies/${n}.glb`, import.meta.url).href).catch(() => null);
-    Promise.all([Promise.all([1, 2].map(k => Z('c_zom_der_zombie_body' + k)))   /* body3's tank top and arms are Shadows of Evil textures, not in this map */, Promise.all([1, 2, 3].map(k => Z('c_zom_der_zombie_head' + k)))]).then(([bodies, heads]) => {
+    await Promise.all([Promise.all([1, 2].map(k => Z('c_zom_der_zombie_body' + k)))   /* body3's tank top and arms are Shadows of Evil textures, not in this map */, Promise.all([1, 2, 3].map(k => Z('c_zom_der_zombie_head' + k)))]).then(async ([bodies, heads]) => {   // awaited (2026-10-29): templates and gib sets must be in place before the shader warm-up
       const e = api.enemies, refB = e.templates[0], refH = e.heads?.[0];
       const ref = new Map(); for (const r of [refB, refH]) r?.traverse(o => { if (o.isBone && !ref.has(o.name)) ref.set(o.name, o.quaternion.clone()); });
       const ok = bodies.filter(Boolean), okH = heads.filter(Boolean);
@@ -101,10 +101,10 @@ export default async function setup(api) {
       // their own gib pieces for the dismemberment mod (same keys as BO1's), re-bound the same way
       const KEYS = { upclean: 'upclean', lowclean: 'lowclean', behead: 'behead', larmoff_1: 'larmoff', rarmoff_1: 'rarmoff', llegoff_1: 'llegoff', rlegoff_1: 'rlegoff', legsoff_1: 'blegsoff' };
       const sets = (window.kino.gibSets ??= {});
-      [1, 2].forEach(k => Promise.all(Object.entries(KEYS).map(async ([key, g]) => [key, await Z(`c_zom_der_zombie_body${k}_g_${g}`)])).then(list => {
+      await Promise.all([1, 2].map(k => Promise.all(Object.entries(KEYS).map(async ([key, g]) => [key, await Z(`c_zom_der_zombie_body${k}_g_${g}`)])).then(list => {
         const set = {}; for (const [key, m] of list) if (m) { rebindTo(m, ref); set[key] = m; }
         sets['castle' + k] = set;
-      }));
+      })));
     });
   }
   // co-op (sync.js): every system below shares its events and state through api.sync

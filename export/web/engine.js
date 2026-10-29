@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { textureMemoryStats, setPrimaryRenderer } from './texture-memory.js';   // first: frees decoded texture images once uploaded
 import './skinned-bounds.js';   // fast SkinnedMesh bounds for every rigged model (no hitch when a zombie first draws)
 import { PlayerController } from './player-controller.js';
-import { ViewWeapon } from './animation.js';
+import { ViewWeapon, pendingModels } from './animation.js';
 import { Enemies } from './enemies.js';
 import { KinoSession } from './kino-session.js';
 import { firesBoth } from './rules.js';
@@ -63,11 +63,22 @@ const firstDraw={n:0,names:[],seen:new WeakMap(),layouts:new Map(),geo:new WeakM
   target=t=>{if(!t)return 0;let id=fd.rt.get(t);if(id===undefined){const k=[t.texture?.format,t.texture?.type,t.samples,t.textures?.length,t.depthBuffer,t.isWebGLCubeRenderTarget].join();id=fd.targets.get(k);if(id===undefined)fd.targets.set(k,id=fd.targets.size+1);fd.rt.set(t,id);}return id;};
   renderer.renderBufferDirect=function(camera,scene,geometry,material,object,group){direct.call(this,camera,scene,geometry,material,object,group);
     const program=this.properties.get(material).currentProgram;if(!program||!geometry)return;
-    let seen=fd.seen.get(program);if(!seen)fd.seen.set(program,seen=new Set());const key=layout(geometry)*64+target(this.getRenderTarget());
+    let seen=fd.seen.get(program);if(!seen)fd.seen.set(program,seen=new Set());const key=(layout(geometry)*4+(object.isPoints?1:object.isLine?2:0))*64+target(this.getRenderTarget());
     if(!seen.has(key)){seen.add(key);fd.n++;if(fd.names.length<3)fd.names.push(String(material.name||material.type).slice(0,24));}
     // a program compiled after the warm-up: what drew it (material, object chain, vertex layout, scene), for the perf log
     if(program.id>=fd.lateFrom&&!fd.lateSeen.has(program.id)){fd.lateSeen.add(program.id);if(fd.late.length<16){let chain='',o=object;for(let i=0;i<4&&o;i++,o=o.parent)chain+=(i?'<':'')+(o.name||o.type);
       fd.late.push(`${material.type.replace('Material','')}:${material.name||''}|${chain}|${Object.keys(geometry.attributes).join('/')}|${scene===viewScene?'view':'world'}`.slice(0,120));}}};}
+// Texture uploads per frame (count, KB, mipmap builds), for the perf log's hitches: a hitch with no first draws and an idle
+// main thread but uploads in its frame is the GPU process converting and creating textures (2026-10-29, the user's logs).
+const texUp={n:0,kb:0,mip:0};
+{const gl=renderer.getContext();const px=(w,h)=>Math.round(w*h*4/1024);
+  const texLog=new URLSearchParams(location.search).has('texLog')?(globalThis.kinoTexLog=[]):null;   // ?texLog: every upload with its caller (debug)
+  const wrap=(name,kb)=>{const f=gl[name];if(typeof f!=='function')return;gl[name]=function(...a){texUp.n++;const k=kb(a)||0;texUp.kb+=k;
+    if(texLog&&texLog.length<4000)texLog.push([Math.round(performance.now()),name,k,a[0],String(new Error().stack).split('\n').slice(2,7).map(l=>l.trim().replace(/^at /,'').replace(/https?:\/\/[^/]+\//,'')).join(' < ')]);return f.apply(this,a);};};
+  wrap('texImage2D',a=>a.length>=9?px(a[3],a[4]):px(a[5]?.width??0,a[5]?.height??0));wrap('texSubImage2D',a=>a.length>=9?px(a[4],a[5]):px(a[6]?.width??0,a[6]?.height??0));
+  wrap('texImage3D',a=>px(a[3],a[4])*(a[5]||1));wrap('texSubImage3D',a=>px(a[5],a[6])*(a[7]||1));wrap('texStorage2D',a=>px(a[3],a[4])*4/3);wrap('texStorage3D',a=>px(a[3],a[4])*(a[5]||1));
+  wrap('compressedTexImage2D',a=>Math.round((a[6]?.byteLength??a[7]??0)/1024));wrap('compressedTexSubImage2D',a=>Math.round((a[8]?.byteLength??a[9]??0)/1024));
+  const gm=gl.generateMipmap;gl.generateMipmap=function(...a){texUp.mip++;return gm.apply(this,a);};}
 const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
 const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait');   // A/B switch for warmShaders' draw pass
 const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
@@ -124,6 +135,8 @@ function diag(ev,extra={}){
 const perf=createPerfDiag({context:()=>({kept:keptPrograms,q:settings.graphics,scale:settings.renderScale,cap:settings.fpsCap,px:renderer.domElement.width+'x'+renderer.domElement.height,
   calls:renderer.info?.render?.calls,tris:renderer.info?.render?.triangles,tex:renderer.info?.memory?.textures,zombies:enemies?.list?.length??0,round:session?.round,coop:!!globalThis.kino?.coop?.code})});mods.perf=perf;
 addEventListener('pagehide',()=>perf.end());
+{const emit=mods.emit.bind(mods),skip=new Set(['update','frame','warm','render','tick']);mods.emit=(ev,...a)=>{if(!skip.has(ev))perf.event?.(ev);return emit(ev,...a);};}
+let evRound=0,evZ=0,evDef=null;
 {const beat=setInterval(()=>{diag('beat',{label:$('load-label')?.textContent});if(ready&&performance.now()-diagT0>0&&(diag.readyAt??=performance.now())&&performance.now()-diag.readyAt>20000)clearInterval(beat);},2000);}
 addEventListener('error',e=>diag('error',{message:String(e.message).slice(0,300),src:e.filename?.split('/').pop(),line:e.lineno}));
 addEventListener('unhandledrejection',e=>diag('rejection',{message:String(e.reason?.message??e.reason).slice(0,300)}));
@@ -502,6 +515,10 @@ try{
     if(instanceCull.meshes){console.info('[instance-cull]',instanceCull.sources,'meshes into',instanceCull.meshes,'batches,',instanceCull.instances,'instances in',instanceCull.buildMs,'ms');
       await paint();await renderer.compileAsync(scene,camera).catch(()=>{});}   // batched props need their own shader variants: compile them behind the loading screen
   }
+  // Every model a mod started loading without awaiting (map zombies, gib sets, props) must land, and its .then chains run
+  // (the timeout yield), before the warm-up, or whatever it puts in place compiles at its first draw (2-3 s each on D3D11:
+  // Nuketown's zombies did, 2026-10-29). Mods can also push their own promises on host.pending.
+  progress('Waiting for models',98);await pendingModels();await new Promise(r=>setTimeout(r,0));await Promise.allSettled(mods.pending??[]);
   if(!perfOff.has('noWarm')){progress('Preparing shaders',99);await paint();await warmShaders(true);
     // mods keep adjusting materials for a moment after loading (the lighting mod tags late materials on a 1 s sweep,
     // which changes their program): compile those too while the player is still on the start screen (cheap: programs
@@ -636,7 +653,8 @@ function renderFrame(now){
   update(dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
   const viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
   keepPrograms();gpuEnd(gq,now);
-  if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(firstDraw.late.length?firstDraw.late.splice(0):renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames]);}else{programCount=renderer.info.programs.length;perf.pause();}
+  if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(firstDraw.late.length?firstDraw.late.splice(0):renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;if(session.round!==evRound){evRound=session.round;perf.event?.('round'+evRound);}const zn=enemies?.list?.length??0;if(zn>evZ)perf.event?.('spawn');evZ=zn;if(session.def!==evDef){evDef=session.def;perf.event?.('equip:'+(evDef?.id??'?'));}
+    perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames],texUp);texUp.n=texUp.kb=texUp.mip=0;}else{programCount=renderer.info.programs.length;perf.pause();}
   lastFirstDraws=firstDraw.n;lastFirstNames=firstDraw.names;firstDraw.n=0;firstDraw.names=[];   // hitches carry the previous frame's first draws (a GPU stall delays the next frame)
 }
 resumeRendering();

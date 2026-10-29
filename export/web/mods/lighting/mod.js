@@ -135,7 +135,27 @@ export default async function setup(api){
   // them by the exposure difference, every frame (maps set theirs after the mods load).
   else if(VM&&renderer&&api.map?.id!=='moon'){
     const base={amb:VM.amb.intensity,key:VM.key.intensity,fill:VM.fill.intensity,rim:VM.rim.intensity};
-    host.on('update',()=>{const k=1.7/Math.max(.3,renderer.toneMappingExposure||1);for(const n in base)VM[n].intensity=base[n]*k;});
+    // ...and by the map's light at the camera (2026-10-29, user: "its darker in nuketown, yet the fpv glows super bright"):
+    // the scene's ambient and hemisphere, its directional lights at half (a shadow-casting sun only while the camera sees
+    // it, one ray every 8 frames), and the point and spot lights in range, summed as irradiance E; the gain is E over the
+    // engine's default lights (2.9), clamped and smoothed, so a dark map or a dark corner darkens the gun and arms too.
+    const lum=c=>.2126*c.r+.7152*c.g+.0722*c.b,REF=2.9,world=api.world;let lights=[],frame=0,sunVis=1,gain=1;const d=new THREE.Vector3(),ray=new THREE.Ray();
+    const E=()=>{const p=camera.position;let e=0;
+      for(const l of lights){if(!l.visible||!l.intensity)continue;
+        if(l.isAmbientLight)e+=l.intensity*lum(l.color);
+        else if(l.isHemisphereLight)e+=l.intensity*(lum(l.color)+lum(l.groundColor))/2;
+        else if(l.isDirectionalLight)e+=l.intensity*lum(l.color)*.5*(l.castShadow?sunVis:1);
+        else if(l.isPointLight||l.isSpotLight){l.getWorldPosition(d);const dist=Math.max(20,d.distanceTo(p)),range=l.distance||Infinity;if(dist>range)continue;
+          const fall=range<Infinity?Math.max(0,1-Math.pow(dist/range,4)):1;e+=l.intensity*lum(l.color)*fall/Math.pow(dist,l.decay??2)*(l.isSpotLight?.35:1);}}
+      return e;};
+    host.on('update',(dt)=>{frame++;
+      if(frame%120===1){lights=[];scene.traverse(o=>{if(o.isLight)lights.push(o);});}
+      if(frame%8===0&&world?.raycast){const sun=lights.find(l=>l.isDirectionalLight&&l.castShadow);if(sun){sun.getWorldPosition(d);d.sub(sun.target.getWorldPosition(new THREE.Vector3())).normalize();
+        ray.set(camera.position,d);const vis=world.raycast(ray,1,6000)?0:1;sunVis+=(vis-sunVis)*.3;}}
+      // dim maps dim the gun more than linearly (Nuketown r≈.3 → .15: the video reference shows the hands as dark as the street)
+      const r=E()/REF,target=Math.min(1.4,Math.max(.08,r<1?Math.pow(r,1.6):r));gain+=(target-gain)*Math.min(1,(dt||.016)*4);
+      const k=1.7/Math.max(.3,renderer.toneMappingExposure||1)*gain;for(const n in base)VM[n].intensity=base[n]*k;
+      if(window.kino)window.kino.vmLight={gain,target,sunVis};});
   }
   else if(api.map?.id==='moon'&&renderer)window.kino.lighting=setupMoon(api,{quality,LIGHT_CLAMP,baking,volume:baking?null:await loadVolume(import.meta.url,'moon-light')});
 }

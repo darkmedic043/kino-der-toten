@@ -19,6 +19,7 @@ export function createPerfDiag({ send, context }) {
   let sends = 0, last = 0, windowStart = performance.now(), lastHeap = heapMb(), w = fresh(), session = freshSession();
   function fresh() { return { gaps: [], upd: [], ren: [], hist: EDGES.map(() => 0).concat(0), hitches: [], hitchAbs: [], gpu: [], gpuHit: [], gc: 0, gcMb: 0, longN: 0, longMs: 0, longMax: 0, heapMax: 0, mods: new Map(), progs: [], fd: 0 }; }
   const tasks = [];   // recent long tasks as [start, end] ms, to tell which hitches the main thread was busy for
+  const events = [];  // recent game events as [name, ms] (event())
   function freshSession() { return { frames: 0, ms: 0, hist: EDGES.map(() => 0).concat(0), hitches: 0, worst: 0, gc: 0, longN: 0, longMs: 0, fd: 0 }; }
   const bucket = ms => { let i = 0; while (i < EDGES.length && ms > EDGES[i]) i++; return i; };
 
@@ -57,7 +58,9 @@ export function createPerfDiag({ send, context }) {
 
   return {
     // one played frame: gapMs = time since the previous played frame, updMs / renMs = CPU time in update and render
-    frame(now, updMs, renMs, extra) {
+    // game events (mod events, round, spawn, equip) with their time, for the hitches: the ones of the last 1.5 s before a hitch are listed with it
+    event(name) { const t = performance.now(); if (events.length && events[events.length - 1][0] === name && t - events[events.length - 1][1] < 250) return; events.push([String(name).slice(0, 24), t]); if (events.length > 24) events.shift(); },
+    frame(now, updMs, renMs, extra, tex) {
       const gap = last ? now - last : 0; last = now;
       const heap = heapMb();
       let gcMb = 0;
@@ -69,7 +72,10 @@ export function createPerfDiag({ send, context }) {
           session.hitches++;
           // what the hitch frame looked like: when, interval, its update/render ms, heap freed just before it (MB), extra
           // (engine.js: first draws in the frame before and in this one, then the first few of those materials' names)
-          if (w.hitches.length < 8) { const h = [r1((now - windowStart) / 1000), Math.round(gap), r1(updMs), r1(renMs), Math.round(gcMb), ...(extra ? [extra] : [])]; w.hitches.push(h); w.hitchAbs.push([h, now - gap, now]); }
+          // then texture uploads in the hitch frame ('tex count/KB/mipmaps') and the game events of the 1.5 s before it ('ev ...')
+          if (w.hitches.length < 8) { const h = [r1((now - windowStart) / 1000), Math.round(gap), r1(updMs), r1(renMs), Math.round(gcMb), ...(extra ? [extra] : [])];
+            if (tex && (tex.n || tex.mip)) h.push(`tex ${tex.n}/${Math.round(tex.kb)}/${tex.mip}`); const ev = events.filter(([, t]) => t > now - gap - 1500).map(e => e[0]); if (ev.length) h.push('ev ' + ev.join(' '));
+            w.hitches.push(h); w.hitchAbs.push([h, now - gap, now]); }
         }
       }
       if (now - windowStart > WINDOW_MS) flush(now);

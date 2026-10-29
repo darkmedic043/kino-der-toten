@@ -5,6 +5,8 @@ import { assetManager, disposeSkeletons } from './runtime-assets.js';
 
 const loader=new GLTFLoader(assetManager), models=new Map(), clips=new Map();
 export async function loadModel(url){if(!url)return null;if(!models.has(url))models.set(url,loader.loadAsync(url).then(gltf=>gltf.scene));return clone(await models.get(url));}
+// every model load started so far (settled or not): the engine waits for them before its shader warm-up (2026-10-29)
+export function pendingModels(){return Promise.allSettled([...models.values()]);}
 export async function loadAnimation(url){if(!clips.has(url))clips.set(url,fetch(url).then(r=>{if(!r.ok)throw new Error('Animation '+url+': '+r.status);return r.json();}));return clips.get(url);}
 export function makeClip(root, data, locomotion=false){
   const tracks=[];const nodes=new Map();
