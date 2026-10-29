@@ -43,12 +43,15 @@ const PORTALS = [V(-1166, 1324, 1828), V(-662, 1055, 3267), V(-207, 1091, 3181),
 const ZONE_LINKS = { blueback: 'construction', bradyback: 'brady' };   // zone opened -> zone that opens with it (the original's enter_* flags)
 const ROUND_LINES = 4, ROUND_LINE_GAIN = .5;   // round-start lines: gain into the master (.42 x the volume setting)
 
-export default function setup(api) {
+export default async function setup(api) {
   if (api.map?.id !== 'nuketown') return;
   try { setupAtmosphere(api); } catch (e) { console.warn('[nuketown] atmosphere', e); }
   try { setupQuest(api); } catch (e) { console.warn('[nuketown] quest', e); }
   try { setupSounds(api); } catch (e) { console.warn('[nuketown] sounds', e); }
-  try { const z = setupZombies(api); if (globalThis.kino?.nuketown) globalThis.kino.nuketown.zombies = z; } catch (e) { console.warn('[nuketown] zombies', e); }
+  // awaited (2026-10-29): the engine's shader warm-up draws enemies.templates/heads (and the dismemberment mod's gib pieces)
+  // once the mods are set up, so the zombies (12 MB, slow over the tunnel) must have replaced BO1's by then, or their
+  // programs compile at the first spawn instead: 2-3 s a program on Windows/D3D11
+  try { const z = await setupZombies(api); if (globalThis.kino?.nuketown) globalThis.kino.nuketown.zombies = z; } catch (e) { console.warn('[nuketown] zombies', e); }
 }
 
 // ---- scene helpers: the builder bakes every ENT_ prop in world space under a node with no transform (several nodes can

@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { init, NavMeshQuery } from '@recast-navigation/core';
+import { init, NavMeshQuery, exportNavMesh, importNavMesh } from '@recast-navigation/core';
 import { generateTiledNavMesh } from '@recast-navigation/generators';
 import { CollisionWorld } from './collision-world.js';
 import { optimizeStaticScene } from './scene-optimizer.js';
@@ -67,6 +67,19 @@ function positionsOf(meshes){
   });
   return geometries.length?mergeGeometries(geometries,false):null;
 }
+
+// Navmesh cache (2026-10-29): generating Nuketown's navmesh froze the loading screen for 5.6 s on every load, so the
+// built mesh (exportNavMesh) is kept in IndexedDB per map, with a signature of what it was built from (the clipped
+// collision triangles, the traversal links, the cell size and headroom, NAV_CACHE_VERSION); a matching signature
+// restores it with importNavMesh in milliseconds, anything else rebuilds and replaces it. Bump NAV_CACHE_VERSION when the
+// generation settings below change.
+const NAV_CACHE_VERSION=1;
+function navSignature(positions,extra){let h=2166136261;const u=new Uint32Array(positions.buffer,positions.byteOffset,positions.length);
+  for(let i=0;i<u.length;i++){h^=u[i];h=Math.imul(h,16777619);}for(let i=0;i<extra.length;i++){h^=extra.charCodeAt(i);h=Math.imul(h,16777619);}return positions.length+':'+(h>>>0).toString(16);}
+const navDb=()=>new Promise((res,rej)=>{if(!globalThis.indexedDB)return rej(new Error('no IndexedDB'));const r=indexedDB.open('kino-navmesh',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('nav');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);r.onblocked=()=>rej(new Error('blocked'));});
+async function navCacheGet(key){try{const db=await navDb();return await new Promise((res,rej)=>{const q=db.transaction('nav','readonly').objectStore('nav').get(key);q.onsuccess=()=>res(q.result??null);q.onerror=()=>rej(q.error);});}catch{return null;}}
+async function navCachePut(key,value){try{const db=await navDb();await new Promise((res,rej)=>{const t=db.transaction('nav','readwrite');t.objectStore('nav').put(value,key);t.oncomplete=res;t.onerror=()=>rej(t.error);});}catch(e){console.warn('[custom-world] navmesh cache',e);}}
 
 export class CustomWorld {
   constructor(scene,data,entry){
@@ -240,10 +253,17 @@ export class CustomWorld {
     const offMeshConnections=this.traversals.map((t,i)=>({startPosition:{x:t.from.x,y:t.from.y,z:t.from.z},
       endPosition:{x:t.to.x,y:t.to.y,z:t.to.z},radius:60,bidirectional:t.both,userId:i}));   // 60: a hop starts at the wall, where the navmesh is eroded back
     // map entry navHeight: the headroom a zombie needs (70; Malibu Drive 60: some of its passages leave 71, lost to rounding)
-    const nav=generateTiledNavMesh(positions,indices,{offMeshConnections,cs,ch,tileSize:32,walkableSlopeAngle:48,walkableHeight:Math.ceil((this.entry.navHeight??70)/ch),walkableClimb:Math.floor(18/ch),walkableRadius:Math.max(1,Math.round(14/cs)),
-      maxEdgeLen:Math.round(48/cs),maxSimplificationError:1.3,minRegionArea:8,mergeRegionArea:20,maxVertsPerPoly:6,detailSampleDist:6,detailSampleMaxError:1});
-    if(!nav.success)throw new Error('Navigation mesh generation failed: '+(nav.error??'unknown error'));
-    this.nav=nav.navMesh;this.query=new NavMeshQuery(this.nav,{maxNodes:65535});this.query.defaultQueryHalfExtents={x:70,y:100,z:70};
+    if(!(positions instanceof Float32Array))positions=Float32Array.from(positions);
+    const navKey=this.entry.id??this.entry.dir,navSig=navSignature(positions,JSON.stringify([NAV_CACHE_VERSION,cs,ch,this.entry.navHeight??70,offMeshConnections]));
+    const cached=await navCacheGet(navKey);let navMesh=null;
+    if(cached?.sig===navSig&&cached.data){try{navMesh=importNavMesh(cached.data).navMesh;console.log('[custom-world] navmesh from the cache');}catch(e){console.warn('[custom-world] navmesh cache import',e);navMesh=null;}}
+    if(!navMesh){const t0=performance.now();
+      const nav=generateTiledNavMesh(positions,indices,{offMeshConnections,cs,ch,tileSize:32,walkableSlopeAngle:48,walkableHeight:Math.ceil((this.entry.navHeight??70)/ch),walkableClimb:Math.floor(18/ch),walkableRadius:Math.max(1,Math.round(14/cs)),
+        maxEdgeLen:Math.round(48/cs),maxSimplificationError:1.3,minRegionArea:8,mergeRegionArea:20,maxVertsPerPoly:6,detailSampleDist:6,detailSampleMaxError:1});
+      if(!nav.success)throw new Error('Navigation mesh generation failed: '+(nav.error??'unknown error'));
+      navMesh=nav.navMesh;console.log(`[custom-world] navmesh built in ${Math.round(performance.now()-t0)} ms`);
+      try{navCachePut(navKey,{sig:navSig,data:exportNavMesh(navMesh)});}catch(e){console.warn('[custom-world] navmesh export',e);}}
+    this.nav=navMesh;this.query=new NavMeshQuery(this.nav,{maxNodes:65535});this.query.defaultQueryHalfExtents={x:70,y:100,z:70};
 
     progress('Placing machines and barricades',65);
     const models=this.data.models,place=async(key,position,yaw,offset=0)=>{

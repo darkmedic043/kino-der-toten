@@ -46,20 +46,29 @@ const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null;
 // its program twice a draw (on The Giant, a glass material and the viewmodel's decals: ~10% of a frame). One pass
 // looks the same here. Swept once a second over both scenes for materials that appear later (was lighting-mod only).
 let singlePassTimer=0,programCount=0;
-const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
+// Every shader program stays built for the whole session. three deletes a program as soon as no material uses it, so effects
+// that make and dispose materials per use (Thundergun blast, DG-2 arcs, Ray Gun bolts) recompiled on every shot; on Windows
+// (ANGLE on D3D11) each compile froze the game for 0.3-1 s. Programs only accumulate per distinct shader setup (a few hundred).
+let keptPrograms=0;
+let standIns=null;   // effect stand-ins (below); declared here: warmShaders runs from the load sequence before the module reaches that line
+function keepPrograms(){const ps=renderer.info.programs;for(;keptPrograms<ps.length;keptPrograms++)ps[keptPrograms].usedTimes++;}
 // First draws (2026-10-24, user: freezes while playing and shooting; RTX 4070 Ti Super, ANGLE on D3D11). A program drawn
 // for the first time with another vertex layout or into another kind of render target can make the driver build a new GPU
 // pipeline (on D3D11 also an ANGLE shader variant) inside the GPU process: frames stop for up to seconds while no page
 // code runs, so it shows in no CPU timing. Counted per frame (program x layout x target format) for the perf log's hitches.
 let lastFirstDraws=0,lastFirstNames=[];
-const firstDraw={n:0,names:[],seen:new WeakMap(),layouts:new Map(),geo:new WeakMap(),targets:new Map(),rt:new WeakMap()};
+const firstDraw={n:0,names:[],seen:new WeakMap(),layouts:new Map(),geo:new WeakMap(),targets:new Map(),rt:new WeakMap(),lateFrom:Infinity,lateSeen:new Set(),late:[]};
 {const fd=firstDraw,direct=renderer.renderBufferDirect,sig=a=>a?(a.isInterleavedBufferAttribute?a.data.array:a.array)?.constructor.name+a.itemSize+(a.normalized?'n':'')+(a.isInstancedBufferAttribute||a.data?.isInstancedInterleavedBuffer?'i':''):'',
   layout=g=>{let id=fd.geo.get(g);if(id===undefined){const k=Object.keys(g.attributes).sort().map(n=>n+':'+sig(g.attributes[n])).join();id=fd.layouts.get(k);if(id===undefined)fd.layouts.set(k,id=fd.layouts.size);fd.geo.set(g,id);}return id;},
   target=t=>{if(!t)return 0;let id=fd.rt.get(t);if(id===undefined){const k=[t.texture?.format,t.texture?.type,t.samples,t.textures?.length,t.depthBuffer,t.isWebGLCubeRenderTarget].join();id=fd.targets.get(k);if(id===undefined)fd.targets.set(k,id=fd.targets.size+1);fd.rt.set(t,id);}return id;};
   renderer.renderBufferDirect=function(camera,scene,geometry,material,object,group){direct.call(this,camera,scene,geometry,material,object,group);
     const program=this.properties.get(material).currentProgram;if(!program||!geometry)return;
     let seen=fd.seen.get(program);if(!seen)fd.seen.set(program,seen=new Set());const key=layout(geometry)*64+target(this.getRenderTarget());
-    if(!seen.has(key)){seen.add(key);fd.n++;if(fd.names.length<3)fd.names.push(String(material.name||material.type).slice(0,24));}};}
+    if(!seen.has(key)){seen.add(key);fd.n++;if(fd.names.length<3)fd.names.push(String(material.name||material.type).slice(0,24));}
+    // a program compiled after the warm-up: what drew it (material, object chain, vertex layout, scene), for the perf log
+    if(program.id>=fd.lateFrom&&!fd.lateSeen.has(program.id)){fd.lateSeen.add(program.id);if(fd.late.length<16){let chain='',o=object;for(let i=0;i<4&&o;i++,o=o.parent)chain+=(i?'<':'')+(o.name||o.type);
+      fd.late.push(`${material.type.replace('Material','')}:${material.name||''}|${chain}|${Object.keys(geometry.attributes).join('/')}|${scene===viewScene?'view':'world'}`.slice(0,120));}}};}
+const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
 const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait');   // A/B switch for warmShaders' draw pass
 const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
 let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer,leaving=false;
@@ -112,7 +121,7 @@ function diag(ev,extra={}){
     heap:performance.memory?Math.round(performance.memory.usedJSHeapSize/1e6):null,lim:performance.memory?Math.round(performance.memory.jsHeapSizeLimit/1e6):null,frames:renderedFrames,calls:renderer.info?.render?.calls,ready,...extra}));}catch{}
 }
 // play-time frame timing (perf-diag.js): 10 s summaries while playing, one for the session when the page goes away
-const perf=createPerfDiag({context:()=>({q:settings.graphics,scale:settings.renderScale,cap:settings.fpsCap,px:renderer.domElement.width+'x'+renderer.domElement.height,
+const perf=createPerfDiag({context:()=>({kept:keptPrograms,q:settings.graphics,scale:settings.renderScale,cap:settings.fpsCap,px:renderer.domElement.width+'x'+renderer.domElement.height,
   calls:renderer.info?.render?.calls,tris:renderer.info?.render?.triangles,tex:renderer.info?.memory?.textures,zombies:enemies?.list?.length??0,round:session?.round,coop:!!globalThis.kino?.coop?.code})});mods.perf=perf;
 addEventListener('pagehide',()=>perf.end());
 {const beat=setInterval(()=>{diag('beat',{label:$('load-label')?.textContent});if(ready&&performance.now()-diagT0>0&&(diag.readyAt??=performance.now())&&performance.now()-diag.readyAt>20000)clearInterval(beat);},2000);}
@@ -518,6 +527,24 @@ try{
 // including hidden ones (made visible just for the compile; lights stay as they are, since toggling a light
 // recompiles every shader). compile doesn't upload textures, so hidden weapons don't fill video memory.
 // ?noWarm skips it.
+// Effect stand-ins for the shader warm-up. Weapons and props make their effect materials on first use (Thundergun blast,
+// DG-2 arcs, booth sparks, bolts, frost rings), each a shader compile mid-game (a freeze on Windows/D3D11). A built-in
+// material's program depends only on a few switches (texture or not, side, fog, tone mapping), not on colour, opacity or
+// blending, so one of each kind covers them all. Back faces too: a transparent double-sided material is drawn back then
+// front (two programs) until the once-a-second singlePass sweep reaches it. Built once; one set for each scene.
+function effectStandIns(){
+  const tex=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);tex.needsUpdate=true;
+  const plane=new THREE.PlaneGeometry(1,1),dot=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3()]),line=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,1,0)]);
+  const set=()=>{const g=new THREE.Group();
+    for(const map of [null,tex])for(const fog of [true,false])for(const toneMapped of [true,false]){
+      const o={map,fog,toneMapped,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending};
+      for(const side of [THREE.FrontSide,THREE.BackSide,THREE.DoubleSide])g.add(new THREE.Mesh(plane,new THREE.MeshBasicMaterial({...o,side})));
+      for(const side of [THREE.FrontSide,THREE.DoubleSide])g.add(new THREE.Mesh(plane,new THREE.MeshBasicMaterial({map,fog,toneMapped,side})));   // opaque ones (another program)
+      g.add(new THREE.Points(dot,new THREE.PointsMaterial(o)),new THREE.Sprite(new THREE.SpriteMaterial(o)));
+      if(!map)g.add(new THREE.LineSegments(line,new THREE.LineBasicMaterial(o)));}
+    g.traverse(o=>{o.frustumCulled=false;});return g;};
+  return {world:set(),view:set()};
+}
 // Waits until the GPU has run everything queued so far (a WebGL2 fence, polled). The warm-up only queues its draws: on
 // Windows/D3D11 the GPU process then builds the real shaders while working through them, seconds of work that finished
 // after the loading screen had gone (2026-10-24, user on an RTX 4070 Ti Super: 0.5-1.7 s freezes in the first seconds of
@@ -537,8 +564,10 @@ async function warmShaders(waitGpu=false){
     // sprites), the power-ups and the enemy templates (zombie bodies and heads, dogs, crawlers; clones share their
     // materials). They're drawn for real (textures uploaded) behind the loading screen.
     later.add(...mods.warmObjects.filter(o=>o?.isObject3D&&!o.parent));
+    standIns??=effectStandIns();later.add(standIns.world);standIns.view.visible=false;viewScene.add(standIns.view);   // the view set compiles with the hidden objects below
     for(const item of Object.values(powerups?.templates??{})){const aura=new THREE.Sprite(powerups.spriteMaterial);later.add(item.clone(true),aura);}
     for(const t of [enemies?.templates,enemies?.heads,enemies?.dog,enemies?.quad,enemies?.quadHead].flat())if(t?.isObject3D&&!t.parent)later.add(t);
+    for(const t of [...(features?.models?.values?.()??[]),features?.reelTemplate])if(t?.isObject3D&&!t.parent)later.add(t);   // claymores, monkeys, the box's weapon reel (2026-10-29)
     later.position.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(120));later.updateMatrixWorld(true);scene.add(later);
     mods.emit('warm');   // mods finish pending material changes first (the lighting mod tags late meshes, these too)
     renderer.render=function(s,c){if((s===scene||s===viewScene)&&!targets.has(s))targets.set(s,this.getRenderTarget());return draw.call(this,s,c);};
@@ -574,10 +603,11 @@ async function warmShaders(waitGpu=false){
     // first played frame. Using each program here (getUniforms/getAttributes) moves that wait behind the loading screen.
     for(const program of renderer.info.programs){try{program.getUniforms();program.getAttributes();}catch{}}
     programCount=renderer.info.programs.length;   // compiled while loading, not mid-game
+    firstDraw.lateFrom=renderer.info.programs.reduce((m,p)=>Math.max(m,p.id),-1)+1;   // programs with a higher id were compiled mid-game (reported with their material and object)
     console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects, in',Math.round(performance.now()-t0),'ms');
     if(waitGpu&&!NO_GPU_WAIT){const ms=Math.round(await gpuIdle());console.info('[warm-shaders] GPU caught up in',ms,'ms');diag('gpuWait',{ms});}   // the loading screen stays meanwhile
   }catch(error){console.warn('[warm-shaders]',error);}
-  finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
+  finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);standIns?.view.removeFromParent();keepPrograms();if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
 }
 renderer.info.autoReset=false;
 // (2026-10-25) a hidden top-level view object (a mod's spare ViewWeapon, the stand-ins: ~1,500 bones on Kino) is left out of
@@ -605,8 +635,8 @@ function renderFrame(now){
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
   update(dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
   const viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
-  gpuEnd(gq,now);
-  if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames]);}else{programCount=renderer.info.programs.length;perf.pause();}
+  keepPrograms();gpuEnd(gq,now);
+  if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(firstDraw.late.length?firstDraw.late.splice(0):renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames]);}else{programCount=renderer.info.programs.length;perf.pause();}
   lastFirstDraws=firstDraw.n;lastFirstNames=firstDraw.names;firstDraw.n=0;firstDraw.names=[];   // hitches carry the previous frame's first draws (a GPU stall delays the next frame)
 }
 resumeRendering();

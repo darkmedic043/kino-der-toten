@@ -117,10 +117,12 @@ export class ModHost {
         const module=mod.module??await import(new URL(mod.manifest.script,mod.url).href);
         this.setupMod=mod.id;   // handlers registered while it sets up are its own (perf-diag per-mod timing)
         const on=(event,fn)=>{if(!this.owners.has(fn))this.owners.set(fn,mod.id);return this.on(event,fn);};
-        await module.default?.({...api,mod,host,on,emit:this.emit.bind(this)});
+        const t0=performance.now();await module.default?.({...api,mod,host,on,emit:this.emit.bind(this)});
+        mod.setupMs=Math.round(performance.now()-t0);if(mod.setupMs>=250)(this.slowSetups??=[]).push(mod.id+':'+mod.setupMs);   // loading-screen time per mod (engine.js logs it)
       }catch(error){this.report(`mod ${mod.id} script`,error);}
       this.setupMod=null;
     }
+    if(this.slowSetups)console.info('[mods] slow setups (ms):',this.slowSetups.join(' '));
     this.emit('ready');
   }
 }

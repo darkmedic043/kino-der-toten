@@ -19,13 +19,19 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 const RELEASE=.12;       // seconds into the throw clip when the item leaves the hand
 
 export default async function setup(api){
-  const {host,session,view,data,audio,camera,scene,world,enemies,features}=api;
+  const {host,session,view,data,audio,camera,scene,world,enemies,features,viewScene}=api;
   const eq=data.equipment??{},frag=eq.frag_grenade_zm,qed=eq.zombie_quantum_bomb;
   // items carried on the QED rig, with the model shown in hand
   const STAND_IN={frag_grenade_zm:frag?.worldModel,zombie_cymbal_monkey:eq.zombie_cymbal_monkey?.projectileModel};
   const handModels={};
   for(const [id,url] of Object.entries(STAND_IN))if(url&&qed)handModels[id]=await loadModel(url).catch(()=>null);
   const fragMesh=handModels.frag_grenade_zm;
+  // load-time warm-up (2026-10-29): the in-hand models are skinned clones under the QED viewmodel and the thrown frag a
+  // world clone; a hidden copy of each in the view scene and one in the engine's warm group compile their programs and
+  // vertex layouts behind the loading screen (the m67's first draw froze the first throw for 2 s on Windows/D3D11)
+  {const warm=new THREE.Group();
+    for(const m of Object.values(handModels))if(m){if(viewScene){const v=cloneSkinned(m);v.visible=false;v.traverse(o=>{o.frustumCulled=false;});viewScene.add(v);}warm.add(m.clone(true));}
+    (host.warmObjects??=[]).push(warm);}
   const cue=k=>Object.keys(audio.manifest).find(x=>x.endsWith(k));
   const PIN=cue('grenade/foley/pin/pin'),WHOOSH=cue('grenade/foley/throw/gren_throw');
 

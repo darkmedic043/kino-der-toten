@@ -64,7 +64,12 @@ export default async function setup(api){
   if(!coarse){
     const t0=performance.now();
     const ids=[...new Set([...(api.session.inventory??[]).map(w=>w.id),...wallbuys.map(w=>w.id),...(data.boxPool??Object.keys(mysteryBox?.models??{}))])].filter(id=>data.weapons[id]);
-    await preload(ids,false);
+    // every model download starts now; the batches below compile and register them as they land, moving the loading
+    // bar (this was one 8-9 s step of the 'Loading mods' stage on the host, 2026-10-29)
+    const allDefs=ids.flatMap(id=>{const d=data.weapons[id];return [d,d.upgrade?{...d,...d.upgrade}:null].filter(Boolean);});
+    for(const u of new Set(allDefs.flatMap(d=>[d.model,d.leftModel]).filter(Boolean)))loadModel(u).catch(()=>{});
+    for(let i=0;i<ids.length;i+=8){api.progress?.(`Preparing weapons ${Math.min(i+8,ids.length)} of ${ids.length}`,95+1.5*i/ids.length);await preload(ids.slice(i,i+8),false);}
+    api.progress?.('Loading mods',96.5);
     console.info('[preload] prepared',ids.length,'weapons in',Math.round(performance.now()-t0),'ms');
   }
   let timer=0;

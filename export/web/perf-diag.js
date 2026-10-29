@@ -75,7 +75,7 @@ export function createPerfDiag({ send, context }) {
       if (now - windowStart > WINDOW_MS) flush(now);
     },
     // shader programs compiled during play (each one a stall on its first frame): names, kept to the first 8 a window
-    programs(names) { session.programs = (session.programs ?? 0) + names.length; for (const n of names) if (w.progs.length < 8) w.progs.push(String(n).slice(0, 40)); },
+    programs(names) { session.programs = (session.programs ?? 0) + names.length; for (const n of names) if (w.progs.length < 8) w.progs.push(String(n).slice(0, 120)); },
     // GPU time of a frame (ms) and the frame interval that followed it (engine.js gpuEnd)
     gpu(ms, gapAfter) { w.gpu.push(ms); if (gapAfter >= HITCH_MS && w.gpuHit.length < 8) w.gpuHit.push([Math.round(gapAfter), r1(ms)]); },
     // first draws this frame (program x vertex layout x target format, engine.js firstDraw): each may build a GPU pipeline

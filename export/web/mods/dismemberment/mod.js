@@ -15,7 +15,7 @@ const BASE=new URL('./',import.meta.url);
 const up=new THREE.Vector3(0,1,0);
 
 export default async function setup(api){
-  const {host,enemies,scene,world,features}=api;
+  const {host,enemies,scene,world,features,on}=api;
   const r=await fetch(new URL('gibs.json',BASE)).catch(()=>null);
   if(!r?.ok){console.info('[dismemberment] not built: run .tools/build_dismemberment.py');return;}
   const gibs=await r.json();
@@ -37,6 +37,19 @@ export default async function setup(api){
   // A map can give its zombie bodies their own gib models: window.kino.gibSets[body.userData.gibSet] = {key: model}
   // with the same keys (Der Eisendrache's BO3 bodies). A body whose set lacks a half isn't dismembered (blood only).
   const partsOf=z=>{const key=z.root.children[0]?.userData?.gibSet;return key?window.kino?.gibSets?.[key]??null:parts;};
+  // load-time warm-up (2026-10-29): one of every gib piece (BO1's and each map set's), wearing the templates' materials as
+  // a live piece does, joins the engine's warm draw. Their skinned programs and vertex layouts otherwise compiled at the
+  // first dismemberment: 2-3 s a program on Windows/D3D11. Filled at 'warm' (a map's sets arrive with its mod).
+  const warm=new THREE.Group();(host.warmObjects??=[]).push(warm);
+  on('warm',()=>{
+    for(const o of [...warm.children])warm.remove(o);
+    const own=new Map();for(const t of [enemies.templates,enemies.heads].flat())t?.traverse?.(o=>{if(o.isMesh&&o.material)for(const m of [].concat(o.material))if(!own.has(m.name))own.set(m.name,m);});
+    const seen=new Set();
+    for(const set of [parts,...Object.values(window.kino?.gibSets??{})])for(const src of Object.values(set??{})){if(!src?.isObject3D||seen.has(src))continue;seen.add(src);
+      const piece=cloneSkinned(src);piece.traverse(o=>{if(!o.isMesh)return;o.frustumCulled=false;o.material=[].concat(o.material).map(m=>own.get(m.name)??(m.map?m:gore));if(o.material.length===1)o.material=o.material[0];});
+      warm.add(piece);}
+    warm.updateMatrixWorld(true);
+  });
   // ---- body halves bound to the zombie's own skeleton --------------------------------------
   function bindPiece(z,key){
     const src=partsOf(z)?.[key];if(!src)return null;

@@ -97,6 +97,7 @@ export default async function setup(api) {
   for (const k of Object.keys(templates)) warm.add(templates[k].clone(true));
   for (const c of [...Object.values(rarityColor), ...Object.values(KIND_GLOW)]) { warm.add(new THREE.Mesh(beamGeo, beamMat(c)), new THREE.Mesh(discGeo, discMat(c))); }
   warm.add(look('perk', '#c0392b'), chestModel('#ff9a2e'));
+  for (const p of PERKS) if (p.color) warm.add(new THREE.Mesh(beamGeo, beamMat(p.color)), new THREE.Mesh(discGeo, discMat(p.color)), look('perk', p.color));   // perk drops: their own colours (2026-10-29)
   (host.warmObjects ??= []).push(warm);
 
   // ---- placing things on the floor
