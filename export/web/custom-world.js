@@ -46,6 +46,19 @@ const up=new THREE.Vector3(0,1,0),_negOffset=new THREE.Vector3();
 function rawName(o){return String(o.userData.name??o.name).replace(/\.\d{3}$/,'');}
 function worldYaw(o){const f=new THREE.Vector3(1,0,0).applyQuaternion(o.getWorldQuaternion(new THREE.Quaternion()));return Math.atan2(-f.z,f.x);}
 function boxCollider(box){const size=box.getSize(new THREE.Vector3());if(size.x<.01||size.y<.01||size.z<.01)return null;const g=new THREE.BoxGeometry(size.x,size.y,size.z);g.translate(...box.getCenter(new THREE.Vector3()).toArray());return new CollisionWorld(g);}
+// A door's footprint seen from above as the smallest rectangle around its pieces: angle a (radians, 0-90°; u = (cos a,
+// sin a), w = (-sin a, cos a) in x/z) and extents along u and w; vu/vw are the same before any growing
+function footprint(object){
+  const pts=[],v=new THREE.Vector3();object.updateMatrixWorld(true);
+  object.traverse(o=>{const p=o.isMesh&&o.geometry?.attributes?.position;if(!p)return;for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);pts.push(v.x,v.z);}});
+  let best=null;
+  for(let deg=0;deg<90;deg++){
+    const a=deg*Math.PI/180,c=Math.cos(a),s=Math.sin(a);let u0=Infinity,u1=-Infinity,w0=Infinity,w1=-Infinity;
+    for(let i=0;i<pts.length;i+=2){const u=pts[i]*c+pts[i+1]*s,w=-pts[i]*s+pts[i+1]*c;if(u<u0)u0=u;if(u>u1)u1=u;if(w<w0)w0=w;if(w>w1)w1=w;}
+    const area=(u1-u0)*(w1-w0);if(!best||area<best.area*.97)best={area,a,u0,u1,w0,w1};   // square-on wins unless clearly worse
+  }
+  best.vu0=best.u0;best.vu1=best.u1;best.vw0=best.w0;best.vw1=best.w1;return best;
+}
 function positionsOf(meshes){
   const geometries=meshes.map(o=>{
     const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();
@@ -124,33 +137,64 @@ export class CustomWorld {
       const box=new THREE.Box3().setFromObject(m.object);
       // The navmesh cut around a closed door covers every polygon the box touches (up to ~48 units beyond it), so
       // the player's collision can be grown the same way (map entry doorMargin / doorHeadroom, in scene units):
-      // otherwise you squeeze past the door pieces, or stand on top of them. Only the door's width grows by the full margin;
+      // otherwise you squeeze past the door pieces, or stand on top of them. Only the door's width grows by up to the margin;
       // its thickness (the facing direction) grows by at most 6, or a thin door becomes an invisible wall in front of it.
-      const grow=this.entry.doorMargin??0,up=this.entry.doorHeadroom??0,plug=box.clone(),size=box.getSize(new THREE.Vector3());
-      if(grow||up){
-        const thin=Math.min(grow,6),gx=size.x>=size.z?grow:thin,gz=size.z>size.x?grow:thin;
-        plug.min.x-=gx;plug.min.z-=gz;plug.max.x+=gx;plug.max.z+=gz;plug.max.y+=up;
-      }
+      // (2026-10-28) the grown block follows the door's own angle (footprint(): the smallest rectangle around its pieces seen
+      // from above): Nuketown's houses stand at an angle, and an axis-aligned box around their angled back doors covered the
+      // porches beside them, an invisible wall there while the door was closed
+      const grow=this.entry.doorMargin??0,up=this.entry.doorHeadroom??0;let plug=box.clone(),obb=null,collider;
       // extras.clip [min, max]: the game's own blocker for the door (World at War: its brush models' clip, often a full
       // clip far taller than the visible pieces, which could be jumped or mantled over)
-      if(Array.isArray(m.extras.clip))plug.union(new THREE.Box3(new THREE.Vector3(...m.extras.clip[0]),new THREE.Vector3(...m.extras.clip[1])));
-      // the headroom stops at a floor above the door (Nuketown's green house: its downstairs doors' blocks stood 50 up
-      // through the deck and the rooms upstairs, an invisible wall there until the door was bought)
-      if(up){
-        const c=box.getCenter(new THREE.Vector3()),wide=size.x>=size.z;let top=plug.max.y;
-        for(const f of[-.45,0,.45]){
-          const o=new THREE.Vector3(c.x+(wide?size.x*f:0),box.max.y+1,c.z+(wide?0:size.z*f)),hit=this.collision.rayIntersect(new THREE.Ray(o,new THREE.Vector3(0,1,0)),0,top-o.y);
-          if(hit)top=Math.min(top,o.y+hit.distance);
+      const clip=Array.isArray(m.extras.clip)?new THREE.Box3(new THREE.Vector3(...m.extras.clip[0]),new THREE.Vector3(...m.extras.clip[1])):null;
+      if(grow||up){
+        const f=footprint(m.object),c=Math.cos(f.a),s=Math.sin(f.a),wideU=f.u1-f.u0>=f.w1-f.w0,thin=Math.min(grow,6);
+        // each end grows only to the door's frame (rays along the door at body heights; flush in its frame: 2): the full
+        // margin ran along the wall beside the door and stood 6 out of it, a block along Nuketown's back porches. An end
+        // with nothing within 70 at any of those heights stands in the open (a couch on the porch) and grows only `thin`.
+        const mid=wideU?(f.u0+f.u1)/2:(f.w0+f.w1)/2,half=wideU?(f.u1-f.u0)/2:(f.w1-f.w0)/2,mo=wideU?(f.w0+f.w1)/2:(f.u0+f.u1)/2;
+        const at=(t,y)=>wideU?new THREE.Vector3(c*t-s*mo,y,s*t+c*mo):new THREE.Vector3(c*mo-s*t,y,s*mo+c*t);
+        const end=sgn=>{
+          const dir=at(mid+sgn,0).sub(at(mid,0));let d=-1;
+          for(const hy of[20,35,50,65]){
+            const hit=this.collision.rayIntersect(new THREE.Ray(at(mid+sgn*(half-2),Math.min(box.min.y+hy,box.max.y-2)),dir),0,72);
+            if(hit)d=Math.max(d,hit.distance-2);
+          }
+          return d<0?thin:Math.min(grow,Math.max(0,d)+2);
+        };
+        const g0=end(-1),g1=end(1);
+        if(wideU){f.u0-=g0;f.u1+=g1;f.w0-=thin;f.w1+=thin;}else{f.w0-=g0;f.w1+=g1;f.u0-=thin;f.u1+=thin;}
+        let y0=box.min.y,y1=box.max.y+up;
+        // the clip's footprint only counts for a square-on door: around an angled one it is the box of angled brushes,
+        // as wide as the porch (its height always counts)
+        if(clip){
+          y0=Math.min(y0,clip.min.y);y1=Math.max(y1,clip.max.y);
+          if(Math.min(f.a,Math.PI/2-f.a)<.09)for(const x of[clip.min.x,clip.max.x])for(const z of[clip.min.z,clip.max.z]){   // within 5° of square-on
+            const u=x*c+z*s,w=-x*s+z*c;f.u0=Math.min(f.u0,u);f.u1=Math.max(f.u1,u);f.w0=Math.min(f.w0,w);f.w1=Math.max(f.w1,w);
+          }
         }
-        plug.max.y=Math.max(box.max.y,top);
-      }
+        // the headroom stops at a floor above the door (Nuketown's green house: its downstairs doors' blocks stood 50 up
+        // through the deck and the rooms upstairs, an invisible wall there until the door was bought)
+        if(up){
+          const mu=(f.vu0+f.vu1)/2,mw=(f.vw0+f.vw1)/2;let top=y1;
+          for(const k of[-.45,0,.45]){
+            const lu=wideU?mu+(f.vu1-f.vu0)*k:mu,lw=wideU?mw:mw+(f.vw1-f.vw0)*k;
+            const o=new THREE.Vector3(c*lu-s*lw,box.max.y+1,s*lu+c*lw),hit=this.collision.rayIntersect(new THREE.Ray(o,new THREE.Vector3(0,1,0)),0,top-o.y);
+            if(hit)top=Math.min(top,o.y+hit.distance);
+          }
+          y1=Math.max(box.max.y,top);
+        }
+        const hu=(f.u1-f.u0)/2,hw=(f.w1-f.w0)/2,lu=(f.u0+f.u1)/2,lw=(f.w0+f.w1)/2;
+        obb={x:c*lu-s*lw,z:s*lu+c*lw,c,s,hu,hw,y0,y1,vu:(f.vu1-f.vu0)/2,vw:(f.vw1-f.vw0)/2};   // vu/vw: the door's own half extents
+        const g=new THREE.BoxGeometry(hu*2,y1-y0,hw*2);g.rotateY(-f.a);g.translate(obb.x,(y0+y1)/2,obb.z);collider=new CollisionWorld(g);
+        plug=new THREE.Box3().setFromBufferAttribute(g.attributes.position);
+      }else{if(clip)plug.union(clip);collider=boxCollider(plug);}
       // pieces with a `move` property [x, y, z] (scene units; the BO3 map builder writes BO3's script_vector) slide that far
       // when the door opens, then disappear; without one the door disappears at once
       // (2026-10-17) a BO3 door prop is a mesh per material (a sliding door 10-17 draws, Der Eisendrache ~90 a view):
       // pieces under one node sharing a material and the same slide become one mesh with that slide
       mergeDoorPieces(m.object);
       const slides=[];m.object.traverse(o=>{const v=o.userData?.move;if(Array.isArray(v)&&v.length===3)slides.push({object:o,base:o.position.clone(),move:new THREE.Vector3(...v)});});
-      const part={object:m.object,collider:boxCollider(plug),box,plug,enabled:true,slides,anim:null};
+      const part={object:m.object,collider,box,plug,obb,enabled:true,slides,anim:null};
       this.doors.set(name,{name,cost,zone,electric:!!m.extras.electric,parts:[part],box});this.dynamic.push(part);
       // `scripted`: no buy prompt; a script opens it (session.openDoors.add(name); world.setDoors(session))
       if(!m.extras.scripted)this.interactions.push({kind:'door',door:name,position:box.getCenter(new THREE.Vector3()),box});
@@ -564,8 +608,12 @@ export class CustomWorld {
     for(const d of this.dynamic){
       const b=d.plug;if(!b||!d.enabled||d.window)continue;
       if(feet.x<b.min.x+1||feet.x>b.max.x-1||feet.z<b.min.z+1||feet.z>b.max.z-1||feet.y<b.min.y-4||feet.y>b.max.y-8)continue;
-      const exits=[[b.min.x-radius-4,feet.z],[b.max.x+radius+4,feet.z],[feet.x,b.min.z-radius-4],[feet.x,b.max.z+radius+4]]
-        .map(([x,z])=>({x,z,d:Math.hypot(x-feet.x,z-feet.z)})).sort((a,c)=>a.d-c.d);
+      // in the door's own frame (an angled door's box): u along it, w across it
+      const o=d.obb??{x:(b.min.x+b.max.x)/2,z:(b.min.z+b.max.z)/2,c:1,s:0,hu:(b.max.x-b.min.x)/2,hw:(b.max.z-b.min.z)/2};
+      const dx=feet.x-o.x,dz=feet.z-o.z,u=dx*o.c+dz*o.s,w=-dx*o.s+dz*o.c;
+      if(Math.abs(u)>o.hu-1||Math.abs(w)>o.hw-1)continue;
+      const exits=[[-o.hu-radius-4,w],[o.hu+radius+4,w],[u,-o.hw-radius-4],[u,o.hw+radius+4]]
+        .map(([eu,ew])=>({x:o.x+eu*o.c-ew*o.s,z:o.z+eu*o.s+ew*o.c,d:Math.hypot(eu-u,ew-w)})).sort((a,c)=>a.d-c.d);
       for(const e of exits){const p=this.closest({x:e.x,y:feet.y,z:e.z},{x:30,y:90,z:30});if(p&&Math.hypot(p.x-e.x,p.z-e.z)<30)return p;}
       return new THREE.Vector3(exits[0].x,Math.max(feet.y,b.max.y)+2,exits[0].z);   // nothing walkable nearby: climb out over the top
     }
