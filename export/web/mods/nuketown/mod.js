@@ -53,9 +53,12 @@ export default function setup(api) {
 
 // ---- scene helpers: the builder bakes every ENT_ prop in world space under a node with no transform (several nodes can
 // share a name: a prop placed more than once, or a brushmodel's surfaces split by material)
+// the top-most nodes named ENT_<name>[_N]: a brushmodel's group and its meshes share the name, and taking both moved the
+// meshes twice (the key elevator rose 320 into the ceiling, 2026-10-29)
 function nodesOf(root, name) {
   const re = new RegExp('^ENT_' + name + '(?:[._]\\d+)?$'), out = [];
-  root?.traverse(o => { if (re.test(o.name)) out.push(o); });
+  const walk = o => { if (re.test(o.name)) out.push(o); else for (const c of o.children) walk(c); };
+  if (root) walk(root);
   return out;
 }
 // moves the node's origin to `origin` (the entity's origin) so it can be rotated about it: the geometry is re-based
@@ -143,7 +146,7 @@ function setupQuest(api) {
     world.addInteraction({
       position: t.at.clone().add(V(0, 8, 0)), nuketown: true,
       hidden: () => flag('got_' + t.node), text: () => `Take the ${t.name}`,
-      use() { setFlag('got_' + t.node); show(t.nodes, false); sfx('buy'); toast(`${t.name[0].toUpperCase() + t.name.slice(1)}: something in the lab needs fixing`, 4); return true; },
+      use() { setFlag('got_' + t.node); show(t.nodes, false); sfx('buy'); toast(`${t.name[0].toUpperCase() + t.name.slice(1)} · ${TOOLS.filter(u => flag('got_' + u.node)).length} / ${TOOLS.length} tools: it repairs a panel by the elevator in the lab`, 5); return true; },
     });
     world.addInteraction({
       position: t.panel.clone(), nuketown: true,
@@ -152,7 +155,7 @@ function setupQuest(api) {
       use() {
         setFlag('fixed_' + t.node); st.fixed++; sfx('buy');
         if (st.fixed < TOOLS.length) { toast(`Panel repaired · ${st.fixed} / ${TOOLS.length}`, 4); return true; }
-        st.elevatorT = 0; sfx('teleport', .6); toast('The elevator is coming up', 5); return true;
+        st.elevatorT = 0; sfx('teleport', .6); toast('The elevator is coming up: take the skull key from it', 5); return true;
       },
     });
   }
@@ -166,7 +169,7 @@ function setupQuest(api) {
   world.addInteraction({
     position: ELEVATOR.key.clone().add(V(0, ELEVATOR.rise + 10, 0)), nuketown: true,
     hidden: () => !flag('elevator') || flag('skull'), text: () => 'Take the skull',
-    use() { setFlag('skull'); show(nodesOf(root, 'pap_key'), false); sfx('powerup', .7); toast('The skull key: it belongs somewhere below', 5); return true; },
+    use() { setFlag('skull'); show(nodesOf(root, 'pap_key'), false); sfx('powerup', .7); toast('The skull key: place it at the sealed alcove in hell', 5); return true; },
   });
   world.addInteraction({
     position: PAP.trig.clone().add(V(0, 20, 0)), nuketown: true,

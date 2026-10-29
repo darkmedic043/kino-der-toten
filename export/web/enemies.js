@@ -11,6 +11,8 @@ const wrapAngle=a=>a-Math.PI*2*Math.round(a/(Math.PI*2));
 const yawTo=(from,to)=>Math.atan2(-(to.z-from.z),to.x-from.x);
 function turnYaw(from,to,rate,dt){const d=wrapAngle(to-from);return from+Math.sign(d)*Math.min(Math.abs(d),rate*dt,Math.abs(d)*Math.min(1,dt*9));}
 const turnRate=z=>z.kind==='dog'?9:2.4+z.speed/55;   // rad/s: a shambler about 3, a sprinter about 6
+const NEAR_SPAWN=2000,FAR_CHASE=2500;   // custom maps: spawn points within this walk of the player; a chaser further away out of sight respawns
+const pathLength=(p,from=0)=>{let d=0;for(let i=from+1;i<p.length;i++)d+=p[i].distanceTo(p[i-1]);return d;};
 // BO1's traversal clips (mods/zombie-rise; vaults in order of preference) and their root motion (`delta`, x forward and
 // z up per key, from .tools/xanim_to_json.mjs) as curves of the clip's time 0..1: f forward share, u rise share
 const VAULTS=['ai_zombie_traverse_v5','ai_zombie_traverse_v7','ai_zombie_traverse_v1'];
@@ -66,6 +68,18 @@ export class Enemies {
     if(riseHere)this.riseAt(z,barrier.inside);
     z.maxHealth=z.health;this.list.push(z);this.session.spawned++;return z;
   }
+  // Spawn points for the next zombie, [{b: barrier, len}]. Custom maps (2026-10-29): the ones nearest `player` by walking
+  // distance (len), as BO's zones spawn around the player; all reachable points were used before, and in Nuketown's lab 56
+  // qualified, most 5,000-9,000 units of walking away on the surface, so zombies took a minute or more to arrive.
+  spawnChoices(player){
+    const near=!!this.world.entry;let out=[];
+    for(const b of this.world.spawnBarriers(this.session)){
+      if(b.free){out.push({b,len:0});continue;}
+      const p=this.world.path(b.inside,player);if(p.length>1&&p.at(-1).distanceTo(player)<150)out.push({b,len:near?pathLength(p):0});
+    }
+    if(near&&out.length>3){out.sort((a,c)=>a.len-c.len);const cap=Math.max(NEAR_SPAWN,out[0].len+1200);out=out.filter((c,i)=>i<3||c.len<=cap);}
+    return out;
+  }
   // The riser clip for a zombie of this speed (mods/zombie-rise), or null when the clips aren't built.
   riseClip(speed){return this.anims[speed>=110?'ai_zombie_traverse_ground_climbout_fast':'ai_zombie_traverse_ground_v1_run']??this.anims.ai_zombie_traverse_ground_climbout_fast??null;}
   // Climb out of the ground at `at` (spawn points without boards, and zombies moved to the player when stuck).
@@ -84,7 +98,7 @@ export class Enemies {
     if(this.autoSpawn!==false&&s.phase==='fighting'&&s.spawned<s.total&&this.list.length<24){
       this.nextSpawn-=dt;
       if(this.nextSpawn<=0){
-        const candidates=this.world.spawnBarriers(s).filter(b=>{if(b.free)return true;const p=this.world.path(b.inside,player);return p.length>1&&p.at(-1).distanceTo(player)<150;});
+        const candidates=this.spawnChoices(player).map(c=>c.b);
         if(candidates.length){
           const b=candidates[Math.floor(s.random()*candidates.length)],nova=s.power&&!s.dogRound&&s.spawned%5===4&&['foyer_zone','foyer2_zone','theater_zone','stage_zone','dining_zone'].includes(this.world.zoneAt(player.clone().add(new THREE.Vector3(0,35,0))));
           const nz=this.spawn(s.dogRound||nova?b.inside:null,s.dogRound||nova?null:b,s.dogRound?'dog':nova?'nova':'zombie');if(b.free&&nz)nz.free=true;
@@ -205,6 +219,19 @@ export class Enemies {
         if(z.probeT>(below?1:2.5)){
           z.probeT=0;const last=z.probePos??z.root.position.clone();z.probePos=z.root.position.clone();
           if((below||last.distanceTo(z.root.position)<6)&&dist>90){const p=this.world.rescuePoint(z.root.position,this.world.playerFeet??tp);if(p){this.riseAt(z,p);z.free=!!p.free;z.path=[];z.repath=0;z.probePos=null;}}
+        }
+      }
+      // a straggler (custom maps, 2026-10-29, after BO3's zombie cleanup): a chaser over FAR_CHASE units of walking from the
+      // player, with the player out of its sight for 8 s (4 s once the round's last zombies are out), goes back into the
+      // round's count and spawns again near the player. The last zombies used to wander the whole map toward a player in
+      // Nuketown's lab or a far house while the round waited on them
+      if(this.world.entry&&!freeWalk&&!lure&&!z.hop&&z.state==='chase'){
+        z.farClock=(z.farClock??0)-dt;
+        if(z.farClock<=0){z.farClock=1;
+          const next=z.path[z.pathIndex],left=next?z.root.position.distanceTo(next)+pathLength(z.path,z.pathIndex):0;
+          z.farT=left>FAR_CHASE&&!this.world.lineClear(at,eye)?(z.farT??0)+1:0;
+          if(z.farT>=(s.spawned>=s.total?4:8)){z.farT=0;const near=this.spawnChoices(tp);   // only when every spawn it could take is nearer
+            if(near.length&&Math.max(...near.map(c=>c.len))<left-500){this.remove(z);s.spawned--;continue;}}
         }
       }
       if(!freeWalk&&!target&&this.freeMode&&dist>40&&z.state==='chase')this.walkFree(z,goal,dt);   // the last stretch to a spot the navmesh does not reach
