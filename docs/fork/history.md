@@ -390,3 +390,4 @@
 - 2026-10-28: Malibu Drive: WaW xanim translations read as bind offsets in `kit.figure` (Rhodes's head was sunk in his chest, Spider-Man's knees folded, every body 37 low), Cap's shield rigid on j_spine4 (`name@tag` attach) (waw-ports.md).
 - 2026-10-28: Controller aim assist (mods/controller/aim-assist.js: slowdown, tracking, ADS snap; chest, head with Deadshot; setting padAimAssist Off/Standard/Strong) (core.md, Controller).
 - 2026-10-28: SCP operators' first-person arms in retarget mode (`fpArmsRetarget: true` on all four, the Captain without the upper arm): the plain re-skin stretched and bent the Chaos Insurgent's hands on every gun and clip (characters.md, SCP).
+- 2026-10-28: SCP operators: `fpArmsReach: false` (hands pinned to the glove wrists; the Atlas 45 support hand hung beside the gun) and `fpArmsNearCut: 4` (the unclamped sleeve filled the view on the knife lunge) (characters.md, SCP).
