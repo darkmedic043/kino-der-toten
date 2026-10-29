@@ -6,7 +6,7 @@
 // teleporter and traps, a custom map's Easter eggs...). Built from upstream's game.js and the
 // fork's zombies.js, which were two copies of this loop.
 import * as THREE from 'three';
-import { textureMemoryStats, setPrimaryRenderer } from './texture-memory.js';   // first: frees decoded texture images once uploaded
+import { textureMemoryStats, setPrimaryRenderer, pendingImages, pendingImageCount } from './texture-memory.js';   // first: frees decoded texture images once uploaded
 import './skinned-bounds.js';   // fast SkinnedMesh bounds for every rigged model (no hitch when a zombie first draws)
 import { PlayerController } from './player-controller.js';
 import { ViewWeapon, pendingModels } from './animation.js';
@@ -519,6 +519,9 @@ try{
   // (the timeout yield), before the warm-up, or whatever it puts in place compiles at its first draw (2-3 s each on D3D11:
   // Nuketown's zombies did, 2026-10-29). Mods can also push their own promises on host.pending.
   progress('Waiting for models',98);await pendingModels();await new Promise(r=>setTimeout(r,0));await Promise.allSettled(mods.pending??[]);
+  // and for textures still downloading or decoding (mods' TextureLoader loads, KTX2 copies, re-decoded images), so the
+  // warm-up draw uploads them too; bounded, the 1.5 s and 4 s re-warms catch the rest (2026-10-29)
+  if(pendingImageCount()){progress('Waiting for textures',99);const t0=performance.now(),left=await pendingImages(15000);console.info('[warm-shaders] waited',Math.round(performance.now()-t0),'ms for textures,',left,'still loading');}
   if(!perfOff.has('noWarm')){progress('Preparing shaders',99);await paint();await warmShaders(true);
     // mods keep adjusting materials for a moment after loading (the lighting mod tags late materials on a 1 s sweep,
     // which changes their program): compile those too while the player is still on the start screen (cheap: programs
@@ -592,18 +595,21 @@ async function warmShaders(waitGpu=false){
     renderer.shadowMap.needsUpdate=true;scene.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});
     try{renderer.info.reset();renderer.clear();if(!(mods.renderWorld&&mods.renderWorld(scene,camera,{viewScene,viewCamera,drawView:true}))){if(!mods.renderWorld)renderer.render(scene,camera);renderer.clearDepth();renderer.render(viewScene,viewCamera);}}
     finally{renderer.render=draw;}
-    const before=renderer.info.programs.length,hidden=[];
-    for(const root of [scene,viewScene])root.traverse(o=>{if(!o.visible&&!o.isLight){hidden.push(o);o.visible=true;}});
+    const before=renderer.info.programs.length,hidden=[],standIn=[];
+    for(const root of [scene,viewScene])root.traverse(o=>{if(!o.visible&&!o.isLight){hidden.push(o);if(root===viewScene)standIn.push(o);o.visible=true;}});
     try{for(const [s,target] of targets){const previous=renderer.getRenderTarget();renderer.setRenderTarget(target);
       try{await renderer.compileAsync(s,s===viewScene?viewCamera:camera);}finally{renderer.setRenderTarget(previous);}}
     // Compiling isn't the whole cost: the driver finishes a program's GPU pipeline on its first draw with each vertex layout
     // and target format (on Windows/D3D11, ANGLE compiles a shader variant then, freezing for up to seconds), so the hidden
-    // objects and the whole map (culling off) are drawn once into each scene's target too. Hidden objects' textures that
-    // aren't on the GPU yet are swapped for a 1x1 stand-in (a 2D texture swap doesn't change the program), so cached
-    // weapons don't fill video memory. ?noWarmDraw skips it (A/B).
+    // objects and the whole map (culling off) are drawn once into each scene's target too. Only the view scene's hidden
+    // objects (the cached weapons, dozens of them) get their missing textures swapped for a 1x1 stand-in (a 2D texture
+    // swap doesn't change the program) so they don't fill video memory; the world's hidden objects (map batches the
+    // instance cull hid, perk machines and power-up models waiting to appear, props mods keep for later) draw with their
+    // real textures, so they are on the GPU before play instead of uploading at first sight (a 1-4 MB stall each on
+    // Nuketown, 2026-10-29). ?noWarmDraw skips it (A/B).
     if(!NO_WARM_DRAW){const swapped=[],culled=[],blank=new Map(),t1=performance.now(),seen=new Set();
       const stand=tex=>{const k=tex.channel+'/'+tex.colorSpace;let b=blank.get(k);if(!b){b=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);b.channel=tex.channel;b.colorSpace=tex.colorSpace;b.needsUpdate=true;blank.set(k,b);}return b;};
-      for(const h of hidden)h.traverse(o=>{for(const m of [o.material].flat())if(m&&!seen.has(m)){seen.add(m);for(const k of Object.keys(m)){const v=m[k];
+      for(const h of standIn)h.traverse(o=>{for(const m of [o.material].flat())if(m&&!seen.has(m)){seen.add(m);for(const k of Object.keys(m)){const v=m[k];
         if(k!=='envMap'&&v?.isTexture&&!v.isCubeTexture&&!v.isRenderTargetTexture&&!v.isData3DTexture&&!v.isDataArrayTexture&&!v.isVideoTexture&&!renderer.properties.get(v).__webglTexture){swapped.push([m,k,v]);m[k]=stand(v);}}}});
       for(const root of [scene,viewScene])root.traverse(o=>{if(o.frustumCulled){culled.push(o);o.frustumCulled=false;}});
       const previous=renderer.getRenderTarget(),n0=firstDraw.n;

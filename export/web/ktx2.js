@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { assetManager, runtimeProfile } from './runtime-assets.js';
+import { trackImage } from './texture-memory.js';
 
 const stats = { ktx2: 0, uses: 0, images: 0, failed: 0, bytes: 0 };
 let loader = null, files = null, ready = null;
@@ -18,7 +19,7 @@ let loader = null, files = null, ready = null;
 const cache = new Map();
 function compressed(key, entry) {
   if (!cache.has(key)) {
-    const p = loader.loadAsync(urlOf(key, entry[0])).then(t => { stats.ktx2++; stats.bytes += entry[3]; t.colorSpace = THREE.NoColorSpace; t.name = key; return t; });
+    const p = trackImage(loader.loadAsync(urlOf(key, entry[0]))).then(t => { stats.ktx2++; stats.bytes += entry[3]; t.colorSpace = THREE.NoColorSpace; t.name = key; return t; });
     cache.set(key, p); p.catch(() => cache.delete(key));
   }
   stats.uses++;

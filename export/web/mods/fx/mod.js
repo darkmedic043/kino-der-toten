@@ -12,14 +12,21 @@ const up=new THREE.Vector3(0,1,0);
 
 export default function setup(api){
   const {host,scene,camera}=api;
-  const loader=new THREE.TextureLoader(),tex={};
-  const load=(k,file)=>{const t=loader.load(new URL(TEX+file,document.baseURI).href);t.colorSpace=THREE.SRGBColorSpace;tex[k]=t;};
+  const loader=new THREE.TextureLoader(),tex={},renderer=api.renderer;
+  // Every sprite clones its texture (its own atlas offset) and disposes the clone when re-keyed; three shares the GPU
+  // texture between clones of one image, but the last clone's dispose deleted it, so each explosion, blood burst or
+  // smoke puff re-uploaded 0.3-1.3 MB with mipmaps mid-game (the quiet-main-thread hitches in the perf log, 2026-10-29).
+  // The base textures are uploaded once their image lands (initTexture) and never disposed, which keeps the GPU
+  // textures alive for every later clone; the loads are awaited by the engine before its warm-up (host.pending).
+  const pending=host.pending??=[];
+  const load=(k,file)=>{const t=loader.load(new URL(TEX+file,document.baseURI).href,done,undefined,done);t.colorSpace=THREE.SRGBColorSpace;tex[k]=t;
+    pending.push(new Promise(r=>{t.userData.loaded=r;}));function done(){if(t.image?.width)renderer?.initTexture(t);t.userData.loaded();}};
   load('fire','fxt_exp_fire.png');load('glow','fxt_exp_glow.png');load('ember','fxt_exp_ember_omni.png');
   load('smoke','fxt_smk_def_1.png');load('smoke2','fxt_smk_gen.png');load('burst','fxt_bio_bloodburst.png');
   load('cloud','fxt_bio_blood_cloud.png');load('gush','fxt_bio_bloodgush.png');load('drops','fxt_bio_blooddrops.png');
   load('swirl','fxt_smk_swirl.png');load('spiral','fxt_smk_whisp_spiral.png');load('sparks','fxt_fx_spark_field.png');load('rring','fxt_fx_raygun_ring.png');
   // the Thundergun's smoky shockwave ring is BO1's, built from the user's install (git-ignored); the Ray Gun ring stands in
-  tex.tgring=loader.load(new URL('textures/fxt_fx_thundergun_ring.png',import.meta.url).href,undefined,undefined,()=>{tex.tgring.image=tex.rring.image;tex.tgring.needsUpdate=true;});tex.tgring.colorSpace=THREE.SRGBColorSpace;
+  tex.tgring=loader.load(new URL('textures/fxt_fx_thundergun_ring.png',import.meta.url).href,()=>renderer?.initTexture(tex.tgring),undefined,()=>{tex.tgring.image=tex.rring.image;tex.tgring.needsUpdate=true;});tex.tgring.colorSpace=THREE.SRGBColorSpace;
 
   // atlases: [columns, rows]
   const GRID={swirl:[2,1],spiral:[1,1],sparks:[1,1],rring:[1,1],tgring:[1,1],fire:[2,2],ember:[2,2],smoke:[2,1],smoke2:[2,1],burst:[4,4],gush:[2,1],drops:[2,2],glow:[1,1],cloud:[1,1]};

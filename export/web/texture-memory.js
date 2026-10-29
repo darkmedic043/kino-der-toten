@@ -23,13 +23,23 @@ let native = null;
 let primary = null, active = null;
 export function setPrimaryRenderer(r) { primary = r; }
 const IMAGE_FETCHES = 48;
+// Image work in flight (queued and running image/KTX2 fetches, bitmaps decoding, released bitmaps being re-decoded):
+// the engine waits for it (bounded) before its warm-up draw, so textures still landing then are uploaded behind the
+// loading screen instead of at first sight mid-game (2026-10-29).
+const inflight = new Set();
+export function trackImage(p) { inflight.add(p); const done = () => inflight.delete(p); p.then(done, done); return p; }
+export const pendingImageCount = () => inflight.size;
+export function pendingImages(maxMs = 15000) {
+  const t0 = performance.now();
+  return new Promise(r => { const poll = () => { if (!inflight.size || performance.now() - t0 > maxMs) r(inflight.size); else setTimeout(poll, 50); }; poll(); });
+}
 
 export function installTextureMemory() {
   if (globalThis.__kinoTextureMemory || typeof createImageBitmap !== 'function' || /[?&]keepTextures/.test(globalThis.location?.search ?? '')) return stats;   // ?keepTextures: off (A/B)
   globalThis.__kinoTextureMemory = stats;
   native = createImageBitmap.bind(globalThis);
   globalThis.createImageBitmap = async function (src, ...args) {
-    const bmp = await native(src, ...args);
+    const bmp = await trackImage(native(src, ...args));
     if (src instanceof Blob) origins.set(bmp, { blob: src, args });
     return bmp;
   };
@@ -42,7 +52,7 @@ export function installTextureMemory() {
     globalThis.fetch = function (input, init) {
       const url = typeof input === 'string' ? input : input?.url ?? String(input);
       if (!/\.(webp|png|jpe?g|ktx2)(\?|$)/i.test(url)) return nativeFetch(input, init);
-      return new Promise(go => { queue.push(go); next(); }).then(() => nativeFetch(input, init)).finally(() => { running--; next(); });
+      return trackImage(new Promise(go => { queue.push(go); next(); }).then(() => nativeFetch(input, init)).finally(() => { running--; next(); }));
     };
   }
   const RP = THREE.WebGLRenderer.prototype;
@@ -86,7 +96,7 @@ function release(tex) {
 
 function restore(s) {
   const r = released.get(s); if (!r) return null;
-  r.pending ??= native(r.blob, ...r.args).then(bmp => {
+  r.pending ??= trackImage(native(r.blob, ...r.args)).then(bmp => {
     origins.set(bmp, { blob: r.blob, args: r.args });
     s.data = bmp; s.needsUpdate = true; released.delete(s); kept.add(s); stats.restored++;
     for (const w of r.texs ?? []) w.deref()?.dispose();   // rebuilt on their next draw, sized from the real image

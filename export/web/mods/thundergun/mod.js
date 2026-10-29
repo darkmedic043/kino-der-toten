@@ -40,7 +40,7 @@ export default async function setup(api){
       g.fillStyle=grad;g.fillRect(x,y,1+Math.random()*2.5,len);}
     g.globalCompositeOperation='destination-in';const fade=g.createLinearGradient(0,0,0,h);fade.addColorStop(0,'rgba(0,0,0,0)');fade.addColorStop(.35,'rgba(0,0,0,1)');fade.addColorStop(1,'rgba(0,0,0,.25)');g.fillStyle=fade;g.fillRect(0,0,w,h);
   });
-  streaks.wrapS=streaks.wrapT=THREE.RepeatWrapping;
+  streaks.wrapS=streaks.wrapT=THREE.RepeatWrapping;api.renderer?.initTexture(streaks);   // on the GPU now: each blast's clone (its own scroll offset) shares it, no upload per shot (2026-10-29)
   const glow=canvasTexture(64,64,(g,w)=>{const r=g.createRadialGradient(w/2,w/2,0,w/2,w/2,w/2);r.addColorStop(0,'rgba(255,255,255,1)');r.addColorStop(.3,'rgba(200,230,255,.6)');r.addColorStop(1,'rgba(160,200,255,0)');g.fillStyle=r;g.fillRect(0,0,w,w);});
   const coneGeometry=new THREE.ConeGeometry(1,1,40,1,true).translate(0,-.5,0).rotateX(-Math.PI/2);   // apex at the origin, opening along +Z
   const ringGeometry=new THREE.RingGeometry(.82,1,56);
@@ -53,7 +53,7 @@ export default async function setup(api){
     const forward=camera.getWorldDirection(new THREE.Vector3()),up=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion),right=new THREE.Vector3().crossVectors(forward,up);
     const origin=camera.position.clone().addScaledVector(forward,34).addScaledVector(up,-9).addScaledVector(right,7),aim=origin.clone().add(forward);
     const tint=upgraded?0xffd9a0:0xcfe6ff,group=new THREE.Group();group.position.copy(origin);group.lookAt(aim);
-    const coneMaterial=new THREE.MeshBasicMaterial(additive({color:tint,map:streaks.clone(),opacity:window.kino?.fx?.thunder?.35:.55}));coneMaterial.map.needsUpdate=true;
+    const coneMaterial=new THREE.MeshBasicMaterial(additive({color:tint,map:streaks.clone(),opacity:window.kino?.fx?.thunder?.35:.55}));
     const cone=new THREE.Mesh(coneGeometry,coneMaterial);group.add(cone);
     // BO1's smoky shockwave rings and smoke cloud come from the fx mod; flat rings are the fallback
     const fx=window.kino?.fx?.thunder;if(fx)fx(origin,forward,upgraded);
