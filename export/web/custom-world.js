@@ -202,11 +202,32 @@ export class CustomWorld {
 
     progress('Building navigation for zombies',50);
     await init();
-    const bounds=new THREE.Box3().setFromBufferAttribute(solid.attributes.position);
+    // The navmesh spans the markers (plus map entry navMargin, 600) when the collision mesh reaches far beyond them
+    // (over 4x their area): Nuketown's COL_world holds the desert and cliffs out to 24,000, which made the cells 19 units
+    // (4 meant) and pinched every doorway to a single vertex, so each zone was an island joined only by one-way hops and
+    // paths ended at the zone line (zombies rescued next to the player, spawns starved; 2026-10-28). A map entry
+    // `navBounds: [[x0,z0],[x1,z1]]` sets the span outright, `navCell` the cell size.
+    let positions=navSource.attributes.position.array,bounds=new THREE.Box3().setFromBufferAttribute(navSource.attributes.position);
+    {const e=this.entry,span=e.navBounds?new THREE.Box3(new THREE.Vector3(e.navBounds[0][0],-Infinity,e.navBounds[0][1]),new THREE.Vector3(e.navBounds[1][0],Infinity,e.navBounds[1][1])):markers.length?new THREE.Box3():null;
+      if(span&&!e.navBounds){for(const m of markers)span.expandByPoint(m.position);span.expandByScalar(e.navMargin??600);span.min.y=-Infinity;span.max.y=Infinity;}
+      const full=bounds.getSize(new THREE.Vector3()),want=span&&span.getSize(new THREE.Vector3());
+      if(span&&(e.navBounds||full.x*full.z>4*want.x*want.z)){const src=positions,keep=[];
+        // triangles crossing the span's edge are clipped to it (the desert is a few huge triangles, each overlapping the span)
+        const planes=[[0,1,span.min.x],[0,-1,-span.max.x],[2,1,span.min.z],[2,-1,-span.max.z]];
+        const clip=poly=>{for(const[axis,sgn,lim]of planes){const out=[];for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length],da=a[axis]*sgn-lim,db=b[axis]*sgn-lim;
+            if(da>=0)out.push(a);if(da>=0!==db>=0){const t=da/(da-db);out.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t]);}}poly=out;if(poly.length<3)return[];}return poly;};
+        const inside=(x,z)=>x>=span.min.x&&x<=span.max.x&&z>=span.min.z&&z<=span.max.z;
+        for(let i=0;i<src.length;i+=9){const x0=Math.min(src[i],src[i+3],src[i+6]),x1=Math.max(src[i],src[i+3],src[i+6]),z0=Math.min(src[i+2],src[i+5],src[i+8]),z1=Math.max(src[i+2],src[i+5],src[i+8]);
+          if(x1<span.min.x||x0>span.max.x||z1<span.min.z||z0>span.max.z)continue;
+          if(inside(x0,z0)&&inside(x1,z1)){for(let k=0;k<9;k++)keep.push(src[i+k]);continue;}
+          const poly=clip([[src[i],src[i+1],src[i+2]],[src[i+3],src[i+4],src[i+5]],[src[i+6],src[i+7],src[i+8]]]);
+          for(let k=1;k+1<poly.length;k++)keep.push(...poly[0],...poly[k],...poly[k+1]);}
+        positions=new Float32Array(keep);bounds=new THREE.Box3().setFromArray(positions);
+        console.log(`[custom-world] navmesh clipped to the markers' span: ${(src.length/9)|0} -> ${(positions.length/9)|0} triangles, ${bounds.getSize(new THREE.Vector3()).toArray().map(Math.round)}`);}}
     const size=bounds.getSize(new THREE.Vector3());
     // ~4 unit cells, coarser for very large maps so generation stays quick.
-    const cs=Math.max(4,Math.sqrt(size.x*size.z/6e6)),ch=2;
-    const positions=navSource.attributes.position.array,indices=new Uint32Array(positions.length/3).map((_,i)=>i);
+    const cs=this.entry.navCell??Math.max(4,Math.sqrt(size.x*size.z/6e6)),ch=2;
+    const indices=new Uint32Array(positions.length/3).map((_,i)=>i);
     // TRAVERSE markers (extras.to: the far end; World at War ports: the AI's fence hops, climbs and jump-downs) become
     // one-way off-mesh links: a path may cross there, and a zombie hops the gap like a narrow doorway (enemies.js)
     // path() marks the point a link ends at (`hop`), and enemies.js walks a zombie straight to it

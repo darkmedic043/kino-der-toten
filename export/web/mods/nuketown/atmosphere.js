@@ -33,12 +33,13 @@ const LOOK = {   // the UGX shots average sRGB (33, 48, 53): a teal-grey overcas
 };
 const FIRE = { range: 620, decay: 1.5, color: 0xff9c4e, intensity: 1500, pool: 6 };
 const LAMP = { range: 760, decay: 1.4, color: 0xcfe0ea, labColor: 0x9fdcea, intensity: 1100, labIntensity: 1600, pool: 4 };
-const GLOW = { lamp: { size: 150, color: [.8, .9, 1.0], gain: .75 }, lab: { size: 90, color: [.5, .9, 1.0], gain: 1.1 }, core: 2.6, halo: .55, through: 300, throughLab: 30, pull: 30, pullLab: 10 };   // additive discs in the lit windows and on the lab's fixtures; depth-tested; pull: drawn this much toward the camera to clear the fixture; through: the line-of-sight fade still shows a disc when the ray is blocked within this many units of it (window frames, glass)
+const DIM_SPLASH = 0;   // the houses' wall and ceiling light decals' share of the pools' emissive; 0 = not drawn (2026-10-28: at 2.6 they bloomed into white blobs hanging on the walls, dimmed they were hard pale cut-outs; the sconce or fixture model, its point light, disc and shaft stay)
+const GLOW = { lamp: { size: 80, color: [.8, .9, 1.0], gain: .75 }, lab: { size: 90, color: [.5, .9, 1.0], gain: 1.1 }, core: 2.6, halo: .55, through: 40, throughLab: 30, pull: 12, pullLab: 10 };   // through 300 / pull 30 showed the houses' ceiling fixtures through the floor above as discs hanging in the room (2026-10-28)   // additive discs in the lit windows and on the lab's fixtures; depth-tested; pull: drawn this much toward the camera to clear the fixture; through: the line-of-sight fade still shows a disc when the ray is blocked within this many units of it (window frames, glass)
 // per fx note: flame sprite size, how hot (white core), sub-flames, smoke puffs, embers
 // light shafts through the haze (the lighting mod's volumetric cones, kino.volumeBeam; Medium and up): from the god-ray
 // markers (godray1: lit windows and rooms, aimed by the struct's angles) and down from the fixtures on walls and ceilings.
 // r: end radius per unit of length; far: hidden beyond this distance from the camera
-const BEAM = { window: { color: 0xc4dceb, strength: 1.6, r: .36, tip: 14, max: 340 }, lamp: { color: 0xd2e6f2, strength: 2, r: .5, tip: 16, max: 380 },
+const BEAM = { window: { color: 0xc4dceb, strength: .55, r: .22, tip: 12, max: 300 }, lamp: { color: 0xd2e6f2, strength: 1.1, r: .38, tip: 16, max: 380 },   // was 2 / .5: a white column through the living rooms (2026-10-28)
   lab: { color: 0x9fdcea, strength: 2.4, r: .5, tip: 16, max: 360 }, far: 2600 };
 const KINDS = {   // kind: the mods/fx/flames.js kind (its glow and aspect)
   fire1: { kind: 'fire', size: 44, hot: 1, sub: 4, smoke: 6, embers: 8 }, fire_long: { kind: 'fire', size: 60, hot: 1, sub: 5, smoke: 7, embers: 10 }, fire2: { kind: 'fire', size: 50, hot: 1, sub: 4, smoke: 6, embers: 8 },
@@ -205,29 +206,36 @@ export function setupAtmosphere(api) {
   const dyn = [], lava = [];
   world?.root?.traverse(o => { if (!o.isMesh) return; for (const m of [o.material].flat()) { if (!m?.name) continue; if (/dyn_lights/.test(m.name)) dyn.push({ mesh: o, mat: m }); else if (/\/lava$/.test(m.name)) lava.push(m); } });
   for (const { mesh } of dyn) {
-    const g = mesh.geometry, p = g.attributes.position, idx = g.index, tri = idx ? idx.count / 3 : p.count / 3, seen = [];
+    const g = mesh.geometry, p = g.attributes.position, idx = g.index, tri = idx ? idx.count / 3 : p.count / 3, seen = [], triQ = [];
     const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), nrm = new THREE.Vector3(), nm = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
     for (let t = 0; t < tri; t++) {
       const i0 = idx ? idx.getX(t * 3) : t * 3, i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
       a.fromBufferAttribute(p, i0); b.fromBufferAttribute(p, i1); c.fromBufferAttribute(p, i2);
       nrm.subVectors(b, a).cross(c.clone().sub(a)).applyMatrix3(nm).normalize(); mesh.localToWorld(a.add(b).add(c).multiplyScalar(1 / 3));
-      const q = seen.find(q => q.p.distanceTo(a) < 140); if (q) { q.n.add(nrm); q.k++; } else seen.push({ p: a.clone(), n: nrm.clone(), k: 1 });
+      let q = seen.find(q => q.p.distanceTo(a) < 140); if (q) { q.n.add(nrm); q.k++; } else seen.push(q = { p: a.clone(), n: nrm.clone(), k: 1 }); triQ.push(q);
     }
     for (const q of seen) { const lab = q.p.y < LAB_Y, n = q.n.divideScalar(q.k); if (n.lengthSq() > .01) n.normalize(); else n.set(0, 1, 0);
+      // the houses' wall and ceiling splashes (behind a sconce, around a ceiling fixture, with their small table pools): DIM_SPLASH
+      q.gain = lab || n.y >= .4 ? 1 : DIM_SPLASH;
       lamps.push({ p: q.p.clone().setY(q.p.y - 16), lab }); if (n.y >= .4) continue;
       glows.push({ p: q.p.clone().addScaledVector(n, 6), kind: lab ? 1 : 0, n, vis: 1, occ: 1 });
-      // ceiling fixtures shine straight down, wall ones out and down
+      // ceiling fixtures shine straight down, wall ones out and down; a house's wall decal is the splash behind a table lamp or
+      // sconce, no shaft from those (it hung as a bright column in front of the wall; the lab's wall panels keep theirs)
+      if (!lab && Math.abs(n.y) < .4) continue;
       shaftSrc.push({ top: q.p.clone().addScaledVector(n, n.y < -.6 ? 4 : 10), dir: n.y < -.6 ? V3(0, -1, 0) : V3(n.x * .6, -1, n.z * .6), kind: lab ? 'lab' : 'lamp' }); }
+    if (!g.attributes.nkGain) { const gain = new Float32Array(p.count).fill(1);
+      for (let t = 0; t < tri; t++) { const v = triQ[t].gain; for (let k = 0; k < 3; k++) gain[idx ? idx.getX(t * 3 + k) : t * 3 + k] = v; }
+      g.setAttribute('nkGain', new THREE.BufferAttribute(gain, 1)); }
   }
   // the pools glow cold and the lab's stutter (a world-y band: the outdoor decals share the merged material)
   const flickU = { value: 1 };
   for (const { mat } of dyn) {
     if (mat.userData.nkPatched) continue; mat.userData.nkPatched = true;
-    mat.emissive.setHex(0xc9e6ff); mat.emissiveIntensity = 2.6;   // at 1 the decals' alpha-tested texture swallows it
+    mat.emissive.setHex(0xc9e6ff); mat.emissiveIntensity = 2.6;   // at 1 the decals' alpha-tested texture swallows it (floor pools); the houses' wall and ceiling clusters get DIM_SPLASH of it through the nkGain attribute
     const prev = mat.onBeforeCompile;
     mat.onBeforeCompile = (sh, r) => { prev?.call(mat, sh, r); sh.uniforms.nkFlick = flickU;
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', 'varying float vNkY;\n#include <common>').replace('#include <begin_vertex>', '#include <begin_vertex>\nvNkY = (modelMatrix * vec4(transformed, 1.0)).y;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', 'varying float vNkY; uniform float nkFlick;\n#include <common>').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= mix(1.0, nkFlick, step(vNkY, ' + LAB_Y.toFixed(1) + '));'); };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', 'attribute float nkGain; varying float vNkY, vNkGain;\n#include <common>').replace('#include <begin_vertex>', '#include <begin_vertex>\nvNkY = (modelMatrix * vec4(transformed, 1.0)).y; vNkGain = nkGain;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', 'varying float vNkY, vNkGain; uniform float nkFlick;\n#include <common>').replace('#include <clipping_planes_fragment>', 'if (vNkGain < 0.001) discard;\n#include <clipping_planes_fragment>').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= mix(vNkGain, nkFlick, step(vNkY, ' + LAB_Y.toFixed(1) + '));'); };
     mat.customProgramCacheKey = () => 'nuketown-dyn-lights'; mat.needsUpdate = true;   // at load, before the warm pass compiles it
   }
   for (const m of lava) { m.emissive.setHex(0xff3c08); m.emissiveIntensity = 1.3; }
@@ -239,6 +247,9 @@ export function setupAtmosphere(api) {
     for (const s of shaftSrc) {
       const B = BEAM[s.kind], dir = s.dir.normalize(); let top = s.top;
       if (s.ceiling) { const h = world.raycast(r.set(top, up), 0, 160); if (!h) continue; top = top.clone().setY(top.y + h.distance - 4); }   // lab lights hang under a fixture
+      // a godray marker floats in the room (UGX placed the ray's sprite, not its source): start the shaft at the wall, window or
+      // roof hole behind it along its aim, so it grows out of a surface instead of hanging mid-air (2026-10-28)
+      if (s.anchor) { const h = world.raycast(r.set(top, dir.clone().negate()), 0, 240); if (h) top = top.clone().addScaledVector(dir, -(h.distance - 3)); }
       if (seen.some(q => q.distanceTo(top) < 40)) continue; seen.push(top);
       const hit = world.raycast(r.set(top.clone().addScaledVector(dir, 6), dir), 0, B.max), len = hit ? hit.distance + 6 : B.max;
       if (len < 60) continue;
@@ -266,7 +277,7 @@ export function setupAtmosphere(api) {
         else if (r.note === 'emb1') floating.push(V3(o[0], o[1] - 60, o[2]));   // embers hanging in the air
         else if (r.note === 'godray1') {   // lit windows and rooms: a light and a shaft along the fx's aim (no disc: the marker floats mid-room)
           const lab = o[1] < LAB_Y, [p, y] = (r.angles ?? [60, r.yaw ?? 0]).map(a => a * Math.PI / 180);
-          lamps.push({ p: V3(o[0], o[1] - 22, o[2]), lab }); shaftSrc.push({ top: V3(o[0], o[1], o[2]), dir: V3(Math.cos(p) * Math.cos(y), -Math.sin(p), -Math.cos(p) * Math.sin(y)), kind: lab ? 'lab' : 'window' }); }
+          lamps.push({ p: V3(o[0], o[1] - 22, o[2]), lab }); shaftSrc.push({ top: V3(o[0], o[1], o[2]), dir: V3(Math.cos(p) * Math.cos(y), -Math.sin(p), -Math.cos(p) * Math.sin(y)), kind: lab ? 'lab' : 'window', anchor: true }); }
         else if (r.note === 'lightning1') bolts.push(new THREE.Vector2(o[0], o[2]));
       } else if (r.name === 'spawned_fire') addFire(o, 'spawned_fire');
       else if (r.light && o[1] < LAB_Y) { lamps.push({ p: V3(o[0], o[1], o[2]), lab: true }); shaftSrc.push({ top: V3(o[0], o[1], o[2]), dir: V3(0, -1, 0), kind: 'lab', ceiling: true }); }
