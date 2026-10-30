@@ -178,7 +178,7 @@
         "explore"
       ],
       "dir": "mods/maps/nuketown/",
-      "model": "nuketown.glb?v=9",
+      "model": "nuketown.glb?v=11",
       "scale": 1,
       "background": "#84a9b2",
       "exposure": 1.0,

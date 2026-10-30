@@ -11,6 +11,9 @@
 //   - A free perk bottle in the closet beside the yellow house's back (free_maxammo), lava that burns, the hell portals
 //     that bring the player back up to the street, the original's zone links (blue back opens construction, brady back
 //     opens brady) and its round-start lines (sounds/round_start_0N.ogg, ripped with the map so git-ignored).
+//   - Buildables (buildables.js): the rake trap, the shield, the electric water trap. Easter egg (easter-egg.js): the rocks, the
+//     scientist's six steps, the truck out. Extras (extras.js): zipline, fire tornadoes, meteors and their song, the TV, the alarm.
+//     Shader effects (fx.js): the portal swirls, the geysers on the water spouts, the tornadoes.
 //   - Falling perks (perks.js): six machines come down from the sky once called, onto crate piles.
 //   - The map's own zombies (characters.js): BO2 Nuketown's hazmat, soldier and civilian zombies.
 //   - Tab tiles (tab.js) and the journal's Nuketown quests (journal/quests.js) read kino.nuketown.state().
@@ -20,6 +23,11 @@ import { setupAtmosphere } from './atmosphere.js';
 import { setupPerkDrops, mapSound } from './perks.js';
 import { setupZombies } from './characters.js';
 import { setupTab } from './tab.js';
+import { createSync } from '../der-eisendrache/sync.js';
+import { setupPortalFx, makeGeyser, fxTick, spotLoop } from './fx.js';
+import { setupBuildables } from './buildables.js';
+import { setupEasterEgg } from './easter-egg.js';
+import { setupExtras } from './extras.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const DEG = Math.PI / 180;
@@ -59,7 +67,12 @@ const ELEVATOR = { rise: 160, time: 3, doorRise: 100, clip: [[-1604, 1335, 902],
 const PAP = { trig: V(-1177, 1024, 2588), skull: V(-1195, 1030, 2582), rise: 100, time: 20, clip: [[-1241, 976, 2507], [-1171, 1187, 2642]] };
 const FREE_PERK = V(1153, 1672, -1278);
 const LAVA = [[[-560, 953, 2456], [-243, 993, 2809]], [[-299, 977, 2408], [66, 1014, 2703]], [[-491, 890, 2942], [38, 945, 3421]]];   // the three lava_damage triggers
-const PORTALS = [V(-1166, 1324, 1828), V(-662, 1055, 3267), V(-207, 1091, 3181), V(-1883, 1092, 2441)];
+// the two hell_area_teleporters: the spot under each swirl and where it lands (initial_spawn_points); the second one lands
+// at the far street once the town is open (road or blue). The third swirl, the lab's, has no teleporter: it is a way in, a
+// walk-through into hell (2026-10-30: the port had a teleporter there too, which threw everyone back up and hid hell)
+const PORTALS = [{ at: V(-655, 1037, 3251), to: V(60.5, 1720, 69.9) }, { at: V(-205, 1029, 3173), to: V(60.5, 1720, 69.9), town: V(-139.5, 1696, 2077.9) }];
+const PORTAL_SWIRLS = [V(-660, 1055, 3267), V(-214, 1083, 3177), V(-1178, 1321, 1819)];
+const PORTAL_REACH = 48, PORTAL_DROP = 120, PORTAL_SAFE = 3;
 const ZONE_LINKS = { blueback: 'construction', bradyback: 'brady' };   // zone opened -> zone that opens with it (the original's enter_* flags)
 // the water spouts (_watershoot.gsc): stand on one for 3 s and it throws the player up its shaft, then carries them along the
 // original's script_origin chain onto the floor above and opens that area (script_flag enter_brady / enter_blue_back).
@@ -71,7 +84,7 @@ const SPOUTS = [
   { trig: [[-1716, 1304, 1850], [-1633, 1312, 1934]], top: 1688, zones: ['blueback'],
     path: [[-1661, 1739, 1880], [-1646, 1762, 1880], [-1618, 1780, 1880], [-1579, 1790, 1880], [-1542, 1780, 1880], [-1513, 1753, 1880], [-1489, 1709, 1880]] },
 ].map(q => ({ ...q, centre: V((q.trig[0][0] + q.trig[1][0]) / 2, q.trig[1][1], (q.trig[0][2] + q.trig[1][2]) / 2), path: q.path.map(a => V(...a)) }));
-const SPOUT = { prepare: 3, speed: 900, step: .2, cooldown: 3, safe: 1.5 };
+const SPOUT = { prepare: 3, speed: 900, step: .2, cooldown: 3, safe: 1.5, radius: 30 };
 const ROUND_LINES = 4, ROUND_LINE_GAIN = .5;   // round-start lines: gain into the master (.42 x the volume setting)
 
 export default async function setup(api) {
@@ -133,6 +146,9 @@ function setupQuest(api) {
   const burst = (position, count = 30) => host.emit?.('effect', { position: position.clone(), color: new THREE.Color(1, .7, .3), count });
   const papLockedText = 'Sealed: the skull key is somewhere in the lab';
   const st = {};   // per-game state, rebuilt on reset
+  let builds = null, egg = null, extras = null;
+  // co-op (der-eisendrache/sync.js): the buildables, the Easter egg and the extras share their events through it
+  const sync = api.sync ??= createSync(api);
 
   let floor = null;
   root.traverse(o => { if (o.isMesh && o.material?.name?.endsWith('bo1_rus_art_metal_panel')) floor = o.material; });
@@ -263,6 +279,8 @@ function setupQuest(api) {
 
   // ---- the water spouts (SPOUTS): a phase machine for the local player, `prep` (rumble and spray) -> `up` -> `carry`
   const sound = mapSound(api);
+  const geysers = SPOUTS.map(q => makeGeyser(api, q.centre.clone(), q.top + 30, SPOUT.radius));
+  const portalLoop = spotLoop(api, 'necros_portal', 700, .5), portalSpots = PORTALS.map(q => q.at);
   let spoutAudio = null;
   const stopSpoutAudio = () => { try { spoutAudio?.pause(); } catch {} spoutAudio = null; };
   const spray = (q, y, count = 8) => host.emit?.('effect', { position: V(q.centre.x, y, q.centre.z), color: new THREE.Color(.75, .9, 1), count });
@@ -275,15 +293,17 @@ function setupQuest(api) {
       if (st.spoutWait > 0 || session.phase === 'reviving' || session.phase === 'gameover') return;
       const q = SPOUTS.find(q => inBox(p, q.trig, 6, 60)); if (!q) return;
       sp = st.spout = { q, phase: 'prep', t: 0, fx: 0 };
+      sync.fx('ntGeyser', { i: SPOUTS.indexOf(q), level: .4 });
       stopSpoutAudio(); spoutAudio = sound('watershoot_prepare', .9); toast('The water spout is building up: stay on it', 3);
     }
     const q = sp.q; sp.t += dt; sp.fx -= dt;
     if (sp.phase === 'prep') {
       if (fp) fp.shake = .4 * Math.min(1, sp.t);
       if (sp.fx <= 0) { sp.fx = .1; spray(q, q.centre.y + 4, 6 + sp.t * 4); }
-      if (!inBox(p, q.trig, 20, 60) || session.phase === 'reviving') { st.spout = null; st.spoutWait = 1; stopSpoutAudio(); if (fp) fp.shake = 0; return; }
+      if (!inBox(p, q.trig, 20, 60) || session.phase === 'reviving') { st.spout = null; st.spoutWait = 1; stopSpoutAudio(); if (fp) fp.shake = 0; sync.fx('ntGeyser', { i: SPOUTS.indexOf(q), level: 0 }); return; }
       if (sp.t < SPOUT.prepare) return;
       Object.assign(sp, { phase: 'up', t: 0, from: p.clone() });
+      sync.fx('ntGeyser', { i: SPOUTS.indexOf(q), level: 1 });
       stopSpoutAudio(); spoutAudio = sound('watershoot_loop', .9);
     }
     st.spoutSafe = SPOUT.safe;
@@ -302,12 +322,13 @@ function setupQuest(api) {
     player.setPosition(q.path.at(-1).clone().add(V(0, 2, 0)));
     for (const z of q.zones) session.flags?.add('zone:' + z);
     st.spout = null; st.spoutWait = SPOUT.cooldown; if (fp) fp.shake = 0;
+    sync.fx('ntGeyser', { i: SPOUTS.indexOf(q), level: 0 });
     const a = spoutAudio; setTimeout(() => { if (a === spoutAudio) stopSpoutAudio(); }, 1500);
   };
 
   const reset = () => {
     if (st.spout && globalThis.kino?.fpMotion) globalThis.kino.fpMotion.shake = 0;
-    stopSpoutAudio();
+    stopSpoutAudio(); portalLoop.stop(); for (const g of geysers) g.set(0);
     Object.assign(st, { safe: [], safeT: 0, offMap: 0, pocket: false, spout: null, spoutWait: 0, spoutSafe: 0, generators: 0, bunkerT: null, fixed: 0, elevatorT: null, skullT: null, lava: 0, portal: 0, zone: 0 });
     show(generators, true); setBunker(0); for (const l of levers) setLever(l, 0);
     for (const t of tools) show(t.nodes, true);
@@ -315,6 +336,7 @@ function setupQuest(api) {
     show(papDoor, true); papClip.enabled = true; elevatorClip.enabled = true; bunkerClip.enabled = true;
     world.papLocked = true; world.papLockedText = papLockedText;
     armGenerators();
+    builds?.reset(); egg?.reset(); extras?.reset();
   };
   // ---- out of the map: back to where the player stood a few seconds ago
   const onPlate = p => Math.abs(p.y - PLATE_Y) < 3 && PLATES.some(([x0, x1, z0, z1]) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1);
@@ -338,8 +360,16 @@ function setupQuest(api) {
     Object.assign(st, { safe: [back], offMap: 0, pocket: false });
     toast('Back on solid ground', 3);
   };
+  sync.onFx('ntGeyser', d => geysers[d.i]?.set(d.level));
+  setupPortalFx(api, PORTAL_SWIRLS);
+  const parts = { api, world, session, host, root, sync, st, nodesOf, pivot, moved, live, show, V, DEG, sound, sfx, burst, toast, announce, player, inBox, boxCollider, flag, setFlag, ease, place };
+  const guard = (name, fn) => { try { return fn(); } catch (e) { console.warn('[nuketown] ' + name, e); return null; } };
+  builds = guard('buildables', () => setupBuildables(parts));
+  egg = guard('easter egg', () => setupEasterEgg(parts));
+  extras = guard('extras', () => setupExtras(parts));
   reset();
   host.on('reset', reset);
+  sync.ready();   // a guest catches up on the game's events so far
   host.on('fall', e => { if (st.spoutSafe > 0 || e.position.y < UNDERGROUND) e.amount = 0; });
   host.on('start', () => { placePerk(); });
   host.on('update', dt => {
@@ -355,12 +385,15 @@ function setupQuest(api) {
     spoutTick(dt, p);
     st.lava += dt;
     if (st.lava > .3) { st.lava = 0; if (LAVA.some(b => inBox(p, b, 0, 90))) { damage?.(50); } }
+    fxTick(dt); for (const g of geysers) g.tick(dt);
+    portalLoop.tick(p, portalSpots);
+    builds?.tick(dt, p); egg?.tick(dt, p); extras?.tick(dt, p);
     st.portal -= dt;
     if (st.portal <= 0) for (const q of PORTALS) {
-      if (Math.abs(p.y - q.y) < 100 && (p.x - q.x) ** 2 + (p.z - q.z) ** 2 < 48 * 48) {
-        st.portal = 3; burst(q.clone().add(V(0, 40, 0)), 24); sfx('teleport', .8);
-        const to = (world.spawn?.position ?? V(60, 1720, 70)).clone().add(V(0, 30, 0));
-        player.setPosition(to);
+      if (Math.abs(p.y - q.at.y) < 70 && (p.x - q.at.x) ** 2 + (p.z - q.at.z) ** 2 < PORTAL_REACH ** 2) {
+        st.portal = 3; st.spoutSafe = PORTAL_SAFE; sfx('teleport', .8);
+        const zones = world.activeZones?.(session), town = q.town && (zones?.has('road') || zones?.has('blue') || zones?.has('blueback'));
+        player.setPosition((town ? q.town : q.to).clone().add(V(0, PORTAL_DROP, 0)));
         toast('Back on the surface', 3); break;
       }
     }
@@ -376,9 +409,10 @@ function setupQuest(api) {
     tools: tools.map(t => ({ name: t.name, at: t.at, panel: t.panel, got: flag('got_' + t.node), fixed: flag('fixed_' + t.node) })),
     elevator: flag('elevator'), skull: flag('skull'), placed: flag('placed'), pap: !world.papLocked, papAt: PAP.trig,
     freePerk: flag('free_perk'), freePerkAt: FREE_PERK,
+    ...builds?.state(), egg: egg?.state(), extras: extras?.state(),
     perks: perks?.drops.map(d => ({ perk: d.perk, called: d.called, landed: d.landed, at: d.at ?? V((d.box[0][0] + d.box[1][0]) / 2, d.box[0][1], (d.box[0][2] + d.box[1][2]) / 2) })) ?? [],
   });
-  globalThis.kino && (globalThis.kino.nuketown = { st, found, state, setBunker, setElevator, setSkull, openPap, placePerk, reset, perks });
+  globalThis.kino && (globalThis.kino.nuketown = { st, found, state, setBunker, setElevator, setSkull, openPap, placePerk, reset, perks, builds, egg, extras, geysers });
   try { setupTab(api, state); } catch (e) { console.warn('[nuketown] tab', e); }
 }
 

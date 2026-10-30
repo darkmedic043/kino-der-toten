@@ -81,7 +81,7 @@ export default function setup(api){
     const topY=probe.y-top.distance,rise=topY-f.y;
     if(rise<=player.stepHeight+1||rise>74)return null;
     const target=new THREE.Vector3(probe.x,topY+player.skin*2,probe.z);
-    if(!fits(target,player.height))return null;
+    if(!fits(target,player.height)||api.world?.closedDoorAt?.(target,player.radius+6))return null;
     // where the left hand plants: on the ledge's edge, a little left of centre
     const left=new THREE.Vector3(dir.z,0,-dir.x);
     const hand=f.clone().addScaledVector(dir,wall.distance+3).addScaledVector(left,7);hand.y=topY+.5;

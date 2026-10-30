@@ -12,7 +12,7 @@ keep it out of git (the map folder gets a .gitignore).
 """
 import collections, json, math, pathlib, re, struct, subprocess, sys, tempfile
 
-SKIP_MATERIAL = re.compile(r'sky|clip|trigger|nodraw|caulk|portal|hint|origin', re.I)
+SKIP_MATERIAL = re.compile(r'sky|clip|trigger|nodraw|caulk|portal|hint|origin|gobo', re.I)   # gobo: shadow-only cards
 # Wall weapons the map names -> weapons this game has (the map's own are not in the game)
 WEAPON_MAP = {'kap40': 'bo3_g18_death', 'pdw': 'bo3_mp7_flanker', 'cheese_gun': 'mp40_zm', 'm1927': 'bo3_tommy_modern',
               'm27': 'bo3_sa80', 'aek': 'bo3_ak117', 'an94': 'bo3_f2000_tech',
@@ -69,11 +69,30 @@ class Builder:
         self.bin = bytearray(); self.views, self.accessors = [], []
         self.images, self.textures, self.materials, self.meshes, self.nodes = [], [], [], [], []
         self.tex_index, self.mat_index = {}, {}
+        self.alias = {}          # cfg 'materialAlias': materials missing from the dump -> the one to draw instead
+        self.blend_decals = False   # cfg 'blendDecals': srcalpha/invsrcalpha materials blend as in the game instead of cutting at .3
+        self.layer_images = None
         self.instancing = False
         self.tmp = pathlib.Path(tempfile.mkdtemp())
 
     # ---- materials and textures ----
+    def layer_image(self, key):
+        # terrain blend names list their layers (`*59_60_7`: layers 59, 60, 7); the dump leaves out some combinations, but
+        # every layer's image can be read off the combinations it does hold
+        if self.layer_images is None:
+            self.layer_images = {}
+            for p in sorted((self.dump / 'materials' / 'generated').glob('_*.json')):
+                ids = p.stem[1:].split('_')
+                for t in json.load(open(p)).get('textures', []):
+                    n = t.get('name') or ''
+                    if n.startswith('colorMap') and not t['image'].startswith('$'):
+                        k = int(n[8:] or 0)
+                        if k < len(ids):
+                            self.layer_images.setdefault(ids[k], t['image'])
+        return self.layer_images.get(key)
+
     def material_info(self, name):
+        name = self.alias.get(name, name)
         path = self.dump / 'materials' / (name + '.json')
         if not path.exists():
             # terrain blends (`*11n_7n`: two layers mixed, sometimes with a leading comma) are dumped under
@@ -83,6 +102,9 @@ class Builder:
             path = self.mod_dump / 'materials' / (name + '.json')
         info = {'image': None, 'alpha': 'OPAQUE', 'layer': None}
         if not path.exists():
+            ids = name.lstrip(',*').split('_') if name.lstrip(',').startswith('*') else []
+            if ids:
+                info['image'], info['layer'] = self.layer_image(ids[0]), self.layer_image(ids[1]) if len(ids) > 1 else None
             return info
         m = json.load(open(path))
         for t in m.get('textures', []):
@@ -111,6 +133,9 @@ class Builder:
         for sb in m.get('stateBits', []):
             if sb.get('blendOpRgb', 'disabled') != 'disabled' and sb.get('dstBlendRgb') not in (None, 'zero') and 'glass' in name + (info['image'] or ''):
                 info['alpha'] = 'BLEND'
+        first = (m.get('stateBits') or [{}])[0]
+        if self.blend_decals and first.get('srcBlendRgb') == 'srcalpha' and first.get('dstBlendRgb') == 'invsrcalpha':
+            info['alpha'] = 'BLEND'
         return info
 
     def texture(self, image, size=None):
@@ -148,6 +173,8 @@ class Builder:
             mat['emissiveTexture'] = {'index': tex}; mat['emissiveFactor'] = [1, 1, 1]
         if info['alpha'] != 'OPAQUE':
             mat['alphaMode'] = info['alpha']
+            if info['alpha'] == 'BLEND' and self.blend_decals:
+                mat['extras'] = {'decal': True}   # CustomWorld's overlay layers: polygon offset over the surface below
             if info['alpha'] == 'MASK':
                 mat['alphaCutoff'] = info.get('cutoff', 0.5)
         self.materials.append(mat)
@@ -336,6 +363,7 @@ def main():
         p = dump / 'model_export' / (name + '_lod0.glb')
         return mod_dump / 'model_export' / (name + '_lod0.glb') if not p.exists() and mod_dump else p
     b = Builder(dump, max_tex, mod_dump)
+    b.alias, b.blend_decals = cfg.get('materialAlias', {}), cfg.get('blendDecals', False)
     out.mkdir(parents=True, exist_ok=True)
 
     # zones: <zone>_spawners_rise structs. 'start_zone' is 'start'. cfg 'compactZones': ids without the zone_ prefix and

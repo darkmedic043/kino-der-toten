@@ -113,9 +113,9 @@ export class CustomWorld {
     // order per material (sorted by distance, stacked layers swapped as the camera moved and flickered) and a polygon
     // offset (their small push off the surface lost to depth precision at range: z-fighting)
     {const layer=new Map();
-      for(const o of meshes){const m=[o.material].flat()[0];if(!m?.transparent||!/_blend|decal/i.test(m.name??''))continue;
-        if(!layer.has(m)){layer.set(m,layer.size);m.polygonOffset=true;m.polygonOffsetFactor=-1;m.polygonOffsetUnits=/decal/i.test(m.name)?-8:-4;}
-        o.renderOrder=(/decal/i.test(m.name)?2000:1000)+layer.get(m);}}
+      for(const o of meshes){const m=[o.material].flat()[0];if(!m?.transparent||!(/_blend|decal/i.test(m.name??'')||m.userData?.decal))continue;
+        if(!layer.has(m)){layer.set(m,layer.size);m.polygonOffset=true;m.polygonOffsetFactor=-1;m.polygonOffsetUnits=/decal/i.test(m.name)||m.userData?.decal?-8:-4;}
+        o.renderOrder=(/decal/i.test(m.name)||m.userData?.decal?2000:1000)+layer.get(m);}}
     progress('Building collision',35);
     const solid=positionsOf(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)&&!clipOnly.includes(o)));
     this.clipCollision=clipOnly.length?new CollisionWorld(positionsOf(clipOnly)):null;   // the player's capsule only (physics)
@@ -524,6 +524,15 @@ export class CustomWorld {
     const pts=r.path.map(p=>new THREE.Vector3(p.x,p.y,p.z)),T=this.traversals,reach=this.entry.zombieWalls?72:40;
     if(T?.length)for(let i=1;i<pts.length;i++){const p=pts[i-1],q=pts[i],t=T.find(t=>p.distanceTo(t.from)<40&&q.distanceTo(t.to)<reach||t.both&&p.distanceTo(t.to)<40&&q.distanceTo(t.from)<reach);if(t)q.hop=t;}   // an off-mesh link's far end (hop: the traversal; with zombieWalls up to 72 away: Recast lands it on the nearest polygon, Nuketown's porch 51 away)
     return pts;}
+  // is the point over a closed door's block? `pad` grows its footprint (the mantle asks, or it lands on top of the blocker)
+  closedDoorAt(p,pad=0){
+    for(const d of this.dynamic){
+      const o=d.obb;if(!o||!d.enabled||p.y<o.y0||p.y>o.y1+24)continue;
+      const dx=p.x-o.x,dz=p.z-o.z;
+      if(Math.abs(dx*o.c+dz*o.s)<o.hu+pad&&Math.abs(-dx*o.s+dz*o.c)<o.hw+pad)return d;
+    }
+    return null;
+  }
   raycast(ray,near=0,far=Infinity,windows=false){let hit=this.collision.rayIntersect(ray,near,far);
     for(const m of this.movers??[]){if(m.disabled)continue;const r=new THREE.Ray(ray.origin.clone().sub(m.offset),ray.direction),h=m.collider.rayIntersect(r,near,hit?Math.min(hit.distance,far):far);if(h){h.position.add(m.offset);h.point.add(m.offset);hit=h;}}for(const d of this.dynamic){if(!d.enabled||!d.collider||(!windows&&d.window))continue;const h=d.collider.rayIntersect(ray,near,hit?Math.min(hit.distance,far):far);if(h)hit=h;}return hit;}
   lineClear(a,b){const v=b.clone().sub(a),dist=v.length();return !this.raycast(new THREE.Ray(a,v.normalize()),1,Math.max(1,dist-4));}

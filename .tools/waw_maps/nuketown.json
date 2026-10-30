@@ -1,6 +1,9 @@
 {
   "_comment": "Nuketown Remastered 1.2 (UGX, BO2 Nuketown with a bunker lab). Per-map settings for build_waw_map.py; coordinates are CoD units (x, y, z up). Zones are plain names (yellow, yellow_back, lab_zone4...) so compactZones joins them; initial_zone/initial/start_zone are the start. Its doors are rotating_door, zombie_debris and zombie_door triggers; the Mystery Box trigger is lukkie_treasure_chests.",
   "instanceProps": true,
+  "blendDecals": true,
+  "materialAlias": {"wc/decal_blood_spatter01": "wc/decal_bloodsplat6", "mc/bo2_wood_burned_blend": "mc/bo2_wood_burned", "mc/bo2_mtl_dest_jun_tvset_d": "mc/bo2_mtl_dest_jun_tvset",
+    "mc/bo1_mtl_p_jun_old_tv_live": "mc/bo1_mtl_p_dest_television01", "mc/mtl_char_jap_impinf_gore_limbs": "mc/mtl_char_jap_impinf_gore_blend"},
   "modDump": "../../dump_mod/mod",
   "entitySwap": {"truck_replace": "nuketown_big_truck"},
   "collisionHoles": [[[-1450, 1200, 1712], [-1355, 1300, 1800]]],

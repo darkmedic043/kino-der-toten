@@ -23,6 +23,21 @@ export function setupTab(api, state) {
       parts: () => state().perks.map(d => { const [name, short] = PERKS[d.perk] ?? [d.perk, d.perk.slice(10, 12)]; return part(name, d.landed ? 'placed' : d.called ? 'carried' : 'none', short); }),
       value: () => { const p = state().perks; return `${p.filter(d => d.landed).length} / ${p.length} landed`; },
       done: () => state().perks.every(d => d.landed) });
+    const craft = (id, key, short) => add({ id, label: state()[key].label,
+      parts: () => state()[key].parts.map(q => part(q.name, q.got ? (state()[key].built ? 'placed' : 'carried') : 'none', q.name.slice(0, 2))),
+      value: () => { const c = state()[key]; return c.built ? 'Built' : `${c.parts.filter(q => q.got).length} / ${c.parts.length} parts`; },
+      done: () => state()[key].built });
+    craft('nt-rake', 'rake'); craft('nt-shield', 'shield');
+    add({ id: 'nt-trap', label: 'Water trap', value: () => { const t = state().trap; return t.on ? 'Running' : t.cooling ? 'Cooling down' : t.ready ? 'Ready · 1000' : 'Needs power'; }, done: () => false });
+    add({ id: 'nt-ee', label: 'The scientist',
+      parts: () => { const s = state().egg, n = s.stepsDone; return [1, 2, 3, 4, 5, 6].map(i => part('Step ' + i, i <= n ? 'placed' : i === n + 1 ? 'carried' : 'none', String(i))); },
+      value: () => {
+        const s = state().egg; if (s.escaped) return 'Escaped';
+        if (s.talking) return 'Listening...';
+        if (s.step === 6) return s.landed ? 'Get in the truck' : s.truck ? 'Truck incoming' : s.left != null ? 'Hold out' : 'Hold out';
+        return `Step ${s.step}: ${s.objective}`;
+      },
+      done: () => state().egg.escaped });
     add({ id: 'nt-free-perk', label: 'Free perk', value: () => state().freePerk ? 'Taken' : 'Not found', done: () => state().freePerk });
   }
   // the scoreboard (a core mod) may set up after this map's mod

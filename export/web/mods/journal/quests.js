@@ -251,6 +251,21 @@ export const JOURNAL = [
       { title: 'The skull key', how: 'Take the skull from the elevator.', where: L => L.prompts(/Take the skull/) },
       { title: 'Hell', how: 'Place the skull at the sealed alcove in hell: a skull rises for 20 s, then the books and wall in front of Pack-a-Punch fall.', where: L => { const s = nt(L); return s?.placed ? [s.papAt] : L.prompts(/Place the skull/); } },
     ] },
+    { id: 'nt-ee', name: 'The scientist', kind: 'MAIN QUEST', progress: L => nt(L)?.egg?.stepsDone ?? 0, steps: [
+      { title: 'The door', how: 'Walk up to the door at the very end of the lab: someone is alive behind it.', where: L => { const s = nt(L)?.egg; return s && s.step === 1 ? [s.door] : []; } },
+      { title: 'Knock', how: 'Knife the door and listen to the whole message.', where: L => { const s = nt(L)?.egg; return s && s.step === 2 ? [s.door] : []; } },
+      { title: 'The files', how: 'Bring down the rocks in the lab with any explosive (a grenade, a launcher, the Ray Gun) and take the files behind them. Knife the door, then go prone at it and slide the files under.', where: L => { const s = nt(L)?.egg; return !s || s.step !== 3 ? [] : !s.rocks ? [s.rocksAt] : !s.files ? [s.filesAt] : [s.door]; } },
+      { title: 'Key and radio', how: 'A key lies in the lab and a radio on the way down to hell: with the key open the vent above the door, then hand the radio through it.', where: L => { const s = nt(L)?.egg; return !s || s.step !== 4 ? [] : [...(s.key ? [] : [s.keyAt]), ...(s.radio ? [] : [s.radioAt]), ...(s.key && s.radio ? [s.door] : [])]; } },
+      { title: 'Failsafe nodes', how: 'Disable the four failsafe nodes around the town, then go back to the door.', where: L => { const s = nt(L)?.egg; return !s || s.step !== 5 ? [] : s.buzzed ? [s.door] : s.nodes.filter(n => !n.off).map(n => n.at); } },
+      { title: 'The way out', how: 'Hold out for 300 s of an endless round of sprinters. A truck comes down under parachutes at the end of the road: get in to escape, which ends the game as a win.', where: L => { const s = nt(L)?.egg; return s && s.landed ? [s.truckAt] : []; } },
+    ] },
+    { id: 'nt-build', name: 'Buildables', kind: 'MAP QUEST', steps: [
+      { title: 'The rake trap', how: 'Axe, rake and rope lie around the map, a different set each game: take all three to a station, build it, take a rake and place it with the claymore key. Stepping on it kills a zombie; it lasts 20 hits and can be moved.', done: L => !!nt(L)?.rake?.built, where: L => { const s = nt(L)?.rake; return !s || s.built ? [] : s.parts.every(q => q.got) ? s.stations : s.parts.filter(q => !q.got).map(q => q.at); } },
+      { title: 'The shield', how: 'A car door and a dolly make the shield: take both to a station, build it and pick it up. A station repairs it.', done: L => !!nt(L)?.shield?.built, where: L => { const s = nt(L)?.shield; return !s || s.built ? [] : s.parts.every(q => q.got) ? s.stations : s.parts.filter(q => !q.got).map(q => q.at); } },
+    ] },
+    { id: 'nt-song', name: 'The song', kind: 'SIDE EGG', steps: [
+      { title: 'Three meteors', how: 'Three meteors hum around the map. Touch all three.', done: L => !!nt(L)?.extras?.meteors.every(m => m.done), where: L => nt(L)?.extras?.meteors.filter(m => !m.done).map(m => m.at) ?? [] },
+    ] },
     { id: 'nt-perks', name: 'Falling perks', kind: 'MAP QUEST', steps: [
       ...[['specialty_quickrevive', 'Quick Revive', 'Its trigger covers the spawn.'], ['specialty_rof', 'Double Tap', 'Walk into its trigger.'],
         ['specialty_fastreload', 'Speed Cola', 'Walk into its trigger.'], ['specialty_additionalprimaryweapon', 'Mule Kick', 'Walk into its trigger (a small one).'],
