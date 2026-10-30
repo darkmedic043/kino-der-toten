@@ -71,14 +71,20 @@ const firstDraw={n:0,names:[],seen:new WeakMap(),layouts:new Map(),geo:new WeakM
 // Texture uploads per frame (count, KB, mipmap builds), for the perf log's hitches: a hitch with no first draws and an idle
 // main thread but uploads in its frame is the GPU process converting and creating textures (2026-10-29, the user's logs).
 const texUp={n:0,kb:0,mip:0};
+let lastTex={n:0,kb:0,mip:0,gl:{}};const fences=[];let fenceSupported=null;   // declared here: the frame loop runs during loading, before the module body reaches the probes below
 {const gl=renderer.getContext();const px=(w,h)=>Math.round(w*h*4/1024);
-  const texLog=new URLSearchParams(location.search).has('texLog')?(globalThis.kinoTexLog=[]):null;   // ?texLog: every upload with its caller (debug)
+  const texLog=new URLSearchParams(location.search).has('texLog')?(globalThis.kinoTexLog=[]):null;if(texLog)Error.stackTraceLimit=30;   // ?texLog: every upload with its caller (debug)
   const wrap=(name,kb)=>{const f=gl[name];if(typeof f!=='function')return;gl[name]=function(...a){texUp.n++;const k=kb(a)||0;texUp.kb+=k;
-    if(texLog&&texLog.length<4000)texLog.push([Math.round(performance.now()),name,k,a[0],String(new Error().stack).split('\n').slice(2,7).map(l=>l.trim().replace(/^at /,'').replace(/https?:\/\/[^/]+\//,'')).join(' < ')]);return f.apply(this,a);};};
+    if(texLog&&texLog.length<4000)texLog.push([Math.round(performance.now()),name,k,a[0],String(new Error().stack).split('\n').slice(2,k>100?16:7).map(l=>l.trim().replace(/^at /,'').replace(/https?:\/\/[^/]+\//,'')).join(' < ')]);return f.apply(this,a);};};
   wrap('texImage2D',a=>a.length>=9?px(a[3],a[4]):px(a[5]?.width??0,a[5]?.height??0));wrap('texSubImage2D',a=>a.length>=9?px(a[4],a[5]):px(a[6]?.width??0,a[6]?.height??0));
   wrap('texImage3D',a=>px(a[3],a[4])*(a[5]||1));wrap('texSubImage3D',a=>px(a[5],a[6])*(a[7]||1));wrap('texStorage2D',a=>px(a[3],a[4])*4/3);wrap('texStorage3D',a=>px(a[3],a[4])*(a[5]||1));
   wrap('compressedTexImage2D',a=>Math.round((a[6]?.byteLength??a[7]??0)/1024));wrap('compressedTexSubImage2D',a=>Math.round((a[8]?.byteLength??a[9]??0)/1024));
-  const gm=gl.generateMipmap;gl.generateMipmap=function(...a){texUp.mip++;return gm.apply(this,a);};}
+  const gm=gl.generateMipmap;gl.generateMipmap=function(...a){texUp.mip++;return gm.apply(this,a);};
+  // other GL work per frame, for the same hitch records ('gl ...'): buffer uploads (count/KB), objects made and deleted,
+  // shader links, and the calls that wait on the GPU process (getError, finish, readPixels, clientWaitSync, get*Parameter)
+  texUp.gl={};const count=(name,kb)=>{const f=gl[name];if(typeof f!=='function')return;gl[name]=function(...a){const glc=texUp.gl;glc[name]=(glc[name]||0)+1;if(kb){const k=kb(a);if(k)glc[name+'KB']=(glc[name+'KB']||0)+k;}return f.apply(this,a);};};
+  const bytes=a=>{const d=a.find(x=>x&&typeof x==='object'&&'byteLength' in x);return d?Math.round(d.byteLength/1024):typeof a[1]==='number'?Math.round(a[1]/1024):0;};
+  count('bufferData',bytes);count('bufferSubData',bytes);for(const n of ['createBuffer','createTexture','deleteBuffer','deleteTexture','createVertexArray','deleteVertexArray','createFramebuffer','createRenderbuffer','renderbufferStorageMultisample','compileShader','linkProgram','getError','finish','flush','readPixels','clientWaitSync','getProgramParameter','getShaderParameter','getUniformLocation','getParameter','getBufferSubData','blitFramebuffer','invalidateFramebuffer'])count(n);}
 const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
 const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait');   // A/B switch for warmShaders' draw pass
 const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
@@ -647,6 +653,17 @@ function gpuEnd(q,now){if(!timerExt)return;const gl=renderer.getContext();if(q){
     const ok=!gl.getParameter(timerExt.GPU_DISJOINT_EXT),ns=ok?gl.getQueryParameter(o.q,gl.QUERY_RESULT):0;gl.deleteQuery(o.q);gpuQ.shift();
     if(ok)perf.gpu?.(ns/1e6,o.next-o.now);}
   catch{timerExt=null;}}
+// GPU-process latency per frame: a fence after each frame's last command, polled from the frame loop and from a 10 ms
+// heartbeat timer (so a frame that finishes while the frame loop is stalled is still timed). A hitch with the main
+// thread idle (heartbeat alive, 'mt 0') and the previous frame's fence late by about the gap ('lat') is the GPU process
+// stuck on that frame's commands (D3D11 shader variants, buffer or texture work); a dead heartbeat ('mt' about the
+// gap) is the main thread or the whole process blocked (2026-10-29, the user's 2 s hitches with every counter quiet).
+function fenceFrame(now){const gl=renderer.getContext();if(fenceSupported===null)fenceSupported=typeof gl.fenceSync==='function';if(!fenceSupported||fences.length>=12)return;
+  try{fences.push({s:gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0),now});}catch{fenceSupported=false;}}
+function pollFences(){if(!fences.length)return;const gl=renderer.getContext();try{while(fences.length){const f=fences[0];if(gl.getSyncParameter(f.s,gl.SYNC_STATUS)!==gl.SIGNALED)break;gl.deleteSync(f.s);fences.shift();perf.lat?.(f.now,performance.now()-f.now);}}catch{fenceSupported=false;fences.length=0;}}
+(function heartbeat(){let last=performance.now();const tick=()=>{const t=performance.now();perf.beat?.(last,t);last=t;if(!document.hidden)pollFences();setTimeout(tick,10);};setTimeout(tick,10);})();
+for(const [ev,name] of [['blur','blur'],['focus','focus']])addEventListener(ev,()=>perf.event?.(name));
+document.addEventListener('visibilitychange',()=>perf.event?.(document.hidden?'hidden':'visible'));document.addEventListener('pointerlockchange',()=>perf.event?.(document.pointerLockElement?'lock':'unlock'));addEventListener('resize',()=>perf.event?.('resize'));
 function skipHidden(force){if(force||this.visible)THREE.Object3D.prototype.updateMatrixWorld.call(this,force);}   // a declaration: the frame loop starts from the load sequence before the module reaches this line
 function renderFrame(now){
   if(document.hidden||contextLost)return;
@@ -658,9 +675,11 @@ function renderFrame(now){
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
   update(dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
   const viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
-  keepPrograms();gpuEnd(gq,now);
+  keepPrograms();gpuEnd(gq,now);if(playing){fenceFrame(now);pollFences();}
   if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(firstDraw.late.length?firstDraw.late.splice(0):renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;if(session.round!==evRound){evRound=session.round;perf.event?.('round'+evRound);}const zn=enemies?.list?.length??0;if(zn>evZ)perf.event?.('spawn');evZ=zn;if(session.def!==evDef){evDef=session.def;perf.event?.('equip:'+(evDef?.id??'?'));}
-    perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames],texUp);texUp.n=texUp.kb=texUp.mip=0;}else{programCount=renderer.info.programs.length;perf.pause();}
+    // the uploads and GL work of the frame before the gap (the culprit when the GPU process stalls) and of this frame
+    perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames],texUp,lastTex);}else{programCount=renderer.info.programs.length;perf.pause();}
+  lastTex={n:texUp.n,kb:texUp.kb,mip:texUp.mip,gl:texUp.gl};texUp.n=texUp.kb=texUp.mip=0;texUp.gl={};
   lastFirstDraws=firstDraw.n;lastFirstNames=firstDraw.names;firstDraw.n=0;firstDraw.names=[];   // hitches carry the previous frame's first draws (a GPU stall delays the next frame)
 }
 resumeRendering();

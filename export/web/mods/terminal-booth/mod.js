@@ -131,9 +131,16 @@ export default async function setup(api){
     const c=document.createElement('canvas');c.width=512;c.height=384;const g=c.getContext('2d');
     const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;tex.anisotropy=4;
     const material=new THREE.MeshStandardMaterial({color:0x000000,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:1.25,roughness:.18,metalness:0});
+    // (2026-10-29) the canvas re-uploads only when its text or cursor changes (a 768 KB mipmapped upload each time: at
+    // 15 Hz it was 11 MB/s of texSubImage2D + generateMipmap all game, the only GPU work in the user's hitch frames);
+    // the rolling refresh bar is a uniform in the shader, the tube flicker is emissiveIntensity (a uniform too)
+    const roll={value:0};
+    material.onBeforeCompile=sh=>{sh.uniforms.uRoll=roll;sh.fragmentShader='uniform float uRoll;\n'+sh.fragmentShader.replace('#include <emissivemap_fragment>',
+      '#include <emissivemap_fragment>\n{float bar=max(0.,1.-abs(vEmissiveMapUv.y-(uRoll-.072))/.078);totalEmissiveRadiance+=emissive*vec3(.47,1.,.67)*.006*bar;}');};
+    material.customProgramCacheKey=()=>'booth-crt';
     const boot=opts.boot??['BOOT ROM 2.14 ...... OK','MEM CHECK 640K ..... OK','COOLANT LOOP ....... OK','LINK NODE-07 .. ONLINE',''];
     const idle=opts.idle??['PWR BUS 3 ........ 118V','COOLANT ..... 4.2 L/MIN','SIGNAL ............ WEAK','CARRIER LOST. RETRYING','HANDSHAKE ........... OK','RELAY 935 .... NO REPLY','ERR 0x2F BAD SECTOR','LISTENING ...'];
-    let lines=[],queue=[],typed='',acc=0,idleIn=6,cursor=0,roll=0,wasPower=null,dirty=true,drawAcc=0;
+    let lines=[],queue=[],typed='',acc=0,idleIn=6,cursor=0,wasPower=null,dirty=true,drawAcc=0,wasBlink=null;
     const print=line=>queue.push(String(line).toUpperCase().slice(0,24));
     function update(dt,power){
       if(power!==wasPower){wasPower=power;lines=[];queue=[];typed='';dirty=true;
@@ -144,10 +151,11 @@ export default async function setup(api){
         if(!queue.length){acc=0;idleIn-=dt;if(idleIn<=0){idleIn=4+Math.random()*7;print(idle[Math.floor(Math.random()*idle.length)]);}}
         while(lines.length>9)lines.shift();
       }
-      cursor+=dt;roll=(roll+dt*.18)%1.3;
-      drawAcc+=dt;if(drawAcc<1/15)return;drawAcc=0;draw(power);
+      cursor+=dt;roll.value=(roll.value+dt*.18)%1.3;
       // tube flicker
       material.emissiveIntensity=(power?1.25:.35)*(.96+Math.random()*.06);
+      const blink=power&&cursor%1<.55;if(blink!==wasBlink){wasBlink=blink;dirty=true;}
+      drawAcc+=dt;if(!dirty||drawAcc<1/10)return;drawAcc=0;dirty=false;draw(power);
     }
     function draw(power){
       const w=c.width,h=c.height;
@@ -157,9 +165,7 @@ export default async function setup(api){
       const all=[...lines];if(power&&(typed||cursor%1<.55))all.push(typed+(cursor%1<.55?'█':''));
       all.slice(-11).forEach((l,i)=>g.fillText(l,62,52+i*27));
       g.shadowBlur=0;
-      // rolling refresh bar, scanlines, vignette
-      const y=(roll-.15)*h;const bar=g.createLinearGradient(0,y,0,y+60);
-      bar.addColorStop(0,'rgba(120,255,170,0)');bar.addColorStop(.5,'rgba(120,255,170,.07)');bar.addColorStop(1,'rgba(120,255,170,0)');g.fillStyle=bar;g.fillRect(0,y,w,60);
+      // scanlines, vignette (the rolling refresh bar is in the shader)
       g.fillStyle='rgba(0,0,0,.32)';for(let s=0;s<h;s+=3)g.fillRect(0,s,w,1);
       const v=g.createRadialGradient(w/2,h/2,h*.25,w/2,h/2,h*.8);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.75)');g.fillStyle=v;g.fillRect(0,0,w,h);
       tex.needsUpdate=true;
@@ -175,7 +181,7 @@ export default async function setup(api){
     const c=document.createElement('canvas');c.width=128;c.height=512;const g=c.getContext('2d');
     const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;
     const material=new THREE.MeshStandardMaterial({color:0x000000,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:1.3,roughness:.3});
-    let lines=['ON','TAP'],t=0,scan=0;
+    let lines=['ON','TAP'],t=0,scan=0,wasPower=null;
     function draw(power){
       g.fillStyle='#07020a';g.fillRect(0,0,128,512);
       g.strokeStyle='#ff2fd055';g.lineWidth=3;g.strokeRect(6,6,116,500);
@@ -188,15 +194,19 @@ export default async function setup(api){
     }
     draw(true);
     return {material,set:l=>{lines=[].concat(l).map(String);draw(true);},
-      update:(dt,power)=>{t+=dt;scan+=dt*20;material.emissiveIntensity=(power?1.3:.35)*(.95+Math.random()*.05);if(Math.floor(t*6)!==Math.floor((t-dt)*6))draw(power);}};
+      update:(dt,power)=>{t+=dt;scan+=dt*20;material.emissiveIntensity=(power?1.3:.35)*(.95+Math.random()*.05);   // (2026-10-29) a 256 KB upload: once a second, not six times
+        if(power!==wasPower||Math.floor(t)!==Math.floor(t-dt)){wasPower=power;draw(power);}}};
   }
 
   function sign(text){
     // A weathered sign: chipped and scratched letters, grime and drips over the
     // face, and one failing letter that stutters on its own.
-    const c=document.createElement('canvas');c.width=1024;c.height=128;const g=c.getContext('2d');
-    const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;tex.anisotropy=4;
-    const material=new THREE.MeshStandardMaterial({color:0x000000,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:1.15,roughness:.4});
+    // (2026-10-29) two canvases, the failing letter lit and dark, drawn once per text: the buzz swaps the emissive map
+    // (a uniform) instead of re-uploading a 512 KB mipmapped canvas every flicker
+    const faces=[0,1].map(()=>{const c=document.createElement('canvas');c.width=1024;c.height=128;
+      const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.flipY=false;tex.anisotropy=4;return {c,g:c.getContext('2d'),tex};});
+    let g=faces[0].g;
+    const material=new THREE.MeshStandardMaterial({color:0x000000,emissive:0xffffff,emissiveMap:faces[1].tex,emissiveIntensity:1.15,roughness:.4});
     let off=0,bad=-1,badOn=true,badT=0,layout=null,rnd;
     const seeded=str=>{let h=1779033703;for(const ch of str)h=Math.imul(h^ch.charCodeAt(0),3432918353);return ()=>{h=Math.imul(h^h>>>15,2246822507);h=Math.imul(h^h>>>13,3266489909);return ((h^=h>>>16)>>>0)/4294967296;};};
     function set(t){
@@ -211,9 +221,10 @@ export default async function setup(api){
       layout.scratch=[];for(let i=0;i<26;i++){const x0=rnd()*1024,y0=rnd()*128;layout.scratch.push([x0,y0,x0+(rnd()-.5)*260,y0+(rnd()-.5)*50,.35+rnd()*.5]);}
       layout.dirt=[];for(let i=0;i<55;i++)layout.dirt.push([rnd()*1024,rnd()*128,8+rnd()*46,.2+rnd()*.4]);
       layout.drips=[];for(let i=0;i<14;i++)layout.drips.push([rnd()*1024,4+rnd()*20,20+rnd()*90,2+rnd()*5]);
-      draw();
+      for(const on of [false,true]){g=faces[+on].g;draw(on);faces[+on].tex.needsUpdate=true;api.renderer?.initTexture?.(faces[+on].tex);}
+      material.emissiveMap=faces[+badOn].tex;
     }
-    function draw(){
+    function draw(badOn){
       g.globalCompositeOperation='source-over';g.fillStyle='#0f0804';g.fillRect(0,0,1024,128);
       g.font='bold 76px "Arial Narrow", Arial, sans-serif';g.textBaseline='middle';g.textAlign='left';
       layout.forEach((l,i)=>{
@@ -232,7 +243,6 @@ export default async function setup(api){
       for(const [x,y,r,a] of layout.dirt){const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,`rgba(12,8,4,${a})`);gr.addColorStop(1,'rgba(12,8,4,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,r*2,r*2);}
       for(const [x,y,len,w] of layout.drips){const gr=g.createLinearGradient(0,y,0,y+len);gr.addColorStop(0,'rgba(70,32,10,.55)');gr.addColorStop(1,'rgba(70,32,10,0)');g.fillStyle=gr;g.fillRect(x,y,w,len);}
       const edge=g.createLinearGradient(0,0,0,128);edge.addColorStop(0,'rgba(0,0,0,.45)');edge.addColorStop(.2,'rgba(0,0,0,0)');edge.addColorStop(.8,'rgba(0,0,0,0)');edge.addColorStop(1,'rgba(0,0,0,.55)');g.fillStyle=edge;g.fillRect(0,0,1024,128);
-      tex.needsUpdate=true;
     }
     set(text);
     function update(dt,power){
@@ -241,7 +251,7 @@ export default async function setup(api){
       if(off<0){if(off<-.35)off=3+Math.random()*9;else k*=Math.random()<.5?.25:1;}
       material.emissiveIntensity=1.15*k;
       // the failing letter buzzes on and off by itself
-      badT-=dt;if(power&&badT<=0){badOn=!badOn;badT=badOn?.4+Math.random()*2.5:.04+Math.random()*.18;draw();}
+      badT-=dt;if(power&&badT<=0){badOn=!badOn;badT=badOn?.4+Math.random()*2.5:.04+Math.random()*.18;material.emissiveMap=faces[+badOn].tex;}
     }
     return {material,set,update};
   }

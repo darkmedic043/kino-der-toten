@@ -20,6 +20,8 @@ export function createPerfDiag({ send, context }) {
   function fresh() { return { gaps: [], upd: [], ren: [], hist: EDGES.map(() => 0).concat(0), hitches: [], hitchAbs: [], gpu: [], gpuHit: [], gc: 0, gcMb: 0, longN: 0, longMs: 0, longMax: 0, heapMax: 0, mods: new Map(), progs: [], fd: 0 }; }
   const tasks = [];   // recent long tasks as [start, end] ms, to tell which hitches the main thread was busy for
   const events = [];  // recent game events as [name, ms] (event())
+  const stalls = [];  // main-thread heartbeat gaps over 50 ms as [start, end] (beat()): a hitch overlapping one had the main thread or process blocked
+  const lats = new Map(), latList = [];   // GPU-process latency per frame, keyed by the frame's time (lat())
   function freshSession() { return { frames: 0, ms: 0, hist: EDGES.map(() => 0).concat(0), hitches: 0, worst: 0, gc: 0, longN: 0, longMs: 0, fd: 0 }; }
   const bucket = ms => { let i = 0; while (i < EDGES.length && ms > EDGES[i]) i++; return i; };
 
@@ -40,7 +42,9 @@ export function createPerfDiag({ send, context }) {
     if (n > 5) {
       const gaps = [...w.gaps].sort((a, b) => a - b), upd = [...w.upd].sort((a, b) => a - b), ren = [...w.ren].sort((a, b) => a - b);
       const sum = a => a.reduce((s, x) => s + x, 0);
-      for (const [h, s, e] of w.hitchAbs) { let busy = 0; for (const [a, b] of tasks) busy += Math.max(0, Math.min(b, e) - Math.max(a, s)); h.push(Math.round(busy)); }
+      for (const [h, s, e, prev] of w.hitchAbs) { let busy = 0, mt = 0; for (const [a, b] of tasks) busy += Math.max(0, Math.min(b, e) - Math.max(a, s)); for (const [a, b] of stalls) mt = Math.max(mt, Math.min(b, e) - Math.max(a, s));
+        h.push(Math.round(busy), 'mt ' + Math.round(mt)); const lat = lats.get(prev); if (lat != null) h.push('lat ' + Math.round(lat)); }
+      const latv = latList.splice(0).sort((a, b) => a - b);
       const gpu = [...w.gpu].sort((a, b) => a - b);
       const mods = [...w.mods].map(([id, m]) => [id, Math.round(m.ms / n * 100) / 100, r1(m.max)]).sort((a, b) => b[1] - a[1]).slice(0, 6);
       post('perf', {
@@ -51,7 +55,9 @@ export function createPerfDiag({ send, context }) {
         hist: w.hist, hitches: w.hitches.slice(0, 8), gc: [w.gc, Math.round(w.gcMb)], long: [w.longN, Math.round(w.longMs), Math.round(w.longMax)],
         heap: lastHeap == null ? null : Math.round(lastHeap), heapMax: Math.round(w.heapMax), mods, progs: w.progs.slice(0, 8), fd: w.fd,
         ...(gpu.length ? { gpuMs: [r1(sum(gpu) / gpu.length), r1(pct(gpu, .95)), r1(gpu[gpu.length - 1])], gpuHit: w.gpuHit } : {}),
+        ...(latv.length ? { latMs: [r1(sum(latv) / latv.length), r1(pct(latv, .95)), r1(latv[latv.length - 1])] } : {}),
       });
+      for (const k of lats.keys()) if (k < now - 20000) lats.delete(k);
     }
     windowStart = now; w = fresh();
   }
@@ -60,7 +66,11 @@ export function createPerfDiag({ send, context }) {
     // one played frame: gapMs = time since the previous played frame, updMs / renMs = CPU time in update and render
     // game events (mod events, round, spawn, equip) with their time, for the hitches: the ones of the last 1.5 s before a hitch are listed with it
     event(name) { const t = performance.now(); if (events.length && events[events.length - 1][0] === name && t - events[events.length - 1][1] < 250) return; events.push([String(name).slice(0, 24), t]); if (events.length > 24) events.shift(); },
-    frame(now, updMs, renMs, extra, tex) {
+    // main-thread heartbeat (engine.js, every 10 ms): gaps over 50 ms are kept for the hitches ('mt')
+    beat(last, now) { if (now - last > 50) { stalls.push([last, now]); while (stalls.length && stalls[0][1] < now - 30000) stalls.shift(); } },
+    // GPU-process latency of the frame submitted at `frameNow` (engine.js fence): ms until its commands completed
+    lat(frameNow, ms) { lats.set(frameNow, ms); if (latList.length < 2000) latList.push(ms); },
+    frame(now, updMs, renMs, extra, tex, prevTex) {
       const gap = last ? now - last : 0; last = now;
       const heap = heapMb();
       let gcMb = 0;
@@ -74,8 +84,11 @@ export function createPerfDiag({ send, context }) {
           // (engine.js: first draws in the frame before and in this one, then the first few of those materials' names)
           // then texture uploads in the hitch frame ('tex count/KB/mipmaps') and the game events of the 1.5 s before it ('ev ...')
           if (w.hitches.length < 8) { const h = [r1((now - windowStart) / 1000), Math.round(gap), r1(updMs), r1(renMs), Math.round(gcMb), ...(extra ? [extra] : [])];
-            if (tex && (tex.n || tex.mip)) h.push(`tex ${tex.n}/${Math.round(tex.kb)}/${tex.mip}`); const ev = events.filter(([, t]) => t > now - gap - 1500).map(e => e[0]); if (ev.length) h.push('ev ' + ev.join(' '));
-            w.hitches.push(h); w.hitchAbs.push([h, now - gap, now]); }
+            // 'tex' = uploads of the frame before the gap | of this frame; 'gl' = the previous frame's other GL work (non-zero counters)
+            const t = x => x ? `${x.n}/${Math.round(x.kb)}/${x.mip}` : '-'; if (tex || prevTex) h.push(`tex ${t(prevTex)}|${t(tex)}`);
+            const glc = prevTex?.gl ? Object.entries(prevTex.gl).filter(([, v]) => v).map(([k, v]) => `${k.replace(/KB$/, 'K')}:${Math.round(v)}`).join(' ') : ''; if (glc) h.push('gl ' + glc.slice(0, 200));
+            const ev = events.filter(([, t]) => t > now - gap - 1500).map(e => e[0]); if (ev.length) h.push('ev ' + ev.join(' '));
+            w.hitches.push(h); w.hitchAbs.push([h, now - gap, now, last - gap]); }
         }
       }
       if (now - windowStart > WINDOW_MS) flush(now);

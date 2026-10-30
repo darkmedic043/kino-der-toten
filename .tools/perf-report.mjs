@@ -37,8 +37,8 @@ function windowLine(w) {
   const mods = (w.mods ?? []).map(([id, avg, max]) => `${id} ${avg}/${max}`).join(', ');
   return `  ${w.at.slice(11, 19)} ${String(w.fps).padStart(5)} fps  interval p50/p95/p99/max ${w.gap.join('/')} ms  update ${w.upd.join('/')}  render ${w.ren.join('/')}` +
     `  zombies ${w.zombies}  calls ${w.calls}  gc ${w.gc[0]} (${w.gc[1]} MB)  long ${w.long[0]} (${w.long[1]} ms, max ${w.long[2]})  heap ${w.heap}/${w.heapMax} MB` +
-    (w.gpuMs ? `  gpu avg/p95/max ${w.gpuMs.join('/')} ms` : '') + (w.tex != null ? `  textures ${w.tex}` : '') +
-    (w.hitches?.length ? `\n      hitches [s, ms, update, render, gcMB, (first draws before, during, names), 'tex uploads count/KB/mipmaps', 'ev events of the 1.5 s before', main-thread busy ms]: ${w.hitches.map(h => `[${h.flat().join(', ')}]`).join(' ')}` : '') +
+    (w.gpuMs ? `  gpu avg/p95/max ${w.gpuMs.join('/')} ms` : '') + (w.latMs ? `  gpu-latency avg/p95/max ${w.latMs.join('/')} ms` : '') + (w.tex != null ? `  textures ${w.tex}` : '') +
+    (w.hitches?.length ? `\n      hitches [s, ms, update, render, gcMB, (first draws before, during, names), 'tex uploads count/KB/mipmaps of the frame before the gap|of this frame', 'gl other GL work of the frame before', 'ev events of the 1.5 s before', main-thread busy ms, 'mt heartbeat gap ms', 'lat GPU latency ms of the frame before']: ${w.hitches.map(h => `[${h.flat().join(', ')}]`).join(' ')}` : '') +
     (w.gpuHit?.length ? `\n      GPU ms of frames followed by a hitch [interval, gpu]: ${w.gpuHit.map(h => `[${h.join(', ')}]`).join(' ')}` : '') +
     (mods ? `\n      mods avg/max ms: ${mods}` : '') + (w.progs?.length ? `\n      shaders compiled mid-game: ${w.progs.join(', ')}` : '') + (w.fd ? `\n      first draws (program x layout x target): ${w.fd}` : '');
 }
