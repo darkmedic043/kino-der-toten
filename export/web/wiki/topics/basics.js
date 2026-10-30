@@ -179,7 +179,7 @@ Maps without a terminal: ${M('Moon')} and ${M('Cheese Cube Unlimited')}.`)));
 
 ## Fall damage
 
-A short drop is free. From about **3 metres** a fall starts to hurt, more the higher it is, and from about **7.5 metres** it takes all your health. ${L('perks', 'PhD Flopper')} removes fall damage, and with it, diving to prone from a height explodes. On ${M('Moon')}'s low gravity it is how hard you land that counts, not how far you fell.
+A short drop is free. From about **3 metres** a fall starts to hurt, more the higher it is, and from about **16 metres** it takes all your health. ${L('perks', 'PhD Flopper')} removes fall damage, and with it, diving to prone from a height explodes. On ${M('Moon')}'s low gravity it is how hard you land that counts, not how far you fell.
 
 ## Going down
 

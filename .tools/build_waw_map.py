@@ -468,14 +468,16 @@ def main():
             extras = {'zone': zone_id, 'zones': info['zones']} if cfg.get('doorModels') else {}
             # the game's own blocker: the door brush models' clip-map brushes (relative to each piece's origin; a full
             # clip often far taller than the visible door): CustomWorld adds it to the door's collision
-            clip = []
+            clip, outline = [], []
             for piece in by_target.get(info['target'], []):
                 o = vec(piece.get('origin', '0 0 0'))
                 for br in door_brushes.get(int(piece['model'].lstrip('*')), []):
                     clip.append([br['mins'][k] + o[k] for k in range(3)]); clip.append([br['maxs'][k] + o[k] for k in range(3)])
+                    outline += [(x + o[0], -(y + o[1])) for x, y in brush_outline(br)]
             if clip:
                 lo = [min(c[k] for c in clip) for k in range(3)]; hi = [max(c[k] for c in clip) for k in range(3)]
                 extras['clip'] = [[round(lo[0], 2), round(lo[2], 2), round(-hi[1], 2)], [round(hi[0], 2), round(hi[2], 2), round(-lo[1], 2)]]   # glTF (x, z, -y)
+                extras['clipRect'] = min_rect(outline)   # angled brushes: the bounds above overstate them, this doesn't
             b.add_mesh_node(f'DOOR_{zone_id}_{cost}', prims, extras=extras or None)
 
     # markers
@@ -762,6 +764,38 @@ def inst_transform(inst):
     R = [[sum(CM[r][k] * C[c][k] for k in range(3)) for c in range(3)] for r in range(3)]   # C M C^T
     s = inst['scale'] * sum(sc) / 3
     return R, [s * sx, s, s], g(inst['origin'])
+
+def brush_outline(br):
+    """A clip-map brush seen from above, in its own coordinates: the bounds cut by its upright angled sides."""
+    mn, mx = br['mins'], br['maxs']
+    p = [(mn[0], mn[1]), (mx[0], mn[1]), (mx[0], mx[1]), (mn[0], mx[1])]
+    for a, b, up, d, *_ in br['sides']:
+        if abs(up) > .2:
+            continue
+        out = []
+        for i, q in enumerate(p):
+            r = p[(i + 1) % len(p)]
+            fq, fr = a * q[0] + b * q[1] - d, a * r[0] + b * r[1] - d
+            if fq <= 0:
+                out.append(q)
+            if (fq < 0) != (fr < 0) and fq != fr:
+                t = fq / (fq - fr)
+                out.append((q[0] + (r[0] - q[0]) * t, q[1] + (r[1] - q[1]) * t))
+        p = out
+    return p
+
+def min_rect(pts):
+    """Smallest rectangle around (x, z) points: [centre x, centre z, angle in radians (0-90 deg), half u, half w], square-on
+    unless clearly worse (custom-world.js footprint() does the same for a door's pieces)."""
+    best = None
+    for deg in range(90):
+        a = math.radians(deg); c, s = math.cos(a), math.sin(a)
+        us = [x * c + z * s for x, z in pts]; ws = [z * c - x * s for x, z in pts]
+        area = (max(us) - min(us)) * (max(ws) - min(ws))
+        if best is None or area < best[0] * .97:
+            lu, lw = (max(us) + min(us)) / 2, (max(ws) + min(ws)) / 2
+            best = (area, [round(c * lu - s * lw, 2), round(s * lu + c * lw, 2), round(a, 4), round((max(us) - min(us)) / 2, 2), round((max(ws) - min(ws)) / 2, 2)])
+    return best[1]
 
 # ---- the clipMap (the game's collision) ------------------------------------------------------------------------------
 # World at War contents flags (the ones that matter here)

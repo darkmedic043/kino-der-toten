@@ -160,7 +160,14 @@ export class CustomWorld {
       // clip far taller than the visible pieces, which could be jumped or mantled over)
       const clip=Array.isArray(m.extras.clip)?new THREE.Box3(new THREE.Vector3(...m.extras.clip[0]),new THREE.Vector3(...m.extras.clip[1])):null;
       if(grow||up){
-        const f=footprint(m.object),c=Math.cos(f.a),s=Math.sin(f.a),wideU=f.u1-f.u0>=f.w1-f.w0,thin=Math.min(grow,6);
+        const f=footprint(m.object),rect=m.extras.clipRect,pile=rect&&Math.min(f.vu1-f.vu0,f.vw1-f.vw0)>20;
+        // a debris pile (no flat side to go by) takes the game's own blocker as it stands, angled brushes and all: the pile's
+        // rectangle stood 9° off its doorway and 80 long in Nuketown's ROAD door, out into the room and through the wall
+        if(pile){
+          const [x,z,a,hu,hw]=rect,lu=x*Math.cos(a)+z*Math.sin(a),lw=-x*Math.sin(a)+z*Math.cos(a);
+          Object.assign(f,{a,u0:lu-hu,u1:lu+hu,w0:lw-hw,w1:lw+hw,vu0:lu-hu,vu1:lu+hu,vw0:lw-hw,vw1:lw+hw});
+        }
+        const c=Math.cos(f.a),s=Math.sin(f.a),wideU=f.u1-f.u0>=f.w1-f.w0,thin=Math.min(grow,6);
         // each end grows only to the door's frame (rays along the door at body heights; flush in its frame: 2): the full
         // margin ran along the wall beside the door and stood 6 out of it, a block along Nuketown's back porches. An end
         // with nothing within 70 at any of those heights stands in the open (a couch on the porch) and grows only `thin`.
@@ -174,14 +181,16 @@ export class CustomWorld {
           }
           return d<0?thin:Math.min(grow,Math.max(0,d)+2);
         };
-        const g0=end(-1),g1=end(1);
-        if(wideU){f.u0-=g0;f.u1+=g1;f.w0-=thin;f.w1+=thin;}else{f.w0-=g0;f.w1+=g1;f.u0-=thin;f.u1+=thin;}
+        if(!pile){
+          const g0=end(-1),g1=end(1);
+          if(wideU){f.u0-=g0;f.u1+=g1;f.w0-=thin;f.w1+=thin;}else{f.w0-=g0;f.w1+=g1;f.u0-=thin;f.u1+=thin;}
+        }
         let y0=box.min.y,y1=box.max.y+up;
         // the clip's footprint only counts for a square-on door: around an angled one it is the box of angled brushes,
         // as wide as the porch (its height always counts)
         if(clip){
           y0=Math.min(y0,clip.min.y);y1=Math.max(y1,clip.max.y);
-          if(Math.min(f.a,Math.PI/2-f.a)<.09)for(const x of[clip.min.x,clip.max.x])for(const z of[clip.min.z,clip.max.z]){   // within 5° of square-on
+          if(!pile&&Math.min(f.a,Math.PI/2-f.a)<.09)for(const x of[clip.min.x,clip.max.x])for(const z of[clip.min.z,clip.max.z]){   // within 5° of square-on
             const u=x*c+z*s,w=-x*s+z*c;f.u0=Math.min(f.u0,u);f.u1=Math.max(f.u1,u);f.w0=Math.min(f.w0,w);f.w1=Math.max(f.w1,w);
           }
         }
@@ -359,9 +368,12 @@ export class CustomWorld {
       if(m.type==='POWER'){
         this.hasPower=true;
         this.interactions.push({kind:'power',position:m.position.clone().addScaledVector(up,10)});
-        const panel=new THREE.Mesh(new THREE.BoxGeometry(22,34,6),new THREE.MeshStandardMaterial({color:0x3b3f3a,roughness:.7,metalness:.4}));
-        panel.position.copy(m.position);panel.rotation.y=m.yaw+FACE;panel.translateZ(-4);this.scene.add(panel);
-        tasks.push(place('zombie_power_lever_handle',m.position,m.yaw,(entry.perkYaw??0)*Math.PI/180).then(o=>{this.powerHandle=o;}));
+        // powerProp:false = the map has its own switch, moved by its mod (Nuketown's levers)
+        if(entry.powerProp!==false){
+          const panel=new THREE.Mesh(new THREE.BoxGeometry(22,34,6),new THREE.MeshStandardMaterial({color:0x3b3f3a,roughness:.7,metalness:.4}));
+          panel.position.copy(m.position);panel.rotation.y=m.yaw+FACE;panel.translateZ(-4);this.scene.add(panel);
+          tasks.push(place('zombie_power_lever_handle',m.position,m.yaw,(entry.perkYaw??0)*Math.PI/180).then(o=>{this.powerHandle=o;}));
+        }
       }
     }
     // The upstream Mystery Box reads its locations from map entities, so each

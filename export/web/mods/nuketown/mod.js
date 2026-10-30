@@ -23,13 +23,33 @@ import { setupTab } from './tab.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const DEG = Math.PI / 180;
-const LEVER2 = { at: V(-2226, 1446, -1471), yaw: 27.8 };
+// the two power switches (_nt_power.gsc): a handle sticks straight out of its panel (roll 90) and swings up to roll 0 in 0.4 s.
+// The script's angle references, pf5006_auto343 and 347 (roll 0, a stray lever standing near each panel), are deleted at its
+// start; 340 is baked in place, and 347 is baked at roll 0 away from the panel, so it's moved in as the first switch's handle
+// (`baked` = the roll in the map's geometry). `at` is the handle's origin, within a unit of the struct the script turns it about
+const LEVERS = [
+  { name: 'pf5006_auto340', from: V(-2225.93, 1445.8, -1471.4), at: V(-2225.93, 1445.8, -1471.4), yaw: 27.8, baked: 90 },
+  { name: 'pf5006_auto347', from: V(-1359.49, 1426.3, -145.71), at: V(-1398.86, 1439.8, -160.04), yaw: 70, baked: 0 },
+];
+const LEVER_TIME = .4;
+// the blue house's floor (bo1_rus_art_metal_panel) stops short under its stairs: two gaps you can walk into, and the rest of
+// the space under them (the original fences that off with a clip volume but draws nothing): tiled over and made solid,
+// [x0, z0, x1, z1] just under the floor's height
+const FLOOR_HOLES = [[-1036, 1711, -982, 1751], [-1036, 1764, -982, 1805], [-983, 1710, -832, 1816]], FLOOR_Y = 1690.8, FLOOR_TILE = 128;
+// the map's shadow plate (caulk_shadow, a solid sheet under the whole town, y 1612-1613, [x0, x1, z0, z1]) and the lower one
+// at 712 catch anyone who slips through a gap in the ground: under the map, with no way back. The hell hole and the
+// bunker stairs come down through the plate's slots, so nothing legitimate stands on it. POCKETS are hollows in the
+// wrecks you can drop into and not climb out of, told from the ground around them by having no navmesh, or none that reaches ROAD.
+const PLATE_Y = 1613, VOID_Y = 800;
+const PLATES = [[-1754, -1590, 1972, 3952], [-1590, -1428, 1791, 3952], [-2771, -1854, -1642, 3952], [-1854, -1428, -1642, 1791],
+  [-664, -563, 445, 680], [-563, 872, 352, 680], [-1348, -1048, 352, 680], [-1348, 872, 680, 3952], [-1348, 872, -1544, 352]];
+const POCKETS = [[992, 1170, -320, -105], [28, 118, 684, 770]], ROAD = V(-300, 1692, 1300);
 const GENERATOR_COUNT = 3;
 // the door swings from its entity origin to bunker_door_moveto (yaw 340 -> 128.3); its clip is a box in entities.json
 const BUNKER = { origin: V(-1383, 1706, -1232), to: V(-1280, 1706, -1432), turn: (128.304 - 340 + 360) * DEG, clip: [[-1442, 1695, -1256], [-1369, 1945, -1224]], time: 2.2 };
-// the shaft behind the bunker door drops 306 units into the lab tunnel (no ladder in the original): a landing at its
-// foot takes no fall damage
-const SHAFT = [[-1440, 1370, -1345], [-1340, 1420, -1240]];
+// the way down is a drop (the shaft behind the bunker door, 306 units into the lab tunnel with no ladder in the original;
+// the holes into hell): a landing below the surface takes no fall damage
+const UNDERGROUND = 1560;
 const TOOLS = [
   { node: 'tool1', name: 'screwdriver', at: V(-1528, 1381, 703), panel: V(-1390, 1380, 772) },
   { node: 'tool2', name: 'wire cutters', at: V(-1943, 1384, -3), panel: V(-1667, 1380, 840) },
@@ -93,6 +113,14 @@ function boxCollider(world, [lo, hi], enabled) {
   const dyn = { collider: new CollisionWorld(geo), box: new THREE.Box3().setFromBufferAttribute(geo.attributes.position), enabled, window: true, nuketown: true };
   world.dynamic.push(dyn); return dyn;
 }
+// a floor tile over a gap, sharing the floor's material (planar uvs at its tile size)
+function patchFloor(world, material, [x0, z0, x1, z1]) {
+  const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, FLOOR_Y, (z0 + z1) / 2);
+  const pos = geo.attributes.position, uv = geo.attributes.uv;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / FLOOR_TILE, pos.getZ(i) / FLOOR_TILE);
+  world.root.add(new THREE.Mesh(geo, material));
+  boxCollider(world, [[x0, FLOOR_Y - 20, z0], [x1, FLOOR_Y, z1]], true);
+}
 const inBox = (p, [lo, hi], pad = 0, up = 0) => p.x >= lo[0] - pad && p.x <= hi[0] + pad && p.z >= lo[2] - pad && p.z <= hi[2] + pad && p.y >= lo[1] - 20 && p.y <= hi[1] + up;
 const ease = t => t < .5 ? 2 * t * t : 1 - (1 - t) * (1 - t) * 2;
 
@@ -106,14 +134,29 @@ function setupQuest(api) {
   const papLockedText = 'Sealed: the skull key is somewhere in the lab';
   const st = {};   // per-game state, rebuilt on reset
 
+  let floor = null;
+  root.traverse(o => { if (o.isMesh && o.material?.name?.endsWith('bo1_rus_art_metal_panel')) floor = o.material; });
+  if (floor) for (const hole of FLOOR_HOLES) patchFloor(world, floor, hole);
   // ---- power: lever 2 first, then the engine's POWER marker
-  const lever = nodesOf(root, 'pf5006_auto340').map(n => pivot(n, LEVER2.at));
-  const leverAxis = V(Math.sin(LEVER2.yaw * DEG), 0, Math.cos(LEVER2.yaw * DEG));
-  const setLever = pulled => { for (const n of lever) { n.quaternion.identity(); if (pulled) n.rotateOnWorldAxis(leverAxis, -1.2); moved(n); } };
+  show(nodesOf(root, 'pf5006_auto343'), false);
+  const levers = LEVERS.map(l => ({ ...l, t: -1, axis: V(Math.cos(l.yaw * DEG), 0, -Math.sin(l.yaw * DEG)),
+    nodes: nodesOf(root, l.name).map(n => { pivot(n, l.from); n.position.copy(l.at); return n; }) }));
+  // t: 0 out of the panel, 1 pulled up
+  const setLever = (l, t) => {
+    if (t === l.t) return;
+    l.t = t;
+    for (const n of l.nodes) { n.quaternion.setFromAxisAngle(l.axis, (90 * (1 - ease(t)) - l.baked) * DEG); moved(n); }
+  };
+  const leverTick = dt => {
+    for (const l of levers) {
+      const on = l.baked ? flag('lever2') : session.power;
+      setLever(l, on ? Math.min(1, l.t + dt / LEVER_TIME) : 0);
+    }
+  };
   world.addInteraction({
-    position: LEVER2.at.clone().add(V(0, 10, 0)), nuketown: true,
+    position: LEVERS[0].at.clone().add(V(0, 10, 0)), nuketown: true,
     hidden: () => flag('lever2'), text: () => 'Pull the lever · 1 of 2',
-    use() { setFlag('lever2'); setLever(true); sfx('buy'); toast('One more lever powers the site', 4); return true; },
+    use() { setFlag('lever2'); sfx('buy'); toast('One more lever powers the site', 4); return true; },
   });
   const power = world.interactions.find(i => i.kind === 'power');
   if (power) { power.locked = () => !flag('lever2'); power.lockedText = 'Pull the other lever in the lab first'; }
@@ -265,17 +308,39 @@ function setupQuest(api) {
   const reset = () => {
     if (st.spout && globalThis.kino?.fpMotion) globalThis.kino.fpMotion.shake = 0;
     stopSpoutAudio();
-    Object.assign(st, { spout: null, spoutWait: 0, spoutSafe: 0, generators: 0, bunkerT: null, fixed: 0, elevatorT: null, skullT: null, lava: 0, portal: 0, zone: 0 });
-    show(generators, true); setBunker(0); setLever(false);
+    Object.assign(st, { safe: [], safeT: 0, offMap: 0, pocket: false, spout: null, spoutWait: 0, spoutSafe: 0, generators: 0, bunkerT: null, fixed: 0, elevatorT: null, skullT: null, lava: 0, portal: 0, zone: 0 });
+    show(generators, true); setBunker(0); for (const l of levers) setLever(l, 0);
     for (const t of tools) show(t.nodes, true);
     setElevator(0); show(nodesOf(root, 'pap_key'), true); show(papSkull, false); for (const n of papSkull) { n.position.set(0, 0, 0); moved(n); }
     show(papDoor, true); papClip.enabled = true; elevatorClip.enabled = true; bunkerClip.enabled = true;
     world.papLocked = true; world.papLockedText = papLockedText;
     armGenerators();
   };
+  // ---- out of the map: back to where the player stood a few seconds ago
+  const onPlate = p => Math.abs(p.y - PLATE_Y) < 3 && PLATES.some(([x0, x1, z0, z1]) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1);
+  const inPocket = p => {
+    if (!POCKETS.some(([x0, x1, z0, z1]) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1) || p.y > 1712) return false;
+    const from = world.closest(p, { x: 24, y: 24, z: 24 }), to = world.closest(ROAD, { x: 60, y: 30, z: 60 });
+    if (!from || Math.abs(from.y - p.y) > 24) return true;
+    const end = world.path(from, to)?.at(-1);
+    return !end || end.distanceTo(to) > 100;
+  };
+  const rescueTick = (dt, p) => {
+    const off = p.y < VOID_Y || (player.grounded && (st.pocket || onPlate(p)));
+    if (!off) {
+      st.offMap = 0;
+      if (player.grounded && (st.safeT += dt) > .25) { st.safeT = 0; st.safe.push(p.clone()); if (st.safe.length > 16) st.safe.shift(); }
+      return;
+    }
+    if ((st.offMap += dt) < 1) return;
+    const back = (st.safe[0] ?? world.spawn?.position ?? V(60, 1720, 70)).clone();
+    player.setPosition(back); player.velocity?.set(0, 0, 0);
+    Object.assign(st, { safe: [back], offMap: 0, pocket: false });
+    toast('Back on solid ground', 3);
+  };
   reset();
   host.on('reset', reset);
-  host.on('fall', e => { const p = e.position; if (st.spoutSafe > 0 || SHAFT[0].every((lo, a) => lo <= p.getComponent(a) && p.getComponent(a) <= SHAFT[1][a])) e.amount = 0; });
+  host.on('fall', e => { if (st.spoutSafe > 0 || e.position.y < UNDERGROUND) e.amount = 0; });
   host.on('start', () => { placePerk(); });
   host.on('update', dt => {
     const s = session;
@@ -283,8 +348,10 @@ function setupQuest(api) {
     if (st.elevatorT != null) { st.elevatorT += dt / ELEVATOR.time; setElevator(st.elevatorT); if (st.elevatorT >= 1) { st.elevatorT = null; setFlag('elevator'); } }
     if (st.skullT != null) { st.skullT += dt; setSkull(st.skullT); if (st.skullT >= PAP.time) { st.skullT = null; openPap(); } }
     if (!flag('lever2') && s.power) setFlag('lever2');   // a cheat or the engine turned it on: keep the lever in step
+    leverTick(dt);
     const p = player?.getFeetPosition?.(); if (!p) return;
-    st.zone += dt; if (st.zone > 1) { st.zone = 0; zoneTick(); }
+    st.zone += dt; if (st.zone > 1) { st.zone = 0; zoneTick(); st.pocket = inPocket(p); }
+    rescueTick(dt, p);
     spoutTick(dt, p);
     st.lava += dt;
     if (st.lava > .3) { st.lava = 0; if (LAVA.some(b => inBox(p, b, 0, 90))) { damage?.(50); } }
@@ -300,11 +367,11 @@ function setupQuest(api) {
   });
   let perks = null;
   try { perks = setupPerkDrops(api, { nodesOf, show }); } catch (e) { console.warn('[nuketown] perks', e); }
-  const found = { lever: lever.length, generators: genGroups.length, bunkerDoor: bunkerDoor.length, tools: tools.map(t => t.nodes.length), elevator: elevator.length, elevatorDoor: elevatorDoor.length, papSkull: papSkull.length, papDoor: papDoor.length, power: !!power, crates: perks?.drops.map(d => d.crateNodes.length) };
+  const found = { levers: levers.map(l => l.nodes.length), generators: genGroups.length, bunkerDoor: bunkerDoor.length, tools: tools.map(t => t.nodes.length), elevator: elevator.length, elevatorDoor: elevatorDoor.length, papSkull: papSkull.length, papDoor: papDoor.length, power: !!power, crates: perks?.drops.map(d => d.crateNodes.length) };
   console.log('[nuketown] quest nodes', JSON.stringify(found));
   // the quest's progress for the Tab tiles (tab.js) and the journal (journal/quests.js); `at` fields are marker spots
   const state = () => ({
-    lever2: flag('lever2'), power: !!session.power, lever: LEVER2.at,
+    lever2: flag('lever2'), power: !!session.power, lever: LEVERS[0].at,
     generators: st.generators, generatorCount: GENERATOR_COUNT, bunker: st.generators >= GENERATOR_COUNT, transformers: genGroups.filter(g => !g.down).map(g => g.centre),
     tools: tools.map(t => ({ name: t.name, at: t.at, panel: t.panel, got: flag('got_' + t.node), fixed: flag('fixed_' + t.node) })),
     elevator: flag('elevator'), skull: flag('skull'), placed: flag('placed'), pap: !world.papLocked, papAt: PAP.trig,

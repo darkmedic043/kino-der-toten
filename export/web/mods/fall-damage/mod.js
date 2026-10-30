@@ -1,5 +1,5 @@
-// Fall damage, as BO1 does it (bg_fallDamageMinHeight 128, bg_fallDamageMaxHeight 300): a drop of more than 128 hurts,
-// scaling linearly up to the player's whole max health at 300. The height is from the top of the arc (a jump's or a
+// Fall damage, gentler than BO1 (bg_fallDamageMinHeight 128, bg_fallDamageMaxHeight 300): a drop of more than 128 hurts,
+// scaling linearly up to the player's whole max health at 640 (user, 2026-10-30: BO1's 300 was too punishing). The height is from the top of the arc (a jump's or a
 // dive's hop counts) to the landing, scaled by gravity against the strongest gravity seen, so Moon's low gravity
 // (and other light-gravity spots) hurts as much as the same impact would, not the same height.
 //
@@ -9,7 +9,7 @@
 //
 // Not counted: teleports and position resets (the feet move more than 150 in one frame), Moon's jump pad flights
 // (api.features.flight), and the time before the game starts.
-const MIN = 128, MAX = 300;
+const MIN = 128, MAX = 640;
 export default function setup(api) {
   const { host, player, session } = api;
   let peak = null, last = null, dive = false, refG = 0;   // refG: from the first frame on (Moon sets its gravity per frame, after the movement mod's setup value)
