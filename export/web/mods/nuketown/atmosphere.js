@@ -5,7 +5,11 @@
 //     map entry's fog/background give the haze, grade.js `nuketown` the grade.
 //   - Sky: one far-plane dome (vertex xyww, follows the camera through mat3(modelViewMatrix)) with the gradient, drifting
 //     fbm clouds, a moon glow, the nuke column (drawn in the dome shader toward the map's `nuke` struct, so the fog can't
-//     swallow a far mesh) and the lightning flash (a uniform; the scene lights get a bump with it above LAB_Y only).
+//     swallow a far mesh) and the lightning (uniforms: the deck's flash, and a procedural bolt with a fork toward the
+//     struct; the scene lights get a bump with it above LAB_Y only). A strike also blows the picture out to white through
+//     the post exposure (kino.post, or the renderer's exposure without a composer) and plays a thunder clap after the
+//     distance; sheet lightning strobes the deck with distant thunder (STORM).
+//   - Crows: a flock of 16 four-vertex birds flapping round an ellipse over the street, in one draw (CROWS).
 //   - Fires: the map's fx structs (entities.json notes fire1 / fire_long / fire2 / hell_fire / candle ...) through the
 //     shared fire layers (mods/fx/flames.js: tongues, embers, smoke, glow; the emb1 emitters as floating embers).
 //   - Ash: 2600 flakes wrapping through a box round the camera, gated by a roof map (the collision world drawn from above
@@ -18,10 +22,11 @@
 //     clusters), faded by a line-of-sight ray; the hell lava glows and breathes. The streetlight heads have no marker
 //     and no material of their own, so they stay dark (as most do in the UGX shots).
 // Everything animates from scene.onBeforeRender (the menu shows the map too; `update` only runs in a match).
-// Debug: window.kino.nukeAtmo = { state(), lightning(), set(k, v) } (kino.nuketown is the quest's).
+// Debug: window.kino.nukeAtmo = { state(), lightning(strike?), set(k, v) } (kino.nuketown is the quest's).
 import * as THREE from 'three';
 import { createFlames, fireFlicker } from '../fx/flames.js';
 import { settings } from '../../settings.js';
+import { mapSound } from './perks.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const NUKE = V3(501, -102, -9854);                                            // the gsc's nuke cloud origin (game space)
@@ -48,12 +53,18 @@ const KINDS = {   // kind: the mods/fx/flames.js kind (its glow and aspect)
 };
 const ASH = { count: 2600, box: V3(560, 380, 560), fall: 26, wind: V3(14, 0, -6), color: new THREE.Color(.2, .25, .18) };
 const SMOKE_WIND = V3(10, 0, -4);
+// the storm (2026-10-30, after the user's video: a strike blows the whole picture out to white for about half a second, the
+// bolt itself shows in the sky toward the lightning1 struct, and the clap follows after the distance). strikeShare: the rest
+// are sheet lightning (strobes in the deck, distant thunder). white: the post exposure's gain at the peak. sound: units/s for
+// the thunder's delay (slower than sound, for the drama). labGain: the thunder down in the lab and hell.
+const STORM = { every: [12, 30], strikeShare: .55, white: 6, hold: .28, decay: .3, sound: 2400, clapDelay: .35, clapGain: .95, distantGain: .55, labGain: .3 };
+const CROWS = { count: 16, span: 46, height: 2600, radius: 1500, speed: 220, spread: V3(380, 110, 420), color: new THREE.Color(.012, .013, .014), far: 2600, on: true };   // a flock wheeling over the street
 
 export function setupAtmosphere(api) {
   const { scene, camera, world, renderer, host, session, map } = api;
   if (!scene || !camera || !renderer) return;
   const low = (settings.graphics ?? 2) < 1;
-  const S = { time: 0, last: performance.now(), flash: 0, flashDir: new THREE.Vector2(0, -1), nextBolt: 6 + Math.random() * 8, strobes: 0, strobeT: 0, flick: 1, flickT: 1.5 + Math.random() * 3, drop: 0, pick: 0 };
+  const S = { time: 0, last: performance.now(), flash: 0, flashDir: new THREE.Vector2(0, -1), nextBolt: 6 + Math.random() * 8, strobes: 0, strobeT: 0, bolt: 0, boltAge: -1, boltSeed: 0, whiteAge: -1, white: 0, thunder: null, baseExp: null, baseTone: null, flick: 1, flickT: 1.5 + Math.random() * 3, drop: 0, pick: 0 };
   const px = () => renderer.getPixelRatio() * (renderer.getSize(new THREE.Vector2()).y / 900);
   const fogColor = () => scene.fog?.color ?? scene.background ?? new THREE.Color(0x314a50);
 
@@ -66,16 +77,19 @@ export function setupAtmosphere(api) {
   // ---- sky dome
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, depthTest: true, fog: false,   // seen from inside: FrontSide culls the whole dome
-    uniforms: { time: { value: 0 }, flash: { value: 0 }, flashDir: { value: S.flashDir }, horizon: { value: new THREE.Color(0x84a9b2) },   // horizon = the map's fog colour each frame; a bright pale cyan overcast with dark cloud masses, after the user's gameplay video (2026-10-29)
+    uniforms: { time: { value: 0 }, flash: { value: 0 }, bolt: { value: 0 }, boltSeed: { value: 0 }, flashDir: { value: S.flashDir }, horizon: { value: new THREE.Color(0x84a9b2) },   // horizon = the map's fog colour each frame; a bright pale cyan overcast with dark cloud masses, after the user's gameplay video (2026-10-29)
       zenith: { value: new THREE.Color(.04, .06, .07) }, cloudLo: { value: new THREE.Color(.015, .022, .026) }, cloudHi: { value: new THREE.Color(.1, .14, .16) },
       moonDir: { value: LOOK.key.dir.clone().normalize() }, nukeDir: { value: new THREE.Vector2(0, -1) }, nukeAng: { value: new THREE.Vector2(.14, .45) } },
     vertexShader: `varying vec3 vDir;
       void main(){ vDir = position; vec4 p = projectionMatrix * vec4(mat3(modelViewMatrix) * position, 1.0); gl_Position = vec4(p.xy, p.w * 0.99999, p.w); }`,
-    fragmentShader: `uniform float time, flash; uniform vec2 flashDir, nukeDir, nukeAng; uniform vec3 horizon, zenith, cloudLo, cloudHi, moonDir; varying vec3 vDir;
+    fragmentShader: `uniform float time, flash, bolt, boltSeed; uniform vec2 flashDir, nukeDir, nukeAng; uniform vec3 horizon, zenith, cloudLo, cloudHi, moonDir; varying vec3 vDir;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
       float fbm(vec2 p){ float v = 0.0, a = 0.5; mat2 m = mat2(1.6, 1.2, -1.2, 1.6); for (int i = 0; i < 5; i++) { v += a * noise(p); p = m * p; a *= 0.5; } return v; }
+      float boltPath(float e, float s){   // the bolt's azimuth at elevation e: a jagged line (random vertices every 2.6 degrees) plus a lean
+        float t = (0.6 - e) * 22.0, i = floor(t);
+        return (mix(hash(vec2(i, s)), hash(vec2(i + 1.0, s)), fract(t)) - 0.5) * 0.12 + (hash(vec2(3.0, s)) - 0.5) * 0.14 * (0.6 - e); }
       void main(){
         vec3 d = normalize(vDir); float el = d.y, h = clamp(el, 0.0, 1.0);
         vec3 col = mix(horizon, zenith, pow(h, 0.45));
@@ -91,6 +105,20 @@ export function setupAtmosphere(api) {
         vec2 n2 = normalize(d.xz + vec2(1e-5, 0.0));
         float toward = pow(max(dot(n2, flashDir), 0.0), 3.0);                      // lightning: the deck lights up from one side
         col += flash * vec3(0.55, 0.65, 0.85) * (0.2 + 0.8 * toward) * (0.25 + den) * smoothstep(-0.06, 0.25, el);
+        if (bolt > 0.001) {                                                        // a strike: a jagged streak down out of the deck toward flashDir, with a fork
+          float f = dot(n2, flashDir), r = n2.x * flashDir.y - n2.y * flashDir.x;
+          if (f > 0.0) {
+            float az = atan(r, f), elv = atan(d.y, length(d.xz));
+            float ext = smoothstep(-0.05, 0.0, elv) * (1.0 - smoothstep(0.4, 0.56, elv));
+            float dd = abs(az - boltPath(elv, boltSeed));
+            float str = (exp(-dd * dd * 9e4) + 0.3 * exp(-dd * 50.0)) * ext;
+            float ef = 0.2 + 0.2 * hash(vec2(9.0, boltSeed)), lean = hash(vec2(11.0, boltSeed)) > 0.5 ? 1.1 : -1.1;
+            float bo = boltPath(ef, boltSeed) + (ef - elv) * lean + (boltPath(elv, boltSeed + 5.0) - boltPath(ef, boltSeed + 5.0)) * 0.5;
+            float db = abs(az - bo);
+            str += (exp(-db * db * 1.6e5) + 0.25 * exp(-db * 60.0)) * smoothstep(ef - 0.2, ef - 0.12, elv) * (1.0 - smoothstep(ef - 0.01, ef, elv)) * 0.6;
+            col += bolt * vec3(0.75, 0.85, 1.0) * str * 6.0;
+          }
+        }
         {                                                                          // the nuke's column, toward the test site
           float L = length(d.xz); vec2 n = d.xz / max(L, 1e-4);
           float f = dot(n, nukeDir), r = n.x * nukeDir.y - n.y * nukeDir.x, az = atan(r, f), elv = atan(d.y, L);
@@ -164,6 +192,37 @@ export function setupAtmosphere(api) {
       }`,
   });
   const ash = new THREE.Points(ashGeo, ashMat); ash.frustumCulled = false; ash.renderOrder = 900; ash.name = 'nuketown_ash'; scene.add(ash);
+
+  // ---- crows: a flock wheeling over the street (the UGX map has them; the user's video, 2026-10-30). Four vertices a bird
+  // (beak, tail, two wing tips), placed and flapped in the vertex shader along an ellipse round the playable area.
+  const cp = [], cs = [], ci = [];
+  for (let b = 0; b < CROWS.count; b++) { const o = [Math.random(), Math.random(), Math.random(), Math.random()];
+    for (let c = 0; c < 4; c++) { cp.push(c, 0, 0); cs.push(...o); } ci.push(b * 4, b * 4 + 1, b * 4 + 2, b * 4, b * 4 + 3, b * 4 + 1); }
+  const crowGeo = new THREE.BufferGeometry(); crowGeo.setAttribute('position', new THREE.Float32BufferAttribute(cp, 3)); crowGeo.setAttribute('seed', new THREE.Float32BufferAttribute(cs, 4)); crowGeo.setIndex(ci);
+  const crowMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, depthTest: true, side: THREE.DoubleSide, fog: false,
+    uniforms: { time: { value: 0 }, center: { value: V3(roofCenter.x, 0, roofCenter.z) }, radius: { value: CROWS.radius }, height: { value: CROWS.height }, speed: { value: CROWS.speed }, span: { value: CROWS.span }, spread: { value: CROWS.spread },
+      color: { value: CROWS.color }, fogColor: { value: new THREE.Color() }, fogDensity: { value: 0 }, far: { value: CROWS.far }, flash: { value: 0 } },
+    vertexShader: `attribute vec4 seed; uniform float time, radius, height, speed, span, far; uniform vec3 center, spread; varying float vFog, vA;
+      void main(){
+        float ang = time * speed / radius + seed.x * 0.6;
+        vec3 fwd = normalize(vec3(-sin(ang), 0.0, cos(ang) * 0.7)), side = vec3(fwd.z, 0.0, -fwd.x);
+        vec3 c = center + vec3(cos(ang) * radius, height + (seed.y - 0.5) * spread.y + sin(time * 0.6 + seed.w * 6.2832) * 30.0, sin(ang) * radius * 0.7);
+        c += side * (seed.z - 0.5) * spread.x + fwd * (seed.w - 0.5) * spread.z;
+        float glide = step(0.55, fract(time * 0.11 + seed.y)), flap = sin(time * 9.5 + seed.w * 6.2832) * mix(1.0, 0.12, glide);
+        vec3 p = c; float id = position.x;
+        if (id < 0.5) p += fwd * span * 0.22; else if (id < 1.5) p -= fwd * span * 0.2;
+        else { float sgn = id < 2.5 ? -1.0 : 1.0; p += side * sgn * span * 0.5 * (0.8 + 0.2 * abs(flap)) + vec3(0.0, flap * span * 0.3, 0.0) - fwd * span * 0.08; }
+        vec4 mv = modelViewMatrix * vec4(p, 1.0); vFog = -mv.z; vA = 1.0 - smoothstep(far * 0.7, far, -mv.z); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 color, fogColor; uniform float fogDensity, flash; varying float vFog, vA;
+      void main(){ float f = 1.0 - exp(-fogDensity * fogDensity * vFog * vFog);
+        gl_FragColor = vec4(mix(color * (1.0 + flash * 3.0), fogColor, f * 0.8), vA * (1.0 - f * 0.5));
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  });
+  const crows = new THREE.Mesh(crowGeo, crowMat); crows.frustumCulled = false; crows.renderOrder = 901; crows.name = 'nuketown_crows'; scene.add(crows);
+  const sound = mapSound(api);   // the thunder clips (sounds/thunder_clap_0N, thunder_distant_0N: BO1's, decoded by .tools/build_nuketown_thunder.py, git-ignored)
 
   // ---- fires: flames, smoke, embers (mods/fx/flames.js; the fires are added once entities.json arrives, the
   // materials compile on stub instances now)
@@ -308,12 +367,25 @@ export function setupAtmosphere(api) {
     const now = performance.now(), dt = Math.min(.1, (now - S.last) / 1000); if (dt < .002) return; S.last = now; S.time += dt;
     camera.getWorldPosition(eye);
     const pxv = px(), fogC = fogColor(), fogD = scene.fog?.density ?? 0;
-    // lightning: a few strobes every 9-25 s from one of the map's lightning1 directions
-    if ((S.nextBolt -= dt) <= 0) { S.nextBolt = 9 + Math.random() * 16; S.strobes = 2 + Math.floor(Math.random() * 2); S.strobeT = 0;
-      const b = bolts.length ? bolts[Math.floor(Math.random() * bolts.length)] : new THREE.Vector2(eye.x + 1000, eye.z - 1200); S.flashDir.set(b.x - eye.x, b.y - eye.z).normalize(); }
+    // lightning, every 12-30 s from one of the map's lightning1 directions: a strike (the bolt in the sky, the video's
+    // white-out through the post exposure, a clap after the distance) or sheet lightning (strobes in the deck, distant thunder)
+    if ((S.nextBolt -= dt) <= 0) {
+      S.nextBolt = STORM.every[0] + Math.random() * (STORM.every[1] - STORM.every[0]);
+      const b = bolts.length ? bolts[Math.floor(Math.random() * bolts.length)] : new THREE.Vector2(eye.x + 1000, eye.z - 1200); S.flashDir.set(b.x - eye.x, b.y - eye.z).normalize();
+      const dist = Math.hypot(b.x - eye.x, b.y - eye.z) / STORM.sound;
+      if (Math.random() < STORM.strikeShare) { S.boltAge = 0; S.boltSeed = Math.random() * 100; S.whiteAge = 0; S.strobes = 1; S.strobeT = 0; S.thunder = { t: STORM.clapDelay + dist, kind: 'clap', n: 6, gain: STORM.clapGain }; }
+      else { S.strobes = 2 + Math.floor(Math.random() * 2); S.strobeT = 0; S.thunder = { t: 1.2 + Math.random() * 2 + dist, kind: 'distant', n: 3, gain: STORM.distantGain }; }
+    }
     if (S.strobes > 0 && (S.strobeT -= dt) <= 0) { S.strobes--; S.strobeT = .07 + Math.random() * .16; S.flash = .7 + Math.random() * .5; }
-    S.flash *= Math.exp(-dt * 10);
-    const flash = S.flash, lit = flash * Math.min(1, Math.max(0, (eye.y - LAB_Y + 150) / 150));   // lit: the scene lights' share, none down in the lab
+    S.flash *= Math.exp(-dt * 10); if (S.flash < .002) S.flash = 0;
+    if (S.boltAge >= 0) { S.boltAge += dt; S.bolt = S.boltAge < .4 ? Math.exp(-S.boltAge * 6) * (.7 + .3 * Math.abs(Math.sin(S.boltAge * 140))) : 0; if (!S.bolt) S.boltAge = -1; }
+    if (S.whiteAge >= 0) { const a = (S.whiteAge += dt); S.white = a < .06 ? a / .06 : a < STORM.hold ? 1 : Math.exp(-(a - STORM.hold) / STORM.decay); if (a > STORM.hold + STORM.decay * 7) { S.white = 0; S.whiteAge = -1; } }
+    const white = S.white + S.flash * .12, gain = 1 + STORM.white * white;   // the picture's over-exposure: full for a strike, a touch for a sheet flash
+    const post = window.kino?.post, grade = post?.get?.();
+    if (grade && 'exposure' in grade) { if (gain !== 1 && S.baseExp == null) S.baseExp = grade.exposure; if (S.baseExp != null) { post.set({ exposure: S.baseExp * gain }); if (gain === 1) S.baseExp = null; } }
+    else { if (gain !== 1 && S.baseTone == null) S.baseTone = renderer.toneMappingExposure; if (S.baseTone != null) { renderer.toneMappingExposure = S.baseTone * gain; if (gain === 1) S.baseTone = null; } }
+    if (S.thunder && (S.thunder.t -= dt) <= 0) { const th = S.thunder; S.thunder = null; sound(`thunder_${th.kind}_${String(Math.floor(Math.random() * th.n)).padStart(2, '0')}`, th.gain * (eye.y < LAB_Y ? STORM.labGain : 1)); }
+    const flash = Math.max(S.flash, S.white * .8), lit = flash * Math.min(1, Math.max(0, (eye.y - LAB_Y + 150) / 150));   // lit: the scene lights' share, none down in the lab
     // the fluorescent lab: a hum plus dropouts
     if ((S.flickT -= dt) <= 0) { if (S.drop > 0) { S.drop = 0; S.flickT = 1.2 + Math.random() * 4; } else { S.drop = 1; S.flickT = .08 + Math.random() * .35; } }
     S.flick = S.drop ? .12 + .45 * (Math.sin(S.time * 75) > 0 ? 1 : 0) : .9 + .1 * Math.sin(S.time * 120);
@@ -326,10 +398,11 @@ export function setupAtmosphere(api) {
     if (key) { key.color.copy(keyColor).lerp(boltColor, Math.min(1, lit)); key.intensity = LOOK.key.intensity + lit * 1.8; key.position.copy(LOOK.key.dir); }
     if (fill) { fill.color.setHex(LOOK.fill.color); fill.intensity = LOOK.fill.intensity; }
     // sky
-    const u = skyMat.uniforms; u.time.value = S.time; u.flash.value = flash; u.horizon.value.copy(fogC);
+    const u = skyMat.uniforms; u.time.value = S.time; u.flash.value = flash; u.bolt.value = S.bolt; u.boltSeed.value = S.boltSeed; u.horizon.value.copy(fogC);
     nukeV.set(NUKE.x - eye.x, NUKE.z - eye.z); const nd = Math.max(2000, nukeV.length()); u.nukeDir.value.copy(nukeV).divideScalar(nd); u.nukeAng.value.set(Math.atan2(1500, nd), Math.atan2(5200, nd));   // the UGX column: about 15 degrees wide, up into the deck
     // particles
     ashMat.uniforms.time.value = S.time; ashMat.uniforms.cam.value.copy(eye); ashMat.uniforms.px.value = pxv; ashMat.uniforms.fogColor.value.copy(fogC); ashMat.uniforms.fogDensity.value = fogD; ashMat.uniforms.flash.value = flash;
+    const cu = crowMat.uniforms; cu.time.value = S.time; cu.fogColor.value.copy(fogC); cu.fogDensity.value = fogD; cu.flash.value = flash; crows.visible = CROWS.on && eye.y > LAB_Y - 100;
     fire.update(dt, { fog: scene.fog, flash });
     glowMat.uniforms.px.value = pxv; glowMat.uniforms.flick.value = S.flick;
     for (const b of shafts) { const u = b.mesh.material.uniforms, near = b.mid.distanceTo(eye) < BEAM.far + b.len / 2; b.mesh.visible = near; if (!near) continue;
@@ -348,11 +421,11 @@ export function setupAtmosphere(api) {
   const prevBefore = scene.onBeforeRender;
   scene.onBeforeRender = function (...a) { prevBefore?.apply(this, a); tick(); };
   host.on('update', tick);
-  host.on('reset', () => { S.flash = 0; S.strobes = 0; S.nextBolt = 6 + Math.random() * 8; });
+  host.on('reset', () => { S.flash = 0; S.strobes = 0; S.bolt = 0; S.boltAge = -1; S.white = 0; S.whiteAge = -1; S.thunder = null; S.nextBolt = 6 + Math.random() * 8; });
 
   if (window.kino) window.kino.nukeAtmo = {
-    state: () => ({ ...S.counts, pools: [firePool.length, lampPool.length], roof: !!roof, flash: S.flash, flick: S.flick, dyn: dyn.length, lava: lava.length, bolts: bolts.length }),
-    lightning: () => { S.nextBolt = 0; }, set: (k, v) => { if (k in skyMat.uniforms) { const t = skyMat.uniforms[k].value; if (t?.set && Array.isArray(v)) t.set(...v); else skyMat.uniforms[k].value = v; } else if (k in LOOK) Object.assign(LOOK[k], v); },
-    LOOK, FIRE, LAMP, ASH, GLOW, BEAM, mats: { skyMat, ashMat, glowMat }, fire, pools: { firePool, lampPool }, sources: { fires, lamps, glows, shafts },
+    state: () => ({ ...S.counts, pools: [firePool.length, lampPool.length], roof: !!roof, flash: S.flash, bolt: S.bolt, white: S.white, thunder: S.thunder, flick: S.flick, dyn: dyn.length, lava: lava.length, bolts: bolts.length }),
+    lightning: (strike) => { S.nextBolt = 0; if (strike != null) STORM.strikeShare = strike ? 1 : 0; }, set: (k, v) => { if (k in skyMat.uniforms) { const t = skyMat.uniforms[k].value; if (t?.set && Array.isArray(v)) t.set(...v); else skyMat.uniforms[k].value = v; } else if (k in LOOK) Object.assign(LOOK[k], v); },
+    LOOK, FIRE, LAMP, ASH, GLOW, BEAM, STORM, CROWS, S, mats: { skyMat, ashMat, glowMat, crowMat }, fire, pools: { firePool, lampPool }, sources: { fires, lamps, glows, shafts },
   };
 }

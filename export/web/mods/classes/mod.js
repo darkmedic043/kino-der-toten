@@ -277,6 +277,9 @@ export default async function setup(api){
   }
   let hudT=0;host.on('update',dt=>{if((hudT-=dt)<=0){hudT=.2;hud();}});
   hud();
+  host.on('warmHud',on=>{   // warmHud (engine.js): the cooldown, locked and active looks painted once behind the loading screen
+    if(!on){hud();return;}for(const c of ['locked','cooling','active'])el.classList.add(c);el.style.setProperty('--p','40%');el.querySelector('.cd').style.background='conic-gradient(#000c 144deg,transparent 0)';
+    el.querySelector('b').textContent='40%';const hp=el.querySelector('.hp');hp.style.display='block';hp.firstChild.style.width='25%';hp.classList.add('low');});
   window.kino.classes={get state(){return state();},cls,grantXp:n=>gain(n),   // grantXp: class XP from other mods (exfil)
     addCharge(s){if(cooldown>0&&!actionUp()){cooldown=Math.max(0,cooldown-s);if(cooldown===0)ready();}},   // seconds of meter from other mods (Vulture Aid's Fetid Upgr-aid)
     stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,use,get charge(){return charge();},get skills(){return skills;},get up(){return actionUp();},get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng,gamb};

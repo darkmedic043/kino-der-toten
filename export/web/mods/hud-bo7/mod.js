@@ -87,25 +87,46 @@ export default async function setup(api){
   function place(){for(const [get,parent] of adopt){const n=get();if(n&&n.parentNode!==parent)parent.append(n);}}
   place();
 
-  // ---- gun silhouette for the dial: the world model, side on, flat white (one small renderer, cached per gun) --------
-  let gunR=null;const gunIcons=new Map();
+  // ---- gun silhouette for the dial: the world model, side on, flat white, drawn by the game's own renderer into a small
+  // render target and read back (cached per gun). It used to have its own WebGLRenderer, a second WebGL context whose one
+  // program (skinned MeshBasicMaterial) linked on the first played frame: 5.2 s on the user's D3D11 trace (2026-10-30) and
+  // invisible to the engine's program telemetry. The main renderer's program compiles during loading instead (the starting
+  // gun's icon is drawn in setup, with an unskinned box for the other variant), so later guns cost a 256x128 draw and a readback.
+  const renderer=api.renderer,gunIcons=new Map();let iconRT=null,iconMat=null,iconCanvas=null,iconBox=null;
+  function drawIcon(model){
+    iconRT??=new THREE.WebGLRenderTarget(256,128,{samples:4});
+    if(!iconMat){iconMat=new THREE.MeshBasicMaterial();iconMat.color.setRGB(0xf2/255,0xee/255,0xe4/255,THREE.LinearSRGBColorSpace);}   // read back as-is: no colour-space conversion into a render target
+    iconBox??=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),iconMat);iconBox.frustumCulled=false;   // unskinned variant, drawn off-screen
+    const scene=new THREE.Scene(),pivot=new THREE.Group();scene.overrideMaterial=iconMat;
+    pivot.add(model);scene.add(pivot);pivot.updateMatrixWorld(true);
+    let box=new THREE.Box3().setFromObject(pivot),size=box.getSize(new THREE.Vector3());
+    if(size.z>size.x){pivot.rotation.y=Math.PI/2;pivot.updateMatrixWorld(true);box=new THREE.Box3().setFromObject(pivot);size=box.getSize(new THREE.Vector3());}
+    const c=box.getCenter(new THREE.Vector3()),half=Math.max(size.x/2,size.y)*1.08,cam=new THREE.OrthographicCamera(-half,half,half/2,-half/2,-5000,5000);
+    cam.position.set(c.x,c.y,c.z+1000);cam.lookAt(c);iconBox.position.set(c.x+half*4,c.y,c.z);scene.add(iconBox);
+    const prevRT=renderer.getRenderTarget(),prevColor=renderer.getClearColor(new THREE.Color()),prevAlpha=renderer.getClearAlpha(),prevAuto=renderer.autoClear;
+    const px=new Uint8Array(256*128*4);
+    try{renderer.setRenderTarget(iconRT);renderer.setClearColor(0x000000,0);renderer.autoClear=true;renderer.render(scene,cam);renderer.readRenderTargetPixels(iconRT,0,0,256,128,px);}
+    finally{renderer.setRenderTarget(prevRT);renderer.setClearColor(prevColor,prevAlpha);renderer.autoClear=prevAuto;pivot.remove(model);scene.remove(iconBox);}
+    iconCanvas??=document.createElement('canvas');iconCanvas.width=256;iconCanvas.height=128;
+    const ctx=iconCanvas.getContext('2d'),img=ctx.createImageData(256,128);
+    for(let y=0;y<128;y++)img.data.set(px.subarray((127-y)*1024,(128-y)*1024),y*1024);   // GL rows run bottom-up
+    ctx.putImageData(img,0,0);return iconCanvas.toDataURL();
+  }
   function gunIcon(id){
     if(gunIcons.has(id))return gunIcons.get(id);
     const p=(async()=>{
       const def=data.weapons[id];const model=def?.worldModel&&await loadModel(def.worldModel).catch(()=>null);if(!model)return null;
-      gunR??=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});gunR.setSize(256,128);
-      const scene=new THREE.Scene(),pivot=new THREE.Group();scene.overrideMaterial=new THREE.MeshBasicMaterial({color:0xf2eee4});
-      pivot.add(model);scene.add(pivot);pivot.updateMatrixWorld(true);
-      let box=new THREE.Box3().setFromObject(pivot),size=box.getSize(new THREE.Vector3());
-      if(size.z>size.x){pivot.rotation.y=Math.PI/2;pivot.updateMatrixWorld(true);box=new THREE.Box3().setFromObject(pivot);size=box.getSize(new THREE.Vector3());}
-      const c=box.getCenter(new THREE.Vector3()),half=Math.max(size.x/2,size.y)*1.08,cam=new THREE.OrthographicCamera(-half,half,half/2,-half/2,-5000,5000);
-      cam.position.set(c.x,c.y,c.z+1000);cam.lookAt(c);gunR.render(scene,cam);
-      const url=gunR.domElement.toDataURL();scene.overrideMaterial.dispose();return url;
+      return drawIcon(model);
     })().catch(e=>{console.warn('bo7-hud gun icon',id,e);return null;});
     gunIcons.set(id,p);return p;
   }
+  if(session.weapon?.id)(host.pending??=[]).push(gunIcon(session.weapon.id));   // the starting gun's icon (and the programs) while loading
   const gunImg=q(right,'.gun');let gunId=null;
   function showGun(id){if(id===gunId)return;gunId=id;gunImg.style.opacity=0;if(!id)return;gunIcon(id).then(url=>{if(gunId!==id)return;if(url){gunImg.src=url;gunImg.style.opacity=1;}});}
+
+  // warmHud (engine.js): the panels' states painted once behind the loading screen (their Skia shaders)
+  host.on('warmHud',on=>{for(const [el,cls] of [[left,'low'],[right,'empty'],[right,'pap'],[round,'text']])el.classList.toggle(cls,on);
+    for(const sat of right.querySelectorAll('.sat')){if(on){sat._arc=null;q(sat,'.arc').setAttribute('d',arcAt(+sat.dataset.dir-115,+sat.dataset.dir+100));}sat.classList.toggle('full',on);sat.classList.toggle('hot',on);}});
 
   // ---- per-frame bits that aren't plain moved nodes -------------------------------------------------------------------------
   let t=0,last='';

@@ -37,6 +37,7 @@ export default async function setup(api){
     body.menu-open #hud-portrait{visibility:hidden}
     @media(max-width:700px){#hud-portrait{left:20px;bottom:180px}#hud-portrait img{width:48px;height:48px}}`;document.head.append(style);
   renderPortrait(entry,api.data).then(url=>{portrait.querySelector('img').src=url;}).catch(e=>console.warn('portrait',e));
+  host.on('warmHud',on=>portrait.classList.toggle('hurt',on));   // warmHud (engine.js): the hurt border painted at load
   let hurtTimer=0;host.on('beforeDamage',()=>{portrait.classList.add('hurt');clearTimeout(hurtTimer);hurtTimer=setTimeout(()=>portrait.classList.remove('hurt'),350);});
   let character=await createCharacter(entry,api.data);
   character.root.visible=false;scene.add(character.root);

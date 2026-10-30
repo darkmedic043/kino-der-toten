@@ -34,12 +34,14 @@ export default async function setup(api){
       // dot cards are hidden per mesh: materials are shared between copies of a model,
       // so a material-level 'already done' check would skip later copies
       if([o.material].flat().some(m=>DOTS.test(m?.name??''))){o.visible=false;return;}
-      for(const m of [o.material].flat()){if(!m||patched.has(m))continue;patched.add(m);const n=m.name??'';
+      for(const m of [o.material].flat()){if(!m)continue;const n=m.name??'';if(GLASS.test(n)||HOLO.test(n))o.renderOrder=2;   // per mesh: later copies of a patched material keep their order
+        if(patched.has(m))continue;patched.add(m);
       // the model's dot cards have mixed backgrounds (some glow as blobs): hide
       // them; a clean dot is drawn at the screen centre while aiming instead
       if(DOTS.test(n)){o.visible=false;}
       else if(GLASS.test(n)||HOLO.test(n)){if(HOLO.test(n))m.name='reflex_lens '+n;Object.assign(m,{transparent:true,depthWrite:false,opacity:.1,roughness:.05,metalness:0});o.renderOrder=2;m.needsUpdate=true;}}});
   }
+  host.on('warmWeapon',({gun})=>glass(gun));   // warmWeapons (engine.js): the map's buyable guns compile with the lens patched, as equipped
   const equip=view.equip.bind(view);
   view.equip=async(...args)=>{const r=await equip(...args);glass(view.gun);align.key=null;return r;};
   glass(view.gun);

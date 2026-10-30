@@ -12,7 +12,7 @@
 //   .booths[i].tapScreen.set(lines)  (the beer tap's screen: what's on tap, e.g. the Wunderfizz's perk)
 // F at the screen opens the MelonTerm desktop (desktop.js) through the engine's mods.prompts hook.
 import * as THREE from 'three';
-import { openDesktop } from './desktop.js';
+import { openDesktop, warmDesktop } from './desktop.js';
 import { loadModel } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 
@@ -45,6 +45,7 @@ export default async function setup(api){
   const cfg=await fetch(BASE+'placements.json').then(r=>r.json());
   const spots=cfg.maps[api.map?.id??'kino'];
   if(!spots?.length)return;
+  api.host.on('warmHud',on=>{try{warmDesktop(on);}catch(error){console.warn('[terminal-booth] warm',error);}});   // MelonTerm painted once at load (desktop.js warmDesktop)
   const {scene,world,session,camera,audio,host}=api;
   const col=world.collision;
   let pulseTex,meshes;

@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { textureMemoryStats, setPrimaryRenderer, pendingImages, pendingImageCount } from './texture-memory.js';   // first: frees decoded texture images once uploaded
 import './skinned-bounds.js';   // fast SkinnedMesh bounds for every rigged model (no hitch when a zombie first draws)
 import { PlayerController } from './player-controller.js';
-import { ViewWeapon, pendingModels } from './animation.js';
+import { ViewWeapon, pendingModels, loadModel } from './animation.js';
 import { Enemies } from './enemies.js';
 import { KinoSession } from './kino-session.js';
 import { firesBoth } from './rules.js';
@@ -50,7 +50,8 @@ let singlePassTimer=0,programCount=0;
 // that make and dispose materials per use (Thundergun blast, DG-2 arcs, Ray Gun bolts) recompiled on every shot; on Windows
 // (ANGLE on D3D11) each compile froze the game for 0.3-1 s. Programs only accumulate per distinct shader setup (a few hundred).
 let keptPrograms=0;
-let standIns=null;   // effect stand-ins (below); declared here: warmShaders runs from the load sequence before the module reaches that line
+let standIns=null,noteHud=()=>{};   // noteHud: the HUD observer's 'seen' registration (below), used by warmHud
+   // effect stand-ins (below); declared here: warmShaders runs from the load sequence before the module reaches that line
 function keepPrograms(){const ps=renderer.info.programs;for(;keptPrograms<ps.length;keptPrograms++)ps[keptPrograms].usedTimes++;}
 // First draws (2026-10-24, user: freezes while playing and shooting; RTX 4070 Ti Super, ANGLE on D3D11). A program drawn
 // for the first time with another vertex layout or into another kind of render target can make the driver build a new GPU
@@ -86,7 +87,7 @@ let lastTex={n:0,kb:0,mip:0,gl:{}};const fences=[];let fenceSupported=null;   //
   const bytes=a=>{const d=a.find(x=>x&&typeof x==='object'&&'byteLength' in x);return d?Math.round(d.byteLength/1024):typeof a[1]==='number'?Math.round(a[1]/1024):0;};
   count('bufferData',bytes);count('bufferSubData',bytes);for(const n of ['createBuffer','createTexture','deleteBuffer','deleteTexture','createVertexArray','deleteVertexArray','createFramebuffer','createRenderbuffer','renderbufferStorageMultisample','compileShader','linkProgram','getError','finish','flush','readPixels','clientWaitSync','getProgramParameter','getShaderParameter','getUniformLocation','getParameter','getBufferSubData','blitFramebuffer','invalidateFramebuffer'])count(n);}
 const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
-const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait');   // A/B switch for warmShaders' draw pass
+const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait'),NO_HUD_WARM=new URLSearchParams(location.search).has('noHudWarm'),NO_WEAPON_WARM=new URLSearchParams(location.search).has('noWeaponWarm'),WEAPON_WARM_MS=8000;   // A/B switches for warmShaders' draw pass and warmHud
 const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
 let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer,leaving=false;
 let timerExt=null,gpuQ=[];try{timerExt=new URLSearchParams(location.search).has('noGpuTimer')?null:renderer.getContext().getExtension('EXT_disjoint_timer_query_webgl2');}catch{}   // (2026-10-27) GPU time per frame for the perf log (gpuBegin/gpuEnd)
@@ -528,7 +529,8 @@ try{
   // and for textures still downloading or decoding (mods' TextureLoader loads, KTX2 copies, re-decoded images), so the
   // warm-up draw uploads them too; bounded, the 1.5 s and 4 s re-warms catch the rest (2026-10-29)
   if(pendingImageCount()){progress('Waiting for textures',99);const t0=performance.now(),left=await pendingImages(15000);console.info('[warm-shaders] waited',Math.round(performance.now()-t0),'ms for textures,',left,'still loading');}
-  if(!perfOff.has('noWarm')){progress('Preparing shaders',99);await paint();await warmShaders(true);
+  const warmGuns=perfOff.has('noWarm')?null:await warmWeapons();
+  if(!perfOff.has('noWarm')){progress('Preparing shaders',99);await paint();await warmHud();await warmShaders(true);if(warmGuns)viewScene.remove(warmGuns);
     // mods keep adjusting materials for a moment after loading (the lighting mod tags late materials on a 1 s sweep,
     // which changes their program): compile those too while the player is still on the start screen (cheap: programs
     // already built are reused)
@@ -582,6 +584,60 @@ async function gpuIdle(max=60000){
   try{while(performance.now()-t<max){const r=gl.clientWaitSync(sync,0,0);if(r!==gl.TIMEOUT_EXPIRED)break;await new Promise(r=>setTimeout(r,25));}}
   finally{gl.deleteSync(sync);}
   return performance.now()-t;
+}
+// The HUD's own shaders. The GPU process paints page content with Skia programs, one per paint pipeline (a drop-shadow
+// radius, a gradient, text with a shadow, a rounded border...), created the first time something is painted. On the
+// user's D3D11 trace (2026-10-30) 37 of the 38 mid-game program loads were Skia's, 1-6 s each on their driver: the panels
+// at start, the first shot's hit marker, the first class-skill cooldown, the resource bar filling. So the HUD is painted
+// once behind the loading screen: every HUD element shown at 2% opacity for a few frames (body.hud-warm in style.css,
+// menu-open lifted so the mods' visibility:hidden rules let go), with the engine's transients (banner, hit marker, prompt,
+// a power-up timer, the hurt and flash overlays) and the mods' ('warmHud' handlers: hud-bo7, classes, hud) switched on
+// meanwhile. Elements painted here are also dropped from the hitch 'hud:' events (already seen). ?noHudWarm skips it (A/B).
+// The weapons this map sells (wall buys, the box pool) are loaded now and parked hidden in the view scene, so
+// warmShaders compiles and draws their programs behind the loading screen: the first wall buy or box take otherwise
+// compiled 2-5 programs mid-game (the user's M14 on Nuketown: 479 ms on the host at 130 fps, 'MeshStandard
+// mtl_weapon_scope_reflex_lens / mtl_player_icon', the lens and icon variants again on every later BO1 gun; seconds on
+// D3D11 when the driver's shader cache misses, 2026-10-30). Models still loading at WEAPON_WARM_MS stay in the model
+// cache for their equip. Mods patch the materials the way they do on equip through the 'warmWeapon' event (the scopes
+// mod's glass). Not on phones (memory); ?noWeaponWarm skips it (A/B).
+async function warmWeapons(){
+  if(NO_WEAPON_WARM||profile.mobile)return null;
+  const t0=performance.now(),ids=new Set();
+  try{
+    for(const e of world?.interactions??[]){if(e.kind==='wallbuy'&&e.weapon)ids.add(e.weapon);else if(e.targetname==='weapon_upgrade'&&e.zombie_weapon_upgrade)ids.add(e.zombie_weapon_upgrade);}
+    const list=globalThis.kino?.boxList;for(const k of [...Object.keys(mysteryBox?.models??{}),...(list?.extra??[])])if(!list||list.allowed?.(k)!==false)ids.add(k);
+  }catch(error){console.warn('[warm-weapons]',error);}
+  for(const w of session?.inventory??[])ids.delete(w.id);
+  const defs=[...ids].map(id=>data.weapons[id]).filter(d=>d?.model);
+  if(!defs.length)return null;
+  const group=new THREE.Group();group.name='warm-weapons';group.visible=false;let done=0,late=0;
+  const loads=defs.map(async def=>{
+    const models=await Promise.all([loadModel(def.model),def.leftModel?loadModel(def.leftModel):null]);
+    if(performance.now()-t0>WEAPON_WARM_MS){late++;return;}
+    for(const gun of models)if(gun){group.add(gun);try{mods.emit('warmWeapon',{def,gun});}catch(error){console.warn('[warm-weapons]',error);}done++;}
+  });
+  await Promise.race([Promise.allSettled(loads),new Promise(r=>setTimeout(r,WEAPON_WARM_MS))]);
+  viewScene.add(group);
+  console.info(`[warm-weapons] ${done} models of ${defs.length} weapons in ${Math.round(performance.now()-t0)} ms${late?`, ${late} late`:''}`);
+  return group;
+}
+async function warmHud(){
+  if(NO_HUD_WARM)return;const t0=performance.now(),undo=[],paint=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
+  const set=(el,prop,v)=>{if(!el)return;const o=el.style[prop];el.style[prop]=v;undo.push(()=>{el.style[prop]=o;});};
+  const html=(el,v)=>{if(!el)return;const o=el.innerHTML;el.innerHTML=v;undo.push(()=>{el.innerHTML=o;});};
+  try{
+    html($('announcement-title'),'Round 1');html($('announcement-small'),(map?.announceTitle??entry?.title??'Zombies').toUpperCase());set($('announcement'),'opacity',1);
+    set($('hitmarker'),'opacity',1);set($('hurt'),'opacity',.5);set($('flash'),'opacity',.5);
+    html($('prompt'),'<kbd>F</kbd> Hold F to warm up');html($('toast'),'Max Ammo');set($('toast'),'opacity',1);
+    const icon=Object.values(data?.powerups??{})[0]?.icon;if(icon)html($('effects'),`<span class="powerup-timer"><img src="${icon}" alt=""><span>30s</span></span><span class="powerup-timer expiring"><img src="${icon}" alt=""><span>3s</span></span>`);
+    html($('objective'),'Warm up');html($('remaining'),'24');
+    document.body.classList.add('hud-warm');document.body.classList.remove('menu-open');
+    mods.emit('warmHud',true);
+    for(let i=0;i<4;i++)await paint();   // commits, rasters (cc holds the next main frame while a pending tree waits) and draws
+    for(const el of document.body.querySelectorAll('*'))if(el.checkVisibility?.({visibilityProperty:true})??el.getClientRects().length)noteHud(el);   // painted: not a first appearance later
+  }catch(error){console.warn('[warm-hud]',error);}
+  finally{try{mods.emit('warmHud',false);}catch{}document.body.classList.add('menu-open');document.body.classList.remove('hud-warm');for(const u of undo.reverse())u();}
+  console.info('[warm-hud] painted in',Math.round(performance.now()-t0),'ms');
 }
 async function warmShaders(waitGpu=false){
   const t0=performance.now(),targets=new Map(),draw=renderer.render,later=new THREE.Group();
@@ -667,7 +723,7 @@ function pollFences(){if(!fences.length)return;const gl=renderer.getContext();tr
 // sight. On Rind (its runtime watches the console: rind src/trace.js) the engine asks for a Chromium trace once per
 // TRACE_V from Ready through 60 s of play (or ?trace[=seconds] any time); it is uploaded to /api/trace and read with
 // .tools/trace-report.mjs. Hitches and play start are user-timing marks, so they show on the trace's timeline.
-function traceStart(){try{const TRACE_V='1',q=new URLSearchParams(location.search);if(!/Rind\//.test(navigator.userAgent))return;
+function traceStart(){try{const TRACE_V='2',q=new URLSearchParams(location.search);if(!/Rind\//.test(navigator.userAgent))return;
   const want=q.has('trace'),due=/Direct3D11/.test(diagGpu||'')&&localStorage.getItem('kinoTraceV')!==TRACE_V;if(!want&&!due)return;
   localStorage.setItem('kinoTraceV',TRACE_V);const s=Math.min(300,+q.get('trace')||240);console.log(`[rind-trace] start ${s}`);perf.event?.('trace');performance.mark('kino-ready');
   window.kinoTracing={from:performance.now(),stop(){console.log('[rind-trace] stop');window.kinoTracing=null;}};
@@ -676,7 +732,7 @@ function tracePlay(){try{performance.mark('kino-play');if(window.kinoTracing)set
 // first appearances of HUD elements, as perf events ('hud:<id or class>'): whether a banner, the hit marker or another
 // piece of DOM is what the GPU process stalls on (its raster shaders) shows in the hitches' 'ev' list
 {const seen=new Set(),key=el=>el.id||Array.from(el.classList).slice(0,2).join('.')||el.tagName.toLowerCase();
-  const note=el=>{if(!el?.classList||seen.size>400)return;const k=key(el);if(seen.has(k))return;seen.add(k);if(started)perf.event?.('hud:'+k.slice(0,20));};
+  const note=el=>{if(!el?.classList||seen.size>1500)return;const k=key(el);if(seen.has(k))return;seen.add(k);if(started)perf.event?.('hud:'+k.slice(0,20));};noteHud=note;
   try{new MutationObserver(rs=>{for(const r of rs){if(r.type==='childList'){for(const n of r.addedNodes)if(n.nodeType===1)note(n);}else if(r.target.nodeType===1)note(r.target);}})
     .observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden']});}catch{}}
 (function heartbeat(){let last=performance.now();const tick=()=>{const t=performance.now();perf.beat?.(last,t);last=t;if(!document.hidden)pollFences();setTimeout(tick,10);};setTimeout(tick,10);})();

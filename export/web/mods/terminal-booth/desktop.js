@@ -306,6 +306,12 @@ const EXFIL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-render
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let ui = null;
+// warmHud (engine.js): the desktop built and shown once behind the loading screen, so its CRT, glow and font paint
+// then (the first open mid-game was a 370 ms hitch, GPU-side, 2026-10-30)
+export function warmDesktop(on) {
+  if (on) { ui ??= build(); if (ui.isOpen()) return; ui.root.hidden = false; ui.root.classList.add('warm'); }
+  else if (ui && ui.root.classList.contains('warm')) { ui.root.classList.remove('warm'); ui.root.hidden = true; }
+}
 export function openDesktop(opts) {
   if (!ui) ui = build();
   ui.open(opts);
@@ -933,5 +939,5 @@ function build() {
 
   for (const b of root.querySelectorAll('[data-close]')) b.addEventListener('click', closeApp);
   root.querySelector('[data-logoff]').addEventListener('click', close);
-  return { open, close, isOpen: () => !root.hidden };
+  return { open, close, isOpen: () => !root.hidden && !root.classList.contains('warm'), root };
 }

@@ -125,6 +125,7 @@ export function setupSkills(x){
     if(!bar||!el.contains(bar)){bar=document.createElement('span');bar.className='res';bar.title=R.name;bar.innerHTML='<i></i><em></em>';el.append(bar);}
     const m=max(),n=v();bar.firstChild.style.height=(m?100*n/m:0)+'%';bar.lastChild.textContent=n||'';bar.classList.toggle('full',n>=m&&m>0);
   }
+  host.on('warmHud',on=>{draw();if(bar){if(on){bar.firstChild.style.height='100%';bar.lastChild.textContent='9';bar.classList.add('full');}else draw();}});   // warmHud (engine.js): the full bar painted behind the loading screen
   if(R){const st=document.createElement('style');st.textContent=`
     #class-skill .res{position:absolute;left:-11px;top:6px;bottom:6px;width:5px;background:#0009;border:1px solid #ffffff30;display:flex;flex-direction:column;justify-content:flex-end}
     #class-skill .res i{display:block;width:100%;background:${R.color??cls.color};box-shadow:0 0 6px ${R.color??cls.color};transition:height .15s}

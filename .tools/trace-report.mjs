@@ -8,12 +8,14 @@
 //   node .tools/trace-report.mjs [file.json.gz | latest] [--top 14] [--marks] [--names]
 //     --top n     longest events listed per window (default 14)
 //     --marks     list every user-timing mark and stop
-//     --names     per-process totals by event name over the whole trace
+//     --names [re] per-process totals by event name over the whole trace (top 40, or every name matching re)
 //     --all       also windows for hitches under 150 ms
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+//     --long ms   list every event over ms (except the generic task wrappers), in time order
+//     --dump re   print the full args of every event whose name matches (shader sources of ShaderTranslateTaskD3D...)
+//     --grep re   list every event whose name matches, with the top-level task it ran inside
+import { readFileSync, readdirSync, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { gunzipSync } from 'node:zlib';
 
 const args = process.argv.slice(2);
 const opt = (name, dflt) => { const i = args.indexOf(name); return i < 0 ? dflt : (args[i + 1] ?? true); };
@@ -26,10 +28,40 @@ if (file === 'latest') {
   if (!files.length) { console.error('no traces in ' + DIR); process.exit(1); }
   file = files[0];
 }
-const raw = readFileSync(file);
-const json = JSON.parse((raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw).toString());
-const events = json.traceEvents || json;
-console.log(`${file}: ${events.length} events` + (json.metadata ? `, ${JSON.stringify(json.metadata).slice(0, 200)}` : ''));
+// Stream the events (the JSON can exceed Node's string limit): gunzip chunk by chunk, split the
+// top-level objects of the traceEvents array by brace depth and parse each one alone.
+import { createReadStream } from 'node:fs';
+import { createGunzip } from 'node:zlib';
+const events = []; let metadata = null;
+async function load(file) {
+  const head = Buffer.alloc(2); { const fd = openSync(file, 'r'); readSync(fd, head, 0, 2, 0); closeSync(fd); }
+  const src = createReadStream(file);
+  const stream = head[0] === 0x1f && head[1] === 0x8b ? src.pipe(createGunzip()) : src;
+  let depth = 0, inStr = false, esc = false, buf = '', started = false, tail = '';
+  const keep = e => {
+    if (e.ph === 'M' || e.ph === 'X' || e.ph === 'B' || e.ph === 'E' || e.ph === 'R' || e.ph === 'I' || e.ph === 'n' || e.ph === 'b') {
+      if (e.args && !(e.ph === 'M' || (e.dur > 2000))) e.args = undefined;
+      events.push(e);
+    }
+  };
+  for await (const chunk of stream) {
+    const text = chunk.toString('latin1');
+    let i = 0;
+    if (!started) { const k = text.indexOf('"traceEvents"'); if (k < 0) { tail = text.slice(-20); continue; } i = text.indexOf('[', k) + 1; started = true; }
+    for (; i < text.length; i++) {
+      const c = text[i];
+      if (depth === 0) { if (c === '{') { depth = 1; buf = '{'; } else if (c === ']') { started = 2; break; } continue; }
+      buf += c;
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true; else if (c === '{') depth++; else if (c === '}') { if (--depth === 0) { try { keep(JSON.parse(Buffer.from(buf, 'latin1').toString('utf8'))); } catch {} buf = ''; } }
+    }
+    if (started === 2) { tail = text.slice(i); break; }
+  }
+  const m = /"metadata"\s*:\s*(\{.*\})\s*\}?\s*$/s.exec(tail); if (m) { try { metadata = JSON.parse(m[1]); } catch {} }
+}
+await load(file);
+const json = { metadata };
+console.log(`${file}: ${events.length} events kept` + (json.metadata ? `, ${JSON.stringify(json.metadata).slice(0, 200)}` : ''));
 
 // process and thread names
 const pname = new Map(), tname = new Map();
@@ -49,8 +81,9 @@ for (const e of events) {
   else if (e.ph === 'E') { const k = e.pid + ':' + e.tid; const st = open.get(k); const b = st?.pop(); if (b) spans.push({ ts: b.ts, dur: e.ts - b.ts, name: b.name, cat: b.cat, pid: b.pid, tid: b.tid, args: b.args }); }
 }
 spans.sort((a, b) => a.ts - b.ts);
-const t0 = Math.min(...events.filter(e => e.ts > 0).map(e => e.ts));
-const t1 = Math.max(...spans.map(s => s.ts + s.dur), ...events.map(e => e.ts || 0));
+let t0 = Infinity, t1 = 0;
+for (const e of events) { if (e.ts > 0 && e.ts < t0) t0 = e.ts; if (e.ts > t1) t1 = e.ts; }
+for (const s of spans) if (s.ts + s.dur > t1) t1 = s.ts + s.dur;
 const sec = ts => ((ts - t0) / 1e6).toFixed(3) + 's';
 const procs = [...new Set(events.map(e => e.pid))].map(p => `${proc(p)}(${p})`).join(', ');
 console.log(`span ${((t1 - t0) / 1e6).toFixed(1)} s; processes: ${procs}`);
@@ -90,6 +123,36 @@ function window_(title, from, to) {
   }
 }
 
+
+const LONG = +opt('--long', 0);
+if (LONG) {
+  const skip = /^(ThreadControllerImpl::RunTask|Scheduler::RunTask|ThreadPool_RunTask|GpuChannel::ExecuteDeferredRequest|CommandBuffer::Flush|CommandBufferStub::OnAsyncFlush|CommandBufferService:PutChanged|SimpleWatcher::OnHandleReady|Receive mojo message|MessageLoop::RunTask|RendererRasterWorker)$/;
+  console.log(`\n== events over ${LONG} ms`);
+  for (const s of spans) if (s.dur >= LONG * 1000 && !skip.test(s.name))
+    console.log(`  ${sec(s.ts)}  ${(s.dur / 1000).toFixed(1).padStart(8)} ms  ${proc(s.pid)}/${thread(s)}  ${s.name}  ${argStr(s.args)}`);
+}
+
+const dump = opt('--dump', null);
+if (dump) { const re = new RegExp(dump); let n = 0; for (const s of spans) if (re.test(s.name) && s.args && n++ < 40) console.log(`\n-- ${sec(s.ts)} ${(s.dur / 1000).toFixed(1)} ms ${proc(s.pid)}/${thread(s)} ${s.name}\n` + JSON.stringify(s.args, null, 1).slice(0, +opt('--dump-len', 4000))); }
+
+const grep = opt('--grep', null);
+if (grep) {
+  const re = new RegExp(grep);
+  // top-level span per thread covering each match (the outermost task on that thread)
+  const byThread = new Map();
+  for (const s of spans) { const k = s.pid + ':' + s.tid; const st = byThread.get(k) || []; st.push(s); byThread.set(k, st); }
+  const outer = s => { const st = byThread.get(s.pid + ':' + s.tid); let best = s; for (const o of st) { if (o.ts > s.ts) break; if (o.ts <= s.ts && o.ts + o.dur >= s.ts + s.dur && o.dur > best.dur) best = o; } return best; };
+  const childNames = s => { const st = byThread.get(s.pid + ':' + s.tid); const names = new Set(); for (const o of st) { if (o.ts >= s.ts + s.dur) break; if (o.ts >= s.ts && o !== s && o.dur > s.dur * 0.3) names.add(o.name); } return [...names].slice(0, 6).join(' > '); };
+  console.log(`\n== events matching /${grep}/`);
+  let n = 0;
+  for (const s of spans) {
+    if (!re.test(s.name)) continue; n++; if (n > 200) break;
+    const o = outer(s);
+    console.log(`  ${sec(s.ts)}  ${(s.dur / 1000).toFixed(1).padStart(8)} ms  ${proc(s.pid)}/${thread(s)}  ${s.name}  ${argStr(s.args)}  in: ${o.name}${o.args?.handler ? ' ' + o.args.handler : ''}  with: ${childNames(s)}`);
+  }
+  console.log(`  ${n} matches`);
+}
+
 const ready = marks.find(m => m.name === 'kino-ready'), play = marks.find(m => m.name === 'kino-play');
 if (ready) window_('kino-ready → +3 s (after the warm-up)', ready.ts, ready.ts + 3e6);
 if (play) window_('kino-play (first played frame) -1 s .. +8 s', play.ts - 1e6, play.ts + 8e6);
@@ -102,10 +165,12 @@ const gpu = spans.filter(s => proc(s.pid) === 'gpu').sort((a, b) => b.dur - a.du
 console.log('\n== longest GPU-process events in the whole trace');
 for (const s of gpu) console.log(`  ${(s.dur / 1000).toFixed(1).padStart(8)} ms  ${thread(s)}  ${s.name}  ${sec(s.ts)}  ${argStr(s.args)}`);
 
-if (opt('--names', false)) {
+const namesRe = opt('--names', false);
+if (namesRe) {
   const tot = new Map();
   for (const s of spans) { const k = proc(s.pid) + '  ' + s.name; const c = tot.get(k) || { n: 0, dur: 0, max: 0 }; c.n++; c.dur += s.dur; c.max = Math.max(c.max, s.dur); tot.set(k, c); }
   console.log('\n== totals by event name');
-  for (const [k, c] of [...tot].sort((a, b) => b[1].dur - a[1].dur).slice(0, 40))
+  const re = typeof namesRe === 'string' ? new RegExp(namesRe) : null;
+  for (const [k, c] of [...tot].filter(([k]) => !re || re.test(k)).sort((a, b) => b[1].dur - a[1].dur).slice(0, re ? 200 : 40))
     console.log(`  ${(c.dur / 1000).toFixed(0).padStart(8)} ms  n=${String(c.n).padStart(6)}  max ${(c.max / 1000).toFixed(1).padStart(7)} ms  ${k}`);
 }

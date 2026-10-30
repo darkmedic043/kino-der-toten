@@ -60,6 +60,9 @@ export default function setup(api){
     if(!m){const el=document.createElement('i');ring.append(el);m={enemy:z,el};marks.push(m);}
     m.el.classList.toggle('shield',shield);m.from=z.root.position.clone();m.life=1.6;m.strength=strength;
   }
+  host.on('warmHud',on=>{   // warmHud (engine.js): a hit arc and a shield arc painted once behind the loading screen
+    for(const el of ring.querySelectorAll('i.warm'))el.remove();if(!on)return;
+    for(const shield of [false,true]){const el=document.createElement('i');el.className='warm'+(shield?' shield':'');el.style.opacity=1;el.style.transform=`rotate(${shield?1:-1}rad)`;ring.append(el);}});
   host.on('beforeDamage',e=>queueMicrotask(()=>{
     if(e.shielded){shieldHit();mark(.85,true);return;}
     if(!(e.amount>0))return;
