@@ -8,7 +8,7 @@
 //   DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET  from the Discord developer portal;
 //                     sign-in is disabled without them (keep the secret out of git)
 //   KINO_PUBLIC_URL   public https address, used for the OAuth redirect
-import { createReadStream, statSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, appendFileSync } from 'node:fs';
+import { createReadStream, createWriteStream, statSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, appendFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -24,7 +24,7 @@ const DISCORD_ID = process.env.DISCORD_CLIENT_ID || '', DISCORD_SECRET = process
 const PUBLIC_URL = (process.env.KINO_PUBLIC_URL || '').replace(/\/$/, '');
 const ENABLED = !!(DISCORD_ID && DISCORD_SECRET && PUBLIC_URL);
 const REDIRECT = PUBLIC_URL + '/api/auth/discord/callback';
-const SESSION_DAYS = 90, MAX_BODY = 256 * 1024;
+const SESSION_DAYS = 90, MAX_BODY = 256 * 1024, MAX_TRACE = 250 * 1024 * 1024, KEEP_TRACES = 6;
 mkdirSync(join(DATA, 'profiles'), { recursive: true });
 
 const TYPES = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8',
@@ -146,6 +146,26 @@ async function api(req, res, url) {
   }
   // Load diagnostics from game pages (engine.js diag): stages, a heartbeat, WebGL context loss, errors, GPU name. One JSON
   // line each in KINO_DATA/client-log.jsonl (rotated past 5 MB). Added 2026-10-15 for a black window while loading in Rind.
+  // a GPU-process trace from the Rind runtime (its src/trace.js, 2026-10-30): gzipped Chromium trace JSON, streamed to
+  // KINO_DATA/traces/<who>-<time>.json.gz (the last KEEP_TRACES kept, a client-log line each); .tools/trace-report.mjs reads them
+  if (url === '/api/trace' && req.method === 'POST') {
+    const s = session(req); if (!s) return send(res, 401, { error: 'sign in first' });
+    const dir = join(DATA, 'traces'); mkdirSync(dir, { recursive: true });
+    const who = String(s.username || s.name || 'anon').replace(/[^\w.-]/g, '_').slice(0, 32), at = new Date().toISOString();
+    const name = `${who}-${at.replace(/[:.]/g, '-').slice(0, 19)}.json.gz`, file = join(dir, name), out = createWriteStream(file);
+    let size = 0, over = false;
+    req.on('data', c => { size += c.length; if (size > MAX_TRACE && !over) { over = true; req.destroy(); out.destroy(); try { unlinkSync(file); } catch {} send(res, 413, { error: 'too large' }); } });
+    req.on('error', () => { out.destroy(); });
+    out.on('error', () => { if (!over) send(res, 500, { error: 'write failed' }); });
+    out.on('finish', () => {
+      if (over) return;
+      try { for (const f of readdirSync(dir).filter(f => f.endsWith('.json.gz')).sort().slice(0, -KEEP_TRACES)) unlinkSync(join(dir, f)); } catch {}
+      try { appendFileSync(join(DATA, 'client-log.jsonl'), JSON.stringify({ at, who: s.name, ev: 'trace', file: name, bytes: size, info: String(req.headers['x-trace-info'] || '').slice(0, 200) }) + '\n'); } catch {}
+      send(res, 200, { file: name, bytes: size });
+    });
+    req.pipe(out);
+    return;
+  }
   if (url === '/api/client-log' && req.method === 'POST') {
     let doc; try { doc = await body(req); } catch { return send(res, 400, { error: 'bad body' }); }
     const s = session(req), file = join(DATA, 'client-log.jsonl');

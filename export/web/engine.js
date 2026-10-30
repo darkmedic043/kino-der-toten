@@ -152,7 +152,7 @@ function setActive(value){
   active=!!value&&ready&&session.phase!=='gameover';$('menu').hidden=active;document.body.classList.toggle('menu-open',!active);keys.clear();primary=false;primaryPressed=false;ads=false;reloadShot=false;reloadHeld=0;
   mousePrimary=mouseAim=false;touchControls.reset();touchControls.setEnabled(active&&session.phase!=='reviving',active);
   if(active&&audio.ctx)audio.start();else if(!active)audio.pause();
-  if(active){if(!started){started=true;announce('Round 1','SURVIVE');audio.play('round');mods.emit('start');}else if(session.phase==='preparing')announce('Round '+session.round,'PREPARE YOURSELF');}
+  if(active){if(!started){started=true;tracePlay();announce('Round 1','SURVIVE');audio.play('round');mods.emit('start');}else if(session.phase==='preparing')announce('Round '+session.round,'PREPARE YOURSELF');}
   else if(started&&session.phase!=='gameover'){$('start').innerHTML='RESUME GAME <span>→</span>';$('restart').hidden=false;$('menu-status').textContent='Paused · Round '+session.round;}
 }
 function start(){if(!ready||contextLost)return;if(session.phase==='gameover')reset();audio.start();warmViewAudio();if(touchControls.mode){setActive(true);return;}renderer.domElement.requestPointerLock?.()?.catch(()=>toast('Click the game to capture the mouse'));}
@@ -533,6 +533,7 @@ try{
     // which changes their program): compile those too while the player is still on the start screen (cheap: programs
     // already built are reused)
     for(const delay of [1500,4000])setTimeout(()=>{if(!started&&!contextLost&&!document.hidden)warmShaders();},delay);}
+  traceStart();   // Rind/D3D11: a GPU-process trace from here through the first played minute (below)
   // a custom map's static objects stop recomputing their matrices every frame (Kino's world.js freezes its own root)
   // rigged props that never move keep their bone textures instead of re-uploading them every frame (still-skeletons.js;
   // the whole scene: Der Eisendrache's 461 still props sit outside world.root). Late arrivals join on the 1 s sweep.
@@ -661,6 +662,23 @@ function gpuEnd(q,now){if(!timerExt)return;const gl=renderer.getContext();if(q){
 function fenceFrame(now){const gl=renderer.getContext();if(fenceSupported===null)fenceSupported=typeof gl.fenceSync==='function';if(!fenceSupported||fences.length>=12)return;
   try{fences.push({s:gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0),now});}catch{fenceSupported=false;}}
 function pollFences(){if(!fences.length)return;const gl=renderer.getContext();try{while(fences.length){const f=fences[0];if(gl.getSyncParameter(f.s,gl.SYNC_STATUS)!==gl.SIGNALED)break;gl.deleteSync(f.s);fences.shift();perf.lat?.(f.now,performance.now()-f.now);}}catch{fenceSupported=false;fences.length=0;}}
+// GPU-process trace (2026-10-30): the user's freezes on an RTX 4070 Ti SUPER under D3D11 came with the page idle ('mt 0',
+// 'lat' about the gap, no first draws, no uploads), so whatever stalls is inside Chromium's GPU process, beyond the page's
+// sight. On Rind (its runtime watches the console: rind src/trace.js) the engine asks for a Chromium trace once per
+// TRACE_V from Ready through 60 s of play (or ?trace[=seconds] any time); it is uploaded to /api/trace and read with
+// .tools/trace-report.mjs. Hitches and play start are user-timing marks, so they show on the trace's timeline.
+function traceStart(){try{const TRACE_V='1',q=new URLSearchParams(location.search);if(!/Rind\//.test(navigator.userAgent))return;
+  const want=q.has('trace'),due=/Direct3D11/.test(diagGpu||'')&&localStorage.getItem('kinoTraceV')!==TRACE_V;if(!want&&!due)return;
+  localStorage.setItem('kinoTraceV',TRACE_V);const s=Math.min(300,+q.get('trace')||240);console.log(`[rind-trace] start ${s}`);perf.event?.('trace');performance.mark('kino-ready');
+  window.kinoTracing={from:performance.now(),stop(){console.log('[rind-trace] stop');window.kinoTracing=null;}};
+  addEventListener('pagehide',()=>window.kinoTracing?.stop(),{once:true});}catch{}}
+function tracePlay(){try{performance.mark('kino-play');if(window.kinoTracing)setTimeout(()=>window.kinoTracing?.stop(),60000);}catch{}}
+// first appearances of HUD elements, as perf events ('hud:<id or class>'): whether a banner, the hit marker or another
+// piece of DOM is what the GPU process stalls on (its raster shaders) shows in the hitches' 'ev' list
+{const seen=new Set(),key=el=>el.id||Array.from(el.classList).slice(0,2).join('.')||el.tagName.toLowerCase();
+  const note=el=>{if(!el?.classList||seen.size>400)return;const k=key(el);if(seen.has(k))return;seen.add(k);if(started)perf.event?.('hud:'+k.slice(0,20));};
+  try{new MutationObserver(rs=>{for(const r of rs){if(r.type==='childList'){for(const n of r.addedNodes)if(n.nodeType===1)note(n);}else if(r.target.nodeType===1)note(r.target);}})
+    .observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden']});}catch{}}
 (function heartbeat(){let last=performance.now();const tick=()=>{const t=performance.now();perf.beat?.(last,t);last=t;if(!document.hidden)pollFences();setTimeout(tick,10);};setTimeout(tick,10);})();
 for(const [ev,name] of [['blur','blur'],['focus','focus']])addEventListener(ev,()=>perf.event?.(name));
 document.addEventListener('visibilitychange',()=>perf.event?.(document.hidden?'hidden':'visible'));document.addEventListener('pointerlockchange',()=>perf.event?.(document.pointerLockElement?'lock':'unlock'));addEventListener('resize',()=>perf.event?.('resize'));

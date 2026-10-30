@@ -87,7 +87,8 @@ export function createPerfDiag({ send, context }) {
             // 'tex' = uploads of the frame before the gap | of this frame; 'gl' = the previous frame's other GL work (non-zero counters)
             const t = x => x ? `${x.n}/${Math.round(x.kb)}/${x.mip}` : '-'; if (tex || prevTex) h.push(`tex ${t(prevTex)}|${t(tex)}`);
             const glc = prevTex?.gl ? Object.entries(prevTex.gl).filter(([, v]) => v).map(([k, v]) => `${k.replace(/KB$/, 'K')}:${Math.round(v)}`).join(' ') : ''; if (glc) h.push('gl ' + glc.slice(0, 200));
-            const ev = events.filter(([, t]) => t > now - gap - 1500).map(e => e[0]); if (ev.length) h.push('ev ' + ev.join(' '));
+            const ev = events.filter(([, t]) => t > now - gap - 1500).map(e => e[0]); if (ev.length) h.push('ev ' + ev.join(' ').slice(0, 220));
+            try { performance.mark('kino-hitch ' + Math.round(gap) + 'ms'); } catch {}   // on a GPU-process trace's timeline (engine.js traceStart)
             w.hitches.push(h); w.hitchAbs.push([h, now - gap, now, last - gap]); }
         }
       }
