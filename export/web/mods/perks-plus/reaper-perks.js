@@ -728,7 +728,7 @@ export function setupReaperPerks(api, catalogue, base) {
   // HUD icons from the git-ignored build (reaper/icons/<id>.webp), only for files that exist
   (async () => {
     const rules = [];
-    for (const id of Object.keys(ids)) { const url = new URL('reaper/icons/' + id + '.webp', base).href; try { const r = await fetch(url, { method: 'HEAD' }); if (r.ok) rules.push([catalogue[id].name, url]); } catch {} }
+    for (const id of Object.keys(ids)) { const url = new URL('reaper/icons/' + id + '.webp?v=2', base).href; try { const r = await fetch(url, { method: 'HEAD' }); if (r.ok) rules.push([catalogue[id].name, url]); } catch {} }
     if (!rules.length) return;
     const st = document.createElement('style'); st.textContent = rules.map(([n, u]) => `#perks span[title="${n.replace(/"/g, '\\"')}"]{border:0;border-radius:0;width:30px;height:30px;font-size:0;color:transparent;background:transparent url(${u}) center/contain no-repeat!important;filter:drop-shadow(0 1px 2px #000)}`).join('');
     document.head.append(st);

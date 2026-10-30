@@ -81,6 +81,7 @@ def tint_glb(path):
 
 ap = argparse.ArgumentParser(); ap.add_argument('--only'); a = ap.parse_args()
 only = set(a.only.split(',')) if a.only else None
+KEEP_ICONS = {'electriccherry'}   # the user's own art, placed by hand: a rebuild must not overwrite it
 for d in ('machines', 'bottles', 'icons', 'audio'): (OUT/d).mkdir(parents=True, exist_ok=True)
 BOTTLE = 'wpn_t7_zmb_perk_bottle_template_view'
 paper = next(pathlib.Path(m['diffuse'].replace('\\', '/')).stem for m in SEM.read_semodel(GH/'xmodels'/BOTTLE/(BOTTLE + '_LOD0.semodel'))['materials']
@@ -98,7 +99,9 @@ for id, p in P.items():
         SEM.to_glb(model(BOTTLE), OUT/'bottles'/f'{id}.glb', texture_loader=loader({paper: p['label']}))
         e['bottle'] = f'bottles/{id}.glb'
     icon = GH/'ximages'/(p['icon'] + '.png')
-    if icon.exists():
+    if id in KEEP_ICONS and (OUT/'icons'/f'{id}.webp').exists():
+        e['icon'] = f'icons/{id}.webp'
+    elif icon.exists():
         ff('-i', icon, '-c:v', 'libwebp', '-quality', '90', OUT/'icons'/f'{id}.webp'); e['icon'] = f'icons/{id}.webp'
     s = p['sound']
     if s:

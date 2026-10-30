@@ -297,7 +297,7 @@ export function setupAtmosphere(api) {
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', 'varying float vNkY, vNkGain; uniform float nkFlick;\n#include <common>').replace('#include <clipping_planes_fragment>', 'if (vNkGain < 0.001) discard;\n#include <clipping_planes_fragment>').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= mix(vNkGain, nkFlick, step(vNkY, ' + LAB_Y.toFixed(1) + '));'); };
     mat.customProgramCacheKey = () => 'nuketown-dyn-lights'; mat.needsUpdate = true;   // at load, before the warm pass compiles it
   }
-  for (const m of lava) { m.emissive.setHex(0xff3c08); m.emissiveIntensity = 1.3; }
+  for (const m of lava) { m.emissive.setHex(0xff6a28); m.emissiveIntensity = 1.3; if (m.map) { m.emissiveMap = m.map; m.needsUpdate = true; } }   // through its texture: a bare emissive paints the lava one flat colour
 
   // ---- light shafts (once the fx structs are in): each runs to the first surface along its aim, up to BEAM.max
   function buildShafts() {
