@@ -29,12 +29,19 @@ const VORTEX_FS = `uniform float time;varying vec2 vUv;${NOISE}
     gl_FragColor=vec4(c,1.);
   }`;
 
-// the walls round the swirl: opaque, so the world doesn't show through. blue_element keeps its veins in the alpha channel
-const SURFACE_FS = `uniform float time;uniform sampler2D map;varying vec2 vUv;
+// blue_element is a splat decal all over hell: drawn as the original's unlit blend, through its alpha (2026-10-30, user: as
+// solid sheets it drew hard-edged slabs round Jugg and on the walls). Round each swirl it fades into an opaque core with the
+// veins moving, so the world doesn't show through the portal; the alpha holds the splat, the RGB is white outside it
+const SURFACE_VS = `varying vec2 vUv;varying vec3 vP;
+  void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vP=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`;
+const SURFACE_FS = `uniform float time;uniform sampler2D map;uniform vec4 spots[3];varying vec2 vUv;varying vec3 vP;
   void main(){
-    float a=texture2D(map,vUv+vec2(0.,time*.03)).a,b=texture2D(map,vUv*.7-vec2(time*.02,0.)).a;
-    float v=clamp(a*.75+b*.55,0.,1.);
-    gl_FragColor=vec4(mix(vec3(.006,.02,.09),vec3(.14,.42,.85),v*v),1.);
+    vec4 t=texture2D(map,vUv);
+    float core=0.,splat=t.a;
+    for(int i=0;i<3;i++)if(spots[i].w>0.){float d=distance(vP,spots[i].xyz)/spots[i].w;core=max(core,smoothstep(.95,.6,d));splat*=smoothstep(.9,1.3,d);}   // no hard edge on the portal's polygon
+    float alpha=max(splat,core);if(alpha<.01)discard;
+    float a=texture2D(map,vUv+vec2(0.,time*.03)).a,b=texture2D(map,vUv*.7-vec2(time*.02,0.)).a,v=clamp(a*.75+b*.55,0.,1.);
+    gl_FragColor=vec4(mix(t.rgb*vec3(.3,.62,.95),mix(vec3(.006,.02,.09),vec3(.14,.42,.85),v*v),core),alpha);
   }`;
 
 // the triangles of `meshes` within `reach` of each spot, as a plane: centre, normal and half size
@@ -66,16 +73,21 @@ function fitPlanes(meshes, spots, reach = 130) {
 export function setupPortalFx(api, spots) {
   const { world, scene } = api;
   const meshes = [];
-  world.root.traverse(o => { if (o.isMesh && /blue_element$/.test(o.material?.name ?? '')) meshes.push(o); });   // split by world tile
+  world.root.traverse(o => {
+    if (!o.isMesh) return; const name = o.material?.name ?? '';
+    if (/blue_element$/.test(name)) meshes.push(o);   // split by world tile
+    else if (/mpl_chalk$/.test(name)) Object.assign(o.material, { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });   // additive in the original, opaque in the glb
+  });
   if (!meshes.length) { console.warn('[nuketown] no portal surface'); return; }
   for (const m of meshes) m.updateWorldMatrix(true, false);
   const planes = fitPlanes(meshes, spots), old = meshes[0].material;
-  const glow = new THREE.ShaderMaterial({ name: old.name, vertexShader: PLAIN_VS, fragmentShader: SURFACE_FS, uniforms: { time: clock, map: { value: old.map } }, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
-  for (const m of meshes) { m.material = glow; m.renderOrder = 2000; }
-  const mat = new THREE.ShaderMaterial({ vertexShader: PLAIN_VS, fragmentShader: VORTEX_FS, uniforms: { time: clock }, ...additive });
+  const core = [0, 1, 2].map(i => { const q = planes[i]; return q ? new THREE.Vector4(q.centre.x, q.centre.y, q.centre.z, q.half) : new THREE.Vector4(); });
+  const glow = new THREE.ShaderMaterial({ name: old.name, vertexShader: SURFACE_VS, fragmentShader: SURFACE_FS, uniforms: { time: clock, map: { value: old.map }, spots: { value: core } }, side: THREE.DoubleSide, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
+  for (const m of meshes) { m.material = glow; m.renderOrder = -2; }   // before the map's decals, whose orders run past 2000: behind the portal they painted over it in shards
+  const mat = new THREE.ShaderMaterial({ vertexShader: PLAIN_VS, fragmentShader: VORTEX_FS, uniforms: { time: clock }, ...additive, depthWrite: true });   // keeps those decals out, things in front still draw
   for (const p of planes) {
     const disc = new THREE.Mesh(new THREE.PlaneGeometry(p.half * 2.1, p.half * 2.1), mat);
-    disc.position.copy(p.centre); disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), p.normal); disc.renderOrder = 2001;
+    disc.position.copy(p.centre); disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), p.normal); disc.renderOrder = -1;
     scene.add(disc); disc.updateMatrix(); disc.updateMatrixWorld(true);
   }
   return planes;

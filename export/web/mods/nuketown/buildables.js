@@ -6,13 +6,14 @@
 //   - The rake trap: take a rake from a station (one in hand, five down per player), place it with the claymore key. A zombie
 //     stepping on it dies with its head off, the handle swings up and falls back; after 20 uses it breaks. A placed rake can
 //     be picked up and moved.
-//   - The Zombie Shield is the game's Rocket Shield (mods/operator-weapons/rocket-shield.js): the t6 shield the map carries
-//     has no viewmodel here, the stations still show it. A station repairs a damaged shield.
+//   - The Zombie Shield (shield.js): the map's car door on a dolly, carried on the Rocket Shield's code and planted as in BO2.
+//     A station repairs a damaged one.
 //   - The electric water trap: two switches, 1000 points, power needed, 30 s on, 60 s cooling; kills every zombie in the water
 //     and shocks players standing in it.
 import * as THREE from 'three';
 import { binds } from '../../settings.js';
 import { makeSparkSheet } from './fx.js';
+import { setupShield } from './shield.js';
 
 const RAKE = { perPlayer: 5, pool: 12, uses: 20, reach: 40, swing: .14, fall: .55, angle: 1.15 };
 const BUILD = { time: 3, reach: 110 };
@@ -187,15 +188,13 @@ export function setupBuildables(c) {
   if (features) { const orig = features.placeClaymore; features.placeClaymore = (...a) => (b.held && session.phase !== 'reviving' ? placeRake() : orig?.(...a)); }
 
   // ---- the shield
-  const rs = () => globalThis.kino?.rocketShield;
-  const damaged = () => { const s = rs()?.state?.(); if (!s?.owned) return false; b.shieldMax = Math.max(b.shieldMax, s.health); return s.health < b.shieldMax; };
+  const shield = setupShield(c, shieldCraft, pop);
   for (const at of shieldCraft.stations) world.addInteraction({
     position: at.clone().add(V(0, 6, 0)), nuketown: true,
-    hidden: () => !shieldCraft.built || (rs()?.owned && !damaged()), text: () => rs()?.owned ? 'Repair the Shield' : 'Pick up Shield',
+    hidden: () => !shieldCraft.built || shield.planted() || (shield.held() && !shield.damaged()), text: () => shield.held() ? 'Repair the Shield' : 'Pick up Shield',
     use() {
-      const s = rs(); if (!s) { toast('No shield mod loaded', 2); return false; }
-      if (s.owned) { s.heal(1e6); sfx('buy', .5); toast('Shield repaired', 2.5); return true; }
-      s.give(); globalThis.kino?.armory?.found?.('rocket_shield'); toast('Shield: H raises it', 4); return true;
+      if (shield.held()) { shield.repair(); sfx('buy', .5); toast('Shield repaired', 2.5); return true; }
+      return shield.give();
     },
   });
 
@@ -235,7 +234,7 @@ export function setupBuildables(c) {
   };
 
   const reset = () => {
-    b.build = null; b.held = false; bar.hidden = true; paintCarry(); b.shieldMax = 0;
+    b.build = null; b.held = false; bar.hidden = true; paintCarry(); shield.reset();
     for (const cr of crafts) { cr.have.clear(); cr.built = false; for (const n of cr.hidden) show(n, false); for (const q of cr.parts) for (const n of q.nodes) show(n, false); }
     for (const r of b.rakes) rakeOff(r);
     Object.assign(b.trap, { on: 0, cool: 0, tick: 0, hurt: 0, by: null }); sheet.value = 0; paintLamps();
@@ -244,14 +243,14 @@ export function setupBuildables(c) {
   let powered = false;
   const tick = (dt, p) => {
     if (!!session.power !== powered) { powered = !!session.power; paintLamps(); }
-    buildTick(dt, p); rakeTick(dt); trapTick(dt, p);
+    buildTick(dt, p); rakeTick(dt); shield.tick(); trapTick(dt, p);
   };
   // journal and Tab: `at` is where the part lies this game
   const state = () => ({
     rake: craftState(rakeCraft), shield: craftState(shieldCraft),
-    shieldOwned: !!rs()?.owned, heldRake: b.held, rakesDown: b.rakes.filter(r => r.on).length,
+    shieldOwned: shield.held(), heldRake: b.held, rakesDown: b.rakes.filter(r => r.on).length,
     trap: { switches: TRAP.switches.map(a => V(...a)), on: b.trap.on > 0, cooling: b.trap.on <= 0 && b.trap.cool > 0, ready: !!session.power && b.trap.cool <= 0 },
   });
   const craftState = cr => ({ label: cr.label, built: cr.built, stations: cr.stations, parts: cr.parts.map(q => ({ name: q.name, got: cr.have.has(q.id), at: q.spots[cr.chosen] })) });
-  return { b, crafts, reset, tick, state, found: crafts.map(cr => [cr.key, cr.parts.map(q => q.nodes.map(n => n.length).join('/')), cr.hidden.map(n => n.length).join('/')]) };
+  return { b, crafts, shield, reset, tick, state, found: crafts.map(cr => [cr.key, cr.parts.map(q => q.nodes.map(n => n.length).join('/')), cr.hidden.map(n => n.length).join('/')]) };
 }

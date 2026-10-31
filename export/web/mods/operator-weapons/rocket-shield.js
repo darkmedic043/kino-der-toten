@@ -8,6 +8,9 @@
 // dmg1/dmg2 looks at 2/3 and 1/3), then breaks. A Carpenter repairs it.
 // window.kino.rocketShield: {give(), raise(), lower(), state(), setTanks(objects, onEmpty), hitting, owned}
 //   hitting is true while the shield's own bash/dash damage is applied (the Armory counts its kills with it).
+// A map's own shield uses this code through give(alt, health): same raise, bash, blocking, repairs and HUD, one shield at a
+// time, but alt.def's model and clips, and right mouse calls alt.plant() instead of the rockets (no charges). See
+// mods/nuketown/shield.js. alt: {def, name, label, hint, plant(), broke()}. `owned` is the Rocket Shield itself; state().owned either.
 import * as THREE from 'three';
 import { ViewWeapon, loadModel } from '../../animation.js';
 import { disposeSkeletons } from '../../runtime-assets.js';
@@ -24,34 +27,39 @@ export function setupRocketShield(api) {
   }).catch(() => {});
   const sh = { owned: false, health: SHIELD_MAX, charges: CHARGES, raised: false, vw: null, look: 0, bash: null, dash: null };
   let hitting = false;
-  const hurt = (...a) => { hitting = true; try { enemies.hurt(...a); } finally { hitting = false; } };
+  const hurt = (...a) => { hitting = !sh.alt; try { enemies.hurt(...a); } finally { hitting = false; } };
   // perk hooks (perks-plus reaper-perks.js sets .perk: Victorious Tortoise blocks from every side, doubles the
   // health when upgraded and blows up when the shield breaks; Crusader's Ale repairs it with heal())
   const hooks = { perk: null };
   const MAX = () => SHIELD_MAX * (hooks.perk?.maxMul?.() ?? 1);
   const look = () => sh.health > MAX() * 2 / 3 ? 0 : sh.health > MAX() / 3 ? 1 : 2;
-  const modelFor = k => k ? DEF.worn?.[k - 1] ?? DEF.model : DEF.model;
-  function reset() { if (sh.raised) lower(); sh.owned = false; sh.health = MAX(); sh.charges = CHARGES; hud(); for (const c of tanks) c.visible = false; }
-  function give() {
+  const def = () => sh.alt?.def ?? DEF;
+  const modelFor = k => k ? def().worn?.[k - 1] ?? def().model : def().model;
+  const relook = () => { const k = look(); if (!sh.raised || k === sh.look) return; const same = modelFor(k) === modelFor(sh.look); sh.look = k; if (!same) equip(); };
+  function reset() { if (sh.raised) lower(); sh.owned = false; sh.alt = null; sh.health = MAX(); sh.charges = CHARGES; hud(); for (const c of tanks) c.visible = false; }
+  function give(alt = null, health = null) {
     if (sh.raised) lower();
-    sh.owned = true; sh.health = MAX(); sh.charges = CHARGES; audio?.play?.('buy', .6);
-    toast?.(`Rocket Shield · ${(binds().shield ?? 'KeyH').replace(/^Key/, '')} to raise`, 3); for (const c of tanks) c.visible = true; hud();
+    sh.owned = true; sh.alt = alt; sh.health = health ?? MAX(); sh.charges = CHARGES; audio?.play?.('buy', .6);
+    const key = (binds().shield ?? 'KeyH').replace(/^Key/, '');
+    toast?.(alt ? `${alt.name} · ${key} to raise, then right mouse to plant it` : `Rocket Shield · ${key} to raise`, 3); if (!alt) for (const c of tanks) c.visible = true; hud();
   }
+  // a planted shield leaves your hands and keeps its health
+  function take() { if (sh.raised) lower(); sh.owned = false; const hp = sh.health; sh.alt = null; hud(); return hp; }
   function raise() {
     if (!sh.owned) { if (tanks.length) toast?.('No shield', 1.2); return; }   // only Der Eisendrache hints (H is Moon's hacker key)
-    if (host.gunBlocked || session.busy || session.phase === 'reviving' || !DEF || !viewScene) return;
+    if (host.gunBlocked || session.busy || session.phase === 'reviving' || !def() || !viewScene) return;
     sh.raised = true; host.gunBlocked = true; sh.look = look(); equip();
     padFire = !!view?.input?.fire; padAim = !!view?.input?.ads;
   }
   function equip() {
     const old = sh.vw; sh.vw = new ViewWeapon(viewScene, data, () => {});
-    const vw = sh.vw; vw.equip({ ...DEF, id: 'rocket_shield_' + sh.look, model: modelFor(sh.look) }).then(() => {
+    const vw = sh.vw; vw.equip({ ...def(), id: def().id + '_' + sh.look, model: modelFor(sh.look) }).then(() => {
       if (sh.vw !== vw) { drop(vw); return; } if (old) drop(old);
       // the window: raised, the shield fills the view and you look through it (its glass would draw solid grey). The worn
       // looks (dmg1/dmg2) swap the glass for BO3's damage decals: a plain broken pane (no texture: faint like the glass)
       // and the shatter cracks, whose texture carries them in its alpha (user, 2026-10-18: a cracked shield was opaque)
       vw.root.traverse(o => { for (const m of [o.material].flat()) {
-        if (m && /rocket_shield_glass|glass_broken_transparent/.test(m.name)) { m.transparent = true; m.opacity = .12; m.depthWrite = false; }
+        if (m && /rocket_shield_glass|zmb_shield_glass|glass_broken_transparent/.test(m.name)) { m.transparent = true; m.opacity = .12; m.depthWrite = false; }
         else if (m && /glass_shatter/.test(m.name)) { m.transparent = true; m.opacity = .85; m.depthWrite = false; }
       } });
     }).catch(e => { console.warn('[rocket-shield] model', e); });
@@ -68,6 +76,7 @@ export function setupRocketShield(api) {
   }
   function boost() {
     if (sh.bash || sh.dash) return;
+    if (sh.alt) { sh.alt.plant(); return; }
     if (sh.charges < 1) { toast?.(tanks.length ? 'No rocket charges · find nitrous tanks' : 'No rocket charges · one returns each round', 1.6); return; }
     sh.charges--; hud(); play('boostInAnim');
     const d = camera.getWorldDirection(new THREE.Vector3()); d.y = 0; d.normalize();
@@ -99,8 +108,8 @@ export function setupRocketShield(api) {
     const to = z.root.position.clone().sub(camera.position); to.y = 0; to.normalize(); const dot = to.dot(fwd());
     if (!(sh.raised ? (dot > .3 || !!hooks.perk?.allSides?.()) : dot < -.3)) return;
     sh.health -= e.amount; e.amount = 0; e.shielded = true;   // the hud mod points a grey damage arc at the attacker and plays a thump
-    if (sh.health <= 0) { try { hooks.perk?.broke?.(player.getFeetPosition()); } catch (err) { console.warn('[rocket-shield]', err); } lower(); sh.owned = false; sh.health = 0; announce?.('ROCKET SHIELD', 'DESTROYED', 2); toast?.(brokeHint, 2.5); for (const c of tanks) c.visible = false; }
-    else if (sh.raised && look() !== sh.look) { sh.look = look(); equip(); }
+    if (sh.health <= 0) { try { hooks.perk?.broke?.(player.getFeetPosition()); } catch (err) { console.warn('[rocket-shield]', err); } lower(); sh.owned = false; sh.health = 0; const alt = sh.alt; sh.alt = null; alt?.broke?.(); announce?.(alt?.label ?? 'ROCKET SHIELD', 'DESTROYED', 2); toast?.(alt?.hint ?? brokeHint, 2.5); if (!alt) for (const c of tanks) c.visible = false; }
+    else relook();
     hud();
   });
   // a Carpenter repairs the shield fully, as it does the boards (user, 2026-10-18)
@@ -109,20 +118,20 @@ export function setupRocketShield(api) {
     const collect = powerups.onCollect;
     powerups.onCollect = (type, at) => {
       const r = collect(type, at);
-      if (type === 'carpenter' && sh.owned && sh.health < MAX()) { sh.health = MAX(); if (sh.raised && look() !== sh.look) { sh.look = look(); equip(); } hud(); toast?.('Rocket shield repaired', 1.6); }
+      if (type === 'carpenter' && sh.owned && sh.health < MAX()) { sh.health = MAX(); relook(); hud(); toast?.(`${sh.alt?.name ?? 'Rocket shield'} repaired`, 1.6); }
       return r;
     };
   }
   // nitrous tanks are back each round; maps without them give a charge back instead
   host.on('roundEnd', () => {
-    if (!sh.owned) return;
+    if (!sh.owned || sh.alt) return;
     if (tanks.length) for (const c of tanks) c.visible = true;
     else if (sh.charges < CHARGES) { sh.charges++; hud(); }
   });
 
   host.on('update', dt => {
     if (!dt) return;
-    if (sh.owned && sh.charges < CHARGES && tanks.length) {   // nitrous tanks: walk into one
+    if (sh.owned && !sh.alt && sh.charges < CHARGES && tanks.length) {   // nitrous tanks: walk into one
       const f = player.getFeetPosition();
       for (const c of tanks) if (c.visible && at(c).distanceTo(f) < 70) { c.visible = false; sh.charges++; audio?.play?.('buy', .4); toast?.(`Rocket charge · ${sh.charges}/${CHARGES}`, 1.5); hud(); if (sh.charges >= CHARGES) break; }
     }
@@ -148,7 +157,7 @@ export function setupRocketShield(api) {
           hurt(z, 2500, false, true, 'melee'); const v = p.clone().sub(player.getFeetPosition()); v.y = 0; p.addScaledVector(v.normalize(), 50);
         }
       }
-      if (sh.bash.t > (DEF?.durations?.meleeAnim ?? .7)) sh.bash = null;
+      if (sh.bash.t > (def()?.durations?.meleeAnim ?? .7)) sh.bash = null;
     }
     if (sh.dash) {
       const d = sh.dash; d.t += dt;
@@ -182,18 +191,18 @@ export function setupRocketShield(api) {
     const slot = document.querySelector('#bo7-left .extra'); if (slot && el.parentNode !== slot) { slot.append(el); el.classList.remove('free'); }
     el.classList.toggle('on', sh.owned); el.classList.toggle('up', sh.raised); el.classList.toggle('low', sh.health < MAX() / 3);
     el.querySelector('.hp i').style.width = Math.round(Math.max(0, sh.health) / MAX() * 100) + '%';
-    el.querySelector('.ch').innerHTML = Array.from({ length: CHARGES }, (_, i) => `<b class="${i < sh.charges ? 'on' : ''}"></b>`).join('');
+    el.querySelector('.ch').innerHTML = Array.from({ length: sh.alt ? 0 : CHARGES }, (_, i) => `<b class="${i < sh.charges ? 'on' : ''}"></b>`).join('');
     el.querySelector('kbd').textContent = (binds().shield ?? 'KeyH').replace(/^Key/, '');
   }
   setTimeout(hud, 800);
 
   return {
-    give, raise, lower, reset,
-    heal(n) { if (!sh.owned) return; sh.health = Math.min(MAX(), sh.health + n); if (sh.raised && look() !== sh.look) { sh.look = look(); equip(); } hud(); },
+    give, take, raise, lower, reset,
+    heal(n) { if (!sh.owned) return; sh.health = Math.min(MAX(), sh.health + n); relook(); hud(); },
     get perk() { return hooks.perk; }, set perk(p) { hooks.perk = p; },
-    state: () => ({ owned: sh.owned, health: Math.round(sh.health), charges: sh.charges, raised: sh.raised, ready: !!sh.vw?.ready }),
+    state: () => ({ owned: sh.owned, alt: sh.alt, max: MAX(), health: Math.round(sh.health), charges: sh.charges, raised: sh.raised, ready: !!sh.vw?.ready }),
     // a map's nitrous tanks (hidden map objects, shown while the shield is owned) and what to say when it breaks
     setTanks(list, hint) { tanks = list ?? []; if (hint) brokeHint = hint; for (const c of tanks) c.visible = sh.owned; },
-    get owned() { return sh.owned; }, get hitting() { return hitting; },
+    get owned() { return sh.owned && !sh.alt; }, get hitting() { return hitting; },
   };
 }
