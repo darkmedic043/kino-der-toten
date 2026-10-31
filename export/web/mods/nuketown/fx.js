@@ -2,7 +2,7 @@
 // from setup on, so the engine's warm-up compiles them with the map:
 //   - portals: the map's wc/blue_element splats are an unlit blend in the original (`wc_unlit_blend`), and each one gets a swirl
 //     drawn over it on the surface's own plane (the fitted plane of its triangles)
-//   - geysers on the water spouts: a column, spray particles and a foam ring, driven by a power level (idle, building, full)
+//   - geysers on the water spouts: water filling the hole, a column, spray particles, driven by a power level (idle, building, full)
 //   - fire tornadoes: the same column in fire colours, walking the original's struct chains (mods/nuketown/extras.js)
 //   - the electric trap's sheet of sparks over the water
 import * as THREE from 'three';
@@ -93,26 +93,27 @@ export function setupPortalFx(api, spots) {
   return planes;
 }
 
-const COLUMN_VS = `uniform float time,height,radius,flare,wobble;varying vec2 vUv;varying float vY,vFacing;${NOISE}
+const COLUMN_VS = `uniform float time,height,radius,flare,wobble;varying vec2 vUv;varying float vY,vFacing,vAxis,vDist;${NOISE}
   void main(){
     vUv=uv;vY=position.y;vFacing=abs(normalize(normalMatrix*normal).z);
     float y=position.y,w=1.+flare*y*y+.28*sin(y*7.-time*9.+uv.x*6.283)*wobble;
     vec3 p=vec3(position.x*radius*w,y*height,position.z*radius*w);
     p.xz+=vec2(sin(y*4.+time*3.),cos(y*3.-time*2.3))*wobble*radius*.18*y;
-    gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);
+    vec4 mv=modelViewMatrix*vec4(p,1.);vAxis=abs(dot(normalize(mv.xyz),normalize(normalMatrix*vec3(0.,1.,0.))));vDist=length(mv.xyz);
+    gl_Position=projectionMatrix*mv;
   }`;
-const COLUMN_FS = `uniform float time,alpha,rate,height;uniform vec3 deep,bright;varying vec2 vUv;varying float vY,vFacing;${NOISE}
+const COLUMN_FS = `uniform float time,alpha,rate,height,axisFade;uniform vec3 deep,bright;varying vec2 vUv;varying float vY,vFacing,vAxis,vDist;${NOISE}
   void main(){
     float streak=fbm(vec2(vUv.x*22.,vUv.y*height*.012-time*rate));
     float body=smoothstep(.36,.7,streak),tip=smoothstep(1.,.72,vY),foot=smoothstep(0.,.06,vY);
-    float a=alpha*body*tip*foot*(1.-.75*vFacing);if(a<.01)discard;   // thin where it faces the camera, like a falling sheet
+    float a=alpha*body*tip*foot*(1.-.75*vFacing)*(1.-axisFade*max(smoothstep(.55,.95,vAxis),1.-smoothstep(20.,70.,vDist)));if(a<.01)discard;   // thin where it faces the camera, like a falling sheet
     gl_FragColor=vec4(mix(deep,bright,smoothstep(.45,.8,streak))*(.75+.5*body),a);
   }`;
-const SPRAY_VS = `uniform float time,power,height,px;attribute vec4 seed;varying float vT;
+const SPRAY_VS = `uniform float time,power,height,px,spread;attribute vec4 seed;varying float vT;
   void main(){
     float t=fract(time*(.55+seed.x*.5)+seed.y);vT=t;
     float h=height*power*(.5+.6*seed.z),g=4.*h;   // up and back down: y = h - g(t-.5)^2
-    float out_=(10.+70.*seed.w*power)*t;
+    float out_=(.3+1.7*seed.w*power)*spread*t;
     vec3 p=vec3(cos(seed.y*97.)*out_,max(0.,h-g*(t-.5)*(t-.5)),sin(seed.y*97.)*out_);
     vec4 mv=modelViewMatrix*vec4(p,1.);
     gl_Position=projectionMatrix*mv;
@@ -123,36 +124,37 @@ const SPRAY_FS = `uniform float alpha;varying float vT;
     float r=length(gl_PointCoord-.5)*2.;if(r>1.)discard;
     gl_FragColor=vec4(.3,.38,.45,alpha*(1.-r*r)*(1.-vT*vT));
   }`;
-const FOAM_FS = `uniform float time,alpha;varying vec2 vUv;${NOISE}
+const WATER_FS = `uniform float time,alpha,churn;varying vec2 vUv;${NOISE}
   void main(){
     vec2 p=vUv*2.-1.;float r=length(p);if(r>1.)discard;
-    float a=atan(p.y,p.x),ripple=.5+.5*sin(r*26.-time*6.+fbm(p*3.)*5.);
-    float foam=smoothstep(.34,.72,fbm(vec2(a*2.,r*5.-time*1.2)+p*2.))*(.45+.55*ripple);
-    float k=alpha*foam*smoothstep(1.,.35,r);if(k<.01)discard;
-    gl_FragColor=vec4(.2,.26,.32,k);
+    float t=time*(.3+churn)-r*2.,c=cos(t),n=sin(t),ripple=.5+.5*sin(r*16.-time*(3.+5.*churn)+fbm(p*3.)*5.);
+    float foam=smoothstep(.42,.78,fbm(mat2(c,-n,n,c)*p*3.5))*(.5+.5*ripple);
+    gl_FragColor=vec4(mix(vec3(.04,.09,.13),vec3(.26,.34,.4),foam*(.35+.65*churn)),alpha);
   }`;
 const normal = { transparent: true, depthWrite: false, side: THREE.DoubleSide };
 const column = (uniforms, segments = 28, rows = 16) => new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, segments, rows, true).translate(0, .5, 0),
-  new THREE.ShaderMaterial({ vertexShader: COLUMN_VS, fragmentShader: COLUMN_FS, uniforms: { time: clock, ...uniforms }, ...normal }));
+  new THREE.ShaderMaterial({ vertexShader: COLUMN_VS, fragmentShader: COLUMN_FS, uniforms: { time: clock, axisFade: { value: 0 }, ...uniforms }, ...normal }));
 const u = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { value: v }]));
 
-// a geyser at `at`, reaching `top`. power 0 idle, .35 building up, 1 full
+// a geyser standing in water of the given radius, with its surface at `at`, reaching `top`. power 0 idle, .35 building up, 1 full.
+// The column leaves the hole narrower than the water and opens out on the way up; looking down its axis the sheets thin out, or
+// they show as hard spokes from above, and so they do close to the camera
 export function makeGeyser(api, at, top, radius) {
   const { scene, renderer } = api;
   const reach = top - at.y, group = new THREE.Group(); group.position.copy(at);
   const shared = { deep: { value: new THREE.Color(.05, .11, .18) }, bright: { value: new THREE.Color(.24, .34, .42) } };
-  const outer = column({ ...u({ height: 40, radius, flare: .35, wobble: 1, alpha: .5, rate: 2.2 }), ...shared });
-  const inner = column({ ...u({ height: 40, radius: radius * .55, flare: .15, wobble: .6, alpha: .8, rate: 3.4 }), ...shared });
+  const width = radius * .62;   // with the wobble the foot still stays inside the hole
+  const outer = column({ ...u({ height: 40, radius: width, flare: 1.7, wobble: 1, alpha: .5, rate: 2.2, axisFade: .85 }), ...shared });
+  const inner = column({ ...u({ height: 40, radius: width, flare: .8, wobble: .6, alpha: .8, rate: 3.4, axisFade: .85 }), ...shared });
   const COUNT = 260, seeds = new Float32Array(COUNT * 4).map(() => Math.random());
   const sprayGeo = new THREE.BufferGeometry();
   sprayGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT * 3), 3));
   sprayGeo.setAttribute('seed', new THREE.BufferAttribute(seeds, 4));
-  const sprayU = { time: clock, ...u({ power: .2, height: reach * 1.05, px: 400, alpha: .4 }) };
+  const sprayU = { time: clock, ...u({ power: .2, height: reach * 1.05, px: 400, alpha: .4, spread: radius }) };
   const spray = new THREE.Points(sprayGeo, new THREE.ShaderMaterial({ vertexShader: SPRAY_VS, fragmentShader: SPRAY_FS, uniforms: sprayU, ...normal }));
-  const foamU = { time: clock, ...u({ alpha: .4 }) };
-  const foam = new THREE.Mesh(new THREE.CircleGeometry(radius * 2.6, 32).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ vertexShader: PLAIN_VS, fragmentShader: FOAM_FS, uniforms: foamU, ...normal }));
-  foam.position.y = 1.5;
-  for (const o of [outer, inner, spray, foam]) { o.frustumCulled = false; o.renderOrder = 1500; group.add(o); }
+  const waterU = { time: clock, ...u({ alpha: .85, churn: 0 }) };
+  const water = new THREE.Mesh(new THREE.CircleGeometry(radius, 48).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ vertexShader: PLAIN_VS, fragmentShader: WATER_FS, uniforms: waterU, ...normal }));
+  for (const o of [outer, inner, spray, water]) { o.frustumCulled = false; o.renderOrder = 1500; group.add(o); }
   scene.add(group); group.updateMatrixWorld(true);
   let level = 0, target = 0, pulse = 0;
   const size = new THREE.Vector2();
@@ -164,9 +166,9 @@ export function makeGeyser(api, at, top, radius) {
       pulse += dt; const idle = .13 + .05 * Math.sin(pulse * 1.7) + .03 * Math.sin(pulse * 4.3), k = Math.max(idle, level);
       const h = reach * k;
       outer.material.uniforms.height.value = h * 1.02; inner.material.uniforms.height.value = h * 1.15;
-      outer.material.uniforms.radius.value = radius * (.35 + .65 * k); inner.material.uniforms.radius.value = radius * (.2 + .35 * k);
+      outer.material.uniforms.radius.value = width * (.35 + .65 * k); inner.material.uniforms.radius.value = width * (.25 + .45 * k);
       outer.material.uniforms.alpha.value = .3 + .3 * k; sprayU.power.value = k; sprayU.px.value = renderer.getDrawingBufferSize(size).y;
-      foamU.alpha.value = .3 + .35 * k;
+      waterU.churn.value = k;
     },
   };
 }

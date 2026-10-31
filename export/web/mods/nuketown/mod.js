@@ -78,14 +78,15 @@ const ZONE_LINKS = { blueback: 'construction', bradyback: 'brady' };   // zone o
 // the water spouts (_watershoot.gsc): stand on one for 3 s and it throws the player up its shaft, then carries them along the
 // original's script_origin chain onto the floor above and opens that area (script_flag enter_brady / enter_blue_back).
 // `trig` is the water_shoot trigger, `top` the bottom of the end-spot trigger; the lab's comes up in the Brady house, hell's
-// at the blue house's back
+// at the blue house's back. `hole` is the water in the hole the spout comes out of, measured off the drawn map: its x, level, z and
+// a radius that ends under the collar, so the collar cuts the water to its own shape; the level just covers the rock inside
 const SPOUTS = [
-  { trig: [[-905, 1432, 464], [-816, 1440, 569]], top: 1660, zones: ['brady', 'bradyback'],
+  { trig: [[-905, 1432, 464], [-816, 1440, 569]], top: 1660, zones: ['brady', 'bradyback'], hole: [-865, 1423, 518.5, 24],
     path: [[-855, 1696, 533], [-854, 1716, 552], [-852, 1728, 575], [-851, 1732, 600], [-850, 1730, 623], [-850, 1721, 642], [-850, 1704, 653]] },
-  { trig: [[-1716, 1304, 1850], [-1633, 1312, 1934]], top: 1688, zones: ['blueback'],
+  { trig: [[-1716, 1304, 1850], [-1633, 1312, 1934]], top: 1688, zones: ['blueback'], hole: [-1674, 1297.5, 1891, 22.5],
     path: [[-1661, 1739, 1880], [-1646, 1762, 1880], [-1618, 1780, 1880], [-1579, 1790, 1880], [-1542, 1780, 1880], [-1513, 1753, 1880], [-1489, 1709, 1880]] },
-].map(q => ({ ...q, centre: V((q.trig[0][0] + q.trig[1][0]) / 2, q.trig[1][1], (q.trig[0][2] + q.trig[1][2]) / 2), path: q.path.map(a => V(...a)) }));
-const SPOUT = { prepare: 3, speed: 900, step: .2, cooldown: 3, safe: 1.5, radius: 30 };
+].map(q => ({ ...q, centre: V(q.hole[0], q.hole[1], q.hole[2]), path: q.path.map(a => V(...a)) }));
+const SPOUT = { prepare: 3, speed: 900, step: .2, cooldown: 3, safe: 1.5 };
 const ROUND_LINES = 4, ROUND_LINE_GAIN = .5;   // round-start lines: gain into the master (.42 x the volume setting)
 
 export default async function setup(api) {
@@ -287,7 +288,7 @@ function setupQuest(api) {
 
   // ---- the water spouts (SPOUTS): a phase machine for the local player, `prep` (rumble and spray) -> `up` -> `carry`
   const sound = mapSound(api);
-  const geysers = SPOUTS.map(q => makeGeyser(api, q.centre.clone(), q.top + 30, SPOUT.radius));
+  const geysers = SPOUTS.map(q => makeGeyser(api, q.centre.clone(), q.top + 30, q.hole[3]));
   const portalLoop = spotLoop(api, 'necros_portal', 700, .5), portalSpots = PORTALS.map(q => q.at);
   let spoutAudio = null;
   const stopSpoutAudio = () => { try { spoutAudio?.pause(); } catch {} spoutAudio = null; };

@@ -409,3 +409,4 @@
 - 2026-10-30: Nuketown hell walked end to end on a fresh page (waw-ports.md): Jugg, rope, skull alcove and both exits reachable; lava glows through its texture; the user's Electric Cherry icon, kept from rebuilds.
 - 2026-10-30: Nuketown Zombie Shield is its own plantable weapon with the original's car door (`shield.js`, waw-ports.md); hell's blue splats draw through their alpha and the map's decals no longer paint over the portal.
 - 2026-10-31: Nuketown's lava burns at 30 a second instead of 167 and only with lava at your feet, no more on its banks and walkways (waw-ports.md).
+- 2026-10-31: Nuketown's water spouts fit their holes: the water fills each collar at the right height instead of floating above it, and the column starts inside it (waw-ports.md).
