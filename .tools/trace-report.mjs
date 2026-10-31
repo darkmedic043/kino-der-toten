@@ -40,7 +40,7 @@ async function load(file) {
   let depth = 0, inStr = false, esc = false, buf = '', started = false, tail = '';
   const keep = e => {
     if (e.ph === 'M' || e.ph === 'X' || e.ph === 'B' || e.ph === 'E' || e.ph === 'R' || e.ph === 'I' || e.ph === 'n' || e.ph === 'b') {
-      if (e.args && !(e.ph === 'M' || (e.dur > 2000))) e.args = undefined;
+      if (e.args && !(e.ph === 'M' || (e.dur > 2000) || /ShaderTranslate/.test(e.name))) e.args = undefined;   // (shader sources kept for --dump)
       events.push(e);
     }
   };
