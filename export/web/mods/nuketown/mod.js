@@ -67,6 +67,7 @@ const ELEVATOR = { rise: 160, time: 3, doorRise: 100, clip: [[-1604, 1335, 902],
 const PAP = { trig: V(-1177, 1024, 2588), skull: V(-1195, 1030, 2582), rise: 100, time: 20, clip: [[-1241, 976, 2507], [-1171, 1187, 2642]] };
 const FREE_PERK = V(1153, 1672, -1278);
 const LAVA = [[[-560, 953, 2456], [-243, 993, 2809]], [[-299, 977, 2408], [66, 1014, 2703]], [[-491, 890, 2942], [38, 945, 3421]]];   // the three lava_damage triggers
+const LAVA_BURN = { hurt: 15, every: .5, above: 12, below: 30 };   // 30 a second, not the original's 167 (user, 2026-10-31); only with the lava's surface at your feet
 // the two hell_area_teleporters: the spot under each swirl and where it lands (initial_spawn_points); the second one lands
 // at the far street once the town is open (road or blue). The third swirl, the lab's, has no teleporter: it is a way in, a
 // walk-through into hell (2026-10-30: the port had a teleporter there too, which threw everyone back up and hid hell)
@@ -146,6 +147,13 @@ function setupQuest(api) {
   const burst = (position, count = 30) => host.emit?.('effect', { position: position.clone(), color: new THREE.Color(1, .7, .3), count });
   const papLockedText = 'Sealed: the skull key is somewhere in the lab';
   const st = {};   // per-game state, rebuilt on reset
+  const lavaMeshes = []; world.root.traverse(o => { if (o.isMesh && /\/lava$/.test(o.material?.name ?? '')) lavaMeshes.push(o); });
+  const lavaRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, LAVA_BURN.below + LAVA_BURN.above);
+  const inLava = p => {   // the trigger boxes also cover the banks and the walkways over the lava
+    if (!LAVA.some(b => inBox(p, b, 0, 90))) return false;
+    lavaRay.ray.origin.set(p.x, p.y + LAVA_BURN.below, p.z);
+    return lavaRay.intersectObjects(lavaMeshes, false).length > 0;
+  };
   let builds = null, egg = null, extras = null;
   // co-op (der-eisendrache/sync.js): the buildables, the Easter egg and the extras share their events through it
   const sync = api.sync ??= createSync(api);
@@ -329,7 +337,7 @@ function setupQuest(api) {
   const reset = () => {
     if (st.spout && globalThis.kino?.fpMotion) globalThis.kino.fpMotion.shake = 0;
     stopSpoutAudio(); portalLoop.stop(); for (const g of geysers) g.set(0);
-    Object.assign(st, { safe: [], safeT: 0, offMap: 0, pocket: false, spout: null, spoutWait: 0, spoutSafe: 0, generators: 0, bunkerT: null, fixed: 0, elevatorT: null, skullT: null, lava: 0, portal: 0, zone: 0 });
+    Object.assign(st, { safe: [], safeT: 0, offMap: 0, pocket: false, spout: null, spoutWait: 0, spoutSafe: 0, generators: 0, bunkerT: null, fixed: 0, elevatorT: null, skullT: null, lava: 0, lavaT: 0, portal: 0, zone: 0 });
     show(generators, true); setBunker(0); for (const l of levers) setLever(l, 0);
     for (const t of tools) show(t.nodes, true);
     setElevator(0); show(nodesOf(root, 'pap_key'), true); show(papSkull, false); for (const n of papSkull) { n.position.set(0, 0, 0); moved(n); }
@@ -383,8 +391,8 @@ function setupQuest(api) {
     st.zone += dt; if (st.zone > 1) { st.zone = 0; zoneTick(); st.pocket = inPocket(p); }
     rescueTick(dt, p);
     spoutTick(dt, p);
-    st.lava += dt;
-    if (st.lava > .3) { st.lava = 0; if (LAVA.some(b => inBox(p, b, 0, 90))) { damage?.(50); } }
+    st.lavaT += dt;
+    if (st.lavaT > .1) { st.lava = inLava(p) ? st.lava + st.lavaT : 0; st.lavaT = 0; if (st.lava >= LAVA_BURN.every) { st.lava = 0; damage?.(LAVA_BURN.hurt); } }   // stepping in starts the clock, so crossing a strip is free
     fxTick(dt); for (const g of geysers) g.tick(dt);
     portalLoop.tick(p, portalSpots);
     builds?.tick(dt, p); egg?.tick(dt, p); extras?.tick(dt, p);

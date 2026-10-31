@@ -408,3 +408,4 @@
 - 2026-10-30: Nuketown content pass (waw-ports.md): portal surface, geysers, fire tornadoes, rake/shield/water trap, the full Easter egg with journal and Tab tracking, zipline, meteors and song, TV lines, nuke alarm, Electric Cherry, explosive-only rocks, hell reachable again, decal and material builder fixes (v=11), mantle refused over closed doors (`closedDoorAt`).
 - 2026-10-30: Nuketown hell walked end to end on a fresh page (waw-ports.md): Jugg, rope, skull alcove and both exits reachable; lava glows through its texture; the user's Electric Cherry icon, kept from rebuilds.
 - 2026-10-30: Nuketown Zombie Shield is its own plantable weapon with the original's car door (`shield.js`, waw-ports.md); hell's blue splats draw through their alpha and the map's decals no longer paint over the portal.
+- 2026-10-31: Nuketown's lava burns at 30 a second instead of 167 and only with lava at your feet, no more on its banks and walkways (waw-ports.md).
