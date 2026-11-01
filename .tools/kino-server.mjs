@@ -9,6 +9,7 @@
 //                     sign-in is disabled without them (keep the secret out of git)
 //   KINO_PUBLIC_URL   public https address, used for the OAuth redirect
 import { createReadStream, createWriteStream, statSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, appendFileSync, readdirSync, unlinkSync } from 'node:fs';
+import { keepCopy, staleUpload } from './save-guard.mjs';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -139,8 +140,12 @@ async function api(req, res, url) {
     if (req.method === 'PUT') {
       let doc; try { doc = await body(req); } catch (e) { return send(res, 400, { error: e.message }); }
       if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return send(res, 400, { error: 'expected an object' });
-      keepRewards(doc, readJson(file, {}));
-      writeJson(file, { ...doc, account: { name: s.name, id: s.sub }, savedAt: Date.now() });
+      const cur = readJson(file, {});
+      if (staleUpload(cur, doc)) { keepCopy(file, doc, 'rejected'); return send(res, 409, { error: 'out of date', updatedAt: cur.updatedAt }); }
+      keepCopy(file, cur, 'auto');
+      keepRewards(doc, cur);
+      const { base, ...save } = doc;
+      writeJson(file, { ...save, account: { name: s.name, id: s.sub }, savedAt: Date.now() });
       return send(res, 200, { ok: true });
     }
   }

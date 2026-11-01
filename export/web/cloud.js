@@ -5,6 +5,9 @@ import { mergeAkimboSaves } from './mods/weapon-levels/akimbo.js';
 
 const TRACKED=/^kino\.(mods\.progression|mods\.classes|mods\.career|mods\.gobblegums|mods\.bank|mods\.armory|mods\.radio|mods\.journal|mods\.terminal|mods\.prestige|mods\.research|mods\.credits|mods\.shop|mods\.pass|settings|best(\..+)?)$/;
 const STAMP='kino.cloud.updatedAt';
+// The server's stamp when this copy last came into step with it, and this browser's (or Rind partition's) own id: a
+// device may only replace a save it has seen, or wrote itself (.tools/save-guard.mjs).
+const BASE='kino.cloud.base',DEVICE='kino.cloud.device';
 // whose progress the local copy is (the account's public id): set on every sync. Rind keeps each account in its own
 // storage, but a browser can see several accounts sign in one after another.
 const OWNER='kino.cloud.owner';
@@ -20,9 +23,19 @@ function snapshot(){
   const keys={};for(let i=0;i<store.length;i++){const k=store.key(i);if(TRACKED.test(k))keys[k]=store.getItem(k);}
   return {updatedAt:+(store.getItem(STAMP)||0),keys};
 }
+function device(){
+  let id=store.getItem(DEVICE);
+  if(!id){id=crypto.randomUUID?.()??String(Math.random()).slice(2);rawSet(DEVICE,id);}
+  return id;
+}
 async function push(){
   if(!account.signedIn)return;
-  try{await fetch('/api/profile',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(snapshot()),keepalive:true,credentials:'same-origin'});}catch{}
+  const base=store.getItem(BASE);
+  const doc={...snapshot(),device:device(),...(base!=null&&{base:+base})};
+  try{
+    const r=await fetch('/api/profile',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(doc),keepalive:true,credentials:'same-origin'});
+    if(r.status===409)console.warn('[cloud] another device saved since this page loaded: this copy was filed, not applied (the next load takes the newer one)');
+  }catch{}
 }
 function dirty(){rawSet(STAMP,String(Date.now()));clearTimeout(pushTimer);pushTimer=setTimeout(push,2000);}
 if(store){
@@ -31,10 +44,12 @@ if(store){
   addEventListener('pagehide',()=>{if(pushTimer){clearTimeout(pushTimer);push();}});
   migrate();
 }
-// Saves from before a change of weapon ids are rewritten in place (and pushed): dual-wield pairs became their single
-// gun's Akimbo attachment (2026-10-23), so a pair's levels, camo progress and stats move onto the single gun.
+// Saves from before a change of weapon ids are rewritten in place: dual-wield pairs became their single gun's Akimbo
+// attachment (2026-10-23), so a pair's levels, camo progress and stats move onto the single gun. This must not stamp the
+// copy (rawSet): it runs before the sync, and a stamp of now made an old device's copy the newest, which then replaced
+// the account's save (2026-11-01).
 function migrate(){
-  for(const k of Object.keys(snapshot().keys)){const v=mergeAkimboSaves(k,store.getItem(k));if(v!=null)store.setItem(k,v);}
+  for(const k of Object.keys(snapshot().keys)){const v=mergeAkimboSaves(k,store.getItem(k));if(v!=null)rawSet(k,v);}
 }
 
 // Newest wins: server copy replaces local keys, or local progress is uploaded.
@@ -45,19 +60,25 @@ async function sync(){
   // and this account's own copy comes down.
   const owner=store.getItem(OWNER);
   if(owner&&account.id&&owner!==account.id){
-    pulling=true;try{for(const k of Object.keys(snapshot().keys))store.removeItem(k);store.removeItem(STAMP);}finally{pulling=false;}
+    pulling=true;try{for(const k of Object.keys(snapshot().keys))store.removeItem(k);store.removeItem(STAMP);store.removeItem(BASE);}finally{pulling=false;}
   }
   if(account.id)rawSet(OWNER,account.id);
   const local=snapshot();
-  if(remote.keys&&(remote.updatedAt??0)>local.updatedAt){
+  const base=store.getItem(BASE);
+  // Another device saved since this one last saw the server: its copy wins whatever the clocks say. Anything this device
+  // changed meanwhile goes up first, and the server files it instead of applying it.
+  const moved=!!remote.keys&&base!=null&&remote.device!==device()&&remote.updatedAt!==+base;
+  if(moved&&local.updatedAt>+base)await push();
+  if(remote.keys&&(moved||(remote.updatedAt??0)>local.updatedAt)){
     pulling=true;
-    try{for(const [k,v] of Object.entries(remote.keys))rawSet(k,v);mergeRewards(local.keys);rawSet(STAMP,String(remote.updatedAt));}finally{pulling=false;}
+    try{for(const [k,v] of Object.entries(remote.keys))rawSet(k,v);mergeRewards(local.keys);rawSet(STAMP,String(remote.updatedAt));rawSet(BASE,String(remote.updatedAt));}finally{pulling=false;}
     migrate();
     dispatchEvent(new Event('kino-cloud-pulled'));
   }else if(local.updatedAt>(remote.updatedAt??-1)||!remote.keys){
     if(remote.keys){pulling=true;try{mergeRewards(remote.keys);}finally{pulling=false;}}
     await push();
-  }else{pulling=true;try{mergeRewards(remote.keys);}finally{pulling=false;}}
+    rawSet(BASE,String(local.updatedAt));
+  }else{pulling=true;try{mergeRewards(remote.keys);}finally{pulling=false;}rawSet(BASE,String(remote.updatedAt));}
 }
 
 // Map rewards (profile.rewards) only get added, whichever copy wins: take the other copy's into the stored profile.
