@@ -51,9 +51,41 @@ User: "build the other stuff please" (everything that was listed as not built).
 - **Tested** on the GPU: both akimbo pairs and the Titans draw in both hands and fire; the OHM swaps both ways with its fold clips and fires 8 pellets; the PaP OHM becomes "Ohm Overload · Shotgun" (9 shells, 330 damage); lockdown ramps in about 1 s and back; grip and red dots as above. `npm test` passes.
 - Not done: lockdown has no fire clip of its own (the hip fire plays under the braced layer).
 
+## Per-gun kits and attachment models (2026-11-01)
+
+Every AW gun now has its own kit, and most attachments have a real model. `mods/bo3-weapons/aw-kits.json` holds, per gun, `kit` (replaces `statAttachments`) and `mounts`; `aw-kits.js` merges it in `prepare` after `weapons.json`, so kits change without rebuilding the guns. Built mounts from `weapons.json` (red dots, grips) survive when listed in the kit. The older lists in `.tools/build_bo3_weapons.py` (`AW_CUSTOM`) are overridden. Attachments dropped from a gun's kit stop applying on old saves (`equipped()` filters them).
+
+**Models:** `.tools/build_aw_attachments.py` (Blender, about 5 min: `PATH=$HOME/.local/bin:$PATH blender -b -P .tools/build_aw_attachments.py` from the repo root) writes `mods/bo3-weapons/parts/aw_attachments.glb`, 39 nodes `part_*` sharing one baked material plus emissive ones (`aw_attachments_emit_*`, `aw_attachments_glass`). Built by us, so it's in the Rind `OWN` list and in git. The script's `export(..., yup=False, spread=120)` keeps Blender axes = gun space and spreads parts apart for the AO bake. Bump the `?v=` in `aw-kits.json` after a rebuild. Material names contain `attachments`, so camos skip them, and avoid `glow|_ret|lens` (glow.js, scopes).
+
+**Mounts** (`weapon-levels/mounts.js`): a mount is `{part, tag, at, rot?, scale?}`. `at` is always gun space (`tag_weapon` at rest: x forward, y left, z up; first person shows the left side and top), whichever bone carries it, so all of a gun's coordinates read the same; `restSpace` converts through the skeleton's inverse binds. Pick the bone by what the part touches: anything on a part that moves on reload must ride that bone (M1 `hinge`, RW1 `tag_barrel`, CEL-3 `tag_flash`, Atlas `slide`, Bulldog stock `butt1_jnt`, OHM body parts `tag_range`). `.tmp-aw`-style fit check: for each mount, the nearest gun vertices' dominant bone must match. Off-hand guns (Atlas and M1 akimbo, the XMG's left arm gun) mount the same parts with y and x rotation mirrored (`{mirror:true}`), and bones looked up with the left models' numbering. Third-person world models don't show parts.
+
+**Off-hand guns:** the left model's bones end in `_le` (`tag_weapon_le`, `tag_clip_le`, `slide_le`; other imported guns number them one up), and `mountParts` tries each name, `{mirror:true}` flips y and the x rotation so a side part is on the outside of both guns. Equip can fire twice while the model loads, so each call takes a run number and an older call stops at its next await; without it upgraded guns carried every part twice (two beams). The OHM's second form shares `mounts` and `mounted` with the first (`attachClips`), or it drops the parts on the next equip.
+
+**Pick the bone in the idle pose:** `at` is converted through the rest pose, so a bone the idle clip moves carries its part off. The OHM's `tag_clip` sits 33 above its rest place in idle and the MDL's `tag_shell` 77 back (their bind poses park the belt and the shell): the OHM's drum rides `magazine`, the MDL's Long Tube `tag_weapon`. Check a new mount by comparing the bone's live position to its rest position with the gun idling. Rest-pose renders also lie about those parts of the gun itself (the OHM's belt hangs in a straight line below the gun there).
+
+**Glow:** keep the parts' emission low (1.6-2.5, lens 5): the bloom pass works on anything over 1, and at 24 the RW1's rails threw flares across the screen. Emission lives in the build, so a change means a rebuild and a `?v=` bump in `aw-kits.json`.
+
+**Lasers:** a part with an `*emit_beam_<colour>` material gets a beam from that emitter (two crossed additive strips, 185 long because the view camera ends at 200). `aw.js lasers()` steers beams at the crosshair each frame (`aimLasers`: when the gun points far away, on a reload or sprint, the beam follows the barrel), dims them to .35 aiming, and puts a dot sprite where the crosshair lands (a cheap torso-sphere test instead of `enemies.rayHit`, which poses every head). Tracker = red, Laser Sight = green. The beam material is in `host.warmObjects`.
+
+| Gun | Unique to it |
+|---|---|
+| Atlas 45 | Titan Slide (35% damage, 20% slower), Kill Chain (chained kills, up to +50% fire rate) |
+| M1 Irons | Speedloader Rig, Hunter Barrel, Fan the Hammer (auto), Trick Shot (headshots bounce) |
+| RW1 | Recall Coil (3+ through refunds the round), Overcharge Rings (first hit bursts for 50%), Arc Rail, Rail Capacitor |
+| Blunderbuss | Double Lock, Bayonet (melee x3), Bell Flare, Ember Load, Chain Shot (pierce 2), Cartridge Box, Grapeshot |
+| Tac-19 | Breacher Choke, Side Saddle, Slam Fire (auto) |
+| Bulldog | Duckbill, Twin Feed (2 rounds, 80% damage), Shell Strip, Bull Rush (first shot after a sprint x2) |
+| OHM | Capacitor Drum, Hot-Swap, Bipod (aim and stand still: 30% faster, half climb), Cross-Feed (kills feed the other form) |
+| CEL-3 | Plasma Overdrive fins, Meltdown (fire ramps damage to +50% in 3 s), Prism Focus (first hit splits for 35%) |
+| MDL | Grenade Bandolier, Rotary Drive, Long Tube, Cluster Rounds, Incendiary Payload |
+| XMG | Bulwark Plating, Overclock Servos, Seismic Brace, Shock Anchor (full lockdown throws a shockwave, 6 s) |
+| MG Turret | Ammo Box (belt +100), Gun Shield (40% less damage while firing), Spin-Up Governor (+60% fire held), Cooling Jacket. No underbarrel grip, stock or muzzle |
+
+Shared and stats live in `attachments.json`; `gunsmith.js` gained the stats `pelletMul`, `pelletSpreadMul`, `pierce`, `adsRecoilScale`, `blastMul`, `projectileMul`. Effects are in `aw.js` (its header lists them): `session.fire` wrap for per-shot triggers, `enemies.hurt` wrap for hits (`shotZ` = zombies this shot has been through, so first hit and pierce counts work), `spool` = trigger-held 0..1.
+
 ## Custom attachments (2026-10-23)
 
-Gunsmith attachments of our own (no model, `tags: []`) at the end of `weapon-levels/attachments.json`: `aws_*` are a shared AW kit, `aw_*` belong to one or a few guns. `AW_CUSTOM` in `.tools/build_bo3_weapons.py` gives each gun its list (added to `statAttachments` after `extmag`; unlocked in catalogue order on each gun's track, levels 2-28). Effects that aren't plain stats live in `mods/bo3-weapons/aw.js`, which reads the equipped list from the base def (`data.weapons[id].attachments`; the OHM's shotgun form has none of its own).
+Gunsmith attachments of our own (no model, `tags: []`) at the end of `weapon-levels/attachments.json`: `aws_*` are a shared AW kit, `aw_*` belong to one or a few guns. (Kits now come from `aw-kits.json`, section above.) `AW_CUSTOM` in `.tools/build_bo3_weapons.py` gives each gun its list (added to `statAttachments` after `extmag`; unlocked in catalogue order on each gun's track, levels 2-28). Effects that aren't plain stats live in `mods/bo3-weapons/aw.js`, which reads the equipped list from the base def (`data.weapons[id].attachments`; the OHM's shotgun form has none of its own).
 
 **Why the count looked small:** `gunsmith.js available()` pads every gun with `generic` catalogue entries up to `padTo` (8), so the first 7 customs only replaced pads and every AW gun still showed 8. The kits push them past the pad: XMG 13, OHM 13, Sentry 12, CEL-3 12, Blunderbuss 13, Tac-19 15 (its red dot and grip mounts), Bulldog 13, RW1 10 (one-round gun: mag-slot entries drop), MDL 8, Atlas 45 / M1 Irons and their akimbos 11 (measured with `available()` on the GPU page).
 

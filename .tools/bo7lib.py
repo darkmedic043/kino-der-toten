@@ -243,7 +243,7 @@ def text(body, size, at, rot_z=0., part='j_gun', m=None, extrude=.01, side=1, fo
 
 
 
-def export(OUT, RENDER, prefix, baked, tex=2048, frame=(7.5, 0, -0.5), ortho=48):
+def export(OUT, RENDER, prefix, baked, tex=2048, frame=(7.5, 0, -0.5), ortho=48, yup=True, spread=0):
     """Join each bone's objects, bake the worn materials into one atlas (<prefix>_body), render, export GLB."""
     for part, obs in PARTS.items():
         if not obs:
@@ -263,6 +263,8 @@ def export(OUT, RENDER, prefix, baked, tex=2048, frame=(7.5, 0, -0.5), ortho=48)
     TEX = tex
     objs = [bpy.data.objects['part_' + p] for p in PARTS if 'part_' + p in bpy.data.objects]
     scene = bpy.context.scene
+    for i, o in enumerate(objs): o.location.x = i * spread   # parts modelled at one origin must not shade each other in the AO bake
+    bpy.context.view_layer.update()
     bpy.ops.object.select_all(action='DESELECT')
     for o in objs: o.select_set(True)
     bpy.context.view_layer.objects.active = objs[0]
@@ -338,6 +340,7 @@ def export(OUT, RENDER, prefix, baked, tex=2048, frame=(7.5, 0, -0.5), ortho=48)
         for m in keep: o.data.materials.append(m)
         for p, i in zip(o.data.polygons, idx): p.material_index = remap[i]
 
+    for o in objs: o.location.x = 0
     if RENDER:
         os.makedirs(RENDER, exist_ok=True)
         sc = bpy.context.scene; sc.render.engine = 'BLENDER_EEVEE_NEXT' if 'BLENDER_EEVEE_NEXT' in [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties['engine'].enum_items] else 'BLENDER_EEVEE'
@@ -357,6 +360,6 @@ def export(OUT, RENDER, prefix, baked, tex=2048, frame=(7.5, 0, -0.5), ortho=48)
             sc.render.filepath = f'{RENDER}/{prefix}_{name}.png'; bpy.ops.render.render(write_still=True)
 
 
-    bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_yup=True, export_apply=True, export_materials='EXPORT',
+    bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_yup=yup, export_apply=True, export_materials='EXPORT',
                               export_image_format='WEBP', export_image_quality=90, export_texcoords=True, export_normals=True)
     print('[bo7] wrote', OUT, {p: len(o) for p, o in PARTS.items()})

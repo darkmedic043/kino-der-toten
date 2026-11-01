@@ -372,6 +372,7 @@ def aw(cls, gid, name, up, gun, tpl, stats, glow, single=True, **kw):
                 upModel=kw.pop('upModel', mdl+'_up'), upWorld=kw.pop('upWorld', 'wm_s1_'+gun+('' if single else '_rdw')+'_up'), pre=pre, tpl=tpl, stats=stats, roles=roles,
                 ads=kw.pop('ads', (pre+'_ads_up', pre+'_ads_down')), shots=['wpn_s1_'+gun+'_shot'], upShots=['wpn_s1_'+gun+'_pap_shot'], glow=glow, **kw)
 # the AW guns' Gunsmith kits (weapon-levels attachments.json aws_* shared, aw_* custom; effects in mods/bo3-weapons/aw.js).
+# Superseded at load: mods/bo3-weapons/aw-kits.json replaces statAttachments and adds part mounts for each gun (aw-kits.js). Edit kits there.
 # Unlock order follows the catalogue, not these lists.
 AW_KIT = ['aws_brake', 'aws_silencer', 'aws_rifling', 'aws_rapid', 'aws_tracker', 'aws_scavenger', 'aws_quickdraw']
 AW_LONG = ['aws_foregrip', 'aws_stabilizer']   # not on the pistols

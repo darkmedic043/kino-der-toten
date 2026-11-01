@@ -7,7 +7,7 @@
 //   fold-in and fold-out clips (no lockdown idle or fire), so they ride on top of whatever plays as additive
 //   layers held at the blend's point, the fire clips still kicking underneath. Braced, you are rooted in place: no
 //   walking, sprinting or jumping until you let go of aim.
-// - Gunsmith kits (weapon-levels attachments.json: aws_* shared, aw_* per gun; lists in AW_CUSTOM, .tools/build_bo3_weapons.py).
+// - Gunsmith kits (weapon-levels attachments.json: aws_* shared, aw_* per gun; each gun's list and part mounts in aw-kits.json).
 //   Most are plain stats; the ones with behaviour live here ("hits" = the gun's bullets, or the MDL's blasts for 4 s
 //   after it fires):
 //   aw_bulwark    XMG: 60% less damage taken while locked down (an amber edge on the screen)
@@ -20,12 +20,31 @@
 //   aw_lastword   Atlas 45, M1 Irons (and akimbo): the last round in a magazine hits for triple
 //   aws_tracker   hits tag the zombie (a red marker) for 4 s: tagged zombies take 20% more from your hits
 //   aws_scavenger a kill puts 2 free rounds back in the magazine
+//   aw_killchain  Atlas: each kill within 3 s of the last adds 10% fire rate, up to 50%
+//   aw_ricochet   M1 Irons: a headshot bounces on to the nearest zombie for full damage
+//   aw_recall     RW1: a slug through 3+ zombies refunds its round
+//   aw_overcharge RW1: a slug's first hit bursts for 50% around it
+//   aw_bayonet    Blunderbuss: melee ×3 with this gun out
+//   aw_emberload  Blunderbuss: hits burn for 50% of the hit a second, 3 s
+//   aw_twinfeed   Bulldog: a shot costs 2 rounds (its 80% damage is a plain stat)
+//   aw_bullrush   Bulldog: the first shot after a sprint hits for double
+//   aw_bipod      OHM: aiming and standing still, 30% faster fire
+//   aw_crossfeed  OHM: a kill puts 3 rounds in the other form's magazine
+//   aw_meltdown   CEL-3: sustained fire ramps damage to +50% over 3 s
+//   aw_prism      CEL-3: a shot's first hit splits to the nearest zombie for 35%
+//   aw_cluster    MDL: a blast that hits throws 3 bomblets, 30% of the gun's damage each
+//   aw_shockanchor XMG: reaching full lockdown throws a shockwave (6 s recharge)
+//   aw_gunshield  MG Turret: 40% less damage taken while firing
+//   aw_spinup     MG Turret: held fire ramps fire rate to +60% over 4 s
+// - Lasers (aws_tracker red, aws_laser green): the part's beam is steered at the crosshair each frame (mounts.js aimLasers),
+//   dimmed while aiming, with a dot where the crosshair lands.
 import * as THREE from 'three';
+import { aimLasers, laserColour, beamWarm } from '../weapon-levels/mounts.js';
 
-const ARC=0x8fb4ff,EMBER=0xff7a2a,GOLD=0xffd36a,DAZE=0xcfe4ff,MARK=0xff2a2a;
+const ARC=0x8fb4ff,EMBER=0xff7a2a,GOLD=0xffd36a,DAZE=0xcfe4ff,MARK=0xff2a2a,PRISM=0xd08cff;
 
 export function setupAw(api){
-  const {host,session,view,player,enemies,scene,world,data}=api;
+  const {host,session,view,player,enemies,scene,camera,world,data,audio}=api;
   const atts=()=>String(data.weapons[session.weapon?.id]?.attachments??'').split('+');   // the base def's (the OHM's shotgun form has none of its own)
   const has=id=>atts().includes(id);
   const now=()=>session.time??performance.now()/1000;
@@ -39,7 +58,7 @@ export function setupAw(api){
     return ok;
   };
 
-  let lock=0,falling=false,rig=null,acts=null,frozen=false;
+  let lock=0,falling=false,rig=null,acts=null,frozen=false,wasLocked=false;
   const layer=(clip,ref)=>{
     const add=THREE.AnimationUtils.makeClipAdditive(clip.clone(),0,ref,30),a=rig.mixer.clipAction(add);
     a.blendMode=THREE.AdditiveAnimationBlendMode;a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;a.play();a.paused=true;a.setEffectiveWeight(0);return a;
@@ -58,8 +77,9 @@ export function setupAw(api){
     lock=THREE.MathUtils.clamp(lock+(want?dt/din:-dt/dout),0,1);
     acts.in.setEffectiveWeight(falling||lock===0?0:1);acts.out.setEffectiveWeight(falling&&lock>0?1:0);
     acts.in.time=lock*din;acts.out.time=(1-lock)*dout;
+    if(lock>=1&&!wasLocked&&has('aw_shockanchor'))shockwave();wasLocked=lock>=1;
   });
-  host.on('reset',()=>{lock=0;falling=false;frozen=false;for(const z of [...burning.keys()])burning.delete(z);for(const z of [...dazed])undaze(z);for(const z of [...marked.keys()])unmark(z);for(const f of fx.splice(0))dispose(f);});
+  host.on('reset',()=>{lock=0;falling=false;frozen=false;wasLocked=false;spool=0;chain=0;chainUntil=0;sprintAt=-9;rush=-1;clusterArmed=false;anchorAt=0;bombs.length=0;for(const z of [...burning.keys()])burning.delete(z);for(const z of [...dazed])undaze(z);for(const z of [...marked.keys()])unmark(z);for(const f of fx.splice(0))dispose(f);});
 
   // Locked down you stay put: no speed (layered over the other speed getters, like the Siren's Soma-81), and the
   // controller input loses its move, sprint and jump. That wrap goes on at the first frame, outside every mod's
@@ -72,23 +92,40 @@ export function setupAw(api){
   let rooted=false;
   host.on('update',()=>{
     if(rooted||!player)return;rooted=true;
+    const melee=host.meleeDamage?.bind(host);   // the melee mod's goes on later than this mod's setup
+    host.meleeDamage=(d,heavy)=>(melee?melee(d,heavy):d)*(has('aw_bayonet')?3:1);
     const update=player.update.bind(player);
     player.update=(dt,input)=>update(dt,frozen&&input?{...input,forward:0,strafe:0,sprint:false,jump:false,jumpPressed:false}:input);
   });
 
   // ---- Bulwark Plating and Overclock Servos (the XMG, locked down) ----
   const braced=id=>lock>0&&!falling&&view.def?.lockdown&&has(id);
-  host.on('beforeDamage',e=>{if(braced('aw_bulwark'))e.amount*=1-.6*lock;});
+  host.on('beforeDamage',e=>{if(braced('aw_bulwark'))e.amount*=1-.6*lock;if(has('aw_gunshield')&&now()-lastShot<.4)e.amount*=.6;});
   const fire=session.fire.bind(session);
   // fully locked down the XMG fires 25% faster (user, 2026-10-24); Overclock Servos stack another 40% on top
-  session.fire=(...args)=>{const ok=fire(...args);if(ok&&lock>=1&&!falling&&view.def?.lockdown)session.fireLeft/=1.25*(braced('aw_overclock')?1.4:1);return ok;};
+  // every shot: the rest of the per-gun triggers. spool = how long the trigger has been held, 0..1
+  let shot=0,lastShot=-9,spool=0,chain=0,chainUntil=0,sprintAt=-9,rush=-1;
+  const shotZ=new Set();   // zombies this shot has been through
+  session.fire=(...args)=>{
+    const ok=fire(...args);if(!ok)return ok;
+    if(lock>=1&&!falling&&view.def?.lockdown)session.fireLeft/=1.25*(braced('aw_overclock')?1.4:1);
+    const a=atts(),t=now();shot++;shotZ.clear();lastShot=t;
+    if(a.includes('aw_killchain')&&t<chainUntil)session.fireLeft/=1+.1*chain;
+    if(a.includes('aw_spinup'))session.fireLeft/=1+.6*spool;
+    if(a.includes('aw_bipod')&&view.input?.ads&&still())session.fireLeft/=1.3;
+    if(a.includes('aw_bullrush')&&t-sprintAt<.5){rush=shot;sprintAt=-9;}
+    if(a.includes('aw_twinfeed')&&session.weapon.mag>0)session.weapon.mag--;
+    return ok;
+  };
+  let movedAt=-9;const moved=new THREE.Vector3();
+  const still=()=>now()-movedAt>.15;   // no walking for a moment (player position, so a push counts too)
   const edge=document.createElement('div');
   edge.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;box-shadow:inset 0 0 90px 18px #ffb43a88;border:2px solid #ffb43a55';
   document.body.append(edge);
 
   // ---- hits ----
   let blastUntil=0;   // the MDL's grenades count as its hits for a while after it fires
-  (host.fireHooks??=[]).push(def=>{if((def.baseId??def.id)==='aw_mdl')blastUntil=now()+4;return false;});   // grenades skip the 'shot' event
+  (host.fireHooks??=[]).push(def=>{if((def.baseId??def.id)==='aw_mdl'){blastUntil=now()+4;clusterArmed=true;}return false;});   // grenades skip the 'shot' event
   const hurt=enemies.hurt.bind(enemies);
   enemies.hurt=(z,damage,head,...rest)=>{
     if(host.remoteDamage||!alive(z))return hurt(z,damage,head,...rest);
@@ -97,14 +134,29 @@ export function setupAw(api){
     const gunHit=cause==='bullet'||(cause==='explosion'&&t<blastUntil&&session.weapon?.id==='aw_mdl');
     if(!gunHit)return hurt(z,damage,head,...rest);
     const a=atts(),at=z.root.position.clone().add(new THREE.Vector3(0,45,0));
+    const first=!shotZ.size;shotZ.add(z);
     if(a.includes('aw_lastword')&&session.weapon.mag===0){damage*=3;burst(at,GOLD,10,60);}
+    if(a.includes('aw_meltdown'))damage*=1+.5*spool;
+    if(rush===shot)damage*=2;
+    if(a.includes('aw_emberload'))ignite(z,damage*.5);
     if(a.includes('aw_ignition'))ignite(z,damage*.4);
     if(a.includes('aw_incendiary'))ignite(z,damage*.3);
     if(a.includes('aw_concussive')||(a.includes('aw_seismic')&&braced('aw_seismic')))daze(z,at);
     if(a.includes('aws_tracker'))mark(z,t);
     const r=hurt(z,damage,head,...rest);
     if(a.includes('aw_arcrail'))arc(z,at,damage*.5);
-    if(a.includes('aws_scavenger')&&!alive(z)){const w=session.weapon,clip=session.def.clipSize;if(w&&w.mag<clip){w.mag=Math.min(clip,w.mag+2);burst(at,GOLD,3,30,2.5);}}
+    if(a.includes('aw_overcharge')&&first){burst(at,ARC,12,90);for(const {o} of near(z,120)){hurt(o,damage*.5,false,false,'explosion');burst(chest(o),ARC,3,40);}}
+    if(a.includes('aw_prism')&&first){const o=near(z,260).find(({o})=>world.lineClear(at,chest(o)))?.o;if(o){bolt(at,chest(o),PRISM);hurt(o,damage*.35,false,false,'explosion');}}
+    if(a.includes('aw_ricochet')&&head){const o=near(z,300).find(({o})=>world.lineClear(at,chest(o)))?.o;if(o){bolt(at,chest(o),GOLD);hurt(o,damage,false,false,'bullet');}}
+    if(a.includes('aw_recall')&&shotZ.size===3){const w=session.weapon;w.mag=Math.min(session.def.clipSize,w.mag+1);burst(at,ARC,10,70);}
+    if(a.includes('aw_cluster')&&clusterArmed&&cause==='explosion'){clusterArmed=false;const dmg=session.def.damage*.3;
+      for(let i=0;i<3;i++){const ang=i*2.1+Math.random(),r=50+Math.random()*40;bombs.push({at:z.root.position.clone().add(new THREE.Vector3(Math.cos(ang)*r,14,Math.sin(ang)*r)),t:t+.3+i*.13,dmg});}}
+    if(!alive(z)){
+      if(a.includes('aws_scavenger')){const w=session.weapon,clip=session.def.clipSize;if(w&&w.mag<clip){w.mag=Math.min(clip,w.mag+2);burst(at,GOLD,3,30,2.5);}}
+      if(a.includes('aw_killchain')){chain=Math.min(5,(t<chainUntil?chain:0)+1);chainUntil=t+3;}
+      if(a.includes('aw_crossfeed')){const w=session.weapon,form=session.attachmentMode?data.weapons[w.id]:session.def.attachment,other=session.attachmentMode?w.primaryAmmo:(w.attachmentAmmo??={mag:form?.clipSize??0,reserve:form?.maxAmmo??0});
+        if(other&&form)other.mag=Math.min(form.clipSize,other.mag+3);}
+    }
     return r;
   };
   const marked=new Map();   // zombie -> its marker sprite
@@ -113,11 +165,12 @@ export function setupAw(api){
     if(!marked.has(z)){const s=new THREE.Sprite(sprite.clone());s.material.color.setHex(MARK);s.scale.setScalar(7);scene.add(s);marked.set(z,s);}
   }
   function unmark(z){const s=marked.get(z);if(s){s.removeFromParent();s.material.dispose();}marked.delete(z);if(z.awMark)z.awMark=null;}
+  const chest=o=>o.root.position.clone().add(new THREE.Vector3(0,42,0));
+  const near=(z,r)=>enemies.list.filter(o=>o!==z&&alive(o)).map(o=>({o,d:o.root.position.distanceTo(z.root.position)})).filter(({d})=>d<r).sort((x,y)=>x.d-y.d);
   function arc(z,from,dmg){
-    const near=enemies.list.filter(o=>o!==z&&alive(o)).map(o=>({o,d:o.root.position.distanceTo(z.root.position)})).filter(({d})=>d<260).sort((x,y)=>x.d-y.d);
     let n=0;
-    for(const {o} of near){
-      const to=o.root.position.clone().add(new THREE.Vector3(0,42,0));
+    for(const {o} of near(z,260)){
+      const to=chest(o);
       if(!world.lineClear(from,to))continue;
       bolt(from,to,ARC);hurt(o,dmg,false,false,'explosion');if(++n>=2)break;
     }
@@ -132,6 +185,14 @@ export function setupAw(api){
     c.until=now()+2.5;dazed.add(z);
   }
   function undaze(z){const c=z.awDaze;if(c?.k===.5){if(z.speed)z.speed/=.5;if(z.rig?.mixer&&c.scale!==undefined)z.rig.mixer.timeScale=c.scale;}z.awDaze=null;dazed.delete(z);}
+
+  // the MDL's bomblets, and the XMG's Shock Anchor
+  let clusterArmed=false,anchorAt=0;const bombs=[];
+  function shockwave(){
+    const t=now();if(t<anchorAt)return;anchorAt=t+6;
+    const p=player.position,dmg=session.def.damage*6;burst(p.clone().add(new THREE.Vector3(0,-30,0)),DAZE,26,260,5);audio?.play?.('explosion');
+    for(const o of enemies.list){if(!alive(o)||o.root.position.distanceTo(p)>220)continue;const at=chest(o);daze(o,at);hurt(o,dmg,false,false,'explosion');}
+  }
 
   // ---- fx: arcs (additive lines) and embers (additive sprites) ----
   const glow=document.createElement('canvas');glow.width=glow.height=32;
@@ -150,7 +211,38 @@ export function setupAw(api){
   host.warmObjects?.push(new THREE.Sprite(sprite.clone()),new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,1,0)]),
     new THREE.LineBasicMaterial({color:ARC,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false})));
 
+  // ---- lasers: beams at the crosshair, a dot on what it lands on ----
+  const dot=new THREE.Sprite(sprite.clone());dot.visible=false;dot.renderOrder=4;dot.material.depthTest=true;scene.add(dot);
+  const eye=new THREE.Vector3(),look=new THREE.Vector3(),aimAt=new THREE.Vector3(),tmp=new THREE.Vector3(),ray=new THREE.Ray();
+  const DOT={red:0xff2a20,green:0x30ff60};
+  host.warmObjects?.push(beamWarm());
+  function lasers(){
+    const gun=view.gun,colour=laserColour(gun),vc=api.viewCamera;
+    if(!colour||!vc||!view.ready){dot.visible=false;return;}
+    vc.getWorldPosition(eye);vc.getWorldDirection(look);aimAt.copy(eye).addScaledVector(look,1500);
+    const opacity=view.input?.ads?.35:1;
+    aimLasers(gun,aimAt,opacity);if(view.leftGun)aimLasers(view.leftGun,aimAt,opacity);
+    const cam=host.camera??camera,pointing=['idle','fire'].includes(view.mode)&&!(session.reloadLeft>0)&&!view.input?.sprint;
+    cam.getWorldPosition(ray.origin);cam.getWorldDirection(ray.direction);
+    let d=world.raycast(ray,2,2500)?.distance??Infinity;
+    for(const o of enemies.list){   // a sphere on the torso: enemies.rayHit poses every head, too dear for each frame
+      const p=o.root.position;tmp.set(p.x,p.y+38,p.z).sub(ray.origin);const along=tmp.dot(ray.direction);
+      if(along>0&&along<d&&tmp.lengthSq()-along*along<400)d=along-14;
+    }
+    if(!pointing||d===Infinity){dot.visible=false;return;}
+    dot.visible=true;dot.position.copy(ray.origin).addScaledVector(ray.direction,d-1.5);dot.scale.setScalar(3+d*.004);
+    dot.material.color.setHex(DOT[colour]);dot.material.opacity=.6+.25*Math.random();
+  }
+
   host.on('update',dt=>{
+    lasers();
+    { const t=now();
+      if(view.input?.sprint)sprintAt=t;
+      if(player?.position){if(moved.distanceToSquared(player.position)>.25){movedAt=t;moved.copy(player.position);}}
+      spool=t-lastShot<.35?Math.min(1,spool+dt/(has('aw_spinup')?4:3)):Math.max(0,spool-dt/1.5);
+      for(let i=bombs.length-1;i>=0;i--){const b=bombs[i];if(t<b.t)continue;bombs.splice(i,1);burst(b.at,EMBER,14,110,5);if(Math.random()<.5)audio?.play?.('explosion');
+        for(const o of enemies.list){if(alive(o)&&o.root.position.distanceTo(b.at)<90)hurt(o,b.dmg,false,false,'explosion');}}
+    }
     edge.style.opacity=braced('aw_bulwark')&&session.phase!=='gameover'?lock.toFixed(2):'0';
     const t=now();
     for(const [z,b] of burning){
@@ -169,5 +261,5 @@ export function setupAw(api){
       if(f.t<=0){dispose(f);fx.splice(i,1);continue;}
       f.obj.material.opacity=f.t/f.life;if(f.vel){f.obj.position.addScaledVector(f.vel,dt);f.vel.y+=20*dt;}}
   });
-  window.kino.aw={get lock(){return lock;},get frozen(){return frozen;},burning,dazed,marked};
+  window.kino.aw={get spool(){return spool;},get chain(){return chain;},bombs,dot,get lock(){return lock;},get frozen(){return frozen;},burning,dazed,marked};
 }

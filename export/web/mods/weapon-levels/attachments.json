@@ -1377,6 +1377,327 @@
         "auto": true,
         "fireMul": 0.9
       }
+    },
+    {
+      "id": "aws_laser",
+      "name": "Laser Sight",
+      "slot": "laser",
+      "tags": [],
+      "desc": "A green aiming laser: hip fire spreads 35% less.",
+      "stats": {
+        "hipSpreadMul": 0.65
+      }
+    },
+    {
+      "id": "aw_titanslide",
+      "name": "Titan Slide",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "A heavy slide weight: 35% more damage, 20% slower fire.",
+      "stats": {
+        "damageMul": 1.35,
+        "fireMul": 0.8
+      }
+    },
+    {
+      "id": "aw_killchain",
+      "name": "Kill Chain",
+      "slot": "grip",
+      "tags": [],
+      "desc": "Custom: an adaptive trigger. Each kill within 3 s of the last adds 10% fire rate, up to 50%, until the chain breaks."
+    },
+    {
+      "id": "aw_speedloader",
+      "name": "Speedloader Rig",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Two loaded speedloaders clamped on the barrel: 40% faster reloads.",
+      "stats": {
+        "reloadMul": 0.6
+      }
+    },
+    {
+      "id": "aw_hunterbarrel",
+      "name": "Hunter Barrel",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "A ribbed, ported long sleeve: 40% more range and 15% more damage.",
+      "stats": {
+        "rangeMul": 1.4,
+        "damageMul": 1.15
+      }
+    },
+    {
+      "id": "aw_fanhammer",
+      "name": "Fan the Hammer",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Hold the trigger and fan it: fully automatic, 60% faster fire, 30% wider hip fire.",
+      "stats": {
+        "auto": true,
+        "fireMul": 1.6,
+        "hipSpreadMul": 1.3
+      }
+    },
+    {
+      "id": "aw_ricochet",
+      "name": "Trick Shot",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: a headshot bounces on to the nearest zombie for full damage."
+    },
+    {
+      "id": "aw_recall",
+      "name": "Recall Coil",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom: a magnet under the rail. A slug that goes through 3 or more zombies is pulled back into the gun: the shot costs nothing."
+    },
+    {
+      "id": "aw_overcharge",
+      "name": "Overcharge Rings",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom: field rings at the muzzle. A slug's first hit bursts, 50% damage to every zombie within reach of it."
+    },
+    {
+      "id": "aw_doublelock",
+      "name": "Double Lock",
+      "slot": "grip",
+      "tags": [],
+      "desc": "A second hammer and flint: 25% faster fire.",
+      "stats": {
+        "fireMul": 1.25
+      }
+    },
+    {
+      "id": "aw_bayonet",
+      "name": "Bayonet",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom: a spike under the bell. Your melee hits for three times the damage while this gun is out."
+    },
+    {
+      "id": "aw_bellflare",
+      "name": "Bell Flare",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "A wider brass mouth: a third more shot, 30% wider spread.",
+      "stats": {
+        "pelletMul": 1.34,
+        "pelletSpreadMul": 1.3
+      }
+    },
+    {
+      "id": "aw_emberload",
+      "name": "Ember Load",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: hot coals packed with the shot. Hits burn for half the hit's damage a second for 3 s."
+    },
+    {
+      "id": "aw_chainshot",
+      "name": "Chain Shot",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Linked balls: every pellet tears through 2 more zombies.",
+      "stats": {
+        "pierce": 2
+      }
+    },
+    {
+      "id": "aw_cartridgebox",
+      "name": "Cartridge Box",
+      "slot": "mag",
+      "tags": [],
+      "desc": "A leather box on the stock: 50% more reserve ammo.",
+      "stats": {
+        "reserveMul": 1.5
+      }
+    },
+    {
+      "id": "aw_breacher",
+      "name": "Breacher Choke",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "A toothed choke: 40% tighter spread, 25% more range.",
+      "stats": {
+        "pelletSpreadMul": 0.6,
+        "rangeMul": 1.25
+      }
+    },
+    {
+      "id": "aw_sidesaddle",
+      "name": "Side Saddle",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Spare shells on the receiver: 30% faster reloads.",
+      "stats": {
+        "reloadMul": 0.7
+      }
+    },
+    {
+      "id": "aw_slamfire",
+      "name": "Slam Fire",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Hold the trigger and work the pump: fully automatic, 40% faster fire, 30% wider hip fire.",
+      "stats": {
+        "auto": true,
+        "fireMul": 1.4,
+        "hipSpreadMul": 1.3
+      }
+    },
+    {
+      "id": "aw_duckbill",
+      "name": "Duckbill",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "A flat spreader: a quarter more pellets, 35% wider spread.",
+      "stats": {
+        "pelletMul": 1.25,
+        "pelletSpreadMul": 1.35
+      }
+    },
+    {
+      "id": "aw_twinfeed",
+      "name": "Twin Feed",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: chambers two shells at once. Every shot hits 80% harder and costs 2 rounds.",
+      "stats": {
+        "damageMul": 1.8
+      }
+    },
+    {
+      "id": "aw_shellstrip",
+      "name": "Shell Strip",
+      "slot": "mag",
+      "tags": [],
+      "desc": "A spare strip on the handguard: 25% faster reloads, 25% more reserve ammo.",
+      "stats": {
+        "reloadMul": 0.75,
+        "reserveMul": 1.25
+      }
+    },
+    {
+      "id": "aw_bullrush",
+      "name": "Bull Rush",
+      "slot": "grip",
+      "tags": [],
+      "desc": "Custom: the first shot after a sprint hits for double."
+    },
+    {
+      "id": "aw_bipod",
+      "name": "Bipod",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom: folding legs. Aiming while standing still fires 30% faster, and aimed fire climbs half as much.",
+      "stats": {
+        "adsRecoilScale": 0.5
+      }
+    },
+    {
+      "id": "aw_crossfeed",
+      "name": "Cross-Feed",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: kills in one form put 3 rounds in the other form's magazine."
+    },
+    {
+      "id": "aw_meltdown",
+      "name": "Meltdown",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: the core runs away with you. Keep firing and damage climbs to 50% more over 3 s; stop and it falls off."
+    },
+    {
+      "id": "aw_prism",
+      "name": "Prism Focus",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom: a crystal in the bolt path. Each shot's first hit splits a bolt into the nearest zombie for 35% of the damage."
+    },
+    {
+      "id": "aw_bandolier",
+      "name": "Grenade Bandolier",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Spare rounds on the stock: 50% more reserve ammo.",
+      "stats": {
+        "reserveMul": 1.5
+      }
+    },
+    {
+      "id": "aw_cluster",
+      "name": "Cluster Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: a blast that hits throws 3 bomblets that go off a moment later for 30% of the gun's damage."
+    },
+    {
+      "id": "aw_rotary",
+      "name": "Rotary Drive",
+      "slot": "grip",
+      "tags": [],
+      "desc": "A motor on the drum: 35% faster fire.",
+      "stats": {
+        "fireMul": 1.35
+      }
+    },
+    {
+      "id": "aw_longtube",
+      "name": "Long Tube",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "A longer launcher tube: 50% faster grenades, 20% bigger blasts.",
+      "stats": {
+        "projectileMul": 1.5,
+        "blastMul": 1.2
+      }
+    },
+    {
+      "id": "aw_shockanchor",
+      "name": "Shock Anchor",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom: a charge ring on the rig. Locking down throws a shockwave that hurts and staggers everything within 220 units (6 s recharge)."
+    },
+    {
+      "id": "aw_beltbox",
+      "name": "Ammo Box",
+      "slot": "mag",
+      "tags": [],
+      "desc": "A side box with a belt feed: 100 more rounds in the belt, 15% slower reloads.",
+      "stats": {
+        "clipMul": 1.667,
+        "reloadMul": 1.15
+      }
+    },
+    {
+      "id": "aw_gunshield",
+      "name": "Gun Shield",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom: an armour plate on the barrels. While the gun is firing you take 40% less damage."
+    },
+    {
+      "id": "aw_spinup",
+      "name": "Spin-Up Governor",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: the barrels keep gaining speed. Hold the trigger and fire rate climbs to 60% faster over 4 s."
+    },
+    {
+      "id": "aw_jacket",
+      "name": "Cooling Jacket",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "A finned jacket round the barrels: 30% more range, 25% tighter hip fire.",
+      "stats": {
+        "rangeMul": 1.3,
+        "hipSpreadMul": 0.75
+      }
     }
   ],
   "ironSights": {

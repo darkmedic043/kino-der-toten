@@ -77,7 +77,8 @@ export default async function setup(api){
   };
 
   // Imported guns (mods/bo3-weapons): equipped attachment models on their tags (mounts.js)
-  const mountParts=def=>{const g=view.gun;mountGunParts(g,def,def?.mounted??[],()=>view.gun===g);};
+  const mountParts=def=>{const g=view.gun,l=view.leftGun;mountGunParts(g,def,def?.mounted??[],()=>view.gun===g);
+    if(l)mountGunParts(l,def,def?.mounted??[],()=>view.leftGun===l,{mirror:true});};
   // the engine's weapon warm-up (warmWeapons, 2026-11-01): each gun compiles as it will be equipped, with the player's
   // mounted sights and camo (the Pack-a-Punch camo on an upgraded def that keeps the base model)
   host.on('warmWeapon',({def,gun,wait})=>{wait?.(mountGunParts(gun,def,def?.mounted??[],()=>true));applyCamo(gun,papLook({id:def.id,upgraded:def.upgraded})?PAP_CAMO:camoById(data.weapons[def.id]?.camo));});

@@ -116,7 +116,7 @@ export function grantWeaponXp(cat,def,id,profile,amount){
   return unlockedAttachments(cat,def,id,profile).slice(before);
 }
 
-const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','suppressed','automatic','fireType','attachments','attachment','mounted',
+const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','pellets','pelletSpread','pierce','adsRecoilScale','explosionRadius','projectileSpeed','suppressed','automatic','fireType','attachments','attachment','mounted',
   'animations','raiseTime','dropTime','sprintInTime','sprintLoopTime','sprintOutTime','reloadStartTime','reloadEndTime'];   // the last row: attachments with their own clips (attachClips)
 function snapshot(obj){if(!pristine.has(obj)){const s={};for(const k of STAT_FIELDS)s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);pristine.set(obj,s);}return pristine.get(obj);}
 function restore(obj){const s=snapshot(obj);for(const k of STAT_FIELDS){if(s[k]===undefined)delete obj[k];else obj[k]=structuredClone(s[k]);}}
@@ -156,6 +156,12 @@ function applyStats(obj,list,cat,show){
     if(s.adsFov)obj.adsFov=s.adsFov;else if(s.adsFovMul&&obj.adsFov)obj.adsFov=Math.round(obj.adsFov*s.adsFovMul);
     if(s.headMul&&obj.headMultiplier)obj.headMultiplier=+(obj.headMultiplier*s.headMul).toFixed(2);
     if(s.hipSpreadMul)obj.hipSpread=+((obj.hipSpread??.012)*s.hipSpreadMul).toFixed(4);   // stacks (grip + stock); .012 is the engine's default
+    if(s.pelletMul&&obj.pellets)obj.pellets=Math.round(obj.pellets*s.pelletMul);
+    if(s.pelletSpreadMul)obj.pelletSpread=+((obj.pelletSpread??.055)*s.pelletSpreadMul).toFixed(4);   // .055 is the engine's default
+    if(s.pierce)obj.pierce=Math.max(obj.pierce??0,s.pierce);
+    if(s.adsRecoilScale)obj.adsRecoilScale=s.adsRecoilScale;
+    if(s.blastMul&&obj.explosionRadius)obj.explosionRadius=Math.round(obj.explosionRadius*s.blastMul);
+    if(s.projectileMul&&obj.projectileSpeed)obj.projectileSpeed=Math.round(obj.projectileSpeed*s.projectileMul);
     if(s.suppressed)obj.suppressed=true;
     if(s.fireMul&&obj.fireTime)obj.fireTime=+(obj.fireTime/s.fireMul).toFixed(4);
     if(s.auto){obj.automatic=true;obj.fireType='Full Auto';}   // the ROC's MFS Warhead Autoloader
@@ -213,7 +219,7 @@ function attachClips(obj,list){
   for(const a of list){const x=obj.attachAnims?.[a.id];if(!x)continue;const {animations,...times}=x;
     obj.animations={...obj.animations,...animations};Object.assign(obj,times);}
   const alt=obj.attachment;
-  if(alt?.altForm){Object.assign(alt,{mounted:obj.mounted,hideTags:obj.hideTags,scope:obj.scope,adsFov:obj.adsFov});
+  if(alt?.altForm){Object.assign(alt,{mounts:obj.mounts,mounted:obj.mounted,hideTags:obj.hideTags,scope:obj.scope,adsFov:obj.adsFov});
     alt.animations={...alt.animations,adsUpAnim:obj.animations.adsUpAnim,adsDownAnim:obj.animations.adsDownAnim};}
 }
 

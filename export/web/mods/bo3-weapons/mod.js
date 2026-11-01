@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { applyGlow, tickGlow } from './glow.js';
 import { setupAw } from './aw.js';
+import { applyKits } from './aw-kits.js';
 
 const BASE=new URL('./',import.meta.url).href;
 const TUNE={base:{first:1000,aim:70,arc:300,kills:10},pap:{first:1200,aim:90,arc:420,kills:24}};
@@ -30,6 +31,7 @@ export async function prepare(data){
   const MS=built.sounds?.mod??{};
   for(const [id,w] of Object.entries(built.weapons))if(w.akimboOf&&MS[id]&&MS[w.akimboOf])MS[w.akimboOf].notes={...MS[id].notes,...MS[w.akimboOf].notes};
   Object.assign(data.weapons,built.weapons);
+  await applyKits(data,BASE);
   // the RW1 railgun's slug goes through every zombie in line up to the wall (engine.js def.pierce; user request 2026-10-24)
   for(const d of [data.weapons.aw_rw1,data.weapons.aw_rw1?.upgrade])if(d)d.pierce=99;
   // the XMG's camera climb (engine.js recoilScale): light at the hip, almost none braced in lockdown (user, 2026-10-24: it climbed ~13 degrees a second)
