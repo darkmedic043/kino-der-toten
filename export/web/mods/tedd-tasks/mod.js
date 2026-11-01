@@ -7,12 +7,15 @@
 //     Bronze / Silver / Gold / Legendary (the task's `tiers`); under Bronze pays nothing.
 //   - The reward is a chest (mods/loot) in front of the terminal the task was started from; F opens it and the loot
 //     spills out. Weapons come from the player's own Mystery Box list (kino.boxList via loot.pickWeapon), so only what
-//     they switched on; a free perk only at Legendary.
+//     they switched on; a free perk only at Legendary. Points are small on purpose (user, 2026-11-01: was up to 2,000).
+//   - Tempo zombies (BO7's, user 2026-11-01): while a task runs, extra zombies keep rising near whoever runs it. They
+//     count for the task but give few points (rules.js scoreHit), drop no power-ups, and aren't part of the round: it
+//     can end with some still walking. Ones left when the task ends stay until killed.
 // Local to each player (like box rolls): in co-op everyone has their own offers and chests.
 // window.kino.tedd: {status(), act('start', booth) -> true | 'reason'}; host events 'teddStart' {task}, 'teddEnd' {task, tier, count}.
 import * as THREE from 'three';
 
-const FIRST = 9, GAP = [4, 6], DURATION = 120, ZONE_R = 230, FAR = 600;
+const FIRST = 9, GAP = [4, 6], DURATION = 120, ZONE_R = 230, FAR = 600, TEMPO_EVERY = 1.6, TEMPO_MAX = 10, TEMPO_NEAR = 220;
 export const teddPrice = round => 500 + 500 * Math.floor(round / 10);
 export const TIERS = [
   { id: 'bronze', name: 'BRONZE', color: '#cd7f32' },
@@ -30,18 +33,19 @@ export const TASKS = [
 ];
 // what each rating's chest holds (weapons from the player's box list, of these rarities)
 const REWARDS = {
-  bronze: { points: [250, 250], ammo: 1, grenades: 1 },
-  silver: { points: [250, 250, 250], ammo: 2, grenades: 1, weapon: ['common', 'uncommon', 'rare'], powerup: .5 },
-  gold: { points: [250, 250, 250, 250], ammo: 2, grenades: 2, weapon: ['rare', 'epic', 'legendary'], powerup: 1 },
-  legendary: { points: [500, 500, 500, 500], ammo: 3, grenades: 2, weapon: ['epic', 'legendary', 'wonder'], powerup: 1, perk: true },
+  bronze: { points: [100], ammo: 1, grenades: 1 },
+  silver: { points: [100, 100], ammo: 2, grenades: 1, weapon: ['common', 'uncommon', 'rare'], powerup: .5 },
+  gold: { points: [100, 100, 100], ammo: 2, grenades: 2, weapon: ['rare', 'epic', 'legendary'], powerup: 1 },
+  legendary: { points: [100, 100, 100, 100], ammo: 3, grenades: 2, weapon: ['epic', 'legendary', 'wonder'], powerup: 1, perk: true },
 };
 const POWERUPS = ['double_points', 'insta_kill', 'full_ammo', 'carpenter', 'nuke'];
 
 export default async function setup(api) {
-  const { host, session, scene, player, data, audio } = api;
+  const { host, session, scene, player, data, audio, world, enemies } = api;
   const feet = () => player.getFeetPosition();
   const booths = () => window.kino.terminalBooth?.booths ?? [];
-  let next = FIRST, offer = null, run = null, last = null;
+  const net = () => window.kino.coop?.id ? window.kino.coop : null;   // a co-op room: the host owns the zombies
+  let next = FIRST, offer = null, run = null, last = null, subscribed = false;
 
   // ---- the ring for HOLD THE LINE (warmed at load)
   const ringMat = new THREE.MeshBasicMaterial({ color: 0x7dffa6, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false });
@@ -94,7 +98,7 @@ export default async function setup(api) {
     const b = booth ?? booths()[0]; if (!b) return 'No terminal here';
     const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(b.root.quaternion).setY(0).normalize();
     const base = b.root.getWorldPosition(new THREE.Vector3());
-    run = { task: offer.task, ends: session.time + DURATION, count: 0, streak: 0, booth: b, chestAt: base.clone().addScaledVector(fwd, 80), chestYaw: Math.atan2(fwd.x, fwd.z) };
+    run = { task: offer.task, ends: session.time + DURATION, count: 0, streak: 0, tempoIn: TEMPO_EVERY, booth: b, chestAt: base.clone().addScaledVector(fwd, 80), chestYaw: Math.atan2(fwd.x, fwd.z) };
     offer = null;
     if (run.task.zone) { run.zone = base.clone().addScaledVector(fwd, 60); ring.position.copy(run.zone).y += 2; scene.add(ring); }
     b.print?.('TASK: ' + run.task.name);
@@ -117,8 +121,21 @@ export default async function setup(api) {
     for (let i = 0; i < rw.grenades; i++) out.push({ kind: 'grenade' });
     if (rw.weapon) { const id = loot?.pickWeapon(rw.weapon); if (id) out.push({ kind: 'weapon', id }); }
     if (rw.powerup && Math.random() < rw.powerup) { const types = POWERUPS.filter(t => data.powerups?.[t]); if (types.length) out.push({ kind: 'powerup', id: types[Math.floor(Math.random() * types.length)] }); }
-    if (rw.perk) { const p = loot?.freePerk(); if (p) out.push({ kind: 'perk', id: p.id }); else out.push({ kind: 'points', amount: 1000 }, { kind: 'points', amount: 1000 }); }   // every perk owned: 2,000 points instead
+    if (rw.perk) { const p = loot?.freePerk(); if (p) out.push({ kind: 'perk', id: p.id }); else out.push({ kind: 'points', amount: 250 }, { kind: 'points', amount: 250 }); }   // every perk owned: 500 points instead
     return out;
+  }
+
+  // ---- tempo zombies: one at a time at a spawn point near the player, rising out of the ground like exfil's horde
+  function tempo(at) {
+    if (!world.spawnBarriers || !enemies || session.phase === 'gameover' || enemies.list.length >= 24 || enemies.list.filter(z => z.tempo).length >= TEMPO_MAX) return;
+    const bars = world.spawnBarriers(session).map(b => ({ b, d: b.inside.distanceTo(at) })).filter(x => x.d > TEMPO_NEAR).sort((a, b) => a.d - b.d).slice(0, 6);
+    if (!bars.length) return;
+    const spot = bars[Math.floor(Math.random() * bars.length)].b.inside.clone(), z = enemies.spawn(spot, null, 'zombie');
+    if (z) { enemies.riseAt?.(z, spot); z.tempo = true; session.spawned--; }   // not one of the round's zombies
+  }
+  function subscribe() {
+    const n = window.kino.coop; if (!n || subscribed) return; subscribed = true;
+    n.on('tedd', m => { if (n.isHost && m.at) tempo(new THREE.Vector3(...m.at)); });   // a guest's task asks the host for each one
   }
 
   host.on('kill', e => {
@@ -131,10 +148,15 @@ export default async function setup(api) {
     if (run.count >= run.task.tiers[3]) finish();
   });
   host.on('beforeDamage', e => { if (run?.task.streak && e.amount > 0) run.streak = 0; });
-  host.on('update', () => {
+  host.on('update', dt => {
+    subscribe();
     if (session.phase === 'gameover') { if (run) { run = null; ring.removeFromParent(); } drawHud(); return; }
     if (!run && booths().length && session.round >= next) newOffer();
     if (run && session.time >= run.ends) finish();
+    if (run && session.phase !== 'reviving' && (run.tempoIn -= dt || 0) <= 0) {
+      run.tempoIn = TEMPO_EVERY; const f = feet();
+      if (net() && !net().isHost) net().send('host', { t: 'tedd', at: f.toArray() }); else tempo(f);
+    }
     drawHud();
   });
   host.on('reset', () => { next = FIRST; offer = null; last = null; if (run) { run = null; ring.removeFromParent(); } drawHud(); });

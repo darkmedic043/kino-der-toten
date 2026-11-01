@@ -785,7 +785,7 @@ function build() {
     if (!st) { tkBody.innerHTML = '<h2>T.E.D.D.</h2><div class="state no">TASKS.EXE IS NOT INSTALLED</div>'; return; }
     const tierRow = (t, count) => `<dt>RATINGS</dt><dd>${t.tiers.map((v, i) => `<span style="color:${st.tiers[i].color}${count !== undefined && count >= v ? ';text-decoration:underline' : ''}">${st.tiers[i].name} ${v}</span>`).join(' · ')}</dd>`;
     const when = `<dt>OFFERS</dt><dd>FROM ROUND ${st.first}, THEN EVERY ${st.gap[0]}-${st.gap[1]} ROUNDS</dd>`;
-    const prize = `<ul><li>Bronze: points, ammo, a grenade</li><li>Silver: more, plus a weapon from your Mystery Box list, maybe a power-up</li><li>Gold: a rarer weapon from your list and a power-up</li><li>Legendary: the best of your list, a power-up and a free perk</li></ul>`;
+    const prize = `<ul><li>Bronze: points, ammo, a grenade</li><li>Silver: more, plus a weapon from your Mystery Box list, maybe a power-up</li><li>Gold: a rarer weapon from your list and a power-up</li><li>Legendary: the best of your list, a power-up and a free perk</li><li>Tempo zombies keep coming while a task runs: they count for it but pay few points</li></ul>`;
     const lastLine = st.last ? `<dt>LAST TASK</dt><dd>${esc(st.last.name)} · ${st.last.tier >= 0 ? `<span style="color:${st.tiers[st.last.tier].color}">${st.tiers[st.last.tier].name}</span>` : 'FAILED'} (${st.last.count})</dd>` : '';
     const msgLine = tkMsg ? `<div class="msg bad">${esc(tkMsg)}</div>` : '';
     keepScroll(tkBody).innerHTML = st.run

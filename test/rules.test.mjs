@@ -33,6 +33,11 @@ test('Quick Revive halves the regen delay and no longer self-revives',()=>{
 test('headshots, knife kills, and timed Double Points award distinct scores',()=>{
  const s=new Session(data);s.scoreHit(false);assert.equal(s.points,510);s.scoreHit(true,true);assert.equal(s.points,610);s.powerup('double_points');s.scoreHit(true,false,true);assert.equal(s.points,870);s.update(31);s.scoreHit(false);assert.equal(s.points,880);
 });
+test('tempo zombies pay 20/30/40 a kill, nothing a hit, and stay out of the round count',()=>{
+ const s=new Session(data),start=s.points;s.scoreHit(false,false,false,true);assert.equal(s.points,start);
+ s.scoreHit(true,false,false,true);assert.equal(s.points,start+20);s.scoreHit(true,true,false,true);assert.equal(s.points,start+50);s.scoreHit(true,false,true,true);assert.equal(s.points,start+90);
+ assert.equal(s.killed,0);assert.equal(s.kills,3);
+});
 test('dog rounds use original population and produce later scheduled rounds',()=>{
  const s=new Session(data,()=>0);while(s.round<5)s.nextRound();assert(s.dogRound);assert.equal(s.total,6);assert.equal(s.nextDogRound,9);
  while(s.round<13)s.nextRound();assert(s.dogRound);assert.equal(s.dogRounds,3);assert.equal(s.total,8);

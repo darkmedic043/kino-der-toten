@@ -231,7 +231,7 @@ export class Enemies {
           const next=z.path[z.pathIndex],left=next?z.root.position.distanceTo(next)+pathLength(z.path,z.pathIndex):0;
           z.farT=left>FAR_CHASE&&!this.world.lineClear(at,eye)?(z.farT??0)+1:0;
           if(z.farT>=(s.spawned>=s.total?4:8)){z.farT=0;const near=this.spawnChoices(tp);   // only when every spawn it could take is nearer
-            if(near.length&&Math.max(...near.map(c=>c.len))<left-500){this.remove(z);s.spawned--;continue;}}
+            if(near.length&&Math.max(...near.map(c=>c.len))<left-500){this.remove(z);if(!z.tempo)s.spawned--;continue;}}
         }
       }
       if(!freeWalk&&!target&&this.freeMode&&dist>40&&z.state==='chase')this.walkFree(z,goal,dt);   // the last stretch to a spot the navmesh does not reach
@@ -239,7 +239,7 @@ export class Enemies {
       if(z.stuck>12){const moved=z.lastPosition.distanceTo(z.root.position);z.lastPosition.copy(z.root.position);z.stuck=0;if(moved<5&&dist>100){z.path=[];z.repath=0;z.stuckCount=(z.stuckCount??0)+1;if(z.stuckCount>=3){this.remove(z);s.spawned--;}}else z.stuckCount=0;}
     }
     for(const d of [...this.dead]){d.life-=dt;d.rig.update(dt);if(d.life<2)d.root.position.y-=dt*24;if(d.life<=0){d.root.removeFromParent();d.rig.mixer.uncacheRoot(d.root);disposeSkeletons(d.root);this.dead.splice(this.dead.indexOf(d),1);}}
-    if(this.autoRounds!==false&&s.phase==='fighting'&&s.spawned>=s.total&&this.list.length===0){if(s.dogRound)this.onKill?.(null,'full_ammo',this.lastDogDeath??player);s.nextRound();this.nextSpawn=0;this.lastDogDeath=null;}
+    if(this.autoRounds!==false&&s.phase==='fighting'&&s.spawned>=s.total&&this.list.every(z=>z.tempo)){if(s.dogRound)this.onKill?.(null,'full_ammo',this.lastDogDeath??player);s.nextRound();this.nextSpawn=0;this.lastDogDeath=null;}
   }
   // zombieWalls: nothing solid (map, doors, clip) on the line between two feet positions at knee or chest height
   walkClear(a,b,heights=[24,50]){
@@ -355,9 +355,9 @@ export class Enemies {
     this.onHit?.(z,head);
     if(z.health<=0){
       if(z.kind==='dog')this.lastDogDeath=z.root.position.clone();
-      if(score)this.session.scoreHit(true,head,melee);else{this.session.kills++;this.session.killed++;}this.list.splice(this.list.indexOf(z),1);z.state='dead';z.life=4;z.rig.play('death',false);this.dead.push(z);z.gasDeath=z.kind==='nova'&&!melee&&cause==='bullet';this.onKill?.(z);
+      if(score)this.session.scoreHit(true,head,melee,z.tempo);else{this.session.kills++;if(!z.tempo)this.session.killed++;}this.list.splice(this.list.indexOf(z),1);z.state='dead';z.life=4;z.rig.play('death',false);this.dead.push(z);z.gasDeath=z.kind==='nova'&&!melee&&cause==='bullet';this.onKill?.(z);
       if(this.dead.length>12){const old=this.dead.shift();old.root.removeFromParent();old.rig.mixer.uncacheRoot(old.root);disposeSkeletons(old.root);}
-    }else if(score)this.session.scoreHit(false);
+    }else if(score)this.session.scoreHit(false,false,false,z.tempo);
   }
   rayHit(ray,far,skip){   // skip: zombies a piercing bullet has already gone through (engine.js def.pierce)
     let best=null;
@@ -373,7 +373,7 @@ export class Enemies {
     }return best;
   }
   headPosition(z){z.root.updateMatrixWorld(true);const bone=z.root.getObjectByName('j_head');return bone?bone.getWorldPosition(new THREE.Vector3()):z.root.position.clone().add(new THREE.Vector3(0,z.kind==='zombie'?63:28,0));}
-  nuke(onDeath){for(const z of [...this.list]){this.list.splice(this.list.indexOf(z),1);this.session.kills++;this.session.killed++;if(z.kind==='dog')this.lastDogDeath=z.root.position.clone();z.state='dead';z.gasDeath=false;z.life=3;z.rig.play('death',false);this.dead.push(z);onDeath(z);this.onKill?.(z);}}
+  nuke(onDeath){for(const z of [...this.list]){this.list.splice(this.list.indexOf(z),1);this.session.kills++;if(!z.tempo)this.session.killed++;if(z.kind==='dog')this.lastDogDeath=z.root.position.clone();z.state='dead';z.gasDeath=false;z.life=3;z.rig.play('death',false);this.dead.push(z);onDeath(z);this.onKill?.(z);}}
   reset(){for(const z of [...this.list,...this.dead]){z.root.removeFromParent();z.rig.mixer.uncacheRoot(z.root);disposeSkeletons(z.root);}this.list=[];this.dead=[];this.nextSpawn=0;this.lastDogDeath=null;}
   snapshot(){return this.list.map(z=>({id:z.id,kind:z.kind,health:z.health,state:z.state,position:z.root.position.toArray(),pathLength:z.path.length,animation:z.rig.current}));}
 }

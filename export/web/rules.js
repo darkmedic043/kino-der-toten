@@ -159,10 +159,12 @@ export class Session {
     if(this.inventory.length<this.weaponSlots){this.inventory.push(w);this.slot=this.inventory.length-1;}else this.inventory[this.slot]=w;
     this.cancelReload();
   }
-  scoreHit(killed=false,head=false,melee=false){
+  // tempo: a T.E.D.D. task's extra zombie (mods/tedd-tasks): 20/30/40 a kill, nothing a hit, and not part of the round's count
+  scoreHit(killed=false,head=false,melee=false,tempo=false){
     this.hits++;
-    if(killed){this.kills++;this.killed++;if(head)this.headshots++;this.addPoints(melee?130:head?100:60);}
-    else this.addPoints(10);
+    const pts=n=>tempo?Math.round(n*.03)*10:n;
+    if(killed){this.kills++;if(!tempo)this.killed++;if(head)this.headshots++;this.addPoints(pts(melee?130:head?100:60));}
+    else this.addPoints(pts(10));
   }
   nextRound(){
     this.round++;this.dogRound=this.round===this.nextDogRound;

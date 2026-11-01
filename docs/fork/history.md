@@ -420,3 +420,4 @@
 - 2026-11-01: Combat Knife: rarity removed (user's call); Pack-a-Punch tiers are its only upgrade and only raise damage.
 - 2026-11-01: Melon Pass: Melon Harvest renumbered Season 0 (season `number` field, id stays s1); the next season is Season 1 with id s2 (pass.md).
 - 2026-11-01: Nuketown: the rubble ramp on the east sidewalk is a one-way way back from the road into town (the clip sheet on top lets the ramp side through) (waw-ports.md).
+- 2026-11-01: The Giant's Fly Trap: journal markers show the three targets (the group nodes sit at the map origin) then the prize until it's taken. T.E.D.D. Tasks: chest points cut to 100-400; tempo zombies rise while a task runs: few points, no drops, outside the round count (journal.md, props.md).

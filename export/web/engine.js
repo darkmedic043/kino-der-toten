@@ -221,7 +221,7 @@ function kill(z,force,position){
   if(z)map.onKill?.(z);
   if(force){powerups.spawn(force,position??player.getFeetPosition());return;}
   if(z&&map.dropAllowed?.(z)===false)return;
-  if(z){const type=session.drops.tryDrop(session,{kind:z.kind,playable:z.state!=='barricade'&&(map.playable?.(z)??true),destroyedWindows:map.brokenWindows?.()??world.barriers.filter(b=>map.boardCount(b)&&b.count===0).length,boxMoves:mysteryBox.moves});if(type)powerups.spawn(type,z.root.position);}
+  if(z&&!z.tempo){const type=session.drops.tryDrop(session,{kind:z.kind,playable:z.state!=='barricade'&&(map.playable?.(z)??true),destroyedWindows:map.brokenWindows?.()??world.barriers.filter(b=>map.boardCount(b)&&b.count===0).length,boxMoves:mysteryBox.moves});if(type)powerups.spawn(type,z.root.position);}
 }
 function collect(type){
   if(!powerupNames[type])return;

@@ -192,9 +192,9 @@ export const JOURNAL = [
   ] },
 
   { map: 'the-giant', title: 'The Giant', quests: [
-    { id: 'flytrap', name: 'The Fly Trap', kind: 'SIDE EGG', progress: L => { const v = String(L.tile('giant-flytrap')?.value() ?? ''); return v === 'done' ? 2 : v && v !== 'not started' ? 1 : 0; }, steps: [
+    { id: 'flytrap', name: 'The Fly Trap', kind: 'SIDE EGG', progress: L => { const f = L.flyTrap(); return !f || f.stage === 'panel' ? 0 : f.done ? 2 : 1; }, steps: [
       { title: 'Shoot the fly trap', how: 'Shoot the fly trap with a Pack-a-Punched gun.', where: L => L.nodes(/^GIANT_FLYTRAP$/) },
-      { title: 'Hide and seek', how: 'Three things appear around the map (a monkey bomb, a Bowie knife teddy bear, a perk bottle teddy bear): shoot all three. The prize spins in the fly trap room: take it.', where: L => [...L.nodes(/^GIANT_EE_/), ...L.nodes(/^GIANT_PRIZE/)] },
+      { title: 'Hide and seek', how: 'Three things appear around the map (a monkey bomb, a Bowie knife teddy bear, a perk bottle teddy bear): shoot all three. The prize spins in the fly trap room: take it.', where: L => { const f = L.flyTrap(); return f?.prize ? [f.prize] : f?.targets ?? []; } },
     ] },
     { id: 'song', name: 'Beauty of Annihilation', kind: 'SIDE EGG', progress: L => L.tile('giant-song')?.done() ? 1 : 0, steps: [
       { title: 'The spine beakers', how: 'Find and use the three beakers with a brain and spine in them.', where: L => L.prompts(/specimen jar/) },

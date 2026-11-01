@@ -155,7 +155,7 @@ function setupEggs(api) {
   const floaty = node('GIANT_FLOATY'), floatyHome = floaty ? floaty.children.map(c => c.position.clone()) : [];
 
   // ---- Fly Trap
-  let stage = 'panel', showAt = 0, prize = null;   // panel -> seek -> prize
+  let stage = 'panel', showAt = 0, prize = null, taken = false;   // panel -> seek -> prize
   const shot = new Set();
   const mine = t => { t.giant = true; return t; };
   const disarm = () => { if (world.shootTargets) world.shootTargets = world.shootTargets.filter(t => !t.giant); };
@@ -173,6 +173,7 @@ function setupEggs(api) {
     for (const t of targets) {
       t.group.visible = true;
       const box = new THREE.Box3().setFromObject(t.group), centre = box.getCenter(new THREE.Vector3());
+      t.spot = centre;   // the group node itself sits at the map origin (only its children are placed)
       world.addShootTarget(mine({
         position: centre, radius: Math.max(12, box.getSize(new THREE.Vector3()).length() / 2),
         hit() {
@@ -200,24 +201,25 @@ function setupEggs(api) {
     host.emit?.('easterEgg', { name: 'fly trap' });
   };
   const scene = () => api.scene;
+  const hasPrize = () => annihilator() ? op()?.current === OPERATOR && op().charge >= 1 && !op().active
+    : session.inventory.some(w => w.id === PRIZE && w.upgraded && !w.lost);
   world.addInteraction({
     position: at(prizeUse ?? prizeAt),
-    hidden: () => stage !== 'prize' || (annihilator() ? op()?.current === OPERATOR && op().charge >= 1 && !op().active
-      : session.inventory.some(w => w.id === PRIZE && w.upgraded && !w.lost)),
+    hidden: () => stage !== 'prize' || hasPrize(),
     text: () => annihilator() ? 'Take the Annihilator (operator weapon)' : 'Take the Annihilator (Pack-a-Punched Python)',
     use() {
       if (stage !== 'prize') return false;
       if (annihilator()) {   // into the operator slot, charged (a held Annihilator is refilled)
         if (op().active) op().putAway(); op().give(OPERATOR, { full: true }); globalThis.kino?.armory?.found?.(OPERATOR); audio?.play?.('buy');   // found: the Armory's unlock (mods/armory)
         toast('Reward: Annihilator · ' + (binds().operator ?? 'KeyY').replace(/^Key/, '') + ' to use', 5);
-        return true;
+        taken = true; return true;
       }
       if (!data.weapons[PRIZE]) return false;
       session.giveWeapon(PRIZE);
       const w = session.inventory.find(x => x.id === PRIZE);
       if (w) { w.upgraded = true; w.mag = session.def.clipSize; w.reserve = session.def.maxAmmo; }
       api.equipView?.(); audio?.play?.('buy'); toast('Reward: ' + session.def.name, 5);
-      return true;
+      taken = true; return true;
     },
   });
 
@@ -237,13 +239,19 @@ function setupEggs(api) {
     },
   }));
 
+  // for the journal's markers: the targets still to shoot, then the prize until it's taken
+  if (globalThis.kino) globalThis.kino.giantFlyTrap = () => {
+    const done = stage === 'prize' && (taken || hasPrize());
+    return { stage, done, targets: stage === 'seek' ? targets.filter(t => t.spot && !shot.has(t.id)).map(t => t.spot.clone()) : [],
+      prize: stage === 'prize' && !done ? at(prizeUse ?? prizeAt) : null };
+  };
   globalThis.kino?.scoreboard?.addCollectible?.({ id: 'giant-flytrap', label: 'Easter egg · Fly Trap',
     value: () => stage === 'panel' ? 'not started' : stage === 'seek' ? `${shot.size} / ${targets.length}` : 'done', done: () => stage === 'prize' });
   globalThis.kino?.scoreboard?.addCollectible?.({ id: 'giant-song', label: 'Easter egg · Song',
     value: () => `${heard.size} / ${jars.length}`, done: () => heard.size === jars.length });
 
   const reset = () => {
-    disarm(); stage = 'panel'; showAt = 0; shot.clear(); heard.clear();
+    disarm(); stage = 'panel'; showAt = 0; taken = false; shot.clear(); heard.clear();
     for (const t of targets) t.group.visible = false;
     prize?.removeFromParent(); prize = null;
     armPanel();

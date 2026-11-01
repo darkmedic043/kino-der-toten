@@ -96,7 +96,7 @@ export class ModHost {
   async start(api){
     this.api=api;const {session,enemies}=api,host=this;
     let lastHit=null;
-    wrap(session,'scoreHit',(original,killed,head,melee)=>{if(killed)lastHit={head:!!head,melee:!!melee};return original(killed,head,melee);});
+    wrap(session,'scoreHit',(original,killed,head,melee,tempo)=>{if(killed)lastHit={head:!!head,melee:!!melee};return original(killed,head,melee,tempo);});
     wrap(enemies,'onKill',(original,z,...rest)=>{const result=original(z,...rest);if(z){host.emit('kill',{enemy:z,kind:z.kind,head:lastHit?.head??false,melee:lastHit?.melee??false,remote:!!host.remoteDamage});lastHit=null;}return result;});
     wrap(session,'nextRound',(original)=>{const finished=session.round;const result=original();host.emit('roundEnd',{round:finished});return result;});
     wrap(session,'reset',(original)=>{const result=original();host.emit('reset');return result;});

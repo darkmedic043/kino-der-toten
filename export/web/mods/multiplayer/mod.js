@@ -155,7 +155,7 @@ export default async function setup(api){
     if(!net.isHost)return;
     const z=enemies.list.find(z=>z.id===m.id);if(!z)return;
     host.remoteDamage=true;host.remoteBy=from;try{enemies.hurt(z,m.amount,m.head,m.melee,m.cause,false);}finally{host.remoteDamage=false;host.remoteBy=null;}
-    net.send(from,{t:'res',killed:!enemies.list.includes(z),head:!!m.head,melee:!!m.melee,kind:z.kind});
+    net.send(from,{t:'res',killed:!enemies.list.includes(z),head:!!m.head,melee:!!m.melee,kind:z.kind,tempo:!!z.tempo});
   });
   net.on('world',m=>{if(net.isHost)applyWorld(m);});
   net.on('box',m=>{if(net.isHost)setBox(m.id);});
@@ -189,7 +189,7 @@ export default async function setup(api){
     powerups.update=(dt,feet,canCollect,lineClear)=>original.powerUpdate(dt,feet,false,lineClear);
     setNote();
   }
-  net.on('res',m=>{session.scoreHit(m.killed,m.head,m.melee);if(m.killed)host.emit('kill',{enemy:null,kind:m.kind,head:m.head,melee:m.melee});});
+  net.on('res',m=>{session.scoreHit(m.killed,m.head,m.melee,m.tempo);if(m.killed)host.emit('kill',{enemy:null,kind:m.kind,head:m.head,melee:m.melee});});
   net.on('hit',m=>{
     if(me.down||me.dead)return;
     const z=enemies.list.find(z=>z.id===m.z);if(z){z.state='attack';z.attackDealt=true;}
