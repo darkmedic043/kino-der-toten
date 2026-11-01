@@ -95,7 +95,7 @@ export default function setup(api){
   const slide={t:0,dir:new THREE.Vector3(),start:0,boost:0};
   function startSlide(){
     const v=player.velocity,h=Math.hypot(v.x,v.z);if(h<160||state.prone)return;
-    state.sliding=true;slide.t=0;slide.boost=0;slide.dir.set(v.x/h,0,v.z/h);slide.start=Math.min(SLIDE.maxSpeed,Math.max(h,220)*1.6);
+    state.sliding=true;slide.t=0;slide.boost=0;slide.dir.set(v.x/h,0,v.z/h);slide.mul=window.kino?.slideMul?.()??1;slide.start=Math.min(SLIDE.maxSpeed,Math.max(h,220)*1.6)*slide.mul;
     controls.crouch=true;host.emit('slide');
   }
   // ---- Dive (BO6/BO7): a low forward leap in the move direction, landing prone ------------
@@ -175,7 +175,7 @@ export default function setup(api){
       // Wall jump is off (user request, 2026-10-05: it fired when they meant to mantle); WALL_JUMP turns it back on.
       else if(WALL_JUMP&&jumpNow&&!prevJump&&!player.onFloor&&state.airTime>.12&&!state.prone&&tryWallJump()){input.jump=false;input.jumpPressed=false;}
       if(state.sliding){
-        slide.t+=dt;input.sprint=false;
+        slide.t+=dt/(slide.mul??1);input.sprint=false;   // Tribologist: faster and farther (same curve, stretched)
         player.groundAcceleration=40;   // the slide curve drives the speed, not friction
         if(slide.t>=SLIDE.duration||(!player.onFloor&&state.airTime>.45))state.sliding=false;
       }

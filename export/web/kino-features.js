@@ -53,7 +53,7 @@ export class KinoFeatures {
     let def=this.data.equipment.zombie_cymbal_monkey;const mesh=this.model(def.projectileModel);mesh.position.copy(this.camera.position);this.scene.add(mesh);
     if(def.explosionRadius&&(aug('monkey.boom')||aug('monkey.radius'))){const k=1+aug('monkey.boom');def={...def,explosionRadius:def.explosionRadius*(1+aug('monkey.radius')),explosionInnerDamage:def.explosionInnerDamage*k,explosionOuterDamage:def.explosionOuterDamage*k};}
     let rig;if(this.monkeyAnimation){rig=new Rig(mesh);rig.add('cymbals',this.monkeyAnimation);}
-    this.projectiles.push({mesh,def,rig,velocity:this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(480).addScaledVector(up,150),life:def.fuseTime*(1+aug('monkey.long')),gravity:650,monkey:true,stuck:false,crash:1});return true;
+    this.projectiles.push({mesh,def,rig,velocity:this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(480*(window.kino?.throwRange?.()??1)).addScaledVector(up,150*(window.kino?.throwRange?.()??1)),life:def.fuseTime*(1+aug('monkey.long')),gravity:650,monkey:true,stuck:false,crash:1});return true;
   }
   lureTarget(z){
     if(z.kind==='dog')return null;

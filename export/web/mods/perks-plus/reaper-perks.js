@@ -223,7 +223,7 @@ export function setupReaperPerks(api, catalogue, base) {
   //      end of each round. Upgrade: kills sometimes patch the shield (10%: 100).
   // ---- Dam-A-Nade: explosions x1.5 (x2 upgraded); one more grenade (5) and the lot refilled each round, +1 monkey.
   // ---- Downer's Delight: co-op bleed-out x2 (x3 upgraded; multiplayer mod), Fighter's Fizz's last stand too.
-  window.kino.coopBleedMul = () => has('downers') ? (up('downers') ? 3 : 2) : 1;
+  window.kino.coopBleedMul = () => (has('downers') ? (up('downers') ? 3 : 2) : 1) * (window.kino.bleedMul?.() ?? 1);   // bleedMul: Slow Death
   // ---- Electric Cherry (BO2): starting a reload sets off a burst, bigger and harder the emptier the magazine.
   let lastReload = 0, cherryReady = 0;
   // ---- Estatic Elixir: sprinting crackles, stunning zombies within 80 every 0.5 s. Upgrade: every 10 stuns store a
@@ -432,7 +432,7 @@ export function setupReaperPerks(api, catalogue, base) {
     broke: at => { if (!has('victorious')) return; blast(at, 200, 3 * zh()); fx(at.clone().add(V(0, 30, 0)), 1, 0x6fd06a); ring(at, 200, 0x6fd06a); } };
   const hookShield = () => { const s = window.kino?.rocketShield; if (s && !s.perk) s.perk = shieldPerk; };
   // Tactiquilla: fire while sprinting (engine.js reads mods.sprintFire)
-  host.sprintFire = () => has('tactiquilla');
+  host.sprintFire = () => has('tactiquilla') || !!stat('su.gunsUp');
 
   // ---- per frame ------------------------------------------------------------------------------------------------------
   let started = false, lastPhase = '', lastPerks = new Set();
@@ -670,8 +670,8 @@ export function setupReaperPerks(api, catalogue, base) {
   //      kills explode), lethal / tactical (+n carried), scav (explosive kills give a grenade back), resupply (full tactical).
   //      The tactical bonus is added to the item's own max (3, 4 with its Extra Monkey / Device / QED equipment augment), so
   //      every top-up (pickup, Max Ammo, Equip Mint) fills the bigger slot: Monkey Bombs with Extra Monkey + Extra Tactical = 6.
-  const nadeMax = () => 5 + stat('dn.lethal');
-  const tacticalBonus = () => has('damnade') ? 1 + stat('dn.tactical') : 0;
+  const nadeMax = () => (has('damnade') ? 5 + stat('dn.lethal') : 4) + stat('mk.equip');   // Mule Kick's Fully Equipped adds to either
+  const tacticalBonus = () => (has('damnade') ? 1 + stat('dn.tactical') : 0) + stat('mk.equip');
   { const monkeyMax = session.monkeyMax?.bind(session); if (monkeyMax) session.monkeyMax = () => monkeyMax() + tacticalBonus(); }   // Gersh/QED: moon-equipment's maxOf
   const tacticalMax = () => { const t = window.kino?.tactical; return t?.id ? t.max?.() ?? 3 + tacticalBonus() : session.monkeyMax?.() ?? 3 + tacticalBonus(); };
   function tacticalBack(n) {
@@ -680,9 +680,9 @@ export function setupReaperPerks(api, catalogue, base) {
     else if (session.monkeysOwned) session.monkeys = Math.max(session.monkeys ?? 0, Math.min(tacticalMax(), (session.monkeys ?? 0) + n));
   }
   { const next = session.nextRound?.bind(session);   // the round-end +2 grenades caps at 4: keep a Dam-A-Nade belt's 5th and 6th
-    if (next) session.nextRound = (...a) => { const before = session.grenades ?? 0, r = next(...a); if (has('damnade')) session.grenades = Math.max(session.grenades ?? 0, Math.min(before, nadeMax())); return r; }; }
+    if (next) session.nextRound = (...a) => { const before = session.grenades ?? 0, r = next(...a); if (has('damnade') || stat('mk.equip')) session.grenades = Math.max(session.grenades ?? 0, Math.min(before + (stat('mk.equip') ? 2 : 0), nadeMax())); return r; }; }
   { const powerup = session.powerup?.bind(session);   // Max Ammo: the bigger belt and tactical slot, filled
-    if (powerup) session.powerup = (type, ...rest) => { const r = powerup(type, ...rest); if (type === 'full_ammo' && has('damnade')) { session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(Infinity); } return r; }; }
+    if (powerup) session.powerup = (type, ...rest) => { const r = powerup(type, ...rest); if (type === 'full_ammo' && (has('damnade') || stat('mk.equip'))) { session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(Infinity); } return r; }; }
 
   // ---- chips ------------------------------------------------------------------------------------------------------------
   chip(() => has('dyingwish') ? [dyingUntil > now() ? 'DYING WISH ' + Math.ceil(dyingUntil - now()) : now() < dyingReady ? 'DW ' + Math.ceil(dyingReady - now()) + 's' : 'DYING WISH', dyingUntil > now() || now() >= dyingReady] : null);

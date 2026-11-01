@@ -39,7 +39,8 @@ export class MysteryBox {
     const teddy=!sale&&this.session.random()<chance;
     const weights=pool.map(k=>list?.weight?.(k)??1);let pick=this.session.random()*weights.reduce((a,b)=>a+b,0),weapon=pool.at(-1);
     for(let i=0;i<pool.length;i++){pick-=weights[i];if(pick<0){weapon=pool[i];break;}}
-    b.roll={weapon,ready:false,time:this.session.time+cycleTime,expires:this.session.time+cycleTime+offerTime,started:this.session.time,sale,teddy,pool};
+    const cycle=cycleTime*(window.kino?.boxSpin?.()??1);   // Speedy Roulette
+    b.roll={weapon,ready:false,time:this.session.time+cycle,expires:this.session.time+cycle+offerTime,started:this.session.time,speed:cycleTime/cycle,sale,teddy,pool};
     b.opening=0;this.world.openBoxes.add(b.id);this.world.updateBox();this.audio.event('box/open/open_00');this.audio.event('box/music_box/music_box_00',.7);return true;
   }
   take(e){const b=this.boxes.get(e.id);if(!b?.roll?.ready||b.roll.teddy)return null;const weapon=b.roll.weapon;this.close(b);return weapon;}
@@ -83,7 +84,7 @@ export class MysteryBox {
     if(this.world.fireSale!==sale){this.world.fireSale=sale;this.world.updateBox();this.audio.fireSale(sale);}
     for(const b of this.boxes.values()){
       if(b.roll){
-        const r=b.roll,age=this.session.time-r.started;b.opening=Math.min(.5,b.opening+dt);
+        const r=b.roll,age=(this.session.time-r.started)*(r.speed??1);b.opening=Math.min(.5,b.opening+dt);
         if(this.session.time>=r.time&&!r.ready){r.ready=true;this.show(b,r.teddy?'teddy':r.weapon);this.toast(r.teddy?'The Mystery Box is moving…':(this.data.weapons[r.weapon]??this.data.equipment[r.weapon]).name+' — press F to take',4);
           if(r.teddy){this.session.points+=950;this.audio.event('box/whoosh/whoosh_00');}}
         if(!r.ready){const step=age<1?Math.floor(age/.05):age<2?20+Math.floor((age-1)/.1):age<3?30+Math.floor((age-2)/.2):35+Math.floor((age-3)/.3);this.show(b,r.pool[step%r.pool.length]);}

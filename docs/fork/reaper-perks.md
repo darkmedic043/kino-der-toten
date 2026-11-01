@@ -70,7 +70,7 @@ Magnet Margarita (user, 2026-10-19): "implements magnet margarita? havbe it be i
 |---|---|---|---|
 | 1 | Strong Pull | Minor | Power-ups drift 50% faster, from as far as 2,500 (was 1,500) (the mod's "twice as fast", toned down) |
 | 2 | Deep Pockets | Major | The stash holds 3 power-ups (was 1) (user: "one of the augments allow it to hold more power ups") |
-| 3 | Long Reach | Minor | Store from 260 away (was 140) |
+| 3 | Stacked | Minor | Up to 3 of the same power-up share one stash slot (`mm.stack`; user 2026-11-01. Replaced Long Reach, same id `p.magnet.longreach`: it did nothing because the pull already stops inside the 140 reach). The wheel shows one slice per type, "Stored ×2" |
 | 4 | Magnetic Pulse | Major | Storing or dropping sends out a pulse: zombies within 220 take 0.3 zh and freeze for 1.5 s |
 | 5 | Lingering | Minor | Power-ups on the ground within 600 of you don't time out (held before they start blinking) |
 | 6 | Attraction | Major | 3% of your kills drop a bonus Nuke, Insta-Kill, Double Points or Max Ammo (the mod's upgrade; on a co-op client, in front of you) |

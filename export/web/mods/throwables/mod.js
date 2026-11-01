@@ -94,8 +94,9 @@ export default async function setup(api){
 
   async function begin(id,key){
     held={id,key,released:false,throwing:false,ready:false};
-    if(id==='frag_grenade_zm')session.grenades--;
-    else if(id!=='zombie_cymbal_monkey')tac().count--;     // monkeys are spent by features.throwMonkey
+    const keep=window.kino.freeThrow?.();   // Free Throw (Mule Kick augment)
+    if(id==='frag_grenade_zm'){if(!keep)session.grenades--;}
+    else if(id!=='zombie_cymbal_monkey'){if(!keep)tac().count--;}     // monkeys are spent by features.throwMonkey
     session.cancelReload?.();session.equipmentLeft=99;
     try{await view.equip(viewDef(id));}catch(err){console.warn('[throwables]',err);}
     if(!held)return;
@@ -103,17 +104,17 @@ export default async function setup(api){
     const r=view.rig,holdKey=r?.actions.holdFireAnim?'holdFireAnim':'fireAnim',t=holdFrame(holdKey);
     held.holdKey=holdKey;held.holdT=t;held.pinAt=session.time;held.ready=true;
     // run the pull-pin clip up to the hold frame (or ease straight into it on the throw clip)
-    if(holdKey==='holdFireAnim'){r.play('holdFireAnim',false,1.6,.05);}
+    if(holdKey==='holdFireAnim'){r.play('holdFireAnim',false,1.6*(window.kino.throwSpeed?.()??1),.05);}
     else{r.play('fireAnim',false,0,.15);r.actions.fireAnim.time=t;}
     if(id==='frag_grenade_zm'&&PIN)setTimeout(()=>held?.id===id&&audio.play(PIN,.8),250);
   }
 
   function release(){
-    const h=held;h.throwing=true;const r=view.rig;
-    if(r?.actions.fireAnim){r.play('fireAnim',false,1,.04);r.actions.fireAnim.time=0;r.actions.fireAnim.timeScale=1;}
+    const h=held;h.throwing=true;const r=view.rig,pace=window.kino.throwSpeed?.()??1;   // Fast Pitcher
+    if(r?.actions.fireAnim){r.play('fireAnim',false,pace,.04);r.actions.fireAnim.time=0;r.actions.fireAnim.timeScale=pace;}
     const len=r?.data.fireAnim?.duration||.4;
-    setTimeout(()=>{if(held===h){hideItem();launch(h);}},RELEASE*1000);
-    setTimeout(async()=>{if(held!==h)return;held=null;session.equipmentLeft=0;await api.equipView?.();},Math.max(len,.3)*1000+80);
+    setTimeout(()=>{if(held===h){hideItem();launch(h);}},RELEASE*1000/pace);
+    setTimeout(async()=>{if(held!==h)return;held=null;session.equipmentLeft=0;await api.equipView?.();},Math.max(len,.3)*1000/pace+80);
   }
 
   // ---- projectiles ---------------------------------------------------------------------
@@ -124,7 +125,8 @@ export default async function setup(api){
       const fuse=Math.max(.05,(frag.fuseTime??3.5)-(session.time-h.pinAt));
       const mesh=fragMesh?fragMesh.clone(true):new THREE.Mesh(new THREE.SphereGeometry(3.5,8,6),new THREE.MeshStandardMaterial({color:0x4a5039,roughness:.8}));
       const dir=camera.getWorldDirection(new THREE.Vector3());mesh.position.copy(camera.position).addScaledVector(dir,12);scene.add(mesh);
-      frags.push({mesh,velocity:dir.multiplyScalar(560).add(new THREE.Vector3(0,150,0)),life:fuse,spin:new THREE.Vector3(Math.random()*9,Math.random()*9,0),sticky:aug('frag.sticky')>0});
+      const far=window.kino.throwRange?.()??1;   // Quarterback
+      frags.push({mesh,velocity:dir.multiplyScalar(560*far).add(new THREE.Vector3(0,150*far,0)),life:fuse,spin:new THREE.Vector3(Math.random()*9,Math.random()*9,0),sticky:aug('frag.sticky')>0});
     }else if(h.id==='zombie_cymbal_monkey'){session.equipmentLeft=0;features.throwMonkey?.();session.equipmentLeft=99;}
     else{tac().launch?.(h.id);const t=tac();if(t.count<=0)t.id=null;}
   }

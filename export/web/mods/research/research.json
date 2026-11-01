@@ -1,5 +1,5 @@
 {
- "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Mule Kick and Shatter Blast aren't in BO7, so theirs are the fork's). Every perk, ammo mod and piece of equipment has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) and Magnet Margarita (2026-10-19) have the fork's own tracks; their mod's double-buy upgrades are Majors (Afterglow, Demolition Expert, Attraction). Equipment (2026-10-28, user): every tactical and lethal has the fork's own track (effect keys frag.*, clay.*, monkey.*, gersch.*, qed.*, read through window.kino.equipAug by the code that throws or places it); they work whenever equipped (they only act when you use the item), and research XP is x activeMul while you carry it.",
+ "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Shatter Blast isn't in BO7, so its names are the fork's). Every perk, ammo mod and piece of equipment has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) and Magnet Margarita (2026-10-19) have the fork's own tracks; their mod's double-buy upgrades are Majors (Afterglow, Demolition Expert, Attraction). Equipment (2026-10-28, user): every tactical and lethal has the fork's own track (effect keys frag.*, clay.*, monkey.*, gersch.*, qed.*, read through window.kino.equipAug by the code that throws or places it); they work whenever equipped (they only act when you use the item), and research XP is x activeMul while you carry it.",
  "unlockLevel": 11,
  "trackCost": [
   6000,
@@ -27,7 +27,7 @@
     {
      "name": "Swift Recovery",
      "kind": "minor",
-     "desc": "When your health refills completely, move 10% faster for 3s.",
+     "desc": "Reviving a teammate makes you both 10% faster for 4s. A full health refill does it for you alone.",
      "effects": {
       "qr.fullBoost": 0.1
      },
@@ -36,54 +36,58 @@
     {
      "name": "EMT",
      "kind": "major",
-     "desc": "Health comes back twice as fast.",
+     "desc": "Go down and a revive gives you your perks back (bleed out and they're gone). Health also comes back twice as fast.",
      "effects": {
-      "qr.regenMul": 1
+      "qr.regenMul": 1,
+      "qr.emt": 1
      },
      "id": "p.quickrevive.emt"
     },
     {
      "name": "Karmic Return",
      "kind": "minor",
-     "desc": "Every kill heals you 3.",
+     "desc": "Reviving a teammate fully heals you. Every kill also heals you 3.",
      "effects": {
-      "qr.killHeal": 3
+      "qr.killHeal": 3,
+      "qr.karmic": 1
      },
      "id": "p.quickrevive.karmicreturn"
     },
     {
      "name": "Equivalent Exchange",
      "kind": "major",
-     "desc": "Kills while you're under 25% health heal you 15.",
+     "desc": "While you're down, 6 kills by your team get you back up (3 times a game). Kills while you're under 25% health heal you 15.",
      "effects": {
-      "qr.lowKillHeal": 15
+      "qr.lowKillHeal": 15,
+      "qr.exchange": 6
      },
      "id": "p.quickrevive.equivalentexchange"
     },
     {
      "name": "Slow Death",
      "kind": "minor",
-     "desc": "Health starts coming back after 1s instead of 2.",
+     "desc": "You bleed out 50% slower. Health also starts coming back after 1s instead of 2.",
      "effects": {
-      "qr.delay": 1
+      "qr.delay": 1,
+      "qr.bleed": 0.5
      },
      "id": "p.quickrevive.slowdeath"
     },
     {
      "name": "Dying Wish",
      "kind": "major",
-     "desc": "A hit that would down you leaves you on 1 health, untouchable for 3s. Up to 3 times a game.",
+     "desc": "A hit that would down you leaves you on 1 health, untouchable for 2s, and costs you Quick Revive. Up to 3 times a game.",
      "effects": {
-      "qr.dyingWish": 3
+      "qr.dyingWish": 2
      },
      "id": "p.quickrevive.dyingwish"
     },
     {
      "name": "Emergency Medical Kit",
      "kind": "minor",
-     "desc": "Once a game, dropping under 20% health heals you to full.",
+     "desc": "Every 5th round earns a self-revive kit, up to 4. A hit that would down you uses one instead: back on half health.",
      "effects": {
-      "qr.emergency": 0.2
+      "qr.emergency": 5
      },
      "id": "p.quickrevive.emergencykit"
     },
@@ -125,18 +129,19 @@
     {
      "name": "Hardened Plates",
      "kind": "minor",
-     "desc": "Take 5% less damage.",
+     "desc": "Your plate health (everything above 100) takes 15% less damage.",
      "effects": {
-      "jug.armor": 0.05
+      "jug.armor": 0.15
      },
      "id": "p.armorvest.hardenedplates"
     },
     {
      "name": "Turtle Shell",
      "kind": "major",
-     "desc": "Hits from behind deal half damage, and hits from the front 10% less.",
+     "desc": "While you have plate health (above 100), hits from behind deal 50% less and hits from the front deal 10% less.",
      "effects": {
-      "jug.turtle": 0.5
+      "jug.turtle": 0.1,
+      "jug.turtleBack": 0.5
      },
      "id": "p.armorvest.turtleshell"
     },
@@ -152,9 +157,9 @@
     {
      "name": "Reactive Armor",
      "kind": "major",
-     "desc": "Taking a hit throws back the zombies within 120 and hurts them for 20% of their health.",
+     "desc": "When your plate health runs out, normal zombies within 200 are stunned for 3s. Recharges in 60s.",
      "effects": {
-      "jug.reactive": 0.2
+      "jug.reactive": 3
      },
      "id": "p.armorvest.reactivearmor"
     },
@@ -170,9 +175,9 @@
     {
      "name": "Iron Core",
      "kind": "major",
-     "desc": "Under 50% health, take 20% less damage.",
+     "desc": "When your plate health runs out, you get 75 health back. Recharges in 60s.",
      "effects": {
-      "jug.ironCore": 0.2
+      "jug.ironCore": 75
      },
      "id": "p.armorvest.ironcore"
     }
@@ -185,11 +190,11 @@
    "color": "#478450",
    "augments": [
     {
-     "name": "Fast Hands",
+     "name": "Speedy Roulette",
      "kind": "minor",
-     "desc": "Reload 10% faster.",
+     "desc": "The Mystery Box spins 60% faster.",
      "effects": {
-      "sc.reload": 0.1
+      "sc.roulette": 0.6
      },
      "id": "p.fastreload.fasthands"
     },
@@ -223,18 +228,18 @@
     {
      "name": "Fast Pitcher",
      "kind": "minor",
-     "desc": "+1 grenade every round.",
+     "desc": "Throw equipment 50% faster.",
      "effects": {
-      "sc.grenade": 1
+      "sc.pitch": 0.5
      },
      "id": "p.fastreload.fastpitcher"
     },
     {
      "name": "Phantom Reload",
      "kind": "major",
-     "desc": "Guns you aren't holding reload themselves after 3s stowed.",
+     "desc": "Every gun slowly refills its magazine from its reserve, in your hand or stowed: a full magazine in about 17s.",
      "effects": {
-      "sc.phantom": 3
+      "sc.phantom": 0.06
      },
      "id": "p.fastreload.phantomreload"
     },
@@ -294,9 +299,9 @@
     {
      "name": "Double Standard",
      "kind": "major",
-     "desc": "Body shots (not headshots) deal 50% more.",
+     "desc": "Body shots (not headshots) deal double.",
      "effects": {
-      "dt.standard": 0.5
+      "dt.standard": 1
      },
      "id": "p.rof.doublestandard"
     },
@@ -321,9 +326,9 @@
     {
      "name": "Double Down",
      "kind": "minor",
-     "desc": "Bullets deal 5% more.",
+     "desc": "Bullets pass through one more zombie.",
      "effects": {
-      "dt.dmg": 0.05
+      "dt.pierce": 1
      },
      "id": "p.rof.doubledown"
     },
@@ -365,9 +370,9 @@
     {
      "name": "Quarterback",
      "kind": "minor",
-     "desc": "Walk 5% faster.",
+     "desc": "Equipment thrown while sprinting flies 40% farther (you can always throw on the run here).",
      "effects": {
-      "su.walk": 0.05
+      "su.quarterback": 0.4
      },
      "id": "p.longersprint.runner"
     },
@@ -401,18 +406,18 @@
     {
      "name": "Footwork",
      "kind": "minor",
-     "desc": "Sprint a further 5% faster.",
+     "desc": "Sprint 15% faster when you're not moving forward.",
      "effects": {
-      "su.sprint": 0.05
+      "su.footwork": 0.15
      },
      "id": "p.longersprint.footwork"
     },
     {
-     "name": "Trailblazer",
+     "name": "Guns Up",
      "kind": "major",
-     "desc": "Sprinting scorches zombies you brush past for 15% of their health a second.",
+     "desc": "Fire while sprinting.",
      "effects": {
-      "su.hotFoot": 0.15
+      "su.gunsUp": 1
      },
      "id": "p.longersprint.trailblazer"
     }
@@ -427,7 +432,7 @@
     {
      "name": "Environmentalist",
      "kind": "minor",
-     "desc": "Take 50% less damage while sliding.",
+     "desc": "While sliding, take no damage from traps, fire and other hazards, and 50% less from zombies.",
      "effects": {
       "phd.slideArmor": 0.5
      },
@@ -445,9 +450,10 @@
     {
      "name": "EOD Technician",
      "kind": "minor",
-     "desc": "PhD blasts are 30% wider.",
+     "desc": "A dive sets off a PhD blast from half the height, and PhD blasts are 30% wider.",
      "effects": {
-      "phd.radius": 0.3
+      "phd.radius": 0.3,
+      "phd.eod": 0.5
      },
      "id": "p.flakjacket.eodtechnician"
     },
@@ -463,9 +469,9 @@
     {
      "name": "Tribologist",
      "kind": "minor",
-     "desc": "After a slide, move 15% faster for 2s.",
+     "desc": "Slides go 20% faster and 20% farther.",
      "effects": {
-      "phd.slideBoost": 0.15
+      "phd.slide": 0.2
      },
      "id": "p.flakjacket.tribologist"
     },
@@ -525,9 +531,9 @@
     {
      "name": "Dead Draw",
      "kind": "minor",
-     "desc": "Hip-fire shots deal 10% more.",
+     "desc": "Hip fire is 40% tighter.",
      "effects": {
-      "ds.hip": 0.1
+      "ds.spread": 0.4
      },
      "id": "p.deadshot.deaddraw"
     },
@@ -543,9 +549,9 @@
     {
      "name": "Dead Set",
      "kind": "minor",
-     "desc": "Headshot kills make you 5% faster for 3s.",
+     "desc": "60% less gun shake while sliding, diving, jumping or mantling, and the gun comes out of a sprint faster.",
      "effects": {
-      "ds.headSpeed": 0.05
+      "ds.steady": 0.6
      },
      "id": "p.deadshot.deadset"
     },
@@ -585,74 +591,74 @@
    "color": "#6a8f3a",
    "augments": [
     {
-     "name": "Light Load",
+     "name": "Fully Equipped",
      "kind": "minor",
-     "desc": "Move 5% faster while carrying three guns.",
+     "desc": "Carry one more lethal and one more tactical.",
      "effects": {
-      "mk.speed": 0.05
+      "mk.equip": 1
      },
      "id": "p.additionalprimaryweapon.lightload"
     },
     {
-     "name": "Ammo Mule",
+     "name": "Pack Mule",
      "kind": "major",
-     "desc": "Every 10s each of your guns gets 5% of its reserve back.",
+     "desc": "Your guns carry 25% more reserve ammo.",
      "effects": {
-      "mk.ammo": 0.05
+      "mk.stock": 0.25
      },
      "id": "p.additionalprimaryweapon.ammomule"
     },
     {
-     "name": "Scavenger",
+     "name": "Plate Hunter",
      "kind": "minor",
-     "desc": "Kills have a 5% chance to refill a tenth of the gun's reserve.",
+     "desc": "Kills have a 10% chance to heal you 15 (there are no armor plates here).",
      "effects": {
-      "mk.scav": 0.05
+      "mk.plate": 0.1
      },
      "id": "p.additionalprimaryweapon.scavenger"
     },
     {
-     "name": "Third Wheel",
+     "name": "Ol' Reliable",
      "kind": "major",
-     "desc": "The gun in your third slot deals 15% more.",
+     "desc": "Lose Mule Kick and buying it again gives your third gun back (not wonder weapons).",
      "effects": {
-      "mk.third": 0.15
+      "mk.reliable": 1
      },
      "id": "p.additionalprimaryweapon.thirdwheel"
     },
     {
-     "name": "Deep Pockets",
+     "name": "Bogo",
      "kind": "minor",
-     "desc": "Kills have a 3% chance to give you a grenade.",
+     "desc": "Whenever you gain a lethal or tactical, you get one extra, up to your limit.",
      "effects": {
-      "mk.grenadeScav": 0.03
+      "mk.bogo": 1
      },
      "id": "p.additionalprimaryweapon.deeppockets"
     },
     {
-     "name": "Hello Again",
+     "name": "Free Throw",
      "kind": "major",
-     "desc": "Your third gun reloads 50% faster.",
+     "desc": "Using a lethal or tactical has a 25% chance not to use it up.",
      "effects": {
-      "mk.thirdReload": 0.5
+      "mk.freeThrow": 0.25
      },
      "id": "p.additionalprimaryweapon.helloagain"
     },
     {
-     "name": "Quick Draw",
+     "name": "Kick Back",
      "kind": "minor",
-     "desc": "With three guns, reload 5% faster.",
+     "desc": "Perks cost 20% less.",
      "effects": {
-      "mk.reload3": 0.05
+      "mk.discount": 0.2
      },
      "id": "p.additionalprimaryweapon.quickdraw"
     },
     {
-     "name": "Quartermaster",
+     "name": "Multi Pack",
      "kind": "major",
-     "desc": "Each new round refills 20% of every gun's reserve.",
+     "desc": "Pack-a-Punching a gun has a 25% chance to Pack-a-Punch another gun you carry too.",
      "effects": {
-      "mk.roundRefill": 0.2
+      "mk.multi": 0.25
      },
      "id": "p.additionalprimaryweapon.quartermaster"
     }
@@ -970,7 +976,7 @@
     {
      "name": "Sixth Sense",
      "kind": "major",
-     "desc": "Take 25% less damage from zombies behind you.",
+     "desc": "Arrows warn you of zombies close behind you, and hits from behind deal 25% less.",
      "effects": {
       "dp.sixth": 0.25
      },
@@ -1067,7 +1073,7 @@
     {
      "name": "Stick 'n Move",
      "kind": "minor",
-     "desc": "Move 25% faster for 2 s after a melee hit.",
+     "desc": "Move backward 25% faster for 2s after a melee hit.",
      "effects": {
       "mm.stick": 0.25
      },
@@ -1323,11 +1329,11 @@
      "id": "p.magnet.deeppockets"
     },
     {
-     "name": "Long Reach",
+     "name": "Stacked",
      "kind": "minor",
-     "desc": "Store power-ups from farther away (260, was 140).",
+     "desc": "Up to 3 of the same power-up share one stash slot.",
      "effects": {
-      "mm.reach": 120
+      "mm.stack": 2
      },
      "id": "p.magnet.longreach"
     },
@@ -1418,12 +1424,9 @@
     {
      "name": "Ice Cloud",
      "kind": "major",
-     "desc": "A proc also chills up to 4 zombies within 120.",
+     "desc": "Zombies killed while chilled have a 35% chance to leave an ice cloud that slows everything in it for 5s.",
      "effects": {
-      "spread": {
-       "n": 4,
-       "r": 120
-      }
+      "iceCloud": 0.35
      },
      "id": "a.cryo.icecloud"
     },
@@ -1591,9 +1594,10 @@
     {
      "name": "Haste",
      "kind": "minor",
-     "desc": "Procs 30% more often.",
+     "desc": "Procs 30% more often, with a 40% shorter cooldown.",
      "effects": {
-      "chance": 1.3
+      "chance": 1.3,
+      "cooldown": 0.6
      },
      "id": "a.deadwire.haste"
     },
@@ -1620,9 +1624,9 @@
     {
      "name": "Lightning Strike",
      "kind": "major",
-     "desc": "A proc also stuns up to 4 zombies within 200.",
+     "desc": "A proc calls a bolt from the sky that stuns up to 4 zombies within 200.",
      "effects": {
-      "spread": {
+      "strike": {
        "n": 4,
        "r": 200
       }
@@ -1632,10 +1636,10 @@
     {
      "name": "Aftershock",
      "kind": "minor",
-     "desc": "The stunned zombie's field is 30% wider.",
+     "desc": "The stunned zombie can shock and stun other zombies near it while its field lasts.",
      "effects": {
-      "mul": {
-       "field": 1.3
+      "add": {
+       "aftershock": 0.35
       }
      },
      "id": "a.deadwire.aftershock"
@@ -1643,13 +1647,10 @@
     {
      "name": "Ball Lightning",
      "kind": "major",
-     "desc": "The field is 60% wider and hurts 10% more.",
+     "desc": "A proc launches a ball of lightning that rolls on for 3s, shocking everything around it.",
      "effects": {
-      "mul": {
-       "field": 1.6
-      },
       "add": {
-       "fieldDmg": 0.1
+       "ball": 0.25
       }
      },
      "id": "a.deadwire.balllightning"
@@ -1685,10 +1686,10 @@
     {
      "name": "Big Bang",
      "kind": "minor",
-     "desc": "Rockets deal 10% more.",
+     "desc": "Rockets deal 50% more to hellhounds and specials.",
      "effects": {
       "add": {
-       "dmg": 0.1
+       "special": 0.5
       }
      },
      "id": "a.fireworks.bigbang"
@@ -1696,11 +1697,13 @@
     {
      "name": "Starburst",
      "kind": "major",
-     "desc": "4 more rockets, 10% stronger.",
+     "desc": "The proc bursts at once, and 2 more rockets fly out flat in every direction.",
      "effects": {
+      "set": {
+       "starburst": true
+      },
       "add": {
-       "rockets": 4,
-       "dmg": 0.1
+       "rockets": 2
       }
      },
      "id": "a.fireworks.starburst"
@@ -1719,13 +1722,10 @@
     {
      "name": "Weeping Willow",
      "kind": "major",
-     "desc": "Rockets burst 50% wider, and one more launches.",
+     "desc": "Every rocket rains 3 flares that fall to the ground and burst there.",
      "effects": {
-      "mul": {
-       "radius": 1.5
-      },
-      "add": {
-       "rockets": 1
+      "set": {
+       "willow": 3
       }
      },
      "id": "a.fireworks.weepingwillow"
@@ -1733,20 +1733,20 @@
     {
      "name": "Short Fuse",
      "kind": "minor",
-     "desc": "Procs 30% more often.",
+     "desc": "Procs 30% more often, with a 40% shorter cooldown.",
      "effects": {
-      "chance": 1.3
+      "chance": 1.3,
+      "cooldown": 0.6
      },
      "id": "a.fireworks.shortfuse"
     },
     {
      "name": "Fire Wheel",
      "kind": "major",
-     "desc": "A proc also launches fireworks from 2 zombies within 200.",
+     "desc": "A proc also sets 2 wheels of fire circling the spot for 4s, burning what they touch.",
      "effects": {
-      "spread": {
-       "n": 2,
-       "r": 200
+      "add": {
+       "wheels": 0.4
       }
      },
      "id": "a.fireworks.firewheel"
@@ -1762,9 +1762,10 @@
     {
      "name": "Haste",
      "kind": "minor",
-     "desc": "Procs 30% more often.",
+     "desc": "Procs 30% more often, with a 40% shorter cooldown.",
      "effects": {
-      "chance": 1.3
+      "chance": 1.3,
+      "cooldown": 0.6
      },
      "id": "a.shadowrift.haste"
     },
@@ -1780,10 +1781,10 @@
     {
      "name": "Targeted",
      "kind": "minor",
-     "desc": "Dropped zombies take 15% more.",
+     "desc": "Dropped zombies land on other zombies and hurt everything they hit.",
      "effects": {
       "add": {
-       "lethal": 0.15
+       "impact": 0.35
       }
      },
      "id": "a.shadowrift.targeted"
@@ -1791,11 +1792,10 @@
     {
      "name": "Topple Danger",
      "kind": "major",
-     "desc": "A proc opens a second rift on a zombie within 300.",
+     "desc": "A proc warps a nearby zombie into the crowd, where it hurts everything around it with shadow energy for 3s.",
      "effects": {
-      "spread": {
-       "n": 1,
-       "r": 300
+      "add": {
+       "topple": 0.3
       }
      },
      "id": "a.shadowrift.toppledanger"
@@ -1814,10 +1814,10 @@
     {
      "name": "Explosive Rain",
      "kind": "major",
-     "desc": "Dropped zombies take 30% more.",
+     "desc": "Dropped zombies explode when they land.",
      "effects": {
       "add": {
-       "lethal": 0.3
+       "rain": 0.6
       }
      },
      "id": "a.shadowrift.explosiverain"
@@ -1834,7 +1834,7 @@
     {
      "name": "Gravity Well",
      "kind": "major",
-     "desc": "The rift is 40% wider and stays open 50% longer.",
+     "desc": "The rift is a black hole: 40% wider, open 50% longer, and everything it doesn't kill is warped away.",
      "effects": {
       "mul": {
        "radius": 1.4,
@@ -1865,11 +1865,10 @@
     {
      "name": "Plague",
      "kind": "major",
-     "desc": "A proc also turns a zombie within 200.",
+     "desc": "A turned zombie's bite has a 40% chance to turn what it bites.",
      "effects": {
-      "spread": {
-       "n": 1,
-       "r": 200
+      "set": {
+       "plague": 0.4
       }
      },
      "id": "a.brainrot.plague"
@@ -1877,9 +1876,10 @@
     {
      "name": "Haste",
      "kind": "minor",
-     "desc": "Procs 30% more often.",
+     "desc": "Procs 30% more often, with a 40% shorter cooldown.",
      "effects": {
-      "chance": 1.3
+      "chance": 1.3,
+      "cooldown": 0.6
      },
      "id": "a.brainrot.haste"
     },

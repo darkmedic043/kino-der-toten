@@ -60,54 +60,92 @@ export default async function setup(api){
 
   // ---- shared state -------------------------------------------------------------------------------------------------
   const QR='specialty_quickrevive';
-  let dyingLeft=3,untouchable=-1,emergencyUsed=false,boosts=[],hitCount=0,lastKillT=-9,slideUsed=false,ramT=0,wallJumps=0,wasFull=true,wasSliding=false;
+  const PLATE=100,PLATE_CD=60,MK='specialty_additionalprimaryweapon';
+  let dyingLeft=3,untouchable=-1,kits=0,boosts=[],hitCount=0,lastKillT=-9,slideUsed=false,ramT=0,wallJumps=0,wasFull=true,wasSliding=false,plateReady=0;
   const boost=(v,dur)=>{if(v)boosts.push({v,until:t()+dur});};
   const boostNow=()=>{boosts=boosts.filter(b=>b.until>t());return boosts.reduce((a,b)=>a+b.v,0);};
-  host.on('reset',()=>{dyingLeft=3;untouchable=-1;emergencyUsed=false;boosts=[];hitCount=0;});
+  host.on('reset',()=>{dyingLeft=3;untouchable=-1;kits=0;boosts=[];hitCount=0;plateReady=0;exchangeLeft=3;exchangeKills=null;downKit=null;reliableGun=lastThird=null;});
   const ads=()=>!!api.getState?.().input?.ads;
+  const hasPlate=()=>session.health>PLATE;   // no armor plates here: Juggernog's health above 100 stands in for them
+  const forward=()=>camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
 
   // ---- you get hit ----------------------------------------------------------------------------------------------------
   host.on('beforeDamage',e=>{
-    if(!(e.amount>0))return;
+    if(!(e.amount>0)||session.effects.invulnerable>session.time)return;   // session.damage refuses it: nothing here may be spent on it
     if(t()<untouchable){e.amount=0;return;}
-    let k=1-stat('jug.armor');
-    if(stat('jug.turtle')){const z=attacker();if(z){const fwd=camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(),to=z.root.position.clone().sub(camera.position).setY(0).normalize();k*=fwd.dot(to)<0?1-stat('jug.turtle'):.9;}}
+    let k=1;const z=attacker();
+    if(hasPlate())k-=stat('jug.armor');
+    if(stat('jug.turtle')&&hasPlate()&&z){const to=z.root.position.clone().sub(camera.position).setY(0).normalize();k*=1-(forward().dot(to)<0?stat('jug.turtleBack'):stat('jug.turtle'));}
+    if(stat('dp.sixth')&&z){const to=z.root.position.clone().sub(camera.position).setY(0).normalize();if(forward().dot(to)<0)k*=1-stat('dp.sixth');}
     if(stat('jug.shake')&&Math.random()<stat('jug.shake'))k*=.25;
-    if(stat('jug.ironCore')&&session.health<session.maxHealth*.5)k*=1-stat('jug.ironCore');
     if(stat('su.hardTarget')&&player.input?.sprint)k*=1-stat('su.hardTarget');
-    if(stat('phd.slideArmor')&&window.kino.movement?.state?.sliding)k*=1-stat('phd.slideArmor');
+    if(stat('phd.slideArmor')&&window.kino.movement?.state?.sliding){if(!z){e.amount=0;return;}k*=1-stat('phd.slideArmor');}
     e.amount*=Math.max(.1,k);
-    if(stat('jug.reactive'))for(const z of [...enemies.list]){const d=z.root.position.clone().sub(camera.position).setY(0);if(d.length()>120)continue;
-      z.root.position.addScaledVector(d.normalize(),60);enemies.hurt(z,full()*stat('jug.reactive'),false,false,'fortify',false);}
-    // Dying Wish (3 a game) and the Emergency Medical Kit (once a game)
-    if(stat('qr.dyingWish')&&dyingLeft>0&&e.amount>=session.health){dyingLeft--;e.amount=Math.max(0,session.health-1);untouchable=t()+stat('qr.dyingWish');api.toast?.(`DYING WISH · ${dyingLeft} left`,1.5);return;}
-    if(stat('qr.emergency')&&!emergencyUsed&&session.health-e.amount<session.maxHealth*stat('qr.emergency')&&session.health-e.amount>0){emergencyUsed=true;setTimeout(()=>{session.health=session.maxHealth;api.toast?.('EMERGENCY MEDICAL KIT',1.5);},0);}
+    // Emergency Medical Kit first, then Dying Wish (3 a game, and it spends Quick Revive)
+    if(e.amount>=session.health){
+      if(kits>0){kits--;e.amount=0;untouchable=t()+2;setTimeout(()=>{session.health=Math.max(session.health,session.maxHealth*.5);api.toast?.(`EMERGENCY MEDICAL KIT · ${kits} left`,2);},0);return;}
+      if(stat('qr.dyingWish')&&dyingLeft>0){dyingLeft--;const sec=stat('qr.dyingWish');e.amount=Math.max(0,session.health-1);untouchable=t()+sec;session.perks.delete(QR);session.boughtPerks?.delete(QR);api.toast?.(`DYING WISH · ${dyingLeft} left`,2);return;}
+    }
+    // the plate health ran out on this hit
+    if(t()>=plateReady&&hasPlate()&&session.health-e.amount<=PLATE&&session.health-e.amount>0&&(stat('jug.reactive')||stat('jug.ironCore'))){
+      plateReady=t()+PLATE_CD;const sec=stat('jug.reactive'),hp=stat('jug.ironCore');
+      if(sec){const at=player.getFeetPosition();window.kino.fx?.explosion?.(at.clone().addScaledVector(up,40),.3,0x9fd8ff);for(const o of enemies.list)if(!special(o)&&o.root.position.distanceTo(at)<200)stun(o,sec);}
+      if(hp)setTimeout(()=>heal(hp),0);}
   });
   function attacker(){const f=camera.position;return enemies.list.filter(z=>z.state==='attack'&&z.root.position.distanceTo(f)<150).sort((a,b)=>a.root.position.distanceTo(f)-b.root.position.distanceTo(f))[0];}
 
   // ---- max health, speeds, reload, swap, fire rate ------------------------------------------------------------------
   {const proto=Object.getOwnPropertyDescriptor(session,'maxHealth')??Object.getOwnPropertyDescriptor(Object.getPrototypeOf(session),'maxHealth');
     if(proto?.get)Object.defineProperty(session,'maxHealth',{configurable:true,get(){return proto.get.call(this)+stat('jug.health');}});}
-  const three=()=>(session.inventory?.filter(w=>!w.lost).length??0)>=3;
-  const common=()=>boostNow()+(three()?stat('mk.speed'):0)+(ads()?stat('su.stalker'):0);
-  for(const [key,bonus] of [['moveSpeed',()=>stat('su.walk')+common()],['sprintSpeed',()=>stat('su.sprint')+common()]]){
+  const common=()=>boostNow()+(ads()?stat('su.stalker'):0);
+  // Footwork: any sprint that isn't forward (the game sprints in every direction)
+  const notForward=()=>{const v=player.velocity;if(!v)return false;const h=Math.hypot(v.x,v.z);return h>40&&(v.x*forward().x+v.z*forward().z)/h<.5;};
+  for(const [key,bonus] of [['moveSpeed',()=>common()],['sprintSpeed',()=>stat('su.sprint')+common()+(stat('su.footwork')&&notForward()?stat('su.footwork'):0)]]){
     const d=Object.getOwnPropertyDescriptor(player,key);let base=player[key];
     const get=d?.get?()=>d.get.call(player):()=>base,set=d?.set?v=>d.set.call(player,v):v=>{base=v;};
     Object.defineProperty(player,key,{configurable:true,get:()=>get()*(1+bonus()),set});
   }
   window.kino.chargeMul=()=>1+stat('sc.charge');   // Supercharged (read by the classes mod)
   window.kino.phdScale=()=>1+stat('phd.radius');   // EOD Technician (read by perks-plus)
+  // numbers other files read (they stay 1 / 0 without the augment)
+  window.kino.phdDiveMul=()=>1-stat('phd.eod');      // EOD Technician: the height a PhD dive blast needs (fall-damage)
+  window.kino.slideMul=()=>1+stat('phd.slide');      // Tribologist (movement)
+  window.kino.hipSpreadMul=()=>1-stat('ds.spread');  // Dead Draw (engine)
+  window.kino.motionSteady=()=>1-stat('ds.steady');  // Dead Set (fp.js)
+  window.kino.pierceBonus=()=>stat('dt.pierce');     // Double Down (engine)
+  window.kino.throwSpeed=()=>1+stat('sc.pitch');     // Fast Pitcher (throwables)
+  window.kino.throwRange=()=>1+(player.input?.sprint?stat('su.quarterback'):0);   // Quarterback (throwables)
+  window.kino.bleedMul=()=>1+stat('qr.bleed');       // Slow Death (read at the moment you go down, reaper-perks)
+  window.kino.boxSpin=()=>1-stat('sc.roulette');     // Speedy Roulette (mystery-box)
   let reloadReserve=null;
   const reload=session.reload.bind(session);
   session.reload=(...a)=>{const before=session.weapon?.reserve,r=reload(...a);
-    if(r){let k=1-stat('sc.reload')-(three()?stat('mk.reload3'):0);if(stat('mk.thirdReload')&&session.inventory?.[2]===session.weapon)k-=stat('mk.thirdReload');
-      k=Math.max(.3,k);if(k<1){session.reloadLeft*=k;session.reloadDuration*=k;}
+    if(r){const k=Math.max(.3,1-stat('sc.reload'));if(k<1){session.reloadLeft*=k;session.reloadDuration*=k;}
       boost(stat('sc.surge'),2);
       if(stat('sc.presti')&&Math.random()<stat('sc.presti'))reloadReserve={w:session.weapon,reserve:before};}   // Prestidigitation: refunded when it lands
     return r;};
   const swap=session.switchWeapon?.bind(session);
   if(swap)session.switchWeapon=(...a)=>{const r=swap(...a);if(stat('sc.swap'))session.fireLeft*=1-stat('sc.swap');return r;};
   let shots=session.shots??0;
+
+  // ---- Mule Kick ---------------------------------------------------------------------------------------------------------
+  const WONDER=/ray_gun|thundergun|microwavegun|minigun|crossbow/;let reliableGun=null,lastThird=null,seen=null;
+  {let p=session,d;while(p&&!(d=Object.getOwnPropertyDescriptor(p,'perkPrice')))p=Object.getPrototypeOf(p);   // Kick Back
+    if(d?.get)Object.defineProperty(session,'perkPrice',{configurable:true,get(){const v=d.get.call(this),k=stat('mk.discount');return k?Math.round(v*(1-k)/10)*10:v;}});}
+  window.kino.freeThrow=()=>Math.random()<stat('mk.freeThrow');   // Free Throw (throwables, the two below)
+  {const use=session.useEquipment?.bind(session);
+    if(use)session.useEquipment=(kind,...a)=>{const before=session[kind],r=use(kind,...a);if(r&&window.kino.freeThrow())session[kind]=before;return r;};}
+  {const take=session.takePack?.bind(session);   // Multi Pack
+    if(take)session.takePack=(...a)=>{const w=session.pack?.weapon,r=take(...a);if(!r||!w||!session.inventory?.includes(w)||!stat('mk.multi')||Math.random()>=stat('mk.multi'))return r;
+      const o=session.inventory.find(x=>x!==w&&!x.lost&&!x.upgraded&&data.weapons[x.id]?.upgrade);
+      if(o){o.upgraded=true;o.mag=clipOf(o);o.reserve=maxOf(o);api.toast?.(`MULTI PACK · ${data.weapons[o.id].upgrade.name??data.weapons[o.id].name}`,3);}
+      return r;};}
+  {const powerup=session.powerup?.bind(session);   // Pack Mule: Max Ammo fills the bigger reserve
+    if(powerup)session.powerup=(type,...rest)=>{const r=powerup(type,...rest);if(type==='full_ammo'&&stat('mk.stock'))for(const w of session.inventory??[])if(!w.lost&&maxOf(w))w.reserve=Math.ceil(maxOf(w)*(1+stat('mk.stock')));return r;};}
+  function bogo(){const tac=window.kino.tactical,rp=window.kino.reaperPerks,now={g:session.grenades??0,t:tac?.id?tac.count??0:session.monkeys??0,id:tac?.id};
+    if(seen&&seen.id===now.id){if(now.g>seen.g)now.g=session.grenades=Math.min(rp?.nadeMax?.()??4,now.g+1);
+      if(now.t>seen.t){const max=tac?.id?tac.max?.()??3:session.monkeyMax?.()??3,v=Math.max(now.t,Math.min(max,now.t+1));if(tac?.id)tac.count=v;else session.monkeys=v;now.t=v;}}
+    seen=now;}
 
   // ---- your bullets -------------------------------------------------------------------------------------------------
   const lastHit=new WeakMap();
@@ -118,12 +156,9 @@ export default async function setup(api){
     if(e.head){k+=stat('ds.head');if(stat('ds.first')&&fullHp)k*=1+stat('ds.first');
       if(stat('ds.again')&&Math.random()<stat('ds.again')&&session.weapon&&session.weapon.mag<clipOf(session.weapon))session.weapon.mag++;}
     else k+=stat('dt.standard');
-    k+=stat('dt.dmg');
     if(special(z))k+=stat('ds.specials');
-    if(!ads())k+=stat('ds.hip');
     if(d<150)k+=stat('ds.point');
     if(session.health<session.maxHealth*.35)k+=stat('jug.retaliation');
-    if(stat('mk.third')&&session.inventory?.[2]&&session.inventory[2]===session.weapon)k+=stat('mk.third');
     if(stat('dt.impact')){const last=lastHit.get(z)??-9;if(t()-last<.5)k+=stat('dt.impact');lastHit.set(z,t());}
     if(stat('dt.dealer')&&++hitCount%stat('dt.dealer')===0)k*=2;
     if(stat('dt.gamble')){const r=Math.random();if(r<.2)k*=2;else if(r<.3)k=0;}
@@ -135,10 +170,10 @@ export default async function setup(api){
     if(stat('qr.killHeal'))heal(stat('qr.killHeal'));
     if(stat('qr.lowKillHeal')&&session.health<session.maxHealth*.25)heal(stat('qr.lowKillHeal'));
     if(stat('qr.adrenaline')&&special(z)){heal(session.maxHealth*stat('qr.adrenaline'));session.damageTime=-100;}
-    if(stat('mk.scav')&&Math.random()<stat('mk.scav')){const w=session.weapon;if(w)w.reserve=Math.min(maxOf(w),w.reserve+Math.ceil(maxOf(w)*.1));}
-    if(stat('mk.grenadeScav')&&Math.random()<stat('mk.grenadeScav')&&session.grenades<4)session.grenades++;
+    if(stat('mk.plate')&&Math.random()<stat('mk.plate'))heal(15);
+    // Ice Cloud: a chilled zombie died
+    for(const fx of ammoFx.cryo??[])if(fx.iceCloud&&at&&z?.amod?.slowUntil>t()&&Math.random()<fx.iceCloud)addPool(at,{slow:true,r:120,sec:5});
     if(cause==='explosion')boost(stat('su.equipBoost'),3);
-    if(e.head&&cause==='bullet')boost(stat('ds.headSpeed'),3);
     if(at&&at.distanceTo(camera.position)<100)boost(stat('ds.closeSpeed'),3);
     if(stat('dt.play')&&t()-lastKillT<1&&session.weapon){const w=session.weapon,add=Math.min(stat('dt.play'),clipOf(w)-w.mag);if(add>0)w.mag+=add;}
     lastKillT=t();
@@ -146,10 +181,23 @@ export default async function setup(api){
     for(const fx of ammoFx.napalm??[])if(fx.firebomb&&z?.amod?.burnUntil>t()){const dmg=full()*fx.firebomb;
       setTimeout(()=>{for(const o of [...enemies.list])if(o.root.position.distanceTo(at)<120)enemies.hurt(o,dmg,false,false,'ammo_mod',false);window.kino.fx?.explosion?.(at.clone().addScaledVector(up,30),.4,0xff7a2a);},0);}
   });
-  host.on('roundEnd',()=>{
-    if(stat('sc.grenade'))session.grenades=Math.min(4+stat('sc.grenade'),session.grenades+stat('sc.grenade'));
-    if(stat('mk.roundRefill'))for(const w of session.inventory??[])if(!w.lost)w.reserve=Math.min(maxOf(w),w.reserve+Math.ceil(maxOf(w)*stat('mk.roundRefill')));
-  });
+  // Emergency Medical Kit: one every 5th round, up to 4
+  host.on('roundEnd',({round})=>{const n=stat('qr.emergency');if(n&&round%n===0&&kits<4){kits++;api.toast?.(`EMERGENCY MEDICAL KIT · ${kits} carried`,2);}});
+
+  // ---- downs and revives (co-op) ------------------------------------------------------------------------------------
+  // Going down clears the perks, so these read the equipped numbers directly instead of stat().
+  const fxOf=(id,k)=>perkFx[id]?.[k]??0;
+  let downKit=null,exchangeLeft=3,exchangeKills=null,exchangeLast=0;
+  host.on('goingDown',()=>{exchangeKills=0;exchangeLast=session.killed??0;
+    downKit=fxOf(QR,'qr.emt')&&has(QR)?{perks:[...session.perks],bought:[...(session.boughtPerks??[])],third:session.inventory?.[2]??null}:null;});
+  host.on('revived',m=>{exchangeKills=null;
+    if(m?.swift)boost(m.swift,4);
+    if(downKit){for(const p of downKit.perks)session.perks.add(p);for(const p of downKit.bought)session.boughtPerks?.add(p);
+      if(downKit.third&&session.inventory?.length===2)session.inventory.push(downKit.third);
+      session.health=session.maxHealth;api.toast?.('EMT · perks restored',2);}
+    downKit=null;});
+  host.on('reviveDone',()=>{if(stat('qr.fullBoost'))boost(stat('qr.fullBoost'),4);if(stat('qr.karmic'))session.health=session.maxHealth;});
+  window.kino.reviveExtras=()=>({swift:stat('qr.fullBoost')});
   host.on('fall',e=>{
     if(stat('su.freeFaller')&&e.amount>0){e.amount=0;boost(stat('su.freeFaller'),3);}
     if(stat('phd.gravity')&&has('specialty_flakjacket')&&!e.dive)window.kino.phd?.flop(e.position??player.getFeetPosition());
@@ -157,7 +205,7 @@ export default async function setup(api){
   host.on('phdBlast',e=>{const k=stat('phd.echo');if(k&&!e.echo)setTimeout(()=>window.kino.phd?.flop(e.at,{power:k,echo:true}),1000);});
 
   // ---- per frame ----------------------------------------------------------------------------------------------------
-  const stowed=new WeakMap();let muleT=10,thermal=[],pools=[];
+  const reserveSeen=new WeakMap(),phantom=new WeakMap();let thermal=[],pools=[];
   host.on('update',dt=>{
     if(!dt||!api.getState?.().active)return;const now=t();
     // Double Time: a shot was fired, shorten the wait for the next one
@@ -167,19 +215,29 @@ export default async function setup(api){
     // Quick Revive regen (its base regen starts 2 s after a hit)
     if(has(QR)&&session.health<session.maxHealth&&session.phase!=='reviving'){const since=now-session.damageTime,start=2-stat('qr.delay');let k=0;
       if(since>start&&since<=2)k+=1;if(since>start)k+=stat('qr.regenMul');if(k)heal(dt*session.maxHealth*.25*k);}
-    const isFull=session.health>=session.maxHealth;if(isFull&&!wasFull)boost(stat('qr.fullBoost'),3);wasFull=isFull;
-    if(stat('sc.phantom'))for(const w of session.inventory??[]){if(w===session.weapon||w.lost){stowed.delete(w);continue;}
-      const since=stowed.get(w)??now;stowed.set(w,since);if(now-since<stat('sc.phantom'))continue;const need=Math.min(clipOf(w)-w.mag,w.reserve);if(need>0){w.mag+=need;w.reserve-=need;}}
-    if(stat('mk.ammo')&&(muleT-=dt)<=0){muleT=10;for(const w of session.inventory??[])if(!w.lost)w.reserve=Math.min(maxOf(w),w.reserve+Math.ceil(maxOf(w)*stat('mk.ammo')));}
+    const isFull=session.health>=session.maxHealth;if(isFull&&!wasFull)boost(stat('qr.fullBoost'),4);wasFull=isFull;
+    // Phantom Reload: every gun that isn't reloading refills from its reserve
+    if(stat('sc.phantom'))for(const w of session.inventory??[]){if(w.lost||(w===session.weapon&&session.reloadLeft>0))continue;
+      const cap=clipOf(w);if(w.mag>=cap||w.reserve<=0){phantom.delete(w);continue;}
+      const got=(phantom.get(w)??0)+cap*stat('sc.phantom')*dt,add=Math.min(Math.floor(got),cap-w.mag,w.reserve);phantom.set(w,got-Math.floor(got));if(add>0){w.mag+=add;w.reserve-=add;}}
+    // Pack Mule: any refill to the normal maximum (a new gun, a Max Ammo) lands on the bigger reserve
+    if(stat('mk.stock'))for(const w of session.inventory??[]){if(w.lost)continue;const max=maxOf(w),last=reserveSeen.get(w);
+      if(max>0&&w.reserve===max&&(last===undefined||last<max))w.reserve=Math.ceil(max*(1+stat('mk.stock')));reserveSeen.set(w,w.reserve);}
+    // Equivalent Exchange: your team's kills while you're down
+    if(exchangeKills!=null&&fxOf(QR,'qr.exchange')&&exchangeLeft>0&&window.kino.coopDown?.down&&!window.kino.coopDown?.dead){const k=session.killed??0;exchangeKills+=Math.max(0,k-exchangeLast);exchangeLast=k;   // session.killed restarts each round
+      if(exchangeKills>=fxOf(QR,'qr.exchange')){exchangeLeft--;exchangeKills=null;window.kino.coopGetUp?.();api.announce?.('Equivalent Exchange',`BACK UP · ${exchangeLeft} left`,3);}}
+    // Ol' Reliable: remember the third gun, hand it back when Mule Kick is bought again
+    if(fxOf(MK,'mk.reliable')){const third=session.inventory?.[2];
+      if(has(MK)){if(third)lastThird=third;else if(reliableGun&&session.inventory?.length===2){session.inventory.push(reliableGun);reliableGun=lastThird=null;api.toast?.("OL' RELIABLE · third gun back",2);}}
+      else if(lastThird&&!third){reliableGun=WONDER.test(lastThird.id)?null:lastThird;lastThird=null;}}
+    // Bogo: gaining equipment gives one more
+    if(stat('mk.bogo'))bogo();else seen=null;
     const feet=player.getFeetPosition(),sprinting=!!player.input?.sprint;
-    if(stat('su.hotFoot')&&sprinting)for(const z of [...enemies.list]){if(z.root.position.distanceTo(feet)>75)continue;
-      if((z.hotT=(z.hotT??0)-dt)<=0){z.hotT=.5;enemies.hurt(z,full()*stat('su.hotFoot')*.5,false,false,'fire',false);window.kino.fx?.burn?.(z.root.position.clone().addScaledVector(up,40));}}
     // DR Ram: sprinting into a zombie
     if(stat('phd.ram')&&sprinting&&(ramT-=dt)<=0){const z=enemies.list.find(z=>z.root.position.distanceTo(feet)<55);
       if(z){ramT=1;const d=z.root.position.clone().sub(feet).setY(0).normalize();z.root.position.addScaledVector(d,70);enemies.hurt(z,full()*stat('phd.ram'),false,false,'melee',false);}}
     const mv=window.kino.movement?.state,sliding=!!mv?.sliding;
     if(stat('phd.slider')&&sliding&&!slideUsed&&enemies.list.some(z=>z.root.position.distanceTo(feet)<70)){slideUsed=true;window.kino.phd?.flop(feet);}
-    if(wasSliding&&!sliding)boost(stat('phd.slideBoost'),2);
     if(!sliding)slideUsed=false;wasSliding=sliding;
     if(mv&&mv.wallJumps>wallJumps&&stat('phd.stunt'))window.kino.phd?.flop(feet,{power:stat('phd.stunt'),echo:true});
     wallJumps=mv?.wallJumps??0;
@@ -187,7 +245,7 @@ export default async function setup(api){
     thermal=thermal.filter(x=>{if(!enemies.list.includes(x.z))return false;if((x.z.amod?.slowUntil??0)>now)return true;enemies.hurt(x.z,(x.z.maxHealth??full())*x.k,false,false,'ammo_mod',false);return false;});
     // Petroleum pools
     pools=pools.filter(p=>{if(p.until<=now){p.mesh.removeFromParent();p.mesh.geometry.dispose();p.mesh.material.dispose();return false;}
-      if((p.tick-=dt)<=0){p.tick=.5;for(const z of [...enemies.list])if(z.root.position.distanceTo(p.at)<100){enemies.hurt(z,(z.maxHealth??full())*p.k*.5,false,false,'ammo_mod',false);window.kino.fx?.burn?.(z.root.position.clone().addScaledVector(up,40));}}
+      if((p.tick-=dt)<=0){p.tick=.5;for(const z of [...enemies.list])if(z.root.position.distanceTo(p.at)<p.r){if(p.slow){slow(z,.5,1);continue;}enemies.hurt(z,(z.maxHealth??full())*p.k*.5,false,false,'ammo_mod',false);window.kino.fx?.burn?.(z.root.position.clone().addScaledVector(up,40));}}
       p.mesh.material.opacity=.35*Math.min(1,(p.until-now)/1)*(.85+Math.random()*.15);return true;});
   });
 
@@ -199,7 +257,10 @@ export default async function setup(api){
       for(const [k,v] of Object.entries(fx.mul??{}))p[k]=(p[k]??0)*v;
       for(const [k,v] of Object.entries(fx.max??{}))p[k]=Math.max(p[k]??0,v);}
   });
-  host.on('ammoModProc',e=>{for(const fx of ammoFx[e.id]??[]){if(fx.chance)e.chance*=fx.chance;if(fx.bigGame&&special(e.enemy))e.chance=1;}});
+  host.on('ammoModProc',e=>{for(const fx of ammoFx[e.id]??[]){if(fx.chance)e.chance*=fx.chance;if(fx.cooldown)e.cooldown=(e.cooldown??1)*fx.cooldown;if(fx.bigGame&&special(e.enemy))e.chance=1;}});
+  function addPool(at,{r=100,sec=4,k=0,slow=false}){if(!api.scene)return;
+    const mesh=new THREE.Mesh(new THREE.CircleGeometry(r,24),new THREE.MeshBasicMaterial({color:slow?0x9fe4ff:0xff6a1a,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}));
+    mesh.rotation.x=-Math.PI/2;mesh.position.copy(at).addScaledVector(up,1.5);api.scene.add(mesh);pools.push({mesh,at,r,slow,until:t()+sec,tick:.5,k});}
   host.on('ammoModFired',e=>{
     const z=e.enemy,at=z.root.position.clone();
     for(const fx of ammoFx[e.id]??[]){
@@ -208,8 +269,10 @@ export default async function setup(api){
       if(fx.burst&&enemies.list.includes(z))enemies.hurt(z,(z.maxHealth??full())*fx.burst,false,false,'ammo_mod',false);
       if(fx.thermal)thermal.push({z,k:fx.thermal});
       if(fx.brittle)for(const o of enemies.list)if(o.root.position.distanceTo(at)<200){o.shatterBrittle=t()+4;o.shatterBrittleK=fx.brittle;}
-      if(fx.pool&&api.scene){const mesh=new THREE.Mesh(new THREE.CircleGeometry(100,24),new THREE.MeshBasicMaterial({color:0xff6a1a,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}));
-        mesh.rotation.x=-Math.PI/2;mesh.position.copy(at).addScaledVector(up,1.5);api.scene.add(mesh);pools.push({mesh,at,until:t()+4,tick:.5,k:fx.pool});}
+      if(fx.pool)addPool(at,{k:fx.pool});
+      // Lightning Strike: bolts from the sky, stunning up to n zombies
+      if(fx.strike){const am=window.kino.ammoMods;for(const o of enemies.list.filter(o=>o.health>0&&o.root.position.distanceTo(at)<fx.strike.r).slice(0,fx.strike.n)){stun(o,2);
+        const g=o.root.position.clone().addScaledVector(up,30);am?.bolt?.([g.clone().addScaledVector(up,500),g],0x8fd4ff);}}
     }
   });
 

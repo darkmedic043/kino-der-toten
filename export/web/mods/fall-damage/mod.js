@@ -25,8 +25,8 @@ export default function setup(api) {
     if (peak === null) { dive = false; return; }
     const height = (peak - feet.y) * (player.gravity || refG) / refG, wasDive = dive;
     peak = null; dive = false;
-    if (height <= MIN) return;
-    const e = { height, amount: session.maxHealth * Math.min(1, (height - MIN) / (MAX - MIN)), dive: wasDive, position: feet };
+    if (height <= (wasDive ? MIN * (window.kino?.phdDiveMul?.() ?? 1) : MIN)) return;   // EOD Technician: a dive counts from half the height
+    const e = { height, amount: session.maxHealth * Math.min(1, Math.max(0, height - MIN) / (MAX - MIN)), dive: wasDive, position: feet };
     host.emit('fall', e);
     if (e.amount > 0) api.damage(e.amount);
   });

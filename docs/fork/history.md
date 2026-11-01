@@ -421,3 +421,4 @@
 - 2026-11-01: Melon Pass: Melon Harvest renumbered Season 0 (season `number` field, id stays s1); the next season is Season 1 with id s2 (pass.md).
 - 2026-11-01: Nuketown: the rubble ramp on the east sidewalk is a one-way way back from the road into town (the clip sheet on top lets the ramp side through) (waw-ports.md).
 - 2026-11-01: The Giant's Fly Trap: journal markers show the three targets (the group nodes sit at the map origin) then the prize until it's taken. T.E.D.D. Tasks: chest points cut to 100-400; tempo zombies rise while a task runs: few points, no drops, outside the round count (journal.md, props.md).
+- 2026-11-01: Research: perk and ammo mod augments follow BO7 much closer (51 rewritten, behaviour and text; health above 100 stands in for armor plates, research.md), plate augments nerfed (Turtle Shell 50% from behind, Reactive Armor / Iron Core 60 s recharge), Magnet Margarita's Long Reach became Stacked (3 of a power-up share a slot).

@@ -101,7 +101,7 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
       const max = w.upgraded ? def.upgrade?.maxAmmo ?? def.maxAmmo : def.maxAmmo;
       const n = Math.ceil((def.clipSize ?? 10) * .3 * (wonder ? 1 + stat('va.gift') : 1));
       w.reserve = Math.min(max ?? Infinity, (w.reserve ?? 0) + n); toast?.(`Vulture · +${n} ammo`, 1.2);
-    } else if (d.kind === 'grenade') { session.grenades = Math.min(4, session.grenades + 1); toast?.('Vulture · +1 grenade', 1.2); }
+    } else if (d.kind === 'grenade') { session.grenades = Math.min(window.kino.reaperPerks?.nadeMax?.() ?? 4, session.grenades + 1); toast?.('Vulture · +1 grenade', 1.2); }
     else { const n = d.amount || 10 + Math.round(Math.random() * 20); points(n); }
     if (stat('va.plates')) heal(stat('va.plates'));   // Armor-matic: no armor plates here, so drops patch you up
     audio?.play?.('buy', .25);
@@ -204,6 +204,7 @@ void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a =
     const fwd = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize(), right = new THREE.Vector3(-fwd.z, 0, fwd.x);
     for (const z of enemies.list) {
       const v = z.root.position.clone().sub(feet()), d = v.length(); if (d > 450) continue;
+      if (!stat('dp.birds') && (v.dot(fwd) > 0 || d > 300)) continue;   // Sixth Sense alone: only close, and behind you
       const p = chest(z).project(camera); if (p.z < 1 && Math.abs(p.x) < .95 && Math.abs(p.y) < .95) continue;
       const a = Math.atan2(v.dot(right), v.dot(fwd)), cx = W / 2 + Math.sin(a) * 120, cy = H / 2 - Math.cos(a) * 120;
       g.save(); g.translate(cx, cy); g.rotate(a); g.globalAlpha = .45 + .5 * (1 - d / 450); g.fillStyle = '#ff7a1a';
@@ -227,7 +228,8 @@ void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a =
   const pushes = [];
   function knock(z, from, dist) { const dir = z.root.position.clone().sub(from).setY(0); if (dir.lengthSq() < 1) return; pushes.push({ z, v: dir.normalize().multiplyScalar(dist / .2), t: .2 }); }
   let boostUntil = 0, meleeWas = 0;
-  (window.kino ??= {}).bo7Perks = { speedMul: () => (has(MM) && now() < boostUntil ? 1 + stat('mm.stick') : 1), webBlast, summonWisp, popOn, get wisp() { return wisp; } };
+  const backward = () => { const v = player.velocity, f = camera.getWorldDirection(new THREE.Vector3()); return v.x * f.x + v.z * f.z < 0; };   // Stick 'n Move
+  (window.kino ??= {}).bo7Perks = { speedMul: () => (has(MM) && now() < boostUntil && backward() ? 1 + stat('mm.stick') : 1), webBlast, summonWisp, popOn, get wisp() { return wisp; } };
 
   // ---- damage hooks ------------------------------------------------------------------------------------------------
   host.on('beforeEnemyDamage', e => {
@@ -359,7 +361,7 @@ void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a =
         const on = has(DP) && z.dpHidden && z.root.position.distanceTo(f) < range; for (const o of k) o.visible = on && o.userData.of.visible; }
     }
     if (has(DP) && stat('dp.gems')) for (const p of powerups?.items ?? []) if (!keyed.has(p.root)) keyed.set(p.root, keyline(p.model, gemMat));
-    if (has(DP) && stat('dp.birds')) drawArrows(); else if (arrows) arrows.getContext('2d').clearRect(0, 0, arrows.width, arrows.height);
+    if (has(DP) && (stat('dp.birds') || stat('dp.sixth'))) drawArrows(); else if (arrows) arrows.getContext('2d').clearRect(0, 0, arrows.width, arrows.height);
     // Elemental Pop: Electric Cherry on starting a reload, stronger the emptier the magazine
     const rl = session.reloadLeft ?? 0;
     if (has(EP) && stat('ep.cherry') && rl > 0 && lastReload <= 0 && t >= cherryReady && session.def) {

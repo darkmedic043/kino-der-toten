@@ -72,7 +72,7 @@ export default async function setup(api){
   function launch(id){
     const mesh=world_[id].clone(true);mesh.position.copy(camera.position);scene.add(mesh);
     const dir=camera.getWorldDirection(new THREE.Vector3());
-    flying.push({id,mesh,v:dir.multiplyScalar(520).addScaledVector(up,170),settled:0,spin:new THREE.Vector3(Math.random()*8,Math.random()*8,Math.random()*8)});
+    flying.push({id,mesh,v:dir.multiplyScalar(520*(window.kino.throwRange?.()??1)).addScaledVector(up,170*(window.kino.throwRange?.()??1)),settled:0,spin:new THREE.Vector3(Math.random()*8,Math.random()*8,Math.random()*8)});
   }
 
   // ---- effects ---------------------------------------------------------------------------------

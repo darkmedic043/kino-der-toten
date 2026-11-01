@@ -138,7 +138,7 @@ export class MoonFeatures {
     if(!t||!this.s.canAct&&!(t.kind==='pack'&&this.s.pack))return false;
     const s=this.s,q=this.quest,a=this.combat.audio;let ok=false;
     if(t.kind==='perk'){
-      if(s.hacker&&s.perks.has(t.perk)&&!s.permanentPerks)return this.startHack(t,5,()=>{const refund=perkPrice(s.perks.size-1);s.losePerk(t.perk);s.points+=refund;this.combat.equip().catch(console.error);});
+      if(s.hacker&&s.perks.has(t.perk)&&!s.permanentPerks)return this.startHack(t,5,()=>{const refund=Math.round(perkPrice(s.perks.size-1)*(1-(window.kino?.research?.stat?.('mk.discount')??0))/10)*10;s.losePerk(t.perk);s.points+=refund;this.combat.equip().catch(console.error);});
       ok=s.buyPerk(t.perk);if(ok){this.combat.clearInput();this.combat.perkDrink.start(t.perk,this.combat.view);this.notice(MOON_PERKS[t.perk].name);a.play(t.perk);}
       else this.notice(s.perks.size>=4?'You can buy four perks. Complete the quest to earn all eight.':'Cannot purchase: check points, power, and owned perks.');
     }

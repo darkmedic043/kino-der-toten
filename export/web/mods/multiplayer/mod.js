@@ -252,14 +252,15 @@ export default async function setup(api){
   };
   function goDown(){
     // coopBleedMul: Downer's Delight (perks-plus reaper-perks.js), read before the perks are cleared
-    me.down=true;me.bleed=BLEED_OUT*(window.kino?.coopBleedMul?.()??1);session.phase='reviving';session.reviveLeft=Infinity;session.health=0;session.perks.clear();session.cancelReload();
+    me.down=true;me.bleed=BLEED_OUT*(window.kino?.coopBleedMul?.()??1);session.phase='reviving';session.reviveLeft=Infinity;session.health=0;host.emit('goingDown');if(session.clearPerks)session.clearPerks();else session.perks.clear();session.cancelReload();
     queueMicrotask(()=>api.announce('You are down','HOLD ON · A TEAMMATE CAN REVIVE YOU',5));showPanel();
   }
   function getUp(){
     me.down=me.dead=false;camera.rotation.z=0;session.phase='fighting';session.reviveLeft=0;session.health=session.maxHealth;session.effects.invulnerable=session.time+2;
-    host.camera=null;host.hideViewmodel=false;showPanel();
+    host.camera=null;host.hideViewmodel=false;showPanel();api.equipView?.();   // the third gun may have gone with Mule Kick
   }
-  net.on('revive',()=>{if(me.down&&!me.dead){getUp();api.announce('Revived','BACK IN THE FIGHT',3);}});
+  net.on('revive',m=>{if(me.down&&!me.dead){getUp();host.emit('revived',m);api.announce('Revived','BACK IN THE FIGHT',3);}});
+  window.kino.coopGetUp=()=>{if(me.down&&!me.dead){getUp();host.emit('revived',{});}};   // Equivalent Exchange
   // Back at the next round, next to a teammate who is still standing (walkable ground beside them), or at the map's
   // spawn if nobody is. The spawn alone could be cut off behind doors, or under Cheese Cube's rising cheese.
   function respawnIfDead(){
@@ -314,7 +315,7 @@ export default async function setup(api){
       me.progress=useHeld?me.progress+dt:0;
       revive.querySelector('span').textContent=useHeld?`Reviving ${candidate.name}…`:`Hold F to revive ${candidate.name}`;
       revive.querySelector('b').style.width=Math.min(100,100*me.progress/need)+'%';
-      if(me.progress>=need){net.send(candidate.id,{t:'revive'});session.addPoints(50);me.progress=0;candidate.down=false;setTag(candidate);api.toast(`Revived ${candidate.name}`,3);}
+      if(me.progress>=need){net.send(candidate.id,{t:'revive',...window.kino.reviveExtras?.()});session.addPoints(50);host.emit('reviveDone');me.progress=0;candidate.down=false;setTag(candidate);api.toast(`Revived ${candidate.name}`,3);}
     }
   }
 

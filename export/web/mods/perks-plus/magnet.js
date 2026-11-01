@@ -7,7 +7,8 @@
 //     (1 slot); DROP <name> puts a stored one back down 110 in front of you with a fresh lifetime, for you or a teammate
 //     to walk into (a dropped one isn't pulled back). Stored power-ups don't time out. Lose the perk and they fall out.
 //     A chip above the perks shows the stash, or the wheel key when a power-up is in reach.
-//   Research track (research.json, mm.*): pull (+50% speed, range 2,500), slots (+2), reach (+120), pulse (storing or
+//   Research track (research.json, mm.*): pull (+50% speed, range 2,500), slots (+2), stack (a slot holds that many more of
+//     the same power-up; replaced the +120 reach, which did nothing since the pull stops within reach), pulse (storing or
 //     dropping hurts zombies within 220 for that x zh and freezes them 1.5 s), linger (power-ups within 600 don't time
 //     out), bonus (kills drop a bonus power-up that often: the mod's double-buy upgrade), restock (every n-th round a
 //     power-up appears in a free slot), twin (a drop comes out twice that often).
@@ -24,8 +25,12 @@ export function setupMagnet(api, h) {
   const { host, session, powerups, world, camera, data, audio } = api;
   const { has, stat, feet, now, zh, near, hurt, slow, ring, fx, chip, toast } = h;
   if (!powerups) return null;
-  const stash = [];   // power-up types, oldest first
+  const stash = [];   // power-up types, oldest first; with Stacked a slot holds several of one type
   const slots = () => 1 + stat('mm.slots');
+  const stackSize = () => 1 + stat('mm.stack');
+  const count = type => stash.filter(t => t === type).length;
+  const used = () => [...new Set(stash)].reduce((n, type) => n + Math.ceil(count(type) / stackSize()), 0);
+  const canStore = type => count(type) % stackSize() > 0 || used() < slots();
   const name = type => data.powerups?.[type]?.name ?? type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   const icon = type => data.powerups?.[type]?.icon ?? null;
   const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -63,9 +68,8 @@ export function setupMagnet(api, h) {
   });
 
   // ---- store / drop ------------------------------------------------------------------------------------------------------
-  const reach = () => REACH + stat('mm.reach');
-  function closest() {
-    const f = feet(); let best = null, bd = reach();
+    function closest() {
+    const f = feet(); let best = null, bd = REACH;
     for (const p of powerups.items) { if (p.mmGone) continue; const d = flat(f, p.root.position); if (d < bd && Math.abs(p.root.position.y - 40 - f.y) < 120) { bd = d; best = p; } }
     return best;
   }
@@ -75,7 +79,7 @@ export function setupMagnet(api, h) {
     ring(f, PULSE, 0xff6a9a);
   }
   function store(p) {
-    if (!p || !powerups.items.includes(p) || stash.length >= slots()) return false;
+    if (!p || !powerups.items.includes(p) || !canStore(p.type)) return false;
     const n = net();
     if (n && !n.isHost) { p.mmGone = true; p.root.visible = false; n.send(n.hostId, { t: 'mmStore', nid: p.nid ?? 0 }); return true; }   // the host confirms (mmStored)
     const at = p.root.position.clone(); powerups.remove(p); powerups.burst(at); stored(p.type);
@@ -132,7 +136,8 @@ export function setupMagnet(api, h) {
     const phase = session.phase;
     if (phase === 'fighting' && lastPhase === 'preparing' && has('magnet')) {
       const every = stat('mm.restock');
-      if (every && session.round % every === 0 && stash.length < slots()) { const type = RESTOCK[Math.floor(Math.random() * RESTOCK.length)]; stash.push(type); toast?.(`Magnet Margarita · Restock: ${name(type)}`, 2.5); }
+      const pool = RESTOCK.filter(canStore);
+      if (every && session.round % every === 0 && pool.length) { const type = pool[Math.floor(Math.random() * pool.length)]; stash.push(type); toast?.(`Magnet Margarita · Restock: ${name(type)}`, 2.5); }
     }
     lastPhase = phase;
   });
@@ -141,15 +146,15 @@ export function setupMagnet(api, h) {
   // ---- the command wheel ----------------------------------------------------------------------------------------------
   const wheel = () => {
     if (!has('magnet')) return [];
-    const p = closest(), full = stash.length >= slots();
+    const p = closest(), full = p ? !canStore(p.type) : used() >= slots();
     const out = [{ label: 'Store power-up', color: '#e04a6a', icon: p ? icon(p.type) : null,
-      sub: full ? `Stash full (${stash.length}/${slots()})` : p ? `${name(p.type)} · ${stash.length}/${slots()}` : 'None in reach', disabled: full || !p, use: () => store(closest()) }];
-    stash.forEach((type, i) => out.push({ label: 'Drop ' + name(type), sub: 'Stored', color: '#ff9ab4', icon: icon(type), use: () => drop(i) }));
+      sub: full ? `Stash full (${used()}/${slots()})` : p ? `${name(p.type)} · ${used()}/${slots()}` : 'None in reach', disabled: full || !p, use: () => store(closest()) }];
+    for (const type of new Set(stash)) { const n = count(type); out.push({ label: 'Drop ' + name(type), sub: n > 1 ? `Stored ×${n}` : 'Stored', color: '#ff9ab4', icon: icon(type), use: () => drop(stash.indexOf(type)) }); }
     return out;
   };
   const register = () => { if (window.kino?.commandWheel) window.kino.commandWheel.add('magnet', wheel); else setTimeout(register, 300); };
   register();
-  chip(() => has('magnet') && stash.length ? [`STASH ${stash.map(t => name(t).toUpperCase()).join(' · ')}`, true] : has('magnet') && closest() && stash.length < slots() ? [`${keyName(binds().wheel)} · STORE POWER-UP`, true] : null);
+  chip(() => has('magnet') && stash.length ? [`STASH ${[...new Set(stash)].map(t => name(t).toUpperCase() + (count(t) > 1 ? ` ×${count(t)}` : '')).join(' · ')}`, true] : has('magnet') && closest() && canStore(closest().type) ? [`${keyName(binds().wheel)} · STORE POWER-UP`, true] : null);
 
-  return { stash, slots, store, drop, closest, reach, get remotes() { return remotes; } };
+  return { stash, slots, used, canStore, store, drop, closest, get remotes() { return remotes; } };
 }

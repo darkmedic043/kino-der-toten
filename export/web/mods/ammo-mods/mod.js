@@ -129,7 +129,20 @@ export default function setup(api) {
   host.on('beforeEnemyDamage', e => { const a = e.enemy?.amod; if (a?.brittleUntil > now()) e.amount *= 1 + a.brittle; });
 
   // ---- the effects -------------------------------------------------------------------------------------------------
-  const rockets = [], rifts = [], glyphs = [];
+  const rockets = [], rifts = [], glyphs = [], balls = [], flares = [], wheels = [];
+  const dropSprite = s => { s.removeFromParent(); s.material.dispose(); };
+  // peak damage (a share of a zombie's health this round) to everything in reach, fading to 40% at the edge
+  function blast(at, radius, share, special = 0) {
+    const peak = roundHealth() * share;
+    for (const o of [...enemies.list]) { const d = chest(o).distanceTo(at); if (d < radius) hurt(o, THREE.MathUtils.lerp(peak, peak * .4, d / radius) * (o.kind !== 'zombie' ? 1 + special : 1)); }
+  }
+  function rocketBurst(r) {   // a Fire Works rocket goes off: Big Bang's bonus, Weeping Willow's falling flares
+    fx.explosion(r.pos, .35 + r.P.radius / 300, r.color.getHex()); audio?.play?.('explosion', .2);
+    blast(r.pos, r.P.radius, r.P.dmg, r.P.special ?? 0);
+    const floor = alive(r.target) ? r.target.root.position.y : r.pos.y - 42;
+    for (let i = 0; i < (r.P.willow ?? 0); i++) { const f = glow(r.color, 7, 1); f.position.copy(r.pos); scene.add(f);
+      flares.push({ s: f, pos: r.pos.clone(), vel: new THREE.Vector3((Math.random() - .5) * 240, 120 + Math.random() * 120, (Math.random() - .5) * 240), t: 0, floor, P: r.P, color: r.color }); }
+  }
   let regenUntil = 0, regenRate = 0;
   const EFFECT = {
     cryo(z, tier) {
@@ -155,11 +168,20 @@ export default function setup(api) {
       for (const [i, o] of chain.entries()) { const a = st(o); a.stunUntil = now() + P.stun; a.frozen = false; mark(o, '#5fe8ff', 42, 30); a.markUntil = a.stunUntil; setSpeed(o);
         if (i) hurt(o, o.maxHealth * P.arcDmg); }
       // the first zombie crackles: a damage field for the length of the stun
-      const a = st(z); a.fieldUntil = now() + P.stun; a.field = P.field; a.fieldDmg = P.fieldDmg; a.fieldTick = 0;
+      const a = st(z); a.fieldUntil = now() + P.stun; a.field = P.field; a.fieldDmg = P.fieldDmg; a.fieldTick = 0; a.fieldColor = undefined; a.aftershock = P.aftershock ?? 0; a.arcDmg = P.arcDmg; a.arcStun = P.stun;
+      if (P.ball) {   // Ball Lightning: rolls on the way the shot was going
+        const at = chest(z), dir = at.clone().sub(api.camera.position).setY(0).normalize(), o = glow('#bff6ff', 46, .95); o.position.copy(at); scene.add(o);
+        balls.push({ s: o, pos: at, dir, t: 0, tick: 0, P });
+      }
       bolt(links); audio?.play?.('explosion', .15);
     },
     fireworks(z, tier) {
       const P = tune('fireworks', tier), from = chest(z), used = new Set([z]);
+      if (P.starburst) { fx.explosion(from, .35 + P.radius / 300, 0xffd27a); blast(from, P.radius, P.dmg, P.special ?? 0); }
+      if (P.wheels) {   // Fire Wheel: two rings of sparks circling the spot
+        const parts = Array.from({ length: 12 }, () => { const o = glow('#ff8a3a', 20, .9); scene.add(o); return o; });
+        wheels.push({ at: z.root.position.clone().addScaledVector(up, 30), parts, t: 0, tick: 0, P });
+      }
       for (let i = 0; i < P.rockets; i++) {
         // targets: the nearest other zombies, round-robin, the source itself if it's alone
         let t = null, bd = 900; for (const o of enemies.list) { if (used.has(o) || !alive(o)) continue; const d = o.root.position.distanceTo(z.root.position); if (d < bd) { bd = d; t = o; } }
@@ -169,7 +191,8 @@ export default function setup(api) {
           new THREE.LineBasicMaterial({ color, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false }));
         trail.frustumCulled = false; scene.add(trail);
         const ang = (i / P.rockets) * Math.PI * 2, vel = new THREE.Vector3(Math.cos(ang) * 120, 520, Math.sin(ang) * 120);
-        rockets.push({ s, trail, pos: from.clone(), vel, t: 0, target: t, P, color, hist: [] });
+        if (P.starburst) vel.set(Math.cos(ang) * 700, 40, Math.sin(ang) * 700);   // flat, straight out, bursting on a short fuse
+        rockets.push({ s, trail, pos: from.clone(), vel, t: 0, target: t, P, color, hist: [], fuse: P.starburst ? .45 : 0 });
       }
       audio?.play?.('explosion', .12);
     },
@@ -178,6 +201,13 @@ export default function setup(api) {
       const hole = new THREE.Sprite(new THREE.SpriteMaterial({ map: holeTex, transparent: true, depthWrite: false })); hole.position.copy(at); hole.scale.setScalar(1); scene.add(hole);
       const halo = glow('#a46bff', P.radius * .9, .5); halo.position.copy(at); scene.add(halo);
       rifts.push({ at, P, t: 0, hole, halo, caught: new Set() });
+      if (P.topple) {   // Topple Danger: the nearest zombie outside the rift is warped into the thickest crowd and hurts it
+        const near = (o, r) => enemies.list.filter(x => x !== o && alive(x) && x.root.position.distanceTo(o.root.position) < r).length;
+        const out = enemies.list.filter(o => o !== z && alive(o) && o.root.position.distanceTo(at) > P.radius && o.root.position.distanceTo(at) < 500).sort((a, b) => a.root.position.distanceTo(at) - b.root.position.distanceTo(at))[0];
+        const crowd = out && enemies.list.filter(o => o !== out && alive(o)).sort((a, b) => near(b, 150) - near(a, 150))[0];
+        if (crowd) { const a = st(out); out.root.position.copy(crowd.root.position).add(new THREE.Vector3(20, 0, 0)); out.path = []; out.repath = 0;
+          a.fieldUntil = now() + 3; a.field = 120; a.fieldDmg = P.topple; a.fieldTick = 0; a.fieldColor = 0xa46bff; a.aftershock = 0; bolt([at, chest(out)], 0xa46bff); }
+      }
       audio?.play?.('explosion', .2);
     },
     lightmend(z, tier) {
@@ -193,7 +223,7 @@ export default function setup(api) {
     },
     brainrot(z, tier) {
       if (z.kind !== 'zombie') return EFFECT.shatter(z, 1);   // dogs and specials don't turn: a small blast instead
-      const P = tune('brainrot', tier), a = st(z); a.rotUntil = now() + P.dur; a.rotLure = P.lure; a.rotExplode = P.explode; a.rotBite = P.bite ?? .25; a.rotFumes = P.fumes ?? 0; a.fumeAt = 0; a.victim = null; a.biteAt = 0;
+      const P = tune('brainrot', tier), a = st(z); a.rotUntil = now() + P.dur; a.rotLure = P.lure; a.rotExplode = P.explode; a.rotBite = P.bite ?? .25; a.rotFumes = P.fumes ?? 0; a.fumeAt = 0; a.victim = null; a.biteAt = 0; a.rotPlague = P.plague ?? 0; a.rotTier = tier;
       rotted.add(z); mark(z, '#8cff5a', 70, 36); a.markUntil = a.rotUntil;
     },
   };
@@ -267,7 +297,7 @@ export default function setup(api) {
     const roll = { id: mod.id, tier: mod.tier, chance: PROC[mod.tier], enemy: z }; host.emit('ammoModProc', roll);
     if (Math.random() > roll.chance) return;
     if (z.amod && (z.amod.rotUntil > now() || (mod.id === 'cryo' && z.amod.slowUntil > now()) || (mod.id === 'napalm' && z.amod.burnUntil > now()))) return;
-    ready = now() + COOLDOWN[mod.id];
+    ready = now() + COOLDOWN[mod.id] * (roll.cooldown ?? 1);
     queueMicrotask(() => { if (!alive(z)) return; SFX(mod.id, chest(z)); EFFECT[mod.id](z, mod.tier); host.emit('ammoModFired', { id: mod.id, tier: mod.tier, enemy: z }); });   // after the hit itself lands ('ammoModFired': research augments)
   });
 
@@ -291,12 +321,17 @@ export default function setup(api) {
       if (a.fieldUntil > t) {   // Dead Wire's field: zombies around the stunned one take shocks twice a second
         a.fieldTick -= dt;
         if (a.fieldTick <= 0) { a.fieldTick = .5;
-          for (const o of enemies.list) if (o !== z && alive(o) && o.root.position.distanceTo(z.root.position) < a.field) { hurt(o, o.maxHealth * a.fieldDmg * .5); if (Math.random() < .5) bolt([chest(z), chest(o)]); } }
+          for (const o of enemies.list) if (o !== z && alive(o) && o.root.position.distanceTo(z.root.position) < a.field) { hurt(o, o.maxHealth * a.fieldDmg * .5); if (Math.random() < .5) bolt([chest(z), chest(o)], a.fieldColor); }
+          if (a.aftershock && Math.random() < a.aftershock) {   // Aftershock: the field reaches out and stuns one more
+            const o = enemies.list.find(o => o !== z && alive(o) && !(o.amod?.stunUntil > t) && o.root.position.distanceTo(z.root.position) < a.field * 1.4);
+            if (o) { const b = st(o); b.stunUntil = t + a.arcStun; b.frozen = false; mark(o, '#5fe8ff', 42, 30); b.markUntil = b.stunUntil; setSpeed(o); hurt(o, o.maxHealth * a.arcDmg); bolt([chest(z), chest(o)]); } }
+        }
       }
       if (a.rotUntil > t && alive(z)) {   // Brain Rot: hunt the nearest zombie and bite it
-        if (!alive(a.victim)) { let best = null, bd = 800; for (const o of enemies.list) { if (o === z || !alive(o) || o.amod?.rotUntil > t) continue; const d = o.root.position.distanceTo(z.root.position); if (d < bd) { bd = d; best = o; } } a.victim = best; }
+        if (!alive(a.victim) || a.victim.amod?.rotUntil > t) { let best = null, bd = 800; for (const o of enemies.list) { if (o === z || !alive(o) || o.amod?.rotUntil > t) continue; const d = o.root.position.distanceTo(z.root.position); if (d < bd) { bd = d; best = o; } } a.victim = best; }
         if (a.victim && a.victim.root.position.distanceTo(z.root.position) < 70 && t >= a.biteAt) {
           a.biteAt = t + 1; z.rig.play?.('attack', false); hurt(a.victim, a.victim.maxHealth * (a.rotBite ?? .25) + 1);
+          if (a.rotPlague && alive(a.victim) && a.victim.kind === 'zombie' && rotted.size < 6 && Math.random() < a.rotPlague) { EFFECT.brainrot(a.victim, a.rotTier); a.victim = null; }   // Plague
         }
         if (a.rotFumes && t >= a.fumeAt) { a.fumeAt = t + 1; for (const o of [...enemies.list]) if (o !== z && alive(o) && o.root.position.distanceTo(z.root.position) < 100) hurt(o, o.maxHealth * a.rotFumes); }   // Caustic Fumes
       }
@@ -309,14 +344,14 @@ export default function setup(api) {
     // Fire Works: up, then curving in on the target, a coloured burst on arrival
     for (const r of [...rockets]) {
       r.t += dt;
-      if (r.t > .3) {
+      if (r.fuse) {   // Starburst: straight out, no homing
+        if (r.t >= r.fuse) { rocketBurst(r); r.s.removeFromParent(); r.s.material.dispose(); r.trail.removeFromParent(); r.trail.geometry.dispose(); r.trail.material.dispose(); rockets.splice(rockets.indexOf(r), 1); continue; }
+      } else if (r.t > .3) {
         const goal = alive(r.target) ? chest(r.target) : r.pos.clone().addScaledVector(r.vel, .05);
         const want = goal.clone().sub(r.pos).normalize().multiplyScalar(900);
         r.vel.lerp(want, Math.min(1, dt * 6));
         if (r.pos.distanceTo(goal) < 22 || r.t > 3) {
-          const peak = roundHealth() * r.P.dmg;
-          fx.explosion(r.pos, .35 + r.P.radius / 300, r.color.getHex()); audio?.play?.('explosion', .2);
-          for (const o of [...enemies.list]) { const d = chest(o).distanceTo(r.pos); if (d < r.P.radius) hurt(o, THREE.MathUtils.lerp(peak, peak * .4, d / r.P.radius)); }
+          rocketBurst(r);
           r.s.removeFromParent(); r.s.material.dispose(); r.trail.removeFromParent(); r.trail.geometry.dispose(); r.trail.material.dispose(); rockets.splice(rockets.indexOf(r), 1); continue;
         }
       } else r.vel.y -= 600 * dt;
@@ -324,6 +359,21 @@ export default function setup(api) {
       r.hist.unshift(r.pos.clone()); if (r.hist.length > 8) r.hist.pop();
       const at = r.trail.geometry.attributes.position; for (let i = 0; i < 8; i++) { const q = r.hist[Math.min(i, r.hist.length - 1)]; at.setXYZ(i, q.x, q.y, q.z); } at.needsUpdate = true;
     }
+    // Weeping Willow: flares fall and burst on the ground
+    for (const f of [...flares]) { f.t += dt; f.vel.y -= 700 * dt; f.pos.addScaledVector(f.vel, dt); f.s.position.copy(f.pos);
+      if (f.pos.y <= f.floor + 6 || f.t > 1.5) { fx.explosion(f.pos, .3, f.color.getHex()); blast(f.pos, f.P.radius * .6, f.P.dmg * .35); dropSprite(f.s); flares.splice(flares.indexOf(f), 1); } }
+    // Fire Wheel: two rings circling the spot, burning what they touch
+    for (const w of [...wheels]) { w.t += dt; w.tick -= dt; const hit = w.tick <= 0; if (hit) w.tick = .25;
+      for (let j = 0; j < 2; j++) { const a = w.t * 2.6 + j * Math.PI, c = w.at.clone().add(new THREE.Vector3(Math.cos(a) * 90, 0, Math.sin(a) * 90));
+        for (let i = 0; i < 6; i++) { const b = w.t * 9 + i * Math.PI / 3; w.parts[j * 6 + i].position.copy(c).add(new THREE.Vector3(Math.cos(a) * Math.cos(b) * 34, Math.sin(b) * 34, Math.sin(a) * Math.cos(b) * 34)); }
+        if (hit) for (const o of [...enemies.list]) if (chest(o).distanceTo(c) < 70) { hurt(o, roundHealth() * w.P.wheels * .25); fx.burn(chest(o)); } }
+      if (w.t >= 4) { w.parts.forEach(dropSprite); wheels.splice(wheels.indexOf(w), 1); } }
+    // Ball Lightning: rolls on until a wall or its time stops it, shocking what's around it
+    for (const b of [...balls]) { b.t += dt; b.tick -= dt;
+      const next = b.pos.clone().addScaledVector(b.dir, 200 * dt); if (world.lineClear(b.pos, next)) b.pos.copy(next); b.s.position.copy(b.pos); b.s.material.rotation += dt * 6;
+      if (b.tick <= 0) { b.tick = .4; let shown = 0;
+        for (const o of [...enemies.list]) if (alive(o) && chest(o).distanceTo(b.pos) < 120) { const a = st(o); a.stunUntil = Math.max(a.stunUntil ?? 0, t + .5); a.frozen = false; setSpeed(o); hurt(o, o.maxHealth * b.P.ball * .4); if (shown++ < 3) bolt([b.pos.clone(), chest(o)]); } }
+      if (b.t >= 3) { dropSprite(b.s); balls.splice(balls.indexOf(b), 1); } }
     // Light Mend: glyphs bob in place, drift to the player while they're hurt and in range, heal on contact
     const me = api.player?.getFeetPosition?.()?.add(new THREE.Vector3(0, 40, 0));
     for (const g of [...glyphs]) {
@@ -353,7 +403,13 @@ export default function setup(api) {
         const far = (world.spawnBarriers?.(session) ?? []).map(b => b.inside).filter(Boolean).sort((a, b) => b.distanceTo(r.at) - a.distanceTo(r.at));
         for (const o of r.caught) {
           if (!alive(o)) continue; const a = st(o); a.pulled = false; unmark(o); setSpeed(o);
-          if (Math.random() < r.P.lethal) { fx.explosion(chest(o), .3, 0xa46bff); hurt(o, o.health + 1); }   // dropped from the sky
+          if (Math.random() < r.P.lethal) {   // dropped from the sky
+            let at = chest(o);
+            if (r.P.impact) { let bd = Infinity; for (const x of enemies.list) { if (x === o || !alive(x) || r.caught.has(x)) continue; const d = x.root.position.distanceTo(o.root.position); if (d < bd) { bd = d; at = chest(x); } } }   // Targeted
+            fx.explosion(at, .3, 0xa46bff); hurt(o, o.health + 1);
+            if (r.P.impact) blast(at, 90, r.P.impact);
+            if (r.P.rain) { fx.explosion(at, .5, 0xa46bff); blast(at, 130, r.P.rain); }   // Explosive Rain
+          }
           else if (far.length) { o.root.position.copy(far[Math.floor(Math.random() * Math.min(4, far.length))]); o.path = []; o.repath = 0; }   // warped away
         }
         r.hole.removeFromParent(); r.hole.material.dispose(); r.halo.removeFromParent(); r.halo.material.dispose(); rifts.splice(rifts.indexOf(r), 1);
@@ -366,6 +422,9 @@ export default function setup(api) {
     for (const r of rockets) { r.s.removeFromParent(); r.trail.removeFromParent(); } rockets.length = 0;
     for (const r of rifts) { r.hole.removeFromParent(); r.halo.removeFromParent(); } rifts.length = 0;
     for (const g of glyphs) g.s.removeFromParent(); glyphs.length = 0; regenUntil = 0;
+    for (const b of balls) dropSprite(b.s); balls.length = 0;
+    for (const f of flares) dropSprite(f.s); flares.length = 0;
+    for (const w of wheels) w.parts.forEach(dropSprite); wheels.length = 0;
   });
 
   // ---- HUD: the mod under the weapon name ----------------------------------------------------------------------------
@@ -404,5 +463,5 @@ export default function setup(api) {
     if (!session.spend(PRICE[m.tier + 1])) return 'Not enough points';
     m.tier++; audio?.play?.('buy'); return true;
   }
-  window.kino.ammoMods = { MODS, PRICE, TUNE, status, buy, upgrade, trigger: (id, z, tier = 1) => { SFX(id, chest(z)); return EFFECT[id]?.(z, tier); }, sfx: (id, at) => SFX(id, at) };   // trigger: for tests
+  window.kino.ammoMods = { MODS, PRICE, TUNE, status, buy, upgrade, bolt, trigger: (id, z, tier = 1) => { SFX(id, chest(z)); return EFFECT[id]?.(z, tier); }, sfx: (id, at) => SFX(id, at) };   // trigger: for tests
 }

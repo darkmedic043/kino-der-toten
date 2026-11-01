@@ -182,7 +182,9 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     if(!dtRaw||!view.pivot||!view.ready)return;
     const dt=Math.min(dtRaw,.05);s.t=(s.t??0)+dt;   // s.t: the layer's own clock (tests sample against it)
     const def=session.def;if(def!==lastDef){lastDef=def;s.weight=weaponWeight(def);}
-    const str=settings.gunMotion??1,w=s.weight,amp=Math.pow(w,.6)*str,lag=Math.pow(w,.4);
+    const steady=window.kino?.motionSteady?.()??1,mv=window.kino?.movement?.state;   // Dead Set: less motion while sliding, diving or in the air
+    s.steadyK=(s.steadyK??1)+(((mv?.sliding||mv?.diving||mv?.airTime>.12)?steady:1)-(s.steadyK??1))*Math.min(1,dt*8);
+    const str=(settings.gunMotion??1)*s.steadyK,w=s.weight,amp=Math.pow(w,.6)*str,lag=Math.pow(w,.4);
     // springs soften with weight: a heavy gun lags more and settles later
     for(const k in base){const [kk,cc]=base[k];s[k].k=kk/lag;s[k].c=cc/Math.sqrt(lag);}
     const aim=view.aim??0,hip=1-aim*.85,hipR=1-aim*.9;   // aiming keeps the gun steady
@@ -223,7 +225,8 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     const want=moving?Math.min(1,speed/190)*(sprint?1.35:1)*(player.crouched?.55:1):0;
     s.bobAmp+=(want-s.bobAmp)*Math.min(1,dt*(want>s.bobAmp?6:9));
     const hv=heavy(w);s.sprintSpring.k=70/(1+hv*.9);s.sprintSpring.c=12/Math.sqrt(1+hv*.9);   // a heavy gun takes longer to drop into the sprint and to come back up
-    s.sprintSpring.step(sprint&&speed>60?1:0,dt);s.sprintBlend=THREE.MathUtils.clamp(s.sprintSpring.x,-.15,1.15);
+    s.sprintSpring.step(sprint&&speed>60?1:0,dt);if(steady<1&&!(sprint&&speed>60))s.sprintSpring.step(0,dt);   // Dead Set: out of the sprint twice as fast
+    s.sprintBlend=THREE.MathUtils.clamp(s.sprintSpring.x,-.15,1.15);
     const cm=def?.dualWield?DUAL.common:1;   // dual wield: the pivot keeps a share of the side-to-side motion, the arms get the rest each on its own
     const bA=s.bobAmp*amp*(1-aim*.9),ph=s.bobPhase;
     const bobX=Math.sin(ph)*.26*bA*(1+.3*s.sprintBlend)*cm,bobY=Math.cos(ph*2)*.15*bA,bobZ=Math.sin(ph*2)*.07*bA*s.sprintBlend;
