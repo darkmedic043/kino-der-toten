@@ -54,7 +54,7 @@ export default async function setup(api){
   routeAround(booths);
   for(const b of booths)if(b.spot.clearDebris!==false)clearDebris(b);   // clearDebris:false where the floor itself is bumpy (The Giant's snow)
   col?.invalidateCache?.();   // the player's capsule test caches nearby triangles (collision-world.js); some just moved
-  window.kino.terminalBooth={booths};
+  window.kino.terminalBooth={booths,open:b=>open(b??booths[0])};   // .open(): MelonTerm as from a booth (tests, other mods)
   usePrompt(booths);
   instanceShared(booths,scene);
   window.kino.lighting?.tag?.(scene);

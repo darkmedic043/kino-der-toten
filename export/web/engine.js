@@ -723,8 +723,10 @@ async function warmHud(){
     if(waits.length)await Promise.race([Promise.allSettled(waits),new Promise(r=>setTimeout(r,3000))]);
     for(let i=0;i<4;i++)await paint();   // commits, rasters (cc holds the next main frame while a pending tree waits) and draws
     probes=sweep?await paintProbes(paint):0;
+    const noteAll=()=>{for(const el of document.body.querySelectorAll('*'))if(el.checkVisibility?.({visibilityProperty:true})??el.getClientRects().length)noteHud(el);};   // painted: not a first appearance later
+    noteAll();   // the warm states too (MelonTerm's desktop, hidden again by warmHud(false)), or the hitch list blames them as first appearances
     if(sweep){try{mods.emit('warmHud',false);}catch{}await paint();probes+=await paintProbes(paint);}   // again in the plain state: a different paint (the idle class skill, the full panels) needs its own variants
-    for(const el of document.body.querySelectorAll('*'))if(el.checkVisibility?.({visibilityProperty:true})??el.getClientRects().length)noteHud(el);   // painted: not a first appearance later
+    noteAll();
   }catch(error){console.warn('[warm-hud]',error);}
   finally{try{mods.emit('warmHud',false);}catch{}document.body.classList.add('menu-open');document.body.classList.remove('hud-warm');for(const u of undo.reverse())u();}
   console.info('[warm-hud] painted in',Math.round(performance.now()-t0),'ms, probes',probes);

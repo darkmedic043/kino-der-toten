@@ -98,9 +98,13 @@ const CSS = `
 #melonterm *{box-sizing:border-box}
 #melonterm .crt{position:relative;width:min(1040px,92vw);height:min(580px,80vh);background:#031208f0;border:2px solid var(--line);border-radius:16px;overflow:hidden;
   box-shadow:0 0 0 8px #050a07,0 0 0 10px #13261a,0 18px 60px #000c,0 0 50px #1bff6a30,inset 0 0 110px #000c;display:flex;flex-direction:column;animation:mt-on .35s ease-out}
-@keyframes mt-on{0%{transform:scaleY(.01) scaleX(.6);filter:brightness(4)}60%{transform:scaleY(1) scaleX(1);filter:brightness(1.6)}100%{filter:none}}
+@keyframes mt-on{0%{transform:scaleY(.01) scaleX(.6)}60%{transform:scaleY(1) scaleX(1)}}
+/* the switch-on flash is an overlay fading out, not filter:brightness on the animated .crt: a filter on a composited layer is applied by the
+   GPU process with a Skia shader (compiled on the first open, a multi-second stall on NVIDIA D3D11, even under Rind's CPU raster, 2026-11-01) */
+#melonterm .crt .flash{position:absolute;inset:0;z-index:10;pointer-events:none;background:#dfffe9;opacity:0;animation:mt-flash .35s ease-out}
+@keyframes mt-flash{0%{opacity:.9}60%{opacity:.3}100%{opacity:0}}
 #melonterm .crt::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:9;
-  background:repeating-linear-gradient(0deg,#0006 0 1px,transparent 1px 3px),radial-gradient(ellipse at center,transparent 55%,#000a 100%);mix-blend-mode:multiply}
+  background:repeating-linear-gradient(0deg,#0006 0 1px,transparent 1px 3px),radial-gradient(ellipse at center,transparent 55%,#000a 100%)}   /* plain alpha, no mix-blend-mode (a GPU blend shader, same stall as the filter) */
 #melonterm .crt::before{content:'';position:absolute;left:0;right:0;height:90px;z-index:8;pointer-events:none;background:linear-gradient(#7dffa600,#7dffa60d,#7dffa600);animation:mt-roll 7s linear infinite}
 @keyframes mt-roll{from{top:-90px}to{top:100%}}
 #melonterm .glow{text-shadow:0 0 6px #3dff8a99}
@@ -325,7 +329,7 @@ function build() {
   }
   const style = document.createElement('style'); style.textContent = CSS; document.head.append(style);
   const root = document.createElement('div'); root.id = 'melonterm'; root.hidden = true;
-  root.innerHTML = `<div class="crt glow">
+  root.innerHTML = `<div class="crt glow"><div class="flash"></div>
     <div class="bar"><span>MELONTERM 2.7</span><span class="grow"></span><span class="exlive warn" hidden>EXFIL OPEN</span><span class="pwr"></span><span class="pts"></span><span class="clock"></span></div>
     <div class="desk">
       <div class="cells"></div>
@@ -846,7 +850,7 @@ function build() {
   }
   function open(o) {
     opts = o; root.hidden = false; status(); clearInterval(clock); clock = setInterval(status, 250);
-    const c = root.querySelector('.crt'); c.style.animation = 'none'; void c.offsetWidth; c.style.animation = '';
+    for (const c of root.querySelectorAll('.crt, .crt .flash')) { c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; }
     layout();
     if (!win.hidden) { say('> SELECT A PERK'); renderGrid(); select(shown); }
     exState = ''; drawExfil();
