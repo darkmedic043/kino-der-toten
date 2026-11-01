@@ -30,8 +30,8 @@
       "pose": {
         "clip": "animations/viewmodel_b_knife_idle_loop.json",
         "frame": 0,
-        "turn": { "j_wrist_le": [0, 0, 85] },
-        "move": { "j_shoulder_ri": [0, 0, -30], "j_shoulder_le": [2, 4, -1] }
+        "turn": { "j_wrist_le": [0, 0, 85], "j_shoulder_le": [-12, 0, 14] },
+        "move": { "j_shoulder_ri": [0, 0, -30], "j_shoulder_le": [5, 4, -4] }
       },
       "damage": 150,
       "heavyMul": 2,
