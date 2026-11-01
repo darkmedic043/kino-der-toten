@@ -38,7 +38,7 @@ export class MoonSession extends Session {
   get def() {
     if(this.effects?.death_machine>this.time&&this.data.weapons.minigun_zm)return this.data.weapons.minigun_zm;
     const w=this.weapon,id=w.id==='microwavegun_zm'&&w.mode==='zap'?'microwavegundw_zm':w.id;
-    const d=this.data.weapons[id];return w.upgraded?{...d,...d.upgrade,id,upgraded:true,name:d.name+' • Pack-a-Punch'}:d;
+    const d=this.data.weapons[id];return w.upgraded?{...d,...d.upgrade,id,upgraded:true,name:d.ownPackName?d.name:d.name+' • Pack-a-Punch'}:d;
   }
   get canAct(){return !['gameover','reviving'].includes(this.phase)&&!this.drinking&&!this.meleeLeft&&!this.pack&&!(this.effects.death_machine>this.time);}
   buyPerk(id,free=false){

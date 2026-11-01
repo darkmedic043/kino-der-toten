@@ -1,0 +1,5 @@
+{
+  "name": "Dedicated melee",
+  "description": "A melee slot of its own, as in Black Ops 6 and 7: tap V to stab, hold V to draw the knife and run faster with it. Upgrades on its own at Pack-a-Punch and through knife kills.",
+  "script": "mod.js"
+}

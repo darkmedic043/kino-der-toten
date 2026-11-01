@@ -72,7 +72,7 @@ export class Session {
     this.teleporter='unlinked';this.teleportTime=0;this.lastEvent='Survive the night';this.doubleUntil=0;
   }
   get weapon(){return this.inventory[this.slot];}
-  get def(){const d=this.data.weapons[this.weapon.id];return this.weapon.upgraded?{...d,...d.upgrade,upgraded:true,name:d.name+' • Pack-a-Punch'}:d;}
+  get def(){const d=this.data.weapons[this.weapon.id];return this.weapon.upgraded?{...d,...d.upgrade,upgraded:true,name:d.ownPackName?d.name:d.name+' • Pack-a-Punch'}:d;}
   get maxHealth(){return this.perks.has('specialty_armorvest')?250:100;}
   // Only perks you paid for raise the price (user, 2026-10-16): free ones (gobblegums, Easter eggs, Moon's random perk,
   // cheats) don't. boughtPerks is marked by the paid paths (engine buyPerk, Moon buyPerk, Cheese Cube's machines);

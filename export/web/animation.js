@@ -143,8 +143,9 @@ export class ViewWeapon {
     // Bottles animate j_gun relative to tag_weapon throughout opening/drinking.
     // Freezing that root leaves the bottle behind while the hands move away.
     if(def.id.startsWith('zombie_perk_bottle_')){gun.getObjectByName('j_gun').userData.animationAnchor=false;gun.matrix.identity();}
+    gun.visible=!def.heldKnife;hands.scale.z=Math.abs(hands.scale.z)*(def.mirror?-1:1);   // mirror: BO1's knife hand is the left
     this.knives={};const knifeTag=hands.getObjectByName('tag_knife_attach');
-    if(knifeTag)Object.keys(this.data.melee).forEach((type,i)=>{attach(knives[i],knifeTag,'tag_knife');knives[i].visible=false;this.knives[type]=knives[i];});
+    if(knifeTag)Object.keys(this.data.melee).forEach((type,i)=>{attach(knives[i],knifeTag,'tag_knife');knives[i].visible=type===def.heldKnife;this.knives[type]=knives[i];});   // heldKnife: a melee weapon holds this knife in the hand (mods/melee)
     this.hiddenTags=[];
     for(const name of def.hideTags??[]){const bone=gun.getObjectByName(name);if(bone){bone.scale.setScalar(.000001);this.hiddenTags.push(name);}}
     this.root.matrixAutoUpdate=false;this.root.matrix.copy(cameraBasis);this.pivot.add(this.root);
@@ -208,8 +209,8 @@ export class ViewWeapon {
   melee(type='knife',charge=false){
     if(!this.ready||this.meleeLeft>0)return null;
     if(this.def.melee){
-      const d=this.def.melee,key=charge?'meleeChargeAnim':'meleeAnim',duration=Math.max(charge?d.meleeChargeTime:d.meleeTime,this.rig.data[key]?.duration??0);
-      this.meleeType=null;this.meleeLeft=duration;this.mode='melee';this.aim=0;this.rig.play(key,false,this.clipSpeed(key,duration),0);
+      const d=this.def.melee,key=charge?'meleeChargeAnim':'meleeAnim',time=charge?d.meleeChargeTime:d.meleeTime,duration=d.exact?time:Math.max(time,this.rig.data[key]?.duration??0);   // exact: a melee weapon's swing, sped up to fit
+      this.meleeType=null;this.meleeLeft=duration;this.mode='melee';this.aim=0;this.rig.play(key,false,this.clipSpeed(key,duration),d.fade??0);
       return {duration,delay:charge?d.meleeChargeDelay:d.meleeDelay,damage:d.meleeDamage};
     }
     const def=this.data.melee[type],key=type+':'+(charge?'meleeChargeAnim':'meleeAnim'),r=this.meleeRig??this.rig;
@@ -226,7 +227,7 @@ export class ViewWeapon {
     const action=this.rig.actions[this.rig.current],finished=!action?.isRunning();
     // sprintPose (mods/movement/fp.js): no sprint clips; the idle grip keeps playing and the motion layer poses the sprint
     const sprintKey=phase=>{if(this.sprintPose)return 'sprintPoseAnim';const key='sprint'+phase+(empty?'Empty':'')+'Anim';return this.rig.actions[key]?key:'sprint'+phase+'Anim';};
-    if(this.mode==='melee'&&this.meleeLeft===0){for(const model of Object.values(this.knives))model.visible=false;this.meleeType=null;this.mode='idle';
+    if(this.mode==='melee'&&this.meleeLeft===0){for(const [k,model] of Object.entries(this.knives))model.visible=k===this.def.heldKnife;this.meleeType=null;this.mode='idle';
       if(this.meleeRoot){this.meleeRoot.visible=false;this.root.visible=true;}}
     if(this.mode==='reload'&&!reloading)this.mode='idle';
     if(['fire','raise','sprintOut'].includes(this.mode)&&finished)this.mode='idle';

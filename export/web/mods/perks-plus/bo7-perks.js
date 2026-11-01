@@ -234,7 +234,7 @@ void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a =
     const z = e.enemy; if (!z) return;
     if (has(MM) && e.melee) {
       const cap = 20 + stat('mm.strength');
-      e.amount = (session.round ?? 1) <= cap ? Math.max(e.amount, (z.health ?? 0) + 1) : Math.max(e.amount, 2700);
+      e.amount = (session.round ?? 1) <= cap ? Math.max(e.amount, (z.health ?? 0) + 1) : Math.max(e.amount * 3, 2700);   // ×3: an upgraded melee weapon keeps one-shotting (mods/melee)
     }
     if (has(DP) && e.cause === 'bullet' && !e.head && stat('dp.crit') && Math.random() < stat('dp.crit')) e.amount *= session.def?.headMultiplier ?? 2;   // Critical Eye
     if (has(EP) && stat('ep.bean') && z.amod && Math.max(z.amod.markUntil ?? 0, z.amod.slowUntil ?? 0, z.amod.stunUntil ?? 0) > now()) e.amount *= 1 + stat('ep.bean');   // Vulnera Bean

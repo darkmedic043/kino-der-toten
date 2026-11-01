@@ -345,13 +345,15 @@ function openLoadoutGunsmith(id,onClose){
 loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;{const st=loadProfile();if(migrateWeaponLevels(c,weapons,st)){saveProfile(st);profile.weaponXp=st.weaponXp;}}   // 30-level track: old saves keep their attachments
   const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
 // One starting slot, pistols only; the Mystery Box card edits what the box can give you.
-const slots=[{key:'primary',label:'STARTING PISTOL'},{key:'box',label:'MYSTERY BOX'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
-let activeSlot='primary',focus=null;
+const slots=[{key:'primary',label:'STARTING PISTOL'},{key:'melee',label:'MELEE'},{key:'box',label:'MYSTERY BOX'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
+let activeSlot='primary',focus=null,meleeCatalog=null;
+fetchJson('mods/melee/melee.json').then(c=>{meleeCatalog=c;renderLoadout();}).catch(e=>console.warn('[melee]',e));
 const weaponList=()=>config.weapons.filter(w=>weapons[w.id]).map(w=>({...w,level:unlockLevel(w)}));
 const pistolList=()=>weaponList().filter(w=>isPistol(weapons[w.id]));
 function slotState(key,u,l){
   if(key==='primary')return {value:l.primary};
   if(key==='box')return {value:''};
+  if(key==='melee')return {value:l.melee};
   if(key==='tactical')return u.tacticalSlot?{value:l.tactical}:{locked:`Unlocks at level ${config.tacticalLevel}`};
   const i=+key.slice(5);return i<u.bonusSlots?{value:l.bonuses[i]??''}:{locked:`Unlocks at level ${config.secondBonusLevel}`};
 }
@@ -362,6 +364,11 @@ function renderLoadout(){
   for(const s of slots){
     const st=slotState(s.key,u,l),isTac=s.key==='tactical',isWeapon=!s.key.startsWith('bonus')&&!isTac,el=document.createElement('button');
     el.className='slot'+(s.key===activeSlot?' active':'')+(st.locked?' locked':'');
+    if(s.key==='melee'){
+      const m=meleeCatalog?.melees[st.value];
+      el.innerHTML=`<span class="label">${s.label}</span><strong>${esc(m?.name??'')}</strong><small>Tap melee to stab, hold it to draw</small>`;
+      el.addEventListener('click',()=>{activeSlot='melee';focus=null;renderLoadout();});$('slots').append(el);continue;
+    }
     if(s.key==='box'){
       const items=boxItems(config,profile,data),on=items.filter(i=>i.on);
       const tiers=(config.rarities??[]).map(r=>[r,on.filter(i=>i.kind==='weapon'&&i.rarity===r.id).length]).filter(([,n])=>n).reverse();
@@ -424,6 +431,7 @@ function gumDetail(cfg,pack,tiers){
 function renderPicker(u,l){
   const grid=$('picker-grid');grid.innerHTML='';
   if(activeSlot==='box'){renderBoxPicker(u);return;}
+  if(activeSlot==='melee'){renderMeleePicker(l);return;}
   const isTac=activeSlot==='tactical',isWeapon=!activeSlot.startsWith('bonus')&&!isTac,current=slotState(activeSlot,u,l).value??'';
   $('picker-title').textContent={primary:'STARTING PISTOL',tactical:'TACTICAL',bonus0:'BONUS',bonus1:'SECOND BONUS'}[activeSlot];
   $('picker-hint').textContent=isWeapon?`${pistolList().filter(w=>u.weapons.includes(w.id)).length} / ${pistolList().length} unlocked · other guns come from the Mystery Box and walls`:isTac?`${u.tactical.length} / ${tacList().length} unlocked`:`${u.bonuses.length} / ${config.bonuses.length} unlocked`;
@@ -474,6 +482,17 @@ let boxTab=null;
 function boxTabs(){
   const tiers=[...(config.rarities??[])].reverse().map(r=>({key:r.id,label:r.name.toUpperCase(),color:r.color,kind:'weapon',all:weaponList().filter(w=>rarityOf(config,w.id)===r.id)}));
   return [...tiers,{key:'tactical',label:'TACTICALS',kind:'tactical',all:tacList()},{key:'lethal',label:'LETHALS',kind:'lethal',all:(config.lethal??[]).filter(t=>data.equipment?.[t.id])}].filter(t=>t.all.length);
+}
+// The melee slot: every entry in melee.json is a choice; the mod reads profile.loadout.melee at the start of a match
+function renderMeleePicker(l){
+  const grid=$('picker-grid'),list=Object.entries(meleeCatalog?.melees??{});
+  $('picker-title').textContent='MELEE';$('picker-hint').textContent=`${list.length} melee weapon${list.length===1?'':'s'} · upgrades on its own at Pack-a-Punch and through melee kills`;$('picker-cats').hidden=true;
+  for(const [id,m] of list){
+    const el=document.createElement('button');el.className='opt bonus'+(id===l.melee?' selected':'');
+    el.innerHTML=`<strong>${esc(m.name)}</strong><small>${esc(m.description)}</small>`;
+    el.addEventListener('click',()=>{profile.loadout.melee=id;save();renderLoadout();});
+    grid.append(el);
+  }
 }
 function renderBoxPicker(u){
   const grid=$('picker-grid'),items=boxItems(config,profile,data),byId=Object.fromEntries(items.map(i=>[i.id,i]));

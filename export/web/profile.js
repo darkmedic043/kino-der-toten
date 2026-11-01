@@ -8,7 +8,7 @@ import { loadPrestige, isPrestigeMaster, masterLevelXp, RULES as PRESTIGE } from
 export const PROFILE_KEY='kino.mods.progression';
 
 export function loadProfile(){
-  const empty={xp:0,level:1,kills:0,games:0,bestRound:0,character:'mannequin',loadout:{primary:'m1911_zm',secondary:'',tactical:'',bonuses:[]}};
+  const empty={xp:0,level:1,kills:0,games:0,bestRound:0,character:'mannequin',loadout:{primary:'m1911_zm',secondary:'',tactical:'',melee:'knife',bonuses:[]}};
   let p;try{const saved=JSON.parse(localStorage.getItem(PROFILE_KEY));p=saved?{...empty,...saved,loadout:{...empty.loadout,...saved.loadout}}:empty;}catch{p=empty;}
   // Prestige Master's levels start at accountMasterStart (an account that entered Master before Master levels existed went back to 1)
   if(p.level<PRESTIGE.accountMasterStart&&isPrestigeMaster(loadPrestige().player.prestige)){p={...p,level:PRESTIGE.accountMasterStart,xp:0};}
@@ -57,7 +57,7 @@ export function validLoadout(config,profile,weapons){
   const primary=u.weapons.includes(l.primary)&&(!weapons||isPistol(weapons[l.primary]))?l.primary:'m1911_zm';
   const bonuses=[...new Set(l.bonuses)].filter(id=>u.bonuses.includes(id)).slice(0,u.bonusSlots);
   const tactical='';   // no loadout tactical (2026-10-28, user): tacticals come only from the Mystery Box
-  return {primary,secondary:'',tactical,bonuses};
+  return {primary,secondary:'',tactical,melee:l.melee||'knife',bonuses};
 }
 
 // ---- The Mystery Box list ---------------------------------------------------------

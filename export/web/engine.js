@@ -185,7 +185,7 @@ addEventListener('keydown',e=>{
   if(['Space','Tab','F3'].includes(e.code))e.preventDefault();
   keys.add(e.code);if(e.repeat||!active)return;
   // R: tap to reload, hold to inspect (mods/inspect); an empty mag reloads at once
-  if(e.code==='KeyR'){if(session.weapon?.mag===0)reload();else reloadHeld=performance.now();}if(e.code==='KeyV')melee();if(e.code==='KeyG')throwGrenade();if(e.code==='KeyF'||e.code==='KeyE')interact();
+  if(e.code==='KeyR'){if(session.weapon?.mag===0)reload();else reloadHeld=performance.now();}if(e.code==='KeyV'&&!mods.meleeKey?.(true))melee();if(e.code==='KeyG')throwGrenade();if(e.code==='KeyF'||e.code==='KeyE')interact();
   if(e.code==='Digit4')features.placeClaymore();if(e.code==='KeyX')features.throwMonkey();
   if(e.code==='Digit5'&&session.toggleAttachment())equipView();
   if(['Digit1','Digit2','Digit3'].includes(e.code)){session.switchWeapon(+e.code.at(-1)-1);equipView();}
@@ -195,7 +195,7 @@ addEventListener('keydown',e=>{
   if(e.code==='Escape'){setActive(false);document.exitPointerLock?.();}
   map?.keydown?.(e);
 });
-addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='KeyR'&&reloadHeld){reloadHeld=0;if(active)reload();}});
+addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='KeyV')mods.meleeKey?.(false);if(e.code==='KeyR'&&reloadHeld){reloadHeld=0;if(active)reload();}});
 addEventListener('wheel',()=>{if(active){session.switchWeapon();equipView();}});
 addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{const width=innerWidth,height=innerHeight,current=renderer.getSize(new THREE.Vector2());if(current.x===width&&current.y===height)return;camera.aspect=viewCamera.aspect=width/height;camera.updateProjectionMatrix();viewCamera.updateProjectionMatrix();renderer.setSize(width,height);},profile.mobile?150:0);});
 
@@ -233,7 +233,7 @@ function collect(type){
   map.onPowerup?.(type);
 }
 // dual wield has no aim, except the XMG's lockdown (def.lockdown: mods/bo3-weapons/aw.js poses it)
-const aiming=()=>ads&&(!session.def.dualWield||!!session.def.lockdown);
+const aiming=()=>ads&&!session.def.noAds&&(!session.def.dualWield||!!session.def.lockdown);
 const blocked=()=>!!map?.blocked?.()||!!mods.gunBlocked;   // gunBlocked: a mod has put the gun away (operator weapons)
 // hand: which gun of a dual pair fires (each has its own trigger and mag, rules.js dualMags); pressed: its trigger was
 // just pulled (an empty gun then clicks and reloads: itself, and the other gun too unless that one is full)
@@ -275,17 +275,18 @@ function warmViewAudio(){if(view?.ready)audio.warmWeapon(session.def,Object.valu
 async function equipView(){reloadShot=false;await view.equip(map?.viewDef?.(session.def)??session.def);warmViewAudio();}
 function reload(){if(!view.ready)return;if(session.reload()){burstLeft=0;ads=false;lastReloadSerial=session.reloadSerial;view.reload(session.reloadEmpty,session.reloadDuration,session.reloadStage,session.reloadHand);}}   // reloadHand: a dual pair's gun(s) that reload
 const dualSwap=()=>mouseHands&&session.def.dualWield&&!firesBoth(session.def);
-function melee(){
+function melee(force){   // force: a melee weapon's own light (false) or heavy (true) attack; otherwise the swing follows the target in reach
   if(!active||session.busy||session.weaponUnavailable||blocked()||!view.ready)return false;
-  const charge=!!meleeTarget(),type=session.bowie?'bowie':'knife',strike=view.melee(type,charge);
+  const charge=force??!!meleeTarget(),type=session.bowie?'bowie':'knife',strike=view.melee(type,charge);
   if(!strike)return false;
   session.cancelReload();session.meleeLeft=strike.duration;burstLeft=0;reloadShot=false;ads=false;primaryPressed=false;
-  pendingMelee={at:session.time+strike.delay,damage:session.weapon.id==='knife_ballistic_zm'&&session.bowie?(session.weapon.upgraded?1500:1000):strike.damage,bowie:session.bowie};
+  const hit=session.weapon.id==='knife_ballistic_zm'&&session.bowie?(session.weapon.upgraded?1500:1000):strike.damage;
+  pendingMelee={at:session.time+strike.delay,damage:mods.meleeDamage?.(hit,charge)??hit,bowie:session.bowie,reach:session.def.melee?.meleeReach};   // meleeDamage: the melee slot's scaling (mods/melee)
   audio.knife('swing',session.bowie);return true;
 }
-function meleeTarget(){
+function meleeTarget(reach=94){
   const direction=camera.getWorldDirection(new THREE.Vector3());let nearest=null;
-  for(const z of enemies.list){const target=z.root.position.clone().add(new THREE.Vector3(0,z.kind==='zombie'?45:22,0)),delta=target.clone().sub(camera.position);if(delta.length()<94&&delta.normalize().dot(direction)>.45&&world.lineClear(camera.position,target)){if(!nearest||z.root.position.distanceTo(camera.position)<nearest.root.position.distanceTo(camera.position))nearest=z;}}
+  for(const z of enemies.list){const target=z.root.position.clone().add(new THREE.Vector3(0,z.kind==='zombie'?45:22,0)),delta=target.clone().sub(camera.position);if(delta.length()<reach&&delta.normalize().dot(direction)>.45&&world.lineClear(camera.position,target)){if(!nearest||z.root.position.distanceTo(camera.position)<nearest.root.position.distanceTo(camera.position))nearest=z;}}
   return nearest;
 }
 function resolveMelee(){
@@ -293,7 +294,7 @@ function resolveMelee(){
   const strike=pendingMelee;pendingMelee=null;
   if(session.phase==='reviving'||session.phase==='gameover')return;
   map.onShot?.(new THREE.Ray(camera.position.clone(),camera.getWorldDirection(new THREE.Vector3())),94,'melee');
-  const nearest=meleeTarget();
+  const nearest=meleeTarget(strike.reach);
   if(nearest){enemies.hurt(nearest,strike.damage,false,true);audio.knife('hit',strike.bowie);}
   else {const ray=new THREE.Ray(camera.position.clone(),camera.getWorldDirection(new THREE.Vector3())),wall=world.raycast(ray,0,94);if(wall){audio.knife('wall');effect(wall.position,0xb8a388,3);}}
 }
@@ -329,7 +330,7 @@ const shop={
     if(session.points<cost){toast('Not enough points');return false;}
     if(!mysteryBox.start(e))return false;session.spend(cost);return true;
   },
-  packPrompt(needPower=false){return needPower&&!session.power?'The power must be activated':session.pack?(session.time>=session.pack.readyAt?'Take '+data.weapons[session.pack.weapon.id].upgrade.name+' · '+Math.ceil(session.pack.expires-session.time)+'s':'Upgrading weapon…'):session.weapon.upgraded?'Weapon already upgraded':data.weapons[session.weapon.id]?.upgrade?'Pack-a-Punch · 5000':'This weapon can\'t be upgraded';},
+  packPrompt(needPower=false){return needPower&&!session.power?'The power must be activated':!session.pack&&mods.packLabel?.()||(session.pack?(session.time>=session.pack.readyAt?'Take '+data.weapons[session.pack.weapon.id].upgrade.name+' · '+Math.ceil(session.pack.expires-session.time)+'s':'Upgrading weapon…'):session.weapon.upgraded?'Weapon already upgraded':data.weapons[session.weapon.id]?.upgrade?'Pack-a-Punch · 5000':'This weapon can\'t be upgraded');},
   usePack(){
     if(session.pack){if(!session.takePack())return false;equipView();toast(session.def.name);return true;}
     if(!session.beginPack())return false;ads=false;primary=false;burstLeft=0;reloadShot=false;audio.play('packapunch');toast('Upgrading… retrieve your weapon when it is ready.');return true;
@@ -415,7 +416,7 @@ function hud(){   // (2026-10-17) text and style written only when they change: 
 
   const s=session,w=s.weapon;
   const rt=map.roundText?.();T('round',rt?.round??(s.round<=5?'I'.repeat(s.round):String(s.round)));T('remaining',rt?.remaining??(s.phase==='preparing'?'STARTS IN '+Math.max(0,Math.ceil(s.countdown)):(s.total-s.killed)+' REMAINING'));
-  T('points',s.points.toLocaleString());T('mag',s.weaponUnavailable?'—':s.def.dualWield?s.handMag('left')+' · '+s.handMag('right'):w.mag);$('mag')?.classList.toggle('dual',!!s.def.dualWield&&!s.weaponUnavailable);T('reserve',s.weaponUnavailable?'—':w.reserve);T('weapon-name',s.weaponUnavailable?(s.pack?'Weapon in Pack-a-Punch':'No weapon'):s.def.name);T('grenades','G · '+s.grenades+' GRENADES'+(s.claymoresOwned?'  |  4 · '+s.claymores+' CLAYMORES':'')+(s.monkeysOwned?'  |  X · '+s.monkeys+' MONKEYS':''));T('reload-label',s.weaponUnavailable?'':s.reloadLeft>0?'RELOADING':w.mag===0?'R TO RELOAD':s.weapon.upgraded&&data.weapons[w.id].upgrade?.attachment?'5 · SWITCH ATTACHMENT':'');
+  T('points',s.points.toLocaleString());T('mag',s.weaponUnavailable||s.def.noAmmo?'—':s.def.dualWield?s.handMag('left')+' · '+s.handMag('right'):w.mag);$('mag')?.classList.toggle('dual',!!s.def.dualWield&&!s.weaponUnavailable);T('reserve',s.weaponUnavailable||s.def.noAmmo?'—':w.reserve);T('weapon-name',s.weaponUnavailable?(s.pack?'Weapon in Pack-a-Punch':'No weapon'):s.def.name);T('grenades','G · '+s.grenades+' GRENADES'+(s.claymoresOwned?'  |  4 · '+s.claymores+' CLAYMORES':'')+(s.monkeysOwned?'  |  X · '+s.monkeys+' MONKEYS':''));T('reload-label',s.weaponUnavailable?'':s.reloadLeft>0?'RELOADING':w.mag===0?'R TO RELOAD':s.weapon.upgraded&&data.weapons[w.id].upgrade?.attachment?'5 · SWITCH ATTACHMENT':'');
   if(touchControls.mode){T('grenades',$('grenades').textContent.replace('G · ','').replace('4 · ','').replace('X · ',''));T('reload-label',$('reload-label').textContent.replace('R TO RELOAD','TAP RELOAD').replace('5 · SWITCH ATTACHMENT','TAP ALT FIRE'));}
   $('health-fill').style.width=(100*s.health/s.maxHealth)+'%';T('health-label',Math.ceil(s.health)+' / '+s.maxHealth);
   $('hurt').style.opacity=s.health<s.maxHealth?(1-s.health/s.maxHealth)*.8:0;$('hitmarker').style.opacity=hitUntil>s.time?1:0;$('flash').style.opacity=Math.max(0,flashUntil-s.time);
@@ -495,7 +496,7 @@ try{
   features=map.createFeatures({scene,world,data,session,enemies,player,camera,audio,effect,damage,toast});
   await Promise.all([enemies.load(),equipView(),audio.load(),powerups.load(),perkDrink.load(),mysteryBox.load(),features.load()]);player.update(.05,{});
   await map.ready?.();
-  progress('Loading mods',95);await mods.start({renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});if(!profile.mobile)mysteryBox.warm(renderer,camera);
+  progress('Loading mods',95);await mods.start({melee,renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});if(!profile.mobile)mysteryBox.warm(renderer,camera);
   // Performance for big ported maps (docs/fork/performance.md). A/B switches for benchmarks: ?noMerge ?noBatch ?noFreeze
   const perfOff=new URLSearchParams(location.search);
   // this runs 1-3 s of main-thread work: show it, and let the page paint between steps (a frozen page showed a black
@@ -607,6 +608,7 @@ async function warmWeapons(){
     for(const e of world?.interactions??[]){if(e.kind==='wallbuy'&&e.weapon)ids.add(e.weapon);else if(e.targetname==='weapon_upgrade'&&e.zombie_weapon_upgrade)ids.add(e.zombie_weapon_upgrade);}
     const list=globalThis.kino?.boxList;for(const k of [...Object.keys(mysteryBox?.models??{}),...(list?.extra??[])])if(!list||list.allowed?.(k)!==false)ids.add(k);
   }catch(error){console.warn('[warm-weapons]',error);}
+  for(const id of mods.warmWeaponIds?.()??[])ids.add(id);
   for(const w of session?.inventory??[])ids.delete(w.id);
   const defs=[...ids].map(id=>data.weapons[id]).filter(d=>d?.model);
   if(!defs.length)return null;

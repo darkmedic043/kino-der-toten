@@ -1,0 +1,50 @@
+{
+  "default": "knife",
+  "holdTime": 0.22,
+  "roundShare": 0.04,
+  "tiers": [
+    { "name": "", "mul": 1 },
+    { "name": "I", "mul": 1.75, "price": 5000 },
+    { "name": "II", "mul": 3, "price": 15000 },
+    { "name": "III", "mul": 5, "price": 30000 }
+  ],
+  "rarities": [
+    { "name": "Common", "mul": 1, "kills": 0 },
+    { "name": "Uncommon", "mul": 1.4, "kills": 25 },
+    { "name": "Rare", "mul": 1.8, "kills": 75 },
+    { "name": "Epic", "mul": 2.4, "kills": 150 },
+    { "name": "Legendary", "mul": 3, "kills": 300 }
+  ],
+  "melees": {
+    "knife": {
+      "name": "Combat Knife",
+      "upgradeName": "Pointed Remark",
+      "description": "Quick slashes and a lunge at anything close. You run faster with it out.",
+      "base": "knife_ballistic_zm",
+      "held": "knife",
+      "worldModel": "models/world_knife_bowie.glb",
+      "lightClip": "animations/viewmodel_bowie_slash.json",
+      "heavyClip": "animations/viewmodel_bowie_stick.json",
+      "mirror": true,
+      "lightFrom": 6,
+      "pose": {
+        "clip": "animations/viewmodel_b_knife_idle_loop.json",
+        "frame": 0,
+        "turn": { "j_wrist_le": [0, 0, 85] },
+        "move": { "j_shoulder_ri": [0, 0, -30], "j_shoulder_le": [2, 4, -1] }
+      },
+      "damage": 150,
+      "heavyMul": 2,
+      "swing": 0.36,
+      "swingDelay": 0.13,
+      "heavy": 0.72,
+      "heavyDelay": 0.22,
+      "reach": 105,
+      "lunge": 190,
+      "moveSpeed": 1.12,
+      "sprintSpeed": 1.15,
+      "raiseTime": 0.22,
+      "dropTime": 0.16
+    }
+  }
+}
