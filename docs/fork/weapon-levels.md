@@ -98,6 +98,17 @@ User: "add more levels to weapons, even if each level doesn't give a unique atta
 - **Saves**: `migrateWeaponLevels` (game: weapon-levels mod; menu: home.js on catalogue load) moves each old entry to the level where it unlocks the same attachments it had (M16 old level 4 → 8, M1911 old 3 → 6; xp reset) and marks it `v: 2`; new entries (`grantWeaponXp`, the prestige reset) are created with `v: 2`, so a copy of the profile saved by another page can never migrate an entry twice.
 - Prestige: every Gunsmith gun now has 30 levels, so Prestige I/II take a full track each and guns that couldn't prestige before (the crossbow) can.
 
+## Camo wrap for the Advanced Warfare guns (2026-11-01)
+
+AW atlases are cut into small islands (some 2:1), so UV-tiled camo broke at every seam, and their albedo runs from near-black to white, so the old `.3+L*1.9` shading made white guns twice as bright as black ones. `camos.json` `wrap` lists them; anything its `guns` regex doesn't match keeps the old path unchanged.
+
+- **Projection**: `camoPlanar()` is triplanar in the mesh's bind pose (`vCamoP=position`, `vCamoN=normal`, not skinned, so a slide or mag carries its pattern). Frequency = `camo.scale * wrap.scale` per model unit: about 20 units a tile at the default 2.5, the same on every gun and on the world models. The Pack-a-Punch and prestige glows use it too.
+- **Shade**: `albedo / its own blur` (mip bias 4) clamped to .6-1.3, times .85: panel lines and wear only, no overall brightness.
+- **Skipped materials** (`wrap.skip`): ammo, speedloader, powder horn, optics, sights, screens, decals, text, emblem, the Sentry's barrels.
+- **Kept parts** inside a material: a mask from the albedo at mip bias 1. `warm` ramps `(top-b)/top` with `top=max(r,g)` (wood, leather, brass, printed red and orange), `pale` ramps the mean (white labels). Default `warm` .6-.75 leaves tan polymer paintable (MDL). The wood guns use .2-.35 (M1 wood reads .3-.7 in linear). `pale` must stay off the white guns (Tac-19, CEL-3). Loot skins have `warm: null`: their red accents are paint. Kept parts also lose the metal camos' metalness and roughness (`camoMR`) and the glows.
+- All of it is uniforms in the one camo program (`camoTri` 0 = old path), so nothing new has to be warmed up, and the data is only material names (no derived texture ships).
+- Judge it at game light: scene lights boosted for a side-view render make the camo look washed out.
+
 ## Camos tab and Gunsmith speed (2026-10-14)
 
 - **Global camos in the Gunsmith** (user, same day: not a main-menu tab, "a 'global' camos in gunsmith"): the camo list has two groups. THIS GUN: CHALLENGE (the gun's own challenge camos, Gold, Diamond) and PRESTIGE (its own three, with requirements, tokens and the Master bar). GLOBAL: tabs from `mods/weapon-levels/global-camos.js` `GLOBAL_CAMO_TABS` ({id, label, hint, list({cats})}; add an entry for a new tab): PRESTIGE (every prestige camo earned on any gun, "Earned on the <gun>"), SHOP, SPECIAL (reward camos). A short-lived main-menu CAMOS tab was removed. Tested: the AK-74u wore the M1911's Master camo from GLOBAL · PRESTIGE; GLOBAL · SHOP listed the 10 shop camos, SPECIAL Swiss Cheese.

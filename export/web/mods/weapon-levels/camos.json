@@ -421,5 +421,16 @@
     "bo3_bow_demon": {
       "headshots": "crowd"
     }
+  },
+  "wrap": {
+    "guns": "^mtl_(m1_irons|titan45|range_pistol|optics_target|weapon_reddot|iron_sights_color|caddy_pistol|blunderbuss|player_emblem|range_blunderbuss|range_fancy|maul|ak12_stock|mp_fusion_shotgun|mdl|lmg_shotgun|rw1|sentry_gun|uts_19|sac3_glass|exo_weapon)",
+    "skip": "bullet|cartridge|speedloader|powderhorn|_glow|_gas|_glass|optic|_ret|reddot|screen|decal|_text|emblem|sights|ironsight|sentry_gun_barrels",
+    "scale": 0.02,
+    "warm": [0.6, 0.75],
+    "rules": [
+      { "match": "m1_irons|blunderbuss", "warm": [0.2, 0.35], "pale": [0.5, 0.65] },
+      { "match": "(titan45|maul|mp_fusion_shotgun|mdl|lmg_shotgun|rw1|uts_19|exo_weapon).*(loot|_op0|_02)", "warm": null, "pale": [0.6, 0.75] },
+      { "match": "lmg_shotgun|exo_weapon|maul|titan45|rw1|sentry_gun", "pale": [0.45, 0.6] }
+    ]
   }
 }

@@ -11,7 +11,18 @@ import { drawPrestigeArt, STYLES as PRESTIGE_STYLES, hslRgb as artRgb } from '..
 export async function loadCamos(base=import.meta.url){
   const r=await fetch(new URL('camos.json',base));
   if(!r.ok)throw new Error('camos.json HTTP '+r.status);
-  return r.json();
+  const cats=await r.json();setWrap(cats.wrap);return cats;
+}
+
+// Per-material wrap rules (camos.json `wrap`; weapon-levels.md): the listed guns take the camo projected
+// in gun space instead of through their UV islands, and keep their parts that aren't paint.
+let WRAP=null;const wrapCache=new Map();
+function setWrap(w){if(!w||WRAP)return;WRAP={...w,guns:new RegExp(w.guns),skip:new RegExp(w.skip),rules:w.rules.map(r=>({...r,re:new RegExp(r.match)}))};wrapCache.clear();}
+export function wrapOf(name=''){
+  if(!WRAP||!WRAP.guns.test(name))return null;
+  let w=wrapCache.get(name);if(w)return w;
+  w={skip:WRAP.skip.test(name),scale:WRAP.scale,warm:WRAP.warm,pale:null,...WRAP.rules.find(r=>r.re.test(name))};
+  wrapCache.set(name,w);return w;
 }
 
 // Not camo'd: anything that isn't the gun's body.
@@ -174,40 +185,57 @@ function camoMaterial(orig,camo){
   const m=orig.clone();m.userData={...orig.userData,camoOf:orig,camo:camo.id};
   // a model may ask for denser tiling (glTF material extras camoScale, e.g. the Grimhawk's single texture atlas)
   const uniforms={camoMap:{value:camoTexture(camo)},camoScale:{value:(camo.scale??2.5)*(orig.userData?.camoScale??1)},camoMix:{value:camo.mix??.92}};
+  // uniforms rather than defines: a wrapped gun shares the programs of every other camo'd gun (no new variant to warm up)
+  const wrap=wrapOf(orig.name),ramp=(r)=>r??[2,3];
+  Object.assign(uniforms,{camoTri:{value:wrap?(camo.scale??2.5)*wrap.scale:0},camoKeep:{value:new THREE.Vector4(...ramp(wrap?.warm),...ramp(wrap?.pale))},camoMR:{value:new THREE.Vector2(1,1)}});
   if(camo.glow)Object.assign(uniforms,{camoGlow:{value:camoTexture(typeof camo.glow==='string'?{texture:camo.glow}:camo.glow)},camoTime});
   if(camo.anim)Object.assign(uniforms,{camoC1:{value:new THREE.Vector3(...camo.anim.c1)},camoC2:{value:new THREE.Vector3(...camo.anim.c2)}});
-  if(camo.metal){m.metalness=Math.max(m.metalness??0,.85);m.roughness=Math.min(m.roughness??1,.35);}
+  if(camo.metal){m.metalness=Math.max(m.metalness??0,.85);m.roughness=Math.min(m.roughness??1,.35);uniforms.camoMR.value.set((orig.metalness??0)/m.metalness,(orig.roughness??1)/m.roughness);}   // kept parts stay as they were
   const prev=orig.onBeforeCompile;
   m.onBeforeCompile=(shader,renderer)=>{prev?.call(m,shader,renderer);Object.assign(shader.uniforms,uniforms);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D camoMap;uniform float camoScale;uniform float camoMix;')
+    const drift=camo.anim?'vec2(camoTime*.025,camoTime*.01)':'vec2(0.)';
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vCamoP;varying vec3 vCamoN;')
+      .replace('#include <begin_vertex>','#include <begin_vertex>\nvCamoP=position;vCamoN=normal;');   // the bind pose: a moving part carries its pattern along
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
+uniform sampler2D camoMap;uniform float camoScale;uniform float camoMix;uniform float camoTri;uniform vec4 camoKeep;uniform vec2 camoMR;
+varying vec3 vCamoP;varying vec3 vCamoN;float camoKept=0.;
+vec3 camoPlanar(sampler2D t,vec2 off){ vec3 p=vCamoP*camoTri,w=abs(normalize(vCamoN+1e-5));w*=w;w*=w;w/=w.x+w.y+w.z+1e-5;
+  return texture2D(t,p.zy+off).rgb*w.x+texture2D(t,p.xz+off+.37).rgb*w.y+texture2D(t,p.xy+off+.71).rgb*w.z; }`)
       .replace('#include <map_fragment>',`#include <map_fragment>
 #ifdef USE_MAP
-{ vec3 camoC=texture2D(camoMap,vMapUv*camoScale${camo.anim?'+vec2(camoTime*.025,camoTime*.01)':''}).rgb;
-  float camoL=dot(diffuseColor.rgb,vec3(.299,.587,.114));
-  diffuseColor.rgb=mix(diffuseColor.rgb,camoC*(.3+camoL*1.9),camoMix); }
-#endif`);
+{ vec2 camoOff=${drift};float camoL=dot(diffuseColor.rgb,vec3(.299,.587,.114));
+  if(camoTri>0.){
+    // plain albedo decides what is paint: wood, leather, brass and printed colour are saturated and warm, labels are pale
+    vec3 k=texture2D(map,vMapUv,1.).rgb;float top=max(k.r,k.g),lo=dot(texture2D(map,vMapUv,4.).rgb,vec3(.299,.587,.114));
+    camoKept=max(smoothstep(camoKeep.x,camoKeep.y,(top-k.b)/max(top,.025))*smoothstep(.008,.03,top),smoothstep(camoKeep.z,camoKeep.w,dot(k,vec3(.333))));
+    // fine detail only (the texture over its own blur), or a white gun comes out twice as bright as a black one
+    diffuseColor.rgb=mix(diffuseColor.rgb,camoPlanar(camoMap,camoOff)*clamp(camoL/max(lo,.02),.6,1.3)*.85,camoMix*(1.-camoKept));
+  }else diffuseColor.rgb=mix(diffuseColor.rgb,texture2D(camoMap,vMapUv*camoScale+camoOff).rgb*(.3+camoL*1.9),camoMix); }
+#endif`)
+      .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor*=mix(1.,camoMR.y,camoKept);')
+      .replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nmetalnessFactor*=mix(1.,camoMR.x,camoKept);');
     // Pack-a-Punch: the circuit traces glow, a colour wave running through them
     // Prestige Master: the cracks glow in the gun's two colours, a pulse running along them, drifting with the pattern
     if(camo.anim)shader.fragmentShader=shader.fragmentShader.replace('uniform sampler2D camoMap;','uniform sampler2D camoMap;uniform sampler2D camoGlow;uniform float camoTime;uniform vec3 camoC1;uniform vec3 camoC2;')
       .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
 #ifdef USE_MAP
-{ vec2 cu=vMapUv*camoScale+vec2(camoTime*.025,camoTime*.01);float crack=texture2D(camoGlow,cu).r;
+{ vec2 camoOff=vec2(camoTime*.025,camoTime*.01),cu=camoTri>0.?vCamoP.xy*camoTri+camoOff:vMapUv*camoScale+camoOff;float crack=camoTri>0.?camoPlanar(camoGlow,camoOff).r:texture2D(camoGlow,cu).r;
   float w=.5+.5*sin(camoTime*3.2-(cu.x*1.3+cu.y)*8.);
   vec3 col=mix(camoC1,camoC2,.5+.5*sin(camoTime*.8+cu.x*4.+cu.y*2.));
-  totalEmissiveRadiance+=col*crack*(.35+2.6*w*w); }
+  totalEmissiveRadiance+=col*crack*(.35+2.6*w*w)*(1.-camoKept); }
 #endif`);
     else if(camo.glow)shader.fragmentShader=shader.fragmentShader.replace('uniform sampler2D camoMap;','uniform sampler2D camoMap;uniform sampler2D camoGlow;uniform float camoTime;')
       .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
 #ifdef USE_MAP
-{ vec2 cu=vMapUv*camoScale;float trace=smoothstep(.36,.62,texture2D(camoGlow,cu).r);
+{ vec2 cu=camoTri>0.?vCamoP.xy*camoTri:vMapUv*camoScale;float trace=smoothstep(.36,.62,camoTri>0.?camoPlanar(camoGlow,vec2(0.)).r:texture2D(camoGlow,cu).r);
   float w=.5+.5*sin(camoTime*2.2-(cu.x+cu.y)*5.);
   vec3 col=mix(vec3(.55,.18,1.),vec3(.1,.55,1.),.5+.5*sin(camoTime*.7+cu.y*2.));
-  totalEmissiveRadiance+=col*trace*(.6+2.2*w*w); }
+  totalEmissiveRadiance+=col*trace*(.6+2.2*w*w)*(1.-camoKept); }
 #endif`);};
   m.customProgramCacheKey=()=>(orig.customProgramCacheKey?.()??'')+(camo.anim?'|camo-anim':camo.glow?'|camo-pap':'|camo');
   m.needsUpdate=true;matCache.set(key,m);return m;
 }
-export const isBody=m=>!!m&&!SKIP.test(m.name??'')&&!!m.map;
+export const isBody=m=>!!m&&!SKIP.test(m.name??'')&&!!m.map&&!wrapOf(m.name)?.skip;
 // Paint `root` with `camo` (an entry from camos.json) or restore it (null).
 export function applyCamo(root,camo){
   root?.traverse(o=>{
