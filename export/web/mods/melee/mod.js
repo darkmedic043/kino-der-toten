@@ -2,9 +2,9 @@
 // controls: tap V stabs with the gun in hand, hold V draws the melee weapon (left mouse slashes, right mouse is a slow heavy stab, hold
 // V, Q or a number goes back to the gun). Lives outside session.inventory, so it takes no gun slot: while it is out, session.weapon is
 // this mod's own weapon, and it drops out by itself if the gun under it is replaced. Upgrades on its own, as the guns' do not reach it:
-// Pack-a-Punch tiers I-III with the knife out (BO6/7's 5,000 / 15,000 / 30,000), and rarity from melee kills (this game has no Arsenal
-// or salvage). Damage = the larger of a flat hit and a share of the round's zombie health, both × tier × rarity, so an upgraded knife
-// keeps up with the rounds and a bare one falls off. Legendary tier III is 60% of a zombie: two hits, and one with Melee Macchiato's ×3.
+// Pack-a-Punch tiers I-III with the knife out (BO6/7's 5,000 / 15,000 / 30,000), which only raise its damage. Damage = the larger of a
+// flat hit and a share of the round's zombie health, both × tier, so an upgraded knife keeps up with the rounds and a bare one falls off.
+// Tier III is 20% of a zombie: five hits, and two with Melee Macchiato's ×3.
 // Weapons are data (melee.json, picked in the loadout's MELEE slot): a new one is an entry there.
 import * as THREE from 'three';
 import { zombieHealth } from '../../rules.js';
@@ -36,7 +36,7 @@ const asUrl=clip=>URL.createObjectURL(new Blob([JSON.stringify(clip)],{type:'app
 const loadClip=url=>fetch(new URL(url,document.baseURI)).then(r=>r.json());
 
 export default async function setup(api){
-  const {host,session,data,player,camera,world,enemies,view,toast,announce,equipView,melee,mod}=api;
+  const {host,session,data,player,camera,world,enemies,view,toast,equipView,melee,mod}=api;
   const C=await fetch(new URL('melee.json',mod.url)).then(r=>r.json());
   const choice=loadProfile().loadout?.melee,E=C.melees[choice]??C.melees[C.default],base=data.weapons[E.base];
   if(!base)return;
@@ -46,15 +46,15 @@ export default async function setup(api){
   const D=data.weapons[id]={...base,id,baseId:E.base,worldModel:E.worldModel??base.worldModel,heldKnife:E.held,mirror:E.mirror,animations:{idleAnim:asUrl(still(pose,E.pose)),meleeAnim:asUrl(from(light,E.lightFrom)),meleeChargeAnim:E.heavyClip},price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,
     noAmmo:true,noAds:true,ownPackName:true,automatic:false,raiseTime:E.raiseTime,dropTime:E.dropTime,weight:.5,upgrade:{},
     melee:{meleeDamage:E.damage,meleeDelay:E.swingDelay,meleeChargeDelay:E.heavyDelay,meleeTime:E.swing,meleeChargeTime:E.heavy,meleeReach:E.reach,exact:true,fade:.05}};
-  const fresh=()=>({id,mag:1,reserve:0,upgraded:false,papLevel:0,rarity:0,kills:0});
+  const fresh=()=>({id,mag:1,reserve:0,upgraded:false,papLevel:0});
   let K=fresh(),on=false,gun=null,pressAt=0,armed=false,held=false,adsWas=false,side=1;
   const now=()=>performance.now()/1000,inventorySlot=()=>session.inventory[session.slot];
 
   Object.defineProperty(session,'weapon',{configurable:true,get:()=>on&&inventorySlot()===gun?K:inventorySlot()});
-  const label=tier=>[K.rarity?C.rarities[K.rarity].name:'',tier?E.upgradeName:E.name,C.tiers[tier].name].filter(Boolean).join(' ');
+  const label=tier=>[tier?E.upgradeName:E.name,C.tiers[tier].name].filter(Boolean).join(' ');
   const name=()=>{D.name=D.upgrade.name=label(K.papLevel);};
   name();
-  const power=()=>C.rarities[K.rarity].mul*C.tiers[K.papLevel].mul;
+  const power=()=>C.tiers[K.papLevel].mul;
   const damage=()=>power()*Math.max(E.damage,C.roundShare*zombieHealth(session.round??1,data.rules));
 
   const free=()=>session.phase!=='reviving'&&session.phase!=='gameover'&&view.ready&&!session.drinking&&!session.meleeLeft&&!session.equipmentLeft&&!host.gunBlocked&&!window.kino?.operator?.active;
@@ -113,10 +113,6 @@ export default async function setup(api){
     Object.defineProperty(player,key,{configurable:true,get:()=>(d?.get?d.get():b)*(on?E[key]:1),set:v=>{if(d?.set)d.set(v);else b=v;}});
   }
 
-  host.on('kill',e=>{
-    if(!e.melee||e.remote||K.rarity>=C.rarities.length-1)return;
-    if(++K.kills>=C.rarities[K.rarity+1].kills){K.rarity++;name();announce?.(D.name.toUpperCase(),`${C.rarities[K.rarity].name} melee`,3);}
-  });
   host.on('update',()=>{
     K.lost=false;K.mag=1;   // (the machine marks what it keeps too long as lost; the knife comes back to you)
     if(armed&&now()-pressAt>=C.holdTime){armed=false;if(on)holster();else draw();}

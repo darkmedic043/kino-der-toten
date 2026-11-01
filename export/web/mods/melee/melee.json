@@ -8,13 +8,6 @@
     { "name": "II", "mul": 3, "price": 15000 },
     { "name": "III", "mul": 5, "price": 30000 }
   ],
-  "rarities": [
-    { "name": "Common", "mul": 1, "kills": 0 },
-    { "name": "Uncommon", "mul": 1.4, "kills": 25 },
-    { "name": "Rare", "mul": 1.8, "kills": 75 },
-    { "name": "Epic", "mul": 2.4, "kills": 150 },
-    { "name": "Legendary", "mul": 3, "kills": 300 }
-  ],
   "melees": {
     "knife": {
       "name": "Combat Knife",

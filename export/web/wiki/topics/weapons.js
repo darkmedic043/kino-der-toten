@@ -432,16 +432,14 @@ Every gun's prestige camos are its own design; once earned you can wear them on 
     if (melee) pages.push({
       id: ctx.slug('Melee'), title: 'Melee', group: SYS, keywords: 'knife combat knife pointed remark lunge stab dedicated melee weapon slot',
       html: c => {
-        const k = melee.melees.knife, t = melee.tiers, r = melee.rarities;
+        const k = melee.melees.knife, t = melee.tiers;
         return c.md(`Your melee weapon has its own slot in the loadout and doesn't use a weapon slot. The **${k.name}** is the only one for now.
 
 **Tap melee** (V) to stab without putting your gun away. **Hold melee** to draw the knife, and hold it again (or switch weapons) to put it away. With the knife out you move ${Math.round((k.moveSpeed - 1) * 100)}% faster and sprint ${Math.round((k.sprintSpeed - 1) * 100)}% faster. Fire slashes (hold it to keep slashing), aim is a slower heavy stab for ${k.heavyMul}× damage, and both lunge you at a zombie that's close.
 
-A knife hit does ${c.num(k.damage)}, or ${Math.round(melee.roundShare * 100)}% of a zombie's health that round if that's more, so it keeps up with the rounds. Tier and rarity multiply that.`) +
+A knife hit does ${c.num(k.damage)}, or ${Math.round(melee.roundShare * 100)}% of a zombie's health that round if that's more, so it keeps up with the rounds. Its Pack-a-Punch tier multiplies that.`) +
           `<h2>Pack-a-Punch</h2>` + c.md(`With the knife out, use the machine to upgrade it into **${k.upgradeName}**. Its tiers are separate from your guns' and last the match.`) +
-          c.table(['Tier', 'Cost', 'Damage'], t.slice(1).map(x => [x.name, c.num(x.price), `×${x.mul}`])) +
-          `<h2>Rarity</h2>` + c.md('Melee kills raise the knife\'s rarity during the match.') +
-          c.table(['Rarity', 'Melee kills', 'Damage'], r.map(x => [x.name, c.num(x.kills), `×${x.mul}`]));
+          c.table(['Tier', 'Cost', 'Damage'], t.slice(1).map(x => [x.name, c.num(x.price), `×${x.mul}`]));
       },
     });
 
