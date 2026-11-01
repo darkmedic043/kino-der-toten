@@ -13,6 +13,11 @@
 const n = v => [v].flat().filter(Boolean);
 const mq = L => L.malibu?.()?.quests?.flags?.();   // Malibu Drive's quest flags (malibu-drive/quests.js)
 const nt = L => globalThis.kino?.nuketown?.state?.();   // Nuketown's quest state (nuketown/mod.js)
+const ntPart = (craft, part) => {   // a part of a Nuketown buildable, any order: `at` is where it lies this game (buildables.js)
+  const of = L => nt(L)?.[craft], item = L => of(L)?.parts.find(q => q.name === part);
+  return { title: part, how: `The ${part.toLowerCase()} lies at one of three spots, a different one each game.`,
+    done: L => !!of(L)?.built || !!item(L)?.got, where: L => { const q = item(L); return !q || q.got || of(L).built ? [] : [q.at]; } };
+};
 const at = (L, name) => { const k = L.malibu?.()?.kit, e = k?.one(name); return e ? [k.center(e)] : []; };   // a Malibu entity's spot
 const bowStage = (L, el) => {   // Der Eisendrache bow quest -> steps done: start, arrow, its own steps, place, souls, take
   const s = L.castle?.bows?.state()?.[el], Q = L.castle?.bows?.sites?.[el]; if (!s || !Q) return 0;
@@ -259,12 +264,16 @@ export const JOURNAL = [
       { title: 'Failsafe nodes', how: 'Disable the four failsafe nodes around the town, then go back to the door.', where: L => { const s = nt(L)?.egg; return !s || s.step !== 5 ? [] : s.buzzed ? [s.door] : s.nodes.filter(n => !n.off).map(n => n.at); } },
       { title: 'The way out', how: 'Hold out for 300 s of an endless round of sprinters. A truck comes down under parachutes at the end of the road: get in to escape, which ends the game as a win.', where: L => { const s = nt(L)?.egg; return s && s.landed ? [s.truckAt] : []; } },
     ] },
-    { id: 'nt-build', name: 'Buildables', kind: 'MAP QUEST', steps: [
-      { title: 'The rake trap', how: 'Axe, rake and rope lie around the map, a different set each game: take all three to a station, build it, take a rake and place it with the claymore key. Stepping on it kills a zombie; it lasts 20 hits and can be moved.', done: L => !!nt(L)?.rake?.built, where: L => { const s = nt(L)?.rake; return !s || s.built ? [] : s.parts.every(q => q.got) ? s.stations : s.parts.filter(q => !q.got).map(q => q.at); } },
-      { title: 'The shield', how: 'A car door and a dolly make the shield: take both to a station, build it and pick it up. A station repairs it.', done: L => !!nt(L)?.shield?.built, where: L => { const s = nt(L)?.shield; return !s || s.built ? [] : s.parts.every(q => q.got) ? s.stations : s.parts.filter(q => !q.got).map(q => q.at); } },
+    { id: 'nt-rake', name: 'Rake Trap', kind: 'BUILDABLE', steps: [
+      ...['Axe', 'Rake', 'Rope'].map(part => ntPart('rake', part)),
+      { title: 'Build it', how: 'With all three parts press use at any of the three rake stations and stay close for 3 seconds.', done: L => !!nt(L)?.rake?.built, where: L => { const s = nt(L)?.rake; return s?.built ? [] : s?.stations ?? []; } },
+      { title: 'Take it', how: 'Take a rake from any of the stations. You carry one at a time, and the stations never run out.', done: L => { const s = nt(L); return !!s?.heldRake || s?.rakesDown > 0; }, where: L => L.prompts(/^Pick up Rake/) },
+      { title: 'Place it', how: 'The claymore key sets it down at your feet. A zombie that steps on it dies; it lasts 20 hits, you can have five down, and a placed rake can be picked up and moved.', done: L => nt(L)?.rakesDown > 0 },
     ] },
-    { id: 'nt-song', name: 'The song', kind: 'SIDE EGG', steps: [
-      { title: 'Three meteors', how: 'Three meteors hum around the map. Touch all three.', done: L => !!nt(L)?.extras?.meteors.every(m => m.done), where: L => nt(L)?.extras?.meteors.filter(m => !m.done).map(m => m.at) ?? [] },
+    { id: 'nt-shield', name: 'Zombie Shield', kind: 'BUILDABLE', steps: [
+      ...['Car door', 'Dolly'].map(part => ntPart('shield', part)),
+      { title: 'Build it', how: 'With both parts press use at any of the three shield stations and stay close for 3 seconds.', done: L => !!nt(L)?.shield?.built, where: L => { const s = nt(L)?.shield; return s?.built ? [] : s?.stations ?? []; } },
+      { title: 'Take it', how: 'Take it from any of the stations, and again if it breaks. A station also repairs a damaged one.', done: L => !!nt(L)?.shield?.built && !L.prompts(/^Pick up Shield/).length, where: L => L.prompts(/^Pick up Shield/) },
     ] },
     { id: 'nt-perks', name: 'Falling perks', kind: 'MAP QUEST', steps: [
       ...[['specialty_quickrevive', 'Quick Revive', 'Its trigger covers the spawn.'], ['specialty_rof', 'Double Tap', 'Walk into its trigger.'],

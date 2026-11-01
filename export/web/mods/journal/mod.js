@@ -9,7 +9,16 @@ import * as THREE from 'three';
 import { JOURNAL, questsFor } from './quests.js';
 
 const KEY = 'kino.mods.journal', TRACK = 'kino.journal.track';
-export function loadJournal() { try { return { maps: {}, ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return { maps: {} }; } }
+// Nuketown's one Buildables quest became a quest per buildable (2026-11-01): its two steps were "built", so they give each
+// new quest's parts and build step. Done on every read and not written back, so nothing runs before the cloud sync.
+const NT_BUILD = [['nt-rake', [0, 1, 2, 3]], ['nt-shield', [0, 1, 2]]];
+function upgrade(j) {
+  const m = j.maps?.nuketown, old = m?.['nt-build']; if (!old) return j;
+  delete m['nt-build'];
+  for (const i of old) if (NT_BUILD[i]) { const [id, steps] = NT_BUILD[i]; m[id] = [...new Set([...(m[id] ?? []), ...steps])].sort((a, b) => a - b); }
+  return j;
+}
+export function loadJournal() { try { return upgrade({ maps: {}, ...JSON.parse(localStorage.getItem(KEY)) }); } catch { return { maps: {} }; } }
 const saveJournal = j => { try { localStorage.setItem(KEY, JSON.stringify(j)); } catch {} };
 const loadTrack = () => { try { return JSON.parse(localStorage.getItem(TRACK)); } catch { return null; } };
 
