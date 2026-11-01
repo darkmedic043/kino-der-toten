@@ -151,6 +151,9 @@ export default async function setup(api){
     if(key!==heldKey){pivot?.removeFromParent();return;}held=pivot;
     window.kino.camo?.apply(pivot,api.data.weapons[s.weapon.id]?.camo);
   }
+  // the held gun is in the hand before the shader warm-up draws the hidden body (its world model and camo compiled when
+  // third person was first switched on, 2026-11-01); the warm event re-syncs it for the later warm-ups
+  (host.pending??=[]).push(syncWeapon().catch(()=>{}));host.on('warm',()=>{syncWeapon().catch(()=>{});});
   host.on('update',()=>{if(third)syncWeapon();
     // the held gun sways in the hands like the first-person one: look lag, movement inertia, the fire kick
     const b=held?.userData?.base,m=window.kino.fpMotion?.s;if(!held||!b||!m)return;

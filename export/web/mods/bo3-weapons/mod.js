@@ -196,6 +196,9 @@ export default async function setup(api){
     tickGlow(modLit.glow,session.time,modFlash);
   }
   let modFlash=0;
+  // the engine's weapon warm-up (warmWeapons): each gun compiles with its glow materials in place, as equipped
+  host.on('warmWeapon',({def,gun})=>{if(isMod(def))applyGlow(gun,data.weapons[modId(def)]?.glow);
+    if(isTesla(def)){const L=rigLights(gun,!!def.upgraded);for(const s of L.sparks){const pts=jag(s.r,s.n);s.lines.geometry.setFromPoints(pts);s.dots.geometry.setFromPoints(pts.filter((_,i)=>i%2));}}});   // the DG-2's own bulbs, glow and arcs too (built at equip otherwise)
   function modShot(){
     const def=session.def;modFlash=1;if(!data.weapons[modId(def)]?.arc)return;
     // MR23 Tesla: the zombie nearest the aim takes an arc that jumps to one neighbour (30% of a zombie's health each)

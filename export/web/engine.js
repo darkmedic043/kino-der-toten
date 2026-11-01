@@ -609,16 +609,24 @@ async function warmWeapons(){
     const list=globalThis.kino?.boxList;for(const k of [...Object.keys(mysteryBox?.models??{}),...(list?.extra??[])])if(!list||list.allowed?.(k)!==false)ids.add(k);
   }catch(error){console.warn('[warm-weapons]',error);}
   for(const id of mods.warmWeaponIds?.()??[])ids.add(id);
-  for(const w of session?.inventory??[])ids.delete(w.id);
-  const defs=[...ids].map(id=>data.weapons[id]).filter(d=>d?.model);
+  for(const w of session?.inventory??[])ids.add(w.id);   // the loadout guns too (2026-11-01: a BO3 start gun's glow parts compiled on the first played frame)
+  try{mods.emit('warmWeapons',ids);}catch(error){console.warn('[warm-weapons]',error);}   // mods add what they may hand out (the loadout's second gun)
+  // each gun as the player may hold it: the base and the Pack-a-Punched def (its own model, or the same one with the
+  // Pack-a-Punch camo), built the way kino-session.js builds session.def; the thrown equipment's viewmodels too (the
+  // Gersch Device's compiled on its first throw, 3.5 s on D3D11)
+  const defs=[];
+  for(const id of ids){const d=data.weapons[id];if(!d?.model)continue;defs.push(d);if(d.upgrade)defs.push({...d,...d.upgrade,id,upgraded:true});}
+  for(const d of Object.values(data.equipment??{}))if(d?.model&&!defs.includes(d))defs.push(d);
   if(!defs.length)return null;
-  const group=new THREE.Group();group.name='warm-weapons';group.visible=false;let done=0,late=0;
+  const group=new THREE.Group();group.name='warm-weapons';group.visible=false;let done=0,late=0;const waits=[];   // mods' own loads for a warm gun (mounted sights)
   const loads=defs.map(async def=>{
-    const models=await Promise.all([loadModel(def.model),def.leftModel?loadModel(def.leftModel):null]);
+    const [hands,...models]=await Promise.all([def.handsModel?loadModel(def.handsModel):null,loadModel(def.model),def.leftModel?loadModel(def.leftModel):null]);
     if(performance.now()-t0>WEAPON_WARM_MS){late++;return;}
-    for(const gun of models)if(gun){group.add(gun);try{mods.emit('warmWeapon',{def,gun});}catch(error){console.warn('[warm-weapons]',error);}done++;}
+    if(hands)group.add(hands);   // a BO3 gun's own arms
+    for(const gun of models)if(gun){group.add(gun);try{mods.emit('warmWeapon',{def,gun,wait:p=>waits.push(p)});}catch(error){console.warn('[warm-weapons]',error);}done++;}
   });
   await Promise.race([Promise.allSettled(loads),new Promise(r=>setTimeout(r,WEAPON_WARM_MS))]);
+  if(waits.length)await Promise.race([Promise.allSettled(waits),new Promise(r=>setTimeout(r,Math.max(500,WEAPON_WARM_MS-(performance.now()-t0))))]);
   viewScene.add(group);
   console.info(`[warm-weapons] ${done} models of ${defs.length} weapons in ${Math.round(performance.now()-t0)} ms${late?`, ${late} late`:''}`);
   return group;
@@ -677,6 +685,9 @@ async function warmShaders(waitGpu=false){
       for(const h of standIn)h.traverse(o=>{for(const m of [o.material].flat())if(m&&!seen.has(m)){seen.add(m);for(const k of Object.keys(m)){const v=m[k];
         if(k!=='envMap'&&v?.isTexture&&!v.isCubeTexture&&!v.isRenderTargetTexture&&!v.isData3DTexture&&!v.isDataArrayTexture&&!v.isVideoTexture&&!renderer.properties.get(v).__webglTexture){swapped.push([m,k,v]);m[k]=stand(v);}}}});
       for(const root of [scene,viewScene])root.traverse(o=>{if(o.frustumCulled){culled.push(o);o.frustumCulled=false;}});
+      // the shadow pass again, now with the hidden objects visible, for their depth programs (the player's own body,
+      // alpha-tested and skinned, compiled when third person was first switched on: 4 s on D3D11, 2026-11-01)
+      renderer.shadowMap.needsUpdate=true;scene.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});
       const previous=renderer.getRenderTarget(),n0=firstDraw.n;
       try{for(const [s,target] of targets){renderer.setRenderTarget(target);renderer.render(s,s===viewScene?viewCamera:camera);}}
       finally{renderer.setRenderTarget(previous);for(const o of culled)o.frustumCulled=true;for(const [m,k,v] of swapped)m[k]=v;for(const b of blank.values())b.dispose();}

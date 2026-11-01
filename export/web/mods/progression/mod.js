@@ -40,6 +40,7 @@ export default async function setup(api){
     // no loadout tactical any more (2026-10-28, user): tacticals come only from the Mystery Box
   }
   host.on('reset',applyLoadout);
+  host.on('warmWeapons',ids=>{for(const id of [active.primary,active.secondary])if(id&&data.weapons[id])ids.add(id);});   // the engine's weapon warm-up compiles the loadout guns
   applyLoadout();await api.equipView();
 
   // ---- The Mystery Box list (edited in the main menu's Loadout pane) -----------------
