@@ -104,7 +104,7 @@ const SHOP_DRAW={
   brushed(g,S,r){g.fillStyle='#9aa0a6';g.fillRect(0,0,S,S);for(let i=0;i<2400;i++){const y=r()*S,v=140+r()*90;g.fillStyle=`rgba(${v},${v},${v+6},.18)`;g.fillRect(0,y,S,1);}},
   hazard(g,S){g.fillStyle='#f2c230';g.fillRect(0,0,S,S);g.fillStyle='#141414';for(let i=-S;i<S*2;i+=64){g.beginPath();g.moveTo(i,0);g.lineTo(i+32,0);g.lineTo(i+32-S,S);g.lineTo(i-S,S);g.fill();}},
   spectrum(g,S){for(let x=0;x<S;x++){g.fillStyle=`hsl(${x/S*360},70%,22%)`;g.fillRect(x,0,1,S);}},
-  // ---- Season 1 (Melon Harvest) camos, from the pass ----
+  // ---- Season 0 (Melon Harvest) camos, from the pass ----
   vinepatch(g,S,r,wrap){g.fillStyle='#1d2a12';g.fillRect(0,0,S,S);g.lineCap='round';for(let i=0;i<40;i++){const x=r()*S,y=r()*S;let a=r()*6.283;const pts=[[x,y]];for(let k=0;k<12;k++){a+=(r()-.5)*.9;pts.push([pts.at(-1)[0]+Math.cos(a)*14,pts.at(-1)[1]+Math.sin(a)*14]);}
     wrap(()=>{g.strokeStyle='#3f6a22';g.lineWidth=5;g.beginPath();pts.forEach(([px,py],k)=>k?g.lineTo(px,py):g.moveTo(px,py));g.stroke();g.fillStyle='#7cd65a';for(const [px,py] of pts.filter((_,k)=>k%3===1)){g.beginPath();g.ellipse(px,py,7,4,a,0,6.283);g.fill();}});}},
   cornfield(g,S,r){g.fillStyle='#5a4a1a';g.fillRect(0,0,S,S);for(let x=0;x<S;x+=10){const h=S;g.fillStyle=`hsl(${45+r()*12},70%,${38+r()*20}%)`;g.fillRect(x,0,6,h);}

@@ -83,7 +83,7 @@ export default async function setup(api){
     if(id==='on_the_house'){const rest=perkList();if(rest.length){const p=rest[Math.floor(Math.random()*rest.length)];givePerk(p);api.toast(`On the House · ${p.name}`,3);}}
     if(id==='equip_mint'){session.grenades=Math.max(session.grenades,4);if(session.claymoresOwned)session.claymores=session.claymoreMax?.()??2;if(session.monkeysOwned)session.monkeys=session.monkeyMax?.()??3;const t=window.kino.tactical;if(t?.id)t.count=Math.max(t.count,t.max?.()??3);}
     if(id==='ephemeral_enhancement')startEnhance();
-    // Melon Pass Season 1 gums (pass-exclusive)
+    // Melon Pass Season 0 gums (pass-exclusive)
     if(id==='vine_snare'){const f=feet();for(const z of enemies.list)if(z.root.position.distanceTo(f)<g.radius)rooted.set(z,{until:session.time+g.root,at:z.root.position.clone()});window.kino.fx?.explosion?.(f.clone().add(new THREE.Vector3(0,5,0)),.5,0x5fd13a);}
     if(id==='pumpkin_bomb'){const eye=api.camera.position.clone(),dir=api.camera.getWorldDirection(new THREE.Vector3()),hit=api.world?.raycast?.(new THREE.Ray(eye.clone(),dir),0,600);
       const at=eye.addScaledVector(dir,hit?Math.max(40,hit.distance-10):600);setTimeout(()=>{const full=zombieHealth(session.round,api.data.rules)*2;

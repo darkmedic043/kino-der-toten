@@ -43,6 +43,8 @@ export function savePass(p){try{localStorage.setItem(PASS_KEY,JSON.stringify(p))
 // one season's progress (made on first use)
 export const rec=(p,season)=>p.seasons[season.id]??=blank();
 export const isLive=(S,season)=>season.id===S.current.id;
+// the number players see; the id stays fixed because saves and item ids use it (Melon Harvest is Season 0, id s1)
+export const seasonNumber=season=>season.number??season.id.slice(1);
 export const seasonEnd=season=>new Date(season.end+'T23:59:59');
 export const allItems=season=>season.pages.flatMap((pg,pi)=>pg.items.map(it=>({...it,page:pi})));
 const tierCount=season=>season.pages.reduce((a,pg)=>a+pg.items.length,0);

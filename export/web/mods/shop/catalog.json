@@ -663,7 +663,7 @@
    "name": "Scarecrow Burlap",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.scarecrowburlap"
    },
@@ -675,7 +675,7 @@
    "name": "Seedling",
    "price": 0,
    "rarity": "common",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#1d2a12",
     "c2": "#7cd65a",
@@ -689,7 +689,7 @@
    "name": "Sprout",
    "price": 0,
    "rarity": "common",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "✚",
     "color": "#7cd65a"
@@ -702,7 +702,7 @@
    "name": "Pumpkin Glow",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 Mystery Box glow.",
+   "desc": "Season 0 Mystery Box glow.",
    "data": {
     "box": "#ff7a1a"
    },
@@ -714,7 +714,7 @@
    "name": "Vine Patch",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.vinepatch"
    },
@@ -726,7 +726,7 @@
    "name": "Sap Kills",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 kill colour.",
+   "desc": "Season 0 kill colour.",
    "data": {
     "blood": "#9cff6a"
    },
@@ -738,7 +738,7 @@
    "name": "Harvest Menu",
    "price": 0,
    "rarity": "common",
-   "desc": "Season 1 menu accent.",
+   "desc": "Season 0 menu accent.",
    "data": {
     "menu": "#ff9a3d"
    },
@@ -750,7 +750,7 @@
    "name": "Vine Frame",
    "price": 0,
    "rarity": "common",
-   "desc": "Season 1 portrait frame.",
+   "desc": "Season 0 portrait frame.",
    "data": {
     "frame": "#7cd65a"
    },
@@ -762,7 +762,7 @@
    "name": "Leaf Hitmarker",
    "price": 0,
    "rarity": "common",
-   "desc": "Season 1 hitmarker.",
+   "desc": "Season 0 hitmarker.",
    "data": {
     "hitmarker": "❦",
     "color": "#9cff6a"
@@ -787,7 +787,7 @@
    "name": "Pumpkin Patch",
    "price": 0,
    "rarity": "common",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#2a1404",
     "c2": "#ff8a1a",
@@ -801,7 +801,7 @@
    "name": "Crop Rows",
    "price": 0,
    "rarity": "common",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#2a1d0c",
     "c2": "#e8b04a",
@@ -815,7 +815,7 @@
    "name": "Melon Dot",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "●",
     "color": "#ff4f6a"
@@ -828,7 +828,7 @@
    "name": "Harvest Moon",
    "price": 0,
    "rarity": "epic",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#120804",
     "c2": "#ff9a3d",
@@ -842,7 +842,7 @@
    "name": "Sprout HUD",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 HUD colours.",
+   "desc": "Season 0 HUD colours.",
    "data": {
     "hud": {
      "points": "#9cff6a",
@@ -858,7 +858,7 @@
    "name": "Cornfield",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.cornfield"
    },
@@ -870,7 +870,7 @@
    "name": "Melon Thumps",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 hit sounds.",
+   "desc": "Season 0 hit sounds.",
    "data": {
     "hits": {
      "pitch": 0.7,
@@ -886,7 +886,7 @@
    "name": "Morning Dew",
    "price": 0,
    "rarity": "common",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#06141c",
     "c2": "#7fd8ff",
@@ -914,7 +914,7 @@
    "name": "Vine Ring",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "❂",
     "color": "#7cd65a"
@@ -927,7 +927,7 @@
    "name": "Vinework",
    "price": 0,
    "rarity": "rare",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#13200c",
     "c2": "#c8ff8a",
@@ -941,7 +941,7 @@
    "name": "Seed Cross",
    "price": 0,
    "rarity": "common",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "✛",
     "color": "#ffd65a"
@@ -954,7 +954,7 @@
    "name": "Jack Sight",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "⚇",
     "color": "#ff8a1a"
@@ -967,7 +967,7 @@
    "name": "Ember Glow",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 Mystery Box glow.",
+   "desc": "Season 0 Mystery Box glow.",
    "data": {
     "box": "#ff6a1a"
    },
@@ -979,7 +979,7 @@
    "name": "Pumpkin Rind",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.pumpkin"
    },
@@ -991,7 +991,7 @@
    "name": "Seed Hitmarker",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 hitmarker.",
+   "desc": "Season 0 hitmarker.",
    "data": {
     "hitmarker": "✦",
     "color": "#ffd65a"
@@ -1004,7 +1004,7 @@
    "name": "Ember Frame",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 portrait frame.",
+   "desc": "Season 0 portrait frame.",
    "data": {
     "frame": "#ff6a1a"
    },
@@ -1016,7 +1016,7 @@
    "name": "Juice Kills",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 kill colour.",
+   "desc": "Season 0 kill colour.",
    "data": {
     "blood": "#ff4f6a"
    },
@@ -1040,7 +1040,7 @@
    "name": "Melon Rind",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.melonrind"
    },
@@ -1052,7 +1052,7 @@
    "name": "Scythe",
    "price": 0,
    "rarity": "rare",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#1a1410",
     "c2": "#e8dcc0",
@@ -1080,7 +1080,7 @@
    "name": "Cinder Kills",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 kill colour.",
+   "desc": "Season 0 kill colour.",
    "data": {
     "blood": "#ff7a3a"
    },
@@ -1092,7 +1092,7 @@
    "name": "Dusk Menu",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 menu accent.",
+   "desc": "Season 0 menu accent.",
    "data": {
     "menu": "#c45bff"
    },
@@ -1104,7 +1104,7 @@
    "name": "Graveyard Fog",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.fog"
    },
@@ -1116,7 +1116,7 @@
    "name": "Dusk HUD",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 HUD colours.",
+   "desc": "Season 0 HUD colours.",
    "data": {
     "hud": {
      "points": "#ff9a3d",
@@ -1132,7 +1132,7 @@
    "name": "Red Barn",
    "price": 0,
    "rarity": "common",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#2a0808",
     "c2": "#ff4a3a",
@@ -1160,7 +1160,7 @@
    "name": "Night Owl",
    "price": 0,
    "rarity": "rare",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#080a14",
     "c2": "#ffd65a",
@@ -1174,7 +1174,7 @@
    "name": "Night Field",
    "price": 0,
    "rarity": "rare",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#05081a",
     "c2": "#5a5cff",
@@ -1188,7 +1188,7 @@
    "name": "Crescent",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "☽",
     "color": "#bfe6ff"
@@ -1201,7 +1201,7 @@
    "name": "Rind Crack",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 hit sounds.",
+   "desc": "Season 0 hit sounds.",
    "data": {
     "hits": {
      "pitch": 1.6,
@@ -1217,7 +1217,7 @@
    "name": "Blood Moon",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.bloodmoon"
    },
@@ -1229,7 +1229,7 @@
    "name": "Moon Hitmarker",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 hitmarker.",
+   "desc": "Season 0 hitmarker.",
    "data": {
     "hitmarker": "☾",
     "color": "#bfe6ff"
@@ -1242,7 +1242,7 @@
    "name": "Moon Frame",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 portrait frame.",
+   "desc": "Season 0 portrait frame.",
    "data": {
     "frame": "#bfe6ff"
    },
@@ -1254,7 +1254,7 @@
    "name": "Night Kills",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 kill colour.",
+   "desc": "Season 0 kill colour.",
    "data": {
     "blood": "#5a5cff"
    },
@@ -1280,7 +1280,7 @@
    "name": "Rot Kills",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 kill colour.",
+   "desc": "Season 0 kill colour.",
    "data": {
     "blood": "#8a9a2a"
    },
@@ -1292,7 +1292,7 @@
    "name": "Lantern",
    "price": 0,
    "rarity": "rare",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#1a0e04",
     "c2": "#ffb347",
@@ -1306,7 +1306,7 @@
    "name": "Lantern",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "✺",
     "color": "#ffb347"
@@ -1319,7 +1319,7 @@
    "name": "Frost Harvest",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.frostharvest"
    },
@@ -1331,7 +1331,7 @@
    "name": "Moonlight Glow",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 Mystery Box glow.",
+   "desc": "Season 0 Mystery Box glow.",
    "data": {
     "box": "#bfe6ff"
    },
@@ -1343,7 +1343,7 @@
    "name": "Harvest Leaves",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.harvest"
    },
@@ -1355,7 +1355,7 @@
    "name": "Moonlit Menu",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 menu accent.",
+   "desc": "Season 0 menu accent.",
    "data": {
     "menu": "#5fb8ff"
    },
@@ -1394,7 +1394,7 @@
    "name": "Lantern Light",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.lanternlight"
    },
@@ -1406,7 +1406,7 @@
    "name": "First Frost",
    "price": 0,
    "rarity": "rare",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#0c1a24",
     "c2": "#bff0ff",
@@ -1420,7 +1420,7 @@
    "name": "Frost Star",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "✳",
     "color": "#bff0ff"
@@ -1433,7 +1433,7 @@
    "name": "Hollow Gourd",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 hit sounds.",
+   "desc": "Season 0 hit sounds.",
    "data": {
     "hits": {
      "pitch": 0.9,
@@ -1449,7 +1449,7 @@
    "name": "Frost HUD",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 HUD colours.",
+   "desc": "Season 0 HUD colours.",
    "data": {
     "hud": {
      "points": "#bff0ff",
@@ -1465,7 +1465,7 @@
    "name": "Frost Hitmarker",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 hitmarker.",
+   "desc": "Season 0 hitmarker.",
    "data": {
     "hitmarker": "❄",
     "color": "#bff0ff"
@@ -1478,7 +1478,7 @@
    "name": "Frost Frame",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 portrait frame.",
+   "desc": "Season 0 portrait frame.",
    "data": {
     "frame": "#bff0ff"
    },
@@ -1490,7 +1490,7 @@
    "name": "Frost Kills",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 kill colour.",
+   "desc": "Season 0 kill colour.",
    "data": {
     "blood": "#bff0ff"
    },
@@ -1518,7 +1518,7 @@
    "name": "Corn Husk",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 hit sounds.",
+   "desc": "Season 0 hit sounds.",
    "data": {
     "hits": {
      "pitch": 1.3,
@@ -1534,7 +1534,7 @@
    "name": "Bonfire",
    "price": 0,
    "rarity": "rare",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#1a0804",
     "c2": "#ff6a1a",
@@ -1548,7 +1548,7 @@
    "name": "Ember",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "✷",
     "color": "#ff6a1a"
@@ -1561,7 +1561,7 @@
    "name": "Witch Glow",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 Mystery Box glow.",
+   "desc": "Season 0 Mystery Box glow.",
    "data": {
     "box": "#3dff8a"
    },
@@ -1573,7 +1573,7 @@
    "name": "Leaf Crunch",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 hit sounds.",
+   "desc": "Season 0 hit sounds.",
    "data": {
     "hits": {
      "pitch": 1.1,
@@ -1604,7 +1604,7 @@
    "name": "Ember Menu",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 menu accent.",
+   "desc": "Season 0 menu accent.",
    "data": {
     "menu": "#ff6a1a"
    },
@@ -1616,7 +1616,7 @@
    "name": "Ember Hitmarker",
    "price": 0,
    "rarity": "rare",
-   "desc": "Season 1 hitmarker.",
+   "desc": "Season 0 hitmarker.",
    "data": {
     "hitmarker": "✶",
     "color": "#ff6a1a"
@@ -1643,7 +1643,7 @@
    "name": "Hayride",
    "price": 0,
    "rarity": "rare",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#2a1e08",
     "c2": "#f0c060",
@@ -1657,7 +1657,7 @@
    "name": "Reaper",
    "price": 0,
    "rarity": "epic",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#0a0a0a",
     "c2": "#c8302a",
@@ -1671,7 +1671,7 @@
    "name": "Skull Dot",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "☠",
     "color": "#e8dcc0"
@@ -1684,7 +1684,7 @@
    "name": "Bonfire Glow",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 Mystery Box glow.",
+   "desc": "Season 0 Mystery Box glow.",
    "data": {
     "box": "#ff4a1a"
    },
@@ -1696,7 +1696,7 @@
    "name": "Blood Moon HUD",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 HUD colours.",
+   "desc": "Season 0 HUD colours.",
    "data": {
     "hud": {
      "points": "#ff4a3a",
@@ -1712,7 +1712,7 @@
    "name": "Blood Frame",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 portrait frame.",
+   "desc": "Season 0 portrait frame.",
    "data": {
     "frame": "#c8302a"
    },
@@ -1724,7 +1724,7 @@
    "name": "Ash Kills",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 kill colour.",
+   "desc": "Season 0 kill colour.",
    "data": {
     "blood": "#9a9a9a"
    },
@@ -1736,7 +1736,7 @@
    "name": "Crop Circle",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 camo: works on every gun.",
+   "desc": "Season 0 camo: works on every gun.",
    "data": {
     "camo": "season.cropcircle"
    },
@@ -1763,7 +1763,7 @@
    "name": "Dawn",
    "price": 0,
    "rarity": "epic",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#1a0e1a",
     "c2": "#ffd0a0",
@@ -1777,7 +1777,7 @@
    "name": "Dawn Ring",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 crosshair.",
+   "desc": "Season 0 crosshair.",
    "data": {
     "char": "⊕",
     "color": "#ffd0a0"
@@ -1790,7 +1790,7 @@
    "name": "Dawn Glow",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 Mystery Box glow.",
+   "desc": "Season 0 Mystery Box glow.",
    "data": {
     "box": "#ffd0a0"
    },
@@ -1802,7 +1802,7 @@
    "name": "Harvest Gold Frame",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 portrait frame.",
+   "desc": "Season 0 portrait frame.",
    "data": {
     "frame": "#f0c060"
    },
@@ -1814,7 +1814,7 @@
    "name": "Dawn Hitmarker",
    "price": 0,
    "rarity": "epic",
-   "desc": "Season 1 hitmarker.",
+   "desc": "Season 0 hitmarker.",
    "data": {
     "hitmarker": "✧",
     "color": "#ffd0a0"
@@ -1827,7 +1827,7 @@
    "name": "Melon Lord",
    "price": 0,
    "rarity": "epic",
-   "desc": "A Season 1 calling card.",
+   "desc": "A Season 0 calling card.",
    "data": {
     "c1": "#0a1a06",
     "c2": "#f0c060",

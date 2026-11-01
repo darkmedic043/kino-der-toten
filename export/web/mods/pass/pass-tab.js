@@ -3,7 +3,7 @@
 // Rules and store: pass.js. Rewards preview in a drawer (camos on a turning gun, outfits as a portrait). Past seasons stay
 // open (Marvel Rivals style): a season strip picks which one to view, tokens are shared, and MAKE ACTIVE points
 // auto-progress at a past season.
-import { loadSeasons, loadPass, savePass, rec, isLive, seasonEnd, tiersEarned, unlockedCount, seasonDone, tokens, tokensNeeded, canBuyToken, pageDone, pageOpen, unlock, autoSpend, trackOf, setTrack, buyPremium, buyToken, describe } from './pass.js';
+import { loadSeasons, loadPass, savePass, rec, isLive, seasonNumber, seasonEnd, tiersEarned, unlockedCount, seasonDone, tokens, tokensNeeded, canBuyToken, pageDone, pageOpen, unlock, autoSpend, trackOf, setTrack, buyPremium, buyToken, describe } from './pass.js';
 import { loadCatalog } from '../shop/shop.js';
 import { loadCredits } from '../credits/credits.js';
 import { loadCamos, fillSwatches } from '../weapon-levels/camo.js';
@@ -44,9 +44,9 @@ export async function mountPass(root,{toast,data}){
     const live=isLive(S,season),active=trackOf(S,p)===season,got=unlockedCount(season,p),xp=R.xp%season.tierXp,cur=S.current,live1=rec(p,cur).xp%cur.tierXp;
     const date=d=>new Date(d+'T12:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
     root.innerHTML=`${S.list.length>1?`<nav class="ps-seasons">${[...S.list].reverse().map(s=>{const n=unlockedCount(s,p),all=s.pages.reduce((a,x)=>a+x.items.length,0);
-        return `<button data-season="${esc(s.id)}" class="${s===season?'on':''}${seasonDone(s,p)?' done':''}" style="--sc:${s.color}"><small>SEASON ${esc(s.id.slice(1))} · ${isLive(S,s)?'LIVE':'PAST'}${trackOf(S,p)===s?' · ACTIVE':''}</small><b>${esc(s.name)}</b><span>${n} / ${all}${rec(p,s).premium?' · PREMIUM':''}</span></button>`;}).join('')}</nav>`:''}
+        return `<button data-season="${esc(s.id)}" class="${s===season?'on':''}${seasonDone(s,p)?' done':''}" style="--sc:${s.color}"><small>SEASON ${esc(seasonNumber(s))} · ${isLive(S,s)?'LIVE':'PAST'}${trackOf(S,p)===s?' · ACTIVE':''}</small><b>${esc(s.name)}</b><span>${n} / ${all}${rec(p,s).premium?' · PREMIUM':''}</span></button>`;}).join('')}</nav>`:''}
       <header class="ps-top" style="--sc:${season.color}">
-        <div><span class="eyebrow">MELON PASS · SEASON ${esc(season.id.slice(1))}${live?'':' · PAST SEASON'}</span><h1>${esc(season.name.toUpperCase())}</h1><span class="muted small">${live?`Ends in ${left(seasonEnd(season))}`:`Ran ${date(season.start)} – ${date(season.end)} · never expires`}</span></div>
+        <div><span class="eyebrow">MELON PASS · SEASON ${esc(seasonNumber(season))}${live?'':' · PAST SEASON'}</span><h1>${esc(season.name.toUpperCase())}</h1><span class="muted small">${live?`Ends in ${left(seasonEnd(season))}`:`Ran ${date(season.start)} – ${date(season.end)} · never expires`}</span></div>
         ${live?`<div class="ps-tier"><b>TIER ${t}</b><span>/ ${total}</span><div class="bar"><i style="width:${(100*xp/season.tierXp).toFixed(1)}%"></i></div><small>${seasonDone(season,p)?'Pass complete · it gives no more tokens':!tokensNeeded(S,p)?'Your tokens cover the rest of this pass: spend them to earn more':t>=total?`All tiers earned · ${xp.toLocaleString()} / ${season.tierXp.toLocaleString()} pass XP to a bonus token`:`${xp.toLocaleString()} / ${season.tierXp.toLocaleString()} pass XP to the next tier`}</small></div>`
           :`<div class="ps-tier"><b>${got}</b><span>/ ${total} UNLOCKED</span><div class="bar"><i style="width:${(100*got/total).toFixed(1)}%"></i></div><small>Tokens from ${esc(cur.name)} spend here · ${live1.toLocaleString()} / ${cur.tierXp.toLocaleString()} pass XP to the next</small></div>`}
         <div class="ps-tok"><b>${tk}</b><span>TOKEN${tk===1?'':'S'}</span></div>

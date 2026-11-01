@@ -11,10 +11,16 @@ globalThis.window ??= globalThis; globalThis.CustomEvent ??= class CustomEvent {
 const web = new URL('../export/web/', import.meta.url);
 const s1 = JSON.parse(readFileSync(new URL('mods/pass/season.json', web), 'utf8'));
 const idx = JSON.parse(readFileSync(new URL('mods/pass/seasons.json', web), 'utf8'));
-// a made-up season 2: season 1's track under a new id
+// a made-up next season: Season 0's track under a new id
 const next = (id, start) => ({ ...structuredClone(s1), id, name: 'Test ' + id, start, end: '2099-01-01' });
 const P = await import('../export/web/mods/pass/pass.js');
 const { loadCredits, saveCredits, change } = await import('../export/web/mods/credits/credits.js');
+
+test('Melon Harvest is Season 0 under its old id, so saves and items keep working', () => {
+  assert.equal(P.seasonNumber(s1), 0);
+  assert.equal(s1.id, 's1');
+  assert.equal(P.seasonNumber({ id: 's3' }), '3');
+});
 
 test('seasons.json lists season.json; future seasons are hidden and the newest started one is live', () => {
   assert.ok(idx.seasons.includes('season.json'));
@@ -53,7 +59,7 @@ test('auto-progress spends on the active pass, then the live one; a new live sea
   const S = P.seasonsFrom([s1, next('s2', '2026-10-20')], '2026-10-22'), [a, b] = S.list, p = P.loadPass();
   assert.equal(P.trackOf(S, p), b);
   P.setTrack(S, p, a); assert.equal(P.trackOf(S, p), a);
-  // finish all of season 1 but its last reward, then earn 3 tokens
+  // finish all of Season 0 but its last reward, then earn 3 tokens
   for (const pg of a.pages) for (const it of pg.items) p.seasons.s1 = { ...P.rec(p, a), unlocked: { ...P.rec(p, a).unlocked, [it.id]: true } };
   delete p.seasons.s1.unlocked[a.pages.at(-1).items.at(-1).id];
   p.seasons.s1.xp = (90 - 1) * a.tierXp;   // what those unlocks cost
