@@ -51,7 +51,7 @@ export function grantResearchXp(cfg,r,amount,isActive){
 export function toggleEquip(cfg,r,augId){
   const a=augById(cfg)[augId];if(!a||!r.done.includes(augId))return 'Research it first';
   const by=augById(cfg),e=r.equip[a.item]??={};
-  for(const k of ['major','minor','minor2'])if(e[k]&&(!by[e[k]]||!r.done.includes(e[k])))e[k]=null;   // slots holding augments that no longer exist (older saves)
+  for(const k of ['major','minor','minor2'])if(e[k]&&(!by[e[k]]||!r.done.includes(e[k])||(k==='major')!==(by[e[k]].kind==='major')))e[k]=null;   // slots holding augments that no longer exist or changed kind (older saves)
   for(const k of ['major','minor','minor2'])if(e[k]===augId){e[k]=null;return null;}
   if(a.kind==='major'){e.major=augId;return null;}
   if(!e.minor)e.minor=augId;else if(mastered(cfg,r,a.item)&&!e.minor2)e.minor2=augId;else if(mastered(cfg,r,a.item))e.minor2=augId;else e.minor=augId;
@@ -61,7 +61,7 @@ export function toggleEquip(cfg,r,augId){
 export function equippedAugments(cfg,r){
   const by=augById(cfg),out=[];
   for(const [item,e] of Object.entries(r.equip??{}))for(const k of ['major','minor','minor2']){
-    const a=by[e?.[k]];if(!a||!r.done.includes(a.id)||a.item!==item)continue;if(k==='minor2'&&!mastered(cfg,r,item))continue;
+    const a=by[e?.[k]];if(!a||!r.done.includes(a.id)||a.item!==item||(k==='major')!==(a.kind==='major'))continue;if(k==='minor2'&&!mastered(cfg,r,item))continue;
     if(!out.some(x=>x.id===a.id))out.push(a);}
   return out;
 }

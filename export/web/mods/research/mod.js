@@ -96,7 +96,7 @@ export default async function setup(api){
 
   // ---- max health, speeds, reload, swap, fire rate ------------------------------------------------------------------
   {const proto=Object.getOwnPropertyDescriptor(session,'maxHealth')??Object.getOwnPropertyDescriptor(Object.getPrototypeOf(session),'maxHealth');
-    if(proto?.get)Object.defineProperty(session,'maxHealth',{configurable:true,get(){return proto.get.call(this)+stat('jug.health');}});}
+    if(proto?.get)Object.defineProperty(session,'maxHealth',{configurable:true,get(){return proto.get.call(this)+stat('jug.health')+(this.boostHealth??0);}});}
   const common=()=>boostNow()+(ads()?stat('su.stalker'):0);
   // Footwork: any sprint that isn't forward (the game sprints in every direction)
   const notForward=()=>{const v=player.velocity;if(!v)return false;const h=Math.hypot(v.x,v.z);return h>40&&(v.x*forward().x+v.z*forward().z)/h<.5;};

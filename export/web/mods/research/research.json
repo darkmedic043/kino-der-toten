@@ -1,5 +1,5 @@
 {
- "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7, BO6 for Light Mend; Shatter Blast isn't in BO7, so its names are the fork's). Every perk, ammo mod and piece of equipment has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) and Magnet Margarita (2026-10-19) have the fork's own tracks; their mod's double-buy upgrades are Majors (Afterglow, Demolition Expert, Attraction). Equipment (2026-10-28, user): every tactical and lethal has the fork's own track (effect keys frag.*, clay.*, monkey.*, gersch.*, qed.*, read through window.kino.equipAug by the code that throws or places it); they work whenever equipped (they only act when you use the item), and research XP is x activeMul while you carry it.",
+ "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7; Shatter Blast isn't in BO7, so its names are the fork's). Every perk, ammo mod and piece of equipment has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) and Magnet Margarita (2026-10-19) have the fork's own tracks; their mod's double-buy upgrades are Majors (Afterglow, Demolition Expert, Attraction). Equipment (2026-10-28, user): every tactical and lethal has the fork's own track (effect keys frag.*, clay.*, monkey.*, gersch.*, qed.*, read through window.kino.equipAug by the code that throws or places it); they work whenever equipped (they only act when you use the item), and research XP is x activeMul while you carry it.",
  "unlockLevel": 11,
  "trackCost": [
   6000,
@@ -1945,23 +1945,24 @@
    "color": "#fff3b0",
    "augments": [
     {
-     "name": "Antibiotic",
+     "name": "Express Remedy",
      "kind": "minor",
-     "desc": "Glyphs heal 5% more and procs come 15% more often.",
+     "desc": "Glyphs reach you from 50% farther.",
      "effects": {
-      "add": {
-       "heal": 0.05
-      },
-      "chance": 1.15
+      "mul": {
+       "range": 1.5
+      }
      },
-     "id": "a.lightmend.antibiotic"
+     "id": "a.lightmend.expressremedy"
     },
     {
      "name": "Big Game",
      "kind": "major",
-     "desc": "Always procs on hellhounds and specials (their glyph heals more).",
+     "desc": "Light Mend can also activate on elites (Panzers and the like), which drop 3 more glyphs.",
      "effects": {
-      "bigGame": 1
+      "set": {
+       "bigGame": 1
+      }
      },
      "id": "a.lightmend.biggame"
     },
@@ -1979,7 +1980,7 @@
     {
      "name": "Dual Action",
      "kind": "major",
-     "desc": "After a glyph heals you, you regenerate 10% a second for 3s.",
+     "desc": "A glyph makes you heal faster: 10% of your health a second for 3s.",
      "effects": {
       "add": {
        "regen": 0.1
@@ -1990,7 +1991,7 @@
     {
      "name": "Extra Strength",
      "kind": "minor",
-     "desc": "Glyphs heal 10% more.",
+     "desc": "Glyphs restore 10% more of your health.",
      "effects": {
       "add": {
        "heal": 0.1
@@ -1999,33 +2000,37 @@
      "id": "a.lightmend.extrastrength"
     },
     {
-     "name": "Express Remedy",
+     "name": "Antibiotic",
      "kind": "major",
-     "desc": "Glyphs reach 50% farther.",
+     "desc": "Glyphs hurt zombies that touch them, but they only last 60% as long.",
      "effects": {
+      "set": {
+       "bite": 0.5
+      },
       "mul": {
-       "range": 1.5
+       "life": 0.6
       }
      },
-     "id": "a.lightmend.expressremedy"
+     "id": "a.lightmend.antibiotic"
     },
     {
-     "name": "Quick Dose",
+     "name": "Mitosis",
      "kind": "minor",
-     "desc": "Procs 30% more often.",
+     "desc": "30% chance of an extra glyph every time Light Mend activates.",
      "effects": {
-      "chance": 1.3
+      "set": {
+       "twin": 0.3
+      }
      },
      "id": "a.lightmend.quickdose"
     },
     {
-     "name": "Overdose",
+     "name": "Booster Shot",
      "kind": "major",
-     "desc": "A proc also turns a zombie within 200 into a glyph.",
+     "desc": "Glyphs can take you past your normal max health, by up to 50%. The extra is lost first when you're hit and slowly drains.",
      "effects": {
-      "spread": {
-       "n": 1,
-       "r": 200
+      "set": {
+       "boost": 0.5
       }
      },
      "id": "a.lightmend.overdose"

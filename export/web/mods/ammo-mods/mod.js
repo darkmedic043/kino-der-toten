@@ -72,6 +72,7 @@ export default function setup(api) {
   const up = new THREE.Vector3(0, 1, 0);
   const now = () => session.time;
   const alive = z => z && z.health > 0 && enemies.list.includes(z);
+  const elite = z => z.kind === 'panzer' || z.boss;
   const chest = z => z.root.position.clone().addScaledVector(up, z.kind === 'dog' ? 20 : 42);
   const roundHealth = () => zombieHealth(session.round, data.rules);
   const hurt = (z, amount) => { if (alive(z) && amount > 0) enemies.hurt(z, amount, false, false, 'ammo_mod'); };
@@ -143,7 +144,7 @@ export default function setup(api) {
     for (let i = 0; i < (r.P.willow ?? 0); i++) { const f = glow(r.color, 7, 1); f.position.copy(r.pos); scene.add(f);
       flares.push({ s: f, pos: r.pos.clone(), vel: new THREE.Vector3((Math.random() - .5) * 240, 120 + Math.random() * 120, (Math.random() - .5) * 240), t: 0, floor, P: r.P, color: r.color }); }
   }
-  let regenUntil = 0, regenRate = 0;
+  let regenUntil = 0, regenRate = 0, over = 0;   // over: Booster Shot's overheal; session.boostHealth (its ceil) raises maxHealth
   const EFFECT = {
     cryo(z, tier) {
       const P = tune('cryo', tier), a = st(z);
@@ -212,9 +213,15 @@ export default function setup(api) {
     },
     lightmend(z, tier) {
       const P = tune('lightmend', tier), at = chest(z);
-      hurt(z, z.kind === 'zombie' ? z.health + 1 : z.maxHealth * .5);   // its health becomes the glyph
-      const s = glow('#fff3b0', 22, .95), core = glow('#ffffff', 9, 1); s.add(core); s.position.copy(at); scene.add(s);
-      glyphs.push({ s, pos: at.clone(), base: at.y, t: 0, P }); audio?.play?.('buy', .4);
+      const big = elite(z);
+      hurt(z, z.kind === 'zombie' ? z.health + 1 : z.boss ? 0 : z.maxHealth * (big ? .1 : .5));   // its health becomes the glyph
+      const n = 1 + (big ? 3 : 0) + (Math.random() < (P.twin ?? 0) ? 1 : 0);   // Big Game, Mitosis
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2, pos = at.clone(); if (i) pos.add(new THREE.Vector3(Math.cos(a) * 45, 0, Math.sin(a) * 45));
+        const s = glow('#fff3b0', 22, .95), core = glow('#ffffff', 9, 1); s.add(core); s.position.copy(pos); scene.add(s);
+        glyphs.push({ s, pos, base: pos.y, t: 0, P, bite: .4 });
+      }
+      audio?.play?.('buy', .4);
     },
     shatter(z, tier, at = chest(z)) {
       const P = tune('shatter', tier), peak = roundHealth() * P.dmg;
@@ -296,6 +303,7 @@ export default function setup(api) {
     if (!mod || !byId[mod.id] || !alive(z) || now() < ready || z.amod?.pulled) return;
     const roll = { id: mod.id, tier: mod.tier, chance: PROC[mod.tier], enemy: z }; host.emit('ammoModProc', roll);
     if (Math.random() > roll.chance) return;
+    if (mod.id === 'lightmend' && elite(z) && !tune('lightmend', mod.tier).bigGame) return;   // elites need Big Game
     if (z.amod && (z.amod.rotUntil > now() || (mod.id === 'cryo' && z.amod.slowUntil > now()) || (mod.id === 'napalm' && z.amod.burnUntil > now()))) return;
     ready = now() + COOLDOWN[mod.id] * (roll.cooldown ?? 1);
     queueMicrotask(() => { if (!alive(z)) return; SFX(mod.id, chest(z)); EFFECT[mod.id](z, mod.tier); host.emit('ammoModFired', { id: mod.id, tier: mod.tier, enemy: z }); });   // after the hit itself lands ('ammoModFired': research augments)
@@ -377,18 +385,30 @@ export default function setup(api) {
     // Light Mend: glyphs bob in place, drift to the player while they're hurt and in range, heal on contact
     const me = api.player?.getFeetPosition?.()?.add(new THREE.Vector3(0, 40, 0));
     for (const g of [...glyphs]) {
-      g.t += dt; const hurtP = session.health < session.maxHealth && session.phase !== 'gameover', d = me ? g.pos.distanceTo(me) : Infinity;
+      g.t += dt; const base = session.maxHealth - (session.boostHealth ?? 0), d = me ? g.pos.distanceTo(me) : Infinity;
+      const hurtP = (session.health < session.maxHealth || (g.P.boost && over < base * g.P.boost)) && session.phase !== 'gameover';
       if (me && hurtP && d < g.P.range) g.pos.add(me.clone().sub(g.pos).normalize().multiplyScalar(Math.min(d, dt * 260)));
       g.s.position.copy(g.pos).add(new THREE.Vector3(0, Math.sin(g.t * 3) * 3, 0)); g.s.material.rotation += dt;
       const fade = Math.min(1, (g.P.life - g.t) / 1.5); g.s.material.opacity = .95 * Math.max(0, fade);
+      if (g.P.bite && (g.bite -= dt) <= 0) {   // Antibiotic: bites what touches it (a tenth as hard on anything tougher than a zombie)
+        g.bite = .4;
+        for (const o of [...enemies.list]) if (alive(o) && chest(o).distanceTo(g.pos) < 45) { mark(o, '#fff3b0'); hurt(o, o.kind === 'zombie' ? o.maxHealth * g.P.bite : o.boss ? 0 : o.maxHealth * g.P.bite * .1); }
+      }
       if (me && hurtP && d < 30) {
-        session.health = Math.min(session.maxHealth, session.health + session.maxHealth * g.P.heal);
+        const amount = base * g.P.heal;
+        if (g.P.boost) { over = Math.min(base * g.P.boost, Math.max(over, session.health + amount - base)); session.boostHealth = Math.ceil(over); }
+        session.health = Math.min(session.maxHealth, session.health + amount);
         if (g.P.regen) { regenUntil = t + 3; regenRate = g.P.regen; }
         api.toast?.('Healed', 1); audio?.play?.('buy', .5);
       } else if (g.t < g.P.life) continue;
       g.s.removeFromParent(); g.s.material.dispose(); glyphs.splice(glyphs.indexOf(g), 1);
     }
     if (regenUntil > t && session.phase === 'fighting') session.health = Math.min(session.maxHealth, session.health + session.maxHealth * regenRate * dt);
+    if (over > 0) {   // overheal drains over 20s and goes first when hit, so regeneration can't refill it
+      const base = session.maxHealth - session.boostHealth;
+      over = Math.max(0, Math.min(over - base * .025 * dt, session.health - base)); session.boostHealth = Math.ceil(over);
+      session.health = Math.min(session.health, session.maxHealth);
+    }
     // Shadow Rift: pull everything in range toward the hole, then drop or warp what was caught
     for (const r of [...rifts]) {
       r.t += dt; const k = Math.min(1, r.t / r.P.dur), grow = Math.sin(Math.min(1, r.t / .25) * Math.PI / 2) * (k < .85 ? 1 : 1 - (k - .85) / .15);
@@ -421,7 +441,7 @@ export default function setup(api) {
     for (const b of bolts) b.line.removeFromParent(); bolts.length = 0;
     for (const r of rockets) { r.s.removeFromParent(); r.trail.removeFromParent(); } rockets.length = 0;
     for (const r of rifts) { r.hole.removeFromParent(); r.halo.removeFromParent(); } rifts.length = 0;
-    for (const g of glyphs) g.s.removeFromParent(); glyphs.length = 0; regenUntil = 0;
+    for (const g of glyphs) g.s.removeFromParent(); glyphs.length = 0; regenUntil = 0; over = 0; session.boostHealth = 0;
     for (const b of balls) dropSprite(b.s); balls.length = 0;
     for (const f of flares) dropSprite(f.s); flares.length = 0;
     for (const w of wheels) w.parts.forEach(dropSprite); wheels.length = 0;
