@@ -36,6 +36,7 @@
 //   aw_shockanchor XMG: reaching full lockdown throws a shockwave (6 s recharge)
 //   aw_gunshield  MG Turret: 40% less damage taken while firing
 //   aw_spinup     MG Turret: held fire ramps fire rate to +60% over 4 s
+// - The MG Turret itself: the barrels spin up (0.6 s) before it fires, aiming keeps them turning; see turret() below
 // - Lasers (aws_tracker red, aws_laser green): the part's beam is steered at the crosshair each frame (mounts.js aimLasers),
 //   dimmed while aiming, with a dot where the crosshair lands.
 import * as THREE from 'three';
@@ -234,12 +235,50 @@ export function setupAw(api){
     dot.material.color.setHex(DOT[colour]);dot.material.opacity=.6+.25*Math.random();
   }
 
+  // ---- the MG Turret's barrels: a motor that has to come up to speed before the gun fires. The pack has no spin clip,
+  // so the bone turns here. One barrel per shot at full speed (three barrels, 0.06 s a shot = 5.5 turns a second), and
+  // a frame never turns them past 50 degrees or the third-turn symmetry reads as spinning backwards.
+  const REV_UP=.7,REV_DOWN=1.4,REV_READY=.85,SPIN=2*Math.PI/(3*.06);
+  let rev=0,spin=0,spinBone=null,spinOn=null,whine=null;
+  const isTurret=()=>(view.def?.baseId??view.def?.id)==='aw_sentry'&&view.ready;
+  const claimFire=()=>{
+    if(host.holdFire?.aw)return;const prev=host.holdFire;
+    const f=()=>(isTurret()&&rev<REV_READY)||!!prev?.();Object.assign(f,prev,{aw:true});host.holdFire=f;   // keeps the earlier claimers' flags
+  };
+  claimFire();
+  // the motor (no sound in the pack for it). Each frame re-arms a fall to silence, so a pause can't leave it humming
+  function motor(){
+    const c=audio?.ctx;if(!c||c.state!=='running'||!audio.master)return;
+    if(!whine&&rev>.01){
+      const g=c.createGain(),lp=c.createBiquadFilter(),a=c.createOscillator(),b=c.createOscillator(),bg=c.createGain();
+      g.gain.value=0;lp.type='lowpass';a.type='sawtooth';b.type='square';bg.gain.value=.35;
+      a.connect(lp);b.connect(bg);bg.connect(lp);lp.connect(g);g.connect(audio.master);a.start();b.start();whine={g,lp,a,b};
+    }
+    if(!whine)return;
+    const t=c.currentTime,r=rev*rev;
+    whine.a.frequency.setTargetAtTime(55+r*330,t,.03);whine.b.frequency.setTargetAtTime(83+r*495,t,.03);
+    whine.lp.frequency.setTargetAtTime(350+r*2200,t,.03);
+    whine.g.gain.cancelScheduledValues(t);whine.g.gain.setTargetAtTime(.012+rev*.05,t,.03);whine.g.gain.setTargetAtTime(0,t+.25,.06);
+    if(rev<=.01){const w=whine;whine=null;w.g.gain.cancelScheduledValues(t);w.g.gain.setTargetAtTime(0,t,.04);w.a.stop(t+.3);w.b.stop(t+.3);}
+  }
+  function turret(dt){
+    if(host.holdFire&&!host.holdFire.aw)claimFire();
+    if(!isTurret()){rev=0;spinBone=null;spinOn=null;motor();return;}
+    const gun=view.gun;
+    if(spinOn!==gun){spinOn=gun;spinBone=null;gun?.traverse?.(o=>{if(o.isBone&&o.name==='tag_barrel_spin')spinBone=o;});}
+    const i=view.input,want=(i?.fire||i?.ads)&&!i?.sprint&&!(session.reloadLeft>0)&&session.phase!=='reviving';
+    rev=want?Math.min(1,rev+dt/REV_UP):Math.max(0,rev-dt/REV_DOWN);
+    if(spinBone&&rev>0){spin=(spin+Math.min(.87,rev*rev*SPIN*(1+.6*spool*+has('aw_spinup'))*dt))%(2*Math.PI);spinBone.rotation.x=spin;}
+    motor();
+  }
+
   host.on('update',dt=>{
     lasers();
     { const t=now();
       if(view.input?.sprint)sprintAt=t;
       if(player?.position){if(moved.distanceToSquared(player.position)>.25){movedAt=t;moved.copy(player.position);}}
       spool=t-lastShot<.35?Math.min(1,spool+dt/(has('aw_spinup')?4:3)):Math.max(0,spool-dt/1.5);
+      turret(dt);
       for(let i=bombs.length-1;i>=0;i--){const b=bombs[i];if(t<b.t)continue;bombs.splice(i,1);burst(b.at,EMBER,14,110,5);if(Math.random()<.5)audio?.play?.('explosion');
         for(const o of enemies.list){if(alive(o)&&o.root.position.distanceTo(b.at)<90)hurt(o,b.dmg,false,false,'explosion');}}
     }
@@ -261,5 +300,5 @@ export function setupAw(api){
       if(f.t<=0){dispose(f);fx.splice(i,1);continue;}
       f.obj.material.opacity=f.t/f.life;if(f.vel){f.obj.position.addScaledVector(f.vel,dt);f.vel.y+=20*dt;}}
   });
-  window.kino.aw={get spool(){return spool;},get chain(){return chain;},bombs,dot,get lock(){return lock;},get frozen(){return frozen;},burning,dazed,marked};
+  window.kino.aw={get spool(){return spool;},get rev(){return rev;},get spin(){return spin;},get chain(){return chain;},bombs,dot,get lock(){return lock;},get frozen(){return frozen;},burning,dazed,marked};
 }
