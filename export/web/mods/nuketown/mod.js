@@ -52,6 +52,10 @@ const PLATE_Y = 1613, VOID_Y = 800;
 const PLATES = [[-1754, -1590, 1972, 3952], [-1590, -1428, 1791, 3952], [-2771, -1854, -1642, 3952], [-1854, -1428, -1642, 1791],
   [-664, -563, 445, 680], [-563, 872, 352, 680], [-1348, -1048, 352, 680], [-1348, 872, 680, 3952], [-1348, 872, -1544, 352]];
 const POCKETS = [[992, 1170, -320, -105], [28, 118, 684, 770]], ROAD = V(-300, 1692, 1300);
+// The rubble ramp on the east sidewalk climbs from the road to the sandbags behind the barricade, and a clip sheet at
+// z 348 stops you on top. It lets a player on the ramp side through and still blocks the town side, so the ramp is a way
+// back from the road and not a free way past the ROAD door. [x0, x1, z, y0, y1]: the sheet
+const RAMP_SHEET = [144, 256, 348, 1722, 1783];
 const GENERATOR_COUNT = 3;
 // the door swings from its entity origin to bunker_door_moveto (yaw 340 -> 128.3); its clip is a box in entities.json
 const BUNKER = { origin: V(-1383, 1706, -1232), to: V(-1280, 1706, -1432), turn: (128.304 - 340 + 360) * DEG, clip: [[-1442, 1695, -1256], [-1369, 1945, -1224]], time: 2.2 };
@@ -162,6 +166,13 @@ function setupQuest(api) {
   let floor = null;
   root.traverse(o => { if (o.isMesh && o.material?.name?.endsWith('bo1_rus_art_metal_panel')) floor = o.material; });
   if (floor) for (const hole of FLOOR_HOLES) patchFloor(world, floor, hole);
+  {
+    const clip = world.clipCollision, hit = clip.capsuleIntersect.bind(clip), [x0, x1, z, y0, y1] = RAMP_SHEET;
+    clip.capsuleIntersect = c => {
+      const h = hit(c), p = c.start;
+      return h && Math.abs(h.normal.z) > .9 && p.z > z && p.x > x0 && p.x < x1 + c.radius && c.end.y + c.radius > y0 && p.y < y1 ? false : h;
+    };
+  }
   // ---- power: lever 2 first, then the engine's POWER marker
   show(nodesOf(root, 'pf5006_auto343'), false);
   const levers = LEVERS.map(l => ({ ...l, t: -1, axis: V(Math.cos(l.yaw * DEG), 0, -Math.sin(l.yaw * DEG)),

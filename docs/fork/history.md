@@ -419,3 +419,4 @@
 - 2026-11-01: AW guns' camo wrap: gun-space triplanar projection (no UV seams, same pattern size on every gun), even shading on black and white guns, wood/brass/ammo/optics/decals stay unpainted; rules in `camos.json` `wrap` (weapon-levels.md).
 - 2026-11-01: Combat Knife: rarity removed (user's call); Pack-a-Punch tiers are its only upgrade and only raise damage.
 - 2026-11-01: Melon Pass: Melon Harvest renumbered Season 0 (season `number` field, id stays s1); the next season is Season 1 with id s2 (pass.md).
+- 2026-11-01: Nuketown: the rubble ramp on the east sidewalk is a one-way way back from the road into town (the clip sheet on top lets the ramp side through) (waw-ports.md).
