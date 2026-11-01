@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { binds } from '../../settings.js';
 import { setupRagnarok } from './ragnarok.js';
 import { setupRocketShield } from './rocket-shield.js';
+import { setupZombieShield } from './zombie-shield.js';
 import { setupAnnihilator } from './annihilator.js';
 
 export default async function setup(api){
@@ -148,6 +149,7 @@ export default async function setup(api){
   setupRagnarok(api,kino.operator);
   setupAnnihilator(api,kino.operator);   // The Giant's Fly Trap prize; the cheat console elsewhere
   kino.rocketShield=setupRocketShield(api);   // BO3's rocket shield: built on Der Eisendrache, bought at the Armory elsewhere
+  kino.zombieShield=setupZombieShield(api);   // Nuketown's car door: the same shield code with a plant; taken there, bought at the Armory elsewhere
   kino.cheats?.addCommand?.('operator',{usage:'operator <id|none>',text:'Give an operator weapon, charged: '+[...defs.keys()].join(', '),cheat:true,
     run:([id])=>{if(!id||id==='none'){take();return 'Operator weapon removed';}const m=[...defs.keys()].find(k=>k.startsWith(id.toLowerCase()));if(!m)return 'Unknown: '+[...defs.keys()].join(', ');give(m,{full:true});return defs.get(m).name+' (charged)';}});
 }

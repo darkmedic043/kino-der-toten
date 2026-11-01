@@ -1,6 +1,6 @@
 // The Armory (ARMORY.EXE on the terminal booth, user 2026-10-17): special gear bought outside the map it comes from,
-// in tabs: OPERATOR WEAPONS (the Ragnarok DG-4, the Annihilator), SHIELDS (the rocket shield) and SCORESTREAKS (to come). Each item has
-// to be earned on its home map first: find it there (Der Eisendrache: take it from its bench; The Giant: the Fly Trap), then get item.kills kills
+// in tabs: OPERATOR WEAPONS (the Ragnarok DG-4, the Annihilator), SHIELDS (the rocket shield, Nuketown's zombie shield) and SCORESTREAKS (to come). Each item has
+// to be earned on its home map first: find it there (Der Eisendrache: take it from its bench; The Giant: the Fly Trap; Nuketown: a shield station), then get item.kills kills
 // with it. After that every other map sells it at a terminal for item.price (mains power on). It can't be bought on
 // its home map: you build it there. Progress is account-wide in kino.mods.armory (cloud.js TRACKED).
 // window.kino.armory: {status(), buy(id) -> true | 'reason', found(id)}
@@ -20,6 +20,9 @@ export const TABS = [
     { id: 'rocket_shield', name: 'Rocket Shield', home: 'der-eisendrache', homeName: 'Der Eisendrache', price: 20000, kills: 250, color: '#ff9a3a', icon: SHIELD_ICON,
       blurb: 'A riot shield with rockets bolted on.',
       specs: ['H raises it: blocks hits from the front (on your back: from behind)', 'Left mouse bashes, right mouse fires a rocket dash (3 charges)', 'Off its home map a charge comes back each round', '1,500 health, then it breaks'] },
+    { id: 'zombie_shield', name: 'Zombie Shield', home: 'nuketown', homeName: 'Nuketown', price: 15000, kills: 150, color: '#9fb7c4', icon: SHIELD_ICON,
+      blurb: 'A car door on a dolly. Carry it, or stand it in a doorway and let them tear at it.',
+      specs: ['H raises it: blocks hits from the front (on your back: from behind)', 'Left mouse bashes, right mouse plants it on the ground', 'Planted it stops zombies, who tear at it (35 hits); F takes it back with its health', '1,500 health, then it breaks'] },
   ] },
   { id: 'streaks', name: 'SCORESTREAKS', soon: true, items: [] },
 ];
@@ -47,15 +50,16 @@ export default async function setup(api) {
     const was = unlocked(r, item); r.kills = (r.kills ?? 0) + 1; saveArmory(a);
     if (!was && unlocked(r, item)) api.announce?.(item.name.toUpperCase(), 'UNLOCKED IN THE ARMORY', 3);
   }
-  // kills with each item: the shield's own bash/dash (rocketShield.hitting while its damage lands, kill is synchronous)
+  // kills with each item: the shields' own bash/dash (rocketShield.hitting / altHitting while the damage lands, kill is synchronous)
   // and the operator weapons' (cause 'operator', recorded by operator-weapons as enemy.lastCause; the one in the slot)
   host.on('kill', e => {
     if (e.remote || !e.enemy || cheating()) return;
     if (kino.rocketShield?.hitting) addKill('rocket_shield');
+    else if (kino.rocketShield?.altHitting) addKill('zombie_shield');
     else if (e.enemy.lastCause === 'operator' && ITEMS[kino.operator?.current]?.tab === 'operators') addKill(kino.operator.current);
   });
 
-  const owned = id => ITEMS[id]?.tab === 'operators' ? kino.operator?.current === id : id === 'rocket_shield' ? !!kino.rocketShield?.owned : false;
+  const owned = id => ITEMS[id]?.tab === 'operators' ? kino.operator?.current === id : id === 'rocket_shield' ? !!kino.rocketShield?.owned : id === 'zombie_shield' ? !!(kino.zombieShield?.held() || kino.zombieShield?.planted()) : false;
   // why it can't be bought right now ('' when it can)
   function blocked(item, rec) {
     if (item.home === mapId) return 'home';
@@ -84,9 +88,11 @@ export default async function setup(api) {
     if (session.phase === 'reviving' || session.busy) return 'Terminal busy';
     if (ITEMS[id].tab === 'operators' && kino.operator?.active) return 'Put your operator weapon away first';
     if (host.gunBlocked) return 'Lower what you are holding first';
+    if (id === 'zombie_shield' && !kino.zombieShield?.ready) return 'The shield model is missing';
     if (!session.spend(item.price)) return 'Not enough points';
     if (ITEMS[id].tab === 'operators') kino.operator?.give(id, { full: true });
     else if (id === 'rocket_shield') kino.rocketShield?.give();
+    else if (id === 'zombie_shield') kino.zombieShield.give();
     return true;
   }
   kino.armory = { status, buy, found };

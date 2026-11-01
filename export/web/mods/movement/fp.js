@@ -299,6 +299,8 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     if(shk>0){cam.roll+=shN(41,89,107)*.0016*shk;cam.pitch+=shN(37,77,113)*.0012*shk;}
     if(!flags.cam)cam.roll=cam.pitch=cam.fov=0;
     if(!Number.isFinite(cam.roll+cam.pitch+cam.fov)){cam.roll=cam.pitch=cam.fov=0;}
+    // the XMG's lockdown fold leaves both barrels 13.5 degrees up (mods/bo3-weapons/aw.js scrubs the clips): level them on the view, muzzles just under the crosshair (user, 2026-11-01)
+    if(view.def?.lockdown){const l=window.kino.aw?.lock??0;R.x-=.24*l;P.y+=10*l;}
     if(!Number.isFinite(P.x+P.y+P.z+R.x+R.y+R.z)){for(const k in base){s[k].x=0;s[k].v=0;}s.bobAmp=0;s.exert=0;P.set(0,0,0);R.set(0,0,0);}   // never let a bad frame stick
     view.pivot.updateMatrixWorld(true);
     // mantle: left hand reaches for the ledge and stays planted while climbing

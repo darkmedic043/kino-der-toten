@@ -267,7 +267,7 @@ export async function createMap(ctx,entry){
         text=`${w.name}${owned?' ammo':''} · ${shown}`;
       }
       const extra=features.findTarget(distance);
-      if(extra){prompt={kind:'feature',feature:extra};return {target:prompt,text:extra.label,distance:0};}
+      if(extra){prompt={kind:'feature',feature:extra};return {target:prompt,text:extra.label,distance:extra.distance};}
       if(!prompt)return null;
       if(!text)text=prompt.kind==='door'?'Open '+(prompt.entity.targetname==='zombie_airlock_buy'?'airlock':'door')+' · '+prompt.door.cost:prompt.kind==='suit'?'Equip P.E.S. life support':prompt.kind==='power'?'Restore power':'';
       return {target:prompt,text,distance};

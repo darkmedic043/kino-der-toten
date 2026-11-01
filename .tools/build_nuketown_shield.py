@@ -8,6 +8,7 @@ SRC = pathlib.Path.home()/'projects/waw-nuketown'
 OUT = ROOT/'export/web/mods/maps/nuketown/shield'
 WEB = 'mods/maps/nuketown/shield/'
 MODEL = SRC/'dump_mod/mod/model_export/t6_wpn_zmb_shield_view_lod0.glb'
+WORLD = SRC/'dump_mod/mod/model_export/t6_wpn_zmb_shield_world_lod0.glb'   # the planted one, on every map (mods/operator-weapons/zombie-shield.js)
 FILE = SRC/'iwd/weapons/sp/zombie_shield'
 IMAGES = [SRC/'dump_mod/mod/images', SRC/'dump/nuketown/images']
 COLOURS = {'mc/bo2_mtl_t6_wpn_zmb_shield': '_-gmtl_t6_wpn_zmb_shield_col', 'mc/bo2_mtl_t6_wpn_zmb_shield_glass': 'mtl_t6_wpn_zmb_shield_glass_col'}
@@ -22,18 +23,24 @@ def texture(name):
     if r.returncode: sys.exit(r.stderr)
     return out.name
 
-def model():
-    b = MODEL.read_bytes(); n = struct.unpack_from('<I', b, 12)[0]; doc = json.loads(b[20:20+n])
+def model(src, name, rigid=False):
+    b = src.read_bytes(); n = struct.unpack_from('<I', b, 12)[0]; doc = json.loads(b[20:20+n])
     doc['images'], doc['textures'] = [], []
     doc['samplers'] = [{'wrapS': 10497, 'wrapT': 10497, 'magFilter': 9729, 'minFilter': 9987}]
     for m in doc['materials']:
         m.pop('normalTexture', None); m.pop('occlusionTexture', None)
         ix = len(doc['images']); doc['images'].append({'uri': texture(COLOURS[m['name']])}); doc['textures'].append({'source': ix, 'sampler': 0})
         m['pbrMetallicRoughness'] = {'metallicFactor': 0, 'roughnessFactor': .7, 'baseColorTexture': {'index': ix}}
+    if rigid:   # one still mesh per primitive set: no skin, no bones, nothing to compile a skinned program for
+        for mesh in doc['meshes']:
+            for p in mesh['primitives']:
+                for k in ('JOINTS_0', 'WEIGHTS_0'): p['attributes'].pop(k, None)
+        doc['nodes'] = [{'mesh': i} for i in range(len(doc['meshes']))]; doc['scenes'] = [{'nodes': list(range(len(doc['meshes'])))}]; doc['scene'] = 0
+        doc.pop('skins', None); doc.pop('animations', None)
     raw = json.dumps(doc, separators=(',', ':')).encode(); raw += b' '*(-len(raw) % 4); tail = b[20+n:]
-    (OUT/'view.glb').write_bytes(struct.pack('<III', 0x46546c67, 2, 20+len(raw)+len(tail))+struct.pack('<II', len(raw), 0x4e4f534a)+raw+tail)
+    (OUT/name).write_bytes(struct.pack('<III', 0x46546c67, 2, 20+len(raw)+len(tail))+struct.pack('<II', len(raw), 0x4e4f534a)+raw+tail)
 
-OUT.mkdir(parents=True, exist_ok=True); model()
+OUT.mkdir(parents=True, exist_ok=True); model(MODEL, 'view.glb'); model(WORLD, 'world.glb', True)
 a = FILE.read_text().split('\\'); d = dict(zip(a[1::2], a[2::2])); num = lambda k, default=0: float(d.get(k) or default)
 anims, durations = {}, {}
 for key, name in CLIPS.items():

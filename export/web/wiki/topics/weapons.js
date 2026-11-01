@@ -261,6 +261,10 @@ export default {
         how: 'Built from parts on Der Eisendrache.',
         rows: [['Health', '1,500, then it breaks'], ['Rocket charges', '3']],
         text: 'A riot shield with rockets bolted on. Press **H** to raise it and again to lower it.\n\n- Raised, it blocks hits from the front; on your back, hits from behind.\n- **Left mouse** bashes the two nearest zombies in front of you (killing them up to 2,500 health) and knocks the rest back.\n- **Right mouse** fires the rockets: a short dash that kills everything in the way. Charges come back from nitrous tanks on Der Eisendrache, and one a round on other maps.\n- A Carpenter repairs it.' },
+      { title: 'Zombie Shield', color: '#9fb7c4', home: 'nuketown', price: 15000, kills: 150,
+        how: 'Taken from a shield station on Nuketown.',
+        rows: [['Health', '1,500, then it breaks'], ['Planted', 'Zombies tear at it: 35 hits']],
+        text: 'A car door on a dolly. Press **H** to raise it and again to lower it.\n\n- Raised, it blocks hits from the front; on your back, hits from behind.\n- **Left mouse** bashes the two nearest zombies in front of you. Bash kills are what unlock it.\n- **Right mouse** plants it on the ground in front of you. Zombies stop at it and tear at it instead of walking through.\n- Press **F** next to your planted shield to take it back with the health it has left.\n- A Carpenter repairs it, in your hands or planted.\n- It shares the shield slot with the Rocket Shield: taking one replaces the other.' },
     ];
     for (const o of OPS) pages.push({
       id: ctx.slug(o.title), title: o.title, group: 'Operator weapons', color: o.color, sub: mapTitle[o.home] ?? '',

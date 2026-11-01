@@ -20,8 +20,11 @@ import * as THREE from 'three';
 
 function mulberry(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
+// One per game (memoised on host, shared by every mod): two would each number their events, and a guest drops what looks repeated.
+// A mod that wants it before the map makes it pushes a callback on host.syncWaiters, called here, ahead of the map's ready().
 export function createSync(api) {
   const { host, session, enemies, player } = api;
+  if (host.sync) return host.sync;
   const net = window.kino?.coop ?? null;
   const online = () => !!net?.id;
   const me = () => (online() ? net.id : 'solo');
@@ -67,7 +70,7 @@ export function createSync(api) {
 
   const on = (type, fn) => { if (!handlers.has(type)) handlers.set(type, []); handlers.get(type).push(fn); };
   on('flag', d => { session.flags.add(d.name); });
-  return {
+  const self = {
     act, on,
     // a passing effect (an arrow's element): applied here and sent straight to everyone, not ordered or logged (a late
     // joiner doesn't replay it); its handlers get the same ctx (rand is Math.random)
@@ -95,4 +98,7 @@ export function createSync(api) {
     },
     v: a => new THREE.Vector3(...a), a: v => [v.x, v.y, v.z].map(x => Math.round(x * 10) / 10),
   };
+  host.sync = self;
+  for (const fn of host.syncWaiters ?? []) fn(self);
+  return self;
 }

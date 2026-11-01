@@ -160,7 +160,7 @@ Every perk, its effects and its upgrades are in ${T('perks')}.`)));
 
 - **PERKS**: buy any perk in the game, at the usual perk prices.
 - **ARSENAL**: put an ammo mod on the gun in your hands (needs the power).
-- **ARMORY**: operator weapons and the Rocket Shield. See ${T('operators')}.
+- **ARMORY**: operator weapons, the Rocket Shield and the Zombie Shield. See ${T('operators')}.
 - **GUMS**: your gobblegum packs. See ${T('gobblegums')}.
 - **BANK**: store points for later.
 - **EXFIL**: call the escape chopper (see ${B('Exfil')}).

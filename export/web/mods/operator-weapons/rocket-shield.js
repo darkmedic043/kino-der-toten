@@ -26,8 +26,8 @@ export function setupRocketShield(api) {
     DEF = j?.operator?.rocketShield ?? null; if (DEF) for (const u of [DEF.model, ...(DEF.worn ?? [])]) loadModel(u).catch(() => {});
   }).catch(() => {});
   const sh = { owned: false, health: SHIELD_MAX, charges: CHARGES, raised: false, vw: null, look: 0, bash: null, dash: null };
-  let hitting = false;
-  const hurt = (...a) => { hitting = !sh.alt; try { enemies.hurt(...a); } finally { hitting = false; } };
+  let hitting = false, altHitting = false;
+  const hurt = (...a) => { hitting = !sh.alt; altHitting = !!sh.alt; try { enemies.hurt(...a); } finally { hitting = altHitting = false; } };
   // perk hooks (perks-plus reaper-perks.js sets .perk: Victorious Tortoise blocks from every side, doubles the
   // health when upgraded and blows up when the shield breaks; Crusader's Ale repairs it with heal())
   const hooks = { perk: null };
@@ -203,6 +203,6 @@ export function setupRocketShield(api) {
     state: () => ({ owned: sh.owned, alt: sh.alt, max: MAX(), health: Math.round(sh.health), charges: sh.charges, raised: sh.raised, ready: !!sh.vw?.ready }),
     // a map's nitrous tanks (hidden map objects, shown while the shield is owned) and what to say when it breaks
     setTanks(list, hint) { tanks = list ?? []; if (hint) brokeHint = hint; for (const c of tanks) c.visible = sh.owned; },
-    get owned() { return sh.owned && !sh.alt; }, get hitting() { return hitting; },
+    get owned() { return sh.owned && !sh.alt; }, get hitting() { return hitting; }, get altHitting() { return altHitting; },
   };
 }
