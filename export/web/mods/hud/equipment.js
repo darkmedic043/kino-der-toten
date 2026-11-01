@@ -44,6 +44,8 @@ export function setupEquipmentHud({host,session,data}){
   renderIcons(ids.map(id=>[id,data.equipment[id]])).then(o=>{Object.assign(icons,o);last='';});
   let last='';
   function set(k,icon,count){const s=slot(k);s.hidden=!icon;if(!icon)return;s.querySelector('i').style.backgroundImage=icons[icon]?`url(${icons[icon]})`:'';s.querySelector('b').textContent=count;s.classList.toggle('empty',!count);}
+  host.on('warmHud',on=>{   // warmHud (engine.js): the slots (icons through their grayscale filter, a count, the greyed empty look) painted once behind the loading screen; they first show at the start otherwise
+    if(on){set('lethal','frag',2);set('tactical','frag',0);set('mine',null);}else{for(const s of el.querySelectorAll('.slot'))s.hidden=true;last='';}});
   host.on('update',()=>{
     const t=window.kino?.tactical,tac=t?.id?[t.id,t.count]:session.monkeysOwned||session.monkeys>0?['zombie_cymbal_monkey',session.monkeys]:[null,0];   // a tactical once held keeps its slot at 0 (greyed) until a Max Ammo refills it
     const key=[session.grenades,...tac,session.claymoresOwned,session.claymores,Object.keys(icons).length].join();if(key===last)return;last=key;

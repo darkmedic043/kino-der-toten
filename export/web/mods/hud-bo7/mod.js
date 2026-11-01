@@ -125,12 +125,16 @@ export default async function setup(api){
   function showGun(id){if(id===gunId)return;gunId=id;gunImg.style.opacity=0;if(!id)return;gunIcon(id).then(url=>{if(gunId!==id)return;if(url){gunImg.src=url;gunImg.style.opacity=1;}});}
 
   // warmHud (engine.js): the panels' states painted once behind the loading screen (their Skia shaders)
-  host.on('warmHud',on=>{for(const [el,cls] of [[left,'low'],[right,'empty'],[right,'pap'],[round,'text']])el.classList.toggle(cls,on);
-    for(const sat of right.querySelectorAll('.sat')){if(on){sat._arc=null;q(sat,'.arc').setAttribute('d',arcAt(+sat.dataset.dir-115,+sat.dataset.dir+100));}sat.classList.toggle('full',on);sat.classList.toggle('hot',on);}});
+  host.on('warmHud',(on,wait)=>{   // the engine's update loop is off while loading: one tick now places the adopted nodes (the bubbles stay display:none until #class-skill is in), fills the texts and shows the gun
+    if(on){t=0;try{tick(0);}catch(e){console.warn('[hud-bo7] warm tick',e);}if(session.weapon?.id)wait?.(gunIcon(session.weapon.id).then(()=>new Promise(r=>requestAnimationFrame(r))));}
+    for(const [el,cls] of [[left,'low'],[right,'empty'],[right,'pap'],[round,'text']])el.classList.toggle(cls,on);
+    for(const sat of right.querySelectorAll('.sat')){if(on){sat._arc=null;q(sat,'.arc').setAttribute('d',arcAt(+sat.dataset.dir-115,+sat.dataset.dir+100));}sat.classList.toggle('full',on);sat.classList.toggle('hot',on);}
+    if(on)q(right,'.mag').setAttribute('d',arc(ARC0,ARC0+(ARC1-ARC0)*.6));else last='';});   // the mag arc (its drop shadow) drawn now, not at the first shot; the update loop redraws the real one
 
   // ---- per-frame bits that aren't plain moved nodes -------------------------------------------------------------------------
   let t=0,last='';
-  host.on('update',dt=>{
+  host.on('update',tick);
+  function tick(dt){
     if((t-=dt)<=0){t=.5;place();}
     const op=!!(window.kino.operator?.active||host.gunBlocked),w=session.weapon,def=w&&!session.weaponUnavailable&&!op?session.def:null;   // an operator weapon or the rocket shield in hand: no gun
     showGun(def?w.id:null);
@@ -151,6 +155,6 @@ export default async function setup(api){
     {const el=q(right,'.amod'),m=am&&window.kino.ammoMods?.MODS?.find(x=>x.id===am.id);el.hidden=!am;if(am){el.style.color=m?.color??'#fff';el.title=m?.name??am.id;q(el,'path')?.remove();const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',MOD_ICONS[am.id]??'M12 4a8 8 0 1 0 0 16 8 8 0 1 0 0-16');q(el,'svg').append(p);q(el,'small').textContent=ROMAN[am.tier]??am.tier;}}
     {const el=q(right,'.pap');el.hidden=!pap;el.textContent=ROMAN[pap]??pap;}
     q(round,'.n').textContent=rn;round.classList.toggle('text',!/^\d+$/.test(rn));   // Moon's No Man's Land: a status line, not a number
-  });
+  }
   host.on('reset',()=>{last='';});
 }

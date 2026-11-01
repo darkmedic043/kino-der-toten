@@ -44,7 +44,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,profile.mobile?1:1.5));renderer
 const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null;
 // three draws a transparent double-sided material in two passes and flags it needsUpdate before each, which re-checks
 // its program twice a draw (on The Giant, a glass material and the viewmodel's decals: ~10% of a frame). One pass
-// looks the same here. Swept once a second over both scenes for materials that appear later (was lighting-mod only).
+// looks the same here. Every material is single-pass from creation (the Material.prototype override below, 2026-11-01).
 let singlePassTimer=0,programCount=0;
 // Every shader program stays built for the whole session. three deletes a program as soon as no material uses it, so effects
 // that make and dispose materials per use (Thundergun blast, DG-2 arcs, Ray Gun bolts) recompiled on every shot; on Windows
@@ -87,8 +87,12 @@ let lastTex={n:0,kb:0,mip:0,gl:{}};const fences=[];let fenceSupported=null;   //
   const bytes=a=>{const d=a.find(x=>x&&typeof x==='object'&&'byteLength' in x);return d?Math.round(d.byteLength/1024):typeof a[1]==='number'?Math.round(a[1]/1024):0;};
   count('bufferData',bytes);count('bufferSubData',bytes);for(const n of ['createBuffer','createTexture','deleteBuffer','deleteTexture','createVertexArray','deleteVertexArray','createFramebuffer','createRenderbuffer','renderbufferStorageMultisample','compileShader','linkProgram','getError','finish','flush','readPixels','clientWaitSync','getProgramParameter','getShaderParameter','getUniformLocation','getParameter','getBufferSubData','blitFramebuffer','invalidateFramebuffer'])count(n);}
 const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
-const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait'),NO_HUD_WARM=new URLSearchParams(location.search).has('noHudWarm'),NO_WEAPON_WARM=new URLSearchParams(location.search).has('noWeaponWarm'),WEAPON_WARM_MS=8000;   // A/B switches for warmShaders' draw pass and warmHud
-const singlePass=root=>root?.traverse(o=>{if(o.material)for(const m of [o.material].flat())if(m?.transparent&&m.side===THREE.DoubleSide&&!m.forceSinglePass)m.forceSinglePass=true;});
+const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait'),NO_HUD_WARM=new URLSearchParams(location.search).has('noHudWarm'),NO_PAINT_WARM=new URLSearchParams(location.search).has('noPaintWarm'),NO_WEAPON_WARM=new URLSearchParams(location.search).has('noWeaponWarm'),WEAPON_WARM_MS=8000;   // A/B switches for warmShaders' draw pass and warmHud
+// Single pass from the first draw, not after the sweep: three drew a new transparent double-sided material (the Mech's arc
+// bolts, built when the mech lands) with its back faces then its front faces until the sweep reached it, each side a
+// program of its own (two compiles mid-game, in each scene; 2026-11-01). Every material answers forceSinglePass=true
+// (the constructor's `this.forceSinglePass=false` lands in the no-op setter), which is the state the sweep gave them all.
+Object.defineProperty(THREE.Material.prototype,'forceSinglePass',{get(){return true;},set(){},configurable:true});
 let previous=performance.now(),lastRendered=0,renderedFrames=0,contextLost=false,resizeTimer,leaving=false;
 let timerExt=null,gpuQ=[];try{timerExt=new URLSearchParams(location.search).has('noGpuTimer')?null:renderer.getContext().getExtension('EXT_disjoint_timer_query_webgl2');}catch{}   // (2026-10-27) GPU time per frame for the perf log (gpuBegin/gpuEnd)
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.6;renderer.autoClear=false;
@@ -560,8 +564,27 @@ try{
 // Effect stand-ins for the shader warm-up. Weapons and props make their effect materials on first use (Thundergun blast,
 // DG-2 arcs, booth sparks, bolts, frost rings), each a shader compile mid-game (a freeze on Windows/D3D11). A built-in
 // material's program depends only on a few switches (texture or not, side, fog, tone mapping), not on colour, opacity or
-// blending, so one of each kind covers them all. Back faces too: a transparent double-sided material is drawn back then
-// front (two programs) until the once-a-second singlePass sweep reaches it. Built once; one set for each scene.
+// blending, so one of each kind covers them all (back-face ones too, for materials made that way). Built once; one set
+// for each scene.
+// Third person and co-op hold a weapon's *world* model, whose materials are the loader's own (none of the viewmodel's
+// patches), tagged for the world scene, with vertex colours (BO1 world models carry COLOR_0): a glow or scope-icon
+// material compiled again the first time such a gun was held (a bow, the L96A1; the user's and a browser player's
+// sessions, 2026-11-01). The held loadout gun covers the common materials (characters mod), this covers the rest: one
+// fresh clone of each distinct material setup in the view scene, with vertex colours and 1x1 textures, on a box in the
+// world set, so its world program compiles here. The engine's 'warm' event then tags them like any world mesh.
+function worldVariants(){
+  const SLOTS=['map','normalMap','emissiveMap','alphaMap','roughnessMap','metalnessMap','aoMap','specularMap','bumpMap','displacementMap','lightMap'];
+  const seen=new Set(),g=new THREE.Group(),geo=new THREE.BoxGeometry(4,4,4),blank=new Map();
+  geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count*3).fill(1),3));
+  const stand=t=>{const k=t.channel+'/'+t.colorSpace;let b=blank.get(k);if(!b){b=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);b.channel=t.channel;b.colorSpace=t.colorSpace;b.needsUpdate=true;blank.set(k,b);}return b;};
+  viewScene.traverse(o=>{if(!o.isMesh)return;for(const m of [o.material].flat()){if(!m||m.isShaderMaterial||m.isRawShaderMaterial)continue;
+    const key=[m.type,...SLOTS.map(k=>m[k]?1:0),m.envMap?1:0,m.transparent?1:0,m.alphaTest>0?1:0,m.side,m.flatShading?1:0,m.fog?1:0,m.toneMapped?1:0,m.blending,m.wireframe?1:0].join('|');   // the switches a built-in program depends on
+    if(seen.has(key))continue;seen.add(key);
+    const c=m.clone();c.vertexColors=true;   // clone(): the loader's switches without a mod's onBeforeCompile, cache key or defines
+    for(const k of SLOTS)if(c[k]?.isTexture&&!c[k].isCubeTexture)c[k]=stand(c[k]);
+    const mesh=new THREE.Mesh(geo,c);mesh.frustumCulled=false;mesh.castShadow=!m.transparent;mesh.receiveShadow=true;g.add(mesh);}});
+  g.userData.count=seen.size;return g;
+}
 function effectStandIns(){
   const tex=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1);tex.needsUpdate=true;
   const plane=new THREE.PlaneGeometry(1,1),dot=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3()]),line=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,1,0)]);
@@ -631,8 +654,61 @@ async function warmWeapons(){
   console.info(`[warm-weapons] ${done} models of ${defs.length} weapons in ${Math.round(performance.now()-t0)} ms${late?`, ${late} late`:''}`);
   return group;
 }
+// Skia's own shaders for the HUD's 2D paint, for browser players (2026-11-01). Chromium rasterises the page on the GPU and
+// each blur is a Skia program per kernel-width bucket and clamp axis (plus gradients, colour filters and rounded clips),
+// built at its first paint: on NVIDIA D3D11 1-5 s each, at the first text glow, popup, round banner or kill feed. Skia
+// scales a blur down until its sigma is 4 or less, so a sweep of small radii (sigma 0.5..4 at every device scale) plus a
+// few large ones meets every bucket a HUD radius or a scaling element can produce. Painted at opacity .02 under the
+// loading screen (the hud-warm rule) in one frame with the HUD. Rind 0.8.3+ rasterises on the CPU and skips it; ?noPaintWarm too.
+function cpuRaster(){const rind=/Rind\/(\d+)\.(\d+)\.(\d+)/.exec(navigator.userAgent);return !!rind&&(+rind[1]>0||+rind[2]>8||(+rind[2]===8&&+rind[3]>=3));}   // Rind 0.8.3+: the page's 2D paint is on the CPU, no Skia GPU programs
+function paintWarmSweep(){
+  if(cpuRaster())return null;
+  const box=document.createElement('div');box.id='paint-warm';box.style.cssText='position:fixed;left:0;top:0;width:100vw;height:100vh;overflow:hidden;pointer-events:none;z-index:1;display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px;padding:4px;color:#fff';
+  const radii=[.5,1,1.5,2,2.5,3,3.5,4,5,6,7,8,10,12,16,24,32,48,64,96,140,200],blurs=[.5,1,1.5,2,3,4,6,8,12,24];
+  const el=(css,text='')=>{const d=document.createElement(text?'span':'div');d.style.cssText=css;if(text)d.textContent=text;box.append(d);};
+  radii.forEach((r,i)=>{const w=10+(i*13)%40,h=8+(i*7)%30;   // odd sizes: a blurred layer cut from a larger texture clamps on one axis or both
+    el(`width:${w}px;height:${h}px;background:#9a8;box-shadow:0 0 ${r}px 1px #fff,0 ${r/2}px ${r}px #000`);
+    el(`font-size:${11+i%3*5}px;text-shadow:0 0 ${r}px #fc8,0 1px ${r/2}px #000`,'Aa');
+    el(`width:${h}px;height:${w}px;background:#cde;filter:drop-shadow(0 0 ${r}px #fff)`);});
+  for(const b of blurs){el(`width:30px;height:18px;background:#8ac;filter:blur(${b}px)`);el(`width:26px;height:26px;backdrop-filter:blur(${b}px);background:#fff2`);}
+  for(const bg of ['radial-gradient(circle,#fff,#000)','radial-gradient(ellipse at 30% 40%,#fc0 0%,#f00 60%,transparent 70%)','linear-gradient(90deg,#fff,#000)','linear-gradient(0deg,#f00 0%,#0f0 50%,#00f 100%)','linear-gradient(90deg,#fff 50%,#000 50%)','conic-gradient(#f00,#0f0,#00f,#f00)','repeating-linear-gradient(45deg,#fff 0 4px,#000 4px 8px)'])
+    for(const extra of ['','border-radius:12px','border-radius:50%','border-radius:8px;overflow:hidden;clip-path:inset(2px round 6px)'])el(`width:40px;height:24px;background:${bg};${extra}`);
+  for(const f of ['grayscale(1)','saturate(2)','brightness(1.4)','contrast(1.3)','sepia(.5)','hue-rotate(40deg)','invert(1)','opacity(.6)','grayscale(1) blur(2px)','drop-shadow(0 0 4px #fff) brightness(1.2)'])el(`width:30px;height:20px;background:linear-gradient(90deg,#f80,#08f);filter:${f}`);
+  for(const m of ['screen','multiply','overlay','lighten','difference','plus-lighter'])el(`width:30px;height:20px;background:#f80;mix-blend-mode:${m}`);
+  el('width:40px;height:40px;border:3px solid #fff;border-radius:50%;background:#333');el('width:40px;height:40px;border:2px dashed #fff;border-radius:8px');
+  el('font-size:18px;font-weight:700;letter-spacing:2px;-webkit-text-stroke:1px #000','Aa');el('font-size:13px;opacity:.5;transform:rotate(7deg) scale(1.3)','Aa');
+  const ic=Object.values(data?.powerups??{})[0]?.icon;if(ic){const im=new Image();im.src=ic;im.style.cssText='width:40px;height:40px;border-radius:50%;filter:drop-shadow(0 0 3px #fff);transform:scale(1.2) rotate(5deg)';box.append(im);const im2=new Image();im2.src=ic;im2.style.cssText='width:40px;height:40px;clip-path:circle(45%)';box.append(im2);}
+  document.body.append(box);return box;
+}
+// Partial repaints (2026-11-01). A full paint of a clipped element (clip-path, border-radius, overflow, a transform) has its
+// clip folded into the draw, but when a later change in the same compositor layer (the ammo text, the class skill's
+// cooldown tick, the mag arc on the first shot) re-rasters a region that cuts through the element, Skia draws it with
+// analytic-clip shader variants (rect and polygon edge arrays), and a blurred element cut the same way gets the clamped
+// blur variants: new programs, so new 1-5 s driver compiles on the user's D3D11 trace (the three class-skill hex variants
+// at the first ammo change, the blur at the first shot). So after the full paint every visible clipped or shadowed HUD
+// element gets a 2x2 probe for one frame beside its left edge, inside the same layer (an absolute child of its parent:
+// a fixed div composites on its own layer and never re-rasters the HUD's), 16 elements a frame, in the mods' warm state
+// and then the plain one (the two paint differently).
+async function paintProbes(paint,limit=160){
+  const pts=[];
+  for(const el of document.body.querySelectorAll('*')){
+    if(el.closest('#menu')||el.id==='paint-warm'||el.closest('#paint-warm')||/^(CANVAS|SCRIPT|STYLE|HTML|HEAD|svg)$/i.test(el.tagName))continue;
+    const r=el.getBoundingClientRect();if(r.width<3||r.height<3||r.bottom<1||r.right<1||r.top>innerHeight-1||r.left>innerWidth-1)continue;
+    if(!(el.checkVisibility?.({visibilityProperty:true})??true))continue;
+    const s=getComputedStyle(el);
+    if(s.clipPath==='none'&&s.borderRadius==='0px'&&s.overflow==='visible'&&s.filter==='none'&&s.backdropFilter==='none'&&s.boxShadow==='none'&&s.textShadow==='none'&&s.maskImage==='none'&&s.transform==='none')continue;
+    let parent=el.parentElement;while(parent&&parent.namespaceURI!=='http://www.w3.org/1999/xhtml')parent=parent.parentElement;if(!parent)continue;
+    pts.push([parent,Math.min(innerWidth-2,Math.max(0,r.left-1)),Math.min(innerHeight-2,Math.max(0,r.top+r.height/2-1))]);   // a damage rect across the left edge (more positions per element gained nothing, 2026-11-01)
+    if(pts.length>=limit)break;}
+  const per=16;let n=0;
+  for(let k=0;k<pts.length;k+=per){
+    const probes=pts.slice(k,k+per).map(([parent,x,y])=>{const d=document.createElement('div');d.className='paint-probe';d.style.cssText='position:absolute;width:2px;height:2px;background:#fff;pointer-events:none;left:0;top:0';parent.append(d);
+      const op=d.offsetParent?.getBoundingClientRect();d.style.left=(x-(op?.left??0))+'px';d.style.top=(y-(op?.top??0))+'px';return d;});
+    n+=probes.length;await paint();for(const d of probes)d.remove();await paint();}
+  return n;
+}
 async function warmHud(){
-  if(NO_HUD_WARM)return;const t0=performance.now(),undo=[],paint=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
+  if(NO_HUD_WARM)return;const t0=performance.now(),undo=[];let probes=0;const paint=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
   const set=(el,prop,v)=>{if(!el)return;const o=el.style[prop];el.style[prop]=v;undo.push(()=>{el.style[prop]=o;});};
   const html=(el,v)=>{if(!el)return;const o=el.innerHTML;el.innerHTML=v;undo.push(()=>{el.innerHTML=o;});};
   try{
@@ -642,12 +718,16 @@ async function warmHud(){
     const icon=Object.values(data?.powerups??{})[0]?.icon;if(icon)html($('effects'),`<span class="powerup-timer"><img src="${icon}" alt=""><span>30s</span></span><span class="powerup-timer expiring"><img src="${icon}" alt=""><span>3s</span></span>`);
     html($('objective'),'Warm up');html($('remaining'),'24');
     document.body.classList.add('hud-warm');document.body.classList.remove('menu-open');
-    mods.emit('warmHud',true);
+    const sweep=NO_PAINT_WARM?null:paintWarmSweep();if(sweep)undo.push(()=>sweep.remove());
+    const waits=[];mods.emit('warmHud',true,p=>waits.push(p));   // wait(promise): a handler's own loads (hud-bo7's gun silhouette) before the paint
+    if(waits.length)await Promise.race([Promise.allSettled(waits),new Promise(r=>setTimeout(r,3000))]);
     for(let i=0;i<4;i++)await paint();   // commits, rasters (cc holds the next main frame while a pending tree waits) and draws
+    probes=sweep?await paintProbes(paint):0;
+    if(sweep){try{mods.emit('warmHud',false);}catch{}await paint();probes+=await paintProbes(paint);}   // again in the plain state: a different paint (the idle class skill, the full panels) needs its own variants
     for(const el of document.body.querySelectorAll('*'))if(el.checkVisibility?.({visibilityProperty:true})??el.getClientRects().length)noteHud(el);   // painted: not a first appearance later
   }catch(error){console.warn('[warm-hud]',error);}
   finally{try{mods.emit('warmHud',false);}catch{}document.body.classList.add('menu-open');document.body.classList.remove('hud-warm');for(const u of undo.reverse())u();}
-  console.info('[warm-hud] painted in',Math.round(performance.now()-t0),'ms');
+  console.info('[warm-hud] painted in',Math.round(performance.now()-t0),'ms, probes',probes);
 }
 async function warmShaders(waitGpu=false){
   const t0=performance.now(),targets=new Map(),draw=renderer.render,later=new THREE.Group();
@@ -657,6 +737,7 @@ async function warmShaders(waitGpu=false){
     // sprites), the power-ups and the enemy templates (zombie bodies and heads, dogs, crawlers; clones share their
     // materials). They're drawn for real (textures uploaded) behind the loading screen.
     later.add(...mods.warmObjects.filter(o=>o?.isObject3D&&!o.parent));
+    const variants=worldVariants();later.add(variants);   // the view scene's materials as world-model ones (third person, co-op)
     standIns??=effectStandIns();later.add(standIns.world);standIns.view.visible=false;viewScene.add(standIns.view);   // the view set compiles with the hidden objects below
     for(const item of Object.values(powerups?.templates??{})){const aura=new THREE.Sprite(powerups.spriteMaterial);later.add(item.clone(true),aura);}
     for(const t of [enemies?.templates,enemies?.heads,enemies?.dog,enemies?.quad,enemies?.quadHead].flat())if(t?.isObject3D&&!t.parent)later.add(t);
@@ -703,7 +784,7 @@ async function warmShaders(waitGpu=false){
     for(const program of renderer.info.programs){try{program.getUniforms();program.getAttributes();}catch{}}
     programCount=renderer.info.programs.length;   // compiled while loading, not mid-game
     firstDraw.lateFrom=renderer.info.programs.reduce((m,p)=>Math.max(m,p.id),-1)+1;   // programs with a higher id were compiled mid-game (reported with their material and object)
-    console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects, in',Math.round(performance.now()-t0),'ms');
+    console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects,',variants.userData.count,'world material variants, in',Math.round(performance.now()-t0),'ms');
     if(waitGpu&&!NO_GPU_WAIT){const ms=Math.round(await gpuIdle());console.info('[warm-shaders] GPU caught up in',ms,'ms');diag('gpuWait',{ms});}   // the loading screen stays meanwhile
   }catch(error){console.warn('[warm-shaders]',error);}
   finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);standIns?.view.removeFromParent();keepPrograms();if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
@@ -758,7 +839,7 @@ function renderFrame(now){
   if(lastRendered&&now-lastRendered<interval-1)return;
   lastRendered=now;const dt=Math.min((now-previous)/1000,.06);previous=now;frameTime+=dt;frameCount++;renderedFrames++;
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
-  if((singlePassTimer-=dt)<=0){singlePassTimer=1;singlePass(scene);singlePass(viewScene);if(ready&&!NO_STILL){stillSkeletons(scene);hideBones(scene);}for(const c of viewScene.children)if(!Object.hasOwn(c,'updateMatrixWorld'))c.updateMatrixWorld=skipHidden;}   // (2026-10-25) hideBones each second too: the zombies' ~2,600 bones left projectObject's walk
+  if((singlePassTimer-=dt)<=0){singlePassTimer=1;if(ready&&!NO_STILL){stillSkeletons(scene);hideBones(scene);}for(const c of viewScene.children)if(!Object.hasOwn(c,'updateMatrixWorld'))c.updateMatrixWorld=skipHidden;}   // (2026-10-25) hideBones each second too: the zombies' ~2,600 bones left projectObject's walk
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
   update(dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
   const viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
