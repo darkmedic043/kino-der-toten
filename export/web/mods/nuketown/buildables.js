@@ -185,7 +185,7 @@ export function setupBuildables(c) {
     hidden: () => !rakeCraft.built || b.held, text: () => mineOut() >= RAKE.perPlayer ? 'Five rakes down: pick one up first' : 'Pick up Rake',
     use() { if (mineOut() >= RAKE.perPlayer) return false; b.held = true; paintCarry(); sfx('buy', .4); toast(`Rake: press ${keyName()} to place it`, 4); return true; },
   });
-  if (features) { const orig = features.placeClaymore; features.placeClaymore = (...a) => (b.held && session.phase !== 'reviving' ? placeRake() : orig?.(...a)); }
+  if (features) { const orig = features.placeClaymore; features.placeClaymore = (...a) => (b.held && session.phase !== 'reviving' ? placeRake() : orig?.call(features, ...a)); }   // bound: the original reads this.events (every claymore press threw, 2026-11-01)
 
   // ---- the shield
   const shield = setupShield(c, shieldCraft, pop);
