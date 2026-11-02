@@ -13,6 +13,7 @@ const BASE = {
 };
 const baseLine = b => Object.entries(b).map(([k, v]) => BASE[k] ? BASE[k](v) : `${k} ${v}`).join(' · ');
 const TYPE = { augment: '◆ Augment', capstone: '★ Capstone', weapon: '⚙ Weapon', game: '🎲 Game unlock' };
+const typeOf = n => n.seed ? '🌱 Seed unlock' : TYPE[n.type];
 const out = [];
 const p = s => out.push(s);
 const names = new Map();
@@ -62,6 +63,21 @@ for (const x of c.classes) {
     p('| Weapon | Tree | Fire | What it does |');
     p('|---|---|---|---|');
     for (const w of Object.values(x.mech.weapons)) p(`| **${w.name}** | ${x.trees.find(t => t.id === w.tree).name} | ${w.mode} | ${w.desc} |`);
+    p('');
+  }
+  if (x.gardener) {
+    const g = x.gardener, D = g.drops;
+    p(`**The Potting Bench** (Z, in every tree): pick a seed, add up to ${g.slots} ingredients, plant it where you aim. ${g.plots} plots. Plants age: ${g.stages.map(s => `${s.name} ${Math.round(s.power * 100)}% power${s.age ? ` at ${s.age} s` : ''}`).join(', ')}. A kill close by adds ${g.ageKill} s, a melee pat ${g.agePat} s and heals it. ${g.bloomCost} Sunlight blooms the garden.`);
+    p('');
+    p('| Plant | Rarity | Life | What it does | Ancient |');
+    p('|---|---|---|---|---|');
+    for (const pl of Object.values(g.plants)) p(`| **${pl.name}** | ${g.rarity[pl.rarity].name} | ${g.life[pl.life].name} | ${pl.desc} | ${pl.ancient} |`);
+    p('');
+    p('**Ingredients**');
+    p('');
+    for (const i of Object.values(g.additives)) p(`- **${i.name}**: ${i.desc}`);
+    p('');
+    p(`Seed Packets (Uncommon seeds) drop from round ${D.packet.from}, Rare Seeds from round ${D.rare.from}, mostly from dogs and specials.`);
     p('');
   }
   if (x.gambler) {
@@ -146,7 +162,7 @@ for (const x of c.classes) {
     p('|---|---|---|---|---|');
     for (const n of [...t.nodes].sort((a, b) => a.tier - b.tier)) {
       const pair = n.excl && t.nodes.concat(...x.trees.map(u => u.nodes)).find(m => m.excl === n.excl && m.id !== n.id);
-      const type = n.excl ? `⬡ Either-or (vs ${pair.name})` : n.type === 'augment' && n.weapon ? `◆ Augment (${x.mech.weapons[n.weapon].name})` : TYPE[n.type] ?? '⬡ Passive';
+      const type = n.excl ? `⬡ Either-or (vs ${pair.name})` : n.type === 'augment' && n.weapon ? `◆ Augment (${x.mech.weapons[n.weapon].name})` : (n.type ? typeOf(n) : '⬡ Passive');
       p(`| ${n.tier} | **${n.name}** | ${type} | ${n.type ? '-' : n.ranks} | ${desc(n)} |`);
     }
     p('');

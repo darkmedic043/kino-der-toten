@@ -41,7 +41,7 @@ export default {
       if(n.type==='augment')return badge(n.weapon?'Augment · '+x.mech.weapons[n.weapon].name:'Augment',CYAN);
       if(n.type==='capstone')return badge('Capstone',GOLD);
       if(n.type==='weapon')return badge('Weapon unlock',MELON);
-      if(n.type==='game')return badge('Game unlock',MELON);
+      if(n.type==='game')return badge(n.seed?'Seed unlock':'Game unlock',MELON);
       if(n.excl){const o=all(x).find(m=>m.excl===n.excl&&m.id!==n.id);return badge('Either-or',RED)+(o?`<br><small class="muted">locks ${esc(o.name)}</small>`:'');}
       return badge('Passive',MUTED);
     };
@@ -67,6 +67,7 @@ export default {
       let h=`<h3 style="color:${t.color??x.color}">${esc(t.name)}</h3><p><i>${esc(t.desc)}</i></p>`;
       if(x.mech)h+=`<p>Base weapon: <b>${esc(x.mech.weapons[t.weapon].name)}</b> (always available).</p>`;
       else if(x.gambler)h+=`<p>Base game: <b>${esc(x.gambler.games[t.game].name)}</b> (always in your pool).</p>`;
+      else if(x.gardener)h+=`<p>Base seed: <b>${esc(x.gardener.plants[t.seed].name)}</b> (always on the bench).</p>`;
       else h+=`<h4>${icon(t.action.icon,t.color)}Action skill: ${esc(t.action.name)}</h4><p>${esc(t.action.desc)}</p>${statTable(baseRows(t.action))}`;
       const nodes=[...t.nodes].sort((a,b)=>a.tier-b.tier);let last=0;
       h+=table(['Tier','Skill','Type','Points','Effect (at max rank)'],nodes.map(n=>{
@@ -108,6 +109,28 @@ Each arm has its own heat: firing builds it and it cools when you stop. An arm t
             :w.arc?`${zh(w.damage)} in a ${w.arc}° swing, reach ${w.range}`
             :w.tick?`${zh(w.damage)} every ${w.tick} s, jumps to ${w.chain} more`:zh(w.damage);
           return [`${icon(w.icon,t?.color)}<b>${esc(w.name)}</b>`,`${esc(t?.name??'')}<br><small class="muted">${base?'base weapon':'tier 3 unlock'}</small>`,MODE[w.mode]??esc(w.mode),dmg,esc(w.desc)];}));
+      }else if(x.gardener){
+        const a=x.trees[0].action,g=x.gardener,D=g.drops;
+        const from=(id,p)=>{const t=x.trees.find(t=>t.seed===id),o=x.trees.find(t=>t.nodes.some(n=>n.seed===id)),n=o?.nodes.find(n=>n.seed===id);return t?`${esc(t.name)} (base)`:`${esc(o.name)}${n.type==='capstone'?' capstone':` tier ${n.tier}`}`;};
+        h+=`<h2>Action skill: ${esc(a.name)}</h2><p>${icon(a.icon,x.color)}${esc(a.desc)}</p>${statTable(baseRows(a))}`;
+        h+=md(`The Gardener has the same action skill in every tree. Each tree brings a seed, and tier-3 **seed unlocks** add more. Augments can come from **any tree**.
+
+## How a garden works
+
+Press **Z** to open the bench (the game keeps running), pick a seed, add up to ${g.slots} ingredients, then press **Plant** and aim. You have **${g.plots} plots**. The bench then cools down: longer for rarer seeds (×${g.cooldownMul.uncommon} uncommon, ×${g.cooldownMul.rare} rare).
+
+Plants age. A sprout does nothing, then it grows into its first stage and keeps getting stronger while it lives:
+
+${g.stages.map((s,i)=>`- **${s.name}**: ${i===0?'not fighting yet':`${Math.round(s.power*100)}% power, ${Math.round(s.hits*100)}% health`}${s.age?`, after ${s.age} s alive`:''}`).join('\n')}
+
+A kill close by adds ${g.ageKill} s of age and a melee pat adds ${g.agePat} s, and the pat also heals it. Zombies stop to chew a plant they walk into, ${g.chew.attackers} at a time. How long it can last depends on its life: ${Object.values(g.life).map(l=>`**${l.name}** (${l.desc.toLowerCase().replace(/\.$/,'')}, stops at ${g.stages[l.cap].name})`).join(', ')}.
+
+**Sunlight** is your resource: kills fill it, and it makes all your plants stronger. Spend ${g.bloomCost} on **Bloom** at the bench to finish every sprout and age the garden ${g.bloomAge} s.`)+
+        `<h2>Plants</h2>`+table(['Plant','Rarity','Life','From','What it does','Ancient'],Object.entries(g.plants).map(([id,p])=>[`<b>${esc(p.name)}</b>`,esc(g.rarity[p.rarity].name),esc(g.life[p.life].name),from(id,p),esc(p.desc),esc(p.ancient)]))+
+        `<h2>Ingredients</h2>`+table(['Ingredient','What it does'],Object.values(g.additives).map(i=>[`<b>${esc(i.name)}</b>`,esc(i.desc)]))+
+        md(`Ingredients drop from kills and you collect them by walking close (they last ${D.life} s): Fertilizer from melee kills, Dew from headshots, Pollen from kills near your garden, Sticky Sap from a zombie killed while it chews, Mutagen from dogs and specials, Compost from a plant that dies.
+
+**Seed Packets** (for Uncommon seeds) drop from round ${D.packet.from}. **Rare Seeds** drop from round ${D.rare.from}, mostly from dogs and specials. If you go ${D.packet.pity} or ${D.rare.pity} kills without one, the next kill drops it.`);
       }else if(x.gambler){
         const a=x.trees[0].action;
         h+=`<h2>Action skill: ${esc(a.name)}</h2><p>${icon(a.icon,x.color)}${esc(a.desc)}</p>${statTable(baseRows(a))}`;
@@ -157,7 +180,7 @@ Each arm has its own heat: firing builds it and it cools when you stop. An arm t
 
     // ---- overview pages
     const overview=()=>{
-      const special=C.classes.filter(x=>x.mech||x.gambler);
+      const special=C.classes.filter(x=>x.mech||x.gambler||x.gardener);
       return md(`Pick a class in the main menu under **Armory → Classes**. Each class levels up on its own as you play it, and its **action skill** goes on the action skill key (**Z** by default, rebindable in Settings).
 
 ## The loadout
@@ -178,7 +201,7 @@ Each tree has 6 tiers. Tier 2 opens after **${C.tierPoints} points in that tree*
 
 ## Classes that work differently
 
-${special.map(x=>x.mech?`- **${x.name}**: one action skill in every tree. You pick a weapon for each arm of the mech instead, and its augments belong to a weapon (${x.mech.augmentSlots} per arm).`:`- **${x.name}**: one action skill in every tree. Each tree adds a casino game, and augments come from any tree.`).join('\n')}
+${special.map(x=>x.mech?`- **${x.name}**: one action skill in every tree. You pick a weapon for each arm of the mech instead, and its augments belong to a weapon (${x.mech.augmentSlots} per arm).`:x.gardener?`- **${x.name}**: one action skill in every tree. Each tree adds a seed, and augments come from any tree.`:`- **${x.name}**: one action skill in every tree. Each tree adds a casino game, and augments come from any tree.`).join('\n')}
 
 ## In a game
 

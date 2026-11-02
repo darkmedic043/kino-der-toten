@@ -21,6 +21,7 @@ const ICONS={
   gear:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
   target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8"/>',
   recycle:'<path d="M7 9l3-5h4l2 3M17 15l-3 5H8M5 15l-2-3 2-4M16 7l3 1-1 3M8 20l-3-1 1-3"/>',
+  sprout:'<path d="M12 21v-9M12 12C12 8 9 5 4 5c0 5 3 7 8 7zM12 14c0-3 3-5 8-5 0 4-3 6-8 5z"/>',
   bolt:'<path d="M13 2L5 14h6l-1 8 8-12h-6z"/>',
   double:'<path d="M3 20h8M5 20l1.5-4h3L11 20M8 16v-4M13 20h8M15 20l1.5-4h3L21 20M18 16v-4M6 12h4M16 12h4"/>',
   shield:'<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/>',
@@ -172,7 +173,7 @@ export function renderClasses(root,cfg,{getState,setState}){
   // synergies of the equipped skill's augments (the mech: of every weapon's), lit when both are equipped
   function synergyList(cls,state){
     const all=cls.trees.flatMap(t=>t.nodes),name=id=>all.find(n=>n.id===id)?.name??id,act=activeSynergies(cls,state).map(y=>y.id);
-    const eq=cls.mech||cls.gambler?null:cls.trees.find(t=>t.id===state.loadout?.action),list=(cls.synergies??[]).filter(y=>!eq||eq.nodes.some(n=>n.id===y.a));
+    const eq=cls.mech||cls.gambler||cls.gardener?null:cls.trees.find(t=>t.id===state.loadout?.action),list=(cls.synergies??[]).filter(y=>!eq||eq.nodes.some(n=>n.id===y.a));
     if(!list.length)return '';
     return `<div class="cls-syn"><small>AUGMENT SYNERGIES</small>${list.map(y=>`<div class="${act.includes(y.id)?'on':''}"><b>${esc(name(y.a))} + ${esc(name(y.b))} · ${esc(y.name)}</b><br>${esc(y.desc)}</div>`).join('')}</div>`;
   }
@@ -186,19 +187,19 @@ export function renderClasses(root,cfg,{getState,setState}){
     root.innerHTML=`<div class="cls">
       ${cfg.classes.length>1?`<div class="cls-pick">${cfg.classes.map(c=>`<button data-class="${c.id}" style="--pc:${c.color}"${c.id===cls.id?' class="on"':''}>${icon(c.trees[0].action.icon)}${esc(c.name.toUpperCase())} <small>LV ${st.classes[c.id]?.level??1}</small></button>`).join('')}</div>`:''}
       <div class="cls-head">
-        <div class="cls-emblem">${icon(cls.id==='engineer'?'wrench':cls.mech?'mech':cls.gambler?'ante':'shield')}</div>
+        <div class="cls-emblem">${icon(cls.id==='engineer'?'wrench':cls.mech?'mech':cls.gambler?'ante':cls.gardener?'sprout':'shield')}</div>
         <div class="cls-title"><span class="eyebrow">CLASS</span><strong>${esc(cls.name.toUpperCase())}</strong><small>${esc(cls.tagline)}</small>
           <div class="cls-xp">LEVEL ${state.level}${maxed?' · MAX':''}<div class="bar"><i style="width:${maxed?100:Math.round(state.xp/need*100)}%"></i></div>${maxed?'':`${state.xp} / ${need} XP`}</div></div>
         <div class="cls-points"><b>${available(state)}</b><span>SKILL POINTS</span><br><button data-act="respec">RESPEC</button></div>
       </div>
       <div class="cls-body">
         <div class="cls-side">
-          <div class="cls-action" style="--cc:${eq.color}"><div class="top"><div class="ic">${icon(act.icon)}</div><div><span class="eyebrow">ACTION SKILL · Z${cls.mech||cls.gambler?'':' · '+esc(eq.name.toUpperCase())}</span><strong>${esc(act.name)}</strong></div></div>
+          <div class="cls-action" style="--cc:${eq.color}"><div class="top"><div class="ic">${icon(act.icon)}</div><div><span class="eyebrow">ACTION SKILL · Z${cls.mech||cls.gambler||cls.gardener?'':' · '+esc(eq.name.toUpperCase())}</span><strong>${esc(act.name)}</strong></div></div>
             <p>${esc(act.desc)}</p>${cls.credit?`<p style="font-size:10px;color:var(--muted);margin-top:-6px"><a href="${esc(cls.credit.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(cls.credit.text)}</a></p>`:''}
             <div class="cls-stats">
               ${actionRows(cls,state,a).map(([label,value,better])=>`<span${better?' class="up"':''}>${label} <b>${value}</b></span>`).join('')}
             </div>
-            ${cls.gambler?`<div class="cls-loadout" style="grid-template-columns:repeat(${augmentSlots(cfg,cls,state)+1},1fr)">${Array.from({length:augmentSlots(cfg,cls,state)},(_,i)=>{const n=cls.trees.flatMap(t=>t.nodes.map(n=>({...n,tc:t.color}))).find(n=>n.id===L.augments[i]);return slot('AUGMENT '+(i+1),n,n?.tc??'#888');}).join('')}${slot('CAPSTONE',capNode,capNode?.tc??'#888')}</div>`:cls.mech?mechArms(cls,state)+`<div class="cls-loadout" style="grid-template-columns:1fr">${slot('CAPSTONE (CORE)',capNode,capNode?.tc??'#888')}</div>`:`<div class="cls-loadout">${slot('AUGMENT 1',eq.nodes.find(n=>n.id===L.augments[0]),eq.color)}${slot('AUGMENT 2',eq.nodes.find(n=>n.id===L.augments[1]),eq.color)}${slot('CAPSTONE',capNode,capNode?.tc??'#888')}</div>`}</div>
+            ${cls.gambler||cls.gardener?`<div class="cls-loadout" style="grid-template-columns:repeat(${augmentSlots(cfg,cls,state)+1},1fr)">${Array.from({length:augmentSlots(cfg,cls,state)},(_,i)=>{const n=cls.trees.flatMap(t=>t.nodes.map(n=>({...n,tc:t.color}))).find(n=>n.id===L.augments[i]);return slot('AUGMENT '+(i+1),n,n?.tc??'#888');}).join('')}${slot('CAPSTONE',capNode,capNode?.tc??'#888')}</div>`:cls.mech?mechArms(cls,state)+`<div class="cls-loadout" style="grid-template-columns:1fr">${slot('CAPSTONE (CORE)',capNode,capNode?.tc??'#888')}</div>`:`<div class="cls-loadout">${slot('AUGMENT 1',eq.nodes.find(n=>n.id===L.augments[0]),eq.color)}${slot('AUGMENT 2',eq.nodes.find(n=>n.id===L.augments[1]),eq.color)}${slot('CAPSTONE',capNode,capNode?.tc??'#888')}</div>`}</div>
           ${cls.resource?`<div class="cls-res" style="--rc:${cls.resource.color??cls.color}"><b>${esc(cls.resource.name.toUpperCase())} · CLASS RESOURCE</b>${esc(cls.resource.desc)}</div>`:''}
           ${synergyList(cls,state)}
           <div class="cls-detail" id="cls-detail"></div>
@@ -206,14 +207,14 @@ export function renderClasses(root,cfg,{getState,setState}){
         <div class="cls-trees">${cls.trees.map(t=>{
           const spentT=treeSpent(cls,state,t.id),tiers=Math.max(...t.nodes.map(n=>n.tier)),fill=Math.min(1,spentT/tierNeed(cfg,tiers));
           return `<div class="tree" style="--tc:${t.color}"><div class="tree-head"><strong>${esc(t.name)}</strong><small>${esc(t.desc)}</small><br><span class="spent">${spentT} PTS</span>
-            ${cls.gambler?`<div class="tree-weapon">${icon(cls.gambler.games[t.game]?.icon??'ante')}<span><small>BASE GAME</small>${esc(cls.gambler.games[t.game]?.name??t.game)}</span></div>`:cls.mech?`<div class="tree-weapon">${icon(cls.mech.weapons[t.weapon].icon)}<span><small>BASE WEAPON</small>${esc(cls.mech.weapons[t.weapon].name)}</span></div>`:`<button class="tree-act${t.id===eq.id?' on':''}" data-equip="${t.id}">${icon(t.action.icon)}<span><small>${t.id===eq.id?'EQUIPPED':'EQUIP ACTION SKILL'}</small>${esc(t.action.name)}</span></button>`}</div>
+            ${cls.gardener?`<div class="tree-weapon">${icon('sprout')}<span><small>BASE SEED</small>${esc(cls.gardener.plants[t.seed]?.name??t.seed)}</span></div>`:cls.gambler?`<div class="tree-weapon">${icon(cls.gambler.games[t.game]?.icon??'ante')}<span><small>BASE GAME</small>${esc(cls.gambler.games[t.game]?.name??t.game)}</span></div>`:cls.mech?`<div class="tree-weapon">${icon(cls.mech.weapons[t.weapon].icon)}<span><small>BASE WEAPON</small>${esc(cls.mech.weapons[t.weapon].name)}</span></div>`:`<button class="tree-act${t.id===eq.id?' on':''}" data-equip="${t.id}">${icon(t.action.icon)}<span><small>${t.id===eq.id?'EQUIPPED':'EQUIP ACTION SKILL'}</small>${esc(t.action.name)}</span></button>`}</div>
             <div class="tree-body"><div class="spine"><i style="height:${fill*100}%"></i></div>
             ${Array.from({length:tiers},(_,i)=>{const tier=i+1,locked=spentT<tierNeed(cfg,tier);
               return `<div class="tier${locked?' locked':''}"><span class="need">${tier===1?'':(locked?'🔒 ':'')+tierNeed(cfg,tier)}</span>${t.nodes.filter(n=>n.tier===tier).map(n=>{
                 const aug=n.type==='augment',node={...n,tree:t.id},open=aug&&unlocked(cfg,cls,state,node),r=aug?(open?1:0):state.points[n.id]??0;
                 const slotted=aug||n.type==='capstone',on=slotted&&r>0&&isEquipped(state,node);
                 // free augments: lit when their tier is open, pulse when one could go in a free slot right now
-                const can=aug?open&&!on&&(cls.gambler?state.loadout.augments.length<augmentSlots(cfg,cls,state):cls.mech?[L.left,L.right].includes(n.weapon)&&augmentsOn(cls,state,n.weapon).length<(cls.mech.augmentSlots??2):t.id===state.loadout.action&&state.loadout.augments.length<(cfg.augmentSlots??2)):canAdd(cfg,cls,state,node);
+                const can=aug?open&&!on&&(cls.gambler||cls.gardener?state.loadout.augments.length<augmentSlots(cfg,cls,state):cls.mech?[L.left,L.right].includes(n.weapon)&&augmentsOn(cls,state,n.weapon).length<(cls.mech.augmentSlots??2):t.id===state.loadout.action&&state.loadout.augments.length<(cfg.augmentSlots??2)):canAdd(cfg,cls,state,node);
                 const blocked=!aug&&!r&&!!exclBlocker(cls,state,node);
                 return `<button class="node ${n.type??'passive'}${n.excl?' excl':''}${blocked?' blocked':''}${r?' invested':''}${r>=n.ranks?' max':''}${on?' on':''}${slotted&&r>0&&!on?' off':''}${can?' can':''}${sel===n.id?' sel':''}" data-node="${n.id}" data-tree="${t.id}">
                   <span class="shape"></span>${icon(n.icon)}${aug?'':`<span class="pips">${Array.from({length:n.ranks},(_,k)=>`<i${k<r?' class="on"':''}></i>`).join('')}</span>`}</button>`;}).join('')}</div>`;}).join('')}
@@ -227,10 +228,10 @@ export function renderClasses(root,cfg,{getState,setState}){
     if(!n){el.innerHTML=`<span class="kind">SKILL</span><p>Hover a skill to see what it does. Left click to spend a point, right click to take it back. Augments are free once their tier opens: click to equip two for your action skill. Every ${cfg.tierPoints} points in a tree opens its next tier.</p>`;return;}
     const node={...n,tree:t.id},locked=treeSpent(cls,state,t.id)<tierNeed(cfg,n.tier),r=n.type==='augment'?(locked?0:1):state.points[n.id]??0;
     const W=cls.mech?.weapons,wname=n.weapon&&W?.[n.weapon]?.name;
-    const kind=n.excl&&n.type!=='augment'?'EITHER-OR PASSIVE':n.type==='weapon'?'WEAPON UNLOCK':n.type==='game'?'GAME UNLOCK':n.type==='augment'?'AUGMENT · '+esc((wname??t.action.name).toUpperCase()):n.type==='capstone'?(cls.mech?'CAPSTONE · MECH CORE':'CAPSTONE · ANY ACTION SKILL'):'PASSIVE';
+    const kind=n.excl&&n.type!=='augment'?'EITHER-OR PASSIVE':n.type==='weapon'?'WEAPON UNLOCK':n.type==='game'?(n.seed?'SEED UNLOCK':'GAME UNLOCK'):n.type==='augment'?'AUGMENT · '+esc((wname??t.action.name).toUpperCase()):n.type==='capstone'?(cls.mech?'CAPSTONE · MECH CORE':'CAPSTONE · ANY ACTION SKILL'):'PASSIVE';
     const eqd=isEquipped(state,node),L=state.loadout;
-    const why=n.type==='game'?(r?'In your game pool: Ante Up can deal it.':'Spend a point to add it to the games Ante Up deals.')
-      :cls.gambler&&n.type==='augment'?(r?(eqd?'Equipped. Click to unequip.':L.augments.length>=augmentSlots(cfg,cls,state)?'Your augment slots are full: click an equipped one to free a slot.':`Unlocked. Click to equip (${augmentSlots(cfg,cls,state)} slots, any tree).`):'Free: unlocks when '+esc(t.name)+' reaches this tier.')
+    const why=n.type==='game'&&n.seed?(r?'On your Potting Bench: you can grow it.':'Spend a point to add this seed to your Potting Bench.'):n.type==='game'?(r?'In your game pool: Ante Up can deal it.':'Spend a point to add it to the games Ante Up deals.')
+      :(cls.gambler||cls.gardener)&&n.type==='augment'?(r?(eqd?'Equipped. Click to unequip.':L.augments.length>=augmentSlots(cfg,cls,state)?'Your augment slots are full: click an equipped one to free a slot.':`Unlocked. Click to equip (${augmentSlots(cfg,cls,state)} slots, any tree).`):'Free: unlocks when '+esc(t.name)+' reaches this tier.')
       :cls.mech&&n.type==='weapon'?(r?`Unlocked: pick it for an arm in the loadout on the left.`:`Spend a point to unlock the ${esc(wname)}.`)
       :cls.mech&&n.type==='augment'?(r?(eqd?'Equipped. Click to unequip.':![L.left,L.right].includes(n.weapon)?`Put the ${esc(wname)} on an arm to use this augment.`:augmentsOn(cls,state,n.weapon).length>=(cls.mech.augmentSlots??2)?`That arm's two augment slots are full.`:'Unlocked. Click to equip (2 per arm).'):`Free: unlocks when ${esc(t.name)} reaches this tier. Only works on the ${esc(wname)}.`)
       :n.type==='augment'?(r?(eqd?'Equipped. Click to unequip.':t.id!==L.action?`Equip ${esc(t.action.name)} to use this augment.`:L.augments.length>=(cfg.augmentSlots??2)?`Both augment slots are full: click one of the equipped ones to free a slot.`:'Unlocked. Click to equip (2 slots).'):'Free: unlocks when '+esc(t.name)+' reaches this tier. Only works on '+esc(t.action.name)+'.')

@@ -3225,6 +3225,943 @@
           ]
         }
       ]
+    },
+    {
+      "id": "gardener",
+      "name": "Gardener",
+      "tagline": "Plants it, feeds it, and lets the round come to it.",
+      "color": "#7fa84a",
+      "resource": {
+        "id": "sunlight",
+        "name": "Sunlight",
+        "max": 100,
+        "color": "#e9c23c",
+        "decayDelay": 9999,
+        "decay": 0,
+        "per": {
+          "plant": 0.002
+        },
+        "desc": "Kills give 1 Sunlight and Sundials make more. Each point adds .2% plant damage. Bloom spends 40: every sprout finishes at once and every plant gains 20 s of age."
+      },
+      "gardener": {
+        "plots": 6,
+        "reach": 300,
+        "minReach": 50,
+        "spacing": 40,
+        "slots": 2,
+        "bloomCost": 40,
+        "bloomAge": 20,
+        "sunPerKill": 1,
+        "cooldownMul": {
+          "common": 1,
+          "uncommon": 1.5,
+          "rare": 2
+        },
+        "rarity": {
+          "common": {
+            "name": "Common"
+          },
+          "uncommon": {
+            "name": "Uncommon",
+            "needs": "packet"
+          },
+          "rare": {
+            "name": "Rare",
+            "needs": "rare"
+          }
+        },
+        "life": {
+          "wilting": {
+            "name": "Wilting",
+            "cap": 1,
+            "desc": "Runs out of uses."
+          },
+          "annual": {
+            "name": "Annual",
+            "cap": 2,
+            "desc": "Dies when the round ends."
+          },
+          "hardy": {
+            "name": "Hardy",
+            "cap": 3,
+            "desc": "Lives until it is eaten."
+          },
+          "perennial": {
+            "name": "Perennial",
+            "cap": 3,
+            "desc": "Regrows its health."
+          }
+        },
+        "stages": [
+          {
+            "name": "Sprout",
+            "power": 0,
+            "hits": 0.4
+          },
+          {
+            "name": "Grown",
+            "power": 1,
+            "hits": 1,
+            "age": 0
+          },
+          {
+            "name": "Mature",
+            "power": 1.4,
+            "hits": 1.4,
+            "age": 60
+          },
+          {
+            "name": "Ancient",
+            "power": 2,
+            "hits": 2,
+            "age": 180
+          }
+        ],
+        "ageKill": 3,
+        "agePat": 6,
+        "patHeal": 4,
+        "patCooldown": 2.5,
+        "regen": 0.2,
+        "chew": {
+          "reach": 48,
+          "attackers": 2,
+          "rest": 6
+        },
+        "plants": {
+          "pod": {
+            "name": "Echo Pod",
+            "rarity": "common",
+            "life": "wilting",
+            "tree": "orchard",
+            "grow": 5,
+            "hits": 8,
+            "range": 500,
+            "uses": 5,
+            "every": 8,
+            "replay": 8,
+            "window": 3,
+            "share": 0.5,
+            "cap": 0.2,
+            "desc": "Remembers your last shots and fires them again at half damage.",
+            "ancient": "Replays twice as many shots."
+          },
+          "thorn": {
+            "name": "Grudge Thorn",
+            "rarity": "common",
+            "life": "hardy",
+            "tree": "thicket",
+            "grow": 6,
+            "hits": 20,
+            "range": 130,
+            "dps": 0.035,
+            "targets": 8,
+            "mark": 0.1,
+            "spike": 0.02,
+            "spikeMax": 0.2,
+            "desc": "Hurts every zombie close by and marks it: your bullets hit marked zombies 10% harder. Kills grow its spikes.",
+            "ancient": "Marks last 3 s after a zombie leaves."
+          },
+          "bulb": {
+            "name": "Sundial",
+            "rarity": "common",
+            "life": "perennial",
+            "tree": "greenhouse",
+            "grow": 8,
+            "hits": 14,
+            "range": 150,
+            "sun": 0.25,
+            "slow": 0.25,
+            "sunCap": 0.75,
+            "desc": "Makes 1 Sunlight every 4 s and slows zombies in its shade by 25%.",
+            "ancient": "Slows by 40%."
+          },
+          "burr": {
+            "name": "Hitchhiker Burr",
+            "rarity": "common",
+            "life": "wilting",
+            "tree": "orchard",
+            "grow": 5,
+            "hits": 8,
+            "range": 60,
+            "uses": 5,
+            "every": 2,
+            "bonus": 0.35,
+            "dps": 0.04,
+            "hops": 3,
+            "hopRange": 200,
+            "last": 12,
+            "desc": "Throws burrs at zombies that pass. A burred zombie takes 35% more damage and bleeds; when it dies the burr hops to the next one, up to 3 times.",
+            "ancient": "Burrs hop twice as far."
+          },
+          "bean": {
+            "name": "Jumping Bean",
+            "rarity": "common",
+            "life": "wilting",
+            "tree": "thicket",
+            "grow": 4,
+            "hits": 10,
+            "range": 45,
+            "uses": 8,
+            "toss": 0.1,
+            "stun": 1,
+            "launch": 640,
+            "push": 420,
+            "rest": 1.2,
+            "desc": "Step on it to be thrown into the air. Zombies on it are tossed, hurt and stunned.",
+            "ancient": "Throws you higher."
+          },
+          "mint": {
+            "name": "Penny Mint",
+            "rarity": "common",
+            "life": "perennial",
+            "tree": "greenhouse",
+            "grow": 7,
+            "hits": 12,
+            "range": 220,
+            "coin": 10,
+            "bank": 600,
+            "desc": "Kills close by store points in its leaves, up to 600. Melee it to collect them.",
+            "ancient": "Stores double."
+          },
+          "gourd": {
+            "name": "Hollow Gourd",
+            "rarity": "uncommon",
+            "life": "annual",
+            "tree": "thicket",
+            "limit": 2,
+            "grow": 8,
+            "hits": 12,
+            "range": 70,
+            "swallow": 6,
+            "gulp": 1.2,
+            "fuse": 12,
+            "burst": 0.3,
+            "perZombie": 0.25,
+            "inner": 1.5,
+            "radius": 200,
+            "desc": "Swallows zombies that come close. Shoot it, or wait 12 s, and it bursts: the more it holds, the harder. Bursting ends the plant.",
+            "ancient": "Bursts 30% wider."
+          },
+          "lily": {
+            "name": "Prism Lily",
+            "rarity": "uncommon",
+            "life": "hardy",
+            "tree": "orchard",
+            "limit": 2,
+            "grow": 9,
+            "hits": 12,
+            "range": 450,
+            "dps": 0.09,
+            "ramp": 2.5,
+            "rampTime": 6,
+            "sundial": 0.5,
+            "sundialRange": 300,
+            "desc": "A beam that burns one zombie at a time and heats up to 2.5× on the same target. 50% stronger near a Sundial.",
+            "ancient": "Refracts to a second target."
+          },
+          "flower": {
+            "name": "Corpse Flower",
+            "rarity": "uncommon",
+            "life": "hardy",
+            "tree": "greenhouse",
+            "limit": 1,
+            "grow": 10,
+            "hits": 40,
+            "range": 120,
+            "dps": 0.05,
+            "targets": 10,
+            "lure": 12,
+            "lureFor": 8,
+            "lureEvery": 25,
+            "lureRange": 900,
+            "desc": "Tough and foul: gas hurts up to 10 zombies close by, and every 25 s its stench pulls in up to 12 for 8 s.",
+            "ancient": "Lures 20 zombies."
+          },
+          "maw": {
+            "name": "Glutton Maw",
+            "rarity": "rare",
+            "life": "hardy",
+            "tree": "thicket",
+            "limit": 1,
+            "plots": 2,
+            "grow": 12,
+            "hits": 30,
+            "range": 110,
+            "every": 3,
+            "bite": 1.1,
+            "full": 6,
+            "digest": 6,
+            "feed": 0.01,
+            "feedMax": 0.3,
+            "desc": "Bites a zombie every 3 s for up to 1.5× a zombie’s health. Each kill makes it stronger; after 6 bites it stops to digest for 6 s.",
+            "ancient": "Each bite also catches its neighbours for half."
+          },
+          "melon": {
+            "name": "Melon Lobber",
+            "rarity": "rare",
+            "life": "hardy",
+            "tree": "orchard",
+            "limit": 1,
+            "plots": 2,
+            "grow": 12,
+            "hits": 20,
+            "range": 900,
+            "every": 5,
+            "lob": 0.45,
+            "radius": 170,
+            "desc": "Lobs an exploding melon every 5 s at the biggest crowd in reach.",
+            "ancient": "Melons split into three."
+          }
+        },
+        "additives": {
+          "fertilizer": {
+            "name": "Fertilizer",
+            "desc": "Grows it big: +60% power, +50% health. Takes 1 more plot.",
+            "power": 0.6,
+            "hits": 0.5,
+            "plots": 1
+          },
+          "dew": {
+            "name": "Dew",
+            "desc": "Sprouts 50% faster and ages 40% faster.",
+            "grow": 0.5,
+            "age": 0.4
+          },
+          "compost": {
+            "name": "Compost",
+            "desc": "+60% health and 60% more uses.",
+            "hits": 0.6,
+            "uses": 0.6
+          },
+          "pollen": {
+            "name": "Pollen",
+            "desc": "+25% range.",
+            "range": 0.25
+          },
+          "sap": {
+            "name": "Sticky Sap",
+            "desc": "Slows zombies in range by 25%.",
+            "slow": 0.25
+          },
+          "mutagen": {
+            "name": "Mutagen",
+            "desc": "+30% power, and it can grow one stage further than it should.",
+            "power": 0.3,
+            "cap": 1
+          }
+        },
+        "items": {
+          "packet": {
+            "name": "Seed Packet",
+            "desc": "Plants one Uncommon seed. Found from round 4."
+          },
+          "rare": {
+            "name": "Rare Seed",
+            "desc": "Plants one Rare seed. Found from round 10, mostly on dogs and specials."
+          }
+        },
+        "drops": {
+          "cap": 9,
+          "life": 20,
+          "reach": 120,
+          "near": 300,
+          "melee": 0.12,
+          "head": 0.06,
+          "pollen": 0.08,
+          "sap": 0.2,
+          "mutagen": 0.1,
+          "packet": {
+            "from": 4,
+            "rate": 0.015,
+            "pity": 70
+          },
+          "rare": {
+            "from": 10,
+            "rate": 0.0015,
+            "special": 0.08,
+            "pity": 300
+          }
+        },
+        "fixtures": {
+          "bloomRage": {
+            "power": 0.3,
+            "time": 10
+          },
+          "deathBlast": 0.2
+        }
+      },
+      "synergies": [
+        {
+          "id": "gsMixed",
+          "a": "oTwin",
+          "b": "oMixed",
+          "name": "Mixed Planting",
+          "desc": "Cross-Pollinate gives +2% more per plant.",
+          "effects": {
+            "garden.variety": 0.02
+          }
+        },
+        {
+          "id": "gsHedge",
+          "a": "tBramble",
+          "b": "tRoot",
+          "name": "Hedgerow",
+          "desc": "Root Snare slows 10% more.",
+          "effects": {
+            "garden.rootSlow": 0.1
+          }
+        },
+        {
+          "id": "gsGlass",
+          "a": "gMove",
+          "b": "gBloom",
+          "name": "Glasshouse",
+          "desc": "Bloom costs 5 less.",
+          "effects": {
+            "garden.bloomCost": -5
+          }
+        }
+      ],
+      "trees": [
+        {
+          "id": "orchard",
+          "name": "Orchard",
+          "color": "#c8703a",
+          "desc": "Plants that do the shooting.",
+          "seed": "pod",
+          "action": {
+            "id": "bench",
+            "name": "Potting Bench",
+            "icon": "sprout",
+            "desc": "Press Z to open the bench: pick a seed, mix in up to two ingredients, and plant it where you aim. Plants grow from Sprout to Grown to Mature to Ancient, getting stronger as they survive. Melee a plant to pat it: it heals and ages faster.",
+            "base": {
+              "cooldown": 40
+            }
+          },
+          "nodes": [
+            {
+              "id": "oPower",
+              "name": "Rich Soil",
+              "ranks": 5,
+              "icon": "bolt",
+              "desc": "Plants deal +{v}% damage.",
+              "effects": {
+                "garden.power": 0.04
+              },
+              "tier": 1
+            },
+            {
+              "id": "oGrow",
+              "name": "Quick Start",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Sprouts grow {v}% faster.",
+              "effects": {
+                "garden.growth": 0.06
+              },
+              "tier": 1
+            },
+            {
+              "id": "oRange",
+              "name": "Long Reach",
+              "ranks": 4,
+              "icon": "crosshair",
+              "desc": "Plants reach {v}% further.",
+              "effects": {
+                "garden.range": 0.04
+              },
+              "tier": 1
+            },
+            {
+              "id": "sBurr",
+              "name": "Burr Seeds",
+              "ranks": 1,
+              "icon": "sprout",
+              "desc": "Adds Hitchhiker Burr to your seed rack.",
+              "effects": {},
+              "tier": 2,
+              "type": "game",
+              "seed": "burr"
+            },
+            {
+              "id": "oHarvest",
+              "name": "Harvest",
+              "ranks": 5,
+              "icon": "recycle",
+              "desc": "Kills near a plant take {v} s off the bench cooldown.",
+              "effects": {
+                "garden.killCd": 0.12
+              },
+              "tier": 2,
+              "fmt": "s"
+            },
+            {
+              "id": "oTwin",
+              "name": "Twin Pods",
+              "ranks": 1,
+              "icon": "double",
+              "desc": "Wilting plants get 2 more uses.",
+              "effects": {
+                "garden.wiltUses": 2
+              },
+              "tier": 2,
+              "type": "augment"
+            },
+            {
+              "id": "sLily",
+              "name": "Prism Seeds",
+              "ranks": 1,
+              "icon": "sprout",
+              "desc": "Adds Prism Lily (Uncommon) to your seed rack. Each planting takes a Seed Packet.",
+              "effects": {},
+              "tier": 3,
+              "type": "game",
+              "seed": "lily"
+            },
+            {
+              "id": "oExec",
+              "name": "Bitter Fruit",
+              "ranks": 3,
+              "icon": "skull",
+              "desc": "Plants deal +{v}% damage to zombies under half health.",
+              "effects": {
+                "garden.execute": 0.1
+              },
+              "tier": 3
+            },
+            {
+              "id": "oBurst",
+              "name": "Seed Burst",
+              "ranks": 1,
+              "icon": "bomb",
+              "desc": "A plant that dies bursts for 20% of a zombie’s health, 160 around it.",
+              "effects": {
+                "garden.deathBlast": 1
+              },
+              "tier": 3,
+              "type": "augment"
+            },
+            {
+              "id": "oOld",
+              "name": "Old Growth",
+              "ranks": 3,
+              "icon": "totem",
+              "desc": "Mature and Ancient plants deal +{v}% damage.",
+              "effects": {
+                "garden.stagePower": 0.08
+              },
+              "tier": 4
+            },
+            {
+              "id": "oMixed",
+              "name": "Cross-Pollinate",
+              "ranks": 1,
+              "icon": "heart",
+              "desc": "Plants deal +4% damage for each different plant in your garden.",
+              "effects": {
+                "garden.variety": 0.04
+              },
+              "tier": 4,
+              "type": "augment"
+            },
+            {
+              "id": "oFed",
+              "name": "Sun Fed",
+              "ranks": 1,
+              "icon": "flame",
+              "desc": "Sunlight’s bonus to plant damage is doubled.",
+              "effects": {
+                "garden.sunPower": 1
+              },
+              "tier": 5
+            },
+            {
+              "id": "oRush",
+              "name": "Sap Rush",
+              "ranks": 1,
+              "icon": "target",
+              "desc": "Bloom gives every plant +30% damage for 10 s.",
+              "effects": {
+                "garden.bloomRage": 1
+              },
+              "tier": 5,
+              "type": "augment"
+            },
+            {
+              "id": "capMelon",
+              "name": "Melon Patch",
+              "ranks": 1,
+              "icon": "bomb",
+              "desc": "Adds Melon Lobber (Rare) to your seed rack. Each planting takes a Rare Seed.",
+              "effects": {
+                "garden.melon": 1
+              },
+              "tier": 6,
+              "type": "capstone",
+              "seed": "melon"
+            }
+          ]
+        },
+        {
+          "id": "thicket",
+          "name": "Thicket",
+          "color": "#5f7a3a",
+          "desc": "Plants that hold the line.",
+          "seed": "thorn",
+          "action": {
+            "id": "bench",
+            "name": "Potting Bench",
+            "icon": "sprout",
+            "desc": "Press Z to open the bench: pick a seed, mix in up to two ingredients, and plant it where you aim. Plants grow from Sprout to Grown to Mature to Ancient, getting stronger as they survive. Melee a plant to pat it: it heals and ages faster.",
+            "base": {
+              "cooldown": 40
+            }
+          },
+          "nodes": [
+            {
+              "id": "tRoots",
+              "name": "Deep Roots",
+              "ranks": 5,
+              "icon": "shield",
+              "desc": "Plants have +{v}% health.",
+              "effects": {
+                "garden.hits": 0.06
+              },
+              "tier": 1
+            },
+            {
+              "id": "tPrick",
+              "name": "Prickly Stems",
+              "ranks": 5,
+              "icon": "target",
+              "desc": "Zombies chewing a plant take {v}% of their health per bite.",
+              "effects": {
+                "garden.chewHurt": 0.02
+              },
+              "tier": 1
+            },
+            {
+              "id": "tGreen",
+              "name": "Green Fingers",
+              "ranks": 4,
+              "icon": "wrench",
+              "desc": "A pat heals {v} more hits.",
+              "effects": {
+                "garden.pat": 1
+              },
+              "tier": 1,
+              "fmt": "n"
+            },
+            {
+              "id": "sBean",
+              "name": "Bean Seeds",
+              "ranks": 1,
+              "icon": "sprout",
+              "desc": "Adds Jumping Bean to your seed rack.",
+              "effects": {},
+              "tier": 2,
+              "type": "game",
+              "seed": "bean"
+            },
+            {
+              "id": "tBark",
+              "name": "Tough Bark",
+              "ranks": 3,
+              "icon": "shield",
+              "desc": "Each bite has a {v}% chance to do nothing.",
+              "effects": {
+                "garden.dodge": 0.08
+              },
+              "tier": 2
+            },
+            {
+              "id": "tBramble",
+              "name": "Brambles",
+              "ranks": 1,
+              "icon": "snare",
+              "desc": "Grudge Thorn’s mark is 15% stronger.",
+              "effects": {
+                "garden.markBonus": 0.15
+              },
+              "tier": 2,
+              "type": "augment"
+            },
+            {
+              "id": "sGourd",
+              "name": "Gourd Seeds",
+              "ranks": 1,
+              "icon": "sprout",
+              "desc": "Adds Hollow Gourd (Uncommon) to your seed rack. Each planting takes a Seed Packet.",
+              "effects": {},
+              "tier": 3,
+              "type": "game",
+              "seed": "gourd"
+            },
+            {
+              "id": "tSap",
+              "name": "Sap Flow",
+              "ranks": 5,
+              "icon": "heart",
+              "desc": "Every plant regrows {v} hits every 10 s.",
+              "effects": {
+                "garden.regen": 0.3
+              },
+              "tier": 3,
+              "fmt": "s"
+            },
+            {
+              "id": "tRind",
+              "name": "Thick Rind",
+              "ranks": 1,
+              "icon": "nest",
+              "desc": "Hollow Gourds hold 2 more zombies.",
+              "effects": {
+                "garden.gourdCap": 2
+              },
+              "tier": 3,
+              "type": "augment"
+            },
+            {
+              "id": "tWide",
+              "name": "Spreading Roots",
+              "ranks": 3,
+              "icon": "snow",
+              "desc": "Plants’ slows are {v}% stronger.",
+              "effects": {
+                "garden.slowMul": 0.15
+              },
+              "tier": 4
+            },
+            {
+              "id": "tRoot",
+              "name": "Root Snare",
+              "ranks": 1,
+              "icon": "snare",
+              "desc": "Zombies hurt by a plant are slowed 20% for 2 s.",
+              "effects": {
+                "garden.rootSlow": 0.2
+              },
+              "tier": 4,
+              "type": "augment"
+            },
+            {
+              "id": "sMaw",
+              "name": "Glutton Seeds",
+              "ranks": 1,
+              "icon": "sprout",
+              "desc": "Adds Glutton Maw (Rare) to your seed rack. Each planting takes a Rare Seed.",
+              "effects": {},
+              "tier": 5,
+              "type": "game",
+              "seed": "maw"
+            },
+            {
+              "id": "tGuard",
+              "name": "Hedge Fighter",
+              "ranks": 1,
+              "icon": "crosshair",
+              "desc": "+12% gun damage within 260 of a plant.",
+              "effects": {
+                "player.damageNear": 0.12
+              },
+              "tier": 5,
+              "type": "augment"
+            },
+            {
+              "id": "capOver",
+              "name": "Overgrowth",
+              "ranks": 1,
+              "icon": "totem",
+              "desc": "Every plant can grow one stage further and has +50% health.",
+              "effects": {
+                "garden.stageCap": 1,
+                "garden.hits": 0.5
+              },
+              "tier": 6,
+              "type": "capstone"
+            }
+          ]
+        },
+        {
+          "id": "greenhouse",
+          "name": "Greenhouse",
+          "color": "#d6a32f",
+          "desc": "Plants that pay for the rest.",
+          "seed": "bulb",
+          "action": {
+            "id": "bench",
+            "name": "Potting Bench",
+            "icon": "sprout",
+            "desc": "Press Z to open the bench: pick a seed, mix in up to two ingredients, and plant it where you aim. Plants grow from Sprout to Grown to Mature to Ancient, getting stronger as they survive. Melee a plant to pat it: it heals and ages faster.",
+            "base": {
+              "cooldown": 40
+            }
+          },
+          "nodes": [
+            {
+              "id": "gSun",
+              "name": "Long Days",
+              "ranks": 5,
+              "icon": "flame",
+              "desc": "+{v}% Sunlight from every source.",
+              "effects": {
+                "garden.sun": 0.1
+              },
+              "tier": 1
+            },
+            {
+              "id": "gShed",
+              "name": "Potting Shed",
+              "ranks": 5,
+              "icon": "clock",
+              "desc": "Bench cooldown −{v}%.",
+              "effects": {
+                "ability.cooldown": 0.04
+              },
+              "tier": 1
+            },
+            {
+              "id": "gHeap",
+              "name": "Warm Heap",
+              "ranks": 5,
+              "icon": "recycle",
+              "desc": "Plants age {v}% faster.",
+              "effects": {
+                "garden.age": 0.06
+              },
+              "tier": 1
+            },
+            {
+              "id": "sMint",
+              "name": "Mint Seeds",
+              "ranks": 1,
+              "icon": "sprout",
+              "desc": "Adds Penny Mint to your seed rack.",
+              "effects": {},
+              "tier": 2,
+              "type": "game",
+              "seed": "mint"
+            },
+            {
+              "id": "gForage",
+              "name": "Forager",
+              "ranks": 3,
+              "icon": "magnet",
+              "desc": "Ingredients drop {v}% more often.",
+              "effects": {
+                "garden.drop": 0.15
+              },
+              "tier": 2
+            },
+            {
+              "id": "gMove",
+              "name": "Transplant",
+              "ranks": 1,
+              "icon": "wrench",
+              "desc": "Uprooting gives back the Seed Packet or Rare Seed and half the cooldown.",
+              "effects": {
+                "garden.refund": 1
+              },
+              "tier": 2,
+              "type": "augment"
+            },
+            {
+              "id": "sFlower",
+              "name": "Corpse Seeds",
+              "ranks": 1,
+              "icon": "sprout",
+              "desc": "Adds Corpse Flower (Uncommon) to your seed rack. Each planting takes a Seed Packet.",
+              "effects": {},
+              "tier": 3,
+              "type": "game",
+              "seed": "flower"
+            },
+            {
+              "id": "gCash",
+              "name": "Cash Crop",
+              "ranks": 5,
+              "icon": "coin",
+              "desc": "Penny Mint stores {v}% more.",
+              "effects": {
+                "garden.coin": 0.12
+              },
+              "tier": 3
+            },
+            {
+              "id": "gStock",
+              "name": "Stocked Shelf",
+              "ranks": 1,
+              "icon": "gear",
+              "desc": "Start each match with a Seed Packet and a Fertilizer.",
+              "effects": {
+                "garden.stock": 1
+              },
+              "tier": 3,
+              "type": "augment"
+            },
+            {
+              "id": "gEye",
+              "name": "Keen Eye",
+              "ranks": 2,
+              "icon": "eye",
+              "desc": "Seed Packets and Rare Seeds drop {v}% more often.",
+              "effects": {
+                "garden.rare": 0.25
+              },
+              "tier": 4
+            },
+            {
+              "id": "gBloom",
+              "name": "Second Bloom",
+              "ranks": 1,
+              "icon": "heart",
+              "desc": "Bloom also heals every plant fully.",
+              "effects": {
+                "garden.bloomHeal": 1
+              },
+              "tier": 4,
+              "type": "augment"
+            },
+            {
+              "id": "gBeds",
+              "name": "Raised Beds",
+              "ranks": 1,
+              "icon": "grenade",
+              "desc": "+1 plot.",
+              "effects": {
+                "garden.plots": 1
+              },
+              "tier": 5,
+              "fmt": "n"
+            },
+            {
+              "id": "gStrain",
+              "name": "Hybrid Strain",
+              "ranks": 1,
+              "icon": "gear",
+              "desc": "Every recipe takes a third ingredient.",
+              "effects": {
+                "garden.slots": 1
+              },
+              "tier": 5,
+              "type": "augment"
+            },
+            {
+              "id": "capThumb",
+              "name": "Green Thumb",
+              "ranks": 1,
+              "icon": "heart",
+              "desc": "+2 plots, and Bloom costs 25 Sunlight.",
+              "effects": {
+                "garden.plots": 2,
+                "garden.bloomCost": -15
+              },
+              "tier": 6,
+              "type": "capstone"
+            }
+          ]
+        }
+      ]
     }
   ],
   "augmentSlots": 2,

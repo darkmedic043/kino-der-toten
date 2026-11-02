@@ -17,6 +17,7 @@ import { setupEngineer } from './engineer.js';
 import { setupCoopSkills } from './coop.js';
 import { setupMech } from './mech.js';
 import { setupSkills } from './skills.js';
+import { loadGarden, setupGardener } from './gardener.js';
 import { setupGambler } from './gambler.js';
 
 const up=new THREE.Vector3(0,1,0);
@@ -139,7 +140,7 @@ export default async function setup(api){
   let wasPowered=powered();
   function ready(){if(!powered())return;audio.play('buy',.35);api.toast?.(act.name+' ready',1.2);hud();}
   function use(){
-    if(!powered()&&!actionUp()){notReady();return;}
+    if(!powered()&&!actionUp()&&!other?.always){notReady();return;}
     const was=actionUp();(other?other.deploy:deploy)();
     if(!was&&actionUp())host.emit('abilityUsed',{act:act.id});   // research: PhD Flash Point
   }
@@ -161,15 +162,17 @@ export default async function setup(api){
     if(!e.melee&&!['turret','explosion','fortify'].includes(e.cause)&&nearAbility())e.amount*=1+(S['player.damageNear']??0);});
   const NEAR=260;
   function nearAbility(){const f=player.getFeetPosition();return turrets.some(t=>t.at.distanceTo(f)<NEAR)||!!other?.near?.(f,NEAR);}
-  const actx={api,act,S:()=>S,A:()=>A,blast,hud:()=>hud(),onHit,getCooldown:()=>cooldown,setCooldown:v=>startCooldown(v),notReady:()=>notReady(),sync,cfg,cls,state};
+  const actx={api,act,S:()=>S,A:()=>A,blast,hud:()=>hud(),onHit,getCooldown:()=>cooldown,setCooldown:v=>startCooldown(v),trimCooldown:v=>{cooldown=Math.max(0,cooldown-v);if(cooldown===0)ready();},notReady:()=>notReady(),sync,cfg,cls,state};
   const fort=['wall','snare','nest'].includes(act.id)?setupFortifier(actx):null;
   const eng=['drone','mortar'].includes(act.id)?setupEngineer(actx):null;
   // the Pilot class: one action skill, weapons on its arms. Every class runs it for co-op (riding a teammate's mech).
   const mechSkill=await setupMech(actx),mech=act.id==='mech'?mechSkill:null;
   const gamb=act.id==='ante'?setupGambler(actx):null;
-  const other=fort??eng??mech??gamb;
+  await loadGarden(host);   // every class: a teammate's garden has to show up in co-op
+  const gard=act.id==='bench'?setupGardener(actx):null;
+  const other=fort??eng??mech??gamb??gard;
   const actionUp=()=>turrets.length>0||!!other?.up();
-  setupCoopSkills({api,turrets,fort,eng,sync,A:()=>A});
+  setupCoopSkills({api,turrets,fort,eng,gard,chew:cfg.classes.find(c=>c.gardener)?.gardener.chew,sync,A:()=>A});
   // Phase 3 class skills: resource, kill skills, conditional passives (skills.js)
   function stagger(z,d){staggered.set(z,{until:session.time+d,at:z.root.position.clone()});}
   function extend(sec){for(const t of turrets)t.life+=sec;eng?.extend?.(sec);}
@@ -237,7 +240,7 @@ export default async function setup(api){
   host.on('reset',()=>{for(const t of [...turrets])t.mesh.removeFromParent();turrets.length=0;cooldown=A.cooldown;banked=0;wasPowered=powered();slowed.clear();staggered.clear();lastRound=session.round;hud();});
 
   // ---- HUD: the action skill icon, its cooldown and the class level ------------------------
-  const ICON_PATHS={"ante": "M5 8h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zM15 11l5-3 3 8-7 3M7 12h.01M11 16h.01M9 14h.01", "mech": "M9 3h6l2 4H7zM7 7h10v7H7zM10 9.5h4M4 8h3v6H4zM17 8h3v6h-3zM8 14l-1 7M16 14l1 7M6 21h3M15 21h3", "turret": "M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4", "wall": "M3 6h18v12H3zM3 10h18M3 14h18M9 6v4M15 10v4M9 14v4", "drone": "M9 10h6v4H9zM4 6h4M16 6h4M4 18h4M16 18h4M6 6l3 4M18 6l-3 4M6 18l3-4M18 18l-3-4", "mortar": "M5 20h14M8 20l3-10h2l3 10M10 7l2-4 2 4M12 3v-1", "snare": "M3 15c2-3 4 3 6 0s4 3 6 0 4 3 6 0M3 10c2-3 4 3 6 0s4 3 6 0 4 3 6 0M6 6v12M18 6v12", "nest": "M4 19V11a8 8 0 0 1 16 0v8M4 15h4M16 15h4M4 11h4M16 11h4M8 7l2 3M16 7l-2 3"};
+  const ICON_PATHS={"sprout": "M12 21v-9M12 12C12 8 9 5 4 5c0 5 3 7 8 7zM12 14c0-3 3-5 8-5 0 4-3 6-8 5z", "ante": "M5 8h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zM15 11l5-3 3 8-7 3M7 12h.01M11 16h.01M9 14h.01", "mech": "M9 3h6l2 4H7zM7 7h10v7H7zM10 9.5h4M4 8h3v6H4zM17 8h3v6h-3zM8 14l-1 7M16 14l1 7M6 21h3M15 21h3", "turret": "M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4", "wall": "M3 6h18v12H3zM3 10h18M3 14h18M9 6v4M15 10v4M9 14v4", "drone": "M9 10h6v4H9zM4 6h4M16 6h4M4 18h4M16 18h4M6 6l3 4M18 6l-3 4M6 18l3-4M18 18l-3-4", "mortar": "M5 20h14M8 20l3-10h2l3 10M10 7l2-4 2 4M12 3v-1", "snare": "M3 15c2-3 4 3 6 0s4 3 6 0 4 3 6 0M3 10c2-3 4 3 6 0s4 3 6 0 4 3 6 0M6 6v12M18 6v12", "nest": "M4 19V11a8 8 0 0 1 16 0v8M4 15h4M16 15h4M4 11h4M16 11h4M8 7l2 3M16 7l-2 3"};
   const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="'+(ICON_PATHS[act.icon]??ICON_PATHS.turret)+'"/></svg>';
   const style=document.createElement('style');style.textContent=`
     #class-skill{position:relative;width:52px;height:58px;color:${cls.color};pointer-events:none;margin-right:6px}
@@ -282,5 +285,5 @@ export default async function setup(api){
     el.querySelector('b').textContent='40%';el.querySelector('svg').style.opacity=.18;const hp=el.querySelector('.hp');hp.style.display='block';hp.firstChild.style.width='25%';hp.classList.add('low');});
   window.kino.classes={get state(){return state();},cls,grantXp:n=>gain(n),   // grantXp: class XP from other mods (exfil)
     addCharge(s){if(cooldown>0&&!actionUp()){cooldown=Math.max(0,cooldown-s);if(cooldown===0)ready();}},   // seconds of meter from other mods (Vulture Aid's Fetid Upgr-aid)
-    stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,use,get charge(){return charge();},get skills(){return skills;},get up(){return actionUp();},get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng,gamb};
+    stats:()=>S,action:()=>A,act,deploy:other?other.deploy:deploy,use,get charge(){return charge();},get skills(){return skills;},get up(){return actionUp();},get cooldown(){return cooldown;},ready(){cooldown=0;banked=0;hud();},gain,turrets,fort,eng,gamb,gard};
 }

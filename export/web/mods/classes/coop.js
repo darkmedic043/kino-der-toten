@@ -1,7 +1,7 @@
 // Action skills in co-op: what one player deploys is mirrored for everyone else.
 //
 // The owner runs their skill as before and, ten times a second, tells the room what it has standing (turrets, walls,
-// sandbag segments, razor wire, claymores, drones, mortar beacons) and what has gone; turret/drone tracers and skill
+// sandbag segments, razor wire, claymores, drones, mortar beacons, plants) and what has gone; turret/drone tracers and skill
 // explosions are sent as they happen. Everyone else builds the same models where the owner put them (mirrors).
 //
 // Gameplay: damage already works (a guest's hits on zombies go to the host like gunshots). Holding and slowing are
@@ -17,12 +17,13 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { steelWall, sandbags, wireField, mineModel } from './fortifier.js';
 import { droneModel, beaconModel } from './engineer.js';
+import { plantModel } from './gardener.js';
 
 const up=new THREE.Vector3(0,1,0);
 const r1=v=>Math.round(v*10)/10,vec=v=>v.toArray().map(r1),v3=a=>new THREE.Vector3(...a);
 
-export function setupCoopSkills({api,turrets,fort,eng,sync,A}){
-  const {host,scene,world,enemies,audio}=api;
+export function setupCoopSkills({api,turrets,fort,eng,gard,chew,sync,A}){
+  const {host,scene,world,enemies,audio,session}=api;
   const net=()=>{const n=window.kino.coop;return n?.id?n:null;};
   let turretModel=null;loadModel('models/weapon_zombie_auto_turret.glb').then(m=>{turretModel=m;}).catch(()=>{});
 
@@ -35,6 +36,7 @@ export function setupCoopSkills({api,turrets,fort,eng,sync,A}){
     ...(fort?.mines??[]).map(o=>['mine',o]),
     ...(eng?.drones??[]).map(o=>['drone',o]),
     ...(eng?.beacons??[]).map(o=>['beacon',o]),
+    ...(gard?.plants??[]).map(o=>['plant',o]),
   ];
   const describe=(kind,o)=>{
     if(kind==='turret')return {at:vec(o.at),yaw:r1(o.mesh.rotation.y)};
@@ -43,6 +45,7 @@ export function setupCoopSkills({api,turrets,fort,eng,sync,A}){
     if(kind==='mine')return {at:vec(o.at)};
     if(kind==='drone')return {at:vec(o.mesh.position)};
     if(kind==='beacon')return {at:vec(o.at)};
+    if(kind==='plant')return {at:vec(o.at),yaw:r1(o.yaw),model:o.model,size:o.size};
   };
   const byId=new Map();   // id -> my object (strikes reported by the host)
   function sendAll(n,to='all'){for(const [kind,o] of mine()){const e=ids.get(o);if(e)n.send(to,{t:'ab',op:'add',id:e.id,kind,...describe(kind,o)});}}
@@ -54,6 +57,7 @@ export function setupCoopSkills({api,turrets,fort,eng,sync,A}){
       live.add(o);let e=ids.get(o);
       if(!e){e={id:nextId++,kind,hp:1};ids.set(o,e);byId.set(e.id,o);n.send('all',{t:'ab',op:'add',id:e.id,kind,...describe(kind,o)});continue;}
       if(kind==='drone'||(kind==='beacon'&&o.follow))n.send('all',{t:'ab',op:'mv',id:e.id,at:vec(kind==='drone'?o.mesh.position:o.at)});
+      if(kind==='plant'&&e.model!==o.model){if(e.model)for(const op of ['del','add'])n.send('all',op==='del'?{t:'ab',op,id:e.id}:{t:'ab',op,id:e.id,kind,...describe(kind,o)});e.model=o.model;}   // a new stage is a new model
       if(o.maxHits){const hp=Math.max(0,o.hits/o.maxHits);if(Math.abs(hp-e.hp)>.04){e.hp=hp;n.send('all',{t:'ab',op:'hp',id:e.id,hp:+hp.toFixed(2)});}}
     }
     for(const [o,e] of ids)if(!live.has(o)){ids.delete(o);byId.delete(e.id);n.send('all',{t:'ab',op:'del',id:e.id});}
@@ -73,13 +77,14 @@ export function setupCoopSkills({api,turrets,fort,eng,sync,A}){
     if(kind==='mine')return mineModel();
     if(kind==='drone')return droneModel();
     if(kind==='beacon')return beaconModel();
+    if(kind==='plant'){const g=new THREE.Group(),p=plantModel(m.model);if(p)g.add(p);g.userData.size=m.size??1;g.scale.setScalar(.01);return g;}
     return null;
   }
   function add(m,from){
     const k=key(from,m.id);if(mirrors.has(k))return;
     const mesh=build(m.kind,m);if(!mesh)return;
     const at=v3(m.at);mesh.position.copy(at);if(m.yaw!=null&&m.kind!=='turret')mesh.rotation.y=m.yaw;scene.add(mesh);
-    const r={kind:m.kind,mesh,at,from,id:m.id,age:0,shake:0,hp:1,inside:new Set(),slow:m.slow??.5,radius:m.r};
+    const r={kind:m.kind,mesh,at,from,id:m.id,age:0,shake:0,chewers:0,hp:1,inside:new Set(),slow:m.slow??.5,radius:m.r};
     if(m.kind==='steel'||m.kind==='sandbag'){
       r.width=m.w;r.height=m.h;r.depth=m.d;r.yaw=m.yaw;r.ax=new THREE.Vector3(Math.cos(m.yaw),0,-Math.sin(m.yaw));r.az=new THREE.Vector3(Math.sin(m.yaw),0,Math.cos(m.yaw));
       mesh.scale.y=.01;
@@ -92,6 +97,7 @@ export function setupCoopSkills({api,turrets,fort,eng,sync,A}){
   function remove(k){
     const r=mirrors.get(k);if(!r)return;mirrors.delete(k);
     r.mesh.removeFromParent();
+    if(r.kind==='plant')for(const z of enemies.list)if(z.mirrorChew===r){z.mirrorChew=null;z.chewNext=session.time+(chew?.rest??6);}
     if(r.dyn){const i=world.dynamic?.indexOf(r.dyn)??-1;if(i>=0)world.dynamic.splice(i,1);}
     for(const z of r.inside)if(z.coopSnareK){z.speed/=z.coopSnareK;z.coopSnareK=0;}
   }
@@ -126,6 +132,17 @@ export function setupCoopSkills({api,turrets,fort,eng,sync,A}){
       r.age+=dt;
       if(r.kind==='turret')r.mesh.scale.setScalar(Math.min(1,r.age/.3));
       if(r.kind==='wire')r.mesh.scale.setScalar(Math.min(1,r.age/.3));
+      if(r.kind==='plant'){   // the host holds zombies at a teammate's plant, as gardener.js does at its own, and reports each bite
+        r.mesh.scale.setScalar(Math.min(1,r.age/.3)*r.mesh.userData.size);
+        if(n?.isHost&&chew)for(const z of enemies.list){
+          if(z.kind==='dog'||z.kind==='nova'||['dead','barricade','entering','rising'].includes(z.state))continue;
+          if(z.mirrorChew===r){
+            z.root.position.x=z.chewAt.x;z.root.position.z=z.chewAt.z;z.stuck=0;
+            if(z.state!=='attack'){z.state='attack';z.attackLeft=1.15;z.attackDealt=true;z.rig.play('attack',false);z.chewBit=false;}
+            else if(!z.chewBit&&z.attackLeft<.62){z.chewBit=true;n.send(r.from,{t:'ab',op:'hit',id:r.id,n:1});}
+          }else if(!z.mirrorChew&&!z.chewing&&r.chewers<chew.attackers&&z.root.position.distanceTo(r.at)<chew.reach&&session.time>=(z.chewNext??0)){z.mirrorChew=r;z.chewAt=z.root.position.clone();r.chewers++;}
+        }
+      }
       if(r.target)r.mesh.position.lerp(r.target,Math.min(1,dt*10));
       if(r.kind==='drone')for(const rot of r.mesh.userData.rotors??[])rot.rotation.y+=dt*40;
       if(r.kind==='beacon'&&r.mesh.userData.lamp)r.mesh.userData.lamp.visible=Math.sin(performance.now()/100)>0;

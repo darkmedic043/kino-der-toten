@@ -7,6 +7,7 @@
 // are free: one unlocks when its tree reaches its tier, and works only while
 // equipped (up to cfg.augmentSlots, from the equipped skill's tree);
 // one capstone (loadout.capstone, from any tree) works with whichever skill is equipped.
+import { gardenSeeds } from './garden-rules.js';
 export const CLASSES_KEY='kino.mods.classes';
 
 export async function loadClasses(base=import.meta.url){
@@ -63,7 +64,7 @@ export function pruneLoadout(cfg,cls,state){
     const per={};L.augments=(L.augments??[]).filter(id=>{const n=nodes(cls).find(n=>n.id===id);if(!n||n.type!=='augment'||!unlocked(cfg,cls,state,n)||![L.left,L.right].includes(n.weapon))return false;per[n.weapon]=(per[n.weapon]??0)+1;return per[n.weapon]<=(cls.mech.augmentSlots??2);});
     if(L.capstone&&!state.points[L.capstone])L.capstone=null;return;
   }
-  if(cls.gambler){   // the Gambler: one action skill, augments from any tree
+  if(cls.gambler||cls.gardener){   // the Gambler and the Gardener: one action skill, augments from any tree
     L.augments=(L.augments??[]).filter(id=>{const n=nodes(cls).find(n=>n.id===id);return n&&n.type==='augment'&&unlocked(cfg,cls,state,n);});
     if(L.capstone&&!state.points[L.capstone])L.capstone=null;
     L.augments=L.augments.slice(0,augmentSlots(cfg,cls,state));return;
@@ -123,7 +124,7 @@ export function toggleAugment(cfg,cls,state,node){
     if(augmentsOn(cls,state,node.weapon).length>=(cls.mech.augmentSlots??2))return 'full';
     l.augments.push(node.id);return null;
   }
-  if(cls.gambler){if(l.augments.length>=augmentSlots(cfg,cls,state))return 'full';l.augments.push(node.id);return null;}
+  if(cls.gambler||cls.gardener){if(l.augments.length>=augmentSlots(cfg,cls,state))return 'full';l.augments.push(node.id);return null;}
   if(node.tree!==l.action)return 'tree';
   if(l.augments.length>=slots)return 'full';
   l.augments.push(node.id);return null;
@@ -157,6 +158,7 @@ export function actionStats(cls,state){
   const dmg=1+k('ability.damage'),dur=1+k('ability.duration'),cd=b.cooldown*Math.max(.3,1-k('ability.cooldown')),rate=1+k('ability.rate'),size=1+k('ability.size'),slow=k('ability.slow'),two=!!k('cap.double');
   const common={cooldown:cd,dmgMul:dmg,slow:Math.min(.8,slow)};
   switch(act.id){
+    case 'bench':return {...common};
     case 'ante':return {...common,games:gamblerGames(cls,state),hand:(cls.gambler.hand??3)+k('gamble.hand'),rides:(cls.gambler.ride?.max??3)+(k('gamble.allIn')?1:0),edge:Math.max(0,1-k('gamble.tilt'))*(k('gamble.houseRules')?.5:1)};
     case 'mech':{const m=mechStats(cls,state).mech;return {...common,cooldown:m.cooldown,duration:m.duration,hitCost:m.hitCost};}
     case 'wall':return {...common,health:Math.round(b.health*dur*(two?.75:1)),width:b.width*size,height:b.height,count:two?2:1};
@@ -173,6 +175,7 @@ export function actionRows(cls,state,a){
   const act=actionOf(cls,state),b=act.base,up=(x,y)=>Math.abs(x-y)>1e-6,pct=v=>Math.round(v*100)+'%',sec=v=>v.toFixed(0)+'s';
   const cdRow=['COOLDOWN',sec(a.cooldown),up(a.cooldown,b.cooldown)],slowRow=['SLOW',a.slow?pct(a.slow):'—',a.slow>0];
   switch(act.id){
+    case 'bench':{const g=cls.gardener,s=stats(cls,state),k=key=>s[key]??0;return [cdRow,['PLOTS',String(g.plots+k('garden.plots')),k('garden.plots')>0],['SEEDS',String(new Set(gardenSeeds(cls,state)).size),gardenSeeds(cls,state).length>3],['BLOOM',Math.max(0,g.bloomCost+k('garden.bloomCost'))+' SUN',k('garden.bloomCost')<0]];}
     case 'ante':return [cdRow,['GAMES',String(a.games.length),a.games.length>3],['HAND',a.hand+' CARDS',a.hand>(cls.gambler.hand??3)],['RIDES','UP TO '+a.rides,a.rides>(cls.gambler.ride?.max??3)],['HOUSE EDGE',a.edge<1?'−'+Math.round((1-a.edge)*100)+'%':'—',a.edge<1],['CALLS','Z · R',false]];
     case 'mech':return [cdRow,['INTEGRITY',sec(a.duration),up(a.duration,b.duration)],['PER HIT','−'+a.hitCost.toFixed(1)+'s',up(a.hitCost,b.hitCost)],['ARMS','LMB · RMB',false]];
     case 'wall':return [cdRow,['LASTS','UNTIL BROKEN',false],['HITS',String(a.health),a.health!==b.health],['WIDTH',String(Math.round(a.width)),up(a.width,b.width)],['DAMAGE',pct(a.dmgMul-1)==='0%'?'—':'+'+pct(a.dmgMul-1),a.dmgMul>1],['WALLS',String(a.count),a.count>1]];
