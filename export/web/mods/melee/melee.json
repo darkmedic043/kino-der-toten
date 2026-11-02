@@ -21,7 +21,7 @@
       "pose": {
         "clip": "animations/viewmodel_b_knife_idle_loop.json",
         "frame": 0,
-        "turn": { "j_shoulder_le": [-20.6, 17.9, 29.4], "j_elbow_le": [-159.2, -5, -36.3], "j_wrist_le": [156.1, -57, 147.1], "j_shoulder_ri": [-6.4, -10.9, 16.3], "j_elbow_ri": [1.4, 15.7, -26.4], "j_wrist_ri": [61.4, 32.8, 1.6], "j_index_ri_1": [0, 0, 16], "j_index_ri_2": [0, 0, 12], "j_mid_ri_1": [0, 0, 16], "j_mid_ri_2": [0, 0, 12], "j_ring_ri_1": [0, 0, 16], "j_ring_ri_2": [0, 0, 12], "j_pinky_ri_1": [0, 0, 16], "j_pinky_ri_2": [0, 0, 12] },
+        "turn": { "j_shoulder_le": [-16.1, 14.4, 28.6], "j_elbow_le": [-154.9, -4.8, -39.1], "j_wrist_le": [53.5, -39.4, 35.8], "j_shoulder_ri": [-6.6, -11, 16.6], "j_elbow_ri": [1.9, 15.9, -26.7], "j_wrist_ri": [61.3, 33, 1.8], "j_index_ri_1": [0, 0, 16], "j_index_ri_2": [0, 0, 12], "j_mid_ri_1": [0, 0, 16], "j_mid_ri_2": [0, 0, 12], "j_ring_ri_1": [0, 0, 16], "j_ring_ri_2": [0, 0, 12], "j_pinky_ri_1": [0, 0, 16], "j_pinky_ri_2": [0, 0, 12] },
         "move": { "j_shoulder_le": [12, 4, -7] },
         "from": [{ "clip": "animations/viewmodel_claymore_idle.json", "frame": 0, "bones": "^j_(index|mid|ring|pinky|thumb|ringpalm|pinkypalm|webbing)_ri" }]
       },
