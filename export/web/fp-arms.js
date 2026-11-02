@@ -388,8 +388,17 @@ export class FirstPersonArms {
       const W=bones[i].matrixWorld,t=live[i];
       const kl=knLive[i];
       if(t&&kl&&kl.every(Boolean)){   // the palm: rotate by how T5's knuckle frame turned since bind, pinned to T5's wrist
-        qb.copy(handBasis(v0.setFromMatrixPosition(t.matrixWorld),v1.setFromMatrixPosition(kl[0].matrixWorld),v2.setFromMatrixPosition(kl[1].matrixWorld),v3.setFromMatrixPosition(kl[2].matrixWorld)));q.copy(qb).multiply(e.qBindInv);
-        R.makeRotationFromQuaternion(q);W.makeTranslation(-e.t5BindPos.x,-e.t5BindPos.y,-e.t5BindPos.z).premultiply(R).premultiply(Tm.makeTranslation(v0.x,v0.y,v0.z)).multiply(e.bind);
+        v0.setFromMatrixPosition(t.matrixWorld);v1.setFromMatrixPosition(kl[0].matrixWorld);v2.setFromMatrixPosition(kl[1].matrixWorld);v3.setFromMatrixPosition(kl[2].matrixWorld);
+        if(t.matrixWorld.determinant()<0){
+          // a mirrored rig (the knife's, def.mirror): the live knuckle points are a reflection of the pose, and a cross product
+          // of reflected vectors is the reflection's negative, so handBasis' proper rotation put the palm's normal the wrong
+          // way round: Bondrewd's palm faced out of the back of the hand and the fingers hung off the far side of the knife
+          // (2026-11-02, user: "hand isnt grabbing onto the knife normally"). Build the reflected basis directly instead.
+          vf.copy(v1).sub(v0).normalize();vl.copy(v2).sub(v3).normalize();vu.crossVectors(vf,vl).normalize().negate();vs.crossVectors(vf,vu).normalize().negate();
+          R.makeBasis(vf,vu,vs).multiply(Rm.makeRotationFromQuaternion(e.qBindInv));
+        }
+        else{qb.copy(handBasis(v0,v1,v2,v3));q.copy(qb).multiply(e.qBindInv);R.makeRotationFromQuaternion(q);}
+        W.makeTranslation(-e.t5BindPos.x,-e.t5BindPos.y,-e.t5BindPos.z).premultiply(R).premultiply(Tm.makeTranslation(v0.x,v0.y,v0.z)).multiply(e.bind);
         // palm fit: slide along the live palm normal by what the pre-pass measured
         if(e.palm&&e.palm.shift){const P=e.palm;vf.copy(v1).sub(v0).normalize();vl.copy(v2).sub(v0).normalize();vu.crossVectors(vf,vl).normalize();W.elements[12]+=vu.x*P.shift;W.elements[13]+=vu.y*P.shift;W.elements[14]+=vu.z*P.shift;}
       }
