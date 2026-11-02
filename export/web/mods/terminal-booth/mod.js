@@ -54,7 +54,7 @@ export default async function setup(api){
   routeAround(booths);
   for(const b of booths)if(b.spot.clearDebris!==false)clearDebris(b);   // clearDebris:false where the floor itself is bumpy (The Giant's snow)
   col?.invalidateCache?.();   // the player's capsule test caches nearby triangles (collision-world.js); some just moved
-  window.kino.terminalBooth={booths,open:b=>open(b??booths[0])};   // .open(): MelonTerm as from a booth (tests, other mods)
+  window.kino.terminalBooth={booths};   // .open(b) is added in usePrompt: MelonTerm as from a booth (tests, other mods)
   usePrompt(booths);
   instanceShared(booths,scene);
   window.kino.lighting?.tag?.(scene);
@@ -455,6 +455,8 @@ export default async function setup(api){
     // The game keeps running while the desktop is up: mods.keepActive (on the mods host) stops the engine pausing when the cursor is
     // freed, the player stands still (desktop.js swallows key presses) and zombies keep coming. Going down or the
     // game ending logs off.
+    // open() lives in this scope: the hook used to be set outside it and fell through to window.open (a new tab per call, 2026-11-01)
+    window.kino.terminalBooth.open=b=>open(b??list[0]);
     function open(b){
       const onMap=perkIds();
       host.keepActive=true;document.exitPointerLock?.();
