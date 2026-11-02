@@ -132,6 +132,17 @@ export class FirstPersonArms {
       S.t5=t5;
     }
     holder.updateMatrixWorld(true);
+    // fpArmsHandScale {width, thick, length} (retarget mode): the palm and fingers are stretched about the wrist along T5's hand
+    // axes. The palm fit above matches a hand's length, but a slim gauntlet is then far narrower and thinner than the glove the
+    // guns were animated for: on the imported guns (a broad glove) Bondrewd's hand lay inside the grip's silhouette with the fingers
+    // short of the far side (2026-11-01, user: "make the hands super tiny").
+    const handStretch={},hs=this.entry.fpArmsHandScale;
+    if(hs&&this.entry.fpArmsRetarget)for(const t5 of Object.keys(sides)){
+      if(![`mid`,`index`,`pinky`].every(n=>T(`j_${n}_${t5}_0`)))continue;
+      const wrist=tp('j_wrist_'+t5),x=tp(`j_mid_${t5}_0`).sub(wrist).normalize(),span=tp(`j_index_${t5}_0`).sub(tp(`j_pinky_${t5}_0`)),y=span.addScaledVector(x,-span.dot(x)).normalize(),z=new THREE.Vector3().crossVectors(x,y);
+      const B=new THREE.Matrix4().makeBasis(x,y,z),M=B.clone().multiply(new THREE.Matrix4().makeScale(hs.length??1,hs.width??1,hs.thick??1)).multiply(B.clone().invert());
+      handStretch[t5]={wrist,M,to:(p,w=1)=>{const d=p.clone().sub(wrist);return p.addScaledVector(d.clone().applyMatrix4(M).sub(d),w);}};
+    }
     // fpArmsRetarget: keep the character's own skeleton and proportions and only copy T5's joint
     // rotations each frame (the hand pinned to T5's wrist, the forearm and upper arm hanging back
     // from it at their own lengths, the fingers at their own lengths). Stays on model, where the
@@ -171,6 +182,7 @@ export class FirstPersonArms {
       // instead (2026-10-19 to 10-20) only moved fully weighted vertices: Bondrewd's fur claws shrank, the suit's fingers
       // under them, blended with the hand, did not, and stuck out of the claws (user: "showing the regular hands underneath").
       S.arm.traverse(b=>{const sc=scaleBones.get(b),e=sc&&rt[rtIndex.get(b)];if(!e)return;const base=sc.base.clone().add(shift[t5]),q=new THREE.Vector3().setFromMatrixPosition(e.bind);e.bind.setPosition(q.sub(base).multiplyScalar(sc.k).add(base));});
+      if(handStretch[t5])S.hand.traverse(b=>{const e=b!==S.hand&&rt[rtIndex.get(b)];if(e)e.bind.setPosition(handStretch[t5].to(new THREE.Vector3().setFromMatrixPosition(e.bind)));});
     }
     if(rt)for(const e of rt){
       if(e.kind==='back')e.d=new THREE.Vector3().setFromMatrixPosition(e.bind.clone().invert().multiply(rt[e.child].bind));
@@ -267,7 +279,8 @@ export class FirstPersonArms {
           {const d=new THREE.Vector3();for(let k=0;k<4;k++){const w=sw.getComponent(v,k),sc=w&&scaleBones.get(src[si.getComponent(v,k)]);if(sc)d.addScaledVector(v3.clone().sub(sc.base),w*(sc.k-1));}v3.add(d);}   // (fpArmsFingerScale, every layer by its weights)
           if(plateMat&&plateMat.test([o.material].flat()[0]?.name??'')){const fx=foreAxis[S.t5];let w=0;for(let k=0;k<4;k++){const b=src[si.getComponent(v,k)];if(b===S.fore||(b&&b.parent===S.fore&&b!==S.hand))w+=sw.getComponent(v,k);}
             if(w>.5){const d=v3.clone().sub(fx.a),t=d.dot(fx.dir);const radial=d.addScaledVector(fx.dir,-t),r=radial.length();if(r>1e-6){const want=Math.max(r*(plates.scale??.6),Math.min(r,innerR[S.t5]??0));v3.addScaledVector(radial,want/r-1);}}}
-          v3.add(shift[S.t5]);P.set([v3.x,v3.y,v3.z],i*3);if(UV)UV.set([g.attributes.uv.getX(v),g.attributes.uv.getY(v)],i*2);
+          v3.add(shift[S.t5]);if(handStretch[S.t5]){const set=handSets.get(S);let hw=0;for(let k=0;k<4;k++)if(set.has(src[si.getComponent(v,k)]))hw+=sw.getComponent(v,k);if(hw)handStretch[S.t5].to(v3,hw);}
+          P.set([v3.x,v3.y,v3.z],i*3);if(UV)UV.set([g.attributes.uv.getX(v),g.attributes.uv.getY(v)],i*2);
           const w=new Map();for(let k=0;k<4;k++){const weight=sw.getComponent(v,k);if(!weight)continue;const j=rtIndex.get(src[si.getComponent(v,k)])??rtIndex.get(sideOf[v].arm);w.set(j,(w.get(j)??0)+weight);}
           const top=[...w].sort((a,b)=>b[1]-a[1]).slice(0,4),sum=top.reduce((s,[,x])=>s+x,0)||1;top.forEach(([j,weight],k)=>{SI[i*4+k]=j;SW[i*4+k]=weight/sum;});
           // (fpArmsPalmMaterial: only this material counts as the palm; Bondrewd's gauntlet plates stand 0.5 proud of its palm
@@ -390,7 +403,8 @@ export class FirstPersonArms {
         if(len>max)W.setPosition(hp.multiplyScalar(max/len).add(sp));
       }
       // forearm/upper arm: rotate like T5, then hang back from their (already solved) child joint
-      if(e.kind==='back'&&e.twistAxis){
+      // (not on a mirrored rig, the knife's: W is a reflection there, its "rotation" is meaningless, and the turn threw the forearm about an arbitrary axis, up the screen or across it, 2026-11-01)
+      if(e.kind==='back'&&e.twistAxis&&W.determinant()>0){
         // The hand follows T5's palm while the forearm follows T5's elbow; where the knife swing rolls the wrist, the
         // hand twisted against the bracer. Turn the forearm about its axis by part of that difference.
         const qF=Qa.setFromRotationMatrix(Rm.extractRotation(W)),qH=Qb.setFromRotationMatrix(Rm.extractRotation(bones[e.child].matrixWorld));

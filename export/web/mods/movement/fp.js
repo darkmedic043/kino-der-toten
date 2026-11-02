@@ -291,6 +291,8 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     const shk=(window.kino.fpMotion.shake??0)*str*(1-.6*aim)*(1+.6*Math.sin(shT*4.7)*Math.sin(shT*1.9+.7));
     if(shk>0&&Math.random()<dt*(1+6*shk)){const j=(.4+Math.random()*.8)*shk;s.kickY.v+=(Math.random()-.5)*9*j;s.kickP.v+=(Math.random()-.35)*4*j;s.kickZ.v+=(Math.random()-.5)*3*j;}
     if(shk>0){P.x+=shN(53,71,97)*.22*shk;P.y+=shN(61,83,109)*.18*shk;R.x+=shN(47,67,113)*.014*shk;R.y+=shN(43,73,101)*.01*shk;R.z+=shN(59,79,103)*.02*shk;}
+    // a melee pose over all of the above (mods/melee: the knife's swings, the gun bash)
+    window.kino.fpMotion.strike?.(P,R,{dt:dtRaw,rig:frame.rig});
     // the camera: a share of the same motion, so the whole view sways with the gun (the movement mod applies it)
     // (the sprint's roll and nod halved on 2026-10-19, user: "screen shake seems a bit excessive")
     cam.roll=rl*.35*hipR+bobRoll*.3+.07*s.slide+.14*s.dive-.1*k+Math.sin(ph)*.005*sw-sx*.03*hipR;
@@ -353,6 +355,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     // and is put back on the grip by the two-bone IK, so the support hand reads as its own thing; off while reloading,
     // meleeing, inspecting or aiming (those clips and the sights own the hand)
     handLag.w=ease(handLag.w,flags.hand&&!mt?.hand&&handMode&&str>0&&!frame.oneHanded&&!window.kino.inspect?.state?1:0,8);   // eased in and out, so no pop at the edges; not on a hand that hangs free
+    if(view.def?.mirror)handLag.w=0;   // the knife's rig is mirrored and its hand is this one: the IK below read the flipped matrices and threw the elbow up the screen whenever the pivot moved
     if(handLag.w>.01){
       const r=view.root,wl=r.getObjectByName('j_wrist_le');
       if(wl){const now=wl.getWorldPosition(handLag.tmp);
@@ -383,7 +386,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
           rollQ.setFromAxisAngle(axis,under.roll*under.w);wl.getWorldQuaternion(tmp.q);const world=rollQ.multiply(tmp.q);wl.parent.getWorldQuaternion(tmp.pq);wl.quaternion.copy(tmp.pq.invert().multiply(world));view.pivot.updateMatrixWorld(true);}
         sealArm();}
     }
-    if(mt?.hand&&s.mantle>.01){
+    if(mt?.hand&&s.mantle>.01&&!view.def?.mirror){
       const r=view.root;remember(['j_shoulder_le','j_elbow_le'].map(n=>r.getObjectByName(n)).filter(Boolean).concat(handBones(r)));
       const local=camera.worldToLocal(mt.hand.clone());   // the viewmodel lives in camera space
       // keep the planted hand in view (bottom left), as BO7 does: the real ledge is often below the frame
