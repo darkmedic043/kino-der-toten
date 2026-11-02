@@ -199,14 +199,14 @@
    },
    {
     "position": [
-     -1818,
+     -1604,
      1385,
-     -1067
+     -883
     ],
-    "yaw": -65,
+    "yaw": 70,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "the bunker lab, the first room down the bunker stairs, in the wall's shallow alcove (11 deep, about 75 wide). Moved 100 along the wall from the scan's first pick, where a corrugated metal sheet leaning on the wall (a BatchedMesh instance, hidden from far away by instance culling) held the booth 20 off the wall. Found by a flat-wall scan (collision and rendered wall agree within 6 over 54 wide and 100 high, level floor, 110+ clear in front, no prompt, window, perk spot or box within 110); light: false as on Der Eisendrache (each booth light costs every pixel)"
+    "note": "the bunker lab, the green-tiled room next to the first one down the bunker stairs: on the two-tone wall, left of the pillar, facing the room, behind the 500 door DOOR_labzone2_500 at (-1608, -710). Moved 2026-11-01 (user: it covered the scientist door): the alcove it stood in was the door itself, 215 away from here at (-1821, -1066), and the Easter egg uses that door. light: false as on Der Eisendrache (each booth light costs every pixel)"
    },
    {
     "position": [
