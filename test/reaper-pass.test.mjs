@@ -42,8 +42,9 @@ test('each has an 8-augment research track, alternating Minor/Major, every effec
 test('they can be drunk (tracked bottles) and are on sale at the terminal behind their pass item', async () => {
   for (const spec of Object.values(PERKS)) { assert.ok(drinks[spec], spec); assert.ok(existsSync(new URL(drinks[spec].model, web)), drinks[spec].model); }
   const { REAPER_ON } = await import('../export/web/mods/perks-plus/reaper-perks.js');
-  assert.deepEqual(Object.keys(REAPER_ON).sort(), Object.values(PERKS).sort());
+  assert.deepEqual(Object.keys(REAPER_ON).sort(), [...Object.values(PERKS), 'specialty_electriccherry'].sort());   // Electric Cherry is on sale without a pass item
   const { PERKS: TERMINAL, perkUnlocked } = await import('../export/web/mods/terminal-booth/desktop.js');
+  const cherry = TERMINAL.find(x => x.id === 'specialty_electriccherry'); assert.ok(drinks[cherry.id]); assert.ok(!cherry.unlock);
   for (const [k, spec] of Object.entries(PERKS)) {
     const p = TERMINAL.find(x => x.id === spec);
     assert.equal(p.unlock, 'pass.s1.perk.' + k);

@@ -189,7 +189,7 @@
    "specialty": "specialty_electriccherry",
    "origin": "Black Ops II",
    "new": true,
-   "status": "working, switched off",
+   "status": "implemented",
    "effect": "Reloading releases an electric burst",
    "upgrade": "Larger range and more damage",
    "source": {

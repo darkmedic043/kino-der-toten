@@ -218,8 +218,8 @@ export default function setup(api) {
       const n = 1 + (big ? 3 : 0) + (Math.random() < (P.twin ?? 0) ? 1 : 0);   // Big Game, Mitosis
       for (let i = 0; i < n; i++) {
         const a = i / n * Math.PI * 2, pos = at.clone(); if (i) pos.add(new THREE.Vector3(Math.cos(a) * 45, 0, Math.sin(a) * 45));
-        const s = glow('#fff3b0', 22, .95), core = glow('#ffffff', 9, 1); s.add(core); s.position.copy(pos); scene.add(s);
-        glyphs.push({ s, pos, base: pos.y, t: 0, P, bite: .4 });
+        const s = glow('#fff3b0', 10, .95), core = glow('#ffffff', .4, 1); s.add(core); s.position.copy(pos); scene.add(s);   // a child sprite's scale multiplies its parent's: the core is 4 units
+        glyphs.push({ s, core, pos, base: pos.y, t: 0, P, bite: .4 });
       }
       audio?.play?.('buy', .4);
     },
@@ -389,7 +389,7 @@ export default function setup(api) {
       const hurtP = (session.health < session.maxHealth || (g.P.boost && over < base * g.P.boost)) && session.phase !== 'gameover';
       if (me && hurtP && d < g.P.range) g.pos.add(me.clone().sub(g.pos).normalize().multiplyScalar(Math.min(d, dt * 260)));
       g.s.position.copy(g.pos).add(new THREE.Vector3(0, Math.sin(g.t * 3) * 3, 0)); g.s.material.rotation += dt;
-      const fade = Math.min(1, (g.P.life - g.t) / 1.5); g.s.material.opacity = .95 * Math.max(0, fade);
+      const fade = Math.min(1, (g.P.life - g.t) / 1.5); g.s.material.opacity = .95 * Math.max(0, fade); g.core.material.opacity = Math.max(0, fade);
       if (g.P.bite && (g.bite -= dt) <= 0) {   // Antibiotic: bites what touches it (a tenth as hard on anything tougher than a zombie)
         g.bite = .4;
         for (const o of [...enemies.list]) if (alive(o) && chest(o).distanceTo(g.pos) < 45) { mark(o, '#fff3b0'); hurt(o, o.kind === 'zombie' ? o.maxHealth * g.P.bite : o.boss ? 0 : o.maxHealth * g.P.bite * .1); }
@@ -401,7 +401,7 @@ export default function setup(api) {
         if (g.P.regen) { regenUntil = t + 3; regenRate = g.P.regen; }
         api.toast?.('Healed', 1); audio?.play?.('buy', .5);
       } else if (g.t < g.P.life) continue;
-      g.s.removeFromParent(); g.s.material.dispose(); glyphs.splice(glyphs.indexOf(g), 1);
+      g.s.removeFromParent(); g.s.material.dispose(); g.core.material.dispose(); glyphs.splice(glyphs.indexOf(g), 1);
     }
     if (regenUntil > t && session.phase === 'fighting') session.health = Math.min(session.maxHealth, session.health + session.maxHealth * regenRate * dt);
     if (over > 0) {   // overheal drains over 20s and goes first when hit, so regeneration can't refill it

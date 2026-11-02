@@ -70,7 +70,7 @@ export const PERKS = [
     effects: ['Getting hit sets off a web explosion: zombies next to you are cocooned, the rest slowed, for 8 s (40 s cooldown)', 'Your melee sometimes webs what it hits'] },
   { id: 'specialty_wisptea', name: 'Wisp Tea', price: 3500, color: '#62c6e8', badge: 'WT', icon: OWN + 'wisptea.webp',
     blurb: 'A friend from the Dark Aether.',
-    effects: ['Every 40 kills summon a small Wisp that stays by you for 20 s', 'Every 1.8 s it strikes a zombie close to you for a third of its health', 'It rests 2 minutes before it can come back, and spares the round\'s last zombie'] },
+    effects: ['Every 30 kills summon a small Wisp that stays by you for 20 s', 'Every 1.4 s it strikes a zombie close to you for 45% of its health', 'It rests 2 minutes before it can come back, and spares the round\'s last zombie'] },
   { id: 'specialty_deathperception', name: 'Death Perception', price: 3000, color: '#e07a1f', badge: 'DP', icon: OWN + 'deathperception.webp',
     blurb: 'Nothing hides from you.',
     effects: ['Zombies within 750 are outlined in orange through walls'] },
@@ -90,6 +90,9 @@ export const PERKS = [
   { id: 'specialty_magnet', name: 'Magnet Margarita', price: 2500, color: '#e04a6a', badge: 'MM', icon: REAPER + 'magnet.webp', unlock: 'pass.s1.perk.magnet',
     blurb: 'Keep one for later.',
     effects: ['Power-ups drift toward you and stop just short', 'Command wheel (hold U): STORE the power-up in reach, DROP it again when you want it', 'Your stash holds 1 power-up and keeps it from timing out'] },
+  { id: 'specialty_electriccherry', name: 'Electric Cherry', price: 2000, color: '#4fa8ff', badge: 'EC', icon: REAPER + 'electriccherry.webp',
+    blurb: 'Reload with a kick.',
+    effects: ['Starting a reload shocks and stuns the zombies around you for 1.5 s', 'The emptier the magazine, the bigger the burst and the harder it hits', '1.5 s cooldown'] },
 ];
 
 const CSS = `

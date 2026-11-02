@@ -143,7 +143,7 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
   // Kills summon a Wisp that hunts zombies near you for 30 s; then it rests 2 minutes and needs more kills. It spares
   // the round's last zombie so you can keep the round going. The masks (Major augments) change what it does.
   // BO7-like: a small blue wisp that helps rather than clears the room (user, 2026-10-15: was far too strong and big)
-  const WISP_KILLS = 40, WISP_LIFE = 20, WISP_RANGE = 320, WISP_EVERY = 1.8;
+  const WISP_KILLS = 30, WISP_LIFE = 20, WISP_RANGE = 400, WISP_EVERY = 1.4;
   let wisp = null, wispCharge = 0, wispRest = 0, salvations = 3;
   function summonWisp() {
     const s = sprite(0x1f6bff, 5, .85), core = sprite(0x9fd4ff, 1.8); s.add(core);
@@ -219,9 +219,9 @@ void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a =
     const A = window.kino?.ammoMods; if (!A || !alive(z)) return;
     if (!ignoreCooldown && now() < popReady) return; popReady = now() + 5 * (1 - stat('ep.chill'));
     const own = session.weapon?.ammoMod?.id, id = stat('ep.citrus') && own ? own : A.MODS[Math.floor(Math.random() * A.MODS.length)].id;
-    popping = true; try { A.trigger(id, z, 1); host.emit('ammoModFired', { id, tier: 1, enemy: z, pop: true }); } finally { popping = false; }   // the event: research augments react as to a gun's own proc
+    const melon = stat('ep.melon') ? enemies.list.filter(o => o !== z && alive(o) && o.root.position.distanceTo(z.root.position) < 200).slice(0, stat('ep.melon')) : [];   // Melon Splash
+    popping = true; try { for (const o of [z, ...melon]) { A.trigger(id, o, 1); host.emit('ammoModFired', { id, tier: 1, enemy: o, pop: true }); } } finally { popping = false; }   // the event: research augments react as to a gun's own proc
   }
-  let lastReload = 0, cherryReady = 0;
 
   // ======================================== Melee Macchiato ========================================
   // The melee becomes a punch that one-shots zombies through round 20 (30 with Strength Training) and throws them back.
@@ -336,13 +336,13 @@ void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a =
         if (wisp.mask === 'distraction') { wisp.s.position.lerp(f.clone().add(camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize().multiplyScalar(260)).setY(f.y + 60), dt * 1.5); }
         else wisp.s.position.lerp(home, Math.min(1, dt * 4));
         if (t > wisp.next) {
-          if (wisp.mask === 'benevolence') { wisp.next = t + 2; heal(10); }
-          else if (wisp.mask === 'distraction') { wisp.next = t + 1.5; for (const z of [...enemies.list]) if (z.root.position.distanceTo(wisp.s.position) < 140 && !lastZombie()) enemies.hurt(z, (z.maxHealth ?? 300) * .12, false, false, 'wisp'); }
+          if (wisp.mask === 'benevolence') { wisp.next = t + 2; heal(15); }
+          else if (wisp.mask === 'distraction') { wisp.next = t + 1.5; for (const z of [...enemies.list]) if (z.root.position.distanceTo(wisp.s.position) < 140 && !lastZombie()) enemies.hurt(z, (z.maxHealth ?? 300) * .16, false, false, 'wisp'); }
           else {
             const z = nearest(f, WISP_RANGE);
-            // a third of a zombie's health a strike (half with Mask of Wrath): it softens what reaches you, it doesn't clear rounds
+            // 45% of a zombie's health a strike (65% with Mask of Wrath): it softens what reaches you, it doesn't clear rounds
             if (z && !lastZombie()) { wisp.next = t + WISP_EVERY * (wisp.mask === 'wrath' ? .8 : 1); bolt(wisp.s.position.clone(), chest(z), 0x5fb0ff);
-              enemies.hurt(z, (z.maxHealth ?? 300) * (.34 + .16 * stat('wt.wrath')), false, false, 'wisp'); }
+              enemies.hurt(z, (z.maxHealth ?? 300) * (.45 + .2 * stat('wt.wrath')), false, false, 'wisp'); }
             else wisp.next = t + .3;
           }
         }
@@ -362,14 +362,6 @@ void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a =
     }
     if (has(DP) && stat('dp.gems')) for (const p of powerups?.items ?? []) if (!keyed.has(p.root)) keyed.set(p.root, keyline(p.model, gemMat));
     if (has(DP) && (stat('dp.birds') || stat('dp.sixth'))) drawArrows(); else if (arrows) arrows.getContext('2d').clearRect(0, 0, arrows.width, arrows.height);
-    // Elemental Pop: Electric Cherry on starting a reload, stronger the emptier the magazine
-    const rl = session.reloadLeft ?? 0;
-    if (has(EP) && stat('ep.cherry') && rl > 0 && lastReload <= 0 && t >= cherryReady && session.def) {
-      cherryReady = t + 1.5; const empty = 1 - (session.weapon?.mag ?? 0) / Math.max(1, session.def.clipSize ?? 1), R = 120 + 80 * empty;
-      for (const z of [...enemies.list]) if (z.root.position.distanceTo(f) < R) { bolt(f.clone().add(new THREE.Vector3(0, 40, 0)), chest(z), 0x7fd8ff); enemies.hurt(z, (150 + (session.round ?? 1) * 60) * (.3 + empty), false, false, 'electric'); if (alive(z) && !special(z)) hold(z, 1.5, 1, 1.5, false, false); }
-      fx(f.clone().add(new THREE.Vector3(0, 30, 0)), .4 + .5 * empty, 0x7fd8ff);
-    }
-    lastReload = rl;
     // Melee Macchiato: Expresso shortens each melee
     const ml = session.meleeLeft ?? 0; if (has(MM) && stat('mm.expresso') && ml > meleeWas + .05) session.meleeLeft = ml * (1 - stat('mm.expresso')); meleeWas = session.meleeLeft ?? 0;
   });

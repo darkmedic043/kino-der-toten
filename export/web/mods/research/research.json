@@ -1,5 +1,5 @@
 {
- "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7; Shatter Blast isn't in BO7, so its names are the fork's). Every perk, ammo mod and piece of equipment has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) and Magnet Margarita (2026-10-19) have the fork's own tracks; their mod's double-buy upgrades are Majors (Afterglow, Demolition Expert, Attraction). Equipment (2026-10-28, user): every tactical and lethal has the fork's own track (effect keys frag.*, clay.*, monkey.*, gersch.*, qed.*, read through window.kino.equipAug by the code that throws or places it); they work whenever equipped (they only act when you use the item), and research XP is x activeMul while you carry it.",
+ "_note": "Phase 5 research, Black Ops 7 style (augment names from BO7; Shatter Blast isn't in BO7, so its names are the fork's). Every perk, ammo mod and piece of equipment has a linear track of 8 augments (4 Major, 4 Minor, alternating as in BO7): you research the next one on a track; one research at a time across all tracks (switching keeps progress). trackCost[i] is the research XP for the i-th augment on a track. Finishing a whole track (mastery) opens a second Minor slot for that item. Research XP: kills (kill, headshot) and rounds survived (round x roundPerRound), x activeMul while its item is active (the perk is owned, or the ammo mod is on the gun in hand). Equip one Major and one Minor (two once mastered) per item; they're locked in at match start. Ammo mod augment effects edit the mod's TUNE numbers (set / add / mul / max), its proc chance (chance x), bigGame (always proc on hellhounds and specials), spread (re-trigger on n zombies within r), refill, burst, firebomb, pool, thermal and brittle. Prismatic Punch and Dam-A-Nade (Reaper Collection perks, switched on 2026-10-18) Magnet Margarita (2026-10-19) and Electric Cherry (2026-11-01) have the fork's own tracks; their mod's double-buy upgrades are Majors (Afterglow, Demolition Expert, Attraction). Equipment (2026-10-28, user): every tactical and lethal has the fork's own track (effect keys frag.*, clay.*, monkey.*, gersch.*, qed.*, read through window.kino.equipAug by the code that throws or places it); they work whenever equipped (they only act when you use the item), and research XP is x activeMul while you carry it.",
  "unlockLevel": 11,
  "trackCost": [
   6000,
@@ -842,7 +842,7 @@
     {
      "name": "Mask of Wrath",
      "kind": "major",
-     "desc": "The Demon: the Wisp strikes harder (half a zombie's health) and 25% more often.",
+     "desc": "The Demon: the Wisp strikes harder (65% of a zombie's health) and 25% more often.",
      "effects": {
       "wt.wrath": 1
      },
@@ -1036,11 +1036,11 @@
      "id": "p.elementalpop.pineappleblast"
     },
     {
-     "name": "Electric Cherry",
+     "name": "Melon Splash",
      "kind": "major",
-     "desc": "Starting a reload shocks and stuns zombies around you; the emptier the magazine, the stronger.",
+     "desc": "Elemental Pop also hits up to 2 more zombies within 200 units with the same ammo mod.",
      "effects": {
-      "ep.cherry": 1
+      "ep.melon": 2
      },
      "id": "p.elementalpop.electriccherry"
     },
@@ -1381,6 +1381,86 @@
       "mm.twin": 0.35
      },
      "id": "p.magnet.doubledip"
+    }
+   ]
+  },
+  {
+   "id": "specialty_electriccherry",
+   "name": "Electric Cherry",
+   "kind": "perk",
+   "color": "#4fa8ff",
+   "augments": [
+    {
+     "name": "Short Circuit",
+     "kind": "minor",
+     "desc": "Bursts recharge 40% faster (1.5 s -> 0.9 s).",
+     "effects": {
+      "ec.cooldown": 0.4
+     },
+     "id": "p.electriccherry.shortcircuit"
+    },
+    {
+     "name": "Tesla Coil",
+     "kind": "major",
+     "desc": "Each zombie the burst hits arcs to another within 200 units for half the damage.",
+     "effects": {
+      "ec.chain": 1
+     },
+     "id": "p.electriccherry.teslacoil"
+    },
+    {
+     "name": "Wide Arc",
+     "kind": "minor",
+     "desc": "The burst reaches 35% further.",
+     "effects": {
+      "ec.radius": 0.35
+     },
+     "id": "p.electriccherry.widearc"
+    },
+    {
+     "name": "Aftershock",
+     "kind": "major",
+     "desc": "The burst goes off a second time 0.6 s later at half damage.",
+     "effects": {
+      "ec.echo": 1
+     },
+     "id": "p.electriccherry.aftershock"
+    },
+    {
+     "name": "High Voltage",
+     "kind": "minor",
+     "desc": "The burst deals 40% more damage.",
+     "effects": {
+      "ec.damage": 0.4
+     },
+     "id": "p.electriccherry.highvoltage"
+    },
+    {
+     "name": "Lightning Rod",
+     "kind": "major",
+     "desc": "A zombie hitting you sets off a burst (6 s cooldown).",
+     "effects": {
+      "ec.rod": 1
+     },
+     "id": "p.electriccherry.lightningrod"
+    },
+    {
+     "name": "Static Hold",
+     "kind": "minor",
+     "desc": "The burst stuns for 1 s longer (1.5 s -> 2.5 s).",
+     "effects": {
+      "ec.stun": 1
+     },
+     "id": "p.electriccherry.statichold"
+    },
+    {
+     "name": "Storm Cell",
+     "kind": "major",
+     "desc": "While reloading, an arc hits the nearest zombie within 220 units every 0.4 s and stuns it briefly.",
+     "effects": {
+      "ec.storm": 1
+     },
+     "id": "p.electriccherry.stormcell"
     }
    ]
   },

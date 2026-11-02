@@ -19,16 +19,14 @@ const FIRES = [
 const METEORS = [[-745, 1864, 2100], [-1183, 1744, -599], [-1123, 1389, 1167]], SONG = 'varien_lilith', SONG_GAIN = .55;
 const TV = [-772, 1762, -776], TV_LINES = 5, TV_REACH = 1400;
 const ALARM_EVERY = 300;
-const CHERRY = { perk: 'specialty_electriccherry', bottle: 'specialty_magnet', at: [-636, 1400, 1511] };
+const CHERRY = { perk: 'specialty_electriccherry', at: [-636, 1400, 1511] };
 
 export function setupExtras(c) {
   const { api, world, session, host, sync, V, moved, sound, sfx, toast, announce, player, inBox, place, st } = c;
   const x = { };
   const v = a => V(...a);
 
-  // the drink borrows a bottle already loaded: Cherry stays off everywhere else (reaper-perks.js)
-  const { data, perkDrink } = api, bottle = CHERRY.bottle;
-  if (data.perkDrinks[bottle]) { data.perkDrinks[CHERRY.perk] = data.perkDrinks[bottle]; if (perkDrink?.views?.[bottle]) perkDrink.views[CHERRY.perk] = perkDrink.views[bottle]; }
+  // the machine; the drink is perks-plus's own (it's on the terminal on every map since 2026-11-01)
   world.interactions.push({ kind: 'perk', perk: CHERRY.perk, position: v(CHERRY.at) });
 
   // ---- zipline

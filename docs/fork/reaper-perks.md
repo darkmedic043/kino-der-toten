@@ -1,9 +1,9 @@
-# Reaper Collection perks (3 implemented, 42 working but switched off)
+# Reaper Collection perks (4 implemented, 41 working but switched off)
 
 The user's requests (2026-10-18): first "add all 45 perks with their effects, but dont implement them, just keep them in the files while i figure out what i want to do, document each and every one of them", then "add the functions of all of them", answered "working, but switched off". So every effect below **works**, but **nothing sells the perks** (except the three in Implemented): no machine, no terminal PERKS entry, no gobblegum or Easter egg gives them. Only the cheat console does:
 
 - `reaper list` (held ones marked `*`, upgraded `**`), `reaper <id|name|all>`, `reaper up <id|all>` (the mod's upgraded "double buy" version), `reaper none`.
-- **Implemented** (sold for real, see the next section): Prismatic Punch, Dam-A-Nade and Magnet Margarita.
+- **Implemented** (sold for real, see the next section): Prismatic Punch, Dam-A-Nade, Magnet Margarita and Electric Cherry.
 - To switch one on for real later (as was done for those three): add it to the terminal's `PERKS` list (`mods/terminal-booth/desktop.js`) and/or a machine marker alias, and give it a drink in perks-plus `data.json`.
 
 Code: `export/web/mods/perks-plus/reaper-perks.js` (`setupReaperPerks`, started by perks-plus once `reaper-perks.json` loads; `window.kino.reaperPerks` {ids, has, up, upgraded, give, armour, momentum, raiseWall, walls, nadeMax, tacticalMax, magnet}). The perks are in the perk table with `offSale: true` only so the HUD shows them while held (icons from the git-ignored `reaper/icons/` when built, else letter badges). **zh** below = `zombieHealth(round)` (1045 at round 10, 3953 at 24): the mod's scripts weren't decompiled, so every number is ours. Perks with charges or timers show a chip above the perks (`#reaper-chips`).
@@ -19,6 +19,7 @@ The user (2026-10-18): "add one of the reaper perks, im thinking prismatic punch
 | **Prismatic Punch** | `specialty_prismatic_punch` | page 6 (Night Shift) tier 9, premium: `pass.s1.perk.prismatic`, replaced the Crows calling card | PERKS app, 3,500 on the tile (the Cold War price ladder applies) | Quick Revive's bottle |
 | **Dam-A-Nade** | `specialty_damnade` | page 8 (Embers) tier 7, free: `pass.s1.perk.damnade`, replaced the Harvest Moon Glow | PERKS app, 3,000 on the tile | PhD Flopper's (Moon) bottle |
 | **Magnet Margarita** | `specialty_magnet` | page 10 (Last Light) tier 1, free: `pass.s1.perk.magnet`, took the Crop Circle camo's slot (the camo moved to page 9 tier 9, premium, in place of the Pyre calling card) | PERKS app, 2,500 on the tile | Juggernog's bottle (as Vulture Aid) |
+| **Electric Cherry** | `specialty_electriccherry` | none, on sale at once (user, 2026-11-01: "add the electric cherry into the terminal") | PERKS app, 2,000 on the tile (BO2's price; the Cold War ladder applies) | Quick Revive's bottle, like Prismatic Punch; Nuketown's lab machine sells the same perk |
 
 Magnet Margarita (user, 2026-10-19): "implements magnet margarita? havbe it be in page 10 of the battle pass, move crop circle camo into page 9, making it replace the pyre calling card, and move magnet margarita into where crop circle used to be… make a new system, a simple command wheel, this allows me to add stuff to perks without crowding the controls… magnet margarita has the ability to "store" powerups… pick it up with the new command, later being able to drop the powerup with the same command wheel, ofcourse add in some augments too… one of the augments allow it to hold more power ups".
 
@@ -59,6 +60,12 @@ Magnet Margarita (user, 2026-10-19): "implements magnet margarita? havbe it be i
 | 8 | Demolition Expert | Major | x2 explosive damage instead of x1.5 (the mod's upgrade) |
 
 - **Verified** (2026-10-18, a Kino match, GPU headless): both bought at the engine's perk path and drunk; Refraction wall 1.4x, a 400-damage bullet through it did 600 with Amplifier and grew it to 1.5x, a miss and a blocked bullet did nothing, 6 more hits maxed it, Supernova hit when it faded; explosions 1,000 → 1,500, bullets unchanged; Bandolier: 6 grenades after a round end and after Max Ammo, Monkey Bombs 1 → 2 at round end and 4 on Max Ammo; Chain Reaction hurt a zombie next to an explosive kill. Menu: page 6 / 8 show PERK UNLOCK tiles; Armory → Research lists both tracks. `test/reaper-pass.test.mjs`.
+
+### Electric Cherry (implemented)
+
+- **Base**: `cherryBurst(empty, power)` in reaper-perks.js: starting a reload shocks everything within 120 + 80 x how empty the magazine was, for 0.3-1.3 zh (the Reaper mod's numbers), with bolts and a 1.5 s stun; 1.5 s cooldown. The cheat's `reaper up` no longer changes it.
+- **Track** (`ec.*`, the fork's own, user: "give electric chery custom augments"; the numbers are my choices): Short Circuit m (cooldown -40%), Tesla Coil M (each hit arcs to another zombie within 200 for half), Wide Arc m (+35% radius), Aftershock M (a second burst 0.6 s later at half damage), High Voltage m (+40% damage), Lightning Rod M (a zombie's hit sets off a burst as if half empty, 6 s cooldown, `beforeDamage`), Static Hold m (+1 s stun), Storm Cell M (while reloading, an arc every 0.4 s on the nearest zombie within 220 for 0.25 zh).
+- Elemental Pop's old Electric Cherry major (the same burst, doubled when you held both) is gone: that id, `p.elementalpop.electriccherry`, is now **Melon Splash** (see research.md), so saves that researched it keep a Major.
 
 ### Magnet Margarita (implemented)
 
@@ -111,7 +118,7 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 | **Dam-A-Nade** (implemented) | `damnade` | custom | Stronger explosives, one more lethal and tactical | bottle jingle |
 | Downer's Delight | `downers` | custom | Double bleed-out time | bottle jingle |
 | Dying Wish | `dyingwish` | Black Ops 4 | Negates death for 9 s on 1 health (5 min cooldown) | bottle  |
-| Electric Cherry | `electriccherry` | Black Ops II | Reloading releases an electric burst | bottle  |
+| **Electric Cherry** (implemented) | `electriccherry` | Black Ops II | Reloading releases an electric burst | bottle  |
 | Estatic Elixir | `estatic` | custom | Sprinting builds an electric charge that stuns nearby zombies | bottle jingle |
 | Ethereal Razor | `razor` | Black Ops 4 | Melee hits several zombies, deals much more damage and heals | bottle  |
 | Fighter's Fizz | `ffyl` | custom | Keep your gun when downed | bottle jingle |
@@ -269,7 +276,7 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 - **Effect**: Reloading releases an electric burst.
 - **Upgrade** (the mod's double-buy): Larger range and more damage.
 - **Assets**: machine `p6_zm_vending_electric_cherry_on`, bottle, icon, **no jingle**.
-- **As built**: Starting a reload sets off a burst around you: radius 120 + 80 x how empty the magazine was, 0.3-1.3 zh with bolts, and a 1.5 s stun; 1.5 s cooldown. Upgraded: radius x1.5, damage x1.6.
+- **As built**: Starting a reload sets off a burst around you: radius 120 + 80 x how empty the magazine was, 0.3-1.3 zh with bolts, and a 1.5 s stun; 1.5 s cooldown. Switched on 2026-11-01: see Implemented; the upgrade is gone, the track replaces it.
 - **Implementation notes (before building)**: On reload (the engine's reload start): an electric burst around the player, damage scaled by how empty the clip was (BO2's rule), stuns survivors. Upgrade: more range and damage. Visual: the fx mod's `strike`/`thunder` or the DG-2 arc.
 
 ### Estatic Elixir (`estatic`)

@@ -3,7 +3,7 @@
 // who holds the perk, but nothing sells them yet. No machine, terminal, gobblegum or map gives them; only the cheat
 // console does (`reaper <id|all|list|none>`, `reaper up <id|all>` for the upgraded "double buy" version). They are in
 // the perk table (offSale) only so the HUD shows their icon while held.
-// Switched ON (REAPER_ON, user 2026-10-18): Prismatic Punch and Dam-A-Nade, then Magnet Margarita (2026-10-19, its own
+// Switched ON (REAPER_ON, user 2026-10-18): Prismatic Punch and Dam-A-Nade, Electric Cherry (2026-11-01, no unlock), then Magnet Margarita (2026-10-19, its own
 // file: magnet.js, with a power-up stash on the command wheel). The terminal's PERKS app sells them once their Melon Pass
 // reward is owned (page 6 / page 8 / page 10), and their double-buy upgrade is replaced by an 8-augment research track
 // each (research.json, read here through kino.research.stat).
@@ -20,6 +20,7 @@ export const REAPER_ON = {
   specialty_prismatic_punch: { name: 'Prismatic Punch', price: 3500, color: '#c89bff', icon: 'PP', reaper: 'prismatic' },
   specialty_damnade: { name: 'Dam-A-Nade', price: 3000, color: '#8a9a4a', icon: 'DN', reaper: 'damnade' },
   specialty_magnet: { name: 'Magnet Margarita', price: 2500, color: '#e04a6a', icon: 'MM', reaper: 'magnet' },
+  specialty_electriccherry: { name: 'Electric Cherry', price: 2000, color: '#4fa8ff', icon: 'EC', reaper: 'electriccherry' },
 };
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
@@ -225,7 +226,23 @@ export function setupReaperPerks(api, catalogue, base) {
   // ---- Downer's Delight: co-op bleed-out x2 (x3 upgraded; multiplayer mod), Fighter's Fizz's last stand too.
   window.kino.coopBleedMul = () => (has('downers') ? (up('downers') ? 3 : 2) : 1) * (window.kino.bleedMul?.() ?? 1);   // bleedMul: Slow Death
   // ---- Electric Cherry (BO2): starting a reload sets off a burst, bigger and harder the emptier the magazine.
-  let lastReload = 0, cherryReady = 0;
+  //      Research (ec.*, the fork's own track): cooldown, radius, damage, stun; chain, echo, rod, storm.
+  let lastReload = 0, cherryReady = 0, rodReady = 0, cherryEcho = 0, cherryEchoK = 0, stormT = 0;
+  function cherryBurst(empty, power = 1) {
+    const f = feet(), R = (120 + 80 * empty) * (1 + stat('ec.radius')), dmg = zh() * (.3 + empty) * (1 + stat('ec.damage')) * power, stun = 1.5 + stat('ec.stun'), hit = [];
+    near(f, R, z => hit.push(z));
+    const from = f.clone().add(V(0, 40, 0)), shock = (z, a, n) => { bolt(a, chest(z), 0x7fd8ff); hurt(z, n, 'electric'); slow(z, stun, 1, stun); };
+    const taken = new Set(hit);
+    for (const z of hit) {
+      const a = chest(z); shock(z, from, dmg);
+      if (stat('ec.chain')) { const o = nearest(z.root.position, 200, taken); if (o) { taken.add(o); shock(o, a, dmg * .5); } }   // Tesla Coil
+    }
+    fx(f.clone().add(V(0, 30, 0)), .4 + .5 * empty, 0x7fd8ff);
+  }
+  host.on('beforeDamage', e => {   // Lightning Rod
+    if (!(e.amount > 0) || !has('electriccherry') || !stat('ec.rod') || session.effects?.invulnerable > session.time || now() < rodReady || !nearest(feet(), 110)) return;
+    rodReady = now() + 6; cherryBurst(.5);
+  });
   // ---- Estatic Elixir: sprinting crackles, stunning zombies within 80 every 0.5 s. Upgrade: every 10 stuns store a
   //      charge (max 4); a charge goes off (radius 200 stun) when you're hit.
   let staticT = 0, stuns = 0, staticCharges = 0;
@@ -508,9 +525,13 @@ export function setupReaperPerks(api, catalogue, base) {
     // Electric Cherry
     const rl = session.reloadLeft ?? 0;
     if (has('electriccherry') && rl > 0 && lastReload <= 0 && t >= cherryReady && session.def) {
-      cherryReady = t + 1.5; const empty = 1 - (session.weapon?.mag ?? 0) / Math.max(1, session.def.clipSize ?? 1), k = up('electriccherry') ? 1.5 : 1, R = (120 + 80 * empty) * k;
-      near(f, R, z => { bolt(f.clone().add(V(0, 40, 0)), chest(z), 0x7fd8ff); hurt(z, zh() * (.3 + empty) * (up('electriccherry') ? 1.6 : 1), 'electric'); slow(z, 1.5, 1, 1.5); });
-      fx(f.clone().add(V(0, 30, 0)), .4 + .5 * empty, 0x7fd8ff);
+      cherryReady = t + 1.5 * (1 - stat('ec.cooldown')); const empty = 1 - (session.weapon?.mag ?? 0) / Math.max(1, session.def.clipSize ?? 1);
+      cherryBurst(empty); if (stat('ec.echo')) { cherryEcho = t + .6; cherryEchoK = empty; }
+    }
+    if (cherryEcho && t >= cherryEcho) { cherryEcho = 0; if (has('electriccherry')) cherryBurst(cherryEchoK, .5); }   // Aftershock
+    if (has('electriccherry') && stat('ec.storm') && rl > 0 && t >= stormT) {   // Storm Cell
+      stormT = t + .4; const z = nearest(f, 220);
+      if (z) { bolt(f.clone().add(V(0, 40, 0)), chest(z), 0x7fd8ff); hurt(z, zh() * .25, 'electric'); slow(z, .5, 1, .5); }
     }
     // Swarm Scotch: reloading an empty magazine
     if (has('swarmscotch') && rl > 0 && lastReload <= 0 && session.weapon?.mag === 0) startSwarm();
@@ -713,7 +734,7 @@ export function setupReaperPerks(api, catalogue, base) {
     if (wolf) wolf.s.removeFromParent(); wolf = null; if (spectre) spectre.g.removeFromParent(); spectre = null; if (swarm) swarm.g.removeFromParent(); swarm = null;
     if (ghost.body) ghost.body.body.removeFromParent(); ghost.body = null; if (tomb) tomb.s.removeFromParent(); tomb = null; if (ringMesh) ringMesh.removeFromParent(); ringMesh = null;
     stand = null; dyingUntil = dyingReady = 0; angelCharge = 1; angelKills = 0; armour = 0; momentum = 0; charges = 10; wails = 3; slidesLeft = 20; blinks = 1; staticCharges = stuns = 0;
-    element = 0; polosaDouble = 0; session.rpNade = false; wolfReady = spectreReady = milkReady = cherryReady = wallReady = 0; upgraded.clear(); tint('#0000', 0);
+    element = 0; polosaDouble = 0; session.rpNade = false; wolfReady = spectreReady = milkReady = cherryReady = rodReady = cherryEcho = stormT = wallReady = 0; upgraded.clear(); tint('#0000', 0);
   });
 
   // ---- the perk table (HUD only: offSale, nothing sells them) and the cheat console ---------------------------------------
