@@ -347,7 +347,7 @@ function setupPads(api) {
   const killNear = (c, r, ctx) => { if (!sync.isHost) return; for (const z of [...enemies.list]) if (z.root.position.distanceTo(c) < r) sync.hurt(z, 1e9, ctx, { cause: 'explosive' }); };
   const padOf = flag => pads.find(p => p.flag === flag);
   sync.on('padOn', d => { session.flags.add('castle:pad:' + d.flag); show(); });
-  sync.on('padLaunch', (d, ctx) => { const p = padOf(d.flag); if (!p) return; p.readyAt = session.time + PAD_COOLDOWN; killNear(p.volume, PAD_RADIUS + 20, ctx); if (ctx.mine) { audio?.play?.('teleport'); flight = { pad: p, d: 0 }; if (api.features) api.features.flight = true; } });
+  sync.on('padLaunch', (d, ctx) => { const p = padOf(d.flag); if (!p) return; p.readyAt = session.time + PAD_COOLDOWN; killNear(p.volume, PAD_RADIUS + 20, ctx); const f = player.getFeetPosition(), aboard = !ctx.mine && !flight && session.phase !== 'reviving' && session.phase !== 'gameover' && Math.hypot(f.x - p.volume.x, f.z - p.volume.z) < PAD_RADIUS + 50 && Math.abs(f.y - p.volume.y) < 160; if (ctx.mine || aboard) { audio?.play?.('teleport'); flight = { pad: p, d: 0 }; if (api.features) api.features.flight = true; } });
   sync.on('padLand', (d, ctx) => { const p = padOf(d.flag); if (p) killNear(p.spots[0] ?? p.curve.getPoint(1), 90, ctx); });
   for (const p of pads) {
     if (p.landing) world.addInteraction({

@@ -78,6 +78,9 @@ function navSignature(positions,extra){let h=2166136261;const u=new Uint32Array(
   for(let i=0;i<u.length;i++){h^=u[i];h=Math.imul(h,16777619);}for(let i=0;i<extra.length;i++){h^=extra.charCodeAt(i);h=Math.imul(h,16777619);}return positions.length+':'+(h>>>0).toString(16);}
 const navDb=()=>new Promise((res,rej)=>{if(!globalThis.indexedDB)return rej(new Error('no IndexedDB'));const r=indexedDB.open('kino-navmesh',1);
   r.onupgradeneeded=()=>r.result.createObjectStore('nav');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);r.onblocked=()=>rej(new Error('blocked'));});
+function navInWorker(positions,indices,config){return new Promise((res,rej)=>{let w;try{w=new Worker(new URL('./navmesh-worker.js',import.meta.url),{type:'module'});}catch(e){return rej(e);}
+  const done=()=>w.terminate();w.onmessage=e=>{done();e.data?.data?res(e.data.data):rej(new Error(e.data?.error??'no reply'));};w.onerror=e=>{done();rej(new Error(e.message||'worker error'));};
+  w.postMessage({positions,indices,config});});}
 async function navCacheGet(key){try{const db=await navDb();return await new Promise((res,rej)=>{const q=db.transaction('nav','readonly').objectStore('nav').get(key);q.onsuccess=()=>res(q.result??null);q.onerror=()=>rej(q.error);});}catch{return null;}}
 async function navCachePut(key,value){try{const db=await navDb();await new Promise((res,rej)=>{const t=db.transaction('nav','readwrite');t.objectStore('nav').put(value,key);t.oncomplete=res;t.onerror=()=>rej(t.error);});}catch(e){console.warn('[custom-world] navmesh cache',e);}}
 
@@ -267,11 +270,15 @@ export class CustomWorld {
     const cached=await navCacheGet(navKey);let navMesh=null;
     if(cached?.sig===navSig&&cached.data){try{navMesh=importNavMesh(cached.data).navMesh;console.log('[custom-world] navmesh from the cache');}catch(e){console.warn('[custom-world] navmesh cache import',e);navMesh=null;}}
     if(!navMesh){const t0=performance.now();
-      const nav=generateTiledNavMesh(positions,indices,{offMeshConnections,cs,ch,tileSize:32,walkableSlopeAngle:48,walkableHeight:Math.ceil((this.entry.navHeight??70)/ch),walkableClimb:Math.floor(18/ch),walkableRadius:Math.max(1,Math.round(14/cs)),
-        maxEdgeLen:Math.round(48/cs),maxSimplificationError:1.3,minRegionArea:8,mergeRegionArea:20,maxVertsPerPoly:6,detailSampleDist:6,detailSampleMaxError:1});
-      if(!nav.success)throw new Error('Navigation mesh generation failed: '+(nav.error??'unknown error'));
-      navMesh=nav.navMesh;console.log(`[custom-world] navmesh built in ${Math.round(performance.now()-t0)} ms`);
-      try{navCachePut(navKey,{sig:navSig,data:exportNavMesh(navMesh)});}catch(e){console.warn('[custom-world] navmesh export',e);}}
+      const config={offMeshConnections,cs,ch,tileSize:32,walkableSlopeAngle:48,walkableHeight:Math.ceil((this.entry.navHeight??70)/ch),walkableClimb:Math.floor(18/ch),walkableRadius:Math.max(1,Math.round(14/cs)),
+        maxEdgeLen:Math.round(48/cs),maxSimplificationError:1.3,minRegionArea:8,mergeRegionArea:20,maxVertsPerPoly:6,detailSampleDist:6,detailSampleMaxError:1};
+      // built in a worker so the loading screen keeps drawing (seconds on a big map); on the main thread if that fails
+      const data=await navInWorker(positions,indices,config).catch(e=>{console.warn('[custom-world] navmesh worker:',e?.message??e,'- building here');return null;});
+      if(data){navMesh=importNavMesh(data).navMesh;console.log(`[custom-world] navmesh built in a worker in ${Math.round(performance.now()-t0)} ms`);try{navCachePut(navKey,{sig:navSig,data});}catch{}}
+      else{const nav=generateTiledNavMesh(positions,indices,config);
+        if(!nav.success)throw new Error('Navigation mesh generation failed: '+(nav.error??'unknown error'));
+        navMesh=nav.navMesh;console.log(`[custom-world] navmesh built in ${Math.round(performance.now()-t0)} ms`);
+        try{navCachePut(navKey,{sig:navSig,data:exportNavMesh(navMesh)});}catch(e){console.warn('[custom-world] navmesh export',e);}}}
     this.nav=navMesh;this.query=new NavMeshQuery(this.nav,{maxNodes:65535});this.query.defaultQueryHalfExtents={x:70,y:100,z:70};
 
     progress('Placing machines and barricades',65);

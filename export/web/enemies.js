@@ -95,7 +95,7 @@ export class Enemies {
     // map entry zombieWalls (custom maps): traversals arc over what is in their way, and the shortcut steps below (the
     // headway rescue, the step off the navmesh) only go where a line at knee and chest height is clear of walls and clip
     const s=this.session,walls=!!this.world.entry?.zombieWalls;
-    if(this.autoSpawn!==false&&s.phase==='fighting'&&s.spawned<s.total&&this.list.length<24){
+    if(this.autoSpawn!==false&&s.phase==='fighting'&&s.spawned<s.total&&this.list.length<(this.maxAlive??24)){
       this.nextSpawn-=dt;
       if(this.nextSpawn<=0){
         const candidates=this.spawnChoices(player).map(c=>c.b);
@@ -362,7 +362,7 @@ export class Enemies {
   rayHit(ray,far,skip){   // skip: zombies a piercing bullet has already gone through (engine.js def.pierce)
     let best=null;
     for(const z of this.list){
-      if(skip?.has(z))continue;
+      if(skip?.has(z)||z.thrall||z.netFlags&2)continue;   // nobody shoots a thrall (mods/classes/thralls.js)
       const base=z.root.position,headPos=this.headPosition(z);
       // z.hit {r, h, head}: a bigger enemy's body box half-width, height and head radius (the Panzersoldat)
       const headPoint=ray.intersectSphere(new THREE.Sphere(headPos,z.hit?.head??(z.kind==='dog'?12:10)),new THREE.Vector3()),hr=z.hit?.r??18;

@@ -3,6 +3,7 @@
 // interactions (normalised entity kinds: doors, wall buys, perks, power, the box, Pack-a-Punch,
 // traps, teleporters, claymores, Easter eggs) and systems (traps, teleporters with return trips,
 // shootable eggs, hellhound fog). Moved from the fork's zombies.js.
+import { groupTrip } from '../group-trip.js';
 import { CustomWorld } from '../custom-world.js';
 import { KinoFeatures } from '../kino-features.js';
 import { loadModel, loadAnimation } from '../animation.js';
@@ -26,6 +27,9 @@ export async function createMap(ctx,entry){
   const baseFog=entry.fog??0;scene.fog=new THREE.FogExp2(scene.background.clone(),baseFog);
   let teleportPending=null,returnTrip=null;
   const S=()=>ctx.session,W=()=>ctx.world;
+  // co-op: everyone on the pad goes along, free; the others share its cooldown (group-trip.js)
+  groupTrip.on('teleporter',(d,here)=>{const s=S(),tp=W()?.teleporters?.[d.i];if(!tp)return;tp.readyAt=s.time+tp.cooldown;
+    if(here&&!teleportPending&&!returnTrip&&s.phase!=='reviving'&&s.phase!=='gameover'){teleportPending={tp,at:s.time+1.6};ctx.toast('Teleporting…');audio.play('buy');}});
   const resetPower=()=>{const s=S(),world=W();if(!world.hasPower){s.power=true;s.flags.add('power_on');}ctx.ambient.intensity=s.power?1.7:1.2;world.setPower(s.power);};
   function findEgg(g,item){
     if(item.found||g.done)return false;item.found=true;item.object.visible=false;ctx.effect(item.position,0xd6a94a,12);audio.play('buy');
@@ -109,7 +113,7 @@ export async function createMap(ctx,entry){
       if(e.kind==='teleport'){
         const tp=world.teleporters[e.teleporter];if(tp.power&&!s.power){ctx.toast('Turn on the power');return false;}if(tp.locked){ctx.toast(tp.lockedText);return false;}
         if(teleportPending||returnTrip||tp.readyAt>s.time)return false;if(tp.cost&&!shop.pay(tp.cost))return false;
-        teleportPending={tp,at:s.time+1.6};tp.readyAt=s.time+tp.cooldown;ctx.toast('Teleporting…');audio.play('buy');return true;
+        teleportPending={tp,at:s.time+1.6};tp.readyAt=s.time+tp.cooldown;groupTrip.start('teleporter',{i:e.teleporter},e.position);ctx.toast('Teleporting…');audio.play('buy');return true;
       }
       if(e.kind==='claymore'){const ok=s.buyClaymores();if(ok){audio.play('buy');ctx.toast('Claymores · press G to place (your lethal now)');}else if(!s.claymoresOwned)ctx.toast('Not enough points');return ok;}
       if(e.kind==='box')return shop.useBox(e);
@@ -135,7 +139,11 @@ export async function createMap(ctx,entry){
     },
     update(dt){
       const s=S(),world=W(),feet=ctx.player.getFeetPosition();
-      world.playerFeet=feet;
+      // spawns and the parkour check go by where the player stands: in the air (a jump, Der Eisendrache's low-gravity
+      // wall-runs) that's the ground below, or the last spot stood on. Their feet alone counted as "off the navmesh",
+      // and zombies were spawned on surfaces at that height around them: wall ledges and inside walls
+      if(ctx.player.grounded||!world.raycast)world.playerFeet=world.groundFeet=feet;
+      else{const h=world.raycast(new THREE.Ray(feet.clone().add(new THREE.Vector3(0,5,0)),new THREE.Vector3(0,-1,0)),0,800);world.playerFeet=h?feet.clone().setY(feet.y+5-h.distance):world.groundFeet??feet;}
       if(entry.doorMargin||entry.doorHeadroom){const out=world.doorEject?.(feet);if(out)ctx.player.setPosition(out);}   // stuck inside a door (mantled into it)
       for(const t of world.traps.values()){
         const on=t.activeUntil>s.time;

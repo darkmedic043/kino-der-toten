@@ -2,6 +2,7 @@
 // upstream's game.js: the map's BO1 entities (doors, wall buys, perks, the box, Pack-a-Punch,
 // power, the Bowie knife), the stage teleporter and the projection room trip, the film reels
 // and hidden rooms (KinoFeatures), the electric traps, the meteor Easter egg and gas crawlers.
+import { groupTrip } from '../group-trip.js';
 import { World, zoneNames } from '../world.js';
 import { KinoFeatures } from '../kino-features.js';
 
@@ -11,7 +12,12 @@ export async function createMap(ctx,entry){
   renderer.toneMappingExposure=2.05;scene.fog=new THREE.FogExp2(0x14181b,.00032);camera.far=14000;camera.updateProjectionMatrix();
   camera.position.set(-101,168,1256);camera.lookAt(160,170,850);
   const traps=[],gasClouds=[],meteors=new Set();
-  let spawn,teleportPending=0,linkUntil=0,returnAt=0,cooldownUntil=0;
+  let spawn,teleportPending=0,linkUntil=0,returnAt=0,cooldownUntil=0,tripRoom=null;
+  // Co-op: the pad's link is shared and everyone on the stage pad goes along, to the same room after (group-trip.js).
+  groupTrip.on('kino:link',d=>{const s=S();s.teleporter=d.state;if(d.state==='linking')linkUntil=s.time+30;});
+  groupTrip.on('kino:trip',(d,here)=>{const s=S();
+    if(here&&!teleportPending&&s.phase!=='reviving'&&s.phase!=='gameover'){teleportPending=s.time+2;tripRoom=d.room??null;ctx.toast('Teleporting…');}
+    else if(!here&&!returnAt){s.teleporter='cooldown';cooldownUntil=s.time+122;}});
   const S=()=>ctx.session,W=()=>ctx.world,F=()=>ctx.features;
   const returnToLobby=()=>{const dest=ctx.data.entities.find(e=>e.targetname==='theater_teleport_player0');ctx.moveTo(vector(dest.position),dest.yaw);cooldownUntil=S().time+90;};
   return {
@@ -72,10 +78,10 @@ export async function createMap(ctx,entry){
       if(t==='treasure_chest_use')return shop.useBox(e);
       if(t==='zombie_vending_upgrade')return shop.usePack();
       if(t==='trigger_teleport_pad_0'&&s.power){
-        if(s.teleporter==='unlinked'){s.teleporter='linking';linkUntil=s.time+30;ctx.toast('Link the mainframe pad in the lobby',5);return true;}
-        if(s.teleporter==='linked'&&!teleportPending){teleportPending=s.time+2;ctx.toast('Teleporting…');return true;}return false;
+        if(s.teleporter==='unlinked'){s.teleporter='linking';linkUntil=s.time+30;groupTrip.start('kino:link',{state:'linking'});ctx.toast('Link the mainframe pad in the lobby',5);return true;}
+        if(s.teleporter==='linked'&&!teleportPending){teleportPending=s.time+2;tripRoom=F().events.chooseRoom()?.targetname??null;groupTrip.start('kino:trip',{room:tripRoom},ctx.player.getFeetPosition());ctx.toast('Teleporting…');return true;}return false;
       }
-      if(t==='pf16_auto1'&&s.teleporter==='linking'){s.teleporter='linked';ctx.toast('Teleporter linked',4);audio.play('buy');return true;}
+      if(t==='pf16_auto1'&&s.teleporter==='linking'){s.teleporter='linked';groupTrip.start('kino:link',{state:'linked'});ctx.toast('Teleporter linked',4);audio.play('buy');return true;}
       if(t?.endsWith('_room_trap')&&s.power){
         if(traps.some(tr=>tr.name===t&&tr.cooldown>s.time)){ctx.toast('Trap cooling down');return false;}if(!shop.pay(1000))return false;
         const p=vector(e.position),mesh=new THREE.Mesh(new THREE.CylinderGeometry(60,60,100,12,1,true),new THREE.MeshBasicMaterial({color:0x8cbbff,transparent:true,opacity:.24,wireframe:true}));mesh.position.copy(p);scene.add(mesh);traps.push({name:t,position:p,mesh,end:s.time+30,cooldown:s.time+90});return true;
@@ -95,7 +101,7 @@ export async function createMap(ctx,entry){
       if(s.teleporter==='linking'&&s.time>linkUntil){s.teleporter='unlinked';ctx.toast('Teleporter link timed out');}
       if(teleportPending&&s.time>=teleportPending){teleportPending=0;const dest=ctx.data.entities.find(e=>e.targetname==='projroom_teleport_player0');ctx.player.setPosition(vector(dest.position));returnAt=s.time+30;s.teleporter='cooldown';ctx.flash();ctx.toast('Projection room · 30 seconds',4);}
       if(returnAt&&s.time>=returnAt){
-        returnAt=0;const room=features.events.chooseRoom();
+        returnAt=0;const room=tripRoom?ctx.data.entities.find(e=>e.targetname===tripRoom):null;tripRoom=null;
         if(room){features.events.room=room;features.events.roomUntil=s.time+5.8;ctx.moveTo(vector(room.position),room.yaw);ctx.toast('A room outside time… find a film reel.',5);}
         else returnToLobby();ctx.flash();
       }
@@ -108,7 +114,7 @@ export async function createMap(ctx,entry){
     },
     reset(){
       for(const group of [traps,gasClouds]){for(const item of group){item.mesh.removeFromParent();item.mesh.geometry?.dispose();item.mesh.material?.dispose();}group.length=0;}
-      meteors.clear();teleportPending=0;returnAt=0;linkUntil=0;cooldownUntil=0;
+      meteors.clear();teleportPending=0;returnAt=0;linkUntil=0;cooldownUntil=0;tripRoom=null;
     },
     hudEffects:()=>returnAt?'<span>RETURN IN '+Math.ceil(returnAt-S().time)+'</span>':'',
     location(){const f=F();return f.events.room?'Hidden room · '+Math.max(0,Math.ceil(f.events.roomUntil-S().time))+'s':returnAt?'Projection room':zoneNames[W().zoneAt(ctx.player.getFeetPosition().add(new THREE.Vector3(0,35,0)))]??'Kino der Toten';},

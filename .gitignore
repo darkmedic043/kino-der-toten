@@ -44,3 +44,10 @@ Thumbs.db
 # KTX2 copies of the game textures (.tools/build-ktx2.mjs): derived from ripped assets, rebuilt locally
 /export/web/ktx2/
 
+
+# Gzip copies for the static server (.tools/build-gz.mjs), rebuilt locally; the few .gz assets the game loads itself stay tracked
+/export/web/**/*.glb.gz
+/export/web/**/*.bin.gz
+/export/web/**/*.json.gz
+/export/web/**/*.wasm.gz
+!/export/web/mods/lighting/*.bin.gz

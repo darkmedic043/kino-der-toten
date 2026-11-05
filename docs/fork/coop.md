@@ -66,3 +66,12 @@
   - the HTTP proxy;
   - 503 with the socket gone;
   - the key reused after a restart.
+
+## No pause, squad scaling, START NOW, group trips (2026-11-02)
+User reports: pausing froze the game and desynced it (hits from nothing, everyone hurt while one player was paused), the start froze, loading took ages, zombie count didn't grow with players.
+- **No pause in co-op**: `host.keepRunning=coop` (engine.js) keeps the update running behind the pause menu on every client while a teammate is in the room. A hidden tab draws no frames, so a worker-driven ticker calls `api.tick(dt)` when no frame has run for 400 ms. A paused player can still be hurt (the zombies keep chasing them, as in BO1/BO3 online).
+- **Ghost hits**: a zombie hit the host sends is ignored when that zombie is over 190 units from the guest's own feet (the host judged it on a stale position).
+- **Zombies per player**: each live teammate adds at least 60% of a solo round (`population`, or BO1's own formula if larger) and 6 more alive at once (`enemies.maxAlive`, enemies.js; 24 solo). Dog rounds add 3 per teammate.
+- **Teammate bodies are warmed**: in the scene before `warmShaders` (the mod waits up to 15 s for them); someone joining after the warm-up is compiled with `compileAsync` and drawn once in front of the camera with the shadow pass (`warmBody`). A remote moving over 600 units snaps instead of sliding.
+- **Loading**: guests ignore snaps until loaded (the first one after has everything). The host can press **START NOW** once loaded; the others enter the moment they finish. The lobby reads the percent from `#load-progress` `data-pct`.
+- **Group trips** (`group-trip.js`, core): everyone standing within 140 units of a teleporter goes with the player who used it, without paying or needing the pad's lock; others share the pad's cooldown. Map code calls `groupTrip.start(key,data,at)` and handles `groupTrip.on(key,(data,here)=>...)`; the multiplayer mod sends the `trip` message. `maps/custom.js` does it for every `world.teleporters` pad (The Giant, Der Eisendrache's rocket pad, future custom maps), `maps/kino.js` for the stage pad. Moon's teleporter is not covered.

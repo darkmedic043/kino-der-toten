@@ -3,15 +3,18 @@ import { loadModel } from './animation.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { objectBox, fitSkinnedBounds } from './skinned-bounds.js';
+import { restoreImages } from './texture-memory.js';
 
-const cycleTime=3.9,offerTime=12;
+const cycleTime=3.9,offerTime=12,LAZY_WAIT_MS=15000;
 export class MysteryBox {
-  constructor(scene,world,data,session,audio,toast){Object.assign(this,{scene,world,data,session,audio,toast});this.boxes=new Map();this.models={};this.displays=new Map();this.moves=0;this.uses=0;}
+  constructor(scene,world,data,session,audio,toast){Object.assign(this,{scene,world,data,session,audio,toast});this.boxes=new Map();this.models={};this.displays=new Map();this.moves=0;this.uses=0;this.lazy=[];}
   async load(){
     // def.lazyWorld (the imported BO3 guns): loaded in the background, not awaited; they join the box pool once loaded
     const all=Object.entries(this.data.weapons),eager=all.filter(([,d])=>!d.lazyWorld);
     await Promise.all(eager.map(async([id,d])=>{this.models[id]=await loadModel(d.worldModel);}));
-    for(const [id,d] of all)if(d.lazyWorld)loadModel(d.worldModel).then(m=>poseIdle(m,d)).then(m=>{this.models[id]=m;}).catch(e=>console.warn('[mystery-box]',id,e));
+    for(const [id,d] of all)if(d.lazyWorld)this.lazy.push(loadModel(d.worldModel).then(m=>poseIdle(m,d)).then(async m=>{
+      if(this.late){globalThis.kino?.lighting?.tag?.(m);await this.late.renderer.compileAsync(m,this.late.camera,this.scene);}   // past the warm-up: never compiles on a spin
+      this.models[id]=m;}).catch(e=>console.warn('[mystery-box]',id,e)));
     if(this.data.equipment?.zombie_cymbal_monkey)this.models.zombie_cymbal_monkey=await loadModel(this.data.equipment.zombie_cymbal_monkey.projectileModel);
     this.models.teddy=await loadModel(this.data.boxTeddy);
     this.world.openBoxes=new Set();
@@ -53,26 +56,24 @@ export class MysteryBox {
     const model=clone(source);
     for(const name of this.data.weapons[id]?.hideTags??[]){const bone=model.getObjectByName(name);if(bone)bone.scale.setScalar(.000001);}
     const center=objectBox(model).getCenter(new THREE.Vector3());model.position.sub(center);   // fast skinned bounds (three's took ~1 s for the box guns)
-    group=new THREE.Group();group.add(model);group.userData.model=model;list.push(group);return group;
+    // No shadows, and no frustum culling: a rigged model's first cull computes its bounds through every bone (a hitch per
+    // new weapon), and the renderer still sorts by bounding sphere, so it gets one here (~1 s saved over the box).
+    group=new THREE.Group();group.add(model);group.userData.model=model;list.push(group);
+    group.traverse(o=>{if(o.isMesh){o.castShadow=false;o.frustumCulled=false;}});fitSkinnedBounds(group);return group;
   }
-  // Compile shaders and upload every box weapon's textures during loading so
-  // the first spin doesn't stall on them.
-  warm(renderer,camera){
-    const holder=new THREE.Group(),groups=Object.keys(this.models).map(id=>this.display(id)).filter(Boolean);
-    camera.updateMatrixWorld();holder.position.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(80));
-    for(const g of groups)holder.add(g);this.scene.add(holder);
-    // Give the box weapons the lighting mod's material setup now; applied on first
-    // display it recompiled shaders mid-spin. They're small: no shadow casting.
-    globalThis.kino?.lighting?.tag?.(holder);
-    // No shadows, and no frustum culling: a rigged model's first cull computes its bounds through every bone (a hitch per new weapon).
-    holder.traverse(o=>{if(o.isMesh){o.castShadow=false;o.frustumCulled=false;}});
-    // the renderer still sorts by bounding sphere, which three computes through every bone: give them one (~1 s saved)
-    fitSkinnedBounds(holder);
-    renderer.render(this.scene,camera);   // uploads every texture and settles every program now, behind the loading screen
-    try{renderer.compile(this.scene,camera);holder.traverse(n=>{for(const m of [n.material].flat())if(m)for(const k of ['map','normalMap','emissiveMap','alphaMap','roughnessMap','metalnessMap'])if(m[k])renderer.initTexture(m[k]);});}
-    catch(e){console.warn('[mystery-box] warm-up failed',e);}
-    holder.removeFromParent();for(const g of groups)holder.remove(g);
+  // A display copy of everything this box can show, for the engine's warmShaders (engine.js adds them to its 'later' group:
+  // lighting tag, compile, real draw with textures uploaded, behind the loading screen). The older warm() drew only what had
+  // loaded when the mods finished, so the imported guns (they load in the background) compiled on the spin: a 3-4 s freeze
+  // each on D3D11 (2026-11-02, hitch logs: one program a gun, up to 72 MB of textures). Wait for them here, for a while; one
+  // that lands later is compiled before it joins the pool (load()).
+  async warmCopies(){
+    await Promise.race([Promise.allSettled(this.lazy),new Promise(done=>setTimeout(done,LAZY_WAIT_MS))]);
+    const list=globalThis.kino?.boxList,ids=[...new Set([...(this.data.boxPool??Object.keys(this.models)),...(list?.extra??[])])].filter(k=>k!=='teddy'&&this.models[k]&&(!list||list.allowed(k)));
+    const groups=[...ids,'teddy'].map(id=>this.display(id)).filter(Boolean);
+    await Promise.all(groups.map(g=>restoreImages(g).catch(()=>{})));   // a world model can share an image the viewmodel's upload already freed (black gun)
+    return groups;
   }
+  setLate(renderer,camera){this.late={renderer,camera};}
   show(b,id){
     if(b.shown===id)return;b.wrapper?.removeFromParent();b.shown=id;
     b.wrapper=this.display(id);b.model=b.wrapper?.userData.model??null;

@@ -370,7 +370,18 @@ function serveFile(req, res, url) {
     if (req.method === 'HEAD') res.end(); else createReadStream(path, { start, end }).on('error', () => res.destroy()).pipe(res);
     return;
   }
-  res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size, 'Accept-Ranges': 'bytes', ETag: etag, 'Last-Modified': lastModified, 'Cache-Control': cacheControl(path) });
+  // a precompressed copy (.tools/build-gz.mjs): maps halve, and a first load pays for them over the home uplink. Same ETag on
+  // purpose: both decode to the same bytes, so a browser holding the plain copy keeps it. X-File-Size is three's FileLoader
+  // total for the loading bar (Content-Length is the compressed size).
+  if (/\bgzip\b/.test(req.headers['accept-encoding'] ?? '')) {
+    let gz = null; try { gz = statSync(path + '.gz'); } catch {}
+    if (gz?.isFile() && gz.mtimeMs >= stat.mtimeMs) {
+      res.writeHead(200, { 'Content-Type': type, 'Content-Encoding': 'gzip', 'Content-Length': gz.size, 'X-File-Size': stat.size, Vary: 'Accept-Encoding', ETag: etag, 'Last-Modified': lastModified, 'Cache-Control': cacheControl(path) });
+      if (req.method === 'HEAD') res.end(); else createReadStream(path + '.gz').on('error', () => res.destroy()).pipe(res);
+      return;
+    }
+  }
+  res.writeHead(200, { 'Content-Type': type, 'Content-Length': stat.size, 'Accept-Ranges': 'bytes', ETag: etag, 'Last-Modified': lastModified, Vary: 'Accept-Encoding', 'Cache-Control': cacheControl(path) });
   if (req.method === 'HEAD') res.end(); else createReadStream(path).on('error', () => res.destroy()).pipe(res);
 }
 

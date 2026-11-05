@@ -71,7 +71,8 @@ export default async function setup(api){
       if(o){o.scale.copy(b.scale);o.updateMatrix();}});
     flamer.placePilot();
     mountParts(def);
-    applyCamo(view.gun,papLook(session.weapon)?PAP_CAMO:camoById(data.weapons[session.weapon?.id]?.camo));
+    const look=papLook(session.weapon)?PAP_CAMO:camoById(data.weapons[session.weapon?.id]?.camo);
+    applyCamo(view.gun,look);if(view.leftGun)applyCamo(view.leftGun,look);   // dual wield: the off-hand gun too
     magFollow(def);
     return r;
   };

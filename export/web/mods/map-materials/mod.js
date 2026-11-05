@@ -149,13 +149,8 @@ export default async function setup(api){
     api.world.dynamic.push({collider:new CollisionWorld(g),box:g.boundingBox.clone(),enabled:true,window:true,note:'spawn pad cap'});
   }
 
-  // Compile every shader now, during loading (normal maps, light clamp, the
-  // lighting mod's changes), instead of hitching on the first frames of play.
-  try{const t0=performance.now();await api.renderer?.compileAsync?.(api.scene,api.camera);if(api.viewScene)await api.renderer?.compileAsync?.(api.viewScene,api.camera);
-    // Draw one full frame too (shadow maps, post-processing targets, texture
-    // uploads) so that cost lands behind the loading screen, not on joining.
-    const R=api.renderer;if(R){(api.host?.renderWorld??((sc,c)=>R.render(sc,c)))(api.scene,api.camera);if(api.viewScene)R.render(api.viewScene,api.camera);}
-    console.info('[map-materials] shaders precompiled and first frame drawn in',Math.round(performance.now()-t0),'ms');}catch(e){console.warn('[map-materials] precompile',e);}
+  // No compile or draw here (2026-11-04): the engine's warmShaders compiles and draws every material after all mods
+  // are set up, in slices between frames. The old compileAsync + full frame here was one 2-3 s block on Kino.
 }
 
 // Smooth shading. The map export gave every triangle its own flat normal, so rounded props (columns, rails, seats,

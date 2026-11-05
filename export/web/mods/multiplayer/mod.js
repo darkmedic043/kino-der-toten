@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { Net } from '../../net.js';
 import { roundPopulation } from '../../rules.js';
+import { groupTrip } from '../../group-trip.js';
 import { loadProfile, cloudReady } from '../../profile.js';
 import { cardSvg } from '../shop/card.js';
 import { startSocial, onSocial, socialState, request as friendRequest, invite as friendInvite, isFriend, isPending, statusText } from '../../social.js';
@@ -68,6 +69,21 @@ export default async function setup(api){
     const r={id:p.id,name:p.name,entry,pos:null,target:null,yaw:0,targetYaw:0,vel:new THREE.Vector3(),grounded:true,down:false,dead:false,weapon:'',held:null,fire:0,lastSeen:performance.now()};
     remotes.set(p.id,r);
     r.character=await createCharacter(entry,data);r.root=r.character.root;r.root.visible=false;scene.add(r.root);setTag(r);showPanel();
+    await warmBody(r);
+  }
+  // A teammate's body compiled at its first draw, 1-5 s of frozen screen for everyone when the game started (hitch logs,
+  // 2026-11-02). Before the engine's warm-up it needs nothing (warmShaders draws hidden objects); someone joining after
+  // that is compiled in the background and drawn once in front of the camera (with the shadow pass, behind the lobby
+  // or for a frame or two in play) while still out of use.
+  async function warmBody(r){
+    if(!api.getState().ready)return;
+    try{window.kino.lighting?.tag?.(r.root);await api.renderer.compileAsync(r.root,camera,scene);}catch(e){console.warn('[coop] warm',e);}
+    if(r.pos||!r.root?.parent)return;
+    r.root.position.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(120));r.root.visible=true;
+    const culled=[];r.root.traverse(o=>{if(o.frustumCulled){o.frustumCulled=false;culled.push(o);}});
+    scene.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});
+    await new Promise(done=>{let n=3;const tick=()=>--n>0?requestAnimationFrame(tick):done();requestAnimationFrame(tick);});
+    for(const o of culled)o.frustumCulled=true;if(!r.pos)r.root.visible=false;
   }
   // an Iron Man armor on or off (mods/stark/armor.js): teammates swap your body to the armor's character and back
   async function setRemoteBody(r,next){
@@ -79,7 +95,7 @@ export default async function setup(api){
   net.on('suit',(m,from)=>{const r=remotes.get(from);if(!r)return;r.ownEntry??=r.entry;
     const next=m.on?registry.find(e=>e.id==='armor_'+m.suit):r.ownEntry;if(next&&next!==r.entry)setRemoteBody(r,next).catch(e=>console.warn('[coop] suit body',e));});
   function removeRemote(id){const r=remotes.get(id);if(!r)return;r.character?.dispose();r.root?.removeFromParent();remotes.delete(id);showPanel();}
-  for(const p of net.players.values())addRemote(p);
+  const firstRemotes=[...net.players.values()].map(addRemote);
   net.on('joined',p=>{addRemote(p);api.toast(`${p.name} joined`,3);});
   net.on('left',(id,p)=>{removeRemote(id);if(p)api.toast(`${p.name} left`,3);});
   net.on('closed',reason=>{api.toast(reason,8);showPanel(reason);});
@@ -89,7 +105,7 @@ export default async function setup(api){
     const r=remotes.get(from);if(!r)return;
     r.target=v3(m.p);r.targetYaw=m.y;r.stance=m.k??'';r.vel.fromArray(m.v);r.grounded=m.g;r.lastSeen=performance.now();
     if(!!m.d!==r.down||!!m.x!==r.dead){r.down=!!m.d;r.dead=!!m.x;setTag(r);showPanel();}
-    if(!r.pos){r.pos=r.target.clone();r.yaw=m.y;}
+    if(!r.pos||r.pos.distanceToSquared(r.target)>360000){r.pos=r.target.clone();r.yaw=m.y;}   // first pose, or a teleport (over 600 units): no slide across the map
     if(m.w!==r.weapon){r.weapon=m.w;setRemoteWeapon(r);}
     if(m.f>r.fire&&r.fire)remoteShot(r);r.fire=m.f;
   });
@@ -123,7 +139,11 @@ export default async function setup(api){
     if(cur&&cur!==best&&cur.position.distanceTo(z.root.position)<bd*1.3)best=cur;
     z.victimId=best.id??null;return best;
   }
-  const scale=()=>{if(!session.dogRound)session.total=roundPopulation(session.round,data.rules,1+alive().length+[...remotes.values()].filter(r=>r.down).length);};
+  // Zombies per player (2026-11-02, user: more zombies with more players): BO1's own formula adds only 6-12 at low rounds
+  // and the 24 alive at once capped what a squad ever saw, so each teammate adds at least 60% of a solo round and 6 more alive.
+  const squad=()=>1+[...remotes.values()].filter(r=>!r.dead).length;
+  const population=n=>Math.max(roundPopulation(session.round,data.rules,n),Math.round(roundPopulation(session.round,data.rules,1)*(1+(n-1)*.6)));
+  const scale=()=>{const n=squad();enemies.maxAlive=24+(n-1)*6;session.total=session.dogRound?(session.dogRounds<3?6:8)+(n-1)*3:population(n);};
   function becomeHost(migrated){
     enemies.update=original.update;enemies.hurt=original.hurt;enemies.nuke=original.nuke;enemies.autoSpawn=true;enemies.autoRounds=true;
     session.drops.tryDrop=original.tryDrop;
@@ -149,13 +169,13 @@ export default async function setup(api){
     net.send('all',{t:'snap',gid,round:session.round,phase:session.phase==='reviving'?'fighting':session.phase,countdown:r1(session.countdown),total:session.total,killed:session.killed,spawned:session.spawned,dogRound:session.dogRound,
       power:session.power,doors:[...session.openDoors],boards:world.barriers.map(b=>b.count),box:world.activeBox?.id??null,
       pu:powerups.items.map(p=>[p.nid??0,p.type,r1(p.root.position.x),r1(p.root.position.y-40),r1(p.root.position.z),r1(p.age)]),
-      z:enemies.list.map(z=>[z.id,z.kind,r1(z.root.position.x),r1(z.root.position.y),r1(z.root.position.z),Math.round(z.root.rotation.y*100)/100,STATES.indexOf(z.state),Math.round(z.health),z.speed])});
+      z:enemies.list.map(z=>[z.id,z.kind,r1(z.root.position.x),r1(z.root.position.y),r1(z.root.position.z),Math.round(z.root.rotation.y*100)/100,STATES.indexOf(z.state),Math.round(z.health),z.speed,(z.swallowed?1:0)|(z.thrall?2:0)|(z.sleepUntil>session.time?4:0)])});
   }
   net.on('dmg',(m,from)=>{
     if(!net.isHost)return;
     const z=enemies.list.find(z=>z.id===m.id);if(!z)return;
-    host.remoteDamage=true;host.remoteBy=from;try{enemies.hurt(z,m.amount,m.head,m.melee,m.cause,false);}finally{host.remoteDamage=false;host.remoteBy=null;}
-    net.send(from,{t:'res',killed:!enemies.list.includes(z),head:!!m.head,melee:!!m.melee,kind:z.kind,tempo:!!z.tempo});
+    const zp=z.root.position.toArray().map(Math.round);host.remoteDamage=true;host.remoteBy=from;try{enemies.hurt(z,m.amount,m.head,m.melee,m.cause,false);}finally{host.remoteDamage=false;host.remoteBy=null;}
+    net.send(from,{t:'res',killed:!enemies.list.includes(z),head:!!m.head,melee:!!m.melee,kind:z.kind,tempo:!!z.tempo,p:zp,tags:host.killTags?.(z)??0});
   });
   net.on('world',m=>{if(net.isHost)applyWorld(m);});
   net.on('box',m=>{if(net.isHost)setBox(m.id);});
@@ -189,15 +209,17 @@ export default async function setup(api){
     powerups.update=(dt,feet,canCollect,lineClear)=>original.powerUpdate(dt,feet,false,lineClear);
     setNote();
   }
-  net.on('res',m=>{session.scoreHit(m.killed,m.head,m.melee,m.tempo);if(m.killed)host.emit('kill',{enemy:null,kind:m.kind,head:m.head,melee:m.melee});});
+  net.on('res',m=>{session.scoreHit(m.killed,m.head,m.melee,m.tempo);if(m.killed)host.emit('kill',{enemy:null,kind:m.kind,head:m.head,melee:m.melee,at:m.p?new THREE.Vector3(...m.p):null,tags:m.tags??0});});
   net.on('hit',m=>{
     if(me.down||me.dead)return;
     const z=enemies.list.find(z=>z.id===m.z);if(z){z.state='attack';z.attackDealt=true;}
+    // The host judged this hit on where it last saw us. A zombie nowhere near us here hit a ghost ("hit by nothing").
+    if(z&&(z.netTarget??z.root.position).distanceTo(player.getFeetPosition())>190)return;
     api.damage(m.amount);
   });
   net.on('pu',m=>{if(!net.isHost){const p=powerups.items.find(p=>p.type===m.type&&m.at&&p.root.position.distanceTo(v3(m.at))<5);if(p){powerups.remove(p);powerups.burst(p.root.position);}}collect(m.type);});
   net.on('snap',m=>{
-    if(net.isHost)return;
+    if(net.isHost||!api.getState().ready)return;   // still loading: the first snap after that has everything, and spawning into a half-built load only slows it
     if(snapGid!==null&&m.gid!==snapGid){api.reset();byNet.clear();me.down=me.dead=false;}
     snapGid=m.gid;
     if(m.round>session.round&&session.round>0){host.emit('roundEnd',{round:session.round});}
@@ -212,10 +234,11 @@ export default async function setup(api){
     for(const [nid,type,x,y,z,age] of m.pu)if(!powerups.items.some(p=>p.nid===nid)){const item=original.powerSpawn(type,new THREE.Vector3(x,y,z));if(item){item.nid=nid;item.age=age;}}
     // Zombies.
     const seen=new Set();
-    for(const [id,kind,x,y,zz,yaw,st,hp,speed] of m.z){
+    for(const [id,kind,x,y,zz,yaw,st,hp,speed,fl=0] of m.z){
       seen.add(id);let z=byNet.get(id);
       if(!z){z=enemies.spawn(new THREE.Vector3(x,y,zz),null,kind);z.id=id;enemies.serial=Math.max(enemies.serial,id);z.state='chase';z.speed=speed;byNet.set(id,z);}
       z.netTarget=new THREE.Vector3(x,y,zz);z.netYaw=yaw;z.health=hp;
+      if(fl!==(z.netFlags??0)){z.netFlags=fl;z.root.visible=!(fl&1);z.rig.mixer.timeScale=fl&4?0:1;}   // thralls.js
       const state=STATES[st]??'chase';
       if(state!==z.state){z.state=state;if(state!=='rising'||!riseClip(z))z.rig.play(state==='chase'||state==='entering'||state==='rising'?'walk':'attack',state!=='attack');}
     }
@@ -338,7 +361,9 @@ export default async function setup(api){
       if(key!==worldKey){worldKey=key;if(!net.isHost)net.send('host',{t:'world',doors:[...session.openDoors],power:session.power});}
     }
   }
+  let lastUpdate=0;
   host.on('update',dt=>{
+    lastUpdate=performance.now();
     peerTick(dt);if(net.isHost)hostTick(dt);downedTick(dt);
     flash.intensity=Math.max(0,flash.intensity-dt*2400);
     for(const r of remotes.values()){
@@ -351,20 +376,25 @@ export default async function setup(api){
       r.root.rotation.z=r.down?Math.PI/2*.9:0;if(!r.down)applyStance(r.character,r.stance,dt);
     }
   });
-  // The game only updates while the host is playing; if the host pauses or
-  // switches tabs, keep the shared world running from a worker-driven timer.
+  // Co-op has no pause: with a teammate in the room the engine keeps updating behind the menu (host and guests alike), or
+  // everyone's zombies chase a frozen copy of whoever paused and of everyone else on the host's screen (2026-11-02, user:
+  // massive desync, hit by nothing, everyone hurt while someone is paused). A hidden tab draws no frames, so a
+  // worker-driven timer runs the same update there, on every client.
+  host.keepRunning=coop;
+  groupTrip.send=m=>{if(coop())net.send('all',{t:'trip',...m});};
+  net.on('trip',m=>groupTrip.receive(m,player.getFeetPosition()));
   const ticker=new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),50)'],{type:'text/javascript'})));
   let lastBg=performance.now();
   ticker.onmessage=()=>{
     const now=performance.now(),dt=Math.min(.25,(now-lastBg)/1000);lastBg=now;
-    if(!net.isHost)return;
-    const st=window.kino.debug.getState();if(st.active||!st.started||session.phase==='gameover')return;
-    session.update(dt);enemies.update(dt,player.getFeetPosition());powerups.update(dt,player.getFeetPosition(),false,()=>true);
-    peerTick(dt);hostTick(dt);
+    if(!coop()||now-lastUpdate<400)return;   // frames are running
+    const st=api.getState();if(!st.ready||!st.started||session.phase==='gameover')return;
+    api.tick(dt);
   };
 
   if(net.isHost)becomeHost(false);else becomeClient();
   addEventListener('pagehide',()=>net.close());
+  await Promise.race([Promise.allSettled(firstRemotes),new Promise(done=>setTimeout(done,15000))]);   // in the scene before warmShaders
 
   // ---- Lobby: a full-screen menu; nobody starts until everyone has fully loaded -----------
   // Left: the map, the room code, START GAME (host) / status, invite and main menu. Right: the squad, one card per
@@ -372,7 +402,8 @@ export default async function setup(api){
   // Each player reports {t:'linfo'} to the host (loading percent while loading, then ready + operator/class); the host
   // keeps lobby.info and broadcasts it with the ready list. START GAME starts everyone: guests enter on the host's
   // 'lobby' started flag (the game starts at once; the mouse is captured on their first click, which browsers require).
-  // Someone joining a game in progress goes straight in.
+  // Someone joining a game in progress goes straight in. The host needn't wait for the slowest loader: START NOW (host
+  // loaded, others not) starts the game and they enter the moment they are ready (2026-11-02).
   const lobby={ready:new Set(),started:false,go:false,info:{}};
   const lob=document.createElement('div');lob.id='coop-lobby';
   const st=document.createElement('style');st.textContent=`
@@ -429,7 +460,7 @@ export default async function setup(api){
   // what this player shows on their card
   function myInfo(){
     const c=window.kino.classes,st=window.kino.debug.getState();
-    const pct=st.ready?100:Math.round(parseFloat(document.getElementById('load-progress')?.style.width)||0);
+    const pct=st.ready?100:Math.round(parseFloat(document.getElementById('load-progress')?.dataset.pct)||0);
     return {p:pct,op:window.kino.characterEntry?.name??registry.find(e=>e.id===profile.character)?.name??null,cls:c?.cls?.name??null,lvl:c?.state?.level??null,in:!!st.started,cd:(({c1,c2,pattern})=>c1?{c1,c2,pattern}:null)(window.kino.cosmetics?.equipped?.card??{})};   // cd: the calling card (shop)
   }
   function renderLobby(){
@@ -451,10 +482,10 @@ export default async function setup(api){
     const waiting=all.filter(p=>!isReady(p.id)).length;
     lob.innerHTML=`<div class="l-left"><div class="kicker">ZOMBIES <span>CO-OP</span></div><p class="chapter">CO-OP LOBBY</p><h1>${esc(title)}</h1>
         <div class="room"><small>ROOM</small><b>${esc(net.code)}</b></div>
-        <div class="btns">${net.isHost?`<button type="button" class="go" ${allReady?'':'disabled'}>START GAME <span>→</span></button>`:
+        <div class="btns">${net.isHost?`<button type="button" class="go" ${isReady(net.id)?'':'disabled'}>${allReady?'START GAME':'START NOW'} <span>→</span></button>`:
           lobby.started?`<button type="button" class="go">JOIN THE GAME <span>→</span></button>`:`<div class="wait">WAITING FOR THE HOST TO START</div>`}
           <div class="sec"><button type="button" class="invite">COPY INVITE</button><button type="button" class="leave">MAIN MENU</button></div></div>
-        <p class="status">${net.isHost?(allReady?'Everyone is loaded in. Start the game for everyone.':`Waiting for ${waiting} player${waiting===1?'':'s'} to finish loading…`):lobby.started?'The game is under way.':'The host starts the game for everyone once all players are loaded in.'}</p></div>
+        <p class="status">${net.isHost?(allReady?'Everyone is loaded in. Start the game for everyone.':`Waiting for ${waiting} player${waiting===1?'':'s'} to finish loading…${isReady(net.id)?' Start now and they drop in as soon as they are loaded.':''}`):lobby.started?'The game is under way.':'The host starts the game for everyone once all players are loaded in.'}</p></div>
       <div class="l-right"><div class="squad">SQUAD <b>${all.length} / ${MAX}</b></div>${all.map(card).join('')}${Array.from({length:Math.max(0,MAX-all.length)},()=>'<div class="empty">OPEN SLOT · INVITE A FRIEND BELOW</div>').join('')}
         <div class="squad" style="margin-top:22px">INVITE FRIENDS <b>${inv.filter(f=>f.status!=='offline').length} ONLINE</b></div><div class="invs">${invHtml}</div></div>`;
     for(const b of lob.querySelectorAll('.add'))b.onclick=async e=>{e.stopPropagation();b.disabled=true;try{await friendRequest({id:b.dataset.uid});api.toast('Friend request sent',2);}catch(err){api.toast(err.message,3);}renderLobby();};

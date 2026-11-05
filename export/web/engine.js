@@ -87,7 +87,7 @@ let lastTex={n:0,kb:0,mip:0,gl:{}};const fences=[];let fenceSupported=null;   //
   const bytes=a=>{const d=a.find(x=>x&&typeof x==='object'&&'byteLength' in x);return d?Math.round(d.byteLength/1024):typeof a[1]==='number'?Math.round(a[1]/1024):0;};
   count('bufferData',bytes);count('bufferSubData',bytes);for(const n of ['createBuffer','createTexture','deleteBuffer','deleteTexture','createVertexArray','deleteVertexArray','createFramebuffer','createRenderbuffer','renderbufferStorageMultisample','compileShader','linkProgram','getError','finish','flush','readPixels','clientWaitSync','getProgramParameter','getShaderParameter','getUniformLocation','getParameter','getBufferSubData','blitFramebuffer','invalidateFramebuffer'])count(n);}
 const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
-const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait'),NO_HUD_WARM=new URLSearchParams(location.search).has('noHudWarm'),NO_PAINT_WARM=new URLSearchParams(location.search).has('noPaintWarm'),NO_WEAPON_WARM=new URLSearchParams(location.search).has('noWeaponWarm'),WEAPON_WARM_MS=8000;   // A/B switches for warmShaders' draw pass and warmHud
+const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_SLICE=new URLSearchParams(location.search).has('noSlice'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait'),NO_HUD_WARM=new URLSearchParams(location.search).has('noHudWarm'),NO_PAINT_WARM=new URLSearchParams(location.search).has('noPaintWarm'),NO_WEAPON_WARM=new URLSearchParams(location.search).has('noWeaponWarm'),WEAPON_WARM_MS=8000;   // A/B switches for warmShaders' draw pass and warmHud
 // Single pass from the first draw, not after the sweep: three drew a new transparent double-sided material (the Mech's arc
 // bolts, built when the mech lands) with its back faces then its front faces until the sweep reached it, each side a
 // program of its own (two compiles mid-game, in each scene; 2026-11-01). Every material answers forceSinglePass=true
@@ -131,7 +131,7 @@ const touchControls=createZombieTouch({
   onPause:()=>{setActive(false);document.exitPointerLock?.();},
 });
 addEventListener('error',e=>errors.push(e.message));addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
-function progress(text,percent){$('load-label').textContent=text;$('load-progress').style.width=percent+'%';diag('stage',{stage:text});}
+function progress(text,percent){$('load-label').textContent=text;const bar=$('load-progress');bar.style.transform=`scaleX(${percent/100})`;bar.dataset.pct=percent;diag('stage',{stage:text});}
 // Load diagnostics (2026-10-15, a black Rind window while loading on the user's Windows PC): stages, a 2 s heartbeat until
 // 20 s after ready, WebGL context loss and errors go to /api/client-log (kino-server writes client-log.jsonl), so the
 // last line before a crash says where it died.
@@ -156,7 +156,7 @@ function announce(title,small=(map?.announceTitle??entry?.title??'Zombies').toUp
 function setActive(value){
   active=!!value&&ready&&session.phase!=='gameover';$('menu').hidden=active;document.body.classList.toggle('menu-open',!active);keys.clear();primary=false;primaryPressed=false;ads=false;reloadShot=false;reloadHeld=0;
   mousePrimary=mouseAim=false;touchControls.reset();touchControls.setEnabled(active&&session.phase!=='reviving',active);
-  if(active&&audio.ctx)audio.start();else if(!active)audio.pause();
+  if(active&&audio.ctx)audio.start();else if(!active&&!mods.keepRunning?.())audio.pause();   // keepRunning: co-op, where the menu pauses nothing
   if(active){if(!started){started=true;tracePlay();announce('Round 1','SURVIVE');audio.play('round');mods.emit('start');}else if(session.phase==='preparing')announce('Round '+session.round,'PREPARE YOURSELF');}
   else if(started&&session.phase!=='gameover'){$('start').innerHTML='RESUME GAME <span>→</span>';$('restart').hidden=false;$('menu-status').textContent='Paused · Round '+session.round;}
 }
@@ -367,22 +367,26 @@ function reset(){
   map.reset?.();renderer.domElement.style.filter='';if(audio.ctx)audio.playMusic('ambience');
   started=false;repairLeft=0;burstLeft=0;lastPhase='';lastRound=0;view.currentId=null;equipView();$('results').hidden=true;$('menu-status').textContent=touchControls.mode?'Tap to start':'Click to capture the mouse';
 }
+const NO_KEYS=new Set(),NO_TOUCH={forward:0,strafe:0};
 function update(dt){
   if(!ready)return;
   touchControls.setEnabled(active&&session.phase!=='reviving'&&session.phase!=='gameover',active&&session.phase!=='gameover');
-  const touch=touchControls.input.read();
+  // Co-op has no pause (mods.keepRunning): the world, the shared rounds and this player's own body keep going behind the
+  // menu, with no input, or every teammate fights a frozen copy of this client (2026-11-02, multiplayer mod).
+  const running=active||(started&&session.phase!=='gameover'&&!!mods.keepRunning?.()),held=active?keys:NO_KEYS;
+  const touchRead=touchControls.input.read(),touch=active?touchRead:NO_TOUCH;
   primary=mousePrimary||touch.fire;primaryPressed ||= touch.firePressed;ads=mouseAim||touch.aim;
-  if(active){
+  if(running){
     session.update(dt);
     if(session.phase!=='gameover'){
       resolveMelee();
       if(session.reloadLeft>0&&session.reloadSerial!==lastReloadSerial){lastReloadSerial=session.reloadSerial;view.reload(false,session.reloadDuration,session.reloadStage,session.reloadHand);}
-      const pad=globalThis.kino?.gamepad?.move;   // controller analog stick (mods/controller)
-      const forward=Number(keys.has('KeyW'))-Number(keys.has('KeyS'))+touch.forward+(pad?.forward??0),strafe=Number(keys.has('KeyD'))-Number(keys.has('KeyA'))+touch.strafe+(pad?.strafe??0);
-      const moving=Math.hypot(forward,strafe)>.01,sprint=((keys.has('ShiftLeft')||keys.has('ShiftRight'))&&moving||touch.sprint||pad?.sprint&&moving)&&!globalThis.kino?.movement?.state?.sliding&&!globalThis.kino?.movement?.state?.diving&&!ads&&!session.reloadLeft&&!session.meleeLeft&&!session.drinking;
+      const pad=active?globalThis.kino?.gamepad?.move:null;   // controller analog stick (mods/controller)
+      const forward=Number(held.has('KeyW'))-Number(held.has('KeyS'))+touch.forward+(pad?.forward??0),strafe=Number(held.has('KeyD'))-Number(held.has('KeyA'))+touch.strafe+(pad?.strafe??0);
+      const moving=Math.hypot(forward,strafe)>.01,sprint=((held.has('ShiftLeft')||held.has('ShiftRight'))&&moving||touch.sprint||pad?.sprint&&moving)&&!globalThis.kino?.movement?.state?.sliding&&!globalThis.kino?.movement?.state?.diving&&!ads&&!session.reloadLeft&&!session.meleeLeft&&!session.drinking;
       // Downed (co-op, or Quick Revive's self-revive): crawl about 40 units/s, low to the ground, instead of lying frozen.
       const crawl=40/Math.max(1,player.crouchSpeed??player.moveSpeed);
-      if(!map.prePlayer?.(dt))player.update(dt,session.phase==='reviving'?{forward:forward*crawl,strafe:strafe*crawl,crouch:true}:{forward,strafe,sprint,crouch:keys.has('ControlLeft')||keys.has('ControlRight')||keys.has('KeyC')||touch.crouch,jump:keys.has('Space'),jumpPressed:touch.jump});
+      if(!map.prePlayer?.(dt))player.update(dt,session.phase==='reviving'?{forward:forward*crawl,strafe:strafe*crawl,crouch:true}:{forward,strafe,sprint,crouch:held.has('ControlLeft')||held.has('ControlRight')||held.has('KeyC')||touch.crouch,jump:held.has('Space'),jumpPressed:touch.jump});
       if(world.bounds&&player.getFeetPosition().y<world.bounds.min.y-600){player.respawn();toast('You fell out of the map');}
       view.update(dt,{moving,sprint,ads:aiming(),reloading:session.reloadLeft>0,empty:session.weapon.mag===0,time:session.time});
       view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();view.input={sprint,ads,fire:primary};   // this frame's input, for mods (inspect cancels on sprint/aim; operator weapons read touch/pad fire)
@@ -399,7 +403,7 @@ function update(dt){
       features.update(dt);
       if(reloadHeld&&performance.now()-reloadHeld>350){reloadHeld=0;mods.emit('inspect');}
       mods.emit('update',dt);
-      repairLeft=Math.max(0,repairLeft-dt);findPrompt();if((keys.has('KeyF')||keys.has('KeyE')||touch.use)&&prompt?.barrier)repair(prompt.barrier);
+      repairLeft=Math.max(0,repairLeft-dt);findPrompt();if((held.has('KeyF')||held.has('KeyE')||touch.use)&&prompt?.barrier)repair(prompt.barrier);
       if((session.round!==lastRound||session.phase!==lastPhase)&&map.announceRounds?.()!==false){if(session.phase==='fighting'){announce(session.dogRound?'Fetch their souls':'Round '+session.round,session.dogRound?'HELLHOUNDS':'SURVIVE');audio.play(session.dogRound?'dog_round':'round');if(session.dogRound)audio.play('dog_announce');}else if(session.phase==='preparing'&&session.round>1){announce('Round survived','RELOAD. REBUILD. PREPARE.');audio.play('round_end');}lastRound=session.round;lastPhase=session.phase;}
       mysteryBox.update(dt);
       map.update?.(dt);
@@ -500,7 +504,7 @@ try{
   features=map.createFeatures({scene,world,data,session,enemies,player,camera,audio,effect,damage,toast});
   await Promise.all([enemies.load(),equipView(),audio.load(),powerups.load(),perkDrink.load(),mysteryBox.load(),features.load()]);player.update(.05,{});
   await map.ready?.();
-  progress('Loading mods',95);await mods.start({melee,renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});if(!profile.mobile)mysteryBox.warm(renderer,camera);
+  progress('Loading mods',95);await mods.start({melee,renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,tick:update,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});
   // Performance for big ported maps (docs/fork/performance.md). A/B switches for benchmarks: ?noMerge ?noBatch ?noFreeze
   const perfOff=new URLSearchParams(location.search);
   // this runs 1-3 s of main-thread work: show it, and let the page paint between steps (a frozen page showed a black
@@ -731,9 +735,31 @@ async function warmHud(){
   finally{try{mods.emit('warmHud',false);}catch{}document.body.classList.add('menu-open');document.body.classList.remove('hud-warm');for(const u of undo.reverse())u();}
   console.info('[warm-hud] painted in',Math.round(performance.now()-t0),'ms, probes',probes);
 }
+// The load's warm (waitGpu) works in slices of about 40 ms and lets the loading screen draw a frame between them
+// (2026-11-04: it was one 3-5 s block on the host, 0 frames for 13 s on a D3D11 Moon load). The canvas is hidden
+// meanwhile, so its half-drawn warm frames never show behind the menu. The re-warms after loading stay one quick pass.
+// (function declarations: warmShaders runs from the load sequence before the module reaches a const here)
+function sliceMs(){return 40;}
+function drawable(o){return (o.isMesh||o.isPoints||o.isLine||o.isSprite)&&!!o.material;}
+function breath(){return new Promise(r=>{let done=false;const go=()=>{if(!done){done=true;r();}};requestAnimationFrame(()=>setTimeout(go,0));setTimeout(go,60);});}   // one frame (or 60 ms in a hidden tab)
+// compile a scene's materials a few objects at a time (lights from the scene; the stub holds no lights), each slice's
+// programs linked before the next (without KHR_parallel_shader_compile the link waits at first use, getUniforms;
+// with it, the final compileAsync waits for them without blocking)
+async function compileSliced(s,cam,target,breathe){
+  const list=[];s.traverse(o=>{if(drawable(o))list.push(o);});
+  for(let i=0;i<list.length;){const t=performance.now(),previous=renderer.getRenderTarget();renderer.setRenderTarget(target);
+    try{while(i<list.length&&performance.now()-t<sliceMs()){const part=list.slice(i,i+=12);
+      for(const m of renderer.compile({traverse:f=>part.forEach(f),traverseVisible(){}},cam,s)){const p=renderer.properties.get(m).currentProgram;if(p?.isReady())try{p.getUniforms();}catch{}}}}
+    finally{renderer.setRenderTarget(previous);}
+    await breathe(true);}
+  const previous=renderer.getRenderTarget();renderer.setRenderTarget(target);
+  try{await renderer.compileAsync(s,cam);}finally{renderer.setRenderTarget(previous);}
+}
 async function warmShaders(waitGpu=false){
-  const t0=performance.now(),targets=new Map(),draw=renderer.render,later=new THREE.Group();
+  const t0=performance.now(),targets=new Map(),draw=renderer.render,later=new THREE.Group(),sliced=waitGpu&&!NO_SLICE,canvas=renderer.domElement;
+  let slice=performance.now(),breaths=0,lap=performance.now();const laps=[],mark=name=>{const t=performance.now();laps.push(name+' '+Math.round(t-lap));lap=t;};const breathe=async force=>{if(!sliced||!force&&performance.now()-slice<sliceMs())return;await breath();breaths++;slice=performance.now();};
   renderer.setAnimationLoop(null);   // no frame may draw the unhidden objects or move the render target meanwhile
+  if(sliced)canvas.style.visibility='hidden';
   try{
     // Things that only appear later join the scene in front of the camera for this one frame: mods.warmObjects (effect
     // sprites), the power-ups and the enemy templates (zombie bodies and heads, dogs, crawlers; clones share their
@@ -744,17 +770,26 @@ async function warmShaders(waitGpu=false){
     for(const item of Object.values(powerups?.templates??{})){const aura=new THREE.Sprite(powerups.spriteMaterial);later.add(item.clone(true),aura);}
     for(const t of [enemies?.templates,enemies?.heads,enemies?.dog,enemies?.quad,enemies?.quadHead].flat())if(t?.isObject3D&&!t.parent)later.add(t);
     for(const t of [...(features?.models?.values?.()??[]),features?.reelTemplate])if(t?.isObject3D&&!t.parent)later.add(t);   // claymores, monkeys, the box's weapon reel (2026-10-29)
+    if(!profile.mobile)for(const g of await mysteryBox?.warmCopies?.()??[])if(!g.parent)later.add(g);   // every gun the box can show
+    mysteryBox?.setLate?.(renderer,camera);mark('setup');await breathe(true);
     later.position.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(120));later.updateMatrixWorld(true);scene.add(later);
     mods.emit('warm');   // mods finish pending material changes first (the lighting mod tags late meshes, these too)
+    mark('warm event');await breathe(true);
     renderer.render=function(s,c){if((s===scene||s===viewScene)&&!targets.has(s))targets.set(s,this.getRenderTarget());return draw.call(this,s,c);};
+    // sliced: this first draw only finds each scene's render target (every drawable hidden; the passes' few programs
+    // compile); the sliced compile and draw below do the rest
+    const dry=[];if(sliced)for(const root of [scene,viewScene])root.traverse(o=>{if(o.visible&&drawable(o)){dry.push(o);o.visible=false;}});
     // shadow maps too (their depth programs), even where the lighting mod only redraws them on a schedule
     renderer.shadowMap.needsUpdate=true;scene.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});
     try{renderer.info.reset();renderer.clear();if(!(mods.renderWorld&&mods.renderWorld(scene,camera,{viewScene,viewCamera,drawView:true}))){if(!mods.renderWorld)renderer.render(scene,camera);renderer.clearDepth();renderer.render(viewScene,viewCamera);}}
-    finally{renderer.render=draw;}
+    finally{renderer.render=draw;for(const o of dry)o.visible=true;}
+    await breathe(true);mark('first draw');
     const before=renderer.info.programs.length,hidden=[],standIn=[];
     for(const root of [scene,viewScene])root.traverse(o=>{if(!o.visible&&!o.isLight){hidden.push(o);if(root===viewScene)standIn.push(o);o.visible=true;}});
-    try{for(const [s,target] of targets){const previous=renderer.getRenderTarget();renderer.setRenderTarget(target);
+    try{for(const [s,target] of targets){if(sliced){await compileSliced(s,s===viewScene?viewCamera:camera,target,breathe);continue;}
+      const previous=renderer.getRenderTarget();renderer.setRenderTarget(target);
       try{await renderer.compileAsync(s,s===viewScene?viewCamera:camera);}finally{renderer.setRenderTarget(previous);}}
+    mark('compile');
     // Compiling isn't the whole cost: the driver finishes a program's GPU pipeline on its first draw with each vertex layout
     // and target format (on Windows/D3D11, ANGLE compiles a shader variant then, freezing for up to seconds), so the hidden
     // objects and the whole map (culling off) are drawn once into each scene's target too. Only the view scene's hidden
@@ -772,7 +807,24 @@ async function warmShaders(waitGpu=false){
       // alpha-tested and skinned, compiled when third person was first switched on: 4 s on D3D11, 2026-11-01)
       renderer.shadowMap.needsUpdate=true;scene.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});
       const previous=renderer.getRenderTarget(),n0=firstDraw.n;
-      try{for(const [s,target] of targets){renderer.setRenderTarget(target);renderer.render(s,s===viewScene?viewCamera:camera);}}
+      // sliced: the textures go up one at a time first (an upload can take 50-150 ms on a busy GPU), then the draw takes a
+      // few drawables at a time (the rest hidden), each slice with its own shadow pass, a frame between slices
+      if(sliced){const texs=new Set();for(const root of [scene,viewScene])root.traverse(o=>{for(const m of [o.material].flat())if(m)for(const k of Object.keys(m)){const v=m[k];
+          if(v?.isTexture&&!v.isRenderTargetTexture&&!v.isVideoTexture&&!renderer.properties.get(v).__webglTexture)texs.add(v);}});
+        for(const t of texs){try{renderer.initTexture(t);}catch{}await breathe();}mark(texs.size+' textures');}
+      try{for(const [s,target] of targets){const cam=s===viewScene?viewCamera:camera;
+        if(!sliced){renderer.setRenderTarget(target);renderer.render(s,cam);continue;}
+        const mine=[];s.traverse(o=>{if(o.visible&&drawable(o))mine.push(o);});for(const o of mine)o.visible=false;
+        // the part size adapts: halved after a slow draw (a first draw can take 0.5 s), doubled after a quick one
+        // matrices once per scene, not per slice (with every cached weapon shown, the view scene's walk was most of a slice)
+        let size=16,draws=0;const autoMatrix=s.matrixWorldAutoUpdate;s.updateMatrixWorld();s.matrixWorldAutoUpdate=false;
+        try{for(let i=0;i<mine.length;){const t=performance.now();
+          while(i<mine.length&&performance.now()-t<sliceMs()){const part=mine.slice(i,i+=size),t2=performance.now();for(const o of part)o.visible=true;draws++;
+            renderer.shadowMap.needsUpdate=true;s.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});
+            renderer.setRenderTarget(target);try{renderer.render(s,cam);}finally{renderer.setRenderTarget(previous);for(const o of part)o.visible=false;}
+            const ms=performance.now()-t2;size=ms>sliceMs()?Math.max(1,size>>1):ms<sliceMs()/4?Math.min(256,size*2):size;}
+          await breathe(true);}}
+        finally{s.matrixWorldAutoUpdate=autoMatrix;for(const o of mine)o.visible=true;mark(`${s===viewScene?'view':'world'} draw ${mine.length} in ${draws}`);}}}
       finally{renderer.setRenderTarget(previous);for(const o of culled)o.frustumCulled=true;for(const [m,k,v] of swapped)m[k]=v;for(const b of blank.values())b.dispose();}
       console.info('[warm-shaders] drew',firstDraw.n-n0,'new program/layout/target pairs,',swapped.length,'textures stood in, in',Math.round(performance.now()-t1),'ms');}
     }
@@ -783,13 +835,14 @@ async function warmShaders(waitGpu=false){
     // Without KHR_parallel_shader_compile (not on the Linux host; not promised elsewhere) compileAsync only queues the
     // compiles: the driver does the work when a program is first used (link check, uniform lookup), which was a 360 ms
     // first played frame. Using each program here (getUniforms/getAttributes) moves that wait behind the loading screen.
-    for(const program of renderer.info.programs){try{program.getUniforms();program.getAttributes();}catch{}}
+    for(const program of renderer.info.programs){try{program.getUniforms();program.getAttributes();}catch{}await breathe();}
+    mark('link');
     programCount=renderer.info.programs.length;   // compiled while loading, not mid-game
     firstDraw.lateFrom=renderer.info.programs.reduce((m,p)=>Math.max(m,p.id),-1)+1;   // programs with a higher id were compiled mid-game (reported with their material and object)
-    console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects,',variants.userData.count,'world material variants, in',Math.round(performance.now()-t0),'ms');
+    console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects,',variants.userData.count,'world material variants, in',Math.round(performance.now()-t0),'ms',sliced?`(${breaths} frames between slices; ms: ${laps.join(', ')})`:'');
     if(waitGpu&&!NO_GPU_WAIT){const ms=Math.round(await gpuIdle());console.info('[warm-shaders] GPU caught up in',ms,'ms');diag('gpuWait',{ms});}   // the loading screen stays meanwhile
   }catch(error){console.warn('[warm-shaders]',error);}
-  finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);standIns?.view.removeFromParent();keepPrograms();if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
+  finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);standIns?.view.removeFromParent();keepPrograms();if(sliced)canvas.style.visibility='';if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
 }
 renderer.info.autoReset=false;
 // (2026-10-25) a hidden top-level view object (a mod's spare ViewWeapon, the stand-ins: ~1,500 bones on Kino) is left out of
@@ -836,8 +889,8 @@ for(const [ev,name] of [['blur','blur'],['focus','focus']])addEventListener(ev,(
 document.addEventListener('visibilitychange',()=>perf.event?.(document.hidden?'hidden':'visible'));document.addEventListener('pointerlockchange',()=>perf.event?.(document.pointerLockElement?'lock':'unlock'));addEventListener('resize',()=>perf.event?.('resize'));
 function skipHidden(force){if(force||this.visible)THREE.Object3D.prototype.updateMatrixWorld.call(this,force);}   // a declaration: the frame loop starts from the load sequence before the module reaches this line
 function renderFrame(now){
-  if(document.hidden||contextLost)return;
-  const interval=settings.fpsCap>0?(active?1000/settings.fpsCap:200):0;   // the frame rate cap setting (frames a second, 0 = none; 30 by default on phones)
+  if(document.hidden||contextLost||!ready&&!NO_SLICE)return;   // nothing is drawn while loading (2026-11-04): each frame's first draws of new models compiled and uploaded in one block (300-950 ms frames); warmShaders does that work in slices
+  const interval=settings.fpsCap>0?(active||mods.keepRunning?.()?1000/settings.fpsCap:200):0;   // the frame rate cap setting (frames a second, 0 = none; 30 by default on phones)
   if(lastRendered&&now-lastRendered<interval-1)return;
   lastRendered=now;const dt=Math.min((now-previous)/1000,.06);previous=now;frameTime+=dt;frameCount++;renderedFrames++;
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
