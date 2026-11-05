@@ -142,46 +142,51 @@ guard = prism([(-0.9, 0.3), (2.6, 0.3), (2.6, -0.6), (2.1, -1.0), (-0.5, -1.0), 
 solid('guard', guard, M['poly'], cuts=[prism(fillet([(-0.5, .1), (2.2, .1), (2.2, -.6), (1.9, -.75), (-.3, -.75), (-.5, -.5)], .2), -1, 1)], bw=.05)
 solid('trigger', prism([(0.55, 0.3), (0.85, 0.3), (0.75, -0.45), (0.45, -0.55)], -.12, .12), M['steel'], bw=.03)
 # magwell collar the canister plugs into
-solid('collar', prism(fillet([(3.2, 0.1), (8.4, 0.1), (8.4, -0.75), (3.6, -0.75)], .15), -.82, .82), M['dark'],
-      cuts=[boxbm(x, x + .3, .7, 1, -.55, -.15) for x in (4.3, 4.9, 5.5)], bw=.05)
-solid('collar_slot', prism(rrect_xz(6.2, 7.9, -.6, -.1, .12), .8, .86), M['steel'], bw=.01)
+solid('collar', prism(fillet([(2.75, 0.1), (6.15, 0.1), (6.15, -0.75), (3.15, -0.75)], .15), -.82, .82), M['dark'],
+      cuts=[boxbm(x, x + .3, .7, 1, -.55, -.15) for x in (3.35, 3.9)], bw=.05)
+solid('collar_slot', prism(rrect_xz(4.45, 5.9, -.6, -.1, .12), .8, .86), M['steel'], bw=.01)
 
 # ---------------------------------------------------------------- front block and coupling
-fb = prism(fillet([(8.5, 0.0), (11.4, 0.4), (11.4, 3.65), (8.5, 3.55)], .3), -1.15, 1.15)
-fb_cuts = [prism(rrect_xz(9.15, 10.85, z0, z0 + .7, .25), -2, -.98) for z0 in (0.75, 2.35)]
-fb_cuts.append(prism(rrect_xz(9.0, 11.0, .65, 3.15, .2), .45, 2))   # the left side's cover is off: a vacuum-tube bay
-solid('front_block', fb, M['primer'], cuts=fb_cuts, bw=.1, seg=3)   # never got its top coat
-for z0 in (0.75, 2.35):
-    solid('slot_grip', prism(rrect_xz(9.35, 10.65, z0 + .18, z0 + .52, .15), -1.04, -.92), M['steel'], bw=.03)
-solid('chev', prism([(11.0, 1.6), (11.2, 1.4), (11.0, 1.2), (10.9, 1.2), (11.1, 1.4), (10.9, 1.6)], -1.18, -1.13), M['label'], bw=0)
-solid('tube_chassis', boxbm(9.05, 10.95, .45, .52, .7, 3.1), M['steel'], bw=.01)
-for x in (9.55, 10.45):   # two valves on bakelite sockets, glass envelopes with a glowing heater inside
-    solid('valve_socket', vcyl(.36, x, .85, .66, .95, 18), M['bakelite'], bw=.03)
-    solid('valve_glass', vcyl(.3, x, .85, .95, 2.7, 20), M['glass'], bw=0)
-    solid('valve_top', vcyl(.3, x, .85, 2.7, 2.95, 20, r2=.1), M['glass'], bw=0)
-    solid('valve_plate', boxbm(x - .17, x + .17, .8, .9, 1.25, 2.35), M['steel'], bw=0)
-    solid('valve_heater', vcyl(.045, x, .95, 1.15, 2.45, 8), M['filament'], bw=0)
-    solid('valve_getter', vcyl(.2, x, .85, 2.55, 2.6, 16), M['copper'], bw=0)
-tube('valve_link', [(9.55, 1.12, .8), (10.0, 1.2, .7), (10.45, 1.12, .8)], .035, M['wwhite'], res=6)
-tube('valve_feed', [(10.45, 1.1, .78), (10.85, 1.18, 1.2), (10.9, 1.24, 2.9), (10.6, 1.3, 3.1)], .04, M['wblue'], res=6)
-ring('coupling', 1.72, 1.0, 11.3, 11.75, M['steel'], bw=.05)
-ring('coupling2', 1.6, 1.0, 11.75, 12.05, M['dark'], bw=.04)
+# The left hand holds the gun here in the M16's pose: the block is the receiver's width and its underside steps up
+# under the fingers (bottom .9 at the receiver to 1.8 from x 10.8), and the shroud starts past the fingertips (x 12.6),
+# so the hand wraps the block instead of sinking into it (measured from the glove's vertices, scratch/fpv/fit.mjs)
+FB_W = .85
+fb = prism(fillet([(8.5, 0.9), (10.0, 1.15), (10.55, 1.45), (10.8, 1.8), (12.8, 1.8), (12.8, 3.65), (8.5, 3.55)], .2), -FB_W, FB_W)
+fb_cuts = [prism(rrect_xz(10.95, 12.55, z0, z0 + .55, .22), -2, -FB_W + .1) for z0 in (2.0, 2.8)]
+fb_cuts.append(prism(rrect_xz(9.35, 12.45, 2.0, 3.28, .2), .3, 2))   # the left side's cover is off: a vacuum-tube bay
+solid('front_block', fb, M['primer'], cuts=fb_cuts, bw=.08, seg=3)   # never got its top coat
+for z0 in (2.0, 2.8):
+    solid('slot_grip', prism(rrect_xz(11.15, 12.35, z0 + .15, z0 + .4, .1), -FB_W + .04, -FB_W + .16), M['steel'], bw=.02)
+solid('chev', prism([(9.3, 2.45), (9.5, 2.25), (9.3, 2.05), (9.2, 2.05), (9.4, 2.25), (9.2, 2.45)], -FB_W - .03, -FB_W + .02), M['label'], bw=0)
+solid('tube_chassis', boxbm(9.4, 12.4, .3, .37, 2.05, 3.23), M['steel'], bw=.01)
+for z in (2.36, 2.94):   # two valves lying in the bay on bakelite sockets, glass envelopes with a glowing heater inside
+    solid('valve_socket', cylbm(.31, 9.45, 9.85, z, y=.58, seg=18), M['bakelite'], bw=.03)
+    solid('valve_glass', cylbm(.25, 9.85, 11.75, z, y=.58, seg=20), M['glass'], bw=0)
+    solid('valve_top', cylbm(.25, 11.75, 12.0, z, y=.58, seg=20, r2=.09), M['glass'], bw=0)
+    solid('valve_plate', boxbm(10.25, 11.35, .53, .63, z - .14, z + .14), M['steel'], bw=0)
+    solid('valve_heater', cylbm(.04, 10.1, 11.5, z, y=.7, seg=8), M['filament'], bw=0)
+    solid('valve_getter', cylbm(.18, 11.55, 11.6, z, y=.58, seg=16), M['copper'], bw=0)
+tube('valve_link', [(9.6, .82, 2.4), (9.5, .88, 2.65), (9.6, .82, 2.9)], .035, M['wwhite'], res=6)
+tube('valve_feed', [(9.65, .8, 2.18), (10.4, .84, 2.1), (12.0, .84, 2.12), (12.3, .8, 2.7), (12.35, .7, 3.1)], .04, M['wblue'], res=6)
+SH0 = 12.75   # where the shroud starts
+ring('coupling', 1.72, 1.0, SH0, SH0 + .4, M['steel'], bw=.05)
+ring('coupling2', 1.6, 1.0, SH0 + .4, SH0 + .65, M['dark'], bw=.04)
 
 # ---------------------------------------------------------------- shroud (brushed alloy), bands, rails
 HATCH = (13.65, 15.35, SZ + .4, SZ + 1.0)   # an open service hatch above the left side rail (its cover is missing)
-solid('shroud', cylbm(SR, 11.9, 18.3, SZ, seg=40), M['silver'], cuts=[boxbm(HATCH[0], HATCH[1], .95, 2, HATCH[2], HATCH[3])], bw=.06, seg=2)
-for x in (13.15, 15.7):
+solid('shroud', cylbm(SR, SH0 + .1, 18.3, SZ, seg=40), M['silver'], cuts=[boxbm(HATCH[0], HATCH[1], .95, 2, HATCH[2], HATCH[3])], bw=.06, seg=2)
+for x in (15.7,):
     ring('red_band', SR + .015, SR - .2, x, x + .26, M['redpaint'], bw=.01)
-for x in (12.75, 17.25):
+for x in (17.25,):
     ring('groove', SR + .03, SR - .2, x, x + .12, M['steel'], bw=.01)
 ring('shroud_cap', SR + .14, 1.0, 18.15, 18.5, M['steel'], bw=.05)
 for s in (1, -1):   # side rails (left and right) and the bottom rail
-    solid('side_rail', boxbm(12.4, 17.6, s * (SR - .1), s * (SR + .32), SZ - .3, SZ + .3), M['dark'],
-          cuts=[boxbm(x, x + .22, s * (SR + .18), s * (SR + .5), SZ - .4, SZ + .4) for x in [12.7 + .5 * k for k in range(10)]], bw=.03)
-    for x in (12.6, 17.4):
+    solid('side_rail', boxbm(13.45, 17.6, s * (SR - .1), s * (SR + .32), SZ - .3, SZ + .3), M['dark'],
+          cuts=[boxbm(x, x + .22, s * (SR + .18), s * (SR + .5), SZ - .4, SZ + .4) for x in [13.7 + .5 * k for k in range(8)]], bw=.03)
+    for x in (13.6, 17.4):
         solid('rail_screw', screw(x, s * (SR + .34), SZ, .09, .05), M['steel'], bw=0)
-solid('bottom_rail', boxbm(12.4, 17.6, -.42, .42, SZ - SR - .3, SZ - SR + .25), M['dark'],
-      cuts=[boxbm(x, x + .22, -.6, .6, SZ - SR - .4, SZ - SR - .15) for x in [12.7 + .5 * k for k in range(10)]], bw=.03)
+solid('bottom_rail', boxbm(13.45, 17.6, -.42, .42, SZ - SR - .3, SZ - SR + .25), M['dark'],
+      cuts=[boxbm(x, x + .22, -.6, .6, SZ - SR - .4, SZ - SR - .15) for x in [13.7 + .5 * k for k in range(8)]], bw=.03)
 solid('knob', vcyl(.24, 14.6, -.5, SZ + SR - .3, SZ + SR + .45), M['steel'], bw=.03)
 solid('knob_cap', vcyl(.3, 14.6, -.5, SZ + SR + .4, SZ + SR + .55), M['steel'], bw=.02)
 solid('amber_vent', prism(rrect_xz(19.6, 20.5, SZ - .8, SZ - .1, .12), .95, 1.2), M['tan'],
@@ -212,14 +217,14 @@ tube('cable', [(-0.4, 1.0, 2.15), (0.6, 1.08, 1.9), (2.0, 1.12, 1.0), (3.4, 1.12
 
 # ---------------------------------------------------------------- prototype work: loose wiring, an open hatch, welds, stencils
 # a loom of four wires from the coil bay along the receiver, past the front block, into the circuit board in the hatch
-LOOM = [(3.7, .35, 2.25), (4.0, .9, 2.55), (4.6, 1.1, 3.16), (6.0, 1.1, 3.18), (7.6, 1.12, 3.06), (8.6, 1.26, 3.0),
-        (10.0, 1.3, 3.12), (11.5, 1.42, 3.4), (12.5, 1.36, 3.45), (13.3, 1.2, 3.2)]
+LOOM = [(3.7, .35, 2.25), (4.0, .9, 2.55), (4.6, 1.1, 3.16), (6.0, 1.1, 3.18), (7.6, 1.04, 3.22), (8.6, .96, 3.5),
+        (10.0, .96, 3.62), (11.5, .98, 3.72), (12.5, 1.1, 3.62), (13.3, 1.2, 3.2)]
 for i, (m, end) in enumerate((('wred', (14.0, 1.07, 2.75)), ('rubber', (14.35, 1.07, 2.85)),
                                ('wblue', (14.1, 1.07, 3.02)), ('wwhite', (14.7, 1.07, 2.95)))):
     a = [i * math.pi / 2 + k * 1.1 for k in range(len(LOOM))]   # loosely twisted round each other
     tube('loom', [(x, y + .06 * math.cos(t), z + .06 * math.sin(t)) for (x, y, z), t in zip(LOOM, a)] + [end], .05, M[m], res=6)
     solid('lug', cylbm(.07, end[0], end[0] + .14, end[2], y=1.04, axis='y', seg=8), M['copper'], bw=0)
-for x, y, z in ((6.0, 1.1, 3.18), (10.0, 1.3, 3.12)):   # electrical tape wraps
+for x, y, z in ((6.0, 1.1, 3.18), (10.0, .96, 3.62)):   # electrical tape wraps
     ring('tape', .16, .02, x - .14, x + .14, M['rubber'], z=z, y=y, seg=14, bw=.02)
 ring('zip', .145, .02, 7.0, 7.05, M['wwhite'], z=3.13, y=1.11, seg=12, bw=0)
 solid('zip_head', boxbm(6.96, 7.1, 1.24, 1.34, 3.04, 3.16), M['wwhite'], bw=0)
@@ -233,18 +238,18 @@ for x in (13.6, 15.4):
     for z in (HATCH[2] + .08, HATCH[3] - .08):
         solid('hatch_boss', screw(x, onside(0, z, SZ, SR, .01), z, .07, .05, seg=6), M['steel'], bw=0)
 # a loose red jumper looping over the window to a terminal on the front block
-tube('jumper', [(5.6, 1.12, 3.1), (6.3, 1.27, 2.3), (7.0, 1.32, 1.55), (7.8, 1.28, 1.3), (8.5, 1.26, 1.55), (8.85, 1.25, 1.9)],
+tube('jumper', [(5.6, 1.12, 3.1), (6.3, 1.22, 2.3), (7.0, 1.12, 1.55), (7.8, .98, 1.3), (8.4, .95, 1.55), (8.8, .93, 1.9)],
      .045, M['wred'], res=8)
-solid('terminal', screw(8.85, 1.19, 1.9, .14, .1, seg=6), M['copper'], bw=0)
-for x, z in ((8.8, .4), (8.8, 3.3), (11.05, 3.4)):   # hex bolts on the front block (one never went back in)
-    solid('fb_bolt', screw(x, 1.19, z, .12, .08, seg=6), M['steel'], bw=0)
-solid('fb_hole', screw(11.15, 1.15, .55, .07, .02, seg=10), M['rubber'], bw=0)
+solid('terminal', screw(8.8, .89, 1.9, .14, .1, seg=6), M['copper'], bw=0)
+for x, z in ((8.8, 1.25), (8.8, 3.3), (12.6, 3.45)):   # hex bolts on the front block (one never went back in)
+    solid('fb_bolt', screw(x, FB_W + .04, z, .12, .08, seg=6), M['steel'], bw=0)
+solid('fb_hole', screw(12.6, FB_W, 2.05, .07, .02, seg=10), M['rubber'], bw=0)
 # a rough weld down the seam where the front block meets the receiver
 weld = bmesh.new()
-for k in range(22):
-    z = .3 + k * .12
+for k in range(21):
+    z = 1.0 + k * .115
     bmesh.ops.create_icosphere(weld, subdivisions=1, radius=.075 + .02 * math.sin(k * 2.7),
-                               matrix=Matrix.Translation((8.47 + .02 * math.sin(k * 1.3), .9, z)))
+                               matrix=Matrix.Translation((8.47 + .02 * math.sin(k * 1.3), FB_W + .03, z)))
 solid('weld', weld, M['steel'], bw=0)
 # a warning plate below the coil bay: lightning triangle, "DANGER! HIGH VOLTAGE"
 solid('warn_plate', prism(rrect_xz(-0.7, 2.4, .28, .88, .06), .85, .89), M['stencil'], bw=.01)
@@ -289,72 +294,77 @@ for x, z in ((-3.75, 2.75), (-13.6, -1.2)):
     ring('sling', .32, .15, 0, .14, M['steel'], z=0, bw=.02).data.transform(Matrix.Translation((x, .7, z)) @ Matrix.Rotation(math.radians(90), 4, 'Z'))
 
 # ---------------------------------------------------------------- canister (tag_clip): the magazine
+# Everything on the mag bones ends by x 5.85: the left hand's palm is just in front (from x 6), and the canister's
+# centre sits on the M16's clip bone (x 4.3) like the M16's own magazine
 C = 'tag_clip'
-solid('canister', cylbm(CR, 3.6, 8.7, CZ, seg=40), M['silver'], part=C, bw=.05)
-solid('can_front', cylbm(CR + .06, 8.6, 9.15, CZ, seg=40), M['dark'], part=C, cuts=[cylbm(CR - .45, 8.95, 9.3, CZ, seg=40)], bw=.08, seg=2)
-solid('can_front_in', cylbm(CR - .45, 8.8, 9.0, CZ, seg=40), M['steel'], part=C, bw=.02)
-solid('can_back', cylbm(CR + .05, 3.3, 3.7, CZ, seg=40), M['dark'], part=C, bw=.06, seg=2)
-solid('can_neck', boxbm(4.3, 8.2, -.7, .7, CZ + CR - .3, -0.6), M['dark'], part=C, bw=.05)
-solid('can_plug', boxbm(5.3, 6.3, .75, 1.0, -1.2, -.7), M['dark'], part=C, bw=.03)
-text('V', .7, (8.3, onside(0, CZ - .9, CZ, CR, .03), CZ - .9), part=C, side=1, m=M['redpaint'])
-for i, z in enumerate((CZ + .25, CZ - .2, CZ - .65)):   # the yellow wires along the canister's side
-    pts = [(5.8, .9, -1.0), (6.0, onside(0, -1.1, CZ, CR, .08), -1.15), (6.4, onside(0, z + .35, CZ, CR, .08), z + .35),
-           (6.9, onside(0, z, CZ, CR, .08), z), (7.9, onside(0, z, CZ, CR, .08), z)]
-    tube('wire', pts, .06, M['hose'], part=C, res=6)
-    solid('wire_end', cylbm(.1, 7.85, 8.15, z, y=onside(0, z, CZ, CR, .08), seg=10), M['rubber'], part=C, bw=0)
-solid('can_label', prism(rrect_xz(6.2, 8.0, CZ + 1.2, CZ + 1.45, .05), 0, .92), M['label'], part=C, bw=0)
-ring('can_tape', CR + .012, CR - .2, 3.85, 4.55, M['masking'], part=C, z=CZ, bw=.005)
-text('№004', .22, (4.2, CR + .03, CZ + .1), part=C, m=M['ink_k'], font=MARKER)
-text('НЕ ВСКРЫВАТЬ', .15, (5.35, onside(0, CZ - .15, CZ, CR, .02), CZ - .15), part=C, m=M['ink_r'], font=STENCIL)   # "do not open"
+CB0, CB1 = 3.1, 5.35   # the canister body; caps behind (2.8) and in front (to 5.85)
 
-# Extended Mag (the shared extmag, on the M16's own tag_ext_clip): a second canister section screwed on in front of
-# the first, joined by a ribbed coupling with a sight-glass, the yellow wires running on along both
+
+def canister(pre, part, z=CZ, body='silver'):
+    solid(pre, cylbm(CR, CB0, CB1, z, seg=40), M[body], part=part, bw=.05)
+    solid(pre + '_front', cylbm(CR + .06, CB1 - .05, 5.85, z, seg=40), M['dark'], part=part, cuts=[cylbm(CR - .45, 5.65, 6.0, z, seg=40)], bw=.08, seg=2)
+    solid(pre + '_front_in', cylbm(CR - .45, 5.5, 5.7, z, seg=40), M['steel'], part=part, bw=.02)
+    solid(pre + '_back', cylbm(CR + .05, 2.8, 3.2, z, seg=40), M['dark'], part=part, bw=.06, seg=2)
+
+
+def can_top(pre, part, wire_x=5.3):
+    """The neck into the collar, the plug the receiver's cable feeds, and three yellow wires from it into the front cap."""
+    solid(pre + '_neck', boxbm(3.3, 5.6, -.7, .7, CZ + CR - .3, -0.6), M['dark'], part=part, bw=.05)
+    solid(pre + '_plug', boxbm(4.1, 4.9, .75, 1.0, -1.2, -.7), M['dark'], part=part, bw=.03)
+    for z in (CZ + .25, CZ - .2, CZ - .65):   # the yellow wires along the canister's side
+        pts = [(4.75, .9, -1.0), (4.95, onside(0, -1.1, CZ, CR, .08), -1.15), (5.05, onside(0, z + .3, CZ, CR, .08), z + .3),
+               (wire_x - .2, onside(0, z, CZ, CR, .08), z), (wire_x, onside(0, z, CZ, CR, .08), z)]
+        tube(pre + '_wire', pts, .06, M['hose'], part=part, res=6)
+        solid(pre + '_wire_end', cylbm(.1, wire_x - .25, wire_x, z, y=onside(0, z, CZ, CR, .08), seg=10), M['rubber'], part=part, bw=0)
+
+
+canister('canister', C)
+can_top('can', C)
+text('V', .7, (4.4, -onside(0, CZ - .5, CZ, CR, .03), CZ - .5), part=C, side=-1, m=M['redpaint'])
+solid('can_label', prism(rrect_xz(3.95, 5.1, CZ + 1.2, CZ + 1.45, .05), 0, .92), M['label'], part=C, bw=0)
+ring('can_tape', CR + .012, CR - .2, 3.25, 3.95, M['masking'], part=C, z=CZ, bw=.005)
+text('№004', .22, (3.6, CR + .03, CZ + .1), part=C, m=M['ink_k'], font=MARKER)
+text('НЕ ВСКРЫВАТЬ', .15, (4.4, onside(0, CZ - .15, CZ, CR, .02), CZ - .15), part=C, m=M['ink_r'], font=STENCIL)   # "do not open"
+
+# Extended Mag (the shared extmag, on the M16's own tag_ext_clip): a booster cell clamped under the canister, joined
+# to it by a fat coupling with a sight-glass (the hand leaves no room to make it longer)
 X = 'tag_ext_clip'
-solid('xc_can', cylbm(CR, 3.6, 8.3, CZ, seg=40), M['silver'], part=X, bw=.05)
-solid('xc_can2', cylbm(CR, 9.3, 12.2, CZ, seg=40), M['primer'], part=X, bw=.05)
-solid('xc_coupling', cylbm(CR + .14, 8.2, 9.4, CZ, seg=40), M['dark'], part=X,
-      cuts=[cylbm(CR + .3, x, x + .1, CZ, seg=40) for x in (8.4, 8.65, 8.9, 9.15)], bw=.04, seg=1)
-solid('xc_gauge', cylbm(.32, 8.8, 9.3, CZ - .1, y=CR + .1, seg=16, axis='y'), M['steel'], part=X, bw=.02)
-solid('xc_gauge_in', cylbm(.22, 8.8, 9.2, CZ - .1, y=CR + .2, seg=16, axis='y'), M['lens'], part=X, bw=0)
-solid('xc_front', cylbm(CR + .06, 12.1, 12.55, CZ, seg=40), M['dark'], part=X, cuts=[cylbm(CR - .45, 12.4, 12.7, CZ, seg=40)], bw=.08, seg=2)
-solid('xc_front_in', cylbm(CR - .45, 12.25, 12.45, CZ, seg=40), M['steel'], part=X, bw=.02)
-solid('xc_back', cylbm(CR + .05, 3.3, 3.7, CZ, seg=40), M['dark'], part=X, bw=.06, seg=2)
-solid('xc_neck', boxbm(4.3, 8.2, -.7, .7, CZ + CR - .3, -0.6), M['dark'], part=X, bw=.05)
-solid('xc_plug', boxbm(5.3, 6.3, .75, 1.0, -1.2, -.7), M['dark'], part=X, bw=.03)
-for z in (CZ + .25, CZ - .2, CZ - .65):
-    pts = [(5.8, .9, -1.0), (6.0, onside(0, -1.1, CZ, CR, .08), -1.15), (6.4, onside(0, z + .35, CZ, CR, .08), z + .35),
-           (6.9, onside(0, z, CZ, CR, .08), z), (11.4, onside(0, z, CZ, CR, .22), z)]
-    tube('xc_wire', pts, .06, M['hose'], part=X, res=6)
-    solid('xc_wire_end', cylbm(.1, 11.35, 11.65, z, y=onside(0, z, CZ, CR, .22), seg=10), M['rubber'], part=X, bw=0)
-solid('xc_label', prism(rrect_xz(9.7, 11.6, CZ + 1.2, CZ + 1.45, .05), 0, .92), M['label'], part=X, bw=0)
-ring('xc_tape', CR + .012, CR - .2, 3.85, 4.55, M['masking'], part=X, z=CZ, bw=.005)
-ring('xc_tape2', CR + .012, CR - .2, 10.2, 10.7, M['masking'], part=X, z=CZ, bw=.005)
-text('№004', .22, (4.2, CR + .03, CZ + .1), part=X, m=M['ink_k'], font=MARKER)
-text('№004-Б', .22, (10.25, CR + .03, CZ + .1), part=X, m=M['ink_k'], font=MARKER)
-text('×1.5', .3, (11.0, onside(0, CZ - .7, CZ, CR, .02), CZ - .7), part=X, m=M['ink_r'], font=STENCIL)
+BZ, BR = CZ - CR - .82, .92   # the booster's axis and radius
+canister('xc_can', X)
+can_top('xc', X)
+solid('xc_booster', cylbm(BR, CB0 + .15, CB1 - .1, BZ, seg=32), M['primer'], part=X, bw=.05)
+for x0, x1 in ((CB0, CB0 + .3), (CB1 - .2, 5.6)):
+    solid('xc_boost_cap', cylbm(BR + .06, x0, x1, BZ, seg=32), M['dark'], part=X, bw=.04, seg=2)
+for x in (3.55, 4.75):   # two clamps: a band round the booster and a web up into the canister
+    ring('xc_clamp', BR + .08, BR - .1, x, x + .3, M['dark'], part=X, z=BZ, seg=32, bw=.02)
+    solid('xc_web', boxbm(x, x + .3, -.5, .5, BZ, CZ - CR + .35), M['dark'], part=X,
+          cuts=[cylbm(CR - .02, x - .1, x + .4, CZ, seg=40), cylbm(BR - .02, x - .1, x + .4, BZ, seg=32)], bw=.02)
+solid('xc_feed', vcyl(.16, 5.1, .6, BZ + .4, CZ - CR + .4, 12), M['copper'], part=X, bw=.02)   # the booster's feed pipe
+solid('xc_gauge', cylbm(.3, 4.0, 4.45, BZ, y=BR - .05, seg=16, axis='y'), M['steel'], part=X, bw=.02)
+solid('xc_gauge_in', cylbm(.2, 4.0, 4.35, BZ, y=BR + .02, seg=16, axis='y'), M['lens'], part=X, bw=0)
+ring('xc_tape', CR + .012, CR - .2, 3.25, 3.95, M['masking'], part=X, z=CZ, bw=.005)
+text('№004', .22, (3.6, CR + .03, CZ + .1), part=X, m=M['ink_k'], font=MARKER)
+text('№004-Б', .17, (4.95, BR + .03, BZ), part=X, m=M['ink_k'], font=MARKER)
+text('×1.5', .3, (4.4, -onside(0, CZ - .5, CZ, CR, .02), CZ - .5), part=X, side=-1, m=M['ink_r'], font=STENCIL)
 
 # Dual Mag (the shared dualmag, on tag_double_clip): a spare canister strapped under the stock one, a coolant bridge
 # between them, so a reload just swaps which one feeds
 DM = 'tag_double_clip'
 Z2 = CZ - 2 * CR - .12   # the spare's axis
-for nm, z, mat in (('dm_can', CZ, 'silver'), ('dm_spare', Z2, 'primer')):
-    solid(nm, cylbm(CR, 3.6, 8.7, z, seg=40), M[mat], part=DM, bw=.05)
-    solid(nm + '_front', cylbm(CR + .06, 8.6, 9.15, z, seg=40), M['dark'], part=DM, cuts=[cylbm(CR - .45, 8.95, 9.3, z, seg=40)], bw=.08, seg=2)
-    solid(nm + '_front_in', cylbm(CR - .45, 8.8, 9.0, z, seg=40), M['steel'], part=DM, bw=.02)
-    solid(nm + '_back', cylbm(CR + .05, 3.3, 3.7, z, seg=40), M['dark'], part=DM, bw=.06, seg=2)
-solid('dm_neck', boxbm(4.3, 8.2, -.7, .7, CZ + CR - .3, -0.6), M['dark'], part=DM, bw=.05)
-solid('dm_plug', boxbm(5.3, 6.3, .75, 1.0, -1.2, -.7), M['dark'], part=DM, bw=.03)
-for x in (4.9, 7.6):   # two straps round both: a steel band and a cam buckle on the side
-    solid('dm_strap', boxbm(x, x + .45, -CR - .1, CR + .1, Z2 - CR - .1, CZ + CR + .1), M['rubber'], part=DM,
-          cuts=[boxbm(x - .1, x + .55, -CR, CR, Z2 - CR, CZ + CR)], bw=.02)
-    solid('dm_buckle', boxbm(x - .05, x + .5, CR + .05, CR + .3, Z2 + CR - .5, Z2 + CR + .5), M['steel'], part=DM, bw=.03)
-tube('dm_bridge', [(9.2, 0, CZ - .3), (9.7, 0, CZ - .6), (9.7, 0, Z2 + .6), (9.2, 0, Z2 + .3)], .2, M['hose'], part=DM, res=8)
+canister('dm_can', DM)
+canister('dm_spare', DM, z=Z2, body='primer')
+can_top('dm', DM)
+for x in (3.3, 4.85):   # two straps round both: a steel band and a cam buckle on the side
+    solid('dm_strap', boxbm(x, x + .4, -CR - .1, CR + .1, Z2 - CR - .1, CZ + CR + .1), M['rubber'], part=DM,
+          cuts=[boxbm(x - .1, x + .5, -CR, CR, Z2 - CR, CZ + CR)], bw=.02)
+    solid('dm_buckle', boxbm(x - .05, x + .45, CR + .05, CR + .3, Z2 + CR - .5, Z2 + CR + .5), M['steel'], part=DM, bw=.03)
+tube('dm_bridge', [(5.8, 0, CZ - .3), (6.25, 0, CZ - .6), (6.25, 0, Z2 + .6), (5.8, 0, Z2 + .3)], .2, M['hose'], part=DM, res=8)
 for z in (CZ - .3, Z2 + .3):
-    solid('dm_bridge_nut', cylbm(.28, 8.95, 9.3, z, seg=12), M['copper'], part=DM, bw=.02)
-solid('dm_label', prism(rrect_xz(5.4, 7.2, Z2 + .1, Z2 + .45, .05), 0, CR + .02), M['label'], part=DM, bw=0)
-text('ЗАПАС', .26, (5.5, onside(0, Z2 - .5, Z2, CR, .02), Z2 - .5), part=DM, m=M['ink_r'], font=STENCIL)   # "spare"
-text('№004', .22, (4.2, CR + .03, CZ + .1), part=DM, m=M['ink_k'], font=MARKER)
-text('№005', .22, (4.2, CR + .03, Z2 + .1), part=DM, m=M['ink_k'], font=MARKER)
+    solid('dm_bridge_nut', cylbm(.28, 5.6, 5.95, z, seg=12), M['copper'], part=DM, bw=.02)
+solid('dm_label', prism(rrect_xz(3.8, 4.8, Z2 + .1, Z2 + .45, .05), 0, CR + .02), M['label'], part=DM, bw=0)
+text('ЗАПАС', .22, (4.3, onside(0, Z2 - .5, Z2, CR, .02), Z2 - .5), part=DM, m=M['ink_r'], font=STENCIL)   # "spare"
+text('№004', .2, (4.3, CR + .03, CZ + .1), part=DM, m=M['ink_k'], font=MARKER)
+text('№005', .2, (4.3, CR + .03, Z2 + .9), part=DM, m=M['ink_k'], font=MARKER)
 
 # ---------------------------------------------------------------- flip-up irons (tag_iron_sight)
 IS = 'tag_iron_sight'
@@ -391,29 +401,29 @@ solid('rx_emit', cylbm(.1, 2.9, 3.2, RAIL + .45, seg=10), M['dot'], part=R, bw=0
 
 # MFS Deflection Core (mag): a faceted armoured canister with blue slits and deflector fins at the front
 D = 'tag_sr_deflect'
-solid('dc_body', cylbm(CR + .12, 3.3, 9.0, CZ, seg=8), M['dark'], part=D,
-      cuts=[cylbm(CR + .5, x, x + .12, CZ, seg=8) for x in (4.6, 5.6, 6.6, 7.6)], bw=.06, seg=2)
-for x in (4.6, 5.6, 6.6, 7.6):
+solid('dc_body', cylbm(CR + .12, 2.8, 5.0, CZ, seg=8), M['dark'], part=D,
+      cuts=[cylbm(CR + .5, x, x + .12, CZ, seg=8) for x in (3.3, 3.85, 4.4)], bw=.06, seg=2)
+for x in (3.3, 3.85, 4.4):
     solid('dc_glow', cylbm(CR + .02, x, x + .12, CZ, seg=8), M['deflect'], part=D, bw=0)
-solid('dc_nose', cylbm(CR + .12, 9.0, 10.0, CZ, seg=8, r2=CR - .45), M['steel'], part=D, bw=.04)
+solid('dc_nose', cylbm(CR + .12, 5.0, 5.85, CZ, seg=8, r2=CR - .45), M['steel'], part=D, bw=.04)
 for k in range(4):
     a = math.radians(45 + 90 * k)
-    fin = prism([(8.2, 0), (9.9, 0), (9.6, .45), (8.4, .45)], -.06, .06)
+    fin = prism([(4.5, 0), (5.8, 0), (5.55, .4), (4.7, .4)], -.06, .06)
     fin.transform(Matrix.Translation((0, 0, CZ)) @ Matrix.Rotation(a, 4, 'X') @ Matrix.Translation((0, 0, CR + .02)))
     solid('dc_fin', fin, M['steel'], part=D, bw=.02)
-solid('dc_neck', boxbm(4.3, 8.2, -.7, .7, CZ + CR - .3, -0.6), M['dark'], part=D, bw=.05)
-text('MFS', .45, (6.1, CR + .16, CZ - .9), part=D, side=1, m=M['label'])
+solid('dc_neck', boxbm(3.3, 5.0, -.7, .7, CZ + CR - .3, -0.6), M['dark'], part=D, bw=.05)
+text('MFS', .4, (3.9, CR + .16, CZ - .9), part=D, side=1, m=M['label'])
 
 # Overclock Cell (mag): a short hot cell with heat-sink fins and orange vents
 O = 'tag_sr_overclock'
-solid('oc_body', cylbm(CR - .2, 4.0, 8.0, CZ + .2, seg=32), M['steel'], part=O, bw=.04)
-for x in [4.3 + .32 * k for k in range(12)]:
+solid('oc_body', cylbm(CR - .2, 2.9, 5.0, CZ + .2, seg=32), M['steel'], part=O, bw=.04)
+for x in [3.1 + .32 * k for k in range(6)]:
     solid('oc_fin', cylbm(CR + .05, x, x + .12, CZ + .2, seg=32), M['dark'], part=O, bw=.02, seg=1)
-for x in (5.0, 6.0, 7.0):
+for x in (3.25, 3.9, 4.55):
     solid('oc_vent', cylbm(CR - .15, x + .1, x + .3, CZ + .2, seg=32), M['over'], part=O, bw=0)
-solid('oc_cap', cylbm(CR, 7.95, 8.4, CZ + .2, seg=32), M['dark'], part=O, cuts=[cylbm(.5, 8.25, 8.6, CZ + .2, seg=16)], bw=.05)
-solid('oc_core', cylbm(.5, 8.2, 8.3, CZ + .2, seg=16), M['over'], part=O, bw=0)
-solid('oc_neck', boxbm(4.3, 7.6, -.7, .7, CZ + CR - .5, -0.6), M['dark'], part=O, bw=.05)
+solid('oc_cap', cylbm(CR, 4.95, 5.45, CZ + .2, seg=32), M['dark'], part=O, cuts=[cylbm(.5, 5.25, 5.6, CZ + .2, seg=16)], bw=.05)
+solid('oc_core', cylbm(.5, 5.2, 5.3, CZ + .2, seg=16), M['over'], part=O, bw=0)
+solid('oc_neck', boxbm(3.3, 4.9, -.7, .7, CZ + CR - .5, -0.6), M['dark'], part=O, bw=.05)
 
 # Resonance Chamber (barrel): a stack of resonator rings round the front of the shroud, teal light between them
 RC = 'tag_sr_resonance'
