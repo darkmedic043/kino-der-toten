@@ -17,12 +17,12 @@
       "held": "knife",
       "worldModel": "models/world_knife_bowie.glb",
       "mirror": true,
-      "grip": [0, 180, 0],
+      "grip": [0, 0, 0],
       "pose": {
         "clip": "animations/viewmodel_b_knife_idle_loop.json",
         "frame": 0,
-        "turn": { "j_shoulder_le": [-16.1, 14.4, 28.6], "j_elbow_le": [-154.9, -4.8, -39.1], "j_wrist_le": [53.5, -39.4, 35.8], "j_shoulder_ri": [-6.6, -11, 16.6], "j_elbow_ri": [1.9, 15.9, -26.7], "j_wrist_ri": [61.3, 33, 1.8], "j_index_ri_1": [0, 0, 16], "j_index_ri_2": [0, 0, 12], "j_mid_ri_1": [0, 0, 16], "j_mid_ri_2": [0, 0, 12], "j_ring_ri_1": [0, 0, 16], "j_ring_ri_2": [0, 0, 12], "j_pinky_ri_1": [0, 0, 16], "j_pinky_ri_2": [0, 0, 12] },
-        "move": { "j_shoulder_le": [12, 4, -7] },
+        "turn": { "j_shoulder_le": [-19.2, 4.5, 45.4], "j_shoulder_ri": [2.6, -5.8, 6.5], "j_elbow_le": [-74.9, -19.2, 14.9], "j_elbow_ri": [-19.9, 29.6, -9.4], "j_wrist_le": [86.4, -67.7, 11.8], "j_wrist_ri": [-52.4, -47.1, 10.9], "j_index_ri_0": [5, 3.8, -8.1], "j_mid_ri_0": [-6, 4.5, -10.1], "j_thumb_ri_0": [-6.2, 14.6, -4.6], "j_index_ri_1": [-0.4, -0.1, 10.2], "j_mid_ri_1": [-0.8, -3.2, -3.4], "j_pinky_ri_0": [4.6, -9.2, -37.9], "j_ring_ri_0": [0.2, 0.3, -20.5], "j_thumb_ri_1": [0, 0, 12.6], "j_index_ri_2": [-0.4, -0.1, -10.8], "j_mid_ri_2": [2, -2.4, -16.8], "j_pinky_ri_1": [0, 0, -24.2], "j_ring_ri_1": [0, 0, -11.2], "j_thumb_ri_2": [0, 0, 29.1], "j_pinky_ri_2": [0, 0, 2.4], "j_ring_ri_2": [0, 0, -1.2] },
+        "move": { "j_shoulder_le": [3, 5, -10], "j_shoulder_ri": [-2, 0, -1] },
         "from": [{ "clip": "animations/viewmodel_claymore_idle.json", "frame": 0, "bones": "^j_(index|mid|ring|pinky|thumb|ringpalm|pinkypalm|webbing)_ri" }]
       },
       "damage": 150,

@@ -43,12 +43,13 @@ export default async function setup(api){
   // A held weapon built on a knife-shaped gun: its arms and clips, none of its shooting
   const from=await Promise.all((E.pose.from??[]).map(async f=>({re:new RegExp(f.bones),clip:await loadClip(f.clip),frame:f.frame})));
   const pose=still(await loadClip(E.pose.clip),E.pose,from),rest=asUrl(pose);
-  // grip: the knife turned in the hand (degrees about the attach tag's axes; [0,180,0] = the reverse grip, the blade out of the pinky side,
-  // as the BO6/7 combat knife is held), applied over animation.js's attach while this knife is out, undone for the gun bashes' knife
+  // grip: the knife turned in the hand (degrees about the attach tag's axes; [0,0,0] = as the tag holds it, which with the palm-down
+  // fist of the rest pose is the BO6/7 reverse grip, the blade out of the pinky side, the pommel under the thumb; [0,180,0] puts the
+  // blade out of the thumb side), applied over animation.js's attach while this knife is out, undone for the gun bashes' knife
   const GRIP=E.grip&&new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...E.grip.map(THREE.MathUtils.degToRad)));
   const grip=()=>{const k=GRIP&&view.knives?.[E.held];if(!k)return;const u=k.userData;u.attachMatrix??=k.matrix.clone();const plain=k.matrix.equals(u.attachMatrix);
     if(on&&plain)k.matrix.premultiply(GRIP);else if(!on&&!plain)k.matrix.copy(u.attachMatrix);};
-  const D=data.weapons[id]={...base,id,baseId:E.base,worldModel:E.worldModel??base.worldModel,heldKnife:E.held,mirror:E.mirror,animations:{idleAnim:rest,meleeAnim:asUrl(swingClip(pose,SLASH)),backslashAnim:asUrl(swingClip(pose,BACKSLASH)),meleeChargeAnim:asUrl(swingClip(pose,STAB))},price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,
+  const D=data.weapons[id]={...base,id,baseId:E.base,worldModel:E.worldModel??base.worldModel,heldKnife:E.held,mirror:E.mirror,armPump:true,animations:{idleAnim:rest,meleeAnim:asUrl(swingClip(pose,SLASH)),backslashAnim:asUrl(swingClip(pose,BACKSLASH)),meleeChargeAnim:asUrl(swingClip(pose,STAB))},price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,
     noAmmo:true,noAds:true,ownPackName:true,automatic:false,raiseTime:E.raiseTime,dropTime:E.dropTime,weight:.5,upgrade:{},
     melee:{meleeDamage:E.damage,meleeDelay:E.swingDelay,meleeChargeDelay:E.heavyDelay,meleeTime:E.swing,meleeChargeTime:E.heavy,meleeReach:E.reach,exact:true,fade:.05}};
   const fresh=()=>({id,mag:1,reserve:0,upgraded:false,papLevel:0});
@@ -67,6 +68,7 @@ export default async function setup(api){
   let anim=null,lowering=null,raising=false;
   const play=(keys,knife=true,end=keys.at(-1)[0],hold=false)=>{anim={keys,knife,end,hold,t:0};};
   const strike=(P,R,c)=>{
+    window.kino.fpMotion.armsBusy=!!anim;   // (fp.js's per-arm idle/sprint layer steps aside for a swing, draw or holster)
     if(!anim)return;
     const {keys,knife}=anim,t=(anim.t+=c.dt);
     apply(P,R,sample(keys,t),knife?SHOULDER:CAMERA.map(x=>x*c.rig),knife?1:c.rig);

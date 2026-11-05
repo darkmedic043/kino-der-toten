@@ -88,6 +88,15 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
   const dual={w:0,lastShots:-1,camQ:new THREE.Quaternion(),camQi:new THREE.Quaternion(),sides:['ri','le'].map((side,i)=>({side,i,sign:i?-1:1,tag:i?'tag_weapon1':'tag_weapon',
     yaw:spring(...DUAL.k.yaw[i]),pitch:spring(...DUAL.k.pitch[i]),sway:spring(...DUAL.k.sway[i]),kickP:spring(...DUAL.k.kickP[i]),kickZ:spring(...DUAL.k.kickZ[i]),
     off:new THREE.Vector3(),rot:new THREE.Euler(),M:new THREE.Matrix4(),tmpM:new THREE.Matrix4(),tagM:new THREE.Matrix4(),q:new THREE.Quaternion(),qw:new THREE.Quaternion(),p:new THREE.Vector3(),err:new THREE.Vector3(),wq:new THREE.Quaternion(),sc:new THREE.Vector3()}))};
+  // The knife (def.armPump, mods/melee, 2026-11-04, user: "make the two arms seperate animations ... make the running animation
+  // make sense"): each arm moves on its own instead of the whole view as one block. The rig is mirrored, so no IK: a rigid turn
+  // about the arm's own shoulder in view space (plus an offset), written back through the parents' matrices (parent⁻¹·A·parent is
+  // still a rotation under the mirror). i 0 = the knife arm (_le, on the right), 1 = the guard hand (_ri, on the left).
+  // sprint: both hands drop and pump alternately, fore and aft, the forearm pitching with the swing; walk: the same, small;
+  // idle: each its own breath and drift, out of step.
+  const ARMS={sprint:{pos:[[-.3,-.5,.7],[.4,-.35,.6]],rot:[[-.03,.06,.1],[-.02,-.08,-.12]]},pump:{z:.6,y:.2,x:.055,roll:.035}};
+  const arms={w:0,camQ:new THREE.Quaternion(),camQi:new THREE.Quaternion(),q:new THREE.Quaternion(),A:new THREE.Matrix4(),M:new THREE.Matrix4(),T:new THREE.Matrix4(),
+    p:new THREE.Vector3(),sc:new THREE.Vector3(),sides:['le','ri'].map((side,i)=>({side,i,sg:i?-1:1,off:new THREE.Vector3(),rot:new THREE.Euler()}))};
   function measureUnder(def){   // once per weapon and attachment set, at idle: the part's extent in the gun's frame
     under.kind=null;const ids=(def?.attachments??'').split('+'),kind=Object.keys(UNDER).find(k=>ids.includes(k));if(!kind||!view.gun)return;
     const r=view.root,g=r.getObjectByName('j_gun')??r.getObjectByName('tag_weapon');if(!g)return;
@@ -261,7 +270,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     // hip poses: gone by the time the sights are up ((1-aim)^2: before the reflex dot shows at aim .85; it used to hang in
     // the air while the gun was still swinging in from the sprint pose or the reload tilt)
     const hp=(1-aim)*(1-aim),sb=s.sprintBlend*hp,sw=s.sprintBlend*s.bobAmp*hp;
-    if(sb>.001){
+    if(sb>.001&&!def?.armPump){   // (the knife pumps its arms instead, below)
       const SP=def?.dualWield?SPRINT.dual:SPRINT,rig=frame.rig,lenK=THREE.MathUtils.clamp(frame.len/32,.5,1.15)*rig;   // a pistol drops less than a rifle; a 2.2x rig is 2.2x further away
       // heavy (hv): deeper, more canted, swung across less, rocking more with each stride
       sprintQ.setFromEuler(sprintE.set(SP.rot[0]*sb*(1+hv*.5)+Math.cos(ph*2)*.025*sw*(1+hv),SP.rot[1]*sb*(1-hv*.45)+Math.sin(ph)*.05*sw,SP.rot[2]*sb*(1+hv*.6)+Math.sin(ph)*.06*sw*(1+hv*.8)));
@@ -350,6 +359,31 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
         view.pivot.updateMatrixWorld(true);
         sealArm();
       }
+    }
+    // ---- the knife: each arm its own motion (see ARMS above); off while a swing, draw or holster pose runs (fpMotion.armsBusy)
+    arms.w=ease(arms.w,def?.armPump&&flags.hand&&str>0&&!mt&&!window.kino.fpMotion.armsBusy?1:0,10);
+    if(arms.w>.01){
+      const r=view.root,rig=frame.rig,aw=arms.w,walk=bA*(1-s.sprintBlend),sk=s.sprintBlend*hp;api.viewCamera.getWorldQuaternion(arms.camQ);arms.camQi.copy(arms.camQ).invert();
+      for(const A of arms.sides){
+        const sh=r.getObjectByName('j_shoulder_'+A.side);if(!sh)continue;
+        const sg=A.sg,pump=sg*Math.sin(ph),lift=Math.max(0,pump);   // pump > 0: this hand forward and up
+        const br=Math.sin(s.breathT*(A.i?.87:1)+A.i*1.9)*bAmp;   // its own breath, out of step with the other
+        const nx=Math.sin(s.t*.9+A.i*2.1)*.6+Math.sin(s.t*1.7+A.i*.7)*.4,ny=Math.sin(s.t*.8+A.i*1.3)*.6+Math.sin(s.t*1.5+A.i*2.9)*.4;
+        const SP=ARMS.sprint,PU=ARMS.pump,sw2=sw*amp;
+        A.off.set(SP.pos[A.i][0]*sk+nx*.12*amp+pump*.1*sw2,
+          SP.pos[A.i][1]*sk+br*1.2+ny*.1*amp+pump*PU.y*sw2+lift*.2*sw2+pump*.2*walk,
+          SP.pos[A.i][2]*sk-pump*PU.z*sw2-pump*.45*walk).multiplyScalar(rig*aw);
+        A.rot.set((SP.rot[A.i][0]*sk+pump*PU.x*sw+pump*.04*walk+br*.035+ny*.008*amp)*aw,(SP.rot[A.i][1]*sk+nx*.01*amp)*aw,(SP.rot[A.i][2]*sk+sg*pump*PU.roll*sw)*aw);
+        remember([sh],true);
+        // A = about the shoulder: T(p+off)·R·T(-p) in world; the bone's local becomes parent⁻¹·A·parent·local
+        sh.getWorldPosition(arms.p);arms.q.copy(arms.camQ).multiply(tmp.q.setFromEuler(A.rot)).multiply(arms.camQi);
+        A.off.applyQuaternion(arms.camQ);
+        arms.A.makeRotationFromQuaternion(arms.q);arms.A.setPosition(tmp.s.copy(arms.p).add(A.off).sub(tmp.e.copy(arms.p).applyQuaternion(arms.q)));
+        sh.updateMatrix();arms.M.copy(sh.parent.matrixWorld).invert().multiply(arms.A).multiply(sh.parent.matrixWorld).multiply(sh.matrix);
+        arms.M.decompose(sh.position,sh.quaternion,arms.sc);
+        sh.updateMatrixWorld(true);
+      }
+      sealArm();
     }
     // adaptive hands: the left hand trails the gun's quick moves a little (a spring in view space on the animated wrist)
     // and is put back on the grip by the two-bone IK, so the support hand reads as its own thing; off while reloading,
