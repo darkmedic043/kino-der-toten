@@ -203,6 +203,9 @@ export function setupRocketShield(api) {
     state: () => ({ owned: sh.owned, alt: sh.alt, max: MAX(), health: Math.round(sh.health), charges: sh.charges, raised: sh.raised, ready: !!sh.vw?.ready }),
     // a map's nitrous tanks (hidden map objects, shown while the shield is owned) and what to say when it breaks
     setTanks(list, hint) { tanks = list ?? []; if (hint) brokeHint = hint; for (const c of tanks) c.visible = sh.owned; },
+    // the raised shield's own viewmodel (Rocket or Zombie Shield), for the characters mod: an operator's own first-person arms
+    // re-skin onto it as on the guns (user, 2026-11-04: the Nuketown shield showed the stock arms)
+    get view() { return sh.raised && sh.vw?.ready ? sh.vw : null; },
     get owned() { return sh.owned && !sh.alt; }, get hitting() { return hitting; }, get altHitting() { return altHitting; },
   };
 }

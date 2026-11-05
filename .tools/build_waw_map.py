@@ -1097,9 +1097,13 @@ def clipmap_collision(cm, keep, flip, col_mesh, clip_nav=False, holes=()):
         surfs = shapes.get(sm['model']); o = sm['origin']
         if not surfs or not keep(o[0], o[1]):
             continue
+        # CoD multiplies row vectors (local = (world - origin) * invScaledAxis), so world = origin + local * M: M's rows
+        # are the model's axes. Applied as columns, every turned prop's hull was mirrored in yaw (Nuketown's garage door,
+        # tipped up under the garage roof, kept a wall hanging to 30 off the floor; user, 2026-11-04)
         M = inv3(sm['invScaledAxis'])
         if not M:
             continue
+        M = [[M[k][r] for k in range(3)] for r in range(3)]
         mirrored = (M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0])
                     + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0])) < 0
         # vehicles stop the player but stay out of the navmesh (Malibu's crashed semi fills the garage way out of
