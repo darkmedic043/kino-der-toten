@@ -825,7 +825,10 @@ async function warmShaders(waitGpu=false){
             const ms=performance.now()-t2;size=ms>sliceMs()?Math.max(1,size>>1):ms<sliceMs()/4?Math.min(256,size*2):size;}
           await breathe(true);}}
         finally{s.matrixWorldAutoUpdate=autoMatrix;for(const o of mine)o.visible=true;mark(`${s===viewScene?'view':'world'} draw ${mine.length} in ${draws}`);}}}
-      finally{renderer.setRenderTarget(previous);for(const o of culled)o.frustumCulled=true;for(const [m,k,v] of swapped)m[k]=v;for(const b of blank.values())b.dispose();}
+      finally{renderer.setRenderTarget(previous);for(const o of culled)o.frustumCulled=true;for(const [m,k,v] of swapped)m[k]=v;for(const b of blank.values())b.dispose();
+        // the slices left every shadow map holding only the last part: redraw them all on the first real frame (2026-11-05,
+        // user: Kino far too bright until a door is bought; the day sun's map only refreshes on a door or the power)
+        renderer.shadowMap.needsUpdate=true;for(const s of [scene,viewScene])s.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});}
       console.info('[warm-shaders] drew',firstDraw.n-n0,'new program/layout/target pairs,',swapped.length,'textures stood in, in',Math.round(performance.now()-t1),'ms');}
     }
     finally{for(const o of hidden)o.visible=false;}
