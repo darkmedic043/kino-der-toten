@@ -633,7 +633,7 @@ export function setupReaperPerks(api, catalogue, base) {
     lastShots = session.shots ?? 0;
     if (rushUntil > t && has('tactiquilla')) speedMul *= 1.15;
     // Victorious Tortoise: Shell Mend (2% of the shield's health a second, 5 s after its last blocked hit)
-    if (has('victorious') && stat('vt.mend') && t - shellHit > 10) { const rs = window.kino?.rocketShield, st = rs?.state?.(); if (st?.owned && st.health < st.max * .5) rs.heal(Math.min(st.max * stat('vt.mend') * dt, st.max * .5 - st.health)); }   // Shell Mend: slow, after 10 s unhit, only up to half health
+    if (has('victorious') && stat('vt.mend') && t - shellHit > 10) { const rs = window.kino?.rocketShield, st = rs?.state?.(); if (st?.owned && st.health < st.max * .7) rs.heal(Math.min(st.max * stat('vt.mend') * dt, st.max * .7 - st.health)); }   // Shell Mend: slow, after 10 s unhit, only up to 70% health
     // Timeslip: Pack-a-Punch
     if (has('timeslip') && session.pack && !session.pack.rpSlip && session.pack.readyAt > t) { session.pack.rpSlip = true; const cut = (session.pack.readyAt - t) / 2; session.pack.readyAt -= cut; session.pack.expires -= cut; }
     // Zombshell: hidden while in a field (upgraded)
