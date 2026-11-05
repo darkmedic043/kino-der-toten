@@ -24,6 +24,7 @@ import { MoonEnemies } from '../moon-enemies.js';
 import { MoonAudio } from '../moon-audio.js';
 import { loadModel } from '../animation.js';
 import { MapFeatures } from './custom.js';
+import { groupTrip } from '../group-trip.js';
 
 const LABELS={nml_zone:'No Man’s Land',bridge_zone:'Receiving Bay',water_zone:'Lunar Surface',cata_left_start_zone:'Tunnel 6',cata_left_middle_zone:'Tunnel 6',cata_right_start_zone:'Tunnel 11',cata_right_middle_zone:'Tunnel 11',cata_right_end_zone:'Tunnel 11',generator_zone:'Power / MPD',generator_exit_east_zone:'Laboratories',enter_forest_east_zone:'Upper Laboratories',forest_zone:'Biodome',tower_zone_east:'Laboratories',tower_zone_east2:'Laboratories'};
 
@@ -108,6 +109,23 @@ export async function createMap(ctx,entry){
     state.exposure=0;state.teleport=null;state.cooldown=4;
     ctx.toast(destination==='area51'?'Reach the teleporter at the far end of the yard.':onMoon&&!state.hasSuit?'Find the P.E.S. station. F to equip life support.':landmark.label,destination==='area51'?7:4);
   }
+
+  // Co-op (2026-11-04): the wave belongs to an area (MoonSession.enterArea: Earth's No Man's Land or the Moon's rounds,
+  // one session for the squad), so a teleport takes the whole squad, wherever they stand, as one trip. A teammate who
+  // joins later, or misses the message, follows the host's session.area from the snaps (multiplayer mod, key 'area');
+  // just after a trip of our own the host's area is still the old one for a snap or two, so that is ignored for 4 s.
+  let tripAt=-1e9;
+  function trip(destination,entityId=null){relocate(destination,entityId);ctx.flash?.();tripAt=performance.now();}
+  const tripTo=lunar=>lunar?trip('receiving'):trip('area51',mapData.returnSpawn);
+  groupTrip.on('moon:trip',d=>{
+    if(!mapData||!ctx.player||S()?.phase==='gameover')return;
+    if(performance.now()-tripAt<3000&&checkpoint===d.destination)return;   // both stepped on a pad at once
+    trip(d.destination,d.entity??null);ctx.toast?.('Your squad teleported.',3);
+  });
+  groupTrip.on('area',d=>{
+    if(!mapData||!ctx.player||S()?.phase==='gameover'||performance.now()-tripAt<4000)return;
+    const lunar=d.area==='moon';if(lunar!==onMoon)tripTo(lunar);
+  });
 
   // ---- distance culling ---------------------------------------------------------------------
   // Moon has no fog and a 70 000-unit view, so every prop batch on the map was drawn (~2 200 draw
@@ -299,7 +317,7 @@ export async function createMap(ctx,entry){
       const position=ctx.player.getFeetPosition().add(new THREE.Vector3(0,35,0)).toArray();
       const pad=mapData.entities.find(e=>['nml_teleporter','generator_teleporter'].includes(e.targetname)&&contains(e.bounds,position));
       const event=state.update(dt,environment,pad?.targetname);
-      if(event.teleport){if(event.teleport==='nml_teleporter')relocate('receiving');else relocate('area51',mapData.returnSpawn);ctx.flash();}
+      if(event.teleport){const destination=event.teleport==='nml_teleporter'?'receiving':'area51',entity=destination==='area51'?mapData.returnSpawn??null:null;trip(destination,entity);groupTrip.start('moon:trip',{destination,entity});}
       if(event.suffocated||ctx.player.getFeetPosition().y<-2000){ctx.damage(10000);return;}
       features.update(dt,keys.has('KeyF')||keys.has('KeyE')||keys.has('KeyH'));
       presentation?.update(dt,environment);
@@ -326,7 +344,7 @@ export async function createMap(ctx,entry){
     hudEffects(){const s=S();return s.effects.death_machine>s.time?'<span>DEATH MACHINE '+Math.ceil(s.effects.death_machine-s.time)+'s</span>':'';},
     state:()=>({moon:{onMoon,checkpoint,power:state?.power,hasSuit:state?.hasSuit,suit:state?.suit,exposure:state?.exposure,environment,doors:[...opened],area:S()?.area}}),
     debug:{
-      relocate:d=>relocate(d),moonState:()=>({onMoon,checkpoint,state,environment,doors:[...opened]}),
+      relocate:d=>relocate(d),teleportPad:n=>mapData.entities.find(e=>e.targetname===n)?.bounds??null,moonState:()=>({onMoon,checkpoint,state,environment,doors:[...opened]}),
       moonFeatures:()=>features,completionState:()=>features?.snapshot?.(),
     },
   };

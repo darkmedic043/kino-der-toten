@@ -5,6 +5,8 @@
 // client keeps for itself (Kino's link). The multiplayer mod fills in `send` and calls `receive`; solo, start does
 // nothing, so a map needs no co-op check. maps/custom.js does this for every world.teleporters pad (The Giant, Der
 // Eisendrache's rocket pad, any future custom map), maps/kino.js for the stage pad.
+// maps/moon.js sends 'moon:trip' (the whole squad goes) and handles 'area' (the multiplayer mod's snaps: the host's
+// session.area, for a teammate left in the other area).
 const handlers=new Map();
 export const TRIP_RADIUS=140;
 export const groupTrip={

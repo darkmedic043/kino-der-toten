@@ -166,7 +166,7 @@ export default async function setup(api){
     snapTimer-=dt;if(snapTimer>0)return;snapTimer=1/SNAP_RATE;
     if(session.phase==='preparing'&&session.round===1)scale();
     checkGameOver();
-    net.send('all',{t:'snap',gid,round:session.round,phase:session.phase==='reviving'?'fighting':session.phase,countdown:r1(session.countdown),total:session.total,killed:session.killed,spawned:session.spawned,dogRound:session.dogRound,
+    net.send('all',{t:'snap',gid,area:session.area,round:session.round,phase:session.phase==='reviving'?'fighting':session.phase,countdown:r1(session.countdown),total:session.total,killed:session.killed,spawned:session.spawned,dogRound:session.dogRound,
       power:session.power,doors:[...session.openDoors],boards:world.barriers.map(b=>b.count),box:world.activeBox?.id??null,
       pu:powerups.items.map(p=>[p.nid??0,p.type,r1(p.root.position.x),r1(p.root.position.y-40),r1(p.root.position.z),r1(p.age)]),
       z:enemies.list.map(z=>[z.id,z.kind,r1(z.root.position.x),r1(z.root.position.y),r1(z.root.position.z),Math.round(z.root.rotation.y*100)/100,STATES.indexOf(z.state),Math.round(z.health),z.speed,(z.swallowed?1:0)|(z.thrall?2:0)|(z.sleepUntil>session.time?4:0)])});
@@ -184,6 +184,9 @@ export default async function setup(api){
 
   // ---- Client role (mirror) -------------------------------------------------------------------
   const byNet=new Map(),dying=[];let snapGid=null,lastBox=null;
+  // enemies.reset() (Moon's area change, a map reset) disposes every zombie; the guest's net copies go with them, or the
+  // next snap plays clips on an uncached mixer (TypeError in _lendBinding, 2026-11-04).
+  {const reset=enemies.reset;enemies.reset=function(...a){byNet.clear();return reset.apply(this,a);};}
   // A zombie the host has climbing out of the ground plays the same riser clip here (enemies.js picks it by speed).
   function riseClip(z){
     const a=enemies.anims,clip=a[z.speed>=110?'ai_zombie_traverse_ground_climbout_fast':'ai_zombie_traverse_ground_v1_run']??a.ai_zombie_traverse_ground_climbout_fast;
@@ -223,6 +226,7 @@ export default async function setup(api){
     if(snapGid!==null&&m.gid!==snapGid){api.reset();byNet.clear();me.down=me.dead=false;}
     snapGid=m.gid;
     if(m.round>session.round&&session.round>0){host.emit('roundEnd',{round:session.round});}
+    if(m.area&&session.area&&m.area!==session.area)groupTrip.receive({key:'area',data:{area:m.area}},player.getFeetPosition());   // Moon: the squad's area (maps/moon.js)
     Object.assign(session,{round:m.round,countdown:m.countdown,total:m.total,killed:m.killed,spawned:m.spawned,dogRound:m.dogRound});
     if(!['gameover','reviving'].includes(session.phase)&&m.phase!=='reviving')session.phase=m.phase;
     applyWorld(m);
