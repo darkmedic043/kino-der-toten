@@ -128,7 +128,7 @@ export default async function setup(api){
     if(WHOOSH)audio.play(WHOOSH,.6);
     if(h.id==='frag_grenade_zm'){
       const fuse=Math.max(.05,(frag.fuseTime??3.5)-(session.time-h.pinAt));
-      const mesh=fragMesh?fragMesh.clone(true):new THREE.Mesh(new THREE.SphereGeometry(3.5,8,6),new THREE.MeshStandardMaterial({color:0x4a5039,roughness:.8}));
+      const mesh=fragMesh?cloneSkinned(fragMesh):new THREE.Mesh(new THREE.SphereGeometry(3.5,8,6),new THREE.MeshStandardMaterial({color:0x4a5039,roughness:.8}));
       const dir=camera.getWorldDirection(new THREE.Vector3());mesh.position.copy(camera.position).addScaledVector(dir,12);scene.add(mesh);
       const far=window.kino.throwRange?.()??1;   // Quarterback
       frags.push({mesh,velocity:dir.multiplyScalar(560*far).add(new THREE.Vector3(0,150*far,0)),life:fuse,spin:new THREE.Vector3(Math.random()*9,Math.random()*9,0),sticky:aug('frag.sticky')>0});

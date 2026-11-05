@@ -22,7 +22,7 @@ const up = new THREE.Vector3(0, 1, 0);
 const url = p => new URL(p, import.meta.url).href;
 const TRIP = url('models/tripmine.glb'), SMOKE = url('models/smoke.glb');
 const SOUNDS = ['plant', 'trip', 'arm', 'zap', 'zap2', 'link', 'short', 'smoke_start', 'smoke_loop', 'smoke_end', 'smoke_bounce'];
-const LASER = 240, WIRE_RANGE = 300, WIRE_CHARGES = 10, WIRE_LIFE = 60, WIRE_COOL = 1.5;
+const TRIP_REACH = 650, TRIP_SPEED = 1100, LASER = 240, WIRE_RANGE = 300, WIRE_CHARGES = 10, WIRE_LIFE = 60, WIRE_COOL = 1.5;
 const CLOUD_R = 200, CLOUD_LIFE = 12, CLOUD_GROW = 1.2, FIND = 75, REVEAL = 1.2;
 
 export async function prepare(data) {
@@ -64,7 +64,7 @@ export default async function setup(api) {
   const wireGeo = new THREE.CylinderGeometry(.45, .45, 1, 6, 1, true).translate(0, .5, 0);
   // warm-up: every program these draw mid-game, compiled behind the loading screen
   {
-    const w = new THREE.Group(); w.add(cloneSkinned(tripSrc), smokeSrc.clone(true), new THREE.Sprite(puffMat), new THREE.Mesh(beamGeo, laserMat), new THREE.Mesh(wireGeo, wireMat));
+    const w = new THREE.Group(); w.add(cloneSkinned(tripSrc), cloneSkinned(smokeSrc), new THREE.Sprite(puffMat), new THREE.Mesh(beamGeo, laserMat), new THREE.Mesh(wireGeo, wireMat));
     const lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 1, 0)]); w.add(new THREE.Line(lg, arcMat));
     (host.warmObjects ??= []).push(w);
   }
@@ -77,6 +77,18 @@ export default async function setup(api) {
     mesh.position.copy(camera.position).addScaledVector(dir, 14); scene.add(mesh);
     return { dir, vel: dir.clone().multiplyScalar(speed * far).addScaledVector(up, lift * far) };
   }
+  const seenRay = new THREE.Raycaster();
+  function seenHit(from, dir, far) {
+    const root = world.mapRoot ?? world.root;
+    if (!root) return null;
+    seenRay.set(from, dir); seenRay.near = 0; seenRay.far = far;
+    let hit;
+    try { hit = seenRay.intersectObject(root, true).find(h => h.object.isMesh && !h.object.isSkinnedMesh && h.face && h.object.material?.visible !== false); } catch { return null; }
+    if (!hit) return null;
+    const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+    if (n.dot(dir) > 0) n.negate();
+    return { at: hit.point.clone().addScaledVector(n, .5), n };
+  }
   function hitNormal(hit, dir) {
     const n = new THREE.Vector3();
     if (hit.triangle?.getNormal) { hit.triangle.getNormal(n); if (n.dot(dir) > 0) n.negate(); } else n.copy(dir).negate();
@@ -87,8 +99,17 @@ export default async function setup(api) {
   let mines = [], wires = [];
   const throwMine = () => {
     const mesh = cloneSkinned(tripSrc); mesh.traverse(o => { o.frustumCulled = false; });
-    const { dir, vel } = launchFrom(mesh, 520, 160);
-    flying.push({ kind: 'mine', mesh, vel, life: 4, face: new THREE.Vector3(dir.x, 0, dir.z).normalize() });
+    const { dir, vel } = launchFrom(mesh, 520, 160), f = { kind: 'mine', mesh, vel, life: 4, face: new THREE.Vector3(dir.x, 0, dir.z).normalize() };
+    // aimed at a surface in reach (wall, ceiling, floor): it flies straight there and sticks to it, as BO3's does;
+    // otherwise it is lobbed and sticks wherever it lands
+    const reach = TRIP_REACH * (kino.throwRange?.() ?? 1), aim = world.raycast(new THREE.Ray(camera.position.clone(), dir.clone()), 0, reach);
+    let at = aim ? (aim.point ?? aim.position).clone() : null, n = aim ? hitNormal(aim, dir) : null;
+    if (!aim || aim.distance > 150) {   // some ceilings aren't in the collision (Kino's): ask the drawn map too, nearest wins (about 5 ms, once a throw)
+      const seen = seenHit(camera.position, dir, aim ? aim.distance : reach);
+      if (seen) ({ at, n } = seen);
+    }
+    if (at) f.target = { at, n, dir: at.clone().sub(mesh.position).normalize() };
+    flying.push(f);
   };
   function plant(f, at, n) {
     const g = new THREE.Group(); g.position.copy(at); g.quaternion.setFromUnitVectors(up, n);
@@ -124,19 +145,21 @@ export default async function setup(api) {
     removeMine(m, false);
     const caught = features?.blast?.(m.top.clone(), def) ?? [], left = caught.filter(alive), kills = caught.length - left.length, f = fx();
     if (f && aug('trip.pct')) for (const z of left) f.pct(z, aug('trip.pct'));                         // Shaped Charge
-    if (f && aug('trip.stun')) for (const z of f.near(m.top, 250)) if (!elite(z)) f.stun(z, aug('trip.stun'));   // Concussive
-    if (aug('trip.salvage') && kills >= aug('trip.salvage') && session.tripsOwned && session.trips < session.tripMax()) {   // Salvage
-      session.trips++; api.toast?.('Salvage · Trip Mine returned');
-    }
+    if (f && aug('trip.stun')) for (const z of f.near(m.top, 250 * (1 + aug('trip.radius')))) if (!elite(z)) f.stun(z, aug('trip.stun'));   // Concussive (Wide Blast widens it)
+    salvage(kills);
   }
-  const zPoints = z => [z.root.position.clone().addScaledVector(up, 18), z.root.position.clone().addScaledVector(up, 55)];
+  // Salvage: a blast, or a Live Wire before it shorts out, that kills 3 or more gives one mine back
+  function salvage(kills) {
+    if (aug('trip.salvage') && kills >= aug('trip.salvage') && session.tripsOwned && session.trips < session.tripMax()) { session.trips++; api.toast?.('Salvage · Trip Mine returned'); }
+  }
+  const zPoints = z => [15, 42, 68].map(h => z.root.position.clone().addScaledVector(up, z.kind === 'dog' ? h * .5 : h));   // legs, chest, head: wall mines sit at any height
   const segDist = (p, a, b) => { const ab = b.clone().sub(a), t = THREE.MathUtils.clamp(p.clone().sub(a).dot(ab) / ab.lengthSq(), 0, 1); return a.clone().addScaledVector(ab, t).distanceTo(p); };
   function crosses(m) {
     for (const b of m.beams) {
       const end = m.top.clone().addScaledVector(b.dir, b.len);
       for (const z of enemies.list) {
         if (z.health <= 0 || z.root.position.distanceTo(m.top) > b.len + 60) continue;
-        if (zPoints(z).some(p => segDist(p, m.top, end) < 16)) return true;
+        if (zPoints(z).some(p => segDist(p, m.top, end) < 18)) return true;
       }
     }
     return false;
@@ -150,14 +173,14 @@ export default async function setup(api) {
     const pts = 14, geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts * 3), 3));
     const arc = new THREE.Line(geo, arcMat); arc.frustumCulled = false;
     scene.add(core, arc);
-    const w = { a, b, core, arc, pts, charges: WIRE_CHARGES, until: now() + WIRE_LIFE, cool: new WeakMap(), jitter: 0 };
+    const w = { a, b, core, arc, pts, kills: 0, charges: WIRE_CHARGES, until: now() + WIRE_LIFE, cool: new WeakMap(), jitter: 0 };
     a.pair = b.pair = w; wires.push(w); play('link', .55);
   }
   function removeWire(w, shorted) {
     if (!wires.includes(w)) return;
     wires = wires.filter(x => x !== w); w.core.removeFromParent(); w.arc.removeFromParent(); w.arc.geometry.dispose();
     w.a.pair = w.b.pair = null;
-    if (shorted) { play('short', .7); for (const m of [w.a, w.b]) removeMine(m, true); }
+    if (shorted) { play('short', .7); for (const m of [w.a, w.b]) removeMine(m, true); salvage(w.kills); }
   }
   function updateWire(w, dt) {
     if (now() > w.until || w.charges <= 0) return removeWire(w, true);
@@ -176,6 +199,7 @@ export default async function setup(api) {
       const f = fx(), hp = f?.maxHp?.(z) ?? z.maxHealth ?? 1000, boss = elite(z);
       if (f) { if (!boss) f.stun(z, .5); f.slow(z, .4, 2.5); }
       enemies.hurt(z, boss ? 300 : 100 + hp * .08, false, false, 'electric');
+      if (!alive(z)) w.kills++;
       kino.fx?.spark?.(z.root.position.clone().addScaledVector(up, 40));
       features?.effect?.(z.root.position.clone().addScaledVector(up, 40), 0x8fd4ff, 8);
       play(Math.random() < .5 ? 'zap' : 'zap2', .55);
@@ -196,9 +220,9 @@ export default async function setup(api) {
   };
 
   // ---- Smoke Grenade -----------------------------------------------------------------------------------------------------
-  let clouds = [], revealedUntil = 0;
+  let clouds = [], revealedUntil = 0, chokeTick = 0;
   const throwSmoke = () => {
-    const mesh = smokeSrc.clone(true), { vel } = launchFrom(mesh, 520, 160);
+    const mesh = cloneSkinned(smokeSrc), { vel } = launchFrom(mesh, 520, 160);
     flying.push({ kind: 'smoke', mesh, vel, life: aug('smoke.quick') ? .6 : 1.2, spin: new THREE.Vector3(Math.random() * 8, Math.random() * 8, 0) });
   };
   function addCloud(at, r, dur, mine) {
@@ -211,13 +235,15 @@ export default async function setup(api) {
     }
     const c = { at: at.clone(), r, born: now(), until: now() + dur, mine, group, mat, sprites, k: 0, tick: 0, quick: mine && aug('smoke.quick') > 0 };
     if (mine) {
-      play('smoke_start', .7); c.loop = audio.native?.('bo3eq_smoke_loop', .35, true);
-      const f = fx(); if (f && aug('smoke.stun')) for (const z of f.near(at, 150)) if (!elite(z)) f.stun(z, aug('smoke.stun'));   // Smoke Bomb
+      play('smoke_start', .7);
+      // audio.native resolves to the source: a cloud that ended first stops it as soon as it arrives
+      if (audio.ctx && audio.native) audio.native('bo3eq_smoke_loop', .35, true).then(src => { if (c.ended) try { src.stop(); } catch {} else c.loop = src; }).catch(() => {});
+      const f = fx(); if (f && aug('smoke.stun')) for (const z of f.near(at, 150 * (1 + aug('smoke.radius')))) if (!elite(z)) f.stun(z, aug('smoke.stun'));   // Smoke Bomb (Thick Smoke widens it)
     }
     clouds.push(c); return c;
   }
   function endCloud(c) {
-    c.group.removeFromParent(); c.mat.dispose(); c.loop?.stop?.();
+    c.ended = true; c.group.removeFromParent(); c.mat.dispose(); try { c.loop?.stop(); } catch {} c.loop = null;
     if (c.mine) play('smoke_end', .5);
     clouds = clouds.filter(x => x !== c);
   }
@@ -273,6 +299,11 @@ export default async function setup(api) {
       const step = f.vel.clone().multiplyScalar(dt), len = step.length();
       ray.set(f.mesh.position.clone(), step.clone().normalize());
       const hit = len > 0 ? world.raycast(ray, 0, len + 3) : null;
+      if (f.kind === 'mine' && f.target) {   // straight to the aimed surface
+        const left = f.target.at.distanceTo(f.mesh.position), go = TRIP_SPEED * dt;
+        if (left <= go + 1) { flying.splice(flying.indexOf(f), 1); plant(f, f.target.at, f.target.n); continue; }
+        f.mesh.position.addScaledVector(f.target.dir, go); f.mesh.rotation.x += 9 * dt; continue;
+      }
       if (f.kind === 'mine') {
         if (hit) { flying.splice(flying.indexOf(f), 1); plant(f, hit.point ?? hit.position, hitNormal(hit, ray.direction)); continue; }
         f.mesh.position.add(step); f.mesh.rotation.x += 7 * dt;
@@ -294,7 +325,7 @@ export default async function setup(api) {
       if (!m.armed) { if (t >= m.armAt) arm(m); continue; }
       if (m.boomAt) { if (t >= m.boomAt) detonate(m); continue; }
       if (aug('trip.tether') && !m.pair) {
-        const other = mines.filter(o => o !== m && o.armed && !o.pair && !o.boomAt && o.top.distanceTo(m.top) < WIRE_RANGE && world.lineClear(m.top, o.top))
+        const other = mines.filter(o => o !== m && o.armed && !o.pair && !o.boomAt && o.top.distanceTo(m.top) < WIRE_RANGE * (1 + aug('trip.radius')) && world.lineClear(m.top, o.top))
           .sort((a, b) => a.top.distanceTo(m.top) - b.top.distanceTo(m.top))[0];
         if (other) { link(m, other); continue; }
       }
@@ -308,11 +339,12 @@ export default async function setup(api) {
       c.mat.opacity = .8 * fade * Math.min(1, c.k * 1.5);
       const e = 1 - (1 - c.k) ** 2;
       for (const s of c.sprites) { s.scale.setScalar(s.userData.size * (.3 + .7 * e)); s.position.copy(s.userData.home).multiplyScalar(.4 + .6 * e); s.position.y += Math.sin(t * .6 + s.id) * 3; }
-      const choke = c.mine ? aug('smoke.choke') : 0, f = fx();   // Choking Cloud
-      if (choke && f && (c.tick -= dt) <= 0) {
-        c.tick = .5;
-        for (const z of [...enemies.list]) if (z.health > 0 && !elite(z) && inside(c, z.root.position)) { f.slow(z, choke, 1); enemies.hurt(z, f.maxHp(z) * .0075, false, false, 'explosion'); }
-      }
+    }
+    // Choking Cloud: every half second, once per zombie however many of your clouds it stands in
+    const choke = aug('smoke.choke'), f = fx();
+    if (choke && f && clouds.some(c => c.mine) && (chokeTick -= dt) <= 0) {
+      chokeTick = .5;
+      for (const z of [...enemies.list]) if (z.health > 0 && !elite(z) && clouds.some(c => c.mine && inside(c, z.root.position))) { f.slow(z, choke, 1); enemies.hurt(z, f.maxHp(z) * .0075, false, false, 'explosion'); }
     }
   });
 

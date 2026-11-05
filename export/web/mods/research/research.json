@@ -2716,7 +2716,7 @@
     {
      "name": "Live Wire",
      "kind": "major",
-     "desc": "Instead of exploding, two armed mines within 300 of each other, with nothing in between, link with an electric wire. It shocks each zombie that touches it (100 + 8% of max health, a 0.5s stun, 40% slower for 2.5s), at most every 1.5s per zombie, and shorts out after 10 shocks or 60s, taking both mines with it. A mine with no partner keeps its laser.",
+     "desc": "Instead of exploding, two armed mines within 300 of each other, with nothing in between, link with an electric wire. It shocks each zombie that touches it (100 + 8% of max health, a 0.5s stun, 40% slower for 2.5s), at most every 1.5s per zombie, and shorts out after 10 shocks or 60s, taking both mines with it. Each mine links to the nearest free one, so every extra pair makes another wire. A mine with no partner keeps its laser and explodes as normal.",
      "effects": {
       "trip.tether": 1
      },
@@ -2725,7 +2725,7 @@
     {
      "name": "Extra Mine",
      "kind": "minor",
-     "desc": "Carry 4 trip mines (refilled each round).",
+     "desc": "+1 trip mine carried (topped up each round).",
      "effects": {
       "trip.extra": 1
      },
@@ -2744,7 +2744,7 @@
     {
      "name": "Wide Blast",
      "kind": "minor",
-     "desc": "Trip mine blasts reach 30% farther.",
+     "desc": "Trip mine blasts reach 30% farther. Also widens Concussive's stun and lets Live Wire link mines 30% farther apart.",
      "effects": {
       "trip.radius": 0.3
      },
@@ -2762,7 +2762,7 @@
     {
      "name": "Salvage",
      "kind": "minor",
-     "desc": "A blast that kills 3 or more zombies gives the mine back.",
+     "desc": "A mine that kills 3 or more zombies, with its blast or as a Live Wire before it shorts out, gives one mine back.",
      "effects": {
       "trip.salvage": 3
      },
@@ -3035,7 +3035,7 @@
     {
      "name": "Thick Smoke",
      "kind": "minor",
-     "desc": "Smoke clouds are 25% wider.",
+     "desc": "Smoke clouds are 25% wider. Also widens Smoke Bomb's stun.",
      "effects": {
       "smoke.radius": 0.25
      },
@@ -3062,7 +3062,7 @@
     {
      "name": "Choking Cloud",
      "kind": "major",
-     "desc": "Zombies in your smoke are 35% slower and lose 1.5% of their max health each second (not bosses).",
+     "desc": "Zombies in your smoke are 35% slower and lose 1.5% of their max health each second (not bosses). Overlapping clouds don't stack.",
      "effects": {
       "smoke.choke": 0.35
      },
@@ -3071,7 +3071,7 @@
     {
      "name": "Extra Smoke",
      "kind": "minor",
-     "desc": "Carry 3 smoke grenades.",
+     "desc": "+1 smoke grenade carried.",
      "effects": {
       "smoke.extra": 1
      },

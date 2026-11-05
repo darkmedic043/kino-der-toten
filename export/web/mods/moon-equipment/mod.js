@@ -10,6 +10,7 @@
 // and qed.* (reroll, blast, double, refund, jackpot, stable, pure, extra).
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { PERKS, perkUnlocked } from '../terminal-booth/desktop.js';
 // QED's free perk skips Melon Pass-locked and coming-soon perks, as the gums do
 const perkOk=id=>{const p=PERKS.find(x=>x.id===id);return !p||perkUnlocked(p);};
@@ -76,7 +77,8 @@ export default async function setup(api){
   const flying=[];
   tac.launch=id=>extra[id]?extra[id].launch():launch(id);
   function launch(id){
-    const mesh=world_[id].clone(true);mesh.position.copy(camera.position);scene.add(mesh);
+    const mesh=cloneSkinned(world_[id]);mesh.traverse(o=>{o.frustumCulled=false;});mesh.position.copy(camera.position);   // the Gersh is skinned: a plain clone(true) stays bound to the source's bones and was never seen in flight
+    scene.add(mesh);
     const dir=camera.getWorldDirection(new THREE.Vector3());
     flying.push({id,mesh,v:dir.multiplyScalar(520*(window.kino.throwRange?.()??1)).addScaledVector(up,170*(window.kino.throwRange?.()??1)),settled:0,spin:new THREE.Vector3(Math.random()*8,Math.random()*8,Math.random()*8)});
   }
