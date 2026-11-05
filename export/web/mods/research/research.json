@@ -1609,9 +1609,9 @@
     {
      "name": "Shell Mend",
      "kind": "minor",
-     "desc": "Your shield mends 2% of its health a second when it hasn't blocked a hit for 5 s.",
+     "desc": "Your shield slowly mends (0.4% of its health a second) when it hasn't blocked a hit for 10 s, up to half health.",
      "effects": {
-      "vt.mend": 0.02
+      "vt.mend": 0.004
      },
      "id": "p.victorious.shellmend"
     },

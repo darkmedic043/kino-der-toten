@@ -142,7 +142,7 @@ The held shield blocks from every side and explodes when it breaks. Base blast: 
 | 4 | Spiked Shell | Major | A blocked attacker takes 0.2× zombie health and is stunned for 0.5 s (`spikes`) |
 | 5 | Hot Shell | Minor | Blast damage +50% (`damage`) |
 | 6 | Last Stand | Major | 3 s invulnerable when the shield breaks (`laststand`) |
-| 7 | Shell Mend | Minor | Repairs 2% of max health per second, 5 s after the last hit (`mend`) |
+| 7 | Shell Mend | Minor | Repairs 0.4% of max health per second, 10 s after the last hit, up to half health (`mend`; was 2%/s from 5 s to full, cut 2026-11-05 as far too strong) |
 | 8 | Retaliate | Major | Every 4th block sends a shockwave: 0.5× zombie health within 150 (`retaliate`) |
 
 ### Zombshell (`zs.`)
