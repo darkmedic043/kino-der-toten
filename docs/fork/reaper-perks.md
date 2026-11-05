@@ -1,9 +1,10 @@
-# Reaper Collection perks (4 implemented, 41 working but switched off)
+# Reaper Collection perks (4 implemented, 4 built and coming soon, 37 working but switched off)
 
 The user's requests (2026-10-18): first "add all 45 perks with their effects, but dont implement them, just keep them in the files while i figure out what i want to do, document each and every one of them", then "add the functions of all of them", answered "working, but switched off". So every effect below **works**, but **nothing sells the perks** (except the three in Implemented): no machine, no terminal PERKS entry, no gobblegum or Easter egg gives them. Only the cheat console does:
 
 - `reaper list` (held ones marked `*`, upgraded `**`), `reaper <id|name|all>`, `reaper up <id|all>` (the mod's upgraded "double buy" version), `reaper none`.
 - **Implemented** (sold for real, see the next section): Prismatic Punch, Dam-A-Nade, Magnet Margarita and Electric Cherry.
+- **Coming soon** (built with research tracks, but not given out yet; see *Coming soon* below): Stone Cold Stronghold, Victorious Tortoise, Zombshell and Tactiquilla Sangria.
 - To switch one on for real later (as was done for those three): add it to the terminal's `PERKS` list (`mods/terminal-booth/desktop.js`) and/or a machine marker alias, and give it a drink in perks-plus `data.json`.
 
 Code: `export/web/mods/perks-plus/reaper-perks.js` (`setupReaperPerks`, started by perks-plus once `reaper-perks.json` loads; `window.kino.reaperPerks` {ids, has, up, upgraded, give, armour, momentum, raiseWall, walls, nadeMax, tacticalMax, magnet}). The perks are in the perk table with `offSale: true` only so the HUD shows them while held (icons from the git-ignored `reaper/icons/` when built, else letter badges). **zh** below = `zombieHealth(round)` (1045 at round 10, 3953 at 24): the mod's scripts weren't decompiled, so every number is ours. Perks with charges or timers show a chip above the perks (`#reaper-chips`).
@@ -85,6 +86,94 @@ Magnet Margarita (user, 2026-10-19): "implements magnet margarita? havbe it be i
 | 8 | Double Dip | Major | A drop from the stash comes out twice 35% of the time |
 
 - **Verified** (2026-10-19, Kino, GPU headless): a power-up spawned 600 away came to 90 and stopped; holding U and pushing the mouse up stored it (no Insta-Kill, gone from the ground); the wheel then showed "Stash full (1/1)" and DROP INSTA-KILL, which put it 110 ahead, not pulled. With Deep Pockets three were stored and a fourth refused; Double Dip dropped two; removing the perk spilled the rest. Co-op (host + client in one browser): the host pulled a power-up to the client (90 on the host, the client's copy following), the client stored it (gone on both, no Double Points) and dropped it back (spawned by the host). `test/reaper-pass.test.mjs` covers the pass slots, the track and the terminal.
+
+## Coming soon (built, not given out)
+
+User request 2026-11-05: "build stone cold stronghold, victorious tortoise, zombshell, and Tactiquilla Sangria, build augments for them too, dont give them out to players yet, mark them as "coming soon", do the same for the gardener class".
+
+**The gate is one flag, `soon: true`**, on four records. Clear it on all four to release a perk:
+- its `REAPER_ON` entry (`reaper-perks.js`);
+- its terminal `PERKS` entry (`terminal-booth/desktop.js`);
+- its research item (`research/research.json`);
+- the release test in `test/reaper-pass.test.mjs`, which expects all four to stay soon.
+
+When releasing, also set `status` in `reaper-perks.json` and give the perk a pass item or price.
+
+What `soon` does:
+- `perkUnlocked(p)` returns false. This blocks loot free perks (Tasks chest, Nuketown), gobblegums, Wunderfizz, the Gambler and QED. `moon-equipment` QED now goes through `perkUnlocked` too, so it no longer hands out pass-locked perks either.
+- The terminal tile is greyed out and tagged SOON, and buying it says "COMING SOON".
+- Research: `isSoon(cfg,id)` (research.js). `startResearch` returns 'Coming soon', active research on a soon item is cleared, auto-advance skips it, and tab counts leave it out. The pane lists the augments with a banner.
+- The wiki pages say "Coming soon".
+
+Testing: the cheat `reaper <id>` still gives them.
+
+All four have drinks in perks-plus `data.json`, re-using existing bottles:
+- Stronghold: Jugg bottle
+- Victorious: Moon three_gun bottle
+- Zombshell: Moon marathon bottle
+- Tactiquilla: Double Tap bottle
+
+They no longer use `up()` (the cheat double-buy): the research augments are the upgrades. Each perk has 8 augments, alternating Minor/Major, read with `stat('<prefix>.<key>')`.
+
+### Stone Cold Stronghold (`sh.`)
+
+Armour builds in a ring while you stand still. Base: the ring forms after 1 s still, radius 70; armour builds at 20/s up to 150, and drains at 30/s once you leave the ring.
+
+| # | Augment | Kind | Effect |
+|---|---|---|---|
+| 1 | Quick Set | Minor | The ring forms 0.5 s sooner (`settle`) |
+| 2 | Reinforced | Major | +100 max armour (`cap`) |
+| 3 | Fast Mason | Minor | Armour builds 50% faster (`rate`) |
+| 4 | Lingering Stone | Major | Armour holds 10 s after you leave the ring before draining (`hold`) |
+| 5 | Thick Skin | Minor | Armour takes 25% less from each hit (`soak`) |
+| 6 | Shatter | Major | When the armour breaks, zombies within 150 take 1× zombie health and freeze for 2 s (`shatter`) |
+| 7 | Slow Drain | Minor | Armour drains 50% slower (`drain`) |
+| 8 | Fortress | Major | Ring radius 110, and zombies inside it are slowed 50% (`fortress`) |
+
+### Victorious Tortoise (`vt.`, needs the rocket shield)
+
+The held shield blocks from every side and explodes when it breaks. Base blast: radius 200, 3× zombie health. New rocket-shield hooks: `perk.takeMul()` scales the damage the shield takes, and `perk.hit(z)` runs on every block.
+
+| # | Augment | Kind | Effect |
+|---|---|---|---|
+| 1 | Hardened Shell | Minor | The shield takes 25% less damage (`tough`) |
+| 2 | Double Shell | Major | Double shield health (`double`) |
+| 3 | Big Bang | Minor | Blast radius +50% (`radius`) |
+| 4 | Spiked Shell | Major | A blocked attacker takes 0.2× zombie health and is stunned for 0.5 s (`spikes`) |
+| 5 | Hot Shell | Minor | Blast damage +50% (`damage`) |
+| 6 | Last Stand | Major | 3 s invulnerable when the shield breaks (`laststand`) |
+| 7 | Shell Mend | Minor | Repairs 2% of max health per second, 5 s after the last hit (`mend`) |
+| 8 | Retaliate | Major | Every 4th block sends a shockwave: 0.5× zombie health within 150 (`retaliate`) |
+
+### Zombshell (`zs.`)
+
+Shots can drop a slowing field that weakens zombies. Base: 8% chance, radius 120, lasts 6 s, 40% slow, ×1.3 damage taken.
+
+| # | Augment | Kind | Effect |
+|---|---|---|---|
+| 1 | Wide Shell | Minor | Field radius +35% (`radius`) |
+| 2 | Hidden Shell | Major | Zombies ignore you while you're in a field (`hide`) |
+| 3 | Long Shell | Minor | Fields last 4 s longer (`life`) |
+| 4 | Corrosive | Major | Fields burn: 0.05× zombie health every 0.5 s (`acid`) |
+| 5 | Frequent | Minor | +4% field chance (`chance`) |
+| 6 | Weakened | Major | Zombies in a field take +30% more damage (`weak`) |
+| 7 | Sticky | Minor | Slow +20% (`slow`) |
+| 8 | Toxic Bloom | Major | A field bursts for 0.5× zombie health when it ends (`bloom`) |
+
+### Tactiquilla Sangria (`ts.`)
+
+Fire while sprinting, a chance to refund ammo, and points for multi-kills. Base: 15% refund, multi-kill window 0.5 s, 50 points per multi-kill.
+
+| # | Augment | Kind | Effect |
+|---|---|---|---|
+| 1 | Wide Window | Minor | Multi-kill window +0.5 s (`window`) |
+| 2 | Bottomless | Major | +15% refund chance (`refund`) |
+| 3 | Tip Jar | Minor | +200 points on a 4-kill (`tip`) |
+| 4 | Double Shot | Major | Double multi-kill points (`double`) |
+| 5 | Lime Wedge | Minor | +15% refund while sprinting (`sprint`) |
+| 6 | Top Off | Major | A 3-kill puts 25% of the clip back (`topoff`) |
+| 7 | Last Drop | Minor | 50% refund on the last 2 rounds of a mag (`last`) |
+| 8 | Sangria Rush | Major | A 3-kill gives 4 s of every shot refunded and +15% speed (`rush`) |
 
 ## The command wheel
 

@@ -18,6 +18,7 @@ import { setupCoopSkills } from './coop.js';
 import { setupMech } from './mech.js';
 import { setupSkills } from './skills.js';
 import { loadGarden, setupGardener } from './gardener.js';
+import { setupThralls } from './thralls.js';
 import { setupGambler } from './gambler.js';
 
 const up=new THREE.Vector3(0,1,0);
@@ -37,7 +38,9 @@ export default async function setup(api){
   // the menu may have changed points in another tab
   // xp/level are earned here; points are spent in the menu: merge the two
   const merged=()=>{const fresh=loadClassProfile(cfg),mine=state(),theirs=fresh.classes[cls.id];
-    if(mine.level>theirs.level||mine.level===theirs.level&&mine.xp>theirs.xp){theirs.level=mine.level;theirs.xp=mine.xp;}return fresh;};
+    if(mine.level>theirs.level||mine.level===theirs.level&&mine.xp>theirs.xp){theirs.level=mine.level;theirs.xp=mine.xp;}
+    if(mine.found?.length)theirs.found=[...new Set([...(theirs.found??[]),...mine.found])];   // the Gardener's Seed Catalogue
+    return fresh;};
   addEventListener('focus',()=>{prof=merged();refresh();hud();});
 
   // ---- XP -------------------------------------------------------------------------------
@@ -169,15 +172,16 @@ export default async function setup(api){
   const mechSkill=await setupMech(actx),mech=act.id==='mech'?mechSkill:null;
   const gamb=act.id==='ante'?setupGambler(actx):null;
   await loadGarden(host);   // every class: a teammate's garden has to show up in co-op
+  actx.Z=setupThralls({api,stagger});
   const gard=act.id==='bench'?setupGardener(actx):null;
   const other=fort??eng??mech??gamb??gard;
   const actionUp=()=>turrets.length>0||!!other?.up();
-  setupCoopSkills({api,turrets,fort,eng,gard,chew:cfg.classes.find(c=>c.gardener)?.gardener.chew,sync,A:()=>A});
+  setupCoopSkills({api,turrets,fort,eng,gard,Z:actx.Z,chew:cfg.classes.find(c=>c.gardener)?.gardener.chew,sync,A:()=>A});
   // Phase 3 class skills: resource, kill skills, conditional passives (skills.js)
   function stagger(z,d){staggered.set(z,{until:session.time+d,at:z.root.position.clone()});}
   function extend(sec){for(const t of turrets)t.life+=sec;eng?.extend?.(sec);}
   var skills=setupSkills({api,cls,S:()=>S,A:()=>A,act,actionUp,nearAbility,blast});
-  Object.assign(actx,{skills:()=>skills,stagger,focus:()=>skills.focus,gainRes:n=>skills.gain(n),mechLand:()=>skills.spendData()});   // other players see (and the host enforces) what you deploy
+  Object.assign(actx,{saveClass:save,skills:()=>skills,stagger,focus:()=>skills.focus,gainRes:n=>skills.gain(n),mechLand:()=>skills.spendData()});   // other players see (and the host enforces) what you deploy
   addEventListener('keydown',e=>{if(e.code==='KeyZ'&&!e.repeat)use();});   // game-menu re-sends a rebound key as the default KeyZ
   // Lockdown augment: zombies go for the turret for its first seconds
   const lure=enemies.lureTarget?.bind(enemies);

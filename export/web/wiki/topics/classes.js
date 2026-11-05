@@ -85,14 +85,14 @@ export default {
     const classPage=x=>{
       const res=x.resource;
       const box=infobox({title:x.name,color:x.color,rows:[
-        ['Role',esc(x.tagline)],
+        ['Role',esc(x.tagline)],x.soon?['Status','Coming soon']:null,
         ['Action skill'+(actions(x).length>1?'s':''),actions(x).map(esc).join('<br>')],
         ['Resource',`${esc(res.name)} (max ${res.max})`],
         ['Skill trees',x.trees.map(t=>esc(t.name)).join('<br>')],
         ['Points to max all',`${maxPoints(x)} (you get ${C.xp.maxLevel})`],
         ['Synergies',String(x.synergies?.length??0)],
       ],foot:x.credit?`${esc(x.credit.text.replace(/\s*\(cut and re-animated\)/,''))}${x.credit.url?` · <a href="${esc(x.credit.url)}" target="_blank" rel="noopener">source</a>`:''}`:null});
-      let h=box+`<p class="lead"><i>${esc(x.tagline)}</i></p>`;
+      let h=box+`<p class="lead"><i>${esc(x.tagline)}</i></p>`+(x.soon?`<p><b>Coming soon.</b> The ${esc(x.name)} isn't out yet. Its skills are listed here as a preview, but it can't be picked or played.</p>`:'');
       h+=`<h2>Resource: ${esc(res.name)}</h2><p>${esc(res.desc)}</p>`;
       if(x.mech){
         const a=x.trees[0].action,M=x.mech;
@@ -126,9 +126,11 @@ ${g.stages.map((s,i)=>`- **${s.name}**: ${i===0?'not fighting yet':`${Math.round
 A kill close by adds ${g.ageKill} s of age and a melee pat adds ${g.agePat} s, and the pat also heals it. Zombies stop to chew a plant they walk into, ${g.chew.attackers} at a time. How long it can last depends on its life: ${Object.values(g.life).map(l=>`**${l.name}** (${l.desc.toLowerCase().replace(/\.$/,'')}, stops at ${g.stages[l.cap].name})`).join(', ')}.
 
 **Sunlight** is your resource: kills fill it, and it makes all your plants stronger. Spend ${g.bloomCost} on **Bloom** at the bench to finish every sprout and age the garden ${g.bloomAge} s.`)+
-        `<h2>Plants</h2>`+table(['Plant','Rarity','Life','From','What it does','Ancient'],Object.entries(g.plants).map(([id,p])=>[`<b>${esc(p.name)}</b>`,esc(g.rarity[p.rarity].name),esc(g.life[p.life].name),from(id,p),esc(p.desc),esc(p.ancient)]))+
+        `<h2>Plants</h2>`+table(['Plant','Rarity','Life','From','What it does','Ancient'],Object.entries(g.plants).filter(([,p])=>!p.parents&&!p.legend).map(([id,p])=>[`<b>${esc(p.name)}</b>`,esc(g.rarity[p.rarity].name),esc(g.life[p.life].name),from(id,p),esc(p.desc),esc(p.ancient)]))+
+        `<h2>Hybrids</h2><p>Put a second seed in the bench's cross socket and you get a hybrid. The second seed takes one ingredient slot. You need both parents, and each hybrid comes from a skill point in a tree.</p>`+table(['Hybrid','Parents','Rarity','Life','What it does','Ancient'],Object.values(g.plants).filter(p=>p.parents).map(p=>[`<b>${esc(p.name)}</b>`,p.parents.map(q=>esc(g.plants[q].name)).join(' × '),esc(g.rarity[p.rarity].name),esc(g.life[p.life].name),esc(p.desc),esc(p.ancient)]))+
+        `<h2>Legendaries</h2><p>Each Legendary is an exact mix of three parts, seeds and ingredients, and it's a surprise: nothing on the bench tells you the mix. The Seed Catalogue gives you a riddle for each, and shows the recipe once you have grown it. You can have ${g.legends} in your garden at a time, and a Legendary takes ${Object.values(g.plants).find(p=>p.legend).plots} plots.</p>`+table(['Legendary','Riddle','What it does','Ancient'],Object.values(g.plants).filter(p=>p.legend).map(p=>[`<b>${esc(p.name)}</b>`,esc(p.riddle),esc(p.desc),esc(p.ancient)]))+
         `<h2>Ingredients</h2>`+table(['Ingredient','What it does'],Object.values(g.additives).map(i=>[`<b>${esc(i.name)}</b>`,esc(i.desc)]))+
-        md(`Ingredients drop from kills and you collect them by walking close (they last ${D.life} s): Fertilizer from melee kills, Dew from headshots, Pollen from kills near your garden, Sticky Sap from a zombie killed while it chews, Mutagen from dogs and specials, Compost from a plant that dies.
+        md(`Ingredients drop from kills and you collect them by walking close (they last ${D.life} s): Fertilizer from melee kills, Dew from headshots, Pollen from kills near your garden, Sticky Sap from a zombie killed while it chews, Mutagen from dogs and specials, Compost from a plant that dies, Mulch from crawlers. Bone Meal, Frost Dew, Ember Ash, Static Pollen and Blood Sap need a skill point first: Bone Meal drops from headshots, Frost Dew, Ember Ash and Static Pollen from zombies killed while slowed, burning or shocked, and Blood Sap sometimes when you get hit. Moon Soil drops only on the Moon.
 
 **Seed Packets** (for Uncommon seeds) drop from round ${D.packet.from}. **Rare Seeds** drop from round ${D.rare.from}, mostly from dogs and specials. If you go ${D.packet.pity} or ${D.rare.pity} kills without one, the next kill drops it.`);
       }else if(x.gambler){
@@ -209,7 +211,7 @@ ${special.map(x=>x.mech?`- **${x.name}**: one action skill in every tree. You pi
 - Each class builds its own **resource** as you play.
 - Equipping both augments of a pair can unlock a **synergy**.
 - In co-op, other players see your action skill and what it puts down (the Gambler's casino table is the exception: only you see it).`)+
-        `<h2>The classes</h2>`+table(['Class','Role','Action skills','Resource'],C.classes.map(x=>[`<b>${L(slug(x.name),x.name)}</b>`,esc(x.tagline),actions(x).map(esc).join(', '),esc(x.resource.name)]))+
+        `<h2>The classes</h2>`+table(['Class','Role','Action skills','Resource'],C.classes.map(x=>[`<b>${L(slug(x.name),x.name)}</b>${x.soon?' (coming soon)':''}`,esc(x.tagline),actions(x).map(esc).join(', '),esc(x.resource.name)]))+
         `<p>More: ${L(slug('Levels and Skill Points'))} · ${L(slug('Charging'))} · ${L(slug('Resources'))} · ${L(slug('Synergies'))}</p>`;};
 
     const levelsPage=()=>{
@@ -252,7 +254,7 @@ You get **one skill point per level**, the first at level 1, so ${X.maxLevel} po
       {title:'Resources',group:'Guide',sub:C.classes.map(x=>x.resource.name).join(' · '),html:resourcePage,keywords:C.classes.map(x=>x.resource.name).join(' ')},
       {title:'Synergies',group:'Guide',sub:`${C.classes.reduce((a,x)=>a+(x.synergies?.length??0),0)} augment pairs`,html:synergyPage,keywords:'synergy augment pair'},
       ...C.classes.flatMap(x=>[
-        {title:x.name,group:'Classes',sub:actions(x).join(' · '),color:x.color,html:()=>classPage(x),
+        {title:x.name,group:'Classes',sub:(x.soon?'Coming soon · ':'')+actions(x).join(' · '),color:x.color,html:()=>classPage(x),
           keywords:[x.tagline,x.resource.name,...x.trees.map(t=>t.name),...actions(x),...all(x).map(n=>n.name),x.mech?'mech pilot '+Object.values(x.mech.weapons).map(w=>w.name).join(' '):'',x.gambler?'casino gambling':''].join(' ')},
         ...(x.gambler?[{title:'Ante Up',group:'Classes',sub:`${x.name}'s casino`,color:x.color,html:antePage,
           keywords:'gambler casino blackjack dice slots poker roulette jackpot high roller ante '+Object.values(x.gambler.games).map(g=>g.name).join(' ')}]:[]),
@@ -261,7 +263,7 @@ You get **one skill point per level**, the first at level 1, so ${X.maxLevel} po
 
     return {
       intro:md(`Melon Zombies has **${C.classes.length} classes**, each with three skill trees, an action skill on **Z** and a resource of its own. Classes level up separately; every level is a skill point.`)+
-        table(['Class','Role','Action skills','Resource'],C.classes.map(x=>[`<b>${L(slug(x.name),x.name)}</b>`,esc(x.tagline),actions(x).map(esc).join(', '),esc(x.resource.name)])),
+        table(['Class','Role','Action skills','Resource'],C.classes.map(x=>[`<b>${L(slug(x.name),x.name)}</b>${x.soon?' (coming soon)':''}`,esc(x.tagline),actions(x).map(esc).join(', '),esc(x.resource.name)])),
       groups:['Guide','Classes'],
       pages,
     };

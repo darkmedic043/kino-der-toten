@@ -10,6 +10,9 @@
 // and qed.* (reroll, blast, double, refund, jackpot, stable, pure, extra).
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { PERKS, perkUnlocked } from '../terminal-booth/desktop.js';
+// QED's free perk skips Melon Pass-locked and coming-soon perks, as the gums do
+const perkOk=id=>{const p=PERKS.find(x=>x.id===id);return !p||perkUnlocked(p);};
 
 const IDS=['zombie_black_hole_bomb','zombie_quantum_bomb'];
 const up=new THREE.Vector3(0,1,0);
@@ -120,7 +123,7 @@ export default async function setup(api){
     if(BAD.includes(roll)&&aug('qed.refund')){tac.id='zombie_quantum_bomb';tac.count=Math.min(tac.count+1,maxOf(tac.id));}   // Entanglement
     if(roll===0){window.kino.debug.collectPowerup?.('full_ammo');say('Max Ammo');}
     else if(roll===1){for(const z of near(650))enemies.hurt(z,z.health,false,false,'explosion');say('Quantum explosion');}
-    else if(roll===2){const all=Object.keys(data.perkDrinks??{}).filter(p=>!session.perks.has(p));const p=all[Math.floor(Math.random()*all.length)];if(p){session.perks.add(p);session.health=session.maxHealth;if(jack>1)refillAmmo();say('Free '+(data.perkDrinks[p].name??'perk'));}else say('Nothing happened');}
+    else if(roll===2){const all=Object.keys(data.perkDrinks??{}).filter(p=>!session.perks.has(p)&&perkOk(p));const p=all[Math.floor(Math.random()*all.length)];if(p){session.perks.add(p);session.health=session.maxHealth;if(jack>1)refillAmmo();say('Free '+(data.perkDrinks[p].name??'perk'));}else say('Nothing happened');}
     else if(roll===3){teleportPlayer();say('Teleportation');}
     else if(roll===4){session.points+=1000*jack;say(`+${1000*jack} points`);}
     else if(roll===5){window.kino.debug.collectPowerup?.('double_points');say('Double Points');}

@@ -1465,6 +1465,330 @@
    ]
   },
   {
+   "id": "specialty_stronghold",
+   "name": "Stone Cold Stronghold",
+   "kind": "perk",
+   "color": "#8a9aa8",
+   "soon": true,
+   "augments": [
+    {
+     "name": "Quick Set",
+     "kind": "minor",
+     "desc": "The ring forms after 0.5 s standing still (was 1 s).",
+     "effects": {
+      "sh.settle": 0.5
+     },
+     "id": "p.stronghold.quickset"
+    },
+    {
+     "name": "Reinforced",
+     "kind": "major",
+     "desc": "Armour builds up to 250 (was 150).",
+     "effects": {
+      "sh.cap": 100
+     },
+     "id": "p.stronghold.reinforced"
+    },
+    {
+     "name": "Fast Mason",
+     "kind": "minor",
+     "desc": "Armour builds 50% faster (30 a second).",
+     "effects": {
+      "sh.rate": 0.5
+     },
+     "id": "p.stronghold.fastmason"
+    },
+    {
+     "name": "Lingering Stone",
+     "kind": "major",
+     "desc": "Leaving the ring, your armour holds for 10 s before it starts to drain.",
+     "effects": {
+      "sh.hold": 10
+     },
+     "id": "p.stronghold.lingeringstone"
+    },
+    {
+     "name": "Thick Skin",
+     "kind": "minor",
+     "desc": "Armour wears 25% slower: each point of armour soaks 1.33 damage.",
+     "effects": {
+      "sh.soak": 0.25
+     },
+     "id": "p.stronghold.thickskin"
+    },
+    {
+     "name": "Shatter",
+     "kind": "major",
+     "desc": "When your armour breaks it bursts: zombies within 150 take a hit and freeze for 2 s.",
+     "effects": {
+      "sh.shatter": 1
+     },
+     "id": "p.stronghold.shatter"
+    },
+    {
+     "name": "Slow Drain",
+     "kind": "minor",
+     "desc": "Armour drains half as fast once you leave the ring.",
+     "effects": {
+      "sh.drain": 0.5
+     },
+     "id": "p.stronghold.slowdrain"
+    },
+    {
+     "name": "Fortress",
+     "kind": "major",
+     "desc": "The ring is wider (110) and zombies inside it move at half speed.",
+     "effects": {
+      "sh.fortress": 1
+     },
+     "id": "p.stronghold.fortress"
+    }
+   ]
+  },
+  {
+   "id": "specialty_victorious",
+   "name": "Victorious Tortoise",
+   "kind": "perk",
+   "color": "#3a8a3a",
+   "soon": true,
+   "augments": [
+    {
+     "name": "Hardened Shell",
+     "kind": "minor",
+     "desc": "Your shield takes 25% less damage from the hits it blocks.",
+     "effects": {
+      "vt.tough": 0.25
+     },
+     "id": "p.victorious.hardenedshell"
+    },
+    {
+     "name": "Double Shell",
+     "kind": "major",
+     "desc": "Your shield has double health.",
+     "effects": {
+      "vt.double": 1
+     },
+     "id": "p.victorious.doubleshell"
+    },
+    {
+     "name": "Big Bang",
+     "kind": "minor",
+     "desc": "The blast when your shield breaks reaches 50% further (300).",
+     "effects": {
+      "vt.radius": 0.5
+     },
+     "id": "p.victorious.bigbang"
+    },
+    {
+     "name": "Spiked Shell",
+     "kind": "major",
+     "desc": "A zombie that hits your shield takes damage back and is stunned for 0.5 s.",
+     "effects": {
+      "vt.spikes": 0.2
+     },
+     "id": "p.victorious.spikedshell"
+    },
+    {
+     "name": "Hot Shell",
+     "kind": "minor",
+     "desc": "The blast when your shield breaks deals 50% more damage.",
+     "effects": {
+      "vt.damage": 0.5
+     },
+     "id": "p.victorious.hotshell"
+    },
+    {
+     "name": "Last Stand",
+     "kind": "major",
+     "desc": "When your shield breaks you are invulnerable for 3 s.",
+     "effects": {
+      "vt.laststand": 3
+     },
+     "id": "p.victorious.laststand"
+    },
+    {
+     "name": "Shell Mend",
+     "kind": "minor",
+     "desc": "Your shield mends 2% of its health a second when it hasn't blocked a hit for 5 s.",
+     "effects": {
+      "vt.mend": 0.02
+     },
+     "id": "p.victorious.shellmend"
+    },
+    {
+     "name": "Retaliate",
+     "kind": "major",
+     "desc": "Every 4th hit your shield blocks sends out a shockwave: zombies within 150 are hurt and stunned for 1 s.",
+     "effects": {
+      "vt.retaliate": 0.5
+     },
+     "id": "p.victorious.retaliate"
+    }
+   ]
+  },
+  {
+   "id": "specialty_zombshell",
+   "name": "Zombshell",
+   "kind": "perk",
+   "color": "#7ab83a",
+   "soon": true,
+   "augments": [
+    {
+     "name": "Wide Shell",
+     "kind": "minor",
+     "desc": "Fields are 35% wider.",
+     "effects": {
+      "zs.radius": 0.35
+     },
+     "id": "p.zombshell.wideshell"
+    },
+    {
+     "name": "Hidden Shell",
+     "kind": "major",
+     "desc": "While you stand in a field, zombies ignore you.",
+     "effects": {
+      "zs.hide": 1
+     },
+     "id": "p.zombshell.hiddenshell"
+    },
+    {
+     "name": "Long Shell",
+     "kind": "minor",
+     "desc": "Fields last 10 s (was 6).",
+     "effects": {
+      "zs.life": 4
+     },
+     "id": "p.zombshell.longshell"
+    },
+    {
+     "name": "Corrosive",
+     "kind": "major",
+     "desc": "Zombies in a field take damage over time.",
+     "effects": {
+      "zs.acid": 0.1
+     },
+     "id": "p.zombshell.corrosive"
+    },
+    {
+     "name": "Frequent",
+     "kind": "minor",
+     "desc": "Bullet hits leave a field 12% of the time (was 8%).",
+     "effects": {
+      "zs.chance": 0.04
+     },
+     "id": "p.zombshell.frequent"
+    },
+    {
+     "name": "Weakened",
+     "kind": "major",
+     "desc": "Zombies in a field take 60% more damage (was 30%).",
+     "effects": {
+      "zs.weak": 0.3
+     },
+     "id": "p.zombshell.weakened"
+    },
+    {
+     "name": "Sticky",
+     "kind": "minor",
+     "desc": "Zombies in a field move at 20% speed (was 40%).",
+     "effects": {
+      "zs.slow": 0.2
+     },
+     "id": "p.zombshell.sticky"
+    },
+    {
+     "name": "Toxic Bloom",
+     "kind": "major",
+     "desc": "When a field ends it bursts, hurting every zombie still in it.",
+     "effects": {
+      "zs.bloom": 0.5
+     },
+     "id": "p.zombshell.toxicbloom"
+    }
+   ]
+  },
+  {
+   "id": "specialty_tactiquilla",
+   "name": "Tactiquilla Sangria",
+   "kind": "perk",
+   "color": "#c03a5a",
+   "soon": true,
+   "augments": [
+    {
+     "name": "Wide Window",
+     "kind": "minor",
+     "desc": "Kills up to 1 s apart count as a multi-kill (was 0.5 s).",
+     "effects": {
+      "ts.window": 0.5
+     },
+     "id": "p.tactiquilla.widewindow"
+    },
+    {
+     "name": "Bottomless",
+     "kind": "major",
+     "desc": "30% of your shots put the round back (was 15%).",
+     "effects": {
+      "ts.refund": 0.15
+     },
+     "id": "p.tactiquilla.bottomless"
+    },
+    {
+     "name": "Tip Jar",
+     "kind": "minor",
+     "desc": "A multi-kill of 4 or more pays 200 extra.",
+     "effects": {
+      "ts.tip": 200
+     },
+     "id": "p.tactiquilla.tipjar"
+    },
+    {
+     "name": "Double Shot",
+     "kind": "major",
+     "desc": "Multi-kills pay double: 100 per extra kill.",
+     "effects": {
+      "ts.double": 1
+     },
+     "id": "p.tactiquilla.doubleshot"
+    },
+    {
+     "name": "Lime Wedge",
+     "kind": "minor",
+     "desc": "Shots fired while sprinting are 15% more likely to come back.",
+     "effects": {
+      "ts.sprint": 0.15
+     },
+     "id": "p.tactiquilla.limewedge"
+    },
+    {
+     "name": "Top Off",
+     "kind": "major",
+     "desc": "A multi-kill of 3 or more puts a quarter of your magazine back.",
+     "effects": {
+      "ts.topoff": 0.25
+     },
+     "id": "p.tactiquilla.topoff"
+    },
+    {
+     "name": "Last Drop",
+     "kind": "minor",
+     "desc": "The last 3 rounds in a magazine come back half the time.",
+     "effects": {
+      "ts.last": 0.5
+     },
+     "id": "p.tactiquilla.lastdrop"
+    },
+    {
+     "name": "Sangria Rush",
+     "kind": "major",
+     "desc": "A multi-kill of 3 or more gives you 4 s of rush: 15% faster, and every shot comes back.",
+     "effects": {
+      "ts.rush": 4
+     },
+     "id": "p.tactiquilla.sangriarush"
+    }
+   ]
+  },
+  {
    "id": "cryo",
    "name": "Cryo Freeze",
    "kind": "ammo",

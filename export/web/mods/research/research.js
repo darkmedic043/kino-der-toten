@@ -24,24 +24,26 @@ export const researchOpen=(cfg,level)=>level>=(cfg.unlockLevel??1);
 // The next augment to research on an item's track (null when the track is done).
 export const nextOnTrack=(cfg,r,itemId)=>cfg.items.find(i=>i.id===itemId)?.augments.find(a=>!r.done.includes(a.id))??null;
 export const mastered=(cfg,r,itemId)=>!nextOnTrack(cfg,r,itemId);
+// items marked `soon` (built, not released yet: user 2026-11-05) are shown but can't be researched
+export const isSoon=(cfg,itemId)=>!!cfg.items.find(i=>i.id===itemId)?.soon;
 
 // Start (or switch to) researching an augment: only the next one on its track. Returns a reason when it can't.
 export function startResearch(cfg,r,augId){
-  const a=augById(cfg)[augId];if(!a)return 'Unknown augment';if(r.done.includes(augId))return 'Already researched';
+  const a=augById(cfg)[augId];if(!a)return 'Unknown augment';if(isSoon(cfg,a.item))return 'Coming soon';if(r.done.includes(augId))return 'Already researched';
   if(nextOnTrack(cfg,r,a.item)?.id!==augId)return 'Research the augments before it on this track first';
   r.active=augId;return null;
 }
 // Grant research XP to the active research. `isActive(itemId)` says whether its item is active in the match (×activeMul).
 // Returns the augment finished by this XP (with `mastery: true` when it completed the track), or null.
 export function grantResearchXp(cfg,r,amount,isActive){
-  const id=r.active;if(!id||amount<=0)return null;const a=augById(cfg)[id];if(!a){r.active=null;return null;}
+  const id=r.active;if(!id||amount<=0)return null;const a=augById(cfg)[id];if(!a||isSoon(cfg,a.item)){r.active=null;return null;}
   r.progress[id]=(r.progress[id]??0)+amount*(isActive?.(a.item)?cfg.activeMul??1:1);
   if(r.progress[id]<costOf(cfg,a))return null;
   const over=r.progress[id]-costOf(cfg,a);delete r.progress[id];if(!r.done.includes(id))r.done.push(id);
   // carry on down the same track automatically, as BO7 does; a mastered track moves on to the next item that isn't
   // (same kind first: perk or ammo mod), so research never stalls mid-match. The XP past the cost carries over.
   const next=nextOnTrack(cfg,r,a.item),item=cfg.items.find(i=>i.id===a.item);
-  const order=[...cfg.items.filter(i=>i.kind===item?.kind),...cfg.items.filter(i=>i.kind!==item?.kind)];
+  const order=[...cfg.items.filter(i=>i.kind===item?.kind),...cfg.items.filter(i=>i.kind!==item?.kind)].filter(i=>!i.soon);
   const after=next??order.map(i=>nextOnTrack(cfg,r,i.id)).find(Boolean)??null;
   r.active=after?.id??null;if(after&&over>0)r.progress[after.id]=(r.progress[after.id]??0)+over;
   return {...a,mastery:!next,next:after};

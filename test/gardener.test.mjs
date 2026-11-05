@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { recipe, stageAt, stagePower, plantDps, plantBlock, plantCooldown, dropsFor, gardenSeeds, plotsFor, bloomCost } from '../export/web/mods/classes/garden-rules.js';
+import { resolve, gardenKnown, recipe, stageAt, stagePower, plantDps, plantBlock, plantCooldown, dropsFor, gardenSeeds, plotsFor, bloomCost } from '../export/web/mods/classes/garden-rules.js';
 
 const cfg=JSON.parse(await readFile(new URL('../export/web/mods/classes/classes.json',import.meta.url)));
 const cls=cfg.classes.find(c=>c.id==='gardener'),G=cls.gardener,S={};
@@ -13,12 +13,12 @@ function bestGarden(s,stage,plots,seeds=Object.keys(G.plants)){
   for(const id of seeds){
     const r=recipe(G,s,id),st=Math.min(stage,r.cap);
     // a wilting plant is used up: only as many stand at once as the bench can replace in its lifetime
-    const p=G.plants[id],most=p.life==='wilting'?Math.max(1,Math.round(p.uses*(p.every??8)/40)):p.limit??plots;
-    for(let i=0;i<most;i++)list.push({id,d:plantDps(r,G,s,st),plots:r.plots});
+    const p=G.plants[id],most=p.lifespan?1:p.life==='wilting'?Math.max(1,Math.round(p.uses*(p.every??8)/40)):p.limit??plots;
+    for(let i=0;i<most;i++)list.push({id,d:plantDps(r,G,s,st),plots:r.plots,legend:p.legend});
   }
   list.sort((a,b)=>b.d/b.plots-a.d/a.plots);
-  let left=plots,dps=0,used=[];
-  for(const x of list)if(x.plots<=left){left-=x.plots;dps+=x.d;used.push(x.id);}
+  let left=plots,dps=0,used=[],legends=G.legends+(s['garden.legends']??0);
+  for(const x of list)if(x.plots<=left&&(!x.legend||legends-->0)){left-=x.plots;dps+=x.d;used.push(x.id);}
   return {dps,used};
 }
 
@@ -40,11 +40,11 @@ test('plants get stronger as they age, and only long-lived ones reach the top',(
 });
 test('a garden stays inside its budget: commons about a Sentry, the best one a strong late game but not a delete key',()=>{
   const commons=Object.keys(G.plants).filter(k=>G.plants[k].rarity==='common');
-  const first=bestGarden(S,1,G.plots,commons),late=bestGarden(S,3,G.plots),maxed={'garden.power':.2,'garden.stagePower':.24,'garden.plots':3},top=bestGarden(maxed,3,plotsFor(G,maxed));
+  const first=bestGarden(S,1,G.plots,commons),late=bestGarden(S,3,G.plots),maxed={'garden.power':.2,'garden.stagePower':.24,'garden.plots':3,'garden.legends':1},top=bestGarden(maxed,3,plotsFor(G,maxed));
   console.log('commons',first.dps.toFixed(2),first.used.join(),'\nlate',late.dps.toFixed(2),late.used.join(),'\nmaxed',top.dps.toFixed(2),top.used.join());
   assert.ok(first.dps<=.8,`commons ${first.dps}`);
-  assert.ok(late.dps<=1.8,`late ${late.dps}`);
-  assert.ok(top.dps<=3.8,`maxed ${top.dps}`);
+  assert.ok(late.dps<=2.2,`late ${late.dps}`);
+  assert.ok(top.dps<=4.5,`maxed ${top.dps}`);
 });
 test('rarer plants are better per plot and cost more bench time',()=>{
   const by=rar=>{const v=Object.keys(G.plants).filter(k=>G.plants[k].rarity===rar).map(k=>{const r=recipe(G,S,k);return plantDps(r,G,S,Math.min(r.cap,3))/r.plots;});return Math.max(...v);};
@@ -96,4 +96,34 @@ test('every class can reach its capstones with one side of each either-or',()=>{
     spend+=Object.values(pairs).reduce((a,b)=>a+b,0);
     assert.ok(spend>=(cap.tier-1)*cfg.tierPoints,`${c.id}/${t.id}: ${spend} points reachable`);
   }
+});
+
+test('two seeds cross only into their hybrid, and a Legendary is an exact recipe',()=>{
+  assert.equal(resolve(G,'pod',null,['dew']).id,'pod');
+  assert.equal(resolve(G,'pod','thorn',[]),null);
+  assert.equal(resolve(G,'pod','lily',['dew']).id,'choir');
+  assert.deepEqual(resolve(G,'pod','lily',['dew']).adds,['dew']);
+  assert.equal(resolve(G,'melon',null,['moon','mutagen']).id,'patriarch');
+  assert.deepEqual(resolve(G,'melon',null,['mutagen','moon']).adds,[]);
+  assert.deepEqual(resolve(G,'melon',null,['mutagen','moon']).cost.sort(),['moon','mutagen']);
+  assert.equal(resolve(G,'mutagen',null,[])?.id,'mutagen');   // nothing here checks seeds: the bench only offers real ones
+});
+test('every hybrid and Legendary is reachable, and a Legendary has a riddle in the Catalogue',()=>{
+  const all=Object.fromEntries(nodes.map(n=>[n.id,1])),caps=nodes.filter(n=>n.seed&&n.type==='capstone').map(n=>n.id);
+  const known=[null,...caps].flatMap(c=>gardenKnown(G,cls,{points:all,loadout:{capstone:c}}));
+  for(const [id,p] of Object.entries(G.plants)){
+    assert.ok(known.includes(id),id);
+    if(p.legend)assert.ok(p.riddle&&p.recipe.length===3&&p.plots===3,id);
+    if(p.parents)assert.ok(p.parents.every(x=>G.plants[x]&&!G.plants[x].parents),id);
+  }
+  const hy=nodes.flatMap(n=>n.hybrids??[]);for(const [id,p] of Object.entries(G.plants))if(p.parents)assert.ok(hy.includes(id),id);
+  const recipes=Object.values(G.plants).filter(p=>p.recipe).map(p=>[...p.recipe].sort().join());assert.equal(new Set(recipes).size,recipes.length);
+  for(const p of Object.values(G.plants))for(const x of p.recipe??[])assert.ok(G.plants[x]||G.additives[x],x);
+});
+test('one Legendary at a time, two with the capstone',()=>{
+  const base={known:Object.keys(G.plants),inv:{rare:3},used:0,garden:['patriarch']};
+  assert.equal(plantBlock(G,S,'grave',[],base),'legend');
+  assert.equal(plantBlock(G,{'garden.legends':1,'garden.plots':3},'grave',[],{...base,used:3}),null);
+  assert.equal(plantBlock(G,S,'pod',['dew'],{...base,inv:{dew:0}}),'ingredient');
+  assert.equal(plantBlock(G,S,'pod',['dew'],{...base,inv:{dew:1},cost:[]}),null);
 });

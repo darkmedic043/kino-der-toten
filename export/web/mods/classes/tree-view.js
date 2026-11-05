@@ -6,7 +6,7 @@
 // BL4 loadout: each tree header equips its action skill; clicking an unlocked
 // augment (free once its tier opens; of the equipped tree, 2 slots) or capstone
 // (a point, any tree, 1 slot) equips it.
-import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, actionRows, describe, actionOf, equippedTree, equipAction, toggleAugment, toggleCapstone, isEquipped, unlocked, exclBlocker, activeSynergies, pruneLoadout, mechWeapons, augmentsOn, equipArm, augmentSlots } from './classes.js';
+import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, actionRows, describe, actionOf, equippedTree, equipAction, toggleAugment, toggleCapstone, isEquipped, unlocked, exclBlocker, activeSynergies, pruneLoadout, mechWeapons, augmentsOn, equipArm, augmentSlots, comingSoon } from './classes.js';
 
 const ICONS={
   turret:'<path d="M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4"/>',
@@ -162,6 +162,9 @@ export const CLASS_CSS=`
 `;
 
 export function renderClasses(root,cfg,{getState,setState}){
+  // a coming-soon class (the Gardener) is only previewed: `preview` holds it, never the saved pick, and nothing in its
+  // view can be changed (points, augments, respec)
+  let preview=null;const cur=st=>classById(cfg,preview??st.selected)??cfg.classes[0];
   let sel=null;
   // Mech: a weapon on each arm (chips of the weapons unlocked so far) and that weapon's augment slots
   function mechArms(cls,state){
@@ -178,14 +181,15 @@ export function renderClasses(root,cfg,{getState,setState}){
     return `<div class="cls-syn"><small>AUGMENT SYNERGIES</small>${list.map(y=>`<div class="${act.includes(y.id)?'on':''}"><b>${esc(name(y.a))} + ${esc(name(y.b))} · ${esc(y.name)}</b><br>${esc(y.desc)}</div>`).join('')}</div>`;
   }
   function draw(){
-    const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0],state=st.classes[cls.id];
+    const st=getState(),cls=cur(st),state=st.classes[cls.id];
     const act=actionOf(cls,state),eq=equippedTree(cls,state),a=actionStats(cls,state),L=state.loadout;
     const capNode=cls.trees.flatMap(t=>t.nodes.map(n=>({...n,tree:t.id,tc:t.color}))).find(n=>n.id===L.capstone);
     const slot=(label,n,color)=>`<div class="${n?'full':''}" style="--sc:${color}"><small>${label}</small>${n?esc(n.name):'EMPTY'}</div>`;
     const need=xpToNext(cfg,state.level),maxed=state.level>=cfg.xp.maxLevel;
     root.style.setProperty('--cc',cls.color);
     root.innerHTML=`<div class="cls">
-      ${cfg.classes.length>1?`<div class="cls-pick">${cfg.classes.map(c=>`<button data-class="${c.id}" style="--pc:${c.color}"${c.id===cls.id?' class="on"':''}>${icon(c.trees[0].action.icon)}${esc(c.name.toUpperCase())} <small>LV ${st.classes[c.id]?.level??1}</small></button>`).join('')}</div>`:''}
+      ${cfg.classes.length>1?`<div class="cls-pick">${cfg.classes.map(c=>`<button data-class="${c.id}" style="--pc:${c.color}"${c.id===cls.id?' class="on"':''}>${icon(c.trees[0].action.icon)}${esc(c.name.toUpperCase())} <small>${comingSoon(c)?'SOON':'LV '+(st.classes[c.id]?.level??1)}</small></button>`).join('')}</div>`:''}
+      ${preview?`<div class="cls-soon" style="padding:10px 14px;margin-bottom:10px;border:1px dashed var(--cc);color:var(--cc);font-size:13px;letter-spacing:.5px"><b>COMING SOON</b> · The ${esc(cls.name)} isn't out yet: its skills are shown here as a preview, but it can't be picked or played. You still play as the ${esc((classById(cfg,st.selected)??cfg.classes[0]).name)}.</div>`:''}
       <div class="cls-head">
         <div class="cls-emblem">${icon(cls.id==='engineer'?'wrench':cls.mech?'mech':cls.gambler?'ante':cls.gardener?'sprout':'shield')}</div>
         <div class="cls-title"><span class="eyebrow">CLASS</span><strong>${esc(cls.name.toUpperCase())}</strong><small>${esc(cls.tagline)}</small>
@@ -245,10 +249,10 @@ export function renderClasses(root,cfg,{getState,setState}){
       ${locked?`<div class="lock">Needs ${tierNeed(cfg,n.tier)} points in ${esc(t.name)} (${treeSpent(cls,state,t.id)} spent)</div>`:''}
       ${!locked&&r<n.ranks&&available(state)<=0?`<div class="lock">No skill points: level the ${esc(cls.name)} up by playing as it.</div>`:''}`;
   }
-  root.addEventListener('mouseover',e=>{const b=e.target.closest('.node');if(!b||b.dataset.node===sel)return;sel=b.dataset.node;root.querySelectorAll('.node.sel').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];detail(cls,st.classes[cls.id]);});
+  root.addEventListener('mouseover',e=>{const b=e.target.closest('.node');if(!b||b.dataset.node===sel)return;sel=b.dataset.node;root.querySelectorAll('.node.sel').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');const st=getState(),cls=cur(st);detail(cls,st.classes[cls.id]);});
   function change(e,dir){
-    const b=e.target.closest('.node');if(!b)return;e.preventDefault();
-    const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0],state=st.classes[cls.id];
+    const b=e.target.closest('.node');if(!b)return;e.preventDefault();if(preview)return;
+    const st=getState(),cls=cur(st),state=st.classes[cls.id];
     const n={...cls.trees.find(t=>t.id===b.dataset.tree).nodes.find(n=>n.id===b.dataset.node),tree:b.dataset.tree};sel=n.id;
     const r=state.points[n.id]??0;
     if(n.type==='augment'){   // free: click toggles it once its tier is open, right click takes it out
@@ -263,10 +267,11 @@ export function renderClasses(root,cfg,{getState,setState}){
     setState(st);draw();
   }
   root.addEventListener('click',e=>{
-    const armb=e.target.closest('[data-arm]');if(armb){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];equipArm(cls,st.classes[cls.id],armb.dataset.arm,armb.dataset.weapon);setState(st);draw();return;}
-        const eqb=e.target.closest('[data-equip]');if(eqb){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];equipAction(cls,st.classes[cls.id],eqb.dataset.equip);setState(st);draw();return;}
-    const pick=e.target.closest('[data-class]');if(pick){const st=getState();st.selected=pick.dataset.class;setState(st);sel=null;draw();return;}
-    if(e.target.closest('[data-act="respec"]')){const st=getState(),cls=classById(cfg,st.selected)??cfg.classes[0];st.classes[cls.id].points={};st.classes[cls.id].loadout={action:st.classes[cls.id].loadout?.action??cls.trees[0].id,augments:[],capstone:null,left:st.classes[cls.id].loadout?.left,right:st.classes[cls.id].loadout?.right};pruneLoadout(cfg,cls,st.classes[cls.id]);setState(st);draw();return;}
+    const pick=e.target.closest('[data-class]');if(pick){const id=pick.dataset.class;if(comingSoon(classById(cfg,id)))preview=id;else{preview=null;const st=getState();st.selected=id;setState(st);}sel=null;draw();return;}
+    if(preview)return;   // a preview can't be changed
+    const armb=e.target.closest('[data-arm]');if(armb){const st=getState(),cls=cur(st);equipArm(cls,st.classes[cls.id],armb.dataset.arm,armb.dataset.weapon);setState(st);draw();return;}
+        const eqb=e.target.closest('[data-equip]');if(eqb){const st=getState(),cls=cur(st);equipAction(cls,st.classes[cls.id],eqb.dataset.equip);setState(st);draw();return;}
+    if(e.target.closest('[data-act="respec"]')){const st=getState(),cls=cur(st);st.classes[cls.id].points={};st.classes[cls.id].loadout={action:st.classes[cls.id].loadout?.action??cls.trees[0].id,augments:[],capstone:null,left:st.classes[cls.id].loadout?.left,right:st.classes[cls.id].loadout?.right};pruneLoadout(cfg,cls,st.classes[cls.id]);setState(st);draw();return;}
     change(e,1);
   });
   root.addEventListener('contextmenu',e=>change(e,-1));

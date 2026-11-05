@@ -21,6 +21,12 @@ export const REAPER_ON = {
   specialty_damnade: { name: 'Dam-A-Nade', price: 3000, color: '#8a9a4a', icon: 'DN', reaper: 'damnade' },
   specialty_magnet: { name: 'Magnet Margarita', price: 2500, color: '#e04a6a', icon: 'MM', reaper: 'magnet' },
   specialty_electriccherry: { name: 'Electric Cherry', price: 2000, color: '#4fa8ff', icon: 'EC', reaper: 'electriccherry' },
+  // built with research tracks but COMING SOON (user, 2026-11-05: "dont give them out to players yet"): the terminal shows
+  // them locked and every free-perk source skips them (desktop.js perkUnlocked); only the cheat console gives them
+  specialty_stronghold: { name: 'Stone Cold Stronghold', price: 3000, color: '#8a9aa8', icon: 'SH', reaper: 'stronghold', soon: true },
+  specialty_victorious: { name: 'Victorious Tortoise', price: 2500, color: '#3a8a3a', icon: 'VT', reaper: 'victorious', soon: true },
+  specialty_zombshell: { name: 'Zombshell', price: 3000, color: '#7ab83a', icon: 'ZS', reaper: 'zombshell', soon: true },
+  specialty_tactiquilla: { name: 'Tactiquilla Sangria', price: 2500, color: '#c03a5a', icon: 'TS', reaper: 'tactiquilla', soon: true },
 };
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
@@ -149,7 +155,9 @@ export function setupReaperPerks(api, catalogue, base) {
         if (angelCharge >= 1) { angelCharge = 0; angelKills = 0; session.effects.invulnerable = now() + 5; tint('#fff2a855', 5); announce?.('GUARDIAN ANGEL', '5 SECONDS', 1.5); return true; }
         if (up('guardianangel')) { const r = inner(n); session.effects.invulnerable = Math.max(session.effects.invulnerable ?? 0, now() + .6); return r; }
       }
-      if (n > 0 && has('stronghold') && armour > 0) { const a = Math.min(armour, n); armour -= a; n -= a; sound('stronghold', 'armour_hit', .5); if (armour <= 0) sound('stronghold', 'armour_broken'); if (n <= 0) return true; }
+      if (n > 0 && has('stronghold') && armour > 0) {   // Thick Skin: a point of armour soaks more than a point of damage
+        const k = 1 - stat('sh.soak'), a = Math.min(armour / k, n); armour = Math.max(0, armour - a * k); n -= a; sound('stronghold', 'armour_hit', .5);
+        if (armour <= 0) { sound('stronghold', 'armour_broken'); if (stat('sh.shatter')) queueMicrotask(shatter); } if (n <= 0) return true; }
       if (n >= session.health) {
         if (saveLethal(n)) return true;
         const had = new Set(session.perks); const r = inner(n);
@@ -286,16 +294,32 @@ export function setupReaperPerks(api, catalogue, base) {
   // ---- Spectre Shot: swapping guns with 10+ zombies within 600 summons a ghost of the previous gun for 8 s (12) that
   //      shoots the nearest zombie every 0.35 s; hits slow, kills put ammo back in that gun. 30 s cooldown (20).
   let lastWeapon = null, spectre = null, spectreReady = 0;
-  // ---- Stone Cold Stronghold: stand still for 1 s and a ring forms; armour builds 20/s (35) up to 150 and soaks
-  //      damage before health. Leaving the ring it drains 30/s (upgraded: holds 10 s first).
+  // ---- Stone Cold Stronghold: stand still for 1 s and a ring forms; armour builds 20/s up to 150 and soaks
+  //      damage before health. Leaving the ring it drains 30/s. Research track sh.* (research.json): Quick Set, Reinforced,
+  //      Fast Mason, Lingering Stone (the mod's upgrade: holds 10 s), Thick Skin, Shatter, Slow Drain, Fortress.
   let armour = 0, stillT = 0, ringMesh = null, leftAt = 0;
+  const ringR = () => stat('sh.fortress') ? 110 : 70;
+  function shatter() {   // Shatter: broken armour bursts, hurting and freezing the zombies round you
+    const at = feet(); near(at, 150, z => { hurt(z, zh() * stat('sh.shatter'), 'perk'); slow(z, 2, 1, 2, 0x9fb6c8); });
+    fx(at.clone().add(V(0, 30, 0)), .6, 0x9fb6c8); ring(at, 150, 0x9fb6c8);
+  }
   // ---- Swarm Scotch: headshot kills (20%) and reloading an empty magazine release a swarm that follows you for 8 s,
   //      biting zombies within 120 every 0.5 s (15% zh, 25% upgraded). Upgrade: zombies that survive a bite set off
   //      another swarm when headshot (40%).
   let swarm = null, lastMag = null;
-  // ---- Tactiquilla Sangria: fire while sprinting (engine `mods.sprintFire`), 15% of shots (30%) refund the round,
-  //      multi-kills (within 0.5 s) pay 50 per extra kill (100).
-  let lastShots = 0; const recentKills = [];
+  // ---- Tactiquilla Sangria: fire while sprinting (engine `mods.sprintFire`), 15% of shots refund the round,
+  //      multi-kills (within 0.5 s) pay 50 per extra kill. Research track ts.*: Wide Window, Bottomless (the mod's
+  //      upgrade: 30%), Tip Jar, Double Shot (the mod's upgrade: x2 pay), Lime Wedge, Top Off, Last Drop, Sangria Rush.
+  let lastShots = 0, rushUntil = 0; const recentKills = [];
+  function multiKill(n) {   // n kills in the window so far (2+)
+    pts(50 * (1 + stat('ts.double')));
+    if (n === 3) {
+      const w = session.weapon, clip = session.def?.clipSize ?? data.weapons?.[w?.id]?.clipSize;
+      if (stat('ts.topoff') && w && clip) { w.mag = Math.min(clip, (w.mag ?? 0) + Math.ceil(clip * stat('ts.topoff'))); toast?.('Tactiquilla · top off', 1); }
+      if (stat('ts.rush')) { if (rushUntil <= now()) sound('tactiquilla', 'sting', .5); rushUntil = now() + stat('ts.rush'); }
+    }
+    if (n === 4 && stat('ts.tip')) pts(stat('ts.tip'));
+  }
   // ---- Timeslip: box spins and Pack-a-Punch take half as long. Upgrade: box spins are instant, operator weapons and
   //      class skills charge 50% faster.
   // ---- Tombstone: solo, see saveLethal (one random gun kept, the rest pay for your life; used up). Co-op: bleeding out
@@ -303,13 +327,16 @@ export function setupReaperPerks(api, catalogue, base) {
   //      (upgraded: until the end of that round + 60 s).
   let tomb = null, downSnap = null;
   // ---- Victorious Tortoise: the rocket shield blocks from every side while raised and explodes when it breaks
-  //      (radius 200, 3 zh). Upgrade: double shield health.
+  //      (radius 200, 3 zh). Research track vt.*: Hardened Shell, Double Shell (the mod's upgrade), Big Bang, Spiked Shell,
+  //      Hot Shell, Last Stand, Shell Mend, Retaliate.
+  let shellHit = 0, shellBlocks = 0;
   // ---- Vigor Rush: bullet hits on zombies burst (radius 60, 30% of the hit, at least 50; x2 upgraded).
   let vigorT = 0;
   // ---- Winter's Wail: getting hurt freezes zombies within 200 for 3 s (5 upgraded); 3 charges (4), one back a round.
   let wails = 3, wailReady = 0;
-  // ---- Zombshell: bullet hits (8%) leave a slowing field (radius 120, 6 s): zombies in it are slowed and take +30%.
-  //      Upgrade: while you stand in one, zombies ignore you.
+  // ---- Zombshell: bullet hits (8%) leave a slowing field (radius 120, 6 s): zombies in it move at 40% and take +30%.
+  //      Research track zs.*: Wide Shell, Hidden Shell (the mod's upgrade: zombies ignore you in a field), Long Shell,
+  //      Corrosive, Frequent, Weakened, Sticky, Toxic Bloom.
   const shells = [];
   // ---- Bubble Blink Blast: melee while sprinting teleports you 300 ahead and leaves an afterimage that lures zombies
   //      for 5 s (8); 15 kills recharge it (2 charges upgraded).
@@ -343,12 +370,13 @@ export function setupReaperPerks(api, catalogue, base) {
       if (dyingUntil > now() && basic(z)) e.amount = Math.max(e.amount, z.health + 1);
       if (has('milk') && now() >= milkReady) { milkReady = now() + (up('milk') ? 8 : 15); queueMicrotask(() => { const done = new Set([z]); let from = z; for (let i = 0; i < (up('milk') ? 7 : 4); i++) { const o = nearest(from.root.position, 150, done); if (!o) break; done.add(o); bolt(chest(from), chest(o), 0x8fb6ff); hurt(o, zh() * .8, 'electric'); from = o; } }); }
     }
-    if (shells.some(s => s.until > now() && z.root.position.distanceTo(s.at) < s.r)) e.amount *= 1.3;
+    if (shells.some(s => s.until > now() && z.root.position.distanceTo(s.at) < s.r)) e.amount *= 1.3 + stat('zs.weak');
     if (bullet) {
       if (has('inferno') && Math.random() < .1) burn(z, up('inferno') ? 6 : 4, zh() * .15, .25);
       if (has('moonshine') && Math.random() < (up('moonshine') ? .1 : .05)) burn(z, 4, zh() * .15);
       if (has('changechews') && e.head && Math.random() < .15) queueMicrotask(() => alive(z) && chew(z));
-      if (has('zombshell') && Math.random() < .08) { const at = z.root.position.clone(); const m = disc(at, 120, 0x9be36a, .25); shells.push({ at, r: 120, until: now() + 6, m: keep(m, 6) }); sound('zombshell', 'start', .5); }
+      if (has('zombshell') && Math.random() < .08 + stat('zs.chance')) { const at = z.root.position.clone(), r = 120 * (1 + stat('zs.radius')), life = 6 + stat('zs.life');
+        shells.push({ at, r, until: now() + life, tick: now() + .5, m: keep(disc(at, r, 0x9be36a, .25), life) }); sound('zombshell', 'start', .5); }
       if (has('vigor') && now() - lastVigor > .05) { lastVigor = now(); const at = chest(z), n = Math.max(50, e.amount * .3) * (up('vigor') ? 2 : 1); queueMicrotask(() => { blast(at, 60, n, 'explosion', z); fx(at, .25, 0xffc04a); }); }
       if (up('swarmscotch') && z.swarmed && e.head && Math.random() < .4) startSwarm();
     }
@@ -380,7 +408,7 @@ export function setupReaperPerks(api, catalogue, base) {
       if (stat('dn.scav') && Math.random() < stat('dn.scav') && session.grenades < nadeMax()) { session.grenades++; toast?.('Dam-A-Nade · grenade recovered', 1); }
     }
     if (has('timeslip') && up('timeslip')) { const op = window.kino?.operator; if (op?.current && !op.active && op.defs?.get(op.current)) op.addCharge(.5 / op.defs.get(op.current).kills); window.kino?.classes?.addCharge?.(.5); }
-    if (has('tactiquilla')) { recentKills.push(t); while (recentKills.length && t - recentKills[0] > .5) recentKills.shift(); if (recentKills.length >= 2) pts((recentKills.length - 1) * (up('tactiquilla') ? 100 : 50)); }
+    if (has('tactiquilla')) { recentKills.push(t); while (recentKills.length && t - recentKills[0] > .5 + stat('ts.window')) recentKills.shift(); if (recentKills.length >= 2) multiKill(recentKills.length); }
     const b = burning.get(z); if (b?.explode && Math.random() < b.explode) { blast(at, 100, zh() * .5, 'explosion', z); fx(at.clone().add(V(0, 30, 0)), .5, 0xff6a1a); }
     if (wolf && z.rpWolf && up('bloodwolf') && Math.random() < .2) { const kind = ['points', 'ammo', 'charge'][Math.floor(Math.random() * 3)]; const s = sprite(kind === 'ammo' ? 0x9cff4f : kind === 'charge' ? 0x5fb8ff : 0xffb43d, 20); s.position.copy(at).y += 14; wolfDrops.push({ kind, s: keep(s, 15), until: t + 15 }); }
     if (spectre && z.rpSpectre) { const w = session.inventory.find(x => x === spectre.weapon); if (w) { const def = data.weapons[w.id]; w.reserve = (w.reserve ?? 0) + Math.ceil((def?.clipSize ?? 10) * .2); } }
@@ -445,8 +473,18 @@ export function setupReaperPerks(api, catalogue, base) {
     return setBoards(b, count);
   };
   // the rocket shield (Victorious Tortoise, Crusader's Ale)
-  const shieldPerk = { allSides: () => has('victorious'), maxMul: () => up('victorious') ? 2 : 1,
-    broke: at => { if (!has('victorious')) return; blast(at, 200, 3 * zh()); fx(at.clone().add(V(0, 30, 0)), 1, 0x6fd06a); ring(at, 200, 0x6fd06a); } };
+  const shieldPerk = { allSides: () => has('victorious'), maxMul: () => has('victorious') && stat('vt.double') ? 2 : 1,
+    takeMul: () => has('victorious') ? 1 - stat('vt.tough') : 1,   // Hardened Shell
+    hit: z => {   // a blocked hit: Spiked Shell, Retaliate, and Shell Mend's 5 s wait
+      if (!has('victorious')) return; shellHit = now();
+      if (stat('vt.spikes') && z) queueMicrotask(() => { hurt(z, zh() * stat('vt.spikes'), 'perk'); slow(z, .5, 1, .5); });
+      if (stat('vt.retaliate') && ++shellBlocks % 4 === 0) { const at = feet(); queueMicrotask(() => { near(at, 150, o => { hurt(o, zh() * stat('vt.retaliate'), 'perk'); slow(o, 1, 1, 1); }); fx(at.clone().add(V(0, 30, 0)), .5, 0x6fd06a); ring(at, 150, 0x6fd06a); }); }
+    },
+    broke: at => {
+      if (!has('victorious')) return; const r = 200 * (1 + stat('vt.radius'));
+      blast(at, r, 3 * zh() * (1 + stat('vt.damage'))); fx(at.clone().add(V(0, 30, 0)), 1, 0x6fd06a); ring(at, r, 0x6fd06a);
+      if (stat('vt.laststand')) { session.effects.invulnerable = Math.max(session.effects.invulnerable ?? 0, now() + stat('vt.laststand')); announce?.('LAST STAND', stat('vt.laststand') + ' SECONDS', 1.5); }
+    } };
   const hookShield = () => { const s = window.kino?.rocketShield; if (s && !s.perk) s.perk = shieldPerk; };
   // Tactiquilla: fire while sprinting (engine.js reads mods.sprintFire)
   host.sprintFire = () => has('tactiquilla') || !!stat('su.gunsUp');
@@ -577,21 +615,34 @@ export function setupReaperPerks(api, catalogue, base) {
     if (has('stronghold')) {
       const moving = player.velocity ? Math.hypot(player.velocity.x, player.velocity.z) > 10 : false;
       stillT = moving ? 0 : stillT + dt;
-      if (stillT >= 1) { if (!ringMesh) { ringMesh = disc(f, 70, 0x9fb6c8, .22); scene.add(ringMesh); } ringMesh.position.copy(f).y += 2; armour = Math.min(150, armour + dt * (up('stronghold') ? 35 : 20)); leftAt = t; }
-      else { if (ringMesh) { ringMesh.removeFromParent(); ringMesh.geometry.dispose(); ringMesh.material.dispose(); ringMesh = null; } if (!(up('stronghold') && t - leftAt < 10)) armour = Math.max(0, armour - dt * 30); }
+      if (stillT >= 1 - stat('sh.settle')) { if (!ringMesh) { ringMesh = disc(f, ringR(), 0x9fb6c8, .22); scene.add(ringMesh); } ringMesh.position.copy(f).y += 2;
+        armour = Math.min(150 + stat('sh.cap'), armour + dt * 20 * (1 + stat('sh.rate'))); leftAt = t;
+        if (stat('sh.fortress')) near(f, ringR(), z => slow(z, .3, .5)); }   // Fortress: the wider ring slows what walks into it
+      else { if (ringMesh) { ringMesh.removeFromParent(); ringMesh.geometry.dispose(); ringMesh.material.dispose(); ringMesh = null; } if (!(t - leftAt < stat('sh.hold'))) armour = Math.max(0, armour - dt * 30 * (1 - stat('sh.drain'))); }
     } else if (ringMesh) { ringMesh.removeFromParent(); ringMesh = null; armour = 0; }
     // Swarm Scotch
     if (swarm) { if (t > swarm.until) { swarm.g.removeFromParent(); swarm = null; }
       else { swarm.g.position.lerp(f.clone().add(V(0, 50, 0)), Math.min(1, dt * 3)); swarm.g.children.forEach((c, i) => c.position.set(Math.cos(t * 6 + i) * 30, Math.sin(t * 9 + i * 2) * 15, Math.sin(t * 5 + i) * 30));
         if (t > swarm.next) { swarm.next = t + .5; near(f, 120, z => { hurt(z, zh() * (up('swarmscotch') ? .25 : .15), 'swarm'); if (alive(z)) z.swarmed = true; }); } } }
     // Tactiquilla: refunded rounds
-    if (has('tactiquilla') && (session.shots ?? 0) > lastShots && session.weapon) { const n = session.shots - lastShots; for (let i = 0; i < n; i++) if (Math.random() < (up('tactiquilla') ? .3 : .15)) session.weapon.mag++; }
+    if (has('tactiquilla') && (session.shots ?? 0) > lastShots && session.weapon) {
+      const n = session.shots - lastShots, w = session.weapon, rush = rushUntil > t;
+      const p = rush ? 1 : Math.max(.15 + stat('ts.refund') + (sprinting() ? stat('ts.sprint') : 0), (w.mag ?? 0) < 3 ? stat('ts.last') : 0);   // Sangria Rush, Lime Wedge, Last Drop
+      for (let i = 0; i < n; i++) if (Math.random() < p) w.mag++;
+    }
     lastShots = session.shots ?? 0;
+    if (rushUntil > t && has('tactiquilla')) speedMul *= 1.15;
+    // Victorious Tortoise: Shell Mend (2% of the shield's health a second, 5 s after its last blocked hit)
+    if (has('victorious') && stat('vt.mend') && t - shellHit > 5) { const rs = window.kino?.rocketShield, st = rs?.state?.(); if (st?.owned && st.health < st.max) rs.heal(st.max * stat('vt.mend') * dt); }
     // Timeslip: Pack-a-Punch
     if (has('timeslip') && session.pack && !session.pack.rpSlip && session.pack.readyAt > t) { session.pack.rpSlip = true; const cut = (session.pack.readyAt - t) / 2; session.pack.readyAt -= cut; session.pack.expires -= cut; }
     // Zombshell: hidden while in a field (upgraded)
-    hidden = up('zombshell') && shells.some(s => s.until > t && f.distanceTo(s.at) < s.r);
-    for (let i = shells.length - 1; i >= 0; i--) { const s = shells[i]; if (t > s.until) { shells.splice(i, 1); continue; } near(s.at, s.r, z => slow(z, .2, .6)); }
+    hidden = has('zombshell') && !!stat('zs.hide') && shells.some(s => s.until > t && f.distanceTo(s.at) < s.r);
+    for (let i = shells.length - 1; i >= 0; i--) { const s = shells[i];
+      if (t > s.until) { shells.splice(i, 1); if (has('zombshell') && stat('zs.bloom')) { const at = s.at, r = s.r; queueMicrotask(() => { near(at, r, z => hurt(z, zh() * stat('zs.bloom'), 'perk')); fx(at.clone().add(V(0, 20, 0)), .45, 0x9be36a); }); } continue; }   // Toxic Bloom
+      near(s.at, s.r, z => slow(z, .2, .6 + stat('zs.slow')));
+      if (t >= s.tick) { s.tick = t + .5; if (stat('zs.acid')) near(s.at, s.r, z => hurt(z, zh() * stat('zs.acid') * .5, 'perk')); }   // Corrosive: per second, in half-second ticks
+    }
     // Bubble Blink Blast: melee while sprinting
     const ml = session.meleeLeft ?? 0;
     if (has('bubbleblink') && ml > meleeWas + .05 && sprinting() && blinks > 0) blink();

@@ -16,6 +16,7 @@ export async function loadClasses(base=import.meta.url){
 export function loadClassProfile(cfg){
   let p;try{p=JSON.parse(localStorage.getItem(CLASSES_KEY));}catch{}
   p??={};p.classes??={};p.selected??=cfg?.classes?.[0]?.id??null;
+  if(comingSoon(classById(cfg??{classes:[]},p.selected)))p.selected=cfg.classes.find(c=>!comingSoon(c))?.id??null;   // a coming-soon class can't stay picked
   for(const c of cfg?.classes??[]){
     const s=p.classes[c.id]??={level:1,xp:0,points:{}};s.points??={};
     // renamed nodes keep their points (Fortifier: Extra Bolts -> Field Repairs)
@@ -43,6 +44,9 @@ export function loadClassProfile(cfg){
 export function saveClassProfile(p){try{localStorage.setItem(CLASSES_KEY,JSON.stringify(p));}catch{}}
 
 export const classById=(cfg,id)=>cfg.classes.find(c=>c.id===id)??null;
+// a class marked `soon` (built, not released: the Gardener, user 2026-11-05) can be looked at in the menu but not picked
+// or played; localStorage kino.dev.soon = '1' lifts that for testing
+export const comingSoon=c=>!!c?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();
 export const tree=(cls,id)=>cls.trees.find(t=>t.id===id)??cls.trees[0];
 export const equippedTree=(cls,state)=>tree(cls,state.loadout?.action);
 export const actionOf=(cls,state)=>equippedTree(cls,state).action;

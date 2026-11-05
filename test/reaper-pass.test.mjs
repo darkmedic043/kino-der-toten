@@ -42,7 +42,7 @@ test('each has an 8-augment research track, alternating Minor/Major, every effec
 test('they can be drunk (tracked bottles) and are on sale at the terminal behind their pass item', async () => {
   for (const spec of Object.values(PERKS)) { assert.ok(drinks[spec], spec); assert.ok(existsSync(new URL(drinks[spec].model, web)), drinks[spec].model); }
   const { REAPER_ON } = await import('../export/web/mods/perks-plus/reaper-perks.js');
-  assert.deepEqual(Object.keys(REAPER_ON).sort(), [...Object.values(PERKS), 'specialty_electriccherry'].sort());   // Electric Cherry is on sale without a pass item
+  assert.deepEqual(Object.keys(REAPER_ON).filter(k => !REAPER_ON[k].soon).sort(), [...Object.values(PERKS), 'specialty_electriccherry'].sort());   // Electric Cherry is on sale without a pass item
   const { PERKS: TERMINAL, perkUnlocked } = await import('../export/web/mods/terminal-booth/desktop.js');
   const cherry = TERMINAL.find(x => x.id === 'specialty_electriccherry'); assert.ok(drinks[cherry.id]); assert.ok(!cherry.unlock);
   for (const [k, spec] of Object.entries(PERKS)) {
@@ -51,6 +51,25 @@ test('they can be drunk (tracked bottles) and are on sale at the terminal behind
     store.clear(); assert.ok(!perkUnlocked(p));
     localStorage.setItem('kino.mods.shop', JSON.stringify({ owned: ['pass.s1.perk.' + k] })); assert.ok(perkUnlocked(p));
   }
+});
+
+test('Stone Cold Stronghold, Victorious Tortoise, Zombshell and Tactiquilla Sangria are built but coming soon: never sold, granted or researched', async () => {
+  const SOON = ['specialty_stronghold', 'specialty_victorious', 'specialty_zombshell', 'specialty_tactiquilla'];
+  const { REAPER_ON } = await import('../export/web/mods/perks-plus/reaper-perks.js');
+  const { PERKS: TERMINAL, perkUnlocked } = await import('../export/web/mods/terminal-booth/desktop.js');
+  const { startResearch, isSoon } = await import('../export/web/mods/research/research.js');
+  assert.deepEqual(Object.keys(REAPER_ON).filter(k => REAPER_ON[k].soon).sort(), [...SOON].sort());
+  for (const spec of SOON) {
+    assert.ok(drinks[spec] && existsSync(new URL(drinks[spec].model, web)), spec);
+    const p = TERMINAL.find(x => x.id === spec); assert.ok(p?.soon, spec);
+    store.clear(); assert.equal(perkUnlocked(p), false);
+    const it = research.items.find(i => i.id === spec);
+    assert.ok(it?.soon, spec); assert.equal(it.augments.length, 8);
+    it.augments.forEach((a, i) => assert.equal(a.kind, i % 2 ? 'major' : 'minor', a.name));
+    for (const a of it.augments) for (const k of Object.keys(a.effects)) assert.ok(reaperSrc.includes(`stat('${k}')`), `${a.name}: ${k} unused`);
+    assert.ok(isSoon(research, spec));
+  }
+  assert.equal(typeof startResearch, 'function');
 });
 
 test('a slot claimed before its reward was swapped hands the new item over, once', async () => {

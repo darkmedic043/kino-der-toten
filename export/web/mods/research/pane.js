@@ -2,7 +2,7 @@ import { keepScroll } from '../../keep-scroll.js';
 // Armory → Research (roadmap Phase 5, BO7 style): three tabs (PERKS, AMMO MODS, EQUIPMENT: tacticals and lethals); pick an item; its 8 augments form a linear track
 // researched in order, one at a time across all items; the end of the track (mastery) opens a second Minor slot.
 // Equip one Major and one Minor (two once mastered) per item. Rules and store: research.js. Touch-sized; one column on phones.
-import { loadResearch, saveResearch, startResearch, toggleEquip, costOf, researchOpen, nextOnTrack, mastered, augById } from './research.js';
+import { loadResearch, saveResearch, startResearch, toggleEquip, costOf, researchOpen, nextOnTrack, mastered, augById, isSoon } from './research.js';
 
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 export const RESEARCH_CSS=`
@@ -57,21 +57,23 @@ export function renderResearch(root,{cfg,level,toast}){
   if(!inTab.some(i=>i.id===sel))sel=inTab[0]?.id??items[0].id;
   const it=items.find(i=>i.id===sel)??items[0],act=r.active&&by[r.active],eq=r.equip[it.id]??{},m=mastered(cfg,r,it.id),next=nextOnTrack(cfg,r,it.id);
   const doneN=i=>i.augments.filter(a=>r.done.includes(a.id)).length;
-  const group=(label,list)=>(label?`<h4>${label}</h4>`:'')+list.map(i=>`<button class="rs-item${i.id===it.id?' on':''}" data-item="${esc(i.id)}" style="--c:${i.color}"><i></i><b>${esc(i.name)}</b>${act?.item===i.id?'<span class="dot" title="Researching"></span>':''}<small class="${doneN(i)===8?'m':''}">${doneN(i)===8?'MASTERED':doneN(i)+'/8'}</small></button>`).join('');
+  const group=(label,list)=>(label?`<h4>${label}</h4>`:'')+list.map(i=>`<button class="rs-item${i.id===it.id?' on':''}" data-item="${esc(i.id)}" style="--c:${i.color}"><i></i><b>${esc(i.name)}</b>${act?.item===i.id?'<span class="dot" title="Researching"></span>':''}<small class="${doneN(i)===8?'m':''}">${i.soon?'SOON':doneN(i)===8?'MASTERED':doneN(i)+'/8'}</small></button>`).join('');
   const slot=(k,label,locked)=>{const a=by[eq[k]];return `<div class="rs-slot${a&&!locked?' full':''}${locked?' locked':''}"><small>${label}</small>${locked?'Master the track':esc(a?.name??'Empty')}</div>`;};
+  const soon=!!it.soon;
   const step=(a,i)=>{const done=r.done.includes(a.id),now=r.active===a.id,isNext=next?.id===a.id,on=Object.values(eq).includes(a.id),cost=costOf(cfg,{...a,index:i}),xp=r.progress[a.id]??0;
-    const st=on?'EQUIPPED':done?'RESEARCHED':now?'RESEARCHING':isNext?(xp?'PAUSED':'NEXT'):'LOCKED';
-    const btn=done?`<button data-equip="${esc(a.id)}" class="${on?'on':''}">${on?'UNEQUIP':'EQUIP'}</button>`:isNext&&!now?`<button data-research="${esc(a.id)}"${open?'':' disabled'}>${xp?'RESUME':'RESEARCH'}</button>`:'';
+    const st=on?'EQUIPPED':done?'RESEARCHED':now?'RESEARCHING':soon?'COMING SOON':isNext?(xp?'PAUSED':'NEXT'):'LOCKED';
+    const btn=done?`<button data-equip="${esc(a.id)}" class="${on?'on':''}">${on?'UNEQUIP':'EQUIP'}</button>`:isNext&&!now&&!soon?`<button data-research="${esc(a.id)}"${open?'':' disabled'}>${xp?'RESUME':'RESEARCH'}</button>`:'';
     return `<div class="rs-step ${a.kind}${done?' done':''}${now?' now':''}${!done&&!isNext?' locked':''}${on?' eq':''}"><span class="st">${i+1} · ${a.kind.toUpperCase()} · ${st}</span>
       <div class="act">${btn}</div><strong>${esc(a.name)}</strong><p>${esc(a.desc)}</p>${done?'':`<div class="bar"><i style="width:${(100*xp/cost).toFixed(1)}%"></i></div><span class="st">${Math.floor(xp).toLocaleString()} / ${cost.toLocaleString()} RESEARCH XP</span>`}</div>`;};
   const fill=Math.max(0,doneN(it)-.5)/7;
   const listHtml=tab==='equipment'?group('TACTICALS',inTab.filter(i=>i.group==='tactical'))+group('LETHALS',inTab.filter(i=>i.group==='lethal')):group('',inTab);
-  const tabs=TABS.map(([k,l])=>{const n=items.filter(i=>i.kind===k),dn=n.reduce((s,i)=>s+doneN(i),0);return `<button data-tab="${k}" class="${k===tab?'on':''}">${l}<small>${dn}/${n.length*8}</small></button>`;}).join('');
+  const tabs=TABS.map(([k,l])=>{const n=items.filter(i=>i.kind===k&&!i.soon),dn=n.reduce((s,i)=>s+doneN(i),0);return `<button data-tab="${k}" class="${k===tab?'on':''}">${l}<small>${dn}/${n.length*8}</small></button>`;}).join('');
   keepScroll(root).innerHTML=`<style>${RESEARCH_CSS}</style><div class="rs">
     <div class="rs-tabs">${tabs}</div>
     <div class="rs-list">${listHtml}</div>
     <div class="rs-main" style="--c:${it.color}">
       ${open?'':`<div class="rs-lock">Research opens at level ${cfg.unlockLevel}.</div>`}
+      ${soon?`<div class="rs-lock">${esc(it.name)} is coming soon. Its augments are shown here, but they can't be researched yet.</div>`:''}
       <div class="rs-active">${act?`RESEARCHING <b>${esc(act.name)}</b> · ${esc(act.itemName)} ${act.index+1}/8 · ${Math.floor(r.progress[act.id]??0).toLocaleString()} / ${costOf(cfg,act).toLocaleString()} XP · ×${cfg.activeMul} while ${carry(act)}<div class="bar"><i style="width:${(100*(r.progress[act.id]??0)/costOf(cfg,act)).toFixed(1)}%"></i></div>`
         :`Nothing is being researched. Each perk, ammo mod, tactical and lethal has a track of 8 augments, researched in order with XP from kills and rounds (×${cfg.activeMul} while the item is active). One at a time; switching keeps progress.`}</div>
       <div class="rs-head"><h2>${esc(it.name)}</h2><span>${HEAD[it.kind]??''}</span></div>

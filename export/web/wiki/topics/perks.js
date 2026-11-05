@@ -64,16 +64,18 @@ export default {
       const group = CLASSIC.includes(p.id) ? G.classic : BO7.includes(p.id) ? G.bo7 : reaperIds.has(p.id) ? G.reaper : G.other;
       const item = items[p.id], unlock = p.unlock ? pass.get(p.unlock) : null, machine = CLASSIC.includes(p.id);
       return {
-        id: slug(p.name), title: p.name, group, color: p.color, img: p.icon ?? p.fallback, sub: p.blurb,
+        id: slug(p.name), title: p.name, group, color: p.color, img: p.icon ?? p.fallback, sub: p.soon ? 'Coming soon' : p.blurb,
         keywords: [p.badge, ...(item?.augments.map(a => a.name) ?? [])].join(' '),
         html: () => {
           let h = infobox({ title: p.name, img: p.icon ?? p.fallback, color: p.color, rows: [
+            p.soon ? ['Status', 'Coming soon'] : null,
             ['Price', `${num(base)} for your first perk, +${num(step)} per perk held`],
             ['Where', machine ? 'Its Perk-a-Cola machine (on maps that have one), or a terminal booth' : 'Terminal booths (PERKS app)'],
             ['Power', p.id === 'specialty_quickrevive' ? 'Not needed' : 'Needed'],
             unlock ? ['Unlock', passText(unlock)] : p.unlock ? ['Unlock', 'A Melon Pass reward'] : null,
             item ? ['Augments', `${item.augments.length} (Research)`] : null,
           ] });
+          if (p.soon) h += note(`Coming soon: ${esc(p.name)} is built but not out yet. The terminal shows it locked, nothing hands it out, and its research track can't be started until it's released.`, 'tip');
           h += `<h2>Effects</h2><ul>${p.effects.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
           if (p.note) h += note(esc(p.note));
           if (EXTRA[p.id]) h += `<p>${esc(EXTRA[p.id])}</p>`;
@@ -134,7 +136,7 @@ export default {
       html: () => {
         const perkItems = research.items.filter(i => i.kind === 'perk'), ammoItems = research.items.filter(i => i.kind !== 'perk');
         const link = i => ctx.find('perks', slug(i.name)) ? ctx.link('perks', slug(i.name), i.name) : esc(i.name);
-        const list = arr => table(['Item', 'Major augments', 'Minor augments'], arr.map(i => [link(i),
+        const list = arr => table(['Item', 'Major augments', 'Minor augments'], arr.map(i => [link(i) + (i.soon ? ' (coming soon)' : ''),
           i.augments.filter(a => a.kind === 'major').map(a => esc(a.name)).join(', '), i.augments.filter(a => a.kind !== 'major').map(a => esc(a.name)).join(', ')]), { cls: 'compact' });
         return md(`Research upgrades your perks and ammo mods with **augments**, as in Black Ops 7. You set it up from the main menu: **Armory → Research**. It opens at player level **${research.unlockLevel}** (see [Progression](${ctx.href('progression')})).
 

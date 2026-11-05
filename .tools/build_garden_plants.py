@@ -110,6 +110,7 @@ class B:
 
     def mound(s, r, c=None):
         """The heap of soil every plant sits in."""
+        if getattr(s, 'nomound', False): return
         soil, dark = hexc('#3a2a1c'), hexc('#1e150e')
         s.lathe([(r, -1), (r * .96, 1), (r * .7, 3.4), (r * .3, 4.6), (r * .02, 5)], (0, 0, 0), dark, soil, seg=12,
                 mod=lambda q, i: 1 + .08 * math.sin(q * 3 + 1) + .06 * math.sin(q * 5))
@@ -420,9 +421,254 @@ def ing_rare(b):
         b.face(ids if yy > 0 else ids[::-1])
     b.blob((0, -3, 11), (6, 1.5, 7.6), hexc('#ffd86a'), hexc('#fff4c0'), seg=10, rows=6, glow=True)
 
-STAGED = {'pod': pod, 'thorn': thorn, 'bulb': bulb, 'burr': burr, 'bean': bean, 'mint': mint, 'gourd': gourd, 'lily': lily, 'flower': flower, 'maw': maw, 'melon': melon}
-SINGLE = {'sprout': sprout, 'burr_ball': burr_ball, 'melon_ball': melon_ball}
-PICTURES = {'fertilizer': ing_fertilizer, 'dew': ing_dew, 'compost': ing_compost, 'pollen': ing_pollen, 'sap': ing_sap, 'mutagen': ing_mutagen, 'packet': ing_packet, 'rare': ing_rare}
+
+# ---- hybrids and Legendaries ------------------------------------------------------------------------------------------
+def part(b, fn, st, at=(0, 0, 0), k=1, yaw=0, tint=None, amt=.35, soil=False):
+    """A plant grafted into another: its verts moved, scaled, turned and tinted. Only the base of a plant keeps its soil."""
+    i0 = len(b.v); b.nomound = not soil; fn(b, st); b.nomound = False
+    cy, sy = math.cos(yaw), math.sin(yaw)
+    for i in range(i0, len(b.v)):
+        x, y, z = b.v[i]; b.v[i] = (at[0] + k * (x * cy - y * sy), at[1] + k * (x * sy + y * cy), at[2] + k * z)
+        if tint: b.c[i] = mix(b.c[i], tint, amt)
+
+def ring(n, r, off=0): return [(math.cos(y) * r, math.sin(y) * r) for y in yaws(n, off)]
+
+def vine(b, st):
+    """Tetherwood: a knot of twisted creepers with tendrils that reach out along the ground."""
+    b.mound(20 + st * 2)
+    d, l = hexc('#2c3a1e'), hexc('#7fa244')
+    for j in range(3):
+        o = j / 3 * math.tau; h = 34 + st * 12; n = 14
+        pts = [Vector((math.cos(o + i * .75) * (9 - i * .35), math.sin(o + i * .75) * (9 - i * .35), 2 + i / n * h)) for i in range(n + 1)]
+        b.tube(pts, [4.2 - 3.6 * i / n for i in range(n + 1)], d, l, seg=6, cap=False)
+    for x, y in ring(4 + st * 2, 38 + st * 6, .4):
+        pts = b.curve((x * .15, y * .15, 8), (x, y, 2), 12, n=8, wob=1.4)
+        b.tube(pts, [2.6, 2.3, 2, 1.7, 1.4, 1.1, .8, .5], d, l, seg=5, cap=False)
+        b.leaf(tuple(pts[-1]), math.atan2(y, x), 12, 6, d, l, rise=.3, droop=.5)
+    rosette(b, 5, 13, 7, c0=d, c1=l, rag=.3)
+
+def cap(b, at, r, h, c0, c1, spots):
+    at = Vector(at)
+    b.tube([at + Vector((0, 0, -h)), at + Vector((1, 0, -h * .5)), at], [r * .22, r * .17, r * .2], hexc('#d8d0b8'), hexc('#efe6cc'), seg=7)
+    b.lathe([(.1, 0), (r * .96, .1), (r, r * .18), (r * .8, r * .52), (r * .42, r * .74), (.1, r * .8)], at, c0, c1, seg=14)
+    for i in range(spots):
+        q = i * 2.399; t = .35 + .55 * (i + 1) / spots
+        p = at + Vector((math.cos(q) * r * t, math.sin(q) * r * t, r * .8 * math.sqrt(max(0, 1 - t * t)) + .4))
+        b.blob(p, (r * .1, r * .1, r * .06), spots and hexc('#f0d8ff'), seg=6, rows=4, glow=True)
+
+def spore(b, st):
+    """Mind Cap: a clutch of violet mushrooms with glowing spots."""
+    b.mound(17 + st * 2)
+    c0, c1 = hexc('#3a1e6a'), hexc('#b48cff')
+    cap(b, (0, 0, 22 + st * 7), 14 + st * 2.5, 22 + st * 7, c0, c1, 7)
+    for i, (x, y) in enumerate(ring(1 + st, 15, .6)):
+        cap(b, (x, y, 11 + i * 3), 7 + st * .8, 11 + i * 3, c0, c1, 4)
+
+def choir(b, st):
+    """Echo Choir: a lily whose stems hold singing pods instead of crystals."""
+    part(b, lily, st, soil=True, tint=hexc('#2ab0a0'), amt=.3)
+    for x, y in ring(2 + st, 15, .5): part(b, pod, 1, (x, y, 22 + st * 7), .5, tint=hexc('#8fe8ff'), amt=.25)
+
+def royalty(b, st):
+    """Royal Pod: a gilded pod plant in a ruff of mint, crowned."""
+    part(b, mint, st, k=.9, soil=True, tint=hexc('#2a8a5a'), amt=.2)
+    part(b, pod, st, (0, 0, 5), .85, tint=hexc('#e9c23c'), amt=.45)
+    h = 44 + st * 9
+    for x, y in ring(6, 8): b.spike((x, y, h), (x * .05, y * .05, 1), 9, 1.5, hexc('#a07a1a'), hexc('#ffe28a'))
+
+def revenant(b, st):
+    """Revenant Bloom: a sick grey corpse flower with a pale pod rising out of it."""
+    part(b, flower, st, k=.9, soil=True, tint=hexc('#6a7a6a'), amt=.55)
+    part(b, pod, max(1, st - 1), (0, 0, 20), .7, tint=hexc('#58ff6a'), amt=.3)
+
+def rider(b, st):
+    """Rider Thorn: canes with a live burr clinging to every tip."""
+    part(b, thorn, st, soil=True, tint=hexc('#8a6a2a'), amt=.2)
+    for x, y in ring(2 + st, 22 + st * 5, .3): burr_head(b, (x, y, 25 + st * 6), 5 + st * .6)
+
+def pitcher(b, st):
+    """Pitcher Maw: a tall jug of a plant, wine red at the lip, with something glowing at the bottom of it."""
+    b.mound(24)
+    g, w = hexc('#3e6a2a'), hexc('#8a2433')
+    H = 44 + st * 12; R = 15 + st * 2
+    b.lathe([(R * .5, 3), (R, H * .2), (R * .95, H * .5), (R * .7, H * .8), (R * .72, H * .92), (R * 1.15, H), (R * .9, H + 1.5), (R * .6, H * .85), (R * .5, H * .3)], (0, 0, 0), g, w, seg=16,
+            mod=lambda q, i: 1 + .05 * math.sin(q * 7))
+    b.blob((0, 0, H * .3), (R * .5, R * .5, 2), hexc('#c2ff5a'), seg=10, rows=4, glow=True)
+    b.leaf((R * .7, 0, H), 0, 22 + st * 3, 18, w, g, rise=.7, droop=.2)
+    rosette(b, 6, 18, 9, c0=hexc('#2c4a22'), c1=g)
+    part(b, gourd, 1, (R + 13, 4, 0), .5, tint=w, amt=.3)
+
+def thornmaw(b, st):
+    """Thornmaw: a Snapjaw grown through a thorn bush."""
+    part(b, thorn, st, k=1.05, soil=True, tint=hexc('#2c1a22'), amt=.3)
+    part(b, maw, st, (0, 0, 2), .92, tint=hexc('#7a3a3a'), amt=.25)
+
+def bloodweb(b, st):
+    """Bloodweb: Tetherwood gone red, its tendrils in thorns."""
+    part(b, vine, st, soil=True, tint=hexc('#8a1a1a'), amt=.6)
+    for x, y in ring(5 + st, 24 + st * 4, .2):
+        b.spike((x, y, 6), (x * .03, y * .03, 1), 11 + st, 1.4, hexc('#4a1616'), hexc('#ff5a4a'))
+
+def puppet(b, st):
+    """Puppet Gourd: a gourd sprouting caps, with threads hanging off it."""
+    part(b, gourd, st, soil=True, tint=hexc('#6a3aa0'), amt=.45)
+    for x, y in ring(3, 11, .7): cap(b, (x, y, 30 + st * 7), 7 + st, 8, hexc('#3a1e6a'), hexc('#b48cff'), 3)
+    for x, y in ring(5, 19, .2):
+        b.tube(b.curve((x * .5, y * .5, 30 + st * 5), (x * 1.3, y * 1.3, 3), 6, n=6), [.5] * 6, hexc('#d8d0b8'), hexc('#efe6cc'), seg=3, cap=False, glow=True)
+
+def daydream(b, st):
+    """Daydream Bloom: a pale sundial with soft mushrooms nodding round it."""
+    part(b, bulb, st, soil=True, tint=hexc('#b48cff'), amt=.5)
+    for x, y in ring(2 + st, 21, .3): cap(b, (x, y, 13), 7 + st, 13, hexc('#6a5ab0'), hexc('#e0d0ff'), 3)
+
+def solar(b, st):
+    """Solar Lily: a gold lily carrying a burning glass."""
+    part(b, lily, st, soil=True, tint=hexc('#e9a020'), amt=.5)
+    h = 52 + st * 13
+    b.tube([(0, 0, 8), (1.5, 0, h * .5), (0, 0, h)], [3, 2.2, 1.6], hexc('#a07a1a'), hexc('#e9c23c'), seg=6)
+    b.blob((0, 0, h + 5), (9, 9, 9), hexc('#ffc23c'), hexc('#fff0b0'), seg=12, rows=8, glow=True)
+    for x, y in ring(8, 10): b.spike((x, y, h + 5), (x, y, 0), 6 + st, 1.2, hexc('#ffc23c'), hexc('#fff0b0'))
+
+def catapult(b, st):
+    """Catapult Gourd: a spring of bean stems with a gourd riding the arm."""
+    part(b, bean, st, soil=True, tint=hexc('#c2852e'), amt=.2)
+    pts = b.curve((0, 0, 8), (34 + st * 3, 0, 40 + st * 6), 12, n=8)
+    b.tube(pts, [4, 3.5, 3.1, 2.7, 2.3, 2, 1.7, 1.5], hexc('#5a4a1e'), hexc('#a0902a'), seg=6, cap=False)
+    part(b, gourd, max(1, st - 1), tuple(pts[-1] - Vector((0, 0, 8))), .55, tint=hexc('#ff7a2a'), amt=.2)
+
+def tick(b, st):
+    """Brain Tick: a burr bush with a violet glow in it and a cap on top."""
+    part(b, burr, st, soil=True, tint=hexc('#6a3aa0'), amt=.4)
+    cap(b, (0, 0, 34 + st * 5), 8 + st, 16, hexc('#3a1e6a'), hexc('#b48cff'), 4)
+
+GOLD, GOLD2 = hexc('#a07a1a'), hexc('#ffe28a')
+def patriarch(b, st):
+    """Melon Patriarch: one huge gold-veined melon on a thick arm, its sons ripening round the foot."""
+    b.mound(30 + st * 2); rosette(b, 6 + st, 34, 20, c0=hexc('#245226'), c1=hexc('#6fae45'), rag=.2, rise=.4)
+    R = 18 + st * 3; H = 26 + st * 5
+    b.tube([(0, 0, 2), (2, 0, H * .5), (0, 0, H)], [10, 8, 7], hexc('#245226'), hexc('#8fbf4e'), seg=8)
+    gold = lambda x, y, z: mix(mix(hexc('#1a4a1e'), hexc('#5fa03e'), (z + 1) / 2), GOLD2, min(1, max(0, math.cos(math.atan2(y, x) * 6 + math.sin(z * 3) * .4) - .72) * 5))
+    b.blob((0, 0, H + R * .85), (R, R, R * 1.1), None, seg=20, rows=13, colf=gold)
+    b.tube(b.curve((0, 0, H + R * 1.9), (5, 3, H + R * 1.9 + 8), 3, n=4), [2.4, 2, 1.5, 1], hexc('#4a3a14'), GOLD2, seg=6)
+    for i in range(2 + st):
+        y = .9 + i * 1.7
+        b.blob((math.cos(y) * 25, math.sin(y) * 25, 9), (8, 8, 7.4), None, seg=12, rows=8, colf=melon_stripe)
+
+def worldroot(b, st):
+    """World Root: a stump older than the map, roots running off in every direction with sap glowing in the cracks."""
+    b.mound(44 + st * 3)
+    d, l = hexc('#2a1c12'), hexc('#6a4a2a')
+    H = 44 + st * 15; R = 17 + st * 3
+    b.lathe([(R * 1.5, 0), (R * 1.08, H * .22), (R * .9, H * .6), (R * .95, H * .85), (R * .7, H), (.1, H + 2)], (0, 0, 0), d, l, seg=18, mod=lambda q, i: 1 + .12 * math.sin(q * 5 + i) + .05 * math.sin(q * 11))
+    for x, y in ring(7 + st, 66 + st * 8, .3):
+        pts = b.curve((x * .2, y * .2, 16), (x, y, 1), 14, n=9, wob=2)
+        b.tube(pts, [8, 7, 6, 5, 4, 3.2, 2.4, 1.6, .4], d, l, seg=6, cap=False)
+        b.tube([q + Vector((0, 0, 1.2)) for q in pts[1:7]], [1.1, 1, .9, .8, .6, .3], hexc('#58ff6a'), hexc('#c2ff5a'), seg=4, cap=False, glow=True)
+    for x, y in ring(5, R * .9):
+        b.tube(b.curve((x * .5, y * .5, H), (x * 1.7, y * 1.7, H + 8), 16, n=6), [3, 2.5, 2, 1.5, 1, .2], d, l, seg=5, cap=False)
+        b.leaf((x * 1.7, y * 1.7, H + 8), math.atan2(y, x), 16, 9, hexc('#2c5a22'), hexc('#7fc24a'), rise=.4, droop=.7)
+
+def kudzu(b, st):
+    """Kudzu Queen: a heap of creepers and thorns swallowing whatever was under it, flowering gold."""
+    part(b, vine, st, k=1.25, soil=True, tint=hexc('#1e3a1e'), amt=.25)
+    part(b, thorn, st, k=.8, tint=hexc('#2c3a1e'), amt=.3)
+    b.blob((0, 0, 17 + st * 3), (32 + st * 3, 32 + st * 3, 19 + st * 3), hexc('#1e3a1e'), hexc('#3e6a2a'), seg=16, rows=9, noise=.16)
+    for i in range(16 + st * 6):
+        q = i * 2.399; t = (i + 1) / (16 + st * 6); r = 34 * t + st
+        b.leaf((math.cos(q) * r, math.sin(q) * r, 30 + st * 6 - 16 * t * t), q, 16, 9, hexc('#2c5a22'), hexc('#7fc24a'), rise=.5, droop=.8, rag=.2)
+    for x, y in ring(3 + st, 18, .5): b.blob((x, y, 36 + st * 6), (3.4, 3.4, 3.4), GOLD2, seg=8, rows=5, glow=True)
+
+def grave(b, st):
+    """Grave Bloom: a burnt corpse flower with embers in its heart and ribs coming out of the ground."""
+    part(b, flower, st, k=1.2, soil=True, tint=hexc('#141010'), amt=.72)
+    b.blob((0, 0, 19 + st * 3), (11, 11, 8), hexc('#ff5a1a'), hexc('#ffc23c'), seg=12, rows=6, glow=True)
+    for x, y in ring(5 + st, 40 + st * 4, .4):
+        b.tube(b.curve((x, y, 0), (x * .7, y * .7, 26 + st * 3), 8, n=6), [3, 2.6, 2.1, 1.7, 1.2, .3], hexc('#b0a890'), hexc('#efe6cc'), seg=5, cap=False)
+        b.blob((x * 1.1, y * 1.1, 2), (2.2, 2.2, 1.6), hexc('#ff7a2a'), seg=6, rows=4, glow=True)
+
+def gourmand(b, st):
+    """The Gourmand: a Snapjaw the size of a car, wine dark, with gold in its teeth."""
+    part(b, maw, st, k=1.45, soil=True, tint=hexc('#5a1a33'), amt=.45)
+    for x, y in ring(10 + st * 2, 24 + st * 3, .1):
+        b.spike((x, y, 26 + st * 6), (x * .04, y * .04, 1), 11 + st, 2.1, GOLD, GOLD2)
+
+def beanstalk(b, st):
+    """The Beanstalk: a twisted green tower 430 units tall with a nest of twigs at the top, gold pods on the way up."""
+    H = 430; b.mound(30 + st * 3)
+    d, l = hexc('#2a5a22'), hexc('#8ad05a')
+    for j in range(2 + st):
+        o = j / (2 + st) * math.tau; n = 40
+        pts = [Vector((math.cos(o + i * .35) * 9, math.sin(o + i * .35) * 9, i / n * H)) for i in range(n + 1)]
+        b.tube(pts, [8 + st * 1.2 - 4 * i / n for i in range(n + 1)], d, l, seg=6, cap=False)
+    for i in range(18):
+        z = 26 + i * 21; q = i * 2.399
+        b.leaf((math.cos(q) * 10, math.sin(q) * 10, z), q, 34 - i * .7, 20, d, l, rise=.4, droop=.7)
+        if i % 3 == st % 3:
+            at = Vector((math.cos(q + 1) * 18, math.sin(q + 1) * 18, z))
+            b.blob(at, (5, 5, 13), GOLD, GOLD2, seg=9, rows=6, glow=st >= 3)
+    t0, t1 = hexc('#4a3420'), hexc('#8a6a42')
+    for i in range(46):
+        q = i * 1.7; r = 66 + (i % 5) * 7
+        a = (math.cos(q) * r, math.sin(q) * r, H - 9 + (i % 4) * 2.5); e = (math.cos(q + 1.4) * r, math.sin(q + 1.4) * r, H - 8 + (i % 3) * 3)
+        b.tube(b.curve(a, e, 0, n=4, wob=1.6), [2.2, 2.4, 2.2, 1.6], t0, t1, seg=4, cap=False)
+    b.lathe([(.1, H - 16), (56, H - 14), (86, H - 10), (84, H - 6)], (0, 0, 0), t0, t1, seg=14, mod=lambda q, i: 1 + .05 * math.sin(q * 9))
+
+def overbloom(b, st):
+    """The Overbloom: a head of glowing flowers on a fat stem, shedding burrs and caps. It looks like it is breathing."""
+    part(b, burr, st, soil=True, k=1.1, tint=hexc('#2a6a4a'), amt=.35)
+    H = 56 + st * 12
+    b.tube(b.curve((0, 0, 4), (0, 0, H), 0, n=7, side=(5, 0, 0), wob=1), [7, 6.2, 5.4, 4.8, 4.4, 4.2, 4.2], hexc('#2a5a3a'), hexc('#58c28a'), seg=8)
+    for i in range(14 + st * 4):
+        y = i * 2.399; t = (i + 1) / (14 + st * 4); r = 7 + 26 * t
+        b.leaf((math.cos(y) * r * .4, math.sin(y) * r * .4, H - 8 * t), y, 16 + 14 * t, 12, hexc('#7dff9a'), hexc('#f0fff0'), rise=.75, droop=.5, rag=.2)
+    b.blob((0, 0, H + 4), (9, 9, 7), hexc('#ffe28a'), hexc('#fff0b0'), seg=12, rows=7, glow=True)
+    for x, y in ring(3, 25, .4): cap(b, (x, y, 14), 9, 14, hexc('#2a6a4a'), hexc('#7dff9a'), 3)
+
+def thrall_vines(b):
+    """Worn by a zombie on your side: creepers wound round the legs and chest, with a sprig on the shoulder."""
+    d, l, g = hexc('#2c3a1e'), hexc('#7fa244'), hexc('#58ff6a')
+    n = 30; pts = [Vector((math.cos(i * .72) * (11 - i * .08), math.sin(i * .72) * (11 - i * .08), 4 + i * 1.9)) for i in range(n + 1)]
+    b.tube(pts, [1.3] * (n + 1), d, l, seg=4, cap=False)
+    b.tube([p + Vector((.6, 0, 0)) for p in pts[::3]], [.5] * len(pts[::3]), g, g, seg=3, cap=False, glow=True)
+    for y in (0.7, 2.6, 4.4): b.leaf((math.cos(y) * 10, math.sin(y) * 10, 52), y, 11, 6, d, l, rise=.6, droop=.6)
+
+def bits(b, c0, c1, n=14):
+    for i in range(n):
+        q = i * 2.399; r = 2 + i * .55
+        b.blob((math.cos(q) * r, math.sin(q) * r, 34.5 + (n - i) * .22), (2.2, 2.2, 1.5), c0, c1, seg=6, rows=4, noise=.2)
+def ing_mulch(b):
+    d, l = hexc('#4a2c14'), hexc('#a0703a')
+    b.blob((0, 0, 8), (19, 19, 8), hexc('#2a1c10'), d, seg=16, rows=8, noise=.2)
+    for i in range(30):
+        q = i * 2.399; r = 2 + i * .55; a = Vector((math.cos(q) * r, math.sin(q) * r, 15 - r * .34 + b.r.uniform(0, 2)))
+        d2 = Vector((math.cos(q * 3), math.sin(q * 3), .1)).normalized()
+        b.tube([a - d2 * 5, a + d2 * 5], [1.7, 1.2], d, l, seg=4)
+def ing_bone(b):
+    jar(b, hexc('#c8c0a8'), hexc('#f0ead8')); bits(b, hexc('#d8d0b8'), hexc('#fffaf0'))
+def ing_frost(b):
+    jar(b, hexc('#4aa0d8'), hexc('#e8fbff'), glow=True)
+    for x, y in ring(6, 8): b.spike((x, y, 35), (x * .06, y * .06, 1), 10, 1.8, hexc('#a8e8ff'), (1, 1, 1))
+def ing_ember(b):
+    jar(b, hexc('#a02a0a'), hexc('#ffb02a'), glow=True); bits(b, hexc('#1a1412'), hexc('#ff7a2a'), 9)
+def ing_static(b):
+    jar(b, hexc('#1a2a80'), hexc('#5a8aff'))
+    for x, y in ring(4, 13, .5):
+        b.tube([(x, y, 6), (x * 1.3, y * 1.3 + 2, 13), (x * .9, y * .9 - 2, 19), (x * 1.3, y * 1.3, 27)], [.5, .8, .8, .3], (1, 1, .6), (1, 1, 1), seg=4, cap=False, glow=True)
+def ing_blood(b): jar(b, hexc('#5a0a0a'), hexc('#d81a1a'))
+def ing_moon(b):
+    jar(b, hexc('#4a4a52'), hexc('#a8a8b4')); bits(b, hexc('#6a6a74'), hexc('#c8c8d4'))
+    b.blob((0, 0, 46), (8, 8, 8), hexc('#7a8aa8'), hexc('#dfe8ff'), seg=12, rows=8, noise=.05)
+def ing_golden(b):
+    b.blob((0, 0, 14), (16, 16, 14), None, seg=18, rows=11, colf=lambda x, y, z: mix(hexc('#c89a2a'), hexc('#fff0a0'), .5 + .5 * math.sin(math.atan2(y, x) * 8)))
+    b.tube(b.curve((0, 0, 27), (5, 2, 33), 2, n=4), [1.6, 1.3, 1, .8], hexc('#2c3a1e'), hexc('#7fa244'), seg=5)
+
+STAGED = {'pod': pod, 'thorn': thorn, 'bulb': bulb, 'burr': burr, 'bean': bean, 'mint': mint, 'gourd': gourd, 'lily': lily, 'flower': flower, 'maw': maw, 'melon': melon,
+          'vine': vine, 'spore': spore, 'choir': choir, 'royalty': royalty, 'revenant': revenant, 'rider': rider, 'pitcher': pitcher, 'thornmaw': thornmaw, 'bloodweb': bloodweb,
+          'puppet': puppet, 'daydream': daydream, 'solar': solar, 'catapult': catapult, 'tick': tick,
+          'patriarch': patriarch, 'worldroot': worldroot, 'kudzu': kudzu, 'grave': grave, 'gourmand': gourmand, 'beanstalk': beanstalk, 'overbloom': overbloom}
+SINGLE = {'sprout': sprout, 'burr_ball': burr_ball, 'melon_ball': melon_ball, 'thrall_vines': thrall_vines}
+PICTURES = {'mulch': ing_mulch, 'bone': ing_bone, 'frost': ing_frost, 'ember': ing_ember, 'static': ing_static, 'blood': ing_blood, 'moon': ing_moon, 'golden': ing_golden,
+            'fertilizer': ing_fertilizer, 'dew': ing_dew, 'compost': ing_compost, 'pollen': ing_pollen, 'sap': ing_sap, 'mutagen': ing_mutagen, 'packet': ing_packet, 'rare': ing_rare}
 
 # ---- Blender --------------------------------------------------------------------------------------------------------
 bpy.ops.wm.read_factory_settings(use_empty=True)

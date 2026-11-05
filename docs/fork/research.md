@@ -6,6 +6,14 @@
 - New effect hooks: Double Time (fire wait shortened per shot via `session.shots`), Quick Swap (wraps `switchWeapon`), Prestidigitation (reserve refunded when the reload lands), Brain Rot `bite`/`fumes` TUNE params (ammo-mods), Thermal Shock / Petroleum / Firebomb / Contact Burn / Concussion in the research mod's `ammoModFired` handler, speed boosts as timed `boost()` entries added to the speed getters.
 - Verified: Node (order enforced, auto-advance through 7 steps to MASTERY, Minor 2 equips only once mastered, an old 2+2 save loads); in a match with a mastered Juggernog (Iron Core + Retaliation + Hardened Plates): a 50 hit took 38 under half health, body shots ×1.15 under 35%; Dead First ×2 headshots only at full health; Big Game: Cryo always procs on a hellhound; Super Serum/Caustic Fumes changed Brain Rot's bite .25→.375 and fumes 0→.1; Thermal Shock dealt exactly 20% when the chill ended; a Petroleum pool burned a neighbour; Double Time finished and Double or Nothing started on its own.
 
+## Coming-soon items (2026-11-05)
+
+An item with `soon: true` (the four coming-soon Reaper perks, reaper-perks.md):
+- shows its 8 augments under a banner but can't be researched (`isSoon`; `startResearch` returns 'Coming soon');
+- has any active research on it cleared;
+- is skipped by auto-advance;
+- is left out of the tab counts.
+
 ## First version (2+2 per item), kept for the record
 
 Black Ops 6 Zombies style. The roadmap PDF assumed no ammo mods existed and four perks; by now there were eight of each (ammo-mods mod, perks-plus), so all 16 items got augments: 2 Major + 2 Minor each, 64 in all (`research.json`; numbers are first drafts).

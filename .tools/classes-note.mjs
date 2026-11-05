@@ -25,7 +25,7 @@ p(`Melon Zombies has **${c.classes.length} classes**, picked in the main menu's 
 p('');
 p('| Class | Role | Action skills | Resource |');
 p('|---|---|---|---|');
-for (const x of c.classes) p(`| **${x.name}** | ${x.tagline} | ${x.trees.map(t => t.action.name).filter((v, i, a) => a.indexOf(v) === i).join(', ')} | ${x.resource.name} |`);
+for (const x of c.classes) p(`| **${x.name}**${x.soon ? ' (coming soon)' : ''} | ${x.tagline} | ${x.trees.map(t => t.action.name).filter((v, i, a) => a.indexOf(v) === i).join(', ')} | ${x.resource.name} |`);
 p('');
 p('## How classes work');
 p('');
@@ -44,10 +44,11 @@ p('');
 for (const x of c.classes) {
   p('---');
   p('');
-  p(`## ${x.name}`);
+  p(`## ${x.name}${x.soon ? ' (coming soon)' : ''}`);
   p('');
   p(`> *${x.tagline}*`);
   p('');
+  if (x.soon) { p(`**Coming soon:** the ${x.name} isn't out yet. Its skills are shown in the game as a preview, but it can't be picked or played.`); p(''); }
   p(`**Resource: ${x.resource.name}** (max ${x.resource.max}). ${x.resource.desc}`);
   p('');
   if (x.mech) {
@@ -71,7 +72,19 @@ for (const x of c.classes) {
     p('');
     p('| Plant | Rarity | Life | What it does | Ancient |');
     p('|---|---|---|---|---|');
-    for (const pl of Object.values(g.plants)) p(`| **${pl.name}** | ${g.rarity[pl.rarity].name} | ${g.life[pl.life].name} | ${pl.desc} | ${pl.ancient} |`);
+    for (const pl of Object.values(g.plants).filter(q => !q.parents && !q.legend)) p(`| **${pl.name}** | ${g.rarity[pl.rarity].name} | ${g.life[pl.life].name} | ${pl.desc} | ${pl.ancient} |`);
+    p('');
+    p('**Hybrids** (a second seed in the cross socket)');
+    p('');
+    p('| Hybrid | Parents | Life | What it does | Ancient |');
+    p('|---|---|---|---|---|');
+    for (const pl of Object.values(g.plants).filter(q => q.parents)) p(`| **${pl.name}** | ${pl.parents.map(q => g.plants[q].name).join(' × ')} | ${g.life[pl.life].name} | ${pl.desc} | ${pl.ancient} |`);
+    p('');
+    p(`**Legendaries** (${g.legends} at a time; the recipes are a secret, the Seed Catalogue gives riddles)`);
+    p('');
+    p('| Legendary | Riddle | What it does | Ancient |');
+    p('|---|---|---|---|');
+    for (const pl of Object.values(g.plants).filter(q => q.legend)) p(`| **${pl.name}** | ${pl.riddle} | ${pl.desc} | ${pl.ancient} |`);
     p('');
     p('**Ingredients**');
     p('');

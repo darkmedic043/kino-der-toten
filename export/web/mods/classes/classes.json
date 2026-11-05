@@ -3228,6 +3228,7 @@
     },
     {
       "id": "gardener",
+      "soon": true,
       "name": "Gardener",
       "tagline": "Plants it, feeds it, and lets the round come to it.",
       "color": "#7fa84a",
@@ -3255,7 +3256,8 @@
         "cooldownMul": {
           "common": 1,
           "uncommon": 1.5,
-          "rare": 2
+          "rare": 2,
+          "legendary": 3
         },
         "rarity": {
           "common": {
@@ -3267,6 +3269,10 @@
           },
           "rare": {
             "name": "Rare",
+            "needs": "rare"
+          },
+          "legendary": {
+            "name": "Legendary",
             "needs": "rare"
           }
         },
@@ -3474,8 +3480,11 @@
             "lureFor": 8,
             "lureEvery": 25,
             "lureRange": 900,
-            "desc": "Tough and foul: gas hurts up to 10 zombies close by, and every 25 s its stench pulls in up to 12 for 8 s.",
-            "ancient": "Lures 20 zombies."
+            "desc": "Tough and foul: gas hurts up to 10 zombies close by, and every 25 s its stench pulls in up to 12 for 8 s. Every 12 seconds a zombie killed in its reach gets up as a thrall for 10 seconds.",
+            "ancient": "Lures 20 zombies.",
+            "raiseEvery": 12,
+            "raiseFor": 10,
+            "raisePower": 0.1
           },
           "maw": {
             "name": "Glutton Maw",
@@ -3493,8 +3502,9 @@
             "digest": 6,
             "feed": 0.01,
             "feedMax": 0.3,
-            "desc": "Bites a zombie every 3 s for up to 1.5× a zombie’s health. Each kill makes it stronger; after 6 bites it stops to digest for 6 s.",
-            "ancient": "Each bite also catches its neighbours for half."
+            "desc": "Bites a zombie every 3 s for up to 1.5× a zombie’s health. Each kill makes it stronger; after 6 bites it stops to digest for 6 s. A quarter of its meals leave an ingredient that matches what it ate.",
+            "ancient": "Each bite also catches its neighbours for half.",
+            "meal": 0.25
           },
           "melon": {
             "name": "Melon Lobber",
@@ -3511,6 +3521,494 @@
             "radius": 170,
             "desc": "Lobs an exploding melon every 5 s at the biggest crowd in reach.",
             "ancient": "Melons split into three."
+          },
+          "vine": {
+            "name": "Tetherwood",
+            "rarity": "common",
+            "life": "wilting",
+            "tree": "thicket",
+            "grow": 4,
+            "hits": 10,
+            "range": 170,
+            "every": 1.5,
+            "ties": 5,
+            "share": 0.4,
+            "lifespan": 30,
+            "desc": "Ties up to 5 zombies in reach together for 30 seconds. Damage to one is shared with the others at 40%.",
+            "ancient": "Ties 8 at a time.",
+            "uses": 1
+          },
+          "spore": {
+            "name": "Mind Cap",
+            "rarity": "uncommon",
+            "life": "annual",
+            "tree": "greenhouse",
+            "limit": 2,
+            "grow": 7,
+            "hits": 8,
+            "range": 180,
+            "uses": 3,
+            "every": 8,
+            "puff": 6,
+            "turn": 4,
+            "power": 0.08,
+            "desc": "Every 8 seconds it puffs, and up to 6 zombies in reach turn on each other for 4 seconds. Three puffs.",
+            "ancient": "Puffs reach twice as far."
+          },
+          "choir": {
+            "parents": [
+              "lily",
+              "pod"
+            ],
+            "name": "Choir Lily",
+            "rarity": "uncommon",
+            "life": "wilting",
+            "tree": "orchard",
+            "grow": 6,
+            "hits": 10,
+            "range": 450,
+            "uses": 5,
+            "every": 8,
+            "replay": 8,
+            "window": 3,
+            "share": 0.4,
+            "cap": 0.2,
+            "fan": 3,
+            "desc": "Replays your last shots as beams, and each beam splits into a fan of 3 zombies.",
+            "ancient": "Replays twice as many shots."
+          },
+          "royalty": {
+            "parents": [
+              "mint",
+              "pod"
+            ],
+            "name": "Royalty Pod",
+            "rarity": "uncommon",
+            "life": "wilting",
+            "tree": "orchard",
+            "grow": 6,
+            "hits": 10,
+            "range": 500,
+            "uses": 6,
+            "every": 8,
+            "replay": 8,
+            "window": 3,
+            "share": 0.35,
+            "cap": 0.15,
+            "pay": 10,
+            "desc": "Replays your last shots, and every replayed hit pays you 10 points.",
+            "ancient": "Replays twice as many shots."
+          },
+          "revenant": {
+            "parents": [
+              "flower",
+              "pod"
+            ],
+            "name": "Revenant Pod",
+            "rarity": "uncommon",
+            "life": "hardy",
+            "tree": "orchard",
+            "limit": 1,
+            "grow": 9,
+            "hits": 16,
+            "range": 300,
+            "every": 14,
+            "raiseFor": 10,
+            "echo": 0.5,
+            "raisePower": 0.1,
+            "desc": "Every 14 seconds it raises a thrall for 10 seconds. Each of its bites hits like half of your last shot.",
+            "ancient": "Raises one every 9 seconds."
+          },
+          "rider": {
+            "parents": [
+              "burr",
+              "thorn"
+            ],
+            "name": "Bramble Rider",
+            "rarity": "uncommon",
+            "life": "wilting",
+            "tree": "orchard",
+            "grow": 5,
+            "hits": 8,
+            "range": 60,
+            "uses": 5,
+            "every": 2,
+            "bonus": 0.3,
+            "dps": 0.04,
+            "hops": 3,
+            "hopRange": 200,
+            "last": 12,
+            "trail": 0.03,
+            "trailRange": 70,
+            "desc": "A burr that sheds thorns: the zombie it rides makes others within 70 bleed.",
+            "ancient": "Burrs hop twice as far."
+          },
+          "pitcher": {
+            "parents": [
+              "gourd",
+              "maw"
+            ],
+            "name": "Pitcher Maw",
+            "rarity": "rare",
+            "life": "annual",
+            "tree": "thicket",
+            "limit": 1,
+            "plots": 2,
+            "grow": 10,
+            "hits": 16,
+            "range": 70,
+            "swallow": 4,
+            "gulp": 2,
+            "fuse": 20,
+            "melt": 4,
+            "burst": 0.2,
+            "perZombie": 0.1,
+            "inner": 1,
+            "radius": 120,
+            "desc": "Swallows up to 4 zombies and dissolves one every 4 seconds into an ingredient.",
+            "ancient": "Dissolves one every 2 seconds."
+          },
+          "thornmaw": {
+            "parents": [
+              "maw",
+              "thorn"
+            ],
+            "name": "Thornmaw",
+            "rarity": "rare",
+            "life": "hardy",
+            "tree": "thicket",
+            "limit": 1,
+            "plots": 2,
+            "grow": 12,
+            "hits": 28,
+            "range": 240,
+            "every": 3,
+            "bite": 0.9,
+            "full": 6,
+            "digest": 6,
+            "feed": 0.01,
+            "feedMax": 0.2,
+            "spit": 0.25,
+            "spikes": 8,
+            "desc": "Bites, and every bite grows a spike it spits at the nearest zombie in reach.",
+            "ancient": "Spits at 2 zombies."
+          },
+          "bloodweb": {
+            "parents": [
+              "thorn",
+              "vine"
+            ],
+            "name": "Bloodweb",
+            "rarity": "uncommon",
+            "life": "wilting",
+            "tree": "thicket",
+            "grow": 5,
+            "hits": 12,
+            "range": 170,
+            "every": 1.5,
+            "ties": 5,
+            "share": 0.3,
+            "bleed": 0.03,
+            "lifespan": 30,
+            "desc": "Ties up to 5 zombies together, and every one of them bleeds while tied.",
+            "ancient": "Ties 8 at a time.",
+            "uses": 1
+          },
+          "puppet": {
+            "parents": [
+              "gourd",
+              "spore"
+            ],
+            "name": "Puppet Gourd",
+            "rarity": "uncommon",
+            "life": "annual",
+            "tree": "thicket",
+            "limit": 2,
+            "grow": 8,
+            "hits": 12,
+            "range": 70,
+            "swallow": 5,
+            "gulp": 1.2,
+            "fuse": 10,
+            "thrallFor": 10,
+            "thrallPower": 0.12,
+            "burst": 0.2,
+            "perZombie": 0.1,
+            "inner": 1,
+            "radius": 120,
+            "desc": "Swallows up to 5 zombies, then lets them out on your side for 10 seconds.",
+            "ancient": "They fight for 15 seconds."
+          },
+          "daydream": {
+            "parents": [
+              "bulb",
+              "spore"
+            ],
+            "name": "Daydream Bloom",
+            "rarity": "uncommon",
+            "life": "perennial",
+            "tree": "greenhouse",
+            "limit": 1,
+            "grow": 9,
+            "hits": 12,
+            "range": 140,
+            "sleep": 12,
+            "every": 2,
+            "desc": "Zombies that stand in its shade fall asleep for up to 12 seconds, until something hits them. They can’t doze off again for 18 seconds.",
+            "ancient": "Reach grows by half."
+          },
+          "solar": {
+            "parents": [
+              "bulb",
+              "lily"
+            ],
+            "name": "Solar Lens",
+            "rarity": "uncommon",
+            "life": "hardy",
+            "tree": "greenhouse",
+            "limit": 1,
+            "grow": 9,
+            "hits": 14,
+            "range": 420,
+            "dps": 0.14,
+            "sweep": 0.9,
+            "width": 0.4,
+            "desc": "A beam of sunlight sweeps around it, burning every zombie it crosses.",
+            "ancient": "Two beams."
+          },
+          "catapult": {
+            "parents": [
+              "bean",
+              "gourd"
+            ],
+            "name": "Catapult Gourd",
+            "rarity": "uncommon",
+            "life": "annual",
+            "tree": "greenhouse",
+            "limit": 2,
+            "grow": 8,
+            "hits": 12,
+            "range": 70,
+            "swallow": 5,
+            "gulp": 1.2,
+            "fuse": 9,
+            "fling": 900,
+            "land": 0.3,
+            "perZombie": 0.2,
+            "inner": 1,
+            "burst": 0.3,
+            "radius": 170,
+            "desc": "Swallows up to 5 zombies, then flings them at the biggest crowd within 900. They crush what they land on.",
+            "ancient": "Landing reach grows by a third."
+          },
+          "tick": {
+            "parents": [
+              "burr",
+              "spore"
+            ],
+            "name": "Brain Tick",
+            "rarity": "uncommon",
+            "life": "wilting",
+            "tree": "greenhouse",
+            "grow": 6,
+            "hits": 8,
+            "range": 60,
+            "uses": 3,
+            "every": 4,
+            "hops": 2,
+            "hopRange": 240,
+            "last": 10,
+            "bonus": 0,
+            "dps": 0,
+            "thrallPower": 0.12,
+            "desc": "The zombie carrying it fights for you for 10 seconds, then the tick jumps to the next one.",
+            "ancient": "It jumps twice as far."
+          },
+          "patriarch": {
+            "recipe": [
+              "melon",
+              "moon",
+              "mutagen"
+            ],
+            "name": "The Melon Patriarch",
+            "tree": "orchard",
+            "grow": 14,
+            "hits": 40,
+            "range": 1000,
+            "every": 6,
+            "lob": 0.45,
+            "radius": 200,
+            "split": 0.4,
+            "bonus": 500,
+            "riddle": "Something sweet grows heavy under a low moon.",
+            "desc": "Lobs giant melons that split in two, and split again. When the round ends it drops a Golden Melon.",
+            "ancient": "Three melons at a time.",
+            "life": "hardy",
+            "rarity": "legendary",
+            "legend": true,
+            "limit": 1,
+            "plots": 3
+          },
+          "worldroot": {
+            "recipe": [
+              "bulb",
+              "compost",
+              "mutagen"
+            ],
+            "name": "World Root",
+            "tree": "greenhouse",
+            "life": "perennial",
+            "grow": 14,
+            "hits": 60,
+            "range": 520,
+            "every": 1,
+            "grab": 0.1,
+            "stun": 2,
+            "save": 3,
+            "riddle": "Bury what fell, and what falls is held.",
+            "desc": "Roots grab zombies climbing through windows in its reach. If you go down in its reach it holds you up, once per round, at full health.",
+            "ancient": "Roots grab harder.",
+            "rarity": "legendary",
+            "legend": true,
+            "limit": 1,
+            "plots": 3
+          },
+          "kudzu": {
+            "recipe": [
+              "mutagen",
+              "thorn",
+              "vine"
+            ],
+            "name": "Kudzu Queen",
+            "tree": "thicket",
+            "grow": 14,
+            "hits": 40,
+            "range": 240,
+            "every": 20,
+            "copies": 4,
+            "copyFor": 45,
+            "copyPower": 0.5,
+            "spreads": [
+              "thorn",
+              "vine",
+              "pod",
+              "burr"
+            ],
+            "riddle": "Bind the spite and feed it: it will never ask for ground again.",
+            "desc": "Every 20 seconds it plants a half-strength copy of a plant nearby, free of plots. Up to 4 at once, for 45 seconds each.",
+            "ancient": "Spreads every 12 seconds.",
+            "life": "hardy",
+            "rarity": "legendary",
+            "legend": true,
+            "limit": 1,
+            "plots": 3
+          },
+          "grave": {
+            "recipe": [
+              "ember",
+              "flower",
+              "mutagen"
+            ],
+            "name": "Graveblossom",
+            "tree": "greenhouse",
+            "grow": 14,
+            "hits": 40,
+            "range": 320,
+            "raiseFor": 8,
+            "raiseEvery": 1.2,
+            "raisePower": 0.1,
+            "dps": 0.04,
+            "targets": 8,
+            "riddle": "The dead rise warmer if you plant them in the coals.",
+            "desc": "Zombies killed in its reach get up again as burning thralls for 8 seconds.",
+            "ancient": "They burn for 12 seconds.",
+            "life": "hardy",
+            "rarity": "legendary",
+            "legend": true,
+            "limit": 1,
+            "plots": 3
+          },
+          "gourmand": {
+            "recipe": [
+              "blood",
+              "fertilizer",
+              "maw"
+            ],
+            "name": "The Gourmand",
+            "tree": "thicket",
+            "grow": 14,
+            "hits": 50,
+            "range": 150,
+            "every": 2.5,
+            "bite": 1.2,
+            "full": 8,
+            "digest": 4,
+            "feed": 0.01,
+            "feedMax": 0.3,
+            "meal": 0.04,
+            "mealMax": 1,
+            "riddle": "Feed it what you bled, and it will never stop asking.",
+            "desc": "Eats zombies whole, specials included. Every meal adds 4% to your gun damage until the round ends, up to double.",
+            "ancient": "Bites what stands around its meal.",
+            "life": "hardy",
+            "rarity": "legendary",
+            "legend": true,
+            "limit": 1,
+            "plots": 3
+          },
+          "beanstalk": {
+            "recipe": [
+              "bean",
+              "mint",
+              "mutagen"
+            ],
+            "name": "Golden Beanstalk",
+            "tree": "greenhouse",
+            "life": "hardy",
+            "grow": 14,
+            "hits": 40,
+            "range": 60,
+            "height": 430,
+            "stay": 30,
+            "rest": 60,
+            "pods": 400,
+            "riddle": "Trade the cow for something that climbs.",
+            "desc": "Walk into it and it carries you to a nest above the map for 30 seconds, then rests for 60. Its golden pods pay 400 points every round.",
+            "ancient": "Pods pay double.",
+            "rarity": "legendary",
+            "legend": true,
+            "limit": 1,
+            "plots": 3
+          },
+          "overbloom": {
+            "recipe": [
+              "burr",
+              "pollen",
+              "spore"
+            ],
+            "name": "Overbloom",
+            "tree": "orchard",
+            "life": "annual",
+            "grow": 14,
+            "hits": 24,
+            "range": 420,
+            "infectFor": 40,
+            "power": 0.12,
+            "hitsThrall": 8,
+            "seedling": 20,
+            "seeds": [
+              "thorn",
+              "burr",
+              "bean",
+              "pod"
+            ],
+            "riddle": "Let the rider carry the dust, and the crowd will carry the garden.",
+            "desc": "Infects the nearest zombie. The infected fight for you, infect what they hit, and burst into a free 20-second seedling when they die. It lasts until the round ends or no infected are left.",
+            "ancient": "Infected last 60 seconds.",
+            "rarity": "legendary",
+            "legend": true,
+            "limit": 1,
+            "plots": 3
           }
         },
         "additives": {
@@ -3548,6 +4046,47 @@
             "desc": "+30% power, and it can grow one stage further than it should.",
             "power": 0.3,
             "cap": 1
+          },
+          "mulch": {
+            "name": "Mulch",
+            "desc": "+40% health. Half of all bites do nothing, and it slowly heals itself.",
+            "hits": 0.4,
+            "mulch": 1
+          },
+          "bone": {
+            "name": "Bone Meal",
+            "gated": true,
+            "desc": "Its hits can crit for double and carry on to one more zombie close by.",
+            "bone": 1
+          },
+          "frost": {
+            "name": "Frost Dew",
+            "gated": true,
+            "desc": "Its hits slow zombies by half for 2 seconds.",
+            "frost": 1
+          },
+          "ember": {
+            "name": "Ember Ash",
+            "gated": true,
+            "desc": "Its hits set zombies on fire for 3 seconds.",
+            "ember": 1
+          },
+          "static": {
+            "name": "Static Pollen",
+            "gated": true,
+            "desc": "Its hits chain to 2 nearby zombies at half damage.",
+            "static": 1
+          },
+          "blood": {
+            "name": "Blood Sap",
+            "gated": true,
+            "desc": "Each zombie it kills heals you by 8.",
+            "blood": 1
+          },
+          "moon": {
+            "name": "Moon Soil",
+            "desc": "Its hits throw zombies up in the air. Found only on the Moon.",
+            "moon": 1
           }
         },
         "items": {
@@ -3558,6 +4097,11 @@
           "rare": {
             "name": "Rare Seed",
             "desc": "Plants one Rare seed. Found from round 10, mostly on dogs and specials."
+          },
+          "golden": {
+            "name": "Golden Melon",
+            "desc": "500 points, a Rare Seed and a Mutagen.",
+            "shelf": false
           }
         },
         "drops": {
@@ -3580,7 +4124,15 @@
             "rate": 0.0015,
             "special": 0.08,
             "pity": 300
-          }
+          },
+          "mulch": 0.25,
+          "bone": 0.08,
+          "frost": 0.1,
+          "ember": 0.12,
+          "static": 0.1,
+          "blood": 0.25,
+          "moon": 0.1,
+          "meal": 0.25
         },
         "fixtures": {
           "bloomRage": {
@@ -3588,7 +4140,8 @@
             "time": 10
           },
           "deathBlast": 0.2
-        }
+        },
+        "legends": 1
       },
       "synergies": [
         {
@@ -3799,6 +4352,44 @@
               "tier": 6,
               "type": "capstone",
               "seed": "melon"
+            },
+            {
+              "id": "aStatic",
+              "name": "Static Pollen",
+              "ranks": 1,
+              "icon": "bolt",
+              "desc": "Adds Static Pollen. Kills of electrified zombies drop it.",
+              "effects": {},
+              "tier": 2,
+              "type": "game",
+              "additive": "static"
+            },
+            {
+              "id": "aBone",
+              "name": "Bone Meal",
+              "ranks": 1,
+              "icon": "skull",
+              "desc": "Adds Bone Meal. Headshot kills drop it.",
+              "effects": {},
+              "tier": 3,
+              "type": "game",
+              "additive": "bone"
+            },
+            {
+              "id": "hOrchard",
+              "name": "Cross-Bred Pods",
+              "ranks": 1,
+              "icon": "double",
+              "desc": "Adds hybrids: Choir Lily, Royalty Pod, Revenant Pod and Bramble Rider.",
+              "effects": {},
+              "tier": 4,
+              "type": "game",
+              "hybrids": [
+                "choir",
+                "royalty",
+                "revenant",
+                "rider"
+              ]
             }
           ]
         },
@@ -3979,6 +4570,44 @@
               },
               "tier": 6,
               "type": "capstone"
+            },
+            {
+              "id": "aFrost",
+              "name": "Frost Dew",
+              "ranks": 1,
+              "icon": "snow",
+              "desc": "Adds Frost Dew. Kills of slowed zombies drop it.",
+              "effects": {},
+              "tier": 3,
+              "type": "game",
+              "additive": "frost"
+            },
+            {
+              "id": "sVine",
+              "name": "Tetherwood Seeds",
+              "ranks": 1,
+              "icon": "sprout",
+              "desc": "Adds Tetherwood, which ties zombies together so they share damage.",
+              "effects": {},
+              "tier": 4,
+              "type": "game",
+              "seed": "vine"
+            },
+            {
+              "id": "hThicket",
+              "name": "Cross-Bred Briars",
+              "ranks": 1,
+              "icon": "double",
+              "desc": "Adds hybrids: Pitcher Maw, Thornmaw, Bloodweb and Puppet Gourd.",
+              "effects": {},
+              "tier": 4,
+              "type": "game",
+              "hybrids": [
+                "pitcher",
+                "thornmaw",
+                "bloodweb",
+                "puppet"
+              ]
             }
           ]
         },
@@ -4151,13 +4780,63 @@
               "name": "Green Thumb",
               "ranks": 1,
               "icon": "heart",
-              "desc": "+2 plots, and Bloom costs 25 Sunlight.",
+              "desc": "+2 plots, Bloom costs 25 Sunlight, and a second Legendary is allowed.",
               "effects": {
                 "garden.plots": 2,
-                "garden.bloomCost": -15
+                "garden.bloomCost": -15,
+                "garden.legends": 1
               },
               "tier": 6,
               "type": "capstone"
+            },
+            {
+              "id": "sSpore",
+              "name": "Mind Cap Spores",
+              "ranks": 1,
+              "icon": "sprout",
+              "desc": "Adds Mind Cap, whose puffs turn zombies on each other.",
+              "effects": {},
+              "tier": 3,
+              "type": "game",
+              "seed": "spore"
+            },
+            {
+              "id": "hGreen",
+              "name": "Cross-Bred Blooms",
+              "ranks": 1,
+              "icon": "double",
+              "desc": "Adds hybrids: Daydream Bloom, Solar Lens, Catapult Gourd and Brain Tick.",
+              "effects": {},
+              "tier": 4,
+              "type": "game",
+              "hybrids": [
+                "daydream",
+                "solar",
+                "catapult",
+                "tick"
+              ]
+            },
+            {
+              "id": "aEmber",
+              "name": "Ember Ash",
+              "ranks": 1,
+              "icon": "flame",
+              "desc": "Adds Ember Ash. Kills of burning zombies drop it.",
+              "effects": {},
+              "tier": 5,
+              "type": "game",
+              "additive": "ember"
+            },
+            {
+              "id": "aBlood",
+              "name": "Blood Sap",
+              "ranks": 1,
+              "icon": "heart",
+              "desc": "Adds Blood Sap. It drips when you take damage.",
+              "effects": {},
+              "tier": 5,
+              "type": "game",
+              "additive": "blood"
             }
           ]
         }

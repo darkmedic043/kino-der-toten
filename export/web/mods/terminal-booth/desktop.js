@@ -31,8 +31,9 @@ import { keepScroll } from '../../keep-scroll.js';
 
 const TEX = new URL('../../textures/', import.meta.url).href, OWN = new URL('../perks-plus/icons/', import.meta.url).href, REAPER = new URL('../perks-plus/reaper/icons/', import.meta.url).href;
 // perks with `unlock` (a shop/pass item id) stay locked until that item is owned (Widow's Wine, Prismatic Punch, Dam-A-Nade: Melon Pass rewards);
-// the terminal and the free-perk gums both check this
-export const perkUnlocked = p => { if (!p.unlock) return true; try { return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned ?? []).includes(p.unlock); } catch { return false; } };
+// the terminal and the free-perk gums both check this. `soon` perks (built but not released yet, user 2026-11-05) are never
+// unlocked: the terminal shows them COMING SOON and every free-perk source (gums, loot, Wunderfizz, the Gambler) skips them
+export const perkUnlocked = p => { if (p.soon) return false; if (!p.unlock) return true; try { return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned ?? []).includes(p.unlock); } catch { return false; } };
 // Every perk in the game. Double-Dew (Cheese Cube) is left out for now, at the user's request.
 export const PERKS = [
   { id: 'specialty_quickrevive', name: 'Quick Revive', price: 1500, color: '#509ebc', badge: 'QR', icon: OWN + 'quickrevive.webp', fallback: TEX + 'specialty_quickrevive_zombies.png',
@@ -93,6 +94,19 @@ export const PERKS = [
   { id: 'specialty_electriccherry', name: 'Electric Cherry', price: 2000, color: '#4fa8ff', badge: 'EC', icon: REAPER + 'electriccherry.webp',
     blurb: 'Reload with a kick.',
     effects: ['Starting a reload shocks and stuns the zombies around you for 1.5 s', 'The emptier the magazine, the bigger the burst and the harder it hits', '1.5 s cooldown'] },
+  // built, with research tracks, but COMING SOON (user, 2026-11-05): shown, never sold or handed out (perkUnlocked)
+  { id: 'specialty_stronghold', name: 'Stone Cold Stronghold', price: 3000, color: '#8a9aa8', badge: 'SH', icon: REAPER + 'stronghold.webp', soon: true,
+    blurb: 'Stand your ground.',
+    effects: ['Stand still for 1 s and a ring forms under you', 'In the ring you build armour (20 a second, up to 150) that takes hits before your health', 'Leave the ring and the armour drains away'] },
+  { id: 'specialty_victorious', name: 'Victorious Tortoise', price: 2500, color: '#3a8a3a', badge: 'VT', icon: REAPER + 'victorious.webp', soon: true,
+    blurb: 'Slow and steady.',
+    effects: ['A raised shield blocks hits from every side, not just the front', 'When your shield breaks it explodes, hurting the zombies around you'], note: 'Needs a shield.' },
+  { id: 'specialty_zombshell', name: 'Zombshell', price: 3000, color: '#7ab83a', badge: 'ZS', icon: REAPER + 'zombshell.webp', soon: true,
+    blurb: 'Leave them something sticky.',
+    effects: ['Bullet hits sometimes (8%) leave a green field where the zombie stood, for 6 s', 'Zombies in a field move at 40% speed and take 30% more damage'] },
+  { id: 'specialty_tactiquilla', name: 'Tactiquilla Sangria', price: 2500, color: '#c03a5a', badge: 'TS', icon: REAPER + 'tactiquilla.webp', soon: true,
+    blurb: 'Run and gun.',
+    effects: ['Fire while sprinting', '15% of your shots put the round back in the magazine', 'Kills close together pay 50 points for each extra kill'] },
 ];
 
 const CSS = `
@@ -436,12 +450,12 @@ function build() {
   // PERKS.EXE opens once you hold 4 perks from the machines (the map's machine count when it has fewer) (user, 2026-10-27)
   const gate = () => opts.perkGate?.() ?? { held: 0, need: 0 }, gated = () => { const g = gate(); return g.held < g.need; };
   const gateMsg = () => { const g = gate(); return `ACCESS DENIED · HOLD ${g.need} PERKS FIRST (${g.held}/${g.need}) · BUY THEM FROM THE MACHINES`; };
-  const blocked = p => opts.owned(p) ? 'owned' : gated() ? 'gate' : !perkUnlocked(p) ? 'pass' : opts.needsPower(p) && !opts.power() ? 'power' : '';
+  const blocked = p => opts.owned(p) ? 'owned' : p.soon ? 'soon' : gated() ? 'gate' : !perkUnlocked(p) ? 'pass' : opts.needsPower(p) && !opts.power() ? 'power' : '';
 
   function renderGrid() {
     keepScroll(grid).innerHTML = PERKS.map((p, i) => {
       const why = blocked(p);
-      return `<button class="tile ${why === 'power' || why === 'pass' || why === 'gate' ? 'locked' : ''} ${why === 'owned' ? 'owned' : ''}" data-i="${i}" title="${esc(p.name)}">${art(p)}<span class="tag">${why === 'power' ? 'NO POWER' : why === 'pass' ? 'MELON PASS' : why === 'gate' ? 'LOCKED' : ''}</span></button>`;
+      return `<button class="tile ${why === 'power' || why === 'pass' || why === 'gate' || why === 'soon' ? 'locked' : ''} ${why === 'owned' ? 'owned' : ''}" data-i="${i}" title="${esc(p.name)}">${art(p)}<span class="tag">${why === 'power' ? 'NO POWER' : why === 'pass' ? 'MELON PASS' : why === 'gate' ? 'LOCKED' : why === 'soon' ? 'SOON' : ''}</span></button>`;
     }).join('');
     for (const t of grid.children) {
       t.addEventListener('mouseenter', () => select(+t.dataset.i)); t.addEventListener('focus', () => select(+t.dataset.i));
@@ -451,10 +465,10 @@ function build() {
   function select(i) {
     shown = i; const p = PERKS[i], why = blocked(p), price = opts.price(p), short = !why && opts.points() < price;
     for (const t of grid.children) t.classList.toggle('on', +t.dataset.i === i);
-    const label = why === 'owned' ? 'OWNED' : why === 'gate' ? `LOCKED · HOLD ${gate().need} PERKS (${gate().held}/${gate().need})` : why === 'pass' ? 'LOCKED · MELON PASS REWARD' : why === 'power' ? 'NEEDS POWER' : short ? 'NOT ENOUGH POINTS' : `BUY · ${price.toLocaleString()}`;
+    const label = why === 'owned' ? 'OWNED' : why === 'gate' ? `LOCKED · HOLD ${gate().need} PERKS (${gate().held}/${gate().need})` : why === 'pass' ? 'LOCKED · MELON PASS REWARD' : why === 'soon' ? 'COMING SOON' : why === 'power' ? 'NEEDS POWER' : short ? 'NOT ENOUGH POINTS' : `BUY · ${price.toLocaleString()}`;
     detail.innerHTML = `<div class="head"><div class="big">${art(p)}</div><div>
         <h2>${esc(p.name.toUpperCase())}</h2><div class="blurb">${esc(p.blurb)}</div><div class="price">${price.toLocaleString()} PTS</div></div></div>
-      <button class="buy ${why === 'power' || why === 'pass' || why === 'gate' ? 'locked' : ''}" ${why || short ? 'disabled' : ''}>${label}</button>
+      <button class="buy ${why === 'power' || why === 'pass' || why === 'gate' || why === 'soon' ? 'locked' : ''}" ${why || short ? 'disabled' : ''}>${label}</button>
       <div class="status"><span>${opts.onMap(p) ? 'MACHINE ON THIS MAP' : 'NO MACHINE ON THIS MAP · TERMINAL ONLY'}</span></div>
       <h3>WHAT IT DOES</h3><ul>${p.effects.map(e => `<li>${esc(e)}</li>`).join('')}</ul>
       ${p.note ? `<div class="note">* ${esc(p.note)}</div>` : ''}`;
@@ -467,6 +481,7 @@ function build() {
     if (why === 'gate') return say(gateMsg(), 'bad');
     if (why === 'power') return say('ACCESS DENIED · RESTORE MAINS POWER', 'bad');
     if (why === 'pass') return say('LOCKED · UNLOCK IT IN THE MELON PASS (PASS TAB)', 'bad');
+    if (why === 'soon') return say(`${p.name.toUpperCase()} IS COMING SOON`, 'bad');
     const r = opts.buy(p);
     if (r === true) { say(`DISPENSING ${p.name.toUpperCase()} ...`, 'ok'); status(); renderGrid(); select(i); return; }
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
