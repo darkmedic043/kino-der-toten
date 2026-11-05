@@ -94,20 +94,24 @@ export function setupPortalFx(api, spots) {
 }
 
 const COLUMN_VS = `uniform float time,height,radius,flare,wobble;varying vec2 vUv;varying float vY,vFacing,vAxis,vDist;${NOISE}
+  #include <fog_pars_vertex>
   void main(){
     vUv=uv;vY=position.y;vFacing=abs(normalize(normalMatrix*normal).z);
     float y=position.y,w=1.+flare*y*y+.28*sin(y*7.-time*9.+uv.x*6.283)*wobble;
     vec3 p=vec3(position.x*radius*w,y*height,position.z*radius*w);
     p.xz+=vec2(sin(y*4.+time*3.),cos(y*3.-time*2.3))*wobble*radius*.18*y;
     vec4 mv=modelViewMatrix*vec4(p,1.);vAxis=abs(dot(normalize(mv.xyz),normalize(normalMatrix*vec3(0.,1.,0.))));vDist=length(mv.xyz);
-    gl_Position=projectionMatrix*mv;
+    gl_Position=projectionMatrix*mv;vec4 mvPosition=mv;
+    #include <fog_vertex>
   }`;
-const COLUMN_FS = `uniform float time,alpha,rate,height,axisFade;uniform vec3 deep,bright;varying vec2 vUv;varying float vY,vFacing,vAxis,vDist;${NOISE}
+const COLUMN_FS = `uniform float time,alpha,rate,height,axisFade,cut,cutY;uniform vec3 deep,bright;varying vec2 vUv;varying float vY,vFacing,vAxis,vDist;${NOISE}
+  #include <fog_pars_fragment>
   void main(){
     float streak=fbm(vec2(vUv.x*22.,vUv.y*height*.012-time*rate));
     float body=smoothstep(.36,.7,streak),tip=smoothstep(1.,.72,vY),foot=smoothstep(0.,.06,vY);
-    float a=alpha*body*tip*foot*(1.-.75*vFacing)*(1.-axisFade*max(smoothstep(.55,.95,vAxis),1.-smoothstep(20.,70.,vDist)));if(a<.01)discard;   // thin where it faces the camera, like a falling sheet
+    float a=alpha*body*tip*foot*(1.-.75*vFacing)*(1.-axisFade*max(smoothstep(.55,.95,vAxis),1.-smoothstep(20.,70.,vDist)));if(a<cut||vY<cutY)discard;   // thin where it faces the camera, like a falling sheet
     gl_FragColor=vec4(mix(deep,bright,smoothstep(.45,.8,streak))*(.75+.5*body),a);
+    #include <fog_fragment>
   }`;
 const SPRAY_VS = `uniform float time,power,height,px,spread;attribute vec4 seed;varying float vT;
   void main(){
@@ -133,7 +137,9 @@ const WATER_FS = `uniform float time,alpha,churn;varying vec2 vUv;${NOISE}
   }`;
 const normal = { transparent: true, depthWrite: false, side: THREE.DoubleSide };
 const column = (uniforms, segments = 28, rows = 16) => new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, segments, rows, true).translate(0, .5, 0),
-  new THREE.ShaderMaterial({ vertexShader: COLUMN_VS, fragmentShader: COLUMN_FS, uniforms: { time: clock, axisFade: { value: 0 }, ...uniforms }, ...normal }));
+  new THREE.ShaderMaterial({ vertexShader: COLUMN_VS, fragmentShader: COLUMN_FS, uniforms: { time: clock, axisFade: { value: 0 }, cut: { value: .01 }, cutY: { value: 0 }, ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), ...uniforms }, ...normal, fog: true }));
+// fog: true takes the scene's fog like the map round them (2026-11-04, user: the tornadoes drew bright through the fog). They
+// write no depth, so the depth haze fogs them by whatever is behind; the scene fog is what fades them with their own distance
 const u = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { value: v }]));
 
 // a geyser standing in water of the given radius, with its surface at `at`, reaching `top`. power 0 idle, .35 building up, 1 full.
@@ -180,6 +186,14 @@ export function makeTornado(api, height = 420) {
   for (const [radius, flare, alpha, rate] of [[46, 2.6, .75, 1.6], [26, 2.2, .9, 2.6]]) {
     const m = column({ ...u({ height, radius, flare, wobble: 1.4, alpha, rate }), ...fire }, 56, 56);
     m.frustumCulled = false; group.add(m);   // not additive: over the bright sky that washes out to white
+    // Its depth, drawn after every other transparent (2026-11-04, user: "tornados seem to draw under the fog"): the colour
+    // pass writes none (a double-sided funnel would hide its own far side), so the depth haze (lighting mod) fogged it by
+    // what lay behind, the sky's full haze over a vivid column. The thick streaks above the foot now write the column's own
+    // distance; the foot is left out so the AO doesn't ring the ground round it.
+    const depth = new THREE.Mesh(m.geometry, m.material.clone());
+    Object.assign(depth.material, { colorWrite: false, depthWrite: true });
+    depth.material.uniforms = { ...m.material.uniforms, cut: { value: .3 }, cutY: { value: .12 } };
+    depth.frustumCulled = false; depth.renderOrder = 5000; group.add(depth);
   }
   scene.add(group); return group;
 }
