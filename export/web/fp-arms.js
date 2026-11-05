@@ -350,7 +350,7 @@ export class FirstPersonArms {
       if(skeleton){mesh.bind(skeleton,new THREE.Matrix4());mesh.onBeforeRender=renderer=>{const f=renderer.info.render.frame;if(skeleton.drawn===f)return;skeleton.drawn=f;skeleton.solve();skeleton.update();};}   // (once a frame for all the parts)
       else mesh.bind(template.skeleton,template.bindMatrix);
     }
-    if(skeleton)skeleton.fp=made;   // (palm fit reads the drawn palm from them)
+    if(skeleton){skeleton.fp=made;hands.userData.fpArmsSkeleton=skeleton;}   // (palm fit reads the drawn palm from them; the melee mod reads knifeShift)
   }
   // Bones driven by a live T5 skeleton (fpArmsRetarget); their matrixWorld is set directly.
   retargetSkeleton(t5,liveT5=[]){
@@ -424,7 +424,19 @@ export class FirstPersonArms {
       }
       if(e.kind==='back'){W.setPosition(0,0,0);p.copy(e.d).applyMatrix4(W);W.setPosition(new THREE.Vector3().setFromMatrixPosition(bones[e.child].matrixWorld).sub(p));}
       else if(e.kind==='follow'&&e.parent>=0){m.multiplyMatrices(bones[e.parent].matrixWorld,e.local);if(t)W.setPosition(p.setFromMatrixPosition(m));else W.copy(m);}
-    });};
+    });knifeFit();};
+    // The knife in the character's fist (2026-11-04, user: "make it so the knife actaulyl fits on the hand, since on bondrewd it
+    // doesnt seem to"): the knife hangs off T5's tag_knife_attach, where the glove's curled fingers close, but a character's own
+    // fingers close nearer its palm (Bondrewd's are shorter, scaled .8), so the handle ran beside his fist. knifeShift = the
+    // centre of the character's curled fingers (knuckles 1 and 2) less the glove's, in the tag's frame; the melee mod moves the
+    // knife by it. Eased, so a frame of odd pose doesn't throw the knife about (the fist doesn't change during a swing).
+    const tag=t5.getBoneByName('tag_knife_attach')??liveT5[0]?.parent?.getObjectByName?.('tag_knife_attach');
+    const fist=rt.map((e,i)=>/^j_(index|mid|ring|pinky)_le_[12]$/.test(e.t5??'')?i:-1).filter(i=>i>=0&&live[i]);
+    const ca=new THREE.Vector3(),cb=new THREE.Vector3(),ti=new THREE.Matrix4();skeleton.knifeShift=new THREE.Vector3();
+    const knifeFit=()=>{if(!tag||fist.length<4)return;ca.set(0,0,0);cb.set(0,0,0);
+      for(const i of fist){ca.add(v0.setFromMatrixPosition(bones[i].matrixWorld));cb.add(v0.setFromMatrixPosition(live[i].matrixWorld));}
+      ti.copy(tag.matrixWorld).invert();ca.divideScalar(fist.length).applyMatrix4(ti);cb.divideScalar(fist.length).applyMatrix4(ti);
+      if(Number.isFinite(ca.x+ca.y+ca.z+cb.x+cb.y+cb.z))skeleton.knifeShift.lerp(ca.sub(cb),skeleton.solveFrame<3?1:.2);};
     return skeleton;
   }
   // Called every frame with the active viewmodel; cheap once a rig is attached.

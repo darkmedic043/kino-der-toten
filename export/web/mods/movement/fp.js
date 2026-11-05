@@ -97,7 +97,10 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
   // (2026-11-04, later; user: "make it so the sprint and movement dont just shake the hands left and right, make it an actual shake"):
   // the pivot keeps only `common` of the figure-8's side-to-side sway, and every footfall (the arms at the ends of their swing) lands
   // as a jolt: both arms drop and nod down, then rattle for about three cycles while it dies out (`step`, sprint full, walk `walk`)
-  const ARMS={common:.25,sprint:{pos:[[-.3,-.5,.7],[.4,-.35,.6]],rot:[[-.03,.06,.1],[-.02,-.08,-.12]]},pump:{z:.6,y:.2,x:.055,roll:.035},
+  // (2026-11-04, later; user: "the sprint should turn the arms so it looks like youre actually running"): the sprint pump is a real
+  // swing about each shoulder, not a slide: pitch `pump.x` (the hand forward and up, then back and down), the forward hand turning
+  // in across the body (`yaw`, only on the way forward) and the forearm rolling with it (`roll`)
+  const ARMS={common:.25,sprint:{pos:[[-.3,-.5,.7],[.4,-.35,.6]],rot:[[-.03,.06,.1],[-.02,-.08,-.12]]},pump:{z:.6,y:.1,x:.2,yaw:.09,roll:.1},
     step:{drop:.8,back:.25,nod:.05,rattle:.25,rattleRot:.018,cycles:3,decay:6,walk:.55,cam:.0016}};
   const arms={w:0,camQ:new THREE.Quaternion(),camQi:new THREE.Quaternion(),q:new THREE.Quaternion(),A:new THREE.Matrix4(),M:new THREE.Matrix4(),T:new THREE.Matrix4(),
     p:new THREE.Vector3(),sc:new THREE.Vector3(),sides:['le','ri'].map((side,i)=>({side,i,sg:i?-1:1,off:new THREE.Vector3(),rot:new THREE.Euler()}))};
@@ -382,7 +385,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
         A.off.set(SP.pos[A.i][0]*sk+nx*.12*amp+pump*.1*sw2+rat*sg*ST.rattle*.4,
           SP.pos[A.i][1]*sk+br*1.2+ny*.1*amp+pump*PU.y*sw2+lift*.2*sw2+pump*.2*walk-hit*ST.drop+rat*ST.rattle,
           SP.pos[A.i][2]*sk-pump*PU.z*sw2-pump*.45*walk+hit*ST.back).multiplyScalar(rig*aw);
-        A.rot.set((SP.rot[A.i][0]*sk+pump*PU.x*sw+pump*.04*walk+br*.035+ny*.008*amp-hit*ST.nod+rat*ST.rattleRot*.5)*aw,(SP.rot[A.i][1]*sk+nx*.01*amp)*aw,(SP.rot[A.i][2]*sk+sg*pump*PU.roll*sw+sg*rat*ST.rattleRot)*aw);
+        A.rot.set((SP.rot[A.i][0]*sk+pump*PU.x*sw+pump*.06*walk+br*.035+ny*.008*amp-hit*ST.nod+rat*ST.rattleRot*.5)*aw,(SP.rot[A.i][1]*sk+nx*.01*amp+sg*lift*PU.yaw*sw)*aw,(SP.rot[A.i][2]*sk+sg*pump*PU.roll*sw+sg*rat*ST.rattleRot)*aw);
         remember([sh],true);
         // A = about the shoulder: T(p+off)·R·T(-p) in world; the bone's local becomes parent⁻¹·A·parent·local
         sh.getWorldPosition(arms.p);arms.q.copy(arms.camQ).multiply(tmp.q.setFromEuler(A.rot)).multiply(arms.camQi);

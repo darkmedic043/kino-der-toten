@@ -49,8 +49,12 @@ export default async function setup(api){
   // fist of the rest pose is the BO6/7 reverse grip, the blade out of the pinky side, the pommel under the thumb; [0,180,0] puts the
   // blade out of the thumb side), applied over animation.js's attach while this knife is out, undone for the gun bashes' knife
   const GRIP=E.grip&&new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...E.grip.map(THREE.MathUtils.degToRad)));
-  const grip=()=>{const k=GRIP&&view.knives?.[E.held];if(!k)return;const u=k.userData;u.attachMatrix??=k.matrix.clone();const plain=k.matrix.equals(u.attachMatrix);
-    if(on&&plain)k.matrix.premultiply(GRIP);else if(!on&&!plain)k.matrix.copy(u.attachMatrix);};
+  // plus, on a character's own retargeted arms (fp-arms.js knifeShift), the move that puts the handle in that character's fist
+  const shiftM=new THREE.Matrix4();
+  const grip=()=>{const k=view.knives?.[E.held];if(!k)return;const u=k.userData;u.attachMatrix??=k.matrix.clone();
+    const sh=view.hands?.userData.fpArmsSkeleton?.knifeShift;
+    if(on){k.matrix.copy(u.attachMatrix);if(GRIP)k.matrix.premultiply(GRIP);if(sh)k.matrix.premultiply(shiftM.makeTranslation(sh.x,sh.y,sh.z));u.gripped=true;}
+    else if(u.gripped){k.matrix.copy(u.attachMatrix);u.gripped=false;}};
   const D=data.weapons[id]={...base,id,baseId:E.base,worldModel:E.worldModel??base.worldModel,heldKnife:E.held,mirror:E.mirror,armPump:true,animations:{idleAnim:rest,meleeAnim:asUrl(swingClip(pose,SLASH)),backslashAnim:asUrl(swingClip(pose,BACKSLASH)),meleeChargeAnim:asUrl(swingClip(pose,STAB))},price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,
     noAmmo:true,noAds:true,ownPackName:true,automatic:false,raiseTime:E.raiseTime,dropTime:E.dropTime,weight:.5,upgrade:{},
     melee:{meleeDamage:E.damage,meleeDelay:E.swingDelay,meleeChargeDelay:E.heavyDelay,meleeTime:E.swing,meleeChargeTime:E.heavy,meleeReach:E.reach,exact:true,fade:.05}};
