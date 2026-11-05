@@ -137,7 +137,10 @@ export class ViewWeapon {
     // Mark weapon-part bones with their bind position (see makeClip). j_gun
     // roots stay absolute: they are anchors, or animate perk bottles.
     for(const model of [gun,leftGun])model?.traverse(n=>{if(n.isBone&&!/^j_gun1?$/.test(n.name))n.userData.bindPosition=n.position.clone();});
-    attach(gun,tag,'j_gun');
+    // gunRoot: the model hangs from this bone at def.gunTag (else tag_weapon) and its clips move j_gun (and a second
+    // gun's j_gun1) from there, as WaW-made dual guns do (Malibu Drive's widow pistols: one model, both guns, posed from
+    // the torso: WaW's tag_weapon rests there, BO1 rigs' sits 15 forward)
+    attach(gun,def.gunTag&&hands.getObjectByName(def.gunTag)||tag,def.gunRoot??'j_gun');if(def.gunRoot){const j=gun.getObjectByName('j_gun');if(j)j.userData.animationAnchor=false;}
     this.leftGun=leftGun;
     if(leftGun){const leftTag=hands.getObjectByName('tag_weapon1');if(leftTag)attach(leftGun,leftTag,leftGun.getObjectByName('j_gun1')?'j_gun1':'j_gun');}
     // Bottles animate j_gun relative to tag_weapon throughout opening/drinking.

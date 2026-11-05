@@ -75,6 +75,8 @@ export default async function setup(api) {
     const placeholder = /viewmodel_hands_(no_model|cloth)\.glb$/.test(d.handsModel ?? '') || !d.handsModel;
     d.malibuArms = placeholder ? arms : d.handsModel; d.handsModel = d.malibuArms;
     if (FIRE[d.fireSound]) d.malibuSound = FIRE[d.fireSound];
+    // Natasha's pistols: one model with both guns under tag_offthewall_dw, whose clips move j_gun/j_gun1 from WaW's tag_weapon (at the torso)
+    if (/^widow_pistols/.test(d.mapWeapon)) { d.gunRoot = 'tag_offthewall_dw'; d.gunTag = 'tag_torso'; }
     d.camo = null;
     // the map's plain guns fire with this game's sounds for the nearest gun
     d.soundsFrom = { ...MAP_GUN, widow_pistols: 'cz75_zm', widow_pistols_upgraded: 'cz75_zm', colt: 'cz75_zm' }[d.mapWeapon.replace(/_upgraded$/, '')];
