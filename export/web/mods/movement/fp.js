@@ -100,9 +100,11 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
   // (2026-11-04, later; user: "the sprint should turn the arms so it looks like youre actually running"): the sprint pump is a real
   // swing about each shoulder, not a slide: pitch `pump.x` (the hand forward and up, then back and down), the forward hand turning
   // in across the body (`yaw`, only on the way forward) and the forearm rolling with it (`roll`)
-  const ARMS={common:.25,sprint:{pos:[[-.3,-.5,.7],[.4,-.35,.6]],rot:[[-.03,.06,.1],[-.02,-.08,-.12]]},pump:{z:.6,y:.1,x:.2,yaw:.09,roll:.1},
+  // (2026-11-05, user: "more downward for the anim, and to the side more, not covering the screen"): `sprint` drops each arm about its
+  // shoulder and turns it out to its own side (it used to turn both in), the forward swing barely turns in, the forearm stands up less
+  const ARMS={common:.25,sprint:{pos:[[1.3,-1,.7],[-1.3,-.8,.6]],rot:[[-.16,-.1,-.1],[-.15,.1,.1]]},pump:{z:.6,y:.1,x:.2,yaw:.03,roll:.1},
     step:{drop:.8,back:.25,nod:.05,rattle:.25,rattleRot:.018,cycles:3,decay:6,walk:.55,cam:.0016},
-    stand:{sprint:1.2,pump:.15}};   // sprint: each arm pitched by `sprint` rad about its own wrist (the elbow drops under the fist, the forearm stands up), ± `pump` with the swing
+    stand:{sprint:.55,pump:.15}};   // sprint: each arm pitched by `sprint` rad about its own wrist (the elbow drops under the fist, the forearm stands up), ± `pump` with the swing
   const arms={w:0,pw:new THREE.Vector3(),e:new THREE.Euler(),camQ:new THREE.Quaternion(),camQi:new THREE.Quaternion(),q:new THREE.Quaternion(),A:new THREE.Matrix4(),M:new THREE.Matrix4(),T:new THREE.Matrix4(),
     p:new THREE.Vector3(),sc:new THREE.Vector3(),sides:['le','ri'].map((side,i)=>({side,i,sg:i?-1:1,off:new THREE.Vector3(),rot:new THREE.Euler()}))};
   function measureUnder(def){   // once per weapon and attachment set, at idle: the part's extent in the gun's frame
