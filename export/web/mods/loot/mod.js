@@ -179,7 +179,8 @@ export default async function setup(api) {
     if (api.perkInfo && !api.perkInfo[id]) api.perkInfo[id] = { name: p.name, price: p.price, color: p.color, icon: p.badge };
     const ok = session.buyPerk ? session.buyPerk(id, true) : session.drink(id);   // Moon's session has a free path; elsewhere the drink is the perk
     if (!ok) { toast('Can\'t drink that now'); return false; }
-    session.markBought?.(id); api.perkDrink?.start(id, api.view); audio?.play?.(id); toast(p.name + ' · free', 2); return true;
+    // free: not marked bought, so it doesn't raise the perk price (rules.js perkPrice)
+    api.perkDrink?.start(id, api.view); audio?.play?.(id); toast(p.name + ' · free', 2); return true;
   }
   function pick(item) {
     if (item.opts.onPick) return item.opts.onPick(item) !== false;
