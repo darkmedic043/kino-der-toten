@@ -33,11 +33,13 @@ export default async function setup(api){
 
   // ---- the tactical slot ----------------------------------------------------------------
   const aug=k=>window.kino.equipAug?.(k)??0,efx=()=>window.kino.equipFx;
-  const maxOf=id=>3+aug(id==='zombie_black_hole_bomb'?'gersch.extra':'qed.extra')+(window.kino.reaperPerks?.tacticalBonus?.()??0);   // Extra Device / Extra QED, Dam-A-Nade
-  const tac={id:null,count:0};
+  // tac.extra: tacticals other mods add to the slot (the Smoke Grenade, mods/bo3-equipment): id -> {max(), launch()}
+  const extra={};
+  const maxOf=id=>extra[id]?extra[id].max():3+aug(id==='zombie_black_hole_bomb'?'gersch.extra':'qed.extra')+(window.kino.reaperPerks?.tacticalBonus?.()??0);   // Extra Device / Extra QED, Dam-A-Nade
+  const tac={id:null,count:0,extra};
   tac.max=()=>tac.id?maxOf(tac.id):0;
   window.kino.tactical=tac;
-  tac.give=(id,quiet)=>{if(!IDS.includes(id))return false;tac.id=id;tac.count=maxOf(id);session.monkeys=0;session.monkeysOwned=false;if(!quiet)api.toast(`${data.equipment[id].name} · X to throw`,3);hud();return true;};
+  tac.give=(id,quiet)=>{if(!IDS.includes(id)&&!extra[id])return false;tac.id=id;tac.count=maxOf(id);session.monkeys=0;session.monkeysOwned=false;if(!quiet)api.toast(`${data.equipment[id].name} · X to throw`,3);hud();return true;};
   const give=id=>{tac.id=id;tac.count=maxOf(id);session.monkeys=0;session.monkeysOwned=false;api.toast(`${data.equipment[id].name} · X to throw`,3);hud();};
   // the box hands out its prize with session.giveWeapon; these aren't guns
   const giveWeapon=session.giveWeapon.bind(session);
@@ -62,6 +64,7 @@ export default async function setup(api){
     const st=api.getState();
     if(throwing||!st.active||tac.count<=0||session.busy||session.phase==='reviving')return;
     throwing=true;tac.count--;hud();session.cancelReload?.();session.equipmentLeft=1.1;
+    if(extra[tac.id]){const id=tac.id;extra[id].launch();setTimeout(()=>{throwing=false;session.equipmentLeft=0;if(tac.count<=0)tac.id=null;},500);return;}
     const def=data.equipment[tac.id],id=tac.id;
     try{
       await view.equip(def);view.rig?.play('fireAnim',false,1,.05);
@@ -71,7 +74,7 @@ export default async function setup(api){
     finally{throwing=false;await api.equipView?.();if(tac.count<=0){tac.id=null;hud();}}
   }
   const flying=[];
-  tac.launch=id=>launch(id);
+  tac.launch=id=>extra[id]?extra[id].launch():launch(id);
   function launch(id){
     const mesh=world_[id].clone(true);mesh.position.copy(camera.position);scene.add(mesh);
     const dir=camera.getWorldDirection(new THREE.Vector3());

@@ -132,8 +132,10 @@ export default async function setup(api){
     powerUpdate:powerups.update.bind(powerups),powerSpawn:powerups.spawn.bind(powerups),onCollect:powerups.onCollect,tryDrop:session.drops.tryDrop.bind(session.drops)};
   let gid=1,snapTimer=0,puSerial=0;
   function targetFor(z,local){
-    const all=[...(me.down||me.dead?[]:[{position:local}]),...alive().map(r=>({id:r.id,position:r.pos.clone()}))];
+    let all=[...(me.down||me.dead?[]:[{position:local}]),...alive().map(r=>({id:r.id,position:r.pos.clone()}))];
     if(!all.length)return {position:local};
+    // BO3 Smoke Grenade (bo3-equipment): players hidden in a cloud are skipped while anyone is in the open
+    const seen=window.kino.concealed?all.filter(t=>!window.kino.concealed(z,t.position,t.id)):all;if(seen.length)all=seen;
     let best=all[0],bd=Infinity;for(const t of all){const d=t.position.distanceTo(z.root.position);if(d<bd){bd=d;best=t;}}
     const cur=all.find(t=>(t.id??null)===(z.victimId??null));
     if(cur&&cur!==best&&cur.position.distanceTo(z.root.position)<bd*1.3)best=cur;

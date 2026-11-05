@@ -1,0 +1,6 @@
+{
+  "name": "BO3 Trip Mines & Smoke",
+  "description": "BO3's Trip Mine (lethal: laser-triggered, Live Wire augment links mines with an electric wire) and Smoke Grenade (tactical: hides players inside the cloud). Coming soon; built from your own BO3 install by .tools/build_bo3_equipment.py.",
+  "script": "mod.js",
+  "skipMaps": ["moon"]
+}

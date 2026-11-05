@@ -22,7 +22,9 @@ export default async function setup(api){
   const {host,session,view,data,audio,camera,scene,world,enemies,features,viewScene}=api;
   const eq=data.equipment??{},frag=eq.frag_grenade_zm,qed=eq.zombie_quantum_bomb;
   // items carried on the QED rig, with the model shown in hand
-  const STAND_IN={frag_grenade_zm:frag?.worldModel,zombie_cymbal_monkey:eq.zombie_cymbal_monkey?.projectileModel};
+  // (equipment other mods add with a `standInModel`, the BO3 Trip Mine and Smoke Grenade, ride the same rig)
+  const STAND_IN={frag_grenade_zm:frag?.worldModel,zombie_cymbal_monkey:eq.zombie_cymbal_monkey?.projectileModel,
+    ...Object.fromEntries(Object.entries(eq).filter(([,d])=>d.standInModel).map(([id,d])=>[id,d.standInModel]))};
   const handModels={};
   for(const [id,url] of Object.entries(STAND_IN))if(url&&qed)handModels[id]=await loadModel(url).catch(()=>null);
   const fragMesh=handModels.frag_grenade_zm;
@@ -39,6 +41,8 @@ export default async function setup(api){
   window.kino.throwables={get holding(){return held?.id??null;}};
   const tac=()=>window.kino.tactical;
   function available(key){
+    const lx=window.kino.lethalExtra;   // a lethal another mod puts in the slot (Trip Mines: lx.owned(), count(), spend(), launch())
+    if(key==='KeyG'&&lx?.owned())return lx.count()>0&&handModels[lx.id]?lx.id:null;
     if(key==='KeyG')return frag&&session.grenades>0?'frag_grenade_zm':null;
     const t=tac();if(t?.id&&t.count>0)return t.id;
     return session.monkeys>0?'zombie_cymbal_monkey':null;
@@ -96,6 +100,7 @@ export default async function setup(api){
     held={id,key,released:false,throwing:false,ready:false};
     const keep=window.kino.freeThrow?.();   // Free Throw (Mule Kick augment)
     if(id==='frag_grenade_zm'){if(!keep)session.grenades--;}
+    else if(id===window.kino.lethalExtra?.id){if(!keep)window.kino.lethalExtra.spend();}
     else if(id!=='zombie_cymbal_monkey'){if(!keep)tac().count--;}     // monkeys are spent by features.throwMonkey
     session.cancelReload?.();session.equipmentLeft=99;
     try{await view.equip(viewDef(id));}catch(err){console.warn('[throwables]',err);}
@@ -128,6 +133,7 @@ export default async function setup(api){
       const far=window.kino.throwRange?.()??1;   // Quarterback
       frags.push({mesh,velocity:dir.multiplyScalar(560*far).add(new THREE.Vector3(0,150*far,0)),life:fuse,spin:new THREE.Vector3(Math.random()*9,Math.random()*9,0),sticky:aug('frag.sticky')>0});
     }else if(h.id==='zombie_cymbal_monkey'){session.equipmentLeft=0;features.throwMonkey?.();session.equipmentLeft=99;}
+    else if(h.id===window.kino.lethalExtra?.id)window.kino.lethalExtra.launch();
     else{tac().launch?.(h.id);const t=tac();if(t.count<=0)t.id=null;}
   }
   // mini: a Cluster Charge bomblet (smaller, 40% damage, no further bomblets or after-effects)

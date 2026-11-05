@@ -2697,6 +2697,89 @@
    ]
   },
   {
+   "id": "tripmine_zm",
+   "name": "Trip Mines",
+   "kind": "equipment",
+   "group": "lethal",
+   "color": "#d24a3c",
+   "soon": true,
+   "augments": [
+    {
+     "name": "Quick Arm",
+     "kind": "minor",
+     "desc": "Trip mines arm a quarter of a second after they stick (normally 1s).",
+     "effects": {
+      "trip.quick": 1
+     },
+     "id": "e.trip.quickarm"
+    },
+    {
+     "name": "Live Wire",
+     "kind": "major",
+     "desc": "Instead of exploding, two armed mines within 300 of each other, with nothing in between, link with an electric wire. It shocks each zombie that touches it (100 + 8% of max health, a 0.5s stun, 40% slower for 2.5s), at most every 1.5s per zombie, and shorts out after 10 shocks or 60s, taking both mines with it. A mine with no partner keeps its laser.",
+     "effects": {
+      "trip.tether": 1
+     },
+     "id": "e.trip.livewire"
+    },
+    {
+     "name": "Extra Mine",
+     "kind": "minor",
+     "desc": "Carry 4 trip mines (refilled each round).",
+     "effects": {
+      "trip.extra": 1
+     },
+     "id": "e.trip.extramine"
+    },
+    {
+     "name": "Shaped Charge",
+     "kind": "major",
+     "desc": "Trip mine blasts deal double damage, plus 15% of each zombie's max health.",
+     "effects": {
+      "trip.dmg": 1,
+      "trip.pct": 0.15
+     },
+     "id": "e.trip.shapedcharge"
+    },
+    {
+     "name": "Wide Blast",
+     "kind": "minor",
+     "desc": "Trip mine blasts reach 30% farther.",
+     "effects": {
+      "trip.radius": 0.3
+     },
+     "id": "e.trip.wideblast"
+    },
+    {
+     "name": "Concussive",
+     "kind": "major",
+     "desc": "The blast stuns every zombie within 250 for 3s (not bosses).",
+     "effects": {
+      "trip.stun": 3
+     },
+     "id": "e.trip.concussive"
+    },
+    {
+     "name": "Salvage",
+     "kind": "minor",
+     "desc": "A blast that kills 3 or more zombies gives the mine back.",
+     "effects": {
+      "trip.salvage": 3
+     },
+     "id": "e.trip.salvage"
+    },
+    {
+     "name": "Laser Grid",
+     "kind": "major",
+     "desc": "Each mine casts three lasers, fanned 25° apart.",
+     "effects": {
+      "trip.grid": 1
+     },
+     "id": "e.trip.lasergrid"
+    }
+   ]
+  },
+  {
    "id": "zombie_cymbal_monkey",
    "name": "Monkey Bombs",
    "kind": "equipment",
@@ -2938,6 +3021,88 @@
       "qed.pure": 1
      },
      "id": "e.qed.collapsethewave"
+    }
+   ]
+  },
+  {
+   "id": "smoke_zm",
+   "name": "Smoke Grenades",
+   "kind": "equipment",
+   "group": "tactical",
+   "color": "#9aa3ab",
+   "soon": true,
+   "augments": [
+    {
+     "name": "Thick Smoke",
+     "kind": "minor",
+     "desc": "Smoke clouds are 25% wider.",
+     "effects": {
+      "smoke.radius": 0.25
+     },
+     "id": "e.smoke.thicksmoke"
+    },
+    {
+     "name": "Ghost",
+     "kind": "major",
+     "desc": "Firing from inside the smoke doesn't give you away.",
+     "effects": {
+      "smoke.ghost": 1
+     },
+     "id": "e.smoke.ghost"
+    },
+    {
+     "name": "Long Burn",
+     "kind": "minor",
+     "desc": "Smoke lasts 50% longer.",
+     "effects": {
+      "smoke.long": 0.5
+     },
+     "id": "e.smoke.longburn"
+    },
+    {
+     "name": "Choking Cloud",
+     "kind": "major",
+     "desc": "Zombies in your smoke are 35% slower and lose 1.5% of their max health each second (not bosses).",
+     "effects": {
+      "smoke.choke": 0.35
+     },
+     "id": "e.smoke.chokingcloud"
+    },
+    {
+     "name": "Extra Smoke",
+     "kind": "minor",
+     "desc": "Carry 3 smoke grenades.",
+     "effects": {
+      "smoke.extra": 1
+     },
+     "id": "e.smoke.extrasmoke"
+    },
+    {
+     "name": "Cover Fire",
+     "kind": "major",
+     "desc": "Zombies standing in your smoke take 20% more damage.",
+     "effects": {
+      "smoke.mark": 0.2
+     },
+     "id": "e.smoke.coverfire"
+    },
+    {
+     "name": "Quick Pop",
+     "kind": "minor",
+     "desc": "The grenade pops sooner and the cloud is full at once.",
+     "effects": {
+      "smoke.quick": 1
+     },
+     "id": "e.smoke.quickpop"
+    },
+    {
+     "name": "Smoke Bomb",
+     "kind": "major",
+     "desc": "The pop stuns zombies within 150 for 2s (not bosses).",
+     "effects": {
+      "smoke.stun": 2
+     },
+     "id": "e.smoke.smokebomb"
     }
    ]
   }

@@ -38,7 +38,7 @@ BO3 (`/mass_drive/SteamLibrary/steamapps/common/Call of Duty Black Ops III`) can
   - Kill it with `pkill -x Greyhound.exe`. `pkill -f Greyhound.exe` matches the calling shell too.
   - Grab screenshots with `ffmpeg -f x11grab -window_id <id> -i :1`.
   - A model's image names are in its `.semodel`: `strings` it and grep `_images\\`.
-- **BO3 multiplayer lethals and tacticals (exported 2026-11-05 from a running MP map, not used yet):**
+- **BO3 multiplayer lethals and tacticals (exported 2026-11-05 from a running MP map; the Trip Mine and Smoke Grenade are used by `mods/bo3-equipment`, built by `.tools/build_bo3_equipment.py`, gameplay.md):**
   - Models (`wpn_t7_*`, `_view`/`_world`/`_projectile`):
     - Lethals: `grenade_frag`, `grenade_semtex`, `grenade_incendiary` (Thermite), `hatchet` (Combat Axe), `c4` (plus `c4_detonator_prop`), `spider_mine` (the Trip Mine, `_prop_open` deployed).
     - Tacticals: `grenade_concussion`, `grenade_flashbang`, `grenade_smoke`, `grenade_emp`, `shock_charge`, `trophy_system` (`_open_prop`), `blackhat` (Black Hat).

@@ -39,7 +39,7 @@ export default async function setup(api){
 
   // ---- research XP (kept in memory during the match, saved 1.5 s after the last gain, on completion and on unload) --
   // equipment is active while you carry it (the lethal slot's frags or Claymores, the tactical slot's item)
-  const carries=id=>id==='frag_grenade_zm'?!session.claymoresOwned&&session.grenades>0:id==='claymore_zm'?!!session.claymoresOwned
+  const carries=id=>id==='frag_grenade_zm'?!session.claymoresOwned&&!session.tripsOwned&&session.grenades>0:id==='claymore_zm'?!!session.claymoresOwned:id==='tripmine_zm'?!!session.tripsOwned
     :id==='zombie_cymbal_monkey'?!!session.monkeysOwned||session.monkeys>0:window.kino.tactical?.id===id||session.equipment===id;
   const isActive=item=>has(item)||session.weapon?.ammoMod?.id===item||carries(item);
   let R=loadResearch(),saveT=null;

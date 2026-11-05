@@ -40,7 +40,7 @@ export function setupEquipmentHud({host,session,data}){
   el.innerHTML='<div class="slot" data-k="lethal"><i></i><b></b><kbd>G</kbd></div><div class="slot" data-k="tactical"><i></i><b></b><kbd>X</kbd></div><div class="slot" data-k="mine"><i></i><b></b><kbd>4</kbd></div>';
   document.body.append(el);document.body.classList.add('equip-hud');
   const slot=k=>el.querySelector(`[data-k="${k}"]`),icons={frag:fragIcon()};
-  const ids=['claymore_zm','zombie_cymbal_monkey','zombie_black_hole_bomb','zombie_quantum_bomb'].filter(id=>data.equipment?.[id]);
+  const ids=['claymore_zm','zombie_cymbal_monkey','zombie_black_hole_bomb','zombie_quantum_bomb','tripmine_zm','smoke_zm'].filter(id=>data.equipment?.[id]);
   renderIcons(ids.map(id=>[id,data.equipment[id]])).then(o=>{Object.assign(icons,o);last='';});
   let last='';
   function set(k,icon,count){const s=slot(k);s.hidden=!icon;if(!icon)return;s.querySelector('i').style.backgroundImage=icons[icon]?`url(${icons[icon]})`:'';s.querySelector('b').textContent=count;s.classList.toggle('empty',!count);}
@@ -48,8 +48,8 @@ export function setupEquipmentHud({host,session,data}){
     if(on){set('lethal','frag',2);set('tactical','frag',0);set('mine',null);}else{for(const s of el.querySelectorAll('.slot'))s.hidden=true;last='';}});
   host.on('update',()=>{
     const t=window.kino?.tactical,tac=t?.id?[t.id,t.count]:session.monkeysOwned||session.monkeys>0?['zombie_cymbal_monkey',session.monkeys]:[null,0];   // a tactical once held keeps its slot at 0 (greyed) until a Max Ammo refills it
-    const key=[session.grenades,...tac,session.claymoresOwned,session.claymores,Object.keys(icons).length].join();if(key===last)return;last=key;
-    if(session.claymoresOwned)set('lethal','claymore_zm',session.claymores);else set('lethal','frag',session.grenades);
+    const key=[session.grenades,...tac,session.claymoresOwned,session.claymores,session.tripsOwned,session.trips,Object.keys(icons).length].join();if(key===last)return;last=key;
+    if(session.claymoresOwned)set('lethal','claymore_zm',session.claymores);else if(session.tripsOwned)set('lethal','tripmine_zm',session.trips);else set('lethal','frag',session.grenades);
     set('tactical',tac[0],tac[1]);set('mine',null);
   });
 }

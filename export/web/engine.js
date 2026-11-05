@@ -304,6 +304,7 @@ function resolveMelee(){
 }
 function throwGrenade(){
   if(session.claymoresOwned)return features.placeClaymore();   // one lethal slot: Claymores replace the frags (kino-session.js)
+  if(session.tripsOwned)return window.kino.lethalExtra?.quick?.();   // Trip Mines (mods/bo3-equipment): a quick throw from the controller/touch button
   if(!active||session.grenades<=0||session.busy||blocked())return false;session.grenades--;
   const mesh=new THREE.Mesh(new THREE.SphereGeometry(3.5,8,6),new THREE.MeshStandardMaterial({color:0x4a5039,roughness:.8}));mesh.position.copy(camera.position);scene.add(mesh);grenades.push({mesh,velocity:camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(480).add(new THREE.Vector3(0,140,0)),life:3});
 }

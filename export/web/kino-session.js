@@ -5,13 +5,16 @@ export class KinoSession extends Session {
   // One lethal slot (2026-10-28, user: "claymores will now replace grenades when grabbed, and that slot will be referred to
   // as lethals"): while Claymores are held there are no frag grenades (reads 0, writes are dropped), and taking frags back
   // gives up the Claymores (giveFrags). Augments can raise the counts (kino.equipAug, the research mod).
-  get grenades(){return this.claymoresOwned?0:this._nades??0;}
-  set grenades(v){if(!this.claymoresOwned)this._nades=v;}
+  get grenades(){return this.claymoresOwned||this.tripsOwned?0:this._nades??0;}
+  set grenades(v){if(!this.claymoresOwned&&!this.tripsOwned)this._nades=v;}
   claymoreMax(){return 2+(globalThis.kino?.equipAug?.('clay.extra')??0);}
   monkeyMax(){return 3+(globalThis.kino?.equipAug?.('monkey.extra')??0);}
-  giveClaymores(){this.claymoresOwned=true;this._nades=0;this.claymores=this.claymoreMax();return true;}
-  giveFrags(n=4){this.claymoresOwned=false;this.claymores=0;this._nades=n;return true;}
-  reset(){this.claymoresOwned=false;super.reset();this.pack=null;this.claymoresOwned=false;this.claymores=0;this.monkeysOwned=false;this.monkeys=0;this.equipmentLeft=0;this.attachmentMode=false;}
+  // Trip Mines (mods/bo3-equipment, 2026-11-05, coming soon) are a third lethal: they replace frags and Claymores the same way
+  tripMax(){return 3+(globalThis.kino?.equipAug?.('trip.extra')??0);}
+  giveTrips(){this.tripsOwned=true;this.claymoresOwned=false;this.claymores=0;this._nades=0;this.trips=this.tripMax();return true;}
+  giveClaymores(){this.tripsOwned=false;this.trips=0;this.claymoresOwned=true;this._nades=0;this.claymores=this.claymoreMax();return true;}
+  giveFrags(n=4){this.tripsOwned=false;this.trips=0;this.claymoresOwned=false;this.claymores=0;this._nades=n;return true;}
+  reset(){this.claymoresOwned=false;this.tripsOwned=false;super.reset();this.tripsOwned=false;this.trips=0;this.pack=null;this.claymoresOwned=false;this.claymores=0;this.monkeysOwned=false;this.monkeys=0;this.equipmentLeft=0;this.attachmentMode=false;}
   get def(){
     const w=this.weapon,d=this.data.weapons[w.id],base=w.upgraded?{...d,...d.upgrade,id:w.id,upgraded:true}:d;
     if(w.lost)return {...base,name:'No weapon',clipSize:0,maxAmmo:0};
@@ -49,12 +52,12 @@ export class KinoSession extends Session {
   }
   buyClaymores(){if(this.busy||this.claymoresOwned||!this.spend(1000))return false;return this.giveClaymores();}
   giveMonkeys(){if(this.busy)return false;this.monkeysOwned=true;this.monkeys=this.monkeyMax();return true;}
-  useEquipment(kind){if(!['claymores','monkeys'].includes(kind)||this.busy||this[kind]<=0)return false;this[kind]--;this.equipmentLeft=.8;this.cancelReload();return true;}
-  nextRound(){super.nextRound();if(this.claymoresOwned)this.claymores=Math.max(this.claymores,this.claymoreMax());}
+  useEquipment(kind){if(!['claymores','monkeys','trips'].includes(kind)||this.busy||this[kind]<=0)return false;this[kind]--;this.equipmentLeft=.8;this.cancelReload();return true;}
+  nextRound(){super.nextRound();if(this.claymoresOwned)this.claymores=Math.max(this.claymores,this.claymoreMax());if(this.tripsOwned)this.trips=Math.max(this.trips,this.tripMax());}
   powerup(type){
     super.powerup(type);
     if(type==='full_ammo'){
-      if(this.claymoresOwned)this.claymores=this.claymoreMax();if(this.monkeysOwned)this.monkeys=Math.max(this.monkeys,this.monkeyMax());
+      if(this.claymoresOwned)this.claymores=this.claymoreMax();if(this.tripsOwned)this.trips=Math.max(this.trips,this.tripMax());if(this.monkeysOwned)this.monkeys=Math.max(this.monkeys,this.monkeyMax());
       for(const w of this.inventory){const a=this.data.weapons[w.id].upgrade?.attachment;if(w.upgraded&&a&&w.attachmentAmmo)w.attachmentAmmo.reserve=a.maxAmmo;}
       if(this.attachmentMode){this.weapon.primaryAmmo.reserve=this.data.weapons[this.weapon.id].upgrade.maxAmmo;this.weapon.reserve=this.def.maxAmmo;}
     }
@@ -67,5 +70,5 @@ export class KinoSession extends Session {
     Object.assign(w,w.attachmentAmmo);this.attachmentMode=true;this.cancelReload();this.fireLeft=.3;return true;
   }
   leaveAttachment(){if(!this.attachmentMode)return;const w=this.weapon;w.attachmentAmmo={mag:w.mag,reserve:w.reserve};Object.assign(w,w.primaryAmmo);this.attachmentMode=false;this.cancelReload();}
-  snapshot(){return {...super.snapshot(),claymores:this.claymores,claymoresOwned:this.claymoresOwned,monkeys:this.monkeys,monkeysOwned:this.monkeysOwned,equipmentLeft:this.equipmentLeft,attachmentMode:this.attachmentMode,weaponUnavailable:this.weaponUnavailable,pack:this.pack?{id:this.pack.weapon.id,ready:this.time>=this.pack.readyAt,readyIn:Math.max(0,this.pack.readyAt-this.time),expiresIn:this.pack.expires-this.time}:null};}
+  snapshot(){return {...super.snapshot(),claymores:this.claymores,claymoresOwned:this.claymoresOwned,trips:this.trips,tripsOwned:this.tripsOwned,monkeys:this.monkeys,monkeysOwned:this.monkeysOwned,equipmentLeft:this.equipmentLeft,attachmentMode:this.attachmentMode,weaponUnavailable:this.weaponUnavailable,pack:this.pack?{id:this.pack.weapon.id,ready:this.time>=this.pack.readyAt,readyIn:Math.max(0,this.pack.readyAt-this.time),expiresIn:this.pack.expires-this.time}:null};}
 }
