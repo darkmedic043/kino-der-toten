@@ -94,7 +94,11 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
   // still a rotation under the mirror). i 0 = the knife arm (_le, on the right), 1 = the guard hand (_ri, on the left).
   // sprint: both hands drop and pump alternately, fore and aft, the forearm pitching with the swing; walk: the same, small;
   // idle: each its own breath and drift, out of step.
-  const ARMS={sprint:{pos:[[-.3,-.5,.7],[.4,-.35,.6]],rot:[[-.03,.06,.1],[-.02,-.08,-.12]]},pump:{z:.6,y:.2,x:.055,roll:.035}};
+  // (2026-11-04, later; user: "make it so the sprint and movement dont just shake the hands left and right, make it an actual shake"):
+  // the pivot keeps only `common` of the figure-8's side-to-side sway, and every footfall (the arms at the ends of their swing) lands
+  // as a jolt: both arms drop and nod down, then rattle for about three cycles while it dies out (`step`, sprint full, walk `walk`)
+  const ARMS={common:.25,sprint:{pos:[[-.3,-.5,.7],[.4,-.35,.6]],rot:[[-.03,.06,.1],[-.02,-.08,-.12]]},pump:{z:.6,y:.2,x:.055,roll:.035},
+    step:{drop:.8,back:.25,nod:.05,rattle:.25,rattleRot:.018,cycles:3,decay:6,walk:.55,cam:.0016}};
   const arms={w:0,camQ:new THREE.Quaternion(),camQi:new THREE.Quaternion(),q:new THREE.Quaternion(),A:new THREE.Matrix4(),M:new THREE.Matrix4(),T:new THREE.Matrix4(),
     p:new THREE.Vector3(),sc:new THREE.Vector3(),sides:['le','ri'].map((side,i)=>({side,i,sg:i?-1:1,off:new THREE.Vector3(),rot:new THREE.Euler()}))};
   function measureUnder(def){   // once per weapon and attachment set, at idle: the part's extent in the gun's frame
@@ -236,7 +240,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     const hv=heavy(w);s.sprintSpring.k=70/(1+hv*.9);s.sprintSpring.c=12/Math.sqrt(1+hv*.9);   // a heavy gun takes longer to drop into the sprint and to come back up
     s.sprintSpring.step(sprint&&speed>60?1:0,dt);if(steady<1&&!(sprint&&speed>60))s.sprintSpring.step(0,dt);   // Dead Set: out of the sprint twice as fast
     s.sprintBlend=THREE.MathUtils.clamp(s.sprintSpring.x,-.15,1.15);
-    const cm=def?.dualWield?DUAL.common:1;   // dual wield: the pivot keeps a share of the side-to-side motion, the arms get the rest each on its own
+    const cm=def?.dualWield?DUAL.common:def?.armPump?ARMS.common:1;   // dual wield: the pivot keeps a share of the side-to-side motion, the arms get the rest each on its own
     const bA=s.bobAmp*amp*(1-aim*.9),ph=s.bobPhase;
     const bobX=Math.sin(ph)*.26*bA*(1+.3*s.sprintBlend)*cm,bobY=Math.cos(ph*2)*.15*bA,bobZ=Math.sin(ph*2)*.07*bA*s.sprintBlend;
     const bobRoll=Math.sin(ph)*.022*bA*cm,bobPitch=Math.cos(ph*2)*.009*bA,bobYaw=-Math.sin(ph)*.012*bA*s.sprintBlend*cm;
@@ -363,17 +367,22 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     // ---- the knife: each arm its own motion (see ARMS above); off while a swing, draw or holster pose runs (fpMotion.armsBusy)
     arms.w=ease(arms.w,def?.armPump&&flags.hand&&str>0&&!mt&&!window.kino.fpMotion.armsBusy?1:0,10);
     if(arms.w>.01){
-      const r=view.root,rig=frame.rig,aw=arms.w,walk=bA*(1-s.sprintBlend),sk=s.sprintBlend*hp;api.viewCamera.getWorldQuaternion(arms.camQ);arms.camQi.copy(arms.camQ).invert();
+      const r=view.root,rig=frame.rig,aw=arms.w,walk=bA*(1-s.sprintBlend),sk=s.sprintBlend*hp,ST=ARMS.step;
+      // the footfall: u runs 0..1 through each step from the moment the foot lands (the arms at the ends of the swing, |sin ph| = 1)
+      const u=(((ph-Math.PI/2)%Math.PI)+Math.PI)%Math.PI/Math.PI,stepE=sw*amp+walk*ST.walk;
+      const imp=(u<.05?u/.05:Math.exp(-(u-.05)*ST.decay))*stepE;
+      if(flags.cam)cam.pitch+=imp*ST.cam*aw;api.viewCamera.getWorldQuaternion(arms.camQ);arms.camQi.copy(arms.camQ).invert();
       for(const A of arms.sides){
         const sh=r.getObjectByName('j_shoulder_'+A.side);if(!sh)continue;
         const sg=A.sg,pump=sg*Math.sin(ph),lift=Math.max(0,pump);   // pump > 0: this hand forward and up
         const br=Math.sin(s.breathT*(A.i?.87:1)+A.i*1.9)*bAmp;   // its own breath, out of step with the other
         const nx=Math.sin(s.t*.9+A.i*2.1)*.6+Math.sin(s.t*1.7+A.i*.7)*.4,ny=Math.sin(s.t*.8+A.i*1.3)*.6+Math.sin(s.t*1.5+A.i*2.9)*.4;
-        const SP=ARMS.sprint,PU=ARMS.pump,sw2=sw*amp;
-        A.off.set(SP.pos[A.i][0]*sk+nx*.12*amp+pump*.1*sw2,
-          SP.pos[A.i][1]*sk+br*1.2+ny*.1*amp+pump*PU.y*sw2+lift*.2*sw2+pump*.2*walk,
-          SP.pos[A.i][2]*sk-pump*PU.z*sw2-pump*.45*walk).multiplyScalar(rig*aw);
-        A.rot.set((SP.rot[A.i][0]*sk+pump*PU.x*sw+pump*.04*walk+br*.035+ny*.008*amp)*aw,(SP.rot[A.i][1]*sk+nx*.01*amp)*aw,(SP.rot[A.i][2]*sk+sg*pump*PU.roll*sw)*aw);
+        const SP=ARMS.sprint,PU=ARMS.pump,sw2=sw*amp,hit=imp*(A.i?.8:1);   // the knife arm is the heavier one
+        const rat=Math.exp(-u*ST.decay*.8)*Math.sin(u*Math.PI*2*ST.cycles+A.i*1.3)*stepE;   // the rattle after the hit, each arm its own phase
+        A.off.set(SP.pos[A.i][0]*sk+nx*.12*amp+pump*.1*sw2+rat*sg*ST.rattle*.4,
+          SP.pos[A.i][1]*sk+br*1.2+ny*.1*amp+pump*PU.y*sw2+lift*.2*sw2+pump*.2*walk-hit*ST.drop+rat*ST.rattle,
+          SP.pos[A.i][2]*sk-pump*PU.z*sw2-pump*.45*walk+hit*ST.back).multiplyScalar(rig*aw);
+        A.rot.set((SP.rot[A.i][0]*sk+pump*PU.x*sw+pump*.04*walk+br*.035+ny*.008*amp-hit*ST.nod+rat*ST.rattleRot*.5)*aw,(SP.rot[A.i][1]*sk+nx*.01*amp)*aw,(SP.rot[A.i][2]*sk+sg*pump*PU.roll*sw+sg*rat*ST.rattleRot)*aw);
         remember([sh],true);
         // A = about the shoulder: T(p+off)·R·T(-p) in world; the bone's local becomes parent⁻¹·A·parent·local
         sh.getWorldPosition(arms.p);arms.q.copy(arms.camQ).multiply(tmp.q.setFromEuler(A.rot)).multiply(arms.camQi);

@@ -439,9 +439,9 @@ Every gun's prestige camos are its own design; once earned you can wear them on 
         const k = melee.melees.knife, t = melee.tiers;
         return c.md(`Your melee weapon has its own slot in the loadout and doesn't use a weapon slot. The **${k.name}** is the only one for now.
 
-**Tap melee** (V) to stab without putting your gun away. **Hold melee** to draw the knife, and hold it again (or switch weapons) to put it away. With the knife out you move ${Math.round((k.moveSpeed - 1) * 100)}% faster and sprint ${Math.round((k.sprintSpeed - 1) * 100)}% faster. Fire slashes (hold it to keep slashing), aim is a slower heavy stab for ${k.heavyMul}× damage, and both lunge you at a zombie that's close.
+**Tap melee** (V) to bash with your gun without putting it away. **Hold melee** to draw the knife, and hold it again (or switch weapons) to put it away. With the knife out you move ${Math.round((k.moveSpeed - 1) * 100)}% faster and sprint ${Math.round((k.sprintSpeed - 1) * 100)}% faster. Fire slashes (hold it to keep slashing), aim is a slower heavy stab for ${k.heavyMul}× damage, and both lunge you at a zombie that's close.
 
-A knife hit does ${c.num(k.damage)}, or ${Math.round(melee.roundShare * 100)}% of a zombie's health that round if that's more, so it keeps up with the rounds. Its Pack-a-Punch tier multiplies that.`) +
+A knife hit does ${c.num(k.damage)}, or ${Math.round(melee.roundShare * 100)}% of a zombie's health that round if that's more, so it keeps up with the rounds. Its Pack-a-Punch tier multiplies that. A gun bash (tap melee) only does ${Math.round(melee.bashShare * 100)}% of a zombie's health and never gets the tiers, so draw the knife for real damage.`) +
           `<h2>Pack-a-Punch</h2>` + c.md(`With the knife out, use the machine to upgrade it into **${k.upgradeName}**. Its tiers are separate from your guns' and last the match.`) +
           c.table(['Tier', 'Cost', 'Damage'], t.slice(1).map(x => [x.name, c.num(x.price), `×${x.mul}`]));
       },

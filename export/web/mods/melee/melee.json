@@ -1,12 +1,13 @@
 {
   "default": "knife",
   "holdTime": 0.22,
-  "roundShare": 0.04,
+  "roundShare": 0.1,
+  "bashShare": 0.03,
   "tiers": [
     { "name": "", "mul": 1 },
-    { "name": "I", "mul": 1.75, "price": 5000 },
-    { "name": "II", "mul": 3, "price": 15000 },
-    { "name": "III", "mul": 5, "price": 30000 }
+    { "name": "I", "mul": 2, "price": 5000 },
+    { "name": "II", "mul": 3.5, "price": 15000 },
+    { "name": "III", "mul": 6, "price": 30000 }
   ],
   "melees": {
     "knife": {
@@ -25,7 +26,7 @@
         "move": { "j_shoulder_le": [3, 5, -10], "j_shoulder_ri": [-2, 0, -1] },
         "from": [{ "clip": "animations/viewmodel_claymore_idle.json", "frame": 0, "bones": "^j_(index|mid|ring|pinky|thumb|ringpalm|pinkypalm|webbing)_ri" }]
       },
-      "damage": 150,
+      "damage": 300,
       "heavyMul": 2,
       "swing": 0.36,
       "swingDelay": 0.13,

@@ -5,7 +5,9 @@
 // this mod's own weapon, and it drops out by itself if the gun under it is replaced. Upgrades on its own, as the guns' do not reach it:
 // Pack-a-Punch tiers I-III with the knife out (BO6/7's 5,000 / 15,000 / 30,000), which only raise its damage. Damage = the larger of a
 // flat hit and a share of the round's zombie health, both × tier, so an upgraded knife keeps up with the rounds and a bare one falls off.
-// Tier III is 20% of a zombie: five hits, and two with Melee Macchiato's ×3.
+// Bare it is 10% of a zombie (ten slashes), tier III 60% (two, or one heavy stab). The gun bash (tap V) gets none of this since
+// 2026-11-04 (user: "make the knife stronger than just the basic melee ... make it scale higher than just pressing v"): the
+// old knife's flat hit or 3% of a zombie (bashShare), never the tiers.
 // Weapons are data (melee.json, picked in the loadout's MELEE slot): a new one is an entry there.
 import * as THREE from 'three';
 import { zombieHealth } from '../../rules.js';
@@ -90,7 +92,7 @@ export default async function setup(api){
     if(armed&&now()-pressAt<C.holdTime){armed=false;if(on)swing(!!view.input?.ads);else melee();}
     return true;
   };
-  host.meleeDamage=(d,heavy)=>Math.max(d,session.bowie?data.melee.bowie.damage:0,damage()*(on&&heavy?E.heavyMul:1));
+  host.meleeDamage=(d,heavy)=>Math.max(d,session.bowie?data.melee.bowie.damage:0,on?damage()*(heavy?E.heavyMul:1):C.bashShare*zombieHealth(session.round??1,data.rules));
   host.packLabel=session.packLabel=()=>{if(!on)return null;const t=C.tiers[K.papLevel+1];return t?`Pack-a-Punch ${E.name} tier ${t.name} · ${t.price}`:`${E.upgradeName} is fully upgraded`;};
   host.warmWeaponIds=()=>[id];
 
