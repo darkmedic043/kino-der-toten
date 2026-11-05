@@ -101,8 +101,9 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
   // swing about each shoulder, not a slide: pitch `pump.x` (the hand forward and up, then back and down), the forward hand turning
   // in across the body (`yaw`, only on the way forward) and the forearm rolling with it (`roll`)
   const ARMS={common:.25,sprint:{pos:[[-.3,-.5,.7],[.4,-.35,.6]],rot:[[-.03,.06,.1],[-.02,-.08,-.12]]},pump:{z:.6,y:.1,x:.2,yaw:.09,roll:.1},
-    step:{drop:.8,back:.25,nod:.05,rattle:.25,rattleRot:.018,cycles:3,decay:6,walk:.55,cam:.0016}};
-  const arms={w:0,camQ:new THREE.Quaternion(),camQi:new THREE.Quaternion(),q:new THREE.Quaternion(),A:new THREE.Matrix4(),M:new THREE.Matrix4(),T:new THREE.Matrix4(),
+    step:{drop:.8,back:.25,nod:.05,rattle:.25,rattleRot:.018,cycles:3,decay:6,walk:.55,cam:.0016},
+    stand:{sprint:1.2,pump:.15}};   // sprint: each arm pitched by `sprint` rad about its own wrist (the elbow drops under the fist, the forearm stands up), ± `pump` with the swing
+  const arms={w:0,pw:new THREE.Vector3(),e:new THREE.Euler(),camQ:new THREE.Quaternion(),camQi:new THREE.Quaternion(),q:new THREE.Quaternion(),A:new THREE.Matrix4(),M:new THREE.Matrix4(),T:new THREE.Matrix4(),
     p:new THREE.Vector3(),sc:new THREE.Vector3(),sides:['le','ri'].map((side,i)=>({side,i,sg:i?-1:1,off:new THREE.Vector3(),rot:new THREE.Euler()}))};
   function measureUnder(def){   // once per weapon and attachment set, at idle: the part's extent in the gun's frame
     under.kind=null;const ids=(def?.attachments??'').split('+'),kind=Object.keys(UNDER).find(k=>ids.includes(k));if(!kind||!view.gun)return;
@@ -394,6 +395,16 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
         sh.updateMatrix();arms.M.copy(sh.parent.matrixWorld).invert().multiply(arms.A).multiply(sh.parent.matrixWorld).multiply(sh.matrix);
         arms.M.decompose(sh.position,sh.quaternion,arms.sc);
         sh.updateMatrixWorld(true);
+        // the sprinting forearm (user, 2026-11-05: "sprint anim should have the arms more vertical, like actual sprinting"): the whole
+        // arm turns about its own wrist, so the fist stays where the pump puts it and the elbow drops under it, the forearm standing
+        // up from the bottom of the screen (an elbow fold instead pulled the hand back into the camera: the shoulder is behind it)
+        const st=(ARMS.stand.sprint*sk+ARMS.stand.pump*pump*sw)*aw,wr=r.getObjectByName('j_wrist_'+A.side);
+        if(wr&&Math.abs(st)>.001){
+          wr.getWorldPosition(arms.pw);arms.q.copy(arms.camQ).multiply(tmp.q.setFromEuler(arms.e.set(st,0,0))).multiply(arms.camQi);
+          arms.A.makeRotationFromQuaternion(arms.q);arms.A.setPosition(tmp.s.copy(arms.pw).sub(tmp.e.copy(arms.pw).applyQuaternion(arms.q)));
+          sh.updateMatrix();arms.M.copy(sh.parent.matrixWorld).invert().multiply(arms.A).multiply(sh.parent.matrixWorld).multiply(sh.matrix);
+          arms.M.decompose(sh.position,sh.quaternion,arms.sc);sh.updateMatrixWorld(true);
+        }
       }
       sealArm();
     }
