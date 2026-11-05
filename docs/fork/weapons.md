@@ -32,6 +32,21 @@ BO3 (`/mass_drive/SteamLibrary/steamapps/common/Call of Duty Black Ops III`) can
 - `greyhound.json`: `exportmodelimg` off (exporting a model *with* its images froze Greyhound), `cdn_downloader` off, `showximage` on. Export images separately by searching their names (`i_wpn_t7_zmb_dg2`).
 - Driving it: BO3's window can't be screen-captured (Vulkan), Greyhound's can (`ffmpeg -f x11grab -window_id`). xdotool clicks work on a fresh Greyhound, but **after one export its input stops**: kill it and relaunch for each batch. Its list never shows a selection, so search the exact name and use Export All (it exports what the list shows).
 - Exports are copied to `export_game/bo3/` (git-ignored): `xmodels/`, `xanims/` (SEAnim), `ximages/` (PNG), `sounds/`.
+- **Faster driving (2026-11-05):**
+  - The search box takes comma-separated terms (`c4,hatchet`), matching anywhere in the name.
+  - To list only one asset type, set `showximage`/`showxanim`/`showxsounds` to false in `greyhound.json` and relaunch. Restore it afterwards: the original is the set with all of them true.
+  - Kill it with `pkill -x Greyhound.exe`. `pkill -f Greyhound.exe` matches the calling shell too.
+  - Grab screenshots with `ffmpeg -f x11grab -window_id <id> -i :1`.
+  - A model's image names are in its `.semodel`: `strings` it and grep `_images\\`.
+- **BO3 multiplayer lethals and tacticals (exported 2026-11-05 from a running MP map, not used yet):**
+  - Models (`wpn_t7_*`, `_view`/`_world`/`_projectile`):
+    - Lethals: `grenade_frag`, `grenade_semtex`, `grenade_incendiary` (Thermite), `hatchet` (Combat Axe), `c4` (plus `c4_detonator_prop`), `spider_mine` (the Trip Mine, `_prop_open` deployed).
+    - Tacticals: `grenade_concussion`, `grenade_flashbang`, `grenade_smoke`, `grenade_emp`, `shock_charge`, `trophy_system` (`_open_prop`), `blackhat` (Black Hat).
+    - Also `grenade_supply` (the supply-drop marker).
+  - Images: `i_wpn_t7_<name>_*`. The Trip Mine's are `i_mtl_wpn_t7_spider_mine_*`, and the Trophy System has both `i_mtl_…` and `i_wpn_t7_trophy_system_*`.
+  - First-person clips are `vm_<name>_*`: `vm_frag_*` covers frag-style throws, `vm_semtex_pullpin`, `vm_incendiary_*`, and `vm_tactical_*` is shared by the tactical grenades. The deploy clips are `o_spider_mine_deploy/detonate` and `o_trophy_deploy/spin`.
+  - Sounds come from `zone/snd/all/mp_common.all.sabl` (Load File): `wpn/grenade`, `mpl/trophy`, `mpl/hacker`, `exp/trophy_system`, `exp/c4`, `wpn/hatchet`, `evt/emp_static`.
+  - Zombies equipment (Cymbal Monkey, Lil' Arnie and others) isn't loaded on an MP map: export it from a Zombies map.
 - **Sounds** don't need the game: Greyhound's Load File opens BO3's sound banks (`zone/snd/all/*.sabl`, 680 of them; type the relative path, e.g. `zone\snd\all\zm_common.all.sabl`, into the dialog's File name). Names have no folders, so Export All the bank (`keepsndpath` keeps `wpn/energy/dg2/...`) and copy the weapon's folder. Find which bank has a weapon with `strings -n 8 <bank>.sabl | grep -i <name>` (the DG-2: `zm_common`; The Giant's `zm_factory` has a patched fire). The build converts them to Ogg (`audio/`, keyed by path in weapons.json `sounds`).
 
 **Building** (`python3 .tools/build_bo3_weapons.py`): `.tools/semodel_to_glb.py` (SEModel → skinned GLB, Z-up → Y-up, CoD winding flipped, WebP textures via EXT_texture_webp, roughness from BO3 gloss), `.tools/seanim.py` (SEAnim reader) → `mods/bo3-weapons/` (models/, animations/ in the xanim_to_json clip format, weapons.json; all git-ignored).
