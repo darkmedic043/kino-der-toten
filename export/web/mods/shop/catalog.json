@@ -1848,6 +1848,138 @@
     "skin": true
    },
    "pass": "s1"
+  },
+  {
+   "id": "pass.s2.camo.blooddip",
+   "cat": "camo",
+   "name": "Blood Dip",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: Black and blood-red stripes; red light catches the edges as the gun turns.",
+   "data": {
+    "camo": "s2.blooddip"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.centurion",
+   "cat": "camo",
+   "name": "Centurion",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 camo: Olive and gold lattice with a gold sheen.",
+   "data": {
+    "camo": "s2.centurion"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.coralmesh",
+   "cat": "camo",
+   "name": "Coral Mesh",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: Purple pixel mesh.",
+   "data": {
+    "camo": "s2.coralmesh"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.murderedout",
+   "cat": "camo",
+   "name": "Murdered Out",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 camo: Near-black shards in three dark tones.",
+   "data": {
+    "camo": "s2.murderedout"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.paranoia",
+   "cat": "camo",
+   "name": "Paranoia",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 camo: Skull-and-claw pattern with red edges.",
+   "data": {
+    "camo": "s2.paranoia"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.crimsonhex",
+   "cat": "camo",
+   "name": "Crimson Hex",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: Grey digital camo over a hex grid, with red patches.",
+   "data": {
+    "camo": "s2.crimsonhex"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.skulls",
+   "cat": "camo",
+   "name": "Skull Pile",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: Skulls, stacked.",
+   "data": {
+    "camo": "s2.skulls"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.ameerga",
+   "cat": "camo",
+   "name": "Ameerga",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 camo: Black blotches over a green-teal fade.",
+   "data": {
+    "camo": "s2.ameerga"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.neonflame",
+   "cat": "camo",
+   "name": "Neon Flame",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 camo: Animated: purple flames roll over the gun, glowing.",
+   "data": {
+    "camo": "s2.neonflame"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.directorscut",
+   "cat": "camo",
+   "name": "Director's Cut",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 camo: Animated: glowing glyphs flicker and glitch across the gun.",
+   "data": {
+    "camo": "s2.directorscut"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.charm.kurb",
+   "cat": "charm",
+   "name": "Kurb",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 weapon charm: a pocket-sized Kurb.",
+   "data": {
+    "charm": "kurb"
+   },
+   "pass": "s2"
   }
  ]
 }

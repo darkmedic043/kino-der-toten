@@ -6,7 +6,9 @@
       "name": "Kurb",
       "desc": "A pocket-sized Kurb, hung by the head. He has seen things.",
       "model": "models/kurb.glb",
-      "size": 3.7
+      "size": 3.7,
+      "pass": "s2",
+      "unlock": "pass.s2.charm.kurb"
     }
   ],
   "anchors": {}

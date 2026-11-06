@@ -366,7 +366,17 @@
       "procedural": "cropcircle",
       "scale": 2,
       "mix": 0.95
-    }
+    },
+    {"id": "s2.blooddip", "name": "Blood Dip", "shop": "pass.s2.camo.blooddip", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/blooddip.png", "gradient": "camos/s2/blooddip_gradient.png"},
+    {"id": "s2.centurion", "name": "Centurion", "shop": "pass.s2.camo.centurion", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/centurion.png", "gradient": "camos/s2/centurion_gradient.png", "metal": true},
+    {"id": "s2.coralmesh", "name": "Coral Mesh", "shop": "pass.s2.camo.coralmesh", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/coralmesh.png", "gradient": "camos/s2/coralmesh_gradient.png"},
+    {"id": "s2.murderedout", "name": "Murdered Out", "shop": "pass.s2.camo.murderedout", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/murderedout.png", "gradient": "camos/s2/murderedout_gradient.png"},
+    {"id": "s2.paranoia", "name": "Paranoia", "shop": "pass.s2.camo.paranoia", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/paranoia.png", "gradient": "camos/s2/paranoia_gradient.png"},
+    {"id": "s2.crimsonhex", "name": "Crimson Hex", "shop": "pass.s2.camo.crimsonhex", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/crimsonhex.jpg"},
+    {"id": "s2.skulls", "name": "Skull Pile", "shop": "pass.s2.camo.skulls", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/skulls.jpg"},
+    {"id": "s2.ameerga", "name": "Ameerga", "shop": "pass.s2.camo.ameerga", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/ameerga.jpg"},
+    {"id": "s2.neonflame", "name": "Neon Flame", "shop": "pass.s2.camo.neonflame", "pass": "s2", "challenge": "pass", "scale": 1.5, "mix": 0.95, "frames": {"dir": "camos/s2/neonflame/", "count": 48, "ext": "jpg", "fps": 6.25}, "emit": 1.4},
+    {"id": "s2.directorscut", "name": "Director's Cut", "shop": "pass.s2.camo.directorscut", "pass": "s2", "challenge": "pass", "scale": 1.5, "mix": 0.95, "frames": {"dir": "camos/s2/directorscut/", "count": 16, "ext": "jpg", "fps": 8, "blend": false}, "emit": 1.6}
   ],
   "_altNote": "alt: weapon id -> {challenge: replacement}, for guns that can't do a challenge (no headshots from a Thundergun blast, or from launchers and explosive bolts, whose kills are nearly all blasts); progress counts on the replacement",
   "alt": {

@@ -51,3 +51,6 @@ Thumbs.db
 /export/web/**/*.json.gz
 /export/web/**/*.wasm.gz
 !/export/web/mods/lighting/*.bin.gz
+
+# Season 1 (s2) pass camos: third-party textures the user supplied (2026-11-06), kept local like the ripped assets
+/export/web/mods/weapon-levels/camos/s2/

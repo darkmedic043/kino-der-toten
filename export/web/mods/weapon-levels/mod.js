@@ -7,7 +7,7 @@ import { mountParts as mountGunParts } from './mounts.js';
 // the UI are in gunsmith.js; tuning in attachments.json.
 import { loadProfile, saveProfile, cloudReady, loadProgression, gunsmithLevel, unlockLvl } from '../../profile.js';
 import { setupFlamer } from './flamer.js';
-import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress, camoTime, PAP_CAMO, camoById as camoLookup } from './camo.js';
+import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress, camoTime, PAP_CAMO, camoById as camoLookup, camoTextures } from './camo.js';
 import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, grantMasterXp, canPrestigeWeapon, RULES as PRESTIGE } from '../prestige/prestige.js';
 import { openGunsmith } from './gunsmith-view.js';
 import { previewDef } from './gunsmith.js';
@@ -82,7 +82,9 @@ export default async function setup(api){
     if(l)mountGunParts(l,def,def?.mounted??[],()=>view.leftGun===l,{mirror:true});};
   // the engine's weapon warm-up (warmWeapons, 2026-11-01): each gun compiles as it will be equipped, with the player's
   // mounted sights and camo (the Pack-a-Punch camo on an upgraded def that keeps the base model)
-  host.on('warmWeapon',({def,gun,wait})=>{wait?.(mountGunParts(gun,def,def?.mounted??[],()=>true));applyCamo(gun,papLook({id:def.id,upgraded:def.upgraded})?PAP_CAMO:camoById(data.weapons[def.id]?.camo));});
+  host.on('warmWeapon',({def,gun,wait})=>{wait?.(mountGunParts(gun,def,def?.mounted??[],()=>true));const look=papLook({id:def.id,upgraded:def.upgraded})?PAP_CAMO:camoById(data.weapons[def.id]?.camo);applyCamo(gun,look);
+    // an animated camo's other frames (and a gradient camo's lookup) are uploaded now, not when they first show
+    const ts=camoTextures(look);if(ts.length>1)wait?.(Promise.all(ts.map(t=>t.userData.loaded)).then(()=>{for(const t of ts)api.renderer?.initTexture?.(t);}));});
 
   // Bigger mags hang off their own bones, which the reload animations never
   // move (they animate tag_clip, the stock mag). While one is fitted, hide the

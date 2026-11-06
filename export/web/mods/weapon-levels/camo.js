@@ -148,11 +148,19 @@ function pumpSwatches(){
   if(swatchBusy||!swatchQueue.length)return;swatchBusy=true;
   requestAnimationFrame(()=>{
     const c=swatchQueue.shift();
-    try{const img=camoTexture(c).image;let url='';
-      if(img instanceof HTMLCanvasElement){const s=document.createElement('canvas');s.width=s.height=96;s.getContext('2d').drawImage(img,0,0,96,96);url=s.toDataURL('image/jpeg',.8);}
-      else url=img?.src??'';
-      swatches.set(c.id,url);for(const f of swatchWaiters.splice(0))f();}catch(e){swatches.set(c.id,'');}
-    swatchBusy=false;pumpSwatches();});
+    swatchOf(c).catch(()=>'').then(url=>{swatches.set(c.id,url);for(const f of swatchWaiters.splice(0))f();swatchBusy=false;pumpSwatches();});});
+}
+async function swatchOf(c){
+  if(c.swatch)return new URL(c.swatch,import.meta.url).href;
+  const t=c.frames?camoFrames(c)[0]:camoTexture(c);await t.userData.loaded;const img=t.image;
+  if(c.gradient){   // pattern × gradient: drawn here with the gradient's row at a head-on view
+    const g=camoTexture({texture:c.gradient});await g.userData.loaded;const S=96,cv=document.createElement('canvas');cv.width=cv.height=S;const x=cv.getContext('2d',{willReadFrequently:true});
+    const G=64;x.drawImage(g.image,0,0,G,G);const gr=x.getImageData(0,0,G,G).data,off=(c.sheen?.[0]??0)+(c.sheen?.[1]??.35)*.15;
+    x.drawImage(img,0,0,S,S);const d=x.getImageData(0,0,S,S);for(let i=0;i<d.data.length;i+=4){const u=d.data[i+1]/255,gx=Math.min(G-1,Math.floor(u*G)),gy=Math.min(G-1,Math.floor(Math.min(1,u+off)*G)),k=(gy*G+gx)*4;d.data[i]=gr[k];d.data[i+1]=gr[k+1];d.data[i+2]=gr[k+2];}
+    x.putImageData(d,0,0);return cv.toDataURL('image/jpeg',.8);
+  }
+  if(img instanceof HTMLCanvasElement){const s=document.createElement('canvas');s.width=s.height=96;s.getContext('2d').drawImage(img,0,0,96,96);return s.toDataURL('image/jpeg',.8);}
+  return img?.src??'';
 }
 const swatchWaiters=[];
 export function fillSwatches(root,lookup){
@@ -164,15 +172,30 @@ export function fillSwatches(root,lookup){
 const shopOwned=()=>{try{return new Set(JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]);}catch{return new Set();}};
 const texCache=new Map();
 export function camoTexture(camo,base=import.meta.url){
-  const key=camo.texture??('proc:'+camo.procedural+(camo.spec?':'+camo.spec.seed+':'+camo.spec.tier+':'+camo.spec.style+':'+camo.spec.h+':'+(camo.spec.tone??0):''));
+  const data=!!camo.gradient,key=(camo.texture?camo.texture+(data?'|data':''):null)??('proc:'+camo.procedural+(camo.spec?':'+camo.spec.seed+':'+camo.spec.tier+':'+camo.spec.style+':'+camo.spec.h+':'+(camo.spec.tone??0):''));
   if(texCache.has(key))return texCache.get(key);
   let t;
-  if(camo.texture){t=new THREE.TextureLoader().load(new URL(camo.texture,base).href);}
+  if(camo.texture){let res;t=new THREE.TextureLoader().load(new URL(camo.texture,base).href,()=>res(),undefined,()=>res());t.userData.loaded=new Promise(r=>res=r);}
   else if(camo.procedural==='prestige')t=new THREE.CanvasTexture(drawPrestigeArt(camo.spec));
   else if(camo.procedural==='prestige-glow')t=new THREE.CanvasTexture(drawPrestigeArt(camo.spec,true));
   else t=new THREE.CanvasTexture(draw(camo.procedural));
-  t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;
+  // a gradient camo's pattern is a lookup value (its green channel picks the gradient's column), not a colour
+  t.colorSpace=data?THREE.NoColorSpace:THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;t.userData.loaded??=Promise.resolve();
   texCache.set(key,t);return t;
+}
+// an animated camo's frames ("frames": {dir, count, ext, fps, blend}): one texture each, swapped as a uniform (no shader change)
+const frameCache=new Map();
+export function camoFrames(camo,base=import.meta.url){
+  const f=camo.frames,key=f.dir;if(frameCache.has(key))return frameCache.get(key);
+  const list=Array.from({length:f.count},(_,i)=>camoTexture({texture:f.dir+String(i).padStart(2,'0')+'.'+(f.ext??'jpg')},base));
+  frameCache.set(key,list);return list;
+}
+// every texture a camo draws with, loaded (the game uploads them all while loading: a frame first shown mid-match would hitch)
+export function camoTextures(camo){
+  if(!camo)return [];const out=camo.frames?[...camoFrames(camo)]:[camoTexture(camo)];
+  if(camo.gradient)out.push(camoTexture({texture:camo.gradient}));
+  if(camo.glow)out.push(camoTexture(typeof camo.glow==='string'?{texture:camo.glow}:camo.glow));
+  return out;
 }
 
 // ---- applying -----------------------------------------------------------------------------
@@ -184,7 +207,10 @@ function camoMaterial(orig,camo){
   const key=orig.uuid+'|'+camo.id;if(matCache.has(key))return matCache.get(key);
   const m=orig.clone();m.userData={...orig.userData,camoOf:orig,camo:camo.id};
   // a model may ask for denser tiling (glTF material extras camoScale, e.g. the Grimhawk's single texture atlas)
-  const uniforms={camoMap:{value:camoTexture(camo)},camoScale:{value:(camo.scale??2.5)*(orig.userData?.camoScale??1)},camoMix:{value:camo.mix??.92}};
+  const fr=camo.frames?camoFrames(camo):null,fps=camo.frames?.fps??8,fpos=()=>((camoTime.value*fps)%fr.length+fr.length)%fr.length;
+  const uniforms={camoMap:fr?{get value(){return fr[Math.floor(fpos())];}}:{value:camoTexture(camo)},
+    camoMapB:fr?{get value(){return fr[(Math.floor(fpos())+1)%fr.length];}}:{value:null},camoBlend:fr&&camo.frames.blend!==false?{get value(){const f=fpos();return Math.max(1e-3,f-Math.floor(f));}}:{value:0},
+    camoGrad:{value:camo.gradient?camoTexture({texture:camo.gradient}):null},camoGradV:{value:new THREE.Vector3(camo.gradient?1:0,...(camo.sheen??[0,.35]))},camoEmit:{value:camo.emit??0},camoScale:{value:(camo.scale??2.5)*(orig.userData?.camoScale??1)},camoMix:{value:camo.mix??.92}};
   // uniforms rather than defines: a wrapped gun shares the programs of every other camo'd gun (no new variant to warm up)
   const wrap=wrapOf(orig.name),ramp=(r)=>r??[2,3];
   Object.assign(uniforms,{camoTri:{value:wrap?(camo.scale??2.5)*wrap.scale:0},camoKeep:{value:new THREE.Vector4(...ramp(wrap?.warm),...ramp(wrap?.pale))},camoMR:{value:new THREE.Vector2(1,1)}});
@@ -198,20 +224,32 @@ function camoMaterial(orig,camo){
       .replace('#include <begin_vertex>','#include <begin_vertex>\nvCamoP=position;vCamoN=normal;');   // the bind pose: a moving part carries its pattern along
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
 uniform sampler2D camoMap;uniform float camoScale;uniform float camoMix;uniform float camoTri;uniform vec4 camoKeep;uniform vec2 camoMR;
-varying vec3 vCamoP;varying vec3 vCamoN;float camoKept=0.;
+uniform sampler2D camoMapB;uniform float camoBlend;uniform sampler2D camoGrad;uniform vec3 camoGradV;uniform float camoEmit;
+varying vec3 vCamoP;varying vec3 vCamoN;float camoKept=0.;vec3 camoE=vec3(0.);
+// gradient camos (BO3 style): the pattern's value is read along the gradient's diagonal, and the view angle moves the row
+// (the colour shifts at glancing angles as the gun turns)
+vec3 camoLook(vec3 c,float fres){ return camoGradV.x<.5?c:texture2D(camoGrad,vec2(clamp(c.g,.004,.996),clamp(c.g+camoGradV.y+camoGradV.z*fres,.004,.996))).rgb; }
 vec3 camoPlanar(sampler2D t,vec2 off){ vec3 p=vCamoP*camoTri,w=abs(normalize(vCamoN+1e-5));w*=w;w*=w;w/=w.x+w.y+w.z+1e-5;
-  return texture2D(t,p.zy+off).rgb*w.x+texture2D(t,p.xz+off+.37).rgb*w.y+texture2D(t,p.xy+off+.71).rgb*w.z; }`)
+  return texture2D(t,p.zy+off).rgb*w.x+texture2D(t,p.xz+off+.37).rgb*w.y+texture2D(t,p.xy+off+.71).rgb*w.z; }
+// animated camos: this frame blended into the next
+vec3 camoTex(vec2 uv){ vec3 c=texture2D(camoMap,uv).rgb;return camoBlend>0.?mix(c,texture2D(camoMapB,uv).rgb,camoBlend):c; }
+vec3 camoTexTri(vec2 off){ vec3 c=camoPlanar(camoMap,off);return camoBlend>0.?mix(c,camoPlanar(camoMapB,off),camoBlend):c; }`)
       .replace('#include <map_fragment>',`#include <map_fragment>
 #ifdef USE_MAP
-{ vec2 camoOff=${drift};float camoL=dot(diffuseColor.rgb,vec3(.299,.587,.114));
+{ vec2 camoOff=${drift};float camoL=dot(diffuseColor.rgb,vec3(.299,.587,.114)),camoF=.3;
+  #if defined(STANDARD)&&!defined(FLAT_SHADED)
+  camoF=1.-abs(dot(normalize(vNormal),normalize(vViewPosition)));
+  #endif
   if(camoTri>0.){
     // plain albedo decides what is paint: wood, leather, brass and printed colour are saturated and warm, labels are pale
     vec3 k=texture2D(map,vMapUv,1.).rgb;float top=max(k.r,k.g),lo=dot(texture2D(map,vMapUv,4.).rgb,vec3(.299,.587,.114));
     camoKept=max(smoothstep(camoKeep.x,camoKeep.y,(top-k.b)/max(top,.025))*smoothstep(.008,.03,top),smoothstep(camoKeep.z,camoKeep.w,dot(k,vec3(.333))));
     // fine detail only (the texture over its own blur), or a white gun comes out twice as bright as a black one
-    diffuseColor.rgb=mix(diffuseColor.rgb,camoPlanar(camoMap,camoOff)*clamp(camoL/max(lo,.02),.6,1.3)*.85,camoMix*(1.-camoKept));
-  }else diffuseColor.rgb=mix(diffuseColor.rgb,texture2D(camoMap,vMapUv*camoScale+camoOff).rgb*(.3+camoL*1.9),camoMix); }
+    vec3 cc=camoLook(camoTexTri(camoOff),camoF);camoE=cc*camoMix*(1.-camoKept);
+    diffuseColor.rgb=mix(diffuseColor.rgb,cc*clamp(camoL/max(lo,.02),.6,1.3)*.85,camoMix*(1.-camoKept));
+  }else{ vec3 cc=camoLook(camoTex(vMapUv*camoScale+camoOff),camoF);camoE=cc*camoMix;diffuseColor.rgb=mix(diffuseColor.rgb,cc*(.3+camoL*1.9),camoMix); } }
 #endif`)
+      .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=camoE*camoEmit;')   // glowing camos (camos.json emit)
       .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor*=mix(1.,camoMR.y,camoKept);')
       .replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nmetalnessFactor*=mix(1.,camoMR.x,camoKept);');
     // Pack-a-Punch: the circuit traces glow, a colour wave running through them
