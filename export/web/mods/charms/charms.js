@@ -44,6 +44,12 @@ export function charmModel(c){
   return templates.get(c.id).then(t=>t&&{...t,object:t.object.clone()});
 }
 
+// how far a charm reaches below its ring and how wide it is (inches), for gunAnchor's drop/width
+// a gun model's units in inches: BO1 viewmodels are in inches, the BO3/AW imports (Greyhound exports) in centimetres;
+// def.charmUnit overrides it. Charms are sized in inches, so the rig and the hang search scale by this.
+export const charmUnit=def=>def?.charmUnit??(def?.bo3?2.54:1);
+export const charmReach=(body,c={})=>({drop:.25+(c.chain??.42)+2*Math.max(.05,body?.com??1),width:body?.width??.3});
+
 // the chain: oval links and the ring on the gun, one shared geometry and material
 let linkGeo=null,ringGeo=null,metal=null;
 const parts=()=>{
@@ -57,11 +63,13 @@ const parts=()=>{
 // vertices at the current pose: just above the grip (a little forward of j_gun, the hand), just under the bore, on the
 // outer surface. side = the gun's widest point below it, which the charm is kept outside of. Cached per model and shown
 // attachments. charms.json anchors[gun id] = [x,y,z] (or {at:[x,y,z],side:y}) where the automatic spot looks wrong.
-const anchors=new Map(),inv=new THREE.Matrix4(),_c=new THREE.Vector3();
+const anchors=new Map(),inv=new THREE.Matrix4(),_m=new THREE.Matrix4(),_c=new THREE.Vector3(),LOOSE=/clip|mag|ammo|shell|bullet|round|speedloader|loader|belt|cartridge|grenade|rocket|arrow|bolt_?release_?no/i,
+  // small parts that snap on every shot (a charm on them would jerk), and no room to hang from them anyway
+  FIDGET=/hammer|trigger|safety|sear|firing_?pin|ejector|selector|lever|button|latch/i;
 // visible vertices of `obj` (skipping the subtree `skip`) in the space of inv, as a flat [x,y,z,...] list: a vertex counts
 // when its mesh and the mesh's ancestors are visible and neither its dominant bone nor any ancestor is scaled to nothing
 // (BO1 hides attachments that way; their vertices collapse far off)
-function visiblePoints(obj,skip,stop){
+function visiblePoints(obj,skip,stop,bones=null,unit=1){
   const pts=[],done=new Map(),dead=b=>{for(let p=b;p&&p!==stop;p=p.parent)if(p.isBone&&p.scale.x<1e-3)return true;return false;};
   const shown=o=>{for(let p=o;p&&p!==stop;p=p.parent)if(!p.visible||p.userData.charm||p===skip)return false;return !dead(o);};
   obj.traverse(o=>{
@@ -71,50 +79,67 @@ function visiblePoints(obj,skip,stop){
     let ids;if(g.index){const seen=done.get(pos)??new Set();done.set(pos,seen);const st=g.drawRange.start,end=Math.min(g.index.count,st+(Number.isFinite(g.drawRange.count)?g.drawRange.count:g.index.count));
       ids=[];for(let k=st;k<end;k++){const i=g.index.getX(k);if(!seen.has(i)){seen.add(i);ids.push(i);}}}
     else ids=Array.from({length:pos.count},(_,i)=>i);
+    let owner=null;if(bones){for(let p=o.parent;p&&p!==stop;p=p.parent)if(p.isBone){owner=p;break;}}   // an unskinned part: the bone it rides on
     const boneOk=new Map(),step=Math.max(1,Math.floor(ids.length/4000));
     for(let k=0;k<ids.length;k+=step){const i=ids[k];
       if(o.isSkinnedMesh&&si&&sw){let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
-        if(!boneOk.has(best))boneOk.set(best,!dead(o.skeleton.bones[best]));if(!boneOk.get(best))continue;}
+        if(!boneOk.has(best))boneOk.set(best,!dead(o.skeleton.bones[best]));if(!boneOk.get(best))continue;if(bones)owner=o.skeleton.bones[best];}
       o.getVertexPosition(i,v).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
-      if(Number.isFinite(v.x+v.y+v.z)&&Math.abs(v.x)<60&&Math.abs(v.y)<30&&Math.abs(v.z)<30)pts.push(v.x,v.y,v.z);   // (the SPAS parks its spare shells 127 in behind)
+      if(Number.isFinite(v.x+v.y+v.z)&&Math.abs(v.x)<60*unit&&Math.abs(v.y)<30*unit&&Math.abs(v.z)<30*unit){pts.push(v.x/unit,v.y/unit,v.z/unit);bones?.push(owner);}   // (the SPAS parks its spare shells 127 in behind)
     }
   });
   return pts;
 }
 const pct=(pts,axis,q)=>{const a=[];for(let i=axis;i<pts.length;i+=3)a.push(pts[i]);a.sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor(a.length*q))];};
 // In the gun's root bone space (BO1: inches, x forward, y left = the side the camera sees, z up), from the visible
-// vertices at the current pose: a little forward of j_gun (the hand), just under the bore, on the outer surface, moved
-// along the gun to where no hand is in the way below it. side = the gun's widest point below it, which the charm is kept
-// outside of. Cached per gun model, hands and shown attachments. charms.json anchors[gun id] = [x,y,z] (or {at:[x,y,z],
-// side:y}) where the automatic spot looks wrong. hands: the arms model the gun is held in (the gun is under it); camera:
-// the view camera (spots where the hanging charm would be off the bottom or side of the screen score badly).
-export function gunAnchor(gun,root,{key,override,hands,camera}={}){
+// vertices at the current pose. The ring goes on a real point of the gun's outer surface on the visible side (it never
+// floats beside the gun): a point with nothing wider below it along the charm's drop, so the charm hangs straight down past
+// the gun. Spots are scored: a hand in the way, off screen, low under the bore (less visible), far from the preferred spot
+// (a little forward of the hand). side = the gun's widest point below the ring, which the charm is kept outside of. Cached
+// per gun model, hands and shown attachments. charms.json anchors[gun id] = [x,y,z] (or {at:[x,y,z],side:y}) where the
+// automatic spot looks wrong. drop: how far the chain and charm reach below the ring (inches); width: the charm's half
+// width; unit: the gun model's units in inches (charmUnit; anchors overrides are in the model's own units); hands: the arms model the gun is held in (the gun is under it); camera: the view camera.
+export function gunAnchor(gun,root,{key,override,hands,camera,drop=2.6,width=.3,unit=1}={}){
   if(override){const at=Array.isArray(override)?override:override.at;return {at:new THREE.Vector3().fromArray(at),side:override.side??at[1]};}
-  const fullKey=key+'|'+(hands?.name??'')+'|'+(()=>{const h=[];gun.traverse(b=>{if(b.isBone&&b.scale.x<1e-3)h.push(b.name);});return h.join(',');})();
+  const fullKey=key+'|'+(hands?.name??'')+'|'+drop.toFixed(1)+'|'+unit+'|'+(()=>{const h=[];gun.traverse(b=>{if(b.isBone&&b.scale.x<1e-3)h.push(b.name);});return h.join(',');})();
   if(anchors.has(fullKey))return anchors.get(fullKey);
   inv.copy(root.matrixWorld).invert();
-  const pts=visiblePoints(gun,null,gun.parent);if(pts.length<9)return null;
-  const hp=hands?visiblePoints(hands,gun,hands.parent):[];
+  const pb=[],pts=visiblePoints(gun,null,gun.parent,pb,unit);if(pts.length<9)return null;
+  const hp=hands?visiblePoints(hands,gun,hands.parent,null,unit):[];
   const xmin=pct(pts,0,.01),xmax=pct(pts,0,.99),L=xmax-xmin,lo=xmin+.12*L,hi=xmax-.3*L;
-  const flash=gun.getObjectByName('tag_flash');let fz=null;
-  if(flash){let ok=true;for(let p=flash;p&&p!==gun.parent;p=p.parent)if(p.scale.x<1e-3)ok=false;if(ok)fz=flash.getWorldPosition(v).applyMatrix4(inv).z-.4;}
-  const zAt=x=>{if(fz!=null)return fz;const zs=[];for(let i=0;i<pts.length;i+=3)if(Math.abs(pts[i]-x)<1.5)zs.push(pts[i+2]);zs.sort((a,b)=>a-b);return zs.length?zs[Math.floor(zs.length*.7)]:0;};
-  const maxY=(x,dx,z0,z1)=>{let m=-1e9;for(let i=0;i<pts.length;i+=3)if(Math.abs(pts[i]-x)<dx&&pts[i+2]>=z0&&pts[i+2]<=z1)m=Math.max(m,pts[i+1]);return m;};
-  // hand vertices in the way: near this x, from the bore down to where the charm hangs, on the visible side
-  const handsAt=(x,z)=>{let n=0;const y0=maxY(x,2,z-6,z+.5)-1.5;for(let i=0;i<hp.length;i+=3)if(Math.abs(hp[i]-x)<1.3&&hp[i+2]<z+1&&hp[i+2]>z-5&&hp[i+1]>y0)n++;return n;};
-  // every spot along the gun, scored: a hand in the way, something wider below (the charm would lie on it, sticking out),
-  // and the distance from the preferred spot
-  const x0=THREE.MathUtils.clamp(.1*L+1,lo,hi);let best=null;
+  // parts that leave the gun in a reload (a mag, shells, a speedloader) are never hung from
+  const loose=new Map(),isLoose=b=>{if(!b)return false;if(!loose.has(b)){let l=false;for(let p=b;p&&p!==root&&p!==gun;p=p.parent)if(LOOSE.test(p.name)||FIDGET.test(p.name))l=true;loose.set(b,l);}return loose.get(b);};
+  const flash=gun.getObjectByName('tag_flash');let top=null;
+  if(flash){let ok=true;for(let p=flash;p&&p!==gun.parent;p=p.parent)if(p.scale.x<1e-3)ok=false;if(ok)top=flash.getWorldPosition(v).applyMatrix4(inv).z/unit;}
+  top??=pct(pts,2,.85);
+  // hand vertices in the way: near this x, from the ring down to the bottom of the charm, on the visible side
+  const handsAt=(x,y,z)=>{let n=0;for(let i=0;i<hp.length;i+=3)if(Math.abs(hp[i]-x)<1.3&&hp[i+2]<z+.5&&hp[i+2]>z-drop&&hp[i+1]>y-1.2)n++;return n;};
+  const fw=Math.max(.35,width+.12),x0=THREE.MathUtils.clamp(.1*L+1,lo,hi);let best=null;
   for(let cx=lo;cx<=hi+1e-6;cx+=.5){
-    const cz=zAt(cx);let cy=maxY(cx,1,cz-.8,cz+.8);if(cy<-1e8)cy=maxY(cx,3,cz-3,cz+3);if(cy<-1e8)continue;
-    const cs=Math.max(cy,maxY(cx,2,cz-5,cz+.5)),h=hp.length?handsAt(cx,cz):0;
-    let off=0;if(camera){_c.set(cx,cy,cz-1.8).applyMatrix4(root.matrixWorld).project(camera);off=_c.z>1||Math.abs(_c.x)>.92||_c.y<-.88?6:0;}
-    const cost=(h?4+Math.min(4,h/40):0)+off+2.5*(cs-cy)+.25*Math.abs(cx-x0);
-    if(!best||cost<best.cost)best={cost,x:cx,y:cy,z:cz,side:cs};
+    // the column the charm drops through (F) and the surface points to hang from (S: the outermost vertex every .15 in of height)
+    const F=[],S=new Map();let y0=1e9,y1=-1e9;
+    for(let i=0;i<pts.length;i+=3){const dx=Math.abs(pts[i]-cx);if(dx>=fw)continue;F.push(pts[i+1],pts[i+2]);
+      if(dx<.3){y0=Math.min(y0,pts[i+1]);y1=Math.max(y1,pts[i+1]);if(pts[i+2]<top+.6){const k=Math.round(pts[i+2]/.15),o=S.get(k);if(!o||pts[i+1]>o[0])S.set(k,[pts[i+1],pts[i+2],pb[i/3]]);}}}
+    const ySide=(y0+y1)/2+(y1-y0)*.15;   // the visible half (a point under the middle of the gun hangs the charm out of sight)
+    for(const [y,z,bone] of S.values()){
+      if(y<ySide||isLoose(bone))continue;
+      let below=-1e9;for(let i=0;i<F.length;i+=2)if(F[i+1]<z-.05&&F[i+1]>z-drop&&F[i]>below)below=F[i];
+      const lean=Math.max(0,below-y-.04);if(lean>.8)continue;   // something sticks out much further below: the charm would lie on it
+      let off=0;if(camera){_c.set(cx,y,z-drop*.6).multiplyScalar(unit).applyMatrix4(root.matrixWorld).project(camera);off=_c.z>1||Math.abs(_c.x)>.92||_c.y<-.88?6:0;}
+      const h=hp.length?handsAt(cx,y,z):0;
+      // a moving part (a slide, a bolt) only when it's clearly the better spot; hammers and triggers are never used (FIDGET)
+      const cost=(h?4+Math.min(4,h/40):0)+off+3*lean+.45*Math.max(0,top-.4-z)+.25*Math.abs(cx-x0)+(bone&&bone!==root?1:0);
+      if(!best||cost<best.cost)best={cost,x:cx,y,z,side:Math.max(below,y-.3),bone};
+    }
   }
-  if(!best){const z=zAt(x0);best={x:x0,y:0,z,side:0};}
-  const {x,z}=best,side=best.side,y=Math.max(best.y,side-.25);   // the ring stands off a little where the side bulges below
-  const a={at:new THREE.Vector3(x,y+.06,z),side};anchors.set(fullKey,a);return a;
+  if(!best){const z=top-.4;best={x:x0,y:pct(pts,1,.99),z,side:pct(pts,1,.99)};}
+  const a={at:new THREE.Vector3(best.x,best.y-.02,best.z).multiplyScalar(unit),side:best.side*unit};   // the ring sinks a hair into the surface
+  // a moving part (a revolver's swing-out frame, a slide, a bolt): the ring rides on its bone, in that bone's own space
+  if(best.bone&&best.bone!==root){a.bone=best.bone.name;_m.copy(best.bone.matrixWorld).invert();
+    a.local=a.at.clone().applyMatrix4(root.matrixWorld).applyMatrix4(_m);   // and the gun's side and forward in that bone's frame:
+    a.n=new THREE.Vector3().setFromMatrixColumn(root.matrixWorld,1).transformDirection(_m);   // they turn only when the part turns
+    a.f=new THREE.Vector3().setFromMatrixColumn(root.matrixWorld,0).transformDirection(_m);}
+  anchors.set(fullKey,a);return a;
 }
 
 // ---- the rig --------------------------------------------------------------------------------------------------------------
@@ -139,10 +164,12 @@ export class CharmRig{
   dispose(){this.group.removeFromParent();}
   // opts: root (bone), anchor ({at,side}), gravity (unit vector in the rig's space), moved (Matrix4: how a fixed point in
   // the rig's space moved this frame, e.g. the camera's turn; optional), follow (how much of `moved` the charm takes)
-  step(dt,{root,anchor,gravity,moved=null,follow=.25,gravityScale=1}){
+  step(dt,{root,anchor,gravity,moved=null,follow=.25,gravityScale=1,bone=null,unit=1}){
     if(!root||!anchor)return;
-    const M=root.matrixWorld,s=_s.setFromMatrixScale(M).x;
-    const n=_n.setFromMatrixColumn(M,1).normalize(),fwd=_f.setFromMatrixColumn(M,0).normalize(),A=_a.copy(anchor.at).applyMatrix4(M).addScaledVector(n,.12*s);   // A: the bottom of the ring, which stands out of the gun's side
+    const M=root.matrixWorld,sR=_s.setFromMatrixScale(M).x,s=sR*unit,B=bone&&anchor.local?bone.matrixWorld:null;
+    const n=B?_n.copy(anchor.n).transformDirection(B):_n.setFromMatrixColumn(M,1).normalize(),fwd=B?_f.copy(anchor.f).transformDirection(B):_f.setFromMatrixColumn(M,0).normalize();
+    // the point on the gun (on a moving part's bone when it has one), then A: the bottom of the ring, out of the gun's side
+    const base=B?_b.copy(anchor.local).applyMatrix4(B):_b.copy(anchor.at).applyMatrix4(M),A=_a.copy(base).addScaledVector(n,.12*s);   // A: the bottom of the ring, which stands out of the gun's side
     const L1=this.chain*s,L2=Math.max(.05,this.body.com)*s;
     if(this.fresh||!(dt>0&&dt<.25)||_t.copy(this.p1).sub(A).length()>L1*6+1e-6){
       this.p1.copy(A).addScaledVector(gravity,L1);this.q1.copy(this.p1);this.p2.copy(this.p1).addScaledVector(gravity,L2);this.q2.copy(this.p2);
@@ -153,7 +180,7 @@ export class CharmRig{
         for(const p of [this.p1,this.q1,this.p2,this.q2]){_u.copy(p).applyMatrix4(_R).sub(p).multiplyScalar(follow).addScaledVector(_t,follow*.3);const l=_u.length(),mx=L1*.5;if(l>mx)_u.multiplyScalar(mx/l);p.add(_u);}}
       this.acc=Math.min(this.acc+dt,STEP*4);
       // the side plane: a point on the gun's widest surface below the ring, normal = the gun's left (+y)
-      const P0=_p.set(anchor.at.x,anchor.side,anchor.at.z).applyMatrix4(M),m1=.06*s,m2=(this.body.depth*.8+.02)*s;
+      const P0=_p.copy(base).addScaledVector(n,(anchor.side-anchor.at.y)*sR),m1=.06*s,m2=(this.body.depth*.8+.02)*s;
       const G=(this.c.gravity??260)*gravityScale*s*STEP*STEP,drag=this.c.drag??.035;
       while(this.acc>=STEP){this.acc-=STEP;
         for(const [p,q] of [[this.p1,this.q1],[this.p2,this.q2]]){_u.copy(p).sub(q).multiplyScalar(1-drag);q.copy(p);p.add(_u).addScaledVector(gravity,G);}
@@ -181,4 +208,4 @@ export class CharmRig{
   }
 }
 const _s=new THREE.Vector3(),_a=new THREE.Vector3(),_n=new THREE.Vector3(),_f=new THREE.Vector3(),_t=new THREE.Vector3(),_u=new THREE.Vector3(),_p=new THREE.Vector3(),
-  _d=new THREE.Vector3(),_x=new THREE.Vector3(),_y=new THREE.Vector3(),_z=new THREE.Vector3(),_sv=new THREE.Vector3(),_R=new THREE.Matrix4();
+  _d=new THREE.Vector3(),_b=new THREE.Vector3(),_x=new THREE.Vector3(),_y=new THREE.Vector3(),_z=new THREE.Vector3(),_sv=new THREE.Vector3(),_R=new THREE.Matrix4();

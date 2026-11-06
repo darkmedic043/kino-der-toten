@@ -11,7 +11,7 @@ import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
-import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, gunAnchor, CharmRig } from '../charms/charms.js';
+import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig } from '../charms/charms.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
 
@@ -300,9 +300,10 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const my=++charmToken;charmRig?.dispose();charmRig=null;if(!gun||!charmCat)return;
     if(charmFor_gun!==gun){charmFor_gun=gun;   // where it hangs on this gun (also where the CHARM slot turns the camera)
       charmRoot=gun.getObjectByName(def.gunRoot??'j_gun')??(()=>{let b=null;gun.traverse(o=>{if(!b&&o.isBone)b=o;});return b;})();
-      scene.updateMatrixWorld(true);charmAnchor=charmRoot&&gunAnchor(gun,charmRoot,{key:def.model,override:charmCat.anchors[id]});}
+      scene.updateMatrixWorld(true);charmAnchor=charmRoot&&gunAnchor(gun,charmRoot,{key:def.model,override:charmCat.anchors[id],unit:charmUnit(def)});}
     const c=charmCat.charms.find(x=>x.id===want);if(!c||!charmAnchor)return;
     const body=await charmModel(c);if(my!==charmToken||!body||!alive||charmFor_gun!==gun)return;
+    charmAnchor=gunAnchor(gun,charmRoot,{key:def.model,override:charmCat.anchors[id],...charmReach(body,c),unit:charmUnit(def)})??charmAnchor;   // this charm's own reach
     charmRig=new CharmRig(body,c);charmRig.gun=gun;scene.add(charmRig.group);charmKick=2;if(slot==='charm')aim();
   }
   function renderOptions(){
@@ -430,7 +431,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
           if(hot)m.emissive.copy(PULSE).multiplyScalar(pulse);else if(m.userData.emissive0)m.emissive.copy(m.userData.emissive0);else m.emissive.setRGB(0,0,0);}}}
     tickGlow(glow,t);
     let swinging=false;
-    if(charmRig&&charmRig.gun===gun){charmRig.step(dt,{root:charmRoot,anchor:charmAnchor,gravity:DOWN});
+    if(charmRig&&charmRig.gun===gun){charmRig.step(dt,{root:charmRoot,anchor:charmAnchor,gravity:DOWN,unit:charmUnit(def),bone:charmAnchor.bone?gun.getObjectByName(charmAnchor.bone):null});
       if(charmKick&&!--charmKick){const n=new THREE.Vector3().setFromMatrixColumn(charmRoot.matrixWorld,0).normalize();charmRig.q2.addScaledVector(n,.05*new THREE.Vector3().setFromMatrixScale(charmRoot.matrixWorld).x);}   // a little swing as it's hung
       swinging=charmRig.p2.distanceTo(charmRig.q2)>1e-4;}
     // the idle spin alone renders at 30 fps; the camera easing, a drag, a hover or slot change, a pulsing slot render every frame
