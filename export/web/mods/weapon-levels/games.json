@@ -1,0 +1,17 @@
+{
+  "_doc": "Which game a gun comes from, shown as that game's logo on the menu's weapon pictures (games.js). base: the game of every gun in game-data.json; prefixes: by id start; weapons: by id (upgraded ids follow their gun). Guns matching nothing show no logo.",
+  "games": {
+    "bo1": { "name": "Call of Duty: Black Ops", "logo": "games/bo1.webp" },
+    "aw": { "name": "Call of Duty: Advanced Warfare", "logo": "games/aw.webp" },
+    "codol": { "name": "Call of Duty Online", "logo": "games/codol.webp" }
+  },
+  "base": "bo1",
+  "prefixes": { "aw_": "aw" },
+  "weapons": {
+    "bo1": ["microwavegundw_zm", "microwavegun_zm", "minigun_zm", "freezegun_zm", "melee_knife"],
+    "codol": ["bo3_mr23_tesla", "bo3_aug_octopus", "bo3_m1014_jellyfish", "bo3_p90_orbit", "bo3_g18_death", "bo3_m240_ice", "bo3_as50_rare",
+      "bo3_uzi_irradiated", "bo3_93r_dystopic", "bo3_aa12_btf", "bo3_rpd_ornate", "bo3_spas12_irradiated", "bo3_mp7_flanker", "bo3_tommy_modern",
+      "bo3_bow", "bo3_rpg_dragon", "bo3_ak117", "bo3_f2000_tech", "bo3_g37h_water", "bo3_sa80", "bo3_k9_heaven", "bo3_smg5_tool", "bo3_umg_dmz",
+      "bo3_m1887", "bo3_striker", "bo3_mg4_heaven"]
+  }
+}

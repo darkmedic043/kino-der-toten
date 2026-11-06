@@ -1,0 +1,3 @@
+# The games' logos (third-party trademarks, supplied by the user): served from this checkout, never committed,
+# and not in Rind's OWN list (.tools/install-manifest.mjs), so installed copies stream them from the site.
+*.webp

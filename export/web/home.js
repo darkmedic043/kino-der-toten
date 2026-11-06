@@ -17,6 +17,7 @@ import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } f
 import { weaponProgress, maxLevel, migrateWeaponLevels } from './mods/weapon-levels/gunsmith.js';
 import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, canPrestigeWeapon, prestigeWeapon, canPrestigePlayer, prestigePlayer, prestigeBadge, prestigeName, prestigeShort, prestigeColor, isPrestigeMaster, masterLook, nextMasterMilestone, milestoneText, awardMasterRewards, MASTER_MILESTONES, roman, RULES as PRESTIGE, TIER_NAMES, PRESTIGE_COLORS } from './mods/prestige/prestige.js';
 import { camoById } from './mods/weapon-levels/camo.js';
+import { loadGames } from './mods/weapon-levels/games.js';
 import { loadCredits, grantCredits, loadCreditsConfig } from './mods/credits/credits.js';
 import { loadCatalog as loadShopCatalog, cosmetics as shopCosmetics, installRewards } from './mods/shop/shop.js';
 import { cardSvg } from './mods/shop/card.js';
@@ -79,6 +80,7 @@ const mods=await Promise.all(modList.map(async id=>{
 // round trips), then apply them in mods.json order as before.
 const [patches,scripts]=await Promise.all([Promise.all(mods.map(m=>Promise.all([m.manifest?.data??[]].flat().map(file=>fetchJson(`mods/${m.id}/${file}`).catch(()=>null))))),
   Promise.all(mods.map(m=>m.manifest?.script?import(`./mods/${m.id}/${m.manifest.script}`).catch(()=>null):null))]);
+const baseIds=new Set(Object.keys(baseData.weapons));   // the base game's own guns (BO1), before mods add theirs: games.js
 let data={weapons:baseData.weapons,equipment:{...baseData.equipment},boxPool:baseData.boxPool,characters:{...baseData.characters}};
 for(const list of patches)for(const patch of list){if(patch)try{data=mergePatch(data,patch);}catch{}}
 // Mods that add weapons from a script (prepare) must show up here too.
@@ -321,11 +323,15 @@ function thumb(id){
   }));
   return thumbWaiters.get(id);
 }
-function fillThumb(el,id){if(!id){el.style.backgroundImage='';return;}thumb(id).then(url=>{if(el.dataset.weapon===id&&url)el.style.backgroundImage=`url(${url})`;});el.dataset.weapon=id;}
+// each weapon picture carries the logo of the game the gun comes from (mods/weapon-levels/games.json)
+let gameOf=()=>null;
+function gameLogo(el,id){el.querySelector(':scope>.game-logo')?.remove();const g=gameOf(id);if(g)el.insertAdjacentHTML('beforeend',`<i class="game-logo game-${g.id}" title="${esc(g.name)}" style="background-image:url(${g.url})"></i>`);}
+function fillThumb(el,id){gameLogo(el,id);if(!id){el.style.backgroundImage='';return;}thumb(id).then(url=>{if(el.dataset.weapon===id&&url)el.style.backgroundImage=`url(${url})`;});el.dataset.weapon=id;}
 
 // ---- Loadout ----------------------------------------------------------------------
 let gunsmith=null,camoCats=null;
 loadCamos(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{camoCats=c;renderLoadout();}).catch(()=>{});
+loadGames(baseIds).then(f=>{gameOf=f;renderLoadout();}).catch(()=>{});
 // Weapon classes, Black Ops style: the picker shows one class at a time.
 const classOf=id=>classOfIn(weapons,id);
 const activeClass={};
