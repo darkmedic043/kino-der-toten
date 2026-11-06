@@ -11,6 +11,7 @@ import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
+import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, gunAnchor, CharmRig } from '../charms/charms.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
 
@@ -167,7 +168,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const long=size.x>=size.z?'x':'z';
     let turn=long==='x'?0:-Math.PI/2;
     if(flash){const along=long==='x'?flash.x-center.x:flash.z-center.z;if((long==='x'&&along<0)||(long==='z'&&along<0))turn+=Math.PI;}
-    gun.rotation.y=turn;gun.updateMatrixWorld(true);
+    gun.rotation.y=turn;gun.updateMatrixWorld(true);charmShown=null;hangCharm();
     box.setFromObject(gun,true);box.getCenter(center);gun.position.sub(center);gun.updateMatrixWorld(true);
     radius=box.getSize(new THREE.Vector3()).length()/2;
     dist=distGoal=radius*3.1;focus.set(0,0,0);focusGoal.set(0,0,0);
@@ -223,7 +224,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     $('.lvl b').textContent=`WEAPON LEVEL ${p.level}${p.level>=cap?'  ·  MAX':''}`;
     $('.lvl i').style.width=(p.level>=cap?100:100*p.xp/need).toFixed(1)+'%';
     {const nx=nextUnlock(cat,def,id,p.level);$('.lvl small').textContent=p.level>=cap?'Max level · prestige it in the Armory':`${p.xp} / ${need} XP to level ${p.level+1}${nx?` · next unlock: ${nx.att.name} at level ${nx.level}`:''} · earn XP with kills using this gun`;}
-    const slots=slotsOf();if(slot!=='camo'&&!slots.includes(slot))slot=null;
+    const slots=slotsOf();if(slot!=='camo'&&slot!=='charm'&&!slots.includes(slot))slot=null;
     const on=equipped(cat,def,id,profile);
     $('.slots').innerHTML='<h3>ATTACHMENTS</h3>'+SLOT_ORDER.map(s=>{
       const has=slots.includes(s),eq=on.find(a=>cat.attachments.find(x=>x.id===a)?.slot===s);
@@ -232,9 +233,12 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(cats){const c=equippedCamo(cats,profile,id,weapons),unl=camoUnlocked(cats,profile,id,weapons),done=cats.camos.filter(k=>!k.reward&&!k.shop&&unl.has(k.id)).length,special=cats.camos.filter(k=>k.reward&&unl.has(k.id)).length;
       $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CAMO</h3><button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
         <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward&&!k.shop).length} UNLOCKED${special?` · ${special} SPECIAL`:''}${loadPrestige().camos.length?` · ${loadPrestige().camos.length} PRESTIGE`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
+    if(charmCat?.charms.length){const c=charmFor(charmCat,loadCharmState(),id);
+      $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CHARM</h3><button class="slot${slot==='charm'?' sel':''}${c?'':' empty'}" data-slot="charm">
+        <div class="ico">${c?'✦':'—'}</div><div><span>CHARM · ${charmCat.charms.filter(x=>!charmLock(x)).length} / ${charmCat.charms.length} OWNED</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
     $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc((def?.slotNames?.[s]??cat.slots[s]).toUpperCase())}</i></div>`).join('');
     renderOptions();renderStats();if(cats)fillSwatches(root,cid=>camoById(cats,cid));
-    $('.stats').style.display=slot==='camo'?'none':'';   // camos don't change stats; the list needs the room
+    $('.stats').style.display=slot==='camo'||slot==='charm'?'none':'';   // camos don't change stats; the list needs the room
   }
   // swatches come from camo.js's shared cache, generated one per frame (fillSwatches after each render)
   const swatch=c=>camoSwatch(c);
@@ -278,9 +282,33 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
           <div class="pc"><span class="${locked?'neu':'pro'}">${esc(what)} · ${have} / ${need}</span></div>
           <div class="cbar"><b style="width:${(100*have/need).toFixed(1)}%"></b></div></div></div></button>`;}).join('');
   }
+  // Weapon charms (mods/charms, 2026-11-06): one per gun, hung on the preview gun as in game and swinging as it's
+  // picked; locked ones (a pass reward, coming soon) preview but can't be equipped
+  let charmYaw=null,charmFor_gun=null,charmCat=null,charmRig=null,charmAnchor=null,charmRoot=null,charmShown,charmToken=0,charmKick=0;
+  loadCharms().then(c=>{charmCat=c;if(alive&&c.charms.length)renderUI();});
+  function renderCharms(el){
+    const on=charmFor(charmCat,loadCharmState(),id)?.id;
+    el.innerHTML='<h3>CHARM</h3><p class="neu">Hangs off the side of this gun and swings as you move.</p>'+
+      `<button class="opt${on?'':' on'}" data-charm=""><strong>None</strong><div class="pc"><span class="neu">No charm</span></div></button>`+
+      charmCat.charms.map(c=>{const lock=charmLock(c);
+        return `<button class="opt${on===c.id?' on':''}${lock?' locked':''}" data-charm="${esc(c.id)}"><span class="tag">${on===c.id?'EQUIPPED':lock==='PASS'?'MELON PASS':lock==='SOON'?'COMING SOON':lock}</span>
+          <strong>${esc(c.name)}</strong><div class="pc"><span class="neu">${esc(c.desc??'')}</span></div></button>`;}).join('');
+  }
+  // hang a charm on the preview gun: cid = a charm id, '' = none, undefined = the one equipped on this gun
+  async function hangCharm(cid){
+    const want=cid===undefined?charmFor(charmCat,loadCharmState(),id)?.id??'':cid;if(want===charmShown&&charmRig?.gun===gun)return;charmShown=want;
+    const my=++charmToken;charmRig?.dispose();charmRig=null;if(!gun||!charmCat)return;
+    if(charmFor_gun!==gun){charmFor_gun=gun;   // where it hangs on this gun (also where the CHARM slot turns the camera)
+      charmRoot=gun.getObjectByName(def.gunRoot??'j_gun')??(()=>{let b=null;gun.traverse(o=>{if(!b&&o.isBone)b=o;});return b;})();
+      scene.updateMatrixWorld(true);charmAnchor=charmRoot&&gunAnchor(gun,charmRoot,{key:def.model,override:charmCat.anchors[id]});}
+    const c=charmCat.charms.find(x=>x.id===want);if(!c||!charmAnchor)return;
+    const body=await charmModel(c);if(my!==charmToken||!body||!alive||charmFor_gun!==gun)return;
+    charmRig=new CharmRig(body,c);charmRig.gun=gun;scene.add(charmRig.group);charmKick=2;if(slot==='charm')aim();
+  }
   function renderOptions(){
     const el=$('.opts');
     if(slot==='camo'&&cats){renderCamos(el);return;}
+    if(slot==='charm'&&charmCat){renderCharms(el);return;}
     if(!slot){el.innerHTML='<h3>SELECT A SLOT</h3><p class="neu">Pick an attachment slot on the left; the camera moves to that part of the gun.</p>';return;}
     const all=available(cat,def,id),unlocked=new Set(unlockedAttachments(cat,def,id,profile).map(a=>a.id)),on=new Set(equipped(cat,def,id,profile));
     const opts=all.filter(a=>a.slot===slot);
@@ -332,6 +360,9 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const tk=e.target.closest('[data-token]');if(tk){const pr=loadPrestige();if(spendToken(pr,tk.dataset.token)){savePrestige(pr);onChange?.(id);}renderUI();return;}
     const s=e.target.closest('.slot');if(s&&!s.classList.contains('na')){slot=slot===s.dataset.slot?null:s.dataset.slot;hover=null;renderUI();aim();return;}
     const o=e.target.closest('.opt');
+    if(o&&o.dataset.charm!==undefined&&!o.classList.contains('locked')){
+      const st=loadCharmState();if(o.dataset.charm)st.on[id]=o.dataset.charm;else delete st.on[id];saveCharmState(st);
+      hover=null;onChange?.(id);dispatchEvent(new CustomEvent('kino-charm',{detail:{id}}));hangCharm();renderUI();return;}
     if(o&&o.dataset.camo!==undefined&&!o.classList.contains('locked')){
       profile.camo??={};const ent=profile.camo[id]??={p:{}};if(o.dataset.camo)ent.on=o.dataset.camo;else delete ent.on;
       hover=null;onChange?.(id);applyCamo(gun,equippedCamo(cats,profile,id,weapons));renderUI();return;}
@@ -345,6 +376,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   });
   root.addEventListener('mouseover',e=>{
     const o=e.target.closest('.opt');
+    if(slot==='charm'){hangCharm(o?o.dataset.charm:undefined);return;}   // locked ones preview too
     if(slot==='camo'&&cats){const cid=o&&!o.classList.contains('locked')?o.dataset.camo:undefined;
       applyCamo(gun,cid===undefined?equippedCamo(cats,profile,id,weapons):camoById(cats,cid)??null);return;}
     const h=o?o.dataset.att??null:null;   // locked ones preview too (stats and parts), as in BO; only equipping needs the level
@@ -369,14 +401,16 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   const onKey=e=>{if(e.code==='Escape'){e.stopPropagation();e.preventDefault();close();}};
   addEventListener('keydown',onKey,true);
   function aim(){
-    const p=slot&&anchorOf(slot);
-    if(p){focusGoal.copy(p);distGoal=radius*2;}else{focusGoal.set(0,0,0);distGoal=radius*3.1;}
+    const p=slot==='charm'?(charmRoot&&charmAnchor?charmRoot.localToWorld(charmAnchor.at.clone()).addScaledVector(DOWN,radius*.08):null):slot&&anchorOf(slot);
+    // the charm hangs on the gun's left: turn round to that side
+    charmYaw=null;if(slot==='charm'&&charmRoot){const n=new THREE.Vector3().setFromMatrixColumn(charmRoot.matrixWorld,1);charmYaw=Math.atan2(n.x,n.z);}
+    if(p){focusGoal.copy(p);distGoal=radius*(slot==='charm'?1.3:2);}else{focusGoal.set(0,0,0);distGoal=radius*3.1;}
   }
 
   // ---- frame: camera, leader lines, pulse ---------------------------------------------------
   const svg=$('svg.lines'),v=new THREE.Vector3();let t=0,last=performance.now();
   let emissiveFor=null,emissiveMeshes=[],pulsedSlot,lastPaths='',skip=false,lastCam=new THREE.Vector3(),lastKey='';
-  const PULSE=new THREE.Color('#f3a33a');
+  const PULSE=new THREE.Color('#f3a33a'),DOWN=new THREE.Vector3(0,-1,0);
   function frame(now){
     if(!alive)return;requestAnimationFrame(frame);
     const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;camoTime.value+=dt;   // animated camos (Pack-a-Punch, Prestige Master)
@@ -384,6 +418,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(canvas.width!==Math.floor(w*renderer.getPixelRatio())||canvas.height!==Math.floor(h*renderer.getPixelRatio())){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
     focus.lerp(focusGoal,1-Math.exp(-dt*6));dist+=(distGoal-dist)*(1-Math.exp(-dt*6));
     if(!dragging&&!slot)yaw+=dt*.12;
+    else if(!dragging&&slot==='charm'&&charmYaw!=null){const d=Math.atan2(Math.sin(charmYaw-yaw),Math.cos(charmYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));}
     camera.position.set(focus.x+Math.sin(yaw)*Math.cos(pitch)*dist,focus.y+Math.sin(pitch)*dist,focus.z+Math.cos(yaw)*Math.cos(pitch)*dist);
     // keep the gun off-centre toward the free middle of the screen
     camera.lookAt(focus);camera.setViewOffset(w,h,-w*.03,0,w,h);
@@ -394,8 +429,12 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
         for(const o of emissiveMeshes){if(!o.visible)continue;const m=o.material;if(!m?.emissive)continue;const hot=slot&&partOf(o)===slot;
           if(hot)m.emissive.copy(PULSE).multiplyScalar(pulse);else if(m.userData.emissive0)m.emissive.copy(m.userData.emissive0);else m.emissive.setRGB(0,0,0);}}}
     tickGlow(glow,t);
+    let swinging=false;
+    if(charmRig&&charmRig.gun===gun){charmRig.step(dt,{root:charmRoot,anchor:charmAnchor,gravity:DOWN});
+      if(charmKick&&!--charmKick){const n=new THREE.Vector3().setFromMatrixColumn(charmRoot.matrixWorld,0).normalize();charmRig.q2.addScaledVector(n,.05*new THREE.Vector3().setFromMatrixScale(charmRoot.matrixWorld).x);}   // a little swing as it's hung
+      swinging=charmRig.p2.distanceTo(charmRig.q2)>1e-4;}
     // the idle spin alone renders at 30 fps; the camera easing, a drag, a hover or slot change, a pulsing slot render every frame
-    const key=String(hover)+'|'+slot+'|'+id;const busy=dragging||slot||key!==lastKey||camera.position.distanceTo(lastCam)>dist*.01||focus.distanceTo(focusGoal)>.5||Math.abs(distGoal-dist)>.5;
+    const key=String(hover)+'|'+slot+'|'+id;const busy=dragging||slot||swinging||key!==lastKey||camera.position.distanceTo(lastCam)>dist*.01||focus.distanceTo(focusGoal)>.5||Math.abs(distGoal-dist)>.5;
     lastKey=key;lastCam.copy(camera.position);skip=!busy&&!skip;if(skip)return;
     renderer.render(scene,camera);
     // markers and leader lines from each slot row to its part on the gun
@@ -434,7 +473,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       res=partTags().get(bone)??null;}
     partCache.set(o,res);return res;
   }
-  function close(){if(!alive)return;alive=false;
+  function close(){if(!alive)return;alive=false;charmRig?.dispose();
     if(host){host.renderWorld=prevWorld;host.hideViewmodel=prevHide;}
     // materials are shared with the game's copies of this model: put them back
     gun?.traverse(o=>{const m=o.material;if(o.isMesh&&m?.emissive&&m.userData.emissive0)m.emissive.copy(m.userData.emissive0);});removeEventListener('keydown',onKey,true);renderer.dispose();root.remove();onClose?.();}

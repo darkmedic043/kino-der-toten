@@ -465,3 +465,4 @@
 - 2026-11-06: Deadlock springs a touch stiffer; `hang: true` (rest straight down) for Seven's wrist chain and Venator's censer; spring chains on the first-person arms (`fp-arms.js` `fpSprings`, swung by the game camera's turning and movement); characters.md.
 - 2026-11-06: Season 1 (s2) pass content: six gums (Wonderbar!, Time Out, Phoenix Up, Profit Sharing, Tactical Diffusion, Anywhere But Here; coming soon) with co-op hooks, and the Gardener class gated as a pass reward (gobblegums.md, coop.md, pass.md).
 - 2026-11-06: game logos on weapon pictures (BO1 skull, Advanced Warfare, Call of Duty Online) from `mods/weapon-levels/games.json`; logos git-ignored as trademarks (weapon-levels.md).
+- 2026-11-06: weapon charms system (`mods/charms`): catalogue of user-supplied GLB charms, automatic hang point on the gun, Verlet swing with camera turns, Gunsmith CHARM row with a zoomed preview, cloud-synced choice; no charms shipped yet (weapon-levels.md).

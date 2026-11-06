@@ -155,3 +155,28 @@ AW atlases are cut into small islands (some 2:1), so UV-tiled camo broke at ever
 ## Game logos on weapon pictures (2026-11-06, user: "you should be able to tell each gun from what game they come from")
 
 Every weapon picture in the menu (loadout slots, the Weapons tab cards, the detail panel) shows the logo of the game the gun comes from in its top right corner. `mods/weapon-levels/games.json` lists the games (`id`, `name`, `logo`) and maps guns to them; `games.js` `loadGames(baseIds)` returns `gameOf(id)`, used by `gameLogo()` in `home.js` (called from `fillThumb`). Lookup order: the explicit `weapons` lists (with `_upgraded` stripped), then `prefixes` (`aw_` = Advanced Warfare), then `base` (bo1) for any id in game-data.json before mods add theirs (`baseIds` is snapshotted in home.js). Games so far: `bo1` (the skull), `aw`, `codol` (Call of Duty Online, 使命召唤: the 26 guns of the user's CoD Online workshop pack, listed by hand). Guns with no game get no logo: DG-2, Wrath of the Ancients, the elemental bows, the BO7 rebuilds and the melon weapons. The logos (`games/*.webp`) are third-party trademarks: git-ignored, not in Rind's OWN list (only `games.json` is installed, so Rind players see no logo). To add a game: an entry in `games`, a logo in `games/` (about 96 px high, transparent), and its guns in `weapons` or a prefix; size tweaks per game go in `home.css` (`.game-logo.game-<id>`).
+
+## Weapon charms (`mods/charms`, 2026-11-06, user: "keep the weapon screen in mind, im gonna go with simple charms to start off")
+
+A charm hangs from a small ring on the gun's left side (the side the player sees) and swings. The system was built first, with no charms in it: the user uploads the first model.
+
+- **Catalogue** `mods/charms/charms.json`. Each entry has `id`, `name`, `desc` and `model` (a GLB relative to the folder, normally `models/<id>.glb`). Optional fields:
+  - `size`: longest side in inches, default 1.3.
+  - `hang`: the loop point in model units, default the top centre.
+  - `links`: number of chain links, default 2.
+  - `chain`: chain length in inches, default .42.
+  - `gravity` (default 260) and `drag` (default .035) set the swing feel.
+  - Ownership: no `unlock` = free; `unlock` = a shop key (a pass reward `pass.<season>.charm.<id>`, with `pass`); `soon` = built but not out yet (`localStorage kino.dev.soon='1'` lifts it).
+  - `anchors[gunId]` = a hand-placed hang point in the gun's root-bone space (inches: x forward, y left, z up), `[x,y,z]` or `{at,side}`, for guns where the automatic spot looks wrong.
+- **State**: `kino.mods.charms` = `{on:{gunId:charmId}}`, cloud-synced (`cloud.js` TRACKED). The install manifest ships `charms.json`. A charm model needs its own `OWN` rule once it is known to be redistributable.
+- **Shared code** `charms.js`:
+  - `charmModel` normalises a model (scale to `size`, hang point at the origin) and caches it.
+  - `gunAnchor` picks the hang spot. It samples the visible gun vertices through each surface's index (BO1 surfaces share one buffer; the SPAS parks spare shells 127 in behind, so it also filters |x| < 60 and uses percentile bounds). It skips dead attachment bones. It scores spots along the gun: hands in the way, off screen, a wide side below, distance from about 10% along. Height is tag_flash z − .4.
+  - `CharmRig`: Verlet physics at 1/120 s with points for the ring, the chain end and the body's centre. Constraints: an angle limit of about 105° from gravity, and a side plane so the body never goes through the gun. The camera's turn is fed in (`moved`, follow .25, shift capped per frame), so turning swings it. Measured: it rests about 12° off vertical (the gun's cant), swings to about 31° at 230°/s and settles in about .3 s.
+- **First person** `mod.js`:
+  - Wraps `view.equip`. The rig lives in `viewScene` and is placed 450 ms after the raise (the hands' grip is measured too). Only the held session gun gets a charm (not equipment, not the left gun of a dual pair).
+  - `warmWeapon` hangs the body on each warm copy so its material compiles at load.
+  - Console: `kino.charms.set(id|null)`, `kino.charms.catalogue`, `.rig`, `.anchor`.
+- **Gunsmith**: a CHARM row after CAMO (only when the catalogue has charms). The row shows None plus each charm with EQUIPPED / MELON PASS / COMING SOON tags; hovering previews a locked charm. Picking a charm saves and fires `kino-charm`, which rehangs the in-game charm. Selecting the slot turns the camera to the charm side (`charmYaw`) and zooms in, and a kick swings it.
+- **Screen charms later** (a stat tracker, a virtual buddy): a model with a screen material drawn from a glyph/sprite atlas through shader uniforms, never a redrawn CanvasTexture (performance rule). Hook them in as an entry with a `screen` field read by `charmModel`.
+- Tests: `scratch/charms/test.mjs [guns]` (anchor, rest and swing angles, frames) and `gs.mjs [gun]` (the Gunsmith row). Both push a stand-in charm into the catalogue at runtime only.

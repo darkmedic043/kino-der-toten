@@ -1,0 +1,5 @@
+{
+  "name": "Weapon charms",
+  "description": "Small charms that hang off the side of your gun and swing as you move, picked per gun in the Gunsmith.",
+  "script": "mod.js"
+}

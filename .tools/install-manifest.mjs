@@ -20,6 +20,7 @@ const OWN = [
   /^vendor\/jsm\/libs\/basis\/basis_transcoder\.wasm$/,                   // the Basis Universal KTX2 transcoder (Apache-2.0)
   /^mods\/(mods|maps)\.json$/, /^mods\/README\.md$/,
   /^mods\/melee\/melee\.json$/,                                    // the melee weapon catalog
+  /^mods\/charms\/charms\.json$/,                                  // the weapon charm catalog (models get their own rule once they are known to be ours)
   /^mods\/[^/]+\/mod\.json$/,                                       // every mod's manifest
   /^mods\/(classes\/classes|characters\/characters|progression\/progression|gobblegums\/gums|prestige\/prestige|research\/research|credits\/credits|shop\/catalog|pass\/season(s|-s\d+)?|weapon-levels\/(attachments|camos|games)|movement\/data|player-health\/data|terminal-booth\/placements|hd-weapons\/hd|map-materials\/(hd|hd-materials|normals)|(gun|event|zombie)-sounds\/sounds|_template\/data|lighting\/fixtures)\.json$/,
   /^mods\/terminal-booth\/terminal_booth(_compact)?\.glb$/,        // built in Blender for this fork (.tools/build-terminal-booth.py)
