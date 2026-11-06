@@ -2393,6 +2393,126 @@
     "note": "Models by PurpleGoop for SCP: Secret Laboratory (Northwood Studios), rigged by DrPri. \"Chaos Insurgent juggernaut\" (the game's heavy-armour version) uploaded to Sketchfab by sigma eat dog. Adapted for Melon Zombies: control bones removed, armour pieces skinned, materials made opaque, untextured boots given the body texture."
    },
    "skinOf": "scp_chaos"
+  },
+ {
+  "id": "deadlock_seven",
+  "name": "Seven",
+  "model": "models/deadlock/deadlock_seven.glb?v=1",
+  "icon": "models/deadlock/deadlock_seven_icon.webp",
+  "height": 80,
+  "type": "gltf",
+  "motion": "bo1",
+  "yaw": 0,
+  "fpArms": true,
+  "fpArmsRetarget": true,
+  "fpArmsReach": false,
+  "fpArmsNearCut": 4,
+  "optional": true,
+  "soon": true,
+  "color": "#b8662a",
+  "accent": "#7fd4ff",
+  "skinName": "Prisoner",
+  "description": "Deadlock's living storm: a convict wired to the lightning rig on his back, and his grin glows when it charges. Operator.",
+  "shop": "pass.s2.operator.deadlock_seven",
+  "pass": "s2",
+  "credit": {
+   "title": "Seven (Deadlock)",
+   "author": "Valve (Deadlock)",
+   "source": "Fan rip of the Deadlock hero model, from a .blend the user supplied",
+   "license": "Valve fan content (non-commercial fan work)",
+   "note": "Seven is Valve's Deadlock hero (internal name gigawatt_prisoner). Adapted for Melon Zombies: held guns and effect meshes removed, about 250 helper bones (twist, cloth, face, gun) merged into the body joints, outline shells dropped. Not shipped in Rind installs."
   }
+ },
+ {
+  "id": "deadlock_venator",
+  "name": "Venator",
+  "model": "models/deadlock/deadlock_venator.glb?v=1",
+  "icon": "models/deadlock/deadlock_venator_icon.webp",
+  "height": 74,
+  "type": "gltf",
+  "motion": "bo1",
+  "yaw": 0,
+  "fpArms": true,
+  "fpArmsRetarget": true,
+  "fpArmsReach": false,
+  "fpArmsNearCut": 4,
+  "optional": true,
+  "soon": true,
+  "color": "#262028",
+  "accent": "#9a4a9a",
+  "skinName": "Priest",
+  "description": "Deadlock's monster-hunting priest: a crossbow across his back, a stake at the ready, an incense burner on a chain. Operator.",
+  "shop": "pass.s2.operator.deadlock_venator",
+  "pass": "s2",
+  "credit": {
+   "title": "Venator (Deadlock)",
+   "author": "Valve (Deadlock)",
+   "source": "Fan rip of the Deadlock hero model, from a .blend the user supplied",
+   "license": "Valve fan content (non-commercial fan work)",
+   "note": "Venator is Valve's Deadlock hero (internal name priest). Adapted for Melon Zombies: held guns and effect meshes removed, about 250 helper bones (twist, cloth, face, gun) merged into the body joints, outline shells dropped. Not shipped in Rind installs."
+  },
+  "variants": [
+   {
+    "id": "face",
+    "label": "Expression",
+    "options": [
+     {
+      "id": "stern",
+      "label": "Stern",
+      "default": true,
+      "meshes": {
+       "Head": true,
+       "HeadGritty": false,
+       "HeadPsycho": false
+      }
+     },
+     {
+      "id": "gritty",
+      "label": "Gritty",
+      "meshes": {
+       "Head": false,
+       "HeadGritty": true,
+       "HeadPsycho": false
+      }
+     },
+     {
+      "id": "psycho",
+      "label": "Unhinged",
+      "meshes": {
+       "Head": false,
+       "HeadGritty": false,
+       "HeadPsycho": true
+      }
+     }
+    ]
+   },
+   {
+    "id": "gear",
+    "label": "Gear",
+    "options": [
+     {
+      "id": "full",
+      "label": "Crossbow and stake",
+      "default": true
+     },
+     {
+      "id": "nobow",
+      "label": "No crossbow",
+      "meshes": {
+       "Crossbow": false
+      }
+     },
+     {
+      "id": "light",
+      "label": "Light",
+      "meshes": {
+       "Crossbow": false,
+       "Stake": false
+      }
+     }
+    ]
+   }
+  ]
+ }
  ]
 }

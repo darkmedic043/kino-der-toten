@@ -25,7 +25,10 @@ export async function loadCharacterRegistry(){
     if(!r.ok)return false;const m=r.headers.get('last-modified');if(m)c.url+=(c.url.includes('?')?'&':'?')+'v='+Date.parse(m);return true;}).catch(()=>false):true));
   // Shop outfits (Phase 6, entries with "shop": <catalog item id>) are listed once owned (kino.mods.shop)
   let owned=new Set();try{owned=new Set(JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]);}catch{}
-  return all.filter((c,i)=>present[i]&&(!c.shop||owned.has(c.shop)));
+  // `soon` entries (operators for a pass season not out yet) stay hidden; localStorage kino.dev.soon = '1' lists them,
+  // owned or not, for testing (as for the classes and melee)
+  let dev=false;try{dev=localStorage.getItem('kino.dev.soon')==='1';}catch{}
+  return all.filter((c,i)=>present[i]&&(c.soon?dev:(!c.shop||owned.has(c.shop))));
 }
 
 // First-person arms. They must be rigged to the T5 viewmodel skeleton, so a

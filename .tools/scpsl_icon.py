@@ -1,16 +1,21 @@
 # Operator icon for the SCP:SL operators: head-and-shoulders, 3/4 view, transparent, 256 px WebP. Prints the model's height.
-#   blender -b -P scpsl_icon.py -- <model.glb> <icon.webp>
+#   blender -b -P scpsl_icon.py -- <model.glb> <icon.webp> [hide-regex] [head-bone]   (meshes to leave out, e.g. spare
+#   heads; a bone to centre on instead of 13% below the top, for a hat that towers over the head)
 import bpy, sys, math
 from mathutils import Vector
-glb, out = sys.argv[sys.argv.index('--') + 1:][:2]
+import re
+args = sys.argv[sys.argv.index('--') + 1:]; glb, out = args[:2]; hide = re.compile(args[2]) if len(args) > 2 else None
 bpy.ops.wm.read_factory_settings(use_empty=True); bpy.ops.import_scene.gltf(filepath=glb)
 sc = bpy.context.scene; dg = bpy.context.evaluated_depsgraph_get(); pts = []
 for o in sc.objects:
+    if hide and o.type == 'MESH' and hide.search(o.name): o.hide_render = True; continue
     if o.type == 'MESH' and o.name != 'Icosphere':   # the glTF importer's bone-shape sphere
         e = o.evaluated_get(dg); m = e.to_mesh(); pts += [e.matrix_world @ v.co for v in m.vertices]; e.to_mesh_clear()
 lo = Vector([min(p[i] for p in pts) for i in range(3)]); hi = Vector([max(p[i] for p in pts) for i in range(3)]); h = hi.z - lo.z
 print('HEIGHT', round(h, 4), 'WIDTH', round(hi.x - lo.x, 4), 'DEPTH', round(hi.y - lo.y, 4))
 head = Vector(((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, hi.z - h * .13))
+if len(args) > 3:
+    rig = next(o for o in sc.objects if o.type == 'ARMATURE'); head.z = (rig.matrix_world @ rig.data.bones[args[3]].head_local).z + h * .02
 cam = bpy.data.cameras.new('c'); cam.type = 'ORTHO'; cam.ortho_scale = h * .36
 co = bpy.data.objects.new('c', cam); sc.collection.objects.link(co); sc.camera = co
 a = math.radians(-30); d = Vector((math.sin(a), -math.cos(a), .12)).normalized()

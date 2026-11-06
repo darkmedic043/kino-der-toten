@@ -29,7 +29,7 @@ export default {
       const key='wiki.op.'+c.id;try{const v=sessionStorage.getItem(key);if(v)return v==='1';}catch{}
       let ok=false;try{const r=await fetch(ctx.url(modelUrl(c)),{headers:{Range:'bytes=0-0'}});ok=r.ok;if(r.status===206)await r.arrayBuffer();else r.body?.cancel?.();}catch{}
       try{sessionStorage.setItem(key,ok?'1':'0');}catch{}return ok;}));
-    const chars=K.filter((c,i)=>present[i]&&!c.hidden);
+    const chars=K.filter((c,i)=>present[i]&&!c.hidden&&!c.soon);   // soon = a pass season not out yet
     const ops=chars.filter(c=>!c.skinOf&&!(c.type==='mannequin'&&c.id!=='mannequin'));
     const skinsOf=op=>chars.filter(c=>c.skinOf===op.id);
     const outfits=chars.filter(c=>c.shop&&!c.pass&&!c.skinOf);
