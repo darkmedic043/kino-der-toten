@@ -299,9 +299,9 @@ function thumb(id){
   if(thumbs.has(id))return Promise.resolve(thumbs.get(id));
   if(!thumbWaiters.has(id))thumbWaiters.set(id,thumbQueue=thumbQueue.then(async()=>{
     // melees: melee_<key> (the Grave Bell is a weapon def; the knife only has its catalog entry's worldModel, mods/melee)
-    const def=weapons[id]??data.equipment?.[id]??(id.startsWith('melee_')?meleeCatalog?.melees[id.slice(6)]:null);let url='';
+    const me=id.startsWith('melee_')?meleeCatalog?.melees[id.slice(6)]:null,def=weapons[id]??data.equipment?.[id]??me;let url='';
     try{
-      const model=await loadModel(def?.worldModel);
+      const model=await loadModel(me?.thumbModel??def?.worldModel);   // thumbModel (melee.json): the knife's world model is a Bowie, its own is the viewmodel knife
       if(model){
         await poseIdle(model,def);
         for(const tag of def.hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
@@ -310,7 +310,7 @@ function thumb(id){
         // (a long barrel turned toward the camera was cut off when only the box's middle was fitted)
         const pivot=new THREE.Group();pivot.add(model);thumbScene.add(pivot);pivot.updateMatrixWorld(true);
         const box=new THREE.Box3().setFromObject(pivot),center=box.getCenter(new THREE.Vector3());
-        pivot.rotation.set(.12,-.35,THREE.MathUtils.degToRad(def.thumbRoll??(id.startsWith('melee_')?meleeCatalog?.melees[id.slice(6)]?.thumbRoll:0)??0));center.applyEuler(pivot.rotation);pivot.position.sub(center);pivot.updateMatrixWorld(true);   // thumbRoll (melee.json): a tall melee lies along the frame
+        pivot.rotation.set(.12,-.35,THREE.MathUtils.degToRad(def.thumbRoll??me?.thumbRoll??0));center.applyEuler(pivot.rotation);pivot.position.sub(center);pivot.updateMatrixWorld(true);   // thumbRoll (melee.json): a tall melee lies along the frame
         const tv=Math.tan(THREE.MathUtils.degToRad(thumbCamera.fov/2)),th=tv*thumbCamera.aspect,c=new THREE.Vector3();let dist=0;
         for(let i=0;i<8;i++){c.set(i&1?box.max.x:box.min.x,i&2?box.max.y:box.min.y,i&4?box.max.z:box.min.z).applyMatrix4(pivot.matrixWorld);dist=Math.max(dist,c.z+Math.abs(c.x)/th,c.z+Math.abs(c.y)/tv);}
         thumbCamera.position.set(0,0,dist*1.04);thumbCamera.lookAt(0,0,0);

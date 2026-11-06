@@ -17,6 +17,7 @@
       "base": "knife_ballistic_zm",
       "held": "knife",
       "worldModel": "models/world_knife_bowie.glb",
+      "thumbModel": "models/viewmodel_knife.glb",
       "mirror": true,
       "grip": [0, 0, 0],
       "pose": {
