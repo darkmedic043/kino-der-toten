@@ -2397,7 +2397,7 @@
  {
   "id": "deadlock_seven",
   "name": "Seven",
-  "model": "models/deadlock/deadlock_seven.glb?v=1",
+  "model": "models/deadlock/deadlock_seven.glb?v=2",
   "icon": "models/deadlock/deadlock_seven_icon.webp",
   "height": 80,
   "type": "gltf",
@@ -2407,6 +2407,82 @@
   "fpArmsRetarget": true,
   "fpArmsReach": false,
   "fpArmsNearCut": 4,
+  "springBones": [
+   {
+    "_doc": "The three cables from the backpack down the back to the knees: heavy, swing with movement, back and legs push them out",
+    "chains": [
+     "cable1_0",
+     "Cable2_1",
+     "Cable3_0"
+    ],
+    "childMatch": "^[Cc]able",
+    "stiffness": 0.03,
+    "drag": 0.14,
+    "gravity": 2,
+    "maxAngle": 35,
+    "follow": 0.6,
+    "followY": 1,
+    "radius": 0.03,
+    "colliders": [
+     {
+      "bone": "pelvis",
+      "to": "spine_1",
+      "radius": 0.2
+     },
+     {
+      "bone": "spine_1",
+      "to": "spine_3",
+      "radius": 0.22
+     },
+     {
+      "bone": "leg_upper_L",
+      "to": "leg_lower_L",
+      "radius": 0.1
+     },
+     {
+      "bone": "leg_upper_R",
+      "to": "leg_lower_R",
+      "radius": 0.1
+     },
+     {
+      "bone": "leg_lower_L",
+      "to": "ankle_L",
+      "radius": 0.08
+     },
+     {
+      "bone": "leg_lower_R",
+      "to": "ankle_R",
+      "radius": 0.08
+     }
+    ]
+   },
+   {
+    "_doc": "Shackle chain on the right wrist",
+    "chains": [
+     "chain_hang_0"
+    ],
+    "childMatch": "chain",
+    "stiffness": 0.02,
+    "drag": 0.12,
+    "gravity": 2.5,
+    "maxAngle": 70,
+    "follow": 0.5,
+    "followY": 1,
+    "radius": 0.02,
+    "colliders": [
+     {
+      "bone": "leg_upper_R",
+      "to": "leg_lower_R",
+      "radius": 0.1
+     },
+     {
+      "bone": "pelvis",
+      "to": "spine_1",
+      "radius": 0.18
+     }
+    ]
+   }
+  ],
   "optional": true,
   "soon": true,
   "color": "#b8662a",
@@ -2426,7 +2502,7 @@
  {
   "id": "deadlock_venator",
   "name": "Venator",
-  "model": "models/deadlock/deadlock_venator.glb?v=1",
+  "model": "models/deadlock/deadlock_venator.glb?v=2",
   "icon": "models/deadlock/deadlock_venator_icon.webp",
   "height": 74,
   "type": "gltf",
@@ -2436,6 +2512,87 @@
   "fpArmsRetarget": true,
   "fpArmsReach": false,
   "fpArmsNearCut": 4,
+  "springBones": [
+   {
+    "_doc": "Coat tails at the back and the sash at the front: trail and swing, the thighs turn them so the legs carry them, the body pushes them out",
+    "chains": [
+     "skirtC_0_L",
+     "skirtC_0_R",
+     "sash_a_1"
+    ],
+    "childMatch": "skirt|sash",
+    "stiffness": 0.025,
+    "drag": 0.16,
+    "gravity": 2,
+    "maxAngle": 28,
+    "follow": 0.6,
+    "followY": 1,
+    "radius": 0.03,
+    "colliders": [
+     {
+      "bone": "pelvis",
+      "to": "spine_1",
+      "radius": 0.18
+     },
+     {
+      "bone": "leg_upper_L",
+      "to": "leg_lower_L",
+      "radius": 0.11
+     },
+     {
+      "bone": "leg_upper_R",
+      "to": "leg_lower_R",
+      "radius": 0.11
+     },
+     {
+      "bone": "leg_lower_L",
+      "to": "ankle_L",
+      "radius": 0.08
+     },
+     {
+      "bone": "leg_lower_R",
+      "to": "ankle_R",
+      "radius": 0.08
+     }
+    ],
+    "drive": {
+     "legs": [
+      "leg_upper_L",
+      "leg_upper_R"
+     ],
+     "weights": {
+      "skirtC": 0.35,
+      "sash": 0.5
+     }
+    }
+   },
+   {
+    "_doc": "The censer on its chain at the right hip: swings freely",
+    "chains": [
+     "urn_chain_0"
+    ],
+    "childMatch": "urn",
+    "stiffness": 0.015,
+    "drag": 0.1,
+    "gravity": 2.5,
+    "maxAngle": 60,
+    "follow": 0.5,
+    "followY": 1,
+    "radius": 0.04,
+    "colliders": [
+     {
+      "bone": "leg_upper_R",
+      "to": "leg_lower_R",
+      "radius": 0.1
+     },
+     {
+      "bone": "pelvis",
+      "to": "spine_1",
+      "radius": 0.18
+     }
+    ]
+   }
+  ],
   "optional": true,
   "soon": true,
   "color": "#262028",

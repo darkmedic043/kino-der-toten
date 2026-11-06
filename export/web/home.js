@@ -69,7 +69,7 @@ mapsReady.then(list=>{
 const [mapList,modList,config,characters,baseData]=await Promise.all([
   mapsReady,
   fetchJson('mods/mods.json').then(d=>withCore(d.enabled??[])).catch(()=>withCore([])),
-  loadProgression(),loadCharacterRegistry(),fetchJson('game-data.json'),
+  loadProgression(),loadCharacterRegistry({all:true}),fetchJson('game-data.json'),   // all: unowned operators listed greyed out, for a preview
 ]);
 // Mod data patches are applied so custom weapons show up in the loadout.
 const mods=await Promise.all(modList.map(async id=>{
@@ -123,7 +123,7 @@ renderSettings($('settings-panel'));
 
 // ---- Profile card -------------------------------------------------------------
 function renderProfile(){
-  const need=levelNeed(config,profile.level),c=characters.find(c=>c.id===profile.character)??characters[0];
+  const need=levelNeed(config,profile.level),c=equippedChar();
   $('p-level').textContent='LEVEL '+profile.level;$('p-bar').style.width=(need===Infinity?100:100*profile.xp/need).toFixed(1)+'%';
   $('p-xp').textContent=need===Infinity?'MAX LEVEL':`${profile.xp.toLocaleString()} / ${need.toLocaleString()} XP`;$('p-char').textContent=c?.name??'';
   $('p-stats').textContent=`${profile.kills.toLocaleString()} kills · best round ${profile.bestRound||'—'} · ${profile.games} games`;
@@ -703,8 +703,9 @@ function renderVariants(entry){
     for(const o of g.options){
       const b=document.createElement('button');b.textContent=o.label;b.classList.toggle('active',o===current);
       b.addEventListener('click',()=>{
-        profile.variants={...profile.variants,[entry.id]:{...profile.variants?.[entry.id],[g.id]:o.id}};save();
-        entry.choice=profile.variants[entry.id];renderVariants(entry);
+        if(isLocked(entry))entry.choice={...entry.choice,[g.id]:o.id};   // a preview: tried on, not saved
+        else{profile.variants={...profile.variants,[entry.id]:{...profile.variants?.[entry.id],[g.id]:o.id}};save();entry.choice=profile.variants[entry.id];}
+        renderVariants(entry);
         // Bone poses (a tail, an eye) change the rest pose the rig and spring bones captured: rebuild.
         if(g.options.some(x=>x.bones))showCharacter(entry);else if(stage.character)applyVariants(stage.character.root,entry);
         portraits.delete(entry.id);renderCharacters();
@@ -716,9 +717,10 @@ function renderVariants(entry){
   }
 }
 async function showCharacter(entry){
-  entry.choice=profile.variants?.[entry.id];renderVariants(entry);
+  if(!isLocked(entry))entry.choice=profile.variants?.[entry.id];renderVariants(entry);
   currentEntry=entry;if(stage.mode==='fp')showArms(entry);
   const token=++stage.loading;$('char-name').textContent=entry.name;$('char-desc').textContent=entry.description??'';
+  const lock=$('char-lock');lock.hidden=!isLocked(entry);if(isLocked(entry))lock.textContent=lockOf(entry)[1];
   $('char-credit').innerHTML=entry.credit?'Model: '+creditHtml(entry.credit):'';
   try{
     const c=await createCharacter(entry,baseData);if(token!==stage.loading){c.dispose();return;}
@@ -736,7 +738,15 @@ function portrait(entry,img){
 }
 const operatorOf=c=>characters.find(o=>o.id===c?.skinOf)??c;
 const skinsOf=op=>[op,...characters.filter(c=>c.skinOf===op.id)];
+// Unowned operators and skins (`locked` by loadCharacterRegistry: a pass reward, a Shop outfit, or coming soon) are
+// listed greyed out; a click previews them on the stage (variants too, not saved) but never equips them.
+function equippedChar(){return characters.find(c=>c.id===profile.character&&!c.locked)??characters.find(c=>!c.locked)??characters[0];}
+const isLocked=c=>!!(c?.locked||operatorOf(c)?.locked);
+const LOCK={soon:['COMING SOON','Preview only: coming soon to the Melon Pass.'],pass:['MELON PASS','Preview only: a Melon Pass reward.'],shop:['IN THE SHOP','Preview only: get it in the Shop.']};
+const lockOf=c=>LOCK[c.locked??operatorOf(c).locked]??LOCK.shop;
+let preview=null;   // the locked operator/skin on the stage, or null for the equipped one
 function equip(c){
+  if(isLocked(c))return;preview=null;
   const op=operatorOf(c);profile.character=c.id;profile.skins={...profile.skins,[op.id]:c.id};save();renderCharacters();showCharacter(c);
   toast(op.name+(c.skinOf||skinsOf(op).length>1?' · '+(c.skinName??'Default'):'')+' equipped');
 }
@@ -747,17 +757,28 @@ function card(c,label,sub,active,onClick,cls){
 }
 function renderCharacters(){
   const list=$('char-list');list.innerHTML='';
-  const current=characters.find(c=>c.id===profile.character)??characters[0],currentOp=operatorOf(current);
-  for(const op of characters.filter(c=>!c.skinOf&&!c.hidden)){   // hidden: armor bodies worn in game, not picked here
-    const skins=skinsOf(op),shown=skins.find(s=>s.id===(op===currentOp?current.id:profile.skins?.[op.id]))??op;
-    const sub=`${op.type==='mannequin'?'PLACEHOLDER':op.type==='t5'?'GAME MODEL':'CUSTOM MODEL'}${skins.length>1?' · '+skins.length+' SKINS':''}`;
-    list.append(card(shown,op.name,sub,op===currentOp,()=>{if(op!==currentOp)equip(shown);},'char-card'));
+  const current=equippedChar(),currentOp=operatorOf(current),shownNow=preview??current,focusOp=operatorOf(shownNow);
+  const ops=characters.filter(c=>!c.skinOf&&!c.hidden);   // hidden: armor bodies worn in game, not picked here
+  for(const op of [...ops.filter(o=>!o.locked),...ops.filter(o=>o.locked)]){   // owned first
+    const skins=skinsOf(op),shown=op===focusOp?shownNow:skins.find(s=>s.id===(op===currentOp?current.id:profile.skins?.[op.id])&&!isLocked(s))??op;
+    const sub=op.locked?lockOf(op)[0]:`${op.type==='mannequin'?'PLACEHOLDER':op.type==='t5'?'GAME MODEL':'CUSTOM MODEL'}${skins.length>1?' · '+skins.length+' SKINS':''}`+(preview&&op===currentOp?' · EQUIPPED':'');
+    list.append(card(shown,op.name,sub,op===focusOp,()=>{
+      if(op.locked){if(preview!==op){preview=op;renderCharacters();showCharacter(op);}return;}
+      if(op===currentOp){if(preview){preview=null;renderCharacters();showCharacter(current);}return;}
+      equip(shown);
+    },'char-card'+(op.locked?' locked':'')));
   }
   if(!characters.length)list.innerHTML='<p class="muted small">No characters registered (mods/characters/characters.json).</p>';
   const row=$('char-skins');row.innerHTML='';
-  if(currentOp){
-    const skins=skinsOf(currentOp);$('skin-count').textContent=skins.length+(skins.length===1?' skin':' skins');
-    for(const s of skins)row.append(card(s,s.skinName??'Default',s===current?'EQUIPPED':s===currentOp?'DEFAULT':s.credit?'BY '+esc(s.credit.author).toUpperCase():'&nbsp;',s===current,()=>{if(s!==current)equip(s);},'skin-card'));
+  if(focusOp){
+    const skins=skinsOf(focusOp);$('skin-count').textContent=skins.length+(skins.length===1?' skin':' skins');
+    for(const s of skins){const locked=isLocked(s);
+      row.append(card(s,s.skinName??'Default',s===current?'EQUIPPED':locked?lockOf(s)[0]:s===focusOp?'DEFAULT':s.credit?'BY '+esc(s.credit.author).toUpperCase():'&nbsp;',s===shownNow,()=>{
+        if(s===shownNow)return;
+        if(locked){preview=s;renderCharacters();showCharacter(s);return;}
+        if(s===current){preview=null;renderCharacters();showCharacter(s);return;}
+        equip(s);
+      },'skin-card'+(locked?' locked':'')));}
   }
   if(current&&!stage.character)showCharacter(current);
 }

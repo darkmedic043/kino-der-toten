@@ -24,7 +24,7 @@ export default async function setup(api){
   const {host,session,enemies,world,player,camera,scene,data,audio,powerups,mysteryBox,mod}=api;
   await cloudReady;
   const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('coop.css',mod.url).href;document.head.append(css);
-  const registry=await loadCharacterRegistry(),profile=loadProfile();
+  const registry=await loadCharacterRegistry({all:true}),profile=loadProfile();
   const net=new Net();window.kino.coop=net;
   const collect=type=>window.kino.debug.collectPowerup(type);
 

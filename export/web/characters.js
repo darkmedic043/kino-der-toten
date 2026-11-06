@@ -13,7 +13,9 @@ import { SpringBones } from './spring-bones.js';
 import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { restoreImages } from './texture-memory.js';
 
-export async function loadCharacterRegistry(){
+// opts.all: every operator on the server, the ones this player can't wear marked `locked` (the menu lists them greyed out
+// for a preview; co-op needs a teammate's operator whether or not this player owns it). Without it, only wearable ones.
+export async function loadCharacterRegistry(opts={}){
   const url=new URL('mods/characters/characters.json',document.baseURI);
   const list=await fetch(url).then(r=>r.ok?r.json():{characters:[]}).catch(()=>({characters:[]}));
   const base=new URL('./',url);
@@ -25,10 +27,14 @@ export async function loadCharacterRegistry(){
     if(!r.ok)return false;const m=r.headers.get('last-modified');if(m)c.url+=(c.url.includes('?')?'&':'?')+'v='+Date.parse(m);return true;}).catch(()=>false):true));
   // Shop outfits (Phase 6, entries with "shop": <catalog item id>) are listed once owned (kino.mods.shop)
   let owned=new Set();try{owned=new Set(JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]);}catch{}
-  // `soon` entries (operators for a pass season not out yet) stay hidden; localStorage kino.dev.soon = '1' lists them,
-  // owned or not, for testing (as for the classes and melee)
+  // `soon` entries (operators for a pass season not out yet) can't be worn (the menu shows them locked, for a preview);
+  // localStorage kino.dev.soon = '1' makes them wearable, owned or not, for testing (as for the classes and melee)
   let dev=false;try{dev=localStorage.getItem('kino.dev.soon')==='1';}catch{}
-  return all.filter((c,i)=>present[i]&&(c.soon?dev:(!c.shop||owned.has(c.shop))));
+  const wearable=c=>c.soon?dev:(!c.shop||owned.has(c.shop));
+  const found=all.filter((c,i)=>present[i]);
+  if(!opts.all)return found.filter(wearable);
+  for(const c of found)if(!wearable(c))c.locked=c.soon?'soon':c.pass?'pass':'shop';
+  return found;
 }
 
 // First-person arms. They must be rigged to the T5 viewmodel skeleton, so a

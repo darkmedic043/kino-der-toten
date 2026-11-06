@@ -7,6 +7,7 @@ set -e
 root=$(cd "$(dirname "$0")/.." && pwd); out="$root/export/web/mods/characters/models/deadlock"
 mkdir -p "$out"; printf "# built by .tools/build_deadlock.sh from the user's uploads (Deadlock fan rips; never commit)\n*\n" > "$out/.gitignore"
 build() { blender -b --disable-autoexec "$2" -P "$root/.tools/build_deadlock_blend.py" -- "$out/deadlock_$1.glb" 2>&1 | grep -E "BONES|PARTS|wrote|Error|Traceback" || true
+  python3 "$root/.tools/glb_joints_first.py" "$out/deadlock_$1.glb" '^(pelvis|spine_|neck_0|head|clavicle_|arm_|hand_|leg_|ankle_|ball_|finger_)'
   e="$out/deadlock_$1_emissive"   # the exporter can't write this one: patched into the GLB
   if [ -f "$e.png" ]; then ffmpeg -loglevel error -y -i "$e.png" -c:v libwebp -quality 90 "$e.webp" && rm "$e.png"
     python3 "$root/.tools/glb_add_texture.py" "$out/deadlock_$1.glb" "$e.webp" gigawatt_prisoner_head emissiveTexture && rm "$e.webp"; fi

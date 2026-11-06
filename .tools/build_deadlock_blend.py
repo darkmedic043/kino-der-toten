@@ -76,11 +76,17 @@ for o in meshes:
 # ---- skeleton: keep the humanoid joints, merge the rest ------------------------------------------------------------
 CORE = re.compile(r'^(pelvis|spine_[0-3]|neck_0|head|clavicle_[LR]|arm_(upper|lower)_[LR]|hand_[LR]|leg_(upper|lower)_[LR]|'
                   r'ankle_[LR]|ball_[LR]|finger_(thumb|index|middle|ring|pinky)_[0-2]_[LR])$')
+# Dangling parts keep their bones for the spring-bone physics (characters.json springBones): Seven's three backpack
+# cables and his wrist shackle chain; Venator's back coat tails, his sash and the censer on its chain. (Seven's ankle
+# chain stays merged: it hangs below the floor in the bind pose, see above.)
+SPRING = re.compile({'seven': r'^(cable1_[0-8]|Cable2_[1-9]|Cable3_[0-8]|chain_hang_[0-3])$',
+                     'venator': r'^(skirtC_([0-4]|end)_[LR]|sash_a_1|sash_b_([0-9]|end)|urn_chain_[0-2]|urn_[01]|urn_end)$'}[hero])
+kept = lambda n: bool(CORE.match(n) or SPRING.match(n))
 bones = arm.data.bones
 def keeper(b):
-    while b and not CORE.match(b.name): b = b.parent
+    while b and not kept(b.name): b = b.parent
     return b.name if b else 'pelvis'
-target = {b.name: keeper(b) for b in bones if not CORE.match(b.name)}
+target = {b.name: keeper(b) for b in bones if not kept(b.name)}
 for o in meshes:
     vg = o.vertex_groups
     for t in set(target.values()):
@@ -98,13 +104,13 @@ C.view_layer.objects.active = arm
 bpy.ops.object.mode_set(mode='EDIT')
 eb = arm.data.edit_bones
 for b in eb:
-    if CORE.match(b.name):
+    if kept(b.name):
         p = b.parent
-        while p and not CORE.match(p.name): p = p.parent
+        while p and not kept(p.name): p = p.parent
         b.parent = p
 for n in target: eb.remove(eb[n])
 bpy.ops.object.mode_set(mode='OBJECT')
-print('BONES', len(arm.data.bones), sorted(b.name for b in arm.data.bones if not b.parent))
+print('BONES', len(arm.data.bones), 'spring', sum(1 for b in arm.data.bones if SPRING.match(b.name)), sorted(b.name for b in arm.data.bones if not b.parent))
 
 # ---- join the parts by name ----------------------------------------------------------------------------------------
 parts = {}
