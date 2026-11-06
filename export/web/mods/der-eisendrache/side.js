@@ -109,7 +109,7 @@ export function setupSide(api, { lowgrav, side2 }) {
     if (!dt) return;
     const f = feet(), lg = lowgrav?.state() ?? {};
     // the plates brought the gravity down: a power-up up high
-    if (sync.isHost && lg.on && !st.lowWas) { const types = Object.keys(data.powerups ?? {}).filter(t => t !== 'fire_sale' || session.power); powerups?.spawn?.(types[Math.floor(Math.random() * types.length)], SPOT.powerup.clone()); }
+    if (sync.isHost && lg.on && !st.lowWas) { const types = Object.keys(data.powerups ?? {}).filter(t => !data.powerups[t].special && (t !== 'fire_sale' || session.power)); powerups?.spawn?.(types[Math.floor(Math.random() * types.length)], SPOT.powerup.clone()); }
     st.lowWas = !!lg.on;
     // the plunger wall-run: the four runes in a row, either way round, airborne the whole time
     if (!st.trip && !st.plunger && lg.on && lg.running && side2?.wallrun) {

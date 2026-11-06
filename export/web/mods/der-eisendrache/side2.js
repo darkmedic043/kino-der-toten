@@ -88,7 +88,7 @@ export function setupSide2(api, { bows }) {
   I(pilePos, () => 'Take the skulls', () => { sync.act('skullTake'); return true; }, () => st.skulls.size < 3);
   sync.on('skullTake', () => {
     if (st.skulls.size < 3) return; for (const p of piles) if (p) p.visible = false; flash(pilePos, 0xff7a2a, 5, 600, .6); sfx('skull_193', .9);
-    if (sync.isHost) { const types = Object.keys(data.powerups ?? {}).filter(t => t !== 'fire_sale'); powerups?.spawn?.(types[Math.floor(Math.random() * types.length)], pilePos.clone().add(new THREE.Vector3(30, 0, 0))); }   // power-ups are the host's (synced)
+    if (sync.isHost) { const types = Object.keys(data.powerups ?? {}).filter(t => t !== 'fire_sale' && !data.powerups[t].special); powerups?.spawn?.(types[Math.floor(Math.random() * types.length)], pilePos.clone().add(new THREE.Vector3(30, 0, 0))); }   // power-ups are the host's (synced)
     st.skulls.clear();
   });
   sync.on('skullShot', d => { const s = skulls[d.k]; if (!s || st.skulls.has(d.k)) return; s.o && (s.o.visible = false); st.skulls.add(d.k); if (piles[st.skulls.size - 1]) piles[st.skulls.size - 1].visible = true; sfx(['skull_119', 'skull_167', 'skull_193'][d.k], .8); flash(s.base, 0xff7a2a, 4, 500, .5); });

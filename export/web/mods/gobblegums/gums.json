@@ -144,7 +144,8 @@
       "rarity": "epic",
       "type": "conditional",
       "level": 8,
-      "desc": "Your next perk purchase gives you a second, random perk too."
+      "charges": 2,
+      "desc": "Your next two perk purchases each give you a second, random perk too."
     },
     {
       "id": "immolation_liquidation",
@@ -224,7 +225,8 @@
       "rarity": "legendary",
       "type": "instant",
       "level": 36,
-      "desc": "Gives you a random perk you don't have, free."
+      "powerup": "free_perk",
+      "desc": "Drops a Free Perk power-up: whoever grabs it, everyone gets a random perk they don't have."
     },
     {
       "id": "free_fire",
@@ -248,7 +250,8 @@
         "double_points",
         "full_ammo",
         "carpenter",
-        "fire_sale"
+        "fire_sale",
+        "free_perk"
       ]
     },
     {

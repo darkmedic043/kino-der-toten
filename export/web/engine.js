@@ -228,7 +228,8 @@ function kill(z,force,position){
   if(z&&!z.tempo){const type=session.drops.tryDrop(session,{kind:z.kind,playable:z.state!=='barricade'&&(map.playable?.(z)??true),destroyedWindows:map.brokenWindows?.()??world.barriers.filter(b=>map.boardCount(b)&&b.count===0).length,boxMoves:mysteryBox.moves});if(type)powerups.spawn(type,z.root.position);}
 }
 function collect(type){
-  if(!powerupNames[type])return;
+  // a mod's own power-up (data.powerups[type].mod, e.g. the gobblegums' Free Perk) is carried out by that mod on 'powerup'
+  if(!powerupNames[type]){const def=data.powerups?.[type];if(!def?.mod)return;audio.event('powerup/grab/grab_00',.75);mods.emit('powerup',{type,def});map.onPowerup?.(type);return;}
   session.powerup(type);toast(powerupNames[type],3);audio.event('powerup/grab/grab_00',.75);
   audio.play(type);
   if(type==='full_ammo')audio.event('powerup/max_ammo/max_ammo_00',.7);

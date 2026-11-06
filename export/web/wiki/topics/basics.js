@@ -130,6 +130,7 @@ A Pack-a-Punched gun refills from a Max Ammo like any other. What each gun turns
         [puName('full_ammo', 'Max Ammo'), 'Refills every gun\'s ammo and your grenades.'],
         [puName('carpenter', 'Carpenter'), `Rebuilds every window and pays ${num(200)} points. Only drops when enough windows are broken.`],
         [puName('fire_sale', 'Fire Sale'), `Every Mystery Box spot opens and a spin costs 10, for ${num(puTime('fire_sale'))} s. Only once the box has moved.`],
+        ['Free Perk', 'Every player gets a random perk they don\'t have. Never drops from zombies: only the On the House and Reign Drops gobblegums put one down.'],
       ].map(([n, d]) => [`<b>${esc(n)}</b>`, esc(d)]);
       return md(`Killed zombies sometimes drop a glowing **power-up**. Walk over it to take it; it works for the whole team. A power-up blinks and then vanishes about ${Math.round(lifetime)} seconds after it drops.`) +
         table(['Power-up', 'What it does'], rows) +

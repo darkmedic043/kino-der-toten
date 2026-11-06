@@ -20,7 +20,7 @@ export default async function setup(api){
   const PERKS={juggernog:'specialty_armorvest',jug:'specialty_armorvest',speedcola:'specialty_fastreload',speed:'specialty_fastreload',doubletap:'specialty_rof',double:'specialty_rof',quickrevive:'specialty_quickrevive',quick:'specialty_quickrevive',revive:'specialty_quickrevive',phd:'specialty_flakjacket',flopper:'specialty_flakjacket'};
   const PERK_NAMES={specialty_armorvest:'Juggernog',specialty_fastreload:'Speed Cola',specialty_rof:'Double Tap',specialty_quickrevive:'Quick Revive',specialty_flakjacket:'PhD Flopper'};
   const perkIds=()=>Object.keys(data.perkDrinks??{});
-  const POWERUPS=['nuke','insta_kill','double_points','full_ammo','carpenter','fire_sale'];
+  const POWERUPS=['nuke','insta_kill','double_points','full_ammo','carpenter','fire_sale','free_perk'];   // free_perk: the gobblegums' own (never drops from kills)
   const toggles={god:false,ammo:false};
 
   // ---- Commands -----------------------------------------------------------

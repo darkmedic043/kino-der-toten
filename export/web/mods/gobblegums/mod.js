@@ -8,6 +8,33 @@ import { loadGums, loadGumProfile, gumById, activePack } from './gums.js';
 import { loadProfile, cloudReady, unlockLvl, rarityOf } from '../../profile.js';
 import { PERKS, perkUnlocked } from '../terminal-booth/desktop.js';
 
+// Free Perk: a power-up of the gums' own (a gold perk bottle) that never drops from kills (the drop deck in rules.js lists
+// its types); only On the House and Reign Drops put one down. Grabbing it gives every player a random perk they don't have.
+export function prepare(data){
+  data.powerups??={};data.powerups.free_perk??={name:'Free Perk',model:'models/zombie_perk_bottle_jugg.glb',icon:null,mod:'gobblegums',special:true};
+  return data;
+}
+
+function bakeBottle(src,height=21){
+  src.updateMatrixWorld(true);const out=new THREE.Group(),inner=new THREE.Group();out.add(inner);
+  const v=new THREE.Vector3(),n=new THREE.Vector3();
+  src.traverse(o=>{if(!o.isMesh)return;const g=o.geometry.clone(),pos=g.attributes.position,nor=g.attributes.normal;
+    for(let i=0;i<pos.count;i++){
+      v.fromBufferAttribute(pos,i);
+      if(nor)n.fromBufferAttribute(nor,i).add(v);
+      if(o.isSkinnedMesh){o.applyBoneTransform(i,v);if(nor)o.applyBoneTransform(i,n);}else{v.applyMatrix4(o.matrixWorld);if(nor)n.applyMatrix4(o.matrixWorld);}
+      pos.setXYZ(i,v.x,v.y,v.z);if(nor){n.sub(v).normalize();nor.setXYZ(i,n.x,n.y,n.z);}
+    }
+    g.deleteAttribute('skinIndex');g.deleteAttribute('skinWeight');g.computeBoundingBox();g.computeBoundingSphere();
+    const gold=m=>{const c=m.clone();c.emissive.setHex(0x9a6a14);c.emissiveIntensity=.7;return c;};   // the bottle's dark glass reads brown under the plain tint
+    const m=new THREE.Mesh(g,Array.isArray(o.material)?o.material.map(gold):gold(o.material));m.frustumCulled=false;inner.add(m);});
+  const box=new THREE.Box3().setFromObject(inner),size=box.getSize(new THREE.Vector3()),c=box.getCenter(new THREE.Vector3());
+  // stand the bottle's long axis up
+  if(size.z>size.y&&size.z>=size.x)inner.rotation.x=-Math.PI/2;else if(size.x>size.y)inner.rotation.z=Math.PI/2;
+  inner.position.copy(c).negate().applyEuler(inner.rotation);
+  out.scale.setScalar(height/Math.max(size.x,size.y,size.z));return out;
+}
+
 export default async function setup(api){
   const {session,host,powerups,enemies,player,mod}=api;
   await cloudReady;
@@ -71,6 +98,7 @@ export default async function setup(api){
   function givePerk(p){
     if(api.perkInfo&&!api.perkInfo[p.id])api.perkInfo[p.id]={name:p.name,price:p.price,color:p.color,icon:p.badge};
     session.perks.add(p.id);session.health=session.maxHealth;
+    perksBefore.add(p.id);   // a perk a gum or Free Perk hands out doesn't set off Soda Fountain
   }
   function chew(){
     const id=st.hand[st.sel];if(!id)return;
@@ -85,7 +113,6 @@ export default async function setup(api){
     if(id==='perkaholic'){const rest=perkList();for(let i=0;i<PERKAHOLIC&&rest.length;i++)givePerk(rest.splice(Math.floor(Math.random()*rest.length),1)[0]);}   // 6 random perks you don't have (was every perk; user, 2026-10-18: more perks keep coming)
     if(g.type==='timed')st.timed[id]=session.time+g.duration;
     if(g.type==='conditional'){st.armed.add(id);if(g.charges)st.charges[id]=g.charges;}
-    if(id==='on_the_house'){const rest=perkList();if(rest.length){const p=rest[Math.floor(Math.random()*rest.length)];givePerk(p);api.toast(`On the House · ${p.name}`,3);}}
     if(id==='equip_mint'){session.grenades=Math.max(session.grenades,4);if(session.claymoresOwned)session.claymores=session.claymoreMax?.()??2;if(session.tripsOwned)session.trips=Math.max(session.trips,session.tripMax());if(session.monkeysOwned)session.monkeys=session.monkeyMax?.()??3;const t=window.kino.tactical;if(t?.id)t.count=Math.max(t.count,t.max?.()??3);}
     if(id==='ephemeral_enhancement')startEnhance();
     // Melon Pass Season 0 gums (pass-exclusive)
@@ -166,13 +193,24 @@ export default async function setup(api){
   // Shopping Free: purchases succeed without taking points
   const spend=session.spend.bind(session);
   session.spend=n=>live('shopping_free')&&n>0?true:spend(n);
-  // Soda Fountain: the next perk you drink brings a random second one
+  // Free Perk power-up (On the House, Reign Drops): a random perk you don't have; everyone's game runs this on the grab.
+  // Its model is the perk-drink bottle, a skinned viewmodel that draws nothing as a plain clone: baked here into a static,
+  // centred mesh (with the gold power-up materials Powerups.load gave it), stood upright and scaled to the others' size.
+  if(powerups?.templates?.free_perk)powerups.templates.free_perk=bakeBottle(powerups.templates.free_perk);
+  host.on('powerup',({type})=>{
+    if(type!=='free_perk')return;const rest=perkList();
+    if(rest.length){const p=rest[Math.floor(Math.random()*rest.length)];givePerk(p);api.toast(`Free Perk · ${p.name}`,3);}
+    else api.toast('Free Perk · you have every perk',3);
+  });
+  // Soda Fountain: the next two perks you drink each bring a random extra one (charges: 2 in gums.json; the extra perks
+  // themselves don't spend a charge)
   let perksBefore=new Set(session.perks);
   host.on('update',()=>{
     const now=session.perks;
     if(st.armed.has('soda_fountain')&&[...now].some(p=>!perksBefore.has(p))){
-      st.armed.delete('soda_fountain');const rest=perkList();
-      if(rest.length){const p=rest[Math.floor(Math.random()*rest.length)];givePerk(p);api.toast(`Soda Fountain · ${p.name}`,3);}hud();
+      const rest=perkList();
+      if(rest.length){const p=rest[Math.floor(Math.random()*rest.length)];givePerk(p);api.toast(`Soda Fountain · ${p.name}`,3);}
+      spendCharge('soda_fountain');
     }
     perksBefore=new Set(now);
     if(enhanced&&!live('ephemeral_enhancement'))endEnhance();
