@@ -11,6 +11,8 @@
 //     "drive": {"legs": ["Left leg", "Right leg"], "weights": {"Coat_Front": .7, ...}}
 //                                             // a chain's rest shape turns with its nearest thigh (by chain-name prefix):
 //                                             // the leg carries a coat panel instead of passing through it
+//     "hang": true,                           // a chain or a censer: its rest shape is straight down (gravity), not the
+//                                             // animated pose, so a hand rolled by an animation doesn't hold it out sideways
 //     "floor": true,                          // keep the chain above the character's feet (a tail dragging on the ground)
 //     "follow": .85,                          // share of the body's own movement/turning the chains just ride along with
 //                                             // (0 = full world inertia: snap turns and sprint starts fling them)
@@ -91,7 +93,9 @@ export class SpringBones {
       j.bone.quaternion.copy(j.rest);j.bone.updateWorldMatrix(false,false);
       j.bone.getWorldPosition(head);restTail.copy(j.childLocal).applyMatrix4(j.bone.matrixWorld);
       const len=restTail.distanceTo(head);
-      if(j.drive){   // turn the rest shape by part of the thigh's swing (relative to the hips)
+      const animDir=cfg.hang?restTail.clone().sub(head).normalize():null;
+      if(cfg.hang)restTail.copy(head).y-=len;
+      else if(j.drive){   // turn the rest shape by part of the thigh's swing (relative to the hips)
         const d=j.drive,hq=d.hips.getWorldQuaternion(new THREE.Quaternion()),rel=hq.clone().invert().multiply(d.leg.getWorldQuaternion(new THREE.Quaternion()));
         const D=hq.clone().multiply(rel.multiply(d.rel0.clone().invert())).multiply(hq.clone().invert());
         restTail.sub(head).applyQuaternion(new THREE.Quaternion().slerp(D,d.weight)).add(head);
@@ -119,7 +123,7 @@ export class SpringBones {
       dir.copy(want).sub(head).normalize();want.copy(head).addScaledVector(dir,len);
       j.prev.copy(j.p);j.p.copy(want);
       // Turn the bone from the animated direction to the simulated one (in world space).
-      q.setFromUnitVectors(restDir,dir);j.bone.parent.getWorldQuaternion(pq);
+      q.setFromUnitVectors(animDir??restDir,dir);j.bone.parent.getWorldQuaternion(pq);
       j.bone.quaternion.premultiply(pq.clone().invert().multiply(q).multiply(pq));
       j.bone.updateWorldMatrix(false,false);
     }

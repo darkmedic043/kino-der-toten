@@ -341,7 +341,7 @@ export class FirstPersonArms {
     this.parts=built.parts;this.rt=built.rt;
     hands.traverse(o=>{if(isT5Arms(o))o.visible=false;});
     const liveT5=[];hands.traverse(o=>{if(isT5Arms(o))liveT5.push(o);});
-    const skeleton=this.rt&&this.retargetSkeleton(template.skeleton,liveT5);
+    const skeleton=this.rt&&this.retargetSkeleton(template.skeleton,liveT5);this.skeleton=skeleton||this.skeleton;   // (debug: the last attached rig's)
     const made=[];
     for(const {geometry,material} of this.parts){
       const mesh=new THREE.SkinnedMesh(geometry,material);mesh.frustumCulled=false;mesh.name='fp_arms';
@@ -424,12 +424,62 @@ export class FirstPersonArms {
       }
       if(e.kind==='back'){W.setPosition(0,0,0);p.copy(e.d).applyMatrix4(W);W.setPosition(new THREE.Vector3().setFromMatrixPosition(bones[e.child].matrixWorld).sub(p));}
       else if(e.kind==='follow'&&e.parent>=0){m.multiplyMatrices(bones[e.parent].matrixWorld,e.local);if(t)W.setPosition(p.setFromMatrixPosition(m));else W.copy(m);}
-    });knifeFit();};
+    });fpSprings?.();knifeFit();};
     // The knife in the character's fist (2026-11-04, user: "make it so the knife actaulyl fits on the hand, since on bondrewd it
     // doesnt seem to"): the knife hangs off T5's tag_knife_attach, where the glove's curled fingers close, but a character's own
     // fingers close nearer its palm (Bondrewd's are shorter, scaled .8), so the handle ran beside his fist. knifeShift = the
     // centre of the character's curled fingers (knuckles 1 and 2) less the glove's, in the tag's frame; the melee mod moves the
     // knife by it. Eased, so a frame of odd pose doesn't throw the knife about (the fist doesn't change during a swing).
+    // Spring chains on the arms in first person (2026-11-06, user: "the chain in fpv doesnt really have physics"): the
+    // character's springBones groups whose chains hang off an arm (Seven's wrist chain) swing here too. The view scene is
+    // camera space (viewCamera never moves), so the player's turning and moving comes in as the world camera's motion
+    // since last frame, applied to the simulated points by (1 - follow); gravity is world down turned into camera space.
+    // A verlet like spring-bones.js, on the retargeted bones' world matrices, after the arm is solved from T5.
+    const fpSprings=(()=>{
+      const cfgs=[this.entry.springBones??[]].flat(),byName=new Map(rt.map((e,i)=>[e.name,i])),joints=[];
+      for(const cfg of cfgs)for(const name of cfg.chains??[]){
+        let i=byName.get(name)??byName.get(THREE.PropertyBinding.sanitizeNodeName(name));
+        const re=cfg.childMatch?new RegExp(cfg.childMatch):null;
+        while(i!=null){const c=rt.findIndex(e=>e.parent===i&&(!re||re.test(e.name)));if(c<0)break;
+          joints.push({i,c,cfg,p:new THREE.Vector3(),prev:new THREE.Vector3(),s:new THREE.Vector3().setFromMatrixScale(rt[i].bind).x});i=c;}
+      }
+      if(!joints.length)return null;
+      const STEP=1/60,head=new THREE.Vector3(),tail=new THREE.Vector3(),dir=new THREE.Vector3(),rd=new THREE.Vector3(),want=new THREE.Vector3(),g=new THREE.Vector3(),ax=new THREE.Vector3();
+      const D=new THREE.Matrix4(),Mq=new THREE.Matrix4(),Tq=new THREE.Matrix4(),qs=new THREE.Quaternion(),camPrev=new THREE.Matrix4(),tmp=new THREE.Vector3();
+      let last=0,acc=0,fresh=true;
+      const child=j=>bones[j.c].matrixWorld.multiplyMatrices(bones[j.i].matrixWorld,rt[j.c].local);
+      return ()=>{
+        const now=performance.now(),cam=this.camera;let dt=(now-last)/1000;last=now;
+        if(dt>.25||dt<=0)fresh=true;
+        // the world camera's motion since last frame, as camera-space points (a world-fixed point moves by D)
+        let moved=null;if(cam){cam.updateMatrixWorld();if(!fresh){D.multiplyMatrices(cam.matrixWorldInverse,camPrev);if(tmp.setFromMatrixPosition(D).length()>150)fresh=true;else moved=D;}camPrev.copy(cam.matrixWorld);
+          g.set(0,-1,0).applyQuaternion(qs.copy(cam.quaternion).invert());}
+        else g.set(0,-1,0);
+        if(fresh){for(const j of joints){child(j);j.p.setFromMatrixPosition(bones[j.c].matrixWorld);j.prev.copy(j.p);}fresh=false;acc=0;return;}
+        // turning in full (by 1 - follow), moving at a third of that: the verlet's drag is like air resistance, so running
+        // at full share blew the chain out sideways like a gale for as long as you ran
+        if(moved){Tq.copy(moved).setPosition(0,0,0);ax.setFromMatrixPosition(moved);
+          for(const j of joints){const k=1-(j.cfg.follow??.85);for(const v of [j.p,j.prev]){tmp.copy(v).applyMatrix4(Tq);v.lerp(tmp,k).addScaledVector(ax,k*.35);}}}
+        acc=Math.min(acc+dt,STEP*3);let steps=0;while(acc>=STEP){acc-=STEP;steps++;}
+        for(const j of joints){
+          const W=bones[j.i].matrixWorld,cfg=j.cfg,stiff=cfg.stiffness??.08,drag=cfg.drag??.12,maxA=THREE.MathUtils.degToRad(cfg.maxAngle??60);
+          head.setFromMatrixPosition(W);tail.setFromMatrixPosition(child(j));const len=tail.distanceTo(head);rd.copy(tail).sub(head).normalize();want.copy(rd);   // (want: the animated direction, for the turn below)
+          if(cfg.hang){rd.copy(g);tail.copy(head).addScaledVector(g,len);}   // "hang": rest straight down (spring-bones.js)
+          const anim=want.clone();
+          for(let n=0;n<steps;n++){
+            want.copy(j.p).sub(j.prev).multiplyScalar(1-drag).add(j.p).addScaledVector(tmp.copy(tail).sub(j.p),stiff).addScaledVector(g,(cfg.gravity??.5)*9.8*j.s*STEP*STEP);
+            dir.copy(want).sub(head).normalize();const a=dir.angleTo(rd);
+            if(a>maxA){ax.crossVectors(rd,dir).normalize();if(ax.lengthSq()>0)dir.copy(rd).applyAxisAngle(ax,maxA);}
+            j.prev.copy(j.p);j.p.copy(head).addScaledVector(dir,len);
+          }
+          if(!Number.isFinite(j.p.x+j.p.y+j.p.z)){fresh=true;return;}
+          // turn the bone about its head from the animated direction to the simulated one; its child follows
+          dir.copy(j.p).sub(head).normalize();qs.setFromUnitVectors(anim,dir);
+          W.premultiply(Tq.makeTranslation(-head.x,-head.y,-head.z)).premultiply(Mq.makeRotationFromQuaternion(qs)).premultiply(Tq.makeTranslation(head.x,head.y,head.z));
+          child(j);
+        }
+      };
+    })();
     const tag=t5.getBoneByName('tag_knife_attach')??liveT5[0]?.parent?.getObjectByName?.('tag_knife_attach');
     const fist=rt.map((e,i)=>/^j_(index|mid|ring|pinky)_le_[12]$/.test(e.t5??'')?i:-1).filter(i=>i>=0&&live[i]);
     const ca=new THREE.Vector3(),cb=new THREE.Vector3(),ti=new THREE.Matrix4();skeleton.knifeShift=new THREE.Vector3();
