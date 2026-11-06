@@ -105,7 +105,7 @@ export default {
       const wname=id=>names[id];
       const wl=(id,r)=>{const n=wname(id);return n?`${lk('weapons',n)}${r&&rar[r]?` <small style="color:${rar[r].color}">${ctx.esc(rar[r].name)}</small>`:''}`:null;};
       const rows=new Map();const at=l=>{if(!rows.has(l))rows.set(l,{weapons:[],gunsmith:[],other:[]});return rows.get(l);};
-      for(const w of cfg.weapons){if(!wname(w.id))continue;
+      for(const w of cfg.weapons){if(!wname(w.id)||w.soon)continue;   // soon: the melon weapons, not out yet
         if(w.kit){at(1).weapons.push(wl(w.id,w.rarity));if((w.gunsmith??1)>1)at(w.gunsmith).gunsmith.push(lk('weapons',wname(w.id)));}
         else at(w.level).weapons.push(wl(w.id,w.rarity));}
       for(const b of cfg.bonuses)at(b.level).other.push(`${ctx.badge('Bonus','#7cd65a')}<b>${ctx.esc(b.name)}</b>: ${ctx.esc(b.description)}`);

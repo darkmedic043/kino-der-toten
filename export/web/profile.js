@@ -37,10 +37,13 @@ export const rarityOf=(config,id)=>[...config.weapons,...config.tactical??[],...
 // the one starting slot takes pistols only
 export const isPistol=d=>!!d&&weaponClass(d)==='Pistol';
 
+// soon (progression.json weapons, the melon weapons): not out yet, a battlepass hands it out. Never unlocked, so never in the
+// box or the starting slot; the Weapons tab shows it locked. localStorage['kino.dev.soon']='1' lifts it (for testing).
+export const soonLocked=w=>!!w?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();
 // weapons: ids known to the current game data (unknown unlock entries are skipped).
 export function unlocks(config,level,weapons){
   return {
-    weapons:config.weapons.filter(w=>unlockLevel(w)<=level&&(!weapons||weapons[w.id])).map(w=>w.id),
+    weapons:config.weapons.filter(w=>!soonLocked(w)&&unlockLevel(w)<=level&&(!weapons||weapons[w.id])).map(w=>w.id),
     bonuses:config.bonuses.filter(b=>b.level<=level).map(b=>b.id),
     bonusSlots:level>=config.secondBonusLevel?2:1,
     tactical:(config.tactical??[]).filter(t=>t.level<=level).map(t=>t.id),
@@ -69,7 +72,7 @@ export function boxItems(config,profile,data){
   const u=unlocks(config,unlockLvl(profile),data.weapons),pool=new Set(data.boxPool??[]),l=profile.loadout;
   const on=new Set(l.boxOn??[]),off=new Set(l.boxOff??[]);
   const item=(id,kind)=>({id,kind,rarity:rarityOf(config,id),on:!off.has(id)&&(pool.has(id)||on.has(id))});
-  const items=[...u.weapons.filter(id=>!/upgraded/.test(id)).map(id=>item(id,'weapon')),
+  const items=[...u.weapons.filter(id=>!/upgraded/.test(id)&&!data.weapons?.[id]?.soon).map(id=>item(id,'weapon')),   // soon guns stay out of the box even with the dev flag (no tier top-up)
     ...u.tactical.filter(id=>data.equipment?.[id]).map(id=>item(id,'tactical')),
     ...u.lethal.filter(id=>data.equipment?.[id]).map(id=>item(id,'lethal'))];
   // each weapon tier keeps its minimum switched on: a short tier is topped up in list order (`forced`)

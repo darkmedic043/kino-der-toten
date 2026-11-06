@@ -10,7 +10,7 @@ import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
 import { startSocial, onSocial, request, accept, decline, cancel, remove, statusText } from './social.js';
 import { mergePatch, resolveWeapons, withCore, isCoreMod } from './mod-loader.js';
-import { loadProfile, saveProfile, loadProgression, xpToNext, levelNeed, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
+import { loadProfile, saveProfile, loadProgression, soonLocked, xpToNext, levelNeed, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
@@ -351,7 +351,7 @@ const slots=[{key:'primary',label:'STARTING PISTOL'},{key:'melee',label:'MELEE'}
 let activeSlot='primary',focus=null,meleeCatalog=null;
 fetchJson('mods/melee/melee.json').then(c=>{meleeCatalog=c;renderLoadout();}).catch(e=>console.warn('[melee]',e));
 const weaponList=()=>config.weapons.filter(w=>weapons[w.id]).map(w=>({...w,level:unlockLevel(w)}));
-const pistolList=()=>weaponList().filter(w=>isPistol(weapons[w.id]));
+const pistolList=()=>weaponList().filter(w=>isPistol(weapons[w.id])&&!soonLocked(w));   // a coming-soon pistol isn't offered
 function slotState(key,u,l){
   if(key==='primary')return {value:l.primary};
   if(key==='box')return {value:''};
@@ -582,7 +582,7 @@ function renderDetail(id,isWeapon,unlocked,level,opts={}){
     ${bar('DAMAGE',Math.log10(Math.max(10,d.damage*pellets)),Math.log10(3000),Math.round(d.damage)+(pellets>1?'×'+pellets:''))}
     ${bar('FIRE RATE',rpm,1000,rpm)}${bar('MAGAZINE',d.clipSize,100,d.clipSize)}${bar('RESERVE',d.maxAmmo,600,d.maxAmmo)}${bar('RELOAD',1/Math.max(.3,d.reloadTime),1/.8,(d.reloadTime??0).toFixed(1)+'s')}
     <p>${d.upgrade?`Pack-a-Punch: <b>${esc(d.upgrade.name)}</b>`:'Cannot be upgraded'} · ${esc(d.fireType??'')}</p>
-    <p class="muted">${rarityLine(id)}${unlocked?'Unlocked':'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}${config.weapons.find(w=>w.id===id)?.kit?' · first kit':''}</p>
+    <p class="muted">${rarityLine(id)}${unlocked?'Unlocked':soonLocked(config.weapons.find(w=>w.id===id))?'Coming soon':'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}${config.weapons.find(w=>w.id===id)?.kit?' · first kit':''}</p>
     ${gunsmith&&gunsmithHas(id)&&!smithOpen(id)?`<p class="muted gs-locked">Gunsmith opens at level ${gunsmithLevel(config,id)}</p>`:''}<div class="gunsmith-slot"></div>${unlocked?`<div data-prestige-host="${id}">${prestigeSlot(id)}</div>`:''}`;
   fillThumb(el.querySelector('.thumb'),id);
   // Weapon levels and attachments (mods/weapon-levels).
@@ -606,7 +606,7 @@ function renderWeapons(){
   const u=unlocks(config,unlockLvl(profile),weapons),list=weaponList(),box=Object.fromEntries(boxItems(config,profile,data).map(i=>[i.id,i]));
   const present=CLASSES.filter(c=>list.some(w=>classOf(w.id)===c[0]));
   if(!present.some(c=>c[0]===wpClass))wpClass=present[0]?.[0];
-  $('wp-hint').textContent=`${u.weapons.length} / ${list.length} unlocked · level up to open guns in the Gunsmith`;
+  $('wp-hint').textContent=`${u.weapons.length} / ${list.filter(w=>!soonLocked(w)).length} unlocked · level up to open guns in the Gunsmith`;
   const cats=$('wp-cats');cats.innerHTML='';
   for(const [key,label] of present){const all=list.filter(w=>classOf(w.id)===key),open=all.filter(w=>u.weapons.includes(w.id)).length;
     const b=document.createElement('button');b.className='cat'+(key===wpClass?' on':'');b.innerHTML=`${label}<small>${open}/${all.length}</small>`;
@@ -619,7 +619,7 @@ function renderWeapons(){
     el.className='opt wp-opt'+(w.id===wpFocus?' selected':'')+(unlocked?'':' locked');if(r)el.style.setProperty('--r',r.color);
     el.innerHTML=`<div class="thumb"></div><strong>${esc(weapons[w.id].name)}</strong><div class="badges">${unlocked?weaponBadges(w.id):`<span class="b rar" style="--r:${r?.color}">${esc((r?.name??'').toUpperCase())}</span>`}${box[w.id]?.on?'<span class="b inbox">IN BOX</span>':''}</div>`;
     fillThumb(el.querySelector('.thumb'),w.id);
-    if(!unlocked)el.insertAdjacentHTML('beforeend',`<span class="lock">LV ${w.level}</span>`);
+    if(!unlocked)el.insertAdjacentHTML('beforeend',soonLocked(w)?'<span class="lock">COMING SOON</span>':`<span class="lock">LV ${w.level}</span>`);
     el.addEventListener('click',()=>{wpFocus=w.id;renderWeapons();});
     grid.append(el);
   }

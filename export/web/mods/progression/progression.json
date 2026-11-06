@@ -387,6 +387,18 @@
       "level": 33
     },
     {
+      "id": "debt_collector_zm",
+      "rarity": "legendary",
+      "level": 1,
+      "soon": true
+    },
+    {
+      "id": "hive_launcher_zm",
+      "rarity": "legendary",
+      "level": 1,
+      "soon": true
+    },
+    {
       "id": "bo3_striker",
       "rarity": "epic",
       "level": 34
