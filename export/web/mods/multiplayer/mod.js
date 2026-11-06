@@ -153,12 +153,13 @@ export default async function setup(api){
     enemies.targetFor=targetFor;
     enemies.onDamage=(amount,z,victim)=>{if(victim?.id)net.send(victim.id,{t:'hit',amount,z:z.id});else original.onDamage(amount,z,victim);};
     powerups.spawn=(type,position)=>{const item=original.powerSpawn(type,position);if(item)item.nid=++puSerial+(migrated?10000:0);return item;};
-    powerups.onCollect=(type,position)=>{original.onCollect(type,position);net.send('all',{t:'pu',type,at:position?.toArray?.()});};
+    // a collect that returns 'defused' (Tactical Diffusion's Nuke, gobblegums) didn't go off: clients skip it too
+    powerups.onCollect=(type,position)=>{const r=original.onCollect(type,position);net.send('all',{t:'pu',type,at:position?.toArray?.(),...(r==='defused'?{skip:1}:{})});};
     powerups.update=(dt,feet,canCollect=true,lineClear)=>{
       original.powerUpdate(dt,feet,canCollect&&!me.down&&!me.dead,lineClear);
       // Teammates collect too.
       for(const p of [...powerups.items])for(const r of alive())if(r.pos.distanceTo(p.root.position)<70){
-        const at=p.root.position.clone();powerups.remove(p);powerups.burst(at);powerups.onCollect(p.type,at);break;
+        const at=p.root.position.clone();powerups.remove(p);powerups.burst(at);window.kino.puBy=r.id;try{powerups.onCollect(p.type,at);}finally{window.kino.puBy=null;}break;   // puBy: who grabbed it (gobblegums)
       }
     };
     setNote();showPanel();
@@ -222,7 +223,7 @@ export default async function setup(api){
     if(z&&(z.netTarget??z.root.position).distanceTo(player.getFeetPosition())>190)return;
     api.damage(m.amount);
   });
-  net.on('pu',m=>{if(!net.isHost){const p=powerups.items.find(p=>p.type===m.type&&m.at&&p.root.position.distanceTo(v3(m.at))<5);if(p){powerups.remove(p);powerups.burst(p.root.position);}}collect(m.type);});
+  net.on('pu',m=>{if(!net.isHost){const p=powerups.items.find(p=>p.type===m.type&&m.at&&p.root.position.distanceTo(v3(m.at))<5);if(p){powerups.remove(p);powerups.burst(p.root.position);}}if(!m.skip)collect(m.type);});
   net.on('snap',m=>{
     if(net.isHost||!api.getState().ready)return;   // still loading: the first snap after that has everything, and spawning into a half-built load only slows it
     if(snapGid!==null&&m.gid!==snapGid){api.reset();byNet.clear();me.down=me.dead=false;}
@@ -290,6 +291,8 @@ export default async function setup(api){
   }
   net.on('revive',m=>{if(me.down&&!me.dead){getUp();host.emit('revived',m);api.announce('Revived','BACK IN THE FIGHT',3);}});
   window.kino.coopGetUp=()=>{if(me.down&&!me.dead){getUp();host.emit('revived',{});}};   // Equivalent Exchange
+  // gobblegums: Phoenix Up revives every downed teammate (extra rides on the message)
+  window.kino.coopReviveAll=(extra={})=>{let n=0;for(const r of remotes.values())if(r.down&&!r.dead){net.send(r.id,{t:'revive',...extra});r.down=false;setTag(r);n++;}if(n)showPanel();return n;};
   // Back at the next round, next to a teammate who is still standing (walkable ground beside them), or at the map's
   // spawn if nobody is. The spawn alone could be cut off behind doors, or under Cheese Cube's rising cheese.
   function respawnIfDead(){

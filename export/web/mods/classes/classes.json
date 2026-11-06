@@ -3229,6 +3229,8 @@
     {
       "id": "gardener",
       "soon": true,
+      "pass": "s2",
+      "unlock": "pass.s2.class.gardener",
       "name": "Gardener",
       "tagline": "Plants it, feeds it, and lets the round come to it.",
       "color": "#7fa84a",

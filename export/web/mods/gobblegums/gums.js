@@ -12,7 +12,9 @@ export const gumById=cfg=>Object.fromEntries(cfg.gums.map(g=>[g.id,g]));
 export const tierIndex=(cfg,rarity)=>cfg.rarities.findIndex(r=>r.id===rarity);
 // Melon Pass gums (gums.json pass: <season>) are unlocked only by owning them from the pass (kino.mods.pass gums), never by level
 export const passGums=()=>{try{return JSON.parse(localStorage.getItem('kino.mods.pass'))?.gums??[];}catch{return [];}};
-export const unlockedGums=(cfg,level)=>{const owned=new Set(passGums());return cfg.gums.filter(g=>g.pass?owned.has(g.id):g.level<=level).map(g=>g.id);};
+// soon: a pass gum whose season isn't out yet (Season 1's, 2026-11-06): never unlocked, except with localStorage kino.dev.soon = '1' (testing)
+const devSoon=()=>{try{return localStorage.getItem('kino.dev.soon')==='1';}catch{return false;}};
+export const unlockedGums=(cfg,level)=>{const owned=new Set(passGums()),dev=devSoon();return cfg.gums.filter(g=>g.soon?dev:g.pass?owned.has(g.id):g.level<=level).map(g=>g.id);};
 
 // The ladder: the k-th gum of a tier needs base + step*(k-1) gums of lower tiers in the pack.
 export function tierNeed(cfg,rarity,count){const r=cfg.rarities.find(r=>r.id===rarity);return count>0&&r?.base!=null?r.base+(r.step??0)*(count-1):0;}

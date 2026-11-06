@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { zombieHealth } from '../../rules.js';
 import { loadGums, loadGumProfile, gumById, activePack } from './gums.js';
-import { loadProfile, cloudReady, unlockLvl } from '../../profile.js';
+import { loadProfile, cloudReady, unlockLvl, rarityOf } from '../../profile.js';
 import { PERKS, perkUnlocked } from '../terminal-booth/desktop.js';
 
 export default async function setup(api){
@@ -20,11 +20,15 @@ export default async function setup(api){
   host.on('reset',reset);
   host.on('roundEnd',()=>{st.rolls=0;});
   const live=id=>(st.timed[id]??0)>session.time;
+  // co-op (Season 1 gums): the room while one is open; co-op-only gums (gums.json coop) never roll solo
+  const net=()=>{const n=window.kino.coop;return n?.id?n:null;};
+  const mates=()=>[...(net()?.remotes?.values()??[])];
+  const rollable=id=>!by[id]?.coop||mates().length>0;
 
   // ---- rolling (the terminal's GUMS app) ------------------------------------------------------------
   const price=()=>cfg.rollPrices[Math.min(st.rolls,cfg.rollPrices.length-1)];
   function status(){
-    const p=pack(),pool=p.ids.filter(id=>!st.hand.includes(id));
+    const p=pack(),pool=p.ids.filter(id=>!st.hand.includes(id)&&rollable(id));
     return {pack:p.ids.map(id=>({...by[id],color:rarity[by[id].rarity]?.color})),ok:p.ok,problems:p.problems,auto:p.auto,
       hand:st.hand.map(id=>by[id].name),handSize:cfg.handSize,full:st.hand.length>=cfg.handSize,rolls:st.rolls,rollsPerRound:cfg.rollsPerRound,
       price:price(),points:session.points,pool:pool.length,rarities:cfg.rarities};
@@ -34,7 +38,7 @@ export default async function setup(api){
     const s=status();
     if(!s.ok)return s.problems[0]??'No usable pack';
     if(st.rolls>=cfg.rollsPerRound)return `${cfg.rollsPerRound} gums a round · wait for the next round`;
-    const pool=pack().ids.filter(id=>!st.hand.includes(id));if(!pool.length)return 'Nothing left in your pack to roll';
+    const pool=pack().ids.filter(id=>!st.hand.includes(id)&&rollable(id));if(!pool.length)return 'Nothing left in your pack to roll';
     if(!session.spend(s.price))return 'Not enough points';
     st.rolls++;const id=pool[Math.floor(Math.random()*pool.length)];
     // a full hand rolls too (user, 2026-10-14): the terminal then asks which held gum to swap out, or to keep the hand
@@ -72,6 +76,7 @@ export default async function setup(api){
     const id=st.hand[st.sel];if(!id)return;
     const g=by[id],st0=api.getState?.();if(st0&&(!st0.active||session.phase==='reviving'||session.phase==='gameover'))return;
     if(id==='ephemeral_enhancement'&&!canEnhance()){api.toast('Ephemeral Enhancement · the gun in hand can\'t be upgraded',3);return;}
+    const why=refuse(id);if(why){api.toast(`${g.name} · ${why}`,3);return;}   // kept in the hand
     st.hand.splice(st.sel,1);st.sel=Math.min(st.sel,Math.max(0,st.hand.length-1));
     if(g.powerup)drop(g.powerup);
     // several power-ups fan out in an arc ahead of you
@@ -91,6 +96,12 @@ export default async function setup(api){
         window.kino.fx?.explosion?.(at,1.3,0xff8a1a);api.audio?.play?.('explosion');},1000);}
     if(id==='cornucopia'){const pool=(api.data.boxPool??[]).filter(w=>api.data.weapons[w]?.upgrade&&!session.inventory.some(x=>x.id===w&&!x.lost));
       const w=pool[Math.floor(Math.random()*pool.length)];if(w){upgradeNext=w;session.giveWeapon(w);api.equipView?.();}}
+    // Melon Pass Season 1 gums (id s2)
+    if(id==='time_out'){const n=net();if(n&&!n.isHost)n.send('host',{t:'gum',op:'timeout',d:g.duration});else timeOut(g.duration);}
+    if(id==='phoenix_up')window.kino.coopReviveAll?.({phoenix:1});
+    if(id==='profit_sharing')net()?.send('all',{t:'gum',op:'profit',d:g.duration});
+    if(id==='tactical_diffusion'){const n=net();if(n&&!n.isHost)n.send('host',{t:'gum',op:'defuse'});}
+    if(id==='anywhere_but_here')anywhere(g);
     api.announce?.(g.name,rarity[g.rarity]?.name.toUpperCase()+' GOBBLEGUM',2.5);
     gumSound(g.rarity);hud();host.emit('gumChewed',{id});   // credits: challenges
   }
@@ -182,6 +193,89 @@ export default async function setup(api){
       if(w){const d=api.data.weapons[id],u={...d,...d.upgrade};w.upgraded=true;w.mag=u.clipSize;w.reserve=u.maxAmmo;api.equipView?.();api.toast(`${d.upgrade.name??d.name} · Pack-a-Punched`,3);}}
     return r;};
 
+  // ---- Melon Pass Season 1 gums (id s2): Wonderbar!, Time Out, Phoenix Up, Profit Sharing, Tactical Diffusion, Anywhere But Here
+  // A gum that would do nothing right now stays in the hand (returns why).
+  function refuse(id){
+    if(by[id].coop&&!mates().length)return 'needs a co-op teammate';
+    if(id==='phoenix_up'&&!mates().some(r=>r.down&&!r.dead))return 'nobody is down';
+    if(id==='anywhere_but_here'&&!spots().length)return 'nowhere to go on this map';
+    return null;
+  }
+  // Wonderbar!: the next box roll lands on a Wonder Weapon from the player's own box list (any unowned one if the list has none)
+  let prog=null;fetch(new URL('../progression/progression.json',import.meta.url)).then(r=>r.json()).then(p=>{prog=p;}).catch(()=>{});
+  const owns=k=>session.inventory.some(w=>w.id===k&&!w.lost);
+  const isWonder=k=>!!prog&&rarityOf(prog,k)==='wonder';
+  const boxStart=api.mysteryBox?.start?.bind(api.mysteryBox);
+  if(boxStart)api.mysteryBox.start=e=>{const ok=boxStart(e);
+    if(ok&&st.armed.has('wonderbar')){const r=api.mysteryBox.at(e),models=api.mysteryBox.models??{};
+      let pool=(r?.pool??[]).filter(isWonder);if(!pool.length)pool=Object.keys(models).filter(k=>isWonder(k)&&!owns(k));
+      if(r&&pool.length){r.weapon=pool[Math.floor(Math.random()*pool.length)];r.teddy=false;st.armed.delete('wonderbar');hud();}}
+    return ok;};
+  // Time Out (host or solo; a guest asks the host): every zombie dies (no points, thralls spared), the round ends, and the next one
+  // waits until the time is up (the between-rounds countdown is held there; the host's snapshot carries it to guests)
+  let holdUntil=0;
+  function timeOut(d){
+    for(const z of [...enemies.list])if(!z.thrall&&z.state!=='dead')enemies.hurt(z,1e9,false,false,'gum',false);
+    session.spawned=Math.max(session.spawned,session.total);holdUntil=session.time+d;
+    api.announce?.('Time Out','THE NEXT ROUND WAITS '+Math.round(d/60)+' MINUTES',3);
+  }
+  host.on('update',()=>{if(holdUntil>session.time&&session.phase==='preparing')session.countdown=Math.max(session.countdown,holdUntil-session.time);});
+  // Phoenix Up: the revive carries phoenix, and the revived player gets back the perks they had when they went down
+  let lostPerks=null;
+  host.on('goingDown',()=>{lostPerks=[...session.perks];});   // emitted before the perks are cleared (multiplayer)
+  host.on('revived',m=>{if(m?.phoenix&&lostPerks?.length){for(const pid of lostPerks){const p=PERKS.find(p=>p.id===pid);if(p)givePerk(p);else session.perks.add(pid);}api.toast('Phoenix Up · your perks are back',3);}lostPerks=null;});
+  // Profit Sharing: points earned (session.addPoints: hits, kills, repairs, revives) are shared with teammates within radius while
+  // either side's gum is live; sent twice a second, received as plain points (not doubled, not shared again)
+  const profitFrom=new Map(),owed=new Map();let flushIn=0;
+  const addPoints=session.addPoints.bind(session);
+  session.addPoints=n=>{const before=session.points,r=addPoints(n),got=session.points-before;if(got>0)share(got);return r;};
+  function share(got){
+    const n=net();if(!n)return;const g=by.profit_sharing,f=feet(),mine=live('profit_sharing'),now=performance.now();
+    for(const r of mates())if(r.pos&&!r.down&&!r.dead&&r.pos.distanceTo(f)<g.radius&&(mine||profitFrom.get(r.id)>now))owed.set(r.id,(owed.get(r.id)??0)+got*g.share);
+  }
+  host.on('update',dt=>{if(!owed.size||(flushIn-=dt)>0)return;flushIn=.5;const n=net();
+    for(const [id,v] of owed){const k=Math.floor(v);if(k>0&&n)n.send(id,{t:'gum',op:'pts',n:k});owed.set(id,v-k);if(!n||v-k<=0)owed.delete(id);}});
+  const gain=n=>{session.points+=n;session.totalScore=(session.totalScore??0)+n;};
+  // Tactical Diffusion: the holder's next Nuke doesn't go off and everyone gets the bonus. The host decides for every grab
+  // (kino.puBy = the teammate it collects for; guests' armed gums are registered with 'defuse'); a defused collect returns
+  // 'defused' so the multiplayer mod tells the guests not to play it.
+  const defusers=new Set();
+  const onCollect=powerups?.onCollect;
+  if(onCollect)powerups.onCollect=(type,at)=>type==='nuke'&&defuse()?'defused':onCollect.call(powerups,type,at);
+  function defuse(){
+    const n=net(),who=window.kino.puBy;
+    if(who&&who!==n?.id){if(!defusers.has(who))return false;defusers.delete(who);n.send(who,{t:'gum',op:'disarm',id:'tactical_diffusion'});}
+    else{if(!st.armed.has('tactical_diffusion'))return false;st.armed.delete('tactical_diffusion');hud();}
+    const bonus=by.tactical_diffusion.bonus;gain(bonus);n?.send('all',{t:'gum',op:'pts',n:bonus,why:'defuse'});
+    api.announce?.('Nuke defused',`TACTICAL DIFFUSION · +${bonus} FOR EVERYONE`,3);return true;
+  }
+  // Anywhere But Here: to a random window's inside spot in the open part of the map (far from here when it can), then a
+  // concussive blast tosses the zombies there away (the thralls' toss order, which a guest's host carries out)
+  function spots(){const f=feet(),list=(api.world?.spawnBarriers?.(session)??[]).map(b=>b.inside).filter(Boolean);
+    const far=list.filter(p=>p.distanceTo(f)>500);return far.length?far:list.filter(p=>p.distanceTo(f)>150);}
+  function anywhere(g){
+    const s=spots(),to=s[Math.floor(Math.random()*s.length)].clone().add(new THREE.Vector3(0,4,0));
+    player.setPosition(to);player.velocity?.set?.(0,0,0);
+    const Z=window.kino.thralls,up=new THREE.Vector3(0,30,0);
+    for(const z of enemies.list){const d=z.root.position.clone().sub(to).setY(0),dist=d.length();if(dist>g.radius||z.thrall||z.state==='dead')continue;
+      if(dist<1)d.set(Math.random()-.5,0,Math.random()-.5);d.normalize();
+      const from=z.root.position.clone().add(up),wall=api.world?.raycast?.(new THREE.Ray(from,d),0,g.radius),push=Math.max(0,Math.min(g.radius+80-dist,wall?wall.distance-25:Infinity));
+      const dest=z.root.position.clone().addScaledVector(d,push);
+      if(Z)Z.order('toss',z,{to:dest.toArray().map(Math.round),h:60,d:.6});}
+    window.kino.fx?.knockback?.(to.clone());api.audio?.play?.('explosion');
+  }
+  // co-op messages ({t:'gum', op}); subscribed once a room is open
+  let subscribed=false;
+  host.on('update',()=>{const n=net();if(!n||subscribed)return;subscribed=true;
+    n.on('gum',(m,from)=>{
+      if(m.op==='timeout'&&n.isHost)timeOut(+m.d||180);
+      else if(m.op==='profit')profitFrom.set(from,performance.now()+(+m.d||0)*1000);
+      else if(m.op==='pts'&&m.n>0){gain(+m.n);if(m.why==='defuse')api.toast(`Tactical Diffusion · +${m.n} points`,3);}
+      else if(m.op==='defuse'&&n.isHost)defusers.add(from);
+      else if(m.op==='disarm'&&st.armed.delete(m.id)){hud();api.announce?.('Nuke defused',`TACTICAL DIFFUSION · +${by.tactical_diffusion.bonus} FOR EVERYONE`,3);}
+    });});
+  host.on('reset',()=>{holdUntil=0;lostPerks=null;profitFrom.clear();owed.clear();defusers.clear();});
+
   // ---- sound: a short synthesized pop, brighter for rarer gums --------------------------------------------
   function gumSound(r){
     const ctx=api.audio?.ctx,out=api.audio?.master;if(!ctx||!out)return;
@@ -215,6 +309,6 @@ export default async function setup(api){
   window.kino.gobblegums={status,roll,chew,get hand(){return [...st.hand];},cfg,
     give:id=>{if(!by[id]||st.hand.length>=cfg.handSize)return false;st.hand.push(id);hud();return true;},
     // a free gum from your pack (Der Eisendrache's plant): into a free slot, or over the selected one when the hand is full
-    gift:()=>{const pool=(pack()?.ids??[]).filter(id=>by[id]&&!st.hand.includes(id));if(!pool.length)return null;const id=pool[Math.floor(Math.random()*pool.length)];
+    gift:()=>{const pool=(pack()?.ids??[]).filter(id=>by[id]&&!st.hand.includes(id)&&rollable(id));if(!pool.length)return null;const id=pool[Math.floor(Math.random()*pool.length)];
       if(st.hand.length<cfg.handSize){st.hand.push(id);st.sel=st.hand.length-1;}else st.hand[st.sel]=id;hud();api.toast(`${by[id].name} · N to chew`,3);return id;},live,armed:id=>st.armed.has(id)};
 }

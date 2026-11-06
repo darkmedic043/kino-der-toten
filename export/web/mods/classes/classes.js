@@ -46,7 +46,12 @@ export function saveClassProfile(p){try{localStorage.setItem(CLASSES_KEY,JSON.st
 export const classById=(cfg,id)=>cfg.classes.find(c=>c.id===id)??null;
 // a class marked `soon` (built, not released: the Gardener, user 2026-11-05) can be looked at in the menu but not picked
 // or played; localStorage kino.dev.soon = '1' lifts that for testing
-export const comingSoon=c=>!!c?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();
+// a class with `unlock` (the Gardener: a Season 1 Melon Pass reward, `pass.s2.class.gardener`) is locked the same way until
+// the shop owns that key; passLocked tells the menu to say PASS instead of SOON
+const devSoon=()=>{try{return localStorage.getItem('kino.dev.soon')==='1';}catch{return false;}};
+const ownsKey=k=>{try{return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]).includes(k);}catch{return false;}};
+export const passLocked=c=>!c?.soon&&!!c?.unlock&&!ownsKey(c.unlock);
+export const comingSoon=c=>(!!c?.soon&&!devSoon())||passLocked(c);
 export const tree=(cls,id)=>cls.trees.find(t=>t.id===id)??cls.trees[0];
 export const equippedTree=(cls,state)=>tree(cls,state.loadout?.action);
 export const actionOf=(cls,state)=>equippedTree(cls,state).action;

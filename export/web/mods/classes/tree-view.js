@@ -6,7 +6,7 @@
 // BL4 loadout: each tree header equips its action skill; clicking an unlocked
 // augment (free once its tier opens; of the equipped tree, 2 slots) or capstone
 // (a point, any tree, 1 slot) equips it.
-import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, actionRows, describe, actionOf, equippedTree, equipAction, toggleAugment, toggleCapstone, isEquipped, unlocked, exclBlocker, activeSynergies, pruneLoadout, mechWeapons, augmentsOn, equipArm, augmentSlots, comingSoon } from './classes.js';
+import { classById, xpToNext, available, totalPoints, treeSpent, tierNeed, canAdd, canRemove, actionStats, actionRows, describe, actionOf, equippedTree, equipAction, toggleAugment, toggleCapstone, isEquipped, unlocked, exclBlocker, activeSynergies, pruneLoadout, mechWeapons, augmentsOn, equipArm, augmentSlots, comingSoon, passLocked } from './classes.js';
 
 const ICONS={
   turret:'<path d="M5 20h14M8 20l2-6h4l2 6M12 14V9M7 9h10v-3H7zM17 7.5h4"/>',
@@ -188,8 +188,8 @@ export function renderClasses(root,cfg,{getState,setState}){
     const need=xpToNext(cfg,state.level),maxed=state.level>=cfg.xp.maxLevel;
     root.style.setProperty('--cc',cls.color);
     root.innerHTML=`<div class="cls">
-      ${cfg.classes.length>1?`<div class="cls-pick">${cfg.classes.map(c=>`<button data-class="${c.id}" style="--pc:${c.color}"${c.id===cls.id?' class="on"':''}>${icon(c.trees[0].action.icon)}${esc(c.name.toUpperCase())} <small>${comingSoon(c)?'SOON':'LV '+(st.classes[c.id]?.level??1)}</small></button>`).join('')}</div>`:''}
-      ${preview?`<div class="cls-soon" style="padding:10px 14px;margin-bottom:10px;border:1px dashed var(--cc);color:var(--cc);font-size:13px;letter-spacing:.5px"><b>COMING SOON</b> · The ${esc(cls.name)} isn't out yet: its skills are shown here as a preview, but it can't be picked or played. You still play as the ${esc((classById(cfg,st.selected)??cfg.classes[0]).name)}.</div>`:''}
+      ${cfg.classes.length>1?`<div class="cls-pick">${cfg.classes.map(c=>`<button data-class="${c.id}" style="--pc:${c.color}"${c.id===cls.id?' class="on"':''}>${icon(c.trees[0].action.icon)}${esc(c.name.toUpperCase())} <small>${passLocked(c)?'PASS':comingSoon(c)?'SOON':'LV '+(st.classes[c.id]?.level??1)}</small></button>`).join('')}</div>`:''}
+      ${preview?`<div class="cls-soon" style="padding:10px 14px;margin-bottom:10px;border:1px dashed var(--cc);color:var(--cc);font-size:13px;letter-spacing:.5px">${passLocked(cls)?`<b>MELON PASS</b> · The ${esc(cls.name)} is a Melon Pass reward: its skills are shown here as a preview, but it can't be picked or played until you unlock it.`:`<b>COMING SOON</b> · The ${esc(cls.name)} isn't out yet (a reward in the next Melon Pass season): its skills are shown here as a preview, but it can't be picked or played.`} You still play as the ${esc((classById(cfg,st.selected)??cfg.classes[0]).name)}.</div>`:''}
       <div class="cls-head">
         <div class="cls-emblem">${icon(cls.id==='engineer'?'wrench':cls.mech?'mech':cls.gambler?'ante':cls.gardener?'sprout':'shield')}</div>
         <div class="cls-title"><span class="eyebrow">CLASS</span><strong>${esc(cls.name.toUpperCase())}</strong><small>${esc(cls.tagline)}</small>

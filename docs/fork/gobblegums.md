@@ -17,3 +17,18 @@ User's rules: no gums at the start of a match; gums come from a terminal app tha
 
 - **Pass-locked perks:** Perkaholic, On the House and Soda Fountain draw from `PERKS` filtered by `perkUnlocked` (terminal-booth/desktop.js), so Widow's Wine only comes from a gum once its Melon Pass item is owned.
 - **Perkaholic gives 6 (2026-10-18, user: "if im going to keep adding more perks, it will be abit hard to balance")**: 6 random perks you don't have (`PERKAHOLIC` in mod.js; fewer if fewer are missing), was every perk. Free, so they don't raise the perk price. Verified on Kino: 6 perks from an empty set, three times.
+
+## Season 1 pass gums (2026-11-06, user's own designs, `pass: "s2"`, `soon: true`)
+
+Six gums for the next Melon Pass season (id `s2`). They are `soon` until it launches: never unlocked (`unlockedGums`, gums.js; the menu shows SOON), except with `localStorage['kino.dev.soon']='1'`. When the season ships, drop `soon` and the pass grants them like Season 0's gums. Code is the "Season 1 pass gums" block in `mod.js`; tunables live in `gums.json`.
+
+| Gum | Rarity / type | What it does |
+|---|---|---|
+| Wonderbar! | ultra, conditional | Wraps `mysteryBox.start`: the next roll is a Wonder Weapon (`rarityOf` = `wonder`, lazily read from progression.json), taken from the roll's own pool (the player's box list) or any wonder weapon with a model; no teddy; then disarms |
+| Time Out | ultra, timed 180 s | Kills every non-thrall zombie (cause `gum`, no score), sets `spawned=total` so the round ends, then holds the between-round countdown at the remaining time (`holdUntil`). Run by the host: a guest sends `{op:'timeout',d}` |
+| Phoenix Up | legendary, instant, `coop` | `kino.coopReviveAll({phoenix:1})` (multiplayer mod) revives every downed teammate; their client saves the perks it lost at `goingDown` and gives them back on a `revived` message with `phoenix` |
+| Profit Sharing | epic, timed 120 s, `coop` | `share` (0.25) of every gain from `session.addPoints` also goes to teammates within `radius` (750), both ways: chewing broadcasts `{op:'profit',d}`, and each client shares its own earnings while its own gum or a nearby chewer's is live. Sent as `{op:'pts',n}` every 0.5 s; received points skip addPoints (no double points, no loop) |
+| Tactical Diffusion | rare, conditional | The next nuke the player picks up doesn't go off (`powerups.onCollect` returns `'defused'`) and everyone gets `bonus` (2000). The host decides: a guest's chew registers it (`{op:'defuse'}`), `kino.puBy` says who grabbed it, and the multiplayer `pu` broadcast carries `skip:1` so clients don't run the nuke |
+| Anywhere But Here | rare, instant | Teleports to a random barrier's inside point (over 500 away if possible), then tosses zombies within `radius` (260) outward through `kino.thralls.order('toss')`, capped at walls, with the fx knockback and an explosion sound |
+
+`coop: true` gums never roll (or come from gift gums) without a teammate, and every gum is refused while it would do nothing (`refuse(id)`: no teammate, nobody down, nowhere to go): the toast says why and the gum stays in hand. Co-op messages are type `gum` with `op` timeout/profit/pts/defuse/disarm (coop.md). Tested solo on Kino 2026-11-06 (`scratch/gums/solo.mjs`); Phoenix Up and Profit Sharing still need a real two-player test.

@@ -44,3 +44,7 @@ User: "every tier has its own reward… use Black Ops 6 and 7's tiering system, 
 - `loadPass` keeps `earned` and `forfeit` (it rebuilds the save from known fields; without that the forfeit was lost on reload).
 - The one real save past the end (108 tiers, all 90 unlocked, 4 bought) goes from 22 tokens to 0. Tests: `test/pass-seasons.test.mjs` "no hoarding"; wiki topic pass updated.
 
+
+## Season 1 (`s2`, planned, 2026-11-06)
+
+Rewards so far (the rest of the 100 slots still to plan with the user): Deadlock operators Seven and Venator, Debt Collector, Hive Launcher, Grave Bell, the four `soon` Reaper perks, the BO3 Trip Mine and Smoke Grenade, six gums (gobblegums.md) and the **Gardener class** (`classes.json` `pass:"s2"`, `unlock:"pass.s2.class.gardener"`; `classes.js` `passLocked` keeps it locked until the shop owns that key, and the menu then shows PASS instead of SOON). `build-season.py` needs a `class` reward kind that writes that catalog key, and `soon` must come off everything when the season starts.
