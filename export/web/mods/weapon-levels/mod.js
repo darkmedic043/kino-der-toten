@@ -7,6 +7,7 @@ import { mountParts as mountGunParts } from './mounts.js';
 // the UI are in gunsmith.js; tuning in attachments.json.
 import { loadProfile, saveProfile, cloudReady, loadProgression, gunsmithLevel, unlockLvl } from '../../profile.js';
 import { setupFlamer } from './flamer.js';
+import { loadStickers, loadStickerState, stickersFor, applyStickers } from '../stickers/stickers.js';
 import { loadCamos, applyCamo, equippedCamo, countCamoKill, classProgress, camoTime, PAP_CAMO, camoById as camoLookup, camoTextures } from './camo.js';
 import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, grantMasterXp, canPrestigeWeapon, RULES as PRESTIGE } from '../prestige/prestige.js';
 import { openGunsmith } from './gunsmith-view.js';
@@ -22,6 +23,10 @@ export default async function setup(api){
   await cloudReady;
   const cat=await loadCatalog(import.meta.url);
   const cats=await loadCamos(import.meta.url);
+  // Weapon stickers (mods/stickers, 2026-11-06): drawn by the gun's own materials; the Gunsmith sends kino-stickers on a change
+  const stickerCat=await loadStickers();let stickerState=loadStickerState();
+  const stick=(g,gid)=>gid?applyStickers(g,stickersFor(stickerCat,stickerState,gid),gid):Promise.resolve();
+  addEventListener('kino-stickers',e=>{stickerState=loadStickerState();const gid=session.weapon?.id;if(e.detail?.id===gid){stick(view.gun,gid);if(view.leftGun)stick(view.leftGun,gid);}});
   const style=document.createElement('style');style.textContent=GUNSMITH_CSS+`
     #weapon-level{position:fixed;right:40px;bottom:112px;display:flex;align-items:center;gap:8px;font:600 9px/1 system-ui,sans-serif;letter-spacing:2px;color:#d6a94a;pointer-events:none;z-index:3}
     #weapon-level i{display:block;width:70px;height:3px;background:#ffffff1f}#weapon-level i b{display:block;height:100%;background:#d6a94a}
@@ -73,6 +78,7 @@ export default async function setup(api){
     mountParts(def);
     const look=papLook(session.weapon)?PAP_CAMO:camoById(data.weapons[session.weapon?.id]?.camo);
     applyCamo(view.gun,look);if(view.leftGun)applyCamo(view.leftGun,look);   // dual wield: the off-hand gun too
+    stick(view.gun,session.weapon?.id);if(view.leftGun)stick(view.leftGun,session.weapon?.id);   // stickers (mods/stickers) on top
     magFollow(def);
     return r;
   };
@@ -83,6 +89,7 @@ export default async function setup(api){
   // the engine's weapon warm-up (warmWeapons, 2026-11-01): each gun compiles as it will be equipped, with the player's
   // mounted sights and camo (the Pack-a-Punch camo on an upgraded def that keeps the base model)
   host.on('warmWeapon',({def,gun,wait})=>{wait?.(mountGunParts(gun,def,def?.mounted??[],()=>true));const look=papLook({id:def.id,upgraded:def.upgraded})?PAP_CAMO:camoById(data.weapons[def.id]?.camo);applyCamo(gun,look);
+    {const sid=def.baseId??def.id;if(stickerState.on[sid]?.length)wait?.(stick(gun,sid));}   // the gun's stickers compile with it ('|stk')
     // an animated camo's other frames (and a gradient camo's lookup) are uploaded now, not when they first show
     const ts=camoTextures(look);if(ts.length>1)wait?.(Promise.all(ts.map(t=>t.userData.loaded)).then(()=>{for(const t of ts)api.renderer?.initTexture?.(t);}));});
 

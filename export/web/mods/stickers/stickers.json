@@ -1,0 +1,6 @@
+{
+  "_note": "Weapon stickers (2026-11-06). Up to three per gun, placed with a click on the gun in the Gunsmith, sized 0.5x-2x and turned. Entry: id, name, image (PNG with alpha, relative to this folder, any size: drawn into a 232 px atlas cell), optional unlock (a shop key; locked until owned), pass (the season, shown as MELON PASS while locked), soon (not out yet; localStorage kino.dev.soon=1 lifts it). No unlock = free for everyone.",
+  "stickers": [
+    {"id": "smiley", "name": "Smiley", "desc": "A well-worn smiley sticker. A test sticker for now.", "image": "images/smiley.png"}
+  ]
+}

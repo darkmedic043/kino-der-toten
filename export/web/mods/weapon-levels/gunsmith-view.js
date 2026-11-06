@@ -12,6 +12,7 @@ import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
 import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig } from '../charms/charms.js';
+import { loadStickers, loadStickerState, saveStickerState, stickersFor, stickerLock, stickerImage, applyStickers, stickerFromHit, MAX_STICKERS } from '../stickers/stickers.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
 
@@ -63,6 +64,14 @@ const CSS=`
 #gsv .opt:hover{border-color:#ffffff66}
 #gsv .opt.on{border-color:#f3a33a;background:#f3a33a1c}
 #gsv .opt.locked{opacity:.4;cursor:not-allowed}
+#gsv .stk-row{display:grid;grid-template-columns:44px 1fr auto;gap:4px 10px;align-items:center}
+#gsv .stk-row img,#gsv .stk-pick img{width:44px;height:44px;object-fit:contain}
+#gsv .stk-row .acts button{font:600 9px/1 system-ui,sans-serif;letter-spacing:2px;padding:5px 7px;margin-left:4px;color:#e9e4d8;background:#ffffff10;border:1px solid #ffffff30;cursor:pointer}
+#gsv .stk-row label{grid-column:1/-1;display:grid;grid-template-columns:70px 1fr 42px;align-items:center;font-size:10px;letter-spacing:2px;color:#a09a8d}
+#gsv .stk-row input[type=range]{width:100%;accent-color:#f3a33a}
+#gsv .stk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+#gsv .stk-pick{text-align:center;padding:8px 4px}#gsv .stk-pick strong{display:block;font-size:11px;margin-top:4px}
+#gsv .stk-hint{font-size:11px;color:#f3a33a;margin:2px 0 10px}
 #gsv .opt strong{font-size:14px}#gsv .opt .tag{float:right;font-size:9px;letter-spacing:2px;color:#f3a33a}
 #gsv .opt .pc{margin-top:5px;font-size:11px;display:flex;flex-wrap:wrap;gap:4px 10px}
 #gsv .pro{color:#7fd48a}#gsv .con{color:#e46b5a}#gsv .neu{color:#a09a8d}
@@ -162,7 +171,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
         m.userData.emissive0??=m.emissive?.clone();}});
     // centre the gun and turn it so the barrel runs along +X
     pivot.add(gun);gun.position.set(0,0,0);gun.rotation.set(0,0,0);gun.updateMatrixWorld(true);
-    showParts(equipped(cat,def,id,profile));if(cats)applyCamo(gun,equippedCamo(cats,profile,id,weapons));gun.updateMatrixWorld(true);
+    showParts(equipped(cat,def,id,profile));if(cats)applyCamo(gun,equippedCamo(cats,profile,id,weapons));stkArm=null;stkShow();gun.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(gun,true),size=box.getSize(new THREE.Vector3());box.getCenter(center);
     const flash=gun.getObjectByName('tag_flash')?.getWorldPosition(new THREE.Vector3());
     const long=size.x>=size.z?'x':'z';
@@ -224,23 +233,27 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     $('.lvl b').textContent=`WEAPON LEVEL ${p.level}${p.level>=cap?'  ·  MAX':''}`;
     $('.lvl i').style.width=(p.level>=cap?100:100*p.xp/need).toFixed(1)+'%';
     {const nx=nextUnlock(cat,def,id,p.level);$('.lvl small').textContent=p.level>=cap?'Max level · prestige it in the Armory':`${p.xp} / ${need} XP to level ${p.level+1}${nx?` · next unlock: ${nx.att.name} at level ${nx.level}`:''} · earn XP with kills using this gun`;}
-    const slots=slotsOf();if(slot!=='camo'&&slot!=='charm'&&!slots.includes(slot))slot=null;
+    const slots=slotsOf();if(slot!=='camo'&&slot!=='charm'&&slot!=='sticker'&&!slots.includes(slot))slot=null;
+    if(slot!=='sticker'&&stkArm){stkArm=null;stkShow();}canvas.style.cursor=stkArm?'crosshair':'';
     const on=equipped(cat,def,id,profile);
     $('.slots').innerHTML='<h3>ATTACHMENTS</h3>'+SLOT_ORDER.map(s=>{
       const has=slots.includes(s),eq=on.find(a=>cat.attachments.find(x=>x.id===a)?.slot===s);
       return `<button class="slot${s===slot?' sel':''}${has?'':' na'}${eq?'':' empty'}" data-slot="${s}">
         <div class="ico">${(def?.slotNames?.[s]??cat.slots[s]).slice(0,2).toUpperCase()}</div><div><span>${esc((def?.slotNames?.[s]??cat.slots[s]).toUpperCase())}</span><strong>${has?esc(eq?nameOf(eq):'None'):'—'}</strong></div></button>`;}).join('');
     // camo and charm share one COSMETIC section (user, 2026-11-06)
-    if(cats||charmCat?.charms.length)$('.slots').insertAdjacentHTML('beforeend','<h3 style="margin-top:14px">COSMETIC</h3>');
+    if(cats||charmCat?.charms.length||stkCat?.stickers.length)$('.slots').insertAdjacentHTML('beforeend','<h3 style="margin-top:14px">COSMETIC</h3>');
     if(cats){const c=equippedCamo(cats,profile,id,weapons),unl=camoUnlocked(cats,profile,id,weapons),done=cats.camos.filter(k=>!k.reward&&!k.shop&&unl.has(k.id)).length,special=cats.camos.filter(k=>k.reward&&unl.has(k.id)).length;
       $('.slots').insertAdjacentHTML('beforeend',`<button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
         <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward&&!k.shop).length} UNLOCKED${special?` · ${special} SPECIAL`:''}${loadPrestige().camos.length?` · ${loadPrestige().camos.length} PRESTIGE`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
     if(charmCat?.charms.length){const c=charmFor(charmCat,loadCharmState(),id);
       $('.slots').insertAdjacentHTML('beforeend',`<button class="slot${slot==='charm'?' sel':''}${c?'':' empty'}" data-slot="charm">
         <div class="ico">${c?'✦':'—'}</div><div><span>CHARM · ${charmCat.charms.filter(x=>!charmLock(x)).length} / ${charmCat.charms.length} OWNED</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
+    if(stkCat?.stickers.length){const n=stkList().length;
+      $('.slots').insertAdjacentHTML('beforeend',`<button class="slot${slot==='sticker'?' sel':''}${n?'':' empty'}" data-slot="sticker">
+        <div class="ico">${n?'◉':'—'}</div><div><span>STICKERS · ${n} / ${MAX_STICKERS}</span><strong>${n?stkList().map(x=>esc(stkCat.stickers.find(s=>s.id===x.id)?.name??x.id)).join(', '):'None'}</strong></div></button>`);}
     $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc((def?.slotNames?.[s]??cat.slots[s]).toUpperCase())}</i></div>`).join('');
     renderOptions();renderStats();if(cats)fillSwatches(root,cid=>camoById(cats,cid));
-    $('.stats').style.display=slot==='camo'||slot==='charm'?'none':'';   // camos don't change stats; the list needs the room
+    $('.stats').style.display=slot==='camo'||slot==='charm'||slot==='sticker'?'none':'';   // camos don't change stats; the list needs the room
   }
   // swatches come from camo.js's shared cache, generated one per frame (fillSwatches after each render)
   const swatch=c=>camoSwatch(c);
@@ -308,10 +321,72 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     charmAnchor=gunAnchor(gun,charmRoot,{key:def.model,override:charmCat.anchors[id],...charmReach(body,c),unit:charmUnit(def)})??charmAnchor;   // this charm's own reach
     charmRig=new CharmRig(body,c);charmRig.gun=gun;scene.add(charmRig.group);charmKick=2;if(slot==='charm')aim();
   }
+  // Weapon stickers (mods/stickers, 2026-11-06): up to three per gun, picked from the list, placed with a click on the gun
+  // (drag still turns it), then sized (50-200%) and turned. The gun's materials draw them (stickers.js).
+  let stkCat=null,stkArm=null,stkSel=0,stkPrev=null;   // stkArm: {id, at (slot index to fill)}; stkPrev: the hover preview
+  loadStickers().then(c=>{stkCat=c;if(alive&&c.stickers.length)renderUI();});
+  const stkList=()=>stkCat?stickersFor(stkCat,loadStickerState(),id):[];
+  function stkSave(listNow){const st=loadStickerState();if(listNow.length)st.on[id]=listNow;else delete st.on[id];saveStickerState(st);
+    onChange?.(id);dispatchEvent(new CustomEvent('kino-stickers',{detail:{id}}));}
+  function stkShow(){if(!gun)return;let l=stkList();if(stkPrev){l=l.slice();l[stkPrev.at]=stkPrev.x;}return applyStickers(gun,l.filter(Boolean),id);}
+  function renderStickers(el){
+    const l=stkList(),nm=x=>esc(stkCat.stickers.find(s=>s.id===x)?.name??x),img=x=>{const s=stkCat.stickers.find(k=>k.id===x);return s?stickerImage(s):'';};
+    if(stkSel>=l.length)stkSel=Math.max(0,l.length-1);
+    const hint=stkArm?`Click on the gun to place ${nm(stkArm.id)}. Drag turns the gun; right-click or Esc cancels.`
+      :l.length<MAX_STICKERS?'Pick a sticker, then click on the gun where it goes.':'All three are placed: move or remove one to add another.';
+    el.innerHTML=`<h3>STICKERS · ${l.length} / ${MAX_STICKERS}</h3><p class="stk-hint">${hint}</p>`+
+      l.map((x,i)=>`<div class="opt stk-row${i===stkSel?' on':''}" data-stk-i="${i}"><img src="${img(x.id)}" alt=""><strong>${nm(x.id)}</strong>
+        <span class="acts"><button data-stk-move="${i}">MOVE</button><button data-stk-del="${i}">REMOVE</button></span>
+        ${i===stkSel?`<label>SIZE<input type="range" min="50" max="200" step="5" value="${Math.round((x.m??1)*100)}" data-stk-size="${i}"><b>${Math.round((x.m??1)*100)}%</b></label>
+        <label>ROTATE<input type="range" min="-180" max="180" step="5" value="${x.r??0}" data-stk-rot="${i}"><b>${x.r??0}°</b></label>`:''}</div>`).join('')+
+      `<h3 style="margin-top:12px">ADD</h3><div class="stk-grid">`+stkCat.stickers.map(s=>{const lock=stickerLock(s);
+        return `<button class="opt stk-pick${stkArm?.id===s.id?' on':''}${lock?' locked':''}" data-stk-pick="${esc(s.id)}" title="${esc(s.desc??'')}">
+          <img src="${stickerImage(s)}" alt=""><strong>${esc(s.name)}</strong>${lock?`<span class="tag" style="float:none">${lock==='PASS'?'MELON PASS':lock==='SOON'?'COMING SOON':lock}</span>`:''}</button>`;}).join('')+'</div>';
+  }
+  // a click on the gun: where the ray meets a painted, visible part
+  const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+  function stkHit(e){
+    if(!gun)return null;const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
+    gun.updateMatrixWorld(true);ray.setFromCamera(ndc,camera);
+    for(const h of ray.intersectObject(gun,true)){const o=h.object;let shown=true;for(let a=o;a&&a!==scene;a=a.parent)if(!a.visible){shown=false;break;}
+      const m=[o.material].flat()[h.face?.materialIndex??0]??[o.material].flat()[0],base=m?.userData?.stickerOf??m?.userData?.camoOf??m;
+      if(!shown||!base?.map||m.transparent&&m.opacity<.5||/lens|glass|reticle|red_dot/i.test(base.name??''))continue;
+      return stickerFromHit(gun,h,camera,radius*.18);}
+    return null;
+  }
+  const stkPlaceAt=()=>{const l=stkList();return stkArm?.at??Math.min(l.length,MAX_STICKERS-1);};
+  let stkDown=null,stkRaf=0,stkMove=null;
+  canvas.addEventListener('pointerdown',e=>{stkDown=slot==='sticker'&&stkArm&&e.button===0?{x:e.clientX,y:e.clientY}:null;});
+  canvas.addEventListener('pointerup',e=>{const d=stkDown;stkDown=null;if(!d||!stkArm||Math.hypot(e.clientX-d.x,e.clientY-d.y)>5)return;
+    const x=stkHit(e);if(!x)return;const l=stkList(),at=stkPlaceAt(),old=l[at];
+    x.id=stkArm.id;if(old&&stkArm.at!=null){x.m=old.m??1;x.r=old.r??0;}
+    l[at]=x;stkSave(l.slice(0,MAX_STICKERS));stkSel=at;stkArm=null;stkPrev=null;stkShow();renderUI();});
+  // while one is armed, it follows the pointer over the gun (one ray a frame)
+  canvas.addEventListener('pointermove',e=>{if(!stkArm||pointers.size)return;stkMove=e;if(stkRaf)return;
+    stkRaf=requestAnimationFrame(()=>{stkRaf=0;if(!stkArm||!stkMove)return;const x=stkHit(stkMove);const l=stkList(),at=stkPlaceAt(),old=l[at];
+      stkPrev=x?{at,x:{...x,id:stkArm.id,m:stkArm.at!=null?old?.m??1:1,r:stkArm.at!=null?old?.r??0:0}}:(stkArm.at!=null?{at,x:null}:null);stkShow();});});
+  canvas.addEventListener('pointerleave',()=>{if(stkPrev){stkPrev=stkArm?.at!=null?{at:stkArm.at,x:null}:null;stkShow();}});
+  canvas.addEventListener('contextmenu',e=>{if(stkArm){e.preventDefault();stkArm=null;stkPrev=null;stkShow();renderUI();}});
+  root.addEventListener('input',e=>{const t=e.target,i=+(t.dataset.stkSize??t.dataset.stkRot);if(t.dataset.stkSize===undefined&&t.dataset.stkRot===undefined)return;
+    const l=stkList();if(!l[i])return;if(t.dataset.stkSize!==undefined)l[i].m=+t.value/100;else l[i].r=+t.value;
+    t.nextElementSibling.textContent=t.dataset.stkSize!==undefined?t.value+'%':t.value+'°';
+    const st=loadStickerState();st.on[id]=l;saveStickerState(st);stkShow();});
+  root.addEventListener('change',e=>{if(e.target.dataset?.stkSize!==undefined||e.target.dataset?.stkRot!==undefined)stkSave(stkList());});
+  function stkClick(e){
+    const pk=e.target.closest('[data-stk-pick]');if(pk){if(pk.classList.contains('locked'))return true;const l=stkList();
+      if(stkArm?.id===pk.dataset.stkPick&&stkArm.at==null){stkArm=null;}else if(l.length<MAX_STICKERS||stkArm?.at!=null)stkArm={id:pk.dataset.stkPick,at:stkArm?.at??null};
+      else stkArm={id:pk.dataset.stkPick,at:stkSel};   // full: replaces the selected one
+      stkPrev=null;stkShow();renderUI();return true;}
+    const mv=e.target.closest('[data-stk-move]');if(mv){const i=+mv.dataset.stkMove;stkArm={id:stkList()[i].id,at:i};stkSel=i;renderUI();return true;}
+    const dl=e.target.closest('[data-stk-del]');if(dl){const l=stkList();l.splice(+dl.dataset.stkDel,1);stkSave(l);stkArm=null;stkPrev=null;stkShow();renderUI();return true;}
+    const row=e.target.closest('[data-stk-i]');if(row){if(e.target.closest('input'))return true;const i=+row.dataset.stkI;if(i!==stkSel){stkSel=i;renderUI();}return true;}
+    return false;
+  }
   function renderOptions(){
     const el=$('.opts');
     if(slot==='camo'&&cats){renderCamos(el);return;}
     if(slot==='charm'&&charmCat){renderCharms(el);return;}
+    if(slot==='sticker'&&stkCat){renderStickers(el);return;}
     if(!slot){el.innerHTML='<h3>SELECT A SLOT</h3><p class="neu">Pick an attachment slot on the left; the camera moves to that part of the gun.</p>';return;}
     const all=available(cat,def,id),unlocked=new Set(unlockedAttachments(cat,def,id,profile).map(a=>a.id)),on=new Set(equipped(cat,def,id,profile));
     const opts=all.filter(a=>a.slot===slot);
@@ -360,6 +435,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   for(const ev of ['click','mousedown','mouseup','pointerdown'])root.addEventListener(ev,e=>e.stopPropagation());
   root.addEventListener('click',e=>{
     const ct=e.target.closest('.ctab,.cgroup');if(ct){camoTab=ct.dataset.ctab;hover=null;renderUI();return;}
+    if(slot==='sticker'&&stkCat&&stkClick(e))return;
     const tk=e.target.closest('[data-token]');if(tk){const pr=loadPrestige();if(spendToken(pr,tk.dataset.token)){savePrestige(pr);onChange?.(id);}renderUI();return;}
     const s=e.target.closest('.slot');if(s&&!s.classList.contains('na')){slot=slot===s.dataset.slot?null:s.dataset.slot;hover=null;renderUI();aim();return;}
     const o=e.target.closest('.opt');
@@ -401,7 +477,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(!dragging)return;yaw+=(e.clientX-dragging.x)*.008;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-dragging.y)*.005,-.6,.8);dragging={x:e.clientX,y:e.clientY};});
   canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);
   canvas.addEventListener('wheel',e=>{distGoal=THREE.MathUtils.clamp(distGoal*(1+Math.sign(e.deltaY)*.1),radius*1.2,radius*5);e.preventDefault();},{passive:false});
-  const onKey=e=>{if(e.code==='Escape'){e.stopPropagation();e.preventDefault();close();}};
+  const onKey=e=>{if(e.code==='Escape'){e.stopPropagation();e.preventDefault();if(stkArm){stkArm=null;stkPrev=null;stkShow();renderUI();return;}close();}};
   addEventListener('keydown',onKey,true);
   function aim(){
     const p=slot==='charm'?(charmRoot&&charmAnchor?charmRoot.localToWorld(charmAnchor.at.clone()).addScaledVector(DOWN,radius*.08):null):slot&&anchorOf(slot);

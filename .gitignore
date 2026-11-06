@@ -55,3 +55,6 @@ Thumbs.db
 # Season 1 (s2) pass camos and calling cards: third-party textures the user supplied (2026-11-06), kept local like the ripped assets
 /export/web/mods/weapon-levels/camos/s2/
 /export/web/mods/shop/cards/s2/
+
+# weapon sticker images the user supplied (2026-11-06); origin unknown, so kept local
+/export/web/mods/stickers/images/

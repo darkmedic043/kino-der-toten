@@ -4,6 +4,7 @@
 // sights, lenses, suppressors, underbarrels, straps, mags or hands), keeping
 // the gun's own shading and wear: camo colour × the base texture's brightness.
 import * as THREE from 'three';
+import { restick } from '../stickers/stickers.js';
 import { loadPrestige } from '../prestige/prestige.js';
 import { PRESTIGE_TABLE } from '../prestige/camo-table.js';
 import { drawPrestigeArt, STYLES as PRESTIGE_STYLES, hslRgb as artRgb } from '../prestige/prestige-art.js';
@@ -282,6 +283,7 @@ export function applyCamo(root,camo){
     const next=list.map(m=>{const orig=m?.userData?.camoOf??m;if(!isBody(orig))return m;return camo?camoMaterial(orig,camo):orig;});
     o.material=Array.isArray(o.material)?next:next[0];
   });
+  if(root?.userData?.kinoStickers)restick(root);   // stickers (mods/stickers) sit on top of whatever camo the gun has
 }
 
 // ---- weapon classes (shared with the loadout picker) -----------------------------------------

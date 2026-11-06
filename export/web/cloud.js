@@ -3,7 +3,7 @@
 // Tracked keys are caught at localStorage.setItem, so game code needs no changes.
 import { mergeAkimboSaves } from './mods/weapon-levels/akimbo.js';
 
-const TRACKED=/^kino\.(mods\.progression|mods\.classes|mods\.career|mods\.gobblegums|mods\.bank|mods\.armory|mods\.radio|mods\.journal|mods\.terminal|mods\.prestige|mods\.research|mods\.credits|mods\.shop|mods\.pass|mods\.charms|settings|best(\..+)?)$/;
+const TRACKED=/^kino\.(mods\.progression|mods\.classes|mods\.career|mods\.gobblegums|mods\.bank|mods\.armory|mods\.radio|mods\.journal|mods\.terminal|mods\.prestige|mods\.research|mods\.credits|mods\.shop|mods\.pass|mods\.charms|mods\.stickers|settings|best(\..+)?)$/;
 const STAMP='kino.cloud.updatedAt';
 // The server's stamp when this copy last came into step with it, and this browser's (or Rind partition's) own id: a
 // device may only replace a save it has seen, or wrote itself (.tools/save-guard.mjs).
