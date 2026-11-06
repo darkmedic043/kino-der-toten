@@ -1,6 +1,7 @@
 import {chromium} from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import fs from 'node:fs';
-const browser=await chromium.launch({executablePath:['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync),headless:true});
+const browser=await launchChromium(chromium,{executablePath:['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync),headless:true});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
 try{
 await page.goto('http://127.0.0.1:5173/');await page.waitForFunction(()=>kino?.debug.getState().ready,null,{timeout:120000});

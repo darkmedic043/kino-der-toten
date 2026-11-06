@@ -1,6 +1,7 @@
 import {chromium} from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import assert from 'node:assert/strict';
-const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+const browser=await launchChromium(chromium,{executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
 const page=await browser.newPage({viewport:{width:1000,height:600}});
 try{
  await page.goto('http://127.0.0.1:5173/');await page.waitForFunction(()=>kino?.debug.getState().ready);

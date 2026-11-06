@@ -2,11 +2,12 @@
 // errors, pages that failed to build, empty pages and links to pages that don't exist.
 //   node .tools/wiki-check.mjs [--base http://127.0.0.1:5190] [--shots <dir> [topicId]] [--mobile]
 import { chromium } from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import { readdirSync, mkdirSync } from 'node:fs';
 const arg=(k,d)=>{const i=process.argv.indexOf(k);return i<0?d:process.argv[i+1];};
 const base=arg('--base','http://127.0.0.1:5190'),shots=arg('--shots',null),only=shots?process.argv[process.argv.indexOf('--shots')+2]:null,mobile=process.argv.includes('--mobile');
 const pw=process.env.HOME+'/.cache/ms-playwright',dir=readdirSync(pw).find(d=>d.startsWith('chromium_headless_shell'));
-const b=await chromium.launch({executablePath:`${pw}/${dir}/chrome-headless-shell-linux64/chrome-headless-shell`});
+const b=await launchChromium(chromium,{executablePath:`${pw}/${dir}/chrome-headless-shell-linux64/chrome-headless-shell`});
 const pg=await b.newPage({viewport:mobile?{width:390,height:844}:{width:1440,height:1000}});
 const errs=[];pg.on('pageerror',e=>errs.push('pageerror: '+e.message));pg.on('console',m=>{if(m.type()==='error'||m.type()==='warning')errs.push(m.type()+': '+m.text());});
 pg.on('requestfailed',r=>errs.push('request failed: '+r.url()));pg.on('response',r=>{if(r.status()>=400)errs.push(`HTTP ${r.status()}: ${r.url()}`);});

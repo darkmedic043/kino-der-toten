@@ -1,4 +1,5 @@
 import { chromium } from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -8,7 +9,7 @@ fs.mkdirSync(out, {recursive: true});
 const savedUrl = path.join(root, 'artifacts/ascension-url.txt');
 const url = process.env.ASCENSION_URL || (fs.existsSync(savedUrl) ? fs.readFileSync(savedUrl, 'utf8').trim() : 'http://127.0.0.1:5173/ascension.html');
 const executablePath = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);
-const browser = await chromium.launch({executablePath, headless: true, args: ['--enable-webgl', '--ignore-gpu-blocklist']});
+const browser = await launchChromium(chromium,{executablePath, headless: true, args: ['--enable-webgl', '--ignore-gpu-blocklist']});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
 const errors = [], failed = [], checks = [];
 page.on('pageerror', e => errors.push(String(e)));

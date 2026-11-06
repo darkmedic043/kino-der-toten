@@ -3,11 +3,12 @@
 // [--profile out.cpuprofile]; env RS=0.5 (render scale: takes the GPU out), SECS=2.5 (per view). Needs the server on 5190.
 // Summarise a profile with node .tools/profile-summary.mjs out.cpuprofile [topN].
 import { chromium } from '../node_modules/playwright-core/index.mjs';
+import { launchChromium } from './browser.mjs';
 import fs from 'fs';
 const args=process.argv.slice(2);const pos=args.filter(a=>!a.startsWith('--'));
 const [quality='high',query='']=pos;const prof=args.includes('--profile')?args[args.indexOf('--profile')+1]:null;
 const secs=+(process.env.SECS||2.5);
-const b=await chromium.launch({executablePath:process.env.HOME+'/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome',
+const b=await launchChromium(chromium,{executablePath:process.env.HOME+'/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome',
   args:['--use-angle=vulkan','--enable-gpu','--ignore-gpu-blocklist','--disable-gpu-vsync','--disable-frame-rate-limit']});
 const p=await b.newPage({viewport:{width:1600,height:900}});const errs=[];p.on('pageerror',e=>errs.push(e.message));
 const logs=[];p.on('console',m=>{if(['error','warning'].includes(m.type()))logs.push(m.type()+': '+m.text().slice(0,300));});

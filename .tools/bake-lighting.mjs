@@ -5,11 +5,12 @@
 //   node .tools/bake-lighting.mjs [moon]   (needs the game served on :5190; moon writes moon-light.*)
 const MAP=process.argv[2]??'kino',NAME=MAP==='kino'?'baked-light':MAP+'-light';
 import {chromium} from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 const base=os.homedir()+'/.cache/ms-playwright/';
 const exe=fs.readdirSync(base).filter(d=>d.startsWith('chromium-')).map(d=>base+d+'/chrome-linux64/chrome').find(fs.existsSync);
-const browser=await chromium.launch({executablePath:exe,headless:true,args:['--use-angle=vulkan','--enable-gpu','--ignore-gpu-blocklist']});
+const browser=await launchChromium(chromium,{executablePath:exe,headless:true,args:['--use-angle=vulkan','--enable-gpu','--ignore-gpu-blocklist']});
 const page=await browser.newPage({viewport:{width:320,height:180}});
 page.on('console',m=>{if(/\[bake\]|rror/.test(m.text()))console.log(m.text());});
 page.on('pageerror',e=>console.log('ERR',String(e)));

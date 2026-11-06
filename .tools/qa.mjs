@@ -1,9 +1,10 @@
 import { chromium } from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 const out=path.resolve('artifacts/qa');fs.mkdirSync(out,{recursive:true});
-const browser=await chromium.launch({executablePath:['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync),headless:true,args:['--enable-webgl','--ignore-gpu-blocklist']});
+const browser=await launchChromium(chromium,{executablePath:['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync),headless:true,args:['--enable-webgl','--ignore-gpu-blocklist']});
 const context=await browser.newContext({viewport:{width:1440,height:900},recordVideo:{dir:out,size:{width:1280,height:800}}});
 const page=await context.newPage(),errors=[],checks=[];
 page.on('pageerror',e=>{errors.push(String(e));console.error(e);});page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)errors.push('HTTP '+r.status()+' '+r.url());});

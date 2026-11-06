@@ -3,10 +3,11 @@
 // export/web/mods/lighting/sunshafts.json (loaded at runtime instead).
 //   node .tools/bake-sunshafts.mjs   (needs the game served on :5190)
 import {chromium} from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 const exe=fs.readdirSync(os.homedir()+'/.cache/ms-playwright').filter(d=>d.startsWith('chromium-')).map(d=>os.homedir()+'/.cache/ms-playwright/'+d+'/chrome-linux64/chrome').find(fs.existsSync);
-const browser=await chromium.launch({executablePath:exe,headless:true,args:['--use-angle=vulkan','--enable-gpu','--ignore-gpu-blocklist']});
+const browser=await launchChromium(chromium,{executablePath:exe,headless:true,args:['--use-angle=vulkan','--enable-gpu','--ignore-gpu-blocklist']});
 const page=await browser.newPage({viewport:{width:320,height:180}});
 await page.addInitScript(()=>{try{localStorage.setItem('kino.settings',JSON.stringify({graphics:2,daytime:true}));}catch{}});
 await page.goto('http://127.0.0.1:5190/index.html?bakeShafts');

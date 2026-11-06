@@ -1,11 +1,12 @@
 // Rendered integration playthrough. Uses controlled placement, supplied inventory,
 // accelerated waits and combat events; never assigns a quest stage or completion.
 import {chromium} from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 const out=path.resolve(import.meta.dirname,'../artifacts/moon/quest');fs.mkdirSync(out,{recursive:true});
 const executablePath=['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);
-const browser=await chromium.launch({executablePath,headless:true,args:['--enable-webgl','--ignore-gpu-blocklist']});
+const browser=await launchChromium(chromium,{executablePath,headless:true,args:['--enable-webgl','--ignore-gpu-blocklist']});
 const page=await browser.newPage({viewport:{width:1440,height:900}}),checks=[],errors=[];
 page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 page.on('response',r=>{if(r.status()>=400)errors.push(r.status()+' '+r.url());});

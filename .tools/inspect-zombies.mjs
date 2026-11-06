@@ -1,7 +1,8 @@
 import {chromium} from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import fs from 'node:fs';
 const out='artifacts/zombies';fs.mkdirSync(out,{recursive:true});
-const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+const browser=await launchChromium(chromium,{executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
 const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
 page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 try{

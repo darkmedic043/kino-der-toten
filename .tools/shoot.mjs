@@ -3,6 +3,7 @@
 //   node .tools/shoot.mjs [url] [out.png]
 // Uses SwiftShader so it renders the same with or without a GPU.
 import { chromium } from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import { existsSync } from 'node:fs';
 
 const URL = process.argv[2] || 'http://localhost:5173/';
@@ -19,10 +20,10 @@ const CANDIDATES = [
 const executablePath = CANDIDATES.find(p => existsSync(p));
 if (!executablePath) throw new Error('no Chrome/Edge found; set BROWSER_PATH');
 
-const browser = await chromium.launch({
+const browser = await launchChromium(chromium,{
   executablePath,
   headless: true,
-  args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
+  args: ['--enable-webgl', '--ignore-gpu-blocklist'],
 });
 
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });

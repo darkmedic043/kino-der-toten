@@ -3,10 +3,11 @@
 // (spawn x4 yaws + the map's exfil zones x2 yaws) samples frame times for 2.5 s. Prints avg/p95 frame time, FPS, draw
 // calls and triangles per view and overall. Needs the kino server on 127.0.0.1:5190.
 import { chromium } from '../node_modules/playwright-core/index.mjs';
+import { launchChromium } from './browser.mjs';
 import fs from 'fs';
 const [map='the-giant',quality='high',query='']=process.argv.slice(2).filter(a=>!a.startsWith('--')),prof=process.argv.includes('--profile')?process.argv[process.argv.indexOf('--profile')+1]:null;
 const zones=JSON.parse(fs.readFileSync(new URL('../export/web/mods/exfil/zones.json',import.meta.url)))[map]??[];
-const b=await chromium.launch({executablePath:process.env.HOME+'/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome',
+const b=await launchChromium(chromium,{executablePath:process.env.HOME+'/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome',
   args:['--use-angle=vulkan','--enable-gpu','--ignore-gpu-blocklist','--disable-gpu-vsync','--disable-frame-rate-limit']});
 const p=await b.newPage({viewport:{width:1600,height:900}});const errs=[];p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://127.0.0.1:5190/');

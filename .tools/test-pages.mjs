@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const url = process.env.KINO_URL ?? 'http://127.0.0.1:5190/';
@@ -24,7 +25,7 @@ const args = ['--enable-webgl', '--ignore-gpu-blocklist'];
 // An optional browser-only route diagnoses unreachable Cloudflare anycast
 // ranges without changing Windows DNS or any game/player configuration.
 if (process.env.KINO_EDGE_IP) args.push(`--host-resolver-rules=MAP ${new URL(url).hostname} ${process.env.KINO_EDGE_IP}`);
-const browser = await chromium.launch({ executablePath, headless: true, args });
+const browser = await launchChromium(chromium,{ executablePath, headless: true, args });
 const report = { url, edgeOverride: process.env.KINO_EDGE_IP ?? null, checks: [], errors: [], failed: [] };
 try {
   for (const mobile of [false, true]) {

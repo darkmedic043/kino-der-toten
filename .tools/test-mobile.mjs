@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const layoutOnly = process.argv.includes('--layout');
@@ -15,7 +16,7 @@ server.stdout.on('data', chunk => { serverLog += chunk; });
 server.stderr.on('data', chunk => { serverLog += chunk; });
 const executablePath = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);
 const report = { checks: [], errors: [], failed: [] };
-const browser = await chromium.launch({ executablePath, headless: true, args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
+const browser = await launchChromium(chromium,{ executablePath, headless: true, args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
 try {
   for (let i = 0; i < 100 && !serverLog.includes('kino:'); i++) {
     if (server.exitCode !== null) throw new Error(serverLog);

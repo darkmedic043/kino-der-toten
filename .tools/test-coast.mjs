@@ -1,4 +1,5 @@
 import { chromium } from 'playwright-core';
+import { launchChromium } from './browser.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -8,7 +9,7 @@ fs.mkdirSync(out, {recursive: true});
 execFileSync('powershell.exe', ['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(root,'.tools/play-coast.ps1'),'-NoBrowser']);
 const url = process.env.COAST_URL || fs.readFileSync(path.join(out, 'url.txt'), 'utf8').trim().replace(/^\uFEFF/, '');
 const executablePath = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);
-const browser = await chromium.launch({executablePath, headless: true, args: ['--enable-webgl','--ignore-gpu-blocklist']});
+const browser = await launchChromium(chromium,{executablePath, headless: true, args: ['--enable-webgl','--ignore-gpu-blocklist']});
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
 const errors = [], failed = [], checks = [];
 page.on('pageerror', error => errors.push(String(error)));
