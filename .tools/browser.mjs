@@ -13,8 +13,28 @@ export function gpuArgs(args = []) {
   return [...GPU_ARGS, ...args.filter(a => !/^--use-angle=/.test(a) && !GPU_ARGS.includes(a))];
 }
 
-export function launchChromium(chromium, opts = {}) {
+// The WebGL renderer a fresh page gets, e.g. "ANGLE (NVIDIA, Vulkan 1.3.277 (... GTX 1660 Ti ...))".
+export async function webglRenderer(browser) {
+  const ctx = await browser.newContext(), page = await ctx.newPage();
+  try {
+    return await page.evaluate(() => { const c = document.createElement('canvas'), g = c.getContext('webgl2') || c.getContext('webgl');
+      if (!g) return 'no WebGL'; const e = g.getExtension('WEBGL_debug_renderer_info'); return String(g.getParameter(e ? e.UNMASKED_RENDERER_WEBGL : g.RENDERER)); });
+  } finally { await ctx.close(); }
+}
+
+// Launches, prints the renderer, and refuses to run on a software renderer (SwiftShader / llvmpipe / no WebGL):
+// KINO_ALLOW_SOFTWARE_GL=1 turns that into a warning.
+export async function launchChromium(chromium, opts = {}) {
   const exe = opts.executablePath && fs.existsSync(opts.executablePath) ? opts.executablePath
     : fs.existsSync(LOCAL_CHROME) ? LOCAL_CHROME : opts.executablePath;
-  return chromium.launch({ ...opts, executablePath: exe, args: gpuArgs(opts.args) });
+  const browser = await chromium.launch({ ...opts, executablePath: exe, args: gpuArgs(opts.args) });
+  let gl;
+  try { gl = await webglRenderer(browser); } catch (e) { gl = 'check failed: ' + e.message; }
+  console.log(`[browser] WebGL renderer: ${gl}`);
+  if (!/NVIDIA/i.test(gl)) {
+    const msg = `[browser] NOT ON THE GPU (${gl}): WebGL would render on the CPU and load the shared server`;
+    if (process.env.KINO_ALLOW_SOFTWARE_GL === '1') console.warn(msg + ' (KINO_ALLOW_SOFTWARE_GL=1, continuing)');
+    else { await browser.close(); throw new Error(msg + '. Set KINO_ALLOW_SOFTWARE_GL=1 to run anyway.'); }
+  }
+  return browser;
 }

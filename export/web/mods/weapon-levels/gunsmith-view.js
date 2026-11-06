@@ -12,7 +12,7 @@ import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
 import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig } from '../charms/charms.js';
-import { loadStickers, loadStickerState, saveStickerState, stickersFor, stickerLock, stickerImage, applyStickers, stickerFromHit, MAX_STICKERS } from '../stickers/stickers.js';
+import { loadStickers, loadStickerState, saveStickerState, stickersFor, stickerLock, stickerImage, applyStickers, stickerFromHit, meshKeys, MAX_STICKERS } from '../stickers/stickers.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
 
@@ -71,6 +71,7 @@ const CSS=`
 #gsv .stk-row input[type=range]{width:100%;accent-color:#f3a33a}
 #gsv .stk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 #gsv .stk-pick{text-align:center;padding:8px 4px}#gsv .stk-pick strong{display:block;font-size:11px;margin-top:4px}
+#gsv .stk-pick,#gsv canvas.stage{touch-action:none}#gsv .stk-flip{width:100%;text-align:left;margin-bottom:8px}#gsv .stk-flip strong{font-size:11px;letter-spacing:2px}
 #gsv .stk-hint{font-size:11px;color:#f3a33a;margin:2px 0 10px}
 #gsv .opt strong{font-size:14px}#gsv .opt .tag{float:right;font-size:9px;letter-spacing:2px;color:#f3a33a}
 #gsv .opt .pc{margin-top:5px;font-size:11px;display:flex;flex-wrap:wrap;gap:4px 10px}
@@ -234,7 +235,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     $('.lvl i').style.width=(p.level>=cap?100:100*p.xp/need).toFixed(1)+'%';
     {const nx=nextUnlock(cat,def,id,p.level);$('.lvl small').textContent=p.level>=cap?'Max level · prestige it in the Armory':`${p.xp} / ${need} XP to level ${p.level+1}${nx?` · next unlock: ${nx.att.name} at level ${nx.level}`:''} · earn XP with kills using this gun`;}
     const slots=slotsOf();if(slot!=='camo'&&slot!=='charm'&&slot!=='sticker'&&!slots.includes(slot))slot=null;
-    if(slot!=='sticker'&&stkArm){stkArm=null;stkShow();}canvas.style.cursor=stkArm?'crosshair':'';
+    if(slot!=='sticker'){if(stkArm||stkPrev){stkArm=null;stkPrev=null;stkShow();}stkFor=null;}if(!stkDrag)canvas.style.cursor=stkArm?'crosshair':'';
     const on=equipped(cat,def,id,profile);
     $('.slots').innerHTML='<h3>ATTACHMENTS</h3>'+SLOT_ORDER.map(s=>{
       const has=slots.includes(s),eq=on.find(a=>cat.attachments.find(x=>x.id===a)?.slot===s);
@@ -321,63 +322,113 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     charmAnchor=gunAnchor(gun,charmRoot,{key:def.model,override:charmCat.anchors[id],...charmReach(body,c),unit:charmUnit(def)})??charmAnchor;   // this charm's own reach
     charmRig=new CharmRig(body,c);charmRig.gun=gun;scene.add(charmRig.group);charmKick=2;if(slot==='charm')aim();
   }
-  // Weapon stickers (mods/stickers, 2026-11-06): up to three per gun, picked from the list, placed with a click on the gun
-  // (drag still turns it), then sized (50-200%) and turned. The gun's materials draw them (stickers.js).
-  let stkCat=null,stkArm=null,stkSel=0,stkPrev=null;   // stkArm: {id, at (slot index to fill)}; stkPrev: the hover preview
+  // Weapon stickers (mods/stickers, 2026-11-06): up to three per gun. Drag one from ADD onto the gun to place it, drag a
+  // placed one to move it (a drag anywhere else still turns the gun; a tap on a sticker then a tap on the gun also
+  // places it, for touch). SIZE and ROTATE on the selected one. The view turns to the gun's right side, the side
+  // first person shows (FLIP for the left). The gun's materials draw them (stickers.js).
+  let stkCat=null,stkArm=null,stkSel=0,stkPrev=null,stkYaw=null,stkFor=null;   // stkArm: {id, at (slot to fill or null)}; stkPrev: {at, x} the live preview
+  const STK_RIGHT=-(Math.PI-.35),STK_LEFT=-.35;   // camera yaw for the gun's right side (in game) and left side
   loadStickers().then(c=>{stkCat=c;if(alive&&c.stickers.length)renderUI();});
   const stkList=()=>stkCat?stickersFor(stkCat,loadStickerState(),id):[];
+  const stkRightSide=()=>Math.cos(yaw)<0;
   function stkSave(listNow){const st=loadStickerState();if(listNow.length)st.on[id]=listNow;else delete st.on[id];saveStickerState(st);
     onChange?.(id);dispatchEvent(new CustomEvent('kino-stickers',{detail:{id}}));}
   function stkShow(){if(!gun)return;let l=stkList();if(stkPrev){l=l.slice();l[stkPrev.at]=stkPrev.x;}return applyStickers(gun,l.filter(Boolean),id);}
   function renderStickers(el){
+    if(stkFor!==id){stkFor=id;stkYaw=STK_RIGHT;}   // first look at a gun's stickers: its in-game side
     const l=stkList(),nm=x=>esc(stkCat.stickers.find(s=>s.id===x)?.name??x),img=x=>{const s=stkCat.stickers.find(k=>k.id===x);return s?stickerImage(s):'';};
     if(stkSel>=l.length)stkSel=Math.max(0,l.length-1);
-    const hint=stkArm?`Click on the gun to place ${nm(stkArm.id)}. Drag turns the gun; right-click or Esc cancels.`
-      :l.length<MAX_STICKERS?'Pick a sticker, then click on the gun where it goes.':'All three are placed: move or remove one to add another.';
-    el.innerHTML=`<h3>STICKERS · ${l.length} / ${MAX_STICKERS}</h3><p class="stk-hint">${hint}</p>`+
-      l.map((x,i)=>`<div class="opt stk-row${i===stkSel?' on':''}" data-stk-i="${i}"><img src="${img(x.id)}" alt=""><strong>${nm(x.id)}</strong>
-        <span class="acts"><button data-stk-move="${i}">MOVE</button><button data-stk-del="${i}">REMOVE</button></span>
+    const hint=stkArm?`Tap the gun to place ${nm(stkArm.id)}, or drag it there. Right-click or Esc cancels.`
+      :l.length<MAX_STICKERS?'Drag a sticker onto the gun. Drag a placed one to move it.':'All three are placed: drag one to move it, or drop a new one to replace the selected one.';
+    el.innerHTML=`<h3>STICKERS · ${l.length} / ${MAX_STICKERS}</h3><p class="stk-hint">${hint}</p>
+      <button class="opt stk-flip" data-stk-flip><strong>${stkRightSide()?'RIGHT SIDE · SEEN IN GAME':'LEFT SIDE'}</strong><span class="tag" style="float:none;margin-left:8px">FLIP ⟲</span></button>`+
+      l.map((x,i)=>`<div class="opt stk-row${i===stkSel?' on':''}" data-stk-i="${i}"><img src="${img(x.id)}" alt="" draggable="false"><strong>${nm(x.id)}</strong>
+        <span class="acts"><button data-stk-del="${i}">REMOVE</button></span>
         ${i===stkSel?`<label>SIZE<input type="range" min="50" max="200" step="5" value="${Math.round((x.m??1)*100)}" data-stk-size="${i}"><b>${Math.round((x.m??1)*100)}%</b></label>
         <label>ROTATE<input type="range" min="-180" max="180" step="5" value="${x.r??0}" data-stk-rot="${i}"><b>${x.r??0}°</b></label>`:''}</div>`).join('')+
       `<h3 style="margin-top:12px">ADD</h3><div class="stk-grid">`+stkCat.stickers.map(s=>{const lock=stickerLock(s);
         return `<button class="opt stk-pick${stkArm?.id===s.id?' on':''}${lock?' locked':''}" data-stk-pick="${esc(s.id)}" title="${esc(s.desc??'')}">
-          <img src="${stickerImage(s)}" alt=""><strong>${esc(s.name)}</strong>${lock?`<span class="tag" style="float:none">${lock==='PASS'?'MELON PASS':lock==='SOON'?'COMING SOON':lock}</span>`:''}</button>`;}).join('')+'</div>';
+          <img src="${stickerImage(s)}" alt="" draggable="false"><strong>${esc(s.name)}</strong>${lock?`<span class="tag" style="float:none">${lock==='PASS'?'MELON PASS':lock==='SOON'?'COMING SOON':lock}</span>`:''}</button>`;}).join('')+'</div>';
   }
-  // a click on the gun: where the ray meets a painted, visible part
+  // where a screen point meets a painted, visible part of the gun (bind-space placement, stickers.js)
   const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
-  function stkHit(e){
-    if(!gun)return null;const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
-    gun.updateMatrixWorld(true);ray.setFromCamera(ndc,camera);
+  function stkHit(cx,cy){
+    if(!gun)return null;const r=canvas.getBoundingClientRect();ndc.set((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1);
+    gun.updateMatrixWorld(true);camera.updateMatrixWorld();ray.setFromCamera(ndc,camera);
     for(const h of ray.intersectObject(gun,true)){const o=h.object;let shown=true;for(let a=o;a&&a!==scene;a=a.parent)if(!a.visible){shown=false;break;}
       const m=[o.material].flat()[h.face?.materialIndex??0]??[o.material].flat()[0],base=m?.userData?.stickerOf??m?.userData?.camoOf??m;
       if(!shown||!base?.map||m.transparent&&m.opacity<.5||/lens|glass|reticle|red_dot/i.test(base.name??''))continue;
       return stickerFromHit(gun,h,camera,radius*.18);}
     return null;
   }
-  const stkPlaceAt=()=>{const l=stkList();return stkArm?.at??Math.min(l.length,MAX_STICKERS-1);};
-  let stkDown=null,stkRaf=0,stkMove=null;
-  canvas.addEventListener('pointerdown',e=>{stkDown=slot==='sticker'&&stkArm&&e.button===0?{x:e.clientX,y:e.clientY}:null;});
-  canvas.addEventListener('pointerup',e=>{const d=stkDown;stkDown=null;if(!d||!stkArm||Math.hypot(e.clientX-d.x,e.clientY-d.y)>5)return;
-    const x=stkHit(e);if(!x)return;const l=stkList(),at=stkPlaceAt(),old=l[at];
-    x.id=stkArm.id;if(old&&stkArm.at!=null){x.m=old.m??1;x.r=old.r??0;}
-    l[at]=x;stkSave(l.slice(0,MAX_STICKERS));stkSel=at;stkArm=null;stkPrev=null;stkShow();renderUI();});
-  // while one is armed, it follows the pointer over the gun (one ray a frame)
-  canvas.addEventListener('pointermove',e=>{if(!stkArm||pointers.size)return;stkMove=e;if(stkRaf)return;
-    stkRaf=requestAnimationFrame(()=>{stkRaf=0;if(!stkArm||!stkMove)return;const x=stkHit(stkMove);const l=stkList(),at=stkPlaceAt(),old=l[at];
-      stkPrev=x?{at,x:{...x,id:stkArm.id,m:stkArm.at!=null?old?.m??1:1,r:stkArm.at!=null?old?.r??0:0}}:(stkArm.at!=null?{at,x:null}:null);stkShow();});});
-  canvas.addEventListener('pointerleave',()=>{if(stkPrev){stkPrev=stkArm?.at!=null?{at:stkArm.at,x:null}:null;stkShow();}});
-  canvas.addEventListener('contextmenu',e=>{if(stkArm){e.preventDefault();stkArm=null;stkPrev=null;stkShow();renderUI();}});
+  // which placed sticker (index) a hit lands on: same vertex buffer, inside its square, facing the same way
+  function stkUnder(x){
+    if(!x)return -1;const keys=meshKeys(gun),buf=k=>{for(const [o,kk] of keys)if(kk===k)return o.geometry?.attributes?.position?.array;};
+    const hb=buf(x.k),l=stkList();let best=-1,bd=Infinity;
+    l.forEach((s,i)=>{if(buf(s.k)!==hb)return;const d=Math.hypot(x.p[0]-s.p[0],x.p[1]-s.p[1],x.p[2]-s.p[2]),lim=s.s*(s.m??1);
+      if(d<lim&&x.n[0]*s.n[0]+x.n[1]*s.n[1]+x.n[2]*s.n[2]>.2&&d<bd){bd=d;best=i;}});
+    return best;
+  }
+  const stkSlotFor=a=>a?.at??(stkList().length<MAX_STICKERS?stkList().length:stkSel);   // a new one fills the next slot, or replaces the selected
+  function stkPreview(cx,cy){   // the dragged/armed sticker under the pointer
+    if(!stkArm)return;const x=stkHit(cx,cy),at=stkSlotFor(stkArm),old=stkArm.at!=null?stkList()[at]:null;
+    stkPrev=x?{at,x:{...x,id:stkArm.id,m:old?.m??1,r:old?.r??0}}:(stkArm.at!=null?{at,x:null}:null);stkShow();return !!x;
+  }
+  function stkDrop(){   // place the previewed sticker
+    const pv=stkPrev;stkPrev=null;const arm=stkArm;stkArm=null;
+    if(pv?.x){const l=stkList();l[pv.at]=pv.x;stkSave(l.slice(0,MAX_STICKERS));stkSel=pv.at;}
+    stkShow();renderUI();
+  }
+  function stkCancel(){stkArm=null;stkPrev=null;stkDrag=null;stkGhost?.remove();stkGhost=null;stkShow();renderUI();}
+  // dragging: from an ADD tile (a ghost follows the pointer) or a placed sticker on the gun
+  let stkDrag=null,stkGhost=null,stkRaf=0,stkLast=null,stkTap=null;
+  const overCanvas=(cx,cy)=>document.elementFromPoint(cx,cy)===canvas;
+  function stkFrame(fn){stkLast=fn;if(stkRaf)return;stkRaf=requestAnimationFrame(()=>{stkRaf=0;const f=stkLast;stkLast=null;f?.();});}
+  root.addEventListener('pointerdown',e=>{
+    const pk=e.target.closest?.('[data-stk-pick]');if(!pk||e.button!==0||pk.classList.contains('locked')||slot!=='sticker')return;
+    stkDrag={kind:'new',id:pk.dataset.stkPick,x:e.clientX,y:e.clientY,moved:false};
+  });
+  canvas.addEventListener('pointerdown',e=>{
+    stkTap=null;if(slot!=='sticker'||e.button!==0||!stkCat)return;
+    if(stkArm){stkTap={x:e.clientX,y:e.clientY};return;}   // armed by a tap: the next tap on the gun places it
+    const i=stkUnder(stkHit(e.clientX,e.clientY));if(i<0)return;   // not on a sticker: the gun turns as usual
+    e.stopImmediatePropagation();canvas.setPointerCapture(e.pointerId);stkSel=i;
+    stkDrag={kind:'move',at:i,x:e.clientX,y:e.clientY,moved:false};stkArm={id:stkList()[i].id,at:i};canvas.style.cursor='grabbing';
+  });
+  const stkMoveH=e=>{
+    if(!alive)return;if(!stkDrag){   // hovering: a hand over placed stickers, the armed one follows the pointer
+      if(slot!=='sticker'||e.target!==canvas||e.buttons)return;
+      stkFrame(()=>{if(stkArm)stkPreview(e.clientX,e.clientY);else canvas.style.cursor=stkUnder(stkHit(e.clientX,e.clientY))>=0?'grab':'';});return;}
+    if(!stkDrag.moved&&Math.hypot(e.clientX-stkDrag.x,e.clientY-stkDrag.y)<5)return;
+    if(!stkDrag.moved){stkDrag.moved=true;
+      if(stkDrag.kind==='new'){stkArm={id:stkDrag.id,at:stkList().length<MAX_STICKERS?null:stkSel};
+        const s=stkCat.stickers.find(k=>k.id===stkDrag.id);stkGhost=document.createElement('img');stkGhost.src=s?stickerImage(s):'';
+        stkGhost.style.cssText='position:fixed;width:64px;height:64px;pointer-events:none;z-index:60;opacity:.85;transform:translate(-50%,-50%);filter:drop-shadow(0 2px 4px #000a)';root.append(stkGhost);}}
+    if(stkGhost){stkGhost.style.left=e.clientX+'px';stkGhost.style.top=e.clientY+'px';}
+    const cx=e.clientX,cy=e.clientY;
+    stkFrame(()=>{if(!stkDrag)return;const on=overCanvas(cx,cy)&&stkPreview(cx,cy);if(!on&&stkDrag.kind==='new'&&stkPrev){stkPrev=null;stkShow();}
+      if(stkGhost)stkGhost.style.opacity=on?'0':'.85';});   // over the gun the sticker itself shows
+  };
+  const stkUpH=e=>{
+    if(!alive)return;const d=stkDrag;stkDrag=null;stkGhost?.remove();stkGhost=null;cancelAnimationFrame(stkRaf);stkRaf=0;stkLast=null;
+    if(d){canvas.style.cursor='';if(!d.moved){if(d.kind==='move'){stkArm=null;stkPrev=null;renderUI();}return;}   // a plain press on a tile: its click arms it
+      if(overCanvas(e.clientX,e.clientY))stkPreview(e.clientX,e.clientY);stkDrop();return;}
+    const t=stkTap;stkTap=null;   // tap-to-place
+    if(t&&stkArm&&e.target===canvas&&Math.hypot(e.clientX-t.x,e.clientY-t.y)<=5){stkPreview(e.clientX,e.clientY);if(stkPrev?.x)stkDrop();}
+  };
+  addEventListener('pointermove',stkMoveH);addEventListener('pointerup',stkUpH);
+  canvas.addEventListener('pointerleave',()=>{if(stkArm&&!stkDrag&&stkPrev){stkPrev=stkArm.at!=null?{at:stkArm.at,x:null}:null;stkShow();}});
+  canvas.addEventListener('contextmenu',e=>{if(stkArm||stkDrag){e.preventDefault();stkCancel();}});
   root.addEventListener('input',e=>{const t=e.target,i=+(t.dataset.stkSize??t.dataset.stkRot);if(t.dataset.stkSize===undefined&&t.dataset.stkRot===undefined)return;
     const l=stkList();if(!l[i])return;if(t.dataset.stkSize!==undefined)l[i].m=+t.value/100;else l[i].r=+t.value;
     t.nextElementSibling.textContent=t.dataset.stkSize!==undefined?t.value+'%':t.value+'°';
     const st=loadStickerState();st.on[id]=l;saveStickerState(st);stkShow();});
   root.addEventListener('change',e=>{if(e.target.dataset?.stkSize!==undefined||e.target.dataset?.stkRot!==undefined)stkSave(stkList());});
   function stkClick(e){
-    const pk=e.target.closest('[data-stk-pick]');if(pk){if(pk.classList.contains('locked'))return true;const l=stkList();
-      if(stkArm?.id===pk.dataset.stkPick&&stkArm.at==null){stkArm=null;}else if(l.length<MAX_STICKERS||stkArm?.at!=null)stkArm={id:pk.dataset.stkPick,at:stkArm?.at??null};
-      else stkArm={id:pk.dataset.stkPick,at:stkSel};   // full: replaces the selected one
+    if(e.target.closest('[data-stk-flip]')){stkYaw=stkRightSide()?STK_LEFT:STK_RIGHT;setTimeout(renderUI,450);return true;}
+    const pk=e.target.closest('[data-stk-pick]');if(pk){if(pk.classList.contains('locked'))return true;
+      stkArm=stkArm?.id===pk.dataset.stkPick?null:{id:pk.dataset.stkPick,at:stkList().length<MAX_STICKERS?null:stkSel};
       stkPrev=null;stkShow();renderUI();return true;}
-    const mv=e.target.closest('[data-stk-move]');if(mv){const i=+mv.dataset.stkMove;stkArm={id:stkList()[i].id,at:i};stkSel=i;renderUI();return true;}
     const dl=e.target.closest('[data-stk-del]');if(dl){const l=stkList();l.splice(+dl.dataset.stkDel,1);stkSave(l);stkArm=null;stkPrev=null;stkShow();renderUI();return true;}
     const row=e.target.closest('[data-stk-i]');if(row){if(e.target.closest('input'))return true;const i=+row.dataset.stkI;if(i!==stkSel){stkSel=i;renderUI();}return true;}
     return false;
@@ -469,7 +520,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   canvas.style.touchAction='none';
   const pointers=new Map();let pinch=0;
   const release=e=>{pointers.delete(e.pointerId);pinch=0;dragging=pointers.size===1?{...[...pointers.values()][0]}:null;};
-  canvas.addEventListener('pointerdown',e=>{pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);
+  canvas.addEventListener('pointerdown',e=>{stkYaw=null;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);
     if(pointers.size===2){const [a,b]=[...pointers.values()];pinch=Math.hypot(a.x-b.x,a.y-b.y);dragging=null;}else dragging={x:e.clientX,y:e.clientY};});
   canvas.addEventListener('pointermove',e=>{
     if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -477,7 +528,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(!dragging)return;yaw+=(e.clientX-dragging.x)*.008;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-dragging.y)*.005,-.6,.8);dragging={x:e.clientX,y:e.clientY};});
   canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);
   canvas.addEventListener('wheel',e=>{distGoal=THREE.MathUtils.clamp(distGoal*(1+Math.sign(e.deltaY)*.1),radius*1.2,radius*5);e.preventDefault();},{passive:false});
-  const onKey=e=>{if(e.code==='Escape'){e.stopPropagation();e.preventDefault();if(stkArm){stkArm=null;stkPrev=null;stkShow();renderUI();return;}close();}};
+  const onKey=e=>{if(e.code==='Escape'){e.stopPropagation();e.preventDefault();if(stkArm||stkDrag){stkCancel();return;}close();}};
   addEventListener('keydown',onKey,true);
   function aim(){
     const p=slot==='charm'?(charmRoot&&charmAnchor?charmRoot.localToWorld(charmAnchor.at.clone()).addScaledVector(DOWN,radius*.08):null):slot&&anchorOf(slot);
@@ -497,6 +548,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(canvas.width!==Math.floor(w*renderer.getPixelRatio())||canvas.height!==Math.floor(h*renderer.getPixelRatio())){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
     focus.lerp(focusGoal,1-Math.exp(-dt*6));dist+=(distGoal-dist)*(1-Math.exp(-dt*6));
     if(!dragging&&!slot)yaw+=dt*.12;
+    else if(!dragging&&slot==='sticker'&&stkYaw!=null){const d=Math.atan2(Math.sin(stkYaw-yaw),Math.cos(stkYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));if(Math.abs(d)<.005)stkYaw=null;}
     else if(!dragging&&slot==='charm'&&charmYaw!=null){const d=Math.atan2(Math.sin(charmYaw-yaw),Math.cos(charmYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));}
     camera.position.set(focus.x+Math.sin(yaw)*Math.cos(pitch)*dist,focus.y+Math.sin(pitch)*dist,focus.z+Math.cos(yaw)*Math.cos(pitch)*dist);
     // keep the gun off-centre toward the free middle of the screen
@@ -552,7 +604,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       res=partTags().get(bone)??null;}
     partCache.set(o,res);return res;
   }
-  function close(){if(!alive)return;alive=false;charmRig?.dispose();
+  function close(){if(!alive)return;alive=false;charmRig?.dispose();removeEventListener('pointermove',stkMoveH);removeEventListener('pointerup',stkUpH);stkGhost?.remove();
     if(host){host.renderWorld=prevWorld;host.hideViewmodel=prevHide;}
     // materials are shared with the game's copies of this model: put them back
     gun?.traverse(o=>{const m=o.material;if(o.isMesh&&m?.emissive&&m.userData.emissive0)m.emissive.copy(m.userData.emissive0);});removeEventListener('keydown',onKey,true);renderer.dispose();root.remove();onClose?.();}
