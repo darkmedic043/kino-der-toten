@@ -159,6 +159,7 @@ export class CharmRig{
     this.chain=c.chain??.42;   // inches, ring to the charm's loop
     this.p1=new THREE.Vector3();this.q1=new THREE.Vector3();this.p2=new THREE.Vector3();this.q2=new THREE.Vector3();
     this.fresh=true;this.acc=0;this.anchor=null;this.prevA=new THREE.Vector3();
+    this.r1=new THREE.Vector3();this.r2=new THREE.Vector3();this.s1=new THREE.Vector3();this.s2=new THREE.Vector3();this.smoothed=false;this.push=[0,1,2,3].map(()=>new THREE.Vector3());   // drawn points; camera shift still to apply
   }
   reset(){this.fresh=true;}
   dispose(){this.group.removeFromParent();}
@@ -173,7 +174,7 @@ export class CharmRig{
     const L1=this.chain*s,L2=Math.max(.05,this.body.com)*s;
     if(this.fresh||!(dt>0&&dt<.25)||_t.copy(this.p1).sub(A).length()>L1*6+1e-6){
       this.p1.copy(A).addScaledVector(gravity,L1);this.q1.copy(this.p1);this.p2.copy(this.p1).addScaledVector(gravity,L2);this.q2.copy(this.p2);
-      this.fresh=false;this.acc=0;this.prevA.copy(A);
+      this.fresh=false;this.acc=0;this.smoothed=false;this.prevA.copy(A);for(const v of this.push)v.set(0,0,0);
     }else{
       // the gun's own motion (aiming down sights, recoil, sway, the raise): the charm is carried with most of it rigidly
       // (p and q both, so no speed is added) and only the rest swings it (user: "doesnt absurdly fling around when ADSing")
@@ -181,12 +182,15 @@ export class CharmRig{
       for(const p of [this.p1,this.q1,this.p2,this.q2])p.add(_u);
       if(moved){_R.extractRotation(moved);_t.setFromMatrixPosition(moved);
         // a world-fixed point moves by `moved`; the charm takes `follow` of that (air drag), at most a third of its chain a frame
-        for(const p of [this.p1,this.q1,this.p2,this.q2]){_u.copy(p).applyMatrix4(_R).sub(p).multiplyScalar(follow).addScaledVector(_t,follow*.3);const l=_u.length(),mx=L1*.5;if(l>mx)_u.multiplyScalar(mx/l);p.add(_u);}}
+        // (spread over this frame's physics steps below: applied in one lump, a strafe pressing it on the gun made it shake)
+        const pts=[this.p1,this.q1,this.p2,this.q2];for(let i=0;i<4;i++){const p=pts[i];_u.copy(p).applyMatrix4(_R).sub(p).multiplyScalar(follow).addScaledVector(_t,follow*.3);const l=_u.length(),mx=L1*.5;if(l>mx)_u.multiplyScalar(mx/l);this.push[i].add(_u);const pl=this.push[i].length();if(pl>L1)this.push[i].multiplyScalar(L1/pl);}}
       this.acc=Math.min(this.acc+dt,STEP*4);
       // the side plane: a point on the gun's widest surface below the ring, normal = the gun's left (+y)
       const P0=_p.copy(base).addScaledVector(n,(anchor.side-anchor.at.y)*sR),m1=.06*s,m2=(this.body.depth*.8+.02)*s;
       const G=(this.c.gravity??260)*gravityScale*s*STEP*STEP,drag=this.c.drag??.07,k=this.c.stiff??.012;
+      let steps=Math.floor(this.acc/STEP+1e-9);
       while(this.acc>=STEP){this.acc-=STEP;
+        {const pts=[this.p1,this.q1,this.p2,this.q2];for(let i=0;i<4;i++){_u.copy(this.push[i]).divideScalar(Math.max(1,steps));pts[i].add(_u);this.push[i].sub(_u);}steps--;}
         for(const [p,q] of [[this.p1,this.q1],[this.p2,this.q2]]){_u.copy(p).sub(q).multiplyScalar(1-drag);q.copy(p);p.add(_u).addScaledVector(gravity,G);}
         // stiffness: a pull toward hanging straight (a charm's loop is a little stiff, so it doesn't flop)
         _t.copy(A).addScaledVector(gravity,L1).sub(this.p1).multiplyScalar(k);this.p1.add(_t);
@@ -195,22 +199,32 @@ export class CharmRig{
           _u.copy(this.p1).sub(A);let d=_u.length();if(d>1e-9)this.p1.copy(A).addScaledVector(_u,L1/d);
           _u.copy(this.p2).sub(this.p1);d=_u.length();if(d>1e-9){const e=(d-L2)/d;this.p1.addScaledVector(_u,e*.7);this.p2.addScaledVector(_u,-e*.3);}
           limit(A,this.p1,L1,gravity,n);limit(this.p1,this.p2,L2,gravity,n);
-          for(const [p,m] of [[this.p1,m1],[this.p2,m2]]){const h=_t.copy(p).sub(P0).dot(n);if(h<m)p.addScaledVector(n,m-h);}
+          for(const [p,q,m] of [[this.p1,this.q1,m1],[this.p2,this.q2,m2]]){const h=_t.copy(p).sub(P0).dot(n);if(h<m){p.addScaledVector(n,m-h);q.addScaledVector(n,m-h);   // on the gun: pushed out without
+            const vn=_t.copy(p).sub(q).dot(n);if(vn<0)q.addScaledVector(n,vn);}}   // gaining speed (no bounce), and its speed into the gun dropped
         }
       }
       if(!Number.isFinite(this.p1.x+this.p1.y+this.p1.z+this.p2.x+this.p2.y+this.p2.z)){this.fresh=true;return;}
     }
+    // drawn between the last two physics steps (120 Hz steps on a 144 Hz or uneven frame rate stuttered), kept on the chain's lengths
+    {const a=this.acc/STEP;this.r1.lerpVectors(this.q1,this.p1,a);_u.copy(this.r1).sub(A);let d=_u.length();if(d>1e-9)this.r1.copy(A).addScaledVector(_u,L1/d);
+     this.r2.lerpVectors(this.q2,this.p2,a);_u.copy(this.r2).sub(this.r1);d=_u.length();if(d>1e-9)this.r2.copy(this.r1).addScaledVector(_u,L2/d);
+     // then smoothed in the gun's own frame (~35 ms): the charm's quick shake against the gun while running is taken out, the gun's
+     // own motion isn't (user: "when moving rapidly and into the gun, it kinda jitters"); stays outside the gun (a blend of points outside it)
+     const F=B||M;_x.setFromMatrixColumn(F,0).normalize();_y.setFromMatrixColumn(F,1).normalize();_z.setFromMatrixColumn(F,2).normalize();
+     const toL=(v,o)=>{_u.copy(v).sub(A);return o.set(_u.dot(_x),_u.dot(_y),_u.dot(_z));},w=this.smoothed?1-Math.exp(-Math.max(0,dt)/(this.c.smooth??.035)):1;
+     this.s1.lerp(toL(this.r1,_d),w);this.s2.lerp(toL(this.r2,_d),w);this.smoothed=true;
+     const toW=(o,v)=>v.copy(A).addScaledVector(_x,o.x).addScaledVector(_y,o.y).addScaledVector(_z,o.z);toW(this.s1,this.r1);toW(this.s2,this.r2);}
     // ring: sticks out of the gun's side, its hole along the gun's length
     _y.copy(n);_z.copy(fwd);_x.crossVectors(_y,_z);this.ring.matrix.makeBasis(_x,_y,_z).scale(_sv.setScalar(s)).setPosition(_t.copy(A).addScaledVector(n,-.02*s));
     // links between the ring and the charm's loop, each turned 90° from the last
-    _d.copy(this.p1).sub(A);const len=_d.length()||1;_d.divideScalar(len);
+    _d.copy(this.r1).sub(A);const len=_d.length()||1;_d.divideScalar(len);
     for(let i=0;i<this.links.length;i++){
       _y.copy(_d);_z.copy(i%2?fwd:n).addScaledVector(_y,-_z.dot(_y));if(_z.lengthSq()<1e-8)_z.set(0,0,1);_z.normalize();_x.crossVectors(_y,_z);
       this.links[i].matrix.makeBasis(_x,_y,_z).scale(_sv.setScalar(s)).setPosition(_t.copy(A).addScaledVector(_d,len*(i+.5)/this.links.length));
     }
     // the body: up = along the chain end to its centre, front = out of the gun's side
-    _y.copy(this.p1).sub(this.p2).normalize();_z.copy(n).addScaledVector(_y,-n.dot(_y));if(_z.lengthSq()<1e-8)_z.copy(fwd);_z.normalize();_x.crossVectors(_y,_z);
-    const o=this.body.object;o.matrix.makeBasis(_x,_y,_z).scale(_sv.setScalar(s*o.scale.x)).setPosition(this.p1);
+    _y.copy(this.r1).sub(this.r2).normalize();_z.copy(n).addScaledVector(_y,-n.dot(_y));if(_z.lengthSq()<1e-8)_z.copy(fwd);_z.normalize();_x.crossVectors(_y,_z);
+    const o=this.body.object;o.matrix.makeBasis(_x,_y,_z).scale(_sv.setScalar(s*o.scale.x)).setPosition(this.r1);
     for(const m of [this.ring,...this.links,o])m.matrixWorldNeedsUpdate=true;
   }
 }
