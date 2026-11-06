@@ -144,7 +144,7 @@ export default async function setup(api){
   host.on('beforeEnemyDamage',e=>{if(e.enemy)lastHit.set(e.enemy,{cause:e.cause,id:session.weapon?.id});});
   const lastKill=new Map(),crowds=new Map();
   host.on('kill',({enemy,head,melee,remote})=>{
-    if(remote||melee||cheating()||!session.weapon)return;
+    if(remote||(melee&&!data.weapons[session.weapon?.id]?.meleeXp)||cheating()||!session.weapon)return;   // (a melee weapon's own swings count for it: the Grave Bell)
     const hit=lastHit.get(enemy),cause=hit?.cause,id=hit?.id&&data.weapons[hit.id]?hit.id:session.weapon.id,def=data.weapons[id];if(!def)return;
     const extra=def.killCauses??KILL_CAUSES[def.baseId??id]??KILL_CAUSES[id]??[];
     if(!(GUN_CAUSES.has(cause)||extra.includes(cause)||(cause==='explosion'&&def.projectileSpeed>0)))return;

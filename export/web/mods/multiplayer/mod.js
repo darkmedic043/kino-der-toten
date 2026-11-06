@@ -341,7 +341,7 @@ export default async function setup(api){
     revive.classList.toggle('show',!!candidate);
     if(candidate){
       const need=session.perks.has('specialty_quickrevive')?REVIVE_TIME/2:REVIVE_TIME;
-      me.progress=useHeld?me.progress+dt:0;
+      me.progress=useHeld?me.progress+dt*(window.kino.reviveRate?.(candidate)??1):0;   // (reviveRate: the Grave Bell's Requiem)
       revive.querySelector('span').textContent=useHeld?`Reviving ${candidate.name}…`:`Hold F to revive ${candidate.name}`;
       revive.querySelector('b').style.width=Math.min(100,100*me.progress/need)+'%';
       if(me.progress>=need){net.send(candidate.id,{t:'revive',...window.kino.reviveExtras?.()});session.addPoints(50);host.emit('reviveDone');me.progress=0;candidate.down=false;setTag(candidate);api.toast(`Revived ${candidate.name}`,3);}

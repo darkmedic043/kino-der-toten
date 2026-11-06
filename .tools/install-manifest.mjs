@@ -25,6 +25,8 @@ const OWN = [
   /^mods\/terminal-booth\/terminal_booth(_compact)?\.glb$/,        // built in Blender for this fork (.tools/build-terminal-booth.py)
   /^mods\/classes\/garden\/(plants\.glb|icons\/[^/]+\.webp)$/,      // the Gardener's plants and pictures, built in Blender for this fork (.tools/build_garden_plants.py)
   /^mods\/bo7-weapons\/[^/]+\.glb$/,                               // rebuilt from reference in Blender for this fork (.tools/build-grimhawk.py etc.)
+  /^mods\/melon-weapons\/[^/]+\.glb$/,                             // fork originals: Debt Collector, Hive Launcher (.tools/build-debt-collector.py, build-hive-launcher.py)
+  /^mods\/melee\/grave_bell_(view|world)\.glb$/,                   // fork original: the Grave Bell (.tools/build-grave-bell.py)
   /^mods\/bo3-weapons\/(parts\/aw_attachments\.glb|aw-kits\.json)$/,    // the AW guns' Gunsmith parts, built in Blender for this fork (.tools/build_aw_attachments.py); not the guns
 ];
 // game code under these is still map-specific data (custom map folders hold a converted map, not code)

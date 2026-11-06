@@ -36,12 +36,27 @@ function still(clip,{frame,turn={},move={}},from=[]){
 const asUrl=clip=>URL.createObjectURL(new Blob([JSON.stringify(clip)],{type:'application/json'}));
 const loadClip=url=>fetch(new URL(url,document.baseURI)).then(r=>r.json());
 
+// soon: in melee.json but not out yet (the battlepass hands it out later); localStorage['kino.dev.soon']='1' lifts it, as for the classes
+export const soon=m=>!!m?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();
+// Melee entries with a model of their own (melee.json `model`, the Grave Bell) are weapons from the start: prepare() puts them in
+// data.weapons before the other mods build anything, so weapon levels, attachments (the Gunsmith), camos and prestige treat them
+// as guns. They hang their model from the knife's attach tag (def.gunTag) in place of the knife, and a `script` gives them their
+// own behaviour (hooks below). The knife has neither and plays exactly as before.
+const ownDef=(key,E,base)=>({...structuredClone(base),id:'melee_'+key,baseId:base.baseId??base.id,name:E.name,model:E.model,worldModel:E.worldModel,worldScale:E.worldScale??1,
+  hideTags:[...(E.hideTags??[])],weaponClass:'Melee',meleeSlot:key,meleeXp:true,gunsmith:true,noBox:true,soon:!!E.soon,slotNames:E.slotNames,killCauses:E.killCauses??[],
+  price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,noAmmo:true,noAds:true,ownPackName:true,automatic:false,
+  upgrade:{name:E.upgradeName}});
+export async function prepare(data,mod){
+  const C=await fetch(new URL('melee.json',mod.url)).then(r=>r.json());
+  for(const [key,E] of Object.entries(C.melees)){const base=data.weapons?.[E.base];if(E.model&&base)data.weapons['melee_'+key]=ownDef(key,E,base);}
+  return data;
+}
 export default async function setup(api){
   const {host,session,data,player,camera,world,enemies,view,toast,equipView,melee,mod}=api;
   const C=await fetch(new URL('melee.json',mod.url)).then(r=>r.json());
-  const choice=loadProfile().loadout?.melee,E=C.melees[choice]??C.melees[C.default],base=data.weapons[E.base];
+  const pick=loadProfile().loadout?.melee,choice=C.melees[pick]&&!soon(C.melees[pick])?pick:C.default,E=C.melees[choice],base=data.weapons[E.base];   // a soon melee (battlepass, not out yet) falls back to the default
   if(!base)return;
-  const id='melee_'+(C.melees[choice]?choice:C.default);
+  const id='melee_'+choice;
   // A held weapon built on a knife-shaped gun: its arms and clips, none of its shooting
   const from=await Promise.all((E.pose.from??[]).map(async f=>({re:new RegExp(f.bones),clip:await loadClip(f.clip),frame:f.frame})));
   const pose=still(await loadClip(E.pose.clip),E.pose,from),rest=asUrl(pose);
@@ -51,13 +66,23 @@ export default async function setup(api){
   const GRIP=E.grip&&new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...E.grip.map(THREE.MathUtils.degToRad)));
   // plus, on a character's own retargeted arms (fp-arms.js knifeShift), the move that puts the handle in that character's fist
   const shiftM=new THREE.Matrix4();
-  const grip=()=>{const k=view.knives?.[E.held];if(!k)return;const u=k.userData;u.attachMatrix??=k.matrix.clone();
+  // own model: it is the view's gun (hung from tag_knife_attach), held the same way; FLIP turns it the right way out again under the
+  // mirrored hands (the knife is symmetric, the bell's lettering is not)
+  const FLIP=new THREE.Matrix4().makeScale(1,1,-1);
+  const grip=()=>{const k=E.model?(view.def?.id===id?view.gun:null):view.knives?.[E.held];if(!k)return;const u=k.userData;u.attachMatrix??=k.matrix.clone();
+    if(E.model&&on){k.matrix.copy(u.attachMatrix);if(GRIP)k.matrix.premultiply(GRIP);const sh=view.hands?.userData.fpArmsSkeleton?.knifeShift;if(sh)k.matrix.premultiply(shiftM.makeTranslation(sh.x,sh.y,sh.z));if(E.mirror)k.matrix.multiply(FLIP);return;}
     const sh=view.hands?.userData.fpArmsSkeleton?.knifeShift;
     if(on){k.matrix.copy(u.attachMatrix);if(GRIP)k.matrix.premultiply(GRIP);if(sh)k.matrix.premultiply(shiftM.makeTranslation(sh.x,sh.y,sh.z));u.gripped=true;}
     else if(u.gripped){k.matrix.copy(u.attachMatrix);u.gripped=false;}};
-  const D=data.weapons[id]={...base,id,baseId:E.base,worldModel:E.worldModel??base.worldModel,heldKnife:E.held,mirror:E.mirror,armPump:true,animations:{idleAnim:rest,meleeAnim:asUrl(swingClip(pose,SLASH)),backslashAnim:asUrl(swingClip(pose,BACKSLASH)),meleeChargeAnim:asUrl(swingClip(pose,STAB))},price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,
-    noAmmo:true,noAds:true,ownPackName:true,automatic:false,raiseTime:E.raiseTime,dropTime:E.dropTime,weight:.5,upgrade:{},
+  const swings=E.swings==='still'?{meleeAnim:rest,backslashAnim:rest}:{meleeAnim:asUrl(swingClip(pose,SLASH)),backslashAnim:asUrl(swingClip(pose,BACKSLASH))};   // still: the script moves the arm (the bell's ring)
+  const own={mirror:E.mirror,armPump:true,animations:{idleAnim:rest,...swings,meleeChargeAnim:asUrl(swingClip(pose,STAB))},raiseTime:E.raiseTime,dropTime:E.dropTime,weight:E.weight??.5,
     melee:{meleeDamage:E.damage,meleeDelay:E.swingDelay,meleeChargeDelay:E.heavyDelay,meleeTime:E.swing,meleeChargeTime:E.heavy,meleeReach:E.reach,exact:true,fade:.05}};
+  // own model: the prepared def (weapon-levels already fitted its attachments to that object, keep it); the knife: built here
+  const D=E.model?data.weapons[id]:data.weapons[id]={...base,id,baseId:E.base,worldModel:E.worldModel??base.worldModel,heldKnife:E.held,price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,
+    noAmmo:true,noAds:true,ownPackName:true,automatic:false,upgrade:{}};
+  if(!D)return;
+  Object.assign(D,own);if(E.model){D.gunTag='tag_knife_attach';delete D.heldKnife;}
+  const meleeBase={...D.melee};
   const fresh=()=>({id,mag:1,reserve:0,upgraded:false,papLevel:0});
   let K=fresh(),on=false,gun=null,pressAt=0,armed=false,held=false,adsWas=false,side=-1;
   const now=()=>performance.now()/1000,inventorySlot=()=>session.inventory[session.slot];
@@ -68,6 +93,11 @@ export default async function setup(api){
   name();
   const power=()=>C.tiers[K.papLevel].mul;
   const damage=()=>power()*Math.max(E.damage,C.roundShare*zombieHealth(session.round??1,data.rules));
+  // The entry's own behaviour (melee.json `script`, e.g. grave-bell.js), a module whose default export takes ctx and returns hooks:
+  // tune(melee): adjust the swing's numbers (D.melee, reset to melee.json's before each swing); swing(heavy) after a swing starts,
+  // may return {keys} (a pivot pose, motion.js) and {lunge:false}; clip(heavy): a clip key to play in place of the swing's;
+  // update(dt) every frame; reset() on a new game. has(tag): an attachment's tag is shown (fitted).
+  const hooks=E.script?(await import(new URL(E.script,mod.url).href)).default({api,E,C,D,id,isOn:()=>on,damage,power,play:keys=>play(keys,true),has:t=>!D.hideTags?.includes(t)}):null;
 
   const free=()=>session.phase!=='reviving'&&session.phase!=='gameover'&&view.ready&&!session.drinking&&!session.meleeLeft&&!session.equipmentLeft&&!host.gunBlocked&&!window.kino?.operator?.active;
   // The pivot pose running now, added by the motion layer after its own (fp.js). keys: motion.js; knife: about the knife arm's shoulder, else about the camera
@@ -96,16 +126,18 @@ export default async function setup(api){
     if(armed&&now()-pressAt<C.holdTime){armed=false;if(on)swing(!!view.input?.ads);else melee();}
     return true;
   };
-  host.meleeDamage=(d,heavy)=>Math.max(d,session.bowie?data.melee.bowie.damage:0,on?damage()*(heavy?E.heavyMul:1):C.bashShare*zombieHealth(session.round??1,data.rules));
+  host.meleeDamage=(d,heavy)=>Math.max(d,session.bowie?data.melee.bowie.damage:0,on?damage()*(heavy?E.heavyMul:E.lightMul??1):C.bashShare*zombieHealth(session.round??1,data.rules));
   host.packLabel=session.packLabel=()=>{if(!on)return null;const t=C.tiers[K.papLevel+1];return t?`Pack-a-Punch ${E.name} tier ${t.name} · ${t.price}`:`${E.upgradeName} is fully upgraded`;};
   host.warmWeaponIds=()=>[id];
 
   function swing(heavy){
     if(session.meleeLeft>0)return;
     if(lowering)return;
+    hooks?.tune?.(Object.assign(D.melee,meleeBase));   // (in place: an upgraded view def is a copy that shares this object)
     const z=lungeTarget();side=heavy?side:-side;if(!melee(heavy))return;
+    const r=hooks?.swing?.(heavy);if(r?.keys)play(r.keys,true);
     const s=window.kino?.fpMotion?.s;if(s){s.kickY.v+=side*(heavy?2:5);s.kickP.v+=heavy?3:1;}
-    if(z){const to=z.root.position.clone().sub(camera.position).setY(0),d=to.length(),v=Math.min(1100,(d-55)/.12);
+    if(z&&r?.lunge!==false){const to=z.root.position.clone().sub(camera.position).setY(0),d=to.length(),v=Math.min(1100,(d-55)/.12);
       if(v>0){to.normalize();player.velocity.set(to.x*v,Math.max(player.velocity.y,70),to.z*v);player.onFloor=player.grounded=false;}}
   }
   function lungeTarget(){
@@ -119,7 +151,9 @@ export default async function setup(api){
   // gun with its own melee clip keeps that clip, and the knife out goes through the engine's def.melee path.
   const swingView=view.melee;
   view.melee=function(type='knife',charge=false){
-    if(this.def?.melee){const r=swingView.call(this,type,charge);if(r&&!charge&&side<0)this.rig.play('backslashAnim',false,this.clipSpeed('backslashAnim',r.duration),this.def.melee.fade);return r;}   // every other slash comes back the other way
+    if(this.def?.melee){const r=swingView.call(this,type,charge);if(r&&!charge&&side<0)this.rig.play('backslashAnim',false,this.clipSpeed('backslashAnim',r.duration),this.def.melee.fade);
+      const k=r&&hooks&&this.def.id===id?hooks.clip?.(charge):null;if(k)this.rig.play(k,false,this.clipSpeed(k,r.duration),this.def.melee.fade);
+      return r;}   // every other slash comes back the other way
     if(type!=='knife')return swingView.call(this,type,charge);
     if(!this.ready||this.meleeLeft>0)return null;
     const d=data.melee.knife,key='knife:'+(charge?'meleeChargeAnim':'meleeAnim'),duration=Math.max(charge?d.chargeTime:d.time,(this.meleeRig??this.rig).data[key]?.duration??0);
@@ -154,7 +188,8 @@ export default async function setup(api){
     Object.defineProperty(player,key,{configurable:true,get:()=>(d?.get?d.get():b)*(on?E[key]:1),set:v=>{if(d?.set)d.set(v);else b=v;}});
   }
 
-  host.on('update',()=>{
+  host.on('update',dt=>{
+    hooks?.update?.(dt||0);
     K.lost=false;K.mag=1;   // (the machine marks what it keeps too long as lost; the knife comes back to you)
     const fm=window.kino?.fpMotion;if(fm&&fm.strike!==strike)fm.strike=strike;
     grip();
@@ -166,5 +201,5 @@ export default async function setup(api){
     if(on&&!session.weaponUnavailable&&!session.drinking){if(fire)swing(false);else if(ads&&!adsWas)swing(true);}
     adsWas=ads;
   });
-  host.on('reset',()=>{K=fresh();on=false;gun=null;armed=held=false;lowering=anim=null;raising=false;name();});
+  host.on('reset',()=>{K=fresh();on=false;gun=null;armed=held=false;lowering=anim=null;raising=false;name();hooks?.reset?.();});
 }

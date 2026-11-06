@@ -550,5 +550,56 @@
   "name": "Atlas 45 Akimbo",
   "cls": "pistol",
   "max": 2
+ },
+ {
+  "id": "hive_launcher_zm",
+  "name": "Hive Launcher",
+  "cls": "launcher",
+  "max": 10,
+  "styles": [
+   "honeycomb",
+   "apiary",
+   "hivemind"
+  ],
+  "names": [
+   "Honeycomb",
+   "Apiary",
+   "Hivemind"
+  ],
+  "pal": [
+   [
+    26,
+    40,
+    0
+   ],
+   [
+    48,
+    42,
+    0
+   ],
+   [
+    30,
+    38,
+    0
+   ]
+  ]
+ },
+ {
+  "id": "debt_collector_zm",
+  "name": "The Debt Collector",
+  "cls": "pistol",
+  "max": 10,
+  "styles": ["promissory", "giltledger", "finalnotice"],
+  "names": ["Promissory", "Gilt Ledger", "Final Notice"],
+  "pal": [[132, 45, 0], [152, 45, 0], [356, 14, 0]]
+ },
+ {
+  "id": "melee_grave_bell",
+  "name": "The Grave Bell",
+  "cls": "special",
+  "max": 10,
+  "styles": ["verdigris", "gildedrequiem", "deathknell"],
+  "names": ["Verdigris", "Gilded Requiem", "Death Knell"],
+  "pal": [[165, 28, 0], [44, 0, 0], [222, 198, 0]]
  }
 ]

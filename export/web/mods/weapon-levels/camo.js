@@ -262,7 +262,7 @@ export const classLabel=key=>CLASSES.find(c=>c[0]===key)?.[1]??key;
 // Stark's suit weapons (stark/armor.js copy a base gun's model) and guns that never kill don't count (2026-10-21: the
 // suitcase and cloak made pistol Diamond impossible in a match)
 export function classGuns(weapons,key){return Object.keys(weapons??{}).filter(id=>{const d=weapons[id];
-  return !/upgraded/.test(id)&&d?.model&&!d.suitWeapon&&!d.hideGun&&!/^iron_/.test(id)&&(d.damage??1)>0&&classOf(weapons,id)===key;});}
+  return !/upgraded/.test(id)&&d?.model&&!d.suitWeapon&&!d.soon&&!d.hideGun&&!/^iron_/.test(id)&&(d.damage??1)>0&&classOf(weapons,id)===key;});}
 
 // ---- challenges -------------------------------------------------------------------------------
 export const camoProgress=(profile,id)=>profile.camo?.[id]?.p??{};

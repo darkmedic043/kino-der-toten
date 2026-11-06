@@ -33,6 +33,96 @@
   ],
   "attachments": [
     {
+      "id": "gb_wolftone",
+      "name": "Wolf Tone Clapper",
+      "slot": "muzzle",
+      "tags": [
+        "tag_gb_wolftone"
+      ],
+      "desc": "A jagged fanged clapper that rings sour. Every ring hurts what it holds: half a swing's damage across the whole wave, more up close."
+    },
+    {
+      "id": "gb_irontongue",
+      "name": "Iron Tongue",
+      "slot": "muzzle",
+      "tags": [
+        "tag_gb_irontongue"
+      ],
+      "desc": "A heavy iron clapper. The bell rings lower and holds zombies 70% longer, but the wave reaches only three quarters as far."
+    },
+    {
+      "id": "gb_veil",
+      "name": "Mourning Veil",
+      "slot": "barrel",
+      "tags": [
+        "tag_gb_veil"
+      ],
+      "desc": "Black funeral cloth wrapped over the bell. A muffled toll that carries 40% further, but holds them only two thirds as long."
+    },
+    {
+      "id": "gb_crown",
+      "name": "Cracked Crown",
+      "slot": "laser",
+      "tags": [
+        "tag_gb_crown"
+      ],
+      "desc": "A broken iron crown on the bell's head. Tolls stack to five with a shorter window, and the Death Knell that ends them hits 50% harder and 20% wider."
+    },
+    {
+      "id": "gb_chain",
+      "name": "Chained Bell",
+      "slot": "under",
+      "tags": [
+        "tag_gb_chain"
+      ],
+      "desc": "Transforms the bell: it hangs from a length of grave chain. Longer reach, and the heavy becomes a flail spin that strikes everything around you before it rings."
+    },
+    {
+      "id": "gb_lantern",
+      "name": "Sexton's Lantern",
+      "slot": "under",
+      "tags": [
+        "tag_gb_lantern"
+      ],
+      "desc": "Transforms the bell: a gravedigger's lantern hangs under it. Every ring leaves a pool of ghost-light for 4 seconds that holds any zombie that walks into it."
+    },
+    {
+      "id": "gb_choir",
+      "name": "Choir of the Dead",
+      "slot": "ammo",
+      "tags": [
+        "tag_gb_choir"
+      ],
+      "desc": "Bone chimes round the rim. Every Death Knell kill lets a wisp go that drifts into the nearest zombie and holds it for 2 seconds."
+    },
+    {
+      "id": "gb_requiem",
+      "name": "Requiem",
+      "slot": "ammo",
+      "tags": [
+        "tag_gb_requiem"
+      ],
+      "desc": "A rosary of bone beads. Ringing near a downed teammate doubles your revive speed and keeps zombies off them for 4 seconds. Alone, a Death Knell heals you and wards you for 2 seconds."
+    },
+    {
+      "id": "gb_ossuary",
+      "name": "Ossuary Grip",
+      "slot": "grip",
+      "tags": [
+        "tag_gb_ossuary"
+      ],
+      "desc": "Finger bones bound round the handle. Rings and bashes come 20% faster and the toll window lasts 30% longer."
+    },
+    {
+      "id": "gb_belfry",
+      "name": "Belfry Spike",
+      "slot": "stock",
+      "tags": [
+        "tag_gb_belfry"
+      ],
+      "desc": "A coffin spike on the pommel. A Death Knell plants a spectral bell in front of you that tolls three more times on its own."
+    },
+    {
       "id": "gh_rangefinder",
       "name": "Rangefinder Optic",
       "slot": "optic",
@@ -1161,6 +1251,118 @@
       ]
     },
     {
+      "id": "hi_waggle",
+      "name": "Waggle Scope",
+      "slot": "optic",
+      "tags": [
+        "tag_hi_waggle"
+      ],
+      "desc": "A brass beekeeper's spyglass with a hex reticle and feelers. Aim at a zombie to mark it: every drone you have out goes for the marked zombie first.",
+      "stats": {
+        "adsFovMul": 0.85
+      }
+    },
+    {
+      "id": "hi_pheromone",
+      "name": "Pheromone Laser",
+      "slot": "laser",
+      "tags": [
+        "tag_hi_pheromone"
+      ],
+      "desc": "A pink scent lamp under the muzzle. Nests lure zombies from twice as far, and drones go for the zombies near the pink dot."
+    },
+    {
+      "id": "hi_swarm",
+      "name": "Swarm Drum",
+      "slot": "mag",
+      "tags": [
+        "tag_hi_swarm"
+      ],
+      "desc": "Swaps the comb for a six-bore drum of seed pods. Each shot is a spread of three small nests (three drones each, six seconds), up to six out at once. Double the magazine.",
+      "stats": {
+        "clipMul": 2,
+        "reloadMul": 1.2
+      },
+      "replaces": [
+        "tag_hi_drum"
+      ]
+    },
+    {
+      "id": "hi_keeper",
+      "name": "Personal Hive",
+      "slot": "mag",
+      "tags": [
+        "tag_hi_keeper"
+      ],
+      "desc": "Swaps the comb for a straw skep: no more nests. Drones hatch from the gun and circle you (up to eight), sting anything that comes close, and a shot sends the whole swarm at whatever you aim at.",
+      "replaces": [
+        "tag_hi_drum"
+      ],
+      "excludes": [
+        "under"
+      ]
+    },
+    {
+      "id": "hi_smoker",
+      "name": "Smoker",
+      "slot": "barrel",
+      "tags": [
+        "tag_hi_smoker"
+      ],
+      "desc": "A beekeeper's smoker can where the barrel was. Each shot pours a cone of smoke that dazes zombies in front of you for 1.5 s and lobs the nest in an arc, and every nest already out empties all its drones at once.",
+      "replaces": [
+        "tag_hi_barrel"
+      ]
+    },
+    {
+      "id": "hi_killer",
+      "name": "Killer Swarm",
+      "slot": "barrel",
+      "tags": [
+        "tag_hi_killer"
+      ],
+      "desc": "A black-and-yellow barrel ringed with venom stingers. Drones explode on their last sting.",
+      "replaces": [
+        "tag_hi_barrel"
+      ]
+    },
+    {
+      "id": "hi_honey",
+      "name": "Honey Trap",
+      "slot": "under",
+      "tags": [
+        "tag_hi_honey"
+      ],
+      "desc": "A jar of glowing honey under the barrel. Every nest spills a pool round it: zombies wading through are 55% slower."
+    },
+    {
+      "id": "hi_queen",
+      "name": "Queen Cell",
+      "slot": "ammo",
+      "tags": [
+        "tag_hi_queen"
+      ],
+      "desc": "A royal cell along the top. Each nest's first drone is a violet queen: twice the size and damage, six stings."
+    },
+    {
+      "id": "hi_propolis",
+      "name": "Propolis Shell",
+      "slot": "ammo",
+      "tags": [
+        "tag_hi_propolis"
+      ],
+      "desc": "Resin-crusted bars round the comb. Nests take 2.5 times the beating before zombies tear them down."
+    },
+    {
+      "id": "hi_jelly",
+      "name": "Royal Jelly",
+      "slot": "stock",
+      "tags": [
+        "tag_hi_jelly"
+      ],
+      "desc": "A canister of royal jelly strapped to the bellows. Drones that finish their stings fly back to you and heal you a little."
+    },
+    {
       "id": "akimbo",
       "name": "Akimbo",
       "slot": "akimbo",
@@ -1698,6 +1900,91 @@
         "rangeMul": 1.3,
         "hipSpreadMul": 0.75
       }
+    },
+    {
+      "id": "dc_loupe",
+      "name": "Appraiser's Loupe",
+      "slot": "optic",
+      "tags": ["tag_dc_loupe"],
+      "desc": "A jeweller's brass loupe with a gold dot. Aimed hits bank 25% more debt.",
+      "stats": {"adsFovMul": 1.05},
+      "scope": "reflex"
+    },
+    {
+      "id": "dc_brake",
+      "name": "Foreclosure Brake",
+      "slot": "muzzle",
+      "tags": ["tag_dc_brake"],
+      "desc": "A padlocked muzzle brake. A zombie that owes more than its health is foreclosed: it shuffles at half speed until it pays.",
+      "stats": {"rangeMul": 1.1}
+    },
+    {
+      "id": "dc_compound",
+      "name": "Compound Interest Cylinder",
+      "slot": "mag",
+      "tags": ["tag_dc_compound"],
+      "desc": "A fluted five-shot cylinder with a gear-driven counter. Interest compounds: 8% a second on everything owed, up to 150% (300% Pack-a-Punched).",
+      "stats": {"clipMul": 0.834},
+      "replaces": ["tag_dc_ledger"]
+    },
+    {
+      "id": "dc_roulette",
+      "name": "Double or Nothing",
+      "slot": "mag",
+      "tags": ["tag_dc_roulette"],
+      "desc": "The cylinder becomes a roulette wheel that spins on every collection. Red: every debt x1.6. Black: the house forgives them all. The green zero: x4.",
+      "replaces": ["tag_dc_ledger"]
+    },
+    {
+      "id": "dc_hook",
+      "name": "Repo Hook",
+      "slot": "under",
+      "tags": ["tag_dc_hook"],
+      "desc": "A chained grappling hook under the barrel. Collecting drags every surviving debtor up to 150 toward you and staggers it for a second."
+    },
+    {
+      "id": "dc_payday",
+      "name": "Payday Clip",
+      "slot": "ammo",
+      "tags": ["tag_dc_payday"],
+      "desc": "A money-clip speedloader. Collections pay you 5% of what they collect as points (up to 100 a zombie)."
+    },
+    {
+      "id": "dc_bailiff",
+      "name": "The Bailiff",
+      "slot": "stock",
+      "tags": ["tag_dc_bailiff"],
+      "desc": "Turns the revolver into a carbine: long barrel, walnut handguard and a wire stock. Double range, 30% more damage, a tighter aim, and every shot goes through to bill the zombie behind. No muzzle or barrel attachments.",
+      "stats": {"rangeMul": 2, "damageMul": 1.3, "adsFovMul": 0.85, "hipSpreadMul": 0.6, "pierce": 1},
+      "replaces": ["tag_barrel_long", "tag_iron_sight"],
+      "excludes": ["barrel", "muzzle"]
+    },
+    {
+      "id": "dc_spiral",
+      "name": "Debt Spiral Barrel",
+      "slot": "barrel",
+      "tags": ["tag_dc_spiral"],
+      "desc": "A barrel wound in a spiral of gold. Each further hit on a debtor banks 15% more than the last, up to 75% more.",
+      "replaces": ["tag_barrel_long"],
+      "excludes": ["stock"]
+    },
+    {
+      "id": "dc_ticker",
+      "name": "Ticker Tape Laser",
+      "slot": "laser",
+      "tags": ["tag_dc_ticker"],
+      "desc": "A gold laser on a stock-ticker reel. 30% tighter hip fire, and a debtor's tag turns red once collecting will kill it.",
+      "stats": {"hipSpreadMul": 0.7},
+      "replaces": ["tag_dc_spool"]
+    },
+    {
+      "id": "dc_shark",
+      "name": "Loan Shark Grips",
+      "slot": "grip",
+      "tags": ["tag_dc_shark"],
+      "desc": "Sharkskin grips with a tooth on the butt. 25% faster reloads, and a melee on a debtor collects its debt on the spot.",
+      "stats": {"reloadMul": 0.75},
+      "replaces": ["tag_dc_grips"]
     }
   ],
   "ironSights": {
@@ -1771,6 +2058,12 @@
       "tag_iron_sight"
     ],
     "xm325_zm": [
+      "tag_iron_sight"
+    ],
+    "hive_launcher_zm": [
+      "tag_hi_irons"
+    ],
+    "debt_collector_zm": [
       "tag_iron_sight"
     ]
   },

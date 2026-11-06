@@ -1,0 +1,5 @@
+{
+  "name": "Melon weapons",
+  "description": "Melon Zombies' own weapons (own Blender models skinned to BO1 skeletons): the Debt Collector, a revolver that banks its damage until you reload, and the Hive Launcher, which fires sticky nests of homing drones. The Grave Bell melee lives in the melee mod.",
+  "script": "mod.js"
+}

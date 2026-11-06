@@ -252,7 +252,7 @@ export function renderGunsmith(el,{cat,def,id,profile,onChange,onOpen,compact=fa
     <div class="gs-bar"><i style="width:${p.level>=cap?100:(100*p.xp/need).toFixed(1)}%"></i></div>
     <small class="muted">${p.level>=cap?'Max level · prestige it in the Armory':`${p.xp} / ${need} weapon XP · kills with this gun${(n=>n?` · next: ${esc(n.att.name)} at LV ${n.level}`:'')(nextUnlock(cat,def,id,p.level))}`}</small>
     <div class="gs-eq">${Object.keys(cat.slots).filter(s=>all.some(a=>a.slot===s)).map(s=>{const a=all.find(x=>x.slot===s&&on.has(x.id));
-      return `<span><i>${esc(cat.slots[s].toUpperCase())}</i>${a?esc(a.name):'—'}</span>`;}).join('')}</div>
+      return `<span><i>${esc((def.slotNames?.[s]??cat.slots[s]).toUpperCase())}</i>${a?esc(a.name):'—'}</span>`;}).join('')}</div>
     <button class="gs-open">OPEN GUNSMITH  ›</button>
     <small class="muted">${all.length?`${unlocked.size} / ${all.length} attachments unlocked`:'Camos only'}</small></div>`;
   el.querySelector('.gs-open').addEventListener('click',e=>{e.stopPropagation();onOpen?.();});

@@ -62,9 +62,27 @@ GUNS.xm325_rh = { ...GUNS.xm325, DONOR: 'models/t5_weapon_cz75_dw_rh_viewmodel.g
   RENAME: { j_bolt: 'j_gun' }, FLASH: ['tag_flash', 'tag_flash2'], NO_WORLD: true };
 GUNS.xm325_lh = { ...GUNS.xm325_rh, DONOR: 'models/t5_weapon_cz75_dw_lh_viewmodel.glb', PARENT: 'j_gun1',
   RENAME: { j_gun: 'j_gun1', j_bolt: 'j_gun1' }, FLASH: ['tag_flash1', 'tag_flash3'] };
+// The Debt Collector (melon-weapons.md) on the Python: its cylinders hang off j_bolt (BONE_PARENT) so they swing out with
+// the crane and turn with the cylinder; the Python has no tag_iron_sight, so the gold-tooth sight gets one.
+const DC_CYL = [1.447, 0, 1.643], DC_SPOOL = [2.3, 0.7, -0.05], DC_GRIP = [-3, 0, -1.5];
+GUNS.debt = { DONOR: 'models/t5_weapon_coltpython_viewmodel.glb', WORLD_SHIFT: [-10.65, -0.875, 0], MUZZLE: [12.4, 0, 2.285], BODY: 'dc_body',
+  NEW_BONES: { tag_iron_sight: [11.82, 0, 2.9], tag_dc_ledger: DC_CYL, tag_dc_compound: DC_CYL, tag_dc_roulette: DC_CYL,
+    tag_dc_grips: DC_GRIP, tag_dc_shark: DC_GRIP, tag_dc_spool: DC_SPOOL, tag_dc_ticker: DC_SPOOL, tag_dc_loupe: [1.4, 0, 3.0],
+    tag_dc_brake: [12.3, 0, 2.285], tag_dc_hook: [11.55, 0, 1.2], tag_dc_payday: [9.7, 0.45, 1.75], tag_dc_bailiff: [-5, 0, -3.5],
+    tag_dc_spiral: [3.8, 0, 2.285] },
+  BONE_PARENT: { tag_dc_ledger: 'j_bolt', tag_dc_compound: 'j_bolt', tag_dc_roulette: 'j_bolt' },
+  WORLD_PARTS: ['j_gun', 'j_press_rear', 'tag_clip', 'j_bolt', 'tag_barrel_long', 'tag_iron_sight', 'tag_dc_grips', 'tag_dc_spool', 'tag_dc_ledger'] };
+// The Hive Launcher (melon-weapons.md) on the M72 LAW: the drum and its swaps (Swarm, Keeper's skep) turn on tag_hi_drum's
+// place, the muzzles (Smoker, Killer) replace tag_hi_barrel
+GUNS.hive = { DONOR: 'models/t5_weapon_law_viewmodel.glb', WORLD_SHIFT: [-12.46, -2.81, 0], MUZZLE: [22.4, 0, 2.1], BODY: 'hi_body',
+  NEW_BONES: { tag_hi_drum: [12.3, 0, 2.1], tag_hi_barrel: [16, 0, 2.1], tag_hi_irons: [4, 0.75, 5.5], tag_hi_waggle: [-3, 0.75, 5.7],
+    tag_hi_pheromone: [17, -1.55, 2.6], tag_hi_swarm: [12.3, 0, 2.1], tag_hi_keeper: [12.3, 0, 2.1], tag_hi_smoker: [16, 0, 2.1],
+    tag_hi_killer: [16, 0, 2.1], tag_hi_honey: [18.3, 0, -0.5], tag_hi_queen: [4, 0.35, 4.2], tag_hi_propolis: [12.3, 0, 2.1], tag_hi_jelly: [-15.5, 0, 4.3] },
+  WORLD_PARTS: ['j_gun', 'tag_hi_drum', 'tag_hi_barrel', 'tag_hi_irons'] };
 // optional: DROP = parts left out; RENAME = part -> donor bone it's weighted to; PARENT = the gun bone new bones hang off;
-// FLASH = the muzzle tags moved to MUZZLE; NO_WORLD = viewmodel only
-const { MUZZLE, NEW_BONES, BODY, WORLD_PARTS, DROP = [], RENAME = {}, PARENT = 'j_gun', FLASH = ['tag_flash'], NO_WORLD } = GUNS[GUN];
+// BONE_PARENT = new bone -> a donor bone under PARENT it hangs off instead (NEW_BONES positions stay in PARENT space; the
+// chain between must be unrotated); FLASH = the muzzle tags moved to MUZZLE; NO_WORLD = viewmodel only
+const { MUZZLE, NEW_BONES, BODY, WORLD_PARTS, DROP = [], RENAME = {}, PARENT = 'j_gun', FLASH = ['tag_flash'], NO_WORLD, BONE_PARENT = {} } = GUNS[GUN];
 const DONOR = path.join(WEB, GUNS[GUN].DONOR ?? 'models/t5_weapon_viewmodel_m16a1.glb');
 const WORLD_SHIFT = GUNS[GUN].WORLD_SHIFT ?? [-10.5, -2.55, 0];   // the M16's: CoD (-10.5, 0, -2.55), in glTF axes
 const CAMO_SCALE = 9;
@@ -153,9 +171,17 @@ for (const n of parts.json.nodes) if (n.mesh !== undefined && n.name?.startsWith
   const mul = (a, b) => { const o = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]; return o; };
   for (const [name, t] of Object.entries(NEW_BONES)) {
     if (!partMeshes.has(name)) continue;
-    out.nodes.push({ name, translation: t }); const ni = out.nodes.length - 1;
-    (out.nodes[jgun].children ??= []).push(ni); joints.push(ni);
-    ibms.push(mul([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -t[0], -t[1], -t[2], 1], jgunIbm));
+    let pn = jgun, l = t;
+    if (BONE_PARENT[name]) {   // a deeper parent: its offset from PARENT summed up the (unrotated) chain
+      pn = out.nodes.findIndex(n => n.name === BONE_PARENT[name]); l = [...t];
+      for (let k = pn; k !== jgun; k = out.nodes.findIndex(n => n.children?.includes(k))) {
+        if (k < 0) throw new Error(BONE_PARENT[name] + ' is not under ' + PARENT);
+        (out.nodes[k].translation ?? [0, 0, 0]).forEach((v, e) => { l[e] -= v; });
+      }
+    }
+    out.nodes.push({ name, translation: l }); const ni = out.nodes.length - 1;
+    (out.nodes[pn].children ??= []).push(ni); joints.push(ni);
+    ibms.push(mul([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -l[0], -l[1], -l[2], 1], pn === jgun ? jgunIbm : ibms[joints.indexOf(pn)]));
   }
   const ibmBuf = Buffer.alloc(ibms.length * 64); ibms.flat().forEach((v, i) => ibmBuf.writeFloatLE(v, i * 4));
   const ibmIdx = addRaw(out, w, ibmBuf, { componentType: 5126, count: ibms.length, type: 'MAT4' });

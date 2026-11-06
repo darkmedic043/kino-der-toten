@@ -8,9 +8,10 @@
 // engraving, launcher blast rays, special glyph runes.
 // Hand-made: the Siren's Wailing Tide (I), Choir Grille (II) and Song of Circe (Master); the GDL Havoc's Danger Close (I),
 // Live Ordnance (II) and Chain Reaction (Master); the ROC 20mm's Ammo Crate (I), Breechworks (II) and Flak Night (Master);
-// the XM325's Voltaic (I), Fated (II) and Cobalt Circuit (Master).
+// the XM325's Voltaic (I), Fated (II) and Cobalt Circuit (Master); the Hive Launcher's Honeycomb (I), Apiary (II) and
+// Hivemind (Master).
 // Hand-made designs for one gun (named in .tools/prestige-guns.json, not in STYLES so no other gun is dealt them)
-const OWN=new Set(['wailtide','choirgrille','songofcirce','dangerclose','liveordnance','chainreaction','ammocrate','breechworks','flaknight','voltaic','fated','cobaltcircuit']);
+const OWN=new Set(['wailtide','choirgrille','songofcirce','dangerclose','liveordnance','chainreaction','ammocrate','breechworks','flaknight','voltaic','fated','cobaltcircuit','honeycomb','apiary','hivemind','verdigris','gildedrequiem','deathknell','promissory','giltledger','finalnotice']);
 export const STYLES={1:['shards','chevrons','splinter','contour','scales','brush'],2:['lattice','filigree','damascus','mosaic','carbon','facets'],3:['cracks','circuit','runes','lightning','magma','constellation']};
 
 const hsl=(h,s,l,a=1)=>`hsla(${((h%360)+360)%360},${s}%,${l}%,${a})`;
@@ -85,6 +86,35 @@ const P1={
     for(let i=0;i<10;i++){const x=r()*S,y=r()*S,k=.8+r()*.7,lit=r()<.5;w(()=>{bolt(x,y,k);g.fillStyle=lit?hsl(p.h2,85,60):hsl(p.h,25,24);g.fill();});}
     const words=['XM325','LEYDEN','500 RD','RIST RAUCH','HV'];g.textBaseline='middle';
     for(let i=0;i<8;i++){const x=r()*S,y=r()*S,t=words[Math.floor(r()*words.length)];w(()=>{g.font='bold 22px monospace';g.fillStyle=hsl(p.h,20,30,.8);g.fillText(t,x,y);});}},
+  // the Hive Launcher's: a slab of comb (wax walls, amber honey cells with a shine, pale wax caps, empty and brood
+  // cells) with honey running down over it
+  honeycomb(g,S,r,p,w){const TAU=6.283;g.fillStyle=hsl(p.h,45,9);g.fillRect(0,0,S,S);
+    const kind=[],sh=[];for(let i=0;i<224;i++){const v=r();kind.push(v<.45?1:v<.75?2:v<.9?0:3);sh.push(r());}
+    hexGrid(S,(x,y,i,a,b)=>{hexPath(g,x,y,a,b,.97);g.fillStyle=hsl(p.h,50,20+sh[i]*6);g.fill();const k=kind[i];hexPath(g,x,y,a,b,.8);
+      if(k===1){const gr=g.createRadialGradient(x-4,y-5,2,x,y,a);gr.addColorStop(0,hsl(p.h2,95,60));gr.addColorStop(1,hsl(p.h2,90,28+sh[i]*8));g.fillStyle=gr;g.fill();
+        g.fillStyle=hsl(p.h2,100,86,.6);g.beginPath();g.ellipse(x-5,y-6,5,2.4,-.5,0,TAU);g.fill();}
+      else if(k===2){const gr=g.createRadialGradient(x-3,y-4,1,x,y,a);gr.addColorStop(0,hsl(p.h2,60,84));gr.addColorStop(1,hsl(p.h2,45,58));g.fillStyle=gr;g.fill();}
+      else if(k===3){g.fillStyle=hsl(p.h,55,27+sh[i]*6);g.fill();}
+      else{g.fillStyle=hsl(p.h,50,5);g.fill();g.strokeStyle=hsl(p.h,40,15);g.lineWidth=2;hexPath(g,x,y,a,b,.6);g.stroke();}});
+    for(let i=0;i<14;i++){const x=r()*S,y=r()*S,len=30+r()*80,wd=5+r()*5,bulb=r()<.65;
+      w(()=>{g.lineCap='round';g.strokeStyle=hsl(p.h2,90,30);g.lineWidth=wd+3;g.beginPath();g.moveTo(x,y);g.lineTo(x,y+len);g.stroke();g.strokeStyle=hsl(p.h2,95,50);g.lineWidth=wd;g.stroke();
+        if(bulb){g.fillStyle=hsl(p.h2,95,48);g.beginPath();g.arc(x,y+len+wd*.4,wd*.95,0,TAU);g.fill();}
+        g.strokeStyle=hsl(p.h2,100,84,.7);g.lineWidth=1.5;g.beginPath();g.moveTo(x-wd*.25,y+4);g.lineTo(x-wd*.25,y+len-4);g.stroke();});}},
+  // the Grave Bell's Prestige I: oxidised bronze, verdigris blooming over it, sound rings engraved in it and MEMENTO MORI bands
+  verdigris(g,S,r,p,w){const TAU=6.283,n=rng(p.seed*7+1);g.fillStyle=hsl(p.h,34,22);g.fillRect(0,0,S,S);
+    for(let i=0;i<150;i++){const x=r()*S,y=r()*S,R=12+r()*58,k=r(),c=k<.55?hsl(p.h,42+r()*18,32+r()*16,.55):k<.8?hsl(p.h2,58,26+r()*12,.5):hsl(p.h,25,11,.5);
+      w(()=>{const gr=g.createRadialGradient(x,y,0,x,y,R);gr.addColorStop(0,c);gr.addColorStop(1,hsl(p.h,34,22,0));g.fillStyle=gr;g.fillRect(x-R,y-R,R*2,R*2);});}
+    for(let i=0;i<2600;i++){g.fillStyle=n()<.7?hsl(p.h,50,55+n()*20,.35):hsl(p.h2,60,40,.35);g.fillRect(n()*S,n()*S,1+n()*1.5,1+n()*1.5);}
+    for(let i=0;i<7;i++){const x=r()*S,y=r()*S,cnt=3+Math.floor(r()*4),st=9+r()*6,arcs=[...Array(cnt)].map(()=>[r()*TAU,(.55+r()*.45)*TAU]);
+      w(()=>{g.lineCap='round';for(let k=0;k<cnt;k++){const R=st*(k+1),[a0,al]=arcs[k];
+        g.strokeStyle=hsl(p.h,40,9,.85);g.lineWidth=2.6;g.beginPath();g.arc(x,y,R,a0,a0+al);g.stroke();
+        g.strokeStyle=hsl(p.h,45,60,.45);g.lineWidth=1;g.beginPath();g.arc(x+1,y+1.2,R,a0,a0+al);g.stroke();}});}
+    g.textBaseline='middle';g.textAlign='center';
+    for(let b=0;b<2;b++){const y=b*S/2+S/8+r()*S/8,ox=r()*S/2;
+      w(()=>{for(const yy of [y-15,y+15]){g.strokeStyle=hsl(p.h,40,9,.85);g.lineWidth=2.4;g.beginPath();g.moveTo(0,yy);g.lineTo(S,yy);g.stroke();g.strokeStyle=hsl(p.h,45,60,.4);g.lineWidth=1;g.beginPath();g.moveTo(0,yy+1.2);g.lineTo(S,yy+1.2);g.stroke();}
+        g.font='bold 21px serif';for(const x of [ox,ox+S/2]){g.fillStyle=hsl(p.h,45,62,.45);g.fillText('MEMENTO ✠ MORI',x+1,y+1.3);g.fillStyle=hsl(p.h,40,8,.9);g.fillText('MEMENTO ✠ MORI',x,y);}});
+      for(let i=0;i<9;i++){const x=r()*S,len=20+r()*70,wd=2+r()*4;w(()=>{const gr=g.createLinearGradient(0,y+16,0,y+16+len);gr.addColorStop(0,hsl(p.h,55,48,.6));gr.addColorStop(1,hsl(p.h,55,48,0));g.fillStyle=gr;g.fillRect(x,y+16,wd,len);});}}
+    g.textAlign='start';},
 };
 // ---- Prestige II ---------------------------------------------------------------------------------------------------
 const gold=(g,x0,y0,x1,y1)=>{const gr=g.createLinearGradient(x0,y0,x1,y1);gr.addColorStop(0,'#fff0b8');gr.addColorStop(.5,'#c9952f');gr.addColorStop(1,'#ffe39a');return gr;};
@@ -150,6 +180,48 @@ const P2={
       for(let k=0;k<24;k++){const a=k/24*TAU;g.lineWidth=2;g.beginPath();g.moveTo(x+Math.cos(a)*(R-6),y+Math.sin(a)*(R-6));g.lineTo(x+Math.cos(a+.1)*(R-2),y+Math.sin(a+.1)*(R-2));g.stroke();}
       g.lineWidth=3;for(let k=0;k<3;k++){const a0=rot+k*TAU/3;g.beginPath();for(let t=0;t<=1;t+=.04){const a=a0+t*3.2,d=t*(R-12);g.lineTo(x+Math.cos(a)*d,y+Math.sin(a)*d);}g.stroke();}
       g.fillStyle=hsl(p.h2,90,80);g.beginPath();g.arc(x,y,4,0,TAU);g.fill();}},
+  // the Hive Launcher's: a painted bee box (planks with grain and chipped paint, seams with brass rivets, brass hand
+  // holds, APIARY stencils) crawling with brass bees
+  apiary(g,S,r,p,w){const TAU=6.283,H=S/4;
+    const brass=(x0,y0,x1,y1)=>{const gr=g.createLinearGradient(x0,y0,x1,y1);gr.addColorStop(0,hsl(p.h2,70,26));gr.addColorStop(.45,hsl(p.h2,85,58));gr.addColorStop(.55,hsl(p.h2,90,76));gr.addColorStop(1,hsl(p.h2,70,28));return gr;};
+    for(let k=0;k<4;k++){const y0=k*H,l=54+r()*10;g.fillStyle=hsl(p.h,48,l);g.fillRect(0,y0,S,H);g.lineWidth=1.2;
+      for(let j=0;j<12;j++){const yy=y0+8+r()*(H-16),amp=2+r()*5,f=1+Math.floor(r()*3),ph=r()*TAU;g.strokeStyle=hsl(p.h,35,l-16,.5);g.beginPath();for(let x=0;x<=S;x+=8)g.lineTo(x,yy+Math.sin(x/S*TAU*f+ph)*amp);g.stroke();}}
+    for(let i=0;i<30;i++){const x=r()*S,y=r()*S,R=4+r()*12,pts=[...Array(7)].map((_,k)=>[x+Math.cos(k/7*TAU)*R*(.6+r()*.6),y+Math.sin(k/7*TAU)*R*(.6+r()*.6)]);
+      w(()=>{poly(g,pts);g.fillStyle=hsl(28,35,30);g.fill();});}
+    for(let y=0;y<=S;y+=H){g.fillStyle=hsl(p.h,40,16);g.fillRect(0,y-3,S,6);
+      for(let x=32;x<S;x+=64)for(const dy of [-12,12]){g.fillStyle=brass(x-5,y+dy-5,x+5,y+dy+5);g.beginPath();g.arc(x,y+dy,5,0,TAU);g.fill();g.strokeStyle=hsl(p.h2,60,20);g.lineWidth=1;g.stroke();}}
+    const words=['APIARY','HIVE No.7','LIVE BEES','QUEEN INSIDE','THIS SIDE UP','HONEY'];
+    for(let i=0;i<6;i++){const j=i%4,t=words[i%words.length],x=((i>>2)*.5+.25+j*.13+(r()-.5)*.05)*S,y=(r(),j)*H+H*(.38+r()*.24),rot=(r()-.5)*.1,sz=20+r()*12;   // one slot each (two a plank, staggered), so stencils never overlap
+      w(()=>{g.save();g.translate(x,y);g.rotate(rot);g.font=`900 ${sz}px Impact, "Arial Black", sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillStyle=hsl(p.h,30,18,.8);g.fillText(t,0,0);g.restore();});}
+    for(let i=0;i<2;i++){const j=i+2,x=((.75+j*.13+(r()-.5)*.04)%1)*S,y=(r(),j)*H+H*.5;   // the hand holds: planks 2-3, opposite their one stencil
+      w(()=>{g.fillStyle=brass(x-50,y-22,x+50,y+22);g.beginPath();g.roundRect(x-50,y-22,100,44,10);g.fill();g.strokeStyle=hsl(p.h2,60,22);g.lineWidth=2;g.stroke();
+        g.fillStyle=hsl(p.h,30,8);g.beginPath();g.roundRect(x-36,y-9,72,18,9);g.fill();
+        for(const sx of [-43,43]){g.fillStyle=hsl(p.h2,50,30);g.beginPath();g.arc(x+sx,y,3,0,TAU);g.fill();}});}
+    for(let i=0;i<9;i++){const x=r()*S,y=r()*S,rot=r()*TAU,s=.8+r()*.6;
+      w(()=>{g.save();g.translate(x,y);g.rotate(rot);g.scale(s,s);g.lineWidth=1.5;
+        for(const sy of [-1,1]){g.fillStyle='rgba(255,250,230,.4)';g.strokeStyle=hsl(p.h2,70,32);g.beginPath();g.ellipse(-2,10*sy,10,5,.4*sy,0,TAU);g.fill();g.stroke();}
+        g.fillStyle=brass(-14,-8,14,8);g.beginPath();g.ellipse(0,0,14,8,0,0,TAU);g.fill();g.strokeStyle=hsl(p.h2,60,20);g.stroke();
+        g.lineWidth=2.5;for(const sx of [-5,1,7]){const hh=8*Math.sqrt(1-(sx/14)**2)-.5;g.beginPath();g.moveTo(sx,-hh);g.lineTo(sx,hh);g.stroke();}
+        g.fillStyle=brass(-21,-5,-11,5);g.beginPath();g.arc(-16,0,5,0,TAU);g.fill();g.lineWidth=1.2;g.stroke();
+        g.beginPath();g.moveTo(-19,-2);g.lineTo(-26,-8);g.moveTo(-19,2);g.lineTo(-26,8);g.stroke();
+        g.fillStyle=hsl(p.h2,60,20);poly(g,[[13,-2],[20,0],[13,2]]);g.fill();g.restore();});}},
+  // the Grave Bell's Prestige II: Gilded Requiem: gold leaf laid in squares (seams, crackle), black enamel skulls set in it
+  gildedrequiem(g,S,r,p,w){const TAU=6.283,L=64,n=S/L;
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const l=50+r()*14,gr=g.createLinearGradient(x*L,y*L,x*L+L,y*L+L);
+      gr.addColorStop(0,hsl(p.h,80,l+12));gr.addColorStop(.5,hsl(p.h,75,l-8));gr.addColorStop(1,hsl(p.h,85,l+6));g.fillStyle=gr;g.fillRect(x*L,y*L,L,L);}
+    g.strokeStyle=hsl(p.h,60,26,.7);g.lineWidth=1.2;for(let i=0;i<=n;i++){g.beginPath();g.moveTo(i*L,0);g.lineTo(i*L,S);g.moveTo(0,i*L);g.lineTo(S,i*L);g.stroke();}
+    for(let i=0;i<60;i++){const x=r()*S,y=r()*S,pts=[[x,y]];let a=r()*TAU;for(let k=0;k<5;k++){a+=(r()-.5)*1.6;const q=pts[k];pts.push([q[0]+Math.cos(a)*(6+r()*10),q[1]+Math.sin(a)*(6+r()*10)]);}
+      w(()=>{g.strokeStyle=hsl(p.h,55,24,.55);g.lineWidth=.8;g.beginPath();pts.forEach((q,k)=>k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));g.stroke();});}
+    const skull=(s)=>{g.beginPath();g.arc(0,-4*s,13*s,Math.PI*.82,Math.PI*.18);g.lineTo(8*s,10*s);g.lineTo(-8*s,10*s);g.closePath();};
+    for(let y=0;y<S/128;y++)for(let x=0;x<S/128;x++)for(const [ox,oy] of [[0,0],[64,64]]){const cx=x*128+32+ox,cy=y*128+32+oy,s=1.9,rot=(r()-.5)*.25;
+      w(()=>{g.save();g.translate(cx,cy);g.rotate(rot);
+        skull(s);g.fillStyle='#0b0908';g.fill();g.strokeStyle=gold(g,-16,-20,16,14);g.lineWidth=2.4;g.stroke();
+        g.fillStyle=gold(g,-10,-10,10,4);for(const sx of [-1,1]){g.beginPath();g.ellipse(sx*5.2*s,-3*s,3.6*s,4.2*s,0,0,TAU);g.fill();}
+        g.fillStyle='#0b0908';for(const sx of [-1,1]){g.beginPath();g.ellipse(sx*5.2*s,-2.6*s,2.4*s,3*s,0,0,TAU);g.fill();}
+        g.fillStyle=gold(g,-3,0,3,6);poly(g,[[0,1.5*s],[-2*s,5*s],[2*s,5*s]]);g.fill();
+        g.strokeStyle=gold(g,-8,6,8,10);g.lineWidth=1.2;for(let t=-3;t<=3;t++){g.beginPath();g.moveTo(t*2.2*s,6.5*s);g.lineTo(t*2.2*s,10*s);g.stroke();}
+        g.restore();});
+      const dx=cx+64,dy=cy;w(()=>{g.fillStyle='#0b0908';poly(g,[[dx,dy-7],[dx+5,dy],[dx,dy+7],[dx-5,dy]]);g.fill();g.strokeStyle=hsl(p.h,70,70);g.lineWidth=1;g.stroke();});}},
 };
 function hslRgb(h,s,l){h=((h%360)+360)%360/360;const f=n=>{const k=(n+h*12)%12,a=s*Math.min(l,1-l);return l-a*Math.max(-1,Math.min(k-3,9-k,1));};return [f(0),f(8),f(4)];}
 export { hslRgb };
@@ -225,7 +297,42 @@ const PM={
     for(let i=0;i<6;i++){const x=Math.floor(r()*16)*G+G/2,y=Math.floor(r()*16)*G+G/2;
       w(()=>{for(let k=0;k<3;k++){g.strokeStyle=glow?`rgba(255,255,255,${.9-k*.25})`:hsl(p.h2,75,55-k*8);g.lineWidth=k?1.5:3;g.beginPath();g.arc(x,y,7+k*6,0,TAU);g.stroke();}
         g.fillStyle=glow?'#fff':hsl(p.h2,90,80);g.beginPath();g.arc(x,y,3.5,0,TAU);g.fill();});}},
+  // the Hive Launcher's Master: dark comb wired into a network; lit cells, circuit veins that run cell to cell and
+  // queen nodes glow
+  hivemind(g,S,r,p,w,glow){const TAU=6.283,n=rng(p.seed*7+1),py=S/14;g.fillStyle=glow?'#000':hsl(p.h,50,6);g.fillRect(0,0,S,S);
+    const lit=[],core=[];for(let i=0;i<224;i++){lit.push(r()<.2);core.push(r()<.35);}
+    if(!glow){const sh=[];for(let i=0;i<224;i++)sh.push(n());   // own generator: the glow must keep r()'s sequence
+      hexGrid(S,(x,y,i,a,b)=>{hexPath(g,x,y,a,b,.94);g.fillStyle=hsl(p.h,40,7+sh[i]*6);g.fill();g.strokeStyle=hsl(p.h,45,15);g.lineWidth=1.5;g.stroke();});}
+    hexGrid(S,(x,y,i,a,b)=>{if(!lit[i])return;hexPath(g,x,y,a,b,.86);g.strokeStyle=glow?'rgba(255,255,255,.75)':hsl(p.h2,85,48);g.lineWidth=2.4;g.stroke();
+      if(core[i]){hexPath(g,x,y,a,b,.42);g.fillStyle=glow?'rgba(255,255,255,.55)':hsl(p.h2,80,32);g.fill();}});
+    const D=[[0,-py],[S/16,-py/2],[S/16,py/2],[0,py],[-S/16,py/2],[-S/16,-py/2]];
+    for(let i=0;i<22;i++){const c=Math.floor(r()*16);let x=c*S/16,y=(Math.floor(r()*14)+(c&1)*.5)*py,d=Math.floor(r()*6);const pts=[[x,y]],steps=3+Math.floor(r()*6);
+      for(let k=0;k<steps;k++){if(r()<.4)d=(d+(r()<.5?1:5))%6;x+=D[d][0];y+=D[d][1];pts.push([x,y]);}
+      const wide=r()<.3;
+      w(()=>{g.lineCap='round';g.lineJoin='round';const path=()=>{g.beginPath();pts.forEach(([a,b],j)=>j?g.lineTo(a,b):g.moveTo(a,b));};
+        if(!glow){g.strokeStyle=hsl(p.h,40,4);g.lineWidth=wide?9:6;path();g.stroke();}
+        g.strokeStyle=glow?'rgba(255,255,255,.95)':hsl(p.h2,85,45);g.lineWidth=wide?4:2.4;path();g.stroke();
+        for(const [a,b] of [pts[0],pts.at(-1)]){g.fillStyle=glow?'#fff':hsl(p.h2,80,62);g.beginPath();g.arc(a,b,wide?6:4.5,0,TAU);g.fill();}});}
+    for(let i=0;i<5;i++){const c=Math.floor(r()*16),x=c*S/16,y=(Math.floor(r()*14)+(c&1)*.5)*py,a=S/24,b=py/1.732;
+      w(()=>{for(let k=0;k<3;k++){hexPath(g,x,y,a,b,.5+k*.4);g.strokeStyle=glow?`rgba(255,255,255,${.95-k*.25})`:hsl(p.h2,85,58-k*8);g.lineWidth=k?1.5:3;g.stroke();}
+        g.fillStyle=glow?'#fff':hsl(p.h2,95,80);g.beginPath();g.arc(x,y,4,0,TAU);g.fill();});}},
+  // the Grave Bell's Master: Death Knell: spectral blue sound rings breaking out of a black bronze, small bells at their hearts,
+  // the toll's tremor lines running across (the glow); base-only noise from its own rng so the glow stays on the shapes
+  deathknell(g,S,r,p,w,glow){const TAU=6.283,n=rng(p.seed*5+11);g.fillStyle=glow?'#000':hsl(p.h,50,6);g.fillRect(0,0,S,S);
+    if(!glow)for(let i=0;i<90;i++){const x=n()*S,y=n()*S,R=15+n()*55,c=hsl(p.h,40,9+n()*7,.5);w(()=>{const gr=g.createRadialGradient(x,y,0,x,y,R);gr.addColorStop(0,c);gr.addColorStop(1,hsl(p.h,50,6,0));g.fillStyle=gr;g.fillRect(x-R,y-R,R*2,R*2);});}
+    for(let i=0;i<4;i++){const y=r()*S,amp=6+r()*10,f=2+Math.floor(r()*3),ph=r()*TAU;
+      w(()=>{g.strokeStyle=glow?'rgba(255,255,255,.4)':hsl(p.h2,70,30,.8);g.lineWidth=1.4;g.beginPath();for(let x=0;x<=S;x+=4)g.lineTo(x,y+Math.sin(x/S*TAU*f+ph)*amp*Math.sin(x/S*TAU*2+ph));g.stroke();});}
+    const bell=(x,y,k)=>{g.beginPath();g.moveTo(x-10*k,y+9*k);g.quadraticCurveTo(x-9*k,y-11*k,x,y-12*k);g.quadraticCurveTo(x+9*k,y-11*k,x+10*k,y+9*k);g.closePath();};
+    for(let i=0;i<6;i++){const x=((i%3)+.2+r()*.6)*S/3,y=((i/3|0)+.2+r()*.6)*S/2,cnt=4+Math.floor(r()*4),st=11+r()*6,k=.8+r()*.5,arcs=[...Array(cnt)].map(()=>[r()*TAU,(.5+r()*.5)*TAU]);
+      w(()=>{g.lineCap='round';for(let j=0;j<cnt;j++){const R=st*(j+2),[a0,al]=arcs[j],fade=1-j/cnt;
+          if(!glow){g.strokeStyle=hsl(p.h,60,3);g.lineWidth=6;g.beginPath();g.arc(x,y,R,a0,a0+al);g.stroke();}
+          g.strokeStyle=glow?`rgba(255,255,255,${.25+.7*fade})`:hsl(p.h2,85,38+22*fade);g.lineWidth=j?2.2:3.4;g.beginPath();g.arc(x,y,R,a0,a0+al);g.stroke();}
+        bell(x,y,k);g.fillStyle=glow?'#fff':hsl(p.h2,90,72);g.fill();g.beginPath();g.arc(x,y+11*k,2.6*k,0,TAU);g.fill();});}},
 };
+// a hex grid that tiles at S: 16 columns x 14 rows of flat-topped hexes (1% squashed so it wraps), each cell called
+// with its centre, its index (wrapped copies share it) and its half-width/half-height
+function hexGrid(S,cb){const py=S/14,a=S/24,b=py/1.732;for(let c=-1;c<=16;c++)for(let q=-1;q<=14;q++)cb(c*S/16,(q+(c&1)*.5)*py,((c+16)%16)*14+(q+14)%14,a,b);}
+function hexPath(g,x,y,a,b,s){g.beginPath();for(let k=0;k<6;k++){const t=k*1.0472;g.lineTo(x+Math.cos(t)*a*s,y+Math.sin(t)*b*s);}g.closePath();}
 function blit(g,img,T,S){const c=document.createElement('canvas');c.width=c.height=T;c.getContext('2d').putImageData(img,0,0);g.drawImage(c,0,0,S,S);}
 
 // ---- class motifs (laid over the base at low alpha; on Master they're part of the base, not the glow) ----------------
@@ -239,6 +346,77 @@ const MOTIF={
   launcher(g,S,r,p,w){g.strokeStyle=hsl(p.h2,85,62,.38);g.lineWidth=2;for(let i=0;i<5;i++){const x=r()*S,y=r()*S;w(()=>{for(let k=0;k<12;k++){const a=k/12*6.283;g.beginPath();g.moveTo(x+Math.cos(a)*10,y+Math.sin(a)*10);g.lineTo(x+Math.cos(a)*(30+r()*20),y+Math.sin(a)*(30+r()*20));g.stroke();}});}},
   special(g,S,r,p,w){g.fillStyle=hsl(p.h2,80,72,.42);g.font='bold 22px serif';const glyphs='✶✷✸✹⟁⌬⍟⎔';for(let i=0;i<22;i++){const x=r()*S,y=r()*S,ch=glyphs[Math.floor(r()*glyphs.length)];w(()=>g.fillText(ch,x,y));}},
 };
+
+// ---- the Debt Collector's (melon-weapons/debt.js): Promissory (I), Gilt Ledger (II), Final Notice (Master) ----------------
+// a gold-leaf gradient whose two ends match (so a full-width rule tiles)
+const leaf=(g,x0,y0,x1,y1)=>{const gr=g.createLinearGradient(x0,y0,x1,y1);gr.addColorStop(0,'#c9952f');gr.addColorStop(.25,'#fff0b8');gr.addColorStop(.5,'#b8862a');gr.addColorStop(.75,'#ffe39a');gr.addColorStop(1,'#c9952f');return gr;};
+function dcCoin(g,x,y,R,tilt,a){const TAU=6.283;g.save();g.translate(x,y);g.rotate(a);g.scale(1,tilt);
+  g.fillStyle='#5a3808';g.beginPath();g.arc(0,R*.28,R,0,TAU);g.fill();   // the coin's edge
+  const gr=g.createRadialGradient(-R*.35,-R*.35,1,0,0,R);gr.addColorStop(0,'#fff3b0');gr.addColorStop(.55,'#e8ad2c');gr.addColorStop(1,'#8a5a10');
+  g.fillStyle=gr;g.beginPath();g.arc(0,0,R,0,TAU);g.fill();g.strokeStyle='#6a420a';g.lineWidth=1.4;g.beginPath();g.arc(0,0,R*.78,0,TAU);g.stroke();
+  g.fillStyle='#6a420a';g.font=`bold ${Math.round(R*1.1)}px serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('$',0,1);g.restore();}
+Object.assign(P1,{
+  // Promissory: a banknote's green guilloche: fine interlaced waves, spirograph rosettes, treasury seals, the
+  // promise to pay and serial numbers
+  promissory(g,S,r,p,w){const TAU=6.283;g.fillStyle=hsl(p.h,32,15);g.fillRect(0,0,S,S);
+    for(let i=0;i<48;i++){const y0=i*S/48,k=3+(i%3),ph=r()*TAU,A=4+r()*5;   // integer waves across the tile, so they wrap
+      w(()=>{g.strokeStyle=hsl(p.h,38,26+(i%2)*6,.85);g.lineWidth=1;g.beginPath();for(let x=0;x<=S;x+=4){const y=y0+A*Math.sin(TAU*k*x/S+ph);x?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();});}
+    for(let i=0;i<24;i++){const x0=i*S/24,k=2+(i%2),ph=r()*TAU,A=6+r()*6;
+      w(()=>{g.strokeStyle=hsl(p.h,30,30,.35);g.lineWidth=1;g.beginPath();for(let y=0;y<=S;y+=4){const x=x0+A*Math.sin(TAU*k*y/S+ph);y?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();});}
+    for(let i=0;i<7;i++){const x=r()*S,y=r()*S,R=30+r()*28,q=[3,4,5][Math.floor(r()*3)],d=.45+r()*.3;   // rosettes: hypotrochoids
+      w(()=>{for(const [s,l,lw] of [[1,62,1.2],[.72,48,1]]){g.strokeStyle=hsl(p.h,45,l,.9);g.lineWidth=lw;g.beginPath();
+        const Rr=R*s,rr=Rr*q/(q*2+1);for(let t=0;t<=TAU*q+.01;t+=.02){const a=(Rr-rr)*Math.cos(t)+rr*d*2*Math.cos((Rr-rr)/rr*t),b=(Rr-rr)*Math.sin(t)-rr*d*2*Math.sin((Rr-rr)/rr*t);t?g.lineTo(x+a,y+b):g.moveTo(x+a,y+b);}g.stroke();}});}
+    for(let i=0;i<4;i++){const x=r()*S,y=r()*S,R=18+r()*6;   // treasury seals: a toothed ring with a balance inside
+      w(()=>{g.fillStyle=hsl(p.h2,55,42);g.beginPath();for(let k=0;k<=64;k++){const a=k/64*TAU,rad=R+(k%2?3:0);k?g.lineTo(x+Math.cos(a)*rad,y+Math.sin(a)*rad):g.moveTo(x+Math.cos(a)*rad,y+Math.sin(a)*rad);}g.fill();
+        g.strokeStyle=hsl(p.h,40,12);g.lineWidth=1.5;g.beginPath();g.arc(x,y,R*.72,0,TAU);g.stroke();
+        g.fillStyle=hsl(p.h,40,12);g.font=`bold ${Math.round(R*.9)}px serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('$',x,y+1);});}
+    const words=['I PROMISE TO PAY THE BEARER ON DEMAND','ONE HUNDRED','LEGAL TENDER FOR ALL DEBTS','PAYABLE WITH INTEREST','THE DEBT COLLECTOR'];
+    g.textBaseline='middle';g.textAlign='left';
+    for(let i=0;i<7;i++){const x=r()*S,y=r()*S,t=words[Math.floor(r()*words.length)],big=t.length<14;
+      w(()=>{g.font=big?'bold 26px serif':'bold 12px serif';g.fillStyle=hsl(p.h,45,big?60:55,.85);g.fillText(t,x,y);});}
+    for(let i=0;i<5;i++){const x=r()*S,y=r()*S,num=String(Math.floor(r()*9e7)).padStart(8,'0');   // serial numbers in the note's red
+      w(()=>{g.font='bold 15px monospace';g.fillStyle='hsla(355,70%,48%,.9)';g.fillText(`DC ${num} A`,x,y);});}
+    for(let i=0;i<5;i++){const x=r()*S,y=r()*S;w(()=>{g.font='bold 54px serif';g.lineWidth=2;g.strokeStyle=hsl(p.h,45,58,.8);g.strokeText('100',x,y);});}},
+});
+Object.assign(P2,{
+  // Gilt Ledger: a leather account book's page edge: gold-leaf rules, red ink columns, the accounts in gold and ink,
+  // flakes of leaf, and red wax seals on gold ribbons
+  giltledger(g,S,r,p,w){const TAU=6.283,R=S/16;g.fillStyle=hsl(p.h,35,10);g.fillRect(0,0,S,S);
+    for(let i=0;i<1400;i++){g.fillStyle=hsl(p.h,30,5+r()*11,.5);g.fillRect(r()*S,r()*S,1+r()*3,1);}   // leather grain
+    for(let y=0;y<S;y+=R){g.fillStyle=leaf(g,0,0,S,0);g.fillRect(0,y,S,2.5);g.fillStyle='rgba(255,226,140,.3)';g.fillRect(0,y+R/2,S,1);}
+    for(let k=0;k<4;k++){const x=k*S/4+S/16;g.fillStyle='hsla(355,78%,42%,.9)';g.fillRect(x,0,2,S);g.fillRect(x+5,0,1.2,S);}   // red ink columns
+    const heads=['PRINCIPAL','INTEREST','BALANCE','OWED','PAID','DEFAULT'];g.textBaseline='middle';g.textAlign='left';
+    for(let row=0;row<16;row++)for(let k=0;k<4;k++){if(r()<.42)continue;const x=k*S/4+S/16+10+r()*20,y=row*R+R*.5+1,v=(r()*9999).toFixed(2),head=r()<.15,ink=r()<.3;
+      const t=head?heads[Math.floor(r()*heads.length)]:Number(v).toLocaleString('en-US',{minimumFractionDigits:2});
+      w(()=>{g.font=head?'bold 13px serif':'italic 14px serif';g.fillStyle=head?'#e8c060':ink?'hsla(355,75%,55%,.95)':'#d9b45a';g.fillText(t,x,y);});}
+    for(let i=0;i<60;i++){const x=r()*S,y=Math.floor(r()*16)*R+(r()-.5)*6,s=2+r()*6,pts=[...Array(5)].map((_,k)=>[x+Math.cos(k*1.26+r())*s,y+Math.sin(k*1.26+r())*s*.7]);   // leaf flakes along the rules
+      w(()=>{g.fillStyle=leaf(g,x-8,y-8,x+8,y+8);poly(g,pts);g.fill();});}
+    for(let i=0;i<4;i++){const x=r()*S,y=r()*S,Rs=20+r()*7,rot=r()*TAU,lumps=[...Array(18)].map(()=>.88+r()*.2);
+      w(()=>{g.save();g.translate(x,y);g.rotate(rot);
+        for(const s of [-1,1]){g.fillStyle=leaf(g,-10,0,10,Rs*2);poly(g,[[s*4,0],[s*16,Rs*1.9],[s*9,Rs*1.6],[s*5,Rs*2.1],[s*(-2),0]]);g.fill();}   // ribbon tails
+        g.fillStyle='hsl(355,70%,26%)';g.beginPath();lumps.forEach((l,k)=>{const a=k/18*TAU;k?g.lineTo(Math.cos(a)*Rs*l,Math.sin(a)*Rs*l+2):g.moveTo(Math.cos(a)*Rs*l,Math.sin(a)*Rs*l+2);});g.closePath();g.fill();
+        const gr=g.createRadialGradient(-Rs*.3,-Rs*.35,2,0,0,Rs);gr.addColorStop(0,'hsl(358,80%,55%)');gr.addColorStop(1,'hsl(355,75%,30%)');
+        g.fillStyle=gr;g.beginPath();lumps.forEach((l,k)=>{const a=k/18*TAU;k?g.lineTo(Math.cos(a)*Rs*l,Math.sin(a)*Rs*l):g.moveTo(Math.cos(a)*Rs*l,Math.sin(a)*Rs*l);});g.closePath();g.fill();
+        g.strokeStyle='hsl(355,70%,24%)';g.lineWidth=2;g.beginPath();g.arc(0,0,Rs*.62,0,TAU);g.stroke();
+        g.fillStyle='hsl(355,70%,24%)';g.font=`bold ${Math.round(Rs*.85)}px serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('DC',0,1);
+        g.fillStyle='hsla(0,0%,100%,.25)';g.beginPath();g.ellipse(-Rs*.35,-Rs*.4,Rs*.28,Rs*.12,-.6,0,TAU);g.fill();g.restore();});}},
+});
+Object.assign(PM,{
+  // Final Notice: black paper, scattered gold coins, and red FINAL NOTICE / PAST DUE rubber stamps (the glow), worn
+  // where the ink didn't take
+  finalnotice(g,S,r,p,w,glow){const TAU=6.283,n=rng(p.seed*11+5),bg=glow?'#000':'#0b0807';g.fillStyle=bg;g.fillRect(0,0,S,S);
+    if(!glow){for(let y=0;y<S;y+=S/16){g.fillStyle='rgba(140,30,25,.16)';g.fillRect(0,y,S,1);}
+      for(let i=0;i<900;i++){g.fillStyle=`rgba(255,240,220,${n()*.05})`;g.fillRect(n()*S,n()*S,1+n()*3,1);}}
+    for(let i=0;i<18;i++){const x=r()*S,y=r()*S,R=8+r()*8,tilt=.35+r()*.65,a=r()*TAU;if(!glow)w(()=>dcCoin(g,x,y,R,tilt,a));}   // coins: base only (r is drawn the same in both passes)
+    const words=['FINAL NOTICE','PAST DUE','OVERDUE','PAY NOW','IN COLLECTIONS'];
+    for(let i=0;i<10;i++){const x=r()*S,y=r()*S,a=(r()-.5)*.9,t=words[Math.floor(r()*words.length)],sz=Math.round(18+r()*14),seed=Math.floor(r()*1e6);
+      w(()=>{g.save();g.translate(x,y);g.rotate(a);g.font=`900 ${sz}px Impact,'Arial Black',sans-serif`;const tw=g.measureText(t).width,hh=sz;
+        const col=glow?'#fff':hsl(p.h,85,46);g.strokeStyle=col;g.fillStyle=col;
+        g.lineWidth=3.5;g.strokeRect(-tw/2-11,-hh/2-9,tw+22,hh+18);g.lineWidth=1.3;g.strokeRect(-tw/2-6,-hh/2-4,tw+12,hh+8);
+        g.textAlign='center';g.textBaseline='middle';g.fillText(t,0,1);
+        const d=rng(seed);g.fillStyle=bg;for(let k=0;k<70;k++){g.fillRect((d()-.5)*(tw+26),(d()-.5)*(hh+22),1+d()*3,1+d()*2);}   // worn ink, the same in both passes
+        g.restore();});}},
+});
 
 // Draw one prestige camo texture. spec: {tier, style, seed, h, h2, cls}; glow: the Master's glow mask.
 export function drawPrestigeArt(spec,glow=false){

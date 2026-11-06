@@ -228,11 +228,11 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     $('.slots').innerHTML='<h3>ATTACHMENTS</h3>'+SLOT_ORDER.map(s=>{
       const has=slots.includes(s),eq=on.find(a=>cat.attachments.find(x=>x.id===a)?.slot===s);
       return `<button class="slot${s===slot?' sel':''}${has?'':' na'}${eq?'':' empty'}" data-slot="${s}">
-        <div class="ico">${cat.slots[s].slice(0,2).toUpperCase()}</div><div><span>${esc(cat.slots[s].toUpperCase())}</span><strong>${has?esc(eq?nameOf(eq):'None'):'—'}</strong></div></button>`;}).join('');
+        <div class="ico">${(def?.slotNames?.[s]??cat.slots[s]).slice(0,2).toUpperCase()}</div><div><span>${esc((def?.slotNames?.[s]??cat.slots[s]).toUpperCase())}</span><strong>${has?esc(eq?nameOf(eq):'None'):'—'}</strong></div></button>`;}).join('');
     if(cats){const c=equippedCamo(cats,profile,id,weapons),unl=camoUnlocked(cats,profile,id,weapons),done=cats.camos.filter(k=>!k.reward&&!k.shop&&unl.has(k.id)).length,special=cats.camos.filter(k=>k.reward&&unl.has(k.id)).length;
       $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CAMO</h3><button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
         <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward&&!k.shop).length} UNLOCKED${special?` · ${special} SPECIAL`:''}${loadPrestige().camos.length?` · ${loadPrestige().camos.length} PRESTIGE`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
-    $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc(cat.slots[s].toUpperCase())}</i></div>`).join('');
+    $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc((def?.slotNames?.[s]??cat.slots[s]).toUpperCase())}</i></div>`).join('');
     renderOptions();renderStats();if(cats)fillSwatches(root,cid=>camoById(cats,cid));
     $('.stats').style.display=slot==='camo'?'none':'';   // camos don't change stats; the list needs the room
   }
@@ -284,8 +284,8 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(!slot){el.innerHTML='<h3>SELECT A SLOT</h3><p class="neu">Pick an attachment slot on the left; the camera moves to that part of the gun.</p>';return;}
     const all=available(cat,def,id),unlocked=new Set(unlockedAttachments(cat,def,id,profile).map(a=>a.id)),on=new Set(equipped(cat,def,id,profile));
     const opts=all.filter(a=>a.slot===slot);
-    el.innerHTML=`<h3>${esc(cat.slots[slot].toUpperCase())}</h3>`+
-      `<button class="opt${opts.some(a=>on.has(a.id))?'':' on'}" data-att=""><strong>None</strong><div class="pc"><span class="neu">Stock ${esc(cat.slots[slot].toLowerCase())}</span></div></button>`+
+    el.innerHTML=`<h3>${esc((def?.slotNames?.[slot]??cat.slots[slot]).toUpperCase())}</h3>`+
+      `<button class="opt${opts.some(a=>on.has(a.id))?'':' on'}" data-att=""><strong>None</strong><div class="pc"><span class="neu">Stock ${esc((def?.slotNames?.[slot]??cat.slots[slot]).toLowerCase())}</span></div></button>`+
       opts.map(a=>{const lv=unlockLevelOf(cat,def,id,a.id),locked=!unlocked.has(a.id);
         return `<button class="opt${on.has(a.id)?' on':''}${locked?' locked':''}" data-att="${a.id}"><span class="tag">${on.has(a.id)?'EQUIPPED':locked?'WEAPON LV '+lv:''}</span>
           <strong>${esc(a.name)}</strong><div class="pc">${prosCons(a)}</div></button>`;}).join('');

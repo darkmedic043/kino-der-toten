@@ -330,7 +330,8 @@ const classOf=id=>classOfIn(weapons,id);
 const activeClass={};
 // Levelling up opens guns in the Gunsmith (a kit gun's `gunsmith` level, else its unlock level).
 const smithOpen=id=>unlockLvl(profile)>=gunsmithLevel(config,id);
-const gunsmithHas=id=>gunsmith&&weapons[id]&&(weapons[id].gunsmith===true||Object.keys(weapons[id].mounts??{}).length>0   // gunsmith:true = camos only (the Grimhawk)
+const gunSoon=d=>!!d?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();   // a coming-soon gun (melon-weapons): no Gunsmith until it's out
+const gunsmithHas=id=>gunsmith&&weapons[id]&&!gunSoon(weapons[id])&&(weapons[id].gunsmith===true||Object.keys(weapons[id].mounts??{}).length>0   // gunsmith:true = camos only (the Grimhawk)
   ||weapons[id].statAttachments?.length>0   // imported guns: mounted / stat-only attachments
   ||gunsmith.attachments.some(a=>a.tags.some(t=>(weapons[id].hideTags??[]).includes(t))));
 // Opened from the loadout: the arrows go through every gun with attachments,
@@ -338,7 +339,7 @@ const gunsmithHas=id=>gunsmith&&weapons[id]&&(weapons[id].gunsmith===true||Objec
 // (attachments are saved per gun and apply however you get it).
 function openLoadoutGunsmith(id,onClose){
   const l=validLoadout(config,profile,weapons),own=[l.primary].filter(w=>w&&gunsmithHas(w)&&smithOpen(w));
-  const ids=[...own,...Object.keys(weapons).filter(w=>!own.includes(w)&&!w.includes('upgraded')&&gunsmithHas(w)&&smithOpen(w))];
+  const ids=[...own,...Object.keys(weapons).filter(w=>!own.includes(w)&&!w.includes('upgraded')&&!weapons[w].meleeSlot&&gunsmithHas(w)&&smithOpen(w))];   // (melee weapons: their own Gunsmith, from the melee slot)
   openGunsmith({cat:gunsmith,weapons,profile,id,ids:ids.includes(id)?ids:[id],label:w=>w===l.primary?'STARTING PISTOL':'BOX / WALL GUN',
     onChange:()=>save(),onClose:onClose??(()=>{focus={id,isWeapon:true};renderLoadout();})});
 }
@@ -365,9 +366,10 @@ function renderLoadout(){
     const st=slotState(s.key,u,l),isTac=s.key==='tactical',isWeapon=!s.key.startsWith('bonus')&&!isTac,el=document.createElement('button');
     el.className='slot'+(s.key===activeSlot?' active':'')+(st.locked?' locked':'');
     if(s.key==='melee'){
-      const m=meleeCatalog?.melees[st.value];
-      el.innerHTML=`<span class="label">${s.label}</span><strong>${esc(m?.name??'')}</strong><small>Tap melee to stab, hold it to draw</small>`;
-      el.addEventListener('click',()=>{activeSlot='melee';focus=null;renderLoadout();});$('slots').append(el);continue;
+      const m=meleeCatalog?.melees[st.value]&&!meleeSoon(meleeCatalog.melees[st.value])?meleeCatalog.melees[st.value]:meleeCatalog?.melees[meleeCatalog.default];   // a soon melee falls back (mods/melee)
+      const mk=m===meleeCatalog?.melees[st.value]?st.value:meleeCatalog?.default,smith=meleeSmith(mk);
+      el.innerHTML=`<span class="label">${s.label}</span><strong>${esc(m?.name??'')}</strong><small>${esc(m?.hint??'Tap melee to stab, hold it to draw')}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
+      el.addEventListener('click',e=>{if(smith&&e.target.closest('.slot-gs')){openMeleeGunsmith(mk);return;}activeSlot='melee';focus=null;renderLoadout();});$('slots').append(el);continue;
     }
     if(s.key==='box'){
       const items=boxItems(config,profile,data),on=items.filter(i=>i.on);
@@ -484,15 +486,28 @@ function boxTabs(){
   return [...tiers,{key:'tactical',label:'TACTICALS',kind:'tactical',all:tacList()},{key:'lethal',label:'LETHALS',kind:'lethal',all:(config.lethal??[]).filter(t=>data.equipment?.[t.id])}].filter(t=>t.all.length);
 }
 // The melee slot: every entry in melee.json is a choice; the mod reads profile.loadout.melee at the start of a match
+// soon (melee.json): not out yet (a coming battlepass): shown locked; localStorage['kino.dev.soon']='1' lifts it, as for the classes
+const meleeSoon=m=>!!m?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();
+// A melee with a model of its own (the Grave Bell) is a weapon in data.weapons (melee_<key>, mods/melee prepare): levels, attachments
+// and camos like a gun, its Gunsmith opened from the melee slot and the picker
+const meleeSmith=key=>{const w='melee_'+key;return !!key&&!!weapons[w]?.meleeSlot&&!meleeSoon(meleeCatalog?.melees[key])&&gunsmithHas(w)&&smithOpen(w);};
+function openMeleeGunsmith(key){const w='melee_'+key;
+  openGunsmith({cat:gunsmith,weapons,profile,id:w,ids:[w],label:()=>'MELEE',onChange:()=>save(),onClose:()=>renderLoadout()});}
 function renderMeleePicker(l){
   const grid=$('picker-grid'),list=Object.entries(meleeCatalog?.melees??{});
   $('picker-title').textContent='MELEE';$('picker-hint').textContent=`${list.length} melee weapon${list.length===1?'':'s'} · upgrades on its own at Pack-a-Punch and through melee kills`;$('picker-cats').hidden=true;
   for(const [id,m] of list){
-    const el=document.createElement('button');el.className='opt bonus'+(id===l.melee?' selected':'');
-    el.innerHTML=`<strong>${esc(m.name)}</strong><small>${esc(m.description)}</small>`;
-    el.addEventListener('click',()=>{profile.loadout.melee=id;save();renderLoadout();});
+    const el=document.createElement('button'),locked=meleeSoon(m);el.className='opt bonus'+(id===l.melee&&!locked?' selected':'')+(locked?' locked':'');
+    const smith=!locked&&meleeSmith(id);
+    el.innerHTML=`<strong>${esc(m.name)}</strong><small>${locked?'<b style="letter-spacing:1px">COMING SOON</b> · ':''}${esc(m.description)}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
+    if(locked){el.disabled=true;el.style.cssText='border-style:dashed;opacity:.55;cursor:not-allowed';el.title='Coming soon';}
+    else el.addEventListener('click',e=>{if(smith&&e.target.closest('.slot-gs')){openMeleeGunsmith(id);return;}profile.loadout.melee=id;save();renderLoadout();});
     grid.append(el);
   }
+  // the chosen melee's detail: a weapon melee shows its level, Gunsmith and prestige panel
+  const sel=meleeCatalog?.melees[l.melee]&&!meleeSoon(meleeCatalog.melees[l.melee])?l.melee:meleeCatalog?.default,m=meleeCatalog?.melees[sel],mw='melee_'+sel,md=weapons[mw]?.meleeSlot?weapons[mw]:null,det=$('detail');
+  if(det&&m){det.innerHTML=`<span class="eyebrow">MELEE</span><h2>${esc(m.name)}</h2><p>${esc(m.description??'')}</p>`+(md?`<p>Pack-a-Punch: <b>${esc(m.upgradeName??'')}</b> · tiers I to III</p><div class="gunsmith-slot"></div><div data-prestige-host="${mw}">${prestigeSlot(mw)}</div>`:'');
+    if(md&&meleeSmith(sel))renderGunsmith(det.querySelector('.gunsmith-slot'),{cat:gunsmith,def:md,id:mw,profile,onOpen:()=>openMeleeGunsmith(sel)});}
 }
 function renderBoxPicker(u){
   const grid=$('picker-grid'),items=boxItems(config,profile,data),byId=Object.fromEntries(items.map(i=>[i.id,i]));
