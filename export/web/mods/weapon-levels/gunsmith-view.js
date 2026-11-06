@@ -230,11 +230,13 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       const has=slots.includes(s),eq=on.find(a=>cat.attachments.find(x=>x.id===a)?.slot===s);
       return `<button class="slot${s===slot?' sel':''}${has?'':' na'}${eq?'':' empty'}" data-slot="${s}">
         <div class="ico">${(def?.slotNames?.[s]??cat.slots[s]).slice(0,2).toUpperCase()}</div><div><span>${esc((def?.slotNames?.[s]??cat.slots[s]).toUpperCase())}</span><strong>${has?esc(eq?nameOf(eq):'None'):'—'}</strong></div></button>`;}).join('');
+    // camo and charm share one COSMETIC section (user, 2026-11-06)
+    if(cats||charmCat?.charms.length)$('.slots').insertAdjacentHTML('beforeend','<h3 style="margin-top:14px">COSMETIC</h3>');
     if(cats){const c=equippedCamo(cats,profile,id,weapons),unl=camoUnlocked(cats,profile,id,weapons),done=cats.camos.filter(k=>!k.reward&&!k.shop&&unl.has(k.id)).length,special=cats.camos.filter(k=>k.reward&&unl.has(k.id)).length;
-      $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CAMO</h3><button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
+      $('.slots').insertAdjacentHTML('beforeend',`<button class="slot${slot==='camo'?' sel':''}${c?'':' empty'}" data-slot="camo">
         <div class="ico swatch" style="background-image:url(${c?swatch(c):''})">${c?'':'—'}</div><div><span>CAMO · ${done} / ${cats.camos.filter(k=>!k.reward&&!k.shop).length} UNLOCKED${special?` · ${special} SPECIAL`:''}${loadPrestige().camos.length?` · ${loadPrestige().camos.length} PRESTIGE`:''}</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
     if(charmCat?.charms.length){const c=charmFor(charmCat,loadCharmState(),id);
-      $('.slots').insertAdjacentHTML('beforeend',`<h3 style="margin-top:14px">CHARM</h3><button class="slot${slot==='charm'?' sel':''}${c?'':' empty'}" data-slot="charm">
+      $('.slots').insertAdjacentHTML('beforeend',`<button class="slot${slot==='charm'?' sel':''}${c?'':' empty'}" data-slot="charm">
         <div class="ico">${c?'✦':'—'}</div><div><span>CHARM · ${charmCat.charms.filter(x=>!charmLock(x)).length} / ${charmCat.charms.length} OWNED</span><strong>${esc(c?.name??'None')}</strong></div></button>`);}
     $('.markers').innerHTML=slots.map(s=>`<div class="marker${s===slot?' sel':''}" data-m="${s}"><i>${esc((def?.slotNames?.[s]??cat.slots[s]).toUpperCase())}</i></div>`).join('');
     renderOptions();renderStats();if(cats)fillSwatches(root,cid=>camoById(cats,cid));
