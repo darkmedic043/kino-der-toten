@@ -71,7 +71,7 @@ const CSS=`
 #gsv .stk-row input[type=range]{width:100%;accent-color:#f3a33a}
 #gsv .stk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 #gsv .stk-pick{text-align:center;padding:8px 4px}#gsv .stk-pick strong{display:block;font-size:11px;margin-top:4px}
-#gsv .stk-pick,#gsv canvas.stage{touch-action:none}#gsv .stk-flip{width:100%;text-align:left;margin-bottom:8px}#gsv .stk-flip strong{font-size:11px;letter-spacing:2px}
+#gsv .stk-pick,#gsv canvas.stage{touch-action:none}#gsv .stk-flip{width:100%;text-align:left;margin-bottom:8px}#gsv .stk-hid{display:block;font:600 9px/1.4 system-ui,sans-serif;letter-spacing:2px;color:#f3a33a}#gsv .stk-flip strong{font-size:11px;letter-spacing:2px}
 #gsv .stk-hint{font-size:11px;color:#f3a33a;margin:2px 0 10px}
 #gsv .opt strong{font-size:14px}#gsv .opt .tag{float:right;font-size:9px;letter-spacing:2px;color:#f3a33a}
 #gsv .opt .pc{margin-top:5px;font-size:11px;display:flex;flex-wrap:wrap;gap:4px 10px}
@@ -327,23 +327,24 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   // places it, for touch). SIZE and ROTATE on the selected one. The view turns to the gun's right side, the side
   // first person shows (FLIP for the left). The gun's materials draw them (stickers.js).
   let stkCat=null,stkArm=null,stkSel=0,stkPrev=null,stkYaw=null,stkFor=null;   // stkArm: {id, at (slot to fill or null)}; stkPrev: {at, x} the live preview
-  const STK_RIGHT=-(Math.PI-.35),STK_LEFT=-.35;   // camera yaw for the gun's right side (in game) and left side
+  const STK_GAME=-(Math.PI-.35),STK_OTHER=-.35;   // camera yaw for the side seen in first person (the gun's left) and the other side
+  const gameDir=new THREE.Vector3(Math.sin(STK_GAME),0,Math.cos(STK_GAME));   // from the gun toward that camera
   loadStickers().then(c=>{stkCat=c;if(alive&&c.stickers.length)renderUI();});
   const stkList=()=>stkCat?stickersFor(stkCat,loadStickerState(),id):[];
-  const stkRightSide=()=>Math.cos(yaw)<0;
+  const stkGameSide=()=>Math.cos(stkYaw??yaw)<0;   // the side being turned to, not the one passing by
   function stkSave(listNow){const st=loadStickerState();if(listNow.length)st.on[id]=listNow;else delete st.on[id];saveStickerState(st);
     onChange?.(id);dispatchEvent(new CustomEvent('kino-stickers',{detail:{id}}));}
   function stkShow(){if(!gun)return;let l=stkList();if(stkPrev){l=l.slice();l[stkPrev.at]=stkPrev.x;}return applyStickers(gun,l.filter(Boolean),id);}
   function renderStickers(el){
-    if(stkFor!==id){stkFor=id;stkYaw=STK_RIGHT;}   // first look at a gun's stickers: its in-game side
+    if(stkFor!==id){stkFor=id;stkYaw=STK_GAME;}   // first look at a gun's stickers: its in-game side
     const l=stkList(),nm=x=>esc(stkCat.stickers.find(s=>s.id===x)?.name??x),img=x=>{const s=stkCat.stickers.find(k=>k.id===x);return s?stickerImage(s):'';};
-    if(stkSel>=l.length)stkSel=Math.max(0,l.length-1);
+    if(stkSel>=l.length)stkSel=Math.max(0,l.length-1);const hid=l.map(stkHidden);
     const hint=stkArm?`Tap the gun to place ${nm(stkArm.id)}, or drag it there. Right-click or Esc cancels.`
       :l.length<MAX_STICKERS?'Drag a sticker onto the gun. Drag a placed one to move it.':'All three are placed: drag one to move it, or drop a new one to replace the selected one.';
     el.innerHTML=`<h3>STICKERS · ${l.length} / ${MAX_STICKERS}</h3><p class="stk-hint">${hint}</p>
-      <button class="opt stk-flip" data-stk-flip><strong>${stkRightSide()?'RIGHT SIDE · SEEN IN GAME':'LEFT SIDE'}</strong><span class="tag" style="float:none;margin-left:8px">FLIP ⟲</span></button>`+
-      l.map((x,i)=>`<div class="opt stk-row${i===stkSel?' on':''}" data-stk-i="${i}"><img src="${img(x.id)}" alt="" draggable="false"><strong>${nm(x.id)}</strong>
-        <span class="acts"><button data-stk-del="${i}">REMOVE</button></span>
+      <button class="opt stk-flip" data-stk-flip><strong>${stkGameSide()?'SIDE SEEN IN GAME':'OTHER SIDE · NOT SEEN IN GAME'}</strong><span class="tag" style="float:none;margin-left:8px">FLIP ⟲</span></button>`+
+      l.map((x,i)=>`<div class="opt stk-row${i===stkSel?' on':''}" data-stk-i="${i}"><img src="${img(x.id)}" alt="" draggable="false"><strong>${nm(x.id)}${hid[i]?'<small class="stk-hid">NOT SEEN IN GAME</small>':''}</strong>
+        <span class="acts">${hid[i]?`<button data-stk-game="${i}">MOVE TO GAME SIDE</button>`:''}<button data-stk-del="${i}">REMOVE</button></span>
         ${i===stkSel?`<label>SIZE<input type="range" min="50" max="200" step="5" value="${Math.round((x.m??1)*100)}" data-stk-size="${i}"><b>${Math.round((x.m??1)*100)}%</b></label>
         <label>ROTATE<input type="range" min="-180" max="180" step="5" value="${x.r??0}" data-stk-rot="${i}"><b>${x.r??0}°</b></label>`:''}</div>`).join('')+
       `<h3 style="margin-top:12px">ADD</h3><div class="stk-grid">`+stkCat.stickers.map(s=>{const lock=stickerLock(s);
@@ -355,11 +356,31 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   function stkHit(cx,cy){
     if(!gun)return null;const r=canvas.getBoundingClientRect();ndc.set((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1);
     gun.updateMatrixWorld(true);camera.updateMatrixWorld();ray.setFromCamera(ndc,camera);
+    return stkPick(camera);
+  }
+  function stkPick(cam){   // the first painted, visible part of the gun along `ray`
     for(const h of ray.intersectObject(gun,true)){const o=h.object;let shown=true;for(let a=o;a&&a!==scene;a=a.parent)if(!a.visible){shown=false;break;}
       const m=[o.material].flat()[h.face?.materialIndex??0]??[o.material].flat()[0],base=m?.userData?.stickerOf??m?.userData?.camoOf??m;
       if(!shown||!base?.map||m.transparent&&m.opacity<.5||/lens|glass|reticle|red_dot/i.test(base.name??''))continue;
-      return stickerFromHit(gun,h,camera,radius*.18);}
+      return stickerFromHit(gun,h,cam,radius*.18);}
     return null;
+  }
+  // a placed sticker's centre and normal in world space (through the skin of its nearest vertex)
+  function stkWorld(x){
+    if(!gun||!x)return null;let o=null;for(const [m,k] of meshKeys(gun))if(k===x.k){o=m;break;}
+    const a=o?.geometry?.attributes?.position;if(!a)return null;gun.updateMatrixWorld(true);
+    let bi=0,bd=Infinity;for(let i=0;i<a.count;i++){const d=(a.getX(i)-x.p[0])**2+(a.getY(i)-x.p[1])**2+(a.getZ(i)-x.p[2])**2;if(d<bd){bd=d;bi=i;}}
+    const p=new THREE.Vector3().fromArray(x.p),q=p.clone().addScaledVector(new THREE.Vector3().fromArray(x.n),Math.max(x.s,1e-3));
+    if(o.isSkinnedMesh){o.skeleton?.update();o.applyBoneTransform(bi,p);o.applyBoneTransform(bi,q);}
+    o.localToWorld(p);o.localToWorld(q);return {p,n:q.sub(p).normalize()};
+  }
+  const stkHidden=x=>{const w=stkWorld(x);return !!w&&w.n.dot(gameDir)<-.25;};   // faces away from the first-person camera
+  // move a sticker to the side seen in game: straight through the gun from that side, same size and turn
+  function stkToGame(i){
+    const l=stkList(),x=l[i],w=stkWorld(x);if(!w)return;
+    const cam=camera.clone();cam.position.copy(w.p).addScaledVector(gameDir,radius*3);cam.up.set(0,1,0);cam.lookAt(w.p);cam.updateMatrixWorld();
+    ray.set(cam.position,gameDir.clone().negate());const y=stkPick(cam);if(!y)return;
+    l[i]={...y,id:x.id,m:x.m??1,r:x.r??0};stkSave(l);stkSel=i;stkYaw=STK_GAME;stkShow();renderUI();
   }
   // which placed sticker (index) a hit lands on: same vertex buffer, inside its square, facing the same way
   function stkUnder(x){
@@ -425,10 +446,11 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const st=loadStickerState();st.on[id]=l;saveStickerState(st);stkShow();});
   root.addEventListener('change',e=>{if(e.target.dataset?.stkSize!==undefined||e.target.dataset?.stkRot!==undefined)stkSave(stkList());});
   function stkClick(e){
-    if(e.target.closest('[data-stk-flip]')){stkYaw=stkRightSide()?STK_LEFT:STK_RIGHT;setTimeout(renderUI,450);return true;}
+    if(e.target.closest('[data-stk-flip]')){stkYaw=stkGameSide()?STK_OTHER:STK_GAME;renderUI();return true;}
     const pk=e.target.closest('[data-stk-pick]');if(pk){if(pk.classList.contains('locked'))return true;
       stkArm=stkArm?.id===pk.dataset.stkPick?null:{id:pk.dataset.stkPick,at:stkList().length<MAX_STICKERS?null:stkSel};
       stkPrev=null;stkShow();renderUI();return true;}
+    const tg=e.target.closest('[data-stk-game]');if(tg){stkToGame(+tg.dataset.stkGame);return true;}
     const dl=e.target.closest('[data-stk-del]');if(dl){const l=stkList();l.splice(+dl.dataset.stkDel,1);stkSave(l);stkArm=null;stkPrev=null;stkShow();renderUI();return true;}
     const row=e.target.closest('[data-stk-i]');if(row){if(e.target.closest('input'))return true;const i=+row.dataset.stkI;if(i!==stkSel){stkSel=i;renderUI();}return true;}
     return false;
