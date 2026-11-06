@@ -298,7 +298,8 @@ let thumbQueue=Promise.resolve();
 function thumb(id){
   if(thumbs.has(id))return Promise.resolve(thumbs.get(id));
   if(!thumbWaiters.has(id))thumbWaiters.set(id,thumbQueue=thumbQueue.then(async()=>{
-    const def=weapons[id]??data.equipment?.[id];let url='';
+    // melees: melee_<key> (the Grave Bell is a weapon def; the knife only has its catalog entry's worldModel, mods/melee)
+    const def=weapons[id]??data.equipment?.[id]??(id.startsWith('melee_')?meleeCatalog?.melees[id.slice(6)]:null);let url='';
     try{
       const model=await loadModel(def?.worldModel);
       if(model){
@@ -309,7 +310,7 @@ function thumb(id){
         // (a long barrel turned toward the camera was cut off when only the box's middle was fitted)
         const pivot=new THREE.Group();pivot.add(model);thumbScene.add(pivot);pivot.updateMatrixWorld(true);
         const box=new THREE.Box3().setFromObject(pivot),center=box.getCenter(new THREE.Vector3());
-        pivot.rotation.set(.12,-.35,0);center.applyEuler(pivot.rotation);pivot.position.sub(center);pivot.updateMatrixWorld(true);
+        pivot.rotation.set(.12,-.35,THREE.MathUtils.degToRad(def.thumbRoll??(id.startsWith('melee_')?meleeCatalog?.melees[id.slice(6)]?.thumbRoll:0)??0));center.applyEuler(pivot.rotation);pivot.position.sub(center);pivot.updateMatrixWorld(true);   // thumbRoll (melee.json): a tall melee lies along the frame
         const tv=Math.tan(THREE.MathUtils.degToRad(thumbCamera.fov/2)),th=tv*thumbCamera.aspect,c=new THREE.Vector3();let dist=0;
         for(let i=0;i<8;i++){c.set(i&1?box.max.x:box.min.x,i&2?box.max.y:box.min.y,i&4?box.max.z:box.min.z).applyMatrix4(pivot.matrixWorld);dist=Math.max(dist,c.z+Math.abs(c.x)/th,c.z+Math.abs(c.y)/tv);}
         thumbCamera.position.set(0,0,dist*1.04);thumbCamera.lookAt(0,0,0);
@@ -368,7 +369,8 @@ function renderLoadout(){
     if(s.key==='melee'){
       const m=meleeCatalog?.melees[st.value]&&!meleeSoon(meleeCatalog.melees[st.value])?meleeCatalog.melees[st.value]:meleeCatalog?.melees[meleeCatalog.default];   // a soon melee falls back (mods/melee)
       const mk=m===meleeCatalog?.melees[st.value]?st.value:meleeCatalog?.default,smith=meleeSmith(mk);
-      el.innerHTML=`<span class="label">${s.label}</span><strong>${esc(m?.name??'')}</strong><small>${esc(m?.hint??'Tap melee to stab, hold it to draw')}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
+      el.innerHTML=`<span class="label">${s.label}</span><div class="thumb"></div><strong>${esc(m?.name??'')}</strong><small>${esc(m?.hint??'Tap melee to stab, hold it to draw')}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
+      if(m?.worldModel)fillThumb(el.querySelector('.thumb'),'melee_'+mk);
       el.addEventListener('click',e=>{if(smith&&e.target.closest('.slot-gs')){openMeleeGunsmith(mk);return;}activeSlot='melee';focus=null;renderLoadout();});$('slots').append(el);continue;
     }
     if(s.key==='box'){
@@ -497,16 +499,18 @@ function renderMeleePicker(l){
   const grid=$('picker-grid'),list=Object.entries(meleeCatalog?.melees??{});
   $('picker-title').textContent='MELEE';$('picker-hint').textContent=`${list.length} melee weapon${list.length===1?'':'s'} · upgrades on its own at Pack-a-Punch and through melee kills`;$('picker-cats').hidden=true;
   for(const [id,m] of list){
-    const el=document.createElement('button'),locked=meleeSoon(m);el.className='opt bonus'+(id===l.melee&&!locked?' selected':'')+(locked?' locked':'');
+    const el=document.createElement('button'),locked=meleeSoon(m);el.className='opt'+(id===l.melee&&!locked?' selected':'')+(locked?' locked':'');
     const smith=!locked&&meleeSmith(id);
-    el.innerHTML=`<strong>${esc(m.name)}</strong><small>${locked?'<b style="letter-spacing:1px">COMING SOON</b> · ':''}${esc(m.description)}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
+    el.innerHTML=`<div class="thumb"></div><strong>${esc(m.name)}</strong><small>${locked?'<b style="letter-spacing:1px">COMING SOON</b> · ':''}${esc(m.description)}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
+    if(m.worldModel)fillThumb(el.querySelector('.thumb'),'melee_'+id);
     if(locked){el.disabled=true;el.style.cssText='border-style:dashed;opacity:.55;cursor:not-allowed';el.title='Coming soon';}
     else el.addEventListener('click',e=>{if(smith&&e.target.closest('.slot-gs')){openMeleeGunsmith(id);return;}profile.loadout.melee=id;save();renderLoadout();});
     grid.append(el);
   }
   // the chosen melee's detail: a weapon melee shows its level, Gunsmith and prestige panel
   const sel=meleeCatalog?.melees[l.melee]&&!meleeSoon(meleeCatalog.melees[l.melee])?l.melee:meleeCatalog?.default,m=meleeCatalog?.melees[sel],mw='melee_'+sel,md=weapons[mw]?.meleeSlot?weapons[mw]:null,det=$('detail');
-  if(det&&m){det.innerHTML=`<span class="eyebrow">MELEE</span><h2>${esc(m.name)}</h2><p>${esc(m.description??'')}</p>`+(md?`<p>Pack-a-Punch: <b>${esc(m.upgradeName??'')}</b> · tiers I to III</p><div class="gunsmith-slot"></div><div data-prestige-host="${mw}">${prestigeSlot(mw)}</div>`:'');
+  if(det&&m){det.innerHTML=`<div class="thumb"></div><span class="eyebrow">MELEE</span><h2>${esc(m.name)}</h2><p>${esc(m.description??'')}</p>`+(md?`<p>Pack-a-Punch: <b>${esc(m.upgradeName??'')}</b> · tiers I to III</p><div class="gunsmith-slot"></div><div data-prestige-host="${mw}">${prestigeSlot(mw)}</div>`:'');
+    if(m.worldModel)fillThumb(det.querySelector('.thumb'),mw);
     if(md&&meleeSmith(sel))renderGunsmith(det.querySelector('.gunsmith-slot'),{cat:gunsmith,def:md,id:mw,profile,onOpen:()=>openMeleeGunsmith(sel)});}
 }
 function renderBoxPicker(u){

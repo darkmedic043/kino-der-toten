@@ -47,7 +47,7 @@
       "soon": true,
       "base": "knife_ballistic_zm",
       "model": "mods/melee/grave_bell_view.glb",
-      "worldModel": "mods/melee/grave_bell_world.glb",
+      "worldModel": "mods/melee/grave_bell_world.glb", "thumbRoll": -60,
       "script": "grave-bell.js",
       "swings": "still",
       "hideTags": ["tag_gb_wolftone", "tag_gb_irontongue", "tag_gb_veil", "tag_gb_crown", "tag_gb_chain", "tag_gb_lantern", "tag_gb_choir", "tag_gb_requiem", "tag_gb_ossuary", "tag_gb_belfry"],

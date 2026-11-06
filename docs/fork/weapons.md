@@ -171,3 +171,4 @@ BO6/BO7-style melee slot: one melee weapon in the loadout (`profile.loadout.mele
 - **Prompts**: `host.packLabel()` (engine) and `session.packLabel()` (`moon-features.js`). `def.ownPackName` stops the " • Pack-a-Punch" name suffix (`rules.js`, `moon-session.js`).
 - **HUD**: `def.noAmmo` shows `—` for mag and reserve; the BO7 HUD's arc stays full. Third person holds the Bowie world model.
 - Tested on Kino, Moon and Cheese Cube, the last with an operator's arms.
+- **Menu thumbnails** (2026-11-05): the loadout's melee tile, the melee picker cards and the melee detail show a rendered thumbnail like the guns (`thumb('melee_<key>')` in `home.js`: a melee with its own weapon def uses it, the knife falls back to its catalog entry's `worldModel`). `thumbRoll` (degrees, melee.json) turns a tall melee along the wide frame (the Grave Bell: -60).
