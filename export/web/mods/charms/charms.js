@@ -158,7 +158,7 @@ export class CharmRig{
     for(const m of [this.ring,...this.links,body.object]){m.matrixAutoUpdate=false;this.group.add(m);}
     this.chain=c.chain??.42;   // inches, ring to the charm's loop
     this.p1=new THREE.Vector3();this.q1=new THREE.Vector3();this.p2=new THREE.Vector3();this.q2=new THREE.Vector3();
-    this.fresh=true;this.acc=0;this.anchor=null;
+    this.fresh=true;this.acc=0;this.anchor=null;this.prevA=new THREE.Vector3();
   }
   reset(){this.fresh=true;}
   dispose(){this.group.removeFromParent();}
@@ -173,17 +173,24 @@ export class CharmRig{
     const L1=this.chain*s,L2=Math.max(.05,this.body.com)*s;
     if(this.fresh||!(dt>0&&dt<.25)||_t.copy(this.p1).sub(A).length()>L1*6+1e-6){
       this.p1.copy(A).addScaledVector(gravity,L1);this.q1.copy(this.p1);this.p2.copy(this.p1).addScaledVector(gravity,L2);this.q2.copy(this.p2);
-      this.fresh=false;this.acc=0;
+      this.fresh=false;this.acc=0;this.prevA.copy(A);
     }else{
+      // the gun's own motion (aiming down sights, recoil, sway, the raise): the charm is carried with most of it rigidly
+      // (p and q both, so no speed is added) and only the rest swings it (user: "doesnt absurdly fling around when ADSing")
+      _u.copy(A).sub(this.prevA).multiplyScalar(this.c.carry??.8);this.prevA.copy(A);
+      for(const p of [this.p1,this.q1,this.p2,this.q2])p.add(_u);
       if(moved){_R.extractRotation(moved);_t.setFromMatrixPosition(moved);
         // a world-fixed point moves by `moved`; the charm takes `follow` of that (air drag), at most a third of its chain a frame
         for(const p of [this.p1,this.q1,this.p2,this.q2]){_u.copy(p).applyMatrix4(_R).sub(p).multiplyScalar(follow).addScaledVector(_t,follow*.3);const l=_u.length(),mx=L1*.5;if(l>mx)_u.multiplyScalar(mx/l);p.add(_u);}}
       this.acc=Math.min(this.acc+dt,STEP*4);
       // the side plane: a point on the gun's widest surface below the ring, normal = the gun's left (+y)
       const P0=_p.copy(base).addScaledVector(n,(anchor.side-anchor.at.y)*sR),m1=.06*s,m2=(this.body.depth*.8+.02)*s;
-      const G=(this.c.gravity??260)*gravityScale*s*STEP*STEP,drag=this.c.drag??.035;
+      const G=(this.c.gravity??260)*gravityScale*s*STEP*STEP,drag=this.c.drag??.07,k=this.c.stiff??.012;
       while(this.acc>=STEP){this.acc-=STEP;
         for(const [p,q] of [[this.p1,this.q1],[this.p2,this.q2]]){_u.copy(p).sub(q).multiplyScalar(1-drag);q.copy(p);p.add(_u).addScaledVector(gravity,G);}
+        // stiffness: a pull toward hanging straight (a charm's loop is a little stiff, so it doesn't flop)
+        _t.copy(A).addScaledVector(gravity,L1).sub(this.p1).multiplyScalar(k);this.p1.add(_t);
+        _t.copy(this.p1).addScaledVector(gravity,L2).sub(this.p2).multiplyScalar(k);this.p2.add(_t);
         for(let it=0;it<3;it++){
           _u.copy(this.p1).sub(A);let d=_u.length();if(d>1e-9)this.p1.copy(A).addScaledVector(_u,L1/d);
           _u.copy(this.p2).sub(this.p1);d=_u.length();if(d>1e-9){const e=(d-L2)/d;this.p1.addScaledVector(_u,e*.7);this.p2.addScaledVector(_u,-e*.3);}
