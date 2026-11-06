@@ -470,7 +470,7 @@ export default async function setup(api){
   function myInfo(){
     const c=window.kino.classes,st=window.kino.debug.getState();
     const pct=st.ready?100:Math.round(parseFloat(document.getElementById('load-progress')?.dataset.pct)||0);
-    return {p:pct,op:window.kino.characterEntry?.name??registry.find(e=>e.id===profile.character)?.name??null,cls:c?.cls?.name??null,lvl:c?.state?.level??null,in:!!st.started,cd:(({c1,c2,pattern})=>c1?{c1,c2,pattern}:null)(window.kino.cosmetics?.equipped?.card??{})};   // cd: the calling card (shop)
+    return {p:pct,op:window.kino.characterEntry?.name??registry.find(e=>e.id===profile.character)?.name??null,cls:c?.cls?.name??null,lvl:c?.state?.level??null,in:!!st.started,cd:(({c1,c2,pattern,image})=>c1?{c1,c2,pattern,image}:null)(window.kino.cosmetics?.equipped?.card??{})};   // cd: the calling card (shop)
   }
   function renderLobby(){
     if(lobby.go){lob.hidden=true;return;}

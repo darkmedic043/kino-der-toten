@@ -1980,6 +1980,126 @@
     "charm": "kurb"
    },
    "pass": "s2"
+  },
+  {
+   "id": "pass.s2.card.airsuperiority",
+   "cat": "card",
+   "name": "Air Superiority",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "A Season 1 animated calling card.",
+   "data": {
+    "c1": "#0d1a2a",
+    "c2": "#7fc8ff",
+    "pattern": "image",
+    "image": "/mods/shop/cards/s2/airsuperiority.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.card.corruption",
+   "cat": "card",
+   "name": "Corruption",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 animated calling card.",
+   "data": {
+    "c1": "#1a0d1f",
+    "c2": "#ff3a3a",
+    "pattern": "image",
+    "image": "/mods/shop/cards/s2/corruption.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.card.everlastingfear",
+   "cat": "card",
+   "name": "Everlasting Fear",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "A Season 1 animated calling card.",
+   "data": {
+    "c1": "#1a0a0a",
+    "c2": "#9fd8ff",
+    "pattern": "image",
+    "image": "/mods/shop/cards/s2/everlastingfear.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.card.firefighter",
+   "cat": "card",
+   "name": "Firefighter",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 animated calling card.",
+   "data": {
+    "c1": "#2a120a",
+    "c2": "#ff8a2a",
+    "pattern": "image",
+    "image": "/mods/shop/cards/s2/firefighter.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.card.hulkingmonster",
+   "cat": "card",
+   "name": "Hulking Monster",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "A Season 1 animated calling card.",
+   "data": {
+    "c1": "#0f1a0f",
+    "c2": "#c8d0d8",
+    "pattern": "image",
+    "image": "/mods/shop/cards/s2/hulkingmonster.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.card.inmateatlarge",
+   "cat": "card",
+   "name": "Inmate at Large",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "A Season 1 calling card.",
+   "data": {
+    "c1": "#1f1a0a",
+    "c2": "#ffb02a",
+    "pattern": "image",
+    "image": "/mods/shop/cards/s2/inmateatlarge.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.card.lathieves",
+   "cat": "card",
+   "name": "LA Thieves",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "A Season 1 animated calling card.",
+   "data": {
+    "c1": "#140a0a",
+    "c2": "#e8303a",
+    "pattern": "image",
+    "image": "/mods/shop/cards/s2/lathieves.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.card.unleashedpotential",
+   "cat": "card",
+   "name": "Unleashed Potential",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "A Season 1 animated calling card.",
+   "data": {
+    "c1": "#0a0f1f",
+    "c2": "#8a7aff",
+    "pattern": "image",
+    "image": "/mods/shop/cards/s2/unleashedpotential.webp"
+   },
+   "pass": "s2"
   }
  ]
 }
