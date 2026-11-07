@@ -39,7 +39,7 @@ function imageAverage(img){
 
 export class FirstPersonArms {
   // gltf: the character's loaded glTF; entry: its characters.json entry.
-  constructor(scene,gltf,entry){this.gltf=gltf;this.entry=entry;this.attached=new WeakSet();this.ok=true;this.builds=new Map();}
+  constructor(scene,gltf,entry){this.gltf=gltf;this.entry=entry;this.attached=new WeakSet();this.ok=true;this.builds=new Map();this.cutU={value:1};this.cutAt=0;}
 
   // Finds the character's arm chains (+X is the character's left; they face +Z).
   rig(model,holder){
@@ -310,19 +310,28 @@ export class FirstPersonArms {
       material.vertexColors=false;   // colours aren't baked; a material expecting them renders black
       // fpArmsNearCut (view units): the arm surface is cut away where it comes closer to the camera than this (a clean
       // near-plane cut; a dithered fade read as noise). Bondrewd's Blessed fur filled the whole screen as the knife lunge swung the forearm past the lens.
-      const near=this.entry.fpArmsNearCut;
-      const nearCut=material=>{if(!near)return;
+      // The layers under the fur (the suit, its hand skin, the metal) are cut deeper (fpArmsHandSkin.innerCut, view
+      // units; near + 3 by default, while the hand skin is on and the `like` material covers them): a cut at the same
+      // depth as the fur opened the fur's surface and showed the suit's hand through the hole as a flat grey slab
+      // (2026-11-07, user: "the arm things still show underneath in fpv").
+      // The whole cut scales by uFpCut (this.cutU): with fpArmsNearCutIdle set, sync() eases it between that (over
+      // the full cut) outside melee attacks and 1 during them. Bondrewd Premium's knife idle holds the fur 2 units
+      // from the lens, inside the 5-unit cut, which opened a hole in the fur there; the cut is only for the lunge.
+      const near=this.entry.fpArmsNearCut,inner=skinOn&&likeMat?(skin.innerCut??(near?near+3:0)):near;
+      const nearCut=(material,n=near)=>{if(!n)return;
         material.onBeforeCompile=sh=>{
+          sh.uniforms.uFpCut=this.cutU;
           sh.vertexShader=sh.vertexShader.replace('void main() {','varying float vFpDepth;\nvoid main() {').replace('#include <project_vertex>','#include <project_vertex>\n\tvFpDepth=-mvPosition.z;');
-          sh.fragmentShader=sh.fragmentShader.replace('void main() {',`varying float vFpDepth;\nvoid main() {\n\tif(vFpDepth<${near.toFixed(2)})discard;`);
+          sh.fragmentShader=sh.fragmentShader.replace('void main() {',`varying float vFpDepth;\nuniform float uFpCut;\nvoid main() {\n\tif(vFpDepth<${n.toFixed(2)}*uFpCut)discard;`);
         };
-        material.customProgramCacheKey=()=>'fpNearCut'+near;};
-      nearCut(material);
+        material.customProgramCacheKey=()=>'fpNearCut'+n;};
+      const cutAt=likeMat&&likeMat.test(material.name??'')?near:inner;
+      nearCut(material,cutAt);
       // fpArmsHandSkin: the hand's triangles go to their own part in the plain fur-coloured material (the attributes and
       // the normals, computed over the whole surface above, are shared)
       if(handFlag){const all=geo.getIndex().array,hand=[],rest=[];for(let t=0;t<all.length;t+=3)(handFlag[all[t]]&&handFlag[all[t+1]]&&handFlag[all[t+2]]?hand:rest).push(all[t],all[t+1],all[t+2]);
         if(hand.length){const g2=new THREE.BufferGeometry();for(const [name,attr] of Object.entries(geo.attributes))g2.setAttribute(name,attr);g2.setIndex(hand);geo.setIndex(rest);
-          const m2=new THREE.MeshStandardMaterial({color:toneOf(skinColor.clone()),roughness:skin.roughness??.9,metalness:0,side:material.side});nearCut(m2);this.skinMats.push(m2);
+          const m2=new THREE.MeshStandardMaterial({color:toneOf(skinColor.clone()),roughness:skin.roughness??.9,metalness:0,side:material.side});nearCut(m2,inner);this.skinMats.push(m2);
           if(rest.length)parts.push({geometry:geo,material});parts.push({geometry:g2,material:m2});return;}}
       parts.push({geometry:geo,material});
     });
@@ -490,7 +499,11 @@ export class FirstPersonArms {
     return skeleton;
   }
   // Called every frame with the active viewmodel; cheap once a rig is attached.
-  sync(view){if(!this.ok)return;if(view?.hands)this.attach(view.hands);if(view?.meleeHands)this.attach(view.meleeHands);}   // (meleeHands: BO1's arms knifing for an imported rig, animation.js)
+  sync(view){if(!this.ok)return;if(view?.hands)this.attach(view.hands);if(view?.meleeHands)this.attach(view.meleeHands);   // (meleeHands: BO1's arms knifing for an imported rig, animation.js)
+    // fpArmsNearCutIdle (view units): the near cut outside melee attacks (the full fpArmsNearCut during them), eased over about 80 ms
+    const idle=this.entry.fpArmsNearCutIdle,near=this.entry.fpArmsNearCut;if(idle===undefined||!near)return;
+    const now=performance.now(),dt=Math.min(.1,(now-(this.cutAt||now))/1000);this.cutAt=now;
+    const want=view?.mode==='melee'?1:idle/near,u=this.cutU;u.value+=(want-u.value)*Math.min(1,dt*14);if(Math.abs(want-u.value)<.01)u.value=want;}
   dispose(){}
 }
 
