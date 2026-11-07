@@ -7,8 +7,8 @@
 // small ring on the gun's left side (the side the player sees) by a short chain of links, and swings it with a two-point
 // verlet (chain end + the body's centre) under gravity, the gun's motion and, in game, the camera's turning.
 //
-// Screen charms (a stat tracker, a virtual buddy) come later: a model with a screen material whose picture is drawn from a
-// glyph/sprite atlas through shader uniforms (never a CanvasTexture redrawn in play, performance rule). They hang the same.
+// Gun screens (a kill counter, a buddy, an ammo readout, animated art) are screens.js: a housing mounted flat on the gun's
+// left side, its own slot per gun (state.screen) next to the charm.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 
@@ -16,10 +16,10 @@ const KEY='kino.mods.charms';
 let catalogue=null;
 export function loadCharms(){
   return catalogue??=fetch(new URL('./charms.json',import.meta.url)).then(r=>r.json())
-    .then(c=>{c.charms??=[];c.anchors??={};return c;}).catch(()=>({charms:[],anchors:{}}));
+    .then(c=>{c.charms??=[];c.anchors??={};c.screens??=[];c.housings??={};c.screenMounts??={};return c;}).catch(()=>({charms:[],anchors:{},screens:[],housings:{},screenMounts:{}}));
 }
-// {on:{[gun base id]:charm id}}
-export function loadCharmState(){try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');s.on??={};return s;}catch{return {on:{}};}}
+// {on:{[gun base id]:charm id}, screen:{[gun base id]:screen id}} (gun screens: screens.js)
+export function loadCharmState(){try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');s.on??={};s.screen??={};return s;}catch{return {on:{},screen:{}};}}
 export function saveCharmState(s){localStorage.setItem(KEY,JSON.stringify(s));}
 
 const devSoon=()=>{try{return localStorage.getItem('kino.dev.soon')==='1';}catch{return false;}};
@@ -63,13 +63,14 @@ const parts=()=>{
 // vertices at the current pose: just above the grip (a little forward of j_gun, the hand), just under the bore, on the
 // outer surface. side = the gun's widest point below it, which the charm is kept outside of. Cached per model and shown
 // attachments. charms.json anchors[gun id] = [x,y,z] (or {at:[x,y,z],side:y}) where the automatic spot looks wrong.
-const anchors=new Map(),inv=new THREE.Matrix4(),_m=new THREE.Matrix4(),_c=new THREE.Vector3(),LOOSE=/clip|mag|ammo|shell|bullet|round|speedloader|loader|belt|cartridge|grenade|rocket|arrow|bolt_?release_?no/i,
+const anchors=new Map(),inv=new THREE.Matrix4(),_m=new THREE.Matrix4(),_c=new THREE.Vector3();
+export const LOOSE=/clip|mag|ammo|shell|bullet|round|speedloader|loader|belt|cartridge|grenade|rocket|arrow|bolt_?release_?no/i,
   // small parts that snap on every shot (a charm on them would jerk), and no room to hang from them anyway
   FIDGET=/hammer|trigger|safety|sear|firing_?pin|ejector|selector|lever|button|latch/i;
 // visible vertices of `obj` (skipping the subtree `skip`) in the space of inv, as a flat [x,y,z,...] list: a vertex counts
 // when its mesh and the mesh's ancestors are visible and neither its dominant bone nor any ancestor is scaled to nothing
 // (BO1 hides attachments that way; their vertices collapse far off)
-function visiblePoints(obj,skip,stop,bones=null,unit=1){
+export function visiblePoints(obj,skip,stop,bones=null,unit=1,space=inv){   // space: world -> the frame the points come out in (the root bone's inverse world matrix)
   const pts=[],done=new Map(),dead=b=>{for(let p=b;p&&p!==stop;p=p.parent)if(p.isBone&&p.scale.x<1e-3)return true;return false;};
   const shown=o=>{for(let p=o;p&&p!==stop;p=p.parent)if(!p.visible||p.userData.charm||p===skip)return false;return !dead(o);};
   obj.traverse(o=>{
@@ -84,13 +85,13 @@ function visiblePoints(obj,skip,stop,bones=null,unit=1){
     for(let k=0;k<ids.length;k+=step){const i=ids[k];
       if(o.isSkinnedMesh&&si&&sw){let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
         if(!boneOk.has(best))boneOk.set(best,!dead(o.skeleton.bones[best]));if(!boneOk.get(best))continue;if(bones)owner=o.skeleton.bones[best];}
-      o.getVertexPosition(i,v).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
+      o.getVertexPosition(i,v).applyMatrix4(o.matrixWorld).applyMatrix4(space);
       if(Number.isFinite(v.x+v.y+v.z)&&Math.abs(v.x)<60*unit&&Math.abs(v.y)<30*unit&&Math.abs(v.z)<30*unit){pts.push(v.x/unit,v.y/unit,v.z/unit);bones?.push(owner);}   // (the SPAS parks its spare shells 127 in behind)
     }
   });
   return pts;
 }
-const pct=(pts,axis,q)=>{const a=[];for(let i=axis;i<pts.length;i+=3)a.push(pts[i]);a.sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor(a.length*q))];};
+export const pct=(pts,axis,q)=>{const a=[];for(let i=axis;i<pts.length;i+=3)a.push(pts[i]);a.sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor(a.length*q))];};
 // In the gun's root bone space (BO1: inches, x forward, y left = the side the camera sees, z up), from the visible
 // vertices at the current pose. The ring goes on a real point of the gun's outer surface on the visible side (it never
 // floats beside the gun): a point with nothing wider below it along the charm's drop, so the charm hangs straight down past

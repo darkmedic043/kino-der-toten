@@ -11,5 +11,95 @@
       "unlock": "pass.s2.charm.kurb"
     }
   ],
-  "anchors": {}
+  "anchors": {},
+  "_screens": "Gun screens (2026-11-07, screens.js): housings = Blender models from .tools/build_gun_screens.py (w/h/d inches, px = the display's pixels, foot = the mount block's face in inches, buttons = btn_0.. meshes). screens[] entry: id, name, desc, housing, kind (art | kills | buddy | ammo), tint (display colour), trim (housing trim colour), art ('melon' or {image, cols, rows, frames, fps}), marquee, glow, plus unlock/pass/soon like charms. screenMounts[gun id] = {at:[x,y,z] model units, size, tilt, yaw, foot} overrides the automatic spot.",
+  "housings": {
+    "slab": {
+      "model": "screens/slab.glb",
+      "w": 1.2,
+      "h": 1.2,
+      "d": 0.3,
+      "px": [
+        64,
+        64
+      ],
+      "foot": [
+        0.62,
+        0.52
+      ]
+    },
+    "field": {
+      "model": "screens/field.glb",
+      "w": 1.1,
+      "h": 1.45,
+      "d": 0.32,
+      "px": [
+        84,
+        64
+      ],
+      "foot": [
+        0.6,
+        0.62
+      ],
+      "buttons": 3
+    }
+  },
+  "screens": [
+    {
+      "id": "melon-loop",
+      "name": "Melon Loop",
+      "desc": "A looping pixel melon slice. Pure decoration.",
+      "housing": "slab",
+      "kind": "art",
+      "art": "melon",
+      "tint": "#ff8fa3",
+      "trim": "#e0405a"
+    },
+    {
+      "id": "tally",
+      "name": "Tally",
+      "desc": "This gun's lifetime kills and headshots, live.",
+      "housing": "slab",
+      "kind": "kills",
+      "tint": "#ffc857",
+      "trim": "#c9a227"
+    },
+    {
+      "id": "melon-buddy",
+      "name": "Melon Buddy",
+      "desc": "A little melon that cheers your kills, flinches when you're hit and dozes off when you're idle.",
+      "housing": "slab",
+      "kind": "buddy",
+      "tint": "#9dff9a",
+      "trim": "#52c24a"
+    },
+    {
+      "id": "field-readout",
+      "name": "Field Readout",
+      "desc": "Mag, reserve and round, with low ammo and reload warnings. The buttons are for later.",
+      "housing": "field",
+      "kind": "ammo",
+      "tint": "#ff6a3d",
+      "trim": "#8a8f96"
+    },
+    {
+      "id": "field-tally",
+      "name": "Field Tally",
+      "desc": "The kill counter in the button housing.",
+      "housing": "field",
+      "kind": "kills",
+      "tint": "#6fe3ff",
+      "trim": "#3b8fd1"
+    },
+    {
+      "id": "field-buddy",
+      "name": "Field Buddy",
+      "desc": "Melon Buddy in the button housing.",
+      "housing": "field",
+      "kind": "buddy",
+      "tint": "#9dff9a",
+      "trim": "#4e9a3f"
+    }
+  ],
+  "screenMounts": {}
 }

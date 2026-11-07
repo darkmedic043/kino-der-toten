@@ -190,9 +190,52 @@ A charm hangs from a small ring on the gun's left side (the side the player sees
   - `warmWeapon` hangs the body on each warm copy so its material compiles at load.
   - Console: `kino.charms.set(id|null)`, `kino.charms.catalogue`, `.rig`, `.anchor`.
 - **Gunsmith**: a CHARM row after CAMO (only when the catalogue has charms); since 2026-11-06 both sit under one COSMETIC heading (user). The row shows None plus each charm with EQUIPPED / MELON PASS / COMING SOON tags; hovering previews a locked charm. Picking a charm saves and fires `kino-charm`, which rehangs the in-game charm. Selecting the slot turns the camera to the charm side (`charmYaw`) and zooms in, and a kick swings it.
-- **Screen charms later** (a stat tracker, a virtual buddy): a model with a screen material drawn from a glyph/sprite atlas through shader uniforms, never a redrawn CanvasTexture (performance rule). Hook them in as an entry with a `screen` field read by `charmModel`.
+- **Gun screens** are their own slot next to the charm (SCREENS tab of the CHARM panel): see the next section.
 - **First charm: Kurb** (2026-11-06, the user's upload, a scan of a person; 52 MB GLB decimated to 15k triangles, 1024/512 textures, 753 KB: `scratch/charms/kurb/shrink.py`, original in `~/helm-uploads/keep/`). Size 3.7 in (user: bigger, then 1.6x). Never committed or installed (user, 2026-11-07: "kurb scan doesnt go in"): `.gitignore` lists `mods/charms/models/kurb.glb` and the install manifest has no rule for it.
 - Tests: `scratch/charms/test.mjs [guns]` (anchor, rest and swing angles, frames; `CHARM=<id>` uses a real charm), `gs.mjs [gun]` (the Gunsmith row), `gsall.mjs [ids|all]` (Gunsmith shots of every gun into `all/`), `ingame.mjs ids` (ring gap to the surface), `start.mjs` (a real match start). Without `CHARM` they push a stand-in charm into the catalogue at runtime only.
+
+## Gun screens (`mods/charms/screens.js`, 2026-11-07, user: "build the gun screens. they'll be include in a new tab in the charms, and will connect to guns in a comfortable manner")
+
+A small display fixed flat on the gun's left side (the side the player sees), one per gun, alongside its charm. The user picked four kinds to start ("basically all of these and more, but just these 4 for now") and the flush side mount. From the user's reference pictures: "set up the square looking one where the screen takes it all up, and make one with interactable buttons ... for future implementation". The user also allowed Blender for this.
+
+- **Housings** are original Blender models, `.tools/build_gun_screens.py` → `mods/charms/screens/{slab,field}.glb` (installed, OWN rule). `blender -b -P .tools/build_gun_screens.py -- --render scratch/screens` also renders previews. Inches, face toward +Z, back at z=0, exported Z-up as built.
+  - `slab` (1.2 × 1.2 in): the screen fills the face inside a thin raised rim. It has a trim band, grip ridges on the right edge and a status LED on top.
+  - `field` (1.1 × 1.45 in): a screen in a raised trim frame on top, three buttons below. `btn_0` is round; `btn_1` and `btn_2` are the up and down halves of a rocker. Each button is its own node with its origin on the face, so a press is a move along -Z.
+  - Every housing has `screen` (UVs 0..1, gets the display shader) and `foot` (a mount block from z=0 to -1, scaled in z to reach the gun's surface). Materials: `shell`, `trim` (recoloured per entry: `trim`), `rubber`, `glyph`, `led`.
+- **Catalogue** (`charms.json`):
+  - `housings{id:{model,w,h,d,px,foot,buttons}}`, where `px` is the display's pixel size (slab 64×64, field 84×64).
+  - `screens[]`: `id`, `name`, `desc`, `housing`, `kind`, `tint` (display colour), `trim`, `art`, `marquee`, `glow`, plus `unlock`/`pass`/`soon` as for charms (`charmOwned`).
+  - `screenMounts{gunId:{at,size,tilt,yaw,foot}}` overrides the automatic spot.
+  - Six starters, all free: Melon Loop (art), Tally (kills), Melon Buddy (buddy), Field Readout (ammo), Field Tally, Field Buddy.
+- **State**: `kino.mods.charms.screen{gunId:screenId}`, in the same cloud-synced key as the charms (`loadCharmState` defaults `screen`).
+- **Kinds** (`KINDS` in screens.js; each has `draw(lcd, state, t, memory, entry)` and an optional `ev(memory, kind)`):
+  - `art`: the built-in `melon` (a rocking pixel melon slice, twinkles and a scrolling marquee). Or a sprite sheet `{image, cols, rows, frames, fps}`, scaled to the screen once at load.
+  - `kills`: the gun's lifetime kills and headshots, from the camo counters (`kino.weaponLevels.profile.camo[id].p`), so attribution matches the camo challenges. The box flashes on a kill or headshot.
+  - `buddy`: a striped melon face with moods idle (blinks), happy (kill, +1), wow (headshot), hurt (shakes), reload (sweat drop), down (X eyes, HELP!), and sleepy after 25 s without an event. Higher-priority moods aren't interrupted.
+  - `ammo`: round, the mag (big), the reserve, and a notch bar (one notch per round up to 40). Warnings: LOW (a quarter mag or less), EMPTY and RELOAD (with a sweep).
+  - Events come from the game: a rise in the gun's kill or headshot count, a reload starting, `beforeDamage` (hurt), `session.phase === 'reviving'` (down), and `button`.
+- **Drawing**: `Lcd` is a tiny RGBA pixel buffer with a 3×5 font (`FONT`, octal rows), rects, discs, lines and character sprites. It's redrawn at most 15 times a second and uploaded only when its hash changes (16-21 KB, `DataTexture`, nearest, no mipmaps). That's far under the 100 KB per-upload line in the performance rules; this replaced the earlier plan of shader-uniform text, because new kinds are plain JS this way.
+  - The shader (`ShaderMaterial` `gun_screen`, one program for all screens) adds the LCD pixel grid (faded out by `fwidth` when the pixels are small on screen), the glow, a vignette and a glass sheen. It includes tone mapping and colour space.
+- **Mount** (`screenMount`): runs in the root bone's space from `visiblePoints`. Pass the root's inverse world matrix as its `space` argument (2026-11-07: it used to read charms.js's private matrix, so screens were mounted in a stale space and sat off the gun).
+  - **Face orientation**: the normal is tilted 20° up and yawed 42° back toward the eye. At 16°/12° the face was about 70° off the line of sight and read edge-on.
+  - **Candidate grid**: the points are binned in 0.15 in cells over (x, z), keeping the outermost `p·n` per cell, plus loose-part (`LOOSE`/`FIDGET`), moving-bone and hand counts.
+    - **Gap fill**: a flat panel has vertices only at its edges, so gaps of up to 1.5 in between backed cells are filled along x, then z, with the surface interpolated. Without this, a plain receiver side failed the coverage test and only 18 spots on the AK survived.
+    - Candidates step 0.25 in (x) and 0.2 in (z), at sizes 1, .86, .74 and .62; all sizes are scored.
+  - **Rejected**: under 45% of the face backed; under 70% of the foot backed; any loose part under the foot; a foot deeper than 0.9 in; facing the eye at under 0.3; hands hiding over 30% of it.
+  - **The eye** is the view camera in game. The Gunsmith has no game camera, so it uses a typical hip eye at (xmin-9, 3.5, top+1.2). The eye's distance behind the gun ranges from 10 in (AK) to 20 in (Ray Gun).
+  - **Cost**: the unbacked area, the foot depth, moving parts, a hand touching the housing, and sticking above the bore (or sitting low under it). The two biggest terms:
+    - `40·max(0, .12 - width·facing/distance)`: how big it reads from the eye, so bigger and closer wins;
+    - `8·hidden`: the share of a 4×4 grid over the face that hand points between the eye and the face cover. The left arm crosses the receiver on most guns.
+  - **Off screen and charm clearance**: corners off screen add 2 each (in game). When the gun has a charm, its plain hang spot (`charmZone`, the same in the Gunsmith and the game) with a 3 in drop and 0.45 in half width adds 5.
+  - **Placement**: the back plane sits 0.03 in outside the outermost point, and the foot reaches back to the mean surface. Results are cached per model, housing, override, hidden bones and hands.
+  - **Results** on the six test guns: AK, MP40, FAMAS and SPAS get a clear screen on the receiver beside the left hand; on the M1911 and Ray Gun it reads smaller, since they sit further from the eye.
+- **Game** (`charms/mod.js`): mounts when the held gun changes (450 ms after the raise, like the charm). The screen is a child of the view scene with `matrix = root.matrixWorld × mount` each frame (`placeScreen`), and is hidden with the gun. The `warmWeapon` handler hangs a copy on each warm-up gun that carries a screen, so the display program compiles at load. `kino-charm` with `{screen:true}` remounts.
+  - Console: `kino.charms.setScreen(id|null)`, `kino.charms.press(i)` (presses a housing button, sends `button` to the content), `.display` (the GunScreen), `.screenMount`.
+- **Gunsmith**: the CHARM row counts charms and screens together and shows both names. The panel has CHARMS | SCREENS tabs (`data-chtab`); options are `data-screen`, tagged with the kind. Hovering previews, locked ones too.
+  - The preview shows demo data: this gun's real counts, a full mag, and the buddy's moods cycling every 2.6 s.
+  - Picking a screen turns the camera to it. The screen's animation keeps the render loop drawing (`update` returns true when the picture changed).
+- **Buttons for later**: `GunScreen.press(i)` animates the cap in and out and calls the kind's `button(memory, i)` if it has one (none do yet).
+- Tests: `scratch/screens/test.mjs` (`GUNS=gun:screen,...`, `EVENTS=1` buddy reactions, `GS=<gun>` Gunsmith shots). Live tuning: `scratch/screens/hold.mjs` keeps one page open (CDP 9333), `probe.mjs '<js>' [frame]` runs code in it, `newmount.sh gun screen name` runs an edited `screenMount` there (imported with a cache-busting query) and places its pick through a `screenMounts` override.
 
 ## Weapon stickers (`mods/stickers`, 2026-11-06, user: "you can freely place 3 stickers on the weapon, having it wreap around it accordingly, you can also resize the stickers abit")
 

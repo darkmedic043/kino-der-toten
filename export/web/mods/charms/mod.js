@@ -2,6 +2,7 @@
 // and swings. The system is in charms.js; this hangs it on the viewmodel. Right-hand gun only (dual wield: not the left).
 import * as THREE from 'three';
 import { loadCharms, loadCharmState, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig } from './charms.js';
+import { screenFor, makeScreen, screenMount, placeScreen, charmZone } from './screens.js';
 
 export default async function setup(api){
   const {host,session,viewScene}=api;const view=api.view;
@@ -23,11 +24,45 @@ export default async function setup(api){
     gun=g;root=rootOf(gun,def);if(!root)return;gunId=id;
     rig=new CharmRig(body,c);viewScene.add(rig.group);rig.group.visible=false;anchor=null;hungAt=performance.now();
   }
+  // ---- the gun screen (screens.js): mounted on the root bone, its picture fed from the session and the gun's counters ----
+  let scr=null,sGun=null,sRoot=null,sMount=null,sId=null,sTok=0,sAt=0,prevK=null,prevRel=false;
+  const dropScreen=()=>{scr?.dispose();scr=null;sGun=sRoot=sMount=null;};
+  async function mountScreen(def){
+    const my=++sTok;dropScreen();
+    const id=heldId(def),e=screenFor(cat,loadCharmState(),id),g=view.gun;if(!e||!g)return;
+    const s=await makeScreen(cat,e);if(my!==sTok||!s||view.gun!==g){s?.dispose();return;}
+    scr=s;sGun=g;sRoot=rootOf(g,def);sId=id;sAt=performance.now();prevK=null;prevRel=false;
+    if(!sRoot){dropScreen();return;}viewScene.add(s.object);s.object.visible=false;
+  }
+  const screenState=()=>{const w=session.weapon,d=view.def??session.def,p=window.kino?.weaponLevels?.profile?.camo?.[sId]?.p??{};
+    return {kills:p.kills??0,heads:p.headshots??0,mag:w?.mag??0,reserve:w?.reserve??0,clip:d?.clipSize??1,round:session.round??1,
+      reloading:(session.reloadLeft??0)>0,down:session.phase==='reviving'};};
+  function stepScreen(dt){
+    if(view.gun!==sGun){dropScreen();return;}
+    let shown=true;for(let o=sGun;o;o=o.parent){if(o===viewScene)break;if(!o.visible){shown=false;break;}}
+    if(!sMount){
+      // after the raise has settled; it keeps clear of where a charm hangs when the gun has one
+      if(!shown||performance.now()-sAt<450){scr.object.visible=false;return;}
+      view.pivot.updateMatrixWorld(true);const def=view.def??session.def,unit=charmUnit(def);
+      const avoid=charmFor(cat,loadCharmState(),sId)?charmZone(sGun,sRoot,{key:(def?.model??sId),override:cat.anchors[sId],unit}):null;
+      sMount=screenMount(sGun,sRoot,{key:(def?.model??sId),override:cat.screenMounts[sId],hands:view.hands,camera:api.viewCamera,housing:scr.housing,unit,avoid});
+      if(!sMount){dropScreen();return;}scr.setFoot(sMount.foot);
+    }
+    scr.object.visible=shown;if(!shown)return;
+    view.pivot.updateMatrixWorld(true);placeScreen(scr,sRoot,sMount);
+    const st=screenState();
+    if(prevK){if(st.heads>prevK.h)scr.event('head');else if(st.kills>prevK.k)scr.event('kill');}prevK={k:st.kills,h:st.heads};
+    if(st.reloading&&!prevRel)scr.event('reload');prevRel=st.reloading;
+    scr.update(dt,st);
+  }
+  host.on('beforeDamage',e=>{if(scr&&e.amount>0&&!['reviving','gameover'].includes(session.phase))scr.event('hurt');});
+
   // hang it whenever the gun in hand changes, however it got there (the match's first gun is equipped before this mod's
   // setup runs, other mods swap viewmodels themselves): watched each frame rather than by wrapping view.equip
   let seen=null;
   host.on('update',dt=>{
-    if(view.gun!==seen){seen=view.gun;if(view.gun&&(!rig||gun!==view.gun))hang(view.def??session.def);}
+    if(view.gun!==seen){seen=view.gun;if(view.gun&&(!rig||gun!==view.gun))hang(view.def??session.def);if(view.gun&&(!scr||sGun!==view.gun))mountScreen(view.def??session.def);}
+    if(scr)stepScreen(dt);
     if(!rig)return;
     if(view.gun!==gun){drop();return;}
     let shown=true;for(let o=gun;o;o=o.parent){if(o===viewScene)break;if(!o.visible){shown=false;break;}}
@@ -51,15 +86,25 @@ export default async function setup(api){
     wait?.(charmModel(c).then(body=>{if(!body)return;const r=rootOf(wg,def);if(!r)return;
       body.object.matrixAutoUpdate=true;body.object.position.set(1,3,0);r.add(body.object);}));
   });
+  // and the screen it carries (its display shader compiles once for every screen)
+  host.on('warmWeapon',({def,gun:wg,wait})=>{
+    const id=def?.baseId??def?.id,e=screenFor(cat,loadCharmState(),id);if(!e||!wg)return;
+    wait?.(makeScreen(cat,e).then(s=>{if(!s)return;const r=rootOf(wg,def);if(!r)return;s.update(1,{kills:0,heads:0,mag:1,clip:1});
+      s.object.matrixAutoUpdate=true;s.object.position.set(2,3,0);s.object.scale.setScalar(charmUnit(def));r.add(s.object);}));
+  });
 
   // the Gunsmith changed a gun's charm (weapon-levels/gunsmith-view.js): rehang it if that's the gun in hand
-  addEventListener('kino-charm',e=>{if(e.detail?.id===session.weapon?.id&&view.gun)hang(view.def??session.def);});
+  addEventListener('kino-charm',e=>{if(e.detail?.id===session.weapon?.id&&view.gun){if(e.detail.screen)mountScreen(view.def??session.def);else hang(view.def??session.def);}});
 
   window.kino??={};
   window.kino.charms={
     // set the held gun's charm (null = none) and save it; for tests and the console
     set:(charmId)=>{const id=session.weapon?.id;if(!id)return;const s=loadCharmState();if(charmId)s.on[id]=charmId;else delete s.on[id];
       localStorage.setItem('kino.mods.charms',JSON.stringify(s));return hang(view.def??session.def);},
-    catalogue:cat,get rig(){return rig;},get anchor(){return anchor;},api,
+    // set the held gun's screen (null = none)
+    setScreen:(screenId)=>{const id=session.weapon?.id;if(!id)return;const s=loadCharmState();if(screenId)s.screen[id]=screenId;else delete s.screen[id];
+      localStorage.setItem('kino.mods.charms',JSON.stringify(s));return mountScreen(view.def??session.def);},
+    press:i=>scr?.press(i),
+    catalogue:cat,get rig(){return rig;},get anchor(){return anchor;},get display(){return scr;},get screenMount(){return sMount;},api,
   };
 }

@@ -20,6 +20,7 @@ const OWN = [
   /^vendor\/jsm\/libs\/basis\/basis_transcoder\.wasm$/,                   // the Basis Universal KTX2 transcoder (Apache-2.0)
   /^mods\/(mods|maps)\.json$/, /^mods\/README\.md$/,
   /^mods\/melee\/melee\.json$/,                                    // the melee weapon catalog
+  /^mods\/charms\/screens\/[^/]+\.glb$/,                         // the gun screen housings, built in Blender for this fork (.tools/build_gun_screens.py)
   /^mods\/(charms\/charms|stickers\/stickers)\.json$/,                                // the weapon charm and sticker catalogs (models and images get their own rule once they are known to be ours)
   /^mods\/stickers\/images\/(pastdue|highvoltage|beeseal|sproutedskull|rainmeter|tollcrest)\.png$/,   // the user's own Season 1 stickers (2026-11-07); not the smiley, and never the Kurb scan
   /^mods\/[^/]+\/mod\.json$/,                                       // every mod's manifest
