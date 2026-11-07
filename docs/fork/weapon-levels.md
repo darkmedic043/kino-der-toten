@@ -206,7 +206,7 @@ A small display fixed flat on the gun's left side (the side the player sees), on
   - `housings{id:{model,w,h,d,px,foot,buttons}}`, where `px` is the display's pixel size (slab 64×64, field 84×64).
   - `screens[]`: `id`, `name`, `desc`, `housing`, `kind`, `tint` (display colour), `trim`, `art`, `marquee`, `glow`, plus `unlock`/`pass`/`soon` as for charms (`charmOwned`).
   - `screenMounts{gunId:{at,size,tilt,yaw,foot}}` overrides the automatic spot.
-  - Six starters, all free: Melon Loop (art), Tally (kills), Melon Buddy (buddy), Field Readout (ammo), Field Tally, Field Buddy.
+  - Six screens, all Season 1 Melon Pass rewards since 2026-11-07 (`pass:"s2"`, `unlock: pass.s2.screen.<id>`, pass.md): Tally (page 1), Field Readout (2, ★), Melon Buddy (4), Field Tally (7, ★), Melon Loop (8), Field Buddy (9, ★). Locked ones show PASS in the SCREENS tab; `kino.dev.soon=1` lifts the lock for testing.
 - **State**: `kino.mods.charms.screen{gunId:screenId}`, in the same cloud-synced key as the charms (`loadCharmState` defaults `screen`).
 - **Kinds** (`KINDS` in screens.js; each has `draw(lcd, state, t, memory, entry)` and an optional `ev(memory, kind)`):
   - `art`: the built-in `melon` (a rocking pixel melon slice, twinkles and a scrolling marquee). Or a sprite sheet `{image, cols, rows, frames, fps}`, scaled to the screen once at load.

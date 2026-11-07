@@ -2054,6 +2054,78 @@
    "pass": "s2"
   },
   {
+   "id": "pass.s2.screen.tally",
+   "cat": "screen",
+   "name": "Tally",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 gun screen: the gun's kill count.",
+   "data": {
+    "screen": "tally"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.screen.field-readout",
+   "cat": "screen",
+   "name": "Field Readout",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 gun screen: an ammo readout in the button housing.",
+   "data": {
+    "screen": "field-readout"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.screen.melon-buddy",
+   "cat": "screen",
+   "name": "Melon Buddy",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 gun screen: a melon that reacts to the fight.",
+   "data": {
+    "screen": "melon-buddy"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.screen.field-tally",
+   "cat": "screen",
+   "name": "Field Tally",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 gun screen: the kill counter in the button housing.",
+   "data": {
+    "screen": "field-tally"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.screen.melon-loop",
+   "cat": "screen",
+   "name": "Melon Loop",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 gun screen: a looping pixel melon.",
+   "data": {
+    "screen": "melon-loop"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.screen.field-buddy",
+   "cat": "screen",
+   "name": "Field Buddy",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 gun screen: Melon Buddy in the button housing.",
+   "data": {
+    "screen": "field-buddy"
+   },
+   "pass": "s2"
+  },
+  {
    "id": "pass.s2.card.airsuperiority",
    "cat": "card",
    "name": "Air Superiority",

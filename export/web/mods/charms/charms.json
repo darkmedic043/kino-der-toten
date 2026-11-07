@@ -48,57 +48,69 @@
     {
       "id": "melon-loop",
       "name": "Melon Loop",
-      "desc": "A looping pixel melon slice. Pure decoration.",
+      "desc": "A looping pixel melon slice. Pure decoration. Season 1, page 8.",
       "housing": "slab",
       "kind": "art",
       "art": "melon",
       "tint": "#ff8fa3",
-      "trim": "#e0405a"
+      "trim": "#e0405a",
+      "pass": "s2",
+      "unlock": "pass.s2.screen.melon-loop"
     },
     {
       "id": "tally",
       "name": "Tally",
-      "desc": "This gun's lifetime kills and headshots, live.",
+      "desc": "This gun's lifetime kills and headshots, live. Season 1, page 1.",
       "housing": "slab",
       "kind": "kills",
       "tint": "#ffc857",
-      "trim": "#c9a227"
+      "trim": "#c9a227",
+      "pass": "s2",
+      "unlock": "pass.s2.screen.tally"
     },
     {
       "id": "melon-buddy",
       "name": "Melon Buddy",
-      "desc": "A little melon that cheers your kills, flinches when you're hit and dozes off when you're idle.",
+      "desc": "A little melon that cheers your kills, flinches when you're hit and dozes off when you're idle. Season 1, page 4.",
       "housing": "slab",
       "kind": "buddy",
       "tint": "#9dff9a",
-      "trim": "#52c24a"
+      "trim": "#52c24a",
+      "pass": "s2",
+      "unlock": "pass.s2.screen.melon-buddy"
     },
     {
       "id": "field-readout",
       "name": "Field Readout",
-      "desc": "Mag, reserve and round, with low ammo and reload warnings. The buttons are for later.",
+      "desc": "Mag, reserve and round, with low ammo and reload warnings. The buttons are for later. Season 1, page 2.",
       "housing": "field",
       "kind": "ammo",
       "tint": "#ff6a3d",
-      "trim": "#8a8f96"
+      "trim": "#8a8f96",
+      "pass": "s2",
+      "unlock": "pass.s2.screen.field-readout"
     },
     {
       "id": "field-tally",
       "name": "Field Tally",
-      "desc": "The kill counter in the button housing.",
+      "desc": "The kill counter in the button housing. Season 1, page 7.",
       "housing": "field",
       "kind": "kills",
       "tint": "#6fe3ff",
-      "trim": "#3b8fd1"
+      "trim": "#3b8fd1",
+      "pass": "s2",
+      "unlock": "pass.s2.screen.field-tally"
     },
     {
       "id": "field-buddy",
       "name": "Field Buddy",
-      "desc": "Melon Buddy in the button housing.",
+      "desc": "Melon Buddy in the button housing. Season 1, page 9.",
       "housing": "field",
       "kind": "buddy",
       "tint": "#9dff9a",
-      "trim": "#4e9a3f"
+      "trim": "#4e9a3f",
+      "pass": "s2",
+      "unlock": "pass.s2.screen.field-buddy"
     }
   ],
   "screenMounts": {}
