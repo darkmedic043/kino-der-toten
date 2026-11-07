@@ -58,9 +58,12 @@ const bufOf=o=>o.geometry?.attributes?.position?.array;
 const SKIP=/reflex_red_dot|scope_pka_crosshair|clan_tag|player_icon|lens|glass|reticle|_dot\b/i;
 const matCache=new Map();   // base material uuid + vertex buffer + gun → sticker material (its uniforms are updated in place)
 let bufIds=new WeakMap(),bufN=0;const bufId=a=>{if(!bufIds.has(a))bufIds.set(a,++bufN);return bufIds.get(a);};
+// Material.clone deep-copies userData through JSON.stringify: a camo material's userData holds the original material, whose
+// textures then serialise to data URLs (and throw on ImageBitmaps texture-memory.js has closed). Clone with userData set aside.
+export function cloneMaterial(src){const ud=src.userData;src.userData={};try{return src.clone();}finally{src.userData=ud;}}
 function stickerMaterial(base,group,gunKey,shared){
   const key=base.uuid+'|'+group+'|'+gunKey;let m=matCache.get(key);if(m)return m;
-  m=base.clone();m.userData={...base.userData,stickerOf:base,camoOf:base.userData?.camoOf??base};
+  m=cloneMaterial(base);m.userData={...base.userData,stickerOf:base,camoOf:base.userData?.camoOf??base};
   const V=()=>[0,1,2].map(()=>new THREE.Vector3());
   const u={stkAtlas:shared.atlas,stkCount:{value:0},stkO:{value:V()},stkT:{value:V()},stkB:{value:V()},stkZ:{value:V()},stkR:{value:[0,1,2].map(()=>new THREE.Vector4())}};
   m.userData.stk=u;

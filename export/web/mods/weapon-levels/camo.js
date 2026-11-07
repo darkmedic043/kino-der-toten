@@ -4,7 +4,7 @@
 // sights, lenses, suppressors, underbarrels, straps, mags or hands), keeping
 // the gun's own shading and wear: camo colour × the base texture's brightness.
 import * as THREE from 'three';
-import { restick } from '../stickers/stickers.js';
+import { restick, cloneMaterial } from '../stickers/stickers.js';
 import { loadPrestige } from '../prestige/prestige.js';
 import { PRESTIGE_TABLE } from '../prestige/camo-table.js';
 import { drawPrestigeArt, STYLES as PRESTIGE_STYLES, hslRgb as artRgb } from '../prestige/prestige-art.js';
@@ -206,7 +206,7 @@ export const PAP_CAMO={id:'pap',name:'Pack-a-Punch',texture:'../../textures/camo
 const matCache=new Map();   // original material uuid + camo id → camo material
 function camoMaterial(orig,camo){
   const key=orig.uuid+'|'+camo.id;if(matCache.has(key))return matCache.get(key);
-  const m=orig.clone();m.userData={...orig.userData,camoOf:orig,camo:camo.id};
+  const m=cloneMaterial(orig);m.userData={...orig.userData,camoOf:orig,camo:camo.id};
   // a model may ask for denser tiling (glTF material extras camoScale, e.g. the Grimhawk's single texture atlas)
   const fr=camo.frames?camoFrames(camo):null,fps=camo.frames?.fps??8,fpos=()=>((camoTime.value*fps)%fr.length+fr.length)%fr.length;
   const uniforms={camoMap:fr?{get value(){return fr[Math.floor(fpos())];}}:{value:camoTexture(camo)},

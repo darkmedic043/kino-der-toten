@@ -143,6 +143,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   const pivot=new THREE.Group();scene.add(pivot);
 
   let gun=null,glow=null,def=null,slot=null,hover=null,yaw=-.35,pitch=.08,dragging=null,radius=40,alive=true;
+  root.debug={get gun(){return gun;},renderer,get camera(){return camera;}};   // for tests: document.getElementById('gsv').debug
   const focus=new THREE.Vector3(),focusGoal=new THREE.Vector3(),center=new THREE.Vector3();let dist=80,distGoal=80;
   const attachmentTags=new Set(Object.values(weapons).flatMap(d=>d?.hideTags??[]));
 
