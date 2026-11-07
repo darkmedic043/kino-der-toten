@@ -70,8 +70,10 @@ export const LOOSE=/clip|mag|ammo|shell|bullet|round|speedloader|loader|belt|car
 // visible vertices of `obj` (skipping the subtree `skip`) in the space of inv, as a flat [x,y,z,...] list: a vertex counts
 // when its mesh and the mesh's ancestors are visible and neither its dominant bone nor any ancestor is scaled to nothing
 // (BO1 hides attachments that way; their vertices collapse far off)
-export function visiblePoints(obj,skip,stop,bones=null,unit=1,space=inv){   // space: world -> the frame the points come out in (the root bone's inverse world matrix)
-  const pts=[],done=new Map(),dead=b=>{for(let p=b;p&&p!==stop;p=p.parent)if(p.isBone&&p.scale.x<1e-3)return true;return false;};
+// fill (inches, optional): also points across triangles with an edge longer than that (a long barrel has vertices only at
+// its two ends, so the vertices alone show only the tube inside it; the gun screens' surface search)
+export function visiblePoints(obj,skip,stop,bones=null,unit=1,space=inv,fill=0){   // space: world -> the frame the points come out in (the root bone's inverse world matrix)
+  const pts=[],vp=new Map(),done=new Map();let added=0;const dead=b=>{for(let p=b;p&&p!==stop;p=p.parent)if(p.isBone&&p.scale.x<1e-3)return true;return false;};
   const shown=o=>{for(let p=o;p&&p!==stop;p=p.parent)if(!p.visible||p.userData.charm||p===skip)return false;return !dead(o);};
   obj.traverse(o=>{
     if(!o.isMesh||!shown(o))return;
@@ -86,8 +88,19 @@ export function visiblePoints(obj,skip,stop,bones=null,unit=1,space=inv){   // s
       if(o.isSkinnedMesh&&si&&sw){let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
         if(!boneOk.has(best))boneOk.set(best,!dead(o.skeleton.bones[best]));if(!boneOk.get(best))continue;if(bones)owner=o.skeleton.bones[best];}
       o.getVertexPosition(i,v).applyMatrix4(o.matrixWorld).applyMatrix4(space);
-      if(Number.isFinite(v.x+v.y+v.z)&&Math.abs(v.x)<60*unit&&Math.abs(v.y)<30*unit&&Math.abs(v.z)<30*unit){pts.push(v.x/unit,v.y/unit,v.z/unit);bones?.push(owner);}   // (the SPAS parks its spare shells 127 in behind)
+      if(Number.isFinite(v.x+v.y+v.z)&&Math.abs(v.x)<60*unit&&Math.abs(v.y)<30*unit&&Math.abs(v.z)<30*unit){pts.push(v.x/unit,v.y/unit,v.z/unit);bones?.push(owner);if(fill)vp.set(i,[v.x/unit,v.y/unit,v.z/unit,owner]);}   // (the SPAS parks its spare shells 127 in behind)
     }
+    if(fill&&added<20000){const N=g.index?g.index.count:pos.count,X=g.index?k=>g.index.getX(k):k=>k,st=g.drawRange.start,end=Math.min(N,st+(Number.isFinite(g.drawRange.count)?g.drawRange.count:N));
+      const P=i=>{if(!vp.has(i)){let ok=true,own=owner;if(o.isSkinnedMesh&&si&&sw){let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
+            if(!boneOk.has(best))boneOk.set(best,!dead(o.skeleton.bones[best]));ok=boneOk.get(best);if(bones)own=o.skeleton.bones[best];}
+          o.getVertexPosition(i,v).applyMatrix4(o.matrixWorld).applyMatrix4(space);vp.set(i,ok&&Number.isFinite(v.x+v.y+v.z)&&Math.abs(v.x)<60*unit&&Math.abs(v.y)<30*unit&&Math.abs(v.z)<30*unit?[v.x/unit,v.y/unit,v.z/unit,own]:null);}
+        return vp.get(i);};
+      for(let k=st;k+2<end&&added<20000;k+=3){const a=P(X(k)),b=P(X(k+1)),c=P(X(k+2));if(!a||!b||!c)continue;
+        const e=Math.max(Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]),Math.hypot(b[0]-c[0],b[1]-c[1],b[2]-c[2]),Math.hypot(c[0]-a[0],c[1]-a[1],c[2]-a[2]));
+        if(e<=fill||e>30)continue;const m=Math.min(40,Math.ceil(e/fill));
+        for(let i=0;i<=m;i++)for(let j=0;i+j<=m;j++){if((i===0&&j===0)||i===m||j===m)continue;const u=i/m,w=j/m,r=1-u-w;
+          pts.push(a[0]*r+b[0]*u+c[0]*w,a[1]*r+b[1]*u+c[1]*w,a[2]*r+b[2]*u+c[2]*w);bones?.push(a[3]);added++;}}}
+    vp.clear();
   });
   return pts;
 }

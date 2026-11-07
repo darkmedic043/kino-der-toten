@@ -229,6 +229,7 @@ export class GunScreen{
       else if(o.material?.name==='trim'&&entry.trim){const k=entry.trim;if(!trims.has(k)){const m=o.material.clone();m.color.setRGB(...hex(k).map(v=>v/255),THREE.SRGBColorSpace);trims.set(k,m);}o.material=trims.get(k);}
     });
     this.foot=model.getObjectByName('foot');this.arm=model.getObjectByName('arm');this.clip=model.getObjectByName('clip');
+    this.hook=['clip_riser','clip_lip','clip_tip'].map(k=>model.getObjectByName(k));this.hook0=this.hook.map(o=>o?.position.y);
     for(let i=0;i<8;i++){const b=model.getObjectByName('btn_'+i);if(!b)break;this.buttons.push(b);this.press0.push(b.position.z);}
     this.presses=this.buttons.map(()=>0);
     if(entry.art?.image)artFrames(entry.art,w,h).then(f=>{this.m.frames=f;});
@@ -238,7 +239,11 @@ export class GunScreen{
   // the arm's length and the clip's place on the gun (housing units), from screenMount
   setMount(m){this.mounted=m;if(this.arm)this.arm.scale.z=Math.max(.001,m.arm??0);
     if(this.clip&&m.clip){this.clip.position.fromArray(m.clip.p);this.clip.quaternion.fromArray(m.clip.q);this.clip.visible=true;}
-    else if(this.clip)this.clip.visible=false;}
+    else if(this.clip)this.clip.visible=false;
+    // the hook over the gun's top (clip units): riser up from the plate's top, the lip over the top, the tip at its end
+    const [r,l,tp]=this.hook,h=m.clip?.hook;
+    for(const o of this.hook)if(o)o.visible=!!h;
+    if(h&&r&&l&&tp){const y0=this.hook0[0];r.scale.y=h.len+.12;l.position.y=tp.position.y=y0+h.len;l.scale.z=h.depth;tp.position.z=-h.depth;}}
   event(k){this.kind.ev?.(this.m,k);}
   press(i){if(i<0||i>=this.buttons.length)return;this.presses[i]=1;this.event('button');this.kind.button?.(this.m,i);}
   update(dt,st){
@@ -256,6 +261,17 @@ export async function makeScreen(cat,entry){
 }
 
 // ---- where it mounts ------------------------------------------------------------------------------------------------------
+// the search costs 100-350 ms, so a gun's spot is remembered in this browser (localStorage, by everything it depends on):
+// it runs once per gun and view, not on every match's first equip. Bump MOUNT_V when the search changes.
+const MOUNT_V=3,MOUNT_KEY='kino.screenMounts';
+let saved=null;
+const savedMounts=()=>{if(saved)return saved;try{const o=JSON.parse(localStorage.getItem(MOUNT_KEY)??'null');saved=o?.v===MOUNT_V?o:{v:MOUNT_V,m:{}};}catch{saved={v:MOUNT_V,m:{}};}return saved;};
+const fromSaved=o=>o&&{...o,matrix:new THREE.Matrix4().fromArray(o.matrix)};
+function saveMount(k,out){const S=savedMounts();delete S.m[k];S.m[k]={...out,matrix:out.matrix.toArray()};
+  const ks=Object.keys(S.m);for(const x of ks.slice(0,Math.max(0,ks.length-150)))delete S.m[x];   // oldest out
+  try{localStorage.setItem(MOUNT_KEY,JSON.stringify(S));}catch{}}
+// which arms are posed around the gun (the characters' rigs differ; their roots carry no name)
+const handsSig=h=>{if(!h)return '';let n=0,v=0;h.traverse(o=>{if(o.isMesh&&o.visible){n++;v+=o.geometry?.attributes?.position?.count??0;}});return n+'.'+v;};
 const mounts=new Map(),inv=new THREE.Matrix4(),_v=new THREE.Vector3(),_x=new THREE.Vector3(),_u=new THREE.Vector3(),_n=new THREE.Vector3();
 // the gun's side in root space as a frame: x back, y up, z out of the left side (the clip's frame)
 const G_SIDE=new THREE.Matrix4().makeBasis(new THREE.Vector3(-1,0,0),new THREE.Vector3(0,0,1),new THREE.Vector3(0,1,0));
@@ -270,30 +286,33 @@ function frameOf(tilt,yaw){
 export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,avoid=null}={}){
   const tilt=override?.tilt??20,yaw=override?.yaw??42,F=frameOf(tilt,yaw),HW=housing.w??1.2,HH=housing.h??1.2,FT=housing.foot??[.6,.55];
   const hidden=[];gun.traverse(b=>{if(b.isBone&&b.scale.x<1e-3)hidden.push(b.name);});
-  const fullKey=[key,housing.model,hands?.name??'',unit,JSON.stringify(override??''),avoid?`${avoid.x.toFixed(1)},${avoid.z.toFixed(1)}`:'',hidden.join(',')].join('|');
+  const fullKey=[key,housing.model,handsSig(hands),unit,JSON.stringify(override??''),avoid?`${avoid.x.toFixed(1)},${avoid.z.toFixed(1)}`:'',hidden.join(',')].join('|');
   if(mounts.has(fullKey))return mounts.get(fullKey);
+  const viewKey=fullKey+(camera?`|${camera.fov.toFixed(0)},${camera.aspect.toFixed(1)}`:'');
+  const kept=fromSaved(savedMounts().m[viewKey]);if(kept){mounts.set(fullKey,kept);return kept;}
   inv.copy(root.matrixWorld).invert();
-  const pb=[],pts=visiblePoints(gun,null,gun.parent,pb,unit,inv);if(pts.length<9)return null;
+  const pb=[],pts=visiblePoints(gun,null,gun.parent,pb,unit,inv,.6);if(pts.length<9)return null;
   const hp=hands?visiblePoints(hands,gun,hands.parent,null,unit,inv):[];
   const n=F.n,dot=(i,a)=>a[i]*n.x+a[i+1]*n.y+a[i+2]*n.z;
   // bins over (x, z): the outermost surface toward the face (max p.n), and whether loose or moving parts are there
   const loose=new Map(),kindOf=b=>{if(!b||b===root)return 0;if(!loose.has(b)){let k=2;for(let p=b;p&&p!==root&&p!==gun;p=p.parent)if(LOOSE.test(p.name)||FIDGET.test(p.name))k=1;loose.set(b,k);}return loose.get(b);};
-  const bins=new Map(),bin=(x,z)=>{const k=Math.round(x/CELL)*4096+Math.round(z/CELL);let b=bins.get(k);if(!b)bins.set(k,b={max:-1e9,n:0,loose:0,moving:0,hand:-1e9});return b;},get=(ix,iz)=>bins.get(ix*4096+iz);
-  for(let i=0;i<pts.length;i+=3){const b=bin(pts[i],pts[i+2]),d=dot(i,pts);b.n++;if(d>b.max)b.max=d;const k=kindOf(pb[i/3]);if(k===1)b.loose++;else if(k===2)b.moving++;}
-  for(let i=0;i<hp.length;i+=3){const b=bin(hp[i],hp[i+2]),d=dot(i,hp);if(d>b.hand)b.hand=d;}
+  const bins=new Map(),bin=(x,z)=>{const k=Math.round(x/CELL)*4096+Math.round(z/CELL);let b=bins.get(k);if(!b)bins.set(k,b={max:-1e9,y:-1e9,ylo:1e9,n:0,loose:0,moving:0,hand:-1e9,hy:-1e9});return b;},get=(ix,iz)=>bins.get(ix*4096+iz);
+  for(let i=0;i<pts.length;i+=3){const b=bin(pts[i],pts[i+2]),d=dot(i,pts);b.n++;if(d>b.max)b.max=d;if(pts[i+1]>b.y)b.y=pts[i+1];if(pts[i+1]<b.ylo)b.ylo=pts[i+1];const k=kindOf(pb[i/3]);if(k===1)b.loose++;else if(k===2)b.moving++;}
+  for(let i=0;i<hp.length;i+=3){const b=bin(hp[i],hp[i+2]),d=dot(i,hp);if(d>b.hand)b.hand=d;if(hp[i+1]>b.hy)b.hy=hp[i+1];}
   // a flat panel has vertices only at its edges: fill gaps of up to 1.5 in between backed cells (along x, then z) with
   // the outer surface interpolated, so a plain receiver side counts as backed
   const fill=alongX=>{const lines=new Map();
     for(const [k,b] of bins){if(!b.n)continue;const ix=Math.round(k/4096),iz=k-ix*4096,key=alongX?iz:ix;let l=lines.get(key);if(!l)lines.set(key,l=[]);l.push(alongX?ix:iz);}
     for(const [key,ps] of lines){ps.sort((a,b)=>a-b);
-      for(let i=1;i<ps.length;i++){const a=ps[i-1],b=ps[i];if(b-a<2||b-a>10)continue;
-        const A=alongX?get(a,key):get(key,a),B=alongX?get(b,key):get(key,b);
-        for(let j=a+1;j<b;j++){const c=alongX?bin(j*CELL,key*CELL):bin(key*CELL,j*CELL);if(c.n)continue;c.n=1;c.max=A.max+(B.max-A.max)*(j-a)/(b-a);}}}};
+      for(let i=1;i<ps.length;i++){const a=ps[i-1],b=ps[i];if(b-a<2||b-a>30)continue;
+        const A=alongX?get(a,key):get(key,a),B=alongX?get(b,key):get(key,b);if(b-a>10&&Math.abs(A.y-B.y)>.25)continue;   // a wide gap only across a flat panel (the G11's sides)
+        for(let j=a+1;j<b;j++){const c=alongX?bin(j*CELL,key*CELL):bin(key*CELL,j*CELL);if(c.n)continue;const f=(j-a)/(b-a);c.n=1;c.fill=1;c.max=A.max+(B.max-A.max)*f;c.y=A.y+(B.y-A.y)*f;c.ylo=A.ylo+(B.ylo-A.ylo)*f;}}}};
   fill(true);fill(false);
   const xmin=pct(pts,0,.01),xmax=pct(pts,0,.99),L=xmax-xmin,zTop=pct(pts,2,.97),zLow=pct(pts,2,.04);
-  // long guns (2026-11-07, user: "alot of them seem to be put on the stock ... closer to the mid section"): the eye-size
-  // term alone pulls the screen back toward the stock, so spots away from the middle cost more, scaled in from 14 to 24 in
-  const xMid=xmin+.47*L,midK=30*THREE.MathUtils.clamp((L-14)/10,0,1);
+  // where along the gun (2026-11-07, user: "more in the middle, center of focus ... its alright for smaller guns like
+  // pistols and sidearms to be closer to the stock"): a target share of the length from the back, .5 on long guns (16 in
+  // and over), .3 on pistols (9 in and under); the cost grows past a 7% dead band either side
+  const aT=override?.along??(.3+.2*THREE.MathUtils.clamp((L-9)/7,0,1)),alongK=10,hT=override?.height;   // per-gun nudges: along / height (0 bottom .. 1 top)
   const x0=THREE.MathUtils.clamp(.1*L+1,xmin+.12*L,xmax-.3*L);
   const flash=gun.getObjectByName('tag_flash');let bore=null;
   if(flash){let ok=true;for(let p=flash;p&&p!==gun.parent;p=p.parent)if(p.scale.x<1e-3)ok=false;if(ok)bore=flash.getWorldPosition(_v).applyMatrix4(inv).z/unit;}
@@ -310,51 +329,74 @@ export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,a
       const qx=eye.x+hx*t-c.x,qy=eye.y+hy*t-c.y,qz=eye.z+hz*t-c.z,a=(qx*F.x.x+qy*F.x.y+qz*F.x.z)/fw+.5,b=(qx*F.u.x+qy*F.u.y+qz*F.u.z)/fh+.5;
       if(a>=0&&a<1&&b>=0&&b<1)m|=1<<((a*4|0)+4*(b*4|0));}
     let k=0;for(;m;m&=m-1)k++;return k/16;};
+  // how much of the face the gun itself hides from the eye (2026-11-07: at the hip you look along a pistol's top, so its
+  // left side is behind the frame): rays from 5 points of the face to the eye, marched through the bins' y extent
+  const gunHid=(c,fw,fh)=>{let k=0;for(const [a,b] of [[0,0],[-.35,-.35],[.35,-.35],[-.35,.35],[.35,.35]]){
+      _v.copy(c).addScaledVector(F.x,a*fw).addScaledVector(F.u,b*fh);_x.subVectors(eye,_v);const len=_x.length();_x.divideScalar(len);
+      for(let d=.3;d<Math.min(len,14);d+=CELL*.7){const y=_v.y+_x.y*d,b=get(Math.round((_v.x+_x.x*d)/CELL),Math.round((_v.z+_x.z*d)/CELL));
+        if(b?.n&&y<b.y-.03&&y>b.ylo+.03){k++;break;}}}
+    return k/5;};
   const rect=(cx,cz,w,h,fn)=>{const ix0=Math.round((cx-w/2)/CELL),ix1=Math.round((cx+w/2)/CELL),iz0=Math.round((cz-h/2)/CELL),iz1=Math.round((cz+h/2)/CELL);
     for(let ix=ix0;ix<=ix1;ix++)for(let iz=iz0;iz<=iz1;iz++)fn(get(ix,iz),ix,iz);return (ix1-ix0+1)*(iz1-iz0+1);};
+  // the clip: an arm straight back (-n) from the housing's back to the ball of a plate lying flat on the gun's side
+  // (normal +y), its back on the outermost side surface under it (the bins' y, gaps filled); then a hook up the side and
+  // over the gun's top when the top is within 2 in of the plate (-> null hook otherwise). Inches; null = no surface there.
+  const landing=(c,s)=>{const BALL=.13*s,PW=.86*s,PH=.7*s,HW=.5*s;let t=0,px=c.x,pz=c.z,ys=0,backed=0,spread=0;
+    for(let it=0;it<3;it++){let m=-1e9,sum=0,k=0;const tot=rect(px,pz,PW,PH,b=>{if(b?.n&&b.y>-1e8){k++;sum+=b.y;if(b.y>m)m=b.y;}});
+      if(!k)return null;ys=m;backed=k/tot;spread=m-sum/k;t=(c.y-ys-BALL)/n.y;px=c.x-n.x*t;pz=c.z-n.z*t;}
+    // the hook: rows above the plate's top whose side surface is near the plate's (a sight or a rail further in is not the top)
+    const zp=pz+PH/2,ix0=Math.round((px-HW/2)/CELL),ix1=Math.round((px+HW/2)/CELL);let top=null,gap=0,ysum=0,yk=0;
+    for(let iz=Math.round(zp/CELL);iz<=Math.round((zp+2.2)/CELL);iz++){let hit=false;
+      for(let ix=ix0;ix<=ix1;ix++){const b=get(ix,iz);if(b?.n&&b.y>ys-1&&b.y<ys+.25){hit=true;ysum+=b.y;yk++;}}
+      if(hit){top=(iz+.5)*CELL;gap=0;}else if(++gap>1)break;}
+    let hook=null;
+    if(top!==null&&top-zp<2){let yc=0,k=0;for(let i=0;i<pts.length;i+=3)if(Math.abs(pts[i]-px)<HW&&pts[i+2]>top-.5&&pts[i+2]<top+.3){yc+=pts[i+1];k++;}
+      yc=k?yc/k:ys-.4;hook={len:Math.max(.04,top+.03-zp)/s,depth:THREE.MathUtils.clamp(ys-yc,.18,.6)/s};}
+    return {t,px,pz,ys,backed,spread,hook};};
   const sizes=override?.size?[override.size]:[1.25,1.08,.93,.78];let best=null;   // a quarter bigger since 2026-11-07 (user: "just abit bigger ... the whole things"); was 1-.62
+  const ndc=new THREE.Vector3();
   for(const s of sizes){
     const fw=HW*s,fh=HH*s,ffw=FT[0]*s,ffh=FT[1]*s;
-    for(let cx=xmin+.12*L+fw/2;cx<=xmax-.25*L-fw/2+1e-6;cx+=.25)for(let cz=zLow+fh/2;cz<=zTop-fh/2+.15;cz+=.2){
-      let cov=0,top=-1e9,lo=0,mv=0,pn=0;
-      const total=rect(cx,cz,fw,fh,b=>{if(!b)return;if(b.n){cov++;pn+=b.n;if(b.max>top)top=b.max;lo+=b.loose;mv+=b.moving;}});
-      if(cov/total<.35||lo>2)continue;   // .45 until the clip (2026-11-07): it holds an overhanging housing on
+    for(let cx=xmin+.08*L+fw/2;cx<=xmax-.2*L-fw/2+1e-6;cx+=.25)for(let cz=zLow+fh/2;cz<=zTop-fh/2+.15;cz+=.2){
+      let cov=0,real=0,top=-1e9,lo=0,mv=0,pn=0;
+      const total=rect(cx,cz,fw,fh,b=>{if(!b)return;if(b.n){cov++;if(!b.fill)real++;pn+=b.n;if(b.max>top)top=b.max;lo+=b.loose;mv+=b.moving;}});
+      if(cov/total<.35||real/total<.1||lo>2)continue;   // some real surface under it, not only bridged gaps   // .45 until the clip (2026-11-07): it holds an overhanging housing on
       let fc=0,fs=0,flo=0;const ftot=rect(cx,cz,ffw,ffh,b=>{if(b?.n){fc++;fs+=b.max;flo+=b.loose;}});
       if(fc/ftot<.7||flo)continue;
       const plane=top+.03,depth=plane-fs/fc;if(depth>.9)continue;
-      let hands=0;rect(cx,cz,fw+.4,fh+.4,b=>{if(b&&b.hand>plane-1.2)hands++;});   // a hand touching the housing
-      // how big it reads: its width x how square it faces the eye / distance (radians); bigger and closer wins
+      let hands=0,near=0;rect(cx,cz,fw+.4,fh+.4,b=>{if(b&&b.hand>plane-1.2)hands++;});   // a hand touching the housing
+      rect(cx,cz,fw+1.6,fh+1,b=>{if(b&&b.hand>plane-2)near++;});   // or crowding it (the left sleeve beside the screen)
       const c=_c.set(cx,0,cz);c.y=(plane-n.x*cx-n.z*cz)/n.y;const dist=c.distanceTo(eye),facing=_w.subVectors(eye,c).dot(n)/dist;
       if(facing<.3)continue;
-      let cost=(1-cov/total)*3+2*depth+(mv/Math.max(1,pn))*4+(hands?1.5+hands*.1:0)+40*Math.max(0,.15-fw*facing/dist)
+      const a=(cx-xmin)/L;
+      let cost=(1-cov/total)*3+depth+(mv/Math.max(1,pn))*4+(hands?1.5+hands*.1:0)+Math.min(2,near*.03)
+        +50*Math.max(0,.1-fw*facing/dist)   // too small to read from the eye (outweighs a deeper stand-off: the arm bridges it)
         +.5*Math.max(0,cz+fh/2-(bore+.25))+.25*Math.abs(cz-(bore-fh/2+.05))
-        +midK*Math.max(0,Math.abs(cx-xMid)/L-.05);   // long guns: toward the middle, not back on the stock
-      if(cost<(best?.cost??1e9)){const h=hidden16(c,fw,fh);if(h>.3)continue;cost+=h*8;}
+        +alongK*Math.max(0,Math.abs(a-aT)-.07)+(hT==null?0:8*Math.max(0,Math.abs((cz-zLow)/(zTop-zLow)-hT)-.06));
+      if(cost<(best?.cost??1e9)){const h=hidden16(c,fw,fh);if(h>.3)continue;const g=gunHid(c,fw,fh);if(g>.3)continue;cost+=h*8+g*6;}
       if(avoid&&cx+fw/2>avoid.x-avoid.w-.2&&cx-fw/2<avoid.x+avoid.w+.2&&cz-fh/2<avoid.z+.3&&cz+fh/2>avoid.z-avoid.drop)cost+=5;
       if(camera&&cost<(best?.cost??1e9)){let off=0;for(const [a,b] of [[-1,-1],[1,-1],[-1,1],[1,1],[0,0]]){
           _v.set(cx,0,cz).addScaledVector(F.x,a*fw/2).addScaledVector(F.u,b*fh/2);_v.y=(plane-n.x*_v.x-n.z*_v.z)/n.y;
           _v.multiplyScalar(unit).applyMatrix4(root.matrixWorld).project(camera);if(_v.z>1||Math.abs(_v.x)>.96||_v.y<-.96)off++;}
-        cost+=off*2;}
-      if(!best||cost<best.cost)best={cost,cx,cz,s,plane,depth};
+        cost+=off*2;
+        // the centre of focus: a little right of and below the crosshair, where the eye already is
+        ndc.copy(c).multiplyScalar(unit).applyMatrix4(root.matrixWorld).project(camera);cost+=1.2*Math.hypot(ndc.x-.12,ndc.y+.15);}
+      if(cost<(best?.cost??1e9)){const l=landing(c.clone(),s);if(!l)continue;cost+=(1-l.backed)*3+Math.min(2,l.spread*2)+(l.hook?Math.max(0,l.hook.len*s-1):.4)+1.5*Math.max(0,l.t-.7);   // a long arm or a tall riser looks spindly
+        if(!best||cost<best.cost)best={cost,cx,cz,s,plane,depth};}
     }
   }
   let out;
   if(override?.at){const at=new THREE.Vector3().fromArray(override.at).divideScalar(unit);best={cx:at.x,cz:at.z,s:override.size??.8,plane:at.dot(n),depth:override.foot??.15};}
   if(!best){const s=.85;best={cx:x0+1.4,cz:bore-HH*s/2,s,plane:pct(pts,1,.99)*n.y+.05,depth:.1};}
   {const s=best.s,c=new THREE.Vector3(best.cx,0,best.cz);c.y=(best.plane-n.x*c.x-n.z*c.z)/n.y;
-    // the mount: an arm straight back (-n) from the housing's back to the ball of a clip lying flat on the gun's side
-    // (normal +y); the clip sits on the outermost gun surface around where the arm lands
-    const BALL=.13*s,PW=.34*s,PH=.42*s;let t=0,px=c.x,pz=c.z;
-    for(let it=0;it<3;it++){let ys=-1e9;
-      for(const r of [1,2.5,5]){for(let i=0;i<pts.length;i+=3)if(Math.abs(pts[i]-px)<PW*r&&Math.abs(pts[i+2]-pz)<PH*r&&pts[i+1]>ys)ys=pts[i+1];if(ys>-1e9)break;}
-      if(ys<=-1e9)ys=c.y-n.y*(best.depth+.2);
-      t=(c.y-ys-BALL)/n.y;px=c.x-n.x*t;pz=c.z-n.z*t;}
-    const tMin=.22*s;if(t<tMin){c.addScaledVector(n,tMin-t);t=tMin;}   // too close: stand the housing off so the arm shows
-    const R=new THREE.Matrix4().makeBasis(F.x,F.u,n).transpose().multiply(G_SIDE),q=new THREE.Quaternion().setFromRotationMatrix(R);
+    let l=landing(c,s);const tMin=.42*s;   // the arm shows past the bracket's collar
+    if(!l)l={t:(best.depth+.2)/n.y,hook:null};
+    if(l.t<tMin){c.addScaledVector(n,tMin-l.t);l.t=tMin;}   // too close: stand the housing off
+    const t=l.t,R=new THREE.Matrix4().makeBasis(F.x,F.u,n).transpose().multiply(G_SIDE),q=new THREE.Quaternion().setFromRotationMatrix(R);
     const cp=[F.x.y*-.13,F.u.y*-.13,-t/s+n.y*-.13];
     const m=new THREE.Matrix4().makeBasis(F.x,F.u,n).scale(_v.setScalar(s*unit)).setPosition(c.multiplyScalar(unit));
-    out={matrix:m,size:s,foot:best.depth/s,arm:t/s,clip:{p:cp,q:q.toArray()},along:(best.cx-xmin)/L,cost:best.cost};}
-  mounts.set(fullKey,out);return out;
+    out={matrix:m,size:s,foot:best.depth/s,arm:t/s,clip:{p:cp,q:q.toArray(),hook:l.hook},along:(best.cx-xmin)/L,cost:best.cost};}
+  mounts.set(fullKey,out);if(!override?.at)saveMount(viewKey,out);return out;
 }
 // the charm's keep-clear zone (inches): its plain hang spot (no hands or camera, so the Gunsmith and the game agree) and a
 // generous drop and width

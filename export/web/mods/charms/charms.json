@@ -113,5 +113,8 @@
       "unlock": "pass.s2.screen.field-buddy"
     }
   ],
-  "screenMounts": {}
+  "screenMounts": {
+    "dragunov_zm": {"along": 0.25},
+    "l96a1_zm": {"along": 0.25}
+  }
 }

@@ -100,33 +100,63 @@ def screen(w, h, r, z, M):
 
 
 def mount(M):
-    """the boss on the housing's back, the arm (unit length, scaled in the game) and the clip that clamps onto the gun"""
+    """the back of the unit (2026-11-07, user: "add abit more to the back part that makes it actually look like its connected"):
+    a bracket on the housing's back, the arm (unit length, scaled in the game) and the clip that sits flush on the gun's side
+    with a hook over the gun's top. The clip's own frame: back on the gun at z=0, +Z away from it, +Y up, the arm's ball at
+    z=.13. The game stretches `clip_riser` (Y, from the plate's top to over the gun's top), moves `clip_lip` to the riser's top
+    and stretches it in -Z over the gun (Z = how far in), and puts `clip_tip` at the lip's end; with no top in reach it
+    hides all three."""
     out = []
-    bm = bmesh.new(); loft(bm, [(circle(.13, 24), -.05), (circle(.13, 24), -.01), (circle(.15, 24), 0.)], cap0=True); out.append(obj('boss', bm, [M['shell']], 40))
-    bm = bmesh.new(); loft(bm, [(rr(.13, .17, .055, 4), -1.), (rr(.13, .17, .055, 4), -.02)], cap0=True, cap1=True); out.append(obj('arm', bm, [M['shell']], 40))
-    clip = bpy.data.objects.new('clip', None); bpy.context.collection.objects.link(clip); out.append(clip)
-    PW, PH, T = .58, .66, .07
-    bm = bmesh.new(); rings = [(shape(PW, PH, .1, .02), 0.), (shape(PW, PH, .1, 0.), .015), (shape(PW, PH, .1, 0.), T - .02), (shape(PW, PH, .1, .025), T)]
-    loft(bm, rings, cap0=True, cap1=True); out.append(obj('clip_plate', bm, [M['shell']], 35, parent=clip))
-    bm = bmesh.new(); loft(bm, [(shape(PW, PH, .1, -.012), -.018), (shape(PW, PH, .1, -.012), .002)], cap0=True, cap1=True)
-    out.append(obj('clip_pad', bm, [M['rubber']], 35, parent=clip))
-    # the claws: lips over the plate's top and bottom edges that bend in toward the gun
+    # the bracket: a rounded plate over the housing's back, a ribbed collar and a knuckle the arm leaves from
+    bm = bmesh.new(); loft(bm, [(shape(.74, .74, .14, .03), -.07), (shape(.74, .74, .14, 0.), -.05), (shape(.74, .74, .14, 0.), 0.)], cap0=True)
+    out.append(obj('boss', bm, [M['shell']], 35))
     bm = bmesh.new()
-    for sy in (1, -1):
-        y = sy * (PH / 2 + .02)
-        loft(bm, [(rr(.4, .05, .018, 3, 0, y), -.16), (rr(.4, .05, .018, 3, 0, y), T + .01)], cap0=True, cap1=True)
-        loft(bm, [(rr(.4, .07, .018, 3, 0, y - sy * .045), -.16), (rr(.4, .07, .018, 3, 0, y - sy * .045), -.12)], cap0=True, cap1=True)
-    out.append(obj('clip_claws', bm, [M['trim']], 40, parent=clip))
-    # the socket the arm's ball sits in (a dome) and its ball
-    bm = bmesh.new(); loft(bm, [(circle(.12 * math.cos(math.radians(a)), 24), T + .1 * math.sin(math.radians(a))) for a in (0, 25, 50, 70, 85)], cap1=True)
+    for sx in (-1, 1):
+        loft(bm, [(rr(.06, .5, .02, 3, sx * .27, 0), -.12), (rr(.06, .5, .02, 3, sx * .27, 0), -.06)], cap0=True, cap1=True)
+    loft(bm, [(circle(.2, 24), -.2), (circle(.2, 24), -.06)], cap0=True, cap1=True)
+    out.append(obj('boss_collar', bm, [M['trim']], 40))
+    for i, (x, y) in enumerate(((-.27, .27), (.27, .27), (-.27, -.27), (.27, -.27))):
+        out.append(screw(x, y, -.085, M, 'boss_screw%d' % i, flip=True))
+    bm = bmesh.new(); loft(bm, [(rr(.22, .26, .08, 4), -1.), (rr(.22, .26, .08, 4), -.15)], cap0=True, cap1=True); out.append(obj('arm', bm, [M['shell']], 40))
+    clip = bpy.data.objects.new('clip', None); bpy.context.collection.objects.link(clip); out.append(clip)
+    PW, PH, T = .86, .7, .09
+    bm = bmesh.new(); rings = [(shape(PW, PH, .12, .02), 0.), (shape(PW, PH, .12, 0.), .02), (shape(PW, PH, .12, 0.), T - .025), (shape(PW, PH, .12, .03), T)]
+    loft(bm, rings, cap0=True, cap1=True); out.append(obj('clip_plate', bm, [M['shell']], 35, parent=clip))
+    bm = bmesh.new(); loft(bm, [(shape(PW, PH, .12, -.015), -.02), (shape(PW, PH, .12, -.015), .002)], cap0=True, cap1=True)
+    out.append(obj('clip_pad', bm, [M['rubber']], 35, parent=clip))
+    # the hook: riser up the gun's side from the plate's top, lip over the top, a tip that bites down
+    HW, HT = .5, .12   # stout, in the housing's dark shell (a thin gold bar read as a coat hanger)
+    bm = bmesh.new(); loft(bm, [(rr(HW + .04, .1, .03, 3, 0, 0), 0.), (rr(HW + .04, .1, .03, 3, 0, 0), T + .03)], cap0=True, cap1=True)
+    o = obj('clip_riser_cap', bm, [M['trim']], 40, parent=clip); o.location = (0, PH / 2 - .02, 0); out.append(o)
+    bm = bmesh.new()
+    vs = [(-HW / 2, 0, 0), (HW / 2, 0, 0), (HW / 2, 1, 0), (-HW / 2, 1, 0), (-HW / 2, 0, HT), (HW / 2, 0, HT), (HW / 2, 1, HT), (-HW / 2, 1, HT)]
+    box(bm, vs); o = obj('clip_riser', bm, [M['shell']], 30, parent=clip); o.location = (0, PH / 2, 0); out.append(o)
+    bm = bmesh.new()
+    vs = [(-HW / 2, 0, -1), (HW / 2, 0, -1), (HW / 2, HT, -1), (-HW / 2, HT, -1), (-HW / 2, 0, HT), (HW / 2, 0, HT), (HW / 2, HT, HT), (-HW / 2, HT, HT)]
+    box(bm, vs); o = obj('clip_lip', bm, [M['shell']], 30, parent=clip); o.location = (0, PH / 2 + 1, 0); out.append(o)
+    bm = bmesh.new()
+    vs = [(-HW / 2, -.12, -.1), (HW / 2, -.12, -.1), (HW / 2, HT, -.1), (-HW / 2, HT, -.1), (-HW / 2, -.07, 0), (HW / 2, -.07, 0), (HW / 2, HT, 0), (-HW / 2, HT, 0)]
+    box(bm, vs); o = obj('clip_tip', bm, [M['trim']], 30, parent=clip); o.location = (0, PH / 2 + 1, -1); out.append(o)
+    # the socket the arm's ball sits in (a dome) and the screws
+    bm = bmesh.new(); loft(bm, [(circle(.15 * math.cos(math.radians(a)), 24), T + .12 * math.sin(math.radians(a))) for a in (0, 25, 50, 70, 85)], cap1=True)
     out.append(obj('clip_socket', bm, [M['trim']], 50, parent=clip))
-    for i, (x, y) in enumerate(((-.19, .22), (.19, -.22))):
+    for i, (x, y) in enumerate(((-.31, .22), (.31, .22), (-.31, -.22), (.31, -.22))):
         o = screw(x, y, T, M, 'clip_screw%d' % i); o.parent = clip; out.append(o)
     return out
 
 
-def screw(x, y, z, M, name):
-    bm = bmesh.new(); loft(bm, [(circle(.028, 12, x, y), z), (circle(.028, 12, x, y), z + .012), (circle(.02, 12, x, y), z + .02)], cap1=True)
+def box(bm, vs):
+    """a box from 8 corners: 0-3 the bottom (or back) loop, 4-7 the top (or front) loop, both counter-clockwise"""
+    v = [bm.verts.new(p) for p in vs]
+    for f in ((0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)):
+        try: bm.faces.new([v[i] for i in f])
+        except ValueError: pass
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+
+
+def screw(x, y, z, M, name, flip=False):
+    s = -1 if flip else 1; c = (lambda r: circle(r, 12, x, y)[::-1]) if flip else (lambda r: circle(r, 12, x, y))   # reversed: faces still point out
+    bm = bmesh.new(); loft(bm, [(c(.03), z), (c(.03), z + s * .014), (c(.021), z + s * .024)], cap1=True)
     return obj(name, bm, [M['trim']], 50)
 
 
