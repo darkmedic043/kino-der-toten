@@ -26,10 +26,11 @@
     {
       "id": "beeseal",
       "name": "Bee Seal",
-      "desc": "A gold wax seal pressed with a bee. Season 1, page 3.",
+      "desc": "A gold wax seal pressed with a bee, and the gold catches the light. Season 1, page 3.",
       "image": "images/beeseal.png",
       "pass": "s2",
-      "unlock": "pass.s2.sticker.beeseal"
+      "unlock": "pass.s2.sticker.beeseal",
+      "shine": "gold"
     },
     {
       "id": "sproutedskull",

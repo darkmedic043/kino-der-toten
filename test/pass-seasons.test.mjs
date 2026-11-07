@@ -32,9 +32,9 @@ test('seasons.json lists season.json; future seasons are hidden and the newest s
 
 test('a one-season save migrates into seasons[id]', () => {
   store.clear();
-  localStorage.setItem(P.PASS_KEY, JSON.stringify({ season: 's1', xp: 7500, bought: 1, auto: false, premium: true, unlocked: { 'p1.1': true }, granted: { 'p1.1': true }, gums: ['g'] }));
+  localStorage.setItem(P.PASS_KEY, JSON.stringify({ season: 's1', xp: 3 * s1.tierXp, bought: 1, auto: false, premium: true, unlocked: { 'p1.1': true }, granted: { 'p1.1': true }, gums: ['g'] }));
   const p = P.loadPass();
-  assert.deepEqual(p.seasons.s1, { xp: 7500, bought: 1, premium: true, unlocked: { 'p1.1': true }, granted: { 'p1.1': true } });
+  assert.deepEqual(p.seasons.s1, { xp: 3 * s1.tierXp, bought: 1, premium: true, unlocked: { 'p1.1': true }, granted: { 'p1.1': true } });
   assert.equal(p.auto, false); assert.deepEqual(p.gums, ['g']); assert.equal(p.season, undefined);
   const S = P.seasonsFrom([s1]);
   assert.equal(P.tokens(S, p), 3 + 1 - 1);
@@ -106,4 +106,15 @@ test('premium is per season', () => {
   assert.ok(!p.seasons.s1.granted['p1.3']);
   assert.equal(P.buyPremium(a, p).map(x => x.id).join(), 'p1.3'); assert.ok(p.seasons.s1.granted['p1.3']);
   assert.equal(P.buyToken(S, p), null); assert.equal(p.seasons.s2.bought, 1);
+});
+
+test('a higher tierXp never pays a tier twice', () => {
+  store.clear();
+  const S = P.seasonsFrom([s1, next('s2', '2026-10-20')], '2026-10-22'), b = S.list[1], p = P.loadPass();
+  p.auto = false;
+  assert.equal(P.addXp(S, p, 5 * b.tierXp), 5);
+  const old = b.tierXp; b.tierXp = Math.round(old * 1.6);   // the season's tiers got dearer: this save now sits at tier 3
+  assert.equal(P.addXp(S, p, 0.4 * b.tierXp), 0);   // back to tier 4: already paid for
+  assert.equal(P.addXp(S, p, 2.5 * b.tierXp), 1);   // 3.525 -> 6.025 tiers: only tier 6 is new   // tier 6 is new
+  b.tierXp = old;
 });

@@ -127,7 +127,8 @@ export function buyToken(S,p){const s=S.current;if(!canBuyToken(S,p))return 'You
 // Pass XP, always into the live season. Returns how many tokens it gave: one per tier crossed while one is needed.
 export function addXp(S,p,n){
   const s=S.current,R=rec(p,s),before=tiersRaw(s,p);R.earned=earnedOf(s,p);R.xp+=Math.max(0,Math.round(n));
-  let got=0;for(let i=tiersRaw(s,p)-before;i>0&&tokensNeeded(S,p);i--){R.earned++;got++;}
+  // tiers already paid for don't pay again: after tierXp rises a save can sit below tiers it has earned tokens for
+  let got=0;for(let i=tiersRaw(s,p)-Math.max(before,R.earned);i>0&&tokensNeeded(S,p);i--){R.earned++;got++;}
   wrapUp(S,p);return got;
 }
 
