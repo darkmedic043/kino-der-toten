@@ -17,6 +17,11 @@ import { loadModel } from '../../animation.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 const RELEASE=.12;       // seconds into the throw clip when the item leaves the hand
+// The lob (2026-11-07): the Moon rigs' throw clips don't show the item leaving the hand in this rig (the Gersh's
+// sits fixed above the screen for the whole clip, the QED's, which frags and monkeys ride, behind the camera), so
+// the item seemed to vanish on release. A rig whose throw clip shows the item in view in under 2 of 9 samples
+// throws with a procedural lob from the hold pose instead: cock back, push forward, the item leaves, the hand drops away.
+const LOB=.46,LOB_RELEASE=.2;
 
 export default async function setup(api){
   const {host,session,view,data,audio,camera,scene,world,enemies,features,viewScene}=api;
@@ -38,7 +43,7 @@ export default async function setup(api){
   const PIN=cue('grenade/foley/pin/pin'),WHOOSH=cue('grenade/foley/throw/gren_throw');
 
   let held=null;   // {id,key,released,throwing,ready,pinAt,holdKey,holdT}
-  window.kino.throwables={get holding(){return held?.id??null;}};
+  window.kino.throwables={get holding(){return held?.id??null;},get held(){return held;}};   // (held: tests pose the lob through held.lob)
   const tac=()=>window.kino.tactical;
   function available(key){
     const lx=window.kino.lethalExtra;   // a lethal another mod puts in the slot (Trip Mines: lx.owned(), count(), spend(), launch())
@@ -56,7 +61,8 @@ export default async function setup(api){
       const st=api.getState();if(st.active&&!session.busy&&session.phase!=='reviving')features.placeClaymore?.();return;}
     const id=available(e.code);if(!id)return;            // nothing to throw: let the game handle it
     e.stopImmediatePropagation();if(e.repeat||held)return;
-    const st=api.getState();if(!st.active||session.busy||session.phase==='reviving'||session.weaponUnavailable)return;
+    // (the gun in hand may be away in Pack-a-Punch: the throw still works, as the game's own grenade does; the engine shows the view in 'throw' mode)
+    const st=api.getState();if(!st.active||session.busy||session.phase==='reviving')return;
     begin(id,e.code);
   },true);
   addEventListener('keyup',e=>{if(held&&e.code===held.key)held.released=true;},true);
@@ -90,10 +96,29 @@ export default async function setup(api){
     for(let i=0;i<=20;i++){
       a.time=d*i/20;r.mixer.update(0);view.root.updateMatrixWorld(true);box.setFromObject(target).getCenter(c);
       if(box.isEmpty()||c.z>-6)continue;
-      const nx=c.x/-c.z,ny=c.y/-c.z,score=-((nx-.28)**2+(ny+.24)**2)+i*1e-4;   // ties go to later frames
+      // ties go to later frames; .01 a second favours an early hold (the Gersh's 3.5 s pull-pin settled at 3 s, 1.9 s after the press)
+      const nx=c.x/-c.z,ny=c.y/-c.z,score=-((nx-.28)**2+(ny+.24)**2)-.01*a.time+i*1e-4;
       if(score>bestScore){bestScore=score;bestT=a.time;}
     }
     best.set(cacheKey,bestT);return bestT;
+  }
+  // whether the rig's throw clip shows the item in view over its first half (else: the lob), cached per rig
+  const clipOk=new Map();
+  function throwClipOk(){
+    const cacheKey=view.def?.id;if(clipOk.has(cacheKey))return clipOk.get(cacheKey);
+    const r=view.rig,a=r?.actions.fireAnim,d=r?.data.fireAnim?.duration;if(!a||!d)return false;
+    const target=inHand??view.gun,box=new THREE.Box3(),c=new THREE.Vector3();let seen=0;
+    r.mixer.stopAllAction();a.reset();a.timeScale=0;a.play();
+    for(let i=0;i<=8;i++){a.time=d*.5*i/8;r.mixer.update(0);view.root.updateMatrixWorld(true);box.setFromObject(target).getCenter(c);
+      if(!box.isEmpty()&&c.z<-6&&Math.abs(c.x/-c.z)<1.1&&Math.abs(c.y/-c.z)<1.1)seen++;}
+    a.stop();clipOk.set(cacheKey,seen>=2);return seen>=2;
+  }
+  const sm=x=>x<=0?0:x>=1?1:x*x*(3-2*x);
+  // the lob over the view pose (fp.js calls it after its own motion): view units, x right, y up, z back
+  function lobPose(P,R){
+    const l=held?.lob;if(!l)return;const u=Math.min(1,l.t/l.T);
+    const back=sm(u/.3)*(1-sm((u-.3)/.18)),fwd=sm((u-.28)/.22),drop=sm((u-.5)/.5);
+    P.z+=.6*back-9*fwd;P.y+=1.8*back+1.4*fwd-16*drop;P.x+=.5*back-1.2*fwd;R.x+=.12*back-.5*fwd-.55*drop;R.z+=.08*back-.18*fwd;
   }
 
   async function begin(id,key){
@@ -106,7 +131,7 @@ export default async function setup(api){
     try{await view.equip(viewDef(id));}catch(err){console.warn('[throwables]',err);}
     if(!held)return;
     dress(id);view.mode='throw';
-    const r=view.rig,holdKey=r?.actions.holdFireAnim?'holdFireAnim':'fireAnim',t=holdFrame(holdKey);
+    const r=view.rig,holdKey=r?.actions.holdFireAnim?'holdFireAnim':'fireAnim',t=holdFrame(holdKey);held.lobbed=!throwClipOk();
     held.holdKey=holdKey;held.holdT=t;held.pinAt=session.time;held.ready=true;
     // run the pull-pin clip up to the hold frame (or ease straight into it on the throw clip)
     if(holdKey==='holdFireAnim'){r.play('holdFireAnim',false,1.6*(window.kino.throwSpeed?.()??1),.05);}
@@ -116,9 +141,10 @@ export default async function setup(api){
 
   function release(){
     const h=held;h.throwing=true;const r=view.rig,pace=window.kino.throwSpeed?.()??1;   // Fast Pitcher
-    if(r?.actions.fireAnim){r.play('fireAnim',false,pace,.04);r.actions.fireAnim.time=0;r.actions.fireAnim.timeScale=pace;}
-    const len=r?.data.fireAnim?.duration||.4;
-    setTimeout(()=>{if(held===h){hideItem();launch(h);}},RELEASE*1000/pace);
+    let len=r?.data.fireAnim?.duration||.4,at=RELEASE;
+    if(h.lobbed){const a=r?.actions[h.holdKey];if(a)a.timeScale=0;h.lob={t:0,T:LOB/pace};len=LOB;at=LOB_RELEASE;}   // the hand holds its pose under the lob
+    else if(r?.actions.fireAnim){r.play('fireAnim',false,pace,.04);r.actions.fireAnim.time=0;r.actions.fireAnim.timeScale=pace;}
+    setTimeout(()=>{if(held===h){hideItem();launch(h);}},at*1000/pace);
     setTimeout(async()=>{if(held!==h)return;held=null;session.equipmentLeft=0;await api.equipView?.();},Math.max(len,.3)*1000/pace+80);
   }
 
@@ -156,7 +182,9 @@ export default async function setup(api){
   host.on('reset',()=>{held=null;for(const f of frags)f.mesh.removeFromParent();frags.length=0;});
   host.on('update',dt=>{
     if(!dt)return;
+    const fm=window.kino.fpMotion;if(fm&&fm.throwPose!==lobPose)fm.throwPose=lobPose;
     if(held){
+      if(held.lob)held.lob.t+=dt;
       session.equipmentLeft=Math.max(session.equipmentLeft,.2);
       if(session.phase==='reviving'||session.phase==='gameover'){held=null;session.equipmentLeft=0;}
       else if(held.ready&&!held.throwing){
@@ -164,7 +192,8 @@ export default async function setup(api){
         if(held.holdKey==='holdFireAnim'&&a&&a.time>=held.holdT)a.timeScale=0;     // stop on the hold frame
         const since=session.time-held.pinAt;
         if(held.id==='frag_grenade_zm'&&since>=(frag.fuseTime??3.5)){const at=camera.position.clone();held=null;session.equipmentLeft=0;explode(at,true);api.equipView?.();}
-        else if(held.released&&since>=.25)release();
+        // a tap before the lobbed item is up: the pull-pin runs on fast to the hold pose first (a lob from there started off screen)
+        else if(held.released&&since>=.25){if(held.lobbed&&held.holdKey==='holdFireAnim'&&a&&a.time<held.holdT-.02)a.timeScale=Math.max(a.timeScale,4.5);else release();}
       }
     }
     for(const g of [...frags]){

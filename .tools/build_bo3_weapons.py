@@ -236,8 +236,9 @@ MODW = [
        stats=dict(clipSize=30, maxAmmo=270, startAmmo=270, damage=140, minDamage=90, fireTime=.07, price=1200),
        roles=dict(idle='idle', fire='fire', adsFire='adsfire', reload='reload', reloadEmpty='reload_empty', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
        ads=('vm_aug_adsup', 'vm_aug_adsdown'), shots=['aug-1', 'aug-2', 'aug-3'], glow='#b45cff'),
+  # reloadStartAdd: 1 when the start clip itself loads a round (all three shell-by-shell imports do; 0 lost that first shell, 2026-11-07)
   dict(cls='Shotgun', id='bo3_m1014_jellyfish', name='M1014 Jellyfish', up="Man o' War", model='m1014_jellyfish_vmgun', pre='vm_m1014', tpl='spas_zm',
-       stats=dict(clipSize=7, maxAmmo=56, startAmmo=56, damage=160, minDamage=20, fireTime=.25, pellets=8, price=1500, segmentedReload=True, reloadAmmoAdd=1, reloadStartAdd=0),
+       stats=dict(clipSize=7, maxAmmo=56, startAmmo=56, damage=160, minDamage=20, fireTime=.25, pellets=8, price=1500, segmentedReload=True, reloadAmmoAdd=1, reloadStartAdd=1),
        roles=dict(idle='idle', fire='fire', adsFire='fireads', reload='reloading', reloadStart='reloadstart', reloadEnd='reloadend', rais='pullout', firstRaise='pullout_first', drop='putaway', sprintIn='runstart', sprintLoop='runing', sprintOut='runover'),
        ads=('vm_m1014_adsup', 'vm_m1014_adsdown'), shots=['m1014-1', 'm1014-2', 'm1014-3'], glow='#ff5ac8'),
   dict(cls='Submachine gun', id='bo3_p90_orbit', name='P90 Orbit', up='P90 Event Horizon', model='p90_orbit_vmgun', pre='vm_p90', tpl='mp5k_zm',
@@ -399,7 +400,7 @@ MODW += [
      roles=dict(adsFire='fire', reloadEmpty='reload', firstRaise='pullout')),
   # pump action: fire and pump joined into one clip (fireTime covers both), shells one at a time
   aw('Shotgun', 'tac19', 'Tac-19', 'Tac-19 Hellfire', 'tac19', 'ithaca_zm', glow='#ff4a3a',
-     stats=dict(clipSize=6, maxAmmo=54, startAmmo=54, damage=170, minDamage=20, fireTime=.9, pellets=8, price=1500, segmentedReload=True, reloadAmmoAdd=1, reloadStartAdd=0),
+     stats=dict(clipSize=6, maxAmmo=54, startAmmo=54, damage=170, minDamage=20, fireTime=.9, pellets=8, price=1500, segmentedReload=True, reloadAmmoAdd=1, reloadStartAdd=1),
      roles=dict(fire=('fire', 'pump'), adsFire=('ads_fire', 'ads_pump'), reload='reload_loop', reloadStart='reload_in', reloadEnd='reload_out', reloadEmpty=None, firstRaise='pullout'),
      sight=dict(tag='tag_weapon', offset=[8, 0, 15.5]),
      # its grip variant: a vertical foregrip (BO3's Man-O-War grip) on the pump, and the grip_* clip set with it
@@ -435,7 +436,7 @@ MODW += [
                                              drop='putaway', sprintIn='sprint_in', sprintLoop='sprint_loop', sprintOut='sprint_out').items()},
      ads=('am_s1_sentry_turret_ads_up', 'am_s1_sentry_turret_ads_down')),
   aw('Launcher', 'mdl', 'MDL', 'MDL Devastator', 'mdl', 'china_lake_zm', glow='#ff9a3a',
-     stats=dict(clipSize=6, maxAmmo=36, startAmmo=36, damage=600, minDamage=0, fireTime=.6, price=2500, segmentedReload=True, reloadAmmoAdd=1, reloadStartAdd=0),
+     stats=dict(clipSize=6, maxAmmo=36, startAmmo=36, damage=600, minDamage=0, fireTime=.6, price=2500, segmentedReload=True, reloadAmmoAdd=1, reloadStartAdd=1),
      roles=dict(reload='reload_loop', reloadStart='reload_in', reloadEnd='reload_out', reloadEmpty=None)),
   aw('Pistol', 'rw1', 'RW1', 'RW1 Railstorm', 'rw1', 'm1911_zm', glow='#5a9aff',
      stats=dict(clipSize=1, maxAmmo=40, startAmmo=40, damage=2500, minDamage=1500, fireTime=.3, automatic=False, fireType='Single Shot', price=1200),

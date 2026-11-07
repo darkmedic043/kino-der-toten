@@ -312,6 +312,8 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     if(shk>0){P.x+=shN(53,71,97)*.22*shk;P.y+=shN(61,83,109)*.18*shk;R.x+=shN(47,67,113)*.014*shk;R.y+=shN(43,73,101)*.01*shk;R.z+=shN(59,79,103)*.02*shk;}
     // a melee pose over all of the above (mods/melee: the knife's swings, the gun bash)
     window.kino.fpMotion.strike?.(P,R,{dt:dtRaw,rig:frame.rig});
+    // a procedural throw over all of it (mods/throwables: the lob for rigs whose own throw clip doesn't show the item leave the hand)
+    window.kino.fpMotion.throwPose?.(P,R);
     // the camera: a share of the same motion, so the whole view sways with the gun (the movement mod applies it)
     // (the sprint's roll and nod halved on 2026-10-19, user: "screen shake seems a bit excessive")
     cam.roll=rl*.35*hipR+bobRoll*.3+.07*s.slide+.14*s.dive-.1*k+Math.sin(ph)*.005*sw-sx*.03*hipR;

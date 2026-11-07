@@ -391,7 +391,7 @@ function update(dt){
       if(!map.prePlayer?.(dt))player.update(dt,session.phase==='reviving'?{forward:forward*crawl,strafe:strafe*crawl,crouch:true}:{forward,strafe,sprint,crouch:held.has('ControlLeft')||held.has('ControlRight')||held.has('KeyC')||touch.crouch,jump:held.has('Space'),jumpPressed:touch.jump});
       if(world.bounds&&player.getFeetPosition().y<world.bounds.min.y-600){player.respawn();toast('You fell out of the map');}
       view.update(dt,{moving,sprint,ads:aiming(),reloading:session.reloadLeft>0,empty:session.weapon.mag===0,time:session.time});
-      view.pivot.visible=!session.weaponUnavailable&&!map.hideViewmodel?.();view.input={sprint,ads,fire:primary};   // this frame's input, for mods (inspect cancels on sprint/aim; operator weapons read touch/pad fire)
+      view.pivot.visible=(!session.weaponUnavailable||view.mode==='throw')&&!map.hideViewmodel?.();view.input={sprint,ads,fire:primary};   // this frame's input, for mods (inspect cancels on sprint/aim; operator weapons read touch/pad fire)
       perkDrink.update(dt,session);
       if((!sprint||mods.sprintFire?.())&&session.phase!=='reviving'&&!mods.holdFire?.()&&(primaryPressed||(primary&&session.def.automatic)||burstLeft>0||reloadShot)){   // holdFire: a mod handles the fire button (bows: hold to draw on touch)
         if(shoot(dualSwap()?'left':'right')){reloadShot=false;if(burstLeft>0)burstLeft--;else if(session.def.fireType==='3-Round Burst')burstLeft=2;}
