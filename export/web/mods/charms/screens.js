@@ -37,9 +37,9 @@ export class Lcd{
     this.w=w;this.h=h;this.data=new Uint8Array(w*h*4);this.prev=0;
     this.tex=new THREE.DataTexture(this.data,w,h,THREE.RGBAFormat);
     this.tex.magFilter=this.tex.minFilter=THREE.NearestFilter;this.tex.generateMipmaps=false;this.tex.colorSpace=THREE.SRGBColorSpace;
-    this.tex.needsUpdate=true;
+    this.tex.needsUpdate=true;   // row 0 is the top: glTF UVs put v=0 at the image's top (rows were flipped for GL until 2026-11-07, so every screen read upside down)
   }
-  px(x,y,c){x|=0;y|=0;if(x<0||y<0||x>=this.w||y>=this.h)return;const i=((this.h-1-y)*this.w+x)*4,d=this.data;d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;}
+  px(x,y,c){x|=0;y|=0;if(x<0||y<0||x>=this.w||y>=this.h)return;const i=(y*this.w+x)*4,d=this.data;d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;}
   clear(c=[0,0,0]){for(let y=0;y<this.h;y++)for(let x=0;x<this.w;x++)this.px(x,y,c);}
   rect(x,y,w,h,c){for(let j=0;j<h;j++)for(let i=0;i<w;i++)this.px(x+i,y+j,c);}
   frame(x,y,w,h,c){for(let i=0;i<w;i++){this.px(x+i,y,c);this.px(x+i,y+h-1,c);}for(let j=0;j<h;j++){this.px(x,y+j,c);this.px(x+w-1,y+j,c);}}
@@ -185,7 +185,7 @@ void main(){
   g=mix(g,.75,clamp(w*2.-.6,0.,1.));                     // the grid fades out when the pixels are small on screen
   vec2 q=vUv-.5;float vig=1.-dot(q,q)*1.1;
   vec3 col=(c*(.3+.7*g)*glow+vec3(.003,.005,.004))*vig*power;
-  float s=vUv.y*.8+vUv.x*.45;col+=vec3(.05,.06,.065)*smoothstep(.95,1.02,s)*(1.-smoothstep(1.06,1.16,s));   // a soft glass sheen
+  float s=(1.-vUv.y)*.8+vUv.x*.45;col+=vec3(.05,.06,.065)*smoothstep(.95,1.02,s)*(1.-smoothstep(1.06,1.16,s));   // a soft glass sheen
   gl_FragColor=vec4(col,1.);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -207,7 +207,7 @@ function artFrames(a,w,h){
       cv.width=w;cv.height=h;const x=cv.getContext('2d',{willReadFrequently:true});x.imageSmoothingEnabled=a.smooth??true;const out=[];
       for(let i=0;i<n;i++){x.fillStyle='#000';x.fillRect(0,0,w,h);const s=Math.min(w/fw,h/fh),dw=fw*s,dh=fh*s;
         x.drawImage(img,(i%cols)*fw,Math.floor(i/cols)*fh,fw,fh,(w-dw)/2,(h-dh)/2,dw,dh);
-        const d=x.getImageData(0,0,w,h).data,f=new Uint8Array(w*h*4);for(let y=0;y<h;y++)f.set(d.subarray(y*w*4,(y+1)*w*4),(h-1-y)*w*4);out.push(f);}
+        const d=x.getImageData(0,0,w,h).data,f=new Uint8Array(w*h*4);f.set(d);out.push(f);}
       res(out);};img.src=new URL(a.image,import.meta.url).href;}));
   return arts.get(key);
 }
@@ -228,13 +228,17 @@ export class GunScreen{
       if(o.name==='screen'||o.material?.name==='screen')o.material=this.mat;
       else if(o.material?.name==='trim'&&entry.trim){const k=entry.trim;if(!trims.has(k)){const m=o.material.clone();m.color.setRGB(...hex(k).map(v=>v/255),THREE.SRGBColorSpace);trims.set(k,m);}o.material=trims.get(k);}
     });
-    this.foot=model.getObjectByName('foot');
+    this.foot=model.getObjectByName('foot');this.arm=model.getObjectByName('arm');this.clip=model.getObjectByName('clip');
     for(let i=0;i<8;i++){const b=model.getObjectByName('btn_'+i);if(!b)break;this.buttons.push(b);this.press0.push(b.position.z);}
     this.presses=this.buttons.map(()=>0);
     if(entry.art?.image)artFrames(entry.art,w,h).then(f=>{this.m.frames=f;});
   }
   // how far the foot reaches back to the gun, in the housing's own units
   setFoot(d){if(!this.foot)return;this.foot.scale.z=Math.max(.001,d);this.foot.visible=d>.02;}
+  // the arm's length and the clip's place on the gun (housing units), from screenMount
+  setMount(m){this.mounted=m;if(this.arm)this.arm.scale.z=Math.max(.001,m.arm??0);
+    if(this.clip&&m.clip){this.clip.position.fromArray(m.clip.p);this.clip.quaternion.fromArray(m.clip.q);this.clip.visible=true;}
+    else if(this.clip)this.clip.visible=false;}
   event(k){this.kind.ev?.(this.m,k);}
   press(i){if(i<0||i>=this.buttons.length)return;this.presses[i]=1;this.event('button');this.kind.button?.(this.m,i);}
   update(dt,st){
@@ -253,6 +257,8 @@ export async function makeScreen(cat,entry){
 
 // ---- where it mounts ------------------------------------------------------------------------------------------------------
 const mounts=new Map(),inv=new THREE.Matrix4(),_v=new THREE.Vector3(),_x=new THREE.Vector3(),_u=new THREE.Vector3(),_n=new THREE.Vector3();
+// the gun's side in root space as a frame: x back, y up, z out of the left side (the clip's frame)
+const G_SIDE=new THREE.Matrix4().makeBasis(new THREE.Vector3(-1,0,0),new THREE.Vector3(0,0,1),new THREE.Vector3(0,1,0));
 const D2R=Math.PI/180,CELL=.15,_c=new THREE.Vector3(),_w=new THREE.Vector3();
 // the housing's frame in root space: face normal n (tilted up and yawed back toward the eye), up u, right x
 function frameOf(tilt,yaw){
@@ -285,6 +291,9 @@ export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,a
         for(let j=a+1;j<b;j++){const c=alongX?bin(j*CELL,key*CELL):bin(key*CELL,j*CELL);if(c.n)continue;c.n=1;c.max=A.max+(B.max-A.max)*(j-a)/(b-a);}}}};
   fill(true);fill(false);
   const xmin=pct(pts,0,.01),xmax=pct(pts,0,.99),L=xmax-xmin,zTop=pct(pts,2,.97),zLow=pct(pts,2,.04);
+  // long guns (2026-11-07, user: "alot of them seem to be put on the stock ... closer to the mid section"): the eye-size
+  // term alone pulls the screen back toward the stock, so spots away from the middle cost more, scaled in from 14 to 24 in
+  const xMid=xmin+.47*L,midK=30*THREE.MathUtils.clamp((L-14)/10,0,1);
   const x0=THREE.MathUtils.clamp(.1*L+1,xmin+.12*L,xmax-.3*L);
   const flash=gun.getObjectByName('tag_flash');let bore=null;
   if(flash){let ok=true;for(let p=flash;p&&p!==gun.parent;p=p.parent)if(p.scale.x<1e-3)ok=false;if(ok)bore=flash.getWorldPosition(_v).applyMatrix4(inv).z/unit;}
@@ -303,13 +312,13 @@ export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,a
     let k=0;for(;m;m&=m-1)k++;return k/16;};
   const rect=(cx,cz,w,h,fn)=>{const ix0=Math.round((cx-w/2)/CELL),ix1=Math.round((cx+w/2)/CELL),iz0=Math.round((cz-h/2)/CELL),iz1=Math.round((cz+h/2)/CELL);
     for(let ix=ix0;ix<=ix1;ix++)for(let iz=iz0;iz<=iz1;iz++)fn(get(ix,iz),ix,iz);return (ix1-ix0+1)*(iz1-iz0+1);};
-  const sizes=override?.size?[override.size]:[1,.86,.74,.62];let best=null;
+  const sizes=override?.size?[override.size]:[1.25,1.08,.93,.78];let best=null;   // a quarter bigger since 2026-11-07 (user: "just abit bigger ... the whole things"); was 1-.62
   for(const s of sizes){
     const fw=HW*s,fh=HH*s,ffw=FT[0]*s,ffh=FT[1]*s;
     for(let cx=xmin+.12*L+fw/2;cx<=xmax-.25*L-fw/2+1e-6;cx+=.25)for(let cz=zLow+fh/2;cz<=zTop-fh/2+.15;cz+=.2){
       let cov=0,top=-1e9,lo=0,mv=0,pn=0;
       const total=rect(cx,cz,fw,fh,b=>{if(!b)return;if(b.n){cov++;pn+=b.n;if(b.max>top)top=b.max;lo+=b.loose;mv+=b.moving;}});
-      if(cov/total<.45||lo>2)continue;
+      if(cov/total<.35||lo>2)continue;   // .45 until the clip (2026-11-07): it holds an overhanging housing on
       let fc=0,fs=0,flo=0;const ftot=rect(cx,cz,ffw,ffh,b=>{if(b?.n){fc++;fs+=b.max;flo+=b.loose;}});
       if(fc/ftot<.7||flo)continue;
       const plane=top+.03,depth=plane-fs/fc;if(depth>.9)continue;
@@ -317,8 +326,9 @@ export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,a
       // how big it reads: its width x how square it faces the eye / distance (radians); bigger and closer wins
       const c=_c.set(cx,0,cz);c.y=(plane-n.x*cx-n.z*cz)/n.y;const dist=c.distanceTo(eye),facing=_w.subVectors(eye,c).dot(n)/dist;
       if(facing<.3)continue;
-      let cost=(1-cov/total)*3+2*depth+(mv/Math.max(1,pn))*4+(hands?1.5+hands*.1:0)+40*Math.max(0,.12-fw*facing/dist)
-        +.5*Math.max(0,cz+fh/2-(bore+.25))+.25*Math.abs(cz-(bore-fh/2+.05));
+      let cost=(1-cov/total)*3+2*depth+(mv/Math.max(1,pn))*4+(hands?1.5+hands*.1:0)+40*Math.max(0,.15-fw*facing/dist)
+        +.5*Math.max(0,cz+fh/2-(bore+.25))+.25*Math.abs(cz-(bore-fh/2+.05))
+        +midK*Math.max(0,Math.abs(cx-xMid)/L-.05);   // long guns: toward the middle, not back on the stock
       if(cost<(best?.cost??1e9)){const h=hidden16(c,fw,fh);if(h>.3)continue;cost+=h*8;}
       if(avoid&&cx+fw/2>avoid.x-avoid.w-.2&&cx-fw/2<avoid.x+avoid.w+.2&&cz-fh/2<avoid.z+.3&&cz+fh/2>avoid.z-avoid.drop)cost+=5;
       if(camera&&cost<(best?.cost??1e9)){let off=0;for(const [a,b] of [[-1,-1],[1,-1],[-1,1],[1,1],[0,0]]){
@@ -330,10 +340,20 @@ export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,a
   }
   let out;
   if(override?.at){const at=new THREE.Vector3().fromArray(override.at).divideScalar(unit);best={cx:at.x,cz:at.z,s:override.size??.8,plane:at.dot(n),depth:override.foot??.15};}
-  if(!best){const s=.7;best={cx:x0+1.4,cz:bore-HH*s/2,s,plane:pct(pts,1,.99)*n.y+.05,depth:.1};}
-  {const c=new THREE.Vector3(best.cx,0,best.cz);c.y=(best.plane-n.x*c.x-n.z*c.z)/n.y;
-    const m=new THREE.Matrix4().makeBasis(F.x,F.u,n).scale(_v.setScalar(best.s*unit)).setPosition(c.multiplyScalar(unit));
-    out={matrix:m,size:best.s,foot:best.depth/best.s,cost:best.cost};}
+  if(!best){const s=.85;best={cx:x0+1.4,cz:bore-HH*s/2,s,plane:pct(pts,1,.99)*n.y+.05,depth:.1};}
+  {const s=best.s,c=new THREE.Vector3(best.cx,0,best.cz);c.y=(best.plane-n.x*c.x-n.z*c.z)/n.y;
+    // the mount: an arm straight back (-n) from the housing's back to the ball of a clip lying flat on the gun's side
+    // (normal +y); the clip sits on the outermost gun surface around where the arm lands
+    const BALL=.13*s,PW=.34*s,PH=.42*s;let t=0,px=c.x,pz=c.z;
+    for(let it=0;it<3;it++){let ys=-1e9;
+      for(const r of [1,2.5,5]){for(let i=0;i<pts.length;i+=3)if(Math.abs(pts[i]-px)<PW*r&&Math.abs(pts[i+2]-pz)<PH*r&&pts[i+1]>ys)ys=pts[i+1];if(ys>-1e9)break;}
+      if(ys<=-1e9)ys=c.y-n.y*(best.depth+.2);
+      t=(c.y-ys-BALL)/n.y;px=c.x-n.x*t;pz=c.z-n.z*t;}
+    const tMin=.22*s;if(t<tMin){c.addScaledVector(n,tMin-t);t=tMin;}   // too close: stand the housing off so the arm shows
+    const R=new THREE.Matrix4().makeBasis(F.x,F.u,n).transpose().multiply(G_SIDE),q=new THREE.Quaternion().setFromRotationMatrix(R);
+    const cp=[F.x.y*-.13,F.u.y*-.13,-t/s+n.y*-.13];
+    const m=new THREE.Matrix4().makeBasis(F.x,F.u,n).scale(_v.setScalar(s*unit)).setPosition(c.multiplyScalar(unit));
+    out={matrix:m,size:s,foot:best.depth/s,arm:t/s,clip:{p:cp,q:q.toArray()},along:(best.cx-xmin)/L,cost:best.cost};}
   mounts.set(fullKey,out);return out;
 }
 // the charm's keep-clear zone (inches): its plain hang spot (no hands or camera, so the Gunsmith and the game agree) and a
@@ -343,5 +363,5 @@ export function charmZone(gun,root,{key,override,unit=1}){
 }
 // put a screen on the gun: its matrix in the view = root's world matrix x the mount
 export function placeScreen(sc,root,mount){
-  const o=sc.object;o.matrixAutoUpdate=false;o.matrix.multiplyMatrices(root.matrixWorld,mount.matrix);o.matrixWorldNeedsUpdate=true;
+  if(sc.mounted!==mount)sc.setMount?.(mount);const o=sc.object;o.matrixAutoUpdate=false;o.matrix.multiplyMatrices(root.matrixWorld,mount.matrix);o.matrixWorldNeedsUpdate=true;
 }

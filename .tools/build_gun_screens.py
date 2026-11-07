@@ -3,8 +3,11 @@
 #   slab  : a square body where the screen fills the face, a thin raised rim
 #   field : a taller body with the screen on top and three buttons below (btn_0 round, btn_1 up, btn_2 down), each its own
 #           object with its origin on the face so a later press is a move along -Z
-# Every unit has: `screen` (the display, UVs 0..1 across it, drawn by a shader in the game), `foot` (the mount block from
-# z=0 to z=-1, scaled in the game to reach the gun's surface), materials shell / trim / rubber / glyph / glass.
+# Every unit has: `screen` (the display, UVs 0..1 across it, drawn by a shader in the game) and the mount (2026-11-07, user:
+# "it doesnt really look like its attached to the gun ... something like a clip added to the back of it"): a boss on the
+# back, `arm` (z=0 to z=-1, scaled in the game to reach the gun) and `clip`, a clamp plate placed by the game flat on the
+# gun's side (its own frame: back on the gun at z=0, +Z away from it, the arm's ball at z=.13), with claws over its top
+# and bottom edges. Materials shell / trim / rubber / glyph / led.
 # blender -b -P .tools/build_gun_screens.py -- [--render scratch/screens]
 import bpy, bmesh, math, os, sys
 
@@ -96,9 +99,30 @@ def screen(w, h, r, z, M):
     bm = bmesh.new(); loft(bm, [(rr(w, h, r, 6), z)], cap1=True); o = obj('screen', bm, [M['screen']], 1); uv_planar(o); return o
 
 
-def foot(w, h, r, M):
-    bm = bmesh.new(); loft(bm, [(rr(w, h, r, 4), -1.), (rr(w, h, r, 4), 0.)], cap0=True, cap1=False)
-    return obj('foot', bm, [M['shell']], 30)
+def mount(M):
+    """the boss on the housing's back, the arm (unit length, scaled in the game) and the clip that clamps onto the gun"""
+    out = []
+    bm = bmesh.new(); loft(bm, [(circle(.13, 24), -.05), (circle(.13, 24), -.01), (circle(.15, 24), 0.)], cap0=True); out.append(obj('boss', bm, [M['shell']], 40))
+    bm = bmesh.new(); loft(bm, [(rr(.13, .17, .055, 4), -1.), (rr(.13, .17, .055, 4), -.02)], cap0=True, cap1=True); out.append(obj('arm', bm, [M['shell']], 40))
+    clip = bpy.data.objects.new('clip', None); bpy.context.collection.objects.link(clip); out.append(clip)
+    PW, PH, T = .58, .66, .07
+    bm = bmesh.new(); rings = [(shape(PW, PH, .1, .02), 0.), (shape(PW, PH, .1, 0.), .015), (shape(PW, PH, .1, 0.), T - .02), (shape(PW, PH, .1, .025), T)]
+    loft(bm, rings, cap0=True, cap1=True); out.append(obj('clip_plate', bm, [M['shell']], 35, parent=clip))
+    bm = bmesh.new(); loft(bm, [(shape(PW, PH, .1, -.012), -.018), (shape(PW, PH, .1, -.012), .002)], cap0=True, cap1=True)
+    out.append(obj('clip_pad', bm, [M['rubber']], 35, parent=clip))
+    # the claws: lips over the plate's top and bottom edges that bend in toward the gun
+    bm = bmesh.new()
+    for sy in (1, -1):
+        y = sy * (PH / 2 + .02)
+        loft(bm, [(rr(.4, .05, .018, 3, 0, y), -.16), (rr(.4, .05, .018, 3, 0, y), T + .01)], cap0=True, cap1=True)
+        loft(bm, [(rr(.4, .07, .018, 3, 0, y - sy * .045), -.16), (rr(.4, .07, .018, 3, 0, y - sy * .045), -.12)], cap0=True, cap1=True)
+    out.append(obj('clip_claws', bm, [M['trim']], 40, parent=clip))
+    # the socket the arm's ball sits in (a dome) and its ball
+    bm = bmesh.new(); loft(bm, [(circle(.12 * math.cos(math.radians(a)), 24), T + .1 * math.sin(math.radians(a))) for a in (0, 25, 50, 70, 85)], cap1=True)
+    out.append(obj('clip_socket', bm, [M['trim']], 50, parent=clip))
+    for i, (x, y) in enumerate(((-.19, .22), (.19, -.22))):
+        o = screw(x, y, T, M, 'clip_screw%d' % i); o.parent = clip; out.append(o)
+    return out
 
 
 def screw(x, y, z, M, name):
@@ -142,7 +166,7 @@ def build_slab():
     parts.append(obj('grip', bm, [M['rubber']], 40))
     bm = bmesh.new(); loft(bm, [(rr(.16, .02, .008, 3, -.32, H / 2 + .006), D * .7), (rr(.16, .02, .008, 3, -.32, H / 2 + .006), D * .9)], cap0=True, cap1=True)
     led = obj('led', bm, [M['led']], 40); parts.append(led)
-    parts.append(foot(.62, .52, .1, M))
+    parts += mount(M)
     return finish('slab', parts, dict(w=W, h=H, d=D)), (sw, sw)
 
 
@@ -189,7 +213,7 @@ def build_field():
     parts.append(obj('led', bm, [M['led']], 40))
     for i, (x, y) in enumerate(((-1, -1), (1, -1))):
         parts.append(screw(x * (W / 2 - B - .045), by - .2 + y * 0, D, M, 'screw%d' % i))
-    parts.append(foot(.6, .62, .1, M))
+    parts += mount(M)
     return finish('field', parts, dict(w=W, h=H, d=D)), (sw, sh)
 
 
