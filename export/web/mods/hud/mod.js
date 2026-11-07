@@ -29,7 +29,8 @@ export default function setup(api){
   // A set with recorded samples (shop sound items with data.hits.samples, user's uploads 2026-11-07): one of them plays per
   // hit, picked at random (never the same twice running when there are several, the Zap set has 3), heads a little higher,
   // and a new hit fades the last one out so fast guns don't stack long zaps. Kills keep the deep thud below. Until the files
-  // have loaded (or if they can't, e.g. a Rind install, which doesn't ship them) the synthesized thump plays instead.
+  // have loaded (or if they can't) the synthesized thump plays instead. They're not in Rind installs, so Rind streams them
+  // from the site like the other third-party assets.
   const buffers=new Map();let lastPick=-1,lastSrc=null;
   function bufferOf(c,url){
     if(!buffers.has(url)){buffers.set(url,null);fetch(url).then(r=>r.ok?r.arrayBuffer():Promise.reject(r.status)).then(a=>c.decodeAudioData(a)).then(b=>buffers.set(url,b),()=>{});}
