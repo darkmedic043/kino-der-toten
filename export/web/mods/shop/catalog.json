@@ -1982,6 +1982,78 @@
    "pass": "s2"
   },
   {
+   "id": "pass.s2.sticker.pastdue",
+   "cat": "sticker",
+   "name": "Past Due",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 weapon sticker.",
+   "data": {
+    "sticker": "pastdue"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.sticker.highvoltage",
+   "cat": "sticker",
+   "name": "High Voltage",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 weapon sticker.",
+   "data": {
+    "sticker": "highvoltage"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.sticker.beeseal",
+   "cat": "sticker",
+   "name": "Bee Seal",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 weapon sticker.",
+   "data": {
+    "sticker": "beeseal"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.sticker.sproutedskull",
+   "cat": "sticker",
+   "name": "Sprouted Skull",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 weapon sticker.",
+   "data": {
+    "sticker": "sproutedskull"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.sticker.rainmeter",
+   "cat": "sticker",
+   "name": "Rain Meter",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 weapon sticker.",
+   "data": {
+    "sticker": "rainmeter"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.sticker.tollcrest",
+   "cat": "sticker",
+   "name": "Toll Crest",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 weapon sticker in gold ink that glimmers.",
+   "data": {
+    "sticker": "tollcrest"
+   },
+   "pass": "s2"
+  },
+  {
    "id": "pass.s2.card.airsuperiority",
    "cat": "card",
    "name": "Air Superiority",

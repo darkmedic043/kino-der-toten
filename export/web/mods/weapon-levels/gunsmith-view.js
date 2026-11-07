@@ -66,6 +66,10 @@ const CSS=`
 #gsv .opt.locked{opacity:.4;cursor:not-allowed}
 #gsv .stk-row{display:grid;grid-template-columns:44px 1fr auto;gap:4px 10px;align-items:center}
 #gsv .stk-row img,#gsv .stk-pick img{width:44px;height:44px;object-fit:contain}
+#gsv .stk-gold{position:relative;display:inline-block;width:44px;height:44px;vertical-align:middle}
+#gsv .stk-gold::after{content:'';position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat;
+  background:linear-gradient(115deg,transparent 40%,#fff3c088 48%,#ffffffcc 50%,#fff3c088 52%,transparent 60%) 0 0/300% 100% no-repeat;animation:stkGold 3.2s linear infinite}
+@keyframes stkGold{0%{background-position:100% 0}60%,100%{background-position:0 0}}
 #gsv .stk-row .acts button{font:600 9px/1 system-ui,sans-serif;letter-spacing:2px;padding:5px 7px;margin-left:4px;color:#e9e4d8;background:#ffffff10;border:1px solid #ffffff30;cursor:pointer}
 #gsv .stk-row label{grid-column:1/-1;display:grid;grid-template-columns:70px 1fr 42px;align-items:center;font-size:10px;letter-spacing:2px;color:#a09a8d}
 #gsv .stk-row input[type=range]{width:100%;accent-color:#f3a33a}
@@ -338,19 +342,19 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   function stkShow(){if(!gun)return;let l=stkList();if(stkPrev){l=l.slice();l[stkPrev.at]=stkPrev.x;}return applyStickers(gun,l.filter(Boolean),id);}
   function renderStickers(el){
     if(stkFor!==id){stkFor=id;stkYaw=STK_GAME;}   // first look at a gun's stickers: its in-game side
-    const l=stkList(),nm=x=>esc(stkCat.stickers.find(s=>s.id===x)?.name??x),img=x=>{const s=stkCat.stickers.find(k=>k.id===x);return s?stickerImage(s):'';};
+    const l=stkList(),nm=x=>esc(stkCat.stickers.find(s=>s.id===x)?.name??x),pic=s=>!s?'':s.shine?`<span class="stk-gold" style="--m:url('${stickerImage(s)}')"><img src="${stickerImage(s)}" alt="" draggable="false"></span>`:`<img src="${stickerImage(s)}" alt="" draggable="false">`;
     if(stkSel>=l.length)stkSel=Math.max(0,l.length-1);const hid=l.map(stkHidden);
     const hint=stkArm?`Tap the gun to place ${nm(stkArm.id)}, or drag it there. Right-click or Esc cancels.`
       :l.length<MAX_STICKERS?'Drag a sticker onto the gun. Drag a placed one to move it.':'All three are placed: drag one to move it, or drop a new one to replace the selected one.';
     el.innerHTML=`<h3>STICKERS · ${l.length} / ${MAX_STICKERS}</h3><p class="stk-hint">${hint}</p>
       <button class="opt stk-flip" data-stk-flip><strong>${stkGameSide()?'SIDE SEEN IN GAME':'OTHER SIDE · NOT SEEN IN GAME'}</strong><span class="tag" style="float:none;margin-left:8px">FLIP ⟲</span></button>`+
-      l.map((x,i)=>`<div class="opt stk-row${i===stkSel?' on':''}" data-stk-i="${i}"><img src="${img(x.id)}" alt="" draggable="false"><strong>${nm(x.id)}${hid[i]?'<small class="stk-hid">NOT SEEN IN GAME</small>':''}</strong>
+      l.map((x,i)=>`<div class="opt stk-row${i===stkSel?' on':''}" data-stk-i="${i}">${pic(stkCat.stickers.find(k=>k.id===x.id))}<strong>${nm(x.id)}${hid[i]?'<small class="stk-hid">NOT SEEN IN GAME</small>':''}</strong>
         <span class="acts">${hid[i]?`<button data-stk-game="${i}">MOVE TO GAME SIDE</button>`:''}<button data-stk-del="${i}">REMOVE</button></span>
         ${i===stkSel?`<label>SIZE<input type="range" min="50" max="200" step="5" value="${Math.round((x.m??1)*100)}" data-stk-size="${i}"><b>${Math.round((x.m??1)*100)}%</b></label>
         <label>ROTATE<input type="range" min="-180" max="180" step="5" value="${x.r??0}" data-stk-rot="${i}"><b>${x.r??0}°</b></label>`:''}</div>`).join('')+
       `<h3 style="margin-top:12px">ADD</h3><div class="stk-grid">`+stkCat.stickers.map(s=>{const lock=stickerLock(s);
         return `<button class="opt stk-pick${stkArm?.id===s.id?' on':''}${lock?' locked':''}" data-stk-pick="${esc(s.id)}" title="${esc(s.desc??'')}">
-          <img src="${stickerImage(s)}" alt="" draggable="false"><strong>${esc(s.name)}</strong>${lock?`<span class="tag" style="float:none">${lock==='PASS'?'MELON PASS':lock==='SOON'?'COMING SOON':lock}</span>`:''}</button>`;}).join('')+'</div>';
+          ${pic(s)}<strong>${esc(s.name)}</strong>${lock?`<span class="tag" style="float:none">${lock==='PASS'?'MELON PASS':lock==='SOON'?'COMING SOON':lock}</span>`:''}</button>`;}).join('')+'</div>';
   }
   // where a screen point meets a painted, visible part of the gun (bind-space placement, stickers.js)
   const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();

@@ -39,13 +39,15 @@ let atlas=null;
 export function stickerAtlas(cat){
   return atlas??=(async()=>{
     const list=cat.stickers,cols=Math.max(1,Math.ceil(Math.sqrt(list.length))),side=Math.min(4096,THREE.MathUtils.ceilPowerOfTwo(cols*CELL));
-    const cv=document.createElement('canvas');cv.width=cv.height=side;const g=cv.getContext('2d');const rect={};
+    const cv=document.createElement('canvas');cv.width=cv.height=side;const g=cv.getContext('2d');const rect={},shine={};
+    for(const s of list)shine[s.id]=s.shine==='gold'?1:0;
     await Promise.all(list.map((s,i)=>new Promise(res=>{const im=new Image();im.onload=()=>{
-      const x=(i%cols)*CELL,y=Math.floor(i/cols)*CELL;g.drawImage(im,x+PAD,y+PAD,CELL-2*PAD,CELL-2*PAD);
+      const x=(i%cols)*CELL,y=Math.floor(i/cols)*CELL,W=CELL-2*PAD,k=W/Math.max(im.naturalWidth,im.naturalHeight,1),w=im.naturalWidth*k,h=im.naturalHeight*k;
+      g.drawImage(im,x+PAD+(W-w)/2,y+PAD+(W-h)/2,w,h);   // kept in proportion, centred in its square
       rect[s.id]=new THREE.Vector4((x+PAD)/side,1-(y+CELL-PAD)/side,(CELL-2*PAD)/side,(CELL-2*PAD)/side);res();};   // flipY: v up
       im.onerror=()=>{console.warn('[stickers] image',s.image);res();};im.src=stickerImage(s);})));
     const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;tex.generateMipmaps=true;
-    tex.minFilter=THREE.LinearMipmapLinearFilter;return {tex,rect};
+    tex.minFilter=THREE.LinearMipmapLinearFilter;return {tex,rect,shine};
   })();
 }
 
@@ -57,6 +59,7 @@ const bufOf=o=>o.geometry?.attributes?.position?.array;
 // ---- the material patch -------------------------------------------------------------------------------------------------
 const SKIP=/reflex_red_dot|scope_pka_crosshair|clan_tag|player_icon|lens|glass|reticle|_dot\b/i;
 const matCache=new Map();   // base material uuid + vertex buffer + gun → sticker material (its uniforms are updated in place)
+const stkTime={value:0};   // shared by every sticker material, set as one draws (onBeforeRender)
 let bufIds=new WeakMap(),bufN=0;const bufId=a=>{if(!bufIds.has(a))bufIds.set(a,++bufN);return bufIds.get(a);};
 // Material.clone deep-copies userData through JSON.stringify: a camo material's userData holds the original material, whose
 // textures then serialise to data URLs (and throw on ImageBitmaps texture-memory.js has closed). Clone with userData set aside.
@@ -65,32 +68,50 @@ function stickerMaterial(base,group,gunKey,shared){
   const key=base.uuid+'|'+group+'|'+gunKey;let m=matCache.get(key);if(m)return m;
   m=cloneMaterial(base);m.userData={...base.userData,stickerOf:base,camoOf:base.userData?.camoOf??base};
   const V=()=>[0,1,2].map(()=>new THREE.Vector3());
-  const u={stkAtlas:shared.atlas,stkCount:{value:0},stkO:{value:V()},stkT:{value:V()},stkB:{value:V()},stkZ:{value:V()},stkR:{value:[0,1,2].map(()=>new THREE.Vector4())}};
+  const u={stkAtlas:shared.atlas,stkCount:{value:0},stkO:{value:V()},stkT:{value:V()},stkB:{value:V()},stkZ:{value:V()},stkR:{value:[0,1,2].map(()=>new THREE.Vector4())},stkF:{value:[0,0,0]},stkTime};
   m.userData.stk=u;
-  const prev=base.onBeforeCompile;
+  const prev=base.onBeforeCompile,prevR=base.onBeforeRender;
+  m.onBeforeRender=function(...a){stkTime.value=performance.now()/1000;return prevR.apply(this,a);};
   m.onBeforeCompile=(shader,renderer)=>{prev?.call(m,shader,renderer);Object.assign(shader.uniforms,u);
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vStkP;varying vec3 vStkN;')
       .replace('#include <begin_vertex>','#include <begin_vertex>\nvStkP=position;vStkN=normal;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
-uniform sampler2D stkAtlas;uniform float stkCount;uniform vec3 stkO[3];uniform vec3 stkT[3];uniform vec3 stkB[3];uniform vec3 stkZ[3];uniform vec4 stkR[3];
+uniform sampler2D stkAtlas;uniform float stkCount;uniform float stkF[3];uniform float stkTime;float stkG=0.;vec2 stkGuv=vec2(0.);uniform vec3 stkO[3];uniform vec3 stkT[3];uniform vec3 stkB[3];uniform vec3 stkZ[3];uniform vec4 stkR[3];
 varying vec3 vStkP;varying vec3 vStkN;float stkA=0.;
 // one sticker: the box projection (x,y across, z along the normal, all -1..1 inside), faded where the surface turns away
-vec4 stkOne(int i,vec3 o,vec3 t,vec3 b,vec3 z,vec4 r){
+vec4 stkOne(int i,vec3 o,vec3 t,vec3 b,vec3 z,vec4 r,float f){
   vec3 d=vStkP-o,l=vec3(dot(d,t),dot(d,b),dot(d,z));vec2 uv=clamp(l.xy*.5+.5,0.,1.);
   vec4 c=texture2D(stkAtlas,r.xy+uv*r.zw);   // sampled outside the test: derivatives stay valid for the mipmaps
   float facing=dot(normalize(vStkN),normalize(z));
   float in_=step(abs(l.x),1.)*step(abs(l.y),1.)*step(abs(l.z),1.)*smoothstep(.08,.3,facing)*step(float(i)+.5,stkCount);
-  c.a*=in_;return c;}
+  c.a*=in_;
+  // gold ink (stickers with shine:"gold"): saturated, warm texels (r>=g>b); the paper and stains around it stay plain
+  float mx=max(c.r,max(c.g,c.b)),sat=(mx-min(c.r,min(c.g,c.b)))/max(mx,1e-3);
+  float g=f*c.a*smoothstep(.38,.62,sat)*smoothstep(-.02,.02,c.r-c.g)*smoothstep(-.02,.02,c.g-c.b);
+  stkGuv=mix(stkGuv,uv,step(stkG,g));stkG=max(stkG,g);
+  return c;}
+float stkHash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
 `).replace('#include <color_fragment>',`#include <color_fragment>
-{ vec4 s0=stkOne(0,stkO[0],stkT[0],stkB[0],stkZ[0],stkR[0]),s1=stkOne(1,stkO[1],stkT[1],stkB[1],stkZ[1],stkR[1]),s2=stkOne(2,stkO[2],stkT[2],stkB[2],stkZ[2],stkR[2]);
+{ vec4 s0=stkOne(0,stkO[0],stkT[0],stkB[0],stkZ[0],stkR[0],stkF[0]),s1=stkOne(1,stkO[1],stkT[1],stkB[1],stkZ[1],stkR[1],stkF[1]),s2=stkOne(2,stkO[2],stkT[2],stkB[2],stkZ[2],stkR[2],stkF[2]);
   diffuseColor.rgb=mix(diffuseColor.rgb,s0.rgb,s0.a);diffuseColor.rgb=mix(diffuseColor.rgb,s1.rgb,s1.a);diffuseColor.rgb=mix(diffuseColor.rgb,s2.rgb,s2.a);
   stkA=max(s0.a,max(s1.a,s2.a)); }`)
       // vinyl: not metal, a little rough, no glow through it (a camo's own glow included)
-      .replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nmetalnessFactor*=1.-stkA;')
-      .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,.5,stkA);')
-      .replace('#include <lights_fragment_begin>','totalEmissiveRadiance*=1.-stkA;\n#include <lights_fragment_begin>');
+      .replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nmetalnessFactor=mix(metalnessFactor*(1.-stkA),.55,stkG);')
+      .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(mix(roughnessFactor,.5,stkA),.28,stkG);')
+      .replace('#include <lights_fragment_begin>',`totalEmissiveRadiance*=1.-stkA;
+// gold-pen glimmer: a soft sheen that sweeps across the ink every few seconds and slides as the gun turns (view-space
+// normal), plus a few flecks that twinkle on their own
+if(stkG>0.){
+  float ph=dot(stkGuv,vec2(.62,.38))+dot(normal.xy,vec2(.55,.35))-stkTime*.16;
+  float band=1.-smoothstep(0.,.075,abs(fract(ph)-.5));
+  vec2 cell=floor(stkGuv*64.);float h=stkHash(cell);
+  vec2 fc=fract(stkGuv*64.)-.5;float sp=smoothstep(.45,0.,length(fc))+.6*smoothstep(.12,0.,min(abs(fc.x),abs(fc.y)))*smoothstep(.5,.1,length(fc));
+  float tw=step(.86,h)*sp*pow(max(0.,sin(stkTime*(1.3+h*2.2)+h*37.)),28.);
+  totalEmissiveRadiance+=(diffuseColor.rgb*1.7+vec3(.2,.15,.04))*stkG*(band*.75+tw*2.2+.05);
+}
+#include <lights_fragment_begin>`);
   };
-  m.customProgramCacheKey=()=>(base.customProgramCacheKey?.()??'')+'|stk';
+  m.customProgramCacheKey=()=>(base.customProgramCacheKey?.()??'')+'|stk2';
   m.needsUpdate=true;matCache.set(key,m);return m;
 }
 
@@ -123,7 +144,7 @@ export function restick(root){
     const next=list.map(m=>{const base=m?.userData?.stickerOf??m;if(!base||!base.map||SKIP.test(base.name??''))return base;
       if(!mine.length)return base;
       const sm=stickerMaterial(base,bufId(bufOf(o)),st.gunKey,{atlas:{value:at.tex}}),u=sm.userData.stk;
-      u.stkCount.value=mine.length;mine.forEach((x,i)=>{axes(x,u.stkO.value[i],u.stkT.value[i],u.stkB.value[i],u.stkZ.value[i]);u.stkR.value[i].copy(at.rect[x.id]);});
+      u.stkCount.value=mine.length;mine.forEach((x,i)=>{axes(x,u.stkO.value[i],u.stkT.value[i],u.stkB.value[i],u.stkZ.value[i]);u.stkR.value[i].copy(at.rect[x.id]);u.stkF.value[i]=at.shine?.[x.id]??0;});
       return sm;});
     o.material=Array.isArray(o.material)?next:next[0];
   });
