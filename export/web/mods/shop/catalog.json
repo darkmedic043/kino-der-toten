@@ -2172,6 +2172,59 @@
     "image": "/mods/shop/cards/s2/unleashedpotential.webp"
    },
    "pass": "s2"
+  },
+  {
+   "id": "pass.s2.sound.zap",
+   "cat": "sound",
+   "name": "Zap Hits",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 hit sounds: a taser zap, one of three each hit.",
+   "data": {
+    "hits": {
+     "samples": [
+      "zap1.wav",
+      "zap2.wav",
+      "zap3.wav"
+     ],
+     "volume": 0.5
+    }
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.sound.classic",
+   "cat": "sound",
+   "name": "Classic Hits",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hit sounds: the classic tick.",
+   "data": {
+    "hits": {
+     "samples": [
+      "classic.wav"
+     ],
+     "volume": 0.55
+    }
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.sound.modern",
+   "cat": "sound",
+   "name": "Modern Hits",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hit sounds: a modern hit crack.",
+   "data": {
+    "hits": {
+     "samples": [
+      "modern.wav"
+     ],
+     "volume": 0.55
+    }
+   },
+   "pass": "s2"
   }
  ]
 }

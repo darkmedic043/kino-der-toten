@@ -55,6 +55,8 @@ Thumbs.db
 # Season 1 (s2) pass camos and calling cards: third-party textures the user supplied (2026-11-06), kept local like the ripped assets
 /export/web/mods/weapon-levels/camos/s2/
 /export/web/mods/shop/cards/s2/
+# Season 1 hit sounds the user supplied (2026-11-07: a free-sound-effect taser zap and two hitmarker sounds of unknown origin), kept local too
+/export/web/mods/shop/sounds/
 
 # weapon sticker images: the six Season 1 ones are the user's own (2026-11-07) and are published; the test smiley's origin is unknown, so it stays local
 /export/web/mods/stickers/images/smiley.png

@@ -32,8 +32,17 @@ let view='featured',sel=null;
 const thumb=makeThumb({camos,chars});
 // a hit-sound sample: the hud mod's thump with the set's numbers
 let actx=null;
+const sampleBufs=new Map();
 function playHits(hs){
   actx??=new AudioContext();const c=actx,t0=c.currentTime;
+  if(hs.samples?.length){   // a recorded set: each sample once (the Zap set's three zaps), then a headshot
+    const urls=hs.samples.map(f=>new URL('mods/shop/sounds/'+f,document.baseURI).href);
+    Promise.all(urls.map(u=>sampleBufs.get(u)??sampleBufs.set(u,fetch(u).then(r=>r.arrayBuffer()).then(a=>c.decodeAudioData(a))).get(u))).then(bufs=>{
+      let t=c.currentTime;
+      for(const [b,rate] of [...bufs.map(b=>[b,1]),[bufs[0],1.08]]){const s=c.createBufferSource(),g=c.createGain();s.buffer=b;s.playbackRate.value=rate;g.gain.value=(hs.volume??.55)*.8;s.connect(g).connect(c.destination);s.start(t);t+=Math.max(.3,b.duration/rate+.1);}
+    },()=>{});
+    return;
+  }
   const thump=(t,{from,to,length,body,knock,knockCut})=>{from*=hs.pitch;to*=hs.pitch;knock*=hs.knock;knockCut*=hs.cut;
     const o=c.createOscillator(),g=c.createGain();o.frequency.setValueAtTime(from,t);o.frequency.exponentialRampToValueAtTime(to,t+length*.6);g.gain.setValueAtTime(body*.5,t);g.gain.exponentialRampToValueAtTime(.001,t+length);o.connect(g).connect(c.destination);o.start(t);o.stop(t+length);
     const n=c.createBufferSource(),b=c.createBuffer(1,c.sampleRate*.08,c.sampleRate),ch=b.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=(Math.random()*2-1)*(1-i/ch.length);n.buffer=b;

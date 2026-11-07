@@ -26,10 +26,29 @@ export default function setup(api){
     const n=noise(c,.08),lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=knockCut;
     n.connect(lp).connect(env(c,t,knock,.001,.05));n.start(t);n.stop(t+.08);
   }
+  // A set with recorded samples (shop sound items with data.hits.samples, user's uploads 2026-11-07): one of them plays per
+  // hit, picked at random (never the same twice running when there are several, the Zap set has 3), heads a little higher,
+  // and a new hit fades the last one out so fast guns don't stack long zaps. Kills keep the deep thud below. Until the files
+  // have loaded (or if they can't, e.g. a Rind install, which doesn't ship them) the synthesized thump plays instead.
+  const buffers=new Map();let lastPick=-1,lastSrc=null;
+  function bufferOf(c,url){
+    if(!buffers.has(url)){buffers.set(url,null);fetch(url).then(r=>r.ok?r.arrayBuffer():Promise.reject(r.status)).then(a=>c.decodeAudioData(a)).then(b=>buffers.set(url,b),()=>{});}
+    return buffers.get(url);
+  }
+  function sample(c,t,hs,head){
+    const ready=hs.samples.map(u=>bufferOf(c,u));const ids=ready.map((b,i)=>b?i:-1).filter(i=>i>=0&&(ready.length<2||i!==lastPick));
+    if(!ids.length)return false;
+    const i=ids[Math.floor(Math.random()*ids.length)];lastPick=i;
+    if(lastSrc){lastSrc.g.gain.setTargetAtTime(0,t,.008);lastSrc.s.stop(t+.05);}
+    const s=c.createBufferSource(),g=c.createGain();s.buffer=ready[i];s.playbackRate.value=head?1.08:1;g.gain.value=hs.volume??.55;
+    s.connect(g).connect(audio.master);s.start(t);lastSrc={s,g};s.onended=()=>{if(lastSrc?.s===s)lastSrc=null;};
+    return true;
+  }
   let lastHit=0;
   function hitmarker(head,kill){
     const c=out();if(!c||c.currentTime-lastHit<.04)return;lastHit=c.currentTime;const t=c.currentTime;
-    thump(c,t,head?{from:230,to:90,length:.12,body:1,knock:.7,knockCut:2600}:{from:170,to:65,length:.13,body:.95,knock:.55,knockCut:1500});
+    const hs=window.kino?.hitSoundSet;
+    if(!(hs?.samples?.length&&sample(c,t,hs,head)))thump(c,t,head?{from:230,to:90,length:.12,body:1,knock:.7,knockCut:2600}:{from:170,to:65,length:.13,body:.95,knock:.55,knockCut:1500});
     // Kills land with a second, deeper thud.
     if(kill)thump(c,t+.05,{from:120,to:42,length:.22,body:1,knock:.35,knockCut:700});
   }
@@ -38,6 +57,9 @@ export default function setup(api){
     thump(c,t,{from:110,to:36,length:.3,body:1.1*v,knock:.9*v,knockCut:800});
     thump(c,t+.07,{from:70,to:30,length:.25,body:.7*v,knock:.2*v,knockCut:400});
   }
+  // load the equipped set's samples before the first hit (the shop mod sets it at its setup and on every start)
+  const preload=()=>{const hs=window.kino?.hitSoundSet;if(hs?.samples&&audio.ctx)for(const u of hs.samples)bufferOf(audio.ctx,u);};
+  host.on('start',()=>setTimeout(preload,0));setTimeout(preload,0);
   host.on('beforeEnemyDamage',e=>{if(!host.remoteDamage&&['bullet','explosion','melee','thunder'].includes(e.cause)&&e.enemy?.health>0)hitmarker(e.head,e.amount>=e.enemy.health||session.effects.insta_kill>session.time);});
 
   // ---- Directional damage indicator --------------------------------------------
