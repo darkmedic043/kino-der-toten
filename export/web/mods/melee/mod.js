@@ -78,7 +78,7 @@ export default async function setup(api){
   const own={mirror:E.mirror,armPump:true,animations:{idleAnim:rest,...swings,meleeChargeAnim:asUrl(swingClip(pose,STAB))},raiseTime:E.raiseTime,dropTime:E.dropTime,weight:E.weight??.5,
     melee:{meleeDamage:E.damage,meleeDelay:E.swingDelay,meleeChargeDelay:E.heavyDelay,meleeTime:E.swing,meleeChargeTime:E.heavy,meleeReach:E.reach,exact:true,fade:.05}};
   // own model: the prepared def (weapon-levels already fitted its attachments to that object, keep it); the knife: built here
-  const D=E.model?data.weapons[id]:data.weapons[id]={...base,id,baseId:E.base,worldModel:E.worldModel??base.worldModel,heldKnife:E.held,price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,
+  const D=E.model?data.weapons[id]:data.weapons[id]={...base,id,baseId:E.base,worldModel:E.worldModel??base.worldModel,iconModel:E.thumbModel,heldKnife:E.held,price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,
     noAmmo:true,noAds:true,ownPackName:true,automatic:false,upgrade:{}};
   if(!D)return;
   Object.assign(D,own);if(E.model){D.gunTag='tag_knife_attach';delete D.heldKnife;}

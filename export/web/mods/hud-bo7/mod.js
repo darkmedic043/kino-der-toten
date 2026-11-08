@@ -115,7 +115,7 @@ export default async function setup(api){
   function gunIcon(id){
     if(gunIcons.has(id))return gunIcons.get(id);
     const p=(async()=>{
-      const def=data.weapons[id];const model=def?.worldModel&&await loadModel(def.worldModel).catch(()=>null);if(!model)return null;
+      const def=data.weapons[id],url=def?.iconModel??def?.worldModel;const model=url&&await loadModel(url).catch(()=>null);if(!model)return null;   // iconModel: the Combat Knife's world model is a Bowie (melee.json thumbModel)
       return drawIcon(model);
     })().catch(e=>{console.warn('bo7-hud gun icon',id,e);return null;});
     gunIcons.set(id,p);return p;
