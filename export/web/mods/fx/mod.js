@@ -46,7 +46,7 @@ export default function setup(api){
   // blood or impact effect doesn't compile its shader mid-game (2026-10-17)
   {const s=sprite('glow');s.visible=false;s.removeFromParent();free.push(s);host.warmObjects?.push(s);}
   const cell=(s,i)=>{const [c,r]=GRID[s.material.userData.key],x=i%c,y=Math.floor(i/c)%r;s.material.map.offset.set(x/c,1-(y+1)/r);};
-  // p: {key, at, vel, size:[from,to], life, fade:[in,out], opacity, additive, color, gravity, spin, frames(flipbook fps), cellIndex}
+  // p: {key, at, vel, size:[from,to], life, fade:[in,out], opacity, additive, color, gravity, spin, frames(flipbook fps), cellIndex, drag, grow, wobble}
   function emit(p){
     if(live.length>220)return;
     const s=sprite(p.key,p);s.position.copy(p.at);
@@ -58,6 +58,7 @@ export default function setup(api){
     for(let i=live.length-1;i>=0;i--){
       const p=live[i];p.t+=dt;const k=p.t/p.life;
       if(k>=1){p.s.visible=false;p.s.removeFromParent();free.push(p.s);live.splice(i,1);continue;}
+      if(p.wobble){const w=p.wobble*dt;p.vel.x+=(Math.random()-.5)*w;p.vel.y+=(Math.random()-.5)*w*.5;p.vel.z+=(Math.random()-.5)*w;}   // a buzzing path (kill effects' bees)
       p.vel.y-=(p.gravity??0)*dt;p.vel.multiplyScalar(Math.max(0,1-(p.drag??0)*dt));p.s.position.addScaledVector(p.vel,dt);
       const ease=1-Math.pow(1-k,p.grow??2.2);p.s.scale.setScalar(p.size[0]+(p.size[1]-p.size[0])*ease);
       const [fi,fo]=p.fade??[.05,.6],a=k<fi?k/fi:k>1-fo?(1-k)/fo:1;p.s.material.opacity=p.base*a;
@@ -161,7 +162,13 @@ export default function setup(api){
   function flash(at,{color=0x8fb4ff,intensity=6,radius=600,life=.5}={}){
     const src={position:at.clone(),color:new THREE.Color(color),intensity,radius,kind:'solid',dynamic:true,cap:2000,weight:1};
     const pool=window.kino.lighting?.sources;if(!pool)return;pool.push(src);flashes.push({src,t:0,life});
-  }
+  }  // one bolt mesh to the load-time warm-up too: the teleporters' and the kill effects' first bolt compiled its program mid-game
+  {const m=new THREE.Mesh(boltGeo,new THREE.MeshBasicMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false,map:tex.b_ground.clone()}));
+    m.material.map.repeat.set(1/4,1/2);m.material.userData.kind='ground';m.frustumCulled=false;m.renderOrder=6;m.visible=false;boltFree.push(m);host.warmObjects?.push(m);}
+  // for other mods (the shop's kill effects): the pooled sprites, bolts and light flashes, and their own sprite atlases
+  // (a texture added here must stay alive: it is uploaded once and every sprite clones it)
+  window.kino.fx={emit,bolt,flash,jitter,addTexture(key,t,grid=[1,1]){tex[key]=t;GRID[key]=grid;renderer?.initTexture(t);}};
+
   host.on('update',dt=>{
     if(!dt)return;
     for(let i=bolts.length-1;i>=0;i--){const b=bolts[i];b.t+=dt;

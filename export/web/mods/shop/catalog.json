@@ -17,7 +17,7 @@
   },
   {
    "id": "reticle",
-   "name": "Reticles & hits"
+   "name": "Reticles, hits & kill effects"
   },
   {
    "id": "theme",
@@ -33,7 +33,7 @@
   },
   {
    "id": "card",
-   "name": "Calling cards"
+   "name": "Calling cards & titles"
   }
  ],
  "daily": 3,
@@ -2295,6 +2295,102 @@
      ],
      "volume": 0.55
     }
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.killfx.payout",
+   "cat": "reticle",
+   "name": "Payout",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 kill effect: the zombie bursts into gold coins that flip and bounce, with a clink.",
+   "data": {
+    "killfx": "payout"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.killfx.swarm",
+   "cat": "reticle",
+   "name": "Swarm",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 kill effect: bees break out of the body and buzz away.",
+   "data": {
+    "killfx": "swarm"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.killfx.grounded",
+   "cat": "reticle",
+   "name": "Grounded",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 kill effect: lightning strikes the body and leaves ash and blue embers.",
+   "data": {
+    "killfx": "grounded"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.killfx.tolled",
+   "cat": "reticle",
+   "name": "Tolled",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 kill effect: a bell tolls once, with a pale ring and a grey puff.",
+   "data": {
+    "killfx": "tolled"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.title.debtcollector",
+   "cat": "card",
+   "name": "Debt Collector",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 title: shown under your name on your calling card, in the co-op lobby and on the scoreboard.",
+   "data": {
+    "title": "Debt Collector"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.title.beekeeper",
+   "cat": "card",
+   "name": "Beekeeper",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 title: shown under your name on your calling card, in the co-op lobby and on the scoreboard.",
+   "data": {
+    "title": "Beekeeper"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.title.apex",
+   "cat": "card",
+   "name": "Apex Predator",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 title: shown under your name on your calling card, in the co-op lobby and on the scoreboard.",
+   "data": {
+    "title": "Apex Predator"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.title.lasttoll",
+   "cat": "card",
+   "name": "Last Toll",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 title: shown under your name on your calling card, in the co-op lobby and on the scoreboard.",
+   "data": {
+    "title": "Last Toll"
    },
    "pass": "s2"
   }

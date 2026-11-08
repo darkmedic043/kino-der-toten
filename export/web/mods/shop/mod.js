@@ -3,8 +3,11 @@
 //   kill: the colour of the engine's hit burst (effect events in its default blood colour)
 //   hud / frame: CSS variables the hud-bo7 layout reads; sound: window.kino.hitSoundSet (the hud mod's thumps, or its recorded samples)
 //   glow: window.kino.boxGlow (the lighting mod's Mystery Box map bulb and lamp); card: shown in the pause menu
+//   killfx: what plays on your kills (kill-fx.js); title: shown with your name on the pause card, the co-op lobby and the
+//   scoreboard (window.kino.titleOf(itemId): peers send an item id, never text)
 import { loadCatalog, cosmetics, installRewards } from './shop.js';
 import { cardSvg } from './card.js';
+import { installKillFx } from './kill-fx.js';
 import { loadProfile } from '../../profile.js';
 import { loadPrestige, prestigeName } from '../prestige/prestige.js';
 
@@ -28,13 +31,18 @@ export default async function setup(api){
     window.kino.boxGlow=C.glow?.box??null;
     // the calling card in the pause menu, under the map title
     const p=loadProfile(),pr=loadPrestige().player.prestige;
-    if(C.card){card.innerHTML=cardSvg(C.card,(p.name??document.querySelector('#account .name')?.textContent)||'Survivor',`LEVEL ${p.level}${pr?' · '+prestigeName(pr):''}`);
+    if(C.card){card.innerHTML=cardSvg(C.card,(p.name??document.querySelector('#account .name')?.textContent)||'Survivor',`${C.title?C.title.title.toUpperCase()+' · ':''}LEVEL ${p.level}${pr?' · '+prestigeName(pr):''}`);
+      const anchor=document.querySelector('#menu .menu-content .tagline')??document.getElementById('map-tagline');if(anchor&&card.previousElementSibling!==anchor)anchor.after(card);}
+    else if(C.title){card.innerHTML=`<div class="pc-title">${String(C.title.title).replace(/[&<>"]/g,'')}</div>`;   // a title with no card: the title alone
       const anchor=document.querySelector('#menu .menu-content .tagline')??document.getElementById('map-tagline');if(anchor&&card.previousElementSibling!==anchor)anchor.after(card);}
     else card.remove();
   }
   const blood=0x9e3023;
   host.on('effect',e=>{if(C.kill&&e.color===blood)e.color=parseInt(C.kill.blood.slice(1),16);});
-  const css2=document.createElement('style');css2.textContent='#pause-card{margin:10px 0 4px;max-width:320px}#pause-card svg{display:block;width:100%;height:auto}';document.head.append(css2);
+  const css2=document.createElement('style');css2.textContent='#pause-card{margin:10px 0 4px;max-width:320px}#pause-card svg{display:block;width:100%;height:auto}#pause-card .pc-title{color:#f0c060;font:700 13px/1 \'Barlow Condensed\',Arial Narrow,sans-serif;letter-spacing:.16em;text-transform:uppercase}';document.head.append(css2);
   apply();host.on('start',apply);addEventListener('focus',apply);
+  installKillFx(api,()=>C.killfx);
+  const by=Object.fromEntries(cat.items.map(i=>[i.id,i]));
+  window.kino.titleOf=id=>typeof id==='string'&&by[id]?.data?.title||null;
   window.kino.cosmetics={get equipped(){return {...C};},apply};
 }

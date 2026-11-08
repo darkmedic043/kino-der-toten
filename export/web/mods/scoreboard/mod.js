@@ -34,12 +34,12 @@ export default async function setup(api){
   const avatar=name=>{const src=document.querySelector('#hud-portrait img')?.src;return src?`<img src="${esc(src)}" alt="">`:esc((name||'?')[0].toUpperCase());};
   const mapTitle=()=>api.map?.title??(/\/\s*([^\n]+)/.exec(document.getElementById('top')?.innerText??'')?.[1]??'Zombies');
   const clock=()=>{const t=Math.floor(session.time);return `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;};
-  const row=(i,name,s,cls,tag,av)=>`<tr class="${cls}"><td class="sb-n">${i}</td><td><div class="sb-who"><i>${av}</i><div>${esc(name)}${tag?`<em>${tag}</em>`:''}</div></div></td><td class="sb-score">${s?s.p.toLocaleString():'—'}</td><td>${s?s.k:'—'}</td><td>${s?s.d:'—'}</td><td>${s?s.r??0:'—'}</td><td>${s?s.h:'—'}</td></tr>`;
+  const row=(i,name,s,cls,tag,av,tt)=>`<tr class="${cls}"><td class="sb-n">${i}</td><td><div class="sb-who"><i>${av}</i><div>${esc(name)}${tt?`<small>${esc(tt)}</small>`:''}${tag?`<em>${tag}</em>`:''}</div></div></td><td class="sb-score">${s?s.p.toLocaleString():'—'}</td><td>${s?s.k:'—'}</td><td>${s?s.d:'—'}</td><td>${s?s.r??0:'—'}</td><td>${s?s.h:'—'}</td></tr>`;
   const tile=(label,value,done,cls='',style='')=>`<div class="sb-tile${done?' done':''}${cls?' '+cls:''}"${style?` style="${style}"`:''}><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
   const build=(label,parts,value,done)=>`<div class="sb-tile sb-build${done?' done':''}"><span>${esc(label)}</span><div class="sb-parts">${parts.map(p=>`<i class="${esc(p.state)}" title="${esc(p.label)}"><b>${esc(p.short??p.label.slice(0,2))}</b><u>${esc(p.label)}</u></i>`).join('')}</div><em>${esc(value)}</em></div>`;
   function html(){
-    const net=window.kino.coop,me=mine(),rows=[row(1,localName()||'You',me,'me',net?.id&&net.id===net.hostId?'HOST':'',avatar(localName()))];
-    for(const p of net?.players?.values?.()??[]){if(p.id===net.id)continue;rows.push(row(rows.length+1,p.name,peers.get(p.id),'',p.id===net.hostId?'HOST':'',esc((p.name||'?')[0].toUpperCase())));}
+    const net=window.kino.coop,me=mine(),rows=[row(1,localName()||'You',me,'me',net?.id&&net.id===net.hostId?'HOST':'',avatar(localName()),window.kino.cosmetics?.equipped?.title?.title)];
+    for(const p of net?.players?.values?.()??[]){if(p.id===net.id)continue;rows.push(row(rows.length+1,p.name,peers.get(p.id),'',p.id===net.hostId?'HOST':'',esc((p.name||'?')[0].toUpperCase()),window.kino.titleOf?.(window.kino.coopInfo?.(p.id)?.tt)));}
     const tiles=[];
     for(const g of world?.eggs?.values?.()??[]){const found=g.items.filter(i=>i.found).length;tiles.push(tile('Easter egg · '+g.name,`${found} / ${g.items.length}`,!!g.done));}
     for(const c of collectibles.values()){let v='',done=false,parts=null;try{v=c.value();done=!!c.done?.();parts=c.parts?.();}catch{}tiles.push(parts?build(c.label,parts,v,done):tile(c.label,v,done));}

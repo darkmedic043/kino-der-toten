@@ -447,6 +447,7 @@ export default async function setup(api){
     #coop-lobby .nm{font-size:14px;color:#eee8dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #coop-lobby .nm em{font-style:normal;font-size:9px;letter-spacing:2px;color:#b82f27;margin-left:8px}
     #coop-lobby .sub{font-size:10px;letter-spacing:1px;color:#8c8272;margin-top:3px}
+    #coop-lobby .tt{font-size:10px;letter-spacing:2px;color:#f0c060;margin-top:3px;text-transform:uppercase}
     #coop-lobby .bar{height:2px;background:#514b4060;margin-top:7px}#coop-lobby .bar i{display:block;height:100%;background:#be4b39;transition:width .4s}
     #coop-lobby .tag{font-size:9px;letter-spacing:2px;color:#9d947e;text-align:right}
     #coop-lobby .tag.ok{color:#7fd36a}#coop-lobby .tag.in{color:#d9c3a0}
@@ -470,8 +471,9 @@ export default async function setup(api){
   function myInfo(){
     const c=window.kino.classes,st=window.kino.debug.getState();
     const pct=st.ready?100:Math.round(parseFloat(document.getElementById('load-progress')?.dataset.pct)||0);
-    return {p:pct,op:window.kino.characterEntry?.name??registry.find(e=>e.id===profile.character)?.name??null,cls:c?.cls?.name??null,lvl:c?.state?.level??null,in:!!st.started,cd:(({c1,c2,pattern,image})=>c1?{c1,c2,pattern,image}:null)(window.kino.cosmetics?.equipped?.card??{})};   // cd: the calling card (shop)
+    return {p:pct,op:window.kino.characterEntry?.name??registry.find(e=>e.id===profile.character)?.name??null,cls:c?.cls?.name??null,lvl:c?.state?.level??null,in:!!st.started,cd:(({c1,c2,pattern,image})=>c1?{c1,c2,pattern,image}:null)(window.kino.cosmetics?.equipped?.card??{}),tt:window.kino.cosmetics?.equipped?.title?.id??null};   // cd: the calling card (shop); tt: the title's item id (shown through titleOf, never as sent text)
   }
+  window.kino.coopInfo=id=>lobby.info[id]??null;   // the scoreboard reads peers' titles here
   function renderLobby(){
     if(lobby.go){lob.hidden=true;return;}
     const all=[...net.players.values()],allReady=all.length>0&&all.every(p=>isReady(p.id));
@@ -483,7 +485,7 @@ export default async function setup(api){
       // ADD FRIEND: signed-in players who aren't friends yet (and only when I'm signed in)
       const soc=socialState(),add=p.id!==net.id&&p.uid&&soc.signedIn&&p.uid!==soc.me?.id?(isFriend(p.uid)?'<span class="fr-tag">FRIEND</span>':isPending(p.uid)?'<span class="fr-tag">REQUESTED</span>':`<button type="button" class="add" data-uid="${esc(p.uid)}">+ ADD FRIEND</button>`):'';
       return `<div class="pl${p.id===net.id?' me':''}${i.cd?' carded':''}">${i.cd?`<div class="cc">${cardSvg(i.cd,'','')}</div>`:''}<div class="av">${p.picture?`<img src="${esc(p.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${esc((p.name||'?')[0].toUpperCase())}'))">`:esc((p.name||'?')[0].toUpperCase())}</div>
-        <div><div class="nm">${esc(p.name)}${p.id===net.hostId?'<em>HOST</em>':''}${p.id===net.id?'<em>YOU</em>':''}</div><div class="sub">${esc(sub)}</div>${ready?'':`<div class="bar"><i style="width:${pct}%"></i></div>`}${add}</div>${tag}</div>`;};
+        <div><div class="nm">${esc(p.name)}${p.id===net.hostId?'<em>HOST</em>':''}${p.id===net.id?'<em>YOU</em>':''}</div>${window.kino.titleOf?.(i.tt)?`<div class="tt">${esc(window.kino.titleOf(i.tt))}</div>`:''}<div class="sub">${esc(sub)}</div>${ready?'':`<div class="bar"><i style="width:${pct}%"></i></div>`}${add}</div>${tag}</div>`;};
     // friends to invite: online ones not already here
     const soc=socialState(),here=new Set(all.map(p=>p.uid).filter(Boolean));
     const inv=soc.signedIn?soc.friends.filter(f=>!here.has(f.id)).sort((a,b)=>(a.status==='offline')-(b.status==='offline')):[];

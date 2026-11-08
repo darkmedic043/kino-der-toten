@@ -24,6 +24,7 @@
 #scoreboard .sb-who{display:flex;align-items:center;gap:12px;font:600 18px/1.1 'Arial Narrow',system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase}
 #scoreboard .sb-who i{display:grid;place-items:center;width:42px;height:42px;background:#0c0c0b;border:2px solid #cfcfca;font:700 16px/1 system-ui;font-style:normal;color:#e8e8e6;overflow:hidden;flex:none;filter:grayscale(.85) contrast(1.1)}
 #scoreboard .sb-who i img{width:100%;height:100%;object-fit:cover}
+#scoreboard .sb-who small{display:block;font-size:10px;letter-spacing:.22em;color:#f0c060;margin-top:3px}
 #scoreboard .sb-who em{display:block;font-style:normal;font-size:9px;letter-spacing:.3em;color:#c9a23a;margin-top:3px}
 #scoreboard .sb-collect{margin-top:8px;padding:10px 4px 0;border-top:1px solid #ffffff30}
 #scoreboard .sb-collect h3{margin:0 0 8px;font-size:11px;letter-spacing:.4em;color:#9a9a96;font-weight:600}
