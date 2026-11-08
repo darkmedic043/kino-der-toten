@@ -12,6 +12,7 @@ export function makeThumb({camos,chars}){
   const d=item.data??{};
   if(item.cat==='camo'){const c=camoOf(item);return `<div class="pv" data-swatch="${c?.id}" style="background-image:url(${camoSwatch(c)})"></div>`;}
   if(d.killfx)return `<div class="pv">${killFxSvg(d.killfx)}</div>`;   // kill effects: a looping picture of the effect
+  if(d.emblem&&/^\/mods\/[\w./-]+$/.test(d.emblem))return `<div class="pv" style="display:grid;place-items:center;background:radial-gradient(circle,#2a251d,#0a0908)"><img src="${esc(d.emblem)}" alt="" loading="lazy" style="height:84%;aspect-ratio:1;object-fit:contain"></div>`;   // emblems: the badge (animated WebP plays by itself)
   if(d.title)return `<div class="pv">${titlePlate(d.title)}</div>`;   // titles: a nameplate
   if(item.cat==='card')return `<div class="pv">${cardSvg(d,'SURVIVOR','LEVEL 1')}</div>`;
   if(item.cat==='perk')return `<div class="pv" style="background:url(${new URL('../perks-plus/'+(d.icon.includes('/')?'':'icons/')+d.icon,import.meta.url).href}) center/62% no-repeat,radial-gradient(circle,${d.color?d.color+'55':'#3a0a14'},#0a0204)"></div>`;   // perk unlocks (pass): the perk's HUD icon (perks-plus/icons/<file>, or a path under perks-plus/ for the Reaper ones)

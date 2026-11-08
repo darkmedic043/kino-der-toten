@@ -1,5 +1,5 @@
 // The Shop (roadmap Phase 6): cosmetics bought with credits, never power. Shared by the Shop page, the main menu and the game.
-// Store: kino.mods.shop = {owned:[itemId], equip:{reticle, hitmarker, kill, killfx, hud, menu, frame, sound, glow, card, title}, seen:[itemId]},
+// Store: kino.mods.shop = {owned:[itemId], equip:{reticle, hitmarker, kill, killfx, hud, menu, frame, sound, glow, card, title, emblem}, seen:[itemId]},
 // cloud-synced (cloud.js TRACKED). Camos are equipped per gun in the Gunsmith (profile.camo) and outfits are characters
 // (Operator pane), so those two categories have no slot here. Catalogue: catalog.json.
 // Rotation: 3 daily slots and a weekly bundle (3 items, 30% off) drawn from the not-yet-owned items with the date as the
@@ -21,7 +21,7 @@ export function slotOf(item){
   const d=item.data??{};
   if(item.cat==='reticle')return d.killfx?'killfx':d.char?'reticle':d.hitmarker?'hitmarker':d.blood?'kill':null;
   if(item.cat==='theme')return d.hud?'hud':d.menu?'menu':d.frame?'frame':null;
-  if(item.cat==='sound')return 'sound';if(item.cat==='glow')return 'glow';if(item.cat==='card')return d.title?'title':'card';
+  if(item.cat==='sound')return 'sound';if(item.cat==='glow')return 'glow';if(item.cat==='card')return d.title?'title':'card';if(item.cat==='emblem')return 'emblem';
   return null;
 }
 // the equipped items' data, by slot (what the game and menu apply)

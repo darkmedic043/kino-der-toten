@@ -58,6 +58,8 @@ The six **gun screens** followed on 2026-11-07, `pass.s2.screen.<id>` (catalog `
 
 The four **kill effects** and four **titles** followed on 2026-11-08 (shop.md, Kill effects and titles), replacing five placeholder calling cards and three placeholder camos: Grounded p7 #6 ★, Payout p8 #1, Debt Collector p8 #2 ★, Swarm p9 #1, Beekeeper p9 #2 ★, Apex Predator p9 #5 ★, Tolled p10 #1, Last Toll p10 #8. 30 placeholder slots are left.
 
+The user's nine **emblems** followed the same day (shop.md, Emblems), replacing five kill colours, three placeholder calling cards (Seven, Venator, Season 1 Veteran) and the Amber box glow: Blind Rage p1 #6 ★, Renegade Shock p2 #9, Warrior Wasp p3 #6 ★, Evidence p4 #6 ★, Bulldawg p5 #6, Marrowed p5 #8, No Reception p7 #4, Mine p9 #4 ★, Death Wave p10 #9 ★. `build-season.py` needs an `emblem` reward kind and the Pass tab an emblem preview. 21 placeholder slots are left.
+
 ## Double XP tokens (2026-11-07, user: "double xp tokens … one for player and weapon, … 1 hour long and only go down in game time, can be equipped mid game in the pause menu or before starting a match in the play menu")
 
 Timed tokens, separate from the per-match boost tokens (`passXp`/`weaponXp`/`researchXp`, consumed at `start` by `startBoosts`). Code: `mods/pass/xp-tokens.js`.

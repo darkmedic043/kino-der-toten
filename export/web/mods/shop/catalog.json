@@ -34,6 +34,10 @@
   {
    "id": "card",
    "name": "Calling cards & titles"
+  },
+  {
+   "id": "emblem",
+   "name": "Emblems"
   }
  ],
  "daily": 3,
@@ -2391,6 +2395,114 @@
    "desc": "Season 1 title: shown under your name on your calling card, in the co-op lobby and on the scoreboard.",
    "data": {
     "title": "Last Toll"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.emblem.blindrage",
+   "cat": "emblem",
+   "name": "Blind Rage",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 emblem: your badge on your calling card, the scoreboard and the co-op lobby.",
+   "data": {
+    "emblem": "/mods/shop/emblems/s2/blindrage.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.emblem.bulldawg",
+   "cat": "emblem",
+   "name": "Bulldawg",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 emblem: your badge on your calling card, the scoreboard and the co-op lobby.",
+   "data": {
+    "emblem": "/mods/shop/emblems/s2/bulldawg.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.emblem.evidence",
+   "cat": "emblem",
+   "name": "Evidence",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 emblem: your badge on your calling card, the scoreboard and the co-op lobby.",
+   "data": {
+    "emblem": "/mods/shop/emblems/s2/evidence.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.emblem.mine",
+   "cat": "emblem",
+   "name": "Mine",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 emblem: your badge on your calling card, the scoreboard and the co-op lobby.",
+   "data": {
+    "emblem": "/mods/shop/emblems/s2/mine.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.emblem.warriorwasp",
+   "cat": "emblem",
+   "name": "Warrior Wasp",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 emblem: your badge on your calling card, the scoreboard and the co-op lobby.",
+   "data": {
+    "emblem": "/mods/shop/emblems/s2/warriorwasp.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.emblem.deathwave",
+   "cat": "emblem",
+   "name": "Death Wave",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 animated emblem: your badge on your calling card, the scoreboard and the co-op lobby.",
+   "data": {
+    "emblem": "/mods/shop/emblems/s2/deathwave.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.emblem.marrowed",
+   "cat": "emblem",
+   "name": "Marrowed",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 animated emblem: your badge on your calling card, the scoreboard and the co-op lobby.",
+   "data": {
+    "emblem": "/mods/shop/emblems/s2/marrowed.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.emblem.noreception",
+   "cat": "emblem",
+   "name": "No Reception",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 animated emblem: your badge on your calling card, the scoreboard and the co-op lobby.",
+   "data": {
+    "emblem": "/mods/shop/emblems/s2/noreception.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.emblem.renegadeshock",
+   "cat": "emblem",
+   "name": "Renegade Shock",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 animated emblem: your badge on your calling card, the scoreboard and the co-op lobby.",
+   "data": {
+    "emblem": "/mods/shop/emblems/s2/renegadeshock.webp"
    },
    "pass": "s2"
   }

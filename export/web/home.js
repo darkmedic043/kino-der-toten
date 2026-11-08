@@ -20,7 +20,7 @@ import { camoById } from './mods/weapon-levels/camo.js';
 import { loadGames } from './mods/weapon-levels/games.js';
 import { loadCredits, grantCredits, loadCreditsConfig } from './mods/credits/credits.js';
 import { loadCatalog as loadShopCatalog, cosmetics as shopCosmetics, installRewards } from './mods/shop/shop.js';
-import { cardSvg } from './mods/shop/card.js';
+import { cardSvg, PLAIN_CARD } from './mods/shop/card.js';
 installRewards();
 let creditsCfg=null,shopCat=null;
 loadCreditsConfig(new URL('mods/credits/',document.baseURI)).then(c=>{creditsCfg=c;}).catch(()=>{});
@@ -135,8 +135,8 @@ function renderProfile(){
   applyMenuTheme();
   const chip=document.getElementById('credits-chip');if(chip)chip.textContent=loadCredits().balance.toLocaleString()+' CR';
   {const pc=document.getElementById('pass-chip');if(pc&&seasonCfg){const n=passTokens(seasonCfg,loadPass());pc.textContent=n>0?n+' TOKEN'+(n>1?'S':''):'';}}
-  {const cardEl=document.getElementById('p-card'),cos=shopCat?shopCosmetics(shopCat):{},cd=cos.card,tt=cos.title?.title;   // a title (Melon Pass) goes before the level, or alone when no card is on
-    if(cardEl)cardEl.innerHTML=cd?cardSvg(cd,$('p-char')?.textContent||'Survivor',(tt?tt.toUpperCase()+' · ':'')+'LEVEL '+profile.level+(isPrestigeMaster(loadPrestige().player.prestige)?' · '+masterLook(profile.level).title.toUpperCase():''))
+  {const cardEl=document.getElementById('p-card'),cos=shopCat?shopCosmetics(shopCat):{},cd=cos.card??(cos.emblem?PLAIN_CARD:null),tt=cos.title?.title;   // a title (Melon Pass) goes before the level, or alone when no card is on; an emblem alone gets a plain card
+    if(cardEl)cardEl.innerHTML=cd?cardSvg(cd,$('p-char')?.textContent||'Survivor',(tt?tt.toUpperCase()+' · ':'')+'LEVEL '+profile.level+(isPrestigeMaster(loadPrestige().player.prestige)?' · '+masterLook(profile.level).title.toUpperCase():''),cos.emblem?.emblem)
       :tt?`<div class="p-title">${esc(tt)}</div>`:'';}
   const pr=loadPrestige(),n=pr.player.prestige,el=$('p-prestige');
   if(el){const can=canPrestigePlayer(pr,profile.level);

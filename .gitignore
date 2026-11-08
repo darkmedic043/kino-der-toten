@@ -52,9 +52,10 @@ Thumbs.db
 /export/web/**/*.wasm.gz
 !/export/web/mods/lighting/*.bin.gz
 
-# Season 1 (s2) pass camos and calling cards: third-party textures the user supplied (2026-11-06), kept local like the ripped assets
+# Season 1 (s2) pass camos, calling cards and emblems (2026-11-08): third-party textures the user supplied (2026-11-06), kept local like the ripped assets
 /export/web/mods/weapon-levels/camos/s2/
 /export/web/mods/shop/cards/s2/
+/export/web/mods/shop/emblems/s2/
 # Season 1 hit sounds the user supplied (2026-11-07: a free-sound-effect taser zap and two hitmarker sounds of unknown origin), kept local too
 /export/web/mods/shop/sounds/
 

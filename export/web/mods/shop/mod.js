@@ -4,9 +4,10 @@
 //   hud / frame: CSS variables the hud-bo7 layout reads; sound: window.kino.hitSoundSet (the hud mod's thumps, or its recorded samples)
 //   glow: window.kino.boxGlow (the lighting mod's Mystery Box map bulb and lamp); card: shown in the pause menu
 //   killfx: what plays on your kills (kill-fx.js); title: shown with your name on the pause card, the co-op lobby and the
-//   scoreboard (window.kino.titleOf(itemId): peers send an item id, never text)
+//   scoreboard (window.kino.titleOf(itemId): peers send an item id, never text); emblem: a badge at the card's left end and
+//   the avatar square on the scoreboard and in the co-op lobby (window.kino.emblemOf(itemId), the same way)
 import { loadCatalog, cosmetics, installRewards } from './shop.js';
-import { cardSvg } from './card.js';
+import { cardSvg, safePath, PLAIN_CARD } from './card.js';
 import { installKillFx } from './kill-fx.js';
 import { loadProfile } from '../../profile.js';
 import { loadPrestige, prestigeName } from '../prestige/prestige.js';
@@ -31,7 +32,7 @@ export default async function setup(api){
     window.kino.boxGlow=C.glow?.box??null;
     // the calling card in the pause menu, under the map title
     const p=loadProfile(),pr=loadPrestige().player.prestige;
-    if(C.card){card.innerHTML=cardSvg(C.card,(p.name??document.querySelector('#account .name')?.textContent)||'Survivor',`${C.title?C.title.title.toUpperCase()+' · ':''}LEVEL ${p.level}${pr?' · '+prestigeName(pr):''}`);
+    if(C.card||C.emblem){card.innerHTML=cardSvg(C.card??PLAIN_CARD,(p.name??document.querySelector('#account .name')?.textContent)||'Survivor',`${C.title?C.title.title.toUpperCase()+' · ':''}LEVEL ${p.level}${pr?' · '+prestigeName(pr):''}`,C.emblem?.emblem);
       const anchor=document.querySelector('#menu .menu-content .tagline')??document.getElementById('map-tagline');if(anchor&&card.previousElementSibling!==anchor)anchor.after(card);}
     else if(C.title){card.innerHTML=`<div class="pc-title">${String(C.title.title).replace(/[&<>"]/g,'')}</div>`;   // a title with no card: the title alone
       const anchor=document.querySelector('#menu .menu-content .tagline')??document.getElementById('map-tagline');if(anchor&&card.previousElementSibling!==anchor)anchor.after(card);}
@@ -43,6 +44,7 @@ export default async function setup(api){
   apply();host.on('start',apply);addEventListener('focus',apply);
   installKillFx(api,()=>C.killfx);
   const by=Object.fromEntries(cat.items.map(i=>[i.id,i]));
+  window.kino.emblemOf=id=>typeof id==='string'&&safePath(by[id]?.data?.emblem)||null;
   window.kino.titleOf=id=>typeof id==='string'&&by[id]?.data?.title||null;
   window.kino.cosmetics={get equipped(){return {...C};},apply};
 }
