@@ -10,6 +10,7 @@ export async function applyKits(data,base){
     for(const k of g.kit)if(d.mounts?.[k])mounts[k]=d.mounts[k];
     for(const [k,m] of Object.entries(g.mounts??{}))mounts[k]={...m,model,node:'part_'+m.part};
     d.statAttachments=g.kit;d.mounts=mounts;
-    if(d.upgrade)d.upgrade.mounts=mounts;   // gunsmith.js fills `mounted` on any def that has `mounts`
+    const up={};for(const [k,m] of Object.entries(mounts))if(m.up!==false)up[k]=m.up?{...m,...m.up}:m;   // mount.up: the Pack-a-Punch model's own placement, false = no part there
+    if(d.upgrade)d.upgrade.mounts=up;   // gunsmith.js fills `mounted` on any def that has `mounts`
   }
 }

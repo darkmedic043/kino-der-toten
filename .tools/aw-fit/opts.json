@@ -1,0 +1,91 @@
+{
+ "aw_arx160": {
+  "retag": {
+   "aws_stabilizer": "tag_weapon"
+  },
+  "veto": [
+   "aws_stabilizer"
+  ]
+ },
+ "aw_imr": {
+  "retag": {
+   "aws_silencer": "tag_weapon",
+   "aws_brake": "tag_weapon"
+  }
+ },
+ "aw_kf5": {
+  "retag": {
+   "aws_stabilizer": "tag_weapon"
+  }
+ },
+ "aw_lynx": {
+  "retag": {
+   "aws_silencer": "tag_weapon",
+   "aws_brake": "tag_weapon",
+   "aws_tracker": "tag_weapon",
+   "aws_foregrip": "tag_weapon"
+  }
+ },
+ "aw_mk14": {
+  "retag": {
+   "aws_silencer": "tag_weapon",
+   "aws_brake": "tag_weapon"
+  }
+ },
+ "aw_pytaek": {
+  "retag": {
+   "aws_silencer": "tag_weapon",
+   "aws_brake": "tag_weapon"
+  },
+  "veto": [
+   "aws_stabilizer"
+  ]
+ },
+ "aw_amr9": {
+  "veto": [
+   "aws_stabilizer"
+  ]
+ },
+ "aw_asm1": {
+  "veto": [
+   "aws_stabilizer"
+  ]
+ },
+ "aw_mp11": {
+  "veto": [
+   "aws_stabilizer"
+  ]
+ },
+ "aw_sn6": {
+  "veto": [
+   "aws_stabilizer"
+  ]
+ },
+ "aw_mp40": {
+  "veto": [
+   "aws_stabilizer",
+   "aws_foregrip"
+  ]
+ },
+ "aw_stg44": {
+  "veto": [
+   "aws_foregrip"
+  ]
+ },
+ "aw_sten": {
+  "veto": [
+   "aws_foregrip"
+  ]
+ },
+ "aw_hbra3": {
+  "veto": [
+   "aws_tracker"
+  ]
+ },
+ "aw_bal27": {
+  "retag": {
+   "aws_tracker": "tag_weapon",
+   "aws_stabilizer": "tag_weapon"
+  }
+ }
+}
