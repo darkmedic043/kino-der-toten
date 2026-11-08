@@ -490,3 +490,4 @@
 - 2026-11-07: Decoded weapon bitmaps (~2 GB a tab): fix planned and deferred, decode behind the box spin, wall buy or Gunsmith (performance.md).
 - 2026-11-08: Kill effects and titles (Season 1 pass rewards, replacing 8 placeholder cards/camos): `mods/shop/kill-fx.js` (Payout, Swarm, Grounded, Tolled through `window.kino.fx`), titles on the calling card, pause card, co-op lobby (sent as an item id) and scoreboard, menu art `cosmetic-art.js`; 30 placeholders left (shop.md).
 - 2026-11-08: BO7 HUD: the Combat Knife's dial silhouette is the knife itself (melee `thumbModel` passed as `iconModel`), not the Bowie world model.
+- 2026-11-08: FOV slider fixed: since ca90519 (2026-10-19) `camera.updateProjectionMatrix()` in engine.js sat inside a line comment, so the FOV setting, ADS zoom and the movement FOV kick changed `camera.fov` but never the projection.
