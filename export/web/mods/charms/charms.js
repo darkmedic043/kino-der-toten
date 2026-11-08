@@ -23,6 +23,8 @@ export function loadCharms(){
 // {on:{[gun base id]:charm id}, screen:{[gun base id]:screen id}} (gun screens: screens.js)
 export function loadCharmState(){try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');s.on??={};s.screen??={};return s;}catch{return {on:{},screen:{}};}}
 export function saveCharmState(s){localStorage.setItem(KEY,JSON.stringify(s));}
+// a gun's screen spot: the player's own (dragged in the Gunsmith: st.place[gunId] = {a, h, s}) over charms.json's nudges
+export function screenOverride(cat,st,gunId){const p=st?.place?.[gunId],o=cat?.screenMounts?.[gunId];return p?{...o,at:undefined,pin:p}:o;}
 
 const devSoon=()=>{try{return localStorage.getItem('kino.dev.soon')==='1';}catch{return false;}};
 const shopOwned=k=>{try{const o=JSON.parse(localStorage.getItem('kino.mods.shop')||'{}')?.owned;return Array.isArray(o)?o.includes(k):!!o?.[k];}catch{return false;}};

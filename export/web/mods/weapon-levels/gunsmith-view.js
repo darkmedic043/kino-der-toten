@@ -11,8 +11,8 @@ import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
-import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig } from '../charms/charms.js';
-import { screenFor, makeScreen, screenMount, placeScreen, charmZone } from '../charms/screens.js';
+import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from '../charms/charms.js';
+import { screenFor, makeScreen, screenMount, placeScreen, charmZone, screenPin } from '../charms/screens.js';
 import { loadStickers, loadStickerState, saveStickerState, stickersFor, stickerLock, stickerImage, applyStickers, stickerFromHit, meshKeys, MAX_STICKERS } from '../stickers/stickers.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
@@ -74,6 +74,7 @@ const CSS=`
 #gsv .stk-row .acts button{font:600 9px/1 system-ui,sans-serif;letter-spacing:2px;padding:5px 7px;margin-left:4px;color:#e9e4d8;background:#ffffff10;border:1px solid #ffffff30;cursor:pointer}
 #gsv .stk-row label{grid-column:1/-1;display:grid;grid-template-columns:70px 1fr 42px;align-items:center;font-size:10px;letter-spacing:2px;color:#a09a8d}
 #gsv .stk-row input[type=range]{width:100%;accent-color:#f3a33a}
+#gsv .stk-row.scr-row{grid-template-columns:1fr auto}#gsv .scr-row strong{font-size:11px;letter-spacing:2px}
 #gsv .stk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 #gsv .stk-pick{text-align:center;padding:8px 4px}#gsv .stk-pick strong{display:block;font-size:11px;margin-top:4px}
 #gsv .stk-pick,#gsv canvas.stage{touch-action:none}#gsv .stk-flip{width:100%;text-align:left;margin-bottom:8px}#gsv .stk-hid{display:block;font:600 9px/1.4 system-ui,sans-serif;letter-spacing:2px;color:#f3a33a}#gsv .stk-flip strong{font-size:11px;letter-spacing:2px}
@@ -148,7 +149,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   const pivot=new THREE.Group();scene.add(pivot);
 
   let gun=null,glow=null,def=null,slot=null,hover=null,yaw=-.35,pitch=.08,dragging=null,radius=40,alive=true;
-  root.debug={get gun(){return gun;},renderer,get camera(){return camera;}};   // for tests: document.getElementById('gsv').debug
+  root.debug={get gun(){return gun;},renderer,get camera(){return camera;},get screen(){return screenObj;}};   // for tests: document.getElementById('gsv').debug
   const focus=new THREE.Vector3(),focusGoal=new THREE.Vector3(),center=new THREE.Vector3();let dist=80,distGoal=80;
   const attachmentTags=new Set(Object.values(weapons).flatMap(d=>d?.hideTags??[]));
 
@@ -313,7 +314,11 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const tabs=charmCat.screens.length?`<div class="ctabs"><button class="ctab${charmTab==='charms'?' on':''}" data-chtab="charms">CHARMS<small>${own(charmCat.charms)} / ${charmCat.charms.length}</small></button>`+
       `<button class="ctab${charmTab==='screens'?' on':''}" data-chtab="screens">SCREENS<small>${own(charmCat.screens)} / ${charmCat.screens.length}</small></button></div>`:'';
     if(charmTab==='screens'){const on=screenFor(charmCat,st,id)?.id;
+      const pl=st.place?.[id],sz=Math.round(100*(pl?.s??screenMnt?.size??1.08));
       el.innerHTML='<h3>CHARM</h3>'+tabs+'<p class="neu">A small screen fixed to the side of this gun, next to its charm. Some show live stats.</p>'+
+        (on?`<p class="stk-hint">Drag the screen along the gun to move it.</p><div class="opt stk-row scr-row on"><strong>PLACEMENT · ${pl?'YOUR SPOT':'AUTOMATIC'}</strong>
+          <span class="acts">${pl?'<button data-scr-auto>AUTOMATIC</button>':''}</span>
+          <label>SIZE<input type="range" min="60" max="150" step="5" value="${sz}" data-scr-size><b>${sz}%</b></label></div>`:'')+
         `<button class="opt${on?'':' on'}" data-screen=""><strong>None</strong><div class="pc"><span class="neu">No screen</span></div></button>`+
         charmCat.screens.map(c=>{const lock=charmLock(c);
           return `<button class="opt${on===c.id?' on':''}${lock?' locked':''}" data-screen="${esc(c.id)}"><span class="tag">${on===c.id?'EQUIPPED':lock==='PASS'?'MELON PASS':lock==='SOON'?'COMING SOON':lock||KIND[c.kind]||''}</span>
@@ -329,7 +334,20 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   // Gun screens (mods/charms/screens.js, 2026-11-07): the SCREENS tab of the CHARM panel, one per gun, fixed to the
   // gun's left side; the preview shows demo data (this gun's real kill counts, a full mag, the buddy cycling its moods)
   const KIND={art:'ANIMATED',kills:'KILL COUNTER',buddy:'BUDDY',ammo:'AMMO READOUT'};
-  let charmTab='charms',screenObj=null,screenMnt=null,screenShown,screenToken=0,demoT=0,demoI=0;
+  let charmTab='charms',screenObj=null,screenMnt=null,screenShown,screenToken=0,demoT=0,demoI=0,screenAvoid=null;
+  // the player's own spot (2026-11-07, user: "on something like the smg, an attachment blocks the screen ... let the player
+  // choose where the screen can go, with a feature similar to the sticker system"): grab the screen and drag it along the
+  // gun; it lands on the gun's side under the pointer (a pin: along/height share of the gun + size, charms state `place`)
+  function remountScreen(pin){
+    if(!screenObj||screenObj.gun!==gun)return;const o=pin?{...charmCat.screenMounts[id],at:undefined,pin}:screenOverride(charmCat,loadCharmState(),id);
+    const m=screenMount(gun,screenObj.root,{key:def.model,override:o,housing:screenObj.housing,unit:charmUnit(def),avoid:screenAvoid,spots:charmCat.screenSpots});
+    if(!m)return;screenMnt=m;screenObj.setFoot(m.foot);placeScreen(screenObj,screenObj.root,m);
+  }
+  function savePlace(pin){const st=loadCharmState();st.place??={};if(pin)st.place[id]=pin;else delete st.place[id];saveCharmState(st);
+    onChange?.(id);dispatchEvent(new CustomEvent('kino-charm',{detail:{id,screen:true}}));}
+  // the current spot as a pin (the first drag or size change starts from where the screen is)
+  const pinNow=()=>{const p=loadCharmState().place?.[id];if(p)return {...p};if(!screenMnt||!screenObj)return null;
+    const c=new THREE.Vector3().setFromMatrixPosition(screenMnt.matrix);return {...screenPin(gun,screenObj.root,c,{key:def.model,unit:charmUnit(def)}),s:screenMnt.size};};
   const DEMO=['kill','head','reload','hurt','kill'];
   async function showScreen(sid){
     const want=sid===undefined?screenFor(charmCat,loadCharmState(),id)?.id??'':sid;if(want===screenShown&&screenObj?.gun===gun)return;screenShown=want;
@@ -339,7 +357,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const r=gun.getObjectByName(def.gunRoot??'j_gun')??(()=>{let b=null;gun.traverse(o=>{if(!b&&o.isBone)b=o;});return b;})();if(!r){sc.dispose();return;}
     scene.updateMatrixWorld(true);const unit=charmUnit(def);
     const avoid=charmFor(charmCat,loadCharmState(),id)?charmZone(gun,r,{key:def.model,override:charmCat.anchors[id],unit}):null;
-    screenMnt=screenMount(gun,r,{key:def.model,override:charmCat.screenMounts[id],housing:sc.housing,unit,avoid,spots:charmCat.screenSpots});if(!screenMnt){sc.dispose();return;}
+    screenAvoid=avoid;screenMnt=screenMount(gun,r,{key:def.model,override:screenOverride(charmCat,loadCharmState(),id),housing:sc.housing,unit,avoid,spots:charmCat.screenSpots});if(!screenMnt){sc.dispose();return;}
     sc.setFoot(screenMnt.foot);sc.gun=gun;sc.root=r;screenObj=sc;scene.add(sc.object);placeScreen(sc,r,screenMnt);demoT=0;
     if(slot==='charm'&&charmTab==='screens')aim();
   }
@@ -451,6 +469,27 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     e.stopImmediatePropagation();canvas.setPointerCapture(e.pointerId);stkSel=i;
     stkDrag={kind:'move',at:i,x:e.clientX,y:e.clientY,moved:false};stkArm={id:stkList()[i].id,at:i};canvas.style.cursor='grabbing';
   });
+  let scrDrag=null,scrRaf=0,scrLast=null;
+  const scrOn=()=>slot==='charm'&&charmTab==='screens'&&screenObj&&screenObj.gun===gun;
+  function scrRay(cx,cy){const r=canvas.getBoundingClientRect();ndc.set((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1);
+    gun.updateMatrixWorld(true);camera.updateMatrixWorld();ray.setFromCamera(ndc,camera);}
+  const scrOver=(cx,cy)=>{scrRay(cx,cy);screenObj.object.updateMatrixWorld(true);return ray.intersectObject(screenObj.object,true).length>0;};
+  function scrMoveTo(cx,cy){   // the first shown, solid part of the gun under the pointer
+    scrRay(cx,cy);for(const h of ray.intersectObject(gun,true)){let shown=true;for(let a=h.object;a&&a!==scene;a=a.parent)if(!a.visible){shown=false;break;}
+      const m=[h.object.material].flat()[0];if(!shown||m?.transparent&&m.opacity<.5||/lens|glass|reticle|red_dot/i.test(m?.name??''))continue;
+      const p=screenObj.root.worldToLocal(h.point.clone()),pin=screenPin(gun,screenObj.root,p,{key:def.model,unit:charmUnit(def)});
+      if(pin){scrDrag.pin={...pin,s:scrDrag.s};remountScreen(scrDrag.pin);}return;}}
+  canvas.addEventListener('pointerdown',e=>{
+    if(e.button!==0||!scrOn()||!scrOver(e.clientX,e.clientY))return;
+    e.stopImmediatePropagation();canvas.setPointerCapture(e.pointerId);scrDrag={pin:null,s:pinNow()?.s??screenMnt?.size??1.08};canvas.style.cursor='grabbing';});
+  const scrMoveH=e=>{if(!alive||!scrOn())return;scrLast=[e.clientX,e.clientY];if(scrRaf)return;
+    scrRaf=requestAnimationFrame(()=>{scrRaf=0;if(!alive||!scrOn()||!scrLast)return;const [x,y]=scrLast;
+      if(scrDrag)scrMoveTo(x,y);else if(!dragging)canvas.style.cursor=overCanvas(x,y)&&scrOver(x,y)?'grab':'';});};
+  const scrUpH=()=>{if(!scrDrag)return;const d=scrDrag;scrDrag=null;canvas.style.cursor='';if(d.pin){savePlace(d.pin);renderUI();}};
+  addEventListener('pointermove',scrMoveH);addEventListener('pointerup',scrUpH);
+  root.addEventListener('input',e=>{if(e.target.dataset?.scrSize===undefined)return;const p=pinNow();if(!p)return;p.s=+e.target.value/100;
+    e.target.nextElementSibling.textContent=e.target.value+'%';remountScreen(p);});
+  root.addEventListener('change',e=>{if(e.target.dataset?.scrSize===undefined)return;const p=pinNow();if(!p)return;p.s=+e.target.value/100;savePlace(p);renderUI();});
   const stkMoveH=e=>{
     if(!alive)return;if(!stkDrag){   // hovering: a hand over placed stickers, the armed one follows the pointer
       if(slot!=='sticker'||e.target!==canvas||e.buttons)return;
@@ -542,6 +581,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   // keep clicks here from reaching the game behind (the pause menu resumes on click)
   for(const ev of ['click','mousedown','mouseup','pointerdown'])root.addEventListener(ev,e=>e.stopPropagation());
   root.addEventListener('click',e=>{
+    if(e.target.closest('[data-scr-auto]')){savePlace(null);remountScreen(null);renderUI();return;}
     const cht=e.target.closest('[data-chtab]');if(cht){charmTab=cht.dataset.chtab;hover=null;renderUI();aim();return;}
     const ct=e.target.closest('.ctab,.cgroup');if(ct){camoTab=ct.dataset.ctab;hover=null;renderUI();return;}
     if(slot==='sticker'&&stkCat&&stkClick(e))return;
@@ -668,7 +708,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       res=partTags().get(bone)??null;}
     partCache.set(o,res);return res;
   }
-  function close(){if(!alive)return;alive=false;charmRig?.dispose();screenObj?.dispose();removeEventListener('pointermove',stkMoveH);removeEventListener('pointerup',stkUpH);stkGhost?.remove();
+  function close(){if(!alive)return;alive=false;charmRig?.dispose();screenObj?.dispose();removeEventListener('pointermove',stkMoveH);removeEventListener('pointerup',stkUpH);removeEventListener('pointermove',scrMoveH);removeEventListener('pointerup',scrUpH);cancelAnimationFrame(scrRaf);stkGhost?.remove();
     if(host){host.renderWorld=prevWorld;host.hideViewmodel=prevHide;}
     // materials are shared with the game's copies of this model: put them back
     gun?.traverse(o=>{const m=o.material;if(o.isMesh&&m?.emissive&&m.userData.emissive0)m.emissive.copy(m.userData.emissive0);});removeEventListener('keydown',onKey,true);renderer.dispose();root.remove();onClose?.();}

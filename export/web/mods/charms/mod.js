@@ -1,7 +1,7 @@
 // Weapon charms in first person (2026-11-06): the charm picked for the held gun in the Gunsmith hangs off its left side
 // and swings. The system is in charms.js; this hangs it on the viewmodel. Right-hand gun only (dual wield: not the left).
 import * as THREE from 'three';
-import { loadCharms, loadCharmState, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig } from './charms.js';
+import { loadCharms, loadCharmState, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from './charms.js';
 import { screenFor, makeScreen, screenMount, placeScreen, charmZone } from './screens.js';
 
 export default async function setup(api){
@@ -40,8 +40,8 @@ export default async function setup(api){
   // the screen's spot: the baked one, the same the Gunsmith shows (screens.js); a gun missing from screen-spots.json gets the
   // Gunsmith's plain search, run at load by the warm-up below so play only reads the cache
   function mountFor(gun,root,def,id,housing){const unit=charmUnit(def),key=def?.model??id;
-    const avoid=charmFor(cat,loadCharmState(),id)?charmZone(gun,root,{key,override:cat.anchors[id],unit}):null;
-    return screenMount(gun,root,{key,override:cat.screenMounts[id],housing,unit,avoid,spots:cat.screenSpots});}
+    const st=loadCharmState(),avoid=charmFor(cat,st,id)?charmZone(gun,root,{key,override:cat.anchors[id],unit}):null;
+    return screenMount(gun,root,{key,override:screenOverride(cat,st,id),housing,unit,avoid,spots:cat.screenSpots});}
   function stepScreen(dt){
     if(view.gun!==sGun){dropScreen();return;}
     let shown=true;for(let o=sGun;o;o=o.parent){if(o===viewScene)break;if(!o.visible){shown=false;break;}}

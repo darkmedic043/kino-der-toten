@@ -286,17 +286,17 @@ function frameOf(tilt,yaw){
   _u.set(0,0,1).addScaledVector(_n,-_n.z).normalize();_x.crossVectors(_u,_n);
   return {n:_n.clone(),u:_u.clone(),x:_x.clone()};
 }
-// -> {matrix (root space, model units), size, foot (housing units)}; null when the gun has no points
-export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,avoid=null,spots=null}={}){
-  const baked=!override?.at&&spots?.[spotKey(key,housing)];if(baked){const k='b|'+spotKey(key,housing)+'|'+unit;if(!mounts.has(k))mounts.set(k,mountFromSpot(baked,unit));return mounts.get(k);}
-  const tilt=override?.tilt??20,yaw=override?.yaw??42,F=frameOf(tilt,yaw),HW=housing.w??1.2,HH=housing.h??1.2,FT=housing.foot??[.6,.55];
+// The gun's surface as the search sees it, in root-bone space (inches), cached per model, arms, unit, face angle and hidden
+// bones: points, hand points, and bins over (x, z) of the outermost surface toward the face. Shared by the search and a
+// player's pinned spot (dragged in the Gunsmith, 2026-11-07), so a drag re-evaluates one spot a frame, not the sampling.
+const preps=new Map();
+function prepOf(gun,root,{key,hands,unit=1,tilt=20,yaw=42}){
   const hidden=[];gun.traverse(b=>{if(b.isBone&&b.scale.x<1e-3)hidden.push(b.name);});
-  const fullKey=[key,housing.model,handsSig(hands),unit,JSON.stringify(override??''),avoid?`${avoid.x.toFixed(1)},${avoid.z.toFixed(1)}`:'',hidden.join(',')].join('|');
-  if(mounts.has(fullKey))return mounts.get(fullKey);
+  const pk=[key,handsSig(hands),unit,tilt,yaw,hidden.join(',')].join('|');if(preps.has(pk))return preps.get(pk);
+  const n=frameOf(tilt,yaw).n,dot=(i,a)=>a[i]*n.x+a[i+1]*n.y+a[i+2]*n.z;
   inv.copy(root.matrixWorld).invert();
   const pb=[],pts=visiblePoints(gun,null,gun.parent,pb,unit,inv,.6);if(pts.length<9)return null;
   const hp=hands?visiblePoints(hands,gun,hands.parent,null,unit,inv):[];
-  const n=F.n,dot=(i,a)=>a[i]*n.x+a[i+1]*n.y+a[i+2]*n.z;
   // bins over (x, z): the outermost surface toward the face (max p.n), and whether loose or moving parts are there
   const loose=new Map(),kindOf=b=>{if(!b||b===root)return 0;if(!loose.has(b)){let k=2;for(let p=b;p&&p!==root&&p!==gun;p=p.parent)if(LOOSE.test(p.name)||FIDGET.test(p.name))k=1;loose.set(b,k);}return loose.get(b);};
   const bins=new Map(),bin=(x,z)=>{const k=Math.round(x/CELL)*4096+Math.round(z/CELL);let b=bins.get(k);if(!b)bins.set(k,b={max:-1e9,y:-1e9,ylo:1e9,n:0,loose:0,moving:0,hand:-1e9,hy:-1e9});return b;},get=(ix,iz)=>bins.get(ix*4096+iz);
@@ -311,7 +311,25 @@ export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,a
         const A=alongX?get(a,key):get(key,a),B=alongX?get(b,key):get(key,b);if(b-a>10&&Math.abs(A.y-B.y)>.25)continue;   // a wide gap only across a flat panel (the G11's sides)
         for(let j=a+1;j<b;j++){const c=alongX?bin(j*CELL,key*CELL):bin(key*CELL,j*CELL);if(c.n)continue;const f=(j-a)/(b-a);c.n=1;c.fill=1;c.max=A.max+(B.max-A.max)*f;c.y=A.y+(B.y-A.y)*f;c.ylo=A.ylo+(B.ylo-A.ylo)*f;}}}};
   fill(true);fill(false);
-  const xmin=pct(pts,0,.01),xmax=pct(pts,0,.99),L=xmax-xmin,zTop=pct(pts,2,.97),zLow=pct(pts,2,.04);
+  const xmin=pct(pts,0,.01),xmax=pct(pts,0,.99),zTop=pct(pts,2,.97),zLow=pct(pts,2,.04);
+  let out=-1e9;for(let i=0;i<pts.length;i+=3)out=Math.max(out,dot(i,pts));
+  const P={key:pk,pts,hp,bins,xmin,xmax,L:xmax-xmin,zTop,zLow,out};
+  if(preps.size>24)preps.delete(preps.keys().next().value);preps.set(pk,P);return P;
+}
+// a root-space point (model units) -> a pin {a: along 0 butt..1 muzzle, h: 0 bottom..1 top}, from the same bounds
+export function screenPin(gun,root,point,{key,hands,unit=1}={}){
+  const P=prepOf(gun,root,{key,hands,unit});if(!P)return null;const r3=v=>Math.round(v*1000)/1000;
+  return {a:r3(THREE.MathUtils.clamp((point.x/unit-P.xmin)/P.L,0,1)),h:r3(THREE.MathUtils.clamp((point.z/unit-P.zLow)/(P.zTop-P.zLow),-.1,1.1))};
+}
+// -> {matrix (root space, model units), size, foot (housing units)}; null when the gun has no points
+export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,avoid=null,spots=null}={}){
+  const baked=!override?.at&&!override?.pin&&spots?.[spotKey(key,housing)];if(baked){const k='b|'+spotKey(key,housing)+'|'+unit;if(!mounts.has(k))mounts.set(k,mountFromSpot(baked,unit));return mounts.get(k);}
+  const tilt=override?.tilt??20,yaw=override?.yaw??42,F=frameOf(tilt,yaw),HW=housing.w??1.2,HH=housing.h??1.2,FT=housing.foot??[.6,.55];
+  const P=prepOf(gun,root,{key,hands,unit,tilt,yaw});if(!P)return null;
+  const fullKey=[P.key,housing.model,JSON.stringify(override??''),avoid?`${avoid.x.toFixed(1)},${avoid.z.toFixed(1)}`:''].join('|');
+  if(mounts.has(fullKey))return mounts.get(fullKey);
+  inv.copy(root.matrixWorld).invert();
+  const {pts,hp,bins,xmin,xmax,L,zTop,zLow}=P,n=F.n,get=(ix,iz)=>bins.get(ix*4096+iz);
   // where along the gun (2026-11-07, user: "more in the middle, center of focus ... its alright for smaller guns like
   // pistols and sidearms to be closer to the stock"): a target share of the length from the back, .5 on long guns (16 in
   // and over), .3 on pistols (9 in and under); the cost grows past a 7% dead band either side
@@ -356,7 +374,11 @@ export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,a
     if(top!==null&&top-zp<2){let yc=0,k=0;for(let i=0;i<pts.length;i+=3)if(Math.abs(pts[i]-px)<HW&&pts[i+2]>top-.5&&pts[i+2]<top+.3){yc+=pts[i+1];k++;}
       yc=k?yc/k:ys-.4;hook={len:Math.max(.04,top+.03-zp)/s,depth:THREE.MathUtils.clamp(ys-yc,.18,.6)/s};}
     return {t,px,pz,ys,backed,spread,hook};};
-  const sizes=override?.size?[override.size]:[1.25,1.08,.93,.78];let best=null;   // a quarter bigger since 2026-11-07 (user: "just abit bigger ... the whole things"); was 1-.62
+  const sizes=override?.pin?[]:override?.size?[override.size]:[1.25,1.08,.93,.78];let best=null;
+  // a player's spot (Gunsmith drag): the face there, its back plane just outside the outermost surface under it
+  if(override?.pin){const p=override.pin,s=THREE.MathUtils.clamp(p.s??1.08,.6,1.5),fw=HW*s,fh=HH*s,cx=xmin+p.a*L,cz=zLow+p.h*(zTop-zLow);
+    let top=-1e9,fc=0,fs=0;rect(cx,cz,fw,fh,b=>{if(b?.n&&b.max>top)top=b.max;});rect(cx,cz,FT[0]*s,FT[1]*s,b=>{if(b?.n){fc++;fs+=b.max;}});
+    if(top<-1e8)top=P.out;const plane=top+.03;best={cost:0,cx,cz,s,plane,depth:fc?Math.min(.9,plane-fs/fc):.15};}   // a quarter bigger since 2026-11-07 (user: "just abit bigger ... the whole things"); was 1-.62
   const ndc=new THREE.Vector3();
   for(const s of sizes){
     const fw=HW*s,fh=HH*s,ffw=FT[0]*s,ffh=FT[1]*s;
@@ -398,6 +420,7 @@ export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,a
     const r3=v=>Math.round(v*1000)/1000,sp={c:c.toArray().map(r3),s,t:r3(l.t),depth:r3(best.depth),hook:l.hook&&{len:r3(l.hook.len),depth:r3(l.hook.depth)},
       tilt,yaw,along:r3((best.cx-xmin)/L),cost:r3(best.cost)};
     out={...mountFromSpot(sp,unit),baked:false};}
+  if(mounts.size>300)mounts.delete(mounts.keys().next().value);   // a Gunsmith drag makes one per spot
   mounts.set(fullKey,out);return out;
 }
 // the charm's keep-clear zone (inches): its plain hang spot (no hands or camera, so the Gunsmith and the game agree) and a
