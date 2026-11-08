@@ -35,12 +35,18 @@ export function charmFor(cat,state,gunId){const c=cat?.charms.find(x=>x.id===sta
 
 // ---- models -------------------------------------------------------------------------------------------------------------
 const templates=new Map(),box=new THREE.Box3(),v=new THREE.Vector3(),v2=new THREE.Vector3();
-// c.flicker: meshes whose material is named glow* (Bottled Lightning's bolt) pulse like a storm. Set just before each draw,
-// so it runs wherever the charm is drawn (match, Gunsmith); a material hook, since clone() drops an object's onBeforeRender
-// but clones share materials. Only a uniform changes, never the program.
-function flicker(){const m=this,t=performance.now()/1000;m.userData.e0??=m.emissiveIntensity;
-  const k=Math.floor(t*9),r=Math.sin(k*12.9898+78.233)*43758.5453%1,flash=Math.abs(r)>.86?1.9:1;
-  m.emissiveIntensity=m.userData.e0*(.62+.16*Math.sin(t*13)+.09*Math.sin(t*37.3))*flash;}
+// c.storm (Bottled Lightning): animated by material name, set just before each draw so it runs wherever the charm is drawn
+// (match, Gunsmith). rain* scroll their streak texture down; bolt_a/bolt_b (transparent) show one at a time during a strike,
+// a double flash every few seconds; cloud* and the glass light up with it. Material hooks, since clone() drops an object's
+// onBeforeRender but clones share materials; only uniforms change (opacity, emissive, the map's uvTransform), never the program.
+const fract=x=>x-Math.floor(x),hash=k=>fract(Math.sin(k*12.9898+78.233)*43758.5453);
+function strike(t){const P=2.6,k=Math.floor(t/P),h=hash(k);if(h<.22)return [0,0];   // about one slot in five stays quiet
+  const d=t-k*P-h*1.3,f=d<0?0:d<.06?1:d<.12?.12:d<.32?1-(d-.12)/.2*.5:d<.5?.5*(1-(d-.32)/.18):0;return [f,hash(k+.37)<.5?0:1];}
+function storm(){const m=this,n=m.name,t=performance.now()/1000;
+  if(n.startsWith('rain')){if(m.map)m.map.offset.y=-fract(t*(n==='rain2'?.75:1.1));return;}
+  const [f,which]=strike(t);
+  if(n.startsWith('bolt')){m.opacity=(n==='bolt_b')===(which===1)?Math.min(1,f*1.6):0;return;}
+  m.userData.e0??=m.emissiveIntensity;m.emissiveIntensity=m.userData.e0*(1+f*(n==='glass'?1.5:14));}
 // A normalised charm body: {object, com (inches below the hang point), depth (half thickness, inches)}
 export function charmModel(c){
   if(!c?.model)return Promise.resolve(null);
@@ -51,8 +57,11 @@ export function charmModel(c){
     // c.yaw (degrees): turn the body about its hang line. The rig faces the model's front (+Z) out of the gun's side, which
     // the Gunsmith sees square on but the player, looking down the barrel, sees edge-on; flat charms turn partway round.
     if(c.yaw){spin.rotation.y=c.yaw*Math.PI/180;spin.updateMatrixWorld(true);box.setFromObject(spin);box.getSize(v);}
-    object.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=false;o.frustumCulled=false;if(c.flicker&&/^glow/.test(o.material?.name??''))o.material.onBeforeRender=flicker;}});
-    return {object,com:(hang.y-(box.min.y+box.max.y)/2)*s,depth:v.z*s/2,width:v.x*s/2};
+    object.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=false;o.frustumCulled=false;if(c.storm&&/^(rain|bolt|cloud|glass)/.test(o.material?.name??''))o.material.onBeforeRender=storm;}});
+    // depth = how far the body reaches toward the gun (-Z) from its hang line, which the rig keeps outside the gun's side:
+    // half the thickness for a body centred on the line, more for a turned one (the price tag's near half swings in)
+    return {object,com:(hang.y-(box.min.y+box.max.y)/2)*s,depth:(c.yaw?Math.max(v.z/2,-box.min.z):v.z/2)*s,width:v.x*s/2,
+      reach:c.yaw?-box.min.z*s:0};   // reach: the same at the top, where a turned flat charm's near edge sits level with the hang point
   }).catch(e=>{console.warn('[charms] model',c.id,e);return null;}));
   return templates.get(c.id).then(t=>t&&{...t,object:t.object.clone()});
 }
@@ -213,7 +222,7 @@ export class CharmRig{
         const pts=[this.p1,this.q1,this.p2,this.q2];for(let i=0;i<4;i++){const p=pts[i];_u.copy(p).applyMatrix4(_R).sub(p).multiplyScalar(follow).addScaledVector(_t,follow*.3);const l=_u.length(),mx=L1*.5;if(l>mx)_u.multiplyScalar(mx/l);this.push[i].add(_u);const pl=this.push[i].length();if(pl>L1)this.push[i].multiplyScalar(L1/pl);}}
       this.acc=Math.min(this.acc+dt,STEP*4);
       // the side plane: a point on the gun's widest surface below the ring, normal = the gun's left (+y)
-      const P0=_p.copy(base).addScaledVector(n,(anchor.side-anchor.at.y)*sR),m1=.06*s,m2=(this.body.depth*.8+.02)*s;
+      const P0=_p.copy(base).addScaledVector(n,(anchor.side-anchor.at.y)*sR),m1=Math.max(.06,(this.body.reach??0)+.05)*s,m2=(this.body.depth*.8+.02)*s;   // m1: a turned body's top edge too
       const G=(this.c.gravity??260)*gravityScale*s*STEP*STEP,drag=this.c.drag??.07,k=this.c.stiff??.012;
       let steps=Math.floor(this.acc/STEP+1e-9);
       while(this.acc>=STEP){this.acc-=STEP;

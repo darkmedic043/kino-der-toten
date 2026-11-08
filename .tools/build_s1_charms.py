@@ -1,10 +1,10 @@
 # Season 1 charms modelled for this fork (2026-11-08, user: "model the melon seedling, bottled lightning, and queen bee in amber"):
 #   seedling          a clay pot with a melon sprout and a MELON plant marker; it hangs from the marker's eyelet
-#   bottledlightning  a corked vial with a lightning bolt inside (materials named glow* flicker in game: charms.json flicker)
+#   bottledlightning  a storm in a corked vial: cloud, rain, puddle, two bolts (animated in game by material name: charms.json storm)
 #   amberqueen        a crowned queen bee in an amber teardrop with a gold cap
 # Plain materials, no textures. Built Z-up in centimetres-ish units (charms.json size rescales them), front toward -Y.
 #   blender -b -P .tools/build_s1_charms.py -- [--out export/web/mods/charms/season1] [--render scratch/charms/s1] [--only id,id]
-import bpy, bmesh, sys, math, os, json
+import random, bpy, bmesh, sys, math, os, json
 from mathutils import Vector, Matrix
 
 A = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
@@ -142,26 +142,73 @@ def seedling():
     return {'hang': (mx, my, 4.66)}
 
 # ---- Bottled Lightning ----------------------------------------------------------------------------------------------------
+def rain_mat(name, seed, streaks):
+    """Falling rain: a tiling texture of thin streaks with fading tails (alpha), scrolled down in game (charms.js storm)."""
+    W, H = 64, 128; px = [0.] * (W * H * 4); rnd = random.Random(seed)
+    for _ in range(streaks):
+        x = rnd.randrange(W - 1); y0 = rnd.randrange(H); L = rnd.randint(10, 26); a0 = rnd.uniform(.55, 1.)
+        for k in range(L):   # the head (lowest, brightest) at y0, the tail fading upward; wraps so the tile repeats
+            y = (y0 + k) % H; a = a0 * (1 - k / L) ** 1.5; i = (y * W + x) * 4
+            px[i:i + 4] = [.82, .9, 1., max(px[i + 3], a)]; px[i + 4:i + 8] = [.82, .9, 1., max(px[i + 7], a * .6)]   # two texels wide
+    img = bpy.data.images.new(name, W, H, alpha=True); img.pixels = px; img.file_format = 'PNG'; img.pack()
+    m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; b = nt.nodes['Principled BSDF']
+    t = nt.nodes.new('ShaderNodeTexImage'); t.image = img; t.interpolation = 'Linear'
+    nt.links.new(t.outputs['Color'], b.inputs['Base Color']); nt.links.new(t.outputs['Alpha'], b.inputs['Alpha'])
+    b.inputs['Roughness'].default_value = .3; b.inputs['Emission Color'].default_value = (*srgb('#9cc4ff'), 1); b.inputs['Emission Strength'].default_value = 1.4
+    if hasattr(m, 'surface_render_method'): m.surface_render_method = 'BLENDED'
+    m.use_backface_culling = False
+    MATS[name] = m; return m
+
+def rain_tube(name, r, z0, z1, wraps, material, segs=24):
+    """An open cylinder (no caps) with u around it and v up it, v in tile units so streaks keep their shape."""
+    bm = bmesh.new(); uv = bm.loops.layers.uv.new(); vs = []
+    for k in range(segs + 1):
+        a = 2 * math.pi * k / segs
+        vs.append((bm.verts.new((r * math.cos(a), r * math.sin(a), z0)), bm.verts.new((r * math.cos(a), r * math.sin(a), z1))))
+    h = (z1 - z0) / (2 * math.pi * r / wraps) * .5   # a tile is 64x128, so it stands twice as tall as it is wide
+    for k in range(segs):
+        f = bm.faces.new((vs[k][0], vs[k + 1][0], vs[k + 1][1], vs[k][1]))
+        for l, (u, v) in zip(f.loops, ((k, 0), (k + 1, 0), (k + 1, h), (k, h))): l[uv].uv = (u / segs * wraps, v)
+    o = obj(name, bm, material, smooth=True); return o
+
 def bottled():
-    glass = mat('glass', '#cfeeff', .04, 0., alpha=.24, emit='#5bbcff', strength=.35)
-    bolt = mat('glow_bolt', '#f4fcff', .3, emit='#9fe8ff', strength=7.)
-    spark = mat('glow_spark', '#ffffff', .3, emit='#c8f2ff', strength=9.)
+    """A storm in a bottle: a dark cloud under the cork, rain falling from it onto a puddle, and two lightning bolts that only
+    show during a strike. The game animates it by material name (charms.json storm, charms.js): rain* scrolls, bolt_a/bolt_b
+    flash one at a time every few seconds, cloud* and glass light up with each strike."""
+    glass = mat('glass', '#cfeeff', .04, 0., alpha=.12, emit='#5bbcff', strength=.06)
     cork, wire = mat('cork', '#a87b4c', .9), mat('wire', '#b9bec6', .3, 1.)
     lathe('vial', [(0, 0), (.38, .05), (.62, .22), (.74, .55), (.75, .9), (.75, 3.0), (.68, 3.2), (.5, 3.33), (.44, 3.4), (.44, 3.6), (.53, 3.66), (.53, 3.78), (.4, 3.8), (0, 3.8)], glass, segs=48)
     lathe('cork', [(0, 3.5), (.4, 3.5), (.43, 3.8), (.48, 4.2), (.44, 4.26), (0, 4.27)], cork, segs=24)
     for i in range(6): lathe(f'cork_pit{i}', [(0, 0), (.03, 0), (0, .01)], mat('cork_pit', '#6d4a2a', 1.), segs=6, at=(.45 * math.cos(i), .45 * math.sin(i), 3.9 + .05 * i))
-    # a wire collar under the lip and a bail over the cork up to the eyelet
     lathe('collar', [(.455, 3.42), (.5, 3.42), (.5, 3.5), (.455, 3.5)], wire, segs=32, smooth=False)
     for s in (-1, 1):
         tube(f'bail{s}', [Vector((s * .49, 0, 3.47)), Vector((s * .5, 0, 3.9)), Vector((s * .4, 0, 4.3)), Vector((s * .12, 0, 4.42)), Vector((0, 0, 4.44))], .028, wire, segs=6)
     ring('eyelet', (0, 0, 4.6), .15, .032, wire)
-    # the bolt: a jagged line down the vial with two forks, thick to thin
-    zz = [(0, -.05, 3.15), (.22, 0, 2.8), (-.12, .05, 2.45), (.3, -.03, 2.1), (-.05, .02, 1.75), (.2, .05, 1.4), (-.25, -.04, 1.05), (.05, 0, .7), (-.1, .03, .38)]
-    tube('bolt', [Vector(p) for p in zz], .07, bolt, segs=6, taper=lambda t: 1 - .55 * t)
-    tube('fork1', [Vector(zz[3]), Vector((.48, -.02, 1.85)), Vector((.4, .05, 1.55)), Vector((.58, 0, 1.3))], .035, bolt, segs=5, taper=lambda t: 1 - .6 * t)
-    tube('fork2', [Vector(zz[5]), Vector((-.3, .03, 1.3)), Vector((-.42, -.03, 1.0))], .03, bolt, segs=5, taper=lambda t: 1 - .6 * t)
-    for i, p in enumerate([(.42, -.3, 2.6), (-.4, .2, 1.9), (.35, .3, .95), (-.3, -.35, 2.95), (.1, .4, 1.5)]):
-        blob(f'spark{i}', Vector(p), (.045, .045, .045), spark, segs=8, rings=6)
+    # the cloud: puffs packed into the top of the vial, darker underneath (a storm cell's flat grey base)
+    top, base = mat('cloud_top', '#464d5a', 1., emit='#b9d4ff', strength=.05), mat('cloud_base', '#22272f', 1., emit='#9fc0ff', strength=.05)
+    rnd = random.Random(7)
+    for i in range(22):
+        a = rnd.uniform(0, 2 * math.pi); d = rnd.uniform(.05, .42); z = rnd.uniform(2.15, 3.0); r = rnd.uniform(.26, .36) * (1.1 - .3 * (z - 2.15) / .85)
+        blob(f'puff{i}', Vector((d * math.cos(a), d * math.sin(a), z)), (r, r, r * .85), top, segs=16, rings=10)
+    for i in range(10):
+        a = 2 * math.pi * i / 10 + rnd.uniform(-.2, .2); d = rnd.uniform(.3, .44)
+        blob(f'base{i}', Vector((d * math.cos(a), d * math.sin(a), 2.0 + rnd.uniform(-.04, .05))), (.27, .27, .15), base, segs=16, rings=8)
+    blob('base_mid', Vector((0, 0, 1.98)), (.42, .42, .16), base, segs=16, rings=8)
+    # rain: two nested streak tubes from the cloud's base to the puddle, scrolling at different speeds for depth
+    rain_tube('rain1', .5, .5, 2.0, 2, rain_mat('rain1', 11, 34))
+    rain_tube('rain2', .27, .5, 2.0, 2, rain_mat('rain2', 23, 22))
+    # the puddle on the bottom, with a meniscus
+    water = mat('water', '#5c8fc4', .05, 0., alpha=.55, emit='#3a78c0', strength=.2)
+    lathe('puddle', [(0, .08), (.5, .1), (.68, .3), (.72, .46), (.66, .47), (0, .45)], water, segs=40)
+    # the strikes: two bolts from the cloud base down to the water, shown one at a time (transparent so they can fade)
+    def bolt(name, pts, forks):
+        m = mat(name, '#f4fcff', .3, alpha=.99, emit='#a8ecff', strength=9.)
+        tube(name, [Vector(p) for p in pts], .075, m, segs=6, taper=lambda t: 1 - .55 * t)
+        for k, f in enumerate(forks): tube(f'{name}_f{k}', [Vector(pts[f[0]])] + [Vector(p) for p in f[1:]], .04, m, segs=5, taper=lambda t: 1 - .6 * t)
+    bolt('bolt_a', [(.05, 0, 1.95), (.22, .02, 1.72), (-.05, -.03, 1.45), (.18, .02, 1.2), (-.08, 0, .95), (.12, .03, .7), (0, 0, .47)],
+         [(2, (-.3, .02, 1.25), (-.24, -.03, 1.02)), (4, (.25, -.02, .82))])
+    bolt('bolt_b', [(-.2, .1, 1.95), (-.35, .05, 1.7), (-.1, .12, 1.45), (-.32, .06, 1.15), (-.12, .1, .85), (-.25, .05, .47)],
+         [(1, (-.1, -.1, 1.5), (.12, -.05, 1.3)), (3, (-.5, .03, .95))])
     return {}
 
 # ---- Queen Bee in Amber ----------------------------------------------------------------------------------------------------
