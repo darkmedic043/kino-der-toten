@@ -1986,6 +1986,78 @@
    "pass": "s2"
   },
   {
+   "id": "pass.s2.charm.pricetag",
+   "cat": "charm",
+   "name": "Price Tag",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 weapon charm: a worn paper price tag: twenty-five cents.",
+   "data": {
+    "charm": "pricetag"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.charm.honeydipper",
+   "cat": "charm",
+   "name": "Honey Dipper",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 weapon charm: a honey dipper, still dripping.",
+   "data": {
+    "charm": "honeydipper"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.charm.seedling",
+   "cat": "charm",
+   "name": "Melon Seedling",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 weapon charm: a melon sprout in a clay pot with its plant marker.",
+   "data": {
+    "charm": "seedling"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.charm.runefang",
+   "cat": "charm",
+   "name": "Rune Fang",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 weapon charm: a carved fang on a knotted cord.",
+   "data": {
+    "charm": "runefang"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.charm.bottledlightning",
+   "cat": "charm",
+   "name": "Bottled Lightning",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 weapon charm: a corked vial with a flickering lightning bolt inside.",
+   "data": {
+    "charm": "bottledlightning"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.charm.amberqueen",
+   "cat": "charm",
+   "name": "Queen Bee in Amber",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 weapon charm: a crowned queen bee kept in amber.",
+   "data": {
+    "charm": "amberqueen"
+   },
+   "pass": "s2"
+  },
+  {
    "id": "pass.s2.sticker.pastdue",
    "cat": "sticker",
    "name": "Past Due",

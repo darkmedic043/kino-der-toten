@@ -35,14 +35,23 @@ export function charmFor(cat,state,gunId){const c=cat?.charms.find(x=>x.id===sta
 
 // ---- models -------------------------------------------------------------------------------------------------------------
 const templates=new Map(),box=new THREE.Box3(),v=new THREE.Vector3(),v2=new THREE.Vector3();
+// c.flicker: meshes whose material is named glow* (Bottled Lightning's bolt) pulse like a storm. Set just before each draw,
+// so it runs wherever the charm is drawn (match, Gunsmith); a material hook, since clone() drops an object's onBeforeRender
+// but clones share materials. Only a uniform changes, never the program.
+function flicker(){const m=this,t=performance.now()/1000;m.userData.e0??=m.emissiveIntensity;
+  const k=Math.floor(t*9),r=Math.sin(k*12.9898+78.233)*43758.5453%1,flash=Math.abs(r)>.86?1.9:1;
+  m.emissiveIntensity=m.userData.e0*(.62+.16*Math.sin(t*13)+.09*Math.sin(t*37.3))*flash;}
 // A normalised charm body: {object, com (inches below the hang point), depth (half thickness, inches)}
 export function charmModel(c){
   if(!c?.model)return Promise.resolve(null);
   if(!templates.has(c.id))templates.set(c.id,loadModel(new URL(c.model,import.meta.url).href).then(m=>{
     if(!m)return null;m.updateMatrixWorld(true);box.setFromObject(m);box.getSize(v);
     const s=(c.size??1.3)/Math.max(v.x,v.y,v.z,1e-6),hang=c.hang?v2.fromArray(c.hang):v2.set((box.min.x+box.max.x)/2,box.max.y,(box.min.z+box.max.z)/2);
-    m.position.sub(hang);const object=new THREE.Group();object.add(m);object.scale.setScalar(s);
-    object.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=false;o.frustumCulled=false;}});
+    m.position.sub(hang);const object=new THREE.Group(),spin=new THREE.Group();spin.add(m);object.add(spin);object.scale.setScalar(s);
+    // c.yaw (degrees): turn the body about its hang line. The rig faces the model's front (+Z) out of the gun's side, which
+    // the Gunsmith sees square on but the player, looking down the barrel, sees edge-on; flat charms turn partway round.
+    if(c.yaw){spin.rotation.y=c.yaw*Math.PI/180;spin.updateMatrixWorld(true);box.setFromObject(spin);box.getSize(v);}
+    object.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=false;o.frustumCulled=false;if(c.flicker&&/^glow/.test(o.material?.name??''))o.material.onBeforeRender=flicker;}});
     return {object,com:(hang.y-(box.min.y+box.max.y)/2)*s,depth:v.z*s/2,width:v.x*s/2};
   }).catch(e=>{console.warn('[charms] model',c.id,e);return null;}));
   return templates.get(c.id).then(t=>t&&{...t,object:t.object.clone()});

@@ -1,5 +1,5 @@
 {
-  "_note": "Weapon charms (2026-11-06). Each charm hangs from a small ring on the left side of the gun (the side the player sees) and swings with the gun and the camera. Entry: id, name, desc, model (GLB, relative to this folder, usually models/<id>.glb), size (longest side in inches, default 1.3), hang (the loop point in model units, default the top centre), links (chain links, default 2), chain (inches, default .42), gravity/drag/stiff/carry (swing feel: drag default .07, stiff .012 = pull toward hanging straight, carry .8 = share of the gun's own motion taken rigidly, smooth .035 = seconds of smoothing on the drawn charm). Owned: no unlock = free; unlock = a shop key (a Melon Pass reward, pass.<season>.charm.<id>, with pass:<season>); soon:true = built but not out yet (localStorage kino.dev.soon='1' lifts it). anchors: per-gun hang point in the gun's root bone space (inches: x forward, y left, z up), [x,y,z] or {at:[x,y,z],side:y}, where the automatic spot looks wrong. Room left for screen charms (a stat tracker, a virtual buddy): a model with a screen drawn from a glyph atlas through shader uniforms, never a redrawn canvas.",
+  "_note": "Weapon charms (2026-11-06). Each charm hangs from a small ring on the left side of the gun (the side the player sees) and swings with the gun and the camera. Entry: id, name, desc, model (GLB, relative to this folder, usually models/<id>.glb), size (longest side in inches, default 1.3), hang (the loop point in model units, default the top centre), links (chain links, default 2), chain (inches, default .42), gravity/drag/stiff/carry (swing feel: drag default .07, stiff .012 = pull toward hanging straight, carry .8 = share of the gun's own motion taken rigidly, smooth .035 = seconds of smoothing on the drawn charm). Owned: no unlock = free; unlock = a shop key (a Melon Pass reward, pass.<season>.charm.<id>, with pass:<season>); soon:true = built but not out yet (localStorage kino.dev.soon='1' lifts it). anchors: per-gun hang point in the gun's root bone space (inches: x forward, y left, z up), [x,y,z] or {at:[x,y,z],side:y}, where the automatic spot looks wrong. yaw (degrees: turns the body about its hang line toward the player, who sees the default front edge-on), flicker (true: meshes with a glow* material pulse like a storm, charms.js). Room left for screen charms (a stat tracker, a virtual buddy): a model with a screen drawn from a glyph atlas through shader uniforms, never a redrawn canvas.",
   "charms": [
     {
       "id": "kurb",
@@ -9,6 +9,66 @@
       "size": 3.7,
       "pass": "s2",
       "unlock": "pass.s2.charm.kurb"
+    },
+    {
+      "id": "pricetag",
+      "name": "Price Tag",
+      "desc": "Twenty-five cents. Marked down, like everything else. Season 1, page 1.",
+      "model": "season1/pricetag.glb",
+      "yaw": 55,
+      "size": 1.7,
+      "pass": "s2",
+      "unlock": "pass.s2.charm.pricetag"
+    },
+    {
+      "id": "honeydipper",
+      "name": "Honey Dipper",
+      "desc": "Still dripping. Season 1, page 3.",
+      "model": "season1/honeydipper.glb",
+      "size": 2.1,
+      "pass": "s2",
+      "unlock": "pass.s2.charm.honeydipper"
+    },
+    {
+      "id": "seedling",
+      "name": "Melon Seedling",
+      "desc": "A melon sprout in a clay pot, labelled in case you forget. Season 1, page 4.",
+      "model": "season1/seedling.glb",
+      "yaw": 40,
+      "size": 1.9,
+      "hang": [-0.25, 4.66, -0.45],
+      "pass": "s2",
+      "unlock": "pass.s2.charm.seedling"
+    },
+    {
+      "id": "runefang",
+      "name": "Rune Fang",
+      "desc": "A carved fang on a knotted cord, taken from something that hunted back. Season 1, page 5.",
+      "model": "season1/runefang.glb",
+      "yaw": 55,
+      "size": 2.1,
+      "pass": "s2",
+      "unlock": "pass.s2.charm.runefang"
+    },
+    {
+      "id": "bottledlightning",
+      "name": "Bottled Lightning",
+      "desc": "A corked vial with a storm inside. It flickers. Season 1, page 7.",
+      "model": "season1/bottledlightning.glb",
+      "size": 1.8,
+      "flicker": true,
+      "pass": "s2",
+      "unlock": "pass.s2.charm.bottledlightning"
+    },
+    {
+      "id": "amberqueen",
+      "name": "Queen Bee in Amber",
+      "desc": "The hive's queen, crown and all, kept forever in amber. Season 1, page 9.",
+      "model": "season1/amberqueen.glb",
+      "yaw": 50,
+      "size": 1.8,
+      "pass": "s2",
+      "unlock": "pass.s2.charm.amberqueen"
     }
   ],
   "anchors": {},
