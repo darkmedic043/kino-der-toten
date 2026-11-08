@@ -71,6 +71,7 @@ export default async function setup(api){
   const cheating=()=>!!window.kino.cheats?.used;
   function grant(amount){
     if(amount<=0||cheating())return;
+    amount=Math.round(amount*(window.kino.xpMul?.('playerXp')??1));   // a double player XP token (pass/xp-tokens.js)
     profile.xp+=amount;gameXp+=amount;
     const before=unlocked(profile.level);
     let levelled=false;

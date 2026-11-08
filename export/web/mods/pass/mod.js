@@ -3,6 +3,7 @@
 // spending, and a pause-menu line. Challenge completions add pass XP through window.kino.pass.addXp (credits mod).
 import { loadSeasons, loadPass, savePass, addXp, autoSpend, tiersEarned, tokens, describe } from './pass.js';
 import { loadCatalog } from '../shop/shop.js';
+import { installXpTokens } from './xp-tokens.js';
 
 export default async function setup(api){
   const {host,mod}=api;
@@ -35,5 +36,6 @@ export default async function setup(api){
   const css=document.createElement('style');css.textContent='#pass-panel{margin:6px 0;font-size:11px;letter-spacing:.06em;color:#b9b2a3}#pass-panel b{color:#ff9a3d}';document.head.append(css);
   let last='';host.on('update',()=>{const n=tokens(S,P),html=`<b>MELON PASS</b> · tier ${tiersEarned(season,P)} · ${(P.seasons[season.id]?.xp??0)%season.tierXp} / ${season.tierXp} XP${n?` · ${n} token${n>1?'s':''} to spend`:''}${Object.keys(window.kino.boost??{}).length?' · double XP on':''}`;
     if(html!==last){last=html;panel.innerHTML=html;}const a=document.getElementById('research-panel')??document.getElementById('gunsmith-panel');if(a&&a.nextElementSibling!==panel)a.after(panel);});
+  installXpTokens(api,()=>P);   // timed double XP tokens: clock, pause-menu strip, window.kino.xpMul
   window.kino.pass={addXp:(n,why)=>{gain(n,why);savePass(P);},get state(){return P;},season,seasons:S};
 }

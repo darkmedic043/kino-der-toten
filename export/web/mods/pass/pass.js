@@ -9,7 +9,8 @@
 // season that has started. Auto-progress spends on the "active" pass: the live season, or a past one the player picked
 // (until the next season goes live).
 // Store: kino.mods.pass = {v:2, auto, track:{id, live}, seasons:{<id>:{xp, bought, premium, unlocked:{rewardId:true},
-//   granted:{rewardId:true}}}, boosts:{passXp, weaponXp, researchXp} (matches left at double XP), gums:[pass gum ids],
+//   granted:{rewardId:true}}}, boosts:{passXp, weaponXp, researchXp} (matches left at double XP),
+//   xpTokens:{playerXp, weaponXp} (one-hour double XP tokens held), xpLeft:{playerXp, weaponXp} (seconds left on the running one), gums:[pass gum ids],
 //   archive:[summaries from before v2]}, cloud-synced (cloud.js TRACKED). Older saves (one flat season) migrate on load.
 // Most rules take S = loadSeasons()'s {list, current}. Rewards go through the reward registry (shop.js grantReward) or the
 // pass's own types.
@@ -36,7 +37,7 @@ export function loadPass(){
   let p;try{p=JSON.parse(localStorage.getItem(PASS_KEY));}catch{}p=p&&typeof p==='object'?p:{};
   const seasons={};for(const [id,r] of Object.entries(p.seasons??{})){seasons[id]={xp:+r.xp||0,bought:+r.bought||0,premium:!!r.premium,unlocked:{...r.unlocked},granted:{...r.granted}};if(Number.isFinite(r.earned))seasons[id].earned=r.earned;}
   if(p.season&&!seasons[p.season])seasons[p.season]={xp:+p.xp||0,bought:+p.bought||0,premium:!!p.premium,unlocked:{...p.unlocked},granted:{...p.granted}};   // v1: one flat season
-  return {v:2,auto:p.auto??true,track:p.track??null,seasons,boosts:{passXp:0,weaponXp:0,researchXp:0,...p.boosts},gums:Array.isArray(p.gums)?p.gums:[],archive:Array.isArray(p.archive)?p.archive:[],forfeit:+p.forfeit||0};
+  return {v:2,auto:p.auto??true,track:p.track??null,seasons,boosts:{passXp:0,weaponXp:0,researchXp:0,...p.boosts},xpTokens:{playerXp:0,weaponXp:0,...p.xpTokens},xpLeft:{playerXp:0,weaponXp:0,...p.xpLeft},gums:Array.isArray(p.gums)?p.gums:[],archive:Array.isArray(p.archive)?p.archive:[],forfeit:+p.forfeit||0};
 }
 export function savePass(p){try{localStorage.setItem(PASS_KEY,JSON.stringify(p));}catch{}window.dispatchEvent?.(new CustomEvent('kino-pass'));}
 
@@ -80,6 +81,7 @@ function give(season,p,entry){
   const R=rec(p,season);if(R.granted[entry.id])return false;const r=entry.reward;
   if(r.type==='item')grantReward('item',r.id);
   else if(r.type==='credits'){const c=loadCredits();change(c,r.amount,`Melon Pass ${season.name}: ${entry.id}`);saveCredits(c);}
+  else if(r.type==='token'&&r.hours)p.xpTokens[r.kind]=(p.xpTokens[r.kind]??0)+r.hours;   // timed double XP: one-hour tokens (xp-tokens.js)
   else if(r.type==='token')p.boosts[r.kind]=(p.boosts[r.kind]??0)+r.matches;
   else if(r.type==='gum'){if(!p.gums.includes(r.id))p.gums.push(r.id);}
   R.granted[entry.id]=true;return true;
@@ -136,6 +138,7 @@ export function addXp(S,p,n){
 export function describe(r,{catalog,gums}={}){
   if(r.type==='item'){const i=catalog?.items.find(x=>x.id===r.id);if(i?.data?.label)return {title:i.name,sub:i.data.label,item:i,desc:i.desc};return {title:i?.name??r.id,sub:{camo:'CAMO',outfit:'OUTFIT',reticle:'RETICLE & HITS',theme:'THEME',sound:'SOUND SET',glow:'MAP GLOW',card:'CALLING CARD'}[i?.cat]??'ITEM',item:i};}
   if(r.type==='credits')return {title:`${r.amount} Credits`,sub:'CREDITS'};
+  if(r.type==='token'&&r.hours)return {title:`Double ${{playerXp:'Player',weaponXp:'Weapon'}[r.kind]} XP`,sub:`${r.hours} HOUR${r.hours>1?'S':''} · GAME TIME`};
   if(r.type==='token')return {title:`Double ${{passXp:'Pass',weaponXp:'Weapon',researchXp:'Research'}[r.kind]} XP`,sub:`NEXT ${r.matches} MATCH${r.matches>1?'ES':''}`};
   if(r.type==='gum'){const g=gums?.gums.find(x=>x.id===r.id);return {title:g?.name??r.id,sub:`GOBBLEGUM · ${(g?.rarity??'').toUpperCase()} · SEASON EXCLUSIVE`,desc:g?.desc};}
   return {title:'?',sub:''};

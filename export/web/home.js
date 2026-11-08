@@ -32,10 +32,12 @@ import { loadResearchConfig } from './mods/research/research.js';
 import { renderResearch } from './mods/research/pane.js';
 import { mountShop } from './mods/shop/shop-tab.js';
 import { mountPass, PASS_CSS } from './mods/pass/pass-tab.js';
+import { mountXpTokens, fmtLeft, xpLeft, XP_TOKEN_NAMES } from './mods/pass/xp-tokens.js';
 import { loadPass, savePass, loadSeasons, reconcile as reconcilePass, wrapUp as wrapUpPass, tokens as passTokens } from './mods/pass/pass.js';
 {const st=document.createElement('style');st.textContent=PASS_CSS;document.head.append(st);}
 let seasonCfg=null;loadSeasons(new URL('mods/pass/',document.baseURI)).then(async s=>{seasonCfg=s;await cloudReady;{const p=loadPass();reconcilePass(s,p);if(wrapUpPass(s,p))savePass(p);}try{renderProfile();}catch{}}).catch(()=>{});   // reconcile: claimed slots whose reward was swapped
-addEventListener('kino-pass',()=>{try{renderProfile();}catch{}});
+let drawXp=null;   // the PLAY panel's DOUBLE XP strip (renderHero)
+addEventListener('kino-pass',()=>{try{renderProfile();}catch{}try{drawXp?.();}catch{}});
 let researchCfg=null;
 loadResearchConfig(new URL('mods/research/',document.baseURI)).then(c=>{researchCfg=c;drawResearch();}).catch(e=>console.warn('[research]',e));
 function drawResearch(){const el=document.getElementById('research-root');if(el&&researchCfg)renderResearch(el,{cfg:researchCfg,level:unlockLvl(loadProfile()),toast});}
@@ -267,6 +269,8 @@ function renderHero(){
   if(modesOf(m).includes('zombies')){const u=zombiesUrl(m);actions.push(`<a class="play-btn" href="${esc(u)}">PLAY ZOMBIES <span>→</span></a>`,`<a class="play-btn secondary" href="${esc(u+(u.includes('?')?'&':'?')+'mp=host')}">HOST CO-OP GAME <span>+</span></a>`);}
   if(modesOf(m).includes('explore'))actions.push(`<a class="play-btn ${actions.length?'secondary':''}" href="${esc(exploreUrl(m))}">EXPLORE THE MAP <span>→</span></a>`);
   $('hero-actions').innerHTML=actions.join('');
+  // timed double XP tokens (Melon Pass rewards): use one before the match; the clock only runs in play
+  if(modesOf(m).includes('zombies'))drawXp=mountXpTokens($('hero-xp'),{onUse:k=>toast(`Double ${XP_TOKEN_NAMES[k].toLowerCase()} on · ${fmtLeft(xpLeft(loadPass(),k))} of play`)});else{drawXp=null;$('hero-xp').innerHTML='';}
 }
 function renderMaps(){
   const grid=$('map-grid');grid.innerHTML='';

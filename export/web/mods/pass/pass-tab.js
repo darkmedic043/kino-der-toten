@@ -29,7 +29,7 @@ export async function mountPass(root,{toast,data}){
   function rewardThumb(r){
     const d=describe(r,{catalog,gums});if(r.type==='item'&&d.item)return thumb(d.item);
     if(r.type==='credits')return `<div class="pv ps-ic" style="color:#f0c060">◈<small>${r.amount}</small></div>`;
-    if(r.type==='token')return `<div class="pv ps-ic" style="color:#7fd8ff">×2<small>${({passXp:'PASS',weaponXp:'WEAPON',researchXp:'RESEARCH'})[r.kind]}</small></div>`;
+    if(r.type==='token')return `<div class="pv ps-ic" style="color:#7fd8ff">×2<small>${({passXp:'PASS',weaponXp:'WEAPON',researchXp:'RESEARCH',playerXp:'PLAYER'})[r.kind]}${r.hours?` · ${r.hours} H`:''}</small></div>`;
     if(r.type==='gum'){const g=gums?.gums.find(x=>x.id===r.id),c=gums?.rarities.find(x=>x.id===g?.rarity)?.color??'#888';return `<div class="pv ps-ic"><i class="gumball" style="--c:${c}"></i></div>`;}
     return '<div class="pv"></div>';
   }
