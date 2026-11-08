@@ -339,7 +339,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const r=gun.getObjectByName(def.gunRoot??'j_gun')??(()=>{let b=null;gun.traverse(o=>{if(!b&&o.isBone)b=o;});return b;})();if(!r){sc.dispose();return;}
     scene.updateMatrixWorld(true);const unit=charmUnit(def);
     const avoid=charmFor(charmCat,loadCharmState(),id)?charmZone(gun,r,{key:def.model,override:charmCat.anchors[id],unit}):null;
-    screenMnt=screenMount(gun,r,{key:def.model,override:charmCat.screenMounts[id],housing:sc.housing,unit,avoid});if(!screenMnt){sc.dispose();return;}
+    screenMnt=screenMount(gun,r,{key:def.model,override:charmCat.screenMounts[id],housing:sc.housing,unit,avoid,spots:charmCat.screenSpots});if(!screenMnt){sc.dispose();return;}
     sc.setFoot(screenMnt.foot);sc.gun=gun;sc.root=r;screenObj=sc;scene.add(sc.object);placeScreen(sc,r,screenMnt);demoT=0;
     if(slot==='charm'&&charmTab==='screens')aim();
   }

@@ -37,6 +37,11 @@ export default async function setup(api){
   const screenState=()=>{const w=session.weapon,d=view.def??session.def,p=window.kino?.weaponLevels?.profile?.camo?.[sId]?.p??{};
     return {kills:p.kills??0,heads:p.headshots??0,mag:w?.mag??0,reserve:w?.reserve??0,clip:d?.clipSize??1,round:session.round??1,
       reloading:(session.reloadLeft??0)>0,down:session.phase==='reviving'};};
+  // the screen's spot: the baked one, the same the Gunsmith shows (screens.js); a gun missing from screen-spots.json gets the
+  // Gunsmith's plain search, run at load by the warm-up below so play only reads the cache
+  function mountFor(gun,root,def,id,housing){const unit=charmUnit(def),key=def?.model??id;
+    const avoid=charmFor(cat,loadCharmState(),id)?charmZone(gun,root,{key,override:cat.anchors[id],unit}):null;
+    return screenMount(gun,root,{key,override:cat.screenMounts[id],housing,unit,avoid,spots:cat.screenSpots});}
   function stepScreen(dt){
     if(view.gun!==sGun){dropScreen();return;}
     let shown=true;for(let o=sGun;o;o=o.parent){if(o===viewScene)break;if(!o.visible){shown=false;break;}}
@@ -44,8 +49,7 @@ export default async function setup(api){
       // after the raise has settled; it keeps clear of where a charm hangs when the gun has one
       if(!shown||performance.now()-sAt<450){scr.object.visible=false;return;}
       view.pivot.updateMatrixWorld(true);const def=view.def??session.def,unit=charmUnit(def);
-      const avoid=charmFor(cat,loadCharmState(),sId)?charmZone(sGun,sRoot,{key:(def?.model??sId),override:cat.anchors[sId],unit}):null;
-      sMount=screenMount(sGun,sRoot,{key:(def?.model??sId),override:cat.screenMounts[sId],hands:view.hands,camera:api.viewCamera,housing:scr.housing,unit,avoid});
+      sMount=mountFor(sGun,sRoot,def,sId,scr.housing);
       if(!sMount){dropScreen();return;}scr.setFoot(sMount.foot);
     }
     scr.object.visible=shown;if(!shown)return;
@@ -90,7 +94,8 @@ export default async function setup(api){
   host.on('warmWeapon',({def,gun:wg,wait})=>{
     const id=def?.baseId??def?.id,e=screenFor(cat,loadCharmState(),id);if(!e||!wg)return;
     wait?.(makeScreen(cat,e).then(s=>{if(!s)return;const r=rootOf(wg,def);if(!r)return;s.update(1,{kills:0,heads:0,mag:1,clip:1});
-      s.object.matrixAutoUpdate=true;s.object.position.set(2,3,0);s.object.scale.setScalar(charmUnit(def));r.add(s.object);}));
+      s.object.matrixAutoUpdate=true;s.object.position.set(2,3,0);s.object.scale.setScalar(charmUnit(def));r.add(s.object);
+      wg.updateMatrixWorld(true);mountFor(wg,r,def,id,s.housing);}));
   });
 
   // the Gunsmith changed a gun's charm (weapon-levels/gunsmith-view.js): rehang it if that's the gun in hand

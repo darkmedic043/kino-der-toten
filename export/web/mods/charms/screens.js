@@ -261,15 +261,19 @@ export async function makeScreen(cat,entry){
 }
 
 // ---- where it mounts ------------------------------------------------------------------------------------------------------
-// the search costs 100-350 ms, so a gun's spot is remembered in this browser (localStorage, by everything it depends on):
-// it runs once per gun and view, not on every match's first equip. Bump MOUNT_V when the search changes.
-const MOUNT_V=3,MOUNT_KEY='kino.screenMounts';
-let saved=null;
-const savedMounts=()=>{if(saved)return saved;try{const o=JSON.parse(localStorage.getItem(MOUNT_KEY)??'null');saved=o?.v===MOUNT_V?o:{v:MOUNT_V,m:{}};}catch{saved={v:MOUNT_V,m:{}};}return saved;};
-const fromSaved=o=>o&&{...o,matrix:new THREE.Matrix4().fromArray(o.matrix)};
-function saveMount(k,out){const S=savedMounts();delete S.m[k];S.m[k]={...out,matrix:out.matrix.toArray()};
-  const ks=Object.keys(S.m);for(const x of ks.slice(0,Math.max(0,ks.length-150)))delete S.m[x];   // oldest out
-  try{localStorage.setItem(MOUNT_KEY,JSON.stringify(S));}catch{}}
+// The spots are baked (2026-11-07, user: "make it consistent with the gunsmith please, no need to have it search during
+// play"): .tools/bake-screen-spots.mjs runs the search below once per gun model and housing in a game page, with the
+// player's arms and the view camera, and writes screen-spots.json. The Gunsmith and the game both read that, so they show
+// the same spot and nothing searches in play. A model missing from it falls back to the plain search (no arms, no camera,
+// the Gunsmith's typical eye), the same in both places; the game runs that at load from its warmWeapon handler.
+export const spotKey=(model,housing)=>`${String(model).replace(/^[a-z]+:\/\/[^/]+\//,'')}|${String(housing?.model??'').replace(/^.*\/|\.glb.*$/g,'')}`;
+// a baked spot -> the mount screenMount returns (root space; `unit` scales it to the gun's model units)
+export function mountFromSpot(sp,unit=1){
+  const F=frameOf(sp.tilt??20,sp.yaw??42),n=F.n,s=sp.s,t=sp.t;
+  const R=new THREE.Matrix4().makeBasis(F.x,F.u,n).transpose().multiply(G_SIDE),q=new THREE.Quaternion().setFromRotationMatrix(R);
+  const m=new THREE.Matrix4().makeBasis(F.x,F.u,n).scale(new THREE.Vector3().setScalar(s*unit)).setPosition(new THREE.Vector3().fromArray(sp.c).multiplyScalar(unit));
+  return {matrix:m,size:s,foot:sp.depth/s,arm:t/s,clip:{p:[F.x.y*-.13,F.u.y*-.13,-t/s+n.y*-.13],q:q.toArray(),hook:sp.hook??null},along:sp.along,cost:sp.cost,spot:sp,baked:true};
+}
 // which arms are posed around the gun (the characters' rigs differ; their roots carry no name)
 const handsSig=h=>{if(!h)return '';let n=0,v=0;h.traverse(o=>{if(o.isMesh&&o.visible){n++;v+=o.geometry?.attributes?.position?.count??0;}});return n+'.'+v;};
 const mounts=new Map(),inv=new THREE.Matrix4(),_v=new THREE.Vector3(),_x=new THREE.Vector3(),_u=new THREE.Vector3(),_n=new THREE.Vector3();
@@ -283,13 +287,12 @@ function frameOf(tilt,yaw){
   return {n:_n.clone(),u:_u.clone(),x:_x.clone()};
 }
 // -> {matrix (root space, model units), size, foot (housing units)}; null when the gun has no points
-export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,avoid=null}={}){
+export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,avoid=null,spots=null}={}){
+  const baked=!override?.at&&spots?.[spotKey(key,housing)];if(baked){const k='b|'+spotKey(key,housing)+'|'+unit;if(!mounts.has(k))mounts.set(k,mountFromSpot(baked,unit));return mounts.get(k);}
   const tilt=override?.tilt??20,yaw=override?.yaw??42,F=frameOf(tilt,yaw),HW=housing.w??1.2,HH=housing.h??1.2,FT=housing.foot??[.6,.55];
   const hidden=[];gun.traverse(b=>{if(b.isBone&&b.scale.x<1e-3)hidden.push(b.name);});
   const fullKey=[key,housing.model,handsSig(hands),unit,JSON.stringify(override??''),avoid?`${avoid.x.toFixed(1)},${avoid.z.toFixed(1)}`:'',hidden.join(',')].join('|');
   if(mounts.has(fullKey))return mounts.get(fullKey);
-  const viewKey=fullKey+(camera?`|${camera.fov.toFixed(0)},${camera.aspect.toFixed(1)}`:'');
-  const kept=fromSaved(savedMounts().m[viewKey]);if(kept){mounts.set(fullKey,kept);return kept;}
   inv.copy(root.matrixWorld).invert();
   const pb=[],pts=visiblePoints(gun,null,gun.parent,pb,unit,inv,.6);if(pts.length<9)return null;
   const hp=hands?visiblePoints(hands,gun,hands.parent,null,unit,inv):[];
@@ -392,11 +395,10 @@ export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,a
     let l=landing(c,s);const tMin=.42*s;   // the arm shows past the bracket's collar
     if(!l)l={t:(best.depth+.2)/n.y,hook:null};
     if(l.t<tMin){c.addScaledVector(n,tMin-l.t);l.t=tMin;}   // too close: stand the housing off
-    const t=l.t,R=new THREE.Matrix4().makeBasis(F.x,F.u,n).transpose().multiply(G_SIDE),q=new THREE.Quaternion().setFromRotationMatrix(R);
-    const cp=[F.x.y*-.13,F.u.y*-.13,-t/s+n.y*-.13];
-    const m=new THREE.Matrix4().makeBasis(F.x,F.u,n).scale(_v.setScalar(s*unit)).setPosition(c.multiplyScalar(unit));
-    out={matrix:m,size:s,foot:best.depth/s,arm:t/s,clip:{p:cp,q:q.toArray(),hook:l.hook},along:(best.cx-xmin)/L,cost:best.cost};}
-  mounts.set(fullKey,out);if(!override?.at)saveMount(viewKey,out);return out;
+    const r3=v=>Math.round(v*1000)/1000,sp={c:c.toArray().map(r3),s,t:r3(l.t),depth:r3(best.depth),hook:l.hook&&{len:r3(l.hook.len),depth:r3(l.hook.depth)},
+      tilt,yaw,along:r3((best.cx-xmin)/L),cost:r3(best.cost)};
+    out={...mountFromSpot(sp,unit),baked:false};}
+  mounts.set(fullKey,out);return out;
 }
 // the charm's keep-clear zone (inches): its plain hang spot (no hands or camera, so the Gunsmith and the game agree) and a
 // generous drop and width

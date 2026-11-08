@@ -15,8 +15,10 @@ import { loadModel } from '../../animation.js';
 const KEY='kino.mods.charms';
 let catalogue=null;
 export function loadCharms(){
-  return catalogue??=fetch(new URL('./charms.json',import.meta.url)).then(r=>r.json())
-    .then(c=>{c.charms??=[];c.anchors??={};c.screens??=[];c.housings??={};c.screenMounts??={};return c;}).catch(()=>({charms:[],anchors:{},screens:[],housings:{},screenMounts:{}}));
+  if(catalogue)return catalogue;
+  const spots=fetch(new URL('./screen-spots.json',import.meta.url)).then(r=>r.ok?r.json():{}).then(j=>j.spots??{}).catch(()=>({}));   // baked gun screen spots (screens.js)
+  return catalogue=fetch(new URL('./charms.json',import.meta.url)).then(r=>r.json())
+    .then(async c=>{c.charms??=[];c.anchors??={};c.screens??=[];c.housings??={};c.screenMounts??={};c.screenSpots=await spots;return c;}).catch(()=>({charms:[],anchors:{},screens:[],housings:{},screenMounts:{},screenSpots:{}}));
 }
 // {on:{[gun base id]:charm id}, screen:{[gun base id]:screen id}} (gun screens: screens.js)
 export function loadCharmState(){try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');s.on??={};s.screen??={};return s;}catch{return {on:{},screen:{}};}}
