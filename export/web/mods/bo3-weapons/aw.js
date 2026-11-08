@@ -36,6 +36,23 @@
 //   aw_shockanchor XMG: reaching full lockdown throws a shockwave (6 s recharge)
 //   aw_gunshield  MG Turret: 40% less damage taken while firing
 //   aw_spinup     MG Turret: held fire ramps fire rate to +60% over 4 s
+//   Shared across a few of the 34 Season guns (2026-11-08): aw_overpressure every 5th round x2 and a stagger; aw_fieldstrip the
+//   first 3 rounds after a reload +30%; aw_cqb +30% within 250, -25% past 700; aw_marksman a headshot refunds its round;
+//   aw_penetrator +20% per zombie already passed; aw_beltfed every 4th round free; aw_gunslinger 2 s of +40% fire rate after the
+//   switch; aw_thermobaric blasts +20%; aw_dronelink a drone over the shoulder shoots the nearest zombie in sight (0.8 s, half a hit).
+//   One per gun: aw_rhythm (AK-12) +4% per hit in a row to +40%, a miss resets; aw_teslarifling (ARX) 15% of hits arc; aw_adaptive
+//   (Bal-27) +5% fire rate a kill to +30% until a reload; aw_splitter (HBRa3) first hit splits 30%; aw_tripletap (IMR) every 3rd
+//   hit in a row on one zombie x2.5; aw_heavybolt (AK-47) hits stagger; aw_rangecard (M16) +20% past 600; aw_spoils (StG) kills +30
+//   points; aw_vent (AE4) the last quarter of the mag +40% and burns; aw_pulse (Repulsor) every 8th hit staggers all within 150;
+//   aw_match (MK14) an aimed shot 0.4 s after the last +25%; aw_chargechamber (M160) 1 s aimed charges x2; aw_frenzy (KF5) kills
+//   within 1 s refund 3; aw_shredder (MP11) +5% per hit on one zombie to +50%; aw_typewriter (ASM1) held fire to +40% fire rate;
+//   aw_bodyguard (SN6) -25% damage taken while firing; aw_sentinel (AMR9) a headshot marks all within 200; aw_static (SAC3) every
+//   20th hit arcs to 4; aw_blitz (MP40) +30% fire rate 1 s after a sprint; aw_lucky (Sten) 1 round in 10 free; aw_heatsink (Ameli)
+//   2 s of fire, hits burn; aw_juggernaut (Pytaek) -30% damage taken aiming; aw_volley (Lynx) hits within 1 s +20% each to +80%;
+//   aw_cryo (MORS) 5 s freeze, a frozen kill shatters; aw_spotter (SVO) aiming marks zombies in view; aw_explosivetip (Atlas 20mm)
+//   hits burst 60% within 120; aw_showstopper (M1911) headshots stagger all within 120; aw_doubletap (MP-443) a second hit within
+//   0.3 s x2; aw_vampire (PDW) kills heal 8; aw_tandem (MAAWS) a second blast 0.35 s later for half; aw_arcwarhead (Mahem) blast hits
+//   arc; aw_salvo (Stinger) a rocket kill refunds a rocket. The AW launchers' blasts count as hits like the MDL's (4 s after firing).
 // - The MG Turret itself: the barrels spin up (0.6 s) before it fires, aiming keeps them turning; see turret() below
 // - Lasers (aws_tracker red, aws_laser green): the part's beam is steered at the crosshair each frame (mounts.js aimLasers),
 //   dimmed while aiming, with a dot where the crosshair lands.
@@ -101,16 +118,32 @@ export function setupAw(api){
 
   // ---- Bulwark Plating and Overclock Servos (the XMG, locked down) ----
   const braced=id=>lock>0&&!falling&&view.def?.lockdown&&has(id);
-  host.on('beforeDamage',e=>{if(braced('aw_bulwark'))e.amount*=1-.6*lock;if(has('aw_gunshield')&&now()-lastShot<.4)e.amount*=.6;});
+  host.on('beforeDamage',e=>{if(braced('aw_bulwark'))e.amount*=1-.6*lock;if(has('aw_gunshield')&&now()-lastShot<.4)e.amount*=.6;
+    if(has('aw_bodyguard')&&now()-lastShot<.4)e.amount*=.75;if(has('aw_juggernaut')&&view.input?.ads)e.amount*=.7;});
   const fire=session.fire.bind(session);
   // fully locked down the XMG fires 25% faster (user, 2026-10-24); Overclock Servos stack another 40% on top
   // every shot: the rest of the per-gun triggers. spool = how long the trigger has been held, 0..1
   let shot=0,lastShot=-9,spool=0,chain=0,chainUntil=0,sprintAt=-9,rush=-1;
   const shotZ=new Set();   // zombies this shot has been through
+  // the Season guns' customs: streaks, the same-zombie run, the shot numbers a bonus belongs to
+  let rhythm=0,volley=0,lastHitAt=-9,adapt=0,fresh=0,freshShot=-1,matchShot=-1,chargeShot=-1,adsAt=-9,drawnAt=-9,heldId=null,frenzyAt=-9,
+    sameZ=null,sameN=0,sameAt=-9,refunded=-1,pulseN=0,staticN=0,tandemArmed=false,salvoArmed=false,blastGun=null,droneT=0,spotT=0;
   session.fire=(...args)=>{
     const ok=fire(...args);if(!ok)return ok;
     if(lock>=1&&!falling&&view.def?.lockdown)session.fireLeft/=1.25*(braced('aw_overclock')?1.4:1);
-    const a=atts(),t=now();shot++;shotZ.clear();lastShot=t;
+    const a=atts(),t=now(),missed=shot>0&&!shotZ.size,since=t-lastShot;shot++;shotZ.clear();lastShot=t;
+    const w=session.weapon,clip=session.def.clipSize,ads=!!view.input?.ads,free=()=>{if(w&&w.mag<clip)w.mag++;};
+    if(missed)rhythm=0;
+    if(fresh>0){fresh--;freshShot=shot;}
+    if(a.includes('aw_adaptive'))session.fireLeft/=1+.05*adapt;
+    if(a.includes('aw_gunslinger')&&t-drawnAt<2)session.fireLeft/=1.4;
+    if(a.includes('aw_typewriter'))session.fireLeft/=1+.4*spool;
+    if(a.includes('aw_blitz')&&t-sprintAt<1)session.fireLeft/=1.3;
+    if(a.includes('aw_match')&&ads&&since>=.4)matchShot=shot;
+    if(a.includes('aw_chargechamber')&&ads&&t-adsAt>=1)chargeShot=shot;
+    adsAt=t;   // the charge starts over from this shot
+    if(a.includes('aw_beltfed')&&shot%4===0)free();
+    if(a.includes('aw_lucky')&&Math.random()<.1)free();
     if(a.includes('aw_killchain')&&t<chainUntil)session.fireLeft/=1+.1*chain;
     if(a.includes('aw_spinup'))session.fireLeft/=1+.6*spool;
     if(a.includes('aw_bipod')&&view.input?.ads&&still())session.fireLeft/=1.3;
@@ -126,16 +159,41 @@ export function setupAw(api){
 
   // ---- hits ----
   let blastUntil=0;   // the MDL's grenades count as its hits for a while after it fires
-  (host.fireHooks??=[]).push(def=>{if((def.baseId??def.id)==='aw_mdl'){blastUntil=now()+4;clusterArmed=true;}return false;});   // grenades skip the 'shot' event
+  // (every AW launcher's: the MDL's grenades and the rockets; they skip the 'shot' event)
+  (host.fireHooks??=[]).push(def=>{const id=def.baseId??def.id;if(def.weaponClass==='Launcher'&&String(id).startsWith('aw_')){blastUntil=now()+4;blastGun=session.weapon?.id;clusterArmed=tandemArmed=salvoArmed=true;}return false;});
   const hurt=enemies.hurt.bind(enemies);
   enemies.hurt=(z,damage,head,...rest)=>{
     if(host.remoteDamage||!alive(z))return hurt(z,damage,head,...rest);
     const t=now(),cause=rest[1];
     if(z.awMark?.until>t)damage*=1.2;   // Tracker
-    const gunHit=cause==='bullet'||(cause==='explosion'&&t<blastUntil&&session.weapon?.id==='aw_mdl');
+    const gunHit=cause==='bullet'||(cause==='explosion'&&t<blastUntil&&session.weapon?.id===blastGun);
     if(!gunHit)return hurt(z,damage,head,...rest);
     const a=atts(),at=z.root.position.clone().add(new THREE.Vector3(0,45,0));
     const first=!shotZ.size;shotZ.add(z);
+    const iced=a.includes('aw_cryo')&&dazed.has(z);   // (frozen before this hit: a kill shatters)
+    let quick=false;
+    if(first){quick=z===sameZ&&t-sameAt<.3;sameN=z===sameZ?sameN+1:1;sameZ=z;sameAt=t;volley=t-lastHitAt<1?Math.min(4,volley+1):0;lastHitAt=t;}
+    const w=session.weapon,clip=session.def.clipSize,dist=player?.position?z.root.position.distanceTo(player.position):0;
+    if(a.includes('aw_overpressure')&&shot%5===0){damage*=2;daze(z,at);}
+    if(a.includes('aw_fieldstrip')&&freshShot===shot)damage*=1.3;
+    if(a.includes('aw_cqb'))damage*=dist<250?1.3:dist>700?.75:1;
+    if(a.includes('aw_penetrator'))damage*=1+.2*(shotZ.size-1);
+    if(a.includes('aw_thermobaric')&&cause==='explosion')damage*=1.2;
+    if(a.includes('aw_rhythm')){damage*=1+.04*rhythm;if(first)rhythm=Math.min(10,rhythm+1);}
+    if(a.includes('aw_tripletap')&&first&&sameN%3===0){damage*=2.5;burst(at,GOLD,8,60);}
+    if(a.includes('aw_shredder'))damage*=1+.05*Math.min(10,sameN-1);
+    if(a.includes('aw_doubletap')&&quick){damage*=2;sameAt=-9;burst(at,GOLD,5,40);}
+    if(a.includes('aw_volley'))damage*=1+.2*volley;
+    if(a.includes('aw_rangecard')&&dist>600)damage*=1.2;
+    if(a.includes('aw_vent')&&w&&w.mag<=clip*.25){damage*=1.4;ignite(z,damage*.3);}
+    if(a.includes('aw_match')&&matchShot===shot)damage*=1.25;
+    if(a.includes('aw_chargechamber')&&chargeShot===shot){damage*=2;if(first)burst(at,ARC,10,70);}
+    if(a.includes('aw_heatsink')&&spool>=.67)ignite(z,damage*.3);
+    if(a.includes('aw_heavybolt'))daze(z,at);
+    if(a.includes('aw_cryo'))daze(z,at,5);
+    if(head&&a.includes('aw_showstopper')){daze(z,at);for(const {o} of near(z,120))daze(o,chest(o));}
+    if(head&&a.includes('aw_sentinel')){mark(z,t);for(const {o} of near(z,200))mark(o,t);}
+    if(head&&a.includes('aw_marksman')&&refunded!==shot&&w&&w.mag<clip){refunded=shot;w.mag++;}
     if(a.includes('aw_lastword')&&session.weapon.mag===0){damage*=3;burst(at,GOLD,10,60);}
     if(a.includes('aw_meltdown'))damage*=1+.5*spool;
     if(rush===shot)damage*=2;
@@ -149,11 +207,24 @@ export function setupAw(api){
     if(a.includes('aw_overcharge')&&first){burst(at,ARC,12,90);for(const {o} of near(z,120)){hurt(o,damage*.5,false,false,'explosion');burst(chest(o),ARC,3,40);}}
     if(a.includes('aw_prism')&&first){const o=near(z,260).find(({o})=>world.lineClear(at,chest(o)))?.o;if(o){bolt(at,chest(o),PRISM);hurt(o,damage*.35,false,false,'explosion');}}
     if(a.includes('aw_ricochet')&&head){const o=near(z,300).find(({o})=>world.lineClear(at,chest(o)))?.o;if(o){bolt(at,chest(o),GOLD);hurt(o,damage,false,false,'bullet');}}
+    if(a.includes('aw_teslarifling')&&Math.random()<.15)arc(z,at,damage*.5);
+    if(a.includes('aw_splitter')&&first){const o=near(z,260).find(({o})=>world.lineClear(at,chest(o)))?.o;if(o){bolt(at,chest(o),GOLD);hurt(o,damage*.3,false,false,'explosion');}}
+    if(a.includes('aw_pulse')&&first&&++pulseN%8===0){burst(at,DAZE,18,160,4.5);for(const {o} of near(z,150))daze(o,chest(o));}
+    if(a.includes('aw_static')&&first&&++staticN%20===0)arc(z,at,damage,4);
+    if(a.includes('aw_explosivetip')){burst(at,EMBER,6,70);for(const {o} of near(z,120))hurt(o,damage*.6,false,false,'explosion');}
+    if(a.includes('aw_arcwarhead')&&cause==='explosion'&&shotZ.size<=3)arc(z,at,damage*.5);
+    if(a.includes('aw_tandem')&&cause==='explosion'&&tandemArmed){tandemArmed=false;bombs.push({at:z.root.position.clone().add(new THREE.Vector3(0,14,0)),t:t+.35,dmg:Math.max(damage,session.def.explosionInnerDamage??0)*.5,r:(session.def.explosionRadius||180)*.8});}
     if(a.includes('aw_recall')&&shotZ.size===3){const w=session.weapon;w.mag=Math.min(session.def.clipSize,w.mag+1);burst(at,ARC,10,70);}
     if(a.includes('aw_cluster')&&clusterArmed&&cause==='explosion'){clusterArmed=false;const dmg=session.def.damage*.3;
       for(let i=0;i<3;i++){const ang=i*2.1+Math.random(),r=50+Math.random()*40;bombs.push({at:z.root.position.clone().add(new THREE.Vector3(Math.cos(ang)*r,14,Math.sin(ang)*r)),t:t+.3+i*.13,dmg});}}
     if(!alive(z)){
       if(a.includes('aws_scavenger')){const w=session.weapon,clip=session.def.clipSize;if(w&&w.mag<clip){w.mag=Math.min(clip,w.mag+2);burst(at,GOLD,3,30,2.5);}}
+      if(a.includes('aw_adaptive'))adapt=Math.min(6,adapt+1);
+      if(a.includes('aw_spoils'))session.addPoints?.(30);
+      if(a.includes('aw_frenzy')){if(t-frenzyAt<1&&w)w.mag=Math.min(clip,w.mag+3);frenzyAt=t;}
+      if(a.includes('aw_vampire'))session.health=Math.min(session.maxHealth,session.health+8);
+      if(a.includes('aw_salvo')&&cause==='explosion'&&salvoArmed&&w&&w.mag<clip){salvoArmed=false;w.mag++;burst(at,GOLD,8,60);}
+      if(iced){burst(at,DAZE,16,120,4.5);for(const {o} of near(z,100))hurt(o,damage*.5,false,false,'explosion');}
       if(a.includes('aw_killchain')){chain=Math.min(5,(t<chainUntil?chain:0)+1);chainUntil=t+3;}
       if(a.includes('aw_crossfeed')){const w=session.weapon,form=session.attachmentMode?data.weapons[w.id]:session.def.attachment,other=session.attachmentMode?w.primaryAmmo:(w.attachmentAmmo??={mag:form?.clipSize??0,reserve:form?.maxAmmo??0});
         if(other&&form)other.mag=Math.min(form.clipSize,other.mag+3);}
@@ -168,22 +239,22 @@ export function setupAw(api){
   function unmark(z){const s=marked.get(z);if(s){s.removeFromParent();s.material.dispose();}marked.delete(z);if(z.awMark)z.awMark=null;}
   const chest=o=>o.root.position.clone().add(new THREE.Vector3(0,42,0));
   const near=(z,r)=>enemies.list.filter(o=>o!==z&&alive(o)).map(o=>({o,d:o.root.position.distanceTo(z.root.position)})).filter(({d})=>d<r).sort((x,y)=>x.d-y.d);
-  function arc(z,from,dmg){
+  function arc(z,from,dmg,max=2){
     let n=0;
     for(const {o} of near(z,260)){
       const to=chest(o);
       if(!world.lineClear(from,to))continue;
-      bolt(from,to,ARC);hurt(o,dmg,false,false,'explosion');if(++n>=2)break;
+      bolt(from,to,ARC);hurt(o,dmg,false,false,'explosion');if(++n>=max)break;
     }
     if(!n)for(let i=0;i<2;i++)bolt(from,from.clone().add(new THREE.Vector3(Math.random()-.5,Math.random()-.3,Math.random()-.5).normalize().multiplyScalar(50)),ARC);
   }
   const burning=new Map();
   function ignite(z,dps){const b=burning.get(z);if(b){b.left=3;b.dps=Math.max(b.dps,dps);}else burning.set(z,{left:3,dps,acc:0,fx:0});}
   const dazed=new Set();
-  function daze(z,at){
+  function daze(z,at,len=2.5){
     const c=z.awDaze??={k:1,scale:z.rig?.mixer?.timeScale};
     if(c.k===1){if(z.speed)z.speed*=.5;if(z.rig?.mixer&&c.scale!==undefined)z.rig.mixer.timeScale=c.scale*.5;c.k=.5;burst(at,DAZE,6,40);}
-    c.until=now()+2.5;dazed.add(z);
+    c.until=Math.max(c.until??0,now()+len);dazed.add(z);
   }
   function undaze(z){const c=z.awDaze;if(c?.k===.5){if(z.speed)z.speed/=.5;if(z.rig?.mixer&&c.scale!==undefined)z.rig.mixer.timeScale=c.scale;}z.awDaze=null;dazed.delete(z);}
 
@@ -277,10 +348,13 @@ export function setupAw(api){
     { const t=now();
       if(view.input?.sprint)sprintAt=t;
       if(player?.position){if(moved.distanceToSquared(player.position)>.25){movedAt=t;moved.copy(player.position);}}
+      if(!view.input?.ads)adsAt=t;
+      const id=session.weapon?.id;if(id!==heldId){heldId=id;drawnAt=t;}
+      season(dt,t);
       spool=t-lastShot<.35?Math.min(1,spool+dt/(has('aw_spinup')?4:3)):Math.max(0,spool-dt/1.5);
       turret(dt);
       for(let i=bombs.length-1;i>=0;i--){const b=bombs[i];if(t<b.t)continue;bombs.splice(i,1);burst(b.at,EMBER,14,110,5);if(Math.random()<.5)audio?.play?.('explosion');
-        for(const o of enemies.list){if(alive(o)&&o.root.position.distanceTo(b.at)<90)hurt(o,b.dmg,false,false,'explosion');}}
+        for(const o of enemies.list){if(alive(o)&&o.root.position.distanceTo(b.at)<(b.r??90))hurt(o,b.dmg,false,false,'explosion');}}
     }
     edge.style.opacity=braced('aw_bulwark')&&session.phase!=='gameover'?lock.toFixed(2):'0';
     const t=now();
@@ -300,5 +374,25 @@ export function setupAw(api){
       if(f.t<=0){dispose(f);fx.splice(i,1);continue;}
       f.obj.material.opacity=f.t/f.life;if(f.vel){f.obj.position.addScaledVector(f.vel,dt);f.vel.y+=20*dt;}}
   });
+  // a finished reload: Field-Stripped's 3 fresh rounds, and the Adaptive Barrel starts over
+  const finish=session.finishReloadStage.bind(session);
+  session.finishReloadStage=(...x)=>{const r=finish(...x);if(!(session.reloadLeft>0)){fresh=has('aw_fieldstrip')?3:0;adapt=0;}return r;};
+  // Drone Uplink: a glow over the right shoulder that shoots; Spotter Scope: aiming marks what is in view
+  const drone=new THREE.Sprite(sprite.clone());drone.material.color.setHex(0x7fffd4);drone.scale.setScalar(4);drone.visible=false;scene.add(drone);
+  const dEye=new THREE.Vector3(),dq=new THREE.Quaternion();
+  function season(dt,t){
+    const cam=host.camera??camera,on=has('aw_dronelink')&&view.ready&&session.phase!=='gameover';
+    drone.visible=on;
+    if(on){
+      cam.getWorldPosition(dEye);cam.getWorldQuaternion(dq);
+      drone.position.set(34,16+Math.sin(t*2.3)*2.5,-40).applyQuaternion(dq).add(dEye);drone.material.opacity=.7+.3*Math.sin(t*11);
+      if((droneT-=dt)<=0){droneT=.8;
+        const o=enemies.list.filter(alive).map(o=>({o,d:o.root.position.distanceTo(dEye)})).filter(({d})=>d<1500).sort((x,y)=>x.d-y.d).find(({o})=>world.lineClear(drone.position,chest(o)))?.o;
+        if(o){bolt(drone.position,chest(o),0x7fffd4);hurt(o,(session.def.damage||100)*.5,false,false,'explosion');burst(chest(o),0x7fffd4,3,30);}else droneT=.2;}
+    }
+    if(has('aw_spotter')&&view.input?.ads&&(spotT-=dt)<=0){spotT=.25;cam.getWorldPosition(dEye);cam.getWorldDirection(tmp);
+      for(const o of enemies.list){if(!alive(o))continue;const c=chest(o),d=c.clone().sub(dEye),l=d.length();if(l<4000&&d.dot(tmp)/l>.96&&world.lineClear(dEye,c))mark(o,t);}}
+  }
+  host.on('reset',()=>{rhythm=volley=adapt=fresh=pulseN=staticN=0;sameZ=null;sameN=0;freshShot=matchShot=chargeShot=refunded=-1;tandemArmed=salvoArmed=false;blastGun=null;drone.visible=false;});
   window.kino.aw={get spool(){return spool;},get rev(){return rev;},get spin(){return spin;},get chain(){return chain;},bombs,dot,get lock(){return lock;},get frozen(){return frozen;},burning,dazed,marked};
 }

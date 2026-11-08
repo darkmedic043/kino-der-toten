@@ -1902,6 +1902,341 @@
       }
     },
     {
+      "id": "aw_overpressure",
+      "name": "Overpressure Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: hot-loaded cartridges. Every 5th round hits for double damage and staggers the zombie."
+    },
+    {
+      "id": "aw_fieldstrip",
+      "name": "Field-Stripped",
+      "slot": "grip",
+      "tags": [],
+      "stats": {
+        "reloadMul": 0.8
+      },
+      "desc": "Custom: a worn-in action, cleaned and oiled. Faster reloads, and the first 3 rounds after a reload hit 30% harder."
+    },
+    {
+      "id": "aw_cqb",
+      "name": "CQB Barrel",
+      "slot": "barrel",
+      "tags": [],
+      "stats": {
+        "rangeMul": 0.8,
+        "hipSpreadMul": 0.85
+      },
+      "desc": "Custom: a cut-down barrel for the crowd at the door. +30% damage within 250 units, -25% past 700."
+    },
+    {
+      "id": "aw_marksman",
+      "name": "Marksman Chamber",
+      "slot": "barrel",
+      "tags": [],
+      "stats": {
+        "headMul": 1.25
+      },
+      "desc": "Custom: a match-grade chamber. Headshots hit harder and put the round back in the magazine."
+    },
+    {
+      "id": "aw_penetrator",
+      "name": "Penetrator Barrel",
+      "slot": "barrel",
+      "tags": [],
+      "stats": {
+        "pierce": 2
+      },
+      "desc": "Custom: tungsten-cored rounds through a tight bore. Shots go through 2 zombies, +20% damage for each one already passed."
+    },
+    {
+      "id": "aw_beltfed",
+      "name": "Linked Belt",
+      "slot": "mag",
+      "tags": [],
+      "stats": {
+        "reserveMul": 1.25
+      },
+      "desc": "Custom: a disintegrating-link belt. 25% more reserve ammo, and every 4th round is free."
+    },
+    {
+      "id": "aw_gunslinger",
+      "name": "Gunslinger Grip",
+      "slot": "grip",
+      "tags": [],
+      "desc": "Custom: a grip made for the quick draw. For 2 s after you switch to this gun it fires 40% faster."
+    },
+    {
+      "id": "aw_thermobaric",
+      "name": "Thermobaric Warhead",
+      "slot": "ammo",
+      "tags": [],
+      "stats": {
+        "blastMul": 1.35
+      },
+      "desc": "Custom: a fuel-air warhead. Bigger blasts that hit 20% harder."
+    },
+    {
+      "id": "aw_dronelink",
+      "name": "Drone Uplink",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom: a buddy drone slaved to the gun. While you hold it, the drone shoots the nearest zombie in sight every 0.8 s for half of a hit."
+    },
+    {
+      "id": "aw_rhythm",
+      "name": "Rhythm Trigger",
+      "slot": "grip",
+      "tags": [],
+      "desc": "Custom (AK-12): keep the beat. Each hit in a row adds 4% damage, up to +40%; a miss starts over."
+    },
+    {
+      "id": "aw_teslarifling",
+      "name": "Tesla Rifling",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom (ARX-160): coiled rifling. Hits have a 15% chance to arc to 2 nearby zombies for half damage."
+    },
+    {
+      "id": "aw_adaptive",
+      "name": "Adaptive Barrel",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom (Bal-27): the barrel learns. Each kill adds 5% fire rate, up to +30%, until you reload."
+    },
+    {
+      "id": "aw_splitter",
+      "name": "Splitter Choke",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom (HBRa3): a shot's first hit splits to the nearest zombie for 30% damage."
+    },
+    {
+      "id": "aw_tripletap",
+      "name": "Triple Tap",
+      "slot": "grip",
+      "tags": [],
+      "desc": "Custom (IMR): every third hit in a row on the same zombie hits for 2.5x."
+    },
+    {
+      "id": "aw_heavybolt",
+      "name": "Heavy Bolt Carrier",
+      "slot": "stock",
+      "tags": [],
+      "stats": {
+        "damageMul": 1.15,
+        "fireMul": 0.9
+      },
+      "desc": "Custom (AK-47): a heavier bolt. Harder, slower hits that stagger zombies."
+    },
+    {
+      "id": "aw_rangecard",
+      "name": "Long Range Barrel",
+      "slot": "barrel",
+      "tags": [],
+      "stats": {
+        "rangeMul": 1.4
+      },
+      "desc": "Custom (M16): a long free-floated barrel. +20% damage on targets past 600 units."
+    },
+    {
+      "id": "aw_spoils",
+      "name": "Spoils of War",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom (StG-44): kills with this gun pay 30 extra points."
+    },
+    {
+      "id": "aw_vent",
+      "name": "Overheat Vent",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom (AE4): the last quarter of a magazine runs hot. Those shots hit 40% harder and set zombies on fire."
+    },
+    {
+      "id": "aw_pulse",
+      "name": "Kinetic Pulse",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom (Repulsor): every 8th hit lets off a pulse that staggers every zombie within 150 units."
+    },
+    {
+      "id": "aw_match",
+      "name": "Match Trigger",
+      "slot": "grip",
+      "tags": [],
+      "desc": "Custom (MK14): a crisp break. An aimed shot taken 0.4 s or more after the last hits 25% harder."
+    },
+    {
+      "id": "aw_thirtyaught",
+      "name": "Thirty-Aught Clip",
+      "slot": "mag",
+      "tags": [],
+      "stats": {
+        "pierce": 1,
+        "headMul": 1.15
+      },
+      "desc": "Custom (M1 Garand): full-power .30-06 in an en-bloc clip. Shots go through a zombie and headshots hit harder."
+    },
+    {
+      "id": "aw_chargechamber",
+      "name": "Charge Chamber",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom (M160): aim for 1 s to charge the chamber. The next shot hits for double."
+    },
+    {
+      "id": "aw_frenzy",
+      "name": "Frenzy Feed",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom (KF5): kills within 1 s of each other put 3 rounds back in the magazine."
+    },
+    {
+      "id": "aw_shredder",
+      "name": "Shredder Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom (MP11): each hit on the same zombie adds 5% damage, up to +50%."
+    },
+    {
+      "id": "aw_typewriter",
+      "name": "Typewriter Spring",
+      "slot": "grip",
+      "tags": [],
+      "desc": "Custom (ASM1): hold the trigger and the fire rate climbs, up to +40% over 3 s."
+    },
+    {
+      "id": "aw_bodyguard",
+      "name": "Bodyguard Plate",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom (SN6): a ballistic plate on the fore-end. 25% less damage taken while firing."
+    },
+    {
+      "id": "aw_sentinel",
+      "name": "Sentinel Uplink",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom (AMR9): headshots mark every zombie within 200 units, and marked zombies take 20% more from your hits."
+    },
+    {
+      "id": "aw_static",
+      "name": "Static Discharge",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom (SAC3): every 20th hit discharges, arcing to 4 nearby zombies for full damage."
+    },
+    {
+      "id": "aw_blitz",
+      "name": "Blitz Bolt",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom (MP40): for 1 s after a sprint the gun fires 30% faster."
+    },
+    {
+      "id": "aw_lucky",
+      "name": "Lucky Magazine",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom (Sten): one round in ten doesn't leave the magazine."
+    },
+    {
+      "id": "aw_heatsink",
+      "name": "Heat Sink",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom (Ameli): after 2 s of sustained fire, hits set zombies on fire."
+    },
+    {
+      "id": "aw_juggernaut",
+      "name": "Juggernaut Frame",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom (Pytaek): a braced frame. 30% less damage taken while aiming."
+    },
+    {
+      "id": "aw_volley",
+      "name": "Volley Pins",
+      "slot": "grip",
+      "tags": [],
+      "desc": "Custom (Lynx): each hit within 1 s of the last adds 20% damage, up to +80%."
+    },
+    {
+      "id": "aw_cryo",
+      "name": "Cryo Slugs",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom (MORS): hits freeze zombies to half speed for 5 s; a frozen zombie killed shatters, hurting those within 100 units for half the hit."
+    },
+    {
+      "id": "aw_spotter",
+      "name": "Spotter Scope",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom (SVO): aiming marks the zombies in view, and marked zombies take 20% more from your hits."
+    },
+    {
+      "id": "aw_explosivetip",
+      "name": "Explosive Tip",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom (Atlas 20mm): hits burst, hurting zombies within 120 units for 60% of the hit."
+    },
+    {
+      "id": "aw_overload",
+      "name": "Buckshot Overload",
+      "slot": "ammo",
+      "tags": [],
+      "stats": {
+        "pelletMul": 1.3,
+        "pelletSpreadMul": 1.2
+      },
+      "desc": "Custom (S12): 30% more pellets in a wider pattern."
+    },
+    {
+      "id": "aw_showstopper",
+      "name": "Showstopper",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom (M1911): headshots stagger the zombie and every zombie within 120 units."
+    },
+    {
+      "id": "aw_doubletap",
+      "name": "Double Tap",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom (MP-443): a second hit on the same zombie within 0.3 s hits for double."
+    },
+    {
+      "id": "aw_vampire",
+      "name": "Vampire Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom (PDW): kills with this gun heal you for 8 health."
+    },
+    {
+      "id": "aw_tandem",
+      "name": "Tandem Charge",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom (MAAWS): a second charge goes off 0.35 s after the first blast, for half its damage."
+    },
+    {
+      "id": "aw_arcwarhead",
+      "name": "Arc Warhead",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom (Mahem): blast hits arc to the 2 nearest zombies for half damage."
+    },
+    {
+      "id": "aw_salvo",
+      "name": "Salvo Link",
+      "slot": "under",
+      "tags": [],
+      "desc": "Custom (Stinger M7): a rocket that kills puts a rocket back in the launcher."
+    },
+    {
       "id": "dc_loupe",
       "name": "Appraiser's Loupe",
       "slot": "optic",

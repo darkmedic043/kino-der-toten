@@ -201,3 +201,62 @@ Per-gun customs:
 
 The hit effects wrap `enemies.hurt` for the gun's hits: cause `bullet`, or cause `explosion` while the MDL is held and within 4 s of it firing (its grenades go through `features.shoot`, which emits no `shot` event, so aw.js records the time from a `host.fireHooks` entry that returns false). Partners' hits (`host.remoteDamage`) are skipped. FX: arcs are additive lines, embers and tracker tags additive sprites with a soft radial canvas texture (one of each in `host.warmObjects`). Tested on the GPU (2026-10-23): locked XMG with W + Space held moves 0 units, speed 0, a 100 damage hit becomes 40, `fireLeft` 0.065 -> 0.0464, all back after release; Arc Rail 50 to each neighbour; Ignition 40/s for 3 s; Concussive 55 -> 27.5 -> 55; Last Word 300 on the last round; Hot-Swap back to the LMG with 5 in the mag -> 60 (reserve 360 -> 305); Tracker 100 then 120, tag gone after 4.5 s; Scavenger kill with 3 in the mag -> 5; Seismic dazes only once `lock` is 1; Incendiary off before the MDL fires, then 30/s; Auto Burst makes the Tac-19 automatic.
 - **Camo on both guns** (2026-11-02): weapon-levels applies the camo to `view.leftGun` too (the XMG's off-hand gun stayed plain).
+
+### Season guns' customs (2026-11-08)
+
+The 34 guns of "The rest of the pack" had only the shared `aws_*` kit. They now have a custom of their own each, plus shared customs that span a few guns (`attachments.json`, kits in `aw-kits.json`, effects in `aw.js`, listed in its header too). Slots are spread so a gun's shared and own custom mostly sit in different slots. The M1 Garand also gets `aw_lastword`, the Stinger `aw_cluster`, the S12 `aw_ignition`.
+
+Shared:
+
+| Id | Name | Slot | Guns | Effect |
+|---|---|---|---|---|
+| `aw_overpressure` | Overpressure Rounds | ammo | AK-12, ARX-160, Bal-27, HBRa3, IMR | every 5th round (`shot%5`) x2 and a stagger |
+| `aw_fieldstrip` | Field-Stripped | grip | AK-47, M16, StG-44, M1 Garand, MP40, Sten, M1911 | reload x0.8; the first 3 rounds after a finished reload (`finishReloadStage` wrap) x1.3 |
+| `aw_cqb` | CQB Barrel | barrel | KF5, MP11, ASM1, SN6, AMR9 | range x0.8, hip spread x0.85; x1.3 within 250, x0.75 past 700 |
+| `aw_marksman` | Marksman Chamber | barrel | MK14, M160, M1 Garand | head x1.25; a headshot puts its round back (once a shot) |
+| `aw_penetrator` | Penetrator Barrel | barrel | Lynx, MORS, SVO, Atlas 20mm | `pierce` 2; x(1 + 0.2 per zombie the shot already went through) |
+| `aw_beltfed` | Linked Belt | mag | Ameli, Pytaek | reserve x1.25; every 4th round refunded |
+| `aw_gunslinger` | Gunslinger Grip | grip | M1911, MP-443, PDW | 2 s of x1.4 fire rate after switching to the gun |
+| `aw_thermobaric` | Thermobaric Warhead | ammo | MAAWS, Mahem, Stinger | blast radius x1.35 (`blastMul`), blast hits x1.2 |
+| `aw_dronelink` | Drone Uplink | stock | AE4, Repulsor, Ameli, SAC3 | a teal glow sprite over the right shoulder (camera space) shoots the nearest zombie in sight within 1500 every 0.8 s for half `def.damage` (cause `explosion`) |
+
+One per gun:
+
+| Id | Name | Slot | Gun | Effect |
+|---|---|---|---|---|
+| `aw_rhythm` | Rhythm Trigger | grip | AK-12 | +4% per hit in a row (once a shot) up to +40%; a shot with no hit resets |
+| `aw_teslarifling` | Tesla Rifling | barrel | ARX-160 | 15% of hits arc to 2 for half |
+| `aw_adaptive` | Adaptive Barrel | barrel | Bal-27 | +5% fire rate a kill, up to +30%, until a reload |
+| `aw_splitter` | Splitter Choke | muzzle | HBRa3 | a shot's first hit splits to the nearest zombie for 30% |
+| `aw_tripletap` | Triple Tap | grip | IMR | every 3rd hit in a row on one zombie x2.5 |
+| `aw_heavybolt` | Heavy Bolt Carrier | stock | AK-47 | damage x1.15, fire rate x0.9, hits stagger |
+| `aw_rangecard` | Long Range Barrel | barrel | M16 | range x1.4; x1.2 past 600 |
+| `aw_spoils` | Spoils of War | mag | StG-44 | kills +30 points (`session.addPoints`, doubled by Double Points) |
+| `aw_vent` | Overheat Vent | muzzle | AE4 | with the mag at a quarter or less: x1.4 and a 30% burn |
+| `aw_pulse` | Kinetic Pulse | under | Repulsor | every 8th hit staggers every zombie within 150 |
+| `aw_match` | Match Trigger | grip | MK14 | an aimed shot 0.4 s or more after the last x1.25 |
+| `aw_thirtyaught` | Thirty-Aught Clip | mag | M1 Garand | `pierce` 1, head x1.15 (stats only) |
+| `aw_chargechamber` | Charge Chamber | stock | M160 | 1 s aimed (`adsAt`, reset by every shot) makes the next shot x2 |
+| `aw_frenzy` | Frenzy Feed | mag | KF5 | a kill within 1 s of the last puts 3 rounds back |
+| `aw_shredder` | Shredder Rounds | ammo | MP11 | +5% per hit in a row on one zombie, up to +50% |
+| `aw_typewriter` | Typewriter Spring | grip | ASM1 | fire rate x(1 + 0.4 spool), spool = 3 s of held fire |
+| `aw_bodyguard` | Bodyguard Plate | under | SN6 | damage taken x0.75 within 0.4 s of a shot |
+| `aw_sentinel` | Sentinel Uplink | under | AMR9 | a headshot marks (Tracker's mark) every zombie within 200 |
+| `aw_static` | Static Discharge | ammo | SAC3 | every 20th hit arcs to 4 for full damage (`arc(z,at,dmg,max)`) |
+| `aw_blitz` | Blitz Bolt | stock | MP40 | fire rate x1.3 within 1 s of sprinting |
+| `aw_lucky` | Lucky Magazine | mag | Sten | 10% of shots refunded |
+| `aw_heatsink` | Heat Sink | barrel | Ameli | spool 0.67 or more (2 s of fire): hits burn for 30% |
+| `aw_juggernaut` | Juggernaut Frame | stock | Pytaek | damage taken x0.7 while aiming |
+| `aw_volley` | Volley Pins | grip | Lynx | each hit within 1 s of the last +20%, up to +80% |
+| `aw_cryo` | Cryo Slugs | ammo | MORS | a 5 s daze (`daze(z,at,len)`); killing a zombie dazed before the hit shatters it: half the hit to all within 100 |
+| `aw_spotter` | Spotter Scope | under | SVO | aiming: every 0.25 s marks zombies within 4000 in a ~16-degree cone in sight |
+| `aw_explosivetip` | Explosive Tip | ammo | Atlas 20mm | hits burst for 60% within 120 |
+| `aw_overload` | Buckshot Overload | ammo | S12 | pellets x1.3, pellet spread x1.2 (stats only) |
+| `aw_showstopper` | Showstopper | barrel | M1911 | headshots stagger the zombie and all within 120 |
+| `aw_doubletap` | Double Tap | barrel | MP-443 | a hit on the same zombie within 0.3 s of the last x2 (alternates) |
+| `aw_vampire` | Vampire Rounds | ammo | PDW | kills heal 8 (`session.health`, capped at `maxHealth`) |
+| `aw_tandem` | Tandem Charge | barrel | MAAWS | the first blast hit of a rocket queues a second blast (bomblet list, `r` = 0.8 x radius) 0.35 s later for half |
+| `aw_arcwarhead` | Arc Warhead | under | Mahem | the first 3 zombies a blast hits arc to 2 for half |
+| `aw_salvo` | Salvo Link | under | Stinger M7 | a rocket's first kill puts a rocket back in the launcher |
+
+Launchers: `fireHooks` now arm `blastUntil` for every AW `Launcher` (`blastGun` = the gun fired), not just the MDL, so the rockets' blasts count as the gun's hits (the MAAWS/Mahem/Stinger's Incendiary Payload and Concussive Slugs did nothing before). Checked in Node with stubbed game objects (`scratch/aw3/hooks.mjs`): every effect's numbers as listed; not yet played in a browser.
