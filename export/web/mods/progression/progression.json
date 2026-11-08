@@ -399,9 +399,124 @@
       "soon": true
     },
     {
+      "id": "aw_m1911",
+      "rarity": "uncommon",
+      "level": 3
+    },
+    {
+      "id": "aw_mp443",
+      "rarity": "uncommon",
+      "level": 5
+    },
+    {
+      "id": "aw_mp40",
+      "rarity": "uncommon",
+      "level": 7
+    },
+    {
+      "id": "aw_sten",
+      "rarity": "uncommon",
+      "level": 8
+    },
+    {
+      "id": "aw_m16",
+      "rarity": "uncommon",
+      "level": 10
+    },
+    {
+      "id": "aw_kf5",
+      "rarity": "rare",
+      "level": 11
+    },
+    {
+      "id": "aw_ak47",
+      "rarity": "rare",
+      "level": 13
+    },
+    {
+      "id": "aw_stg44",
+      "rarity": "rare",
+      "level": 15
+    },
+    {
+      "id": "aw_m1garand",
+      "rarity": "rare",
+      "level": 16
+    },
+    {
+      "id": "aw_pdw",
+      "rarity": "rare",
+      "level": 17
+    },
+    {
+      "id": "aw_mp11",
+      "rarity": "rare",
+      "level": 19
+    },
+    {
+      "id": "aw_s12",
+      "rarity": "rare",
+      "level": 20
+    },
+    {
+      "id": "aw_mk14",
+      "rarity": "rare",
+      "level": 22
+    },
+    {
+      "id": "aw_sn6",
+      "rarity": "rare",
+      "level": 23
+    },
+    {
+      "id": "aw_bal27",
+      "rarity": "rare",
+      "level": 24
+    },
+    {
+      "id": "aw_asm1",
+      "rarity": "rare",
+      "level": 26
+    },
+    {
+      "id": "aw_ak12",
+      "rarity": "epic",
+      "level": 27
+    },
+    {
+      "id": "aw_amr9",
+      "rarity": "epic",
+      "level": 29
+    },
+    {
+      "id": "aw_arx160",
+      "rarity": "epic",
+      "level": 30
+    },
+    {
+      "id": "aw_sac3",
+      "rarity": "epic",
+      "level": 31
+    },
+    {
+      "id": "aw_hbra3",
+      "rarity": "epic",
+      "level": 33
+    },
+    {
       "id": "bo3_striker",
       "rarity": "epic",
       "level": 34
+    },
+    {
+      "id": "aw_imr",
+      "rarity": "epic",
+      "level": 34
+    },
+    {
+      "id": "aw_lynx",
+      "rarity": "epic",
+      "level": 35
     },
     {
       "id": "bo3_m240_ice",
@@ -414,6 +529,11 @@
       "level": 36
     },
     {
+      "id": "aw_m160",
+      "rarity": "epic",
+      "level": 37
+    },
+    {
       "id": "bo3_rpg_dragon",
       "rarity": "legendary",
       "level": 38
@@ -422,6 +542,16 @@
       "id": "siren_zm",
       "rarity": "legendary",
       "level": 38
+    },
+    {
+      "id": "aw_maaws",
+      "rarity": "epic",
+      "level": 38
+    },
+    {
+      "id": "aw_ameli",
+      "rarity": "epic",
+      "level": 39
     },
     {
       "id": "havoc_zm",
@@ -444,7 +574,17 @@
       "level": 40
     },
     {
+      "id": "aw_svo",
+      "rarity": "epic",
+      "level": 41
+    },
+    {
       "id": "bo3_mg4_heaven",
+      "rarity": "legendary",
+      "level": 42
+    },
+    {
+      "id": "aw_pytaek",
       "rarity": "legendary",
       "level": 42
     },
@@ -464,9 +604,19 @@
       "level": 44
     },
     {
+      "id": "aw_repulsor",
+      "rarity": "legendary",
+      "level": 44
+    },
+    {
       "id": "aw_sentry",
       "rarity": "legendary",
       "level": 45
+    },
+    {
+      "id": "aw_mors",
+      "rarity": "legendary",
+      "level": 46
     },
     {
       "id": "minigun_zm",
@@ -479,9 +629,29 @@
       "level": 47
     },
     {
+      "id": "aw_stingerm7",
+      "rarity": "legendary",
+      "level": 47
+    },
+    {
+      "id": "aw_ae4",
+      "rarity": "legendary",
+      "level": 48
+    },
+    {
       "id": "freezegun_zm",
       "rarity": "wonder",
       "level": 49
+    },
+    {
+      "id": "aw_mahem",
+      "rarity": "legendary",
+      "level": 50
+    },
+    {
+      "id": "aw_atlas_20mm",
+      "rarity": "legendary",
+      "level": 50
     }
   ],
   "bonuses": [

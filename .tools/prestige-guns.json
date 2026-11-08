@@ -601,5 +601,209 @@
   "styles": ["verdigris", "gildedrequiem", "deathknell"],
   "names": ["Verdigris", "Gilded Requiem", "Death Knell"],
   "pal": [[165, 28, 0], [44, 0, 0], [222, 198, 0]]
+ },
+ {
+  "id": "aw_bal27",
+  "name": "Bal-27",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_ak12",
+  "name": "AK12",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_arx160",
+  "name": "ARX-160",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_hbra3",
+  "name": "HBRa3",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_imr",
+  "name": "IMR",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_ak47",
+  "name": "AK-47",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_m16",
+  "name": "M16A4",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_stg44",
+  "name": "STG-44",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_ae4",
+  "name": "AE4",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_repulsor",
+  "name": "Repulsor",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_mk14",
+  "name": "MK14",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_m1garand",
+  "name": "M1 Garand",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_m160",
+  "name": "M160",
+  "cls": "ar",
+  "max": 3
+ },
+ {
+  "id": "aw_kf5",
+  "name": "KF5",
+  "cls": "smg",
+  "max": 3
+ },
+ {
+  "id": "aw_mp11",
+  "name": "MP11",
+  "cls": "smg",
+  "max": 3
+ },
+ {
+  "id": "aw_asm1",
+  "name": "ASM1",
+  "cls": "smg",
+  "max": 3
+ },
+ {
+  "id": "aw_sn6",
+  "name": "SN6",
+  "cls": "smg",
+  "max": 3
+ },
+ {
+  "id": "aw_amr9",
+  "name": "AMR9",
+  "cls": "smg",
+  "max": 3
+ },
+ {
+  "id": "aw_sac3",
+  "name": "SAC3",
+  "cls": "smg",
+  "max": 3
+ },
+ {
+  "id": "aw_mp40",
+  "name": "MP-40",
+  "cls": "smg",
+  "max": 3
+ },
+ {
+  "id": "aw_sten",
+  "name": "Sten",
+  "cls": "smg",
+  "max": 3
+ },
+ {
+  "id": "aw_ameli",
+  "name": "Ameli",
+  "cls": "lmg",
+  "max": 3
+ },
+ {
+  "id": "aw_pytaek",
+  "name": "Pytaek",
+  "cls": "lmg",
+  "max": 3
+ },
+ {
+  "id": "aw_lynx",
+  "name": "Lynx",
+  "cls": "sniper",
+  "max": 3
+ },
+ {
+  "id": "aw_mors",
+  "name": "MORS",
+  "cls": "sniper",
+  "max": 3
+ },
+ {
+  "id": "aw_svo",
+  "name": "SVO",
+  "cls": "sniper",
+  "max": 3
+ },
+ {
+  "id": "aw_atlas_20mm",
+  "name": "Atlas 20mm",
+  "cls": "sniper",
+  "max": 3
+ },
+ {
+  "id": "aw_s12",
+  "name": "S-12",
+  "cls": "shotgun",
+  "max": 3
+ },
+ {
+  "id": "aw_m1911",
+  "name": "Classic M1911",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "aw_mp443",
+  "name": "MP-443 Grach",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "aw_pdw",
+  "name": "PDW",
+  "cls": "pistol",
+  "max": 3
+ },
+ {
+  "id": "aw_maaws",
+  "name": "MAAWS",
+  "cls": "launcher",
+  "max": 3
+ },
+ {
+  "id": "aw_mahem",
+  "name": "MAHEM",
+  "cls": "launcher",
+  "max": 3
+ },
+ {
+  "id": "aw_stingerm7",
+  "name": "Stinger M7",
+  "cls": "launcher",
+  "max": 3
  }
 ]

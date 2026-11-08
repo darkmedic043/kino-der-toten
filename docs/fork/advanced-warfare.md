@@ -20,6 +20,65 @@ User: "add in the cel3, blunderbuss, tac19, bulldog, OHM, xmg, m1 irons, MG turr
 
 Box levels are the unlock ladder in `mods/progression/progression.json`. Pack-a-Punch uses each gun's own `_up` model (`upModel`/`upWorld` in the build, the upgrade's `model`). Stats are the `aw()` entries in the build script.
 
+## The rest of the pack (2026-11-08)
+
+User: "im gonna import the rest of the AW guns, can you help me". 33 more guns plus 4 akimbo pairs, from the same pack (all of its `s1_` guns except `energy_launcher` and `lever_action`, which have sounds only, no models or clips). Entries are `aw2()`/`aw2_dw()` in the build. `aw2()` picks each role from the clips the gun has:
+- `fire` falls back to `ads_fire` (MAHEM and Stinger M7 have no hip fire clip);
+- `firstRaise` falls back to `pullout`;
+- `reloadEmpty`, `lastShot` and `adsLastShot` are only set when the gun has those clips;
+- aim uses `ads_up/down`, or `scope_ads_*` for snipers;
+- the SAC3's single-gun clips are `sdw_*`.
+
+A gun with a `vm_s1_<gun>_hip_scope` model wears it on `tag_scope` (`fixed`). That covers Lynx, MORS, SVO, Atlas 20mm and MAHEM; the snipers use the `duplex` scope overlay. Launchers fire their own rocket models (`projectile`). The SN6 has numbered shots (`shot1..3`, `shots=`).
+
+| Gun | Id | Class | Rarity | Box level |
+|---|---|---|---|---|
+| Classic M1911 (+ Akimbo) | `aw_m1911` | Pistol | uncommon | 3 |
+| MP-443 Grach (+ Akimbo) | `aw_mp443` | Pistol | uncommon | 5 |
+| MP-40 | `aw_mp40` | SMG | uncommon | 7 |
+| Sten | `aw_sten` | SMG | uncommon | 8 |
+| M16A4 (burst) | `aw_m16` | Rifle | uncommon | 10 |
+| KF5 | `aw_kf5` | SMG | rare | 11 |
+| AK-47 | `aw_ak47` | Rifle | rare | 13 |
+| STG-44 | `aw_stg44` | Rifle | rare | 15 |
+| M1 Garand | `aw_m1garand` | Rifle (semi) | rare | 16 |
+| PDW (+ Akimbo) | `aw_pdw` | Pistol (auto) | rare | 17 |
+| MP11 | `aw_mp11` | SMG | rare | 19 |
+| S-12 | `aw_s12` | Shotgun | rare | 20 |
+| MK14 | `aw_mk14` | Rifle (semi) | rare | 22 |
+| SN6 | `aw_sn6` | SMG | rare | 23 |
+| Bal-27 | `aw_bal27` | Rifle | rare | 24 |
+| ASM1 | `aw_asm1` | SMG | rare | 26 |
+| AK12 | `aw_ak12` | Rifle | epic | 27 |
+| AMR9 | `aw_amr9` | SMG | epic | 29 |
+| ARX-160 | `aw_arx160` | Rifle | epic | 30 |
+| SAC3 (+ Akimbo) | `aw_sac3` | SMG | epic | 31 |
+| HBRa3 | `aw_hbra3` | Rifle | epic | 33 |
+| IMR (burst) | `aw_imr` | Rifle | epic | 34 |
+| Lynx | `aw_lynx` | Sniper | epic | 35 |
+| M160 | `aw_m160` | Rifle (semi) | epic | 37 |
+| MAAWS | `aw_maaws` | Launcher | epic | 38 |
+| Ameli | `aw_ameli` | LMG | epic | 39 |
+| SVO | `aw_svo` | Sniper | epic | 41 |
+| Pytaek | `aw_pytaek` | LMG | legendary | 42 |
+| Repulsor | `aw_repulsor` | Rifle | legendary | 44 |
+| MORS | `aw_mors` | Sniper | legendary | 46 |
+| Stinger M7 | `aw_stingerm7` | Launcher | legendary | 47 |
+| AE4 | `aw_ae4` | Rifle | legendary | 48 |
+| MAHEM | `aw_mahem` | Launcher | legendary | 50 |
+| Atlas 20mm | `aw_atlas_20mm` | Sniper | legendary | 50 |
+
+Kits are the shared `aws_*` set (rifles, SMGs, LMGs and the S-12 also get Auto Burst; pistols get Last Word, Concussive and Akimbo; launchers get the MDL's kit). None has an entry in `aw-kits.json` yet, so none has part mounts or unique attachments; add them there. Every gun is in `.tools/prestige-guns.json` and the camo table was regenerated (adding guns re-spreads the hues within each design).
+
+Not done yet:
+- the rifles' underbarrel grenade launcher clips (`to_gl`/`in_gl_*` on the AK12, AK-47, AMR9, HBRa3 and M16A4), which could become an alt like the OHM's;
+- the M160's `to_charge` clips;
+- the SN6's inspect clip.
+
+**Export.** The 522 missing textures were exported as described below, in four batches. Greyhound was driven with xdotool, which needs `DISPLAY=:1 XAUTHORITY=/run/user/1000/xauth_*` (take the cookie path from BO3's environ). The search box takes a comma list, pasted with xclip. Copy the exports only after Greyhound has finished writing: two MP-443 PaP textures (`i_mp443_loot_op01_skn_01_n`, `i_mp443_loot_op02_skn_01_c`) were copied half-written. They are kept in `scratch/aw2/broken/`, and the MP-443's PaP model is white until they are re-exported.
+
+**Tested** on the GPU (Kino, headless, one page per batch under `lowpri`). All 34 guns and the 5 akimbo pairs passed: they raise, fire (bursts for the IMR and M16A4), reload and refill, and Pack-a-Punch to their `_up` models. The akimbo pairs were checked through the real Akimbo attachment. The renderer held at 3.4-4.6 GB, the known baseline, and stayed flat or fell across 17 guns per page. The AW M16 and MP40 are named M16A4 and MP-40 so they don't clash with the BO1 guns in the wiki (`wiki-check` refuses duplicate names) and the box. Reloads: MAAWS and MAHEM take 6.6 s, Ameli 6.9/8.0 s, Pytaek 8.0/8.7 s (the clips' own lengths).
+
 ## Exporting
 
 - Find the loaded pack by listing `/proc/<BlackOps3 pid>/fd` for `workshop/content/311210/<id>/` (grepping 150 workshop folders timed out).

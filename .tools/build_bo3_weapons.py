@@ -371,7 +371,7 @@ def aw(cls, gid, name, up, gun, tpl, stats, glow, single=True, **kw):
     mdl = kw.pop('model', 'vm_s1_'+gun+('' if single else '_rdw'))
     return dict(cls=cls, id='aw_'+gid, name=name, up=up, model=mdl, world=kw.pop('world', 'wm_s1_'+gun+('' if single else '_rdw')),
                 upModel=kw.pop('upModel', mdl+'_up'), upWorld=kw.pop('upWorld', 'wm_s1_'+gun+('' if single else '_rdw')+'_up'), pre=pre, tpl=tpl, stats=stats, roles=roles,
-                ads=kw.pop('ads', (pre+'_ads_up', pre+'_ads_down')), shots=['wpn_s1_'+gun+'_shot'], upShots=['wpn_s1_'+gun+'_pap_shot'], glow=glow, **kw)
+                ads=kw.pop('ads', (pre+'_ads_up', pre+'_ads_down')), shots=kw.pop('shots', ['wpn_s1_'+gun+'_shot']), upShots=['wpn_s1_'+gun+'_pap_shot'], glow=glow, **kw)
 # the AW guns' Gunsmith kits (weapon-levels attachments.json aws_* shared, aw_* custom; effects in mods/bo3-weapons/aw.js).
 # Superseded at load: mods/bo3-weapons/aw-kits.json replaces statAttachments and adds part mounts for each gun (aw-kits.js). Edit kits there.
 # Unlock order follows the catalogue, not these lists.
@@ -456,6 +456,96 @@ MODW += [
      left=dict(model='vm_s1_atlas45', out='vm_s1_atlas45_ldw', suffix='_le', idle='ldw_idle', fire='ldw_fire', reload='ldw_reload', reloadEmpty='ldw_reload_empty'),
      upLeft='vm_s1_atlas45_ldw_up'),
 ]
+# ---- the rest of the AW pack (2026-11-08, user: "im gonna import the rest of the AW guns"): roles picked from the clips each gun has.
+# Snipers aim with their scope_ads clips and carry the hip scope model on tag_scope; launchers without a hip fire clip fire with ads_fire.
+# Akimbo pairs (pistols, SAC3) follow the Atlas 45: the single gun plus an *_dw entry folded in as its Akimbo attachment.
+def aw2(cls, gid, name, up, tpl, stats, glow, gun=None, **kw):
+    gun = gun or gid; pre = 'am_s1_'+gun
+    has = lambda c: (SRC/'xanims'/f'{pre}_{c}.seanim').exists()
+    sdw = kw.pop('sdw', '')   # the SAC3's single-gun clips are sdw_*
+    r = lambda c: sdw+c
+    roles = dict(idle=r('idle'), fire=r('fire') if has(r('fire')) else r('ads_fire'), reload=r('reload'), rais=r('pullout'), drop=r('putaway'),
+                 sprintIn=r('sprint_in'), sprintLoop=r('sprint_loop'), sprintOut=r('sprint_out'))
+    roles['adsFire'] = r('ads_fire') if has(r('ads_fire')) else roles['fire']
+    roles['firstRaise'] = r('first_raise') if has(r('first_raise')) else roles['rais']
+    roles['reloadEmpty'] = r('reload_empty') if has(r('reload_empty')) else None   # falsy roles are dropped for aw_ guns
+    if has(r('fire_last')): roles['lastShot'] = r('fire_last')
+    if has(r('ads_fire_last')): roles['adsLastShot'] = r('ads_fire_last')
+    roles.update(kw.pop('roles', {}))
+    aim = next((a for a in (r('ads'), 'scope_ads', r('reddot_ads')) if has(a+'_up')), 'ads')
+    if cls == 'Sniper rifle' and has('scope_ads_up'): aim = 'scope_ads'
+    if (SRC/'xmodels'/f'vm_s1_{gun}_hip_scope').exists(): kw.setdefault('fixed', [(f'vm_s1_{gun}_hip_scope', 'tag_scope')])
+    if not (SRC/'xmodels'/f'vm_s1_{gun}_up').exists() and (SRC/'xmodels'/f'vm_s1_{gun}_rdw_up').exists():
+        kw.setdefault('upModel', f'vm_s1_{gun}_rdw_up'); kw.setdefault('upWorld', f'wm_s1_{gun}_rdw_up')
+    return aw(cls, gid, name, up, gun, tpl, stats, glow, roles=roles, ads=kw.pop('ads', (pre+'_'+aim+'_up', pre+'_'+aim+'_down')), **kw)
+def aw2_dw(gid, name, up, tpl, stats, glow, gun=None, real_left=False):
+    gun = gun or gid; pre = 'am_s1_'+gun
+    has = lambda c: (SRC/'xanims'/f'{pre}_{c}.seanim').exists()
+    roles = {k: v for k, v in DW_ROLES.items() if has(v)}
+    roles.setdefault('reloadEmpty', 'rdw_reload'); roles.setdefault('firstRaise', 'fdw_pullout')
+    left = dict(idle='ldw_idle', fire='ldw_fire', reload='ldw_reload', **({'reloadEmpty': 'ldw_reload_empty'} if has('ldw_reload_empty') else {}))
+    if real_left: kw = dict(left=dict(model=f'vm_s1_{gun}_ldw', **left), model=f'vm_s1_{gun}_rdw', world=f'wm_s1_{gun}_rdw')
+    else: kw = dict(left=dict(model=f'vm_s1_{gun}', out=f'vm_s1_{gun}_ldw', suffix='_le', **left), model=f'vm_s1_{gun}', world=f'wm_s1_{gun}')
+    return aw('Pistol' if not real_left else 'Submachine gun', gid+'_dw', name, up, gun, tpl, stats, glow, single=False, roles=roles,
+              ads=(pre+'_fdw_ads_up', pre+'_fdw_ads_down'), upModel=f'vm_s1_{gun}_rdw_up', upWorld=f'wm_s1_{gun}_rdw_up', upLeft=f'vm_s1_{gun}_ldw_up', **kw)
+AUTO, SEMI = dict(automatic=True, fireType='Full Auto'), dict(automatic=False, fireType='Single Shot')
+MODW += [
+  # assault rifles
+  aw2('Rifle', 'bal27', 'Bal-27', 'Bal-27 Ballistica', 'galil_zm', glow='#5ac8ff', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=140, minDamage=95, fireTime=.075, price=1400, **AUTO)),
+  aw2('Rifle', 'ak12', 'AK12', 'AK12 Red Star', 'galil_zm', glow='#ff5a3a', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=150, minDamage=100, fireTime=.085, price=1400, **AUTO)),
+  aw2('Rifle', 'arx160', 'ARX-160', 'ARX-160 Arcturus', 'commando_zm', glow='#7affd2', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=135, minDamage=90, fireTime=.07, price=1300, **AUTO)),
+  aw2('Rifle', 'hbra3', 'HBRa3', 'HBRa3 Hydra', 'commando_zm', glow='#5a9aff', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=140, minDamage=92, fireTime=.072, price=1400, **AUTO)),
+  aw2('Rifle', 'imr', 'IMR', 'IMR Imperator', 'm16_zm', glow='#ffd36a', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=160, minDamage=110, fireTime=.06, price=1300)),
+  aw2('Rifle', 'ak47', 'AK-47', 'AK-47 Red Dawn', 'galil_zm', glow='#ff7a2a', stats=dict(clipSize=30, maxAmmo=270, startAmmo=270, damage=170, minDamage=110, fireTime=.1, price=1300, **AUTO)),
+  aw2('Rifle', 'm16', 'M16A4', 'M16 Ironfist', 'm16_zm', glow='#ffb45a', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=160, minDamage=110, fireTime=.06, price=1200)),
+  aw2('Rifle', 'stg44', 'STG-44', 'STG-44 Sturmwolf', 'galil_zm', glow='#ffa04a', stats=dict(clipSize=30, maxAmmo=270, startAmmo=270, damage=160, minDamage=105, fireTime=.1, price=1300, **AUTO)),
+  aw2('Rifle', 'ae4', 'AE4', 'AE4 Annihilux', 'commando_zm', glow='#c46bff', stats=dict(clipSize=24, maxAmmo=240, startAmmo=240, damage=220, minDamage=170, fireTime=.11, price=2000, **AUTO)),
+  aw2('Rifle', 'repulsor', 'Repulsor', 'Repulsor Vortex', 'commando_zm', glow='#5affb4', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=150, minDamage=100, fireTime=.08, price=1600, **AUTO)),
+  # marksman rifles
+  aw2('Rifle', 'mk14', 'MK14', 'MK14 Mark of the Beast', 'm14_zm', glow='#ff9a3a', stats=dict(clipSize=15, maxAmmo=150, startAmmo=150, damage=320, minDamage=240, fireTime=.14, price=1500, **SEMI)),
+  aw2('Rifle', 'm1garand', 'M1 Garand', 'M1 Garand Thunderclap', 'm14_zm', glow='#ffd36a', stats=dict(clipSize=8, maxAmmo=128, startAmmo=128, damage=360, minDamage=280, fireTime=.15, price=1200, **SEMI)),
+  aw2('Rifle', 'm160', 'M160', 'M160 Overcharge', 'm14_zm', glow='#5ad0ff', stats=dict(clipSize=20, maxAmmo=200, startAmmo=200, damage=280, minDamage=210, fireTime=.12, price=1600, **SEMI)),
+  # submachine guns
+  aw2('Submachine gun', 'kf5', 'KF5', 'KF5 Kraken', 'mp5k_zm', glow='#5ac8ff', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=110, minDamage=70, fireTime=.06, price=1100, **AUTO)),
+  aw2('Submachine gun', 'mp11', 'MP11', 'MP11 Hellhound', 'mp5k_zm', glow='#ff5a5a', stats=dict(clipSize=32, maxAmmo=320, startAmmo=320, damage=100, minDamage=65, fireTime=.05, price=1000, **AUTO)),
+  aw2('Submachine gun', 'asm1', 'ASM1', 'ASM1 Assembler', 'mp5k_zm', glow='#ffcf5a', stats=dict(clipSize=40, maxAmmo=360, startAmmo=360, damage=120, minDamage=75, fireTime=.08, price=1100, **AUTO)),
+  aw2('Submachine gun', 'sn6', 'SN6', 'SN6 Sinister', 'mp5k_zm', glow='#c46bff', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=115, minDamage=72, fireTime=.065, price=1100, **AUTO), shots=['wpn_s1_sn6_shot1', 'wpn_s1_sn6_shot2', 'wpn_s1_sn6_shot3']),
+  aw2('Submachine gun', 'amr9', 'AMR9', 'AMR9 Armageddon', 'mp5k_zm', glow='#ff7a2a', stats=dict(clipSize=30, maxAmmo=300, startAmmo=300, damage=125, minDamage=80, fireTime=.07, price=1200, **AUTO)),
+  aw2('Submachine gun', 'sac3', 'SAC3', 'SAC3 Sacrament', 'mp5k_zm', glow='#5affb4', sdw='sdw_', stats=dict(clipSize=24, maxAmmo=288, startAmmo=288, damage=95, minDamage=60, fireTime=.055, price=1000, **AUTO)),
+  aw2('Submachine gun', 'mp40', 'MP-40', 'MP40 Blitzkrieg', 'mp40_zm', glow='#ffb45a', stats=dict(clipSize=32, maxAmmo=320, startAmmo=320, damage=120, minDamage=78, fireTime=.1, price=1000, **AUTO)),
+  aw2('Submachine gun', 'sten', 'Sten', 'Sten Sentinel', 'mp40_zm', glow='#7affd2', stats=dict(clipSize=32, maxAmmo=320, startAmmo=320, damage=115, minDamage=75, fireTime=.09, price=1000, **AUTO)),
+  # light machine guns
+  aw2('Light machine gun', 'ameli', 'Ameli', 'Ameli Amalgam', 'rpk_zm', glow='#ff5a3a', stats=dict(clipSize=80, maxAmmo=480, startAmmo=480, damage=140, minDamage=95, fireTime=.07, price=2500, **AUTO)),
+  aw2('Light machine gun', 'pytaek', 'Pytaek', 'Pytaek Pyre', 'rpk_zm', glow='#ff9a3a', stats=dict(clipSize=100, maxAmmo=500, startAmmo=500, damage=130, minDamage=90, fireTime=.085, price=2500, **AUTO)),
+  # sniper rifles (scope overlay)
+  aw2('Sniper rifle', 'lynx', 'Lynx', 'Lynx Prowler', 'dragunov_zm', glow='#5ac8ff', stats=dict(clipSize=10, maxAmmo=80, startAmmo=80, damage=800, minDamage=600, fireTime=.25, price=2000, scope='duplex', **SEMI)),
+  aw2('Sniper rifle', 'mors', 'MORS', 'MORS Mortis', 'dragunov_zm', glow='#c46bff', stats=dict(clipSize=5, maxAmmo=40, startAmmo=40, damage=2500, minDamage=2000, fireTime=1.1, price=2500, scope='duplex', **SEMI)),
+  aw2('Sniper rifle', 'svo', 'SVO', 'SVO Svarog', 'dragunov_zm', glow='#ff7a2a', stats=dict(clipSize=10, maxAmmo=70, startAmmo=70, damage=900, minDamage=700, fireTime=.28, price=2000, scope='duplex', **SEMI)),
+  aw2('Sniper rifle', 'atlas_20mm', 'Atlas 20mm', 'Atlas 20mm Colossus', 'dragunov_zm', glow='#ffa04a', stats=dict(clipSize=5, maxAmmo=40, startAmmo=40, damage=1500, minDamage=1100, fireTime=.45, price=2500, scope='duplex', **SEMI)),
+  # shotgun
+  aw2('Shotgun', 's12', 'S-12', 'S-12 Salvo', 'spas_zm', glow='#5ad0ff', stats=dict(clipSize=10, maxAmmo=80, startAmmo=80, damage=150, minDamage=20, fireTime=.22, pellets=8, segmentedReload=False, price=1800, **SEMI)),
+  # pistols (each also has an akimbo pair below)
+  aw2('Pistol', 'm1911', 'Classic M1911', 'Classic M1911 Liberator', 'm1911_zm', glow='#ffd36a', stats=dict(clipSize=8, maxAmmo=96, startAmmo=96, damage=200, minDamage=130, fireTime=.14, price=800, **SEMI)),
+  aw2('Pistol', 'mp443', 'MP-443 Grach', 'MP-443 Grackle', 'cz75_zm', glow='#ff7a2a', stats=dict(clipSize=15, maxAmmo=150, startAmmo=150, damage=160, minDamage=100, fireTime=.11, price=900, **SEMI)),
+  aw2('Pistol', 'pdw', 'PDW', 'PDW Paladin', 'cz75_zm', glow='#5ac8ff', stats=dict(clipSize=25, maxAmmo=225, startAmmo=225, damage=110, minDamage=70, fireTime=.07, price=1100, **AUTO)),
+  # launchers
+  aw2('Launcher', 'maaws', 'MAAWS', 'MAAWS Maelstrom', 'm72_law_zm', glow='#ff9a3a', stats=dict(clipSize=1, maxAmmo=15, startAmmo=15, price=2500, soundAs='m72_law_zm', hideClipEmpty=True), projectile='wm_s1_maaws_rocket'),
+  aw2('Launcher', 'mahem', 'MAHEM', 'MAHEM Mayhem', 'm72_law_zm', glow='#5affb4', stats=dict(clipSize=4, maxAmmo=24, startAmmo=24, price=2800, soundAs='m72_law_zm'), projectile='wm_s1_mahem_projectile'),
+  aw2('Launcher', 'stingerm7', 'Stinger M7', 'Stinger M7 Swarm', 'm72_law_zm', glow='#ff5a3a', stats=dict(clipSize=4, maxAmmo=24, startAmmo=24, price=2800, soundAs='m72_law_zm'), projectile='wm_s1_stingerm7_rocket'),
+  # akimbo pairs: folded into their single gun as its Akimbo attachment
+  aw2_dw('m1911', 'Classic M1911 Akimbo', 'Classic M1911 Liberators', 'm1911_zm', glow='#ffd36a', stats=dict(clipSize=16, maxAmmo=160, startAmmo=160, damage=200, minDamage=130, fireTime=.1, price=1600, **SEMI)),
+  aw2_dw('mp443', 'MP-443 Grach Akimbo', 'MP-443 Grackles', 'cz75_zm', glow='#ff7a2a', stats=dict(clipSize=30, maxAmmo=240, startAmmo=240, damage=160, minDamage=100, fireTime=.08, price=1800, **SEMI)),
+  aw2_dw('pdw', 'PDW Akimbo', 'PDW Paladins', 'cz75_zm', glow='#5ac8ff', stats=dict(clipSize=50, maxAmmo=350, startAmmo=350, damage=110, minDamage=70, fireTime=.05, price=2000, **AUTO)),
+  aw2_dw('sac3', 'SAC3 Akimbo', 'SAC3 Sacraments', 'mp5k_zm', glow='#5affb4', real_left=True, stats=dict(clipSize=48, maxAmmo=384, startAmmo=384, damage=95, minDamage=60, fireTime=.045, price=2000, **AUTO)),
+]
+AKIMBO_OF.update({f'aw_{g}_dw': f'aw_{g}' for g in ('m1911', 'mp443', 'pdw', 'sac3')})
+AW_RIFLE = AW_KIT + AW_LONG + ['aws_autoburst']
+AW_CUSTOM.update({f'aw_{g}': AW_RIFLE for g in ('bal27', 'ak12', 'arx160', 'hbra3', 'imr', 'ak47', 'm16', 'stg44', 'ae4', 'repulsor', 'mk14', 'm1garand', 'm160',
+                                                 'kf5', 'mp11', 'asm1', 'sn6', 'amr9', 'mp40', 'sten', 'ameli', 'pytaek', 's12')})
+AW_CUSTOM.update({f'aw_{g}': AW_KIT + AW_LONG for g in ('lynx', 'mors', 'svo', 'atlas_20mm')})
+AW_CUSTOM.update({f'aw_{g}': AW_KIT + ['aw_lastword', 'aw_concussive', 'aws_autoburst', 'akimbo'] for g in ('m1911', 'mp443', 'pdw')})
+AW_CUSTOM['aw_sac3'] = AW_KIT + ['aws_autoburst', 'akimbo']
+AW_CUSTOM.update({f'aw_{g}': ['aws_rapid', 'aws_quickdraw', 'aws_stabilizer', 'aws_tracker', 'aw_incendiary', 'aw_concussive'] for g in ('maaws', 'mahem', 'stingerm7')})
 for w in MODW:
     if w['id'].startswith('aw_'): w['roles'] = {k: v for k, v in w['roles'].items() if v}
 # the mod's attachment models, mounted on the guns' tags by the weapon-levels mod (def.mounts)
