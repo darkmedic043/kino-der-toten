@@ -183,6 +183,7 @@ export function setupRagnarok(api,operator){
       metal.dispose();glow.dispose();
     }
     return {update,fire,aim,end,
+      get view(){return vw?.ready&&vw.pivot.visible?vw:null;},   // the view in hand, for the operator's own arms (characters mod)
       get planted(){return !!planted;},get plantedAt(){return planted?.at?.clone()??null;},get lifted(){return planted?planted.lifted.size:0;}};
   }
 }

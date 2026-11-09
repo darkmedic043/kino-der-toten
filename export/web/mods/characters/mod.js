@@ -125,7 +125,7 @@ export default async function setup(api){
 
   // "fpArms": the character's own arms in first person, posed onto the hidden
   // T5 viewmodel rig (see fp-arms.js). Perk drinks and the raised shields use their own viewmodels.
-  const activeView=()=>{const k=window.kino.knuckles;if(k?.active)return k.view;const sh=window.kino.rocketShield?.view;if(sh)return sh;const d=api.perkDrink;return d?.current?d.views[d.current]:api.view;};
+  const activeView=()=>{const k=window.kino.knuckles;if(k?.active)return k.view;const op=window.kino.operator?.handle?.view;if(op)return op;const sh=window.kino.rocketShield?.view;if(sh)return sh;const d=api.perkDrink;return d?.current?d.views[d.current]:api.view;};
   if(entry.fpArms&&entry.type==='gltf'&&api.viewScene){
     const fp=new FirstPersonArms(api.viewScene,await loadCharacterGltf(entry),entry);window.kino.fpArms=fp;fp.camera=api.camera;   // debug handle; the camera swings spring chains (fp-arms.js)
     host.on('update',()=>fp.sync(activeView(),!third));
