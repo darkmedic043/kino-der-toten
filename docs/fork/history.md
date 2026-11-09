@@ -523,3 +523,4 @@
 - 2026-11-09: First-person arms: the palm fit reads the BO3 rig's glove mesh (it read the wrist device: off on every imported gun); plain Bondrewd's palm material regex matches `Body.001`; new `fpArmsFingerFitLength` lengthens his fingers per segment so the left hand wraps BO3 handguards (RPD Gilded, AK117) (characters.md)
 - 2026-11-09: Zap Guns: left/right animation split works on their both-arms idle (independent reloads, right shots no longer sag the left arm); the loadout lists only the Wave Gun, Zap Gun kills/camo count for it (weapons.md).
 - 2026-11-09: Stone Cold Stronghold in co-op: teammates see your ring and build armour inside it (owner's rate and cap), Fortress slows on the host; BO7 card: armour is a shorter bar left of the HP figure with its number above (reaper-perks.md)
+- 2026-11-09: Vulture Aid ammo drops rarer: 3% of kills (was 5%), points stay 5% (gameplay.md)

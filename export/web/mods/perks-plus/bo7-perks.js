@@ -269,7 +269,7 @@ void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a =
     if (e.remote) return; const z = e.enemy, at = z?.root?.position?.clone(); if (!at) return;
     if (has(VA)) {
       const r = Math.random();
-      if (r < .1) drop(at, Math.random() < .5 ? 'ammo' : 'points');
+      if (r < .05) drop(at, 'points'); else if (r < .08) drop(at, 'ammo');   // ammo on 3% of kills (was 5%), points 5% (2026-11-09: "make ammo drops abit rarer")
       if (e.head && stat('va.luggage') && Math.random() < stat('va.luggage')) drop(at, 'points', 50);
       if (stat('va.picky') && Math.random() < stat('va.picky')) drop(at, 'grenade');
       if (special(z) && stat('va.serving') && Math.random() < stat('va.serving')) drop(at, 'big', 250);
