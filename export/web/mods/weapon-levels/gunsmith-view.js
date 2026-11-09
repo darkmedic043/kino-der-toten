@@ -636,11 +636,18 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   canvas.addEventListener('wheel',e=>{distGoal=THREE.MathUtils.clamp(distGoal*(1+Math.sign(e.deltaY)*.1),radius*1.2,radius*5);e.preventDefault();},{passive:false});
   const onKey=e=>{if(e.code==='Escape'){e.stopPropagation();e.preventDefault();if(stkArm||stkDrag){stkCancel();return;}close();}};
   addEventListener('keydown',onKey,true);
+  let viewX=-.03,viewGoal=-.03;   // horizontal framing (a fraction of the width; aim() moves it for the sticker view)
   function aim(){
     const p=slot==='charm'&&charmTab==='screens'&&screenObj?new THREE.Vector3().setFromMatrixPosition(screenObj.object.matrix):slot==='charm'?(charmRoot&&charmAnchor?charmRoot.localToWorld(charmAnchor.at.clone()).addScaledVector(DOWN,radius*.08):null):slot&&anchorOf(slot);
     // the charm hangs on the gun's left: turn round to that side
     charmYaw=null;if(slot==='charm'&&charmRoot){const n=new THREE.Vector3().setFromMatrixColumn(charmRoot.matrixWorld,1);charmYaw=Math.atan2(n.x,n.z);}
     if(p){focusGoal.copy(p);distGoal=radius*(slot==='charm'?1.3:2);}else{focusGoal.set(0,0,0);distGoal=radius*3.1;}
+    // stickers: the whole gun, mounted attachments included, in the clear space between the slot list and the sticker panel
+    // (the panel covered the muzzle end, so a silencer or brake couldn't take one)
+    viewGoal=-.03;
+    if(slot==='sticker'&&!p&&gun){const rb=root.getBoundingClientRect(),w=rb.width,h=rb.height,l=$('.slots').getBoundingClientRect().right-rb.left,r=$('.opts').getBoundingClientRect().left-rb.left;
+      if(r-l>160){viewGoal=.5-(l+r)/2/w;const bx=new THREE.Box3().setFromObject(gun,true),half=Math.max(-bx.min.x,bx.max.x,-bx.min.z,bx.max.z);
+        distGoal=Math.max(distGoal,half*h/((r-l)*.88*Math.tan(camera.fov*Math.PI/360)));}}
   }
 
   // ---- frame: camera, leader lines, pulse ---------------------------------------------------
@@ -651,18 +658,11 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(!alive)return;requestAnimationFrame(frame);
     const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;camoTime.value+=dt;   // animated camos (Pack-a-Punch, Prestige Master)
     const w=root.clientWidth,h=root.clientHeight;
-  let viewX=-.03,viewGoal=-.03;   // horizontal framing (a fraction of the width; aim() moves it for the sticker view)
     if(canvas.width!==Math.floor(w*renderer.getPixelRatio())||canvas.height!==Math.floor(h*renderer.getPixelRatio())){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
     focus.lerp(focusGoal,1-Math.exp(-dt*6));dist+=(distGoal-dist)*(1-Math.exp(-dt*6));
     if(!dragging&&!slot)yaw+=dt*.12;
     else if(!dragging&&slot==='sticker'&&stkYaw!=null){const d=Math.atan2(Math.sin(stkYaw-yaw),Math.cos(stkYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));if(Math.abs(d)<.005)stkYaw=null;}
     else if(!dragging&&slot==='charm'&&charmYaw!=null){const d=Math.atan2(Math.sin(charmYaw-yaw),Math.cos(charmYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));}
-    // stickers: the whole gun, mounted attachments included, in the clear space between the slot list and the sticker panel
-    // (the panel covered the muzzle end, so a silencer or brake couldn't take one)
-    viewGoal=-.03;
-    if(slot==='sticker'&&!p&&gun){const rb=root.getBoundingClientRect(),w=rb.width,h=rb.height,l=$('.slots').getBoundingClientRect().right-rb.left,r=$('.opts').getBoundingClientRect().left-rb.left;
-      if(r-l>160){viewGoal=.5-(l+r)/2/w;const bx=new THREE.Box3().setFromObject(gun,true),half=Math.max(-bx.min.x,bx.max.x,-bx.min.z,bx.max.z);
-        distGoal=Math.max(distGoal,half*h/((r-l)*.88*Math.tan(camera.fov*Math.PI/360)));}}
     camera.position.set(focus.x+Math.sin(yaw)*Math.cos(pitch)*dist,focus.y+Math.sin(pitch)*dist,focus.z+Math.cos(yaw)*Math.cos(pitch)*dist);
     // keep the gun off-centre toward the free middle of the screen
     camera.lookAt(focus);viewX+=(viewGoal-viewX)*(1-Math.exp(-dt*6));camera.setViewOffset(w,h,w*viewX,0,w,h);
