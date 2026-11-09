@@ -773,7 +773,9 @@ function setupBow(api) {
   const spot = pick.getWorldPosition(new THREE.Vector3());
   // the bow on the pedestal: its world model, slowly turning in a red glow
   const shown = new THREE.Group(); shown.position.copy(spot).add(new THREE.Vector3(0, 45, 0)); shown.visible = false; scene.add(shown);
-  const glow = new THREE.PointLight(0xff5a1a, 0, 220, 1.6); shown.add(glow);
+  // the glow stays in the scene, dark until the bow shows: under the hidden group it left and joined the light count,
+  // and every lit material recompiled each time (2026-11-08, freezes)
+  const glow = new THREE.PointLight(0xff5a1a, 0, 220, 1.6); glow.position.copy(shown.position); scene.add(glow);
   const def = api.data?.weapons?.[BOW];
   if (def?.worldModel) import('../../animation.js').then(({ loadModel }) => loadModel(def.worldModel)).then(m => { if (m) { m.rotation.z = Math.PI / 2; shown.add(m); } }).catch(() => {});
   const taken = () => session.flags.has('castle:bow:taken:' + sync.me), charged = () => heads.every(h => h.n >= SOULS);
@@ -832,9 +834,9 @@ function setupBow(api) {
         if (k === 'idle') { a.rig.play('idle', true, 1, .3); } else if (k === 'outtro') dragonPlay(h, 'outtro', 'done'); else if (k === 'done') {} else dragonPlay(h, k, a.after ?? 'idle'); }
       else if (!a.until && a.rig.current === 'idle' && Math.random() < dt / 25) dragonPlay(h, 'idle_twitch_roar'); }
     shown.visible = charged() && !taken();
-    if (shown.visible) { shown.rotation.y += dt * .6; shown.position.y = spot.y + 45 + Math.sin(t * 1.5) * 3; glow.intensity = 900 + Math.sin(t * 3) * 200; }
+    if (shown.visible) { shown.rotation.y += dt * .6; shown.position.y = spot.y + 45 + Math.sin(t * 1.5) * 3; glow.intensity = 900 + Math.sin(t * 3) * 200; glow.position.copy(shown.position); } else glow.intensity = 0;
   });
-  host.on('reset', () => { for (const h of heads) { h.n = 0; if (h.anim) { h.anim.until = 0; h.anim.rig.play('idle'); } } shown.visible = false; for (const f of flying) f.orb.removeFromParent(); flying.length = 0; });
+  host.on('reset', () => { for (const h of heads) { h.n = 0; if (h.anim) { h.anim.until = 0; h.anim.rig.play('idle'); } } shown.visible = false; glow.intensity = 0; for (const f of flying) f.orb.removeFromParent(); flying.length = 0; });
   return { ready: dragonsReady, state: () => ({ souls: heads.map(h => [h.id, h.n]), charged: charged(), taken: taken() }), feed: (k = 0) => { for (const h of heads) h.n = SOULS; shown.visible = true; } };
 }
 

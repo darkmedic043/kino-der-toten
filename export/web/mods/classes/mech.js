@@ -267,11 +267,14 @@ export async function setupMech(ctx){
     scene.add(l);lines.push({l,t:.08,life:.08});sync.tracer(a,b,color);
   }
   const pools=[];          // thermite fire
+  // their lights: a fixed set made here, lit while a pool burns. Adding a light mid-game changes every lit shader's light
+  // count, so each material recompiled as it was next drawn (2026-11-08, Der Eisendrache freezes)
+  const poolLights=pilot?[0,1,2].map(()=>{const l=new THREE.PointLight(0xff7a22,0,1,1.4);l.position.set(0,-1e5,0);scene.add(l);return l;}):[];
   const shells=[];         // rockets and thermite shells in flight
   const poolMat=new THREE.MeshBasicMaterial({color:0xff7a22,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
   function firePool(at,w){
     const r=w.radius;const mesh=new THREE.Mesh(new THREE.CircleGeometry(r,24),poolMat.clone());mesh.rotation.x=-Math.PI/2;mesh.position.copy(at).addScaledVector(up,1.5);scene.add(mesh);
-    const light=new THREE.PointLight(0xff7a22,40,r*2.6,1.4);light.position.copy(at).addScaledVector(up,20);scene.add(light);
+    const light=poolLights.find(l=>!pools.some(p=>p.light===l))??null;if(light){light.distance=r*2.6;light.position.copy(at).addScaledVector(up,20);}
     pools.push({at:at.clone(),r,until:session.time+w.pool,dps:w.burn*M.mech.burn,w,mesh,light,tick:0});
   }
   const rocketGeo=new THREE.CylinderGeometry(1.4,2,9,8).rotateX(Math.PI/2),rocketMat=new THREE.MeshStandardMaterial({color:0x3a3d40,emissive:0xff8a2a,emissiveIntensity:.6});
@@ -483,9 +486,9 @@ export async function setupMech(ctx){
     for(let i=lines.length-1;i>=0;i--){const o=lines[i];o.t-=dt;o.l.material.opacity=Math.max(0,o.t/o.life)*.95;if(o.t<=0){o.l.removeFromParent();o.l.geometry.dispose();o.l.material.dispose();lines.splice(i,1);}}
     for(const [z,b] of burning){if(!enemies.list.includes(z)||session.time>b.until){burning.delete(z);continue;}if((b.tick-=dt)<=0){b.tick=.5;hurt(z,0,null,{flat:b.dps*.5,cause:'fire'});window.kino.fx?.burn?.(z.root.position.clone().addScaledVector(up,40));}}
     for(const [z,s] of stunned){if(!enemies.list.includes(z)||session.time>s.until){stunned.delete(z);continue;}z.root.position.x=s.at.x;z.root.position.z=s.at.z;z.stuck=0;}
-    for(let i=pools.length-1;i>=0;i--){const p=pools[i];const left=p.until-session.time;p.mesh.material.opacity=.55*Math.min(1,left)*(.85+.15*Math.sin(session.time*20));p.light.intensity=40*Math.min(1,left);
+    for(let i=pools.length-1;i>=0;i--){const p=pools[i];const left=p.until-session.time;p.mesh.material.opacity=.55*Math.min(1,left)*(.85+.15*Math.sin(session.time*20));if(p.light)p.light.intensity=40*Math.min(1,left);
       if((p.tick-=dt)<=0){p.tick=.5;for(const z of [...enemies.list])if(z.root.position.distanceTo(p.at)<p.r)hurt(z,p.dps*.5,p.w);window.kino.fx?.burn?.(p.at.clone().add(new THREE.Vector3((Math.random()-.5)*p.r,8,(Math.random()-.5)*p.r)));}
-      if(left<=0){p.mesh.removeFromParent();p.mesh.geometry.dispose();p.mesh.material.dispose();p.light.removeFromParent();pools.splice(i,1);}}
+      if(left<=0){p.mesh.removeFromParent();p.mesh.geometry.dispose();p.mesh.material.dispose();if(p.light)p.light.intensity=0;pools.splice(i,1);}}
     for(let i=shells.length-1;i>=0;i--){
       const s=shells[i];s.life-=dt;
       if(s.homing){const f=s.vel.clone().normalize(),z=enemies.list.filter(z=>z.state!=='rising').map(z=>({z,v:z.root.position.clone().addScaledVector(up,38).sub(s.mesh.position)})).filter(o=>o.v.length()<900&&o.v.clone().normalize().dot(f)>.7).sort((a,b)=>a.v.length()-b.v.length())[0];
@@ -545,7 +548,7 @@ export async function setupMech(ctx){
   });
   host.on('reset',()=>{
     if(phase==='piloting')eject(false);phase='idle';drop=null;world3.root.visible=false;fp.root.visible=false;document.body.classList.remove('mech-pilot','mech-rider');
-    for(const s of shells)s.mesh.removeFromParent();shells.length=0;for(const p of pools){p.mesh.removeFromParent();p.light.removeFromParent();}pools.length=0;
+    for(const s of shells)s.mesh.removeFromParent();shells.length=0;for(const p of pools){p.mesh.removeFromParent();if(p.light)p.light.intensity=0;}pools.length=0;
     burning.clear();stunned.clear();riding=null;mgView.visible=false;
   });
 

@@ -786,8 +786,14 @@ async function warmShaders(waitGpu=false){
     try{renderer.info.reset();renderer.clear();if(!(mods.renderWorld&&mods.renderWorld(scene,camera,{viewScene,viewCamera,drawView:true}))){if(!mods.renderWorld)renderer.render(scene,camera);renderer.clearDepth();renderer.render(viewScene,viewCamera);}}
     finally{renderer.render=draw;for(const o of dry)o.visible=true;}
     await breathe(true);mark('first draw');
-    const before=renderer.info.programs.length,hidden=[],standIn=[];
+    const before=renderer.info.programs.length,hidden=[],standIn=[],dark=[];
+    // the lights that will light play: a light under a hidden group (Der Eisendrache's bow glow under its pedestal model) or
+    // in the warm-up's own group doesn't count in play, and the number of lights is part of every lit program's key: shown
+    // here, the whole warm-up compiled with one light too many and every material recompiled when first seen in play (the
+    // map at the start, props at the first spawns, each gun of a box spin, the mech: 0.3-2 s freezes, 2026-11-08)
+    const lit=new Set();for(const root of [scene,viewScene])root.traverseVisible(o=>{if(o.isLight)lit.add(o);});later.traverse(o=>{if(o.isLight)lit.delete(o);});
     for(const root of [scene,viewScene])root.traverse(o=>{if(!o.visible&&!o.isLight){hidden.push(o);if(root===viewScene)standIn.push(o);o.visible=true;}});
+    for(const root of [scene,viewScene])root.traverse(o=>{if(o.isLight&&o.visible&&!lit.has(o)){dark.push(o);o.visible=false;}});
     try{for(const [s,target] of targets){if(sliced){await compileSliced(s,s===viewScene?viewCamera:camera,target,breathe);continue;}
       const previous=renderer.getRenderTarget();renderer.setRenderTarget(target);
       try{await renderer.compileAsync(s,s===viewScene?viewCamera:camera);}finally{renderer.setRenderTarget(previous);}}
@@ -833,7 +839,7 @@ async function warmShaders(waitGpu=false){
         renderer.shadowMap.needsUpdate=true;for(const s of [scene,viewScene])s.traverse(o=>{if(o.isLight&&o.castShadow&&o.shadow)o.shadow.needsUpdate=true;});}
       console.info('[warm-shaders] drew',firstDraw.n-n0,'new program/layout/target pairs,',swapped.length,'textures stood in, in',Math.round(performance.now()-t1),'ms');}
     }
-    finally{for(const o of hidden)o.visible=false;}
+    finally{for(const o of hidden)o.visible=false;for(const l of dark)l.visible=true;}
     // the gun and arms in hand are first drawn when play starts: upload their textures now (only these: every cached
     // weapon's would fill video memory), or the first played frames stall on them (67 ms each on the host)
     view?.pivot?.traverse(o=>{for(const m of [o.material].flat())if(m)for(const k of ['map','normalMap','emissiveMap','alphaMap','roughnessMap','metalnessMap','aoMap'])if(m[k]?.isTexture)renderer.initTexture(m[k]);});
