@@ -110,7 +110,7 @@ export function setupReaperPerks(api, catalogue, base) {
     #reaper-veil{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;transition:opacity .25s}
     #sh-armour{display:flex;align-items:center;gap:6px;width:140px;margin-top:8px;font:700 10px/1 Arial,sans-serif;color:#cfdbe5}#sh-armour[hidden]{display:none}
     #sh-armour>div{flex:1;height:5px;background:#0007;border:1px solid #9fb6c840;overflow:hidden}#sh-armour i{display:block;height:100%;background:linear-gradient(#e6eef4,#8aa3b8);transform-origin:left;transition:transform .15s}
-    #sh-armour.empty{color:#8a96a0}body.touch-mode #sh-armour{width:90px;margin-top:5px}#bo7-left #sh-armour{width:100%;margin:4px 0 -1px}#bo7-left #sh-armour>div{height:6px;-webkit-mask:repeating-linear-gradient(90deg,#000 0 3px,transparent 3px 4px);mask:repeating-linear-gradient(90deg,#000 0 3px,transparent 3px 4px)}`;
+    #sh-armour.empty{color:#8a96a0}body.touch-mode #sh-armour{width:90px;margin-top:5px}#bo7-left #sh-armour{width:58%;margin:3px 0 -21px;flex-direction:column-reverse;align-items:flex-start;gap:3px}#bo7-left #sh-armour b{font:700 12px/1 var(--bo7-font);letter-spacing:.5px}#bo7-left #sh-armour>div{flex:none;width:100%;height:6px;-webkit-mask:repeating-linear-gradient(90deg,#000 0 3px,transparent 3px 4px);mask:repeating-linear-gradient(90deg,#000 0 3px,transparent 3px 4px)}`;
   document.head.append(style);
   const chipsEl = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'reaper-chips' }));
   const veil = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'reaper-veil' }));
@@ -158,7 +158,8 @@ export function setupReaperPerks(api, catalogue, base) {
         if (angelCharge >= 1) { angelCharge = 0; angelKills = 0; session.effects.invulnerable = now() + 5; tint('#fff2a855', 5); announce?.('GUARDIAN ANGEL', '5 SECONDS', 1.5); return true; }
         if (up('guardianangel')) { const r = inner(n); session.effects.invulnerable = Math.max(session.effects.invulnerable ?? 0, now() + .6); return r; }
       }
-      if (n > 0 && has('stronghold') && armour > 0) {   // Thick Skin: a point of armour soaks more than a point of damage
+      if (n > 0 && armour > 0) {   // (armour: your own ring, or a teammate's in co-op)
+          // Thick Skin: a point of armour soaks more than a point of damage
         const k = 1 - stat('sh.soak'), a = Math.min(armour / k, n); armour = Math.max(0, armour - a * k); n -= a; sound('stronghold', 'armour_hit', .5);
         if (armour <= 0) { sound('stronghold', 'armour_broken'); if (stat('sh.shatter')) queueMicrotask(shatter); } if (n <= 0) return true; }
       if (n >= session.health) {
@@ -306,7 +307,13 @@ export function setupReaperPerks(api, catalogue, base) {
   //      The armour bar sits right above the health bar (in the BO7 card too). The ring (faint disc, bright edge, two
   //      bands rising off the edge) is built once and warmed at load, then only added to / taken off the scene. Research track sh.* (research.json): Quick Set, Reinforced,
   //      Fast Mason, Lingering Stone (the mod's upgrade: holds 10 s), Thick Skin, Shatter, Slow Drain, Fortress.
-  let armour = 0, stillT = 0, ringAt = null, leftAt = 0;
+  //      Co-op (2026-11-09, user: "can you make it work for teammates?"): the owner sends its ring once a second
+  //      ({t:'sh', at, r, cap, rate, fort}; {t:'sh', off:1} when it ends). Teammates see it (a clone of shRing, same
+  //      materials and geometry, so nothing compiles) and build armour inside it at the owner's rate up to the owner's
+  //      cap, perk or not; out of every ring it drains as usual. A ring not heard of for 3 s is dropped. Fortress's slow
+  //      runs on the host (the real zombies) for a teammate's ring too.
+  let armour = 0, stillT = 0, ringAt = null, leftAt = 0, armourMax = 150, shSent = 0;
+  const teamRings = new Map();   // player id -> { at, r, cap, rate, fort, seen, g }
   const ringR = () => stat('sh.fortress') ? 150 : 100;
   const SH = 0x9fb6c8, shRing = (() => {
     const g = new THREE.Group(), add = (geo, op, tex) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: SH, map: tex ?? null, transparent: true, opacity: op,
@@ -320,13 +327,28 @@ export function setupReaperPerks(api, catalogue, base) {
     return g;
   })();
   host.warmObjects?.push(shRing);
+  const shNetOn = () => { const n = window.kino?.coop; return n?.id ? n : null; };
+  function endRing() { shRing.removeFromParent(); ringAt = null; stillT = 0; shNetOn()?.send('all', { t: 'sh', off: 1 }); }
+  function dropTeamRing(id) { teamRings.get(id)?.g.removeFromParent(); teamRings.delete(id); }
+  let shSub = false;
+  host.on('update', () => { const n = shNetOn(); if (!n || shSub) return; shSub = true;
+    n.on('left', id => dropTeamRing(id));
+    n.on('sh', (m, from) => {
+      if (from === n.id) return;
+      if (m.off || !Array.isArray(m.at)) { dropTeamRing(from); return; }
+      let q = teamRings.get(from);
+      if (!q) { const ud = shRing.userData; shRing.userData = {}; const g = shRing.clone(); shRing.userData = ud; g.userData.bands = g.children.slice(2); q = { g }; teamRings.set(from, q); scene.add(g); }   // (userData is JSON-copied by clone: the band meshes kept out of it)
+      q.at = new THREE.Vector3(...m.at.map(Number)); q.r = Math.min(300, +m.r || 100); q.cap = Math.min(400, +m.cap || 150); q.rate = Math.min(3, +m.rate || 0); q.fort = !!m.fort;
+      q.seen = performance.now() / 1000; q.g.position.copy(q.at).y += 2; q.g.scale.set(q.r, 1, q.r);
+    }); });
   const shEl = Object.assign(document.createElement('div'), { id: 'sh-armour', hidden: true, innerHTML: '<div><i></i></div><b>0</b>' });
   let shShown = '';
-  function armourHud(on, a = armour) {   // the armour bar, kept right above the health bar (wherever the HUD moved it)
-    const ht = document.querySelector('.health-track');
+  function armourHud(on, a = armour) {   // the armour bar, kept right above the health bar (wherever the HUD moved it); on the
+    // BO7 card it is a shorter bar on the left of the "315 HP" row, its number above it, so the HP figure stays on the health bar (2026-11-09)
+    const ht = document.querySelector('#bo7-left .hp') ?? document.querySelector('.health-track');
     if (!on || !ht) { if (!shEl.hidden) shEl.hidden = true; shShown = ''; return; }
     if (shEl.nextElementSibling !== ht) ht.before(shEl);
-    const max = 150 + stat('sh.cap'), v = Math.round(a), key = v + '/' + max;
+    const max = armourMax, v = Math.round(a), key = v + '/' + max;
     if (shEl.hidden) shEl.hidden = false; if (key === shShown) return; shShown = key;
     shEl.firstChild.firstChild.style.transform = `scaleX(${Math.min(1, v / max)})`; shEl.lastChild.textContent = v; shEl.classList.toggle('empty', v <= 0);
   }
@@ -643,20 +665,32 @@ export function setupReaperPerks(api, catalogue, base) {
         if (z) { spectre.g.lookAt(chest(z)); if (t > spectre.next && (world?.lineClear?.(spectre.g.position, chest(z)) ?? true)) { spectre.next = t + .35; const d = data.weapons[spectre.weapon.id]; z.rpSpectre = true;
           bolt(spectre.g.position.clone(), up('spectorshot') ? enemies.headPosition(z) : chest(z), 0x9fe8ff); hurt(z, (d?.damage ?? 100) * (up('spectorshot') ? 3 : 1.5), 'bullet', up('spectorshot')); slow(z, 1, .5); } } }
     }
-    // Stone Cold Stronghold
+    // Stone Cold Stronghold (own ring, or a teammate's: see teamRings)
+    const shNet = shNetOn(), wall = performance.now() / 1000;
+    for (const [id, q] of teamRings) if (wall - q.seen > 3) dropTeamRing(id);
+    let team = null; for (const q of teamRings.values()) if (Math.hypot(f.x - q.at.x, f.z - q.at.z) <= q.r && Math.abs(f.y - q.at.y) <= 80 && (!team || q.cap > team.cap)) team = q;
+    if (shNet?.isHost) for (const q of teamRings.values()) if (q.fort) near(q.at, q.r, z => slow(z, .3, .5));
+    const build = (cap, rate) => { armourMax = cap; armour = Math.min(cap, armour + dt * 20 * (1 + rate)); leftAt = t; };
     if (has('stronghold')) {
       const moving = player.velocity ? Math.hypot(player.velocity.x, player.velocity.z) > 10 : false, r = ringR();
-      if (ringAt && (Math.hypot(f.x - ringAt.x, f.z - ringAt.z) > r || Math.abs(f.y - ringAt.y) > 80)) { ringAt = null; shRing.removeFromParent(); stillT = 0; }   // walked out
+      if (ringAt && (Math.hypot(f.x - ringAt.x, f.z - ringAt.z) > r || Math.abs(f.y - ringAt.y) > 80)) endRing();   // walked out
       if (!ringAt) { stillT = moving ? 0 : stillT + dt;
-        if (stillT >= 3 * (1 - stat('sh.settle'))) { ringAt = f.clone(); shRing.position.copy(f).y += 2; scene.add(shRing); } }
+        if (stillT >= 3 * (1 - stat('sh.settle'))) { ringAt = f.clone(); shRing.position.copy(f).y += 2; scene.add(shRing); shSent = 0; } }
       if (ringAt) {
-        shRing.scale.set(r, 1, r); shRing.userData.bands.forEach((b, i) => { const k = (t * .55 + i / 2) % 1;   // bands rise off the edge and fade
-          b.position.y = 6 + k * 60; b.scale.y = 12; b.material.opacity = .7 * (1 - k) * Math.min(1, k * 6); });
-        armour = Math.min(150 + stat('sh.cap'), armour + dt * 20 * (1 + stat('sh.rate'))); leftAt = t;
-        if (stat('sh.fortress')) near(ringAt, r, z => slow(z, .3, .5)); }   // Fortress: the wider ring slows what walks in
+        shRing.scale.set(r, 1, r);
+        build(150 + stat('sh.cap'), stat('sh.rate'));
+        if (stat('sh.fortress')) near(ringAt, r, z => slow(z, .3, .5));   // Fortress: the wider ring slows what walks in
+        if (shNet && wall - shSent >= 1) { shSent = wall; shNet.send('all', { t: 'sh', at: [ringAt.x, ringAt.y, ringAt.z].map(Math.round), r, cap: armourMax, rate: stat('sh.rate'), fort: stat('sh.fortress') ? 1 : 0 }); } }
+      else if (team) build(team.cap, team.rate);
       else if (!(t - leftAt < stat('sh.hold'))) armour = Math.max(0, armour - dt * 30 * (1 - stat('sh.drain')));
       armourHud(true);
-    } else if (ringAt || armour || shShown) { shRing.removeFromParent(); ringAt = null; armour = 0; armourHud(false); }
+    } else {
+      if (ringAt) endRing();
+      if (team) build(team.cap, team.rate); else armour = Math.max(0, armour - dt * 30);
+      if (team || armour > 0) armourHud(true); else if (shShown) armourHud(false);
+    }
+    if (ringAt || teamRings.size) for (const g of [shRing, ...[...teamRings.values()].map(q => q.g)]) g.userData.bands.forEach((b, i) => { const k = (t * .55 + i / 2) % 1;   // bands rise off the edge and fade
+      b.position.y = 6 + k * 60; b.scale.y = 12; b.material.opacity = .7 * (1 - k) * Math.min(1, k * 6); });
     // Swarm Scotch
     if (swarm) { if (t > swarm.until) { swarm.g.removeFromParent(); swarm = null; }
       else { swarm.g.position.lerp(f.clone().add(V(0, 50, 0)), Math.min(1, dt * 3)); swarm.g.children.forEach((c, i) => c.position.set(Math.cos(t * 6 + i) * 30, Math.sin(t * 9 + i * 2) * 15, Math.sin(t * 5 + i) * 30));
@@ -834,7 +868,7 @@ export function setupReaperPerks(api, catalogue, base) {
     puddles.length = poison.length = lures.length = shells.length = fountains.length = wolfDrops.length = 0;
     for (const w of walls) w.m.removeFromParent(); walls.length = 0;
     if (wolf) wolf.s.removeFromParent(); wolf = null; if (spectre) spectre.g.removeFromParent(); spectre = null; if (swarm) swarm.g.removeFromParent(); swarm = null;
-    if (ghost.body) ghost.body.body.removeFromParent(); ghost.body = null; if (tomb) tomb.s.removeFromParent(); tomb = null; shRing.removeFromParent(); ringAt = null; stillT = 0; armourHud(false);
+    if (ghost.body) ghost.body.body.removeFromParent(); ghost.body = null; if (tomb) tomb.s.removeFromParent(); tomb = null; shRing.removeFromParent(); ringAt = null; stillT = 0; armourHud(false); for (const id of [...teamRings.keys()]) dropTeamRing(id);
     stand = null; dyingUntil = dyingReady = 0; angelCharge = 1; angelKills = 0; armour = 0; momentum = 0; charges = 10; wails = 3; slidesLeft = 20; blinks = 1; staticCharges = stuns = 0;
     element = 0; polosaDouble = 0; session.rpNade = false; wolfReady = spectreReady = milkReady = cherryReady = rodReady = cherryEcho = stormT = wallReady = 0; upgraded.clear(); tint('#0000', 0);
   });
