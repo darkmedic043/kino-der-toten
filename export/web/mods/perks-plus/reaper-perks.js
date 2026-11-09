@@ -236,8 +236,12 @@ export function setupReaperPerks(api, catalogue, base) {
   // ---- Electric Cherry (BO2): starting a reload sets off a burst, bigger and harder the emptier the magazine.
   //      Research (ec.*, the fork's own track): cooldown, radius, damage, stun; chain, echo, rod, storm.
   let lastReload = 0, cherryReady = 0, rodReady = 0, cherryEcho = 0, cherryEchoK = 0, stormT = 0;
+  // Its damage is a share of the round's zombie health, so it never fell off: an empty-mag reload did 1.3 zh (1.8 with
+  // High Voltage), a one-shot on every round. Nerfed 2026-11-08 (user: "insta killing on round 30"): 0.15-0.6 zh, and
+  // past round 20 that share shrinks with sqrt(20/round) (round 30: x0.82, round 50: x0.63), like BO2's flat damage fading.
+  const cherryHp = () => zh() * Math.sqrt(20 / Math.max(20, session.round ?? 1));
   function cherryBurst(empty, power = 1) {
-    const f = feet(), R = (120 + 80 * empty) * (1 + stat('ec.radius')), dmg = zh() * (.3 + empty) * (1 + stat('ec.damage')) * power, stun = 1.5 + stat('ec.stun'), hit = [];
+    const f = feet(), R = (120 + 80 * empty) * (1 + stat('ec.radius')), dmg = cherryHp() * (.15 + .45 * empty) * (1 + stat('ec.damage')) * power, stun = 1.5 + stat('ec.stun'), hit = [];
     near(f, R, z => hit.push(z));
     const from = f.clone().add(V(0, 40, 0)), shock = (z, a, n) => { bolt(a, chest(z), 0x7fd8ff); hurt(z, n, 'electric'); slow(z, stun, 1, stun); };
     const taken = new Set(hit);
@@ -569,7 +573,7 @@ export function setupReaperPerks(api, catalogue, base) {
     if (cherryEcho && t >= cherryEcho) { cherryEcho = 0; if (has('electriccherry')) cherryBurst(cherryEchoK, .5); }   // Aftershock
     if (has('electriccherry') && stat('ec.storm') && rl > 0 && t >= stormT) {   // Storm Cell
       stormT = t + .4; const z = nearest(f, 220);
-      if (z) { bolt(f.clone().add(V(0, 40, 0)), chest(z), 0x7fd8ff); hurt(z, zh() * .25, 'electric'); slow(z, .5, 1, .5); }
+      if (z) { bolt(f.clone().add(V(0, 40, 0)), chest(z), 0x7fd8ff); hurt(z, cherryHp() * .15, 'electric'); slow(z, .5, 1, .5); }
     }
     // Swarm Scotch: reloading an empty magazine
     if (has('swarmscotch') && rl > 0 && lastReload <= 0 && session.weapon?.mag === 0) startSwarm();
