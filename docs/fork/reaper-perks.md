@@ -47,16 +47,16 @@ Magnet Margarita (user, 2026-10-19): "implements magnet margarita? havbe it be i
 
 ### Dam-A-Nade (implemented)
 
-- **Base**: explosions (`cause` explosion / grenade) deal x1.5; you carry 5 lethals (one more than 4, filled when you drink it) and one more tactical, added to the item's own limit (3, or 4 with its Extra Monkey / Extra Device / Extra QED equipment augment; `tacticalBonus()` goes into `session.monkeyMax()` and moon-equipment's `maxOf`, so pickups, Max Ammo and Equip Mint fill the bigger slot, and drinking the perk adds the extra ones; 2026-10-28); when each round starts (the countdown ends; user, 2026-10-18: it was at the round's end) your lethals refill and one tactical comes back, and the round-end +2 grenades no longer cuts a 5- or 6-grenade belt back to 4; Max Ammo fills both to the bigger limits.
+- **Base**: explosions (`cause` explosion / grenade) deal x1.5; you carry one more lethal of whatever kind you hold (frags 4 → 5, Claymores 2 → 3, Trip Mines 3 → 4; since 2026-11-08 `lethalBonus()` wraps `session.claymoreMax`/`tripMax`, which the bonus never reached before because `session.grenades` reads 0 while you hold them; Bandolier, Fully Equipped and Recycler follow the held kind too; filled when you drink it) and one more tactical, added to the item's own limit (3, or 4 with its Extra Monkey / Extra Device / Extra QED equipment augment; `tacticalBonus()` goes into `session.monkeyMax()` and moon-equipment's `maxOf`, so pickups, Max Ammo and Equip Mint fill the bigger slot, and drinking the perk adds the extra ones; 2026-10-28); when each round starts (the countdown ends; user, 2026-10-18: it was at the round's end) your lethals refill and one tactical comes back, and the round-end +2 grenades no longer cuts a 5- or 6-grenade belt back to 4; Max Ammo fills both to the bigger limits.
 - **Research track** (`dn.*`):
 
 | # | Augment | Kind | Effect |
 |---|---|---|---|
-| 1 | Bandolier | Minor | One more lethal (6) |
+| 1 | Bandolier | Minor | One more lethal of the held kind (6 frags, 4 Claymores, 5 Trip Mines) |
 | 2 | Concussion | Major | Explosives freeze the zombies they don't kill for 2 s |
 | 3 | Extra Tactical | Minor | One more tactical on top of the perk's +1: 5, or 6 with the item's Extra augment |
 | 4 | Chain Reaction | Major | Explosive kills explode: 0.3 zh within 110 (cause `shrapnel`, so they don't chain or take the x1.5) |
-| 5 | Recycler | Minor | 8% of explosive kills give a grenade back |
+| 5 | Recycler | Minor | 8% of explosive kills give one of the held lethal back |
 | 6 | Incendiary | Major | Explosives set the zombies they don't kill burning (4 s, 0.15 zh/s) |
 | 7 | Resupply | Minor | The round-start refill gives the whole tactical slot back, not one |
 | 8 | Demolition Expert | Major | x2 explosive damage instead of x1.5 (the mod's upgrade) |

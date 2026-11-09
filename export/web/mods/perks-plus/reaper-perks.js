@@ -409,7 +409,7 @@ export function setupReaperPerks(api, catalogue, base) {
     if (has('prismatic') && t >= wallReady && Math.random() < .15 + stat('pp.chance') && z.rpCause === 'bullet') { wallReady = Infinity; raiseWall(at); }   // no new wall while one stands; the cooldown starts when it fades
     if (has('damnade') && (z.rpCause === 'explosion' || z.rpCause === 'grenade')) {
       if (stat('dn.shrapnel')) queueMicrotask(() => { blast(at, 110, zh() * stat('dn.shrapnel'), 'shrapnel', z); fx(at.clone().add(V(0, 25, 0)), .35, 0xffb347); });   // 'shrapnel': doesn't chain
-      if (stat('dn.scav') && Math.random() < stat('dn.scav') && session.grenades < nadeMax()) { session.grenades++; toast?.('Dam-A-Nade · grenade recovered', 1); }
+      if (stat('dn.scav') && Math.random() < stat('dn.scav') && lethalBack()) toast?.('Dam-A-Nade · ' + lethalName() + ' recovered', 1);
     }
     if (has('timeslip') && up('timeslip')) { const op = window.kino?.operator; if (op?.current && !op.active && op.defs?.get(op.current)) op.addCharge(.5 / op.defs.get(op.current).kills); window.kino?.classes?.addCharge?.(.5); }
     if (has('tactiquilla')) { recentKills.push(t); while (recentKills.length && t - recentKills[0] > .5 + stat('ts.window')) recentKills.shift(); if (recentKills.length >= 2) multiKill(recentKills.length); }
@@ -561,7 +561,7 @@ export function setupReaperPerks(api, catalogue, base) {
     // Change Chews: the element turns over when you fall below 40%
     if (has('changechews')) { const low = session.health < session.maxHealth * .4; if (low && !wasLow) { element = (element + 1) % 4; toast?.('Change Chews · ' + ELEMENTS[element][0], 1.5); } wasLow = low; }
     // Dam-A-Nade: a full belt of lethals when you drink it (5, 6 with Bandolier), and the extra tacticals it adds
-    if (has('damnade') && !session.rpNade) { session.rpNade = true; session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(tacticalBonus()); }
+    if (has('damnade') && !session.rpNade) { session.rpNade = true; fillLethal(); tacticalBack(tacticalBonus()); }
     // Dying Wish: the end
     if (dyingUntil && t >= dyingUntil) { dyingUntil = 0; sound('dyingwish', 'end'); if (up('dyingwish')) session.health = session.maxHealth; }
     // Electric Cherry
@@ -672,7 +672,7 @@ export function setupReaperPerks(api, catalogue, base) {
     }
     if (tomb && (tomb.upgraded ? session.round > tomb.round && t > tomb.until : t > tomb.until)) { tomb.s.removeFromParent(); tomb = null; }
     // Dam-A-Nade: the refill comes when a round starts (its countdown ends), not when the last one ends (user, 2026-10-18)
-    if (phase === 'fighting' && lastPhase === 'preparing' && has('damnade')) { session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(stat('dn.resupply') ? Infinity : 1); }
+    if (phase === 'fighting' && lastPhase === 'preparing' && has('damnade')) { fillLethal(); tacticalBack(stat('dn.resupply') ? Infinity : 1); }
     // Nuka Cola: a co-op down
     if (phase === 'reviving' && lastPhase !== 'reviving' && lastPerks.has(S('nukacola'))) nukaGoesOff();
     // Winter's Wail charges come back with rounds (roundEnd); Moonshine's slides too
@@ -741,13 +741,28 @@ export function setupReaperPerks(api, catalogue, base) {
     w.size = Math.min(2, w.size + .1); w.m.scale.setScalar(w.size);
     if (w.size >= 2 && !w.maxed) { w.maxed = true; if (stat('pp.afterglow')) w.until = Math.max(w.until, now() + stat('pp.afterglow')); sound('prismatic', 'punch_max_size', .6); }
   }
-  // ---- Dam-A-Nade (switched on): explosives x1.5, one more lethal (5) and tactical, lethals refill and a tactical comes
+  // ---- Dam-A-Nade (switched on): explosives x1.5, one more lethal (5 frags, 3 Claymores, 4 Trip Mines) and tactical, lethals refill and a tactical comes
   //      back when each round starts (Max Ammo fills both). Augments (dn.*): damage, stun (s frozen), burn, shrapnel (explosive
-  //      kills explode), lethal / tactical (+n carried), scav (explosive kills give a grenade back), resupply (full tactical).
+  //      kills explode), lethal / tactical (+n carried), scav (explosive kills give one of the carried lethal back), resupply (full tactical).
   //      The tactical bonus is added to the item's own max (3, 4 with its Extra Monkey / Device / QED equipment augment), so
   //      every top-up (pickup, Max Ammo, Equip Mint) fills the bigger slot: Monkey Bombs with Extra Monkey + Extra Tactical = 6.
   const nadeMax = () => (has('damnade') ? 5 + stat('dn.lethal') : 4) + stat('mk.equip');   // Mule Kick's Fully Equipped adds to either
   const tacticalBonus = () => (has('damnade') ? 1 + stat('dn.tactical') : 0) + stat('mk.equip');
+  // The same +1 (+1 Bandolier, +1 Fully Equipped) goes on whichever lethal you carry: Claymores 2 -> 3 and Trip Mines 3 -> 4
+  // (2026-11-08: they have their own counters, and session.grenades reads 0 while you hold them, so the bonus never reached them).
+  const lethalBonus = () => (has('damnade') ? 1 + stat('dn.lethal') : 0) + stat('mk.equip');
+  for (const k of ['claymoreMax', 'tripMax']) { const base = session[k]?.bind(session); if (base) session[k] = () => base() + lethalBonus(); }
+  const lethalName = () => session.tripsOwned ? 'Trip Mine' : session.claymoresOwned ? 'Claymore' : 'grenade';
+  function fillLethal() {
+    if (session.tripsOwned) session.trips = Math.max(session.trips ?? 0, session.tripMax());
+    else if (session.claymoresOwned) session.claymores = Math.max(session.claymores ?? 0, session.claymoreMax());
+    else session.grenades = Math.max(session.grenades ?? 0, nadeMax());
+  }
+  function lethalBack() {   // one lethal back, up to the max: false when already full
+    if (session.tripsOwned) { if (!(session.trips < session.tripMax())) return false; session.trips++; return true; }
+    if (session.claymoresOwned) { if (!(session.claymores < session.claymoreMax())) return false; session.claymores++; return true; }
+    if (!(session.grenades < nadeMax())) return false; session.grenades++; return true;
+  }
   { const monkeyMax = session.monkeyMax?.bind(session); if (monkeyMax) session.monkeyMax = () => monkeyMax() + tacticalBonus(); }   // Gersh/QED: moon-equipment's maxOf
   const tacticalMax = () => { const t = window.kino?.tactical; return t?.id ? t.max?.() ?? 3 + tacticalBonus() : session.monkeyMax?.() ?? 3 + tacticalBonus(); };
   function tacticalBack(n) {
@@ -758,7 +773,7 @@ export function setupReaperPerks(api, catalogue, base) {
   { const next = session.nextRound?.bind(session);   // the round-end +2 grenades caps at 4: keep a Dam-A-Nade belt's 5th and 6th
     if (next) session.nextRound = (...a) => { const before = session.grenades ?? 0, r = next(...a); if (has('damnade') || stat('mk.equip')) session.grenades = Math.max(session.grenades ?? 0, Math.min(before + (stat('mk.equip') ? 2 : 0), nadeMax())); return r; }; }
   { const powerup = session.powerup?.bind(session);   // Max Ammo: the bigger belt and tactical slot, filled
-    if (powerup) session.powerup = (type, ...rest) => { const r = powerup(type, ...rest); if (type === 'full_ammo' && (has('damnade') || stat('mk.equip'))) { session.grenades = Math.max(session.grenades ?? 0, nadeMax()); tacticalBack(Infinity); } return r; }; }
+    if (powerup) session.powerup = (type, ...rest) => { const r = powerup(type, ...rest); if (type === 'full_ammo' && (has('damnade') || stat('mk.equip'))) { fillLethal(); tacticalBack(Infinity); } return r; }; }
 
   // ---- chips ------------------------------------------------------------------------------------------------------------
   chip(() => has('dyingwish') ? [dyingUntil > now() ? 'DYING WISH ' + Math.ceil(dyingUntil - now()) : now() < dyingReady ? 'DW ' + Math.ceil(dyingReady - now()) + 's' : 'DYING WISH', dyingUntil > now() || now() >= dyingReady] : null);

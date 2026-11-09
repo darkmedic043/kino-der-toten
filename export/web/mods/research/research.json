@@ -1233,7 +1233,7 @@
     {
      "name": "Bandolier",
      "kind": "minor",
-     "desc": "Carry one more lethal (6 grenades).",
+     "desc": "Carry one more lethal of any kind: 6 grenades, 4 Claymores or 5 Trip Mines.",
      "effects": {
       "dn.lethal": 1
      },
@@ -1269,7 +1269,7 @@
     {
      "name": "Recycler",
      "kind": "minor",
-     "desc": "Explosive kills have an 8% chance to give a grenade back.",
+     "desc": "Explosive kills have an 8% chance to give back one of the lethal you carry (grenade, Claymore or Trip Mine).",
      "effects": {
       "dn.scav": 0.08
      },
