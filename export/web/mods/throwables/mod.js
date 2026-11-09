@@ -160,7 +160,7 @@ export default async function setup(api){
       frags.push({mesh,velocity:dir.multiplyScalar(560*far).add(new THREE.Vector3(0,150*far,0)),life:fuse,spin:new THREE.Vector3(Math.random()*9,Math.random()*9,0),sticky:aug('frag.sticky')>0});
     }else if(h.id==='zombie_cymbal_monkey'){session.equipmentLeft=0;features.throwMonkey?.();session.equipmentLeft=99;}
     else if(h.id===window.kino.lethalExtra?.id)window.kino.lethalExtra.launch();
-    else{tac().launch?.(h.id);const t=tac();if(t.count<=0)t.id=null;}
+    else tac().launch?.(h.id);   // an empty tactical keeps its slot (greyed at 0) for the next Max Ammo
   }
   // mini: a Cluster Charge bomblet (smaller, 40% damage, no further bomblets or after-effects)
   function explode(at,inHandBlast,mini=false){

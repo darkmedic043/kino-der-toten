@@ -511,3 +511,4 @@
 - 2026-11-08: Gun screens: the display no longer depth-fights its holder (it sat 0.001-0.002 above the recess floor; now 0.014 plus a polygon offset, models `?v=2`; weapon-levels.md Display depth).
 - 2026-11-08: no level gates left on AW pack guns or Melon Pass rewards: their Gunsmith opens at level 1 once owned (`profile.js` `unlockLevel`/`gunsmithLevel`), the Mystery Box picker and tactical card say AW PACK / MELON PASS instead of LV n, the wiki Level unlocks table drops them (shop.md).
 - 2026-11-08: Melon Pass rewards (Trip Mine, Smoke, Debt Collector, Hive Launcher) can be switched off in the Mystery Box list: `setBoxItem` only recorded "off" for boxPool items, and pass rewards are on by default without being in it (profile.js).
+- 2026-11-08: Empty tacticals (Gersh, QED, Smoke) keep their slot greyed at 0 so Max Ammo refills them (gameplay.md Equipment HUD).

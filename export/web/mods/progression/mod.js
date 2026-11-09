@@ -48,8 +48,8 @@ export default async function setup(api){
   // weighted by rarity. Lethals aren't guns: the box hands them out through giveWeapon.
   // a tactical you hold never rolls again (2026-10-20, user: "box spins can't give duplicate tacticals"): Monkey Bombs while
   // owned (mystery-box.js checks that for its own pool; the loadout list's extras come through here), the moon-equipment
-  // mod's Gersch Device and QED while they are the slot's (kino.tactical.id; a different one may still roll: it replaces)
-  const owned=id=>id==='frag_grenade_zm'?session.grenades>=4:id==='claymore_zm'?!!session.claymoresOwned:id==='tripmine_zm'?!!session.tripsOwned:id==='zombie_cymbal_monkey'?!!session.monkeysOwned:data.equipment?.[id]?.tactical?window.kino.tactical?.id===id:false;
+  // mod's Gersch Device and QED while they are the slot's (kino.tactical.id, with some left: an empty slot keeps its item at 0, and the box may refill it; a different one may still roll: it replaces)
+  const owned=id=>id==='frag_grenade_zm'?session.grenades>=4:id==='claymore_zm'?!!session.claymoresOwned:id==='tripmine_zm'?!!session.tripsOwned:id==='zombie_cymbal_monkey'?!!session.monkeysOwned:data.equipment?.[id]?.tactical?window.kino.tactical?.id===id&&window.kino.tactical.count>0:false;
   Object.defineProperty(window.kino,'boxList',{configurable:true,get:()=>({...boxFilter(config,profile,data),owned})});
   const giveWeapon=session.giveWeapon.bind(session);
   session.giveWeapon=(id,...rest)=>{

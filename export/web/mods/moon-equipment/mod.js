@@ -47,7 +47,8 @@ export default async function setup(api){
   session.giveWeapon=(id,...rest)=>{if(IDS.includes(id)){give(id);return true;}return giveWeapon(id,...rest);};
   const giveMonkeys=session.giveMonkeys?.bind(session);
   if(giveMonkeys)session.giveMonkeys=(...a)=>{const r=giveMonkeys(...a);if(r){tac.id=null;tac.count=0;hud();}return r;};
-  // Max Ammo refills them, a new game clears them
+  // Max Ammo refills them, a new game clears them. The slot keeps its item at 0 (2026-11-08, user: "when you run out of a tactical
+  // or lethal, it instead greys out and shows 0 so when you get a max ammo it will fill it"): it used to empty, so Max Ammo had nothing to fill
   const powerup=session.powerup?.bind(session);
   if(powerup)session.powerup=(type,...rest)=>{if(type==='full_ammo'&&tac.id)tac.count=Math.max(tac.count,maxOf(tac.id));hud();return powerup(type,...rest);};
   host.on('reset',()=>{tac.id=null;tac.count=0;hud();});
@@ -65,14 +66,14 @@ export default async function setup(api){
     const st=api.getState();
     if(throwing||!st.active||tac.count<=0||session.busy||session.phase==='reviving')return;
     throwing=true;tac.count--;hud();session.cancelReload?.();session.equipmentLeft=1.1;
-    if(extra[tac.id]){const id=tac.id;extra[id].launch();setTimeout(()=>{throwing=false;session.equipmentLeft=0;if(tac.count<=0)tac.id=null;},500);return;}
+    if(extra[tac.id]){const id=tac.id;extra[id].launch();setTimeout(()=>{throwing=false;session.equipmentLeft=0;},500);return;}
     const def=data.equipment[tac.id],id=tac.id;
     try{
       await view.equip(def);view.rig?.play('fireAnim',false,1,.05);
       setTimeout(()=>launch(id),380);
       await new Promise(r=>setTimeout(r,820));
     }catch(err){console.warn('[moon-equipment]',err);launch(id);}
-    finally{throwing=false;await api.equipView?.();if(tac.count<=0){tac.id=null;hud();}}
+    finally{throwing=false;await api.equipView?.();hud();}
   }
   const flying=[];
   tac.launch=id=>extra[id]?extra[id].launch():launch(id);
