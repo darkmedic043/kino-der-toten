@@ -39,7 +39,7 @@ export default async function setup(api){
   {const st=loadProfile();if(migrateWeaponLevels(cat,data.weapons,st)){saveProfile(st);profile=st;}}
   const save=()=>{const fresh=loadProfile();fresh.weaponXp=profile.weaponXp;fresh.attachments=profile.attachments;fresh.camo=profile.camo;saveProfile(fresh);};
   // Every tag some weapon hides by default: the attachment parts.
-  const attachmentTags=new Set(Object.values(data.weapons).flatMap(d=>d?.hideTags??[]));
+  const attachmentTags=new Set([...Object.values(data.weapons).flatMap(d=>d?.hideTags??[]),...(cat?.attachments??[]).flatMap(a=>a.replaces??[])]);   // + stock parts an attachment replaces
   // What each gun hides out of the box (base and Pack-a-Punched), before any attachment
   const stockHidden=new Map(Object.entries(data.weapons).map(([id,d])=>[id,{base:new Set(d?.hideTags??[]),up:new Set(d?.upgrade?.hideTags??[])}]));
   // attachments, plus each gun's equipped camo id on its definition (read by third person, co-op and the box)

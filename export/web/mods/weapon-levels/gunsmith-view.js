@@ -151,7 +151,9 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   let gun=null,glow=null,def=null,slot=null,hover=null,yaw=-.35,pitch=.08,dragging=null,radius=40,alive=true;
   root.debug={get gun(){return gun;},renderer,get camera(){return camera;},get screen(){return screenObj;}};   // for tests: document.getElementById('gsv').debug
   const focus=new THREE.Vector3(),focusGoal=new THREE.Vector3(),center=new THREE.Vector3();let dist=80,distGoal=80;
-  const attachmentTags=new Set(Object.values(weapons).flatMap(d=>d?.hideTags??[]));
+  // every tag a part can be hidden by: stock-hidden attachment parts, and stock parts an attachment replaces (the Debt
+  // Collector's barrel, cylinder, spool and grips): restored when nothing hides them, or the slot-measuring pass left them gone
+  const attachmentTags=new Set([...Object.values(weapons).flatMap(d=>d?.hideTags??[]),...(cat?.attachments??[]).flatMap(a=>a.replaces??[])]);
 
   function tagsFor(ids){const d=previewDef(cat,def,id,ids);return new Set(d.hideTags??[]);}
   const MAG_TAGS=['tag_ext_clip','tag_extended_clip','tag_clip_extended','tag_dual_clip','tag_double_clip','tag_duel_clip','tag_drum','tag_ammo_expander','tag_gh_expanse','tag_sr_deflect','tag_sr_overclock','tag_xm_fastbelt','tag_xm_extbelt','tag_xm_leyden','tag_xm_titan'];   // tag_gh_expanse: the Grimhawk's P.T. Expanse; tag_sr_*: the Siren's cells
@@ -169,7 +171,8 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   async function loadGun(){
     def=weapons[id];const token=id;
     const model=await loadModel(def.model);if(!alive||token!==id)return;
-    await poseIdle(model,def);if(!alive||token!==id)return;
+    // shell-loaded BO1 guns too: unanimated, the Python's (and Debt Collector's) speedloader and spent cases stick out of the cylinder
+    await poseIdle(model,def,{force:!!def.segmentedReload});if(!alive||token!==id)return;
     if(gun){pivot.remove(gun);}
     gun=model;glow=def.glow?applyGlow(gun,def.glow,{depthTest:true}):null;   // BO3 mod guns' lights, as in game (before emissive0 is recorded)
     gun=model;gun.traverse(o=>{if(!o.isMesh)return;o.frustumCulled=false;
