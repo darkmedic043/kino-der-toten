@@ -107,10 +107,15 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     stand:{sprint:.55,pump:.15}};   // sprint: each arm pitched by `sprint` rad about its own wrist (the elbow drops under the fist, the forearm stands up), ± `pump` with the swing
   const arms={w:0,pw:new THREE.Vector3(),e:new THREE.Euler(),camQ:new THREE.Quaternion(),camQi:new THREE.Quaternion(),q:new THREE.Quaternion(),A:new THREE.Matrix4(),M:new THREE.Matrix4(),T:new THREE.Matrix4(),
     p:new THREE.Vector3(),sc:new THREE.Vector3(),sides:['le','ri'].map((side,i)=>({side,i,sg:i?-1:1,off:new THREE.Vector3(),rot:new THREE.Euler()}))};
+  // what each gun hides out of the box (read before weapon-levels applies attachments): its attachment parts
+  const stockHide=new Map(Object.entries(api.data?.weapons??{}).map(([id,d])=>[id,new Set([...(d?.hideTags??[]),...(d?.upgrade?.hideTags??[])])]));
   function measureUnder(def){   // once per weapon and attachment set, at idle: the part's extent in the gun's frame
     under.kind=null;const ids=(def?.attachments??'').split('+'),kind=Object.keys(UNDER).find(k=>ids.includes(k));if(!kind||!view.gun)return;
     const r=view.root,g=r.getObjectByName('j_gun')??r.getObjectByName('tag_weapon');if(!g)return;
-    const bone=UNDER[kind].tags.map(t=>r.getObjectByName(t)).find(b=>b&&b.scale.x>.5);if(!bone)return;
+    // the tag the attachment reveals first (stock-hidden on this gun): the Jellyfish's plain tag_grip is its pistol grip,
+    // its foregrip part is tag_foregripd
+    const hid=stockHide.get(def.baseId??def.id),cands=UNDER[kind].tags.map(t=>r.getObjectByName(t)).filter(b=>b&&b.scale.x>.5);
+    const bone=cands.find(b=>hid?.has(b.name))??cands[0];if(!bone)return;
     view.pivot.updateMatrixWorld(true);const p=new THREE.Vector3(),box=new THREE.Box3();let n=0;   // (view space: the gun bone's own axes are not the view's)
     view.gun.traverse(o=>{if(!o.isMesh||!o.visible||!o.isSkinnedMesh)return;const geo=o.geometry,P=geo.attributes.position,SI=geo.attributes.skinIndex,SW=geo.attributes.skinWeight,I=geo.index,count=I?I.count:P.count,bones=o.skeleton.bones;
       for(let k=0;k<count;k+=2){const i=I?I.getX(k):k;let best=0,bw=-1;for(let c=0;c<4;c++){const ww=SW.getComponent(i,c);if(ww>bw){bw=ww;best=SI.getComponent(i,c);}}let b=bones[best],ok=false;for(;b;b=b.parent)if(b===bone){ok=true;break;}if(!ok)continue;

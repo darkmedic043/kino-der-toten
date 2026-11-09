@@ -516,3 +516,4 @@
 - 2026-11-08: Der Eisendrache bows: each arrow carries its own draw (a quick shot loosed during a charged arrow's 1.5 s fuse made it burst plain), elements come from the arrow, grenades no longer fire them (weapons.md).
 - 2026-11-09: gun-screen kill trackers start over on Restart / Play again on the same map too (charms/mod.js clears `gameBase` on `reset`; before, only a page load reset them) (weapon-levels.md).
 - 2026-11-09: first-use freezes of the class abilities and throwables: one copy of each Engineer, Fortifier, Sentry turret and Gersch/QED effect goes into `host.warmObjects`, and the Gambler's wheel/board/banner get a `warmHud` state (performance.md).
+- 2026-11-09: Support-hand grip IK prefers the tag the gun hides out of the box (Jellyfish: tag_foregripd, not its pistol-grip tag_grip), so the left hand holds the foregrip (movement.md).
