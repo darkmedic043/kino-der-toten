@@ -55,7 +55,8 @@ export const comingSoon=c=>(!!c?.soon&&!devSoon())||passLocked(c);
 export const tree=(cls,id)=>cls.trees.find(t=>t.id===id)??cls.trees[0];
 export const equippedTree=(cls,state)=>tree(cls,state.loadout?.action);
 export const actionOf=(cls,state)=>equippedTree(cls,state).action;
-export const xpToNext=(cfg,level)=>Math.round(cfg.xp.base*Math.pow(cfg.xp.growth,level-1));
+// levels past flatFrom (40, the old cap) all cost what level 40 does: the cap went to 60 on 2026-11-08 without the curve going 8x
+export const xpToNext=(cfg,level)=>Math.round(cfg.xp.base*Math.pow(cfg.xp.growth,Math.min(level,cfg.xp.flatFrom??Infinity)-1));
 export const nodes=cls=>cls.trees.flatMap(t=>t.nodes.map(n=>({...n,tree:t.id})));
 export const totalPoints=(state)=>state.level;                       // one point per level, the first at level 1
 export const spent=(state)=>Object.values(state.points??{}).reduce((a,b)=>a+b,0);

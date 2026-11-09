@@ -216,13 +216,14 @@ ${special.map(x=>x.mech?`- **${x.name}**: one action skill in every tree. You pi
 
     const levelsPage=()=>{
       const X=C.xp,rows=[];let total=0;
-      for(let l=1;l<X.maxLevel;l++){const need=Math.round(X.base*Math.pow(X.growth,l-1));total+=need;rows.push([l,need,total]);}
+      for(let l=1;l<X.maxLevel;l++){const need=Math.round(X.base*Math.pow(X.growth,Math.min(l,X.flatFrom??Infinity)-1));total+=need;rows.push([l,need,total]);}
       const cols=4,per=Math.ceil(rows.length/cols),split=[];for(let i=0;i<per;i++)split.push(Array.from({length:cols},(_,k)=>rows[i+k*per]).flatMap(r=>r?[`<b>${r[0]}→${r[0]+1}</b>`,ctx.num(r[1])]:['','']));
       return md(`Each class has its own level, from 1 to **${X.maxLevel}**, and earns XP only while it's the class you play.
 
 - **${X.kill} XP** per kill, **+${X.headshot}** for a headshot (kills by your action skill count too).
 - **${X.round} XP** per round survived.
-
+${X.flatFrom?`- Each level costs ${Math.round((X.growth-1)*100)}% more XP than the one before, up to level ${X.flatFrom}; every level after that costs the same.
+`:''}
 You get **one skill point per level**, the first at level 1, so ${X.maxLevel} points at the top. A capstone takes ${C.tierPoints*5+1} points in one tree, and maxing every skill of a class takes far more than ${X.maxLevel} (the class pages list how many), so a build is a choice.`)+
         `<h2>XP to the next level</h2>`+table(Array.from({length:cols},()=>['Level','XP']).flat(),split,{cls:'compact'})+
         `<p class="muted">Level 1 to ${X.maxLevel} takes ${ctx.num(total)} XP in all.</p>`;};

@@ -504,3 +504,4 @@
 - 2026-11-08: BO3 glow guns (Striker and the other 81) no longer blind you at ADS: `tickGlow` fades the halos out with `view.aim` and dims the cards, scrolling glows and emissive (weapons.md Glow look).
 - 2026-11-08: Mech kill time nerfed: Kill Feed, Berserker Core and Covering Fire share a diminishing pool per deployment (halves every 6 s restored; 60 kills give 15 s, was 42) (classes.md Balance).
 - 2026-11-08: Electric Cherry nerfed (it one-shot on every round): the burst does 0.15-0.6 of the round's zombie health (was 0.3-1.3), shrinking by sqrt(20/round) past round 20; Storm Cell arcs 0.15 (was 0.25) (reaper-perks.md).
+- 2026-11-08: class level cap 40 → 60 (`classes.json` `maxLevel`); levels past 40 cost a flat 23,424 XP each (`flatFrom`), so 1→60 is 678k XP instead of the 1.7M the compound curve would give; wiki levels table matches (classes.md).

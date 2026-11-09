@@ -14,7 +14,8 @@
     "round": 60,
     "base": 400,
     "growth": 1.11,
-    "maxLevel": 40
+    "maxLevel": 60,
+    "flatFrom": 40
   },
   "tierPoints": 5,
   "classes": [
