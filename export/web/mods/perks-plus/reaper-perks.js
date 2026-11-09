@@ -107,7 +107,10 @@ export function setupReaperPerks(api, catalogue, base) {
   // ---- HUD: one chip per perk that has charges, a cooldown or a meter ------------------------------------------------
   const style = document.createElement('style'); style.textContent = `#reaper-chips{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);display:flex;gap:6px;pointer-events:none;z-index:3;font:700 10px/1 Arial,sans-serif;color:#eee;text-shadow:0 1px 2px #000}
     #reaper-chips span{padding:3px 6px;border-radius:3px;background:#000a;border:1px solid #ffffff30}#reaper-chips span.on{border-color:#ffd27a;color:#ffd27a}body.menu-open #reaper-chips{visibility:hidden}
-    #reaper-veil{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;transition:opacity .25s}`;
+    #reaper-veil{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:0;transition:opacity .25s}
+    #sh-armour{display:flex;align-items:center;gap:6px;width:140px;margin-top:8px;font:700 10px/1 Arial,sans-serif;color:#cfdbe5}#sh-armour[hidden]{display:none}
+    #sh-armour>div{flex:1;height:5px;background:#0007;border:1px solid #9fb6c840;overflow:hidden}#sh-armour i{display:block;height:100%;background:linear-gradient(#e6eef4,#8aa3b8);transform-origin:left;transition:transform .15s}
+    #sh-armour.empty{color:#8a96a0}body.touch-mode #sh-armour{width:90px;margin-top:5px}#bo7-left #sh-armour{width:100%;margin:4px 0 -1px}#bo7-left #sh-armour>div{height:6px;-webkit-mask:repeating-linear-gradient(90deg,#000 0 3px,transparent 3px 4px);mask:repeating-linear-gradient(90deg,#000 0 3px,transparent 3px 4px)}`;
   document.head.append(style);
   const chipsEl = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'reaper-chips' }));
   const veil = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'reaper-veil' }));
@@ -298,11 +301,36 @@ export function setupReaperPerks(api, catalogue, base) {
   // ---- Spectre Shot: swapping guns with 10+ zombies within 600 summons a ghost of the previous gun for 8 s (12) that
   //      shoots the nearest zombie every 0.35 s; hits slow, kills put ammo back in that gun. 30 s cooldown (20).
   let lastWeapon = null, spectre = null, spectreReady = 0;
-  // ---- Stone Cold Stronghold: stand still for 1 s and a ring forms; armour builds 20/s up to 150 and soaks
-  //      damage before health. Leaving the ring it drains 30/s. Research track sh.* (research.json): Quick Set, Reinforced,
+  // ---- Stone Cold Stronghold: stand still for 3 s and a ring (radius 100) forms where you stand; it stays put until you
+  //      walk out of it. Inside it armour builds 20/s up to 150 and soaks damage before health; out of it, it drains 30/s.
+  //      The armour bar sits right above the health bar (in the BO7 card too). The ring (faint disc, bright edge, two
+  //      bands rising off the edge) is built once and warmed at load, then only added to / taken off the scene. Research track sh.* (research.json): Quick Set, Reinforced,
   //      Fast Mason, Lingering Stone (the mod's upgrade: holds 10 s), Thick Skin, Shatter, Slow Drain, Fortress.
-  let armour = 0, stillT = 0, ringMesh = null, leftAt = 0;
-  const ringR = () => stat('sh.fortress') ? 110 : 70;
+  let armour = 0, stillT = 0, ringAt = null, leftAt = 0;
+  const ringR = () => stat('sh.fortress') ? 150 : 100;
+  const SH = 0x9fb6c8, shRing = (() => {
+    const g = new THREE.Group(), add = (geo, op, tex) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: SH, map: tex ?? null, transparent: true, opacity: op,
+      depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); m.frustumCulled = false; g.add(m); return m; };
+    add(new THREE.CircleGeometry(1, 48), .09).rotation.x = -Math.PI / 2;
+    add(new THREE.RingGeometry(.975, 1, 72), .55).rotation.x = -Math.PI / 2;
+    const c = document.createElement('canvas'); c.width = 2; c.height = 32; const x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 32);   // soft band: dark at both ends (additive = clear)
+    gr.addColorStop(0, '#000'); gr.addColorStop(.5, '#fff'); gr.addColorStop(1, '#000'); x.fillStyle = gr; x.fillRect(0, 0, 2, 32);
+    const band = new THREE.CanvasTexture(c), cyl = new THREE.CylinderGeometry(1, 1, 1, 72, 1, true);
+    g.userData.bands = [add(cyl, .5, band), add(cyl, .5, band)];
+    return g;
+  })();
+  host.warmObjects?.push(shRing);
+  const shEl = Object.assign(document.createElement('div'), { id: 'sh-armour', hidden: true, innerHTML: '<div><i></i></div><b>0</b>' });
+  let shShown = '';
+  function armourHud(on, a = armour) {   // the armour bar, kept right above the health bar (wherever the HUD moved it)
+    const ht = document.querySelector('.health-track');
+    if (!on || !ht) { if (!shEl.hidden) shEl.hidden = true; shShown = ''; return; }
+    if (shEl.nextElementSibling !== ht) ht.before(shEl);
+    const max = 150 + stat('sh.cap'), v = Math.round(a), key = v + '/' + max;
+    if (shEl.hidden) shEl.hidden = false; if (key === shShown) return; shShown = key;
+    shEl.firstChild.firstChild.style.transform = `scaleX(${Math.min(1, v / max)})`; shEl.lastChild.textContent = v; shEl.classList.toggle('empty', v <= 0);
+  }
+  host.on('warmHud', on => armourHud(on, on ? 75 : 0));
   function shatter() {   // Shatter: broken armour bursts, hurting and freezing the zombies round you
     const at = feet(); near(at, 150, z => { hurt(z, zh() * stat('sh.shatter'), 'perk'); slow(z, 2, 1, 2, 0x9fb6c8); });
     fx(at.clone().add(V(0, 30, 0)), .6, 0x9fb6c8); ring(at, 150, 0x9fb6c8);
@@ -617,13 +645,18 @@ export function setupReaperPerks(api, catalogue, base) {
     }
     // Stone Cold Stronghold
     if (has('stronghold')) {
-      const moving = player.velocity ? Math.hypot(player.velocity.x, player.velocity.z) > 10 : false;
-      stillT = moving ? 0 : stillT + dt;
-      if (stillT >= 1 - stat('sh.settle')) { if (!ringMesh) { ringMesh = disc(f, ringR(), 0x9fb6c8, .22); scene.add(ringMesh); } ringMesh.position.copy(f).y += 2;
+      const moving = player.velocity ? Math.hypot(player.velocity.x, player.velocity.z) > 10 : false, r = ringR();
+      if (ringAt && (Math.hypot(f.x - ringAt.x, f.z - ringAt.z) > r || Math.abs(f.y - ringAt.y) > 80)) { ringAt = null; shRing.removeFromParent(); stillT = 0; }   // walked out
+      if (!ringAt) { stillT = moving ? 0 : stillT + dt;
+        if (stillT >= 3 * (1 - stat('sh.settle'))) { ringAt = f.clone(); shRing.position.copy(f).y += 2; scene.add(shRing); } }
+      if (ringAt) {
+        shRing.scale.set(r, 1, r); shRing.userData.bands.forEach((b, i) => { const k = (t * .55 + i / 2) % 1;   // bands rise off the edge and fade
+          b.position.y = 6 + k * 60; b.scale.y = 12; b.material.opacity = .7 * (1 - k) * Math.min(1, k * 6); });
         armour = Math.min(150 + stat('sh.cap'), armour + dt * 20 * (1 + stat('sh.rate'))); leftAt = t;
-        if (stat('sh.fortress')) near(f, ringR(), z => slow(z, .3, .5)); }   // Fortress: the wider ring slows what walks into it
-      else { if (ringMesh) { ringMesh.removeFromParent(); ringMesh.geometry.dispose(); ringMesh.material.dispose(); ringMesh = null; } if (!(t - leftAt < stat('sh.hold'))) armour = Math.max(0, armour - dt * 30 * (1 - stat('sh.drain'))); }
-    } else if (ringMesh) { ringMesh.removeFromParent(); ringMesh = null; armour = 0; }
+        if (stat('sh.fortress')) near(ringAt, r, z => slow(z, .3, .5)); }   // Fortress: the wider ring slows what walks in
+      else if (!(t - leftAt < stat('sh.hold'))) armour = Math.max(0, armour - dt * 30 * (1 - stat('sh.drain')));
+      armourHud(true);
+    } else if (ringAt || armour || shShown) { shRing.removeFromParent(); ringAt = null; armour = 0; armourHud(false); }
     // Swarm Scotch
     if (swarm) { if (t > swarm.until) { swarm.g.removeFromParent(); swarm = null; }
       else { swarm.g.position.lerp(f.clone().add(V(0, 50, 0)), Math.min(1, dt * 3)); swarm.g.children.forEach((c, i) => c.position.set(Math.cos(t * 6 + i) * 30, Math.sin(t * 9 + i * 2) * 15, Math.sin(t * 5 + i) * 30));
@@ -783,7 +816,6 @@ export function setupReaperPerks(api, catalogue, base) {
   chip(() => has('estatic') && up('estatic') ? [`STATIC ${staticCharges}`, staticCharges > 0] : null);
   chip(() => has('moonshine') ? [`SLIDES ${slidesLeft}`, slidesLeft > 0] : null);
   chip(() => has('bubbleblink') ? [`BLINK ${blinks}`, blinks > 0] : null);
-  chip(() => has('stronghold') ? [`ARMOUR ${Math.round(armour)}`, armour > 0] : null);
   chip(() => has('blazephase') && blaze > 0 ? [`BLAZE ${Math.round(blaze / (up('blazephase') ? 3 : 1.5) * 100)}%`, blaze >= .4] : null);
   chip(() => has('changechews') ? [ELEMENTS[element][0].toUpperCase(), true] : null);
   chip(() => stand ? [`GET A KILL · ${Math.ceil(stand.until - now())}s`, true] : null);
@@ -802,7 +834,7 @@ export function setupReaperPerks(api, catalogue, base) {
     puddles.length = poison.length = lures.length = shells.length = fountains.length = wolfDrops.length = 0;
     for (const w of walls) w.m.removeFromParent(); walls.length = 0;
     if (wolf) wolf.s.removeFromParent(); wolf = null; if (spectre) spectre.g.removeFromParent(); spectre = null; if (swarm) swarm.g.removeFromParent(); swarm = null;
-    if (ghost.body) ghost.body.body.removeFromParent(); ghost.body = null; if (tomb) tomb.s.removeFromParent(); tomb = null; if (ringMesh) ringMesh.removeFromParent(); ringMesh = null;
+    if (ghost.body) ghost.body.body.removeFromParent(); ghost.body = null; if (tomb) tomb.s.removeFromParent(); tomb = null; shRing.removeFromParent(); ringAt = null; stillT = 0; armourHud(false);
     stand = null; dyingUntil = dyingReady = 0; angelCharge = 1; angelKills = 0; armour = 0; momentum = 0; charges = 10; wails = 3; slidesLeft = 20; blinks = 1; staticCharges = stuns = 0;
     element = 0; polosaDouble = 0; session.rpNade = false; wolfReady = spectreReady = milkReady = cherryReady = rodReady = cherryEcho = stormT = wallReady = 0; upgraded.clear(); tint('#0000', 0);
   });

@@ -1473,7 +1473,7 @@
     {
      "name": "Quick Set",
      "kind": "minor",
-     "desc": "The ring forms after 0.5 s standing still (was 1 s).",
+     "desc": "The ring forms after 1.5 s standing still (was 3 s).",
      "effects": {
       "sh.settle": 0.5
      },
@@ -1536,7 +1536,7 @@
     {
      "name": "Fortress",
      "kind": "major",
-     "desc": "The ring is wider (110) and zombies inside it move at half speed.",
+     "desc": "The ring is wider (150, was 100) and zombies inside it move at half speed.",
      "effects": {
       "sh.fortress": 1
      },

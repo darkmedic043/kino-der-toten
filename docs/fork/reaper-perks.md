@@ -120,7 +120,7 @@ They no longer use `up()` (the cheat double-buy): the research augments are the 
 
 ### Stone Cold Stronghold (`sh.`)
 
-Armour builds in a ring while you stand still. Base: the ring forms after 1 s still, radius 70; armour builds at 20/s up to 150, and drains at 30/s once you leave the ring.
+Armour builds in a ring while you stand still. Base: the ring forms after 3 s still (was 1 s until 2026-11-09), radius 100 (was 70; Fortress 150, was 110), and stays where it formed until you walk out of it (it used to vanish the moment you moved); armour builds at 20/s up to 150 inside it, and drains at 30/s once you are out.
 
 | # | Augment | Kind | Effect |
 |---|---|---|---|
@@ -566,7 +566,8 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 - **Effect**: Standing still forms a ring that builds armour over time.
 - **Upgrade** (the mod's double-buy): Armour builds faster and lingers after leaving the ring.
 - **Assets**: machine `cz_zombie_vending_stronghold_on`, bottle, icon, **no jingle**.
-- **As built**: Standing still for 1 s raises a ring under you and builds armour 20/s (35 upgraded) up to 150 (chip ARMOUR); armour soaks damage before health (outermost damage wrapper, the mod's hit/break sounds). Moving drains it 30/s (upgraded: it holds 10 s first).
+- **As built**: Standing still for 3 s raises a ring (radius 100) under you; it stays put until you walk out of it, and inside it armour builds 20/s up to 150. Armour soaks damage before health (outermost damage wrapper, the mod's hit/break sounds). Out of the ring it drains 30/s (upgraded: it holds 10 s first).
+- **Look (2026-11-09, user: bigger, more transparent, a rising ring on the edge, armour above health)**: a faint additive disc (opacity .09), a bright edge line and two soft bands (a 2x32 canvas gradient on an open cylinder) rising 60 units off the edge and fading, staggered half a cycle. The group `shRing` is built once at setup, pushed on `host.warmObjects`, and only added to / removed from the scene. The armour bar (`#sh-armour`, a slim steel-blue bar plus the number) is inserted right before `.health-track`, wherever the HUD put it (the BO7 card's `.bar`, the classic `#player-panel`), shown while the perk is held, and painted in `warmHud`; it replaced the ARMOUR chip.
 - **Implementation notes (before building)**: Standing still builds a ring on the floor and armour over time; there's no player armour yet, so it needs an armour bar (absorbs damage before health, `beforeDamage`). Upgrade: faster, and the armour lingers when leaving the ring. The mod's `armour_hit`/`armour_broken` sounds are exported.
 
 ### Swarm Scotch (`swarmscotch`)
