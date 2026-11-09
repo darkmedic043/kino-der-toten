@@ -41,7 +41,7 @@ export async function setupMech(ctx){
   // ---- state -----------------------------------------------------------------------------------------------------
   let phase='idle';        // idle | falling | piloting
   let shield=0,reactiveT=-9,stompT=0;   // Overshield (seconds of integrity), Reactive Armour and Crushing Stride timers
-  let integrity=0,maxIntegrity=1,lastHitT=-9,landedAt=0,coreUsed=false,dataBonus=0;   // dataBonus: Combat Data spent on landing
+  let killRestored=0,integrity=0,maxIntegrity=1,lastHitT=-9,landedAt=0,coreUsed=false,dataBonus=0;   // dataBonus: Combat Data spent on landing
   let drop=null;           // {mech, at, t}
   const arms={left:null,right:null};   // per-arm weapon state
   const trig={left:false,right:false,leftAt:-9,rightAt:-9};
@@ -234,9 +234,17 @@ export async function setupMech(ctx){
     else if(M.mech.ignite&&cause!=='fire'){const dps=health()*M.mech.ignite/3;if((burning.get(z)?.dps??0)<dps)burn(z,dps);}   // Napalm Coating
     return killed;
   }
+  // Kill Feed, Berserker Core and Covering Fire share one diminishing pool per deployment: every KILL_HALF seconds kills
+  // have already put back halves what the next kill gives (0.7 s a kill at most: 30 kills ~11 s, 60 ~15 s, 100 ~19 s)
+  const KILL_HALF=6;
+  function killTime(base){
+    if(!(base>0))return;
+    const before=integrity;integrity=Math.min(maxIntegrity,integrity+base*Math.pow(.5,killRestored/KILL_HALF));
+    killRestored+=integrity-before;
+  }
   function onKill(at){
     if(phase!=='piloting')return;
-    integrity=Math.min(maxIntegrity,integrity+(M.mech.killTime??0)+(M.mech.berserk??0));
+    killTime((M.mech.killTime??0)+(M.mech.berserk??0));
     if(M.mech.killPoints)session.addPoints?.(Math.round(M.mech.killPoints));
     if(at&&M.mech.chain&&Math.random()<M.mech.chain)setTimeout(()=>mblast(at.clone().addScaledVector(up,30),120,.4),120);   // Chain Reaction
   }
@@ -435,7 +443,7 @@ export async function setupMech(ctx){
     // climb in
     phase='piloting';lunge=null;landedAt=session.time;coreUsed=false;lastHitT=session.time;
     const cd=ctx.mechLand?.()??{damage:0,time:0};dataBonus=cd.damage;if(cd.n)api.toast?.(`Combat Data ×${cd.n} · +${Math.round(cd.damage*100)}% damage, +${cd.time.toFixed(1)}s integrity`,2.5);
-    maxIntegrity=integrity=M.mech.duration+cd.time;shield=M.mech.shield??0;
+    maxIntegrity=integrity=M.mech.duration+cd.time;shield=M.mech.shield??0;killRestored=0;
     arms.left=newArm(M.left);arms.right=newArm(M.right);fp.setWeapons(M.left.id,M.right.id);
     saved={move:player.moveSpeed,sprint:player.sprintSpeed,jump:player.jumpHeight,crouch:player.crouchSpeed};
     player.moveSpeed=saved.move*.82*M.mech.speed;player.sprintSpeed=saved.move*1.12*M.mech.speed;player.jumpHeight=0;player.crouchSpeed=player.moveSpeed;
@@ -582,7 +590,7 @@ export async function setupMech(ctx){
         if(m.op==='mount'&&phase==='piloting'&&M.mech.mount&&!rider){rider=from;sendState(true);api.toast?.('A gunner climbed on',2);}
         if(m.op==='dismount'&&rider===from){rider=null;sendState(true);}
         if(m.op==='off'&&riding===from)dismount();
-        if(m.op==='rkill'&&phase==='piloting'&&rider===from)integrity=Math.min(maxIntegrity,integrity+(M.mech.riderTime??0));
+        if(m.op==='rkill'&&phase==='piloting'&&rider===from)killTime(M.mech.riderTime??0);
       });
     }
     if(n&&(stTimer-=dt)<=0){stTimer=.1;sendState(false);}

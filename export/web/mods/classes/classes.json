@@ -1781,7 +1781,7 @@
               "name": "Kill Feed",
               "ranks": 3,
               "icon": "heart",
-              "desc": "Each kill by your mech adds {v}s to the integrity bar (explosions and fire included).",
+              "desc": "Each kill by your mech adds up to {v}s to the integrity bar (explosions and fire included). Diminishing: every 6s that kills have restored this deployment halves what the next kill gives.",
               "effects": {
                 "mech.killTime": 0.15
               },
@@ -2210,7 +2210,7 @@
               "name": "Covering Fire",
               "ranks": 3,
               "icon": "coin",
-              "desc": "Each kill by your rear gunner adds {v}s to the integrity bar.",
+              "desc": "Each kill by your rear gunner adds up to {v}s to the integrity bar. Shares Kill Feed's diminishing returns.",
               "effects": {
                 "mech.riderTime": 0.3
               },
@@ -2248,7 +2248,7 @@
               "ranks": 1,
               "type": "capstone",
               "icon": "fist",
-              "desc": "Capstone: every kill by your mech restores 0.25s of integrity (explosions and fire included).",
+              "desc": "Capstone: every kill by your mech restores up to 0.25s of integrity (explosions and fire included). Adds to Kill Feed and shares its diminishing returns.",
               "effects": {
                 "cap.core.berserk": 0.25
               }
