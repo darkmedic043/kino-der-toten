@@ -693,6 +693,22 @@ export function setupGambler(ctx){
     if(hand.length)rows.push(`<div>${hand.map((id,i)=>`<span class="hc">${REWARD[id].name.toUpperCase()}${i===0&&ctx.getCooldown()>0&&phase==='idle'?`<kbd>${key('ability')}</kbd>`:''}</span>`).join('')}</div>`);
     put(rack,'r',rows.join(''));
   }
+  // warmHud (engine.js): the ante wheel with an ante lit, a board with every game's table pieces and a result banner, painted
+  // once behind the loading screen; their first paint mid-game froze the user's game for 3.7 s (2026-11-05 log, ev abilityUsed hud:disc...)
+  let warmed=false;
+  host.on('warmHud',on=>{
+    if(on){
+      if(phase!=='idle'||!G.antes.length)return;warmed=true;
+      wheel={list:G.antes.map(a=>({a,why:why(a)})),sel:0,cx:30,cy:-40,t0:performance.now(),sticky:true,game:nextGame(A().games,lastGame)};
+      buildWheel();el.classList.add('on','hr');board.classList.add('show');word.innerHTML='<span>WARM</span>';
+      bd.innerHTML='<div class="ttl">WARM · <b>SLOTS</b></div><div class="tbl"><span class="reel spin">7</span><span class="reel n">7</span>'+
+        '<span class="cd">A</span><span class="cd w">★</span><span class="cd up">K</span><span class="cd nx">Q</span><span class="die held">⚅</span><span class="die hs">⚀</span><span class="die up">⚂</span>'+
+        '<span class="pk red">1</span><span class="pk black c">2</span><span class="pk green">0</span></div><div class="now">NOW</div><div class="clock"><i style="width:50%"></i></div>'+
+        oddsBar(null)+'<div class="hint">HINT</div>'+markerPips();
+      const [n,c]=TIER.jackpot;ban.innerHTML=`<h1 style="color:${c}">${n}</h1><h2>WARM</h2><p>WARM</p>`;ban.classList.add('show');
+      rack.innerHTML='<div class="hrm">HIGH ROLLER</div><div class="tm">WARM <b>9</b></div><div><span class="hc">WARM<kbd>Z</kbd></span></div>';
+    }else if(warmed){warmed=false;wheel=null;wh.classList.remove('show');word.innerHTML='';wordShown=-1;draw(true);}
+  });
   draw(true);
 
   return {

@@ -89,6 +89,9 @@ export default async function setup(api){
   const glow=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d'),r=g.createRadialGradient(64,64,0,64,64,64);
     r.addColorStop(0,'rgba(0,0,0,1)');r.addColorStop(.32,'rgba(10,0,25,1)');r.addColorStop(.42,'rgba(170,110,255,.95)');r.addColorStop(.6,'rgba(110,60,220,.35)');r.addColorStop(1,'rgba(60,20,160,0)');
     g.fillStyle=r;g.fillRect(0,0,128,128);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;})();
+  // the hole's glow sprite and the power-up burst sphere in the warm-up: both compile (and the glow uploads) behind the loading screen (2026-11-09)
+  host.warmObjects?.push(new THREE.Sprite(new THREE.SpriteMaterial({map:glow,transparent:true,depthWrite:false})),
+    new THREE.Mesh(new THREE.SphereGeometry(1,20,12),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.7,depthWrite:false,blending:THREE.AdditiveBlending})));
   function blackHole(at,twin=false){
     const dur=10+aug('gersch.long');   // Stable Orbit
     const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glow,transparent:true,depthWrite:false}));sp.position.copy(at).addScaledVector(up,30);sp.scale.setScalar(10);scene.add(sp);

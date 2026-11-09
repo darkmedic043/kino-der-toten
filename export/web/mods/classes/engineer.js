@@ -31,10 +31,21 @@ export function beaconModel(){
   return g;
 }
 
+// One of each thing the drone and mortar draw, in host.warmObjects: their programs compile behind the loading screen,
+// not on the first use (2026-11-09, user: freezes on the first use of the class abilities)
+function engineerWarm(){
+  const g=new THREE.Group();g.name='warm-engineer';g.add(droneModel(),beaconModel());
+  const add=o=>{g.add(o);return o;},line=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,10,0)]);
+  add(new THREE.Line(line,new THREE.LineBasicMaterial({color:0x9ff3ff,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false})));
+  add(new THREE.Mesh(new THREE.RingGeometry(8,9,12),new THREE.MeshBasicMaterial({color:0xff4020,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide})));
+  add(new THREE.Mesh(new THREE.CircleGeometry(8,8),new THREE.MeshBasicMaterial({color:0xff6a1a,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending})));
+  return g;
+}
 export function setupEngineer(ctx){
   const {api,act,S,A,blast,hud,onHit,getCooldown,setCooldown}=ctx;
   const {host,session,data,scene,camera,player,enemies,world,audio}=api;
   const full=()=>zombieHealth(session.round,data.rules);
+  host.warmObjects?.push(engineerWarm());
   const drones=[],beacons=[],marks=[],fires=[],tracers=[],arcs=[];
   const tracerMat=new THREE.LineBasicMaterial({color:0x9ff3ff,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false});
   const center=z=>z.root.position.clone().addScaledVector(up,z.kind==='dog'?20:40);

@@ -98,10 +98,21 @@ export function mineModel(){
   return m;
 }
 
+// One of each fortification in host.warmObjects (shadow casters included), so the wall, snare and nest compile and upload
+// their canvas textures behind the loading screen, not on the first use (2026-11-09)
+function fortifierWarm(){
+  const g=new THREE.Group();g.name='warm-fortifier';
+  const wall=steelWall(60,40),bags=sandbags(60,30);bags.position.x=70;
+  for(const m of [wall,bags])m.traverse(o=>{if(o.isMesh)o.castShadow=o.receiveShadow=true;});
+  const wire=wireField(40);wire.position.x=-70;const mine=mineModel();mine.position.z=20;
+  const zap=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,10,0)]),new THREE.LineBasicMaterial({color:0x9fd8ff,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+  g.add(wall,bags,wire,mine,zap);g.scale.setScalar(.25);return g;
+}
 export function setupFortifier(ctx){
   const {api,act,S,A,blast,hud,onHit,getCooldown,setCooldown}=ctx;
   const {host,session,data,scene,camera,player,enemies,world,audio}=api;
   const {frameMat}=mats();
+  host.warmObjects?.push(fortifierWarm());
   const walls=[];      // wall and sandbag segments (both hold zombies)
   const snares=[];
   const mines=[],arcs=[];

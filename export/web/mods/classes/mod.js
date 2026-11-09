@@ -90,6 +90,9 @@ export default async function setup(api){
   // co-op: coop.js replaces these to send tracers and skill explosions to the room
   const sync={tracer(){},boom(){}};
   function tracer(a,b){const g=new THREE.BufferGeometry().setFromPoints([a,b]);const l=new THREE.Line(g,tracerMat.clone());scene.add(l);tracers.push({l,t:.06});sync.tracer(a,b);}
+  // the turret and a tracer in the warm-up (any class: co-op shows teammates' turrets), so the first deploy compiles nothing (2026-11-09)
+  if(model){const g=new THREE.Group(),m=cloneSkinned(model);m.scale.setScalar(.01);m.traverse(o=>{if(o.isMesh){o.castShadow=true;o.frustumCulled=false;}});
+    g.add(m,new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,10,0)]),tracerMat));host.warmObjects?.push(g);}
   // credit: the blast is the action skill's own (a turret grenade, Final Payload, Shrapnel Charge, a claymore), so each
   // zombie it hits goes through onHit and its kills count for the kill passives (Recycler, Bounty, Nanites, Contractor…)
   function blast(at,radius,healthFrac,credit=false){
