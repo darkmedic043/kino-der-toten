@@ -33,7 +33,7 @@ export default async function setup(api){
   // Moon's weapon sounds: merge just the wonder-weapon cues into this map's audio.
   try{
     const manifest=await fetch(new URL('moon/audio/manifest.json',document.baseURI)).then(r=>r.json());
-    for(const [k,v] of Object.entries(manifest))if(/moon\/wpn\/(microwave|lmg\/minigun)/.test(k))audio.manifest[k]=v;
+    for(const [k,v] of Object.entries(manifest))if(/moon\/(wpn\/(microwave|lmg\/minigun)|fly\/gibs\/epic)/.test(k))audio.manifest[k]=v;
   }catch{}
   const minigunShot=Object.keys(audio.manifest).find(k=>/lmg\/minigun\/.*plr.*(loop|shot)/.test(k));
   const weaponSound=audio.weapon.bind(audio);
@@ -48,8 +48,46 @@ export default async function setup(api){
   // Zap Guns: any hit kills.
   host.on('beforeEnemyDamage',e=>{if(current()==='microwavegundw_zm'&&e.cause==='bullet'&&e.enemy)e.amount=Math.max(e.amount,e.enemy.health+1);});
 
-  // Wave Gun: a microwave cone that pops every zombie in front of you.
+  // Wave Gun: a microwave cone that cooks every zombie in front of you.
   const waves=[];
+  // As in BO1's Moon, a cooked zombie swells up and writhes on the spot, then bursts (2026-11-09). The kill and its
+  // points count at the shot (cause 'wave', which weapon-levels counts); only the corpse is held, its death clip
+  // waiting on the first frame. Bones are scaled uniformly (local = this region's swell / the parent's, so nothing
+  // shears), the root rises as the legs lengthen, and the writhe sits on top of the clip (mods update after the mixer).
+  const SWELL={j_spinelower:1.5,j_spineupper:1.85,j_spine4:1.7,j_clavicle_le:1.7,j_clavicle_ri:1.7,j_shoulder_le:1.6,j_shoulder_ri:1.6,j_elbow_le:1.45,j_elbow_ri:1.45,j_wrist_le:1.15,j_wrist_ri:1.15,
+    j_hip_le:1.25,j_hip_ri:1.25,j_knee_le:1.1,j_knee_ri:1.1,j_ankle_le:1,j_ankle_ri:1};
+  const WRITHE={j_spineupper:.1,j_spine4:.12,j_neck:.2,j_head:.3,j_clavicle_le:.15,j_clavicle_ri:.15,j_shoulder_le:.5,j_shoulder_ri:.5,j_elbow_le:.55,j_elbow_ri:.55,j_wrist_le:.4,j_wrist_ri:.4};
+  const cooking=[];let cookSound=false,dingAt=-1;
+  const v3=new THREE.Vector3(),jit=new THREE.Quaternion(),eul=new THREE.Euler();
+  function cook(z,forward){
+    const body=z.root.children[0];if(!body||z.kind==='dog')return;
+    const death=z.rig.actions.death;if(death){death.time=.04;death.timeScale=0;}
+    z.life=99;cookSound=true;
+    const f=new Map(),swell=[],writhe=[],phase={};
+    // the head model (enemies.spawn) hangs off j_spine4 with its own copy of the spine chain: scaling those copies would
+    // pull the head off the neck, so it only swells with the chest
+    const headModel=body.getObjectByName('j_spine4')?.children.find(c=>!c.isBone),inHead=b=>{for(let o=b;o&&o!==body;o=o.parent)if(o===headModel)return true;return false;};
+    body.traverse(b=>{if(!b.isBone)return;const fp=f.get(b.parent)??1,fb=inHead(b)?fp:SWELL[b.name]??fp;f.set(b,fb);
+      if(Math.abs(fb/fp-1)>1e-3)swell.push({b,s:fb/fp,base:b.scale.clone()});
+      // the head is its own model with its own copies of the neck bones (enemies.spawn): same phase for both copies
+      if(WRITHE[b.name]&&!b.userData.animationAnchor)writhe.push({b,amp:WRITHE[b.name],base:new THREE.Quaternion(),set:null,p:phase[b.name]??=[Math.random()*7,Math.random()*7]});});
+    const ankles=['j_ankle_le','j_ankle_ri'].map(n=>body.getObjectByName(n)).filter(Boolean);
+    z.root.updateMatrixWorld(true);
+    const ankleY=()=>ankles.reduce((a,b)=>a+b.getWorldPosition(v3).y,0)/(ankles.length||1);
+    const up=session.weapon.upgraded;
+    cooking.push({z,t:0,D:up?.8+Math.random()*.5:1.1+Math.random()*.8,swell,writhe,ankles,ankleY,ground:ankles.length?ankleY():0,dir:forward.clone().setY(0).normalize(),steam:0});
+  }
+  function unswell(c){for(const s of c.swell)s.b.scale.copy(s.base);for(const w of c.writhe)if(w.set)w.b.quaternion.copy(w.base);}
+  function burst(c){
+    const z=c.z;unswell(c);z.root.updateMatrixWorld(true);
+    const chest=(z.root.children[0].getObjectByName('j_spine4')??z.root).getWorldPosition(new THREE.Vector3()),fx=window.kino?.fx;
+    if(performance.now()-dingAt>150){dingAt=performance.now();audio.play('moon/wpn/microwave/rifle/microwave_ding',.45);audio.play('moon/fly/gibs/epic/fly_gib_0'+(Math.random()*3|0),.85);}
+    if(fx){fx.blood?.([chest.x,chest.y,chest.z],1.5);fx.blood?.([chest.x,chest.y+12,chest.z],1.2);
+      for(let i=0;i<4;i++)fx.emit?.({key:'cloud',at:chest.clone().add(fx.jitter(10)),vel:fx.jitter(90).addScaledVector(c.dir,40),size:[14,Math.random()*20+40],life:.8+Math.random()*.5,fade:[.03,.7],color:0x7a0c08,opacity:.85,gravity:-60,drag:2.5,spin:Math.random()-.5});
+      fx.emit?.({key:'smoke',at:chest.clone(),vel:new THREE.Vector3(0,25,0),size:[20,70],life:1.2,fade:[.05,.8],color:0xd8dde0,opacity:.4,drag:2});}
+    window.kino?.dismemberment?.burst?.(z,c.dir);   // arms, legs and head fly off (BO1's gib models)
+    z.root.visible=false;z.life=Math.min(z.life,.05);
+  }
   let lastShots=session.shots;
   host.on('update',dt=>{
     if(session.shots!==lastShots){
@@ -58,11 +96,29 @@ export default async function setup(api){
         const forward=camera.getWorldDirection(new THREE.Vector3()),range=session.weapon.upgraded?1400:1000;
         for(const z of [...enemies.list]){
           const delta=z.root.position.clone().add(new THREE.Vector3(0,35,0)).sub(camera.position),d=delta.length();
-          if(d<range&&delta.normalize().dot(forward)>.78&&world.lineClear(camera.position,enemies.headPosition(z)))enemies.hurt(z,z.health+1,false,false,'wave');
+          if(d<range&&delta.normalize().dot(forward)>.78&&world.lineClear(camera.position,enemies.headPosition(z))){enemies.hurt(z,z.health+1,false,false,'wave');if(z.state==='dead')cook(z,forward);}
         }
+        if(cookSound){cookSound=false;audio.play('moon/wpn/microwave/rifle/microwave_cooking',.7);}
         const ring=new THREE.Mesh(new THREE.ConeGeometry(60,160,24,1,true),new THREE.MeshBasicMaterial({color:0xbfe8ff,transparent:true,opacity:.35,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
         ring.position.copy(camera.position).addScaledVector(forward,120);ring.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),forward);scene.add(ring);waves.push({ring,forward,life:.45});
       }
+    }
+    for(const c of [...cooking]){
+      const z=c.z;if(!z.root.parent||z.life<=0){cooking.splice(cooking.indexOf(c),1);continue;}   // evicted by the corpse cap or a reset
+      if(!dt)continue;c.t+=dt;const k=Math.min(1,c.t/c.D),e=1-(1-k)*(1-k);
+      if(k>=1){burst(c);cooking.splice(cooking.indexOf(c),1);continue;}
+      for(const s of c.swell)s.b.scale.copy(s.base).multiplyScalar(1+(s.s-1)*e);
+      const amp=.25+.75*k,shake=k>.7?(k-.7)*3:0;
+      for(const w of c.writhe){
+        if(!w.set||!w.b.quaternion.equals(w.set))w.base.copy(w.b.quaternion);   // the clip sets bones it has; others keep their base
+        const a=w.amp*amp;
+        eul.set(a*.3*Math.sin(c.t*23+w.p[1])+shake*.08*Math.sin(c.t*61+w.p[0]),a*(.6*Math.sin(c.t*13+w.p[0])+.4*Math.sin(c.t*29+w.p[1])),a*(.6*Math.sin(c.t*11+w.p[1])+.4*Math.sin(c.t*31+w.p[0])));
+        w.b.quaternion.copy(w.base).multiply(jit.setFromEuler(eul));(w.set??=new THREE.Quaternion()).copy(w.b.quaternion);
+      }
+      if(c.ankles.length){z.root.updateMatrixWorld(true);z.root.position.y+=c.ground-c.ankleY();}   // longer legs lift the body, feet stay down
+      c.steam-=dt;const fx=window.kino?.fx;
+      if(fx?.emit&&c.steam<=0){c.steam=.14-.07*k;const at=z.root.position.clone().add(fx.jitter(10));at.y+=40+Math.random()*25;
+        fx.emit({key:'smoke',at,vel:fx.jitter(12).add(new THREE.Vector3(0,35,0)),size:[6,26+20*k],life:.7,fade:[.1,.7],color:0xdfe6ea,opacity:.22+.2*k,drag:1.5});}
     }
     for(const w of [...waves]){w.life-=dt;w.ring.position.addScaledVector(w.forward,dt*1600);w.ring.scale.multiplyScalar(1+dt*3);w.ring.material.opacity=Math.max(0,w.life*.8);
       if(w.life<=0){w.ring.removeFromParent();w.ring.geometry.dispose();w.ring.material.dispose();waves.splice(waves.indexOf(w),1);}}
@@ -122,7 +178,7 @@ export default async function setup(api){
     equipInPlace();
   });
   host.on('update',()=>{const next=pair[current()];if(next)warm(next);});
-  host.on('reset',()=>{swap=null;});
+  host.on('reset',()=>{swap=null;cooking.length=0;});
   // Max Ammo also refills the form you aren't holding.
   const powerup=session.powerup.bind(session);
   session.powerup=(type,...rest)=>{

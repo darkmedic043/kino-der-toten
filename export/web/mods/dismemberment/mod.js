@@ -207,7 +207,14 @@ export default async function setup(api){
     }
     while(flying.length>40){const f=flying.shift();f.piece.removeFromParent();}
   });
+  // a whole zombie blown apart (the Wave Gun's pop, moon-weapons): both arms, both legs and the head fly off; works on a corpse too
+  function burst(z,toward=new THREE.Vector3(1,0,0)){
+    if(!z?.root)return false;z.body??=z.root.children[0];
+    const dir=()=>toward.clone().add(new THREE.Vector3(Math.random()-.5,0,Math.random()-.5)).normalize();
+    for(const [key,bone] of [['rarmspawn','j_elbow_ri'],['larmspawn','j_elbow_le'],['rlegspawn','j_knee_ri'],['llegspawn','j_knee_le']])launch(z,key,bone,dir());
+    popHead(z,dir());gibCount+=3;return true;
+  }
   // debug: kino.dismemberment.cut(zombieId,'rarm'|'larm'|'legs') / .behead(zombieId)
   const byId=id=>enemies.list.find(z=>z.id===id);
-  window.kino.dismemberment={get gibs(){return gibCount;},cut:(id,limb)=>{const z=byId(id);if(z)cut(z,limb,new THREE.Vector3(1,0,0));return !!z;},behead:id=>{const z=byId(id);if(z)behead(z,new THREE.Vector3(1,0,0));return !!z;},state:id=>{const z=byId(id);return z&&{lost:[...(z.gib?.lost??[])],crawler:!!z.crawler,speed:z.speed,anim:z.rig.current};}};
+  window.kino.dismemberment={get gibs(){return gibCount;},cut:(id,limb)=>{const z=byId(id);if(z)cut(z,limb,new THREE.Vector3(1,0,0));return !!z;},behead:id=>{const z=byId(id);if(z)behead(z,new THREE.Vector3(1,0,0));return !!z;},burst,state:id=>{const z=byId(id);return z&&{lost:[...(z.gib?.lost??[])],crawler:!!z.crawler,speed:z.speed,anim:z.rig.current};}};
 }
