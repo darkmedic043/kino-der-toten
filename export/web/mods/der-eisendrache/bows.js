@@ -374,8 +374,13 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     const f = feet();
     shot = { el: elOf(session.weapon?.id), k, full: k >= 1, at: performance.now(), from: f, eye: camera.position.clone(), flung: !!pads?.flying?.(), run: !!lowgrav?.state?.().running,
       battery: Q.storm.batteries.find(b => inV(f, b.charged))?.id ?? null };
-    if (window.kino.debug?.shoot?.()) { session.weapon.reserve = Math.max(0, quiver - (cost(k) - 1)); nockAt = session.time + Math.max(.25, (session.def.fireTime ?? .32)); }
-    else shot = null;
+    if (window.kino.debug?.shoot?.()) {
+      session.weapon.reserve = Math.max(0, quiver - (cost(k) - 1)); nockAt = session.time + Math.max(.25, (session.def.fireTime ?? .32));
+      // the arrow carries its own draw (user 2026-11-08: "charge doesnt seem to work for the upgraded bows"): an arrow sticks
+      // for its 1.5 s fuse before it bursts, so a quick shot loosed meanwhile took the one pending slot and the charged
+      // arrow burst as a plain one (and the next got nothing)
+      const pr = api.features?.projectiles?.at(-1); if (pr && pr.def?.id === session.weapon.id && !pr.bowShot) { pr.bowShot = shot; shot = null; }
+    } else shot = null;
   }
   const press = touch => { if (taps.down()) nockAt = Math.min(nockAt || session.time, session.time); startDraw(touch); };   // a double tap nocks at once
   addEventListener('mousedown', e => { if (e.button !== 0 || !api.getState().active || host.keepActive || !bowInHand() || window.kino.operator?.active) return;   // keepActive: a UI is up (the terminal), its clicks aren't shots
@@ -411,9 +416,11 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   // ---- arrow impacts (the shooter's client): quest shots and the element effects ---------------------------------------
   // the bows' arrows explode through kino-features blast() -> effect(position, 0xffb347, 25)
   host.on('effect', e => {
-    if (e.count !== 25 || !isBow(session.weapon?.id) || session.weaponUnavailable) return;
-    const p = e.position.clone(); if (p.distanceTo(camera.position) > 12000) return;
-    const sh = shot && performance.now() - shot.at < 6000 ? shot : null; shot = null;
+    if (e.count !== 25) return;
+    const pr = api.features?.projectiles?.find(q => q.bowShot && q.mesh.position.distanceToSquared(e.position) < 25);   // one of our arrows bursting
+    if (!pr && (!isBow(session.weapon?.id) || session.weaponUnavailable || api.features?.projectiles && !shot)) return;   // other blasts (a grenade) aren't arrows
+    const p = e.position.clone(); if (!pr && p.distanceTo(camera.position) > 12000) return;
+    let sh = null; if (pr) { sh = pr.bowShot; pr.bowShot = null; } else { sh = shot && performance.now() - shot.at < 6000 ? shot : null; shot = null; }   // untagged: testShot()
     const flung = sh?.flung || !!pads?.flying?.(), run = sh?.run || !!lowgrav?.state?.().running, from = sh?.from ?? feet();
     // starts (anyone)
     for (const el of ['storm', 'rune', 'demon']) if (st[el].stage === 'idle' && near(p, Q[el].start, Q[el].startR)) sync.act('bqStart', { el });
@@ -428,8 +435,8 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     if (step('wolf') === 'burial' && run && near(p, Q.wolf.burial, 90)) sync.act('bqHit', { el: 'wolf', what: 'burial' });
     if (step('demon') === 'runes') { if (near(p, Q.demon.urnHit, 70)) sync.act('bqHit', { el: 'demon', what: 'urn' }); for (const [k, r] of Object.entries(Q.demon.runes)) if (near(p, r, 45) && st.demon.d.lit.has(k)) sync.act('bqHit', { el: 'demon', what: 'rune', k }); }
     // the element (everyone sees it; the host's zombies take it)
-    const el = elOf(session.weapon.id), ch = sh?.k ? { el: sh.el, k: +sh.k.toFixed(2) } : null;
-    lastImpact = { p: p.toArray().map(Math.round), charged: ch, flung, run };
+    const el = pr ? elOf(pr.def.id) : elOf(session.weapon?.id), ch = sh?.k ? { el: sh.el, k: +sh.k.toFixed(2) } : null;
+    lastImpact = { p: p.toArray().map(Math.round), el, charged: ch, flung, run };
     if (ch || ELEMENT[el]) sync.fx('bowFx', { p: sync.a(p), el, ch, eye: sync.a(sh?.eye ?? camera.position) });
   });
   // the obelisk takes magma for 7.5 s after a rocket test fire (zm_castle_rocket_trap.gsc)
