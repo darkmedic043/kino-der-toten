@@ -238,6 +238,7 @@
     },
     {
       "id": "aw_atlas45",
+      "pack": "aw",
       "rarity": "uncommon",
       "level": 4
     },
@@ -253,6 +254,7 @@
     },
     {
       "id": "aw_bulldog",
+      "pack": "aw",
       "rarity": "rare",
       "level": 9
     },
@@ -273,6 +275,7 @@
     },
     {
       "id": "aw_m1_irons",
+      "pack": "aw",
       "rarity": "rare",
       "level": 12
     },
@@ -283,6 +286,7 @@
     },
     {
       "id": "aw_tac19",
+      "pack": "aw",
       "rarity": "rare",
       "level": 14
     },
@@ -303,6 +307,7 @@
     },
     {
       "id": "aw_blunderbuss",
+      "pack": "aw",
       "rarity": "epic",
       "level": 18
     },
@@ -318,6 +323,7 @@
     },
     {
       "id": "aw_ohm",
+      "pack": "aw",
       "rarity": "epic",
       "level": 21
     },
@@ -338,6 +344,7 @@
     },
     {
       "id": "aw_cel3",
+      "pack": "aw",
       "rarity": "epic",
       "level": 25
     },
@@ -358,6 +365,7 @@
     },
     {
       "id": "aw_rw1",
+      "pack": "aw",
       "rarity": "epic",
       "level": 28
     },
@@ -373,6 +381,7 @@
     },
     {
       "id": "aw_mdl",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 32
     },
@@ -400,106 +409,127 @@
     },
     {
       "id": "aw_m1911",
+      "pack": "aw",
       "rarity": "uncommon",
       "level": 3
     },
     {
       "id": "aw_mp443",
+      "pack": "aw",
       "rarity": "uncommon",
       "level": 5
     },
     {
       "id": "aw_mp40",
+      "pack": "aw",
       "rarity": "uncommon",
       "level": 7
     },
     {
       "id": "aw_sten",
+      "pack": "aw",
       "rarity": "uncommon",
       "level": 8
     },
     {
       "id": "aw_m16",
+      "pack": "aw",
       "rarity": "uncommon",
       "level": 10
     },
     {
       "id": "aw_kf5",
+      "pack": "aw",
       "rarity": "rare",
       "level": 11
     },
     {
       "id": "aw_ak47",
+      "pack": "aw",
       "rarity": "rare",
       "level": 13
     },
     {
       "id": "aw_stg44",
+      "pack": "aw",
       "rarity": "rare",
       "level": 15
     },
     {
       "id": "aw_m1garand",
+      "pack": "aw",
       "rarity": "rare",
       "level": 16
     },
     {
       "id": "aw_pdw",
+      "pack": "aw",
       "rarity": "rare",
       "level": 17
     },
     {
       "id": "aw_mp11",
+      "pack": "aw",
       "rarity": "rare",
       "level": 19
     },
     {
       "id": "aw_s12",
+      "pack": "aw",
       "rarity": "rare",
       "level": 20
     },
     {
       "id": "aw_mk14",
+      "pack": "aw",
       "rarity": "rare",
       "level": 22
     },
     {
       "id": "aw_sn6",
+      "pack": "aw",
       "rarity": "rare",
       "level": 23
     },
     {
       "id": "aw_bal27",
+      "pack": "aw",
       "rarity": "rare",
       "level": 24
     },
     {
       "id": "aw_asm1",
+      "pack": "aw",
       "rarity": "rare",
       "level": 26
     },
     {
       "id": "aw_ak12",
+      "pack": "aw",
       "rarity": "epic",
       "level": 27
     },
     {
       "id": "aw_amr9",
+      "pack": "aw",
       "rarity": "epic",
       "level": 29
     },
     {
       "id": "aw_arx160",
+      "pack": "aw",
       "rarity": "epic",
       "level": 30
     },
     {
       "id": "aw_sac3",
+      "pack": "aw",
       "rarity": "epic",
       "level": 31
     },
     {
       "id": "aw_hbra3",
+      "pack": "aw",
       "rarity": "epic",
       "level": 33
     },
@@ -510,11 +540,13 @@
     },
     {
       "id": "aw_imr",
+      "pack": "aw",
       "rarity": "epic",
       "level": 34
     },
     {
       "id": "aw_lynx",
+      "pack": "aw",
       "rarity": "epic",
       "level": 35
     },
@@ -525,11 +557,13 @@
     },
     {
       "id": "aw_xmg",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 36
     },
     {
       "id": "aw_m160",
+      "pack": "aw",
       "rarity": "epic",
       "level": 37
     },
@@ -545,11 +579,13 @@
     },
     {
       "id": "aw_maaws",
+      "pack": "aw",
       "rarity": "epic",
       "level": 38
     },
     {
       "id": "aw_ameli",
+      "pack": "aw",
       "rarity": "epic",
       "level": 39
     },
@@ -575,6 +611,7 @@
     },
     {
       "id": "aw_svo",
+      "pack": "aw",
       "rarity": "epic",
       "level": 41
     },
@@ -585,6 +622,7 @@
     },
     {
       "id": "aw_pytaek",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 42
     },
@@ -605,16 +643,19 @@
     },
     {
       "id": "aw_repulsor",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 44
     },
     {
       "id": "aw_sentry",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 45
     },
     {
       "id": "aw_mors",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 46
     },
@@ -630,11 +671,13 @@
     },
     {
       "id": "aw_stingerm7",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 47
     },
     {
       "id": "aw_ae4",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 48
     },
@@ -645,11 +688,13 @@
     },
     {
       "id": "aw_mahem",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 50
     },
     {
       "id": "aw_atlas_20mm",
+      "pack": "aw",
       "rarity": "legendary",
       "level": 50
     }

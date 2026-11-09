@@ -40,10 +40,15 @@ export const isPistol=d=>!!d&&weaponClass(d)==='Pistol';
 // soon (progression.json weapons, the melon weapons): not out yet, a battlepass hands it out. Never unlocked, so never in the
 // box or the starting slot; the Weapons tab shows it locked. localStorage['kino.dev.soon']='1' lifts it (for testing).
 export const soonLocked=w=>!!w?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();
+// pack (progression.json weapons, e.g. "aw"): sold as a Shop weapon pack (mods/shop catalog.json item 'pack.<id>'). Locked
+// until the pack is owned: not in the box, the loadout or the unlock count. Owning it unlocks every gun in it at any level.
+// The dev flag kino.dev.soon lifts it too.
+export const ownsPack=id=>{try{if(localStorage.getItem('kino.dev.soon')==='1')return true;return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]).includes('pack.'+id);}catch{return false;}};
+export const packLocked=w=>!!w?.pack&&!ownsPack(w.pack);
 // weapons: ids known to the current game data (unknown unlock entries are skipped).
 export function unlocks(config,level,weapons){
   return {
-    weapons:config.weapons.filter(w=>!soonLocked(w)&&unlockLevel(w)<=level&&(!weapons||weapons[w.id])).map(w=>w.id),
+    weapons:config.weapons.filter(w=>!soonLocked(w)&&(w.pack?!packLocked(w):unlockLevel(w)<=level)&&(!weapons||weapons[w.id])).map(w=>w.id),
     bonuses:config.bonuses.filter(b=>b.level<=level).map(b=>b.id),
     bonusSlots:level>=config.secondBonusLevel?2:1,
     tactical:(config.tactical??[]).filter(t=>t.level<=level).map(t=>t.id),

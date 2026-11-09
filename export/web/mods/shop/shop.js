@@ -35,7 +35,7 @@ export function cosmetics(cat,s=loadShop()){
 function seeded(str){let h=2166136261;for(const ch of str){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return ()=>{h^=h<<13;h^=h>>>17;h^=h<<5;return (h>>>0)/4294967296;};}
 export function rotation(cat,s=loadShop(),now=new Date()){
   const pick=(seed,pool,n)=>{const r=seeded(seed),p=[...pool],out=[];while(out.length<n&&p.length)out.push(p.splice(Math.floor(r()*p.length),1)[0]);return out;};
-  const all=cat.items.filter(i=>!i.pass);   // pass rewards are never sold
+  const all=cat.items.filter(i=>!i.pass&&i.cat!=='pack');   // pass rewards are never sold; weapon packs stay in their own tab, at full price
   const daily=pick('d'+dayKey(now),all.filter(i=>i.cat!=='bundle'),cat.daily??3);
   const bundle=pick('w'+weekKey(now),all.filter(i=>!daily.includes(i)),cat.bundle?.size??3);
   const bundlePrice=Math.round(bundle.reduce((a,i)=>a+i.price,0)*(1-(cat.bundle?.discount??.3))/10)*10;

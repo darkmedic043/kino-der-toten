@@ -8,6 +8,10 @@
  },
  "categories": [
   {
+   "id": "pack",
+   "name": "Weapon packs"
+  },
+  {
    "id": "camo",
    "name": "Weapon camos"
   },
@@ -2577,6 +2581,18 @@
     "emblem": "/mods/shop/emblems/s2/renegadeshock.webp"
    },
    "pass": "s2"
+  },
+  {
+   "id": "pack.aw",
+   "cat": "pack",
+   "name": "Advanced Warfare Weapon Pack",
+   "price": 5000,
+   "rarity": "legendary",
+   "desc": "Every Advanced Warfare gun, for keeps: 45 weapons from rifles and SMGs to the energy guns, launchers and Akimbo pistols, each with its Gunsmith kit, attachments and prestige camos. They join your unlocks, the Mystery Box and the starting pistol slot.",
+   "data": {
+    "pack": "aw",
+    "game": "aw"
+   }
   }
  ]
 }

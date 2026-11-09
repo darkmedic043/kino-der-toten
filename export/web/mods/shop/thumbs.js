@@ -10,6 +10,7 @@ export function makeThumb({camos,chars}){
   const charOf=item=>chars.characters.find(c=>c.id===item.data?.character);
   return function thumb(item){
   const d=item.data??{};
+  if(item.cat==='pack')return `<div class="pv" style="background:url(${new URL('../weapon-levels/games/'+esc(d.game)+'.webp',import.meta.url).href}) center/auto 62% no-repeat,radial-gradient(circle at 50% 40%,#3a2a14,#0a0806 70%)"></div>`;   // weapon packs: the game's logo
   if(item.cat==='camo'){const c=camoOf(item);return `<div class="pv" data-swatch="${c?.id}" style="background-image:url(${camoSwatch(c)})"></div>`;}
   if(d.killfx)return `<div class="pv">${killFxSvg(d.killfx)}</div>`;   // kill effects: a looping picture of the effect
   if(d.emblem&&/^\/mods\/[\w./-]+$/.test(d.emblem))return `<div class="pv" style="display:grid;place-items:center;background:radial-gradient(circle,#2a251d,#0a0908)"><img src="${esc(d.emblem)}" alt="" loading="lazy" style="height:84%;aspect-ratio:1;object-fit:contain"></div>`;   // emblems: the badge (animated WebP plays by itself)

@@ -4,7 +4,7 @@
 // or the Camos tab, outfits in the Operator pane). Rules: shop.js.
 import { loadCatalog, loadShop, saveShop, itemById, slotOf, rotation, listed, buy, toggleEquip, installRewards } from './shop.js';
 import { loadCredits, saveCredits, loadCreditsConfig, currentChallenges, challengeText, nextReset } from '../credits/credits.js';
-import { loadCamos, camoSwatch, fillSwatches } from '../weapon-levels/camo.js';
+import { loadCamos, camoSwatch, fillSwatches, weaponClass } from '../weapon-levels/camo.js';
 import { gunPreview } from '../weapon-levels/gun-preview.js';
 import { renderPortrait } from '../../characters.js';
 import { cardSvg } from './card.js';
@@ -21,11 +21,18 @@ export async function mountShop(root,{toast,data}){
   const base=new URL('mods/',document.baseURI);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 installRewards();
-const [cat,ccfg,camos,chars]=await Promise.all([loadCatalog(new URL('shop/',base)),loadCreditsConfig(new URL('credits/',base)),
-  loadCamos(new URL('weapon-levels/',base)),fetch(new URL('characters/characters.json',base)).then(r=>r.json())]);
+const [cat,ccfg,camos,chars,prog]=await Promise.all([loadCatalog(new URL('shop/',base)),loadCreditsConfig(new URL('credits/',base)),
+  loadCamos(new URL('weapon-levels/',base)),fetch(new URL('characters/characters.json',base)).then(r=>r.json()),
+  fetch(new URL('progression/progression.json',base)).then(r=>r.json()).catch(()=>({weapons:[]}))]);
 const by=itemById(cat),rar=cat.rarities;
 const camoOf=item=>camos.camos.find(c=>c.id===item.data?.camo);
 const charOf=item=>chars.characters.find(c=>c.id===item.data?.character);
+// a weapon pack's guns: progression.json weapons tagged with its pack id (profile.js packLocked), grouped by class
+const packGuns=item=>prog.weapons.filter(w=>w.pack===item.data?.pack&&data.weapons[w.id]).map(w=>data.weapons[w.id]);
+function packList(item){
+  const by=new Map();for(const d of packGuns(item)){const c=weaponClass(d);by.set(c,[...(by.get(c)??[]),d.name]);}
+  return `<div class="sp-pack">${[...by].map(([c,n])=>`<div><b>${esc(c.toUpperCase())} · ${n.length}</b><span>${n.map(esc).join(' · ')}</span></div>`).join('')}</div>`;
+}
 let view='featured',sel=null;
 
 // ---- small previews ---------------------------------------------------------------------------------------------
@@ -92,22 +99,22 @@ function render(){
 }
 async function drawer(){
   const el=$('sp-drawer'),item=by[sel];
-  if(!item){el.classList.remove('open');el.innerHTML='<p class="hint">Pick an item to preview it. Everything here is a look or a sound: power comes from play.</p>';return;}
+  if(!item){el.classList.remove('open');el.innerHTML='<p class="hint">Pick an item to preview it. Everything here is a look or a sound, except the weapon packs: more guns, never stronger ones.</p>';return;}
   const s=loadShop(),owned=s.owned.includes(item.id),slot=slotOf(item),eq=slot&&s.equip[slot]===item.id,bal=loadCredits().balance,r=rotation(cat,s),onSale=!item.rotating||r.daily.includes(item)||r.bundle.includes(item);
   if(!s.seen.includes(item.id)){s.seen.push(item.id);saveShop(s);}
-  const where=item.cat==='camo'?'Equip it on any gun in the Gunsmith (camo · SHOP tab).':item.cat==='outfit'?'Pick it in Armory → Operator.':'';
+  const where=item.cat==='camo'?'Equip it on any gun in the Gunsmith (camo · SHOP tab).':item.cat==='outfit'?'Pick it in Armory → Operator.':item.cat==='pack'?`All ${packGuns(item).length} guns are unlocked: Armory → Weapons, the Mystery Box and the starting pistol slot.`:'';
   el.style.setProperty('--r',rar[item.rarity]);el.classList.add('open');
   el.innerHTML=`<div class="pv" id="sp-pv"></div><span class="rar">${item.rarity.toUpperCase()} · ${esc(CATS.find(c=>c.id===item.cat)?.name.toUpperCase())}</span><h3>${esc(item.name)}</h3><p>${esc(item.desc)}</p>
     <div class="act">${owned?(slot?`<button class="buy" data-equip="${esc(item.id)}">${eq?'UNEQUIP':'EQUIP'}</button>`:`<span class="hint">Owned. ${where}</span>`)
       :onSale?`<button class="buy" data-buy="${esc(item.id)}"${bal<item.price?' disabled':''}>BUY · ${item.price.toLocaleString()}</button>${bal<item.price?`<span class="hint">You need ${(item.price-bal).toLocaleString()} more credits.</span>`:''}`:'<span class="hint">Not in the shop today.</span>'}
-      ${item.data?.hits?'<button class="buy" data-play="1">PLAY</button>':''}</div>${!owned&&where?`<span class="hint">${where}</span>`:''}`;
+      ${item.data?.hits?'<button class="buy" data-play="1">PLAY</button>':''}</div>${!owned&&where&&item.cat!=='pack'?`<span class="hint">${where}</span>`:''}${item.cat==='pack'?packList(item):''}`;
   const pv=$('sp-pv'),d=item.data??{};
   if(item.cat==='camo')preview.show(pv,data.weapons.m16_zm??Object.values(data.weapons)[0],camoOf(item));
   else if(item.cat==='card'&&!d.title)pv.innerHTML=cardSvg(d,'SURVIVOR','LEVEL 20 · PRESTIGE 2');
   else if(item.cat==='outfit'&&charOf(item)?.icon){const ch=charOf(item);pv.innerHTML=`<img src="${iconUrl(ch)}" alt="" style="height:100%;background:linear-gradient(135deg,${ch.color} 0 55%,${ch.accent} 55%)">`;}
   else if(item.cat==='outfit'){const ch=charOf(item);pv.innerHTML='<span class="hint">Rendering…</span>';renderPortrait({...ch,type:'mannequin'},data).then(u=>{if(sel===item.id)pv.innerHTML=`<img src="${u}" alt="" style="height:100%">`;}).catch(()=>{pv.innerHTML='';});}
   else if(d.char||d.hitmarker)pv.innerHTML=`<div class="mock-hud" style="background:radial-gradient(#2a2620,#0a0a0a)"><span style="color:${d.color};font-size:${d.char?42:56}px">${esc(d.char??d.hitmarker)}</span></div>`;
-  else pv.innerHTML=thumb(item).replace('class="pv"','class="pv" style="height:100%"');
+  else{const t=thumb(item);pv.innerHTML=t.includes('class="pv" style="')?t.replace('class="pv" style="','class="pv" style="height:100%;width:100%;'):t.replace('class="pv"','class="pv" style="height:100%"');}   // a thumb with its own style keeps it
 }
 root.addEventListener('click',e=>{
   const c=e.target.closest('[data-cat]');if(c){view=c.dataset.cat;render();return;}
@@ -117,7 +124,8 @@ root.addEventListener('click',e=>{
   const b=e.target.closest('[data-buy]');if(b&&!b.disabled){
     if(!b.dataset.armed){b.dataset.armed='1';const t=b.textContent;b.textContent='CONFIRM · '+t;setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent=t;}},4000);return;}
     const id=b.dataset.buy,why=buy(cat,id);if(why){toast(why);render();return;}
-    toast(id==='bundle'?'Bundle bought':`${by[id].name} bought${slotOf(by[id])?' and equipped':''}`);render();return;}
+    if(id!=='bundle'&&by[id].cat==='pack')dispatchEvent(new CustomEvent('kino-shop-pack',{detail:{id}}));   // home.js redraws the loadout and Weapons panes
+    toast(id==='bundle'?'Bundle bought':by[id].cat==='pack'?`${by[id].name} bought: ${packGuns(by[id]).length} guns unlocked`:`${by[id].name} bought${slotOf(by[id])?' and equipped':''}`);render();return;}
   if(e.target.closest('#sp-drawer')===null&&innerWidth<=760&&!e.target.closest('.sp-item'))$('sp-drawer').classList.remove('open');
 });
 $('sp-cats-select').addEventListener('change',e=>{view=e.target.value;render();});
