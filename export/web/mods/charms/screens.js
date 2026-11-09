@@ -289,14 +289,16 @@ function frameOf(tilt,yaw){
 // The gun's surface as the search sees it, in root-bone space (inches), cached per model, arms, unit, face angle and hidden
 // bones: points, hand points, and bins over (x, z) of the outermost surface toward the face. Shared by the search and a
 // player's pinned spot (dragged in the Gunsmith, 2026-11-07), so a drag re-evaluates one spot a frame, not the sampling.
-const preps=new Map();
+const preps=new Map(),samples=new Map();
 function prepOf(gun,root,{key,hands,unit=1,tilt=20,yaw=42}){
   const hidden=[];gun.traverse(b=>{if(b.isBone&&b.scale.x<1e-3)hidden.push(b.name);});
-  const pk=[key,handsSig(hands),unit,tilt,yaw,hidden.join(',')].join('|');if(preps.has(pk))return preps.get(pk);
+  const sk=[key,handsSig(hands),unit,hidden.join(',')].join('|'),pk=sk+'|'+tilt+'|'+yaw;if(preps.has(pk))return preps.get(pk);
   const n=frameOf(tilt,yaw).n,dot=(i,a)=>a[i]*n.x+a[i+1]*n.y+a[i+2]*n.z;
-  inv.copy(root.matrixWorld).invert();
-  const pb=[],pts=visiblePoints(gun,null,gun.parent,pb,unit,inv,.6);if(pts.length<9)return null;
-  const hp=hands?visiblePoints(hands,gun,hands.parent,null,unit,inv):[];
+  // the sampling (the slow part) is shared by every face angle; only the bins below depend on it
+  let S=samples.get(sk);
+  if(!S){inv.copy(root.matrixWorld).invert();const pb=[],pts=visiblePoints(gun,null,gun.parent,pb,unit,inv,.6);if(pts.length<9)return null;
+    S={pts,pb,hp:hands?visiblePoints(hands,gun,hands.parent,null,unit,inv):[]};if(samples.size>12)samples.delete(samples.keys().next().value);samples.set(sk,S);}
+  const {pts,pb,hp}=S;
   // bins over (x, z): the outermost surface toward the face (max p.n), and whether loose or moving parts are there
   const loose=new Map(),kindOf=b=>{if(!b||b===root)return 0;if(!loose.has(b)){let k=2;for(let p=b;p&&p!==root&&p!==gun;p=p.parent)if(LOOSE.test(p.name)||FIDGET.test(p.name))k=1;loose.set(b,k);}return loose.get(b);};
   const bins=new Map(),bin=(x,z)=>{const k=Math.round(x/CELL)*4096+Math.round(z/CELL);let b=bins.get(k);if(!b)bins.set(k,b={max:-1e9,y:-1e9,ylo:1e9,n:0,loose:0,moving:0,hand:-1e9,hy:-1e9});return b;},get=(ix,iz)=>bins.get(ix*4096+iz);
@@ -321,8 +323,41 @@ export function screenPin(gun,root,point,{key,hands,unit=1}={}){
   const P=prepOf(gun,root,{key,hands,unit});if(!P)return null;const r3=v=>Math.round(v*1000)/1000;
   return {a:r3(THREE.MathUtils.clamp((point.x/unit-P.xmin)/P.L,0,1)),h:r3(THREE.MathUtils.clamp((point.z/unit-P.zLow)/(P.zTop-P.zLow),-.1,1.1))};
 }
-// -> {matrix (root space, model units), size, foot (housing units)}; null when the gun has no points
-export function screenMount(gun,root,{key,override,hands,camera,housing,unit=1,avoid=null,spots=null}={}){
+// the spot at a given angle; null when the gun has no points
+// -> {matrix (root space, model units), size, foot (housing units)}, turned to face the eye (2026-11-08, user: "doesnt
+// seem to face the player properly"). The spot (baked, the player's or searched) is chosen at the stock angle, tilt 20 and
+// yaw 42, which left a pistol's screen about 40 degrees off the line of sight. Then the housing swings on its arm's ball
+// toward the eye (faceCam: the view camera in game; the Gunsmith's typical hip eye otherwise), yaw 42-64 and tilt 12-30 in
+// 2 degree steps: the clip and its hook stay where the spot put them on the gun, and the arm (straight back from the face)
+// grows until no gun point is inside the housing. Pivoting about the face instead pushed the arm forward past a pistol's
+// muzzle (nothing to clip onto) or left the housing inches off the gun. A charms.json screenMounts entry with tilt, yaw or
+// at keeps its own angle.
+export function screenMount(gun,root,o={}){
+  const m=mountAt(gun,root,o),ov=o.override,unit=o.unit??1,sp=m?.spot;
+  if(!m||!sp||ov?.tilt!=null||ov?.yaw!=null||ov?.at)return m;
+  const P=prepOf(gun,root,{key:o.key,hands:o.hands,unit});if(!P)return m;
+  const c=new THREE.Vector3().fromArray(sp.c),eye=new THREE.Vector3();
+  if(o.faceCam){o.faceCam.updateMatrixWorld();inv.copy(root.matrixWorld).invert();eye.setFromMatrixPosition(o.faceCam.matrixWorld).applyMatrix4(inv).divideScalar(unit);}
+  else eye.set(P.xmin-9,3.5,P.zTop+1.2);
+  const d=eye.sub(c),len=d.length();if(len<1e-3)return m;
+  const q2=v=>Math.round(v/2)*2,yaw=THREE.MathUtils.clamp(q2(Math.atan2(-d.x,d.y)/D2R),42,64),tilt=THREE.MathUtils.clamp(q2(Math.asin(d.z/len)/D2R),12,30);
+  const t0=sp.tilt??20,y0=sp.yaw??42;if(yaw===y0&&tilt===t0)return m;
+  const k=['f',spotKey(o.key,o.housing),unit,JSON.stringify(sp),yaw,tilt].join('|');if(mounts.has(k))return mounts.get(k);
+  // the ball stays put; the housing's outline along the new normal is a fixed prism through it
+  const B=c.clone().addScaledVector(frameOf(t0,y0).n,-sp.t),F=frameOf(tilt,yaw),n=F.n,s=sp.s;
+  const hw=(o.housing?.w??1.2)*s/2+.05,hh=(o.housing?.h??1.2)*s/2+.05,D=(o.housing?.d??.35)*s,bn=B.dot(n),pts=P.pts;
+  let plane=bn+Math.max(.42*s,sp.t*.6),ok=false;
+  for(let it=0;it<40&&plane-bn<4;it++){let hit=-1e9;
+    for(let i=0;i<pts.length;i+=3){const dx=pts[i]-B.x,dy=pts[i+1]-B.y,dz=pts[i+2]-B.z,dn=dx*n.x+dy*n.y+dz*n.z+bn;
+      if(dn<plane-.03||dn>plane+D||dn<=hit)continue;
+      if(Math.abs(dx*F.x.x+dy*F.x.y+dz*F.x.z)<hw&&Math.abs(dx*F.u.x+dy*F.u.y+dz*F.u.z)<hh)hit=dn;}
+    if(hit<-1e8){ok=true;break;}plane=hit+.05;}
+  if(!ok)return m;   // no clear spot within 4 in: keep the stock angle
+  const t=plane-bn,r3=v=>Math.round(v*1000)/1000;
+  const out={...mountFromSpot({...sp,c:B.clone().addScaledVector(n,t).toArray().map(r3),t:r3(t),tilt,yaw},unit),baked:m.baked};
+  if(mounts.size>300)mounts.delete(mounts.keys().next().value);mounts.set(k,out);return out;
+}
+function mountAt(gun,root,{key,override,hands,camera,housing,unit=1,avoid=null,spots=null}={}){
   const baked=!override?.at&&!override?.pin&&spots?.[spotKey(key,housing)];if(baked){const k='b|'+spotKey(key,housing)+'|'+unit;if(!mounts.has(k))mounts.set(k,mountFromSpot(baked,unit));return mounts.get(k);}
   const tilt=override?.tilt??20,yaw=override?.yaw??42,F=frameOf(tilt,yaw),HW=housing.w??1.2,HH=housing.h??1.2,FT=housing.foot??[.6,.55];
   const P=prepOf(gun,root,{key,hands,unit,tilt,yaw});if(!P)return null;

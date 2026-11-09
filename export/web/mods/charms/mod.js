@@ -1,7 +1,7 @@
 // Weapon charms in first person (2026-11-06): the charm picked for the held gun in the Gunsmith hangs off its left side
 // and swings. The system is in charms.js; this hangs it on the viewmodel. Right-hand gun only (dual wield: not the left).
 import * as THREE from 'three';
-import { loadCharms, loadCharmState, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from './charms.js';
+import { loadCharms, loadCharmState, saveCharmState, tallyBase, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from './charms.js';
 import { screenFor, makeScreen, screenMount, placeScreen, charmZone } from './screens.js';
 
 export default async function setup(api){
@@ -25,23 +25,26 @@ export default async function setup(api){
     rig=new CharmRig(body,c);viewScene.add(rig.group);rig.group.visible=false;anchor=null;hungAt=performance.now();
   }
   // ---- the gun screen (screens.js): mounted on the root bone, its picture fed from the session and the gun's counters ----
-  let scr=null,sGun=null,sRoot=null,sMount=null,sId=null,sTok=0,sAt=0,prevK=null,prevRel=false;
+  let scr=null,sGun=null,sRoot=null,sMount=null,sId=null,sBase=null,sTok=0,sAt=0,prevK=null,prevRel=false;
   const dropScreen=()=>{scr?.dispose();scr=null;sGun=sRoot=sMount=null;};
   async function mountScreen(def){
     const my=++sTok;dropScreen();
     const id=heldId(def),e=screenFor(cat,loadCharmState(),id),g=view.gun;if(!e||!g)return;
     const s=await makeScreen(cat,e);if(my!==sTok||!s||view.gun!==g){s?.dispose();return;}
-    scr=s;sGun=g;sRoot=rootOf(g,def);sId=id;sAt=performance.now();prevK=null;prevRel=false;
+    scr=s;sGun=g;sRoot=rootOf(g,def);sId=id;sBase=null;sAt=performance.now();prevK=null;prevRel=false;
     if(!sRoot){dropScreen();return;}viewScene.add(s.object);s.object.visible=false;
   }
-  const screenState=()=>{const w=session.weapon,d=view.def??session.def,p=window.kino?.weaponLevels?.profile?.camo?.[sId]?.p??{};
-    return {kills:p.kills??0,heads:p.headshots??0,mag:w?.mag??0,reserve:w?.reserve??0,clip:d?.clipSize??1,round:session.round??1,
+  // a kill counter starts at 0 when it goes on the gun (charms.js tallyBase); made once the profile is there
+  const screenState=()=>{const w=session.weapon,d=view.def??session.def,prof=window.kino?.weaponLevels?.profile,p=prof?.camo?.[sId]?.p??{};
+    if(!sBase&&prof&&scr?.e?.kind==='kills'){const st=loadCharmState(),r=tallyBase(st,sId,scr.e.id,p);if(r.fresh)saveCharmState(st);sBase=r.base;}
+    return {kills:Math.max(0,(p.kills??0)-(sBase?.k??0)),heads:Math.max(0,(p.headshots??0)-(sBase?.h??0)),mag:w?.mag??0,reserve:w?.reserve??0,clip:d?.clipSize??1,round:session.round??1,
       reloading:(session.reloadLeft??0)>0,down:session.phase==='reviving'};};
   // the screen's spot: the baked one, the same the Gunsmith shows (screens.js); a gun missing from screen-spots.json gets the
   // Gunsmith's plain search, run at load by the warm-up below so play only reads the cache
-  function mountFor(gun,root,def,id,housing){const unit=charmUnit(def),key=def?.model??id;
+  // faceCam: the view camera in play (the face turns to it)
+  function mountFor(gun,root,def,id,housing,faceCam=null){const unit=charmUnit(def),key=def?.model??id;
     const st=loadCharmState(),avoid=charmFor(cat,st,id)?charmZone(gun,root,{key,override:cat.anchors[id],unit}):null;
-    return screenMount(gun,root,{key,override:screenOverride(cat,st,id),housing,unit,avoid,spots:cat.screenSpots});}
+    return screenMount(gun,root,{key,override:screenOverride(cat,st,id),housing,unit,avoid,spots:cat.screenSpots,faceCam});}
   function stepScreen(dt){
     if(view.gun!==sGun){dropScreen();return;}
     let shown=true;for(let o=sGun;o;o=o.parent){if(o===viewScene)break;if(!o.visible){shown=false;break;}}
@@ -49,7 +52,7 @@ export default async function setup(api){
       // after the raise has settled; it keeps clear of where a charm hangs when the gun has one
       if(!shown||performance.now()-sAt<450){scr.object.visible=false;return;}
       view.pivot.updateMatrixWorld(true);const def=view.def??session.def,unit=charmUnit(def);
-      sMount=mountFor(sGun,sRoot,def,sId,scr.housing);
+      sMount=mountFor(sGun,sRoot,def,sId,scr.housing,api.viewCamera);
       if(!sMount){dropScreen();return;}scr.setFoot(sMount.foot);
     }
     scr.object.visible=shown;if(!shown)return;
