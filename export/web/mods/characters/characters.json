@@ -115,7 +115,7 @@
     "license": "Free to use, edit and share (author's readme)",
     "note": "Fan model. Bondrewd is from Made in Abyss by Akihito Tsukushi."
    },
-   "fpArmsRetarget": true, "fpArmsHandScale": {"width": 1.3, "thick": 1.25, "length": 1.08}, "fpArmsFingerScale": {"thumb": 0.7, "*": 0.8}, "fpArmsReach": false, "fpArmsPalmMaterial": "^Body$", "fpArmsForearmPlates": {"material": "^Transform$", "scale": 0.55},
+   "fpArmsRetarget": true, "fpArmsHandScale": {"width": 1.3, "thick": 1.25, "length": 1.08}, "fpArmsFingerScale": {"thumb": 0.7}, "fpArmsFingerFit": 1, "fpArmsFingerFitLength": true, "fpArmsReach": false, "fpArmsPalmMaterial": "^Body(\\.\\d+)?$", "fpArmsForearmPlates": {"material": "^Transform$", "scale": 0.55},
    "springBones": {
     "chains": [
      "Coat_Back_L_0",

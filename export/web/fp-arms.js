@@ -94,6 +94,9 @@ export class FirstPersonArms {
 
     // Pose each arm over the T5 bind pose, then note how far to slide it so the wrists meet.
     const shift={},boneMap=new Map(),scaleBones=new Map();
+    // how far a point moves under a finger scale (about the base knuckle)
+    // (sc.seg: one segment of a length-fitted finger, see fpArmsFingerFitLength)
+    const scaleOff=(p,sc,out=new THREE.Vector3())=>{const g=sc.seg;if(g)return out.copy(g.dir).multiplyScalar(out.copy(p).sub(g.head).dot(g.dir)*(g.k-1)).add(g.delta);return out.copy(p).sub(sc.base).multiplyScalar(sc.k-1);};
     for(const [t5,S] of Object.entries(sides)){
       const tS=tp('j_shoulder_'+t5),tE=tp('j_elbow_'+t5),tW=tp('j_wrist_'+t5);
       aim(S.arm,pos(S.fore).sub(pos(S.arm)),tE.clone().sub(tS));
@@ -114,10 +117,20 @@ export class FirstPersonArms {
       for(const [name,k] of Object.entries(this.entry.fpArmsFingerScale??{})){const ch=f[name];if(!ch)continue;const base=pos(ch[0]);ch.forEach(b=>b.traverse(x=>{if(x.isBone)scaleBones.set(x,{base,k});}));}
       // fpArmsFingerFit: grow each (articulated) finger as a whole, thickness too, to T5's finger
       // length; thin short gauntlet fingers otherwise stretch into long noodles round the grip
-      if(this.entry.fpArmsFingerFit)for(const [name,ch] of Object.entries(f)){
+      // A number fits part of the way (k = 1 + (want/own - 1) * fit), and fpArmsFingerFitLength grows each segment along its
+      // own bone (every joint moves out by the growth of the segments before it; the tip past the last joint keeps its
+      // length, since the fit measured only up to it), not the thickness: Bondrewd's claws fell
+      // short of the far side of a BO3 rifle's handguard, and the uniform fit made them fat (2026-11-09)
+      const ff=this.entry.fpArmsFingerFit;
+      if(ff)for(const [name,ch] of Object.entries(f)){
         if(scaleBones.has(ch[0])||(this.entry.fpArmsKeepFingers??[]).includes(name)||!ch[2]||!T(`j_${name}_${t5}_2`))continue;
         const own=pos(ch[1]).distanceTo(pos(ch[0]))+pos(ch[2]).distanceTo(pos(ch[1])),want=tp(`j_${name}_${t5}_1`).distanceTo(tp(`j_${name}_${t5}_0`))+tp(`j_${name}_${t5}_2`).distanceTo(tp(`j_${name}_${t5}_1`));
-        const base=pos(ch[0]),k=want/own;ch.forEach(b=>b.traverse(x=>{if(x.isBone)scaleBones.set(x,{base,k});}));}
+        const base=pos(ch[0]),k=1+(want/own-1)*(ff===true?1:+ff);(this.fingerFit??={})[`${name}_${t5}`]=+(want/own).toFixed(3);
+        if(!this.entry.fpArmsFingerFitLength){ch.forEach(b=>b.traverse(x=>{if(x.isBone)scaleBones.set(x,{base,k});}));continue;}
+        const heads=ch.map(b=>pos(b)),delta=new THREE.Vector3();
+        ch.forEach((b,i)=>{const dir=(i+1<heads.length?heads[i+1].clone().sub(heads[i]):heads[i].clone().sub(heads[i-1])).normalize(),seg={head:heads[i],dir,delta:delta.clone(),k:i+1<heads.length?k:1};
+          if(i+1<heads.length)delta.addScaledVector(heads[i+1].clone().sub(heads[i]),k-1);
+          b.traverse(x=>{if(x.isBone&&(x===b||!ch.includes(x))&&!(scaleBones.get(x)?.seg&&ch.indexOf(scaleBones.get(x).bone)>i))scaleBones.set(x,{base,k,seg,bone:b});});});}
       S.targets=[[S.arm,'j_shoulder_'+t5],[S.fore,'j_elbow_'+t5],[S.hand,'j_wrist_'+t5]];
       // fpArmsKeepFingers (e.g. ['thumb']): those fingers keep their own segment lengths (only the
       // base knuckle is pinned); a much shorter thumb than T5's otherwise stretches ~1.6x
@@ -157,10 +170,13 @@ export class FirstPersonArms {
     const palmFit=(t5,S)=>{
       if(!T(`j_mid_${t5}_0`)||!T(`j_index_${t5}_0`))return null;
       const primary=(o,i)=>{const SI=o.geometry.attributes.skinIndex,SW=o.geometry.attributes.skinWeight;let best=0,bw=-1;for(let c=0;c<4;c++){const ww=SW.getComponent(i,c);if(ww>bw){bw=ww;best=SI.getComponent(i,c);}}return o.skeleton.bones[best];};
-      const o=template[0],idx=[];   // (the first mesh only: BO1's surfaces share one vertex buffer)
-      for(let i=0;i<o.geometry.attributes.position.count;i++)if(primary(o,i)?.name==='j_wrist_'+t5)idx.push(i);
-      if(idx.length<8)return null;
-      return {t5:[{mi:0,idx:Uint32Array.from(idx)}],bIdx:[],hand:S.hand,ups:new Float32Array(4096),shift:0};};
+      // every mesh with its own vertex buffer (BO1's surfaces share one: read once). A BO3 rig's first mesh is the wrist
+      // device and the glove the second: reading only the first left the palm fit off on every imported gun (2026-11-09)
+      const seen=new Set(),t5l=[];let count=0;
+      template.forEach((o,mi)=>{const P=o.geometry.attributes.position;if(seen.has(P))return;seen.add(P);const idx=[];
+        for(let i=0;i<P.count;i++)if(primary(o,i)?.name==='j_wrist_'+t5)idx.push(i);if(idx.length){t5l.push({mi,idx:Uint32Array.from(idx)});count+=idx.length;}});
+      if(count<8)return null;
+      return {t5:t5l,bIdx:[],hand:S.hand,ups:new Float32Array(4096),shift:0};};
     if(rt)for(const [t5,S] of Object.entries(sides)){
       const sh=new THREE.Matrix4().makeTranslation(shift[t5]);
       const add=(bone,info)=>{const t=info.t5&&T(info.t5);rtIndex.set(bone,rt.length);
@@ -181,7 +197,7 @@ export class FirstPersonArms {
       // every layer's vertices by their finger weights, as the re-skin path does). Scaling the knuckle matrices each frame
       // instead (2026-10-19 to 10-20) only moved fully weighted vertices: Bondrewd's fur claws shrank, the suit's fingers
       // under them, blended with the hand, did not, and stuck out of the claws (user: "showing the regular hands underneath").
-      S.arm.traverse(b=>{const sc=scaleBones.get(b),e=sc&&rt[rtIndex.get(b)];if(!e)return;const base=sc.base.clone().add(shift[t5]),q=new THREE.Vector3().setFromMatrixPosition(e.bind);e.bind.setPosition(q.sub(base).multiplyScalar(sc.k).add(base));});
+      S.arm.traverse(b=>{const sc=scaleBones.get(b),e=sc&&rt[rtIndex.get(b)];if(!e)return;const q=new THREE.Vector3().setFromMatrixPosition(e.bind);e.bind.setPosition(q.add(scaleOff(q.clone().sub(shift[t5]),sc)));});
       if(handStretch[t5])S.hand.traverse(b=>{const e=b!==S.hand&&rt[rtIndex.get(b)];if(e)e.bind.setPosition(handStretch[t5].to(new THREE.Vector3().setFromMatrixPosition(e.bind)));});
     }
     if(rt)for(const e of rt){
@@ -202,7 +218,7 @@ export class FirstPersonArms {
     // knuckle) is moved exactly onto its T5 joint and the mesh between stretches,
     // so different arm and finger proportions still close around the grips.
     // Unmapped bones (twist, tips) follow their nearest mapped ancestor.
-    const scaled=b=>{const p=pos(b),sc=scaleBones.get(b);return sc?p.sub(sc.base).multiplyScalar(sc.k).add(sc.base):p;};
+    const scaled=b=>{const p=pos(b),sc=scaleBones.get(b);return sc?p.add(scaleOff(p,sc)):p;};
     const offset=new Map();
     for(const S of Object.values(sides))for(const [bone,name] of S.targets)offset.set(bone,tp(name).sub(scaled(bone)));
     const offsetOf=b=>{let p=b;while(p&&!offset.has(p))p=p.parent;return p?offset.get(p):null;};
@@ -276,7 +292,7 @@ export class FirstPersonArms {
         o.getVertexPosition(v,v3);v3.applyMatrix4(o.matrixWorld);
         if(handFlag){const hs=handSets.get(sideOf[v]);let hw=0;for(let k=0;k<4;k++)if(hs?.has(src[si.getComponent(v,k)]))hw+=sw.getComponent(v,k);handFlag[i]=hw>.5?1:0;}
         if(rt){const S=sideOf[v];
-          {const d=new THREE.Vector3();for(let k=0;k<4;k++){const w=sw.getComponent(v,k),sc=w&&scaleBones.get(src[si.getComponent(v,k)]);if(sc)d.addScaledVector(v3.clone().sub(sc.base),w*(sc.k-1));}v3.add(d);}   // (fpArmsFingerScale, every layer by its weights)
+          {const d=new THREE.Vector3();for(let k=0;k<4;k++){const w=sw.getComponent(v,k),sc=w&&scaleBones.get(src[si.getComponent(v,k)]);if(sc)d.addScaledVector(scaleOff(v3,sc),w);}v3.add(d);}   // (fpArmsFingerScale, every layer by its weights)
           if(plateMat&&plateMat.test([o.material].flat()[0]?.name??'')){const fx=foreAxis[S.t5];let w=0;for(let k=0;k<4;k++){const b=src[si.getComponent(v,k)];if(b===S.fore||(b&&b.parent===S.fore&&b!==S.hand))w+=sw.getComponent(v,k);}
             if(w>.5){const d=v3.clone().sub(fx.a),t=d.dot(fx.dir);const radial=d.addScaledVector(fx.dir,-t),r=radial.length();if(r>1e-6){const want=Math.max(r*(plates.scale??.6),Math.min(r,innerR[S.t5]??0));v3.addScaledVector(radial,want/r-1);}}}
           v3.add(shift[S.t5]);if(handStretch[S.t5]){const set=handSets.get(S);let hw=0;for(let k=0;k<4;k++)if(set.has(src[si.getComponent(v,k)]))hw+=sw.getComponent(v,k);if(hw)handStretch[S.t5].to(v3,hw);}
@@ -287,7 +303,7 @@ export class FirstPersonArms {
           // and would seat themselves on the grip instead of the hand)
           const pf=rt[rtIndex.get(sideOf[v].hand)]?.palm;if(pf&&top[0]?.[0]===rtIndex.get(sideOf[v].hand)&&(!palmMat||palmMat.test([o.material].flat()[0]?.name??'')))(palmLists.get(pf)??palmLists.set(pf,[]).get(pf)).push(i);
           return;}
-        {const d=new THREE.Vector3();for(let k=0;k<4;k++){const w=sw.getComponent(v,k),sc=w&&scaleBones.get(src[si.getComponent(v,k)]);if(sc)d.addScaledVector(v3.clone().sub(sc.base),w*(sc.k-1));}v3.add(d);}
+        {const d=new THREE.Vector3();for(let k=0;k<4;k++){const w=sw.getComponent(v,k),sc=w&&scaleBones.get(src[si.getComponent(v,k)]);if(sc)d.addScaledVector(scaleOff(v3,sc),w);}v3.add(d);}
         const move=new THREE.Vector3();let wsum=0;
         for(let k=0;k<4;k++){const weight=sw.getComponent(v,k);if(!weight)continue;const off=offAt(src[si.getComponent(v,k)],v3);if(off){move.addScaledVector(off,weight);wsum+=weight;}}
         v3.add(wsum>0?move.divideScalar(wsum):shift[sideOf[v].t5]).applyMatrix4(toBind);P.set([v3.x,v3.y,v3.z],i*3);
