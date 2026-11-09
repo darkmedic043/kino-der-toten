@@ -508,3 +508,4 @@
 - 2026-11-08: Gun screens face the player (the housing swings on its arm's ball toward the view camera, yaw 42-64/tilt 12-30, arm grows until no gun point is inside it) and kill counters start at 0 when put on a gun (`tally[gunId]` baseline in the charm state). weapon-levels.md Gun screens.
 - 2026-11-08: Gun screen kill counters show one game's kills (per-gun baseline in memory at the first read; the saved `tally` baselines are gone, the Gunsmith shows 0). weapon-levels.md Gun screens.
 - 2026-11-08: Gun screens clear the gun's moving parts (`partTravel`: slide/bolt travel from the fire clips, swept in the clearance; a firing G18's slide went through the screen) and pick the angle by facing plus arm length; camo skips charm subtrees. weapon-levels.md Gun screens.
+- 2026-11-08: Gun screens: the display no longer depth-fights its holder (it sat 0.001-0.002 above the recess floor; now 0.014 plus a polygon offset, models `?v=2`; weapon-levels.md Display depth).

@@ -220,7 +220,7 @@ export class GunScreen{
     this.entry=entry;this.housing=housing;this.object=model;this.object.userData.charm=true;
     const [w,h]=housing.px??[64,64];this.lcd=new Lcd(w,h);this.kind=KINDS[entry.kind]??KINDS.art;this.m={t:0};this.t=0;this.acc=1;
     this.e={...entry,pal:palette(entry)};
-    this.mat=new THREE.ShaderMaterial({name:'gun_screen',vertexShader:VS,fragmentShader:FS,
+    this.mat=new THREE.ShaderMaterial({name:'gun_screen',vertexShader:VS,fragmentShader:FS,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-4,
       uniforms:{map:{value:this.lcd.tex},res:{value:new THREE.Vector2(w,h)},glow:{value:entry.glow??1.35},power:{value:1}}});
     this.foot=null;this.buttons=[];this.press0=[];
     model.traverse(o=>{

@@ -186,7 +186,9 @@ def build_slab():
     W, H, D, R, B = 1.2, 1.2, .3, .2, .045
     rim = [(shape(W, H, R, B + .012), D + .018), (shape(W, H, R, B + .045), D + .018), (shape(W, H, R, B + .06), D - .012)]
     bm = body(W, H, D, R, B, rim); hb = obj('housing', bm, [M['shell']], 35)
-    sw = W - 2 * (B + .06); scr = screen(sw, sw, R - B - .06, D - .011, M)
+    # the screen 14 thou above the recess floor (D - .012); at .001 it z-fought the shell in game (2026-11-08, user: "clip into
+    # the screen holder itself, its like the texture isnt pushed far enough")
+    sw = W - 2 * (B + .06); scr = screen(sw, sw, R - B - .06, D + .002, M)
     # a trim band around the sides, tiny grip ridges on the right edge, a status LED on top
     bm = bmesh.new(); loft(bm, [(shape(W, H, R, -.006), D * .42), (shape(W, H, R, -.006), D * .62)]); band = obj('band', bm, [M['trim']], 35)
     parts = [hb, scr, band]
@@ -211,7 +213,7 @@ def build_field():
     loft(bm, [(rr(fw, fh, .1, 6, 0, sy), D), (rr(fw, fh, .1, 6, 0, sy), D + .035), (rr(fw - .03, fh - .03, .09, 6, 0, sy), D + .045),
               (rr(sw + .02, sh + .02, .06, 6, 0, sy), D + .045), (rr(sw, sh, .055, 6, 0, sy), D + .01)], cap1=True)
     parts.append(obj('frame', bm, [M['trim']], 35))
-    s = screen(sw, sh, .055, D + .012, M); s.location.y = 0; parts.append(s)
+    s = screen(sw, sh, .055, D + .024, M); s.location.y = 0; parts.append(s)   # 14 thou above the frame's floor (D + .01): at .002 it z-fought
     # move the screen's geometry up: built at the origin
     for v in s.data.vertices: v.co.y += sy
     # button wells (rubber plates) and the three caps

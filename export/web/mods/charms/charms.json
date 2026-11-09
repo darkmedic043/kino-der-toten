@@ -75,7 +75,7 @@
   "_screens": "Gun screens (2026-11-07, screens.js): housings = Blender models from .tools/build_gun_screens.py (w/h/d inches, px = the display's pixels, foot = the mount block's face in inches, buttons = btn_0.. meshes). screens[] entry: id, name, desc, housing, kind (art | kills | buddy | ammo), tint (display colour), trim (housing trim colour), art ('melon' or {image, cols, rows, frames, fps}), marquee, glow, plus unlock/pass/soon like charms. screenMounts[gun id] = {at:[x,y,z] model units, size, tilt, yaw, foot} overrides the automatic spot.",
   "housings": {
     "slab": {
-      "model": "screens/slab.glb",
+      "model": "screens/slab.glb?v=2",
       "w": 1.2,
       "h": 1.2,
       "d": 0.3,
@@ -89,7 +89,7 @@
       ]
     },
     "field": {
-      "model": "screens/field.glb",
+      "model": "screens/field.glb?v=2",
       "w": 1.1,
       "h": 1.45,
       "d": 0.32,
