@@ -525,3 +525,4 @@
 - 2026-11-09: Stone Cold Stronghold in co-op: teammates see your ring and build armour inside it (owner's rate and cap), Fortress slows on the host; BO7 card: armour is a shorter bar left of the HP figure with its number above (reaper-perks.md)
 - 2026-11-09: Vulture Aid ammo drops rarer: 3% of kills (was 5%), points stay 5% (gameplay.md)
 - 2026-11-09: Wave Gun cooks zombies as in BO1 Moon: they swell up, writhe and steam for 1-2 s, then burst into gibs (kino.dismemberment.burst) with the ding and gib sounds (weapons.md).
+- 2026-11-09: Stickers on attachments: mounted parts (BO3/AW) get their own mesh keys (`@<mountId>/...`), are resticked when they finish loading, plain-colour parts take stickers, a sticker on an unfitted attachment waits for it (Gunsmith: NOT FITTED), and the sticker view frames the whole gun clear of the panel (weapon-levels.md).

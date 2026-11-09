@@ -13,7 +13,7 @@ import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challeng
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
 import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from '../charms/charms.js';
 import { screenFor, makeScreen, screenMount, placeScreen, charmZone, screenPin, partTravel, travelFor } from '../charms/screens.js';
-import { loadStickers, loadStickerState, saveStickerState, stickersFor, stickerLock, stickerImage, applyStickers, stickerFromHit, meshKeys, MAX_STICKERS } from '../stickers/stickers.js';
+import { loadStickers, loadStickerState, saveStickerState, stickersFor, stickerLock, stickerImage, applyStickers, stickerFromHit, meshKeys, stickerPaintable, stickerMount, MAX_STICKERS } from '../stickers/stickers.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
 
@@ -395,11 +395,13 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(stkFor!==id){stkFor=id;stkYaw=STK_GAME;}   // first look at a gun's stickers: its in-game side
     const l=stkList(),nm=x=>esc(stkCat.stickers.find(s=>s.id===x)?.name??x),pic=s=>!s?'':s.shine?`<span class="stk-gold" style="--m:url('${stickerImage(s)}')"><img src="${stickerImage(s)}" alt="" draggable="false"></span>`:`<img src="${stickerImage(s)}" alt="" draggable="false">`;
     if(stkSel>=l.length)stkSel=Math.max(0,l.length-1);const hid=l.map(stkHidden);
+    // a sticker on an attachment that isn't fitted now: kept, drawn again once it is
+    const off=l.map(x=>{const a=stickerMount(x);return a&&!stkWorld(x)?(cat?.attachments?.find(y=>y.id===a)?.name??a).toUpperCase():null;});
     const hint=stkArm?`Tap the gun to place ${nm(stkArm.id)}, or drag it there. Right-click or Esc cancels.`
       :l.length<MAX_STICKERS?'Drag a sticker onto the gun. Drag a placed one to move it.':'All three are placed: drag one to move it, or drop a new one to replace the selected one.';
     el.innerHTML=`<h3>STICKERS · ${l.length} / ${MAX_STICKERS}</h3><p class="stk-hint">${hint}</p>
       <button class="opt stk-flip" data-stk-flip><strong>${stkGameSide()?'SIDE SEEN IN GAME':'OTHER SIDE · NOT SEEN IN GAME'}</strong><span class="tag" style="float:none;margin-left:8px">FLIP ⟲</span></button>`+
-      l.map((x,i)=>`<div class="opt stk-row${i===stkSel?' on':''}" data-stk-i="${i}">${pic(stkCat.stickers.find(k=>k.id===x.id))}<strong>${nm(x.id)}${hid[i]?'<small class="stk-hid">NOT SEEN IN GAME</small>':''}</strong>
+      l.map((x,i)=>`<div class="opt stk-row${i===stkSel?' on':''}" data-stk-i="${i}">${pic(stkCat.stickers.find(k=>k.id===x.id))}<strong>${nm(x.id)}${off[i]?`<small class="stk-hid">ON ${esc(off[i])} · NOT FITTED</small>`:hid[i]?'<small class="stk-hid">NOT SEEN IN GAME</small>':''}</strong>
         <span class="acts">${hid[i]?`<button data-stk-game="${i}">MOVE TO GAME SIDE</button>`:''}<button data-stk-del="${i}">REMOVE</button></span>
         ${i===stkSel?`<label>SIZE<input type="range" min="50" max="200" step="5" value="${Math.round((x.m??1)*100)}" data-stk-size="${i}"><b>${Math.round((x.m??1)*100)}%</b></label>
         <label>ROTATE<input type="range" min="-180" max="180" step="5" value="${x.r??0}" data-stk-rot="${i}"><b>${x.r??0}°</b></label>`:''}</div>`).join('')+
@@ -417,7 +419,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   function stkPick(cam){   // the first painted, visible part of the gun along `ray`
     for(const h of ray.intersectObject(gun,true)){const o=h.object;let shown=true;for(let a=o;a&&a!==scene;a=a.parent)if(!a.visible){shown=false;break;}
       const m=[o.material].flat()[h.face?.materialIndex??0]??[o.material].flat()[0],base=m?.userData?.stickerOf??m?.userData?.camoOf??m;
-      if(!shown||!base?.map||m.transparent&&m.opacity<.5||/lens|glass|reticle|red_dot/i.test(base.name??''))continue;
+      if(!shown||!stickerPaintable(base)||m.transparent&&m.opacity<.5||/lens|glass|reticle|red_dot/i.test(base.name??''))continue;
       return stickerFromHit(gun,h,cam,radius*.18);}
     return null;
   }
@@ -649,14 +651,21 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(!alive)return;requestAnimationFrame(frame);
     const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;camoTime.value+=dt;   // animated camos (Pack-a-Punch, Prestige Master)
     const w=root.clientWidth,h=root.clientHeight;
+  let viewX=-.03,viewGoal=-.03;   // horizontal framing (a fraction of the width; aim() moves it for the sticker view)
     if(canvas.width!==Math.floor(w*renderer.getPixelRatio())||canvas.height!==Math.floor(h*renderer.getPixelRatio())){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
     focus.lerp(focusGoal,1-Math.exp(-dt*6));dist+=(distGoal-dist)*(1-Math.exp(-dt*6));
     if(!dragging&&!slot)yaw+=dt*.12;
     else if(!dragging&&slot==='sticker'&&stkYaw!=null){const d=Math.atan2(Math.sin(stkYaw-yaw),Math.cos(stkYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));if(Math.abs(d)<.005)stkYaw=null;}
     else if(!dragging&&slot==='charm'&&charmYaw!=null){const d=Math.atan2(Math.sin(charmYaw-yaw),Math.cos(charmYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));}
+    // stickers: the whole gun, mounted attachments included, in the clear space between the slot list and the sticker panel
+    // (the panel covered the muzzle end, so a silencer or brake couldn't take one)
+    viewGoal=-.03;
+    if(slot==='sticker'&&!p&&gun){const rb=root.getBoundingClientRect(),w=rb.width,h=rb.height,l=$('.slots').getBoundingClientRect().right-rb.left,r=$('.opts').getBoundingClientRect().left-rb.left;
+      if(r-l>160){viewGoal=.5-(l+r)/2/w;const bx=new THREE.Box3().setFromObject(gun,true),half=Math.max(-bx.min.x,bx.max.x,-bx.min.z,bx.max.z);
+        distGoal=Math.max(distGoal,half*h/((r-l)*.88*Math.tan(camera.fov*Math.PI/360)));}}
     camera.position.set(focus.x+Math.sin(yaw)*Math.cos(pitch)*dist,focus.y+Math.sin(pitch)*dist,focus.z+Math.cos(yaw)*Math.cos(pitch)*dist);
     // keep the gun off-centre toward the free middle of the screen
-    camera.lookAt(focus);camera.setViewOffset(w,h,-w*.03,0,w,h);
+    camera.lookAt(focus);viewX+=(viewGoal-viewX)*(1-Math.exp(-dt*6));camera.setViewOffset(w,h,w*viewX,0,w,h);
     // pulse the parts of the selected slot
     if(gun){
       if(emissiveFor!==gun){emissiveFor=gun;emissiveMeshes=[];gun.traverse(o=>{if(o.isMesh&&o.material?.emissive)emissiveMeshes.push(o);});pulsedSlot=undefined;}
@@ -672,7 +681,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
       demoT+=dt;if(demoT>2.6){demoT=0;screenObj.event(DEMO[demoI++%DEMO.length]);}
       if(screenObj.update(dt,demoState()))swinging=true;}
     // the idle spin alone renders at 30 fps; the camera easing, a drag, a hover or slot change, a pulsing slot render every frame
-    const key=String(hover)+'|'+slot+'|'+id;const busy=dragging||slot||swinging||key!==lastKey||camera.position.distanceTo(lastCam)>dist*.01||focus.distanceTo(focusGoal)>.5||Math.abs(distGoal-dist)>.5;
+    const key=String(hover)+'|'+slot+'|'+id;const busy=dragging||slot||swinging||key!==lastKey||camera.position.distanceTo(lastCam)>dist*.01||focus.distanceTo(focusGoal)>.5||Math.abs(distGoal-dist)>.5||Math.abs(viewGoal-viewX)>.001;
     lastKey=key;lastCam.copy(camera.position);skip=!busy&&!skip;if(skip)return;
     renderer.render(scene,camera);
     // markers and leader lines from each slot row to its part on the gun

@@ -10,6 +10,7 @@
 // A part with a laser (a material named *emit_beam_<colour>) gets a beam from that emitter: aimLasers steers it.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { restick } from '../stickers/stickers.js';
 
 // tag_weapon space to a bone's, from the rest pose (bones move while a clip plays, the skeleton's inverses don't)
 function restSpace(gun,bone){
@@ -70,13 +71,13 @@ export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>t
   const run=gun.userData.mountRun=(gun.userData.mountRun??0)+1;   // a newer call (equip fires twice on some guns) replaces this one, or its parts stack on top
   for(const o of gun.userData.mounts??[])o.removeFromParent();gun.userData.mounts=[];gun.userData.beams=[];
   // def.fixedParts: always-on parts that are their own model (the AS50's scope), mounted the same way
-  for(const m of [...(def?.fixedParts??[]),...ids.map(id=>def?.mounts?.[id])]){
+  for(const [mid,m] of [...(def?.fixedParts??[]).map((m,i)=>['fixed'+i,m]),...ids.map(id=>[id,def?.mounts?.[id]])]){
     const bone=m&&[m.tag,m.tag+'1',m.tag+'_le',m.tag.replace(/\d+$/,d=>+d+1)].map(n=>gun.getObjectByName(n)).find(Boolean);if(!bone)continue;   // left models number their bones one up, or add _le
     let part=await loadModel(m.model).catch(()=>null);if(!part||!stillCurrent()||gun.userData.mountRun!==run)return;
     if(m.node){   // one node of a shared model: nothing below needs patching
       part=part.getObjectByName(m.node);if(!part)continue;
       part.removeFromParent();part.matrixAutoUpdate=false;part.matrix.copy(placement(gun,bone,m,mirror));
-      part.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});bone.add(part);gun.userData.mounts.push(part);addBeam(part,gun);continue;
+      part.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});part.userData.mountId=mid;bone.add(part);gun.userData.mounts.push(part);addBeam(part,gun);continue;
     }
     part.updateMatrixWorld(true);let root=null;part.traverse(o=>{if(!root&&o.isBone)root=o;});
     part.matrixAutoUpdate=false;if(root)part.matrix.copy(root.matrixWorld).invert();
@@ -84,6 +85,8 @@ export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>t
     part.traverse(o=>{if(!o.isMesh)return;o.frustumCulled=false;const mm=o.material=o.material.clone(),n=mm.name??'';
       if(/reticle|_ret1$|reflex_ret$/.test(n))o.visible=false;
       else if(/lens|eotech_ret$/.test(n)){mm.name='reflex_lens '+n;Object.assign(mm,{transparent:true,depthWrite:false,opacity:.12,roughness:.05,metalness:0});o.renderOrder=2;}});
-    bone.add(part);gun.userData.mounts.push(part);
+    part.userData.mountId=mid;bone.add(part);gun.userData.mounts.push(part);
   }
+  // stickers placed on attachments (mods/stickers): the parts arrive after the gun's stickers were applied
+  if(gun.userData.kinoStickers)restick(gun);
 }

@@ -52,12 +52,21 @@ export function stickerAtlas(cat){
 }
 
 // ---- meshes: stable keys, shared vertex buffers -----------------------------------------------------------------------
+// Attachment models mounted on the gun (weapon-levels mounts.js, userData.mountId) get keys of their own, '@<attachment>/<name>#n':
+// the gun's own keys don't move when one is fitted or removed, and a sticker on an attachment shows only while it is fitted.
 export function meshKeys(root){const keys=new Map(),seen={};
-  root.traverse(o=>{if(!o.isMesh||o.userData?.mountedPart)return;const n=o.name||'mesh';seen[n]=(seen[n]??-1)+1;keys.set(o,n+'#'+seen[n]);});return keys;}
+  const walk=(o,pre)=>{if(o!==root&&o.userData?.mountId!=null)pre='@'+o.userData.mountId+'/';
+    if(o.isMesh){const n=pre+(o.name||'mesh');seen[n]=(seen[n]??-1)+1;keys.set(o,n+'#'+seen[n]);}
+    for(const c of o.children)walk(c,pre);};
+  walk(root,'');return keys;}
+// the attachment a placed sticker sits on (null: on the gun itself)
+export const stickerMount=x=>x?.k?.startsWith('@')?x.k.slice(1,x.k.indexOf('/')):null;
 const bufOf=o=>o.geometry?.attributes?.position?.array;
 
 // ---- the material patch -------------------------------------------------------------------------------------------------
 const SKIP=/reflex_red_dot|scope_pka_crosshair|clan_tag|player_icon|lens|glass|reticle|_dot\b/i;
+// a material a sticker can go on: textured, or an opaque lit one (the Blender-built attachments are plain colours)
+export const stickerPaintable=m=>!!m&&!SKIP.test(m.name??'')&&(!!m.map||!!m.isMeshStandardMaterial&&!m.transparent);
 const matCache=new Map();   // base material uuid + vertex buffer + gun → sticker material (its uniforms are updated in place)
 const stkTime={value:0};   // shared by every sticker material, set as one draws (onBeforeRender)
 let bufIds=new WeakMap(),bufN=0;const bufId=a=>{if(!bufIds.has(a))bufIds.set(a,++bufN);return bufIds.get(a);};
@@ -141,7 +150,7 @@ export function restick(root){
     if(!o.isMesh)return;
     const list=Array.isArray(o.material)?o.material:[o.material];
     const mine=st&&at?st.list.filter(x=>{const src=byKey.get(x.k);return src&&bufOf(src)===bufOf(o)&&at.rect[x.id];}):[];
-    const next=list.map(m=>{const base=m?.userData?.stickerOf??m;if(!base||!base.map||SKIP.test(base.name??''))return base;
+    const next=list.map(m=>{const base=m?.userData?.stickerOf??m;if(!stickerPaintable(base))return base;
       if(!mine.length)return base;
       const sm=stickerMaterial(base,bufId(bufOf(o)),st.gunKey,{atlas:{value:at.tex}}),u=sm.userData.stk;
       u.stkCount.value=mine.length;mine.forEach((x,i)=>{axes(x,u.stkO.value[i],u.stkT.value[i],u.stkB.value[i],u.stkZ.value[i]);u.stkR.value[i].copy(at.rect[x.id]);u.stkF.value[i]=at.shine?.[x.id]??0;});
