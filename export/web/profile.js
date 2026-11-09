@@ -102,7 +102,8 @@ export function setBoxItem(profile,data,id,on){
   const l=profile.loadout,inPool=(data.boxPool??[]).includes(id);
   const boxOn=new Set(l.boxOn??[]),boxOff=new Set(l.boxOff??[]);
   boxOn.delete(id);boxOff.delete(id);
-  if(on&&!inPool)boxOn.add(id);if(!on&&inPool)boxOff.add(id);
+  // off always goes in boxOff: Melon Pass rewards are on by default without being in boxPool (the Trip Mine couldn't be switched off, 2026-11-08)
+  if(on&&!inPool)boxOn.add(id);if(!on)boxOff.add(id);
   l.boxOn=[...boxOn];l.boxOff=[...boxOff];
 }
 // What the box may roll: ids the player has switched on, plus anything the list
