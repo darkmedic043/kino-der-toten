@@ -54,12 +54,15 @@ function buildGlow(gun,color,depthTest){
 export function applyGlow(gun,color,{depthTest=false}={}){
   return gun.userData.bo3Glow??=buildGlow(gun,new THREE.Color(color??'#ffffff'),depthTest);
 }
-// Animate: per-light flicker, scrolling glow images, flare (0..1) on a shot.
-export function tickGlow(glow,t,flash=0){
+// Animate: per-light flicker, scrolling glow images, flare (0..1) on a shot. aim (0..1, first person's
+// view.aim): the lights dim while aiming down sights so they don't cover the sight picture: halos
+// (drawn on top of everything) fade out completely, glow cards and scrolling glows keep a little.
+export function tickGlow(glow,t,flash=0,{aim=0}={}){
   if(!glow)return;
-  const k=1.6+Math.sin(t*3)*.4+flash*2;for(const m of glow.mats)m.emissiveIntensity=k;
+  const a=Math.min(1,Math.max(0,aim)),halo=(1-a)*(1-a),card=1-.7*a,scroll=1-.6*a;
+  const k=(1.6+Math.sin(t*3)*.4+flash*2)*(1-.4*a);for(const m of glow.mats)m.emissiveIntensity=k;
   for(const l of glow.lights){const f=.85+Math.sin(t*l.speed+l.phase)*.12+Math.sin(t*l.speed*3.7+l.phase*2)*.05+flash*(l.halo?1.2:.8);
-    if(l.halo)l.mat.opacity=Math.min(1,f*.9);
-    else if(l.base){l.mat.color.copy(l.base).multiplyScalar(f*1.5);if(l.scroll)l.mat.map.offset.set((t*l.scroll[0])%1,(t*l.scroll[1])%1);}
-    else l.mat.color.setScalar(f*1.3);}
+    if(l.halo)l.mat.opacity=Math.min(1,f*.9)*halo;
+    else if(l.base){l.mat.color.copy(l.base).multiplyScalar(f*1.5*scroll);if(l.scroll)l.mat.map.offset.set((t*l.scroll[0])%1,(t*l.scroll[1])%1);}
+    else l.mat.color.setScalar(f*1.3*card);}
 }

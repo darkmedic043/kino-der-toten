@@ -195,7 +195,7 @@ export default async function setup(api){
     const def=view?.def,gun=view?.gun;if(!gun||!isMod(def)){modLit=null;return;}
     if(modLit?.gun!==gun){   // viewmodels are cached: build once per gun object
       modLit={gun,glow:applyGlow(gun,data.weapons[modId(def)]?.glow)};}
-    tickGlow(modLit.glow,session.time,modFlash);
+    tickGlow(modLit.glow,session.time,modFlash,{aim:view.aim??0});
   }
   let modFlash=0;
   // the engine's weapon warm-up (warmWeapons): each gun compiles with its glow materials in place, as equipped
