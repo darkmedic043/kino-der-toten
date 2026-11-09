@@ -16,7 +16,7 @@
 // sights and the charm's drop; the face is tilted a little up and back toward the eye. `foot` stretches from the back
 // to the gun's surface. charms.json screenMounts[gun id] = {at:[x,y,z] (model units), size, tilt, yaw} where it looks wrong.
 import * as THREE from 'three';
-import { loadModel } from '../../animation.js';
+import { loadModel, loadAnimation } from '../../animation.js';
 import { charmOwned, visiblePoints, pct, LOOSE, FIDGET, gunAnchor } from './charms.js';
 
 export function screenFor(cat,state,gunId){const s=cat?.screens?.find(x=>x.id===state?.screen?.[gunId]);return s&&charmOwned(s)?s:null;}
@@ -315,7 +315,7 @@ function prepOf(gun,root,{key,hands,unit=1,tilt=20,yaw=42}){
   fill(true);fill(false);
   const xmin=pct(pts,0,.01),xmax=pct(pts,0,.99),zTop=pct(pts,2,.97),zLow=pct(pts,2,.04);
   let out=-1e9;for(let i=0;i<pts.length;i+=3)out=Math.max(out,dot(i,pts));
-  const P={key:pk,pts,hp,bins,xmin,xmax,L:xmax-xmin,zTop,zLow,out};
+  const P={key:pk,pts,pb,hp,bins,xmin,xmax,L:xmax-xmin,zTop,zLow,out};
   if(preps.size>24)preps.delete(preps.keys().next().value);preps.set(pk,P);return P;
 }
 // a root-space point (model units) -> a pin {a: along 0 butt..1 muzzle, h: 0 bottom..1 top}, from the same bounds
@@ -324,6 +324,29 @@ export function screenPin(gun,root,point,{key,hands,unit=1}={}){
   return {a:r3(THREE.MathUtils.clamp((point.x/unit-P.xmin)/P.L,0,1)),h:r3(THREE.MathUtils.clamp((point.z/unit-P.zLow)/(P.zTop-P.zLow),-.1,1.1))};
 }
 // the spot at a given angle; null when the gun has no points
+// How far the gun's parts move when it fires (2026-11-08, user: "clipping constantly": a firing G18's slide recoils about
+// 2 in, through a screen placed by the resting pose). Read from the fire clips (def.animations fire/lastShot/adsFire/
+// adsLastShot): bone name -> the position values that are furthest from the first frame (the part's own parent space).
+// partTravel(def) loads them once (the game and the Gunsmith await it before mounting, so both place the screen alike);
+// travelFor(def) is the loaded result or null.
+const travels=new Map(),travelDone=new Map(),travelKey=def=>String(def?.id)+'|'+def?.model;
+export function partTravel(def){const k=travelKey(def);if(travels.has(k))return travels.get(k);
+  const urls=Object.entries(def?.animations??{}).filter(([a])=>/^(ads)?(fire|lastShot)Anim$/i.test(a)).map(([,u])=>u);
+  const pr=Promise.all(urls.map(u=>loadAnimation(u).catch(()=>null))).then(clips=>{const out={};
+    for(const c of clips)for(const b of c?.bones??[]){const v=b.pos?.values;if(!v||v.length<6)continue;
+      let best=null,bd=-1;for(let i=3;i<v.length;i+=3){const d=(v[i]-v[0])**2+(v[i+1]-v[1])**2+(v[i+2]-v[2])**2;if(d>bd){bd=d;best=[v[i],v[i+1],v[i+2]];}}
+      if(bd>1e-4&&(!out[b.name]||bd>out[b.name].d))out[b.name]={d:bd,from:[v[0],v[1],v[2]],to:best};}
+    travelDone.set(k,out);return out;});
+  travels.set(k,pr);return pr;}
+export const travelFor=def=>travelDone.get(travelKey(def))??null;
+// the travel as root-space vectors (inches) per bone object, for the parts that move over .1 in
+function travelVecs(gun,root,travel,unit){const out=new Map();if(!travel)return out;
+  inv.copy(root.matrixWorld).invert();const M=new THREE.Matrix4(),m3=new THREE.Matrix3();
+  for(const [name,t] of Object.entries(travel)){const b=gun.getObjectByName(name);if(!b?.parent)continue;
+    const d=new THREE.Vector3(t.to[0]-t.from[0],t.to[1]-t.from[1],t.to[2]-t.from[2]);
+    M.multiplyMatrices(inv,b.parent.matrixWorld);d.applyMatrix3(m3.setFromMatrix4(M)).divideScalar(unit);
+    if(d.length()>.1)out.set(b,d);}
+  return out;}
 // -> {matrix (root space, model units), size, foot (housing units)}, turned to face the eye (2026-11-08, user: "doesnt
 // seem to face the player properly"). The spot (baked, the player's or searched) is chosen at the stock angle, tilt 20 and
 // yaw 42, which left a pistol's screen about 40 degrees off the line of sight. Then the housing swings on its arm's ball
@@ -341,20 +364,34 @@ export function screenMount(gun,root,o={}){
   else eye.set(P.xmin-9,3.5,P.zTop+1.2);
   const d=eye.sub(c),len=d.length();if(len<1e-3)return m;
   const q2=v=>Math.round(v/2)*2,yaw=THREE.MathUtils.clamp(q2(Math.atan2(-d.x,d.y)/D2R),42,64),tilt=THREE.MathUtils.clamp(q2(Math.asin(d.z/len)/D2R),12,30);
-  const t0=sp.tilt??20,y0=sp.yaw??42;if(yaw===y0&&tilt===t0)return m;
-  const k=['f',spotKey(o.key,o.housing),unit,JSON.stringify(sp),yaw,tilt].join('|');if(mounts.has(k))return mounts.get(k);
-  // the ball stays put; the housing's outline along the new normal is a fixed prism through it
-  const B=c.clone().addScaledVector(frameOf(t0,y0).n,-sp.t),F=frameOf(tilt,yaw),n=F.n,s=sp.s;
-  const hw=(o.housing?.w??1.2)*s/2+.05,hh=(o.housing?.h??1.2)*s/2+.05,D=(o.housing?.d??.35)*s,bn=B.dot(n),pts=P.pts;
-  let plane=bn+Math.max(.42*s,sp.t*.6),ok=false;
-  for(let it=0;it<40&&plane-bn<4;it++){let hit=-1e9;
-    for(let i=0;i<pts.length;i+=3){const dx=pts[i]-B.x,dy=pts[i+1]-B.y,dz=pts[i+2]-B.z,dn=dx*n.x+dy*n.y+dz*n.z+bn;
-      if(dn<plane-.03||dn>plane+D||dn<=hit)continue;
-      if(Math.abs(dx*F.x.x+dy*F.x.y+dz*F.x.z)<hw&&Math.abs(dx*F.u.x+dy*F.u.y+dz*F.u.z)<hh)hit=dn;}
-    if(hit<-1e8){ok=true;break;}plane=hit+.05;}
-  if(!ok)return m;   // no clear spot within 4 in: keep the stock angle
-  const t=plane-bn,r3=v=>Math.round(v*1000)/1000;
-  const out={...mountFromSpot({...sp,c:B.clone().addScaledVector(n,t).toArray().map(r3),t:r3(t),tilt,yaw},unit),baked:m.baked};
+  const t0=sp.tilt??20,y0=sp.yaw??42;
+  const k=['f',spotKey(o.key,o.housing),unit,JSON.stringify(sp),yaw,tilt,o.travel?1:0].join('|');if(mounts.has(k))return mounts.get(k);
+  // the ball stays put; the housing's outline along the new normal is a fixed prism through it. The arm grows until no gun
+  // or hand point is in the housing (its back parts too). A point on a part that moves when the gun fires is
+  // also tried along that travel (partTravel)
+  const B=c.clone().addScaledVector(frameOf(t0,y0).n,-sp.t),s=sp.s,pts=P.pts,hp=P.hp;
+  const TV=travelVecs(gun,root,o.travel,unit),vec=new Map(),moveOf=b=>{if(!b)return null;if(vec.has(b))return vec.get(b);let r=null;for(let p=b;p&&p!==root&&p!==gun;p=p.parent)if(TV.has(p)){r=TV.get(p);break;}vec.set(b,r);return r;};
+  const mv=TV.size?P.pb.map(moveOf):null,F4=[.25,.5,.75,1];
+  const hw=(o.housing?.w??1.2)*s/2+.05,hh=(o.housing?.h??1.2)*s/2+.05,D=(o.housing?.d??.35)*s,BACK=.22*s;
+  const clearAt=(ti,ya,maxT)=>{const F=frameOf(ti,ya),n=F.n,bn=B.dot(n);let plane=bn+Math.max(.42*s,sp.t*.6);
+    const test=(x,y,z,hit)=>{const dx=x-B.x,dy=y-B.y,dz=z-B.z,dn=dx*n.x+dy*n.y+dz*n.z+bn;
+      if(dn<plane-BACK||dn>plane+D||dn<=hit)return hit;
+      return Math.abs(dx*F.x.x+dy*F.x.y+dz*F.x.z)<hw&&Math.abs(dx*F.u.x+dy*F.u.y+dz*F.u.z)<hh?dn:hit;};
+    for(let it=0;it<60&&plane-bn<=maxT;it++){let hit=-1e9;
+      for(let i=0,q=0;i<pts.length;i+=3,q++){hit=test(pts[i],pts[i+1],pts[i+2],hit);const v=mv?.[q];if(v)for(const f of F4)hit=test(pts[i]+v.x*f,pts[i+1]+v.y*f,pts[i+2]+v.z*f,hit);}
+      for(let i=0;i<hp.length;i+=3)hit=test(hp[i],hp[i+1],hp[i+2],hit);
+      if(hit<-1e8)return {t:plane-bn,n};plane=hit+BACK+.03;}
+    return null;};
+  // from the eye's angle back toward the stock one, each made clear (arm up to 4 in): the best of facing and a short arm,
+  // 20 degrees off the eye costing as much as an inch of arm (the G18's slide: turned with a 2.2 in arm beat 36 degrees off
+  // with 1.7 in)
+  const de=d.clone().normalize();let got=null,ti=tilt,ya=yaw,bestC=1e9;const seen=new Set();
+  for(let st=0;st<=4;st++){const a=q2(tilt+(t0-tilt)*st/4),b=q2(yaw+(y0-yaw)*st/4);if(seen.has(a*1000+b))continue;seen.add(a*1000+b);const r=clearAt(a,b,4);if(!r)continue;
+    const cost=Math.acos(THREE.MathUtils.clamp(r.n.dot(de),-1,1))/D2R/20+r.t;if(cost<bestC){bestC=cost;got=r;ti=a;ya=b;}}
+  if(!got)return m;   // nothing clear within 4 in: the spot as it was
+  if(ti===t0&&ya===y0&&Math.abs(got.t-sp.t)<.02){mounts.set(k,m);return m;}
+  const t=got.t,r3=v=>Math.round(v*1000)/1000;
+  const out={...mountFromSpot({...sp,c:B.clone().addScaledVector(got.n,t).toArray().map(r3),t:r3(t),tilt:ti,yaw:ya},unit),baked:m.baked};
   if(mounts.size>300)mounts.delete(mounts.keys().next().value);mounts.set(k,out);return out;
 }
 function mountAt(gun,root,{key,override,hands,camera,housing,unit=1,avoid=null,spots=null}={}){

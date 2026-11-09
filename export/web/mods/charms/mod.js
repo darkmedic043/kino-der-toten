@@ -2,7 +2,7 @@
 // and swings. The system is in charms.js; this hangs it on the viewmodel. Right-hand gun only (dual wield: not the left).
 import * as THREE from 'three';
 import { loadCharms, loadCharmState, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from './charms.js';
-import { screenFor, makeScreen, screenMount, placeScreen, charmZone } from './screens.js';
+import { screenFor, makeScreen, screenMount, placeScreen, charmZone, partTravel, travelFor } from './screens.js';
 
 export default async function setup(api){
   const {host,session,viewScene}=api;const view=api.view;
@@ -30,7 +30,7 @@ export default async function setup(api){
   async function mountScreen(def){
     const my=++sTok;dropScreen();
     const id=heldId(def),e=screenFor(cat,loadCharmState(),id),g=view.gun;if(!e||!g)return;
-    const s=await makeScreen(cat,e);if(my!==sTok||!s||view.gun!==g){s?.dispose();return;}
+    const [s]=await Promise.all([makeScreen(cat,e),partTravel(def).catch(()=>null)]);if(my!==sTok||!s||view.gun!==g){s?.dispose();return;}
     scr=s;sGun=g;sRoot=rootOf(g,def);sId=id;sBase=null;sAt=performance.now();prevK=null;prevRel=false;
     if(!sRoot){dropScreen();return;}viewScene.add(s.object);s.object.visible=false;
   }
@@ -45,7 +45,7 @@ export default async function setup(api){
   // faceCam: the view camera in play (the face turns to it)
   function mountFor(gun,root,def,id,housing,faceCam=null){const unit=charmUnit(def),key=def?.model??id;
     const st=loadCharmState(),avoid=charmFor(cat,st,id)?charmZone(gun,root,{key,override:cat.anchors[id],unit}):null;
-    return screenMount(gun,root,{key,override:screenOverride(cat,st,id),housing,unit,avoid,spots:cat.screenSpots,faceCam});}
+    return screenMount(gun,root,{key,override:screenOverride(cat,st,id),housing,unit,avoid,spots:cat.screenSpots,faceCam,travel:travelFor(def)});}
   function stepScreen(dt){
     if(view.gun!==sGun){dropScreen();return;}
     let shown=true;for(let o=sGun;o;o=o.parent){if(o===viewScene)break;if(!o.visible){shown=false;break;}}

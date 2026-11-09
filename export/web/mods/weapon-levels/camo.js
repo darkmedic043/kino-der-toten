@@ -292,7 +292,10 @@ vec3 camoTexTri(vec2 off){ vec3 c=camoPlanar(camoMap,off);return camoBlend>0.?mi
 export const isBody=m=>!!m&&!SKIP.test(m.name??'')&&!!m.map&&!wrapOf(m.name)?.skip;
 // Paint `root` with `camo` (an entry from camos.json) or restore it (null).
 export function applyCamo(root,camo){
-  root?.traverse(o=>{
+  // charms and gun screens (userData.charm, mods/charms) hang under the gun but keep their own materials (2026-11-08: the
+  // gold camo was painted over a screen's textured housing; the user saw it as a texture glitch)
+  const walk=(o,fn)=>{if(o.userData?.charm)return;fn(o);for(const c of o.children)walk(c,fn);};
+  if(root)walk(root,o=>{
     if(!o.isMesh)return;
     const list=Array.isArray(o.material)?o.material:[o.material];
     const next=list.map(m=>{const orig=m?.userData?.camoOf??m;if(!isBody(orig))return m;return camo?camoMaterial(orig,camo):orig;});

@@ -12,7 +12,7 @@ import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
 import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from '../charms/charms.js';
-import { screenFor, makeScreen, screenMount, placeScreen, charmZone, screenPin } from '../charms/screens.js';
+import { screenFor, makeScreen, screenMount, placeScreen, charmZone, screenPin, partTravel, travelFor } from '../charms/screens.js';
 import { loadStickers, loadStickerState, saveStickerState, stickersFor, stickerLock, stickerImage, applyStickers, stickerFromHit, meshKeys, MAX_STICKERS } from '../stickers/stickers.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
@@ -340,7 +340,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   // gun; it lands on the gun's side under the pointer (a pin: along/height share of the gun + size, charms state `place`)
   function remountScreen(pin){
     if(!screenObj||screenObj.gun!==gun)return;const o=pin?{...charmCat.screenMounts[id],at:undefined,pin}:screenOverride(charmCat,loadCharmState(),id);
-    const m=screenMount(gun,screenObj.root,{key:def.model,override:o,housing:screenObj.housing,unit:charmUnit(def),avoid:screenAvoid,spots:charmCat.screenSpots});
+    const m=screenMount(gun,screenObj.root,{key:def.model,override:o,housing:screenObj.housing,unit:charmUnit(def),avoid:screenAvoid,spots:charmCat.screenSpots,travel:travelFor(def)});
     if(!m)return;screenMnt=m;screenObj.setFoot(m.foot);placeScreen(screenObj,screenObj.root,m);
   }
   function savePlace(pin){const st=loadCharmState();st.place??={};if(pin)st.place[id]=pin;else delete st.place[id];saveCharmState(st);
@@ -353,11 +353,11 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const want=sid===undefined?screenFor(charmCat,loadCharmState(),id)?.id??'':sid;if(want===screenShown&&screenObj?.gun===gun)return;screenShown=want;
     const my=++screenToken;screenObj?.dispose();screenObj=screenMnt=null;if(!gun||!charmCat)return;
     const e=charmCat.screens.find(x=>x.id===want);if(!e)return;
-    const sc=await makeScreen(charmCat,e);if(my!==screenToken||!sc||!alive||!gun){sc?.dispose();return;}
+    const [sc]=await Promise.all([makeScreen(charmCat,e),partTravel(def).catch(()=>null)]);if(my!==screenToken||!sc||!alive||!gun){sc?.dispose();return;}
     const r=gun.getObjectByName(def.gunRoot??'j_gun')??(()=>{let b=null;gun.traverse(o=>{if(!b&&o.isBone)b=o;});return b;})();if(!r){sc.dispose();return;}
     scene.updateMatrixWorld(true);const unit=charmUnit(def);
     const avoid=charmFor(charmCat,loadCharmState(),id)?charmZone(gun,r,{key:def.model,override:charmCat.anchors[id],unit}):null;
-    screenAvoid=avoid;screenMnt=screenMount(gun,r,{key:def.model,override:screenOverride(charmCat,loadCharmState(),id),housing:sc.housing,unit,avoid,spots:charmCat.screenSpots});if(!screenMnt){sc.dispose();return;}
+    screenAvoid=avoid;screenMnt=screenMount(gun,r,{key:def.model,override:screenOverride(charmCat,loadCharmState(),id),housing:sc.housing,unit,avoid,spots:charmCat.screenSpots,travel:travelFor(def)});if(!screenMnt){sc.dispose();return;}
     sc.setFoot(screenMnt.foot);sc.gun=gun;sc.root=r;screenObj=sc;scene.add(sc.object);placeScreen(sc,r,screenMnt);demoT=0;
     if(slot==='charm'&&charmTab==='screens')aim();
   }
