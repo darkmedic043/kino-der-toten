@@ -29,10 +29,11 @@ export const levelNeed=(config,level,prestige=loadPrestige().player.prestige)=>i
 // Weapon unlocks (2026-10-14): the base BO1 guns (`kit: true`) are the first
 // unlock kit, owned from level 1; their `gunsmith` level opens them in the
 // Gunsmith. Every other gun unlocks at its `level`, Gunsmith included.
-export const unlockLevel=w=>w.kit?1:w.level;
+// Shop-pack guns (`pack`) and Melon Pass rewards (`unlock`) have no level gate at all: owning them is the unlock (2026-11-08).
+export const unlockLevel=w=>w.kit||w.pack||w.unlock?1:w.level;
 // The level unlocks are checked against: the highest ever reached, so a player prestige (level back to 1) re-locks nothing.
 export const unlockLvl=profile=>Math.max(profile?.level??1,loadPrestige().player.peak??0);
-export const gunsmithLevel=(config,id)=>{const w=config.weapons.find(w=>w.id===id);return w?w.gunsmith??w.level:1;};
+export const gunsmithLevel=(config,id)=>{const w=config.weapons.find(w=>w.id===id);return w?(w.pack||w.unlock?1:w.gunsmith??w.level):1;};
 export const rarityOf=(config,id)=>[...config.weapons,...config.tactical??[],...config.lethal??[]].find(w=>w.id===id)?.rarity??'common';
 // the one starting slot takes pistols only
 export const isPistol=d=>!!d&&weaponClass(d)==='Pistol';

@@ -105,12 +105,12 @@ export default {
       const wname=id=>names[id];
       const wl=(id,r)=>{const n=wname(id);return n?`${lk('weapons',n)}${r&&rar[r]?` <small style="color:${rar[r].color}">${ctx.esc(rar[r].name)}</small>`:''}`:null;};
       const rows=new Map();const at=l=>{if(!rows.has(l))rows.set(l,{weapons:[],gunsmith:[],other:[]});return rows.get(l);};
-      for(const w of cfg.weapons){if(!wname(w.id)||w.soon)continue;   // soon: the melon weapons, not out yet
+      for(const w of cfg.weapons){if(!wname(w.id)||w.soon||w.pack||w.unlock)continue;   // soon: not out yet; pack (Shop) and unlock (Melon Pass) guns have no level
         if(w.kit){at(1).weapons.push(wl(w.id,w.rarity));if((w.gunsmith??1)>1)at(w.gunsmith).gunsmith.push(lk('weapons',wname(w.id)));}
         else at(w.level).weapons.push(wl(w.id,w.rarity));}
       for(const b of cfg.bonuses)at(b.level).other.push(`${ctx.badge('Bonus','#7cd65a')}<b>${ctx.esc(b.name)}</b>: ${ctx.esc(b.description)}`);
-      for(const t of cfg.tactical??[])at(t.level).other.push(`${ctx.badge('Tactical','#4aa3ff')}<b>${ctx.esc(t.name)}</b>: ${ctx.esc(t.description)}`);
-      for(const t of cfg.lethal??[])at(t.level).other.push(`${ctx.badge('Lethal','#ff9a2e')}<b>${ctx.esc(t.name)}</b>: ${ctx.esc(t.description)}`);
+      for(const t of (cfg.tactical??[]).filter(t=>!t.unlock))at(t.level).other.push(`${ctx.badge('Tactical','#4aa3ff')}<b>${ctx.esc(t.name)}</b>: ${ctx.esc(t.description)}`);
+      for(const t of (cfg.lethal??[]).filter(t=>!t.unlock))at(t.level).other.push(`${ctx.badge('Lethal','#ff9a2e')}<b>${ctx.esc(t.name)}</b>: ${ctx.esc(t.description)}`);
       if(cfg.tacticalLevel)at(cfg.tacticalLevel).other.unshift(`${ctx.badge('Slot','#d6a94a')}<b>Tactical slot</b>: start each game with a tactical`);
       if(cfg.secondBonusLevel)at(cfg.secondBonusLevel).other.unshift(`${ctx.badge('Slot','#d6a94a')}<b>Second bonus slot</b>: two starting bonuses at once`);
       const lv=[...rows.keys()].sort((a,b)=>a-b);
@@ -123,7 +123,7 @@ export default {
 - **Bonuses**: one slot, two from level ${cfg.secondBonusLevel}.
 - **Mystery Box list**: every unlocked weapon, tactical and lethal can be switched on or off for your Mystery Box. Each weapon rarity keeps a few switched on (${Object.entries(minTier).map(([r,n])=>`${n} ${rar[r]?.name??r}`).join(', ')}).`)+
         `<h2>Starting bonuses</h2>`+c.table(['Bonus','Level','Effect'],cfg.bonuses.map(b=>[`<b>${ctx.esc(b.name)}</b>`,b.level,ctx.esc(b.description)]),{cls:'compact'})+
-        `<h2>Unlocks by level</h2>`+c.md(`The ${kitCount} weapons of the starting kit are yours from level 1. Each one's **Gunsmith** (weapon levels, attachments and camos; see ${ml('weapons',null,'Weapons')}) opens at a later level. Every other weapon unlocks at its level, Gunsmith included, and joins your Mystery Box list. Rarities are the Mystery Box tiers.`)+
+        `<h2>Unlocks by level</h2>`+c.md(`The ${kitCount} weapons of the starting kit are yours from level 1. Each one's **Gunsmith** (weapon levels, attachments and camos; see ${ml('weapons',null,'Weapons')}) opens at a later level. Every other weapon unlocks at its level, Gunsmith included, and joins your Mystery Box list. Rarities are the Mystery Box tiers.\n\nShop weapon packs (the Advanced Warfare guns) and Melon Pass rewards have no level: they unlock, Gunsmith included, as soon as you own them, so they aren't in this table.`)+
         c.table(['Level','Weapons','Gunsmith opens','Other'],lv.map(l=>{const r=rows.get(l);
           return [`<b>${l}</b>`,r.weapons.join(r.weapons.length>4?', ':'<br>')||'—',r.gunsmith.join(', ')||'—',r.other.join('<br>')||'—'];}));
     };

@@ -509,3 +509,4 @@
 - 2026-11-08: Gun screen kill counters show one game's kills (per-gun baseline in memory at the first read; the saved `tally` baselines are gone, the Gunsmith shows 0). weapon-levels.md Gun screens.
 - 2026-11-08: Gun screens clear the gun's moving parts (`partTravel`: slide/bolt travel from the fire clips, swept in the clearance; a firing G18's slide went through the screen) and pick the angle by facing plus arm length; camo skips charm subtrees. weapon-levels.md Gun screens.
 - 2026-11-08: Gun screens: the display no longer depth-fights its holder (it sat 0.001-0.002 above the recess floor; now 0.014 plus a polygon offset, models `?v=2`; weapon-levels.md Display depth).
+- 2026-11-08: no level gates left on AW pack guns or Melon Pass rewards: their Gunsmith opens at level 1 once owned (`profile.js` `unlockLevel`/`gunsmithLevel`), the Mystery Box picker and tactical card say AW PACK / MELON PASS instead of LV n, the wiki Level unlocks table drops them (shop.md).

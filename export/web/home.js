@@ -488,9 +488,12 @@ const tacList=()=>(config.tactical??[]).filter(t=>data.equipment?.[t.id]);
 function renderTactical(id,unlocked){
   const el=$('detail');
   if(!id){el.innerHTML='<h2>None</h2><p class="muted">Start without a tactical. You can still buy or find one in game.</p>';return;}
-  const t=tacById[id];el.innerHTML=`<div class="thumb"></div><span class="eyebrow">TACTICAL</span><h2>${esc(t.name)}</h2><p>${esc(t.description)}</p><p>Mystery Box only · 3 per pickup · X to throw · Max Ammo refills them</p><p class="muted">Unlocks at level ${t.level}${unlocked?'':' · locked'}</p>`;
+  const t=tacById[id];el.innerHTML=`<div class="thumb"></div><span class="eyebrow">TACTICAL</span><h2>${esc(t.name)}</h2><p>${esc(t.description)}</p><p>Mystery Box only · 3 per pickup · X to throw · Max Ammo refills them</p><p class="muted">${t.unlock?'A Melon Pass reward':'Unlocks at level '+t.level}${unlocked?'':' · locked'}</p>`;
   fillThumb(el.querySelector('.thumb'),id);
 }
+// what a locked Mystery Box entry says: shop packs and pass rewards have no level
+const lockLabel=w=>soonLocked(w)?'COMING SOON':passLocked(w)?'MELON PASS':packLocked(w)?w.pack.toUpperCase()+' PACK':'LV '+w.level;
+const lockHint=w=>soonLocked(w)?'Coming soon':passLocked(w)?'A Melon Pass reward: get it in the PASS tab':packLocked(w)?`In the ${PACKS[w.pack]??'weapon pack'}: buy it in the Shop`:`Reach level ${w.level} to unlock`;
 const rarityLine=id=>{const r=rarityById[rarityOf(config,id)];return r?`<b class="rar-text" style="--r:${r.color}">${esc(r.name)}</b> · `:'';};
 
 // ---- Mystery Box list -------------------------------------------------------------------
@@ -559,10 +562,10 @@ function renderBoxPicker(u){
     const name=tab.kind==='weapon'?weapons[w.id].name:(tab.kind==='tactical'?tacById:lethalById)[w.id].name;
     el.innerHTML=`<div class="thumb"></div><strong>${esc(name)}</strong><div class="badges">${tab.kind==='weapon'&&unlocked?weaponBadges(w.id):`<span class="b rar" style="--r:${r?.color}">${esc((r?.name??'').toUpperCase())}</span>`}</div>${unlocked?`<span class="box-check">${it.on?'IN BOX':'OFF'}</span>`:''}`;
     fillThumb(el.querySelector('.thumb'),w.id);
-    if(!unlocked)el.insertAdjacentHTML('beforeend',`<span class="lock">LV ${w.level}</span>`);
+    if(!unlocked)el.insertAdjacentHTML('beforeend',`<span class="lock">${esc(lockLabel(w))}</span>`);
     el.addEventListener('mouseenter',()=>tab.kind==='weapon'?renderDetail(w.id,true,unlocked,w.level):tab.kind==='tactical'?renderTactical(w.id,unlocked):renderLethal(w.id));
     el.addEventListener('click',()=>{
-      if(!unlocked){toast(`Reach level ${w.level} to unlock`);return;}
+      if(!unlocked){toast(lockHint(w));return;}
       if(it.on&&onTier<=min){toast(`The box needs ${need}`);return;}
       keep();setBoxItem(profile,data,w.id,!it.on);focus={id:w.id,isWeapon:tab.kind==='weapon'};save();renderLoadout();
     });
