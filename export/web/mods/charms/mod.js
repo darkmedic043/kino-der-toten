@@ -1,7 +1,7 @@
 // Weapon charms in first person (2026-11-06): the charm picked for the held gun in the Gunsmith hangs off its left side
 // and swings. The system is in charms.js; this hangs it on the viewmodel. Right-hand gun only (dual wield: not the left).
 import * as THREE from 'three';
-import { loadCharms, loadCharmState, saveCharmState, tallyBase, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from './charms.js';
+import { loadCharms, loadCharmState, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from './charms.js';
 import { screenFor, makeScreen, screenMount, placeScreen, charmZone } from './screens.js';
 
 export default async function setup(api){
@@ -25,7 +25,7 @@ export default async function setup(api){
     rig=new CharmRig(body,c);viewScene.add(rig.group);rig.group.visible=false;anchor=null;hungAt=performance.now();
   }
   // ---- the gun screen (screens.js): mounted on the root bone, its picture fed from the session and the gun's counters ----
-  let scr=null,sGun=null,sRoot=null,sMount=null,sId=null,sBase=null,sTok=0,sAt=0,prevK=null,prevRel=false;
+  let scr=null,sGun=null,sRoot=null,sMount=null,sId=null,sBase=null,gameBase=new Map(),sTok=0,sAt=0,prevK=null,prevRel=false;
   const dropScreen=()=>{scr?.dispose();scr=null;sGun=sRoot=sMount=null;};
   async function mountScreen(def){
     const my=++sTok;dropScreen();
@@ -34,9 +34,10 @@ export default async function setup(api){
     scr=s;sGun=g;sRoot=rootOf(g,def);sId=id;sBase=null;sAt=performance.now();prevK=null;prevRel=false;
     if(!sRoot){dropScreen();return;}viewScene.add(s.object);s.object.visible=false;
   }
-  // a kill counter starts at 0 when it goes on the gun (charms.js tallyBase); made once the profile is there
+  // a kill counter shows this game's kills only (2026-11-08, user: "the kill tracker should work just for 1 game, so it resets
+  // for every game"): each gun's camo counters the first time its screen reads them in this page (one page = one game)
   const screenState=()=>{const w=session.weapon,d=view.def??session.def,prof=window.kino?.weaponLevels?.profile,p=prof?.camo?.[sId]?.p??{};
-    if(!sBase&&prof&&scr?.e?.kind==='kills'){const st=loadCharmState(),r=tallyBase(st,sId,scr.e.id,p);if(r.fresh)saveCharmState(st);sBase=r.base;}
+    if(!sBase&&prof&&scr?.e?.kind==='kills'){if(!gameBase.has(sId))gameBase.set(sId,{k:p.kills??0,h:p.headshots??0});sBase=gameBase.get(sId);}
     return {kills:Math.max(0,(p.kills??0)-(sBase?.k??0)),heads:Math.max(0,(p.headshots??0)-(sBase?.h??0)),mag:w?.mag??0,reserve:w?.reserve??0,clip:d?.clipSize??1,round:session.round??1,
       reloading:(session.reloadLeft??0)>0,down:session.phase==='reviving'};};
   // the screen's spot: the baked one, the same the Gunsmith shows (screens.js); a gun missing from screen-spots.json gets the

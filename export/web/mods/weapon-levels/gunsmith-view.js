@@ -11,7 +11,7 @@ import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
 import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
-import { loadCharms, loadCharmState, saveCharmState, tallyBase, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from '../charms/charms.js';
+import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from '../charms/charms.js';
 import { screenFor, makeScreen, screenMount, placeScreen, charmZone, screenPin } from '../charms/screens.js';
 import { loadStickers, loadStickerState, saveStickerState, stickersFor, stickerLock, stickerImage, applyStickers, stickerFromHit, meshKeys, MAX_STICKERS } from '../stickers/stickers.js';
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
@@ -361,8 +361,8 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     sc.setFoot(screenMnt.foot);sc.gun=gun;sc.root=r;screenObj=sc;scene.add(sc.object);placeScreen(sc,r,screenMnt);demoT=0;
     if(slot==='charm'&&charmTab==='screens')aim();
   }
-  const demoState=()=>{const p=profile?.camo?.[id]?.p??{},clip=def?.clipSize??30,b=loadCharmState().tally?.[id],base=b?.s===screenShown?b:{k:p.kills??0,h:p.headshots??0};   // counts since it went on (0 for a preview)
-    return {kills:Math.max(0,(p.kills??0)-base.k),heads:Math.max(0,(p.headshots??0)-base.h),mag:clip,reserve:def?.maxAmmo??clip*4,clip,round:1,reloading:false,down:false};};
+  const demoState=()=>{const clip=def?.clipSize??30;   // a kill counter shows one game's kills: 0 out of a game
+    return {kills:0,heads:0,mag:clip,reserve:def?.maxAmmo??clip*4,clip,round:1,reloading:false,down:false};};
   // hang a charm on the preview gun: cid = a charm id, '' = none, undefined = the one equipped on this gun
   async function hangCharm(cid){
     const want=cid===undefined?charmFor(charmCat,loadCharmState(),id)?.id??'':cid;if(want===charmShown&&charmRig?.gun===gun)return;charmShown=want;
@@ -589,7 +589,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const s=e.target.closest('.slot');if(s&&!s.classList.contains('na')){slot=slot===s.dataset.slot?null:s.dataset.slot;hover=null;renderUI();aim();return;}
     const o=e.target.closest('.opt');
     if(o&&o.dataset.screen!==undefined&&!o.classList.contains('locked')){
-      const st=loadCharmState();if(o.dataset.screen){st.screen[id]=o.dataset.screen;tallyBase(st,id,o.dataset.screen,profile?.camo?.[id]?.p);}else delete st.screen[id];saveCharmState(st);
+      const st=loadCharmState();delete st.tally;if(o.dataset.screen)st.screen[id]=o.dataset.screen;else delete st.screen[id];saveCharmState(st);
       hover=null;onChange?.(id);dispatchEvent(new CustomEvent('kino-charm',{detail:{id,screen:true}}));showScreen();renderUI();return;}
     if(o&&o.dataset.charm!==undefined&&!o.classList.contains('locked')){
       const st=loadCharmState();if(o.dataset.charm)st.on[id]=o.dataset.charm;else delete st.on[id];saveCharmState(st);

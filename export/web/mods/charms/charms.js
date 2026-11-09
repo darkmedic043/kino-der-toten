@@ -23,12 +23,6 @@ export function loadCharms(){
 // {on:{[gun base id]:charm id}, screen:{[gun base id]:screen id}} (gun screens: screens.js)
 export function loadCharmState(){try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');s.on??={};s.screen??={};return s;}catch{return {on:{},screen:{}};}}
 export function saveCharmState(s){localStorage.setItem(KEY,JSON.stringify(s));}
-// a kill-counter screen counts from when it went on the gun (2026-11-08, user: "the tracker starts at a huge number rather
-// than 0"): the gun's camo counters at that moment, kept per gun in the charm state as tally[gunId] = {s: screen id, k, h}.
-// Another screen on that gun (or this one put back later) starts again from 0. -> the base; `fresh` true when just made
-// (the caller saves the state then).
-export function tallyBase(st,gunId,screenId,p){st.tally??={};const b=st.tally[gunId];if(b?.s===screenId)return {base:b,fresh:false};
-  return {base:st.tally[gunId]={s:screenId,k:p?.kills??0,h:p?.headshots??0},fresh:true};}
 // a gun's screen spot: the player's own (dragged in the Gunsmith: st.place[gunId] = {a, h, s}) over charms.json's nudges
 export function screenOverride(cat,st,gunId){const p=st?.place?.[gunId],o=cat?.screenMounts?.[gunId];return p?{...o,at:undefined,pin:p}:o;}
 
