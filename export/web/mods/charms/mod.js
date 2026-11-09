@@ -63,6 +63,8 @@ export default async function setup(api){
     if(st.reloading&&!prevRel)scr.event('reload');prevRel=st.reloading;
     scr.update(dt,st);
   }
+  // a new game on the same map (Restart / Play again: session.reset, no page load) starts the kill counters over too (2026-11-09)
+  host.on('reset',()=>{gameBase.clear();sBase=null;prevK=null;});
   host.on('beforeDamage',e=>{if(scr&&e.amount>0&&!['reviving','gameover'].includes(session.phase))scr.event('hurt');});
 
   // hang it whenever the gun in hand changes, however it got there (the match's first gun is equipped before this mod's

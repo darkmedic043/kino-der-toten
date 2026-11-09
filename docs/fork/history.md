@@ -514,3 +514,4 @@
 - 2026-11-08: Empty tacticals (Gersh, QED, Smoke) keep their slot greyed at 0 so Max Ammo refills them (gameplay.md Equipment HUD).
 - 2026-11-08: Dam-A-Nade's +1 lethal (and Bandolier, Fully Equipped, Recycler, the refills) now reaches Claymores (2 → 3) and Trip Mines (3 → 4): it only raised frags before, since `session.grenades` reads 0 while you hold the others (reaper-perks.js `lethalBonus`/`fillLethal`/`lethalBack`; checked in a sandbox match: Trip Mines 3 → 4, Max Ammo refills to 4) (reaper-perks.md).
 - 2026-11-08: Der Eisendrache bows: each arrow carries its own draw (a quick shot loosed during a charged arrow's 1.5 s fuse made it burst plain), elements come from the arrow, grenades no longer fire them (weapons.md).
+- 2026-11-09: gun-screen kill trackers start over on Restart / Play again on the same map too (charms/mod.js clears `gameBase` on `reset`; before, only a page load reset them) (weapon-levels.md).
