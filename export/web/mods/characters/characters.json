@@ -2485,7 +2485,6 @@
    }
   ],
   "optional": true,
-  "soon": true,
   "color": "#b8662a",
   "accent": "#7fd4ff",
   "skinName": "Prisoner",
@@ -2596,7 +2595,6 @@
    }
   ],
   "optional": true,
-  "soon": true,
   "color": "#262028",
   "accent": "#9a4a9a",
   "skinName": "Priest",

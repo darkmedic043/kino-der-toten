@@ -136,6 +136,21 @@ const SHOP_DRAW={
       for(let k=0;k<6;k++){const a=k/6*6.283;g.beginPath();g.arc(x+Math.cos(a)*R*1.4,y+Math.sin(a)*R*1.4,R*.2,0,6.283);g.stroke();}});}},
   frostharvest(g,S,r,wrap){g.fillStyle='#c8892a';g.fillRect(0,0,S,S);for(let i=0;i<80;i++){const x=r()*S,y=r()*S,l=12+r()*16;wrap(()=>{g.fillStyle=['#a8501a','#e8a040','#7a3a12'][i%3];g.beginPath();g.ellipse(x,y,l,l*.5,r()*3,0,6.283);g.fill();});}
     g.fillStyle='rgba(230,245,255,.55)';for(let i=0;i<900;i++){const x=r()*S,y=r()*S;g.fillRect(x,y,1+r()*2,1);}g.strokeStyle='rgba(220,240,255,.6)';g.lineWidth=1;for(let i=0;i<40;i++){const x=r()*S,y=r()*S;g.beginPath();for(let k=0;k<6;k++){const a=k/6*6.283;g.moveTo(x,y);g.lineTo(x+Math.cos(a)*7,y+Math.sin(a)*7);}g.stroke();}},
+  // ---- Season 1 (Storm & Toll) procedural camos ----
+  counterfeit(g,S,r,wrap){const bg=g.createLinearGradient(0,0,S,S);bg.addColorStop(0,'#3f8a5a');bg.addColorStop(.5,'#5aa874');bg.addColorStop(1,'#356f4a');g.fillStyle=bg;g.fillRect(0,0,S,S);g.fillStyle='rgba(20,50,30,.3)';for(let i=0;i<900;i++)g.fillRect(r()*S,r()*S,1+r()*2,1);
+    g.lineWidth=1.3;for(let j=0;j<64;j++){const y0=j*S/64,k=2+(j%3),ph=j*.37;g.strokeStyle=j%4?'rgba(200,240,200,.4)':'rgba(255,215,100,.6)';
+      wrap(()=>{g.beginPath();for(let x=0;x<=S;x+=4){const y=y0+Math.sin(x/S*6.283*k+ph)*10+Math.sin(x/S*6.283*(k+3)-ph)*4;x?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();});}
+    for(let i=0;i<11;i++){const x=r()*S,y=r()*S,R=34+r()*30;wrap(()=>{g.fillStyle='rgba(20,60,35,.55)';g.beginPath();g.arc(x,y,R*.98,0,6.283);g.fill();g.strokeStyle='rgba(255,215,100,.9)';g.lineWidth=2;g.beginPath();
+      for(let t=0;t<=6.283*1.001;t+=.02){const rr=R*(.62+.38*Math.cos(t*9));g.lineTo(x+Math.cos(t)*rr,y+Math.sin(t)*rr);}g.stroke();
+      g.strokeStyle='#ffd86a';g.lineWidth=3;g.beginPath();g.arc(x,y,R*.36,0,6.283);g.stroke();g.fillStyle='#ffd86a';g.font=`bold ${Math.round(R*.42)}px serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('$',x,y+1);});}
+    g.fillStyle='rgba(230,255,230,.3)';g.font='bold 9px monospace';g.textAlign='left';g.textBaseline='alphabetic';for(let y=12;y<S;y+=48)g.fillText('MELON NOTE · NOT LEGAL TENDER · MELON NOTE · NOT LEGAL TENDER · MELON NOTE · NOT LEGAL TENDER ·'.repeat(2),-((y*7)%60),y);},
+  wax(g,S,r,wrap){g.fillStyle='#7a4a08';g.fillRect(0,0,S,S);const C=10,Rw=12,w=S/C,h=S/Rw,ry=h/1.5;
+    for(let row=0;row<Rw;row++)for(let col=0;col<C;col++){const x=col*w+(row%2?w/2:0),y=row*h,l=40+r()*14,fill=r()<.82;
+      wrap(()=>{g.beginPath();g.moveTo(x,y-ry);g.lineTo(x+w/2,y-ry/2);g.lineTo(x+w/2,y+ry/2);g.lineTo(x,y+ry);g.lineTo(x-w/2,y+ry/2);g.lineTo(x-w/2,y-ry/2);g.closePath();
+        const gr=g.createRadialGradient(x-w*.12,y-ry*.3,1,x,y,ry*1.1);gr.addColorStop(0,fill?`hsl(40,95%,${l+16}%)`:'#3a1e02');gr.addColorStop(1,fill?`hsl(32,90%,${l-8}%)`:'#1e0e00');g.fillStyle=gr;g.fill();
+        g.strokeStyle='#4a2604';g.lineWidth=4;g.stroke();g.strokeStyle='rgba(255,220,140,.35)';g.lineWidth=1;g.stroke();});}
+    for(let i=0;i<16;i++){const x=r()*S,y=r()*S,len=30+r()*70,dw=4+r()*5;wrap(()=>{const gr=g.createLinearGradient(x,y,x,y+len);gr.addColorStop(0,'rgba(255,200,70,.85)');gr.addColorStop(1,'rgba(230,150,20,.9)');g.fillStyle=gr;
+      g.beginPath();g.moveTo(x-dw,y);g.lineTo(x-dw*.6,y+len);g.arc(x,y+len,dw*.75,3.1416,0,true);g.lineTo(x+dw,y);g.fill();g.fillStyle='rgba(255,245,200,.5)';g.fillRect(x-dw*.45,y+3,1.5,len*.8);});}},
   'stripes-glow'(g,S){g.fillStyle='#000';g.fillRect(0,0,S,S);g.fillStyle='#fff';for(let i=-S;i<S*2;i+=48){g.beginPath();g.moveTo(i,0);g.lineTo(i+10,0);g.lineTo(i+10-S,S);g.lineTo(i-S,S);g.fill();}},
 };
 // ---- swatches: small thumbnails for menus, shared by every page and generated one per frame -----------------------

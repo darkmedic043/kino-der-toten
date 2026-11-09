@@ -1,4 +1,4 @@
 {
  "_note": "Every Melon Pass season, oldest first (pass.js loadSeasons). Past seasons stay playable forever; the newest one whose start date has passed is the live season, and one that hasn't started yet stays hidden. A new season: write its file (same shape as season.json, a new id, a number, start/end dates, pass: <id> items) and add it here. The number is what players see; ids never change because saves and item ids use them, so Melon Harvest is Season 0 with id s1, and the next season is Season 1 with id s2.",
- "seasons": ["season.json"]
+ "seasons": ["season.json", "season-s2.json"]
 }

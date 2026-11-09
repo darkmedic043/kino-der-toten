@@ -36,14 +36,17 @@ function still(clip,{frame,turn={},move={}},from=[]){
 const asUrl=clip=>URL.createObjectURL(new Blob([JSON.stringify(clip)],{type:'application/json'}));
 const loadClip=url=>fetch(new URL(url,document.baseURI)).then(r=>r.json());
 
-// soon: in melee.json but not out yet (the battlepass hands it out later); localStorage['kino.dev.soon']='1' lifts it, as for the classes
-export const soon=m=>!!m?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();
+// soon: in melee.json but not out yet (the battlepass hands it out later); localStorage['kino.dev.soon']='1' lifts it, as for the classes.
+// unlock: a Melon Pass item id (the Grave Bell, Season 1, 2026-11-08): locked the same way until that item is owned.
+const devSoon=()=>{try{return localStorage.getItem('kino.dev.soon')==='1';}catch{return false;}};
+const owns=key=>{try{return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]).includes(key);}catch{return false;}};
+export const soon=m=>!devSoon()&&(!!m?.soon||(!!m?.unlock&&!owns(m.unlock)));
 // Melee entries with a model of their own (melee.json `model`, the Grave Bell) are weapons from the start: prepare() puts them in
 // data.weapons before the other mods build anything, so weapon levels, attachments (the Gunsmith), camos and prestige treat them
 // as guns. They hang their model from the knife's attach tag (def.gunTag) in place of the knife, and a `script` gives them their
 // own behaviour (hooks below). The knife has neither and plays exactly as before.
 const ownDef=(key,E,base)=>({...structuredClone(base),id:'melee_'+key,baseId:base.baseId??base.id,name:E.name,model:E.model,worldModel:E.worldModel,worldScale:E.worldScale??1,
-  hideTags:[...(E.hideTags??[])],weaponClass:'Melee',meleeSlot:key,meleeXp:true,gunsmith:true,noBox:true,soon:!!E.soon,slotNames:E.slotNames,killCauses:E.killCauses??[],
+  hideTags:[...(E.hideTags??[])],weaponClass:'Melee',meleeSlot:key,meleeXp:true,gunsmith:true,noBox:true,soon:!!E.soon,unlock:E.unlock,slotNames:E.slotNames,killCauses:E.killCauses??[],
   price:0,clipSize:1,startAmmo:0,maxAmmo:0,damage:0,minDamage:0,projectileType:'none',projectileSpeed:0,noAmmo:true,noAds:true,ownPackName:true,automatic:false,
   upgrade:{name:E.upgradeName}});
 export async function prepare(data,mod){

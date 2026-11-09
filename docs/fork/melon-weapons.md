@@ -4,6 +4,8 @@ Melon Zombies' own weapons (2026-11-05, user: "build 3 weapons from the weapon i
 
 They are fork originals, modelled in Blender like the BO7 guns (weapons.md, Black Ops 7 weapons: parts in a BO1 donor's `j_gun` space, skinned by `.tools/assemble-grimhawk.mjs`, shared helpers in `.tools/bo7lib.py`), so they ship in Rind installs. The two guns are `mods/melon-weapons` (`debt.js`, `hive.js`); the bell is a melee entry (`mods/melee`).
 
+**Released 2026-11-08 as Melon Pass Season 1 rewards** (pass.md Season 1): `soon` is gone; Debt Collector `pass.s2.weapon.debtcollector` and Hive Launcher `pass.s2.weapon.hivelauncher` are progression.json `unlock` entries (unlocked at any level once owned, on in the Mystery Box by default), the Grave Bell is melee.json `unlock:"pass.s2.melee.gravebell"`. Until owned, the Armory shows MELON PASS. The paragraph below is the pre-release state.
+
 **Coming soon**: all three carry `soon: true`. Until the user puts them in a battlepass they are never handed out (no Mystery Box, no wall buy, no loadout pick); the loadout and the melee picker show them locked as "Coming soon". `localStorage['kino.dev.soon'] = '1'` lifts that for testing (the same switch as the classes).
 
 ## The Debt Collector (`debt_collector_zm`, Pistol, donor: the Python)
@@ -98,7 +100,7 @@ The bell is in prestige-guns.json as `melee_grave_bell` (class `special`), so th
 
 Known limits: in co-op the stun and shove act on the host's zombies only (zombies are host-authoritative), so a guest's bell rings and shows the wave but does not hold zombies yet; more than 20 stunned zombies share halos.
 
-## Release checklist (when the battlepass hands them out)
+## Release checklist (when the battlepass hands them out)Done 2026-11-08 (see the top). 
 
 - Remove `soon: true` from `debt.js`, `hive.js` and `melee.json`'s `grave_bell` (or keep it and have the pass unlock override it), and from their `progression.json` entries (both there since 2026-11-05 with `soon: true` at level 1, so the Weapons tab lists them as COMING SOON cards; set the real level or a pass unlock then); add them to `boxPool` only if they should roll from the box.
 - Where the gate lives: `home.js` `gunSoon` (no Gunsmith), `meleeSoon` (picker locked, a saved soon melee falls back to the default), the box-list filter (`!d.soon`), `weapon-levels/camo.js`, and `profile.js` (`soonLocked`: a soon `progression.json` entry is never unlocked, so it's not offered as the starting pistol; `boxItems` skips any def with `soon` even with the dev flag, so the legendary tier's top-up can't force one in). The Weapons tab shows them locked with COMING SOON; with `kino.dev.soon`=1 they open with their Gunsmith. The wiki doesn't load `melon-weapons`, so they have no wiki pages yet.

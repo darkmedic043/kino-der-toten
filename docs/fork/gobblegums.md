@@ -21,7 +21,7 @@ User's rules: no gums at the start of a match; gums come from a terminal app tha
 
 ## Season 1 pass gums (2026-11-06, user's own designs, `pass: "s2"`, `soon: true`)
 
-Six gums for the next Melon Pass season (id `s2`). They are `soon` until it launches: never unlocked (`unlockedGums`, gums.js; the menu shows SOON), except with `localStorage['kino.dev.soon']='1'`. When the season ships, drop `soon` and the pass grants them like Season 0's gums. Code is the "Season 1 pass gums" block in `mod.js`; tunables live in `gums.json`.
+**Released 2026-11-08**: `soon` removed; they unlock when owned from the Season 1 pass. Six gums for the next Melon Pass season (id `s2`). They are `soon` until it launches: never unlocked (`unlockedGums`, gums.js; the menu shows SOON), except with `localStorage['kino.dev.soon']='1'`. When the season ships, drop `soon` and the pass grants them like Season 0's gums. Code is the "Season 1 pass gums" block in `mod.js`; tunables live in `gums.json`.
 
 | Gum | Rarity / type | What it does |
 |---|---|---|

@@ -57,7 +57,9 @@ Thumbs.db
 /export/web/mods/shop/cards/s2/
 /export/web/mods/shop/emblems/s2/
 # Season 1 hit sounds the user supplied (2026-11-07: a free-sound-effect taser zap and two hitmarker sounds of unknown origin), kept local too
-/export/web/mods/shop/sounds/
+/export/web/mods/shop/sounds/*
+# except Funeral Bells, synthesised by .tools/build-bell-sounds.py (ours)
+!/export/web/mods/shop/sounds/bell[123].wav
 
 # weapon sticker images: the six Season 1 ones are the user's own (2026-11-07) and are published; the test smiley's origin is unknown, so it stays local
 /export/web/mods/stickers/images/smiley.png

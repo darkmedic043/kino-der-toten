@@ -10,7 +10,7 @@ import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
 import { startSocial, onSocial, request, accept, decline, cancel, remove, statusText } from './social.js';
 import { mergePatch, resolveWeapons, withCore, isCoreMod } from './mod-loader.js';
-import { loadProfile, saveProfile, loadProgression, soonLocked, packLocked, xpToNext, levelNeed, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
+import { loadProfile, saveProfile, loadProgression, soonLocked, packLocked, passLocked, ownsItem, xpToNext, levelNeed, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, boxItems, setBoxItem, boxMin } from './profile.js';
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
@@ -118,7 +118,7 @@ function showTab(name){
   stage.active=name==='armory'&&pane==='operator';if(stage.active)stage.start();
   if(name==='armory'&&pane==='research')drawResearch();
   if(name==='shop')mountShop($('shop-root'),{toast,data}).catch(e=>console.warn('[shop]',e));
-  if(name==='pass')mountPass($('pass-root'),{toast,data}).catch(e=>console.warn('[pass]',e));
+  if(name==='pass')mountPass($('pass-root'),{toast,data,weaponThumb:thumb}).catch(e=>console.warn('[pass]',e));
   if(name==='career')renderCareer($('career-root'),{mapList,weapons:baseData?.weapons??{}});
 }
 for(const b of tabs)b.addEventListener('click',()=>showTab(b.dataset.tab));
@@ -308,7 +308,8 @@ function thumb(id){
   if(thumbs.has(id))return Promise.resolve(thumbs.get(id));
   if(!thumbWaiters.has(id))thumbWaiters.set(id,thumbQueue=thumbQueue.then(async()=>{
     // melees: melee_<key> (the Grave Bell is a weapon def; the knife only has its catalog entry's worldModel, mods/melee)
-    const me=id.startsWith('melee_')?meleeCatalog?.melees[id.slice(6)]:null,def=weapons[id]??data.equipment?.[id]??me;let url='';
+    // model:<url>: any glb by itself (the Pass tab's weapon charms)
+    const me=id.startsWith('melee_')?meleeCatalog?.melees[id.slice(6)]:null,def=id.startsWith('model:')?{worldModel:id.slice(6)}:weapons[id]??data.equipment?.[id]??me;let url='';
     try{
       const model=await loadModel(me?.thumbModel??def?.worldModel);   // thumbModel (melee.json): the knife's world model is a Bowie, its own is the viewmodel knife
       if(model){
@@ -344,7 +345,7 @@ const classOf=id=>classOfIn(weapons,id);
 const activeClass={};
 // Levelling up opens guns in the Gunsmith (a kit gun's `gunsmith` level, else its unlock level).
 const smithOpen=id=>unlockLvl(profile)>=gunsmithLevel(config,id);
-const gunSoon=d=>!!d?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();   // a coming-soon gun (melon-weapons): no Gunsmith until it's out
+const gunSoon=d=>(!!d?.unlock&&!ownsItem(d.unlock))||passLocked(config.weapons.find(w=>w.id===d?.id))||!!d?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();   // a coming-soon gun (melon-weapons): no Gunsmith until it's out
 const gunsmithHas=id=>gunsmith&&weapons[id]&&!gunSoon(weapons[id])&&(weapons[id].gunsmith===true||Object.keys(weapons[id].mounts??{}).length>0   // gunsmith:true = camos only (the Grimhawk)
   ||weapons[id].statAttachments?.length>0   // imported guns: mounted / stat-only attachments
   ||gunsmith.attachments.some(a=>a.tags.some(t=>(weapons[id].hideTags??[]).includes(t))));
@@ -366,7 +367,7 @@ fetchJson('mods/melee/melee.json').then(c=>{meleeCatalog=c;renderLoadout();}).ca
 const weaponList=()=>config.weapons.filter(w=>weapons[w.id]).map(w=>({...w,level:unlockLevel(w)}));
 // a weapon pack gun (progression.json pack): the lock names the pack, sold in the Shop's Weapon packs tab
 const PACKS={aw:'Advanced Warfare Weapon Pack'},packOf=id=>{const w=config.weapons.find(x=>x.id===id);return packLocked(w)?w.pack:null;};
-const pistolList=()=>weaponList().filter(w=>isPistol(weapons[w.id])&&!soonLocked(w));   // a coming-soon pistol isn't offered
+const pistolList=()=>weaponList().filter(w=>isPistol(weapons[w.id])&&!soonLocked(w)&&!passLocked(w));   // a coming-soon pistol isn't offered
 function slotState(key,u,l){
   if(key==='primary')return {value:l.primary};
   if(key==='box')return {value:''};
@@ -504,7 +505,7 @@ function boxTabs(){
 }
 // The melee slot: every entry in melee.json is a choice; the mod reads profile.loadout.melee at the start of a match
 // soon (melee.json): not out yet (a coming battlepass): shown locked; localStorage['kino.dev.soon']='1' lifts it, as for the classes
-const meleeSoon=m=>!!m?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();
+const meleeSoon=m=>(!!m?.unlock&&!ownsItem(m.unlock))||!!m?.soon&&(()=>{try{return localStorage.getItem('kino.dev.soon')!=='1';}catch{return true;}})();   // unlock: a Melon Pass item (the Grave Bell)
 // A melee with a model of its own (the Grave Bell) is a weapon in data.weapons (melee_<key>, mods/melee prepare): levels, attachments
 // and camos like a gun, its Gunsmith opened from the melee slot and the picker
 const meleeSmith=key=>{const w='melee_'+key;return !!key&&!!weapons[w]?.meleeSlot&&!meleeSoon(meleeCatalog?.melees[key])&&gunsmithHas(w)&&smithOpen(w);};
@@ -516,7 +517,7 @@ function renderMeleePicker(l){
   for(const [id,m] of list){
     const el=document.createElement('button'),locked=meleeSoon(m);el.className='opt'+(id===l.melee&&!locked?' selected':'')+(locked?' locked':'');
     const smith=!locked&&meleeSmith(id);
-    el.innerHTML=`<div class="thumb"></div><strong>${esc(m.name)}</strong><small>${locked?'<b style="letter-spacing:1px">COMING SOON</b> · ':''}${esc(m.description)}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
+    el.innerHTML=`<div class="thumb"></div><strong>${esc(m.name)}</strong><small>${locked?`<b style="letter-spacing:1px">${m.unlock?'MELON PASS':'COMING SOON'}</b> · `:''}${esc(m.description)}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
     if(m.worldModel)fillThumb(el.querySelector('.thumb'),'melee_'+id);
     if(locked){el.disabled=true;el.style.cssText='border-style:dashed;opacity:.55;cursor:not-allowed';el.title='Coming soon';}
     else el.addEventListener('click',e=>{if(smith&&e.target.closest('.slot-gs')){openMeleeGunsmith(id);return;}profile.loadout.melee=id;save();renderLoadout();});
@@ -597,7 +598,7 @@ function renderDetail(id,isWeapon,unlocked,level,opts={}){
     ${bar('DAMAGE',Math.log10(Math.max(10,d.damage*pellets)),Math.log10(3000),Math.round(d.damage)+(pellets>1?'×'+pellets:''))}
     ${bar('FIRE RATE',rpm,1000,rpm)}${bar('MAGAZINE',d.clipSize,100,d.clipSize)}${bar('RESERVE',d.maxAmmo,600,d.maxAmmo)}${bar('RELOAD',1/Math.max(.3,d.reloadTime),1/.8,(d.reloadTime??0).toFixed(1)+'s')}
     <p>${d.upgrade?`Pack-a-Punch: <b>${esc(d.upgrade.name)}</b>`:'Cannot be upgraded'} · ${esc(d.fireType??'')}</p>
-    <p class="muted">${rarityLine(id)}${unlocked?'Unlocked':soonLocked(config.weapons.find(w=>w.id===id))?'Coming soon':packOf(id)?`In the ${esc(PACKS[packOf(id)]??'weapon pack')} (Shop)`:'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}${config.weapons.find(w=>w.id===id)?.kit?' · first kit':''}</p>
+    <p class="muted">${rarityLine(id)}${unlocked?'Unlocked':soonLocked(config.weapons.find(w=>w.id===id))?'Coming soon':passLocked(config.weapons.find(w=>w.id===id))?'A Melon Pass Season 1 reward':packOf(id)?`In the ${esc(PACKS[packOf(id)]??'weapon pack')} (Shop)`:'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}${config.weapons.find(w=>w.id===id)?.kit?' · first kit':''}</p>
     ${gunsmith&&gunsmithHas(id)&&!smithOpen(id)?`<p class="muted gs-locked">Gunsmith opens at level ${gunsmithLevel(config,id)}</p>`:''}<div class="gunsmith-slot"></div>${unlocked?`<div data-prestige-host="${id}">${prestigeSlot(id)}</div>`:''}`;
   fillThumb(el.querySelector('.thumb'),id);
   // Weapon levels and attachments (mods/weapon-levels).
@@ -621,7 +622,7 @@ function renderWeapons(){
   const u=unlocks(config,unlockLvl(profile),weapons),list=weaponList(),box=Object.fromEntries(boxItems(config,profile,data).map(i=>[i.id,i]));
   const present=CLASSES.filter(c=>list.some(w=>classOf(w.id)===c[0]));
   if(!present.some(c=>c[0]===wpClass))wpClass=present[0]?.[0];
-  $('wp-hint').textContent=`${u.weapons.length} / ${list.filter(w=>!soonLocked(w)&&!packLocked(w)).length} unlocked${list.some(packLocked)?` · ${list.filter(packLocked).length} more in Shop weapon packs`:''} · level up to open guns in the Gunsmith`;
+  $('wp-hint').textContent=`${u.weapons.length} / ${list.filter(w=>!soonLocked(w)&&!packLocked(w)&&!passLocked(w)).length} unlocked${list.some(packLocked)?` · ${list.filter(packLocked).length} more in Shop weapon packs`:''}${list.some(passLocked)?` · ${list.filter(passLocked).length} in the Melon Pass`:''} · level up to open guns in the Gunsmith`;
   const cats=$('wp-cats');cats.innerHTML='';
   for(const [key,label] of present){const all=list.filter(w=>classOf(w.id)===key),open=all.filter(w=>u.weapons.includes(w.id)).length;
     const b=document.createElement('button');b.className='cat'+(key===wpClass?' on':'');b.innerHTML=`${label}<small>${open}/${all.length}</small>`;
@@ -634,7 +635,7 @@ function renderWeapons(){
     el.className='opt wp-opt'+(w.id===wpFocus?' selected':'')+(unlocked?'':' locked');if(r)el.style.setProperty('--r',r.color);
     el.innerHTML=`<div class="thumb"></div><strong>${esc(weapons[w.id].name)}</strong><div class="badges">${unlocked?weaponBadges(w.id):`<span class="b rar" style="--r:${r?.color}">${esc((r?.name??'').toUpperCase())}</span>`}${box[w.id]?.on?'<span class="b inbox">IN BOX</span>':''}</div>`;
     fillThumb(el.querySelector('.thumb'),w.id);
-    if(!unlocked)el.insertAdjacentHTML('beforeend',soonLocked(w)?'<span class="lock">COMING SOON</span>':packLocked(w)?`<span class="lock">${esc(w.pack.toUpperCase())} PACK</span>`:`<span class="lock">LV ${w.level}</span>`);
+    if(!unlocked)el.insertAdjacentHTML('beforeend',soonLocked(w)?'<span class="lock">COMING SOON</span>':passLocked(w)?'<span class="lock">MELON PASS</span>':packLocked(w)?`<span class="lock">${esc(w.pack.toUpperCase())} PACK</span>`:`<span class="lock">LV ${w.level}</span>`);
     el.addEventListener('click',()=>{wpFocus=w.id;renderWeapons();});
     grid.append(el);
   }

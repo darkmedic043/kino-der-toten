@@ -2593,6 +2593,367 @@
     "pack": "aw",
     "game": "aw"
    }
+  },
+  {
+   "id": "pass.s2.perk.stronghold",
+   "cat": "perk",
+   "name": "Stone Cold Stronghold",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Unlocks Stone Cold Stronghold (a Reaper Collection perk, with research augments) at the terminal's PERKS app.",
+   "data": {
+    "perk": "specialty_stronghold",
+    "label": "PERK UNLOCK",
+    "icon": "reaper/icons/stronghold.webp",
+    "color": "#8a9aa8"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.perk.victorious",
+   "cat": "perk",
+   "name": "Victorious Tortoise",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Unlocks Victorious Tortoise (a Reaper Collection perk, with research augments) at the terminal's PERKS app.",
+   "data": {
+    "perk": "specialty_victorious",
+    "label": "PERK UNLOCK",
+    "icon": "reaper/icons/victorious.webp",
+    "color": "#3a8a3a"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.perk.zombshell",
+   "cat": "perk",
+   "name": "Zombshell",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Unlocks Zombshell (a Reaper Collection perk, with research augments) at the terminal's PERKS app.",
+   "data": {
+    "perk": "specialty_zombshell",
+    "label": "PERK UNLOCK",
+    "icon": "reaper/icons/zombshell.webp",
+    "color": "#7ab83a"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.perk.tactiquilla",
+   "cat": "perk",
+   "name": "Tactiquilla Sangria",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Unlocks Tactiquilla Sangria (a Reaper Collection perk, with research augments) at the terminal's PERKS app.",
+   "data": {
+    "perk": "specialty_tactiquilla",
+    "label": "PERK UNLOCK",
+    "icon": "reaper/icons/tactiquilla.webp",
+    "color": "#c03a5a"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.class.gardener",
+   "cat": "class",
+   "name": "The Gardener",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Unlocks the Gardener class: plant seeds at the Potting Bench, grow them through the match and breed hybrids.",
+   "data": {
+    "class": "gardener",
+    "label": "CLASS",
+    "color": "#7fa84a",
+    "icon": "classes/garden/icons/melon_3.webp"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.operator.deadlock_seven",
+   "cat": "outfit",
+   "name": "Seven",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Seven, the Prisoner. Operator.",
+   "data": {
+    "character": "deadlock_seven",
+    "label": "OPERATOR",
+    "skin": false
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.operator.deadlock_venator",
+   "cat": "outfit",
+   "name": "Venator",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Venator, the Priest. Operator.",
+   "data": {
+    "character": "deadlock_venator",
+    "label": "OPERATOR",
+    "skin": false
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.weapon.debtcollector",
+   "cat": "weapon",
+   "name": "The Debt Collector",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "A revolver that banks the damage of every hit; reloading collects the debt in one blast. Unlocks it for your loadout and your Mystery Box.",
+   "data": {
+    "weapon": "debt_collector_zm",
+    "label": "WEAPON"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.weapon.hivelauncher",
+   "cat": "weapon",
+   "name": "Hive Launcher",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Fires nests that stick and hatch drones to hunt the horde. Unlocks it for your Mystery Box.",
+   "data": {
+    "weapon": "hive_launcher_zm",
+    "label": "WEAPON"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.melee.gravebell",
+   "cat": "weapon",
+   "name": "The Grave Bell",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "A melee weapon: ring it to stun every zombie around you; three tolls in time ring a Death Knell.",
+   "data": {
+    "weapon": "melee_grave_bell",
+    "melee": "grave_bell",
+    "label": "MELEE WEAPON"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.equip.tripmine",
+   "cat": "equipment",
+   "name": "Trip Mines",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "BO3 Trip Mines: plant two and the laser between them blows on the first zombie through. Joins your Mystery Box (one lethal slot with frags and Claymores).",
+   "data": {
+    "equipment": "tripmine_zm",
+    "label": "LETHAL"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.equip.smoke",
+   "cat": "equipment",
+   "name": "Smoke Grenades",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Smoke Grenades: zombies lose sight of anyone inside the cloud. Joins your Mystery Box.",
+   "data": {
+    "equipment": "smoke_zm",
+    "label": "TACTICAL"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.reticle.hex",
+   "cat": "reticle",
+   "name": "Hex",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 reticle: a honey-gold hexagon.",
+   "data": {
+    "char": "⬡",
+    "color": "#ffc23a"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.menu.greenhouse",
+   "cat": "theme",
+   "name": "Greenhouse",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 menu theme: greenhouse green.",
+   "data": {
+    "menu": "#5ad17c"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.glow.bloom",
+   "cat": "glow",
+   "name": "Bloom",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 Mystery Box glow: blossom pink.",
+   "data": {
+    "box": "#ff7ad1"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.reticle.clapper",
+   "cat": "reticle",
+   "name": "Clapper",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 reticle: a bell clapper.",
+   "data": {
+    "char": "⚲",
+    "color": "#d8dde0"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.glow.candlelight",
+   "cat": "glow",
+   "name": "Candlelight",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 Mystery Box glow: warm candlelight.",
+   "data": {
+    "box": "#ffd28a"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.frame.headstone",
+   "cat": "theme",
+   "name": "Headstone",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 portrait frame: weathered headstone grey.",
+   "data": {
+    "frame": "#9aa3a8"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.hitmarker.ding",
+   "cat": "reticle",
+   "name": "Ding",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 hitmarker: a pale gold sparkle.",
+   "data": {
+    "hitmarker": "✧",
+    "color": "#fff0b0"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.frame.goldleaf",
+   "cat": "theme",
+   "name": "Gold Leaf",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 portrait frame: gold leaf.",
+   "data": {
+    "frame": "#e8c25a"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.hitmarker.kaching",
+   "cat": "reticle",
+   "name": "Ka-Ching",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 hitmarker: every hit pays.",
+   "data": {
+    "hitmarker": "$",
+    "color": "#ffd23a"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.menu.vault",
+   "cat": "theme",
+   "name": "Vault",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 menu theme: vault gold.",
+   "data": {
+    "menu": "#d4a838"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.counterfeit",
+   "cat": "camo",
+   "name": "Counterfeit",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 camo: banknote green with gold engraving. Works on every gun.",
+   "data": {
+    "camo": "s2.counterfeit"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.glow.hiveheart",
+   "cat": "glow",
+   "name": "Hive Heart",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 Mystery Box glow: hive amber.",
+   "data": {
+    "box": "#ff9500"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.camo.wax",
+   "cat": "camo",
+   "name": "Wax",
+   "price": 0,
+   "rarity": "rare",
+   "desc": "Season 1 camo: amber honeycomb wax with drips. Works on every gun.",
+   "data": {
+    "camo": "s2.wax"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.reticle.halo",
+   "cat": "reticle",
+   "name": "Halo",
+   "price": 0,
+   "rarity": "epic",
+   "desc": "Season 1 reticle: a halo.",
+   "data": {
+    "char": "◎",
+    "color": "#fff6d8"
+   },
+   "pass": "s2"
+  },
+  {
+   "id": "pass.s2.sound.funeralbells",
+   "cat": "sound",
+   "name": "Funeral Bells",
+   "price": 0,
+   "rarity": "legendary",
+   "desc": "Season 1 hit sounds: every hit tolls a funeral bell.",
+   "data": {
+    "hits": {
+     "samples": [
+      "bell1.wav",
+      "bell2.wav",
+      "bell3.wav"
+     ],
+     "volume": 0.5
+    }
+   },
+   "pass": "s2"
   }
  ]
 }

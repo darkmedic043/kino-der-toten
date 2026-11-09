@@ -49,16 +49,19 @@ export default async function setup(api){
   // a tactical you hold never rolls again (2026-10-20, user: "box spins can't give duplicate tacticals"): Monkey Bombs while
   // owned (mystery-box.js checks that for its own pool; the loadout list's extras come through here), the moon-equipment
   // mod's Gersch Device and QED while they are the slot's (kino.tactical.id; a different one may still roll: it replaces)
-  const owned=id=>id==='frag_grenade_zm'?session.grenades>=4:id==='claymore_zm'?!!session.claymoresOwned:id==='zombie_cymbal_monkey'?!!session.monkeysOwned:data.equipment?.[id]?.tactical?window.kino.tactical?.id===id:false;
+  const owned=id=>id==='frag_grenade_zm'?session.grenades>=4:id==='claymore_zm'?!!session.claymoresOwned:id==='tripmine_zm'?!!session.tripsOwned:id==='zombie_cymbal_monkey'?!!session.monkeysOwned:data.equipment?.[id]?.tactical?window.kino.tactical?.id===id:false;
   Object.defineProperty(window.kino,'boxList',{configurable:true,get:()=>({...boxFilter(config,profile,data),owned})});
   const giveWeapon=session.giveWeapon.bind(session);
   session.giveWeapon=(id,...rest)=>{
     // one lethal slot: frags and Claymores replace each other (kino-session.js giveFrags/giveClaymores)
     if(id==='frag_grenade_zm'){if(session.giveFrags)session.giveFrags(4);else session.grenades=4;return true;}
     if(id==='claymore_zm'){if(session.giveClaymores)session.giveClaymores();else{session.claymoresOwned=true;session.claymores=2;}return true;}
+    // Season 1's BO3 Trip Mines (lethal) and Smoke Grenades (tactical slot, mods/bo3-equipment), once owned from the Melon Pass
+    if(id==='tripmine_zm'&&session.giveTrips){session.giveTrips();return true;}
+    if(id==='smoke_zm'&&window.kino.tactical?.give?.('smoke_zm'))return true;
     return giveWeapon(id,...rest);
   };
-  if(api.mysteryBox?.models)for(const id of ['frag_grenade_zm','claymore_zm'])if(data.equipment?.[id]?.worldModel&&!api.mysteryBox.models[id])
+  if(api.mysteryBox?.models)for(const id of ['frag_grenade_zm','claymore_zm','tripmine_zm','smoke_zm'])if(data.equipment?.[id]?.worldModel&&!api.mysteryBox.models[id])
     loadModel(data.equipment[id].worldModel).then(m=>{api.mysteryBox.models[id]=m;}).catch(e=>console.warn('[progression] box model',id,e));
 
   host.on('beforeDamage',e=>{if(active.bonuses.has('iron_skin'))e.amount*=1-bonuses.iron_skin.value;});

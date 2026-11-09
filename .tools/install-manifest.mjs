@@ -24,6 +24,7 @@ const OWN = [
   /^mods\/(charms\/charms|charms\/screen-spots|stickers\/stickers)\.json$/,                                // the weapon charm and sticker catalogs (models and images get their own rule once they are known to be ours)
   /^mods\/charms\/season1\/(pricetag|honeydipper|runefang|seedling|bottledlightning|amberqueen)\.glb$/,   // Season 1 charms: the user's own three (2026-11-08, "made by me so they can be downloaded") and three built in Blender (.tools/build_s1_charms.py); never the Kurb scan
   /^mods\/stickers\/images\/(pastdue|highvoltage|beeseal|sproutedskull|rainmeter|tollcrest)\.png$/,   // the user's own Season 1 stickers (2026-11-07); not the smiley, and never the Kurb scan
+  /^mods\/shop\/sounds\/bell[123]\.wav$/,                          // Funeral Bells hit sounds, synthesised by .tools/build-bell-sounds.py; the other hit sounds there are not ours
   /^mods\/[^/]+\/mod\.json$/,                                       // every mod's manifest
   /^mods\/(classes\/classes|characters\/characters|progression\/progression|gobblegums\/gums|prestige\/prestige|research\/research|credits\/credits|shop\/catalog|pass\/season(s|-s\d+)?|weapon-levels\/(attachments|camos|games)|movement\/data|player-health\/data|terminal-booth\/placements|hd-weapons\/hd|map-materials\/(hd|hd-materials|normals)|(gun|event|zombie)-sounds\/sounds|_template\/data|lighting\/fixtures)\.json$/,
   /^mods\/terminal-booth\/terminal_booth(_compact)?\.glb$/,        // built in Blender for this fork (.tools/build-terminal-booth.py)

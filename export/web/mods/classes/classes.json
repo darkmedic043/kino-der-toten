@@ -3228,7 +3228,6 @@
     },
     {
       "id": "gardener",
-      "soon": true,
       "pass": "s2",
       "unlock": "pass.s2.class.gardener",
       "name": "Gardener",

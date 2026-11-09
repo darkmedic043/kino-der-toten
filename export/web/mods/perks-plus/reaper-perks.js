@@ -21,12 +21,12 @@ export const REAPER_ON = {
   specialty_damnade: { name: 'Dam-A-Nade', price: 3000, color: '#8a9a4a', icon: 'DN', reaper: 'damnade' },
   specialty_magnet: { name: 'Magnet Margarita', price: 2500, color: '#e04a6a', icon: 'MM', reaper: 'magnet' },
   specialty_electriccherry: { name: 'Electric Cherry', price: 2000, color: '#4fa8ff', icon: 'EC', reaper: 'electriccherry' },
-  // built with research tracks but COMING SOON (user, 2026-11-05: "dont give them out to players yet"): the terminal shows
-  // them locked and every free-perk source skips them (desktop.js perkUnlocked); only the cheat console gives them
-  specialty_stronghold: { name: 'Stone Cold Stronghold', price: 3000, color: '#8a9aa8', icon: 'SH', reaper: 'stronghold', soon: true },
-  specialty_victorious: { name: 'Victorious Tortoise', price: 2500, color: '#3a8a3a', icon: 'VT', reaper: 'victorious', soon: true },
-  specialty_zombshell: { name: 'Zombshell', price: 3000, color: '#7ab83a', icon: 'ZS', reaper: 'zombshell', soon: true },
-  specialty_tactiquilla: { name: 'Tactiquilla Sangria', price: 2500, color: '#c03a5a', icon: 'TS', reaper: 'tactiquilla', soon: true },
+  // Melon Pass Season 1 unlocks (released 2026-11-08; COMING SOON from 2026-11-05): the terminal keeps them locked until the
+  // pass item is owned and every free-perk source skips them till then (desktop.js PERKS unlock, perkUnlocked)
+  specialty_stronghold: { name: 'Stone Cold Stronghold', price: 3000, color: '#8a9aa8', icon: 'SH', reaper: 'stronghold' },
+  specialty_victorious: { name: 'Victorious Tortoise', price: 2500, color: '#3a8a3a', icon: 'VT', reaper: 'victorious' },
+  specialty_zombshell: { name: 'Zombshell', price: 3000, color: '#7ab83a', icon: 'ZS', reaper: 'zombshell' },
+  specialty_tactiquilla: { name: 'Tactiquilla Sangria', price: 2500, color: '#c03a5a', icon: 'TS', reaper: 'tactiquilla' },
 };
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 

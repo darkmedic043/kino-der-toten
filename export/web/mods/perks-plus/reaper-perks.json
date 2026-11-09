@@ -474,7 +474,7 @@
    "specialty": "specialty_stronghold",
    "origin": "Black Ops 4",
    "new": true,
-   "status": "built, coming soon",
+   "status": "implemented (Melon Pass Season 1 unlock, research augments)",
    "effect": "Standing still forms a ring that builds armour over time",
    "upgrade": "Armour builds faster and lingers after leaving the ring",
    "source": {
@@ -504,7 +504,7 @@
    "specialty": "specialty_tactiquilla",
    "origin": "custom",
    "new": true,
-   "status": "built, coming soon",
+   "status": "implemented (Melon Pass Season 1 unlock, research augments)",
    "effect": "Fire while sprinting, chance to regain fired ammo, multi-kills give bonus points",
    "upgrade": "Higher ammo chance, doubled multi-kill rewards",
    "source": {
@@ -549,7 +549,7 @@
    "specialty": "specialty_victorious",
    "origin": "Black Ops 4",
    "new": true,
-   "status": "built, coming soon",
+   "status": "implemented (Melon Pass Season 1 unlock, research augments)",
    "effect": "A held shield blocks damage from every direction and explodes when destroyed",
    "upgrade": "Double shield health",
    "source": {
@@ -594,7 +594,7 @@
    "specialty": "specialty_zombshell",
    "origin": "Black Ops 4",
    "new": true,
-   "status": "built, coming soon",
+   "status": "implemented (Melon Pass Season 1 unlock, research augments)",
    "effect": "Shooting a zombie can create a slowing field that also weakens zombies",
    "upgrade": "Zombies ignore you while you stand in the field",
    "source": {

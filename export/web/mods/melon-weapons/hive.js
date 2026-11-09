@@ -2,7 +2,7 @@
 // sticky wax nests that cling to walls, floors and zombies, lure the zombies round them (350 units) and hatch glowing
 // mechanical drones that home on zombies and sting them three times. Zombies that reach a nest tear it apart.
 // Built by .tools/build-hive-launcher.py + .tools/assemble-grimhawk.mjs --gun hive on the M72 LAW's skeleton (its
-// animations and shot sound drive it); the comb drum turns a cell each shot. Launcher class. Coming soon (Melon Pass).
+// animations and shot sound drive it); the comb drum turns a cell each shot. Launcher class. A Melon Pass Season 1 reward (released 2026-11-08).
 //
 // Attachments (weapon-levels attachments.json, ids hi_*):
 //   hi_waggle     Waggle Scope (optic): aim at a zombie to mark it; every drone goes for the marked zombie first
@@ -38,7 +38,7 @@ export function prepareHive(data) {
     id: HIVE, name: 'Hive Launcher', price: 2000, clipSize: 3, startAmmo: 18, maxAmmo: 24, damage: 320, minDamage: 0,
     explosionRadius: 0, explosionInnerDamage: 0, explosionOuterDamage: 0, fireTime: .7, reloadTime: 2.6, reloadEmptyTime: 2.2,
     hideTags: [...ATTACHMENT_TAGS], model, worldModel: world, adsFov: 62, hipSpread: .008,
-    hive: true, weaponClass: 'Launcher', gunsmith: true, soon: true, killCauses: ['hive', 'explosion'],
+    hive: true, weaponClass: 'Launcher', gunsmith: true, killCauses: ['hive', 'explosion'],
   });
   gun.upgrade = Object.assign(structuredClone(law.upgrade ?? law), {
     name: 'Murder Hornet', clipSize: 5, startAmmo: 30, maxAmmo: 40, damage: 900, minDamage: 0,
@@ -47,7 +47,7 @@ export function prepareHive(data) {
     killCauses: ['hive', 'explosion'],
   });
   for (const o of [gun, gun.upgrade]) for (const k of ['projectileType', 'projectileModel', 'projectileSpeed']) delete o[k];   // our hook fires the nest
-  data.weapons[HIVE] = gun;   // not in the box, on a wall or in progression: it waits for the Melon Pass (soon)
+  data.weapons[HIVE] = gun;   // a Melon Pass Season 1 reward: progression.json unlock pass.s2.weapon.hivelauncher (profile.js passLocked)
 }
 
 export function setupHive(api) {

@@ -399,13 +399,13 @@
       "id": "debt_collector_zm",
       "rarity": "legendary",
       "level": 1,
-      "soon": true
+      "unlock": "pass.s2.weapon.debtcollector"
     },
     {
       "id": "hive_launcher_zm",
       "rarity": "legendary",
       "level": 1,
-      "soon": true
+      "unlock": "pass.s2.weapon.hivelauncher"
     },
     {
       "id": "aw_m1911",
@@ -756,6 +756,14 @@
       "description": "Something random happens, good or bad",
       "level": 33,
       "rarity": "epic"
+    },
+    {
+      "id": "smoke_zm",
+      "name": "Smoke Grenades",
+      "description": "Zombies lose sight of anyone inside the cloud (Melon Pass Season 1)",
+      "level": 1,
+      "rarity": "rare",
+      "unlock": "pass.s2.equip.smoke"
     }
   ],
   "lethal": [
@@ -772,6 +780,14 @@
       "description": "2 claymores, refilled each round; they take the lethal slot (replace your grenades)",
       "level": 1,
       "rarity": "uncommon"
+    },
+    {
+      "id": "tripmine_zm",
+      "name": "Trip Mines",
+      "description": "Lasers that blow on the first zombie through; they take the lethal slot (Melon Pass Season 1)",
+      "level": 1,
+      "rarity": "rare",
+      "unlock": "pass.s2.equip.tripmine"
     }
   ],
   "box": {

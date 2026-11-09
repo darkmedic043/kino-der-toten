@@ -134,9 +134,13 @@ export function addXp(S,p,n){
   wrapUp(S,p);return got;
 }
 
+// an item's kind label: by the field its data carries first (one shop cat holds several kinds: reticles, hitmarkers, kill effects...)
+const SUB_DATA={killfx:'KILL EFFECT',hitmarker:'HITMARKER',blood:'KILL COLOUR',char:'RETICLE',menu:'MENU THEME',frame:'PROFILE FRAME',hud:'HUD THEME',title:'TITLE',box:'MAP GLOW',hits:'HIT SOUNDS'};
+const SUB_CAT={camo:'CAMO',outfit:'OUTFIT',card:'CALLING CARD',charm:'WEAPON CHARM',sticker:'STICKER',screen:'GUN SCREEN',emblem:'EMBLEM'};
+const subOf=i=>{for(const k in SUB_DATA)if(i?.data?.[k]!=null)return SUB_DATA[k];return SUB_CAT[i?.cat]??'ITEM';};
 // what a reward is, for the UI: {title, sub, kind}
 export function describe(r,{catalog,gums}={}){
-  if(r.type==='item'){const i=catalog?.items.find(x=>x.id===r.id);if(i?.data?.label)return {title:i.name,sub:i.data.label,item:i,desc:i.desc};return {title:i?.name??r.id,sub:{camo:'CAMO',outfit:'OUTFIT',reticle:'RETICLE & HITS',theme:'THEME',sound:'SOUND SET',glow:'MAP GLOW',card:'CALLING CARD'}[i?.cat]??'ITEM',item:i};}
+  if(r.type==='item'){const i=catalog?.items.find(x=>x.id===r.id);if(i?.data?.label)return {title:i.name,sub:i.data.label,item:i,desc:i.desc};return {title:i?.name??r.id,sub:subOf(i),item:i};}
   if(r.type==='credits')return {title:`${r.amount} Credits`,sub:'CREDITS'};
   if(r.type==='token'&&r.hours)return {title:`Double ${{playerXp:'Player',weaponXp:'Weapon'}[r.kind]} XP`,sub:`${r.hours} HOUR${r.hours>1?'S':''} · GAME TIME`};
   if(r.type==='token')return {title:`Double ${{passXp:'Pass',weaponXp:'Weapon',researchXp:'Research'}[r.kind]} XP`,sub:`NEXT ${r.matches} MATCH${r.matches>1?'ES':''}`};

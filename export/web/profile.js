@@ -43,17 +43,21 @@ export const soonLocked=w=>!!w?.soon&&(()=>{try{return localStorage.getItem('kin
 // pack (progression.json weapons, e.g. "aw"): sold as a Shop weapon pack (mods/shop catalog.json item 'pack.<id>'). Locked
 // until the pack is owned: not in the box, the loadout or the unlock count. Owning it unlocks every gun in it at any level.
 // The dev flag kino.dev.soon lifts it too.
-export const ownsPack=id=>{try{if(localStorage.getItem('kino.dev.soon')==='1')return true;return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]).includes('pack.'+id);}catch{return false;}};
+export const ownsItem=key=>{try{if(localStorage.getItem('kino.dev.soon')==='1')return true;return (JSON.parse(localStorage.getItem('kino.mods.shop'))?.owned??[]).includes(key);}catch{return false;}};
+export const ownsPack=id=>ownsItem('pack.'+id);
 export const packLocked=w=>!!w?.pack&&!ownsPack(w.pack);
+// unlock (a Melon Pass item id, Season 1's melon weapons, Trip Mines and Smoke Grenades, 2026-11-08): locked until that item is
+// owned, then unlocked at any level and switched on in the box. The dev flag lifts it too.
+export const passLocked=w=>!!w?.unlock&&!ownsItem(w.unlock);
 // weapons: ids known to the current game data (unknown unlock entries are skipped).
 export function unlocks(config,level,weapons){
   return {
-    weapons:config.weapons.filter(w=>!soonLocked(w)&&(w.pack?!packLocked(w):unlockLevel(w)<=level)&&(!weapons||weapons[w.id])).map(w=>w.id),
+    weapons:config.weapons.filter(w=>!soonLocked(w)&&!passLocked(w)&&(w.pack?!packLocked(w):w.unlock||unlockLevel(w)<=level)&&(!weapons||weapons[w.id])).map(w=>w.id),
     bonuses:config.bonuses.filter(b=>b.level<=level).map(b=>b.id),
     bonusSlots:level>=config.secondBonusLevel?2:1,
-    tactical:(config.tactical??[]).filter(t=>t.level<=level).map(t=>t.id),
+    tactical:(config.tactical??[]).filter(t=>!passLocked(t)&&(t.unlock||t.level<=level)).map(t=>t.id),
     tacticalSlot:level>=(config.tacticalLevel??Infinity),
-    lethal:(config.lethal??[]).filter(t=>t.level<=level).map(t=>t.id),
+    lethal:(config.lethal??[]).filter(t=>!passLocked(t)&&(t.unlock||t.level<=level)).map(t=>t.id),
   };
 }
 
@@ -76,7 +80,8 @@ export function validLoadout(config,profile,weapons){
 export function boxItems(config,profile,data){
   const u=unlocks(config,unlockLvl(profile),data.weapons),pool=new Set(data.boxPool??[]),l=profile.loadout;
   const on=new Set(l.boxOn??[]),off=new Set(l.boxOff??[]);
-  const item=(id,kind)=>({id,kind,rarity:rarityOf(config,id),on:!off.has(id)&&(pool.has(id)||on.has(id))});
+  const pass=new Set([...config.weapons,...config.tactical??[],...config.lethal??[]].filter(w=>w.unlock).map(w=>w.id));   // pass rewards join the box when owned
+  const item=(id,kind)=>({id,kind,rarity:rarityOf(config,id),on:!off.has(id)&&(pool.has(id)||on.has(id)||pass.has(id))});
   const items=[...u.weapons.filter(id=>!/upgraded/.test(id)&&!data.weapons?.[id]?.soon).map(id=>item(id,'weapon')),   // soon guns stay out of the box even with the dev flag (no tier top-up)
     ...u.tactical.filter(id=>data.equipment?.[id]).map(id=>item(id,'tactical')),
     ...u.lethal.filter(id=>data.equipment?.[id]).map(id=>item(id,'lethal'))];

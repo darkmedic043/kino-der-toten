@@ -159,6 +159,8 @@ User: "claymores will now replace grenades when grabbed, and that slot will be r
 
 ## BO3 Trip Mine and Smoke Grenade (2026-11-05, coming soon)
 
+**Released 2026-11-08 as Melon Pass Season 1 rewards** (`pass.s2.equip.tripmine` / `.smoke`): `soon` is off the defs and research items; progression.json has lethal `tripmine_zm` and tactical `smoke_zm` with `unlock`, so once owned they join the Mystery Box (`progression/mod.js` gives them through `session.giveTrips()` / `kino.tactical.give`). The notes below are the pre-release state.
+
 User: "add in the trip mine and smoke ... smoke bomb could probably work as a way to conceal the player(s) inside of it ... one of the major augments ... connects an electric tether between them that shocks, damages and slows them ... within a distance of each other, and can't go between walls ... isn't too op ... mark these as coming soon". Mod `mods/bo3-equipment` (after `throwables`, skips Moon). Models and sounds are built from the user's BO3 export by `.tools/build_bo3_equipment.py` into the git-ignored `models/` and `sounds/` (never published; the Rind manifest never walks those folders); `prepare()` HEAD-checks the two glbs and registers nothing without them (`MapFeatures` preloads every `data.equipment` model, so a missing glb would break the map load).
 
 - **Coming soon**: both equipment defs and both research items carry `soon:true`. They are not in any box pool, wall buy, gum or loot table. Cheat `bo3gear trip|smoke` gives them. Debug handle `kino.bo3eq.{flying,mines,wires,clouds}()`; test script `scratch/bo3eq/test.mjs`.

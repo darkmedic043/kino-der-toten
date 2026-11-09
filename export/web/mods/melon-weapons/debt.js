@@ -4,7 +4,7 @@
 // at once. A debtor that dies some other way defaults: its debt passes to the nearest zombie within 300.
 // Built by .tools/build-debt-collector.py + .tools/assemble-grimhawk.mjs --gun debt on the Python's skeleton (its
 // animations drive it; the cylinder variants hang off j_bolt so they swing out with the crane). Sounds: the Python's,
-// with a coin tick and a till of our own. Coming soon (def.soon): never handed out until the battlepass gives it.
+// with a coin tick and a till of our own. A Melon Pass Season 1 reward (released 2026-11-08): progression.json unlock.
 //
 // Attachments (weapon-levels attachments.json, ids dc_*):
 //   dc_loupe     Appraiser's Loupe (optic, reflex): aimed hits bank 25% more
@@ -41,7 +41,7 @@ export function prepareDebt(data) {
   const common = {
     hideTags: [...ATTACHMENT_TAGS], model, worldModel, automatic: false, fireType: 'Single Shot', pellets: 1, headMultiplier: 2.5,
     explosionRadius: 0, projectileSpeed: 0, segmentedReload: true, reloadStartAdd: 1, reloadStartTime: 1.3, reloadEndTime: .8,
-    weaponClass: 'Pistol', gunsmith: true, soon: true, killCauses: ['debt'], debt: true, weight: 1.15,
+    weaponClass: 'Pistol', gunsmith: true, killCauses: ['debt'], debt: true, weight: 1.15,
   };
   const gun = Object.assign(structuredClone(py), common, {
     id: DEBT, name: 'The Debt Collector', price: 1950, clipSize: 6, startAmmo: 48, maxAmmo: 84, damage: 1100, minDamage: 650, range: 1000,
@@ -52,7 +52,7 @@ export function prepareDebt(data) {
     fireTime: .14, reloadTime: .6, reloadEmptyTime: .6, reloadAmmoAdd: 8, adsFov: 60,
   });
   for (const o of [gun, gun.upgrade]) for (const k of ['projectileType', 'projectileModel']) delete o[k];
-  data.weapons[DEBT] = gun;   // coming soon: not in the box, on a wall or in progression.json (the battlepass hands it out)
+  data.weapons[DEBT] = gun;   // a Melon Pass Season 1 reward: progression.json unlock pass.s2.weapon.debtcollector (profile.js passLocked)
 }
 
 export function setupDebt(api) {

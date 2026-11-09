@@ -14,12 +14,13 @@ import { renderPortrait } from '../../characters.js';
 
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let mounted=null;
-export async function mountPass(root,{toast,data}){
+export async function mountPass(root,{toast,data,weaponThumb}){
   if(mounted){mounted.render();return;}
   const base=new URL('mods/',document.baseURI);
   const [S,catalog,camos,chars,gums]=await Promise.all([loadSeasons(new URL('pass/',base)),loadCatalog(new URL('shop/',base)),loadCamos(new URL('weapon-levels/',base)),
     fetch(new URL('characters/characters.json',base)).then(r=>r.json()),loadGums(new URL('gobblegums/',base)).catch(()=>null)]);
-  const thumb=makeThumb({camos,chars}),preview=gunPreview(),rar=catalog.rarities;
+  const [charms,stickers]=await Promise.all(['charms/charms.json','stickers/stickers.json'].map(f=>fetch(new URL(f,base)).then(r=>r.json()).catch(()=>null)));
+  const thumb=makeThumb({camos,chars,charms,stickers}),preview=gunPreview(),rar=catalog.rarities;
   let season,page=0,sel=null;
   // open a season on its first page that isn't done
   function view(s){season=s;page=0;sel=null;const p=loadPass();while(page<season.pages.length-1&&pageDone(season,p,page)&&pageOpen(season,p,page+1))page++;}
@@ -58,7 +59,7 @@ export async function mountPass(root,{toast,data}){
         return `<button data-page="${i}" class="${i===page?'on':''}${open?'':' locked'}${done?' done':''}"><small>PAGE ${i+1}</small><b>${esc(x.name)}</b><span>${done?'✓ DONE':open?`${n} / ${x.items.length}`:'🔒'}</span></button>`;}).join('')}</nav>
       <div class="ps-body"><div class="ps-grid">${pg.items.map(it=>card(it,p)).join('')}</div>${card(pg.major,p,{major:true})}<aside class="ps-drawer" id="ps-drawer"></aside></div>
       <p class="muted small">Every pass tier you earn gives a token. Spend it on any reward on an open page; unlocking all 9 on a page grants its page reward and opens the next page. ${R.premium?'':'Premium rewards can be unlocked without premium (the page still progresses); they are handed over when you buy this season\'s premium pass.'} Pass XP comes from kills, rounds survived and challenges, and always goes to the live season. Seasons never expire: tokens are shared, so they can be spent on any past season. Tokens stop once yours can pay for the rest of the live season, so a finished pass gives no more and nothing carries over to the next one; tiers past the last reward give a token only when you're short.${S.list.length>1?' Auto-progress spends on the active pass, then the live season.':''}</p>`;
-    fillSwatches(root,cid=>camos.camos.find(c=>c.id===cid));drawer(p);
+    fillSwatches(root,cid=>camos.camos.find(c=>c.id===cid));fillModels(root);drawer(p);
   }
   function drawer(p){
     const el=root.querySelector('#ps-drawer'),pg=season.pages[page],entry=[...pg.items,pg.major].find(x=>x.id===sel);
@@ -66,14 +67,19 @@ export async function mountPass(root,{toast,data}){
     const R=rec(p,season),major=entry===pg.major,d=describe(entry.reward,{catalog,gums}),open=pageOpen(season,p,page),tk=tokens(S,p),unlocked=!!R.unlocked[entry.id];
     el.innerHTML=`<div class="ps-pv" id="ps-pv"></div><h3>${esc(d.title)}</h3><span class="muted small">${esc(d.sub)}${entry.premium?' · PREMIUM':''}</span>${d.item?`<p>${esc(d.item.desc)}</p>`:d.desc?`<p>${esc(d.desc)}</p>`:''}
       ${major?`<p class="muted small">${R.granted[entry.id]?'Claimed.':'Unlock all 9 rewards on this page to get it.'}</p>`
-        :unlocked?`<p class="muted small">${entry.premium&&!R.premium?'Unlocked · handed over when you buy the premium pass.':'Unlocked and yours.'}${d.item&&['camo','outfit'].includes(d.item.cat)?` ${d.item.cat==='camo'?'Equip it in the Gunsmith (GLOBAL · SEASON).':d.item.data?.skin?'Pick it under SKINS in Armory → Operator.':'Pick it in Armory → Operator.'}`:d.item?.cat==='perk'?' Buy it at any terminal booth (PERKS).':d.item?' Equip it in the Shop tab.':''}</p>`
+        :unlocked?`<p class="muted small">${entry.premium&&!R.premium?'Unlocked · handed over when you buy the premium pass.':'Unlocked and yours.'}${d.item&&['camo','outfit'].includes(d.item.cat)?` ${d.item.cat==='camo'?'Equip it in the Gunsmith (GLOBAL · SEASON).':d.item.data?.skin?'Pick it under SKINS in Armory → Operator.':'Pick it in Armory → Operator.'}`:d.item?.cat==='perk'?' Buy it at any terminal booth (PERKS).':({weapon:' Pick it in Armory → Weapons; it also joins your Mystery Box.',melee:' Pick it in Armory → Weapons (MELEE).',equipment:' It joins your Mystery Box (Armory → Weapons → MYSTERY BOX).',class:' Pick it in Armory → Classes.',charm:' Hang it on a gun in the Gunsmith (CHARM).',sticker:' Put it on a gun in the Gunsmith (STICKERS).',screen:' Mount it on a gun in the Gunsmith (SCREENS).'})[d.item?.data?.melee?'melee':d.item?.cat]??(d.item?' Equip it in the Shop tab.':'')}</p>`
         :`<button class="ps-unlock" data-unlock="${esc(entry.id)}"${!open||tk<=0?' disabled':''}>UNLOCK · 1 TOKEN</button><p class="muted small">${!open?'Finish the page before it first.':tk<=0?'No tokens: earn pass tiers by playing, or buy one.':''}</p>`}`;
     const pv=el.querySelector('#ps-pv'),it=d.item;
     if(it?.cat==='camo')preview.show(pv,data.weapons.m16_zm??Object.values(data.weapons)[0],camos.camos.find(c=>c.id===it.data.camo));
     else if(it?.cat==='outfit'&&chars.characters.find(c=>c.id===it.data.character)?.icon){const ch=chars.characters.find(c=>c.id===it.data.character);pv.innerHTML=`<img src="${iconUrl(ch)}" alt="" style="height:100%;background:linear-gradient(135deg,${ch.color} 0 55%,${ch.accent} 55%)">`;}
     else if(it?.cat==='outfit'){const ch=chars.characters.find(c=>c.id===it.data.character);pv.innerHTML='';renderPortrait({...ch,type:'mannequin'},data).then(u=>{if(sel===entry.id)pv.innerHTML=`<img src="${u}" alt="" style="height:100%">`;}).catch(()=>{});}
     else pv.innerHTML=rewardThumb(entry.reward).replace('class="pv','class="pv big');
-    fillSwatches(el,cid=>camos.camos.find(c=>c.id===cid));
+    fillSwatches(el,cid=>camos.camos.find(c=>c.id===cid));fillModels(el);
+  }
+  // guns, melees, equipment and charms: a 3D picture from the page's thumbnail renderer (home.js) over the glyph
+  function fillModels(el){
+    if(!weaponThumb)return;
+    for(const t of el.querySelectorAll('[data-wthumb]'))weaponThumb(t.dataset.wthumb).then(u=>{if(u&&t.isConnected){t.textContent='';t.style.background=`url(${u}) center/contain no-repeat,radial-gradient(circle,#2a2a2a,#0a0a0a)`;}}).catch(()=>{});
   }
   const report=out=>{const names=(out.granted??[]).map(e=>describe(e.reward,{catalog,gums}).title);toast?.(out.major?`PAGE COMPLETE · ${names.join(' · ')}`:names.length?`Unlocked: ${names.join(' · ')}`:out.held?'Unlocked · held until you buy premium':'Unlocked');};
   root.onclick=e=>{
@@ -123,6 +129,6 @@ export const PASS_CSS=`
 .ps-ic{font-size:30px;font-weight:700;display:flex!important;flex-direction:column;align-items:center;justify-content:center}.ps-ic small{font-size:10px;letter-spacing:2px;color:inherit}
 .gumball{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff8,var(--c) 45%,#000 120%)}
 .ps-drawer{border:1px solid var(--line);background:#0b0b0bee;padding:14px;display:flex;flex-direction:column;gap:8px;position:sticky;top:12px}
-.ps-pv{height:180px;background:#0a0a0a;display:grid;place-items:center;overflow:hidden}.ps-pv .pv.big{height:100%;width:100%}.ps-drawer h3{margin:0;font-size:20px}.ps-drawer p{margin:0;font-size:12px;color:#cfc8b8}
+.ps-pv{height:180px;background:#0a0a0a;display:grid;place-items:center;overflow:hidden}.ps-pv .pv.big{height:180px;width:100%;display:grid;place-items:center}.ps-pv .pv.big svg{height:100%;width:auto;max-width:100%}.ps-drawer h3{margin:0;font-size:20px}.ps-drawer p{margin:0;font-size:12px;color:#cfc8b8}
 @media (max-width:1300px){.ps-body{grid-template-columns:minmax(0,1fr) 220px}.ps-drawer{grid-column:1/-1;position:static}}
 @media (max-width:760px){.ps-top{grid-template-columns:minmax(0,1fr) auto;gap:12px}.ps-top h1{font-size:22px;letter-spacing:2px;overflow-wrap:anywhere}.ps-tier{grid-column:1/-1}.ps-btns{grid-column:1/-1;align-items:stretch}.ps-body{grid-template-columns:minmax(0,1fr)}.ps-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ps-card.major .pv{height:120px}}`;

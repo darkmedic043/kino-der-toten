@@ -4,6 +4,7 @@ The user's requests (2026-10-18): first "add all 45 perks with their effects, bu
 
 - `reaper list` (held ones marked `*`, upgraded `**`), `reaper <id|name|all>`, `reaper up <id|all>` (the mod's upgraded "double buy" version), `reaper none`.
 - **Implemented** (sold for real, see the next section): Prismatic Punch, Dam-A-Nade, Magnet Margarita and Electric Cherry.
+- **Melon Pass Season 1 unlocks since 2026-11-08** (`soon` removed; terminal `unlock:"pass.s2.perk.<id>"`, research tracks open; pass.md Season 1): Stone Cold Stronghold, Victorious Tortoise, Zombshell and Tactiquilla Sangria. Before that:
 - **Coming soon** (built with research tracks, but not given out yet; see *Coming soon* below): Stone Cold Stronghold, Victorious Tortoise, Zombshell and Tactiquilla Sangria.
 - To switch one on for real later (as was done for those three): add it to the terminal's `PERKS` list (`mods/terminal-booth/desktop.js`) and/or a machine marker alias, and give it a drink in perks-plus `data.json`.
 
@@ -87,7 +88,9 @@ Magnet Margarita (user, 2026-10-19): "implements magnet margarita? havbe it be i
 
 - **Verified** (2026-10-19, Kino, GPU headless): a power-up spawned 600 away came to 90 and stopped; holding U and pushing the mouse up stored it (no Insta-Kill, gone from the ground); the wheel then showed "Stash full (1/1)" and DROP INSTA-KILL, which put it 110 ahead, not pulled. With Deep Pockets three were stored and a fourth refused; Double Dip dropped two; removing the perk spilled the rest. Co-op (host + client in one browser): the host pulled a power-up to the client (90 on the host, the client's copy following), the client stored it (gone on both, no Double Points) and dropped it back (spawned by the host). `test/reaper-pass.test.mjs` covers the pass slots, the track and the terminal.
 
-## Coming soon (built, not given out)
+## Coming soon (built, not given out)**Released 2026-11-08 (Melon Pass Season 1); this section is the pre-release record.**
+
+
 
 User request 2026-11-05: "build stone cold stronghold, victorious tortoise, zombshell, and Tactiquilla Sangria, build augments for them too, dont give them out to players yet, mark them as "coming soon", do the same for the gardener class".
 

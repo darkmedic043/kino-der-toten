@@ -376,7 +376,9 @@
     {"id": "s2.skulls", "name": "Skull Pile", "shop": "pass.s2.camo.skulls", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/skulls.jpg"},
     {"id": "s2.ameerga", "name": "Ameerga", "shop": "pass.s2.camo.ameerga", "pass": "s2", "challenge": "pass", "scale": 2, "mix": 0.95, "texture": "camos/s2/ameerga.jpg"},
     {"id": "s2.neonflame", "name": "Neon Flame", "shop": "pass.s2.camo.neonflame", "pass": "s2", "challenge": "pass", "scale": 1.5, "mix": 0.95, "frames": {"dir": "camos/s2/neonflame/", "count": 48, "ext": "jpg", "fps": 6.25}, "emit": 1.4},
-    {"id": "s2.directorscut", "name": "Director's Cut", "shop": "pass.s2.camo.directorscut", "pass": "s2", "challenge": "pass", "scale": 1.5, "mix": 0.95, "frames": {"dir": "camos/s2/directorscut/", "count": 16, "ext": "jpg", "fps": 8, "blend": false}, "emit": 1.6}
+    {"id": "s2.directorscut", "name": "Director's Cut", "shop": "pass.s2.camo.directorscut", "pass": "s2", "challenge": "pass", "scale": 1.5, "mix": 0.95, "frames": {"dir": "camos/s2/directorscut/", "count": 16, "ext": "jpg", "fps": 8, "blend": false}, "emit": 1.6},
+    {"id": "s2.counterfeit", "name": "Counterfeit", "shop": "pass.s2.camo.counterfeit", "pass": "s2", "challenge": "pass", "procedural": "counterfeit", "scale": 2, "mix": 0.95},
+    {"id": "s2.wax", "name": "Wax", "shop": "pass.s2.camo.wax", "pass": "s2", "challenge": "pass", "procedural": "wax", "scale": 2, "mix": 0.95}
   ],
   "_altNote": "alt: weapon id -> {challenge: replacement}, for guns that can't do a challenge (no headshots from a Thundergun blast, or from launchers and explosive bolts, whose kills are nearly all blasts); progress counts on the replacement",
   "alt": {

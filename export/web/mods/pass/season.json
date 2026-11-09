@@ -6,9 +6,9 @@
  "color": "#ff9a3d",
  "accent": "#7cd65a",
  "start": "2026-10-14",
- "end": "2026-12-14",
+ "end": "2026-11-07",
  "tierXp": 4000,
- "premiumPrice": 1000,
+ "premiumPrice": 2000,
  "tokenPrice": 150,
  "xp": {
   "kill": 10,

@@ -45,7 +45,7 @@
       "upgradeName": "Last Rites",
       "description": "Ring it to stop every zombie around you dead and turn them to you. Three tolls in time ring a Death Knell.",
       "hint": "Tap melee to ring, right mouse to slam, hold melee to draw",
-      "soon": true,
+      "unlock": "pass.s2.melee.gravebell",
       "base": "knife_ballistic_zm",
       "model": "mods/melee/grave_bell_view.glb",
       "worldModel": "mods/melee/grave_bell_world.glb", "thumbRoll": -60,

@@ -384,8 +384,7 @@
       "type": "conditional",
       "desc": "The next weapon from the Mystery Box will be a Wonder Weapon from your own box list.",
       "level": 999,
-      "pass": "s2",
-      "soon": true
+      "pass": "s2"
     },
     {
       "id": "time_out",
@@ -395,8 +394,7 @@
       "duration": 180,
       "desc": "Clears every zombie, normal and special, and ends the round. The next round holds off for 3 minutes.",
       "level": 999,
-      "pass": "s2",
-      "soon": true
+      "pass": "s2"
     },
     {
       "id": "phoenix_up",
@@ -406,8 +404,7 @@
       "coop": true,
       "desc": "Revives every downed teammate. They keep all of their perks. Co-op only.",
       "level": 999,
-      "pass": "s2",
-      "soon": true
+      "pass": "s2"
     },
     {
       "id": "profit_sharing",
@@ -420,8 +417,7 @@
       "radius": 750,
       "desc": "For 2 minutes a quarter of the points you earn also goes to nearby teammates, and theirs to you. Co-op only.",
       "level": 999,
-      "pass": "s2",
-      "soon": true
+      "pass": "s2"
     },
     {
       "id": "tactical_diffusion",
@@ -431,8 +427,7 @@
       "bonus": 2000,
       "desc": "The next Nuke you pick up doesn't go off: instead everyone gets 2000 points.",
       "level": 999,
-      "pass": "s2",
-      "soon": true
+      "pass": "s2"
     },
     {
       "id": "anywhere_but_here",
@@ -442,8 +437,7 @@
       "radius": 260,
       "desc": "Teleports you to a random spot in the open map. A concussive blast knocks nearby zombies away.",
       "level": 999,
-      "pass": "s2",
-      "soon": true
+      "pass": "s2"
     }
   ]
 }

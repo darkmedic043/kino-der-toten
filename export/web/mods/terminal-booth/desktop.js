@@ -94,17 +94,17 @@ export const PERKS = [
   { id: 'specialty_electriccherry', name: 'Electric Cherry', price: 2000, color: '#4fa8ff', badge: 'EC', icon: REAPER + 'electriccherry.webp',
     blurb: 'Reload with a kick.',
     effects: ['Starting a reload shocks and stuns the zombies around you for 1.5 s', 'The emptier the magazine, the bigger the burst and the harder it hits', '1.5 s cooldown'] },
-  // built, with research tracks, but COMING SOON (user, 2026-11-05): shown, never sold or handed out (perkUnlocked)
-  { id: 'specialty_stronghold', name: 'Stone Cold Stronghold', price: 3000, color: '#8a9aa8', badge: 'SH', icon: REAPER + 'stronghold.webp', soon: true,
+  // Season 1 Melon Pass perks (released 2026-11-08; COMING SOON from 2026-11-05 until then)
+  { id: 'specialty_stronghold', name: 'Stone Cold Stronghold', price: 3000, color: '#8a9aa8', badge: 'SH', icon: REAPER + 'stronghold.webp', unlock: 'pass.s2.perk.stronghold',
     blurb: 'Stand your ground.',
     effects: ['Stand still for 1 s and a ring forms under you', 'In the ring you build armour (20 a second, up to 150) that takes hits before your health', 'Leave the ring and the armour drains away'] },
-  { id: 'specialty_victorious', name: 'Victorious Tortoise', price: 2500, color: '#3a8a3a', badge: 'VT', icon: REAPER + 'victorious.webp', soon: true,
+  { id: 'specialty_victorious', name: 'Victorious Tortoise', price: 2500, color: '#3a8a3a', badge: 'VT', icon: REAPER + 'victorious.webp', unlock: 'pass.s2.perk.victorious',
     blurb: 'Slow and steady.',
     effects: ['A raised shield blocks hits from every side, not just the front', 'When your shield breaks it explodes, hurting the zombies around you'], note: 'Needs a shield.' },
-  { id: 'specialty_zombshell', name: 'Zombshell', price: 3000, color: '#7ab83a', badge: 'ZS', icon: REAPER + 'zombshell.webp', soon: true,
+  { id: 'specialty_zombshell', name: 'Zombshell', price: 3000, color: '#7ab83a', badge: 'ZS', icon: REAPER + 'zombshell.webp', unlock: 'pass.s2.perk.zombshell',
     blurb: 'Leave them something sticky.',
     effects: ['Bullet hits sometimes (8%) leave a green field where the zombie stood, for 6 s', 'Zombies in a field move at 40% speed and take 30% more damage'] },
-  { id: 'specialty_tactiquilla', name: 'Tactiquilla Sangria', price: 2500, color: '#c03a5a', badge: 'TS', icon: REAPER + 'tactiquilla.webp', soon: true,
+  { id: 'specialty_tactiquilla', name: 'Tactiquilla Sangria', price: 2500, color: '#c03a5a', badge: 'TS', icon: REAPER + 'tactiquilla.webp', unlock: 'pass.s2.perk.tactiquilla',
     blurb: 'Run and gun.',
     effects: ['Fire while sprinting', '15% of your shots put the round back in the magazine', 'Kills close together pay 50 points for each extra kill'] },
 ];

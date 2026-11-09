@@ -1,5 +1,6 @@
-// BO3 Trip Mine (lethal) and Smoke Grenade (tactical), 2026-11-05. Both are COMING SOON (`soon` on the equipment and the
-// research items): nothing hands them out (box, wall buys, gums, loot); the cheat `bo3gear trip|smoke` gives them for tests.
+// BO3 Trip Mine (lethal) and Smoke Grenade (tactical), 2026-11-05. Melon Pass Season 1 rewards since 2026-11-08 (COMING SOON
+// before): owned ones join the player's Mystery Box list (progression.json unlock, progression mod giveWeapon); the cheat
+// `bo3gear trip|smoke` gives them for tests.
 // Models and sounds come from the user's own BO3 install (.tools/build_bo3_equipment.py, git-ignored `models/`, `sounds/`):
 // without them prepare() registers nothing.
 //
@@ -29,9 +30,9 @@ export async function prepare(data) {
   const have = await Promise.all([TRIP, SMOKE].map(u => fetch(u, { method: 'HEAD' }).then(r => r.ok, () => false)));
   if (!have.every(Boolean)) return data;
   data.equipment ??= {};
-  data.equipment.tripmine_zm = { id: 'tripmine_zm', name: 'Trip Mines', worldModel: TRIP, standInModel: TRIP, lethal: true, soon: true,
+  data.equipment.tripmine_zm = { id: 'tripmine_zm', name: 'Trip Mines', worldModel: TRIP, standInModel: TRIP, lethal: true,
     explosionRadius: 190, explosionInnerDamage: 500, explosionOuterDamage: 120 };
-  data.equipment.smoke_zm = { id: 'smoke_zm', name: 'Smoke Grenades', worldModel: SMOKE, standInModel: SMOKE, tactical: true, soon: true };
+  data.equipment.smoke_zm = { id: 'smoke_zm', name: 'Smoke Grenades', worldModel: SMOKE, standInModel: SMOKE, tactical: true };
   return data;
 }
 
@@ -358,14 +359,14 @@ export default async function setup(api) {
 
   kino.bo3eq = { flying: () => flying, mines: () => mines, wires: () => wires, clouds: () => clouds };   // debug handle (tests)
 
-  // cheat: give them while they are coming soon
+  // cheat: give them (tests)
   (function addCheat(tries = 0) {
     const ch = kino.cheats;
     if (!ch?.addCommand) { if (tries < 20) setTimeout(() => addCheat(tries + 1), 500); return; }
-    ch.addCommand('bo3gear', { usage: 'bo3gear trip|smoke', text: 'Give the BO3 Trip Mines or Smoke Grenades (coming soon)', cheat: true, run: args => {
+    ch.addCommand('bo3gear', { usage: 'bo3gear trip|smoke', text: 'Give the BO3 Trip Mines or Smoke Grenades', cheat: true, run: args => {
       const what = String(args?.[0] ?? '').toLowerCase();
-      if (what.startsWith('trip')) { session.giveTrips(); return `Trip Mines x${session.trips} (coming soon)`; }
-      if (what.startsWith('smoke')) { if (!kino.tactical?.give) return 'No tactical slot on this map'; kino.tactical.give('smoke_zm'); return 'Smoke Grenades (coming soon)'; }
+      if (what.startsWith('trip')) { session.giveTrips(); return `Trip Mines x${session.trips}`; }
+      if (what.startsWith('smoke')) { if (!kino.tactical?.give) return 'No tactical slot on this map'; kino.tactical.give('smoke_zm'); return 'Smoke Grenades'; }
       return 'Usage: bo3gear trip|smoke';
     } });
   })();
