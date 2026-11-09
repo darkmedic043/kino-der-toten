@@ -21,6 +21,7 @@ export async function prepare(data){
       // Never Pack-a-Punchable in BO1/BO2 (a power-up there): our own upgrade, with a faster spin-up (see setup).
       def.upgrade??={name:'The Reaper',clipSize:750,maxAmmo:1500,startAmmo:1500,damage:900,minDamage:550,range:2200,headMultiplier:2.5,reloadTime:2.6,reloadEmptyTime:2.6};
     }
+    if(id==='microwavegundw_zm')def.progressAs='microwavegun_zm';   // one gun in the menus: the Zap Guns' kills and camo are the Wave Gun's (weapon-levels)
     data.weapons[id]=def;
   }
   data.boxPool=[...new Set([...(data.boxPool??[]),'microwavegun_zm','minigun_zm'])];

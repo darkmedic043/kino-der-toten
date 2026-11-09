@@ -88,6 +88,12 @@ export class ViewWeapon {
       // akimbo Atlas's authored shot flips the gun 25° and floats it back down over half a second).
       if(li&&ri){
         leftBones=new Set(li.bones.map(b=>b.name));for(const b of ri.bones)leftBones.delete(b.name);
+        // A right idle that holds both arms (Moon's Zap Guns: only tag_brass1 was left, so the right gun's fire and
+        // reload let the left arm sag to its bind pose and the left reload moved nothing, 2026-11-09): the left gun's
+        // bones are then the ones its own clips move and the right gun's fire/reload clips don't.
+        if(leftBones.size<li.bones.length/4){
+          const names=(m,keys)=>keys.flatMap(k=>m.get(k)?.bones.map(b=>b.name)??[]),own=new Set(names(right,['fireAnim','lastShotAnim','reloadAnim','reloadEmptyAnim']));
+          leftBones=new Set(names(left,['idleAnimLeft','fireAnimLeft','lastShotAnimLeft','reloadAnimLeft','reloadEmptyAnimLeft']).filter(n=>!own.has(n)));}
         const only=(clip,keep,name)=>({...clip,name,bones:clip.bones.filter(b=>keep(b.name))}),fire=/^(ads)?(fire|lastShot)Anim$/i;
         const soften=(clip,k)=>k==null||k===1?clip:{...clip,bones:clip.bones.map(b=>({...b,
           ...(b.pos&&{pos:{...b.pos,values:b.pos.values.map((v,i)=>b.pos.values[i%3]+(v-b.pos.values[i%3])*k)}}),

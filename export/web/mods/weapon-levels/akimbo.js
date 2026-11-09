@@ -6,6 +6,9 @@
 
 // pair -> single gun (imported pairs also say so in their def: akimboOf, .tools/build_bo3_weapons.py AKIMBO_OF)
 export const AKIMBO_OF = { cz75dw_zm: 'cz75_zm', aw_atlas45_dw: 'aw_atlas45', aw_m1_irons_dw: 'aw_m1_irons' };
+// a gun's other form -> the gun the menus list (2026-11-09: the Zap Guns are the Wave Gun split, def.progressAs in
+// mods/moon-weapons): its old saves merge the same way, without the Akimbo attachment
+export const FORM_OF = { microwavegundw_zm: 'microwavegun_zm' };
 // fields that stay the single gun's
 const KEEP = new Set(['id', 'baseId', 'upgrade', 'akimbo', 'akimboOf', 'noBox', 'statAttachments', 'mounts', 'attachAnims', 'gunsmith',
   'price', 'hideTags', 'camo', 'weaponClass', 'rarity', 'attachment', 'attachments', 'mounted', 'bo3', 'modWeapon', 'glow']);
@@ -63,10 +66,11 @@ function walk(o, from, to) {
 }
 // raw: a stored value (JSON text) → the migrated text, or null when it never mentions a pair
 export function mergeAkimboSaves(key, raw) {
-  if (!raw || !Object.keys(AKIMBO_OF).some(id => raw.includes(id))) return null;
+  const all = { ...AKIMBO_OF, ...FORM_OF };
+  if (!raw || !Object.keys(all).some(id => raw.includes(id))) return null;
   let o; try { o = JSON.parse(raw); } catch { return null; }
-  for (const [from, to] of Object.entries(AKIMBO_OF)) {
-    const l = o?.loadout, carried = l && Object.values(l).includes(from);
+  for (const [from, to] of Object.entries(all)) {
+    const l = o?.loadout, carried = l && AKIMBO_OF[from] && Object.values(l).includes(from);
     walk(o, from, to);
     if (carried && key === 'kino.mods.progression') { o.attachments ??= {}; o.attachments[to] = [...new Set([...(o.attachments[to] ?? []), 'akimbo'])]; }
   }

@@ -43,7 +43,7 @@ export default async function setup(api){
   // What each gun hides out of the box (base and Pack-a-Punched), before any attachment
   const stockHidden=new Map(Object.entries(data.weapons).map(([id,d])=>[id,{base:new Set(d?.hideTags??[]),up:new Set(d?.upgrade?.hideTags??[])}]));
   // attachments, plus each gun's equipped camo id on its definition (read by third person, co-op and the box)
-  const apply=()=>{applyAttachments(cat,data.weapons,profile);for(const [id,d] of Object.entries(data.weapons))if(d&&typeof d==='object')d.camo=equippedCamo(cats,profile,id,data.weapons)?.id;};
+  const apply=()=>{applyAttachments(cat,data.weapons,profile);for(const [id,d] of Object.entries(data.weapons))if(d&&typeof d==='object')d.camo=equippedCamo(cats,profile,data.weapons[d.progressAs]?d.progressAs:id,data.weapons)?.id;};
   const camoById=id=>id?camoLookup(cats,id)??null:null;   // camos.json, or a prestige camo (pr1/pr2/pr3:<gun>)
   await loadPrestigeRules();
   apply();
@@ -154,9 +154,11 @@ export default async function setup(api){
   const lastKill=new Map(),crowds=new Map();
   host.on('kill',({enemy,head,melee,remote})=>{
     if(remote||(melee&&!data.weapons[session.weapon?.id]?.meleeXp)||cheating()||!session.weapon)return;   // (a melee weapon's own swings count for it: the Grave Bell)
-    const hit=lastHit.get(enemy),cause=hit?.cause,id=hit?.id&&data.weapons[hit.id]?hit.id:session.weapon.id,def=data.weapons[id];if(!def)return;
-    const extra=def.killCauses??KILL_CAUSES[def.baseId??id]??KILL_CAUSES[id]??[];
-    if(!(GUN_CAUSES.has(cause)||extra.includes(cause)||(cause==='explosion'&&def.projectileSpeed>0)))return;
+    const hit=lastHit.get(enemy),cause=hit?.cause,gid=hit?.id&&data.weapons[hit.id]?hit.id:session.weapon.id,gdef=data.weapons[gid];if(!gdef)return;
+    const extra=gdef.killCauses??KILL_CAUSES[gdef.baseId??gid]??KILL_CAUSES[gid]??[];
+    if(!(GUN_CAUSES.has(cause)||extra.includes(cause)||(cause==='explosion'&&gdef.projectileSpeed>0)))return;
+    // a gun's other form levels the gun the loadout lists (def.progressAs: the Zap Guns count for the Wave Gun)
+    const id=data.weapons[gdef.progressAs]?gdef.progressAs:gid,def=data.weapons[id];
     const now=performance.now()/1000,multi=now-(lastKill.get(id)??-9)<1.5;lastKill.set(id,now);
     // crowd kills: the 3rd and later kill inside a 1.5 s chain (the camo swap for guns that can't headshot)
     const cr=crowds.get(id),run=cr&&now-cr.t<1.5?cr.n+1:1;crowds.set(id,{t:now,n:run});const crowd=run>=3;
@@ -189,7 +191,7 @@ export default async function setup(api){
   const hud=document.createElement('div');hud.id='weapon-level';hud.innerHTML='<span></span><i><b></b></i>';document.body.append(hud);
   let hudKey='';
   function renderHud(){
-    const id=session.weapon?.id,def=data.weapons[id];
+    const sid=session.weapon?.id,id=data.weapons[data.weapons[sid]?.progressAs]?data.weapons[sid].progressAs:sid,def=data.weapons[id];
     if(!def||!available(cat,def,id).length){hud.style.display='none';hudKey='';return;}
     const p=weaponProgress(profile,id),cap=maxLevel(cat,def,id);
     hud.style.display='';hud.querySelector('span').textContent='WPN LV '+p.level+(p.level>=cap?' MAX':'');
