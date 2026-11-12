@@ -17,6 +17,7 @@ import { prepareDetail, applyDetail } from '../../map-detail.js';
 import { metalLook } from '../lighting/metal-look.js';
 import { floatingDebris } from '../fx/floating-debris.js';
 import { mergeProps, instanceProps } from './merge-props.js';
+import { carvedDecals } from './carved.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -55,6 +56,7 @@ export default async function setup(api) {
     for (const x of s.flags) if (x.startsWith('zone:')) zones.add(x.slice(5));
     return zones;
   };
+  if (world.root) carvedDecals(world.root, api.scene);   // before the props are merged: the nodes it drops must not be instanced
   if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes); }
   // the map nodes this mod moves (Ragnarok parts, levers, the crate lid, clock hands, floaters, Skadi, the claws, the
   // astroglobe...) set position/rotation and call updateMatrixWorld. The world's optimizeStaticScene turns every map
