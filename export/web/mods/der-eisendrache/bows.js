@@ -46,6 +46,7 @@ const SOULS = 20, PAINT_SPOTS = ['cannon', 'clock', 'hall', 'living'];
 const V = (p, r, h = 120) => ({ p, r, h });
 const inV = (p, v) => Math.hypot(p.x - v.p.x, p.z - v.p.z) < v.r && Math.abs(p.y - v.p.y) < v.h;
 const near = (p, t, r) => p.distanceTo(t) < r;
+const BEACON_R = 230;   // a hit on a storm beacon: its wood pyre (180 wide, 145 tall round the point) or the ground beside it
 const Q = {
   storm: { name: 'Storm Bow', color: 0x7fd0ff, arrow: W(-137, 1927, 952), reforge: W(-127, 1941, 952), pedestal: W(-1358.7, 2424.6, 218),
     steps: ['beacons', 'wallrun', 'batteries', 'reforge'],
@@ -85,7 +86,7 @@ const Q = {
 };
 const STATUE = V(W(-1192, 2256, 248), 520, 160);
 const HINT = {
-  storm: { beacons: 'Shoot the three beacons far out from the castle', wallrun: 'Wall-run through all five undercroft triggers without landing (low gravity)',
+  storm: { beacons: 'Shoot the three beacon pyres far out from the castle: each one catches fire', wallrun: 'Wall-run through all five undercroft triggers without landing (low gravity)',
     batteries: 'Fill the three storm batteries with kills, then from each fire a fully drawn arrow at a beacon', reforge: 'Reforge the arrow on the roof' },
   rune: { obelisk: 'Shoot the obelisk by the rocket pad just after a rocket test fire', circles: 'Shoot the runic circles while flying off a launch pad, then charge each with kills standing in it',
     clock: 'Turn the clock in the clock tower', golf: 'Magma golf: from the pool, land arrows toward the fireplace the wheel shows', fireplace: 'Take the magma from the fireplace', reforge: 'Reforge the arrow on the roof' },
@@ -427,8 +428,8 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     for (const el of ['storm', 'rune', 'demon']) if (st[el].stage === 'idle' && near(p, Q[el].start, Q[el].startR)) sync.act('bqStart', { el });
     // the owner's quest targets
     const step = el => owner(el) ? stepOf(el) : null;
-    if (step('storm') === 'beacons') Q.storm.beacons.forEach((b, k) => { if (near(p, b, 150) && !st.storm.d.lit?.has(k)) sync.act('bqHit', { el: 'storm', k }); });
-    if (step('storm') === 'batteries' && sh?.full && sh.battery) Q.storm.beacons.forEach((b, k) => { if (near(p, b, 150)) sync.act('bqHit', { el: 'storm', what: 'beacon', k, battery: sh.battery }); });
+    if (step('storm') === 'beacons') Q.storm.beacons.forEach((b, k) => { if (near(p, b, BEACON_R) && !st.storm.d.lit?.has(k)) sync.act('bqHit', { el: 'storm', k }); });
+    if (step('storm') === 'batteries' && sh?.full && sh.battery) Q.storm.beacons.forEach((b, k) => { if (near(p, b, BEACON_R)) sync.act('bqHit', { el: 'storm', what: 'beacon', k, battery: sh.battery }); });
     if (step('rune') === 'obelisk' && near(p, Q.rune.obelisk, 130) && session.time < magmaUntil) sync.act('bqHit', { el: 'rune', what: 'obelisk' });
     if (step('rune') === 'circles' && flung) for (const c of Q.rune.circles) if (near(p, c.trig, 110)) sync.act('bqHit', { el: 'rune', what: 'circle', k: c.id });
     if (step('rune') === 'golf') { const pool = golfPool(); if (pool && inV(from, pool)) { const g = world.closest?.(p, { x: 40, y: 140, z: 40 }); sync.act('bqHit', { el: 'rune', what: 'golf', p: sync.a(g ?? p) }); } }
@@ -474,6 +475,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   function soul(from, to, color) { const m = glow(from.clone().add(new THREE.Vector3(0, 40, 0)), color, 22); souls.push({ m, from: m.position.clone(), to: to.clone().add(new THREE.Vector3(0, 25, 0)), t: 0 }); }
   const want = new Map(), add = (id, p, color, size = 40, extra) => want.set(id, { p, color, size, ...extra });
   let skadi = null;
+  const beaconFire = Q.storm.beacons.map(b => b.clone().add(new THREE.Vector3(0, 10, 0))), beaconGlow = Q.storm.beacons.map(b => b.clone().add(new THREE.Vector3(0, 200, 0)));   // among the pyre's logs (the beacon point is its middle), in its flames
   host.on('update', dt => {
     if (!dt) return;
     want.clear(); const t = performance.now() / 1000;
@@ -485,9 +487,15 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       if (bow) { bow.visible = s.stage === 'ready' || s.stage === 'spawned'; if (bow.visible) { bow.position.copy(q.pedestal).add(new THREE.Vector3(0, 48 + Math.sin(t * 2) * 3, 0)); bow.rotation.set(0, t * .6, Math.PI / 2); } }
       if (loose) add('loose:' + el, looseAt(el).clone().add(new THREE.Vector3(0, 12, 0)), q.color, 45, { pulse: true });
       if (s.stage === 'souls' || s.stage === 'ready') add('ped:' + el, q.pedestal.clone().add(new THREE.Vector3(0, 40, 0)), q.color, 30 + 40 * (s.stage === 'ready' ? 1 : s.souls / SOULS));
+      // the storm beacons' pyres burn from the arrow that lights them to the end of the match, taller once a battery arrow
+      // has charged them (user 2026-11-12: "the bonfires for the storm bow doesnt seem to work": a lit one only had a
+      // 70-unit glow, 3000-5000 units from where it is shot)
+      if (el === 'storm') { const at = s.stage === 'idle' ? -1 : s.stage === 'steps' ? s.step : 9;
+        q.beacons.forEach((b, k) => { const lit = at > 0 || (at === 0 && !!s.d.lit?.has(k)), ch = at > 2 || (at === 2 && !!s.d.charged?.has(k));
+          bonfire('beacon:' + k, lit ? (ch ? 1 : .4) : -1, dt, beaconFire[k], null, 0, 420);
+          if (lit) add(`beacon:${k}`, beaconGlow[k], ch ? 0xffffff : q.color, ch ? 260 : 150, { pulse: ch }); }); }
       if (!step) continue;
       if (el === 'storm') {
-        if (step === 'beacons' || step === 'batteries') q.beacons.forEach((b, k) => { const lit = s.d.lit?.has(k) || step === 'batteries', ch = s.d.charged?.has(k); if (lit) add(`beacon:${k}`, b, ch ? 0xffffff : q.color, ch ? 140 : 70, { pulse: ch }); });
         if (step === 'wallrun' && my) q.wallrun.forEach((w, k) => add(`wr:${k}`, w, run.hit.has(k) ? 0xffffff : q.color, run.hit.has(k) ? 60 : 30, { opacity: run.hit.has(k) ? 1 : .35 }));
         if (step === 'batteries') for (const b of q.batteries) { const n = s.d.kills[b.id] ?? 0; if (n) add(`bat:${b.id}`, b.at.clone().add(new THREE.Vector3(0, 30, 0)), q.color, 20 + n * 10, { pulse: n >= 5 && !s.d.used.has(b.id) }); }
       }
@@ -602,12 +610,19 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     streak.frustumCulled = false; streak.renderOrder = 5; t.g.position.set(10, 0, 0); streak.position.set(6, 0, 0); g.add(streak, t.g); return { g, t, streak, p: null, puff: 0, kind: kindOf(el) };
   }
   function warmFlames() { const r = flightRig('base'), v = torch('base', 12, 2); const w = new THREE.Group(); w.add(r.g, v.g); host.warmObjects?.push(w); }
+  function loft(from, aim, speed, g) {   // the low arc that passes through `aim` (null when it is out of reach)
+    const d = aim.clone().sub(from), h = d.y; d.y = 0; const x = d.length(), s2 = speed * speed, disc = s2 * s2 - g * (g * x * x + 2 * h * s2);
+    if (x < 1 || disc < 0) return null; const th = Math.atan2(s2 - Math.sqrt(disc), g * x); return d.multiplyScalar(Math.cos(th) / x).setY(Math.sin(th));
+  }
   function launch(pr, k) {   // re-aim the engine's shot: from beside the bow at what the crosshair is on, at the draw's speed and drop
     const tier = cost(k) - 1, f = FLIGHT[tier], dir = pr.velocity.clone().addScaledVector(UP, -(pr.def.projectileSpeedUp ?? 0)).normalize(), eye = camera.position;
     const hit = world.raycast?.(new THREE.Ray(eye.clone(), dir), 0, 6000), aim = eye.clone().addScaledVector(dir, Math.max(250, hit?.distance ?? 6000));
     const from = eye.clone().addScaledVector(dir, 12).addScaledVector(tmpV.crossVectors(dir, UP).normalize(), 3).addScaledVector(UP, -5), d0 = from.clone().sub(eye), len = d0.length();
     if (world.raycast?.(new THREE.Ray(eye.clone(), d0.normalize()), 0, len + 4)) from.copy(eye);   // against a wall: from the eye
-    const v = aim.sub(from).normalize(); pr.mesh.position.copy(from); pr.mesh.quaternion.setFromUnitVectors(AX, v); pr.velocity.copy(v).multiplyScalar(f.speed); pr.gravity = f.gravity; pr.def.impactExplode = true;
+    // a storm beacon in the crosshair: the arrow is lofted so its drop lands where the crosshair is (the pyres stand
+    // 2000-5000 units out: a quick arrow falls 300-600 short of them, a part-drawn one about 200)
+    const sq = owner('storm') ? stepOf('storm') : null, far = (sq === 'beacons' || sq === 'batteries') && Q.storm.beacons.some(b => near(aim, b, BEACON_R + 60)) ? loft(from, aim, f.speed, f.gravity) : null;
+    const v = far ?? aim.sub(from).normalize(); pr.mesh.position.copy(from); pr.mesh.quaternion.setFromUnitVectors(AX, v); pr.velocity.copy(v).multiplyScalar(f.speed); pr.gravity = f.gravity; pr.def.impactExplode = true;
     pr.bow = { el: elOf(pr.def.id), tier };
   }
   const gunTorch = new WeakMap();
@@ -656,23 +671,26 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   // Driven every frame; lit < 0 puts it out. m: the ring's plane (a node's world matrix) or null for a spot at `at`.
   // The flames are rebuilt only when k changes (lit, a kill, put out)
   const pyre = createFlames({ scene, renderer: api.renderer, low: (settings.graphics ?? 2) < 1, name: 'castle_bonfires' }); pyre.build();
+  // the storm beacons' pyres are lit from 2000-5000 units away and the flames fade out by 2600: a second set that
+  // doesn't (the same shaders, so no new programs; its stub instances are in the load-time warm-up like the first's)
+  const farPyre = createFlames({ scene, renderer: api.renderer, low: (settings.graphics ?? 2) < 1, name: 'castle_beacons', fade: 30000 }); farPyre.build();
   const fires = new Map(); let pyreDirty = false;
-  function bonfire(id, lit, dt, at, m = null, R = 0) {
-    let f = fires.get(id); if (!f) fires.set(id, f = { src: null, ph: Math.random() * 9, k: -1, list: [] });
+  function bonfire(id, lit, dt, at, m = null, R = 0, big = 0) {
+    let f = fires.get(id); if (!f) fires.set(id, f = { src: null, ph: Math.random() * 9, k: -1, list: [], sys: big ? farPyre : pyre });
     const pool = kino.lighting?.sources, k = lit < 0 ? -1 : Math.min(1, lit);
     if (k !== f.k) {
-      f.k = k; for (const x of f.list) { const j = pyre.fires.indexOf(x); if (j >= 0) pyre.fires.splice(j, 1); } f.list.length = 0; pyreDirty = true;
+      const sys = f.sys; f.k = k; for (const x of f.list) { const j = sys.fires.indexOf(x); if (j >= 0) sys.fires.splice(j, 1); } f.list.length = 0; pyreDirty = true;
       if (k >= 0 && R) { const N = 14, c = m ? new THREE.Vector3().setFromMatrixPosition(m) : at;
         for (let i = 0; i < N; i++) { const a = i / N * 6.283 + f.ph, p = new THREE.Vector3(Math.cos(a) * R, 2, Math.sin(a) * R); if (m) p.applyMatrix4(m); else p.add(at);
           f.list.push(pyre.add(p, 'torch', { size: 30 + 46 * k, sub: 2, embers: 3, smoke: 0, glow: 1.5 })); }
         if (k >= 1) f.list.push(pyre.add(c.clone().addScaledVector(UP, 2), 'fire', { size: 130, sub: 6, embers: 22 }));   // charged: a pyre in the middle
-      } else if (k >= 0) f.list.push(pyre.add(at.clone(), 'fire', { size: 46 + 44 * k }));
+      } else if (k >= 0) f.list.push(sys.add(at.clone(), 'fire', big ? { size: big * (.75 + .6 * k), sub: 7, embers: Math.round(18 + 16 * k), smoke: 4, glow: 2.6 } : { size: 46 + 44 * k }));   // big: a pyre seen from far off
     }
     if (k < 0) { if (f.src) { const j = pool?.indexOf(f.src) ?? -1; if (j >= 0) pool.splice(j, 1); f.src = null; } return; }
-    if (!f.src && pool) { f.src = { position: at.clone().addScaledVector(UP, 45), color: new THREE.Color(0xff6a1a), intensity: 3, radius: 380 + R * 1.5, kind: 'solid', dynamic: true, cap: 2000, weight: 1 }; pool.push(f.src); }
+    if (!f.src && pool) { f.src = { position: at.clone().addScaledVector(UP, 45), color: new THREE.Color(0xff6a1a), intensity: 3, radius: 380 + R * 1.5 + big * 2, kind: 'solid', dynamic: true, cap: 2000, weight: 1 }; pool.push(f.src); }
     if (f.src) f.src.intensity = (2.4 + 3 * k) * fireFlicker(performance.now() / 1000, f.ph);
   }
-  host.on('update', dt => { if (pyreDirty) { pyreDirty = false; pyre.build(); } if (dt) pyre.update(dt, { fog: scene.fog }); });
+  host.on('update', dt => { if (pyreDirty) { pyreDirty = false; pyre.build(); farPyre.build(); } if (dt) { pyre.update(dt, { fog: scene.fog }); farPyre.update(dt, { fog: scene.fog }); } });
   host.on('reset', () => { for (const id of fires.keys()) bonfire(id, -1, 0); });
 
   // ---- element effects (upgraded bows): shown everywhere, damage on the host credited to the shooter -------------------

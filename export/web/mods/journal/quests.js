@@ -56,7 +56,7 @@ export const JOURNAL = [
     { id: 'storm', name: 'Storm Bow', kind: 'BOW UPGRADE', progress: L => bowStage(L, 'storm'), steps: [
       { title: 'Start the quest', how: 'Shoot the weather vane on top of the clock tower with Wrath of the Ancients.', where: L => n(site(L, 'storm').start) },
       ARROW('storm'),
-      { title: 'The beacons', how: 'Shoot the three beacons far out from the castle (the wall, the cliff, the rocket pad).', where: L => (site(L, 'storm').beacons ?? []).filter((b, k) => !bowD(L, 'storm').lit?.includes(k)) },
+      { title: 'The beacons', how: 'Shoot the three beacon pyres (stacks of logs) far out from the castle: the wall, the cliff, the rocket pad. Each one catches fire when hit; any draw reaches them.', where: L => (site(L, 'storm').beacons ?? []).filter((b, k) => !bowD(L, 'storm').lit?.includes(k)) },
       { title: 'Wall-run', how: 'While the undercroft\'s gravity is low, wall-run through its five triggers without landing.', where: L => site(L, 'storm').wallrun ?? [] },
       { title: 'The batteries', how: 'Fill the three storm batteries (gatehouse, clock tower, rocket pad) with 5 kills each; then stand on a filled battery and fire a fully drawn arrow at a beacon, once per beacon.', where: L => (site(L, 'storm').batteries ?? []).filter(b => !bowD(L, 'storm').used?.includes(b.id)).map(b => b.at) },
       { title: 'Reforge', how: 'Reforge the arrow on the roof.', where: L => n(site(L, 'storm').reforge) },
