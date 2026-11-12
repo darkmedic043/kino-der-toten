@@ -8,6 +8,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { init, NavMeshQuery, exportNavMesh, importNavMesh } from '@recast-navigation/core';
 import { generateTiledNavMesh } from '@recast-navigation/generators';
 import { CollisionWorld } from './collision-world.js';
+import { propCollision } from './prop-collision.js';
 import { optimizeStaticScene } from './scene-optimizer.js';
 import { loadModel } from './animation.js';
 import { assetManager } from './runtime-assets.js';
@@ -111,6 +112,8 @@ export class CustomWorld {
     const meshes=[];root.traverse(o=>{if(o.isMesh&&!o.userData.marker)meshes.push(o);});
     const dedicated=meshes.filter(o=>COLLISION_NAME.test(rawName(o))),playerOnly=meshes.filter(o=>PLAYER_COLLISION_NAME.test(rawName(o))),navOnly=meshes.filter(o=>NAV_ONLY_NAME.test(rawName(o))),clipOnly=meshes.filter(o=>CLIP_NAME.test(rawName(o)));
     for(const o of [...dedicated,...playerOnly,...navOnly,...clipOnly])o.visible=false;
+    // Map entry propCollision {box, mesh, minHeight}: instanced props that stop the player and bullets (prop-collision.js)
+    if(entry.propCollision){const extra=propCollision(root,entry.propCollision);if(extra)playerOnly.push(extra);}
     root.traverse(o=>{if(o.userData.hidden)o.visible=false;});   // builder props hidden until a mod shows them (kept out of the batching, which would drop their names)
     // Overlay layers (BO3 ports' _blend surfaces and decals: see-through, drawn over the surface below): a fixed draw
     // order per material (sorted by distance, stacked layers swapped as the camera moved and flickered) and a polygon

@@ -12,6 +12,9 @@ import { createSync } from './sync.js';
 import { setupTab } from './tab.js';
 import { setupWeather } from './weather.js';
 import { fireFlicker } from '../fx/flames.js';
+import { loadMapLight } from '../lighting/map-volume.js';
+import { metalLook } from '../lighting/metal-look.js';
+import { floatingDebris } from '../fx/floating-debris.js';
 import { mergeProps, instanceProps } from './merge-props.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
@@ -116,7 +119,7 @@ export default async function setup(api) {
   const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api), traps = setupTraps(api);
   const craft = setupCraftables(api, { traps, pads }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav, pads, traps }), ee = setupEE(api, { bows, traps }), side2 = setupSide2(api, { bows }), side = setupSide(api, { lowgrav, side2 });
   useGameAudio(api.audio);
-  setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupRocketCollision(api); setupCryptBoards(api);
+  setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupDebris(api); setupRocketCollision(api); setupCryptBoards(api);
   setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 });   // the Tab scoreboard's tiles
   const bounds = setupBounds(api, { lowgrav });   // after the pads: it watches their flights
   await bows?.ready;   // the spirit wolves too
@@ -396,24 +399,33 @@ function setupPads(api) {
 // (on the GTX 1660 Ti 10 cost ~5 FPS; a fast GPU barely notices), and its size is in the shaders, so it only changes with
 // the setting (one recompile then). Lamps in view are picked over ones behind you, and a light fades out before it moves
 // to another lamp, so lamps don't pop on and off as you walk.
+// Since 2026-11-12 the lamps' light is baked (light.json + light.bin.gz, .tools/bake-map-light.mjs; lighting.md): every lamp
+// lights its surroundings at any distance, through no walls, at no per-light cost, so nothing pops in. The pool is then
+// only an accent on the nearest few lamps (ACCENT of a lamp's level, faded out by 900 units): specular glints and the
+// fires' flicker. Without the bake files (or with ?noBake) the old full pool runs.
+const ACCENTS_BY_QUALITY = [2, 3, 4, 6], ACCENT = .3;
 const POOL_BY_QUALITY = [4, 6, 10, 16], LAMP = { color: 0xffac62, bulb: 0xffd9a8, on: 3000, off: 2000, range: 620, decay: 1.4 };
-const poolSize = () => POOL_BY_QUALITY[Math.max(0, Math.min(3, Math.round(settings.graphics ?? 2)))];
-function setupLook({ scene, world, session, host, camera }) {
+const poolSize = baked => (baked ? ACCENTS_BY_QUALITY : POOL_BY_QUALITY)[Math.max(0, Math.min(3, Math.round(settings.graphics ?? 2)))];
+function setupLook(api) {
+  const { scene, world, session, host, camera } = api;
+  metalLook(world.root);
   const kids = scene.children;
   const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
   const [key, fill] = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
   // lamps carry extras.kind since map v=29 ('fire': candles, torches, fire pits, chandeliers; 'electric'): a fire's light
   // flickers and sits warmer; a bulb's is steady and paler
   const lamps = [], fireAt = new Map(); world.root?.traverse(o => { if (/^CASTLE_LAMP_/.test(o.name)) { const p = o.getWorldPosition(new THREE.Vector3()); lamps.push(p); if (o.userData.kind !== 'electric') fireAt.set(p, Math.random() * 6.2832); if (!o.children.length) o.visible = false; } });   // (empty marker nodes hidden once read: the renderer walked 359 of them a frame)
-  const pool = [];
+  const pool = []; let baked = null;
   const resize = () => {
-    const n = Math.min(poolSize(), lamps.length);
+    const n = Math.min(poolSize(baked), lamps.length);
     while (pool.length > n) pool.pop().removeFromParent();
     while (pool.length < n) { const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); Object.assign(l.userData, { fire: null, lamp: null, level: 0 }); scene.add(l); pool.push(l); }
     timer = 0;
   };
-  let timer = 0; resize();
-  onSettingsChange((_, k) => { if (k === 'graphics' || k === null) resize(); });
+  // the lights are made once the bake has (or hasn't) loaded: still during loading, before the shader warm-up
+  let timer = 0;
+  (host.pending ??= []).push(loadMapLight(api, { skyFloor: .3, sunFloor: .12, strength: 1, powerOff: .7 }).catch(() => null).then(light => { baked = light; resize(); }));
+  onSettingsChange((_, k) => { if (k === 'graphics' || k === null) resize(); });   // (a no-op until the bake has answered: the pool is empty then)
   // the sky: BO3's skybox model isn't exported (a flat grey background showed through the castle's breaches): a dome at
   // the far plane with an overcast gradient, a soft sun glow and drifting cloud bands; the fog takes its horizon colour
   const HORIZON = new THREE.Color(0xd9dfe6);
@@ -475,7 +487,7 @@ function setupLook({ scene, world, session, host, camera }) {
     // bright white noon under a night sky), the warmth coming from the lamp pool and the flames
     if (ambient) { ambient.color.setHex(0x8e9db6); ambient.intensity = .8; }
     if (hemi) { hemi.color.setHex(0xc3d0e4); hemi.groundColor.setHex(0x4c4a48); hemi.intensity = 1.0; }
-    if (key) { key.color.setHex(0xe9eef7); key.intensity = 1.25; key.position.set(.45, 1, .3); }
+    if (key) { key.color.setHex(0xe9eef7); key.intensity = baked ? 1.45 : 1.25; key.position.set(.45, 1, .3); }   // (baked: daylight only lands where the sky reaches)
     if (fill) { fill.color.setHex(0x74889f); fill.intensity = .4; }
     if ((timer -= dt) <= 0 && pool.length) {
       timer = .25;
@@ -495,7 +507,8 @@ function setupLook({ scene, world, session, host, camera }) {
     if (timer > .24 && world.wallGuns) for (const g of world.wallGuns) g.visible = g.position.distanceToSquared(camera.position) < 1800 * 1800;
     const want = session.power ? LAMP.on : LAMP.off, T = performance.now() / 1000;
     for (const l of pool) {
-      const goal = l.userData.lamp && !l.userData.leaving ? want : 0;
+      // with the bake an accent also fades with its distance from the camera (gone by 900 units)
+      const goal = l.userData.lamp && !l.userData.leaving ? baked ? want * ACCENT * Math.min(1, Math.max(0, 1.5 - l.position.distanceTo(camera.position) / 600)) : want : 0;
       l.userData.level += (goal - l.userData.level) * Math.min(1, dt * (goal ? 2.5 : 5));
       const f = l.userData.fire; l.intensity = l.userData.level * (f == null ? 1 : fireFlicker(T, f) * 1.08);   // a flame's flicker (the curve the flames themselves use)
     }
@@ -577,6 +590,21 @@ function setupRocketPad({ world, session, host, player, sync }) {
 // the collision (x 172-348, floor 96, lintel 224, narrowest at z -1612), as an electric door: shut until the power,
 // then it sinks and goes, and setDoors cuts and restores the navmesh under it like any door.
 const UC_GATE = { name: 'DOOR_connectstarttoundercroft_power', min: [172, 96, -1620], max: [348, 226, -1604] };
+// The castle's four debris piles are brush-only in BO3 (the pieces are script brushes the export has no model for), so the
+// map builder stood a plank wall in each. The wall stays as the door's collision; what is drawn is floating debris made
+// from the castle's own stone blocks, crates and boards (fx/floating-debris.js).
+const DEBRIS_DOORS = ['DOOR_connectsubclocktowertocourtyard_', 'DOOR_connectcourtyardtogreathallupper_', 'DOOR_connectlowercourtyardtolivingquarters_', 'DOOR_connectarmorytoarmoryback_'];
+const DEBRIS_PROPS = ['p7_zm_ctl_stone_wall_block_single_01', 'p7_zm_ctl_stone_wall_block_single_02', 'p7_crate_wood_01_med', 'p7_crate_berlin_wood_01', 'p7_boulder4_granite_test_half_a', 'p7_block_granite_test',
+  'p7_barrel_vintage_wood_cloth', 'p7_debris_concrete_rubble_lg_02_no_metal_flat_edge', 'p7_debris_wood_board_2x8x64'];
+function setupDebris(api) {
+  const { world } = api;
+  if (!world.doors || !world.root || /[?&]noDebris/.test(location.search)) return;
+  const doors = [...world.doors.values()].filter(d => DEBRIS_DOORS.some(n => d.name.startsWith(n)));
+  if (!doors.length) return;
+  const debris = floatingDebris(api, { models: DEBRIS_PROPS });
+  for (const d of doors) debris.block(d);
+}
+
 function setupUndercroftGate({ world, session }) {
   if (!world.doors || world.doors.has(UC_GATE.name)) return;
   const box = new THREE.Box3(new THREE.Vector3(...UC_GATE.min), new THREE.Vector3(...UC_GATE.max)), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());

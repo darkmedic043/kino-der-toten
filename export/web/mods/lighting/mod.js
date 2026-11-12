@@ -140,11 +140,13 @@ export default async function setup(api){
     // it, one ray every 8 frames), and the point and spot lights in range, summed as irradiance E; the gain is E over the
     // engine's default lights (2.9), clamped and smoothed, so a dark map or a dark corner darkens the gun and arms too.
     const lum=c=>.2126*c.r+.7152*c.g+.0722*c.b,REF=2.9,world=api.world;let lights=[],frame=0,sunVis=1,gain=1;const d=new THREE.Vector3(),ray=new THREE.Ray();
-    const E=()=>{const p=camera.position;let e=0;
+    // a map with a baked light volume (map-volume.js): the sky and sun reach the gun only as far as they reach the
+    // camera's cell, and the baked lamp light there is added
+    const E=()=>{const p=camera.position,ml=window.kino?.mapLight?.at?.(p),sky=ml?ml.sky:1,sun=ml?ml.sun:1;let e=ml?lum(ml.lamp):0;
       for(const l of lights){if(!l.visible||!l.intensity)continue;
-        if(l.isAmbientLight)e+=l.intensity*lum(l.color);
-        else if(l.isHemisphereLight)e+=l.intensity*(lum(l.color)+lum(l.groundColor))/2;
-        else if(l.isDirectionalLight)e+=l.intensity*lum(l.color)*.5*(l.castShadow?sunVis:1);
+        if(l.isAmbientLight)e+=l.intensity*lum(l.color)*sky;
+        else if(l.isHemisphereLight)e+=l.intensity*(lum(l.color)+lum(l.groundColor))/2*sky;
+        else if(l.isDirectionalLight)e+=l.intensity*lum(l.color)*.5*(l.castShadow?sunVis:sun);
         else if(l.isPointLight||l.isSpotLight){l.getWorldPosition(d);const dist=Math.max(20,d.distanceTo(p)),range=l.distance||Infinity;if(dist>range)continue;
           const fall=range<Infinity?Math.max(0,1-Math.pow(dist/range,4)):1;e+=l.intensity*lum(l.color)*fall/Math.pow(dist,l.decay??2)*(l.isSpotLight?.35:1);}}
       return e;};

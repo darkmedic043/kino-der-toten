@@ -108,6 +108,11 @@
       ],
       "dir": "mods/maps/the-giant/",
       "model": "the-giant.glb?v=17",
+      "propCollision": {
+        "mesh": "teleporter_outerwall|doorframe_gen_a_arch|door_frame_buy_std|gantry_support|arch_tower_01|window_gen_[ac]_large",
+        "box": "dumpster_metal_large|door_metal_rusted_(left|right)|lab_cage|furnace_metal_door|generator_large_01_rod|corrugated_sheet_metal|door_track_buy_pole|pipe_metal_hp_12_|teleporter_interior_beam|utility_pole|chalkboard_vintage",
+        "minHeight": 30
+      },
       "scale": 1,
       "background": "#141a22",
       "exposure": 0.95,

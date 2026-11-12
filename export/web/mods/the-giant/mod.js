@@ -9,6 +9,9 @@ import { CollisionWorld } from '../../collision-world.js';
 import { loadModel } from '../../animation.js';
 import { binds } from '../../settings.js';
 import { fixAnnihilatorMaterials } from '../operator-weapons/annihilator.js';
+import { loadMapLight } from '../lighting/map-volume.js';
+import { metalLook } from '../lighting/metal-look.js';
+import { floatingDebris, debrisDoor } from '../fx/floating-debris.js';
 
 const LINK_TIME = 30, WHERE = { pad0: 'east', pad1: 'south', pad2: 'west' };
 export default function setup(api) {
@@ -54,6 +57,7 @@ export default function setup(api) {
   });
   host.on('reset', () => { pending = null; lock(); });
   setupLook(api);
+  setupDebris(api);
   setupEggs(api);
   setupBridges(api);
 }
@@ -269,39 +273,87 @@ function setupEggs(api) {
 }
 
 // ---- the look: a snowy night. The engine's default lights (an even ambient + hemisphere + key + fill, tuned for Kino's
-// interiors) are retuned every frame (the engine sets the ambient on power and reset), and a pool of POOL warm point
-// lights follows the lamps nearest the camera (GIANT_LAMP_<n> nodes: BO3's buzzing fixtures and lanterns). The pool
-// has a fixed size: changing the number of lights recompiles every shader. Lamps are dim until the power is on.
-const POOL = 8, LAMP = { color: 0xffc58a, on: 2200, off: 700, range: 650, decay: 1.4 };
-function setupLook({ scene, world, session, host, camera }) {
+// interiors) are retuned every frame (the engine sets the ambient on power and reset). The lamps (GIANT_LAMP_<n> nodes:
+// BO3's buzzing fixtures and lanterns) are baked into the map's light volume (mods/lighting/map-volume.js, made by
+// .tools/bake-map-light.mjs: LAMP must match its table), which also darkens the ambient indoors and shadows the
+// moonlight (2026-11-11, user: "lighting popping in and out", "proper and really nice looking lighting"): every lamp
+// lights its room from any distance. ACCENTS point lights ride the nearest lamps on top for the highlights, faded out
+// by distance before they move, so nothing pops. Without a bake (?noBake) the old pool of POOL lights follows the
+// camera. The pool has a fixed size: changing the number of lights recompiles every shader. Lamps are dim until the
+// power is on.
+const POOL = 8, ACCENTS = 3, ACCENT = .3, LAMP = { color: 0xffc58a, on: 2200, off: 700, range: 650, decay: 1.4 };
+// zm_factory's two debris piles (the Wnuen loading dock and the top of the warehouse stairs, 1000 each). The map file has
+// nothing there and both passages stood open, so the doors are made here: a collision box each (measured through
+// COL_world) and floating debris built from the map's own crates and rubble (fx/floating-debris.js). `from` is the
+// building the pile is in: its spawn points and windows on the far side of the pile only wake once the pile is bought.
+const DEBRIS = [
+  { name: 'DEBRIS_wnuen_loading_dock', cost: 1000, zone: 'loadingdock', from: 'wnuenbuilding', min: [1043, 160, 935], max: [1067, 330, 1062], show: [[1043, 160, 938], [1067, 284, 1060]] },
+  { name: 'DEBRIS_warehouse_second_floor', cost: 1000, zone: 'warehouseupper', from: 'warehousebuilding', min: [-496, 199, 1034], max: [-388, 415, 1058], show: [[-490, 199, 1034], [-390, 322, 1058]] },
+];
+const DEBRIS_PROPS = ['p7_crate_wood_01_short', 'p7_crate_wood_01', 'p7_debris_concrete_rubble_lg_03_no_metal', 'p7_debris_concrete_rubble_sm_10', 'p7_brick_dirty_breakout_06_wet', 'p7_sandbag_01', 'p7_box_wood_01_long',
+  'p7_zm_der_plank_wood_2x12x96_dmg', 'p7_wood_plank_rustic01_2x16x48'];
+function setupDebris(api) {
+  const { world, session } = api;
+  if (!world.doors || !world.root || /[?&]noDebris/.test(location.search)) return;
+  const debris = floatingDebris(api, { models: DEBRIS_PROPS }), fronts = [...world.doors.values()];
+  for (const d of DEBRIS) {
+    const door = debrisDoor(api, d); if (!door) continue;
+    debris.block(door, [new THREE.Box3(new THREE.Vector3(...d.show[0]), new THREE.Vector3(...d.show[1]))]);
+    // a spawn point of the building that walks to the building's front door only once the pile is gone is past the pile:
+    // it joins the pile's zone (points on their own navmesh island stay as they were)
+    const front = fronts.find(x => x.zone === d.from)?.box?.getCenter(new THREE.Vector3()), mine = (world.barriers ?? []).filter(b => b.group === d.from);
+    if (!front || !world.path || !session?.openDoors) continue;
+    const walks = b => { const path = world.path(b.inside, front), last = path[path.length - 1]; return !!last && last.distanceTo(front) < 130; };
+    const shut = mine.map(walks); session.openDoors.add(door.name); world.setDoors(session);
+    const past = mine.filter((b, i) => !shut[i] && walks(b)); session.openDoors.delete(door.name); world.setDoors(session);
+    if (past.length < mine.length) for (const b of past) b.group = d.zone;
+    console.info('[the-giant] debris', d.name, '· spawn points past it:', past.length, 'of', mine.length);
+  }
+}
+
+function setupLook(api) {
+  const { scene, world, session, host, camera } = api;
   // the vats' water (one of them hides the Fly Trap's Bowie-knife bear) came out of the export as an opaque grey sheet:
   // see-through, tinted, and drawn after what's under it (user, 2026-10-18)
   world.root?.traverse(o => { if (!o.isMesh) return; for (const m of [o.material].flat()) if (/t7_water_zm_der_vats/.test(m?.name ?? '')) {
     Object.assign(m, { transparent: true, opacity: .32, depthWrite: false, roughness: .12, metalness: 0 }); m.color?.setHex(0x7fb0aa); m.needsUpdate = true; o.renderOrder = 2; } });
+  metalLook(world.root);
   const kids = scene.children;
   const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
   const dirs = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
   const [key, fill] = dirs;
   const lamps = []; world.root?.traverse(o => { if (/^GIANT_LAMP_/.test(o.name)) lamps.push(o.getWorldPosition(new THREE.Vector3())); });
-  const pool = Array.from({ length: Math.min(POOL, lamps.length) }, () => {
-    const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); scene.add(l); l.userData.want = 0; return l;
-  });
+  const pool = []; let baked = null;
+  // the lights are made once the bake has (or hasn't) loaded: still during loading, before the shader warm-up
+  (host.pending ??= []).push(loadMapLight(api, { skyFloor: .3, sunFloor: .1, strength: 1, powerOff: .3 }).catch(() => null).then(light => {
+    baked = light;
+    for (let i = 0; i < Math.min(light ? ACCENTS : POOL, lamps.length); i++) {
+      const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); scene.add(l); Object.assign(l.userData, { lamp: null, level: 0 }); pool.push(l);
+    }
+  }));
   let last = performance.now(), timer = 0;
   host.on('update', () => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
     const power = !!session.power;
     if (ambient) { ambient.color.setHex(0x8b97ab); ambient.intensity = power ? .75 : .55; }
     if (hemi) { hemi.color.setHex(0xa3b3c9); hemi.groundColor.setHex(0x3a3129); hemi.intensity = .85; }
-    if (key) { key.color.setHex(0xc9d5ff); key.intensity = 1.1; key.position.set(-.35, 1, .45); }
+    if (key) { key.color.setHex(0xc9d5ff); key.intensity = baked ? 1.35 : 1.1; key.position.set(-.35, 1, .45); }   // (baked: the moon only lands where it reaches, so it can be stronger)
     if (fill) { fill.color.setHex(0x6a82a6); fill.intensity = .25; }
+    const eye = camera.position;
     if ((timer -= dt) <= 0 && pool.length) {
       timer = .5;
-      const eye = camera.position, near = lamps.map(p => ({ p, d: p.distanceToSquared(eye) })).sort((a, b) => a.d - b.d).slice(0, pool.length);
-      // keep lights on lamps still in the set; move the rest (they fade in where they land)
-      const free = pool.filter(l => !near.some(n => n.p.equals(l.position)));
-      for (const n of near) if (!pool.some(l => l.position.equals(n.p))) { const l = free.shift(); if (l) { l.position.copy(n.p); l.intensity = 0; } }
+      const near = new Set(lamps.map(p => ({ p, d: p.distanceToSquared(eye) })).sort((a, b) => a.d - b.d).slice(0, pool.length).map(n => n.p));
+      // a light stays on its lamp while that is one of the nearest; a free one (or one that has faded out) takes the next
+      const open = [...near].filter(p => !pool.some(l => l.userData.lamp === p));
+      for (const l of pool) if (open.length && (!l.userData.lamp || (!near.has(l.userData.lamp) && l.userData.level < .02))) { l.userData.lamp = open.shift(); l.userData.level = 0; l.position.copy(l.userData.lamp); }
+      for (const l of pool) l.userData.leaving = !!l.userData.lamp && !near.has(l.userData.lamp);
     }
     const want = power ? LAMP.on : LAMP.off;
-    for (const l of pool) l.intensity += (want - l.intensity) * Math.min(1, dt * 2.5);
+    for (const l of pool) {
+      // level 0..1: with the bake an accent also fades with its distance from the camera (gone by 900 units)
+      const goal = !l.userData.lamp || l.userData.leaving ? 0 : baked ? Math.min(1, Math.max(0, 1.5 - l.position.distanceTo(eye) / 600)) : 1;
+      l.userData.level += (goal - l.userData.level) * Math.min(1, dt * (goal < l.userData.level ? 5 : 2.5));
+      l.intensity = want * (baked ? ACCENT : 1) * l.userData.level;
+    }
   });
 }
