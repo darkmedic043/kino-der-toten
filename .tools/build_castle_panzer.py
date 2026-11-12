@@ -93,6 +93,23 @@ def build_pap():
     (POUT/'anims.json').write_text(json.dumps(pindex, indent=1))
     print('pap', pindex)
 if sys.argv[1:2] == ['pap']: build_pap(); sys.exit()
+# ---- the map's own power switch (2026-11-12, user: "making the power be normal"): BO3's p7_fxanim_zm_power_switch_mod
+# (box, lever, cables) and its two fxanim clips (idle = lever up, start = thrown) -> switch/ (git-ignored)
+#   python3 .tools/build_castle_panzer.py switch
+def build_switch():
+    SOUT = ROOT/'export/web/mods/der-eisendrache/switch'
+    (SOUT/'anims').mkdir(parents=True, exist_ok=True); (SOUT/'.gitignore').write_text('*\n')
+    name = 'p7_fxanim_zm_power_switch_mod'
+    SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/name/f'{name}_LOD0.semodel')), SOUT/'switch.glb', texture_loader=webp)
+    print('switch', round((SOUT/'switch.glb').stat().st_size / 1e6, 2), 'MB')
+    sindex = {}
+    for key in ['idle', 'start']:
+        src = f'p7_fxanim_zm_power_switch_{key}_anim'
+        if not (GH/'xanims'/(src + '.seanim')).exists(): print('no anim', src); continue
+        c = anim(key, src, SOUT); sindex[key] = {'duration': c['duration']}
+    (SOUT/'anims.json').write_text(json.dumps(sindex, indent=1))
+    print('switch', sindex)
+if sys.argv[1:2] == ['switch']: build_switch(); sys.exit()
 # the storm bow's wall-run wind runes (p7_zm_ctl_rune_wind_emissive is a shader-only card; its reveal mask is the symbol)
 #   python3 .tools/build_castle_panzer.py wind   -> wind/wind.webp (git-ignored)
 if sys.argv[1:2] == ['wind']:

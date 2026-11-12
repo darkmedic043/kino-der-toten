@@ -18,6 +18,8 @@ import { metalLook } from '../lighting/metal-look.js';
 import { floatingDebris } from '../fx/floating-debris.js';
 import { mergeProps, instanceProps } from './merge-props.js';
 import { carvedDecals } from './carved.js';
+import { overlayLayers } from './overlays.js';
+import { setupSwitch } from './switch.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -57,6 +59,7 @@ export default async function setup(api) {
     return zones;
   };
   if (world.root) carvedDecals(world.root, api.scene);   // before the props are merged: the nodes it drops must not be instanced
+  if (world.root && !/[?&]noOverlays/.test(location.search)) console.info('[der-eisendrache] overlay layers:', JSON.stringify(overlayLayers(world.root)));   // snow, decals and cut-outs the map drew solid (overlays.js)
   if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes); }
   // the map nodes this mod moves (Ragnarok parts, levers, the crate lid, clock hands, floaters, Skadi, the claws, the
   // astroglobe...) set position/rotation and call updateMatrixWorld. The world's optimizeStaticScene turns every map
@@ -129,11 +132,12 @@ export default async function setup(api) {
   const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api), traps = setupTraps(api);
   const craft = setupCraftables(api, { traps, pads }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav, pads, traps }), ee = setupEE(api, { bows, traps }), side2 = setupSide2(api, { bows }), side = setupSide(api, { lowgrav, side2 });
   useGameAudio(api.audio);
-  setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupDebris(api); setupRocketCollision(api); setupCryptBoards(api);
+  const powerSwitch = setupSwitch(api); setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupDebris(api); setupRocketCollision(api); setupCryptBoards(api);
   setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 });   // the Tab scoreboard's tiles
   const bounds = setupBounds(api, { lowgrav });   // after the pads: it watches their flights
   await bows?.ready;   // the spirit wolves too
   await pap?.ready;   // the map's own Pack-a-Punch machine
+  await powerSwitch?.ready;   // and its power switch
   await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
   await look;   // the light bake and its lights: before the engine batches the map and compiles its shaders (see setupLook)
   sync.ready();   // a guest catches up on the game's events so far

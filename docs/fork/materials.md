@@ -22,6 +22,17 @@
 
 How it was found: `scratch/blotch/ray.mjs x z` (a vertical ray through the map GLB, every triangle crossed with node and material) named the sheet; `near.mjs` lists a region. A build-side fix (skip the `SM` duplicates, export carved materials as overlays) can replace this file after the next rebuild; the function then finds nothing to do.
 
+## Der Eisendrache: overlay layers drawn solid (2026-11-12, user: "also noticing stuff like this")
+
+The map build marks a material as an overlay only when its *name* says `decal` or `_blend`, and it merges equal materials under whichever name came first, so many overlay shells on props came out opaque: white snow coats over whole machines (the Pack-a-Punch roof's generator, boxes, tesla towers), a pale grey panel where a chalkboard's writing is, purple-grey slush sheets, solid cards where chains, grates and banners have holes. `mods/der-eisendrache/overlays.js` (`overlayLayers(root)`, called right after `carvedDecals`, before the props are merged; `?noOverlays` skips it) sorts opaque materials by their colour texture's stem (the GLB material name is unreliable) into four kinds:
+
+- **blend** (85 stems: every `decal` texture plus chalk writing, labels, stains, rivet and weld strips, slush, rune and logo cards): transparent, no depth write, polygon offset -1/-8, render order 2200. Carved symbols and normal-only weld seams (white image) are tinted to .22.
+- **mask** (26 stems: chains, grates, straw, splinters, fletchings, banners, vista cards): `alphaTest = .4`.
+- **snow** (materials named `snow*_blend`, not the BSP `wc/` ones, which carry real blend weights): transparent with a vertex alpha written from the world normal (0 below .2 up, full above .75), since Greyhound's prop vertex colours are all 255: snow stays on top faces only. An instanced prop uses its first instance's turn.
+- **soft** (the oxidised copper shell .35, dark grout .5): a constant opacity over the base they duplicate.
+
+Left solid on purpose (their alpha is data, not coverage): the blue barrel, icicles, `t7_micro_stone_mixed*`, opus tile, tritium, jars, the crates' `_wood_blend`/`_metal_blend`. The lists come from the textures' alpha statistics and two contact sheets (session scripts); a rebuilt map should mark these in the builder instead. Checked on the GPU in cropped copies of the map (bedroom chalkboard, Pack-a-Punch roof); the whole map cannot be run headless within the memory rule (renderer 2.8 GB while loading, 2.36 GB even with a cropped map file), so the in-engine wiring is covered only by syntax checks and the sandbox warm-check.
+
 ## Metal look on the BO3 ports (2026-11-12)
 BO3 keeps a metal's colour in its specular map and leaves the diffuse black. The map export has neither the specular maps nor reflections, so pipes, ducts, gratings, cabinets, lamp housings and brass were flat near-black shapes (The Giant: 137 materials, Der Eisendrache: 465). `metalLook(world.root)` (`mods/lighting/metal-look.js`, called in both map mods' setup, before the warm-up) gives every untextured material whose name reads as metal (`IS_METAL`, minus `NOT_METAL`) a colour, roughness and metalness by kind (`KINDS`: rust, brass, copper, painted, plain steel...; first match wins); its normal map does the rest. It is a stand-in: the real fix is exporting the specular/gloss images in `build_bo3_map.py` and rebuilding both maps, which has not been done.
 
