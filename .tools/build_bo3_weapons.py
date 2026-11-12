@@ -83,10 +83,48 @@ def read_clips(names):
     out['frames'] = off+1
     return out
 
+def _qmul(a, b):
+    ax, ay, az, aw = a; bx, by, bz, bw = b
+    return (aw*bx+ax*bw+ay*bz-az*by, aw*by-ax*bz+ay*bw+az*bx, aw*bz+ax*by-ay*bx+az*bw, aw*bw-ax*bx-ay*by-az*bz)
+def _qrot(q, v):
+    x, y, z, w = _qmul(_qmul(q, (v[0], v[1], v[2], 0.0)), (-q[0], -q[1], -q[2], q[3])); return (x, y, z)
+def _sample(keys, f, quat):
+    # value of a (frame, value) key list at frame f: lerp, or nlerp on the short arc for rotations
+    if not keys: return (0.0, 0.0, 0.0, 1.0) if quat else (0.0, 0.0, 0.0)
+    if f <= keys[0][0]: return tuple(keys[0][1])
+    if f >= keys[-1][0]: return tuple(keys[-1][1])
+    for (f0, a), (f1, b) in zip(keys, keys[1:]):
+        if f0 <= f <= f1:
+            t = (f-f0)/(f1-f0) if f1 > f0 else 0.0
+            if quat and sum(x*y for x, y in zip(a, b)) < 0: b = [-x for x in b]
+            v = [x+(y-x)*t for x, y in zip(a, b)]
+            if quat: n = sum(x*x for x in v)**.5 or 1.0; v = [x/n for x in v]
+            return tuple(v)
+
+def gun_root_motion(a):
+    # A few inspects (the M1014's, the M240's) move the gun through its own root, `tag_weapon`, as an offset from
+    # where the hand tag holds it, and leave `tag_weapon_right` still. That root is the attachment anchor here and is
+    # not animated, so the hands turned and the gun stayed at the hip: fold the offset into the hand tag's track.
+    for root, tag in (('tag_weapon', 'tag_weapon_right'), ('tag_weapon_le', 'tag_weapon_left')):
+        if a.get('modifiers', {}).get(root) != 'relative': continue
+        d, t = a['bones'].get(root) or {}, a['bones'].get(tag)
+        dr, dl = d.get('rot') or [], d.get('loc') or []
+        if not t or not t.get('loc'): continue
+        if max([1-abs(q[3]) for _, q in dr] or [0]) < 1e-4 and max([sum(x*x for x in v) for _, v in dl] or [0]) < .04: continue
+        tr, tl = t.get('rot') or [], t['loc']
+        frames = sorted({f for k in (dr, dl, tr, tl) for f, _ in k})
+        rot, loc = [], []
+        for f in frames:
+            q, p = _sample(tr, f, True), _sample(tl, f, False)
+            o = _qrot(q, _sample(dl, f, False))
+            rot.append((f, _qmul(q, _sample(dr, f, True)))); loc.append((f, tuple(x+y for x, y in zip(p, o))))
+        t['rot'], t['loc'] = rot, loc
+    return a
+
 def animation(name, gun_bind, loop=False):
     if isinstance(name, (list, tuple)):
         a = read_clips(name); name = name[0]+''.join('_'+n.rsplit('_', 1)[-1] for n in name[1:])
-    else: a = read_seanim(SRC/'xanims'/(name+'.seanim'))
+    else: a = gun_root_motion(read_seanim(SRC/'xanims'/(name+'.seanim')))
     fps = a['framerate'] or 30
     bones = []
     last = 0

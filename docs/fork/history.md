@@ -526,3 +526,4 @@
 - 2026-11-09: Vulture Aid ammo drops rarer: 3% of kills (was 5%), points stay 5% (gameplay.md)
 - 2026-11-09: Wave Gun cooks zombies as in BO1 Moon: they swell up, writhe and steam for 1-2 s, then burst into gibs (kino.dismemberment.burst) with the ding and gib sounds (weapons.md).
 - 2026-11-09: Stickers on attachments: mounted parts (BO3/AW) get their own mesh keys (`@<mountId>/...`), are resticked when they finish loading, plain-colour parts take stickers, a sticker on an unfitted attachment waits for it (Gunsmith: NOT FITTED), and the sticker view frames the whole gun clear of the panel (weapon-levels.md).
+- 2026-11-11: Jellyfish shotgun (M1014) and M240 inspect fixed: their clips move the gun through its own root, which the builder dropped, so the gun stayed at the hip; the builder now folds that motion into the hand tag (weapons.md, Weapon inspect).
