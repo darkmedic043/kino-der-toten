@@ -8,9 +8,9 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 |---|---|
 | Hosting, tunnel, Discord auth, cache headers, test browsers | `setup.md` |
 | Main menu, profile, mod loader, settings, keybinds, controller (native DualSense/Xbox, glyphs, menu navigation, aim assist with Deadshot head aim) | `core.md` |
-| Custom maps (`CustomWorld`, markers, navmesh, traps, teleporters) | `custom-maps.md` |
+| Custom maps (`CustomWorld`, markers, navmesh, traps, teleporters, floating debris doors, `propCollision` map-entry option, collision audit `.tools/col-audit.mjs`) | `custom-maps.md` |
 | Characters, motion model, procedural rig, FP arms, portraits | `characters.md` |
-| Lighting mod, baked irradiance volume, beams, sun, viewmodel light, mystery box map bulbs, Moon lighting, the post chain (colour grade / film look `grade.js`, depth haze, viewmodel drawn inside the composer) | `lighting.md` |
+| Lighting mod, baked irradiance volume, baked light volume of the BO3 ports (`map-volume.js`, `.tools/bake-map-light.mjs`: rebake after a map rebuild), beams, sun, viewmodel light, mystery box map bulbs, Moon lighting, the post chain (colour grade / film look `grade.js`, depth haze, viewmodel drawn inside the composer) | `lighting.md` |
 | Map materials, normal maps, HD textures (map + weapons) | `materials.md` |
 | Performance measurements and load-time warm-ups | `performance.md` |
 | Health, HUD/hit sounds, BO7 HUD layout (`hud-bo7`), operator weapons (Ragnarok), zombie voices, music, cheat console, perks (PhD, Quick Revive), fall damage, exfil, world loot (`mods/loot`: 3D Vulture drops, reward chests, melee the box), BO3 Trip Mine (Live Wire tether) and Smoke Grenade (hides players), Melon Pass Season 1 rewards (`mods/bo3-equipment`) | `gameplay.md` |
