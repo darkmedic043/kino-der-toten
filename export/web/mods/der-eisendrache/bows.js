@@ -224,7 +224,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     if (el === 'storm' && step === 'beacons' && !s.d.lit?.has(d.k)) { (s.d.lit ??= new Set()).add(d.k); audio?.play?.('buy', .35); if (s.d.lit.size === 3) next(el, ctx); }
     if (el === 'storm' && step === 'wallrun' && d.what === 'wallrun') next(el, ctx);
     if (el === 'storm' && step === 'batteries' && d.what === 'beacon' && !s.d.charged.has(d.k) && s.d.kills[d.battery] >= 5 && !s.d.used.has(d.battery)) {
-      s.d.charged.add(d.k); s.d.used.add(d.battery); audio?.play?.('buy', .5); if (s.d.charged.size === 3) next(el, ctx); }
+      s.d.charged.add(d.k); s.d.used.add(d.battery); urnBurst(Q.storm.batteries.find(b => b.id === d.battery), Q.storm.beacons[d.k]); audio?.play?.('buy', .5); if (s.d.charged.size === 3) next(el, ctx); }
     if (el === 'rune' && step === 'obelisk') { s.d.ball = true; next(el, ctx); }
     if (el === 'rune' && step === 'circles' && !s.d.active.has(d.k)) { s.d.active.add(d.k); s.d.kills[d.k] = 0; audio?.play?.('buy', .4); tell(el, `The ${d.k} circle is lit`, 3); }
     if (el === 'rune' && step === 'golf' && d.what === 'golf') golfShot(el, sync.v(d.p), ctx);
@@ -300,7 +300,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       if (s.owner == null || d.by !== s.owner || d.kind === 'dog' || d.kind === 'panzer') continue;
       const step = stepOf(el);
       if (s.stage === 'souls' && inV(p, STATUE)) { s.souls++; soul(p, Q[el].pedestal, Q[el].color); if (s.souls >= SOULS) { s.stage = 'ready'; announce?.(Q[el].name.toUpperCase(), 'READY ON ITS PEDESTAL', 3); audio?.play?.('box'); } }
-      if (el === 'storm' && step === 'batteries') for (const b of Q.storm.batteries) if (inV(p, b.vol) && (s.d.kills[b.id] ?? 0) < 5) { s.d.kills[b.id] = (s.d.kills[b.id] ?? 0) + 1; soul(p, b.at, Q.storm.color); if (s.d.kills[b.id] === 5) { audio?.play?.('buy', .4); tell(el, `The ${b.id === 'a10' ? 'rocket pad' : b.id} battery is full`, 3); } }
+      if (el === 'storm' && step === 'batteries') for (const b of Q.storm.batteries) if (inV(p, b.vol) && (s.d.kills[b.id] ?? 0) < 5) { s.d.kills[b.id] = (s.d.kills[b.id] ?? 0) + 1; soul(p, b.at, Q.storm.color); if (s.d.kills[b.id] === 5) { urnBurst(b, null); audio?.play?.('buy', .4); tell(el, `The ${b.id === 'a10' ? 'rocket pad' : b.id} battery is full`, 3); } }
       if (el === 'rune' && step === 'circles' && bp) for (const c of Q.rune.circles) if (s.d.active.has(c.id) && s.d.kills[c.id] < 9 && inV(bp, c.vol)) {
         s.d.kills[c.id]++; soul(p, c.vol.p, Q.rune.color); if (s.d.kills[c.id] % 3 === 0) audio?.play?.('buy', .35);
         if (Q.rune.circles.every(x => s.d.kills[x.id] >= 9)) next(el, ctx);
@@ -489,6 +489,38 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     m.visible = false; m.updateMatrix(); m.updateMatrixWorld(true); scene.add(m); return m; });
   host.warmObjects?.push(new THREE.Mesh(windGeo, windMat()));
   const want = new Map(), add = (id, p, color, size = 40, extra) => want.set(id, { p, color, size, ...extra });
+  // the storm urns (BO3's p7_zm_ctl_battery_ceramic, placed in the map at each aq_es_battery struct; 41 tall, copper
+  // terminals on top): each kill around one makes it crackle more often (BO1's electric-arc billboards from the fx mod)
+  // with a light that jumps with every arc; a full one arcs nonstop and throws bolts upward until it is fired from; a
+  // spent one keeps a dim glow (user 2026-11-12: "make sure the storm bow urns have the effects": it was a plain glow)
+  const urns = new Map(), urnTop = b => b.at.clone().add(new THREE.Vector3(0, 40, 0));
+  function urn(b, n, used, dt) {
+    let u = urns.get(b.id); if (!u) urns.set(b.id, u = { top: urnTop(b), tick: 0, zap: 0, src: null });
+    const live = n > 0 && !used, full = live && n >= 5, pool = kino.lighting?.sources, F = fxk(), R = (a, z) => a + Math.random() * (z - a);
+    if (live) add(`bat:${b.id}`, u.top.clone().add(new THREE.Vector3(0, 4, 0)), full ? 0xd8f2ff : Q.storm.color, full ? 70 : 18 + n * 8, { pulse: full });
+    else if (used) add(`bat:${b.id}`, u.top, Q.storm.color, 26, { opacity: .45 });
+    u.zap = Math.max(0, u.zap - dt);
+    if (live && (u.tick -= dt) <= 0) {
+      u.tick = full ? R(.05, .14) : (1.5 - n * .25) * R(.6, 1.4); u.zap = .09;
+      const a = Math.random() * 6.283, at = u.top.clone().add(new THREE.Vector3(Math.cos(a) * R(0, 12), R(-6, 4), Math.sin(a) * R(0, 12)));
+      F?.bolt?.('arc', at, { height: full ? R(30, 55) : R(18, 30), width: full ? R(60, 100) : R(36, 56), life: R(.12, .25), color: full ? 0xd8eeff : 0x9fd8ff });
+      if (full && Math.random() < .25) F?.bolt?.('ground', u.top.clone().add(new THREE.Vector3(R(-6, 6), -4, R(-6, 6))), { height: R(120, 220), width: R(40, 70), life: R(.15, .3), color: 0xbfe6ff });
+      if (full && Math.random() < .3) F?.emit?.({ key: 'sparks', at: u.top.clone(), size: [14, R(50, 80)], life: R(.2, .35), fade: [.02, .7], additive: true, color: 0xcfe8ff, spin: R(-3, 3) });
+    }
+    const k = full ? 1 : live ? n / 8 : 0;
+    if (k && !u.src && pool) { u.src = { position: u.top.clone().addScaledVector(UP, 10), color: new THREE.Color(0x9fd8ff), intensity: 0, radius: 300, kind: 'solid', dynamic: true, cap: 2000, weight: 1 }; pool.push(u.src); }
+    if (!k && u.src) { const j = pool?.indexOf(u.src) ?? -1; if (j >= 0) pool.splice(j, 1); u.src = null; }
+    if (u.src) u.src.intensity = k * (1.2 + (u.zap > 0 ? 3 : 0));
+  }
+  function urnBurst(b, to) {   // the 5th kill (to = null) or the full-draw arrow fired from it at a beacon
+    const top = urnTop(b), F = fxk();
+    flash(top, 0x9fd8ff, to ? 6 : 4, to ? 600 : 400, to ? .9 : .5);
+    F?.bolt?.('ground', top.clone().addScaledVector(UP, -4), { height: to ? 320 : 200, width: to ? 110 : 70, life: .4, color: 0xd8eeff });
+    if (to) { const end = to.clone().addScaledVector(UP, 120), len = top.distanceTo(end);
+      for (let i = 0; i < 3; i++) bolt(top, end, i ? 0x9fd8ff : 0xffffff, .45 + i * .15, Math.min(400, len / 20), Math.max(8, Math.round(len / 150)));
+      F?.bolt?.('ground', to.clone(), { height: 900, width: 280, life: .6, color: 0xd8eeff }); }
+  }
+  host.on('reset', () => { for (const b of Q.storm.batteries) urn(b, 0, false, 0); });
   let skadi = null;
   const beaconFire = Q.storm.beacons.map(b => b.clone().add(new THREE.Vector3(0, 10, 0))), beaconGlow = Q.storm.beacons.map(b => b.clone().add(new THREE.Vector3(0, 200, 0)));   // among the pyre's logs (the beacon point is its middle), in its flames
   host.on('update', dt => {
@@ -511,10 +543,10 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
           if (lit) add(`beacon:${k}`, beaconGlow[k], ch ? 0xffffff : q.color, ch ? 260 : 150, { pulse: ch }); }); }
       if (el === 'storm' && windOk) windCards.forEach((c, k) => { const on = step === 'wallrun' && my, hit = on && run.hit.has(k); c.visible = on;
         if (on) { c.material.opacity = hit ? 1 : .3; c.material.color.setHex(hit ? 0xd8f2ff : q.color); } });
+      if (el === 'storm') q.batteries.forEach(b => urn(b, step === 'batteries' ? s.d.kills[b.id] ?? 0 : 0, step === 'batteries' && s.d.used.has(b.id), dt));
       if (!step) continue;
       if (el === 'storm') {
         if (step === 'wallrun' && my && !windOk) q.wallrun.forEach((w, k) => add(`wr:${k}`, w, run.hit.has(k) ? 0xffffff : q.color, run.hit.has(k) ? 60 : 30, { opacity: run.hit.has(k) ? 1 : .35 }));
-        if (step === 'batteries') for (const b of q.batteries) { const n = s.d.kills[b.id] ?? 0; if (n) add(`bat:${b.id}`, b.at.clone().add(new THREE.Vector3(0, 30, 0)), q.color, 20 + n * 10, { pulse: n >= 5 && !s.d.used.has(b.id) }); }
       }
       if (el === 'rune') {
         if (step === 'obelisk' && session.time < magmaUntil) add('obelisk', q.obelisk, 0xff5a10, 90, { pulse: true });
@@ -713,8 +745,8 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   // ---- element effects (upgraded bows): shown everywhere, damage on the host credited to the shooter -------------------
   const fx = [];
   const lineMat = c => new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: .95, blending: THREE.AdditiveBlending });
-  function bolt(a, b, color) { const pts = [a.clone()]; for (let i = 1; i < 8; i++) pts.push(a.clone().lerp(b, i / 8).add(new THREE.Vector3((Math.random() - .5) * 30, (Math.random() - .5) * 30, (Math.random() - .5) * 30))); pts.push(b.clone());
-    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat(color)); scene.add(l); fx.push({ o: l, life: .12 }); }
+  function bolt(a, b, color, life = .12, jit = 30, segs = 8) { const pts = [a.clone()]; for (let i = 1; i < segs; i++) pts.push(a.clone().lerp(b, i / segs).add(new THREE.Vector3((Math.random() - .5) * jit, (Math.random() - .5) * jit, (Math.random() - .5) * jit))); pts.push(b.clone());
+    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat(color)); scene.add(l); fx.push({ o: l, life }); }
   function flash(p, color, intensity = 4, radius = 500, life = .5) { const pool = kino.lighting?.sources; if (!pool) return; const src = { position: p.clone(), color: new THREE.Color(color), intensity, radius, kind: 'solid', dynamic: true, cap: 2000, weight: 1 }; pool.push(src); fx.push({ light: src, life, max: life }); }
   host.warmObjects?.push(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 1, 0)]), lineMat(0xffffff)));
   // the spirit wolves (BO3's c_gen_direwolf_ghost running ai_direwolf_base_run; .tools/build_castle_panzer.py wolf ->

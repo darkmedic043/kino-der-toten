@@ -537,3 +537,4 @@
 - 2026-11-12: Easter egg steps no longer tell you the next step (user: "when you do steps for the easter egg, like the storm bow, it doesnt tell you the next step"): Der Eisendrache's bow quests and main egg and Nuketown's egg only say what just happened; JOURNAL.EXE tracking is unchanged (journal.md).
 - 2026-11-12: Der Eisendrache Pack-a-Punch faces the stairs (the spot's yaw, not +90) and its carvings show in the colour (normal-map slope darkens the rocks); waw-ports.md.
 - 2026-11-12: Der Eisendrache storm bow wall-run shows BO3's wind symbol on each of the five walls (the emissive card's mask) instead of a glow; waw-ports.md.
+- 2026-11-12: Der Eisendrache storm bow urns (the batteries) crackle with electric arcs that speed up per kill, arc nonstop when full, and send a bolt to the beacon when fired from; waw-ports.md.
