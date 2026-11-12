@@ -164,7 +164,7 @@ export function setupEE(api, { bows, traps }) {
       const m = P.move; m.t += dt; if (m.t < 0) return;
       if (P.a.rig.current !== 'keeperIdle') P.a.rig.play('keeperIdle', true);
       const k = Math.min(1, m.t / 3); P.a.root.position.lerpVectors(m.from, m.to, k * k * (3 - 2 * k)); P.a.root.position.y += Math.sin(k * Math.PI) * 120; face(P.a.root, m.to.clone().add(new THREE.Vector3(1, 0, 0)));
-      if (k >= 1) { P.move = null; if (P.stone >= STONES.length) { P.a.root.removeFromParent(); P = null; st.done.add('stones'); announce?.('THE KEEPER', 'SEEN AT THE MPD', 3); check(); return; } P.a.rig.play(KA.stoneIn ? 'stoneIn' : 'keeperIdle', false); P.loopAt = P.t + (K.index.stoneIn?.duration ?? 1); P.kills = 0; toast?.(`Channeling stone ${P.stone + 1} of 4 · kill zombies around it`, 3); }
+      if (k >= 1) { P.move = null; if (P.stone >= STONES.length) { P.a.root.removeFromParent(); P = null; st.done.add('stones'); announce?.('THE KEEPER', 'SEEN AT THE MPD', 3); check(); return; } P.a.rig.play(KA.stoneIn ? 'stoneIn' : 'keeperIdle', false); P.loopAt = P.t + (K.index.stoneIn?.duration ?? 1); P.kills = 0; toast?.(`Channeling stone ${P.stone + 1} of 4`, 3); }
     } else if (P.loopAt && P.t > P.loopAt) { P.loopAt = 0; P.a.rig.play(KA.stoneLoop ? 'stoneLoop' : 'keeperIdle', true); }
   }
   sync.on('kill', d => {
@@ -226,7 +226,7 @@ export function setupEE(api, { bows, traps }) {
     st.step = n; audio?.play?.('box');
     if (n === 2) { announce?.('THE PAST', 'IS WITHIN REACH', 3); lightNext(); showNode('CASTLE_EE_canister_past_0'); showNode('CASTLE_EE_fuse_0'); }
     if (n === 3) { showNode('CASTLE_EE_vril_0'); }
-    if (HINT[n]) toast?.(HINT[n], 5);
+    // no toast of the next step (user, 2026-11-12); HINT stays for state() / the journal
     hud(); check();
   }
 
@@ -311,7 +311,7 @@ export function setupEE(api, { bows, traps }) {
         if (!s.fired && s.t > charge) { s.fired = true; z.rig.play(KA[s.key + 'Deploy'] ? s.key + 'Deploy' : 'idle', false);
           const tp = sync.players().find(q => q.id === s.target)?.pos ?? me;
           sync.act('bossCast', { kind: s.kind, target: s.target, at: sync.a(tp), from: sync.a(pos), offs: Array.from({ length: 8 }, () => [(Math.random() - .5) * 260, (Math.random() - .5) * 260]) }); }
-        if (s.t > charge + 2.5) { b.spell = null; b.t = 0; b.casts++; z.rig.play('idle', true); if (b.casts >= 3) { b.state = 'center'; b.t = 0; flash(pos, 0xb06bff, 4, 500, .5); pos.copy(ARENA.keeper); z.rig.play(KA.elementalLoop ? 'elementalLoop' : 'idle', true); b.bar.update(); toast?.('The Keeper is charging · plant the Ragnarok beneath it', 3); } }
+        if (s.t > charge + 2.5) { b.spell = null; b.t = 0; b.casts++; z.rig.play('idle', true); if (b.casts >= 3) { b.state = 'center'; b.t = 0; flash(pos, 0xb06bff, 4, 500, .5); pos.copy(ARENA.keeper); z.rig.play(KA.elementalLoop ? 'elementalLoop' : 'idle', true); b.bar.update(); toast?.('The Keeper is charging', 3); } }
       }
     } else if (b.state === 'center') {
       if (b.t > 10) {   // the storm: everyone outside the safe circles (each client checks its own player)

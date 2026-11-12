@@ -75,15 +75,15 @@ export function setupEasterEgg(c) {
 
   // ---- the steps
   const interact = o => world.addInteraction({ nuketown: true, ...o });
-  sync.on('ntFiles', (d, ctx) => { e.files = true; show(files, false); if (ctx.mine) { sfx('buy', .5); toast('The files: take them to the door', 4); } });
+  sync.on('ntFiles', (d, ctx) => { e.files = true; show(files, false); if (ctx.mine) { sfx('buy', .5); toast('You took the files', 3); } });
   interact({ position: v(FILES), hidden: () => e.step !== 3 || !e.rocks || e.files, text: () => 'Pick up the Files', use() { sync.act('ntFiles'); return true; } });
   interact({ position: v(PAPER.use), hidden: () => e.step !== 3 || !e.knifed || e.paperT != null || talking(),
     text: () => 'Slide the paper under the door', locked: () => !globalThis.kino?.movement?.state?.prone, lockedText: 'Go prone to reach under the door',
     use() { sync.act('ntPaper'); return true; } });
   sync.on('ntPaper', () => { if (e.paperT != null) return; e.paperT = 0; show(paper, true); });
 
-  sync.on('ntKey', (d, ctx) => { e.key = true; show(key, false); if (ctx.mine) { sfx('buy', .5); toast('The key: it opens the vent over the door', 4); } });
-  sync.on('ntRadio', (d, ctx) => { e.radio = true; show(radio, false); if (ctx.mine) { sfx('buy', .5); toast('The radio: the scientist can use it', 4); } });
+  sync.on('ntKey', (d, ctx) => { e.key = true; show(key, false); if (ctx.mine) { sfx('buy', .5); toast('You took the key', 3); } });
+  sync.on('ntRadio', (d, ctx) => { e.radio = true; show(radio, false); if (ctx.mine) { sfx('buy', .5); toast('You took the radio', 4); } });
   interact({ position: v(KEY), hidden: () => e.step !== 4 || e.key, text: () => 'Pick up the Key', use() { sync.act('ntKey'); return true; } });
   interact({ position: v(RADIO), hidden: () => e.step !== 4 || e.radio, text: () => 'Pick up the Radio', use() { sync.act('ntRadio'); return true; } });
   interact({ position: v(VENT_USE), hidden: () => e.step !== 4 || !e.key || e.vent || talking(), text: () => 'Open the Vent', use() { sync.act('ntVent'); return true; } });
@@ -100,7 +100,7 @@ export function setupEasterEgg(c) {
   sync.on('ntNode', (d, ctx) => {
     if (e.nodes[d.i]) return; e.nodes[d.i] = true; sound('tactical_buttonpress', .8);
     const n = e.nodes.filter(Boolean).length; if (ctx.mine) toast(`Failsafe node ${n} / 4`, 3);
-    if (n === 4) setTimeout(() => { sound('tactical_buttonpress', 1); e.buzzed = true; if (ctx.mine) toast('Back to the door', 4); }, 500);
+    if (n === 4) setTimeout(() => { sound('tactical_buttonpress', 1); e.buzzed = true; if (ctx.mine) toast('Every failsafe node is down', 4); }, 500);
   });
 
   // ---- step 6: the endless round, the truck, the way out

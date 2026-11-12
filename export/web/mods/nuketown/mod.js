@@ -248,7 +248,7 @@ function setupQuest(api) {
       use() {
         setFlag('fixed_' + t.node); st.fixed++; sfx('buy');
         if (st.fixed < TOOLS.length) { toast(`Panel repaired · ${st.fixed} / ${TOOLS.length}`, 4); return true; }
-        st.elevatorT = 0; sfx('teleport', .6); toast('The elevator is coming up: take the skull key from it', 5); return true;
+        st.elevatorT = 0; sfx('teleport', .6); toast('The elevator is coming up', 4); return true;
       },
     });
   }
@@ -262,7 +262,7 @@ function setupQuest(api) {
   world.addInteraction({
     position: ELEVATOR.key.clone().add(V(0, ELEVATOR.rise + 10, 0)), nuketown: true,
     hidden: () => !flag('elevator') || flag('skull'), text: () => 'Take the skull',
-    use() { setFlag('skull'); show(nodesOf(root, 'pap_key'), false); sfx('powerup', .7); toast('The skull key: place it at the sealed alcove in hell', 5); return true; },
+    use() { setFlag('skull'); show(nodesOf(root, 'pap_key'), false); sfx('powerup', .7); toast('You took the skull key', 4); return true; },
   });
   world.addInteraction({
     position: PAP.trig.clone().add(V(0, 20, 0)), nuketown: true,

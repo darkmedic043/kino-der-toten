@@ -85,6 +85,7 @@ const Q = {
     runes: { ulla: W(-578, 1251, 512), zor: W(-668, 1204, 512), oth: W(-741, 1254, 513), mar: W(-739, 1342, 512), uja: W(-647, 1389, 512), lor: W(-576, 1339, 512) } },
 };
 const STATUE = V(W(-1192, 2256, 248), 520, 160);
+// what each step wants (no longer toasted: the user wants the steps found, 2026-11-12); kept as the record of the steps
 const HINT = {
   storm: { beacons: 'Shoot the three beacon pyres far out from the castle: each one catches fire', wallrun: 'Wall-run through all five undercroft triggers without landing (low gravity)',
     batteries: 'Fill the three storm batteries with kills, then from each fire a fully drawn arrow at a beacon', reforge: 'Reforge the arrow on the roof' },
@@ -179,7 +180,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   sync.on('bqTake', (d, ctx) => {   // pick up a loose arrow (or claim a placed one)
     const s = st[d.el]; if (!s || s.owner != null || !['steps', 'place', 'souls', 'ready'].includes(s.stage)) return;
     for (const [el, o] of Object.entries(st)) if (el !== d.el && o.owner === ctx.by) drop(el);   // one quest each (quest_swap)
-    s.owner = ctx.by; if (ctx.mine) { audio?.play?.('buy', .5); const step = stepOf(d.el); tell(d.el, step ? HINT[d.el][step] : s.stage === 'place' ? 'Place the arrow on its pedestal in the undercroft' : 'Feed the pedestal kills in the undercroft', 5); }
+    s.owner = ctx.by; if (ctx.mine) { audio?.play?.('buy', .5); const step = stepOf(d.el); tell(d.el, 'You took the arrow', 3); }
   });
   sync.on('bqDrop', d => drop(d.el));
   let ownT = 0;
@@ -201,11 +202,10 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       s.d.armour = Object.fromEntries(crests.map((c, i) => [c, runes[i]])); s.d.seq = [1, 2, 3].map(i => crests[i]); s.d.need = [1, 2, 3].map(i => runes[i]);
       s.d.drops = shuffle(Object.keys(Q.demon.runes), ctx.rand); s.d.lit = new Set(); s.d.slot = 0; s.d.rune = null; s.d.failUntil = 0; s.d.shown = false;
     }
-    if (step) tell(el, HINT[el][step], 5);
   }
   function next(el, ctx) {
     const s = st[el]; audio?.play?.('buy', .5); s.step++;
-    if (s.step >= Q[el].steps.length) { s.stage = 'place'; tell(el, 'Place the arrow on its pedestal in the undercroft', 5); return; }
+    if (s.step >= Q[el].steps.length) { s.stage = 'place'; return; }
     enter(el, ctx);
   }
   function shuffle(a, rand) { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -226,16 +226,16 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     if (el === 'storm' && step === 'batteries' && d.what === 'beacon' && !s.d.charged.has(d.k) && s.d.kills[d.battery] >= 5 && !s.d.used.has(d.battery)) {
       s.d.charged.add(d.k); s.d.used.add(d.battery); audio?.play?.('buy', .5); if (s.d.charged.size === 3) next(el, ctx); }
     if (el === 'rune' && step === 'obelisk') { s.d.ball = true; next(el, ctx); }
-    if (el === 'rune' && step === 'circles' && !s.d.active.has(d.k)) { s.d.active.add(d.k); s.d.kills[d.k] = 0; audio?.play?.('buy', .4); tell(el, `The ${d.k} circle is lit · charge it with kills standing in it`, 3); }
+    if (el === 'rune' && step === 'circles' && !s.d.active.has(d.k)) { s.d.active.add(d.k); s.d.kills[d.k] = 0; audio?.play?.('buy', .4); tell(el, `The ${d.k} circle is lit`, 3); }
     if (el === 'rune' && step === 'golf' && d.what === 'golf') golfShot(el, sync.v(d.p), ctx);
     if (el === 'wolf' && step === 'shrine') { audio?.play?.('box', .5); tell(el, 'The skull rolled down below the shrine', 3); next(el, ctx); }
-    if (el === 'wolf' && step === 'burial' && d.what === 'burial') { s.d.ledgeUntil = session.time + 10; audio?.play?.('box', .5); tell(el, 'The ledge formed · reforge the arrow on it', 3); }
+    if (el === 'wolf' && step === 'burial' && d.what === 'burial') { s.d.ledgeUntil = session.time + 10; audio?.play?.('box', .5); tell(el, 'A ledge formed', 3); }
     if (el === 'demon' && step === 'runes') runeShot(el, d, ctx);
   });
   // the owner's uses
   sync.on('bqUse', (d, ctx) => {
     const el = d.el, s = st[el], step = stepOf(el);
-    if (d.what === 'place' && s.stage === 'place' && s.owner === ctx.by) { s.stage = 'souls'; s.souls = 0; audio?.play?.('box', .6); if (sync.isHost) api.powerups?.spawn?.('full_ammo', Q[el].pedestal.clone()); tell(el, `Feed it ${SOULS} kills in the undercroft`, 4); return; }
+    if (d.what === 'place' && s.stage === 'place' && s.owner === ctx.by) { s.stage = 'souls'; s.souls = 0; audio?.play?.('box', .6); if (sync.isHost) api.powerups?.spawn?.('full_ammo', Q[el].pedestal.clone()); tell(el, 'The arrow is in place', 3); return; }
     if (d.what === 'take' && (s.stage === 'ready' && s.owner === ctx.by || s.stage === 'spawned')) { if (s.stage === 'ready') { s.stage = 'spawned'; s.owner = null; } if (ctx.mine) give(el); return; }
     if (s.owner !== ctx.by) return;
     if (step === 'reforge' && d.what === 'reforge') { announce?.(Q[el].name.toUpperCase(), 'ARROW REFORGED', 2.5); return next(el, ctx); }
@@ -245,7 +245,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     }
     if (el === 'rune' && step === 'fireplace' && d.what === 'fireplace') return next(el, ctx);
     if (el === 'wolf' && step === 'skull' && d.what === 'skull') return next(el, ctx);
-    if (el === 'wolf' && step === 'escort' && d.what === 'skadi' && s.d.phase === 'skull') { s.d.phase = 'walk'; s.d.k = 0; s.d.p = Q.wolf.skadi.clone(); s.d.kills = 0; audio?.play?.('box', .5); tell(el, 'Skadi rises · follow her and protect her', 4); return; }
+    if (el === 'wolf' && step === 'escort' && d.what === 'skadi' && s.d.phase === 'skull') { s.d.phase = 'walk'; s.d.k = 0; s.d.p = Q.wolf.skadi.clone(); s.d.kills = 0; audio?.play?.('box', .5); tell(el, 'Skadi rises', 3); return; }
     if (el === 'wolf' && step === 'escort' && d.what === 'bones' && s.d.phase === 'dug' && d.k === s.d.k) { s.d.k++; s.d.kills = 0; audio?.play?.('buy', .5); s.d.phase = s.d.k >= 3 ? 'tomb' : 'walk'; return; }
     if (el === 'wolf' && step === 'burial' && d.what === 'reforge' && session.time < (s.d.ledgeUntil ?? 0)) { announce?.(Q[el].name.toUpperCase(), 'ARROW REFORGED', 2.5); return next(el, ctx); }
     if (el === 'demon' && step === 'urn' && d.what === 'urn') { s.d.urn = 0; return next(el, ctx); }
@@ -254,13 +254,13 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     if (el === 'demon' && step === 'runes' && d.what === 'grab' && s.d.rune) { const r = s.d.rune.label; s.d.rune = null; s.d.lit.add(r); s.d.drops = s.d.drops.filter(x => x !== r); audio?.play?.('box', .5); tell(el, `The rune ${RUNE[r]} lit on the circle`, 3); }
   });
   // the Skadi escort's waypoints (the host walks her: shared state)
-  sync.on('bqSkadi', (d, ctx) => { const s = st.wolf; if (stepOf('wolf') !== 'escort') return; if (d.what === 'at') { s.d.phase = 'dig'; s.d.kills = 0; s.d.k = d.k; tell('wolf', `Kill zombies near Skadi (10)`, 3); } if (d.what === 'tomb') next('wolf', ctx); });
+  sync.on('bqSkadi', (d, ctx) => { const s = st.wolf; if (stepOf('wolf') !== 'escort') return; if (d.what === 'at') { s.d.phase = 'dig'; s.d.kills = 0; s.d.k = d.k; tell('wolf', 'Skadi stopped', 3); } if (d.what === 'tomb') next('wolf', ctx); });
   sync.shared('skadi', () => st.wolf.d.p ? { p: sync.a(st.wolf.d.p), wait: !!st.wolf.d.wait } : null, v => { if (v && st.wolf.d) { st.wolf.d.to = sync.v(v.p); st.wolf.d.p ??= st.wolf.d.to.clone(); st.wolf.d.wait = v.wait; } });
   // golf (BO3 rune_prison_golf): the pool is the circle, then each landing; 4 shots without the fireplace, then after the round
   function golfShot(el, p, ctx) {
     const s = st[el], fp = Q.rune.fireplaces[s.fire]; if (s.d.wait) return;
     const hops = s.d.hops ?? 0;
-    if (inV(p, fp.vol)) { if (hops < 3 && sync.isHost) api.powerups?.spawn?.('full_ammo', fp.drop.clone()); audio?.play?.('box', .6); tell(el, 'The magma reached the fireplace · take it', 3); s.d.pool = null; return next(el, ctx); }
+    if (inV(p, fp.vol)) { if (hops < 3 && sync.isHost) api.powerups?.spawn?.('full_ammo', fp.drop.clone()); audio?.play?.('box', .6); tell(el, 'The magma reached the fireplace', 3); s.d.pool = null; return next(el, ctx); }
     s.d.hops = hops + 1; audio?.play?.('hit', .5);
     if (s.d.hops >= 4) { s.d.pool = null; s.d.hops = 0; s.d.wait = session.round; tell(el, 'The magma cooled · try again next round', 3); return; }
     s.d.pool = p.clone();
@@ -305,7 +305,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
         s.d.kills[c.id]++; soul(p, c.vol.p, Q.rune.color); if (s.d.kills[c.id] % 3 === 0) audio?.play?.('buy', .35);
         if (Q.rune.circles.every(x => s.d.kills[x.id] >= 9)) next(el, ctx);
       }
-      if (el === 'wolf' && step === 'escort' && s.d.phase === 'dig' && inV(p, Q.wolf.digs[s.d.k].vol)) { s.d.kills++; soul(p, Q.wolf.digs[s.d.k].at, Q.wolf.color); if (s.d.kills >= 10) { s.d.phase = 'dug'; audio?.play?.('box', .4); tell(el, 'Skadi dug up bones · pick them up', 3); } }
+      if (el === 'wolf' && step === 'escort' && s.d.phase === 'dig' && inV(p, Q.wolf.digs[s.d.k].vol)) { s.d.kills++; soul(p, Q.wolf.digs[s.d.k].at, Q.wolf.color); if (s.d.kills >= 10) { s.d.phase = 'dug'; audio?.play?.('box', .4); tell(el, 'Skadi dug up bones', 3); } }
       if (el === 'demon' && step === 'seal' && d.melee && inV(p, Q.demon.seal)) { audio?.play?.('box', .5); next(el, ctx); }
       if (el === 'demon' && step === 'runes' && !s.d.rune && s.d.drops.length && ctx.rand() <= .1) { s.d.rune = { label: s.d.drops[0], p: p.clone().add(new THREE.Vector3(0, 30, 0)), t: session.time }; tell(el, 'A demonic rune dropped', 2); }
     }
