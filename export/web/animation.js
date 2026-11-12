@@ -251,8 +251,9 @@ export class ViewWeapon {
     this.applyAim(!['idle','fire'].includes(this.mode));
     this.recoil=Math.max(0,this.recoil-dt*8);
     const bob=moving&&this.mode!=='melee'?(1-this.aim)*.13*(this.bobScale??1):0;   // bobScale: a motion layer (mods/movement/fp.js) replaces this bob with its own
-    this.pivot.position.set(Math.sin(time*(sprint?13:9))*bob,Math.cos(time*(sprint?26:18))*bob*.7,this.recoil*.25);
-    this.pivot.rotation.set(this.recoil*.012,0,0);
+    const rk=this.def?.noRecoil?0:this.recoil;   // def.noRecoil (the bows): no push back; this.recoil still marks the shot
+    this.pivot.position.set(Math.sin(time*(sprint?13:9))*bob,Math.cos(time*(sprint?26:18))*bob*.7,rk*.25);
+    this.pivot.rotation.set(rk*.012,0,0);
     // def.viewOffset [x,y,z] (view space): where the weapon rests at the hip (e.g. BO3 guns sit lower, in the corner); gone in ADS
     if(this.def.viewOffset&&!this.meleeRoot?.visible)this.pivot.position.add(new THREE.Vector3(...this.def.viewOffset).multiplyScalar(1-this.aim));   // (BO1's knife rig sits where BO1's arms do)
     // Ray Gun uses authored weapon offsets in place of sprint XAnims.

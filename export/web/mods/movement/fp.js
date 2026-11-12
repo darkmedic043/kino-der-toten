@@ -237,7 +237,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     if(grounded&&state.stairs>0&&Math.abs(stepUp)>1.5&&Math.abs(stepUp)<=14)s.lift.v-=clamp(stepUp,-8,8)*.9*amp;   // a step: a small bump
     if(aim>.5&&lastAim<=.5)s.settle.v+=3.5*amp;if(aim<.5&&lastAim>=.5)s.settle.v-=2*amp;lastAim=aim;              // sights up: overshoot and settle
     const recoil=view.recoil??0;
-    if(recoil>lastRecoil+.05){const k=(.6+w*.5)*str;s.kickP.v+=5*k;s.kickY.v+=(Math.random()-.5)*4*k;s.kickZ.v+=4*k;}   // a shot: kick back and up, settle by weight
+    if(recoil>lastRecoil+.05&&!view.def?.noRecoil){const k=(.6+w*.5)*str;s.kickP.v+=5*k;s.kickY.v+=(Math.random()-.5)*4*k;s.kickZ.v+=4*k;}   // a shot: kick back and up, settle by weight
     lastRecoil=recoil;
     const lf=s.lift.step(0,dt),dp=s.dip.step(0,dt),kp=s.kickP.step(0,dt),ky=s.kickY.step(0,dt),kz=s.kickZ.step(0,dt),st=s.settle.step(0,dt);
     // ---- bob: a figure-8 paced by distance travelled

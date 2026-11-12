@@ -541,3 +541,4 @@
 - 2026-11-12: Der Eisendrache storm urns charge the nocked arrow: lightning crackles along it while you stand at a full urn (there was no sign before); waw-ports.md.
 - 2026-11-12: Der Eisendrache storm urns: a full urn's charge now goes onto your bow and is carried to wherever a beacon can be seen (the urns can't see them); waw-ports.md.
 - 2026-11-12: Der Eisendrache storm beacons smoulder before they're lit (low fire, embers, smoke, light) so they can be found; waw-ports.md.
+- 2026-11-12: Der Eisendrache bows have no recoil (`def.noRecoil`: engine camera climb, viewmodel push, fp.js fire kick, third-person act; weapons.md).

@@ -626,7 +626,9 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   // a quick shot is slow and drops, a full draw is fast and near flat) and burns at the head, on the nocked arrow in
   // the hand and all the way to its target. BO3's weapon files aren't in the export: FLIGHT is tuned by eye, not copied.
   const BOW_IDS = [BASE, ...Object.keys(Q).map(el => 'bo3_bow_' + el)];
-  for (const id of BOW_IDS) if (data.weapons?.[id]) data.weapons[id].impactExplode = true;
+  // no recoil on the bows (user 2026-11-12: "make it so wrath of ancients and any other bows dont have recoil"): def.noRecoil
+  // drops the engine's camera climb, the viewmodel push (animation.js) and the movement mod's fire kick (fp.js)
+  for (const id of BOW_IDS) for (const d of [data.weapons?.[id], data.weapons?.[id]?.upgrade]) if (d) Object.assign(d, { impactExplode: true, noRecoil: true });
   host.on('warmWeapons', ids => { if (data.weapons?.[BASE]) ids.add(BASE); });   // every game hands this one out; the upgrades load when taken (same programs)
   const FLIGHT = [{ speed: 2500, gravity: 460 }, { speed: 3400, gravity: 300 }, { speed: 4400, gravity: 160 }];   // quick, part, full draw (units/s, units/s²)
   const FLAME = { base: [0xff7a22, 0xffc98a], rune: [0xff5a14, 0xffb870], storm: [0x5fb8ff, 0xd8f0ff], wolf: [0x8fd0ff, 0xe8f6ff], demon: [0xa45cff, 0xe2ccff] };   // flame, core

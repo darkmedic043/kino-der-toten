@@ -98,7 +98,7 @@ export default async function setup(api){
   const s=api.session;
   const act={shots:s.shots,weapon:s.weapon,grenades:s.grenades,reloadSlap:false,meleeLen:0,throwT:0,swapT:0};
   function driveActions(dt,speed,yaw){
-    if(s.shots>act.shots){const def=s.def,base=def.baseId??def.id;
+    if(s.shots>act.shots&&!s.def?.noRecoil){const def=s.def,base=def.baseId??def.id;   // def.noRecoil: the bows don't kick
       const kick=base==='thundergun_zm'?2.2:THREE.MathUtils.clamp(.3+(def.fireTime??.1)*1.6+(def.pellets>1?.5:0),.3,1.6);character.act('recoil',kick);}
     act.shots=s.shots;
     // Reload envelope, with a slap at 60% (the magazine seating).
