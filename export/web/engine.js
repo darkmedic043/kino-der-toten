@@ -631,6 +631,14 @@ async function gpuIdle(max=60000){
 // D3D11 when the driver's shader cache misses, 2026-10-30). Models still loading at WEAPON_WARM_MS stay in the model
 // cache for their equip. Mods patch the materials the way they do on equip through the 'warmWeapon' event (the scopes
 // mod's glass). Not on phones (memory); ?noWeaponWarm skips it (A/B).
+// What the programs are, for the load telemetry: a count per material type, then the scene's lights (their counts are
+// in every lit program, and three writes one copy of the light code per light)
+function programKinds(){
+  try{const n={},l={};for(const p of renderer.info.programs??[])n[p.name]=(n[p.name]??0)+1;
+    scene.traverse(o=>{if(o.isLight){const k=o.type.replace('Light','')+(o.castShadow?'+shadow':'');l[k]=(l[k]??0)+1;}});
+    const list=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k.replace(/^Mesh|Material$/g,'')+' '+v).join(', ');
+    return (list(n)+' | lights: '+list(l)).slice(0,600);}catch{return '';}
+}
 async function warmWeapons(){
   if(NO_WEAPON_WARM||profile.mobile)return null;
   const t0=performance.now(),ids=new Set();
@@ -760,7 +768,7 @@ async function compileSliced(s,cam,target,breathe){
 }
 async function warmShaders(waitGpu=false){
   const t0=performance.now(),targets=new Map(),draw=renderer.render,later=new THREE.Group(),sliced=waitGpu&&!NO_SLICE,canvas=renderer.domElement;
-  let slice=performance.now(),breaths=0,lap=performance.now();const laps=[],mark=name=>{const t=performance.now();laps.push(name+' '+Math.round(t-lap));lap=t;};const breathe=async force=>{if(!sliced||!force&&performance.now()-slice<sliceMs())return;await breath();breaths++;slice=performance.now();};
+  let slice=performance.now(),breaths=0,lap=performance.now();let lapProgs=renderer.info.programs?.length??0;const laps=[],mark=name=>{const t=performance.now(),p=renderer.info.programs?.length??0;laps.push(name+' '+Math.round(t-lap)+(p!==lapProgs?' p'+p:''));lapProgs=p;lap=t;};const breathe=async force=>{if(!sliced||!force&&performance.now()-slice<sliceMs())return;await breath();breaths++;slice=performance.now();};   // p<n> in a lap: the program count after a step that made programs
   renderer.setAnimationLoop(null);   // no frame may draw the unhidden objects or move the render target meanwhile
   if(sliced)canvas.style.visibility='hidden';
   try{
@@ -853,7 +861,7 @@ async function warmShaders(waitGpu=false){
     firstDraw.lateFrom=renderer.info.programs.reduce((m,p)=>Math.max(m,p.id),-1)+1;   // programs with a higher id were compiled mid-game (reported with their material and object)
     console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects,',variants.userData.count,'world material variants, in',Math.round(performance.now()-t0),'ms',sliced?`(${breaths} frames between slices; ms: ${laps.join(', ')})`:'');
     // the same numbers in the client log, so a slow load on a player's machine can be read afterwards (2026-11-12)
-    if(waitGpu)diag('warm',{ms:Math.round(performance.now()-t0),programs:renderer.info.programs.length-before,total:renderer.info.programs.length,laps:laps.join(', ').slice(0,2400)});
+    if(waitGpu)diag('warm',{ms:Math.round(performance.now()-t0),programs:renderer.info.programs.length-before,total:renderer.info.programs.length,laps:laps.join(', ').slice(0,2400),kinds:programKinds()});
     if(waitGpu&&!NO_GPU_WAIT){const ms=Math.round(await gpuIdle());console.info('[warm-shaders] GPU caught up in',ms,'ms');diag('gpuWait',{ms});}   // the loading screen stays meanwhile
   }catch(error){console.warn('[warm-shaders]',error);}
   finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);standIns?.view.removeFromParent();keepPrograms();if(sliced)canvas.style.visibility='';if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}

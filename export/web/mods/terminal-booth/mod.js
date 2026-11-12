@@ -48,11 +48,12 @@ export default async function setup(api){
   api.host.on('warmHud',on=>{try{warmDesktop(on);}catch(error){console.warn('[terminal-booth] warm',error);}});   // MelonTerm painted once at load (desktop.js warmDesktop)
   const {scene,world,session,camera,audio,host}=api;
   const col=world.collision;
-  let pulseTex,meshes;
+  let pulseTex,meshes,debrisMeshes,lowest=-1;const worldBoxes=new Map();   // (declared before the booths are built below: build() uses them)
   const booths=[];
   for(const spot of spots)booths.push(build(await loadModel(BASE+(spot.model??'terminal_booth.glb')),spot));
   routeAround(booths);
-  for(const b of booths)if(b.spot.clearDebris!==false)clearDebris(b);   // clearDebris:false where the floor itself is bumpy (The Giant's snow)
+  {let cut=0;for(const b of booths)if(b.spot.clearDebris!==false)cut+=clearDebris(b);   // clearDebris:false where the floor itself is bumpy (The Giant's snow)
+    if(cut){col.geometry.index.needsUpdate=true;col.bvh.refit();}}   // one refit for all the booths (a refit walks every triangle)
   col?.invalidateCache?.();   // the player's capsule test caches nearby triangles (collision-world.js); some just moved
   window.kino.terminalBooth={booths};   // .open(b) is added in usePrompt: MelonTerm as from a booth (tests, other mods)
   usePrompt(booths);
@@ -67,11 +68,14 @@ export default async function setup(api){
     // The visible wall can stand proud of its collision (Kino's under-stair
     // wall is 8 in front), so the back also snaps to the rendered meshes.
     const rc=new THREE.Raycaster();
-    const seen=(o,d,far)=>{rc.set(o,d.clone().normalize());rc.far=far;return rc.intersectObjects(visibleMeshes(),false)[0];};
+    let nearby;const seen=(o,d,far)=>{rc.set(o,d.clone().normalize());rc.far=far;return rc.intersectObjects(nearby,false)[0];};
     const floor=cast(p.clone().addScaledVector(fwd,15).add(new THREE.Vector3(0,60,0)),new THREE.Vector3(0,-1,0),200);
     if(floor)p.y=floor.point.y;
     // The nearest wall surface behind, measured at a few heights and offsets.
     let back=null;const side=new THREE.Vector3(fwd.z,0,-fwd.x);
+    {const reach=new THREE.Box3();   // every ray below: from 40 in front to 50 behind, 15 to each side, 20 to 70 up
+      for(const f of [40,-50])for(const s of [-15,15])for(const h of [20,70])reach.expandByPoint(p.clone().addScaledVector(fwd,f).addScaledVector(side,s*sc).setY(p.y+h*sc));
+      nearby=meshesIn(reach.expandByScalar(1));}
     for(const h of [20,45,70])for(const s of [-15,0,15]){
       const o=p.clone().addScaledVector(fwd,40).addScaledVector(side,s*sc);o.y=p.y+h*sc;
       for(const hit of [cast(o,fwd.clone().negate(),90),seen(o,fwd.clone().negate(),90)])if(hit&&(back===null||hit.distance<back))back=hit.distance;}
@@ -82,6 +86,15 @@ export default async function setup(api){
   function visibleMeshes(){
     return meshes??=(()=>{const list=[];scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&o.visible&&!o.material?.transparent)list.push(o);});return list;})();
   }
+  // Only the meshes near a booth are ray tested. Der Eisendrache has 19,000 map meshes and 8 booths: 72 rays through
+  // all of them, plus the debris sweep below walking all 7.7M collision triangles once a booth, were 10 s of every load.
+  function worldBox(m){
+    let b=worldBoxes.get(m);
+    if(!b){const own=m.isInstancedMesh||m.isBatchedMesh,src=own?m:m.geometry;if(!src.boundingBox)src.computeBoundingBox();
+      b=src.boundingBox.clone().applyMatrix4(m.matrixWorld);worldBoxes.set(m,b);}
+    return b;
+  }
+  function meshesIn(box){return visibleMeshes().filter(m=>{const b=worldBox(m);return b.isEmpty()||b.intersectsBox(box);});}
 
   function collide(root){
     if(!world.dynamic)return;
@@ -352,22 +365,25 @@ export default async function setup(api){
     const v=new THREE.Vector3();let n=0,nc=0;
     const area=new THREE.Box3();for(const [lx,lz] of [[-X,-4],[X,-4],[-X,Z],[X,Z]])area.expandByPoint(new THREE.Vector3(o.x+lx*c+lz*sn,floor,o.z-lx*sn+lz*c));
     area.min.y=floor-1;area.max.y=floor+10;
-    // rendered map meshes (skip geometry shared by several meshes)
-    const users=new Map();scene.traverse(m=>{if(m.isMesh)users.set(m.geometry,(users.get(m.geometry)??0)+1);});
-    scene.traverse(m=>{
-      if(!m.isMesh||m.isSkinnedMesh||users.get(m.geometry)>1||b.root===m||isChildOf(m,b.root))return;
-      const g=m.geometry;if(!g.index||!g.attributes.position)return;
-      if(!g.boundingBox)g.computeBoundingBox();if(!g.boundingBox.clone().applyMatrix4(m.matrixWorld).intersectsBox(area))return;
-      const I=g.index,P=g.attributes.position;let hit=false;
+    // rendered map meshes (skip geometry shared by several meshes); the list and its bounds are made once for all booths
+    debrisMeshes??=(()=>{const users=new Map(),list=[];scene.traverse(m=>{if(m.isMesh)users.set(m.geometry,(users.get(m.geometry)??0)+1);});
+      scene.traverse(m=>{if(!m.isMesh||m.isSkinnedMesh||users.get(m.geometry)>1)return;
+        const g=m.geometry;if(!g.index||!g.attributes.position)return;
+        if(!g.boundingBox)g.computeBoundingBox();list.push({m,box:g.boundingBox.clone().applyMatrix4(m.matrixWorld)});});
+      return list;})();
+    debrisMeshes.forEach(({m,box})=>{
+      if(!box.intersectsBox(area)||b.root===m||isChildOf(m,b.root))return;
+      const g=m.geometry,I=g.index,P=g.attributes.position;let hit=false;
       for(let t=0;t<I.count;t+=3){const a=I.getX(t),bb=I.getX(t+1),cc=I.getX(t+2);if(debris(P,a,bb,cc,m.matrixWorld)){I.setX(t+1,a);I.setX(t+2,a);hit=true;n++;}}
       if(hit)I.needsUpdate=true;});
-    // collision
+    // collision: only the triangles the tree finds around the booth; the caller refits the tree once
     const cg=col?.geometry,bvh=col?.bvh;
-    if(cg?.index&&bvh){const I=cg.index,P=cg.attributes.position;let far=0;
-      for(let i=1;i<P.count;i++)if(P.getY(i)<P.getY(far))far=i;
-      for(let t=0;t<I.count;t+=3){const a=I.getX(t),bb=I.getX(t+1),cc=I.getX(t+2);if(debris(P,a,bb,cc,null)){I.setX(t,far);I.setX(t+1,far);I.setX(t+2,far);nc++;}}
-      if(nc){I.needsUpdate=true;bvh.refit();}}
+    if(cg?.index&&bvh){const I=cg.index,P=cg.attributes.position,near=[];
+      if(lowest<0){lowest=0;for(let i=1;i<P.count;i++)if(P.getY(i)<P.getY(lowest))lowest=i;}
+      bvh.shapecast({intersectsBounds:box=>box.intersectsBox(area),intersectsTriangle:(tri,i)=>{near.push(i*3);return false;}});
+      for(const t of near){const a=I.getX(t),bb=I.getX(t+1),cc=I.getX(t+2);if(debris(P,a,bb,cc,null)){I.setX(t,lowest);I.setX(t+1,lowest);I.setX(t+2,lowest);nc++;}}}
     console.info('[terminal-booth] cleared debris triangles: render',n,'collision',nc);
+    return nc;
   }
   function isChildOf(o,root){for(let p=o.parent;p;p=p.parent)if(p===root)return true;return false;}
 

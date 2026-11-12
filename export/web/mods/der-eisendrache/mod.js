@@ -442,7 +442,11 @@ function setupLook(api) {
   // host.pending it landed after the engine's "Optimizing the map" compile, so every map program was built there without
   // the bake and the lights, thrown away, and built again in the warm-up.
   let timer = 0;
-  const ready = loadMapLight(api, { skyFloor: .3, sunFloor: .12, strength: 1, powerOff: .7, knee: .4 }).catch(() => null).then(light => { baked = light; resize(); });
+  // 2026-11-12 (user: "everything in DE is WAY too dark"): knee .4 halved every room, not just the snow by the lamps. The
+  // bake is now made from the game's own lights (.tools/bo3_ff_lights.py) with the glare held down in the data (its
+  // outdoor cap), so the knee is only a trim (.1), and the light left indoors is stronger and cool (the game's blue
+  // shadows against warm lamps) instead of a dim warm grey.
+  const ready = loadMapLight(api, { skyFloor: .55, indoor: [.85, .95, 1.18], sunFloor: .12, strength: 1, powerOff: .7, knee: .1 }).catch(() => null).then(light => { baked = light; resize(); });
   onSettingsChange((_, k) => { if (k === 'graphics' || k === null) resize(); });   // (a no-op until the bake has answered: the pool is empty then)
   // the sky: BO3's skybox model isn't exported (a flat grey background showed through the castle's breaches): a dome at
   // the far plane with an overcast gradient, a soft sun glow and drifting cloud bands; the fog takes its horizon colour

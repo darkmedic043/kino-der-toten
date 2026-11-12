@@ -7,9 +7,16 @@
 // ambient + hemisphere by the sky value, its directional lights by the sun value, and adds the lamp light, so
 // interiors go dark, lamps light their rooms from any distance and nothing pops in or out.
 //
-//   node .tools/bake-map-light.mjs <map-id> [--cell N]
+//   node .tools/bake-map-light.mjs <map-id> [--cell N] [--out dir/]   (--out: write somewhere else, to compare before going live;
+//   --cache file: keeps the sky and visibility pass, 4 of the 5 minutes, between runs while tuning: delete it after a map rebuild)
 // Reads export/web/mods/maps/<id>/<id>.glb, writes light.json + light.bin.gz next to it (git-ignored, like the map).
 // Rerun after rebuilding the map or changing a number in MAPS (they must match the map mod's LAMP table).
+//
+// A map with `real` takes its lamp light from the game's own primary lights (.tools/bo3_ff_lights.py reads them out of
+// the map's fastfile into export_game/, git-ignored) instead of the lamp markers and the invented fill lights: true
+// positions, colours, radii and spot cones, inverse-square falloff. `gain` turns the game's light units into this
+// volume's (set once so the lit rooms keep about their old level and the map's grade still fits); `--gain N` tries
+// another. Without the file the bake falls back to the markers and says so.
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import * as THREE from 'three';
@@ -18,14 +25,15 @@ import { MeshBVH } from 'three-mesh-bvh';
 const MAPS = {
   'the-giant': { lamps: /^GIANT_LAMP_/, cell: 40, range: 650, decay: 1.4, off: 700, on: 2200, color: () => 0xffc58a, sun: [-.35, 1, .45], extra: [] },
   'der-eisendrache': { lamps: /^CASTLE_LAMP_/, cell: 48, range: 620, decay: 1.4, off: 2000, on: 3000,
-    color: n => n.extras?.kind === 'electric' ? 0xffd9a8 : 0xffac62, sun: [.45, 1, .3], extra: ['PCOL_props', 'COL_flagstones'] },
+    color: n => n.extras?.kind === 'electric' ? 0xffd9a8 : 0xffac62, sun: [.45, 1, .3], extra: ['PCOL_props', 'COL_flagstones'],
+    real: { file: 'export_game/bo3/maps/zm_castle/zm_castle.lights.json', gain: 550, minRadius: 30, albedo: .5, bounces: 3, adapt: [6, .45], fill: [1.5, .84, .93, 1.1], outdoor: 1.4 } },
 };
 const id = process.argv[2], cfg = MAPS[id];
 if (!cfg) { console.error('usage: bake-map-light.mjs <' + Object.keys(MAPS).join('|') + '> [--cell N]'); process.exit(1); }
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? +process.argv[i + 1] : d; };
 const CELL = arg('cell', cfg.cell), SCALE = 8, CLAMP = 4, SKY_RAYS = 32, SKY_FAR = 9000;
 const MARK = /^(ZSPAWN|WINDOW|WALLBUY|PERK|BOX|PLAYER_SPAWN|PAP|POWER|TELEPORT|TPDEST|TRAP|CLAYMORE)/, REACH = 1000, BELOW = 300, ABOVE = 600;
-const dir = `export/web/mods/maps/${id}/`, t0 = Date.now(), log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, ...a);
+const dir = `export/web/mods/maps/${id}/`, outDir = process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : dir, t0 = Date.now(), log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, ...a);
 
 // ---- the glb
 const glb = fs.readFileSync(dir + id + '.glb'), jsonLen = glb.readUInt32LE(12), gltf = JSON.parse(glb.toString('utf8', 20, 20 + jsonLen)), bin0 = 20 + jsonLen + 8;
@@ -97,7 +105,9 @@ const toL = new THREE.Vector3(), kOn = cfg.on - cfg.off; let rays = 0, done = 0,
 const cellPos = (i, v) => v.set(origin.x + (i % X) * CELL, origin.y + (Math.floor(i / X) % Y) * CELL, origin.z + Math.floor(i / (X * Y)) * CELL);
 const hit = (o, d, far) => { ray.origin.copy(o); ray.direction.copy(d); rays++; return bvh.raycastFirst(ray, SIDE, 0, far); };
 // ---- pass 1: sky and sun; a cell whose rays mostly leave through back faces is inside a wall or under the floor
-for (let z = 0; z < Z; z++) {
+const cachePath = process.argv.includes('--cache') ? process.argv[process.argv.indexOf('--cache') + 1] : null;
+const cached = cachePath && fs.existsSync(cachePath) && fs.statSync(cachePath).size === N * 10 ? fs.readFileSync(cachePath) : null;
+if (!cached) for (let z = 0; z < Z; z++) {
   for (let y = 0; y < Y; y++) for (let x = 0; x < X; x++) {
     const i = (z * Y + y) * X + x; if (!active[i]) continue;
     ray.origin.set(origin.x + x * CELL, origin.y + y * CELL, origin.z + z * CELL);
@@ -111,8 +121,10 @@ for (let z = 0; z < Z; z++) {
 }
 // ---- links: which of a cell's +x, +y, +z neighbours it can see (light only spreads through open links)
 const link = new Uint8Array(N), AX = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)], STEP = [1, X, X * Y], o = new THREE.Vector3();
-for (let i = 0; i < N; i++) { if (valid[i] !== 1) continue; cellPos(i, o); const x = i % X, y = Math.floor(i / X) % Y, z = Math.floor(i / (X * Y));
+if (!cached) for (let i = 0; i < N; i++) { if (valid[i] !== 1) continue; cellPos(i, o); const x = i % X, y = Math.floor(i / X) % Y, z = Math.floor(i / (X * Y));
   for (let k = 0; k < 3; k++) { if ([x, y, z][k] >= [X, Y, Z][k] - 1 || valid[i + STEP[k]] !== 1) continue; if (!hit(o, AX[k], CELL)) link[i] |= 1 << k; } }
+if (cached) { valid.set(cached.subarray(0, N)); link.set(cached.subarray(N, N * 2)); sky.set(new Float32Array(cached.buffer.slice(cached.byteOffset + N * 2, cached.byteOffset + N * 6))); sunV.set(new Float32Array(cached.buffer.slice(cached.byteOffset + N * 6, cached.byteOffset + N * 10))); log('sky pass from ' + cachePath); }
+else if (cachePath) fs.writeFileSync(cachePath, Buffer.concat([Buffer.from(valid.buffer), Buffer.from(link.buffer), Buffer.from(sky.buffer), Buffer.from(sunV.buffer)]));
 const NEIGH = [[1, 1], [-1, 1], [X, 2], [-X, 2], [X * Y, 4], [-X * Y, 4]];
 const eachOpen = (i, f) => { for (const [s, bit] of NEIGH) { const j = i + s; if (j < 0 || j >= N) continue; if (link[s > 0 ? i : j] & bit) f(j); } };
 log(`links done, ${rays} rays`);
@@ -136,10 +148,44 @@ for (const c of cands) { cellPos(c.i, o);
   all.push({ p: o.clone().addScaledVector(UP, h), c: FILL.color, k: FILL.level, fill: true }); nFill++; }
 log(`${cands.length} indoor standing cells, ${nFill} fill lights added to ${lamps.length} lamps`);
 
+// ---- the game's own lights (cfg.real): CoD axes -> the map's (x, z, -y); only the default lighting state's lights, and
+// none smaller than a cell can show (candle glows of 5-13 units)
+const realFile = cfg.real && !process.argv.includes('--markers') && fs.existsSync(cfg.real.file) ? cfg.real.file : null;
+if (cfg.real && !realFile) log(`no ${cfg.real.file}: falling back to the lamp markers`);
+const GAIN = arg('gain', cfg.real?.gain ?? 1), toMap = v => new THREE.Vector3(v[0], v[2], -v[1]);
+const real = !realFile ? null : JSON.parse(fs.readFileSync(realFile)).lights.filter(l => (l.states & 1) && l.radius >= cfg.real.minRadius)
+  .map(l => ({ p: toMap(l.origin), c: l.color, r: l.radius, d: l.toLight ? toMap(l.toLight).normalize() : null, ci: l.cosInner, co: l.cosOuter }))
+  .filter(l => l.p.x + l.r > origin.x && l.p.y + l.r > origin.y && l.p.z + l.r > origin.z && l.p.x - l.r < origin.x + X * CELL && l.p.y - l.r < origin.y + Y * CELL && l.p.z - l.r < origin.z + Z * CELL);
+if (real) {
+  const share = cfg.off / cfg.on, acc = new Float32Array(N * 3), cv = new THREE.Vector3(); let used = 0;
+  for (const L of real) {
+    const lo = [L.p.x - L.r - origin.x, L.p.y - L.r - origin.y, L.p.z - L.r - origin.z].map(v => Math.max(0, Math.ceil(v / CELL)));
+    const hi = [L.p.x + L.r - origin.x, L.p.y + L.r - origin.y, L.p.z + L.r - origin.z].map((v, k) => Math.min([X, Y, Z][k] - 1, Math.floor(v / CELL)));
+    const top = Math.max(L.c[0], L.c[1], L.c[2]) * GAIN; let any = false;
+    for (let z = lo[2]; z <= hi[2]; z++) for (let y = lo[1]; y <= hi[1]; y++) for (let x = lo[0]; x <= hi[0]; x++) {
+      const i = (z * Y + y) * X + x; if (valid[i] !== 1) continue; cellPos(i, cv);
+      toL.subVectors(L.p, cv); const d = toL.length(); if (d >= L.r) continue;
+      let cone = 1; if (L.d) { const c = toL.dot(L.d) / Math.max(d, 1e-3); cone = L.ci - L.co < 1e-4 ? +(c >= L.co) : Math.min(1, Math.max(0, (c - L.co) / (L.ci - L.co))); cone *= cone * (3 - 2 * cone); if (cone <= 0) continue; }
+      const dd = Math.max(d, 16), fall = Math.pow(1 - Math.pow(dd / L.r, 4), 2) / (dd * dd) * cone;
+      if (top * fall < .004) continue;
+      if (d > 34 && hit(cv, toL.clone().divideScalar(d), d - 30)) continue;   // stops short of the light: it may sit in its fixture
+      const e = GAIN * fall * Math.min(1, CLAMP / (top * fall)), w = e * top / Math.max(d, 1);
+      for (let k = 0; k < 3; k++) { lampOff[i * 3 + k] += L.c[k] * e * share; lampOn[i * 3 + k] += L.c[k] * e * (1 - share); }
+      acc[i * 3] += toL.x * w; acc[i * 3 + 1] += toL.y * w; acc[i * 3 + 2] += toL.z * w; any = true;
+    }
+    if (any) used++;
+  }
+  for (let i = 0; i < N; i++) { if (valid[i] !== 1) continue; const dl = Math.hypot(acc[i * 3], acc[i * 3 + 1], acc[i * 3 + 2]);
+    if (dl > 0) for (let k = 0; k < 3; k++) dirs[i * 3 + k] = acc[i * 3 + k] / dl; else dirs[i * 3 + 1] = 1; done++; }
+  // the level people stand in, for setting the gain: lamp light (power on) at the indoor standing cells
+  const lum = cands.map(c => .2126 * (lampOff[c.i * 3] + lampOn[c.i * 3]) + .7152 * (lampOff[c.i * 3 + 1] + lampOn[c.i * 3 + 1]) + .0722 * (lampOff[c.i * 3 + 2] + lampOn[c.i * 3 + 2])).sort((a, b) => a - b);
+  log(`${real.length} real lights in reach, ${used} light a cell (gain ${GAIN}); indoor standing cells, lamp level p10/25/50/75/90: ${[.1, .25, .5, .75, .9].map(q => lum[Math.floor(lum.length * q)].toFixed(3)).join(' ')}`);
+}
+
 // ---- pass 2: lamp light with occlusion (lamps bucketed by range)
 const bucket = new Map(), bk = p => Math.floor(p.x / cfg.range) + ',' + Math.floor(p.z / cfg.range);
 for (const L of all) { const k = bk(L.p); bucket.has(k) || bucket.set(k, []); bucket.get(k).push(L); }
-for (let i = 0; i < N; i++) { if (valid[i] !== 1) continue; cellPos(i, o);
+for (let i = 0; i < N && !real; i++) { if (valid[i] !== 1) continue; cellPos(i, o);
   const bx = Math.floor(o.x / cfg.range), bz = Math.floor(o.z / cfg.range); let dx = 0, dy = 0, dz = 0;
   for (let u = -1; u <= 1; u++) for (let v = -1; v <= 1; v++) for (const L of bucket.get((bx + u) + ',' + (bz + v)) ?? []) {
     toL.subVectors(L.p, o); const d = toL.length(); if (d >= cfg.range) continue;
@@ -167,7 +213,54 @@ function diffuse(f, ch, steps) {
     [a, b] = [b, a]; }
   return a;
 }
-for (const f of [lampOff, lampOn]) { const d = diffuse(f, 3, 10); for (let i = 0; i < f.length; i++) f[i] += d[i] * BOUNCE; }
+if (!real) for (const f of [lampOff, lampOn]) { const d = diffuse(f, 3, 10); for (let i = 0; i < f.length; i++) f[i] += d[i] * BOUNCE; }
+// The real lights reach only about a third of the indoor space directly: the game fills the rest with bounced light in
+// its lightmaps. So their bounce is a gather: every cell looks 24 ways, takes the light of the cell in front of whatever
+// it sees, times the surfaces' albedo, and that repeats (`bounces`): rooms fill from their own lamps, through doorways too.
+if (real) {
+  const RAYS = 24, gd = [], cells = []; for (let i = 0; i < RAYS; i++) { const y = 1 - 2 * (i + .5) / RAYS, r = Math.sqrt(1 - y * y), a = i * 2.39996323; gd.push(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r)); }
+  for (let i = 0; i < N; i++) if (valid[i] === 1) cells.push(i);
+  const gPath = cachePath && cachePath + '.gather', pv = new THREE.Vector3(); let seen;
+  const cellAt = p => { const x = Math.round((p.x - origin.x) / CELL), y = Math.round((p.y - origin.y) / CELL), z = Math.round((p.z - origin.z) / CELL);
+    return x < 0 || y < 0 || z < 0 || x >= X || y >= Y || z >= Z ? -1 : (z * Y + y) * X + x; };
+  if (gPath && fs.existsSync(gPath) && fs.statSync(gPath).size === cells.length * RAYS * 4) { const b = fs.readFileSync(gPath); seen = new Int32Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.length)); }
+  else { seen = new Int32Array(cells.length * RAYS);
+    for (let n = 0; n < cells.length; n++) { const i = cells[n]; cellPos(i, o);
+      for (let r = 0; r < RAYS; r++) { const h = hit(o, gd[r], 3000); let j = -1;
+        if (h) for (const back of [.6, 1.3]) { j = cellAt(pv.copy(o).addScaledVector(gd[r], Math.max(0, h.distance - CELL * back))); if (j >= 0 && valid[j] === 1) break; j = i; }
+        seen[n * RAYS + r] = j; }
+      if (n % 200000 === 0) log(`gather: ${n}/${cells.length} cells`); }
+    if (gPath) fs.writeFileSync(gPath, Buffer.from(seen.buffer)); }
+  const albedo = arg('albedo', cfg.real.albedo), bounces = arg('bounces', cfg.real.bounces);
+  for (const f of [lampOff, lampOn]) { const direct = f.slice(); let cur = direct;
+    for (let b = 0; b < bounces; b++) { const next = new Float32Array(f.length);
+      for (let n = 0; n < cells.length; n++) { const i = cells[n]; let r0 = 0, g0 = 0, b0 = 0;
+        for (let r = 0; r < RAYS; r++) { const j = seen[n * RAYS + r]; if (j < 0) continue; r0 += cur[j * 3]; g0 += cur[j * 3 + 1]; b0 += cur[j * 3 + 2]; }
+        next[i * 3] = direct[i * 3] + r0 / RAYS * albedo; next[i * 3 + 1] = direct[i * 3 + 1] + g0 / RAYS * albedo; next[i * 3 + 2] = direct[i * 3 + 2] + b0 / RAYS * albedo; }
+      cur = next; }
+    f.set(cur); }
+  log(`gather bounce done (albedo ${albedo}, ${bounces} bounces)`);
+  // The game's eye adaptation opens up in its dim rooms; this renderer's exposure is fixed. `adapt: [ref, power]` does
+  // that job in the data: a cell's level L becomes ref * (L / ref) ^ power (colour kept; a lift of at most 8x), so a
+  // lamp's pool stays a few times brighter than the room around it instead of thirty times.
+  const [ref, pw] = [arg('ref', cfg.real.adapt?.[0] ?? 1), arg('adapt', cfg.real.adapt?.[1] ?? 1)];
+  if (pw !== 1) for (const i of cells) { const q = i * 3, L = .2126 * (lampOff[q] + lampOn[q]) + .7152 * (lampOff[q + 1] + lampOn[q + 1]) + .0722 * (lampOff[q + 2] + lampOn[q + 2]); if (L <= 0) continue;
+    const k = Math.min(8, Math.pow(L / ref, pw - 1)); for (let c = 0; c < 3; c++) { lampOff[q + c] *= k; lampOn[q + c] *= k; } }
+  // and no room is left black: BO3's lightmaps hold bounce light everywhere indoors. `fill: [level, r, g, b]` tops up
+  // every cell to `level` (scaled by how far indoors it is, 1 - sky) with that colour, a cool grey against the lamps.
+  const fill = cfg.real.fill, fillLevel = arg('fill', fill?.[0] ?? 0);
+  if (fillLevel > 0) { const fc = fill?.length > 3 ? fill.slice(1) : [.84, .93, 1.1], fl = .2126 * fc[0] + .7152 * fc[1] + .0722 * fc[2]; let n = 0;
+    for (const i of cells) { const q = i * 3, L = .2126 * (lampOff[q] + lampOn[q]) + .7152 * (lampOff[q + 1] + lampOn[q + 1]) + .0722 * (lampOff[q + 2] + lampOn[q + 2]);
+      const short = fillLevel * (1 - Math.min(1, sky[i])) - L; if (short <= 0) continue; n++;
+      for (let c = 0; c < 3; c++) lampOff[q + c] += fc[c] / fl * short; }
+    log(`room fill ${fillLevel}: ${n} cells topped up`); }
+  // under the open sky the daylight is already there: `outdoor` caps the lamp level at outdoor / sky (lamps on snow
+  // burned it white with bloom on top, 2026-11-12), so a lamp still reads in a doorway but not on the open pad
+  const capOut = arg('outdoor', cfg.real.outdoor ?? 0);
+  if (capOut > 0) { let n = 0; for (const i of cells) { const s = sky[i]; if (s <= .05) continue; const q = i * 3, L = .2126 * (lampOff[q] + lampOn[q]) + .7152 * (lampOff[q + 1] + lampOn[q + 1]) + .0722 * (lampOff[q + 2] + lampOn[q + 2]), lim = capOut / s;
+      if (L > lim) { n++; for (let c = 0; c < 3; c++) { lampOff[q + c] *= lim / L; lampOn[q + c] *= lim / L; } } }
+    log(`outdoor cap ${capOut}: ${n} cells held down`); }
+}
 function smooth(f) { const out = new Float32Array(f); for (let i = 0; i < N; i++) { if (valid[i] !== 1) continue; let s = f[i] * 2, w = 2; eachOpen(i, j => { s += f[j]; w++; }); out[i] = s / w; } return out; }
 function spread(f, steps) { let a = new Float32Array(f), b = new Float32Array(f);
   for (let s = 0; s < steps; s++) { for (let i = 0; i < N; i++) { if (valid[i] !== 1) continue; let sum = 0; eachOpen(i, j => { sum += a[j]; }); b[i] = Math.max(f[i], sum / 6 * SKY_DECAY); } [a, b] = [b, a]; }
@@ -234,8 +327,8 @@ for (const r of regs) { const [dx, dy, dz] = dimsOf(r);
   }
   xoff += dx; }
 log(`${regions.length} region(s): ${regions.map(r => r.dims.join('x')).join(' + ')} -> atlas ${AX_}x${AY}x${AZ}`);
-const meta = { map: id, cell: CELL, atlas: [AX_, AY, AZ], regions, scale: SCALE, sun: sun.toArray(), lamps: lamps.length, fills: nFill, baked: new Date().toISOString().slice(0, 10),
+const meta = { map: id, cell: CELL, atlas: [AX_, AY, AZ], regions, scale: SCALE, sun: sun.toArray(), lamps: lamps.length, fills: real ? 0 : nFill, ...(real ? { real: real.length, gain: GAIN } : {}), baked: new Date().toISOString().slice(0, 10), stamp: Date.now().toString(36),
   lamp: { off: cfg.off, on: cfg.on, range: cfg.range, decay: cfg.decay } };
-fs.writeFileSync(dir + 'light.json', JSON.stringify(meta));
-const gz = zlib.gzipSync(out, { level: 9 }); fs.writeFileSync(dir + 'light.bin.gz', gz);
-log(`wrote ${dir}light.bin.gz: ${(gz.length / 1048576).toFixed(2)} MB (${(out.length / 1048576).toFixed(1)} MB raw)`);
+fs.writeFileSync(outDir + 'light.json', JSON.stringify(meta));
+const gz = zlib.gzipSync(out, { level: 9 }); fs.writeFileSync(outDir + 'light.bin.gz', gz);
+log(`wrote ${outDir}light.bin.gz: ${(gz.length / 1048576).toFixed(2)} MB (${(out.length / 1048576).toFixed(1)} MB raw)`);

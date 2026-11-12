@@ -19,8 +19,10 @@ const DIR_INFO = 'getDirectionalLightInfo( directionalLight, directLight );';
 export async function loadMapLight({ scene, world, session, host }, { skyFloor = .3, indoor = [1.1, .98, .84], sunFloor = .12, strength = 1, powerOff = .3, knee = 0, dir = world?.entry?.dir } = {}) {
   if (!dir || /[?&]noBake\b/.test(location.search) || !THREE.ShaderChunk.lights_fragment_begin.includes(DIR_INFO)) return null;
   const base = new URL(dir.replace(/\/?$/, '/'), document.baseURI);
-  const meta = await fetch(new URL('light.json', base)).then(r => r.ok ? r.json() : null).catch(() => null); if (!meta) return null;
-  const res = await fetch(new URL('light.bin.gz', base)).catch(() => null); if (!res?.ok) return null;
+  // A rebake must reach players on their next load: light.json is re-checked every time (an ETag match answers 304), and the
+  // volume carries the bake's stamp as a version query (it is cached for a day, at Cloudflare's edge too).
+  const meta = await fetch(new URL('light.json', base), { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null); if (!meta) return null;
+  const res = await fetch(new URL('light.bin.gz?v=' + encodeURIComponent(meta.stamp ?? meta.baked ?? 0), base)).catch(() => null); if (!res?.ok) return null;
   const bin = new Uint8Array(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
   // up to two play areas, packed side by side along x in one atlas (region.x = its first column)
   const regions = (meta.regions ?? [{ origin: meta.origin, dims: meta.dims, x: 0 }]).slice(0, 2), [X, Y, Z] = meta.atlas ?? meta.dims, n = X * Y * Z; if (bin.length < n * 12) return null;
