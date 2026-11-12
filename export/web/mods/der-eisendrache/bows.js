@@ -88,7 +88,7 @@ const STATUE = V(W(-1192, 2256, 248), 520, 160);
 // what each step wants (no longer toasted: the user wants the steps found, 2026-11-12); kept as the record of the steps
 const HINT = {
   storm: { beacons: 'Shoot the three beacon pyres far out from the castle: each one catches fire', wallrun: 'Wall-run through all five undercroft triggers without landing (low gravity)',
-    batteries: 'Fill the three storm batteries with kills, then from each fire a fully drawn arrow at a beacon', reforge: 'Reforge the arrow on the roof' },
+    batteries: 'Fill the three storm urns with kills, take each one\'s charge onto your bow, and fire it fully drawn at a beacon', reforge: 'Reforge the arrow on the roof' },
   rune: { obelisk: 'Shoot the obelisk by the rocket pad just after a rocket test fire', circles: 'Shoot the runic circles while flying off a launch pad, then charge each with kills standing in it',
     clock: 'Turn the clock in the clock tower', golf: 'Magma golf: from the pool, land arrows toward the fireplace the wheel shows', fireplace: 'Take the magma from the fireplace', reforge: 'Reforge the arrow on the roof' },
   wolf: { shrine: 'Shoot the skull shrine above the rocket pad', skull: 'Pick up the wolf skull below the shrine', escort: 'Place the skull in the undercroft and protect Skadi while she digs',
@@ -194,7 +194,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   // ---- steps ------------------------------------------------------------------------------------------------------------
   function enter(el, ctx) {   // a step begins (on every client, in event order)
     const s = st[el], step = stepOf(el); s.d = {};
-    if (step === 'batteries') { s.d.kills = {}; s.d.charged = new Set(); s.d.used = new Set(); }
+    if (step === 'batteries') { s.d.kills = {}; s.d.charged = new Set(); s.d.used = new Set(); s.d.held = null; }
     if (step === 'circles') { s.d.active = new Set(); s.d.kills = {}; }
     if (step === 'escort') s.d.phase = 'skull';
     if (step === 'runes') {   // BO3 function_8700782f: armour crests and circle runes shuffled together; slots 1-3 are the sequence
@@ -223,8 +223,12 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     const el = d.el, s = st[el], step = stepOf(el); if (!s || s.owner !== ctx.by) return;
     if (el === 'storm' && step === 'beacons' && !s.d.lit?.has(d.k)) { (s.d.lit ??= new Set()).add(d.k); audio?.play?.('buy', .35); if (s.d.lit.size === 3) next(el, ctx); }
     if (el === 'storm' && step === 'wallrun' && d.what === 'wallrun') next(el, ctx);
-    if (el === 'storm' && step === 'batteries' && d.what === 'beacon' && !s.d.charged.has(d.k) && s.d.kills[d.battery] >= 5 && !s.d.used.has(d.battery)) {
-      s.d.charged.add(d.k); s.d.used.add(d.battery); urnBurst(Q.storm.batteries.find(b => b.id === d.battery), Q.storm.beacons[d.k]); audio?.play?.('buy', .5); if (s.d.charged.size === 3) next(el, ctx); }
+    // a full urn's charge goes onto the bow (standing at it with a bow out) and rides there until a fully drawn arrow
+    // hits a beacon: the urns can't see the beacons (user 2026-11-12), so the charge is carried to wherever one shows
+    if (el === 'storm' && step === 'batteries' && d.what === 'urn' && s.d.held == null && s.d.kills[d.battery] >= 5 && !s.d.used.has(d.battery)) {
+      s.d.used.add(d.battery); s.d.held = d.battery; urnBurst(Q.storm.batteries.find(b => b.id === d.battery), true); audio?.play?.('buy', .45); }
+    if (el === 'storm' && step === 'batteries' && d.what === 'beacon' && !s.d.charged.has(d.k) && d.battery != null && d.battery === s.d.held) {
+      s.d.charged.add(d.k); s.d.held = null; beaconStrike(Q.storm.beacons[d.k]); audio?.play?.('buy', .5); if (s.d.charged.size === 3) next(el, ctx); }
     if (el === 'rune' && step === 'obelisk') { s.d.ball = true; next(el, ctx); }
     if (el === 'rune' && step === 'circles' && !s.d.active.has(d.k)) { s.d.active.add(d.k); s.d.kills[d.k] = 0; audio?.play?.('buy', .4); tell(el, `The ${d.k} circle is lit`, 3); }
     if (el === 'rune' && step === 'golf' && d.what === 'golf') golfShot(el, sync.v(d.p), ctx);
@@ -376,7 +380,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     let k = d.t > .3 ? Math.min(1, d.t / CHARGE) : 0; while (k > 0 && cost(k) - 1 > quiver) k = cost(k) === 3 ? .99 : 0;   // a short quiver caps the draw
     const f = feet();
     shot = { el: elOf(session.weapon?.id), k, full: k >= 1, at: performance.now(), from: f, eye: camera.position.clone(), flung: !!pads?.flying?.(), run: !!lowgrav?.state?.().running,
-      battery: Q.storm.batteries.find(b => inV(f, b.charged))?.id ?? null };
+      battery: owner('storm') && stepOf('storm') === 'batteries' ? st.storm.d.held ?? null : null };   // the urn charge the bow carries
     if (window.kino.debug?.shoot?.()) {
       session.weapon.reserve = Math.max(0, quiver - (cost(k) - 1)); nockAt = session.time + Math.max(.25, (session.def.fireTime ?? .32));
       // the arrow carries its own draw (user 2026-11-08: "charge doesnt seem to work for the upgraded bows"): arrows in the
@@ -512,13 +516,15 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     if (!k && u.src) { const j = pool?.indexOf(u.src) ?? -1; if (j >= 0) pool.splice(j, 1); u.src = null; }
     if (u.src) u.src.intensity = k * (1.2 + (u.zap > 0 ? 3 : 0));
   }
-  function urnBurst(b, to) {   // the 5th kill (to = null) or the full-draw arrow fired from it at a beacon
+  function urnBurst(b, give) {   // the 5th kill, or (give) its charge jumping onto the bow of whoever stands at it
     const top = urnTop(b), F = fxk();
-    flash(top, 0x9fd8ff, to ? 6 : 4, to ? 600 : 400, to ? .9 : .5);
-    F?.bolt?.('ground', top.clone().addScaledVector(UP, -4), { height: to ? 320 : 200, width: to ? 110 : 70, life: .4, color: 0xd8eeff });
-    if (to) { const end = to.clone().addScaledVector(UP, 120), len = top.distanceTo(end);
-      for (let i = 0; i < 3; i++) bolt(top, end, i ? 0x9fd8ff : 0xffffff, .45 + i * .15, Math.min(400, len / 20), Math.max(8, Math.round(len / 150)));
-      F?.bolt?.('ground', to.clone(), { height: 900, width: 280, life: .6, color: 0xd8eeff }); }
+    flash(top, 0x9fd8ff, give ? 6 : 4, give ? 600 : 400, give ? .9 : .5);
+    F?.bolt?.('ground', top.clone().addScaledVector(UP, -4), { height: give ? 320 : 200, width: give ? 110 : 70, life: .4, color: 0xd8eeff });
+    if (give) { const to = b.charged.p.clone().addScaledVector(UP, 50); for (let i = 0; i < 3; i++) bolt(top, to, i ? 0x9fd8ff : 0xffffff, .3 + i * .12, 18, 7); }
+  }
+  function beaconStrike(p) {   // the charged arrow lands: lightning onto the pyre
+    const F = fxk(); flash(p.clone().addScaledVector(UP, 150), 0x9fd8ff, 7, 1400, 1);
+    F?.bolt?.('ground', p.clone(), { height: 900, width: 280, life: .6, color: 0xd8eeff }); F?.bolt?.('ground', p.clone(), { height: 800, width: 200, life: .45, color: 0xffffff });
   }
   host.on('reset', () => { for (const b of Q.storm.batteries) urn(b, 0, false, 0); });
   let skadi = null;
@@ -696,8 +702,9 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       a.g.visible = false; bone.add(a.g); }
     gunArcs.set(gun, a); return a;
   }
-  let urnWas = null;
-  const urnCharge = () => { if (!owner('storm') || stepOf('storm') !== 'batteries') return null; const s = st.storm, f = feet();
+  let urnAsk = 0;
+  const stormHeld = () => owner('storm') && stepOf('storm') === 'batteries' && st.storm.d.held != null;
+  const urnHere = () => { if (!owner('storm') || stepOf('storm') !== 'batteries' || st.storm.d.held != null) return null; const s = st.storm, f = feet();
     return Q.storm.batteries.find(b => (s.d.kills[b.id] ?? 0) >= 5 && !s.d.used.has(b.id) && inV(f, b.charged)) ?? null; };
   host.on('warmWeapon', ({ def, gun }) => { if (isBow(def?.id) && gun) { gunFlame(gun, def.id); gunArc(gun, def.id); } });   // made at load (hidden, like the torch: the same sprite program)
   host.on('update', dt => {
@@ -706,8 +713,8 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     const gun = view?.gun, held = gun && isBow(view?.def?.id) ? gunFlame(gun, view.def.id) : null;
     if (held) { const on = bowInHand() && session.weapon.mag > 0; held.g.visible = on;
       if (on) { held.bone.getWorldQuaternion(tmpQ).invert(); torchTick(held, time, drawing ? Math.min(1, drawing.t / CHARGE) : 0, tmpV.set(0, 1, 0).applyQuaternion(tmpQ)); } }
-    { const u = bowInHand() && session.weapon.mag > 0 ? urnCharge() : null, a = gun && isBow(view?.def?.id) ? gunArc(gun, view.def.id) : null;
-      if (u && u !== urnWas) audio?.play?.('buy', .35); urnWas = u;
+    { const here = bowInHand() ? urnHere() : null; if (here && time >= urnAsk) { urnAsk = time + 1; sync.act('bqHit', { el: 'storm', what: 'urn', battery: here.id }); }
+      const u = bowInHand() && session.weapon.mag > 0 && stormHeld(), a = gun && isBow(view?.def?.id) ? gunArc(gun, view.def.id) : null;
       if (a) { a.g.visible = !!u;
         if (u && time >= a.next) { a.next = time + .04 + Math.random() * .05; const k = drawing ? Math.min(1, drawing.t / CHARGE) : .4;
           a.list.forEach((m, i) => { const c = Math.floor(Math.random() * 4); m.material.map.offset.set(c / 4, 0); m.material.opacity = (.5 + .5 * Math.random()) * (.5 + .5 * k);
@@ -718,6 +725,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     for (let i = flights.length - 1; i >= 0; i--) { const r = flights[i], p = r.p;
       if (!list.includes(p) || p.stuck) { r.g.removeFromParent(); p.flame = null; r.p = null; flights.splice(i, 1); spare[r.kind].push(r); continue; }
       const sp = p.velocity.length(); if (sp > 1) p.mesh.quaternion.setFromUnitVectors(AX, tmpV.copy(p.velocity).divideScalar(sp));   // nose down the arc
+      if (p.bowShot?.battery && Math.random() < dt * 14) fxk()?.bolt?.('arc', p.mesh.position.clone(), { height: 30, width: 80, life: .15, color: 0xd8eeff });   // an urn's charge riding it
       torchTick(r.t, time, .4); r.streak.scale.set(90 + sp * .045, 9, 9); r.streak.material.opacity = .55 + .2 * Math.sin(time * 40 + r.t.ph);
       if ((r.puff -= dt) <= 0) { r.puff = .035; const hot = r.kind === 'hot'; fxk()?.emit?.({ key: r.kind === 'hot' ? 'fire' : 'coldfire', at: p.mesh.position.clone(), vel: new THREE.Vector3(0, 22, 0), size: [15, 4], life: .3, fade: [.05, .7], additive: true, color: (FLAME[p.bow.el] ?? FLAME.base)[0], opacity: .7 }); } }
   });
