@@ -682,13 +682,36 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     if (bone) { t = torch(el, 12, 2); t.g.position.set(TIP, 0, 0); t.bone = bone; bone.add(t.g); t.g.visible = false; }
     gunTorch.set(gun, t); return t;
   }
-  host.on('warmWeapon', ({ def, gun }) => { if (isBow(def?.id) && gun) gunFlame(gun, def.id); });
+  // standing at a full storm urn (its aq_es_battery_volume_charged) charges the nocked arrow: BO1's electric arcs crackle
+  // along it until you shoot or step away (user 2026-11-12: "it isnt putting the electricity on my bow": the step
+  // worked but nothing showed it). Sprites like the torch's (same program); the atlas is uploaded while loading.
+  const arcTex = (() => { let done; const wait = new Promise(r => { done = r; }), t = new THREE.TextureLoader().load(new URL('textures/fxt_env_electric_arc1.png', document.baseURI).href, () => { api.renderer?.initTexture(t); done(); }, undefined, () => done());
+    t.colorSpace = THREE.SRGBColorSpace; (host.pending ??= []).push(wait); return t; })();
+  const gunArcs = new WeakMap();
+  function gunArc(gun, id) {
+    if (gunArcs.has(gun)) return gunArcs.get(gun);
+    const bone = gun.getObjectByName('tag_clip_' + elOf(id)); let a = null;
+    if (bone) { a = { g: new THREE.Group(), list: [], next: 0 }; for (let i = 0; i < 3; i++) { const map = arcTex.clone(); map.repeat.set(.25, 1);
+        const m = new THREE.Sprite(new THREE.SpriteMaterial({ map, color: 0xbfe6ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); m.frustumCulled = false; a.g.add(m); a.list.push(m); }
+      a.g.visible = false; bone.add(a.g); }
+    gunArcs.set(gun, a); return a;
+  }
+  let urnWas = null;
+  const urnCharge = () => { if (!owner('storm') || stepOf('storm') !== 'batteries') return null; const s = st.storm, f = feet();
+    return Q.storm.batteries.find(b => (s.d.kills[b.id] ?? 0) >= 5 && !s.d.used.has(b.id) && inV(f, b.charged)) ?? null; };
+  host.on('warmWeapon', ({ def, gun }) => { if (isBow(def?.id) && gun) { gunFlame(gun, def.id); gunArc(gun, def.id); } });   // made at load (hidden, like the torch: the same sprite program)
   host.on('update', dt => {
     if (!dt) return; const time = performance.now() / 1000;
     // the nocked arrow
     const gun = view?.gun, held = gun && isBow(view?.def?.id) ? gunFlame(gun, view.def.id) : null;
     if (held) { const on = bowInHand() && session.weapon.mag > 0; held.g.visible = on;
       if (on) { held.bone.getWorldQuaternion(tmpQ).invert(); torchTick(held, time, drawing ? Math.min(1, drawing.t / CHARGE) : 0, tmpV.set(0, 1, 0).applyQuaternion(tmpQ)); } }
+    { const u = bowInHand() && session.weapon.mag > 0 ? urnCharge() : null, a = gun && isBow(view?.def?.id) ? gunArc(gun, view.def.id) : null;
+      if (u && u !== urnWas) audio?.play?.('buy', .35); urnWas = u;
+      if (a) { a.g.visible = !!u;
+        if (u && time >= a.next) { a.next = time + .04 + Math.random() * .05; const k = drawing ? Math.min(1, drawing.t / CHARGE) : .4;
+          a.list.forEach((m, i) => { const c = Math.floor(Math.random() * 4); m.material.map.offset.set(c / 4, 0); m.material.opacity = (.5 + .5 * Math.random()) * (.5 + .5 * k);
+            m.position.set(30 + (TIP - 30) * (i + Math.random()) / 3, (Math.random() - .5) * 6, (Math.random() - .5) * 6); m.scale.set((26 + 20 * k) * (Math.random() < .5 ? -1 : 1), 10 + 8 * k, 1); m.material.rotation = (Math.random() - .5) * .8; }); } } }
     // arrows in the air
     const list = api.features?.projectiles ?? [];
     for (const p of list) if (p.bow && !p.stuck && !p.flame) { const r = spare[kindOf(p.bow.el)].pop() ?? flightRig(p.bow.el); tint(r.t, p.bow.el); r.streak.material.color.set((FLAME[p.bow.el] ?? FLAME.base)[0]); r.p = p; p.flame = r; r.g.visible = true; r.g.scale.setScalar(1 / (p.mesh.scale.x || 1)); p.mesh.add(r.g); flights.push(r); }

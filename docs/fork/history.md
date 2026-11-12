@@ -538,3 +538,4 @@
 - 2026-11-12: Der Eisendrache Pack-a-Punch faces the stairs (the spot's yaw, not +90) and its carvings show in the colour (normal-map slope darkens the rocks); waw-ports.md.
 - 2026-11-12: Der Eisendrache storm bow wall-run shows BO3's wind symbol on each of the five walls (the emissive card's mask) instead of a glow; waw-ports.md.
 - 2026-11-12: Der Eisendrache storm bow urns (the batteries) crackle with electric arcs that speed up per kill, arc nonstop when full, and send a bolt to the beacon when fired from; waw-ports.md.
+- 2026-11-12: Der Eisendrache storm urns charge the nocked arrow: lightning crackles along it while you stand at a full urn (there was no sign before); waw-ports.md.
