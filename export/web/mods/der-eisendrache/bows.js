@@ -546,6 +546,9 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       if (el === 'storm') { const at = s.stage === 'idle' ? -1 : s.stage === 'steps' ? s.step : 9;
         q.beacons.forEach((b, k) => { const lit = at > 0 || (at === 0 && !!s.d.lit?.has(k)), ch = at > 2 || (at === 2 && !!s.d.charged?.has(k));
           bonfire('beacon:' + k, lit ? (ch ? 1 : .4) : -1, dt, beaconFire[k], null, 0, 420);
+          // unlit, a pyre smoulders (a low fire, embers, a smoke plume and a small light): a dark woodpile in snow 2000-5000
+          // units off at night, under the valley fog, couldn't be found (user 2026-11-12: "the bonfire here is extremely hard to see")
+          bonfire('ember:' + k, lit ? -1 : 0, dt, beaconFire[k], null, 0, 150);
           if (lit) add(`beacon:${k}`, beaconGlow[k], ch ? 0xffffff : q.color, ch ? 260 : 150, { pulse: ch }); }); }
       if (el === 'storm' && windOk) windCards.forEach((c, k) => { const on = step === 'wallrun' && my, hit = on && run.hit.has(k); c.visible = on;
         if (on) { c.material.opacity = hit ? 1 : .3; c.material.color.setHex(hit ? 0xd8f2ff : q.color); } });
