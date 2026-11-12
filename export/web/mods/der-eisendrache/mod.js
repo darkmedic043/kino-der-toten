@@ -7,7 +7,7 @@ import { setupBows } from './bows.js';
 import { setupEE } from './ee.js';
 import { setupSide } from './side.js';
 import { setupSide2 } from './side2.js';
-import { useGameAudio } from './castle-audio.js';
+import { useGameAudio, sfxAt } from './castle-audio.js';
 import { createSync } from './sync.js';
 import { setupTab } from './tab.js';
 import { setupWeather } from './weather.js';
@@ -1177,18 +1177,61 @@ function setupPanzer(api) {
 
 // ---- Der Wunderfizz (BO3's random perk machine, zm_perk_random). Five machines (CASTLE_FIZZ_<n>); one is lit at a
 // time, starting at one of the two start spots, with the power on. The current perk price less 1,000 (user, 2026-10-18:
-// 2,500 -> 1,500, 3,000 -> 2,000...): the ball spins (3 s) and lands on a
+// 2,500 -> 1,500, 3,000 -> 2,000...): the machine spins (5 s) and lands on a
 // random perk you don't have (pass-locked ones only once owned), which you take within 10 s. After 3-6 uses it moves
 // on (another machine lights up).
-const FIZZ_DISCOUNT = 1000;
+// The spin as in BO3 (2026-11-12, user: "actually has the sound it plays ... the spinning bottles animation"): a perk
+// bottle turns in the niche above the machine's tray, flicking through the buyer's perks faster than the eye and slowing
+// down until it settles on the one they get, which then turns slowly and bobs until taken. Sounds are the machine's own
+// (zm_castle bank, .tools/extract_sabl.py -> audio/, git-ignored): rand_perk_mach_start, its loop, the stop (a 5 s
+// wind-down), and leave / strike + ball_drop when it moves. Everyone near the machine hears them.
+const FIZZ_DISCOUNT = 1000, FIZZ_SPIN = 5, FIZZ_TAKE = 10;
+const FIZZ_SLOT = new THREE.Vector3(0, 43.6, 0);   // the bottle's foot, machine-local: on the tray, in the niche open from y 43 to 60 at |x| < 9
+// One bottle (the loot mod's perk-bottle shape, 14 tall) whose materials are swapped per perk: glass in the perk's colour
+// and a label with its icon, front and back. Every perk's pair is made at load (two programs in all) and the labels are
+// drawn once and uploaded then; a swap is a material reference, nothing compiles or uploads mid-game.
+function fizzBottle(api, perks) {
+  const { host } = api;
+  const gold = new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: .3, metalness: .9 });
+  const parts = { body: new THREE.CylinderGeometry(2.2, 2.4, 7, 14).translate(0, 3.5, 0), neck: new THREE.CylinderGeometry(1, 2.2, 2.6, 14).translate(0, 8.3, 0), cap: new THREE.CylinderGeometry(1.15, 1.15, 1.1, 14).translate(0, 10.1, 0), label: new THREE.PlaneGeometry(3.8, 3.8).translate(0, 3.6, 2.42) };
+  const looks = new Map(), loads = [];
+  for (const p of perks) {
+    const c = new THREE.Color(p.color ?? '#c0392b'), cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const label = new THREE.MeshBasicMaterial({ map: tex, alphaTest: .4 });
+    looks.set(p.id, { glass: new THREE.MeshStandardMaterial({ color: c, roughness: .18, metalness: .1, emissive: c, emissiveIntensity: .55 }), label });
+    const draw = img => {   // a dark disc in the perk's colour, the icon over it (or its badge letters)
+      const g = cv.getContext('2d'); g.clearRect(0, 0, 128, 128); g.fillStyle = '#' + c.clone().multiplyScalar(.45).getHexString(); g.beginPath(); g.arc(64, 64, 62, 0, 7); g.fill();
+      g.lineWidth = 5; g.strokeStyle = '#e8d9a8'; g.stroke();
+      if (img) g.drawImage(img, 12, 12, 104, 104); else { g.fillStyle = '#fff'; g.font = 'bold 44px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(p.badge ?? '?', 64, 66); }
+      api.renderer?.initTexture(tex);
+    };
+    loads.push(new Promise(done => { if (!p.icon) { draw(null); done(); return; } const img = new Image(); img.onload = () => { draw(img); done(); }; img.onerror = () => { draw(null); done(); }; img.src = p.icon; }));
+  }
+  (host.pending ??= []).push(Promise.all(loads));
+  const first = looks.values().next().value;
+  const make = () => {
+    const g = new THREE.Group(), glass = [new THREE.Mesh(parts.body, first.glass), new THREE.Mesh(parts.neck, first.glass)], labels = [new THREE.Mesh(parts.label, first.label), new THREE.Mesh(parts.label, first.label)];
+    labels[1].rotation.y = Math.PI; g.add(...glass, ...labels, new THREE.Mesh(parts.cap, gold));
+    g.traverse(o => { o.castShadow = false; o.receiveShadow = false; });
+    g.userData.set = id => { const l = looks.get(id); if (!l) return; for (const m of glass) m.material = l.glass; for (const m of labels) m.material = l.label; };
+    return g;
+  };
+  (host.warmObjects ??= []).push(make());   // its two programs at load
+  return make();
+}
 const fizzCost = session => Math.max(0, session.perkPrice - FIZZ_DISCOUNT);   // the perk price ladder (rules.js perkPrice), 1,000 off
 // Co-op: the machine (where it is, its spin) is shared; the perk is the buyer's (their own missing perks, sent with the
 // purchase); the host lets an untaken spin lapse and moves it with the shared random stream.
 function setupFizz(api) {
-  const { world, session, host, scene, toast, announce, audio, sync } = api, root = world.root;
-  const machines = []; root.traverse(o => { if (/^CASTLE_FIZZ_\d+$/.test(o.name)) machines.push({ o, p: o.getWorldPosition(new THREE.Vector3()), start: !!o.userData.start }); });
+  const { world, session, host, scene, toast, announce, audio, sync, camera } = api, root = world.root;
+  const machines = []; root.traverse(o => { if (/^CASTLE_FIZZ_\d+$/.test(o.name)) { o.updateWorldMatrix(true, false); machines.push({ o, p: o.getWorldPosition(new THREE.Vector3()), slot: o.localToWorld(FIZZ_SLOT.clone()), yaw: new THREE.Euler().setFromQuaternion(o.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y, scale: o.getWorldScale(new THREE.Vector3()).y, start: !!o.userData.start }); } });
   if (!machines.length) { console.warn('[der-eisendrache] Wunderfizz missing (rebuild the map)'); return null; }
   const light = new THREE.PointLight(0x7ab8ff, 0, 260, 1.6); scene.add(light);
+  const bottle = fizzBottle(api, PERKS); bottle.visible = false; scene.add(bottle);
+  const fx = { loop: null, stopped: false, next: 0, i: 0 };   // this client's view of the current spin (sounds, which bottle shows)
+  const at = (m, name, vol = .9) => sfxAt(name, m.p, camera, vol, 1600);
+  const endLoop = () => { if (fx.loop) { fx.loop.pause(); fx.loop = null; } };
   const st = { at: 0, uses: 0, left: 4, spin: null };
   // the host picks the starting machine (an event: guests get it, late ones from the log)
   sync.on('fizzStart', d => { Object.assign(st, { at: d.at, uses: 0, left: d.left, spin: null }); });
@@ -1197,9 +1240,11 @@ function setupFizz(api) {
   const pool = () => PERKS.filter(p => !session.perks?.has(p.id) && perkUnlocked(p));
   const give = p => { if (api.perkInfo && !api.perkInfo[p.id]) api.perkInfo[p.id] = { name: p.name, price: p.price, color: p.color, icon: p.badge }; session.perks.add(p.id); session.markBought?.(p.id); session.health = session.maxHealth; };
   const byId = id => PERKS.find(p => p.id === id);
-  sync.on('fizzBuy', (d, ctx) => { if (st.spin || !d.pool?.length) return; st.spin = { by: ctx.by, perk: byId(d.pool[Math.floor(ctx.rand() * d.pool.length)]), t: session.time, ready: false }; if (ctx.mine) audio?.play?.('box', .7); });
+  sync.on('fizzBuy', (d, ctx) => { if (st.spin || !d.pool?.length) return; st.spin = { by: ctx.by, perk: byId(d.pool[Math.floor(ctx.rand() * d.pool.length)]), pool: d.pool, t: session.time, ready: false };
+    Object.assign(fx, { stopped: false, next: 0, i: Math.floor(Math.random() * d.pool.length) }); endLoop(); at(machines[st.at], 'rand_perk_mach_start'); });
   sync.on('fizzTake', (d, ctx) => { if (!st.spin || st.spin.by !== ctx.by) return; if (ctx.mine) { give(st.spin.perk); audio?.play?.('perk', .8); toast?.(st.spin.perk.name, 3); } st.spin = null; if (++st.uses >= st.left) move(ctx.rand); });
   sync.on('fizzLapse', (d, ctx) => { if (!st.spin) return; st.spin = null; if (++st.uses >= st.left) move(ctx.rand); });
+  host.on('reset', () => { endLoop(); bottle.visible = false; });
   for (const [i, m] of machines.entries()) world.addInteraction({
     position: m.p.clone().add(new THREE.Vector3(0, 45, 0)),
     hidden: () => i !== st.at,
@@ -1214,13 +1259,33 @@ function setupFizz(api) {
       return true;
     },
   });
-  function move(rand = Math.random) { let n = st.at; while (machines.length > 1 && n === st.at) n = Math.floor(rand() * machines.length); st.at = n; st.uses = 0; st.left = 3 + Math.floor(rand() * 4); announce?.('DER WUNDERFIZZ', 'HAS MOVED', 3); }
+  function move(rand = Math.random) {
+    const from = machines[st.at]; let n = st.at; while (machines.length > 1 && n === st.at) n = Math.floor(rand() * machines.length); st.at = n; st.uses = 0; st.left = 3 + Math.floor(rand() * 4); announce?.('DER WUNDERFIZZ', 'HAS MOVED', 3);
+    at(from, 'rand_perk_mach_leave'); at(machines[n], 'random_perk_strike', .7); at(machines[n], 'ball_drop');   // the ball leaves one machine and drops into the next
+  }
   host.on('update', () => {
     const m = machines[st.at]; light.position.copy(m.p).add(new THREE.Vector3(0, 80, 0));
     light.intensity = session.power ? (st.spin && !st.spin.ready ? 2600 + Math.sin(session.time * 20) * 900 : 1400) : 0;
-    if (st.spin && !st.spin.ready && session.time - st.spin.t > 3) { st.spin.ready = true; if (st.spin.by === sync.me) toast?.(`Der Wunderfizz · ${st.spin.perk.name}`, 3); }
-    if (st.spin?.ready && session.time - st.spin.t > 13 && sync.isHost && !st.spin.lapsing) { st.spin.lapsing = true; sync.act('fizzLapse'); }   // not taken in time
+    if (st.spin && !st.spin.ready && session.time - st.spin.t > FIZZ_SPIN) { st.spin.ready = true; if (st.spin.by === sync.me) toast?.(`Der Wunderfizz · ${st.spin.perk.name}`, 3); }
+    if (st.spin?.ready && session.time - st.spin.t > FIZZ_SPIN + FIZZ_TAKE && sync.isHost && !st.spin.lapsing) { st.spin.lapsing = true; sync.act('fizzLapse'); }   // not taken in time
+    spinView(m);
   });
+  // the bottle and the spin's sounds: start (at the buy), the loop from 0.4 s, the stop's wind-down from 1.5 s; the flicks
+  // slow from 14 a second to about 2 as the spin ends
+  function spinView(m) {
+    const s = st.spin;
+    if (!s) { if (bottle.visible) { bottle.visible = false; endLoop(); } return; }
+    const age = session.time - s.t, k = Math.min(1, age / FIZZ_SPIN);
+    if (!s.ready) {
+      if (!fx.loop && !fx.stopped && age > .4) { fx.loop = at(m, 'rand_perk_mach_loop', .8); if (fx.loop) fx.loop.loop = true; }
+      if (!fx.stopped && age > 1.5) { fx.stopped = true; endLoop(); at(m, 'rand_perk_mach_stop'); }
+      if (age >= fx.next && s.pool.length) { fx.i = (fx.i + 1) % s.pool.length; if (s.pool.length > 1 && s.pool[fx.i] === s.perk.id && age < FIZZ_SPIN - .6) fx.i = (fx.i + 1) % s.pool.length; bottle.userData.set(s.pool[fx.i]); fx.next = age + .07 + .42 * k * k; }
+    } else if (fx.landed !== s) { fx.landed = s; endLoop(); bottle.userData.set(s.perk.id); }
+    const spin = s.ready ? 6 * FIZZ_SPIN * .7 + .9 * (age - FIZZ_SPIN) : 6 * age * (1 - .3 * k * k);   // 6 rad/s slowing to 0.6, then a slow turn
+    bottle.position.copy(m.slot); if (s.ready) bottle.position.y += (1 - Math.cos((age - FIZZ_SPIN) * 2.2)) * .6 * m.scale;
+    bottle.rotation.set(0, m.yaw + spin, 0); bottle.scale.setScalar(1.3 * m.scale); bottle.visible = true;
+    bottle.updateMatrix(); bottle.updateMatrixWorld(true);
+  }
   host.on('reset', pickStart);
   return { state: () => ({ at: st.at, uses: st.uses, left: st.left, spin: st.spin ? { perk: st.spin.perk.id, ready: st.spin.ready } : null, machines: machines.length }) };
 }
