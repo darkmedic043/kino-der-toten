@@ -792,9 +792,31 @@ function setupBow(api) {
       const m = cloneSkinned(model); h.model.matrixWorld.decompose(m.position, m.quaternion, m.scale); m.scale.setScalar(1);
       m.traverse(o => { if (o.isBone) o.userData.bindPosition = o.position.clone(); if (o.isMesh) { o.frustumCulled = false; o.castShadow = o.receiveShadow = false; } });
       const rig = new Rig(m); for (const [k, d] of Object.entries(clips)) if (d) rig.add(k, d);
-      scene.add(m); h.model.visible = false; h.anim = { m, rig, index, until: 0, next: 'idle' }; rig.play('idle');
+      // a fed dragon turns to stone and crumbles off its plaque (below): its own materials (the three heads shared one
+      // set) and a pool of rubble, made now and warmed, so nothing compiles when it goes
+      const mats = [], parts = [];
+      m.traverse(o => { if (!o.isMesh) return; const plaque = /plaque/i.test(o.material.name ?? ''); o.material = o.material.clone();
+        mats.push({ mat: o.material, c: o.material.color.clone(), e: o.material.emissive?.clone(), ei: o.material.emissiveIntensity ?? 1, r: o.material.roughness ?? 1, plaque }); if (!plaque) parts.push(o); });
+      const rubble = []; for (let i = 0; i < RUBBLE; i++) { const r = new THREE.Mesh(rubbleGeo, rubbleMat); r.visible = false; r.frustumCulled = false; scene.add(r); host.warmObjects?.push(r); rubble.push({ o: r, v: new THREE.Vector3(), w: new THREE.Vector3(), t: 9 }); }
+      scene.add(m); h.model.visible = false; h.anim = { m, rig, index, until: 0, next: 'idle', mats, parts, rubble, stone: -1 }; rig.play('idle');
     }
   });
+  // ---- a fed dragon leaves (2026-11-11, user: "the dragons dont disappear after eating all the required zombies"). As in
+  // BO3: after the outro roar the head greys to stone (its glow dies with it), then breaks up and falls off the wall;
+  // the plaque stays, dark. STONE s of greying, then the head's meshes are hidden behind rubble and dust.
+  const RUBBLE = 14, STONE = 1.5, STONE_COL = new THREE.Color(0x77726a), PLAQUE_COL = new THREE.Color(0x221d1a), rubbleGeo = new THREE.DodecahedronGeometry(1, 0), rubbleMat = new THREE.MeshStandardMaterial({ color: 0x4d453e, roughness: 1, metalness: 0, flatShading: true });
+  const stoneLook = (a, k) => { for (const x of a.mats) { x.mat.color.copy(x.c).lerp(x.plaque ? PLAQUE_COL : STONE_COL, k);   // (the plaque's ember disc is its colour map: darkened, it reads as gone out)
+    if (x.e) x.mat.emissiveIntensity = x.ei * (1 - k); x.mat.roughness = x.r + (1 - x.r) * k; } };
+  const tmpV = new THREE.Vector3();
+  const crumble = (h, quiet) => { const a = h.anim; a.stone = -1; a.gone = true; stoneLook(a, 1); for (const o of a.parts) o.visible = false; if (quiet) return;
+    // rubble starts on the head's own bones (wherever the outro left them) and is thrown out from the wall
+    const bones = []; a.m.traverse(o => { if (o.isBone) bones.push(o); }); const out = new THREE.Vector3().subVectors(h.mouth, a.m.position).setY(0).normalize();
+    a.rubble.forEach((r, i) => { const b = bones[(i * 7 + 3) % Math.max(1, bones.length)]; (b ?? a.m).getWorldPosition(r.o.position); r.o.position.add(tmpV.set(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(26));
+      r.s = 5 + Math.random() * 9; r.o.scale.set(r.s, r.s * (.6 + Math.random() * .6), r.s * (.7 + Math.random() * .5)); r.o.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+      r.v.copy(out).multiplyScalar(40 + Math.random() * 110).add(tmpV.set((Math.random() - .5) * 120, 40 + Math.random() * 130, (Math.random() - .5) * 120)); r.w.set(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(9); r.t = 0; r.o.visible = true; });
+    for (let i = 0; i < 4; i++) api.effect?.(a.rubble[i * 3].o.position.clone(), 0xb8a388, 3);   // (the fx mod's dust puff)
+    audio?.play?.('explosion', .3); audio?.play?.('land', .8); };
+  const restoreHead = h => { const a = h.anim; if (!a) return; a.stone = -1; a.gone = false; stoneLook(a, 0); for (const o of a.parts) o.visible = true; for (const r of a.rubble) { r.o.visible = false; r.t = 9; } };
   const dragonPlay = (h, k, then = 'idle') => { const a = h.anim; if (!a || !a.rig.actions[k]) return; a.rig.play(k, false, 1, .2); a.until = t + (a.index[k]?.duration ?? 2); a.next = then; };
   const flying = [], corpses = [];
   const lastDead = new Map();   // the host: a kill's body, for the drag into the mouth
@@ -831,13 +853,18 @@ function setupBow(api) {
       if (k >= 1) { c.o.visible = false; corpses.splice(corpses.indexOf(c), 1); } }
     for (const h of heads) { const a = h.anim; if (!a) continue; a.rig.update(dt);
       if (a.until && t >= a.until) { const k = a.next; a.until = 0;
-        if (k === 'idle') { a.rig.play('idle', true, 1, .3); } else if (k === 'outtro') dragonPlay(h, 'outtro', 'done'); else if (k === 'done') {} else dragonPlay(h, k, a.after ?? 'idle'); }
-      else if (!a.until && a.rig.current === 'idle' && Math.random() < dt / 25) dragonPlay(h, 'idle_twitch_roar'); }
+        if (k === 'idle') { a.rig.play('idle', true, 1, .3); } else if (k === 'outtro') dragonPlay(h, 'outtro', 'done'); else if (k === 'done') { a.stone = 0; } else dragonPlay(h, k, a.after ?? 'idle'); }
+      else if (!a.until && !a.gone && a.stone < 0 && a.rig.current === 'idle' && Math.random() < dt / 25) dragonPlay(h, 'idle_twitch_roar');
+      if (a.stone >= 0) { a.stone += dt; stoneLook(a, Math.min(1, a.stone / STONE)); if (a.stone >= STONE) crumble(h); }
+      for (const r of a.rubble) { if (r.t > 2.2) continue; r.t += dt; r.v.y -= 620 * dt; r.o.position.addScaledVector(r.v, dt); r.o.rotation.x += r.w.x * dt; r.o.rotation.y += r.w.y * dt; r.o.rotation.z += r.w.z * dt;
+        const k = Math.max(0, 1 - Math.max(0, r.t - 1.2)); r.o.scale.setScalar(Math.max(.001, r.s * k)); if (r.t > 2.2) r.o.visible = false; } }
+    // the static prop (no animated head loaded): a fed dragon is simply gone
+    for (const h of heads) if (!h.anim && h.model) h.model.visible = h.n < SOULS;
     shown.visible = charged() && !taken();
     if (shown.visible) { shown.rotation.y += dt * .6; shown.position.y = spot.y + 45 + Math.sin(t * 1.5) * 3; glow.intensity = 900 + Math.sin(t * 3) * 200; glow.position.copy(shown.position); } else glow.intensity = 0;
   });
-  host.on('reset', () => { for (const h of heads) { h.n = 0; if (h.anim) { h.anim.until = 0; h.anim.rig.play('idle'); } } shown.visible = false; glow.intensity = 0; for (const f of flying) f.orb.removeFromParent(); flying.length = 0; });
-  return { ready: dragonsReady, state: () => ({ souls: heads.map(h => [h.id, h.n]), charged: charged(), taken: taken() }), feed: (k = 0) => { for (const h of heads) h.n = SOULS; shown.visible = true; } };
+  host.on('reset', () => { for (const h of heads) { h.n = 0; if (h.anim) { restoreHead(h); h.anim.until = 0; h.anim.rig.play('idle'); } } shown.visible = false; glow.intensity = 0; for (const f of flying) f.orb.removeFromParent(); flying.length = 0; });
+  return { ready: dragonsReady, state: () => ({ souls: heads.map(h => [h.id, h.n]), charged: charged(), taken: taken() }), feed: (k = 0) => { for (const h of heads) { h.n = SOULS; if (h.anim && !h.anim.gone && h.anim.stone < 0) dragonPlay(h, 'outtro', 'done'); } shown.visible = true; } };
 }
 
 // ---- The Panzersoldat (zm_castle_mechz.gsc + BO3's mechz behaviour). Assets: .tools/build_castle_panzer.py (BO3's
