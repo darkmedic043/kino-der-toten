@@ -54,7 +54,7 @@ export default async function setup(api) {
   // reached the matrix: the Panzersoldat's Ragnarok body showed at its home spot, not where it died (user, 2026-10-22).
   // On again for the castle's own nodes: the freeze (made at the end of the load) freezes them and thaws whatever moves.
   if (world.root) for (const top of world.root.children) if (/^CASTLE_/.test(top.name)) top.traverse(o => { if (!o.isInstancedMesh && !o.isBatchedMesh) o.matrixAutoUpdate = true; });
-  setupLook(api);
+  const look = setupLook(api);
   const weather = setupWeather(api);   // snow outdoors, flames on the fixtures (weather.js)
   // Der Eisendrache's own zombies (BO3's c_zom_der_zombie_body1-3 + head1-3, .tools/build_castle_zombies.py; git-ignored,
   // ripped), driven by BO1's zombie clips. The clips set each joint's local rotation in BO1's joint frames; BO3's joints
@@ -124,6 +124,7 @@ export default async function setup(api) {
   const bounds = setupBounds(api, { lowgrav });   // after the pads: it watches their flights
   await bows?.ready;   // the spirit wolves too
   await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
+  await look;   // the light bake and its lights: before the engine batches the map and compiles its shaders (see setupLook)
   sync.ready();   // a guest catches up on the game's events so far
   window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz, traps, craft, lowgrav, bows, ee, side, side2, sync, bounds, weather };
 }
@@ -422,9 +423,11 @@ function setupLook(api) {
     while (pool.length < n) { const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); Object.assign(l.userData, { fire: null, lamp: null, level: 0 }); scene.add(l); pool.push(l); }
     timer = 0;
   };
-  // the lights are made once the bake has (or hasn't) loaded: still during loading, before the shader warm-up
+  // The lights are made once the bake has (or hasn't) loaded, and setup() waits for that (2026-11-12): left on
+  // host.pending it landed after the engine's "Optimizing the map" compile, so every map program was built there without
+  // the bake and the lights, thrown away, and built again in the warm-up.
   let timer = 0;
-  (host.pending ??= []).push(loadMapLight(api, { skyFloor: .3, sunFloor: .12, strength: 1, powerOff: .7 }).catch(() => null).then(light => { baked = light; resize(); }));
+  const ready = loadMapLight(api, { skyFloor: .3, sunFloor: .12, strength: 1, powerOff: .7 }).catch(() => null).then(light => { baked = light; resize(); });
   onSettingsChange((_, k) => { if (k === 'graphics' || k === null) resize(); });   // (a no-op until the bake has answered: the pool is empty then)
   // the sky: BO3's skybox model isn't exported (a flat grey background showed through the castle's breaches): a dome at
   // the far plane with an overcast gradient, a soft sun glow and drifting cloud bands; the fog takes its horizon colour
@@ -513,6 +516,7 @@ function setupLook(api) {
       const f = l.userData.fire; l.intensity = l.userData.level * (f == null ? 1 : fireFlicker(T, f) * 1.08);   // a flame's flicker (the curve the flames themselves use)
     }
   });
+  return ready;
 }
 
 // ---- Pack-a-Punch (zm_castle_pap_quest.gsc). The machine starts hidden (the PAP marker is BO3's storage spot under the

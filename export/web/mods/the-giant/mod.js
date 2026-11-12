@@ -14,7 +14,7 @@ import { metalLook } from '../lighting/metal-look.js';
 import { floatingDebris, debrisDoor } from '../fx/floating-debris.js';
 
 const LINK_TIME = 30, WHERE = { pad0: 'east', pad1: 'south', pad2: 'west' };
-export default function setup(api) {
+export default async function setup(api) {
   if (api.map?.id !== 'the-giant') return;
   const { world, session, host, toast, announce, audio } = api;
   const at = name => { const o = world.root?.getObjectByName(name); return o ? o.getWorldPosition(new THREE.Vector3()) : null; };
@@ -56,10 +56,11 @@ export default function setup(api) {
     if (pending && session.time > pending.until) { pending = null; toast('The link failed · pull the lever again', 4); }
   });
   host.on('reset', () => { pending = null; lock(); });
-  setupLook(api);
+  const look = setupLook(api);
   setupDebris(api);
   setupEggs(api);
   setupBridges(api);
+  await look;   // the bake and its lights, before the engine batches the map and compiles its shaders (see setupLook)
 }
 
 // ---- the drawbridges: BO3's fxanim rigs (GIANT_BRIDGE_<side>, see build_bo3_map.py) lower when the power comes on, as in
@@ -324,13 +325,15 @@ function setupLook(api) {
   const [key, fill] = dirs;
   const lamps = []; world.root?.traverse(o => { if (/^GIANT_LAMP_/.test(o.name)) lamps.push(o.getWorldPosition(new THREE.Vector3())); });
   const pool = []; let baked = null;
-  // the lights are made once the bake has (or hasn't) loaded: still during loading, before the shader warm-up
-  (host.pending ??= []).push(loadMapLight(api, { skyFloor: .3, sunFloor: .1, strength: 1, powerOff: .3 }).catch(() => null).then(light => {
+  // The lights are made once the bake has (or hasn't) loaded, and setup() waits for that (2026-11-12): left on
+  // host.pending it landed after the engine's "Optimizing the map" compile, so every map program was built there without
+  // the bake and the lights, thrown away, and built again in the warm-up.
+  const ready = loadMapLight(api, { skyFloor: .3, sunFloor: .1, strength: 1, powerOff: .3 }).catch(() => null).then(light => {
     baked = light;
     for (let i = 0; i < Math.min(light ? ACCENTS : POOL, lamps.length); i++) {
       const l = new THREE.PointLight(LAMP.color, 0, LAMP.range, LAMP.decay); l.position.set(0, -1e5, 0); scene.add(l); Object.assign(l.userData, { lamp: null, level: 0 }); pool.push(l);
     }
-  }));
+  });
   let last = performance.now(), timer = 0;
   host.on('update', () => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
@@ -356,4 +359,5 @@ function setupLook(api) {
       l.intensity = want * (baked ? ACCENT : 1) * l.userData.level;
     }
   });
+  return ready;
 }

@@ -35,7 +35,9 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
   function patch(m) {
     if (m.userData.mapLight || !(m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) return false;
     m.userData.mapLight = true;
-    const prev = m.onBeforeCompile, prevKey = m.customProgramCacheKey?.bind(m);
+    // (three's default key is the patch function's source: read it from the earlier patch now, or every material would
+    // answer with this function's text and two materials with different earlier patches would share one program)
+    const prev = m.onBeforeCompile, ownKey = Object.hasOwn(m, 'customProgramCacheKey') ? m.customProgramCacheKey.bind(m) : null, prevSrc = String(prev ?? '');
     m.onBeforeCompile = (shader, renderer) => {
       prev?.call(m, shader, renderer);
       if (!shader.fragmentShader.includes('#include <lights_fragment_begin>')) return;
@@ -47,19 +49,24 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
         varying vec3 vMapLightPos;uniform highp sampler3D mvA,mvB,mvC;uniform vec3 mvOrg[2],mvInv,mvIndoor;uniform vec4 mvDim[2];uniform float mvCell,mvScale,mvPower,mvStrength,mvSunFloor;`)
         .replace('#include <lights_fragment_begin>', `float mvSun=1.;vec3 mvSky=vec3(1.),mvLamp=vec3(0.),mvDir=vec3(0.,1.,0.);vec3 mvN=inverseTransformDirection(normal,viewMatrix);
         {vec3 mvP=vMapLightPos+mvN*mvCell*.45;   // nudged off the surface: a wall samples the room it faces, not its own inside
-         for(int r=0;r<2;r++){vec3 lc=(mvP-mvOrg[r])/mvCell;
-          if(all(greaterThanEqual(lc,vec3(0.)))&&all(lessThanEqual(lc,mvDim[r].xyz))){
-           vec3 uvw=(clamp(lc,vec3(.5),mvDim[r].xyz-.5)+vec3(mvDim[r].w,0.,0.))*mvInv;
-           vec4 a=texture(mvA,uvw),b=texture(mvB,uvw);
-           mvSun=mix(mvSunFloor,1.,a.a);mvSky=mix(mvIndoor,vec3(1.),b.a);
-           mvLamp=(a.rgb*a.rgb+b.rgb*b.rgb*mvPower)*mvScale;mvDir=normalize(texture(mvC,uvw).rgb*2.-1.);break;}}}
+         // Straight-line code on purpose (2026-11-12): the first version looped over the two regions with texture() inside
+         // an if and a break, in every lit program; D3D11's shader compiler is slow on exactly that, and warm-ups on
+         // Windows went from 8-28 s to about 2 minutes. Region 0 wins where both hold the point, as the loop did.
+         vec3 lc0=(mvP-mvOrg[0])/mvCell,lc1=(mvP-mvOrg[1])/mvCell;
+         vec3 s0=step(vec3(0.),lc0)*step(lc0,mvDim[0].xyz),s1=step(vec3(0.),lc1)*step(lc1,mvDim[1].xyz);
+         float w0=s0.x*s0.y*s0.z,mvIn=w0+(1.-w0)*s1.x*s1.y*s1.z;
+         vec3 lc=mix(lc1,lc0,w0);vec4 dm=mix(mvDim[1],mvDim[0],w0);
+         vec3 uvw=(clamp(lc,vec3(.5),max(dm.xyz-.5,vec3(.5)))+vec3(dm.w,0.,0.))*mvInv;
+         vec4 a=textureLod(mvA,uvw,0.),b=textureLod(mvB,uvw,0.);vec3 c=textureLod(mvC,uvw,0.).rgb*2.-1.;
+         mvSun=mix(1.,mix(mvSunFloor,1.,a.a),mvIn);mvSky=mix(vec3(1.),mix(mvIndoor,vec3(1.),b.a),mvIn);
+         mvLamp=(a.rgb*a.rgb+b.rgb*b.rgb*mvPower)*mvScale*mvIn;mvDir=normalize(mix(vec3(0.,1.,0.),c,mvIn));}
         ` + THREE.ShaderChunk.lights_fragment_begin.replace(DIR_INFO, DIR_INFO + ' directLight.color *= mvSun;'))
         .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
         #if defined( RE_IndirectDiffuse )
           irradiance*=mvSky;irradiance+=mvLamp*mix(.45,1.,max(dot(mvN,mvDir),0.))*mvStrength;
         #endif`);
     };
-    m.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|maplight';
+    m.customProgramCacheKey = () => (ownKey ? ownKey() : prevSrc) + '|maplight';
     m.needsUpdate = true; return true;
   }
   // every lit material in the world scene, now (before the shader warm-up) and as things appear (zombies, drops, players)

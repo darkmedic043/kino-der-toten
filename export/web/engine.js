@@ -513,6 +513,7 @@ try{
   // screen before the game finished loading)
   const paint=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
   progress('Optimizing the map',97);await paint();
+  if(mods.slowSetups)diag('mods',{slow:mods.slowSetups.join(' ').slice(0,1500)});   // setups over 250 ms, per mod: where 'Loading mods' went
   // opt-in per map: static level meshes merged per material (scene-merge.js)
   if(entry.mergeStatic&&world.root&&!perfOff.has('noMerge')){const t=performance.now(),r=mergeStaticMeshes(world.root,{exclude:entry.mergeExclude?new RegExp(entry.mergeExclude):null});globalThis.kino.sceneMerge=r;
     console.info('[scene-merge]',r.merged,'meshes into',r.meshes,'in',Math.round(performance.now()-t),'ms');await paint();}
@@ -851,6 +852,8 @@ async function warmShaders(waitGpu=false){
     programCount=renderer.info.programs.length;   // compiled while loading, not mid-game
     firstDraw.lateFrom=renderer.info.programs.reduce((m,p)=>Math.max(m,p.id),-1)+1;   // programs with a higher id were compiled mid-game (reported with their material and object)
     console.info('[warm-shaders]',renderer.info.programs.length-before,'programs for',targets.size,'scenes,',hidden.length,'hidden objects,',variants.userData.count,'world material variants, in',Math.round(performance.now()-t0),'ms',sliced?`(${breaths} frames between slices; ms: ${laps.join(', ')})`:'');
+    // the same numbers in the client log, so a slow load on a player's machine can be read afterwards (2026-11-12)
+    if(waitGpu)diag('warm',{ms:Math.round(performance.now()-t0),programs:renderer.info.programs.length-before,total:renderer.info.programs.length,laps:laps.join(', ').slice(0,2400)});
     if(waitGpu&&!NO_GPU_WAIT){const ms=Math.round(await gpuIdle());console.info('[warm-shaders] GPU caught up in',ms,'ms');diag('gpuWait',{ms});}   // the loading screen stays meanwhile
   }catch(error){console.warn('[warm-shaders]',error);}
   finally{later.removeFromParent();for(const o of [...later.children])later.remove(o);standIns?.view.removeFromParent();keepPrograms();if(sliced)canvas.style.visibility='';if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
