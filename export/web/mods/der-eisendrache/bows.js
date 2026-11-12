@@ -473,6 +473,21 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   // ---- visuals from the state (every frame) -----------------------------------------------------------------------------
   const souls = [];
   function soul(from, to, color) { const m = glow(from.clone().add(new THREE.Vector3(0, 40, 0)), color, 22); souls.push({ m, from: m.position.clone(), to: to.clone().add(new THREE.Vector3(0, 25, 0)), t: 0 }); }
+  // the storm wall-run's five wind runes: each aq_es_wallrun_trigger targets a p7_zm_ctl_rune_wind_emissive card on the
+  // carved rune beside it, lit as you run through (user: "actually show the symbol instead of a generic glow"). The card is
+  // shader-only in BO3, so its reveal mask (i_p7_mtl_zm_ctl_rune_wind_r) is drawn on it: wind/wind.webp (git-ignored,
+  // build_castle_panzer.py wind), 228.6 x 142.4 at the model's spot and yaw (CoD yaw = rotation.y), faint until run through.
+  // Without the file, the old glows. [x, y, z, yaw] in Q.storm.wallrun's order.
+  const WIND = [[-524.6, 1806.19, 457, 359.9], [54.14, 2687.52, 457, 110.6], [-616.79, 2816.11, 457, 225.8], [390.67, 2214.41, 455, 31.8], [-1606.35, 2536.22, 456.84, 251.92]];
+  let windOk = false;
+  const windTex = (() => { let done; const wait = new Promise(r => { done = r; }), t = new THREE.TextureLoader().load(new URL('wind/wind.webp', import.meta.url).href, () => { api.renderer?.initTexture(t); windOk = true; done(); }, undefined, () => done());
+    t.colorSpace = THREE.SRGBColorSpace; (host.pending ??= []).push(wait); return t; })();
+  const windGeo = new THREE.PlaneGeometry(228.6, 142.4).rotateY(Math.PI);   // faces -Z = the model's +Y (CoD), its +X on your left
+  { const uv = windGeo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, .191 + uv.getY(i) * .623); }   // the card's rows of the mask
+  const windMat = () => new THREE.MeshBasicMaterial({ map: windTex, color: Q.storm.color, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+  const windCards = WIND.map(([x, y, z, yaw]) => { const m = new THREE.Mesh(windGeo, windMat()); m.position.copy(W(x, y, z)); m.rotation.y = yaw * Math.PI / 180; m.translateZ(-1.5);
+    m.visible = false; m.updateMatrix(); m.updateMatrixWorld(true); scene.add(m); return m; });
+  host.warmObjects?.push(new THREE.Mesh(windGeo, windMat()));
   const want = new Map(), add = (id, p, color, size = 40, extra) => want.set(id, { p, color, size, ...extra });
   let skadi = null;
   const beaconFire = Q.storm.beacons.map(b => b.clone().add(new THREE.Vector3(0, 10, 0))), beaconGlow = Q.storm.beacons.map(b => b.clone().add(new THREE.Vector3(0, 200, 0)));   // among the pyre's logs (the beacon point is its middle), in its flames
@@ -494,9 +509,11 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
         q.beacons.forEach((b, k) => { const lit = at > 0 || (at === 0 && !!s.d.lit?.has(k)), ch = at > 2 || (at === 2 && !!s.d.charged?.has(k));
           bonfire('beacon:' + k, lit ? (ch ? 1 : .4) : -1, dt, beaconFire[k], null, 0, 420);
           if (lit) add(`beacon:${k}`, beaconGlow[k], ch ? 0xffffff : q.color, ch ? 260 : 150, { pulse: ch }); }); }
+      if (el === 'storm' && windOk) windCards.forEach((c, k) => { const on = step === 'wallrun' && my, hit = on && run.hit.has(k); c.visible = on;
+        if (on) { c.material.opacity = hit ? 1 : .3; c.material.color.setHex(hit ? 0xd8f2ff : q.color); } });
       if (!step) continue;
       if (el === 'storm') {
-        if (step === 'wallrun' && my) q.wallrun.forEach((w, k) => add(`wr:${k}`, w, run.hit.has(k) ? 0xffffff : q.color, run.hit.has(k) ? 60 : 30, { opacity: run.hit.has(k) ? 1 : .35 }));
+        if (step === 'wallrun' && my && !windOk) q.wallrun.forEach((w, k) => add(`wr:${k}`, w, run.hit.has(k) ? 0xffffff : q.color, run.hit.has(k) ? 60 : 30, { opacity: run.hit.has(k) ? 1 : .35 }));
         if (step === 'batteries') for (const b of q.batteries) { const n = s.d.kills[b.id] ?? 0; if (n) add(`bat:${b.id}`, b.at.clone().add(new THREE.Vector3(0, 30, 0)), q.color, 20 + n * 10, { pulse: n >= 5 && !s.d.used.has(b.id) }); }
       }
       if (el === 'rune') {

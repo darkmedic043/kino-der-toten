@@ -93,6 +93,12 @@ def build_pap():
     (POUT/'anims.json').write_text(json.dumps(pindex, indent=1))
     print('pap', pindex)
 if sys.argv[1:2] == ['pap']: build_pap(); sys.exit()
+# the storm bow's wall-run wind runes (p7_zm_ctl_rune_wind_emissive is a shader-only card; its reveal mask is the symbol)
+#   python3 .tools/build_castle_panzer.py wind   -> wind/wind.webp (git-ignored)
+if sys.argv[1:2] == ['wind']:
+    WD = ROOT/'export/web/mods/der-eisendrache/wind'; WD.mkdir(exist_ok=True); (WD/'.gitignore').write_text('*\n')
+    subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', str(GH/'ximages'/'i_p7_mtl_zm_ctl_rune_wind_r.png'), '-vf', 'format=gray,scale=512:-2', '-c:v', 'libwebp', '-quality', '90', str(WD/'wind.webp')], check=True)
+    print('wind', (WD/'wind.webp').stat().st_size, 'bytes'); sys.exit()
 
 (OUT/'anims').mkdir(parents=True, exist_ok=True); (OUT/'.gitignore').write_text('*\n')
 for name in MODELS:
