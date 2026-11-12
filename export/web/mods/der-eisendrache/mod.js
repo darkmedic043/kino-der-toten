@@ -566,19 +566,24 @@ function setupPap(api) {
   };
   const place = k => { st.at = k; world.movePap(locs[k].pos, locs[k].yaw); machineVisible(true);
     const h = own.holder; if (!h) return;
-    const ry = locs[k].yaw + Math.PI / 2, p = MOUTH.clone().applyAxisAngle(UP, ry).add(locs[k].pos);
+    // BO3 places this model at the spot's own yaw (its scattered parts stand that way: 135, 165, 0 degrees), which puts the
+    // mouth (+Z) toward the spot's activation point about 100 out; the +90 the generic machine needs turned its side to you
+    const ry = locs[k].yaw, p = MOUTH.clone().applyAxisAngle(UP, ry).add(locs[k].pos);
     h.position.copy(locs[k].pos); h.rotation.y = ry; h.updateMatrix(); h.updateMatrixWorld(true);
     const it = world.interactions.find(i => i.kind === 'pap'), ent = world.data.entities.find(e => e.id === 'custom_pap');
     if (it) it.position.copy(p); if (ent) ent.position = p.toArray();
     own.rig.play('poweron', false, 1, 0);
   };
+  // BO3 gives the rocks no colour map of their own (only the pebble tile); their carvings are only in the per-rock normal
+  // maps, which barely show under the map's soft light, so the carved walls also darken the colour (slope of the normal)
+  const ROCK_CARVE = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_NORMALMAP\n{vec3 cv=texture2D(normalMap,vNormalMapUv).xyz*2.-1.;diffuseColor.rgb*=mix(.35,1.,smoothstep(.5,.96,cv.z));}\n#endif'); };
   const PAP_URL = new URL('pap/', import.meta.url).href;
   const ownReady = /[?&]noPapModel/.test(location.search) ? null : Promise.all([loadModel(PAP_URL + 'pap.glb').catch(() => null), fetch(PAP_URL + 'anims.json').then(r => r.json()).catch(() => null)]).then(async ([model, index]) => {
     if (!model || !index) return;
     const m = cloneSkinned(model), holder = new THREE.Group(), rig = new Rig(m);
     m.traverse(o => { if (o.isBone) o.userData.bindPosition = o.position.clone(); if (!o.isMesh) return; o.frustumCulled = false; o.castShadow = o.receiveShadow = false;
       // the rocks share one tiling pebble map stretched once over each piece (a tile every 80 units): three tiles instead
-      if (/packapunch_rock/i.test(o.material.name ?? '') && o.material.map) o.material.map.repeat.set(3, 3);
+      if (/packapunch_rock/i.test(o.material.name ?? '') && o.material.map) { o.material.map.repeat.set(3, 3); o.material.onBeforeCompile = ROCK_CARVE; o.material.customProgramCacheKey = () => 'papRock'; }
       // the gems glow by themselves (their own colour map as the glow)
       if (/gemstone/i.test(o.material.name ?? '')) { o.material = o.material.clone(); o.material.emissiveMap = o.material.map; o.material.emissive.setHex(0xffffff); o.material.emissiveIntensity = 1.6; } });
     await Promise.all(Object.keys(index).map(async k => { const d = await loadAnimation(PAP_URL + 'anims/' + k + '.json').catch(() => null); if (d) rig.add(k, d); }));
