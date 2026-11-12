@@ -542,3 +542,4 @@
 - 2026-11-12: Der Eisendrache storm urns: a full urn's charge now goes onto your bow and is carried to wherever a beacon can be seen (the urns can't see them); waw-ports.md.
 - 2026-11-12: Der Eisendrache storm beacons smoulder before they're lit (low fire, embers, smoke, light) so they can be found; waw-ports.md.
 - 2026-11-12: Der Eisendrache bows have no recoil (`def.noRecoil`: engine camera climb, viewmodel push, fp.js fire kick, third-person act; weapons.md).
+- 2026-11-12: Der Eisendrache bow pedestals and forges: the placed arrow lies in its cradle and the bow lies level (no upright spinning), element sparks replace the big glow, the forge sparks once the steps are done and reforging plays a rise-spin-flash animation; wind rune cards at 0.6 size; waw-ports.md.

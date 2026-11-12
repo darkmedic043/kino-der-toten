@@ -488,11 +488,33 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     t.colorSpace = THREE.SRGBColorSpace; (host.pending ??= []).push(wait); return t; })();
   const windGeo = new THREE.PlaneGeometry(228.6, 142.4).rotateY(Math.PI);   // faces -Z = the model's +Y (CoD), its +X on your left
   { const uv = windGeo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, .191 + uv.getY(i) * .623); }   // the card's rows of the mask
+  windGeo.scale(.6, .6, 1);   // at full card size the symbol came out much bigger than the carving (user: "symbols are abit blown up")
   const windMat = () => new THREE.MeshBasicMaterial({ map: windTex, color: Q.storm.color, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
   const windCards = WIND.map(([x, y, z, yaw]) => { const m = new THREE.Mesh(windGeo, windMat()); m.position.copy(W(x, y, z)); m.rotation.y = yaw * Math.PI / 180; m.translateZ(-1.5);
     m.visible = false; m.updateMatrix(); m.updateMatrixWorld(true); scene.add(m); return m; });
   host.warmObjects?.push(new THREE.Mesh(windGeo, windMat()));
   const want = new Map(), add = (id, p, color, size = 40, extra) => want.set(id, { p, color, size, ...extra });
+  // what lies on the pedestals and at the forges (user 2026-11-12: the arrow stood upright and spun over its pedestal in
+  // a big glow; "not upright and turned the correct way, fix this for all"). The pedestal fxanims (CASTLE_BQ_pedestal_*)
+  // carry their element's arrow in the cradle (BO3 raises it once placed): shown while the souls are fed. The bow then
+  // lies level over the pedestal at BO3's upgraded_bow_struct yaw. The models are along +X (head forward), flat.
+  const PED_YAW = { storm: 45, wolf: 135, demon: 225, rune: 315 }, REST_YAW = 30;
+  const pedArrow = {}, pedBox = {};
+  root.traverse(o => { if (/^CASTLE_BQ_pedestal_/.test(o.name)) o.traverse(c => { const m = /_bow_(\w+?)_miss/.exec(c.material?.name ?? ''); if (c.isMesh && m) { (pedArrow[m[1]] ??= []).push(c); c.visible = false; } }); });
+  const pedAt = el => { if (!pedBox[el]) { const b = new THREE.Box3(); for (const c of pedArrow[el] ?? []) { c.updateWorldMatrix(true, false); b.expandByObject(c); } pedBox[el] = b.isEmpty() ? Q[el].pedestal.clone().addScaledVector(UP, 4) : b.getCenter(new THREE.Vector3()); } return pedBox[el].clone(); };
+  const ease = u => { u = Math.min(1, Math.max(0, u)); return u * u * (3 - 2 * u); };
+  const layFlat = (o, at, yaw, roll = 0, centre = true) => { const a = yaw * Math.PI / 180; o.rotation.set(roll, a, 0); o.position.copy(at); if (centre) o.position.add(new THREE.Vector3(Math.cos(a), 0, -Math.sin(a)).multiplyScalar(23)); };   // the arrow model runs -56..+11 from its head
+  const forging = {}, lastStage = {};
+  // each element's sparks, `rate` a second, at p (the forge, the reforged arrow, the pedestal)
+  const SPARK = { storm: 0xd8eeff, rune: 0xffb870, wolf: 0xe8f6ff, demon: 0xe2ccff };
+  function crackle(el, p, rate, k, dt) {
+    const F = fxk(); if (!F?.emit || Math.random() > rate * dt) return; const R = (a, b) => a + Math.random() * (b - a), at = p.clone().add(new THREE.Vector3(R(-10, 10), R(-4, 8), R(-10, 10)));
+    F.emit({ key: 'sparks', at, size: [8 * k, R(36, 60) * k], life: R(.2, .35), fade: [.02, .7], additive: true, color: SPARK[el] ?? 0xffffff, spin: R(-3, 3) });
+    if (el === 'storm' && Math.random() < .6) F.bolt?.('arc', at, { height: R(16, 30) * k, width: R(30, 56) * k, life: R(.1, .2), color: 0x9fd8ff });
+    else if (el === 'rune') F.emit({ key: 'ember', at, cellIndex: 3, vel: new THREE.Vector3(0, R(30, 60), 0), size: [10 * k, R(30, 50) * k], life: R(.4, .7), fade: [.05, .7], additive: true, color: 0xff7a22 });
+    else if (el === 'demon') F.emit({ key: 'spiral', at, size: [30 * k, 6], life: R(.4, .6), fade: [.1, .5], additive: true, color: 0xa45cff, opacity: .7, spin: R(3, 6) });
+    else if (el === 'wolf') F.emit({ key: 'glow', at, size: [10 * k, 40 * k], life: .3, fade: [.05, .8], additive: true, color: 0x8fd0ff });
+  }
   // the storm urns (BO3's p7_zm_ctl_battery_ceramic, placed in the map at each aq_es_battery struct; 41 tall, copper
   // terminals on top): each kill around one makes it crackle more often (BO1's electric-arc billboards from the fx mod)
   // with a light that jumps with every arc; a full one arcs nonstop and throws bolts upward until it is fired from; a
@@ -536,10 +558,28 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       const q = Q[el], step = stepOf(el), my = owner(el);
       // the loose arrow / the bow on its pedestal
       const arrow = models['arrow:' + el], bow = models['bow:' + el], loose = s.owner == null && ['steps', 'place'].includes(s.stage);
-      if (arrow) { arrow.visible = loose || (s.stage === 'souls'); if (arrow.visible) { arrow.position.copy(s.stage === 'souls' ? q.pedestal.clone().add(new THREE.Vector3(0, 45, 0)) : looseAt(el).clone().add(new THREE.Vector3(0, 8, 0))); arrow.rotation.set(0, t, Math.PI / 2); } }
-      if (bow) { bow.visible = s.stage === 'ready' || s.stage === 'spawned'; if (bow.visible) { bow.position.copy(q.pedestal).add(new THREE.Vector3(0, 48 + Math.sin(t * 2) * 3, 0)); bow.rotation.set(0, t * .6, Math.PI / 2); } }
-      if (loose) add('loose:' + el, looseAt(el).clone().add(new THREE.Vector3(0, 12, 0)), q.color, 45, { pulse: true });
-      if (s.stage === 'souls' || s.stage === 'ready') add('ped:' + el, q.pedestal.clone().add(new THREE.Vector3(0, 40, 0)), q.color, 30 + 40 * (s.stage === 'ready' ? 1 : s.souls / SOULS));
+      const cradle = pedArrow[el]?.length > 0, onPed = s.stage === 'souls';
+      for (const c of pedArrow[el] ?? []) c.visible = onPed;   // placed: it lies in the pedestal's cradle, as in BO3
+      if (s.stage === 'place' && lastStage[el] === 'steps') forging[el] = t;   // just reforged (everyone sees it)
+      lastStage[el] = s.stage;
+      const fa = forging[el] != null ? t - forging[el] : 9;
+      if (forging[el] != null && (fa > 2.6 || s.stage !== 'place')) { if (!loose && s.stage === 'place') flash(q.reforge.clone().addScaledVector(UP, 30), q.color, 3, 300, .4); forging[el] = null; }   // the reforger keeps it: it leaves the forge
+      const forge = s.stage === 'place' && (loose || forging[el] != null);
+      if (arrow) { arrow.visible = loose || onPed && !cradle || forge; if (arrow.visible) {
+        if (onPed) layFlat(arrow, pedAt(el), PED_YAW[el]);
+        else if (s.stage === 'steps') layFlat(arrow, q.arrow.clone().addScaledVector(UP, 4), REST_YAW);   // the broken arrow, lying where it fell
+        else { const u = fa < 2.6 ? ease((fa - .3) / 1.6) : 1, h = 4 + 26 * ease((fa - .2) / 1.2) + (fa >= 2.6 ? Math.sin(t * 1.8) * 2 : 0);
+          layFlat(arrow, q.reforge.clone().addScaledVector(UP, h), REST_YAW, u * Math.PI * 6); } } }   // reforged: rises spinning on its shaft, settles level
+      if (bow) { bow.visible = s.stage === 'ready' || s.stage === 'spawned'; if (bow.visible) layFlat(bow, q.pedestal.clone().addScaledVector(UP, 8 + Math.sin(t * 1.6) * 2), PED_YAW[el], 0, false); }
+      if (loose && s.stage === 'steps') add('loose:' + el, looseAt(el).clone().add(new THREE.Vector3(0, 12, 0)), q.color, 45, { pulse: true });
+      if (forge) { const p = q.reforge.clone().addScaledVector(UP, 30), f = forging[el] != null;
+        add('loose:' + el, p, q.color, f ? 20 + 50 * ease(fa / 1.9) : 26, { pulse: !f });
+        if (f && fa >= 1.9 && !forging['hit:' + el]) { forging['hit:' + el] = true; flash(p, q.color, 5, 500, .8); burst(p, el, .3); audio?.play?.('box', .5); }
+        if (!f) forging['hit:' + el] = false;
+        crackle(el, p, f ? (fa < 1.9 ? 8 + 30 * fa / 1.9 : 6) : 3, f ? 1.4 : 1, dt); }
+      if (step === 'reforge' || el === 'wolf' && step === 'burial') crackle(el, q.reforge.clone().addScaledVector(UP, 10), 5, .8, dt);   // the forge sparks once every other step is done
+      if (onPed || s.stage === 'ready') { const k = s.stage === 'ready' ? 1 : s.souls / SOULS, p = s.stage === 'ready' ? q.pedestal.clone().addScaledVector(UP, 12) : pedAt(el);
+        add('ped:' + el, p, q.color, 14 + 16 * k, { pulse: s.stage === 'ready' }); crackle(el, p, 1.5 + 4 * k, .7 + .5 * k, dt); }
       // the storm beacons' pyres burn from the arrow that lights them to the end of the match, taller once a battery arrow
       // has charged them (user 2026-11-12: "the bonfires for the storm bow doesnt seem to work": a lit one only had a
       // 70-unit glow, 3000-5000 units from where it is shot)
