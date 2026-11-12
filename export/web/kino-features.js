@@ -116,7 +116,7 @@ export class KinoFeatures {
         if(wall||hit){
           p.mesh.position.copy(hit?.point??wall.position).addScaledVector(direction,-2);
           if(p.monkey){p.velocity.multiplyScalar(-.3);p.velocity.y=Math.abs(p.velocity.y)*.6;if(p.velocity.length()<50)p.stuck=true;}
-          else if(p.def.projectileType==='bolt'||p.def.id==='knife_ballistic_zm'){
+          else if((p.def.projectileType==='bolt'&&!p.def.impactExplode)||p.def.id==='knife_ballistic_zm'){   // impactExplode: bursts where it lands (the bows, mods/der-eisendrache/bows.js)
             p.stuck=true;p.life=p.def.id==='knife_ballistic_zm'?30:Math.max(.1,p.def.fuseTime||1.5);p.target=hit?.z;p.offset=hit?p.mesh.position.clone().sub(hit.z.root.position):null;
             if(hit)this.enemies.hurt(hit.z,p.def.damage,hit.head,false,'projectile');
           }else{

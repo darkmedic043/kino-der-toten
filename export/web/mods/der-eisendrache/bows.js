@@ -36,6 +36,8 @@ import { chargeTaps } from '../../charge-taps.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { CollisionWorld } from '../../collision-world.js';
+import { createFlames, fireFlicker } from '../fx/flames.js';
+import { settings } from '../../settings.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);   // BO3 (CoD) coordinates -> the map's
 const BASE = 'bo3_wrath_ancients', isBow = id => id === BASE || /^bo3_bow_/.test(id ?? '');
@@ -376,10 +378,9 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       battery: Q.storm.batteries.find(b => inV(f, b.charged))?.id ?? null };
     if (window.kino.debug?.shoot?.()) {
       session.weapon.reserve = Math.max(0, quiver - (cost(k) - 1)); nockAt = session.time + Math.max(.25, (session.def.fireTime ?? .32));
-      // the arrow carries its own draw (user 2026-11-08: "charge doesnt seem to work for the upgraded bows"): an arrow sticks
-      // for its 1.5 s fuse before it bursts, so a quick shot loosed meanwhile took the one pending slot and the charged
-      // arrow burst as a plain one (and the next got nothing)
-      const pr = api.features?.projectiles?.at(-1); if (pr && pr.def?.id === session.weapon.id && !pr.bowShot) { pr.bowShot = shot; shot = null; }
+      // the arrow carries its own draw (user 2026-11-08: "charge doesnt seem to work for the upgraded bows"): arrows in the
+      // air at once each burst with their own (one pending slot gave a charged arrow's burst to a quick shot loosed after it)
+      const pr = api.features?.projectiles?.at(-1); if (pr && pr.def?.id === session.weapon.id && !pr.bowShot) { pr.bowShot = shot; shot = null; launch(pr, k); }
     } else shot = null;
   }
   const press = touch => { if (taps.down()) nockAt = Math.min(nockAt || session.time, session.time); startDraw(touch); };   // a double tap nocks at once
@@ -437,7 +438,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     // the element (everyone sees it; the host's zombies take it)
     const el = pr ? elOf(pr.def.id) : elOf(session.weapon?.id), ch = sh?.k ? { el: sh.el, k: +sh.k.toFixed(2) } : null;
     lastImpact = { p: p.toArray().map(Math.round), el, charged: ch, flung, run };
-    if (ch || ELEMENT[el]) sync.fx('bowFx', { p: sync.a(p), el, ch, eye: sync.a(sh?.eye ?? camera.position) });
+    sync.fx('bowFx', { p: sync.a(p), el, ch, eye: sync.a(sh?.eye ?? camera.position) });
   });
   // the obelisk takes magma for 7.5 s after a rocket test fire (zm_castle_rocket_trap.gsc)
   let magmaUntil = 0, rocketWas = null;
@@ -516,6 +517,9 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     for (const c of Q.rune.circles) {
       const on = rs === 'circles' ? rd.active.has(c.id) || owner('rune') && !!pads?.flying?.() : rs === 'clock' || (rs === 'golf' && st.rune.fire === c.id), n = rs === 'circles' ? rd.kills[c.id] ?? 0 : on ? 9 : 0;
       showNode('CASTLE_BQ_rcircle_' + c.id, on); for (let i = 1; i <= 3; i++) showNode(`CASTLE_BQ_rsymbol_${c.id}_${i}`, n >= i * 3);
+      // a lit circle burns (BO3's bonfires; user 2026-11-11: "it should clearly indicate its on fire"), higher as it charges
+      const lit = on && (rs !== 'circles' || rd.active.has(c.id)), cn = lit ? node('CASTLE_BQ_rcircle_' + c.id) : null;
+      bonfire('circle:' + c.id, lit ? .25 + .75 * n / 9 : -1, dt, c.vol.p, cn?.matrixWorld ?? null, 104);
     }
     const w = st.wolf, ws = stepOf('wolf'), wi = Q.wolf.steps.indexOf(ws);
     showNode('CASTLE_BQ_skull_0', ws === 'skull');
@@ -537,6 +541,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     // the urn (BO3 raises it to aq_dg_urn_position once used): a glow while it stands
     if (di >= 2 && di <= 4) add('urn', Q.demon.urnTop, Q.demon.color, 55, { pulse: ds === 'runes' && session.time - (st.demon.d.replay ?? -99) < 6 });
     if (wheel && st.rune.wheel) { const wh = st.rune.wheel; if (wh.t < 1) { wh.t = Math.min(1, wh.t + dt / 4); wheel.quaternion.copy(wheelQ).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, -1), wh.to * (1 - Math.cos(wh.t * Math.PI)) / 2)); wheel.updateMatrixWorld(true); } }
+    { const fp = (rs === 'golf' || rs === 'fireplace') && Q.rune.fireplaces[st.rune.fire]; bonfire('fireplace', fp ? (rs === 'fireplace' ? 1 : .4) : -1, dt, fp ? fp.at : null); }   // the fireplace the fire went to
     marksUpdate(want);
     // souls in flight
     for (let i = souls.length - 1; i >= 0; i--) { const s = souls[i]; s.t += dt / .7; s.m.position.lerpVectors(s.from, s.to, Math.min(1, s.t)).y += Math.sin(Math.min(1, s.t) * Math.PI) * 40; if (s.t >= 1) { unglow(s.m); souls.splice(i, 1); } }
@@ -548,6 +553,127 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     session.giveWeapon(id); api.equipView?.();
     announce?.(q.name.toUpperCase(), 'WRATH OF THE ANCIENTS', 3); audio?.play?.('box');
   }
+
+  // ---- the arrow: burst, flight and flame (user 2026-11-11) ------------------------------------------------------------
+  // As in BO3 the arrow bursts the moment it lands (def.impactExplode: the engine's other bolts stick for their fuse),
+  // flies by how far the bow was drawn (BO3 fires a different weapon per charge level, elemental_bow .. elemental_bow4:
+  // a quick shot is slow and drops, a full draw is fast and near flat) and burns at the head, on the nocked arrow in
+  // the hand and all the way to its target. BO3's weapon files aren't in the export: FLIGHT is tuned by eye, not copied.
+  const BOW_IDS = [BASE, ...Object.keys(Q).map(el => 'bo3_bow_' + el)];
+  for (const id of BOW_IDS) if (data.weapons?.[id]) data.weapons[id].impactExplode = true;
+  host.on('warmWeapons', ids => { if (data.weapons?.[BASE]) ids.add(BASE); });   // every game hands this one out; the upgrades load when taken (same programs)
+  const FLIGHT = [{ speed: 2500, gravity: 460 }, { speed: 3400, gravity: 300 }, { speed: 4400, gravity: 160 }];   // quick, part, full draw (units/s, units/s²)
+  const FLAME = { base: [0xff7a22, 0xffc98a], rune: [0xff5a14, 0xffb870], storm: [0x5fb8ff, 0xd8f0ff], wolf: [0x8fd0ff, 0xe8f6ff], demon: [0xa45cff, 0xe2ccff] };   // flame, core
+  const TIP = 140, UP = new THREE.Vector3(0, 1, 0), AX = new THREE.Vector3(1, 0, 0), tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();   // TIP: the head, along tag_clip_<el> (the nocked arrow spans x 0..146 there)
+  const fxk = () => window.kino?.fx;
+  let fireReady = false;
+  // the fire atlas is orange: tinted blue or purple it goes mud, so the storm, wolf and void flames use a grey copy
+  const HOT = new Set(['base', 'rune']); let coldTex = null;
+  const greyOf = img => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+    const im = x.getImageData(0, 0, c.width, c.height), d = im.data; for (let i = 0; i < d.length; i += 4) d[i] = d[i + 1] = d[i + 2] = Math.max(d[i], d[i + 1], d[i + 2]); x.putImageData(im, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  const fireTex = (() => { let done; const wait = new Promise(r => { done = r; }), t = new THREE.TextureLoader().load(new URL('textures/fxt_exp_fire.png', document.baseURI).href, () => { api.renderer?.initTexture(t); coldTex = greyOf(t.image); api.renderer?.initTexture(coldTex); fxk()?.addTexture?.('coldfire', coldTex, [2, 2]); fireReady = true; warmFlames(); done(); }, undefined, done);
+    t.colorSpace = THREE.SRGBColorSpace; (host.pending ??= []).push(wait); return t; })();
+  const streakTex = (() => { const c = document.createElement('canvas'); c.width = 128; c.height = 32; const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 128, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.7, 'rgba(255,255,255,.45)'); g.addColorStop(1, 'rgba(255,255,255,1)');
+    x.fillStyle = g; x.fillRect(0, 0, 128, 32); const v = x.createLinearGradient(0, 0, 0, 32); v.addColorStop(0, 'rgba(0,0,0,1)'); v.addColorStop(.5, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = v; x.fillRect(0, 0, 128, 32); return new THREE.CanvasTexture(c); })();
+  const streakGeo = new THREE.BufferGeometry();   // two crossed cards trailing back along -x
+  streakGeo.setAttribute('position', new THREE.Float32BufferAttribute([-1, -.5, 0, 0, -.5, 0, 0, .5, 0, -1, .5, 0, -1, 0, -.5, 0, 0, -.5, 0, 0, .5, -1, 0, .5], 3));
+  streakGeo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1], 2)); streakGeo.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+  // a flame for an arrow head: a fireball (the fire atlas, flipped through), a hot core, a halo, and licks that rise from it
+  function torch(el, size, licks = 0) {
+    const g = new THREE.Group(), sp = (map, s, o) => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); m.scale.setScalar(s); m.frustumCulled = false; g.add(m); return m; };
+    const fmap = () => { const m = (HOT.has(el) || !coldTex ? fireTex : coldTex).clone(); m.repeat.set(.5, .5); return m; };
+    const t = { g, size, halo: sp(glowTex, 2.2, .3), fire: sp(fmap(), 1.5, .95), core: sp(glowTex, .7, 1), licks: [], ph: Math.random() * 9 };
+    for (let i = 0; i < licks; i++) t.licks.push(sp(fmap(), .8, .8));
+    g.scale.setScalar(size); tint(t, el); return t;
+  }
+  function tint(t, el) { const [c1, c2] = FLAME[el] ?? FLAME.base; t.halo.material.color.set(c1); t.fire.material.color.set(c1); t.core.material.color.set(c2); for (const l of t.licks) l.material.color.set(c1); }
+  function torchTick(t, time, k = 0, upLocal = null) {   // k: the draw, 0..1 (the flame swells with it)
+    const s = time + t.ph, f = Math.floor(s * 16), fl = .86 + .14 * Math.sin(s * 31) + .08 * Math.sin(s * 17.3);
+    t.fire.material.map.offset.set((f & 1) * .5, ((f >> 1) & 1) * .5); t.fire.material.rotation = (f * 2.399) % 6.283;
+    t.fire.scale.setScalar(1.5 * fl * (1 + .3 * k)); t.core.scale.setScalar(.7 * (1 + .35 * k)); t.halo.scale.setScalar(2.2 * fl * (1 + .45 * k)); t.halo.material.opacity = .26 + .2 * k;
+    t.licks.forEach((l, i) => { const p = (s * 1.9 + i / t.licks.length) % 1, c = Math.floor(s * 9 + i * 1.7); l.material.map.offset.set((c & 1) * .5, ((c >> 1) & 1) * .5);
+      if (upLocal) l.position.copy(upLocal).multiplyScalar(.4 + p * 1.5 * (1 + .3 * k)); l.scale.setScalar((1.1 - p * .8) * (1 + .2 * k)); l.material.opacity = .85 * Math.min(1, p * 6) * (1 - p); });
+  }
+  // in flight: the torch at the head and a streak behind it, riding the arrow's own mesh (pooled; one made for the warm-up)
+  const flights = [], spare = { hot: [], cold: [] }, kindOf = el => (HOT.has(el) ? 'hot' : 'cold');
+  function flightRig(el) {
+    const t = torch(el, 13), g = new THREE.Group(), streak = new THREE.Mesh(streakGeo, new THREE.MeshBasicMaterial({ map: streakTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+    streak.frustumCulled = false; streak.renderOrder = 5; t.g.position.set(10, 0, 0); streak.position.set(6, 0, 0); g.add(streak, t.g); return { g, t, streak, p: null, puff: 0, kind: kindOf(el) };
+  }
+  function warmFlames() { const r = flightRig('base'), v = torch('base', 12, 2); const w = new THREE.Group(); w.add(r.g, v.g); host.warmObjects?.push(w); }
+  function launch(pr, k) {   // re-aim the engine's shot: from beside the bow at what the crosshair is on, at the draw's speed and drop
+    const tier = cost(k) - 1, f = FLIGHT[tier], dir = pr.velocity.clone().addScaledVector(UP, -(pr.def.projectileSpeedUp ?? 0)).normalize(), eye = camera.position;
+    const hit = world.raycast?.(new THREE.Ray(eye.clone(), dir), 0, 6000), aim = eye.clone().addScaledVector(dir, Math.max(250, hit?.distance ?? 6000));
+    const from = eye.clone().addScaledVector(dir, 12).addScaledVector(tmpV.crossVectors(dir, UP).normalize(), 3).addScaledVector(UP, -5), d0 = from.clone().sub(eye), len = d0.length();
+    if (world.raycast?.(new THREE.Ray(eye.clone(), d0.normalize()), 0, len + 4)) from.copy(eye);   // against a wall: from the eye
+    const v = aim.sub(from).normalize(); pr.mesh.position.copy(from); pr.mesh.quaternion.setFromUnitVectors(AX, v); pr.velocity.copy(v).multiplyScalar(f.speed); pr.gravity = f.gravity; pr.def.impactExplode = true;
+    pr.bow = { el: elOf(pr.def.id), tier };
+  }
+  const gunTorch = new WeakMap();
+  function gunFlame(gun, id) {   // the nocked arrow's flame, once per viewmodel (they're cached)
+    if (gunTorch.has(gun)) return gunTorch.get(gun);
+    if (!fireReady) return null;
+    const el = elOf(id), bone = gun.getObjectByName('tag_clip_' + el); let t = null;
+    if (bone) { t = torch(el, 12, 2); t.g.position.set(TIP, 0, 0); t.bone = bone; bone.add(t.g); t.g.visible = false; }
+    gunTorch.set(gun, t); return t;
+  }
+  host.on('warmWeapon', ({ def, gun }) => { if (isBow(def?.id) && gun) gunFlame(gun, def.id); });
+  host.on('update', dt => {
+    if (!dt) return; const time = performance.now() / 1000;
+    // the nocked arrow
+    const gun = view?.gun, held = gun && isBow(view?.def?.id) ? gunFlame(gun, view.def.id) : null;
+    if (held) { const on = bowInHand() && session.weapon.mag > 0; held.g.visible = on;
+      if (on) { held.bone.getWorldQuaternion(tmpQ).invert(); torchTick(held, time, drawing ? Math.min(1, drawing.t / CHARGE) : 0, tmpV.set(0, 1, 0).applyQuaternion(tmpQ)); } }
+    // arrows in the air
+    const list = api.features?.projectiles ?? [];
+    for (const p of list) if (p.bow && !p.stuck && !p.flame) { const r = spare[kindOf(p.bow.el)].pop() ?? flightRig(p.bow.el); tint(r.t, p.bow.el); r.streak.material.color.set((FLAME[p.bow.el] ?? FLAME.base)[0]); r.p = p; p.flame = r; r.g.visible = true; r.g.scale.setScalar(1 / (p.mesh.scale.x || 1)); p.mesh.add(r.g); flights.push(r); }
+    for (let i = flights.length - 1; i >= 0; i--) { const r = flights[i], p = r.p;
+      if (!list.includes(p) || p.stuck) { r.g.removeFromParent(); p.flame = null; r.p = null; flights.splice(i, 1); spare[r.kind].push(r); continue; }
+      const sp = p.velocity.length(); if (sp > 1) p.mesh.quaternion.setFromUnitVectors(AX, tmpV.copy(p.velocity).divideScalar(sp));   // nose down the arc
+      torchTick(r.t, time, .4); r.streak.scale.set(90 + sp * .045, 9, 9); r.streak.material.opacity = .55 + .2 * Math.sin(time * 40 + r.t.ph);
+      if ((r.puff -= dt) <= 0) { r.puff = .035; const hot = r.kind === 'hot'; fxk()?.emit?.({ key: r.kind === 'hot' ? 'fire' : 'coldfire', at: p.mesh.position.clone(), vel: new THREE.Vector3(0, 22, 0), size: [15, 4], life: .3, fade: [.05, .7], additive: true, color: (FLAME[p.bow.el] ?? FLAME.base)[0], opacity: .7 }); } }
+  });
+  host.on('reset', () => { for (const r of flights.splice(0)) { r.g.removeFromParent(); if (r.p) r.p.flame = null; r.p = null; spare[r.kind].push(r); } });
+  // where it lands: each element's own burst over the engine's explosion (everyone sees it: bowFx)
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function burst(p, el, k = 0) {
+    const fx = fxk(); if (!fx?.emit) return; const [c1, c2] = FLAME[el] ?? FLAME.base, S = 1 + .5 * k, c = p.clone().addScaledVector(UP, 14);
+    fx.emit({ key: 'glow', at: c, size: [50 * S, 300 * S], life: .28, fade: [.04, .8], additive: true, color: c2 });
+    if (!HOT.has(el) && fireReady) {   // the cold bows burst in their own colour (the engine's orange fireball is held back for them: fx.blasts below)
+      for (let i = 0; i < 4; i++) fx.emit({ key: 'coldfire', at: c.clone().add(fx.jitter?.(18 * S) ?? new THREE.Vector3()), vel: new THREE.Vector3(rnd(-50, 50), rnd(20, 70), rnd(-50, 50)).multiplyScalar(S), size: [40 * S, rnd(150, 210) * S], life: rnd(.45, .7), fade: [.04, .55], additive: true, color: c1, spin: rnd(-1, 1) });
+      for (let i = 0; i < 5; i++) fx.emit({ key: i % 2 ? 'smoke' : 'smoke2', at: c.clone().add(new THREE.Vector3(rnd(-30, 30), rnd(0, 30), rnd(-30, 30)).multiplyScalar(S)), vel: new THREE.Vector3(rnd(-40, 40), rnd(35, 70), rnd(-40, 40)).multiplyScalar(S), size: [60 * S, rnd(200, 280) * S], life: rnd(2.2, 3.2), fade: [.12, .55], opacity: rnd(.45, .6), color: el === 'demon' ? 0x3a3048 : 0x55626e, spin: rnd(-.3, .3), drag: .6, grow: 1.6 });
+    }
+    if (el === 'storm') { fx.strike?.(p.toArray(), { scale: .7 * S, color: c1 }); return; }
+    if (el === 'demon') { fx.implode?.(c); for (let i = 0; i < 4; i++) fx.emit({ key: i % 2 ? 'swirl' : 'spiral', at: c.clone(), size: [220 * S, 30], life: rnd(.5, .8), fade: [.1, .5], additive: true, color: c1, opacity: .8, spin: rnd(3, 6) * (i % 2 ? 1 : -1) }); return; }
+    if (el === 'wolf') { fx.emit({ key: 'rring', at: c, size: [20, 320 * S], life: .45, fade: [.02, .8], additive: true, color: c1 }); for (let i = 0; i < 4; i++) fx.emit({ key: 'sparks', at: c.clone(), size: [30, rnd(120, 190) * S], life: rnd(.3, .5), fade: [.02, .7], additive: true, color: c2, spin: rnd(-3, 3) }); return; }
+    // fire (the base bow and the Fire Bow): flames lick up from where it burst
+    for (let i = 0; i < 6; i++) { const a = Math.random() * 6.283, r = rnd(8, 60) * S; fx.emit({ key: 'fire', at: p.clone().add(new THREE.Vector3(Math.cos(a) * r, rnd(4, 16), Math.sin(a) * r)), vel: new THREE.Vector3(rnd(-12, 12), rnd(70, 150), rnd(-12, 12)), size: [rnd(40, 60) * S, 12], life: rnd(.5, .95), fade: [.1, .6], additive: true, color: c1, spin: rnd(-1, 1) }); }
+  }
+  fxk()?.blasts?.push(e => { if (e.count !== 25 || !fireReady) return false; const pr = api.features?.projectiles?.find(q => q.bow && q.mesh.position.distanceToSquared(e.position) < 25); return !!pr && !HOT.has(pr.bow.el); });
+  // a fire that keeps burning (the runic circles, the fireplace): the castle's flame system (mods/fx/flames.js: tongues,
+  // embers, smoke; its programs are the fixtures' own, so nothing new compiles) around a ring, taller with k, and a light.
+  // Driven every frame; lit < 0 puts it out. m: the ring's plane (a node's world matrix) or null for a spot at `at`.
+  // The flames are rebuilt only when k changes (lit, a kill, put out)
+  const pyre = createFlames({ scene, renderer: api.renderer, low: (settings.graphics ?? 2) < 1, name: 'castle_bonfires' }); pyre.build();
+  const fires = new Map(); let pyreDirty = false;
+  function bonfire(id, lit, dt, at, m = null, R = 0) {
+    let f = fires.get(id); if (!f) fires.set(id, f = { src: null, ph: Math.random() * 9, k: -1, list: [] });
+    const pool = kino.lighting?.sources, k = lit < 0 ? -1 : Math.min(1, lit);
+    if (k !== f.k) {
+      f.k = k; for (const x of f.list) { const j = pyre.fires.indexOf(x); if (j >= 0) pyre.fires.splice(j, 1); } f.list.length = 0; pyreDirty = true;
+      if (k >= 0 && R) { const N = 14, c = m ? new THREE.Vector3().setFromMatrixPosition(m) : at;
+        for (let i = 0; i < N; i++) { const a = i / N * 6.283 + f.ph, p = new THREE.Vector3(Math.cos(a) * R, 2, Math.sin(a) * R); if (m) p.applyMatrix4(m); else p.add(at);
+          f.list.push(pyre.add(p, 'torch', { size: 30 + 46 * k, sub: 2, embers: 3, smoke: 0, glow: 1.5 })); }
+        if (k >= 1) f.list.push(pyre.add(c.clone().addScaledVector(UP, 2), 'fire', { size: 130, sub: 6, embers: 22 }));   // charged: a pyre in the middle
+      } else if (k >= 0) f.list.push(pyre.add(at.clone(), 'fire', { size: 46 + 44 * k }));
+    }
+    if (k < 0) { if (f.src) { const j = pool?.indexOf(f.src) ?? -1; if (j >= 0) pool.splice(j, 1); f.src = null; } return; }
+    if (!f.src && pool) { f.src = { position: at.clone().addScaledVector(UP, 45), color: new THREE.Color(0xff6a1a), intensity: 3, radius: 380 + R * 1.5, kind: 'solid', dynamic: true, cap: 2000, weight: 1 }; pool.push(f.src); }
+    if (f.src) f.src.intensity = (2.4 + 3 * k) * fireFlicker(performance.now() / 1000, f.ph);
+  }
+  host.on('update', dt => { if (pyreDirty) { pyreDirty = false; pyre.build(); } if (dt) pyre.update(dt, { fog: scene.fog }); });
+  host.on('reset', () => { for (const id of fires.keys()) bonfire(id, -1, 0); });
 
   // ---- element effects (upgraded bows): shown everywhere, damage on the host credited to the shooter -------------------
   const fx = [];
@@ -600,6 +726,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   const kill = (z, panzer, c) => sync.hurt(z, z.kind === 'panzer' ? panzer : 1e9, c, { cause: 'explosion' });
   sync.onFx('bowFx', (d, c) => {
     const p = sync.v(d.p), eye = sync.v(d.eye ?? d.p);
+    burst(p, d.ch?.el ?? d.el, d.ch?.k ?? 0);
     if (d.ch) CHARGED[d.ch.el]?.(p, d.ch.k, c, eye); else ELEMENT[d.el]?.(p, c, eye);
   });
   host.on('update', dt => {
@@ -610,6 +737,10 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       if (f.life <= 0) { if (f.o) { f.o.removeFromParent(); f.o.geometry.dispose(); f.o.material.dispose(); } if (f.sprite) unglow(f.sprite); if (f.light) { const pool = kino.lighting?.sources, j = pool?.indexOf(f.light) ?? -1; if (j >= 0) pool.splice(j, 1); } fx.splice(i, 1); } }
     const hostSide = sync.isHost;
     for (let i = zones.length - 1; i >= 0; i--) { const z = zones[i]; z.t -= dt;
+      const puff = z.kind !== 'wolf' && z.kind !== 'chompers' && (z.puff = (z.puff ?? 0) - dt) <= 0; if (puff) z.puff = z.kind === 'void' ? .16 : .09;
+      if (puff && z.kind === 'prison') fxk()?.emit?.({ key: 'fire', at: z.at.clone().add(new THREE.Vector3(rnd(-14, 14), rnd(0, 70), rnd(-14, 14))), vel: new THREE.Vector3(0, rnd(110, 170), 0), size: [rnd(44, 60), 12], life: rnd(.45, .7), fade: [.1, .6], additive: true, color: 0xff6a1a });   // the lava column that holds it
+      if (puff && z.kind === 'burn' && enemies.list.includes(z.z)) kino.fx?.burn?.(z.z.root.position.clone().add(new THREE.Vector3(0, rnd(20, 60), 0)));
+      if (puff && z.kind === 'void') fxk()?.emit?.({ key: Math.random() < .5 ? 'swirl' : 'spiral', at: z.p.clone().add(new THREE.Vector3(0, 30, 0)), size: [(z.r ?? 220) * 1.1, 24], life: .7, fade: [.15, .5], additive: true, color: 0xa45cff, opacity: .55, spin: rnd(3, 5) });
       if (z.kind === 'prison') { if (enemies.list.includes(z.z)) { if (hostSide) { z.z.root.position.x = z.at.x; z.z.root.position.z = z.at.z; z.z.stuck = 0; } if (z.t <= 0) kill(z.z, 2500, z.c); } }
       if (z.kind === 'wolf') {
         z.at.addScaledVector(z.d, WOLF_SPEED * dt); const g = world.closest?.(z.at, { x: 40, y: 120, z: 40 }); if (g) z.at.y = THREE.MathUtils.lerp(z.at.y, g.y, Math.min(1, dt * 12));
@@ -620,7 +751,8 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
       }
       if (z.kind === 'chompers' && (z.tick -= dt) <= 0) { z.tick = .3; const t = enemies.list.filter(e => !e.boss && e.root.position.distanceTo(z.p) < 650).sort((a, b) => a.root.position.distanceTo(z.p) - b.root.position.distanceTo(z.p))[0]; if (t) { const m = glow(t.root.position.clone().add(new THREE.Vector3(0, 40, 0)), 0xb06bff, 40); fx.push({ sprite: m, life: .4 }); kill(t, 600, z.c); } }
       if (z.kind === 'storm' && (z.tick -= dt) <= 0) { z.tick = z.rate ?? .3; const top = z.p.clone().add(new THREE.Vector3(0, 60, 0)); const n = enemies.list.filter(e => !e.boss && e.root.position.distanceTo(z.p) < (z.r ?? 240)).sort((a, b) => a.root.position.distanceTo(z.p) - b.root.position.distanceTo(z.p))[0];
-        if (n) { bolt(top, n.root.position.clone().add(new THREE.Vector3(0, 45, 0)), 0xbfe6ff); kill(n, 800, z.c); } else bolt(top, z.p.clone().add(new THREE.Vector3((Math.random() - .5) * 120, 0, (Math.random() - .5) * 120)), 0xbfe6ff); }
+        fxk()?.bolt?.('arc', top, { height: 90, width: 150, life: .2, color: 0xbfe6ff });
+        if (n) { bolt(top, n.root.position.clone().add(new THREE.Vector3(0, 45, 0)), 0xbfe6ff); fxk()?.bolt?.('ground', n.root.position.clone(), { height: 230, width: 70, life: .22, color: 0xbfe6ff }); kill(n, 800, z.c); } else bolt(top, z.p.clone().add(new THREE.Vector3((Math.random() - .5) * 120, 0, (Math.random() - .5) * 120)), 0xbfe6ff); }
       if (z.kind === 'burn' && z.t <= 0 && enemies.list.includes(z.z)) kill(z.z, 600, z.c);
       if (z.kind === 'void' && hostSide) for (const e of [...enemies.list]) { const d = e.root.position.distanceTo(z.p); if (d > (z.r ?? 220) || e.boss) continue; if (e.kind === 'panzer') { if (!z.held.has(e)) { z.held.add(e); sync.hurt(e, 1200, z.c, { cause: 'explosion' }); } continue; } e.root.position.lerp(z.p, Math.min(1, dt * 2.5)); e.stuck = 0; if (d < 40) kill(e, 0, z.c); }
       if (z.t <= 0) zones.splice(i, 1); }

@@ -139,9 +139,10 @@ export default function setup(api){
   host.on('reset',()=>{emitters.length=0;});
 
   const near=(c,r,g,b)=>{const h=typeof c==='number'?c:new THREE.Color(c).getHex(THREE.SRGBColorSpace);return Math.abs((h>>16&255)/255-r)+Math.abs((h>>8&255)/255-g)+Math.abs((h&255)/255-b)<.25;};
+  const blasts=[];   // kino.fx.blasts: a mod's f(e) returning true draws that blast itself (the elemental bows' cold bursts)
   host.on('effect',e=>{
     const {position:at,color,count}=e;if(!at)return;
-    if(near(color,1,.7,.3)&&count>=12){explosion(at,Math.min(1.4,.55+count/40));e.handled=true;}     // grenades, launchers, Gersh-less blasts
+    if(near(color,1,.7,.3)&&count>=12){if(!blasts.some(f=>f(e)))explosion(at,Math.min(1.4,.55+count/40));e.handled=true;}     // grenades, launchers, Gersh-less blasts
     else if(near(color,.58,.93,.38)||near(color,.55,.96,.4)){count>=12?explosion(at,.7,0x7dff6a):energy(at,0x8dff6a);e.handled=true;}   // Ray Gun
     else if(color===0x9e3023||near(color,.62,.19,.14)||near(color,.43,.04,.03)){bloodHit(at,count>8?1.8:1);e.handled=true;}
     else if(near(color,.72,.64,.53)&&count<=4){dust(at);e.handled=true;}
@@ -167,7 +168,7 @@ export default function setup(api){
     m.material.map.repeat.set(1/4,1/2);m.material.userData.kind='ground';m.frustumCulled=false;m.renderOrder=6;m.visible=false;boltFree.push(m);host.warmObjects?.push(m);}
   // for other mods (the shop's kill effects): the pooled sprites, bolts and light flashes, and their own sprite atlases
   // (a texture added here must stay alive: it is uploaded once and every sprite clones it)
-  window.kino.fx={emit,bolt,flash,jitter,addTexture(key,t,grid=[1,1]){tex[key]=t;GRID[key]=grid;renderer?.initTexture(t);}};
+  window.kino.fx={emit,bolt,flash,jitter,blasts,addTexture(key,t,grid=[1,1]){tex[key]=t;GRID[key]=grid;renderer?.initTexture(t);}};
 
   host.on('update',dt=>{
     if(!dt)return;
