@@ -571,14 +571,19 @@ export class PlayerController {
   _tryStep(start,end,movement) {
     if(!this.stepHeight)return false;
     const trial=new Capsule(start.clone(),end.clone(),this.radius);
+    // Lift as far as the ceiling allows, up to the step height: under a low ceiling or arch (Der Eisendrache's tower
+    // stairs) a full lift never fit, so every step of the flight was refused although its riser was only 8-12 high.
+    let lift=0;
     for(let rise=2;rise<=this.stepHeight;rise+=2){
       trial.start.copy(start).add(new THREE.Vector3(0,rise,0));trial.end.copy(end).add(new THREE.Vector3(0,rise,0));
       const overhead=this.worldOctree.capsuleIntersect(trial);
-      if(overhead&&overhead.normal.y<-.1&&overhead.depth>this.skin)return false;
+      if(overhead&&overhead.normal.y<-.1&&overhead.depth>this.skin)break;
+      lift=rise;
     }
-    trial.translate(new THREE.Vector3(movement.x,0,movement.z));
+    if(!lift)return false;
+    trial.start.copy(start).add(new THREE.Vector3(movement.x,lift,movement.z));trial.end.copy(end).add(new THREE.Vector3(movement.x,lift,movement.z));
     const blocked=this.worldOctree.capsuleIntersect(trial);if(blocked&&blocked.depth>this.skin)return false;
-    for(let drop=0;drop<this.stepHeight;drop+=.5){
+    for(let drop=0;drop<lift;drop+=.5){
       trial.translate(new THREE.Vector3(0,-.5,0));const contact=this.worldOctree.capsuleIntersect(trial);
       if(contact&&contact.depth>this.skin){
         if(contact.normal.y<.1)return false;

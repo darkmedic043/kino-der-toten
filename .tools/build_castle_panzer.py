@@ -76,6 +76,24 @@ def build_wolf():
     print('wolf', windex)
 if sys.argv[1:2] == ['wolf']: build_wolf(); sys.exit()
 
+# ---- Der Eisendrache's own Pack-a-Punch (2026-11-12, user: "its not using the pack a punch machine from DE"): BO3's
+# p7_fxanim_zm_castle_pap_mod (the assembled machine: base, six parts, six rollers, 21 joints) and its fxanim clips -> pap/
+#   python3 .tools/build_castle_panzer.py pap   (just this part)
+def build_pap():
+    POUT = ROOT/'export/web/mods/der-eisendrache/pap'
+    (POUT/'anims').mkdir(parents=True, exist_ok=True); (POUT/'.gitignore').write_text('*\n')
+    name = 'p7_fxanim_zm_castle_pap_mod'
+    SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/name/f'{name}_LOD0.semodel')), POUT/'pap.glb', texture_loader=webp)
+    print('pap', round((POUT/'pap.glb').stat().st_size / 1e6, 2), 'MB')
+    pindex = {}
+    for key in ['poweron', 'teleport', 'working_loop', 'working_take_gun', 'working_eject_gun']:
+        src = f'p7_fxanim_zm_castle_pap_{key}_anim'
+        if not (GH/'xanims'/(src + '.seanim')).exists(): print('no anim', src); continue
+        c = anim(key, src, POUT); pindex[key] = {'duration': c['duration']}
+    (POUT/'anims.json').write_text(json.dumps(pindex, indent=1))
+    print('pap', pindex)
+if sys.argv[1:2] == ['pap']: build_pap(); sys.exit()
+
 (OUT/'anims').mkdir(parents=True, exist_ok=True); (OUT/'.gitignore').write_text('*\n')
 for name in MODELS:
     src = GH/'xmodels'/name/(name + '_LOD0.semodel')
@@ -134,3 +152,4 @@ COUT.mkdir(parents=True, exist_ok=True); (COUT/'.gitignore').write_text('*\n')
 SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/'c_t6_zom_mech_claw_hat'/'c_t6_zom_mech_claw_hat_LOD0.semodel')), COUT/'claw_hat.glb', texture_loader=webp)
 print('claw hat', round((COUT/'claw_hat.glb').stat().st_size / 1e6, 2), 'MB')
 build_wolf()
+build_pap()

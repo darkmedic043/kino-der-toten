@@ -41,3 +41,14 @@ The Giant and Der Eisendrache lit their lamps with a pool of point lights that f
 - **Metal look** (`mods/lighting/metal-look.js`, materials.md) runs in the same setup.
 - **Load order and shader shape (2026-11-12, the same day: Der Eisendrache's "Preparing shaders" went from 8-28 s to about 2 minutes on the user's Windows PC)**: the bake patches every lit material and decides the light count, and both are in every lit program's key. Left on `host.pending` it landed after the engine's "Optimizing the map" compile, so every map program was built there without it, thrown away and built again in the warm-up. The map mod's `setup()` now awaits it (`await look`), so the engine batches and compiles the final materials once (batched copies inherit the patch through instance-cull's carried `onBeforeCompile`). The lookup itself is straight-line code: no loop over the two regions, no `if`, `textureLod(..., 0.)` (the first version had `texture()` inside an `if` inside a `for` with a `break`, in every lit program: the kind of code D3D11's compiler is slow on). Old and new shader compared on 28 Giant shots: PSNR 62 dB (the same picture). The patch's program key now carries the earlier `onBeforeCompile`'s source (three's default key is the patch function's text, which the wrapper replaced with its own for every material). **Not measured on Windows**: the host has no D3D11; the next loads' `warm` and `mods` lines in the client log show the result (performance.md).
 - Checked on the GPU in a routed test page with the map's GLB and 256 px textures (`scratch/ovh/light-test.mjs`), not in a played match: a full Giant load passes 2.3 GB of renderer memory before `ready`.
+
+## Der Eisendrache glare (2026-11-12)
+
+User, with a screenshot of the rocket pad: "snow seems to shine off really bad, causing insane blinding". The baked volume's lamp term was unbounded, so snow under a lamp reached several times white and the bloom spread it over the screen. Four changes:
+
+- `loadMapLight(api, {knee})` (`map-volume.js`, uniform `mvKnee`): the volume's light is rolled off above the knee (`l = knee + (l - knee) / (1 + (l - knee))` per channel), so a surface next to a lamp tops out near 1.4 instead of 4-6. Der Eisendrache passes `knee: .4` together with `skyFloor .3, sunFloor .12, strength 1, powerOff .7`; maps that pass no knee are unchanged.
+- The accent pool lights there are `ACCENT = .18` and 1/2/3/4 lights by quality (`ACCENTS_BY_QUALITY`): they add the moving highlight, the volume carries the level.
+- Snow materials are tinted blue-grey (`SNOW_TINT`, about .86/.89/.96) so lit snow reads as snow and not paper white.
+- The map's bloom strength in `grade.js` is 1.0 (was 1.4).
+
+Checked on the GPU in the cropped rocket-pad scene (`scratch/ovh/light-test.mjs`): lit snow sits at .3-1.4, no shader errors. Not checked in a played match.

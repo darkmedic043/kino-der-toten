@@ -16,7 +16,7 @@ import * as THREE from 'three';
 // (the chunk is read at compile time: the lighting mod adds its light clamp to it when it loads)
 const DIR_INFO = 'getDirectionalLightInfo( directionalLight, directLight );';
 
-export async function loadMapLight({ scene, world, session, host }, { skyFloor = .3, indoor = [1.1, .98, .84], sunFloor = .12, strength = 1, powerOff = .3, dir = world?.entry?.dir } = {}) {
+export async function loadMapLight({ scene, world, session, host }, { skyFloor = .3, indoor = [1.1, .98, .84], sunFloor = .12, strength = 1, powerOff = .3, knee = 0, dir = world?.entry?.dir } = {}) {
   if (!dir || /[?&]noBake\b/.test(location.search) || !THREE.ShaderChunk.lights_fragment_begin.includes(DIR_INFO)) return null;
   const base = new URL(dir.replace(/\/?$/, '/'), document.baseURI);
   const meta = await fetch(new URL('light.json', base)).then(r => r.ok ? r.json() : null).catch(() => null); if (!meta) return null;
@@ -30,7 +30,7 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
     mvOrg: { value: [0, 1].map(k => regions[k] ? new THREE.Vector3(...regions[k].origin).addScalar(-meta.cell / 2) : new THREE.Vector3()) },   // texel centres sit on the cell positions
     mvDim: { value: [0, 1].map(k => regions[k] ? new THREE.Vector4(...regions[k].dims, regions[k].x) : new THREE.Vector4(-1, -1, -1, 0)) },
     mvInv: { value: new THREE.Vector3(1 / X, 1 / Y, 1 / Z) }, mvCell: { value: meta.cell }, mvScale: { value: meta.scale },
-    mvPower: { value: session.power ? 1 : powerOff }, mvStrength: { value: strength }, mvIndoor: { value: new THREE.Vector3(...indoor).multiplyScalar(skyFloor) }, mvSunFloor: { value: sunFloor } };
+    mvPower: { value: session.power ? 1 : powerOff }, mvStrength: { value: strength }, mvIndoor: { value: new THREE.Vector3(...indoor).multiplyScalar(skyFloor) }, mvSunFloor: { value: sunFloor }, mvKnee: { value: knee } };
 
   function patch(m) {
     if (m.userData.mapLight || !(m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) return false;
@@ -46,7 +46,7 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
       shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vMapLightPos;')
         .replace('#include <project_vertex>', '#include <project_vertex>\n{vec4 lp=vec4(transformed,1.);\n#ifdef USE_BATCHING\nlp=batchingMatrix*lp;\n#endif\n#ifdef USE_INSTANCING\nlp=instanceMatrix*lp;\n#endif\nvMapLightPos=(modelMatrix*lp).xyz;}');
       shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>
-        varying vec3 vMapLightPos;uniform highp sampler3D mvA,mvB,mvC;uniform vec3 mvOrg[2],mvInv,mvIndoor;uniform vec4 mvDim[2];uniform float mvCell,mvScale,mvPower,mvStrength,mvSunFloor;`)
+        varying vec3 vMapLightPos;uniform highp sampler3D mvA,mvB,mvC;uniform vec3 mvOrg[2],mvInv,mvIndoor;uniform vec4 mvDim[2];uniform float mvCell,mvScale,mvPower,mvStrength,mvSunFloor,mvKnee;`)
         .replace('#include <lights_fragment_begin>', `float mvSun=1.;vec3 mvSky=vec3(1.),mvLamp=vec3(0.),mvDir=vec3(0.,1.,0.);vec3 mvN=inverseTransformDirection(normal,viewMatrix);
         {vec3 mvP=vMapLightPos+mvN*mvCell*.45;   // nudged off the surface: a wall samples the room it faces, not its own inside
          // Straight-line code on purpose (2026-11-12): the first version looped over the two regions with texture() inside
@@ -63,6 +63,8 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
         ` + THREE.ShaderChunk.lights_fragment_begin.replace(DIR_INFO, DIR_INFO + ' directLight.color *= mvSun;'))
         .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
         #if defined( RE_IndirectDiffuse )
+          // soft knee (opts.knee): a lamp's light levels off towards 1/knee instead of burning pale surfaces white next to it
+          mvLamp/=1.+max(mvLamp.r,max(mvLamp.g,mvLamp.b))*mvKnee;
           irradiance*=mvSky;irradiance+=mvLamp*mix(.45,1.,max(dot(mvN,mvDir),0.))*mvStrength;
         #endif`);
     };
@@ -88,7 +90,8 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
     const x = Math.round((p.x - R.origin[0]) / meta.cell) + R.x, y = Math.round((p.y - R.origin[1]) / meta.cell), z = Math.round((p.z - R.origin[2]) / meta.cell);
     const i = ((z * Y + y) * X + x) * 4, j = n * 4 + i, pw = uniforms.mvPower.value, s = uniforms.mvStrength.value * .75;
     out.sun = uniforms.mvSunFloor.value + (1 - uniforms.mvSunFloor.value) * bin[i + 3] / 255; { const f = uniforms.mvIndoor.value, fl = (f.x + f.y + f.z) / 3; out.sky = fl + (1 - fl) * bin[j + 3] / 255; }
-    out.valid = bin[n * 8 + i + 3]; lamp.setRGB((dec(bin[i]) + dec(bin[j]) * pw) * s, (dec(bin[i + 1]) + dec(bin[j + 1]) * pw) * s, (dec(bin[i + 2]) + dec(bin[j + 2]) * pw) * s); return out;
+    out.valid = bin[n * 8 + i + 3]; lamp.setRGB(dec(bin[i]) + dec(bin[j]) * pw, dec(bin[i + 1]) + dec(bin[j + 1]) * pw, dec(bin[i + 2]) + dec(bin[j + 2]) * pw);
+    lamp.multiplyScalar(s / (1 + Math.max(lamp.r, lamp.g, lamp.b) * uniforms.mvKnee.value)); return out;   // (the shader's knee)
   };
   const light = { meta, uniforms, at, patch, sweep };
   if (window.kino) window.kino.mapLight = light;

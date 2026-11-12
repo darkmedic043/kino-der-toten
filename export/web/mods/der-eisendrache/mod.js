@@ -13,6 +13,7 @@ import { setupTab } from './tab.js';
 import { setupWeather } from './weather.js';
 import { fireFlicker } from '../fx/flames.js';
 import { loadMapLight } from '../lighting/map-volume.js';
+import { prepareDetail, applyDetail } from '../../map-detail.js';
 import { metalLook } from '../lighting/metal-look.js';
 import { floatingDebris } from '../fx/floating-debris.js';
 import { mergeProps, instanceProps } from './merge-props.js';
@@ -29,6 +30,13 @@ import { PERKS, perkUnlocked } from '../terminal-booth/desktop.js';
 const ADJ = [["v10pad","v10paddoor","castleteleporterused"],["v10paddoor","v10padexterior","castleteleporterused"],["start","tramhigh","alwayson"],["start","tramtogatehouse","connectstarttotram2gatehouse"],["tramhigh","tramtosubclocktowerbot","connectstarttosubclocktower"],["tramhigh","undercroftjail","connectstarttoundercroft"],["tramtosubclocktower","tramtosubclocktowertop","activatetramtosubclocktower"],["tramtosubclocktower","tramtosubclocktowerbot","activatetramtosubclocktower"],["tramtosubclocktowertop","courtyard","connectsubclocktowertocourtyard"],["clocktower","courtyardedge","activatecourtyard"],["clocktower","clocktowerrooftop","activatecourtyard"],["courtyard","courtyardedge","activatecourtyard"],["courtyard","clocktowerrooftop","activatecourtyard"],["courtyard","greathall","connectgreathalltocourtyard"],["courtyardedge","greathallupperleft","connectcourtyardtogreathallupper"],["courtyard","greathallupper","connectcourtyardtogreathallupper"],["gatehouse","lowergatehouse","buyabledropdowngatehousetolowercourtyard"],["tramtogatehouse","lowergatehouse","connectgatehousearea"],["gatehouse","lowercourtyardupper","connectlowercourtyard"],["lowercourtyard","lowercourtyardupper","connectlowercourtyard"],["lowercourtyardupper","ramparts","poweron"],["lowercourtyard","lowergatehouse","connectgatehousetolowercourtyard"],["lowercourtyardupper","livingquarters","connectlowercourtyardtolivingquarters"],["lowercourtyardupper","lowercourtyardback","connectlowercourtyard"],["lowercourtyard","lowercourtyardback","connectlowercourtyard"],["lowercourtyardback","undercroftpaphall","connectlowercourtyardtoundercroft"],["greathallupper","armory","connectgreathalltoarmory"],["greathall","greathallupperleft","activategreathall"],["greathall","greathallupper","activategreathall"],["armory","armoryback","activatearmory"],["armory","livingquarters","connectarmorytolivingquarters"],["rooftop","ramparts","poweron"],["rooftop","clocktowerrooftop","poweron"],["rooftop","armoryback","poweron"],["undercroftchapel","greathall","connectgreathalltoundercroft"],["undercroft","undercroftlab","connectundercrofttoundercroftlab"],["undercroft","undercroftchapel","activateundercroft"],["undercroft","undercroftjail","activateundercroft"],["undercroft","undercroftpap","activateundercroft"],["undercroftjail","undercroftpap","activateundercroft"],["undercroftpap","undercroftpaphall","activateundercroft"]];
 const DERIVED = {"activatecourtyard":["connectsubclocktowertocourtyard","connectcourtyardtogreathallupper","connectcourtyardtorooftop","connectgreathalltocourtyard","connectarmorytorooftop"],"activatetramtosubclocktower":["connectstarttosubclocktower","connectsubclocktowertocourtyard"],"connectgatehousearea":["connectstarttotram2gatehouse","connectgatehousetolowercourtyard","buyabledropdowngatehousetolowercourtyard"],"connectlowercourtyard":["connectgatehousetolowercourtyard","connectlowercourtyardtolivingquarters","connectlowercoutryardtorooftop","connectlowercourtyardtoundercroft"],"activategreathall":["connectgreathalltoarmory","connectgreathalltoundercroft","connectcourtyardtogreathallupper"],"activatearmory":["connectarmorytolivingquarters","connectgreathalltoarmory"],"activateundercroft":["connectlowercourtyardtoundercroft","connectgreathalltoundercroft"]};
 const POWER_FLAGS = ['poweron', 'connectstarttoundercroft'];
+
+// Sharper textures (2026-11-12, user: "some textures are also extremely blurry"): the map's detail.json redirects the
+// blurriest colour maps to larger copies and tiles the props' micro detail maps (map-detail.js, .tools/map-detail.mjs).
+export async function prepare(data) {
+  if (new URLSearchParams(location.search).get('map') === 'der-eisendrache' && !/[?&]noDetail/.test(location.search)) await prepareDetail('mods/maps/der-eisendrache/');
+  return data;
+}
 
 export default async function setup(api) {
   if (api.map?.id !== 'der-eisendrache') return;
@@ -123,6 +131,7 @@ export default async function setup(api) {
   setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 });   // the Tab scoreboard's tiles
   const bounds = setupBounds(api, { lowgrav });   // after the pads: it watches their flights
   await bows?.ready;   // the spirit wolves too
+  await pap?.ready;   // the map's own Pack-a-Punch machine
   await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
   await look;   // the light bake and its lights: before the engine batches the map and compiles its shaders (see setupLook)
   sync.ready();   // a guest catches up on the game's events so far
@@ -404,12 +413,18 @@ function setupPads(api) {
 // lights its surroundings at any distance, through no walls, at no per-light cost, so nothing pops in. The pool is then
 // only an accent on the nearest few lamps (ACCENT of a lamp's level, faded out by 900 units): specular glints and the
 // fires' flicker. Without the bake files (or with ?noBake) the old full pool runs.
-const ACCENTS_BY_QUALITY = [2, 3, 4, 6], ACCENT = .3;
+// 2026-11-12 (user: "snow shines really bad, insane blinding"): the lamps' baked light was 3-5 times the daylight on the
+// rocket pad and burned snow and pale concrete white, with bloom on top. The bake now has a soft knee (knee .4: a lamp's
+// light levels off at 2.5), the accents are weaker and fewer (each is a per-pixel light in every lit shader), the snow's
+// albedo is a blue-grey instead of near white (SNOW_TINT), and the map's bloom is 1.0 (grade.js, was 1.4).
+const ACCENTS_BY_QUALITY = [1, 2, 3, 4], ACCENT = .18, SNOW_TINT = [.86, .89, .96];
 const POOL_BY_QUALITY = [4, 6, 10, 16], LAMP = { color: 0xffac62, bulb: 0xffd9a8, on: 3000, off: 2000, range: 620, decay: 1.4 };
 const poolSize = baked => (baked ? ACCENTS_BY_QUALITY : POOL_BY_QUALITY)[Math.max(0, Math.min(3, Math.round(settings.graphics ?? 2)))];
 function setupLook(api) {
   const { scene, world, session, host, camera } = api;
   metalLook(world.root);
+  applyDetail(world.root);
+  { const seen = new Set(); world.root?.traverse(o => { for (const m of [o.material].flat()) if (m?.color && !seen.has(m) && /snow|frost/i.test(m.name ?? '') && !/glass/i.test(m.name)) { seen.add(m); m.color.r *= SNOW_TINT[0]; m.color.g *= SNOW_TINT[1]; m.color.b *= SNOW_TINT[2]; } }); }
   const kids = scene.children;
   const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
   const [key, fill] = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
@@ -427,7 +442,7 @@ function setupLook(api) {
   // host.pending it landed after the engine's "Optimizing the map" compile, so every map program was built there without
   // the bake and the lights, thrown away, and built again in the warm-up.
   let timer = 0;
-  const ready = loadMapLight(api, { skyFloor: .3, sunFloor: .12, strength: 1, powerOff: .7 }).catch(() => null).then(light => { baked = light; resize(); });
+  const ready = loadMapLight(api, { skyFloor: .3, sunFloor: .12, strength: 1, powerOff: .7, knee: .4 }).catch(() => null).then(light => { baked = light; resize(); });
   onSettingsChange((_, k) => { if (k === 'graphics' || k === null) resize(); });   // (a no-op until the bake has answered: the pool is empty then)
   // the sky: BO3's skybox model isn't exported (a flat grey background showed through the castle's breaches): a dome at
   // the far plane with an overcast gradient, a soft sun glow and drifting cloud bands; the fog takes its horizon colour
@@ -526,7 +541,7 @@ function setupLook(api) {
 const PAP_ORDER = ['under', 'rocket', 'roof'], PAP_NAME = { under: 'the undercroft', rocket: 'the rocket pad', roof: 'the rooftop' };
 // Co-op: each step is an event (anyone's look re-forms it); the host picks when it moves on.
 function setupPap(api) {
-  const { world, session, host, player, camera, toast, announce, audio, sync } = api, root = world.root;
+  const { world, session, host, player, camera, toast, announce, audio, sync, scene } = api, root = world.root;
   const locs = {}, tps = {}, parts = {};
   for (const k of PAP_ORDER) {
     const l = root.getObjectByName('CASTLE_PAPLOC_' + k), t = root.getObjectByName('CASTLE_PAPTP_' + k);
@@ -537,13 +552,40 @@ function setupPap(api) {
   if (Object.keys(locs).length < 3 || !world.movePap) { console.warn('[der-eisendrache] Pack-a-Punch spots missing (rebuild the map)'); return null; }
   const st = { active: new Set(), reformAt: null, reformed: false, at: null, used: false, nextMove: 0 };
   const showParts = (k, v) => { for (const o of parts[k]) o.visible = v; };
-  const machineVisible = v => { if (world.papMachine) world.papMachine.visible = v; };
+  // The map's own machine (2026-11-12, user: "its not using the pack a punch machine from DE"): BO3's
+  // p7_fxanim_zm_castle_pap_mod with its roller clips (.tools/build_castle_panzer.py pap; pap/, git-ignored) stands in
+  // for the generic BO1 one, which stays hidden. Its mouth (the rollers) faces +Z and its base is 15 above its origin,
+  // which is where the map's spots are; the prompt and the gun being upgraded move out to the mouth (MOUTH), the gun
+  // lying across it. Without the files (or with ?noPapModel) the generic machine is used as before.
+  const own = { holder: null, rig: null, was: false, ejected: false }, MOUTH = new THREE.Vector3(0, 62, 38), UP = new THREE.Vector3(0, 1, 0);
+  const machineVisible = v => { if (own.holder) own.holder.visible = v; if (world.papMachine) world.papMachine.visible = v && !own.holder; };
   const reset = () => {
     Object.assign(st, { active: new Set(), reformAt: null, reformed: false, at: null, used: false, nextMove: 0 });
     for (const k of PAP_ORDER) showParts(k, true);
     world.papLocked = true; world.papLockedText = 'Pack-a-Punch hasn\'t re-formed';
   };
-  const place = k => { st.at = k; world.movePap(locs[k].pos, locs[k].yaw); machineVisible(true); };
+  const place = k => { st.at = k; world.movePap(locs[k].pos, locs[k].yaw); machineVisible(true);
+    const h = own.holder; if (!h) return;
+    const ry = locs[k].yaw + Math.PI / 2, p = MOUTH.clone().applyAxisAngle(UP, ry).add(locs[k].pos);
+    h.position.copy(locs[k].pos); h.rotation.y = ry; h.updateMatrix(); h.updateMatrixWorld(true);
+    const it = world.interactions.find(i => i.kind === 'pap'), ent = world.data.entities.find(e => e.id === 'custom_pap');
+    if (it) it.position.copy(p); if (ent) ent.position = p.toArray();
+    own.rig.play('poweron', false, 1, 0);
+  };
+  const PAP_URL = new URL('pap/', import.meta.url).href;
+  const ownReady = /[?&]noPapModel/.test(location.search) ? null : Promise.all([loadModel(PAP_URL + 'pap.glb').catch(() => null), fetch(PAP_URL + 'anims.json').then(r => r.json()).catch(() => null)]).then(async ([model, index]) => {
+    if (!model || !index) return;
+    const m = cloneSkinned(model), holder = new THREE.Group(), rig = new Rig(m);
+    m.traverse(o => { if (o.isBone) o.userData.bindPosition = o.position.clone(); if (!o.isMesh) return; o.frustumCulled = false; o.castShadow = o.receiveShadow = false;
+      // the rocks share one tiling pebble map stretched once over each piece (a tile every 80 units): three tiles instead
+      if (/packapunch_rock/i.test(o.material.name ?? '') && o.material.map) o.material.map.repeat.set(3, 3);
+      // the gems glow by themselves (their own colour map as the glow)
+      if (/gemstone/i.test(o.material.name ?? '')) { o.material = o.material.clone(); o.material.emissiveMap = o.material.map; o.material.emissive.setHex(0xffffff); o.material.emissiveIntensity = 1.6; } });
+    await Promise.all(Object.keys(index).map(async k => { const d = await loadAnimation(PAP_URL + 'anims/' + k + '.json').catch(() => null); if (d) rig.add(k, d); }));
+    holder.add(m); holder.visible = false; scene.add(holder); host.warmObjects?.push(holder);
+    own.holder = holder; own.rig = rig; if (world.papMachine) world.papMachine.visible = false;
+    if (st.at) place(st.at);
+  });
   sync.on('papAct', d => { const k = d.k; if (st.active.has(k) || st.reformAt != null) return;
       st.active.add(k); showParts(k, false); audio?.play?.('teleport', .6);
       if (st.active.size >= 2) {
@@ -562,8 +604,18 @@ function setupPap(api) {
   });
   let reformAsked = false;
   const look = new THREE.Vector3(), to = new THREE.Vector3();
-  host.on('update', () => {
+  host.on('update', dt => {
     if (!st.reformed) machineVisible(false);
+    if (own.holder) {
+      if (world.papMachine?.visible) world.papMachine.visible = false;   // (it loads on its own time)
+      // the rollers: they take the gun in (4 s, the upgrade takes 4.35), push it back out when it's ready, then rest
+      const pk = session.pack, on = !!pk, done = on && session.time >= pk.readyAt;
+      if (on && !own.was) { own.rig.play('working_take_gun', false, 1, .1); own.ejected = false; }
+      if (done && !own.ejected) { own.ejected = true; own.rig.play('working_eject_gun', false, 1, .1); }
+      own.was = on;
+      if (own.holder.visible) own.rig.update(typeof dt === 'number' ? dt : 1 / 60);
+      const gun = api.features?.packMesh; if (gun) gun.rotation.y = own.holder.rotation.y;   // (world models lie along X)
+    }
     if (st.reformAt && !st.reformed) {
       const l = locs[st.reformAt], feet = player.getFeetPosition();
       camera.getWorldDirection(look); to.copy(l.pos).add(new THREE.Vector3(0, 50, 0)).sub(camera.position).normalize();
@@ -575,9 +627,9 @@ function setupPap(api) {
     if (!sync.isHost || !st.used || session.pack || (session.round ?? 0) < st.nextMove) return;
     sync.act('papMove', { k: PAP_ORDER[(PAP_ORDER.indexOf(st.at) + 1) % 3] });
   });
-  host.on('reset', () => { reset(); reformAsked = false; st.usedAsked = false; });
+  host.on('reset', () => { reset(); reformAsked = false; st.usedAsked = false; own.was = own.ejected = false; });
   reset();
-  return { state: () => ({ active: [...st.active], reformAt: st.reformAt, reformed: st.reformed, at: st.at, nextMove: st.nextMove }) };
+  return { ready: ownReady, model: () => own.holder, state: () => ({ active: [...st.active], reformAt: st.reformAt, reformed: st.reformed, at: st.at, nextMove: st.nextMove }) };
 }
 
 // ---- The rocket pad: its zones open once someone has taken the teleporter (castle_teleporter_used)

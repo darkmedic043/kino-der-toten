@@ -34,7 +34,7 @@ export const NEUTRAL={
 export const GRADES={
   default:{black:.04,contrast:1.3,saturation:1.04,vibrance:.3,shadowTint:[.84,.92,1.16],highlightTint:[1.12,1.03,.9],vignette:.46,chroma:.0015,sharpen:.25,grain:.03,bloom:1.25},
   kino:{exposure:.96,black:.035,contrast:1.3,shadowTint:[.84,.92,1.1],highlightTint:[1.14,1.04,.86],vibrance:.3,warmth:.02,bloom:1.35},
-  'der-eisendrache':{exposure:.86,black:.045,contrast:1.34,saturation:.98,vibrance:.34,shadowTint:[.76,.87,1.22],highlightTint:[1.14,1.03,.88],vignette:.5,bloom:1.4,haze:[.06,.08,.12],hazeDensity:.00022,hazeStart:400},
+  'der-eisendrache':{exposure:.86,black:.045,contrast:1.34,saturation:.98,vibrance:.34,shadowTint:[.76,.87,1.22],highlightTint:[1.14,1.03,.88],vignette:.5,bloom:1.0,haze:[.06,.08,.12],hazeDensity:.00022,hazeStart:400},
   moon:{exposure:.95,black:.045,contrast:1.34,saturation:.92,vibrance:.22,shadowTint:[.82,.9,1.16],highlightTint:[1.06,1.03,.98],vignette:.52,chroma:.003,grain:.034},
   'the-giant':{exposure:.92,black:.045,contrast:1.32,saturation:.94,vibrance:.3,shadowTint:[.82,.94,1.08],highlightTint:[1.12,1.04,.9],vignette:.46,bloom:1.3,haze:[.05,.06,.07],hazeDensity:.0002,hazeStart:300},
   nuketown:{exposure:1.18,black:.06,contrast:1.42,saturation:.42,vibrance:.3,warmth:-.1,shadowTint:[.55,.95,1],highlightTint:[.8,1.02,.98],vignette:.42,chroma:.0025,sharpen:.3,bloom:1.55,grain:.05,haze:[.14,.19,.21],hazeDensity:.00015,hazeStart:500},   // UGX Nuketown Remastered's look (2026-10-27, picked from six variants next to the screenshots; 2026-10-29 matched to the user's gameplay video: paler, more desaturated, a pale haze toward the bright sky, lighter vignette): a heavy teal cast on everything, crushed blacks, fires stay orange (mods/nuketown/atmosphere.js)
