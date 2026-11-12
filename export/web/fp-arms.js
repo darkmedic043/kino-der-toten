@@ -91,6 +91,20 @@ export class FirstPersonArms {
     const armLen=pos(S0.arm).distanceTo(pos(S0.fore))+pos(S0.fore).distanceTo(pos(S0.hand)),t5Arm=tp('j_shoulder_ri').distanceTo(tp('j_elbow_ri'))+tp('j_elbow_ri').distanceTo(tp('j_wrist_ri'));
     const fit=this.entry.fpArmsFit==='arm'?t5Arm/armLen:palm?t5Palm/palm:1;
     holder.scale.setScalar(fit*(this.entry.fpArmsScale??1));holder.updateMatrixWorld(true);
+    // fpArmsTipAim: the last finger bone (the fingertip) is aimed like the others, at T5's last segment (joint 2 to 3). It has
+    // no child bone to aim by, so its own direction is read from the mesh: the far end of the vertices it carries. Without
+    // it the tip only copies T5's turn since bind, and a rig whose fingers are modelled straight (Seven's) kept them
+    // straight where the glove's tips curl round a grip: his trigger finger stuck out past the pistol (2026-11-11).
+    const tipLocal=new Map();
+    if(this.entry.fpArmsTipAim){
+      const lists=new Map(),vp=new THREE.Vector3();for(const S of Object.values(sides))for(const ch of Object.values(S.fingers))if(ch.length>1)lists.set(ch.at(-1),[]);
+      model.traverse(o=>{if(!o.isSkinnedMesh)return;o.skeleton.update();const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight,src=o.skeleton.bones;
+        for(let v=0;v<g.attributes.position.count;v++){let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(v,k);if(w>bw){bw=w;best=si.getComponent(v,k);}}
+          const list=lists.get(src[best]);if(!list||bw<.6)continue;o.getVertexPosition(v,vp);list.push(vp.applyMatrix4(o.matrixWorld).clone());}});
+      for(const [bone,list] of lists){if(list.length<6)continue;const h=pos(bone);list.sort((x,y)=>y.distanceToSquared(h)-x.distanceToSquared(h));
+        // (direction: the middle of the farthest eighth; length: out to the very end)
+        const n=Math.max(3,list.length>>3),c=new THREE.Vector3();for(let i=0;i<n;i++)c.add(list[i]);c.divideScalar(n).sub(h).setLength(list[0].distanceTo(h)).add(h);tipLocal.set(bone,bone.worldToLocal(c));}
+    }
 
     // Pose each arm over the T5 bind pose, then note how far to slide it so the wrists meet.
     const shift={},boneMap=new Map(),scaleBones=new Map();
@@ -111,6 +125,8 @@ export class FirstPersonArms {
         const a=T(`j_${name}_${t5}_${i}`),b=T(`j_${name}_${t5}_${i+1}`),next=chain[i+1];
         if(a&&b&&next)aim(bone,pos(next).sub(pos(bone)),pos(b).sub(pos(a)));
       });
+      for(const [name,chain] of Object.entries(f)){const i=chain.length-1,bone=chain[i],l=tipLocal.get(bone),a=T(`j_${name}_${t5}_${i}`),b=T(`j_${name}_${t5}_${i+1}`);
+        if(l&&a&&b)aim(bone,bone.localToWorld(l.clone()).sub(pos(bone)),pos(b).sub(pos(a)));}
       shift[t5]=tW.clone().sub(pos(S.hand));
       // fpArmsFingerScale {thumb:.6}: shrink a finger's geometry toward its base knuckle
       // (a gauntlet's long thumb plate that pokes far past the grip)
@@ -124,11 +140,18 @@ export class FirstPersonArms {
       const ff=this.entry.fpArmsFingerFit;
       if(ff)for(const [name,ch] of Object.entries(f)){
         if(scaleBones.has(ch[0])||(this.entry.fpArmsKeepFingers??[]).includes(name)||!ch[2]||!T(`j_${name}_${t5}_2`))continue;
-        const own=pos(ch[1]).distanceTo(pos(ch[0]))+pos(ch[2]).distanceTo(pos(ch[1])),want=tp(`j_${name}_${t5}_1`).distanceTo(tp(`j_${name}_${t5}_0`))+tp(`j_${name}_${t5}_2`).distanceTo(tp(`j_${name}_${t5}_1`));
+        let own=pos(ch[1]).distanceTo(pos(ch[0]))+pos(ch[2]).distanceTo(pos(ch[1])),want=tp(`j_${name}_${t5}_1`).distanceTo(tp(`j_${name}_${t5}_0`))+tp(`j_${name}_${t5}_2`).distanceTo(tp(`j_${name}_${t5}_1`));
+        // fpArmsFingerFitReach: a finger whose base knuckle sits nearer the wrist than the glove's (Seven's index: 0.7 of a
+        // 3.8 palm) is fitted that much longer, so its tip still lands where the glove's does (on the trigger guard)
+        // with fpArmsTipAim the tip's own length is known (to the far end of its mesh), so the fit takes in the tip too, against
+        // T5's last segment: Seven's fingertips are half as long again as the glove's and stood out past the grip
+        const tipB=ch.length===3&&tipLocal.has(ch[2])&&T(`j_${name}_${t5}_3`)?ch[2].localToWorld(tipLocal.get(ch[2]).clone()):null;
+        if(tipB){own+=tipB.distanceTo(pos(ch[2]));want+=tp(`j_${name}_${t5}_3`).distanceTo(tp(`j_${name}_${t5}_2`));}
+        if(this.entry.fpArmsFingerFitReach&&name!=='thumb'&&T(`j_mid_${t5}_0`)){const x=tp(`j_mid_${t5}_0`).sub(tW).normalize();want+=Math.max(0,tp(`j_${name}_${t5}_0`).sub(tW).dot(x)-pos(ch[0]).sub(pos(S.hand)).dot(x));}
         const base=pos(ch[0]),k=1+(want/own-1)*(ff===true?1:+ff);(this.fingerFit??={})[`${name}_${t5}`]=+(want/own).toFixed(3);
         if(!this.entry.fpArmsFingerFitLength){ch.forEach(b=>b.traverse(x=>{if(x.isBone)scaleBones.set(x,{base,k});}));continue;}
         const heads=ch.map(b=>pos(b)),delta=new THREE.Vector3();
-        ch.forEach((b,i)=>{const dir=(i+1<heads.length?heads[i+1].clone().sub(heads[i]):heads[i].clone().sub(heads[i-1])).normalize(),seg={head:heads[i],dir,delta:delta.clone(),k:i+1<heads.length?k:1};
+        ch.forEach((b,i)=>{const dir=(i+1<heads.length?heads[i+1].clone().sub(heads[i]):tipB?tipB.clone().sub(heads[i]):heads[i].clone().sub(heads[i-1])).normalize(),seg={head:heads[i],dir,delta:delta.clone(),k:i+1<heads.length||tipB?k:1};
           if(i+1<heads.length)delta.addScaledVector(heads[i+1].clone().sub(heads[i]),k-1);
           b.traverse(x=>{if(x.isBone&&(x===b||!ch.includes(x))&&!(scaleBones.get(x)?.seg&&ch.indexOf(scaleBones.get(x).bone)>i))scaleBones.set(x,{base,k,seg,bone:b});});});}
       S.targets=[[S.arm,'j_shoulder_'+t5],[S.fore,'j_elbow_'+t5],[S.hand,'j_wrist_'+t5]];
@@ -462,7 +485,7 @@ export class FirstPersonArms {
     // A verlet like spring-bones.js, on the retargeted bones' world matrices, after the arm is solved from T5.
     const fpSprings=(()=>{
       const cfgs=[this.entry.springBones??[]].flat(),byName=new Map(rt.map((e,i)=>[e.name,i])),joints=[];
-      for(const cfg of cfgs)for(const name of cfg.chains??[]){
+      for(const cfg of cfgs)if(cfg.fp!==false)for(const name of cfg.chains??[]){   // "fp": false = third person only (Seven's sleeves: their bones carry the sleeve itself, and a swing opened its seam on the forearm up close)
         let i=byName.get(name)??byName.get(THREE.PropertyBinding.sanitizeNodeName(name));
         const re=cfg.childMatch?new RegExp(cfg.childMatch):null;
         while(i!=null){const c=rt.findIndex(e=>e.parent===i&&(!re||re.test(e.name)));if(c<0)break;

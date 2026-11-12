@@ -79,7 +79,9 @@ CORE = re.compile(r'^(pelvis|spine_[0-3]|neck_0|head|clavicle_[LR]|arm_(upper|lo
 # Dangling parts keep their bones for the spring-bone physics (characters.json springBones): Seven's three backpack
 # cables and his wrist shackle chain; Venator's back coat tails, his sash and the censer on its chain. (Seven's ankle
 # chain stays merged: it hangs below the floor in the bind pose, see above.)
-SPRING = re.compile({'seven': r'^(cable1_[0-8]|Cable2_[1-9]|Cable3_[0-8]|chain_hang_[0-3])$',
+# 2026-11-11 (user: "give the belts on his body some physics"): Seven's six leather strap tails (upper arms, forearms,
+# shins), the three cloth strips at his waist and the torn sleeves' hanging rags keep their bones too.
+SPRING = re.compile({'seven': r'^(cable1_[0-8]|Cable2_[1-9]|Cable3_[0-8]|chain_hang_[0-3]|leather_strap_cloth_\d+|waist_cloth_[0-8]|sleeve_cloth_[LR]_\d+)$',
                      'venator': r'^(skirtC_([0-4]|end)_[LR]|sash_a_1|sash_b_([0-9]|end)|urn_chain_[0-2]|urn_[01]|urn_end)$'}[hero])
 kept = lambda n: bool(CORE.match(n) or SPRING.match(n))
 bones = arm.data.bones

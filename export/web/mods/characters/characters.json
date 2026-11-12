@@ -2397,7 +2397,7 @@
  {
   "id": "deadlock_seven",
   "name": "Seven",
-  "model": "models/deadlock/deadlock_seven.glb?v=2",
+  "model": "models/deadlock/deadlock_seven.glb?v=3",
   "icon": "models/deadlock/deadlock_seven_icon.webp",
   "height": 80,
   "type": "gltf",
@@ -2407,6 +2407,10 @@
   "fpArmsRetarget": true,
   "fpArmsReach": false,
   "fpArmsNearCut": 4,
+  "fpArmsFingerFit": 1,
+  "fpArmsFingerFitLength": true,
+  "fpArmsFingerFitReach": true,
+  "fpArmsTipAim": true,
   "springBones": [
    {
     "_doc": "The three cables from the backpack down the back to the knees: heavy, swing with movement, back and legs push them out",
@@ -2480,6 +2484,139 @@
       "bone": "pelvis",
       "to": "spine_1",
       "radius": 0.18
+     }
+    ]
+   },
+   {
+    "_doc": "Leather strap tails on the upper arms, forearms and shins: stiff leather, they flap a little and sag",
+    "chains": [
+     "leather_strap_cloth_0",
+     "leather_strap_cloth_3",
+     "leather_strap_cloth_6",
+     "leather_strap_cloth_9",
+     "leather_strap_cloth_12",
+     "leather_strap_cloth_15"
+    ],
+    "childMatch": "^leather_strap",
+    "stiffness": 0.07,
+    "drag": 0.17,
+    "gravity": 1.2,
+    "maxAngle": 46,
+    "follow": 0.6,
+    "followY": 1,
+    "radius": 0.015,
+    "colliders": [
+     {
+      "bone": "arm_upper_L",
+      "to": "arm_lower_L",
+      "radius": 0.07
+     },
+     {
+      "bone": "arm_upper_R",
+      "to": "arm_lower_R",
+      "radius": 0.07
+     },
+     {
+      "bone": "arm_lower_L",
+      "to": "hand_L",
+      "radius": 0.06
+     },
+     {
+      "bone": "arm_lower_R",
+      "to": "hand_R",
+      "radius": 0.06
+     },
+     {
+      "bone": "leg_lower_L",
+      "to": "ankle_L",
+      "radius": 0.08
+     },
+     {
+      "bone": "leg_lower_R",
+      "to": "ankle_R",
+      "radius": 0.08
+     }
+    ]
+   },
+   {
+    "_doc": "The three cloth strips hanging from the belt (right hip, left hip, back)",
+    "chains": [
+     "waist_cloth_0",
+     "waist_cloth_3",
+     "waist_cloth_6"
+    ],
+    "childMatch": "^waist_cloth",
+    "stiffness": 0.04,
+    "drag": 0.15,
+    "gravity": 1.5,
+    "maxAngle": 38,
+    "follow": 0.6,
+    "followY": 1,
+    "radius": 0.025,
+    "colliders": [
+     {
+      "bone": "pelvis",
+      "to": "spine_1",
+      "radius": 0.2
+     },
+     {
+      "bone": "leg_upper_L",
+      "to": "leg_lower_L",
+      "radius": 0.1
+     },
+     {
+      "bone": "leg_upper_R",
+      "to": "leg_lower_R",
+      "radius": 0.1
+     }
+    ]
+   },
+   {
+    "_doc": "The torn sleeves' hanging rags: short and light, a small sway only (they carry most of the sleeve's skin)",
+    "chains": [
+     "sleeve_cloth_L_0",
+     "sleeve_cloth_L_4",
+     "sleeve_cloth_L_7",
+     "sleeve_cloth_R_0",
+     "sleeve_cloth_R_4",
+     "sleeve_cloth_R_7",
+     "sleeve_cloth_R_11",
+     "sleeve_cloth_R_15"
+    ],
+    "childMatch": "^sleeve_cloth",
+    "fp": false,
+    "stiffness": 0.08,
+    "drag": 0.18,
+    "gravity": 1,
+    "maxAngle": 14,
+    "follow": 0.7,
+    "followY": 1,
+    "radius": 0.02,
+    "colliders": [
+     {
+      "bone": "arm_upper_L",
+      "to": "arm_lower_L",
+      "radius": 0.07
+     },
+     {
+      "bone": "arm_upper_R",
+      "to": "arm_lower_R",
+      "radius": 0.07
+     },
+     {
+      "bone": "arm_lower_L",
+      "to": "hand_L",
+      "radius": 0.06
+     },
+     {
+      "bone": "arm_lower_R",
+      "to": "hand_R",
+      "radius": 0.06
+     },
+     {
+      "bone": "spine_1",
+      "to": "spine_3",
+      "radius": 0.2
      }
     ]
    }
