@@ -22,7 +22,7 @@ export function mergeProps(root, scene = null) {
   for (const parent of parents) {
     const groups = new Map();
     for (const o of parent.children) {
-      if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || o.isBatchedMesh || !o.visible || Array.isArray(o.material) || o.morphTargetInfluences?.length || o.children.length || o.userData.move || o.userData.hidden) continue;
+      if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || o.isBatchedMesh || !o.visible || Array.isArray(o.material) || o.morphTargetInfluences?.length || o.children.length || o.userData.move || o.userData.hidden || o.userData.noInstance) continue;
       const g = o.geometry; if (!g.index || Object.values(g.attributes).some(a => a.isInterleavedBufferAttribute)) continue;
       const layout = Object.keys(g.attributes).sort().map(k => `${k}:${g.attributes[k].itemSize}${g.attributes[k].normalized ? 'n' : ''}`).join(',');
       const key = [o.material.uuid, layout, o.castShadow, o.receiveShadow, o.renderOrder, o.layers.mask].join('|');
@@ -54,7 +54,7 @@ const ZERO = new THREE.Matrix4().makeScale(0, 0, 0), M = new THREE.Matrix4(), S 
 export function instanceProps(root, scene, host) {
   const groups = new Map(), unit = new THREE.BoxGeometry(1, 1, 1);
   const consider = top => top.traverse(o => {
-    if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || o.isBatchedMesh || Array.isArray(o.material) || o.morphTargetInfluences?.length || o.layers.mask === 0) return;
+    if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || o.isBatchedMesh || Array.isArray(o.material) || o.morphTargetInfluences?.length || o.layers.mask === 0 || o.userData.noInstance) return;
     const box = o.geometry.type === 'BoxGeometry' ? o.geometry.parameters : null;
     const key = [box ? 'box' : o.geometry.uuid, o.material.uuid, o.castShadow, o.receiveShadow, o.renderOrder, o.layers.mask].join('|');
     (groups.get(key) ?? groups.set(key, []).get(key)).push({ o, box, last: new Float64Array(16).fill(NaN), lm: new Float64Array(6).fill(NaN), vis: null, par: null });   // Float64: a Float32 copy never compared equal to the matrix's doubles, so every instance was re-set and re-uploaded every frame (2026-10-17)

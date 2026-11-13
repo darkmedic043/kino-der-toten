@@ -32,7 +32,10 @@ const MAPS = {
       // lights instead (the mod drives mvPower from the gravity while the camera is inside), the always set holds every
       // other light of the room at full plus a dim warm copy of the blue ones (`keep`: level, r, g, b of their
       // luminance), and the room fill there is warm (`fill`) and measured against the always set.
-      gated: { box: [[-1900, 0, -3100], [320, 620, -1650]], blue: 1.3, keep: [.5, 1, .97, .9], fill: [1, .95, .88] } } },
+      // `tame` (2026-11-13): the pure orange floods round the pyramid (1 : .28 : 0) turned the floor orange once the blue
+      // was held back, so a room light whose blue is under tame[0] of its red is mixed tame[1] of the way to its luminance
+      // times the torch tint (tame[2..4]).
+      gated: { box: [[-1900, 0, -3100], [320, 620, -1650]], blue: 1.3, keep: [.5, 1, .97, .9], fill: [1, .95, .88], tame: [.3, .7, 1.12, .96, .74] } } },
 };
 const id = process.argv[2], cfg = MAPS[id];
 if (!cfg) { console.error('usage: bake-map-light.mjs <' + Object.keys(MAPS).join('|') + '> [--cell N]'); process.exit(1); }
@@ -162,7 +165,7 @@ const GAIN = arg('gain', cfg.real?.gain ?? 1), toMap = v => new THREE.Vector3(v[
 const GATED = cfg.real?.gated, inBox = p => !!GATED && p.x > GATED.box[0][0] && p.y > GATED.box[0][1] && p.z > GATED.box[0][2] && p.x < GATED.box[1][0] && p.y < GATED.box[1][1] && p.z < GATED.box[1][2];
 const real = !realFile ? null : JSON.parse(fs.readFileSync(realFile)).lights.filter(l => (l.states & 1) && l.radius >= cfg.real.minRadius)
   .map(l => ({ p: toMap(l.origin), c: l.color, r: l.radius, d: l.toLight ? toMap(l.toLight).normalize() : null, ci: l.cosInner, co: l.cosOuter }))
-  .map(l => { if (inBox(l.p)) { if (l.c[2] > l.c[0] * GATED.blue) { const lum = (.2126 * l.c[0] + .7152 * l.c[1] + .0722 * l.c[2]) * GATED.keep[0]; l.keep = l.c.map((v, k) => Math.min(v, lum * GATED.keep[1 + k])); } else l.room = true; } return l; })
+  .map(l => { if (inBox(l.p)) { if (l.c[2] > l.c[0] * GATED.blue) { const lum = (.2126 * l.c[0] + .7152 * l.c[1] + .0722 * l.c[2]) * GATED.keep[0]; l.keep = l.c.map((v, k) => Math.min(v, lum * GATED.keep[1 + k])); } else { l.room = true; const t = GATED.tame; if (t && l.c[2] < l.c[0] * t[0]) { const lum = .2126 * l.c[0] + .7152 * l.c[1] + .0722 * l.c[2]; l.c = l.c.map((v, k) => v + (lum * t[2 + k] - v) * t[1]); } } } return l; })
   .filter(l => l.p.x + l.r > origin.x && l.p.y + l.r > origin.y && l.p.z + l.r > origin.z && l.p.x - l.r < origin.x + X * CELL && l.p.y - l.r < origin.y + Y * CELL && l.p.z - l.r < origin.z + Z * CELL);
 if (real) {
   const share = cfg.off / cfg.on, acc = new Float32Array(N * 3), cv = new THREE.Vector3(); let used = 0;

@@ -63,6 +63,7 @@ export default async function setup(api) {
   if (world.root) carvedDecals(world.root, api.scene);   // before the props are merged: the nodes it drops must not be instanced
   if (world.root) blackPlanes(world.root);   // the void planes: unlit black from both sides (overlays.js)
   if (world.root && !/[?&]noOverlays/.test(location.search)) console.info('[der-eisendrache] overlay layers:', JSON.stringify(overlayLayers(world.root)));   // snow, decals and cut-outs the map drew solid (overlays.js)
+  if (world.root) doorBacks(world.root);   // the blast doors get a back (before the merge: its pieces stay plain meshes)
   if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes); }
   // the map nodes this mod moves (Ragnarok parts, levers, the crate lid, clock hands, floaters, Skadi, the claws, the
   // astroglobe...) set position/rotation and call updateMatrixWorld. The world's optimizeStaticScene turns every map
@@ -1387,6 +1388,24 @@ const TESLA_AREA = new THREE.Box3(new THREE.Vector3(-340, 0, -2600), new THREE.V
 //   'fire' and ends with the burn (bows.js starts its magma then); the reopening runs on rocket.re.
 // Co-op: switching a trap on is an event (the switcher pays); its kills run on the host, each player takes its damage
 // on their own client; the host schedules the rocket's test fires (its state goes to everyone).
+// The blast door model is detailed on one side only and the two doors face opposite ways, so from either side of the shut
+// doors one half was a door and the other a flat rust plate (2026-11-13). Each door gets a copy of its own pieces mirrored
+// through the middle of its base plate (local z 4.5): seen from behind it is the mirror image of the other door's front,
+// so both sides show one whole round door. Plain meshes, not instances (`noInstance`): a mirrored instance would be lit
+// inside out. Safe to call twice.
+export function doorBacks(root) {
+  for (const name of ['CASTLE_SM_rocket_tunnel_door_l', 'CASTLE_SM_rocket_tunnel_door_r']) {
+    const o = root.getObjectByName(name); if (!o || o.getObjectByName('door_back')) continue;
+    o.updateWorldMatrix(true, true);
+    const inv = o.matrixWorld.clone().invert(), parts = []; o.traverse(m => { if (m.isMesh && m.layers.mask !== 0) parts.push(m); });
+    const back = new THREE.Group(); back.name = 'door_back'; back.scale.z = -1; back.position.z = 9; back.updateMatrix();
+    for (const m of parts) {
+      const c = new THREE.Mesh(m.geometry, m.material); c.applyMatrix4(inv.clone().multiply(m.matrixWorld)); c.updateMatrix();
+      c.castShadow = m.castShadow; c.receiveShadow = m.receiveShadow; c.renderOrder = m.renderOrder; c.userData.noInstance = true; back.add(c);
+    }
+    o.add(back); back.updateMatrixWorld(true);
+  }
+}
 export function setupTraps(api) {   // (exported for the test page)
   const { world, session, host, scene, enemies, player, toast, announce, audio, damage, sync } = api, root = world.root;
   const at = n => { const o = root.getObjectByName(n); return o ? o.getWorldPosition(new THREE.Vector3()) : null; };
@@ -1449,10 +1468,11 @@ export function setupTraps(api) {   // (exported for the test page)
   // Maxis on the PA (vox_maxis_rocket_pa_*, the castle's English voice bank), at the script's times: the test begins,
   // the doors, the count from ten at 9 s, "initiating" as the engine lights; "complete" when the burn ends
   const PA = [[0, 'begin'], [7, 'doors'], ...['ten', 'nine', 'eight', 'seven', 'six', 'five', 'four', 'three', 'two', 'one'].map((n, i) => [9 + i, n]), [19, 'initiating']];
+  doorBacks(root);
   const doors = [['CASTLE_SM_rocket_tunnel_door_l', -24.5, 92.5], ['CASTLE_SM_rocket_tunnel_door_r', 25.5, -92.5]].map(([name, dx, dz]) => {
     const o = root.getObjectByName(name); if (!o) return null;
     o.updateWorldMatrix(true, false);
-    const g = new THREE.CylinderGeometry(256, 256, 19, 20, 1, false, 0, Math.PI).rotateX(Math.PI / 2).translate(0, 0, 9.5), solid = new THREE.Mesh(g);
+    const g = new THREE.CylinderGeometry(256, 256, 29, 20, 1, false, 0, Math.PI).rotateX(Math.PI / 2).translate(0, 0, 4.5), solid = new THREE.Mesh(g);   // (z -10..19: the door and its mirrored back)
     solid.matrixWorld.copy(o.matrixWorld);
     const col = world.addScriptedMover?.([solid], { exact: true }) ?? null; if (col) col.disabled = true;
     return { o, open: o.getWorldPosition(new THREE.Vector3()), d: new THREE.Vector3(dx, 0, dz), col, p: new THREE.Vector3(), off: new THREE.Vector3() };
@@ -1465,16 +1485,24 @@ export function setupTraps(api) {   // (exported for the test page)
   // leaf covers its place on the door line, a zombie is held on the side it came from, clear of the door (the host
   // moves the zombies; a step of more than 150 past the door is a way round, not a way through).
   const doorN = doorU ? new THREE.Vector3(doorU.z, 0, -doorU.x) : null, slab = [0, 0];
-  if (doorN) for (const d of doors) { const c = d.open.clone().sub(doorMid).dot(doorN), far = c + 19 * new THREE.Vector3(0, 0, 1).transformDirection(d.o.matrixWorld).dot(doorN); slab[0] = Math.min(slab[0], c, far); slab[1] = Math.max(slab[1], c, far); }
+  if (doorN) for (const d of doors) { const c = d.open.clone().sub(doorMid).dot(doorN), zn = new THREE.Vector3(0, 0, 1).transformDirection(d.o.matrixWorld).dot(doorN), far = c + 19 * zn, near = c - 10 * zn; slab[0] = Math.min(slab[0], near, far); slab[1] = Math.max(slab[1], near, far); }
+  // A held zombie beats on the door (its attack clip, looped) instead of walking on the spot (2026-11-13); guests work
+  // out the same from the positions the host sends: within 14 of the line a zombie is held on.
   const holdZombies = k => {
-    if (!doorN || !sync.isHost) return;
-    const open = doorGap * (1 - k) / 2 - 12, lo = slab[0] - 30, hi = slab[1] + 30, mid = (slab[0] + slab[1]) / 2;
+    if (!doorN) return;
+    const open = doorGap * (1 - k) / 2 - 12, lo = slab[0] - 30, hi = slab[1] + 30, mid = (slab[0] + slab[1]) / 2, now = performance.now() / 1000;
     for (const z of enemies.list) {
       const p = z.root.position, x = p.x - doorMid.x, dz = p.z - doorMid.z, c = x * doorN.x + dz * doorN.z, along = Math.abs(x * doorU.x + dz * doorU.z);
       const at = c <= lo ? -1 : c >= hi ? 1 : 0, covered = k > 0 && along >= open && along < 300 && Math.abs(p.y - doorMid.y) < 300 && c > lo - 150 && c < hi + 150;
-      if (!covered) { z._doorSide = at || (c < mid ? -1 : 1); continue; }
-      const side = z._doorSide ??= at || (c < mid ? -1 : 1);
-      if (at !== side) { const to = (side < 0 ? lo : hi) - c; p.x += to * doorN.x; p.z += to * doorN.z; }
+      if (!covered) z._doorSide = at || (c < mid ? -1 : 1);
+      else {
+        const side = z._doorSide ??= at || (c < mid ? -1 : 1), to = (side < 0 ? lo : hi) - c;
+        if (sync.isHost) { if (at !== side) { p.x += to * doorN.x; p.z += to * doorN.z; z._doorHeld = now; } }
+        else if (Math.abs(to) < 14) z._doorHeld = now;
+      }
+      const held = covered && now - (z._doorHeld ?? -9) < .5;
+      if (held) { if (z.state === 'chase' && z.rig?.current === 'walk' && z.rig.play('attack', true, 1, .2)) z._doorBeat = true; }
+      else if (z._doorBeat) { z._doorBeat = false; if (z.state === 'chase' && z.rig?.current === 'attack') z.rig.play('walk', true, 1, .2); }
     }
   };
   const setDoors = k => {   // 0 open .. 1 shut
@@ -1562,7 +1590,7 @@ export function setupTraps(api) {   // (exported for the test page)
   sync.shared('rocket', () => ({ next: rocket.next == null ? null : rocket.next - session.time, phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : 0, re: rocket.re == null ? null : session.time - rocket.re }),
     s => { rocket.next = s.next == null ? null : session.time + s.next; if (s.phase) { if (!rocket.phase) rocket.t0 = session.time - s.t; rocket.phase = s.phase; } else rocket.phase = null; if (s.re == null) rocket.re = null; else if (rocket.re == null) rocket.re = session.time - s.re; });
   host.on('reset', () => { ray.on = ray.cool = 0; mash.on = mash.cool = 0; rocket.next = rocket.phase = rocket.re = null; rocket.cue = rocket.alarm = rocket.vo = -1; hush(); setDoors(0); rocketLight.intensity = 0; if (tp) tp.locked = false; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
-  return { inTesla, teslaCells: () => cells.size, rocketNow: () => { if (sync.isHost && rocket.phase == null && rocket.re == null) rocket.next = session.time; }, state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : null, door: rocket.k, switch: !!rocket.phase && session.time - rocket.t0 >= 6 } }),
+  return { inTesla, teslaCells: () => cells.size, rocketNow: () => { if (sync.isHost && rocket.phase == null && rocket.re == null) rocket.next = session.time; }, state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : null, door: rocket.k, switch: !!rocket.phase && session.time - rocket.t0 >= 6, doorLine: doorMid && { mid: doorMid.toArray().map(Math.round), n: [doorN.x, doorN.z] }, beating: enemies.list.filter(z => z._doorBeat).length, backs: doors.map(d => { const b = d.o.getObjectByName('door_back'); return b ? b.children.filter(c => c.isMesh && !c.isInstancedMesh && c.layers.mask !== 0).length : 0; }) } }),
     fireRocket: () => { rocket.next = session.time; } };
 }
 
