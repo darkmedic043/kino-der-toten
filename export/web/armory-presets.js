@@ -59,7 +59,7 @@ const CSS=`.pr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(22
 
 let styled=false;
 // root: the pane's container. opts: portrait(snap) => Promise<url|null>, describe(snap) => {cls:{name,icon,color}, lines:[..]},
-// setProfile(character, loadout), onSwitch(index) after another slot became live, onOpen(index) on a click of the live one.
+// setProfile(character, loadout), onSwitch(index) after another slot became live, onOpen(index) after any pick (the live one or a switch): home.js opens LOADOUT.
 export function mountPresets(root,opts){
   if(!styled){const st=document.createElement('style');st.textContent=CSS;document.head.append(st);styled=true;}
   const st=loadPresets(),live=snapshot();
@@ -71,7 +71,7 @@ export function mountPresets(root,opts){
         ${d?.cls?`<span class="pr-class" style="--c:${esc(d.cls.color??'#888')}">${d.cls.icon?`<img src="${esc(d.cls.icon)}" alt="">`:''}${esc(d.cls.name.toUpperCase())}</span>`:''}</div>
       <div class="pr-foot"><input class="pr-name" value="${esc(s.name)}" maxlength="24" spellcheck="false" aria-label="Preset name">
         ${(d?.lines??[]).map(l=>`<span class="pr-sub">${esc(l)}</span>`).join('')}</div></div>`;}).join('')}</div>
-    <p class="muted small" style="margin-top:14px">Each preset keeps its own operator, loadout, class set-up, Gobblegum pack and research augments. Progress is shared. Click a name to rename it.</p>`;
+    <p class="muted small" style="margin-top:14px">Each preset keeps its own operator, loadout, class set-up, Gobblegum pack and research augments. Progress is shared. Pick one to edit it; BACK (bottom left) returns here. Click a name to rename it.</p>`;
   st.slots.forEach((s,i)=>{if(!s.snap)return;const art=root.querySelector(`[data-preset="${i}"] .pr-art`);
     Promise.resolve(opts.portrait(s.snap)).then(url=>{if(!url||!art.isConnected)return;art.querySelector('.wait')?.remove();const img=new Image();img.alt='';img.src=url;art.prepend(img);}).catch(()=>{});});
   for(const inp of root.querySelectorAll('.pr-name')){
@@ -82,7 +82,7 @@ export function mountPresets(root,opts){
     const p=loadPresets();if(i===p.active){opts.onOpen?.(i);return;}
     p.slots[p.active].snap=snapshot();
     p.slots[i].snap??=structuredClone(p.slots[p.active].snap);   // a new slot starts as a copy of the live one
-    p.active=i;savePresets(p);applySnap(p.slots[i].snap,opts);opts.onSwitch?.(i);
+    p.active=i;savePresets(p);applySnap(p.slots[i].snap,opts);opts.onSwitch?.(i);opts.onOpen?.(i);   // then straight into its panes (2026-11-13)
   };
   root.onclick=e=>{const c=e.target.closest('[data-preset]');if(c&&!e.target.closest('.pr-name'))pick(+c.dataset.preset);};
   root.onkeydown=e=>{const c=e.target.closest?.('[data-preset]');if(c&&e.target===c&&(e.key==='Enter'||e.key===' ')){e.preventDefault();pick(+c.dataset.preset);}};

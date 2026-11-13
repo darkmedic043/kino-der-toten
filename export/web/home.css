@@ -334,3 +334,14 @@ body>main{min-width:0}   /* grid item: let wide children (the Armory tab bar) sc
 @media (max-width:900px){#rail{min-width:0;max-width:100vw}#tabs{max-width:100%;min-width:0}}   /* portrait phones: the sidebar's tab row scrolls instead of widening the page */
 #wiki-link{display:block;padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:3px;color:var(--dim);text-decoration:none;border-top:1px solid var(--line);margin-top:6px}#wiki-link:hover{color:var(--text);background:#ffffff06}#wiki-link b{margin-left:4px}
 @media (max-width:860px){#rail>.brand{order:-2}#wiki-link{order:-1;margin:0 0 0 auto;border:1px solid var(--line);padding:8px 12px}}   /* phones: top right, beside the logo */
+
+/* Armory flow (2026-11-13, user: "when you click armory, you choose between your presets, and then it brings up their menu, with a go back in the bottom left"):
+   the presets page has no pane bar; picking a preset opens its panes, BACK (bottom left) returns to the presets */
+#tab-armory.at-presets .armory-nav{display:none}
+#tab-armory.at-presets #pane-presets .tab-head{margin-top:0}
+.armory-back{display:inline-flex;position:fixed;left:304px;bottom:22px;z-index:40;align-items:baseline;gap:10px;padding:10px 18px;border:1px solid var(--line);background:#0b0c0ce8;color:var(--text);font-weight:700;letter-spacing:.22em;font-size:13px;cursor:pointer}
+.armory-back:hover{border-color:var(--red-hi)}
+.armory-back small{font-weight:600;letter-spacing:.12em;color:var(--muted);font-size:11px;text-transform:uppercase}
+.armory-back[hidden]{display:none}
+#tab-armory:not(.at-presets){padding-bottom:64px}
+@media (max-width:900px){.armory-back{left:12px;bottom:12px}}

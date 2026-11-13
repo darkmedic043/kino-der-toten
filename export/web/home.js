@@ -117,6 +117,8 @@ function showTab(name){
   for(const b of panes)b.classList.toggle('active',b.dataset.pane===pane);
   for(const s of document.querySelectorAll('.pane'))s.classList.toggle('active',s.id==='pane-'+pane);
   const hash=name==='armory'?pane:name;if(location.hash!=='#'+hash)history.replaceState(null,'','#'+hash);
+  $('tab-armory').classList.toggle('at-presets',pane==='presets');
+  const back=$('armory-back');back.hidden=!(name==='armory'&&pane!=='presets');if(!back.hidden)$('armory-back-name').textContent=activePresetName();
   stage.active=name==='armory'&&pane==='operator';if(stage.active)stage.start();
   if(name==='armory'&&pane==='research')drawResearch();
   if(name==='armory'&&pane==='presets')drawPresets().catch(e=>console.warn('[presets]',e));
@@ -128,6 +130,7 @@ function showTab(name){
 for(const b of tabs)b.addEventListener('click',()=>showTab(b.dataset.tab));
 addEventListener('kino-shop-pack',()=>renderLoadout());   // a weapon pack bought in the Shop unlocks its guns
 for(const b of panes)b.addEventListener('click',()=>showTab(b.dataset.pane));
+document.body.append($('armory-back'));$('armory-back').addEventListener('click',()=>showTab('armory'));   // fixed, outside the fading tab (its transform would carry the button)
 renderSettings($('settings-panel'));
 
 // ---- Profile card -------------------------------------------------------------
@@ -883,7 +886,7 @@ async function drawPresets(){
       profile=loadProfile();preview=null;renderProfile();renderLoadout();renderCharacters();
       const cur=equippedChar();if(cur&&stage.character)showCharacter(cur);
       classView?.redraw();drawResearch();drawPresets();toast(`${activePresetName()} is active`);},
-    onOpen:()=>showTab('loadout')});
+    onOpen:()=>showTab('loadout')});   // any pick opens the preset's panes (armory-presets.js pick)
 }
 
 renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();renderCredits();
@@ -901,7 +904,8 @@ try{
 // Controller navigation of the menu (gamepad-nav.js): D-pad / stick move the focus ring, A selects, B backs out of
 // the Gunsmith (Escape) or returns to the tab strip, L1/R1 change tabs, L2/R2 the second strip (Armory panes,
 // settings tabs), Start plays the selected map. The corner strip shows the pad's own glyphs.
+// B inside a preset's panes goes back to the presets page first.
 const padNav=installGamepadNav({glyphs:{identify:identifyPad,glyphUrl:padGlyph},startLabel:'PLAY',
   scope:()=>document.getElementById('gsv')??document.body,initial:()=>document.querySelector('#tabs button.active'),
-  onBack:()=>{if(document.getElementById('gsv'))return false;const t=document.querySelector('#tabs button.active');if(t)padNav.focus(t);return true;},
+  onBack:()=>{if(document.getElementById('gsv'))return false;if(!$('armory-back').hidden){showTab('armory');const c=document.querySelector('.pr-card.on');if(c)padNav.focus(c);return true;}const t=document.querySelector('#tabs button.active');if(t)padNav.focus(t);return true;},
   onStart:()=>document.querySelector('#hero-actions a,#hero-actions button')?.click()});
