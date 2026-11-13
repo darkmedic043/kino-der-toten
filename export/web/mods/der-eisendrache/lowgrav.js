@@ -1,9 +1,12 @@
 // Der Eisendrache's low gravity (zm_castle_low_grav.gsc): the undercroft (BO3's trig_low_gravity_zone, a brush the
 // dump doesn't have: here a box around the room, from the undercroft's floaters, wall-run triggers and pressure pads)
-// goes low when its four pressure plates around the pyramid (grav_pad_trigger) have all been stepped on: each lights
-// as you step on it and stays lit; with the fourth the gravity drops for 50 s (its last 10 s flashing), then the plates
-// rest dark for 60 s before they take steps again (user, 2026-10-22: it ran on a timer from the start, the original
-// is triggered by the plates). Inside while it's on (BO3 dvars:
+// goes low once its four pressure plates around the pyramid (grav_pad_trigger) are locked down. As in the game
+// (2026-11-12, from the script): a plate sinks under whoever steps on it and its symbol starts to glow; stand on it
+// for 3 s and it locks (stays down and lit), step off sooner and it comes back up. One player can do the four one
+// after another; nothing times out. 5 s after the fourth the plate lights go out and the gravity drops for 50 s (its
+// last 10 s flashing), rests 60 s, and from then on cycles by itself for the rest of the game (before: every plate lit
+// at a touch, and all four had to be stepped on again for each 50 s).
+// Inside while it's on (BO3 dvars:
 // bg_lowGravity 300 of 800, wallrun_enabled, doublejump_enabled, wallRun_maxTimeMs_zm 10000):
 //   - gravity is 3/8, so jumps carry far and falls are slow
 //   - a second jump in the air (once per jump)
@@ -12,8 +15,10 @@
 // The floating books, skulls, candles and urns (undercroft_floater_model script models) rise and drift while it's on.
 import * as THREE from 'three';
 import { setupLowGravFx } from './lowgrav-fx.js';
+import { sfx, sfxAt, setVol } from './castle-audio.js';
 
-const ON = 50, COOL = 60, RUN_MAX = 10, LOW = 300 / 800;
+const ON = 50, COOL = 60, CYC = ON + COOL, HOLD = 3, WAIT = 5, SINK = 2.5, RUN_MAX = 10, LOW = 300 / 800;
+const GLYPHS = new URL('../maps/der-eisendrache/grav-glyphs.png', import.meta.url).href;   // four Keeper glyphs in a row (BO3's sheet, git-ignored)
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);
 export const PADS = [W(-1191, 2541, 200), W(-907, 2256, 200), W(-1192, 1972, 200), W(-1476, 2257, 200)];   // grav_pad_trigger (CoD x, y, z)
 // CoD box x -1750..500, y 1700..3100, z 40..560 -> world (x, z, -y)
@@ -22,23 +27,59 @@ const PYRAMID = new THREE.Vector3(-1193, 200, -2256);   // the MPD (CoD -1193, 2
 
 export function setupLowGrav(api) {
   const { world, session, host, player, camera, toast, announce, audio, enemies, sync } = api;
-  // co-op: a plate stepped on is a team event; the host's clock times the low gravity (shared 5 times a second, with
+  // co-op: standing on a plate and locking it are team events; the host's clock times the low gravity (shared 5 times a second, with
   // when it began and the lit plates); gravity, jumps and wall-runs are each player's own; the zombies' bounds run on
   // the host (its snapshot carries their height)
-  sync?.shared('lowgrav', () => ({ t: st.t, started: st.started, onAt: st.onAt, pads: [...st.pads], n: st.triggered }), s => { st.t = s.t; st.started = s.started; st.onAt = s.onAt ?? -1; st.pads = new Set(s.pads ?? []); st.triggered = s.n ?? st.triggered; });
+  sync?.shared('lowgrav', () => ({ t: st.t, started: st.started, onAt: st.onAt, pads: [...st.pads], stand: [...st.stand] }), s => { st.t = s.t; st.started = s.started; st.onAt = s.onAt ?? -1; st.pads = new Set(s.pads ?? []); st.stand = new Set(s.stand ?? []); });
   const floaters = []; world.root.traverse(o => { if (/^CASTLE_SM_undercroft_floater_model/.test(o.name)) floaters.push({ o, base: o.position.clone(), rot: o.rotation.clone(), ph: Math.random() * 6, rise: 30 + Math.random() * 40 }); });
-  const st = { t: 0, on: false, started: false, inside: false, run: null, doubled: false, wasGrounded: true, k: 0, onAt: -1, pads: new Set(), asked: new Set(), triggered: 0, hinted: false };
-  const since = () => st.t - st.onAt, lowOn = () => st.onAt >= 0 && since() < ON, resting = () => st.onAt >= 0 && since() >= ON && since() < ON + COOL;
-  // the plates: a glow on each while it's lit (and on all four while the gravity is low)
+  const st = { t: 0, on: false, started: false, inside: false, run: null, doubled: false, wasGrounded: true, k: 0, onAt: -1, pads: new Set(), stand: new Set(), sent: new Set(), hold: -1, holdT: 0, ask: 0, standT: [0, 0, 0, 0], lit: [0, 0, 0, 0], down: [0, 0, 0, 0], hinted: false };
+  // onAt: when the gravity first drops (5 s after the fourth plate locked); it cycles from there by itself
+  const running = () => st.onAt >= 0 && st.t >= st.onAt, since = () => (st.t - st.onAt) % CYC, lowOn = () => running() && since() < ON, resting = () => running() && since() >= ON;
+  const cycles = () => (running() ? Math.floor((st.t - st.onAt) / CYC) + 1 : 0);
+  // The plates. Each is the map's stand-in slab (CASTLE_GRAVPAD_<n>, matched to its trigger by position), which sinks
+  // SINK units in half a second under a player (the game's pad moves 2), a Keeper glyph flat on its top that glows
+  // while it's stood on (brighter as the 3 s run) or locked, and a soft halo on the floor around it. The collision
+  // stays where it is: the player doesn't drop the 2.5 units with the slab.
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.4, 'rgba(255,255,255,.3)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
-  const padGlows = PADS.map(p => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x9fd8ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); m.position.copy(p).add(new THREE.Vector3(0, 4, 0)); m.scale.setScalar(90); m.visible = false; api.scene?.add(m); return m; });
-  const showPads = () => { const all = lowOn(); padGlows.forEach((g, k) => { g.visible = all || st.pads.has(k); }); };
+  const slabs = []; world.root.traverse(o => { if (/^CASTLE_GRAVPAD_/.test(o.name)) { let m = o.isMesh ? o : null; o.traverse(c => { if (!m && c.isMesh) m = c; }); if (m) { m.updateWorldMatrix(true, false); m.geometry.computeBoundingBox(); slabs.push({ o, c: m.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(m.matrixWorld), y0: o.position.y }); } } });
+  const GLOW = new THREE.Color(0x6fc8ff);
+  const flat = (size, y, p, yaw = 0) => { const g = new THREE.PlaneGeometry(size, size); g.rotateX(-Math.PI / 2); g.rotateY(yaw); const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: 0x000000, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.position.set(p.x, y, p.z); m.visible = false; m.renderOrder = 3; api.scene?.add(m); m.updateMatrixWorld(true); return m; };
+  const plates = PADS.map((p, k) => {
+    const slab = slabs.slice().sort((a, b) => Math.hypot(a.c.x - p.x, a.c.z - p.z) - Math.hypot(b.c.x - p.x, b.c.z - p.z))[0], at = slab && Math.hypot(slab.c.x - p.x, slab.c.z - p.z) < 30 ? slab.c : p;
+    return { slab: at === p ? null : slab, top: p.y + 1.3, glyph: flat(33, p.y + 1.3, at, Math.atan2(PYRAMID.x - at.x, PYRAMID.z - at.z) + Math.PI), halo: flat(120, p.y + 1.25, at), drawn: -1, sunk: -1 };
+  });
+  host.warmObjects?.push(...plates.flatMap(q => [q.glyph, q.halo]));
+  host.pending?.push(new Promise(done => new THREE.TextureLoader().load(GLYPHS, tex => {   // (missing: the plates keep the plain glow)
+    tex.anisotropy = 4; api.renderer?.initTexture?.(tex);
+    plates.forEach((q, k) => { const uv = q.glyph.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, (k + uv.getX(i)) / 4); uv.needsUpdate = true; q.glyph.material.map = tex; });
+    done();
+  }, undefined, () => done())));
+  function drawPlates(dt, on, blink) {
+    plates.forEach((q, k) => {
+      const locked = st.pads.has(k), stood = st.stand.has(k) && !locked;
+      st.standT[k] = stood ? st.standT[k] + dt : 0;
+      const want = running() ? (on ? blink : .16) : locked ? 1 : stood ? .3 + .7 * Math.min(1, st.standT[k] / HOLD) : 0;
+      st.lit[k] = Math.abs(want - st.lit[k]) < .004 ? want : THREE.MathUtils.damp(st.lit[k], want, on ? 30 : 5, dt);
+      const dn = locked || stood ? 1 : 0; st.down[k] = dn ? Math.min(1, st.down[k] + dt * 2) : Math.max(0, st.down[k] - dt * 2);
+      if (st.down[k] !== q.sunk) {   // (a node under the map root: its matrix is ours to refresh)
+        q.sunk = st.down[k]; const dy = -SINK * q.sunk;
+        if (q.slab) { q.slab.o.position.y = q.slab.y0 + dy; q.slab.o.updateMatrix(); q.slab.o.updateMatrixWorld(true); }
+        q.glyph.position.y = q.top + dy; q.glyph.updateMatrix(); q.glyph.updateMatrixWorld(true);
+      }
+      const v = st.lit[k] * (locked && !running() ? .88 + .12 * Math.sin(st.t * 3 + k) : 1);
+      if (Math.abs(v - q.drawn) > .003) { q.drawn = v; q.glyph.visible = q.halo.visible = v > .01; q.glyph.material.color.copy(GLOW).multiplyScalar(v * 1.5); q.halo.material.color.copy(GLOW).multiplyScalar(v * .3); }
+    });
+  }
+  const plateSound = (name, k) => sfxAt(name, PADS[k], camera, .8, 1200);
+  sync?.on('gravStand', d => {
+    if (d.on) { if (!st.stand.has(d.k) && !st.pads.has(d.k)) { st.stand.add(d.k); plateSound('grav_plate_down', d.k); } }
+    else if (st.stand.delete(d.k) && !st.pads.has(d.k)) plateSound('grav_plate_up', d.k);
+  });
   sync?.on('gravPad', d => {
-    if (lowOn() || resting() || st.pads.has(d.k)) return;
-    st.pads.add(d.k); audio?.play?.('buy', .4);
-    if (st.pads.size < 4) toast?.(`A pressure plate sinks · ${st.pads.size}/4`, 2);
-    else { st.started = true; st.onAt = st.t; st.pads.clear(); st.asked.clear(); st.triggered++; }
-    showPads();
+    if (st.onAt >= 0 || st.pads.has(d.k)) return;
+    st.pads.add(d.k); st.stand.delete(d.k); plateSound('grav_plate_up', d.k); audio?.play?.('buy', .3);
+    if (st.pads.size < 4) toast?.(`Pressure plate locked · ${st.pads.size}/4`, 2);
+    else { st.started = true; st.onAt = st.t + WAIT; toast?.('All four plates are locked', 2.5); }
   });
   const baseGravity = player.gravity;
   let glow = null;   // a cold glow in the room while it's on (the lighting mod's pool: adding a THREE light recompiles shaders)
@@ -69,34 +110,44 @@ export function setupLowGrav(api) {
     if (!player.grounded && !st.doubled) { st.doubled = true; player.velocity.y = Math.max(player.velocity.y, player.jumpSpeed * .85); fx.jump(player.getFeetPosition()); }
   });
   host.on('start', () => { st.started = true; st.t = 0; });
-  host.on('reset', () => { st.started = false; st.t = 0; st.onAt = -1; st.pads.clear(); st.asked.clear(); st.triggered = 0; st.hinted = false; set(false); showPads(); st.run = null; player.gravity = baseGravity; fx.reset(); });
+  host.on('reset', () => { st.started = false; st.t = 0; st.onAt = -1; st.pads.clear(); st.stand.clear(); st.sent.clear(); st.hold = -1; st.holdT = 0; st.hinted = false; set(false); drawPlates(1, false, 1); st.run = null; player.gravity = baseGravity; fx.reset(); });
+  let hum = null;   // the machine's loop while the gravity is low (heard in the room)
   function set(on) {
     if (st.on === on) return; st.on = on; setGlow(on); fx.pulse(on);
-    if (on && inside()) { audio?.play?.('dog_round', .3); announce?.('LOW GRAVITY', '', 2); fx.enter(); }
+    if (hum) { hum.pause(); hum = null; }
+    if (on) { sfxAt('grav_start', PYRAMID, camera, .7, 2600); hum = sfx('grav_loop', 0); hum.loop = true; if (inside()) { announce?.('LOW GRAVITY', '', 2); fx.enter(); } }
+    else if (st.started && st.t > 1) sfxAt('grav_stop', PYRAMID, camera, .45, 2600);
   }
   host.on('update', dt => {
     if (!dt) return;
     if ((sync?.isHost ?? true) && (st.started || session.round >= 1 && session.phase !== 'waiting')) { st.started = true; st.t += dt; }
     else if (st.started) st.t += dt;   // a guest runs on between the host's updates
     const on = lowOn(), cyc = since();
-    set(on); showPads();
+    set(on);
     const nowInside = inside(), lowNow = on && nowInside;
     if (nowInside !== st.inside) {
       st.inside = nowInside;
       if (lowNow) { toast?.('Low gravity · Space again in the air, run along the walls', 3); fx.enter(); }
-      else if (nowInside && !on && !st.hinted) { st.hinted = true; toast?.('Four pressure plates around the pyramid · step on them all', 3); }
+      else if (nowInside && st.onAt < 0 && !st.hinted) { st.hinted = true; toast?.('Four pressure plates around the pyramid · stand on each for 3 seconds', 3.5); }
     }
-    // my own steps on the plates (the team's event, sent once each time I step onto an unlit plate)
-    const f = player.getFeetPosition();
-    PADS.forEach((p, k) => {
-      const onIt = Math.hypot(f.x - p.x, f.z - p.z) < 50 && Math.abs(f.y - p.y) < 40;
-      if (!onIt) { st.asked.delete(k); return; }
-      if (!on && !resting() && !st.pads.has(k) && !st.asked.has(k)) { st.asked.add(k); sync?.act('gravPad', { k }); }
-    });
+    // my own weight on a plate: stepping on and off are the team's events, and 3 s without leaving locks it
+    const f = player.getFeetPosition(); let onK = -1;
+    if (st.onAt < 0 && api.getState().active) PADS.forEach((p, k) => { if (!st.pads.has(k) && !st.sent.has(k) && Math.abs(f.x - p.x) < 27 && Math.abs(f.z - p.z) < 27 && Math.abs(f.y - p.y) < 40) onK = k; });
+    if (onK !== st.hold) {
+      if (st.hold >= 0 && !st.pads.has(st.hold) && !st.sent.has(st.hold)) sync?.act('gravStand', { k: st.hold, on: false });
+      st.hold = onK; st.holdT = 0; st.ask = .6;
+      if (onK >= 0) sync?.act('gravStand', { k: onK, on: true });
+    } else if (onK >= 0) {
+      st.holdT += dt;
+      if (!st.stand.has(onK) && (st.ask -= dt) <= 0) { st.ask = .6; sync?.act('gravStand', { k: onK, on: true }); }   // (a teammate stepping off the same plate cleared it)
+      if (st.holdT >= HOLD) { st.sent.add(onK); sync?.act('gravPad', { k: onK }); }
+    }
     player.gravity = lowNow ? baseGravity * LOW : baseGravity;
     // countdown: the last 10 s (BO3 flashes the lights, 7 s slow then 3 s fast)
     const blink = on && cyc > ON - 10 ? (Math.sin(st.t * (cyc > ON - 3 ? 30 : 10)) > 0 ? 1 : .25) : 1;
     if (glow) glow.weight = blink;
+    if (hum) setVol(hum, nowInside ? .32 : 0);
+    drawPlates(dt, on, blink);
     // double jump resets on the ground; wall-running
     if (player.grounded) { st.doubled = false; st.run = null; }
     if (lowNow && !player.grounded) {
@@ -131,7 +182,8 @@ export function setupLowGrav(api) {
       f.o.updateMatrixWorld(true);
     }
   });
-  return { state: () => ({ on: st.on, inside: st.inside, left: lowOn() ? Math.round(ON - since()) : resting() ? Math.round(ON + COOL - since()) : null, resting: resting(), pads: [...st.pads], triggered: st.triggered,
-      running: !!st.run, gravity: player.gravity, floaters: floaters.length, fx: fx.state() }), fx,
-    force(on = true) { st.started = true; st.onAt = on ? st.t : -1; st.pads.clear(); st.asked.clear(); if (on) st.triggered++; } };
+  return { state: () => ({ on: st.on, inside: st.inside, left: lowOn() ? Math.round(ON - since()) : resting() ? Math.round(CYC - since()) : null, resting: resting(), pads: [...st.pads], stand: [...st.stand], hold: st.hold >= 0 ? +st.holdT.toFixed(2) : null,
+      triggered: cycles(), running: !!st.run, gravity: player.gravity, floaters: floaters.length, plates: plates.map((q, k) => ({ slab: !!q.slab, lit: +st.lit[k].toFixed(2), down: +st.down[k].toFixed(2) })), fx: fx.state() }), fx,
+    level: () => st.k,   // 0..1, eased: the room's light follows it (setupLook)
+    force(on = true) { st.started = true; st.onAt = on ? st.t : -1; st.pads = new Set(on ? [0, 1, 2, 3] : []); st.stand.clear(); st.sent.clear(); } };
 }

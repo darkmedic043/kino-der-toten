@@ -126,14 +126,15 @@ export function setupCraftables(api, { traps, pads }) {
     const k = pool[Math.floor(Math.random() * pool.length)], flag = nearestPad(at(list[k])).flag;
     sync.act('partDrop', { key: 'spike:handle', k, msg: flag ? `The Tesla coils threw something into the air · catch it flying from the ${padName(flag)} launch pad${on.has(flag) ? '' : ' (switch its landing pad on first)'}` : 'The Tesla coils threw something into the air' });
   }
-  // guards: the A10 wall switch during a rocket test fire, then the console's lever within 20 s
+  // guards: the A10 wall switch during a rocket test (as in BO3 it unlocks 6 s into the test, before the blast doors
+  // start to close, and stays live until the burn ends), then the console's lever within 20 s
   const wallSwitch = root.getObjectByName('CASTLE_SM_spike_quest_wall_switch'), consoleSwitch = root.getObjectByName('CASTLE_SM_spike_quest_console_switch');
   const lever = (o, on) => { if (!o) return; o.userData.rest ??= o.rotation.z; o.rotation.z = o.userData.rest + (on ? -2.09 : 0); o.updateMatrixWorld(true); };
   if (wallSwitch) world.addInteraction({
     position: at(wallSwitch),
-    text: () => st.built.spike || st.have.spike.has('guards') || st.shown.has('spike:guards') ? '' : traps?.state().rocket.phase === 'fire' ? 'Pull the switch' : st.armed > session.time ? '' : 'The switch is locked',
+    text: () => st.built.spike || st.have.spike.has('guards') || st.shown.has('spike:guards') ? '' : traps?.state().rocket.switch ? 'Pull the switch' : st.armed > session.time ? '' : 'The switch is locked',
     use() {
-      if (traps?.state().rocket.phase !== 'fire' || st.built.spike || st.have.spike.has('guards')) return false;
+      if (!traps?.state().rocket.switch || st.built.spike || st.have.spike.has('guards')) return false;
       sync.act('guardsArm'); audio?.play?.('buy', .5); return true;
     },
   });

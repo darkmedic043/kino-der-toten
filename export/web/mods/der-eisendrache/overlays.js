@@ -92,3 +92,14 @@ export function overlayLayers(root) {
   });
   return count;
 }
+
+// BO3's "infinite blackness" planes (wc/global_diffuse_black: the ceilings over the Juggernog room, the undercroft and
+// its passages, the backs of shafts) are meant to read as nothing. As an untextured near-black material the look pass
+// took them for dark metal, so they mirrored the blue room light and sparkled like a night sky (user, 2026-11-12:
+// "missing" ceilings). Here they become one unlit black material without fog, drawn from both sides: the planes'
+// winding is mixed, and the ones facing up left gaps that showed the courtyard above from below.
+export function blackPlanes(root) {
+  const mat = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false, side: THREE.DoubleSide }); mat.name = 'castle_void'; let n = 0;
+  root.traverse(o => { if (o.isMesh && !Array.isArray(o.material) && /global_diffuse_black|infinite_blackness/.test(o.material?.name ?? '')) { o.material = mat; o.castShadow = false; n++; } });
+  return n;
+}

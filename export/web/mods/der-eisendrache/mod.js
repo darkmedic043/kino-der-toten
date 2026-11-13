@@ -7,7 +7,7 @@ import { setupBows } from './bows.js';
 import { setupEE } from './ee.js';
 import { setupSide } from './side.js';
 import { setupSide2 } from './side2.js';
-import { useGameAudio, sfxAt } from './castle-audio.js';
+import { useGameAudio, sfx, sfxAt, setVol } from './castle-audio.js';
 import { createSync } from './sync.js';
 import { setupTab } from './tab.js';
 import { setupWeather } from './weather.js';
@@ -18,7 +18,7 @@ import { metalLook } from '../lighting/metal-look.js';
 import { floatingDebris } from '../fx/floating-debris.js';
 import { mergeProps, instanceProps } from './merge-props.js';
 import { carvedDecals } from './carved.js';
-import { overlayLayers } from './overlays.js';
+import { overlayLayers, blackPlanes } from './overlays.js';
 import { setupSwitch } from './switch.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
@@ -59,6 +59,7 @@ export default async function setup(api) {
     return zones;
   };
   if (world.root) carvedDecals(world.root, api.scene);   // before the props are merged: the nodes it drops must not be instanced
+  if (world.root) blackPlanes(world.root);   // the void planes: unlit black from both sides (overlays.js)
   if (world.root && !/[?&]noOverlays/.test(location.search)) console.info('[der-eisendrache] overlay layers:', JSON.stringify(overlayLayers(world.root)));   // snow, decals and cut-outs the map drew solid (overlays.js)
   if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes); }
   // the map nodes this mod moves (Ragnarok parts, levers, the crate lid, clock hands, floaters, Skadi, the claws, the
@@ -69,60 +70,7 @@ export default async function setup(api) {
   if (world.root) for (const top of world.root.children) if (/^CASTLE_/.test(top.name)) top.traverse(o => { if (!o.isInstancedMesh && !o.isBatchedMesh) o.matrixAutoUpdate = true; });
   const look = setupLook(api);
   const weather = setupWeather(api);   // snow outdoors, flames on the fixtures (weather.js)
-  // Der Eisendrache's own zombies (BO3's c_zom_der_zombie_body1-3 + head1-3, .tools/build_castle_zombies.py; git-ignored,
-  // ripped), driven by BO1's zombie clips. The clips set each joint's local rotation in BO1's joint frames; BO3's joints
-  // sit in other frames (the ankles and balls most: feet turned backwards, user), so every skeleton is re-bound first:
-  // each joint takes BO1's rest rotation, keeps its own position, and the skin is re-bound to that pose (rebindTo).
-  // ?bo1Zombies keeps the BO1 ones.
-  if (!new URLSearchParams(location.search).has('bo1Zombies') && api.enemies) {
-    const Z = n => loadModel(new URL(`zombies/${n}.glb`, import.meta.url).href).catch(() => null);
-    await Promise.all([Promise.all([1, 2].map(k => Z('c_zom_der_zombie_body' + k)))   /* body3's tank top and arms are Shadows of Evil textures, not in this map */, Promise.all([1, 2, 3].map(k => Z('c_zom_der_zombie_head' + k)))]).then(async ([bodies, heads]) => {   // awaited (2026-10-29): templates and gib sets must be in place before the shader warm-up
-      const e = api.enemies, refB = e.templates[0], refH = e.heads?.[0];
-      const ref = new Map(); for (const r of [refB, refH]) r?.traverse(o => { if (o.isBone && !ref.has(o.name)) ref.set(o.name, o.quaternion.clone()); });
-      const ok = bodies.filter(Boolean), okH = heads.filter(Boolean);
-      if (!ok.length || !okH.length || !ref.size) return;
-      // the body's j_spine4 bind matrix before re-binding: the heads are modelled in that joint's own space
-      const j4 = new Map(ok.map(m => { m.updateMatrixWorld(true); return [m, m.getObjectByName('j_spine4').matrixWorld.clone()]; }));
-      for (const m of ok) rebindTo(m, ref);
-      // the heads' root joint (j_spine4) takes the re-bound body's world orientation there, so the head lines up when
-      // enemies.js mounts it on the body's j_spine4 (same local rotation alone left them turned ~90°, user)
-      ok[0].updateMatrixWorld(true);
-      const rootWorld = new Map([['j_spine4', ok[0].getObjectByName('j_spine4').getWorldQuaternion(new THREE.Quaternion())]]);
-      // (heads aren't re-bound: they take the body's bind matrices below)
-      // each head's meshes bound to its body's own bones (a separate head rig mounted on j_spine4 drifted off the neck
-      // under animation, user): one template per body x head; the head's face joints follow the body's j_head
-      const combos = [];
-      bodies.forEach((body, i) => { if (!body) return;
-        for (const head of okH) {
-          const t = cloneSkinned(body); t.userData.gibSet = 'castle' + (i + 1);
-          const bones = new Map(); t.traverse(o => { if (o.isBone && !bones.has(o.name)) bones.set(o.name, o); });
-          // the body's own inverse bind matrices for each bone (heads and bodies share BO3's bind space, so the head's
-          // vertices sit right with them; the head rig's own re-bound frames left the face turned backwards, user)
-          let bodySkin = null; const inv = new Map();
-          t.traverse(o => { if (!o.isSkinnedMesh) return; bodySkin ??= o; o.skeleton.bones.forEach((b, k) => { if (!inv.has(b)) inv.set(b, o.skeleton.boneInverses[k]); }); });
-          const h = cloneSkinned(head), meshes = []; h.updateMatrixWorld(true); h.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
-          // head space (its j_spine4 at the origin) -> the body's bind space: body j4 x inverse(head j4)
-          const toBody = j4.get(body).clone().multiply(h.getObjectByName('j_spine4').matrixWorld.clone().invert());
-          for (const m of meshes) {
-            m.geometry = m.geometry.clone().applyMatrix4(toBody.clone().multiply(m.matrixWorld));
-            m.position.set(0, 0, 0); m.quaternion.identity(); m.scale.set(1, 1, 1);
-            const mapped = m.skeleton.bones.map(b => bones.get(b.name) ?? bones.get('j_head'));
-            m.bind(new THREE.Skeleton(mapped, mapped.map(b => (inv.get(b) ?? new THREE.Matrix4().copy(b.matrixWorld).invert()).clone())), bodySkin.bindMatrix);
-            m.userData.headMesh = true; m.removeFromParent(); t.add(m);   // dismemberment: kept when the body splits, hidden when beheaded
-          }
-          combos.push(t);
-        }
-      });
-      e.templates = combos; e.heads = [];
-      // their own gib pieces for the dismemberment mod (same keys as BO1's), re-bound the same way
-      const KEYS = { upclean: 'upclean', lowclean: 'lowclean', behead: 'behead', larmoff_1: 'larmoff', rarmoff_1: 'rarmoff', llegoff_1: 'llegoff', rlegoff_1: 'rlegoff', legsoff_1: 'blegsoff' };
-      const sets = (window.kino.gibSets ??= {});
-      await Promise.all([1, 2].map(k => Promise.all(Object.entries(KEYS).map(async ([key, g]) => [key, await Z(`c_zom_der_zombie_body${k}_g_${g}`)])).then(list => {
-        const set = {}; for (const [key, m] of list) if (m) { rebindTo(m, ref); set[key] = m; }
-        sets['castle' + k] = set;
-      })));
-    });
-  }
+  await setupZombies(api);   // the castle's own zombies, their gib pieces and eye glow (below)
   // co-op (sync.js): every system below shares its events and state through api.sync
   const sync = api.sync = createSync(api);
   // personal events: a weapon or points for one player
@@ -174,6 +122,96 @@ function rig(root, name) {
   };
 }
 const at = (root, name) => { const o = root.getObjectByName(name); return o ? o.getWorldPosition(new THREE.Vector3()) : null; };
+// Der Eisendrache's own zombies (BO3's c_zom_der_zombie_body1-3 + head1-3, .tools/build_castle_zombies.py; git-ignored,
+// ripped), driven by BO1's zombie clips. The clips set each joint's local rotation in BO1's joint frames; BO3's joints
+// sit in other frames (the ankles and balls most: feet turned backwards, user), so every skeleton is re-bound first:
+// each joint takes BO1's rest rotation, keeps its own position, and the skin is re-bound to that pose (rebindTo).
+// ?bo1Zombies keeps the BO1 ones.
+export async function setupZombies(api) {   // (exported for the test page)
+  if (new URLSearchParams(location.search).has('bo1Zombies') || !api.enemies) return;
+  const Z = n => loadModel(new URL(`zombies/${n}.glb`, import.meta.url).href).catch(() => null);
+  await Promise.all([Promise.all([1, 2].map(k => Z('c_zom_der_zombie_body' + k)))   /* body3's tank top and arms are Shadows of Evil textures, not in this map */, Promise.all([1, 2, 3].map(k => Z('c_zom_der_zombie_head' + k)))]).then(async ([bodies, heads]) => {   // awaited (2026-10-29): templates and gib sets must be in place before the shader warm-up
+    const e = api.enemies, refB = e.templates[0], refH = e.heads?.[0];
+    const ref = new Map(); for (const r of [refB, refH]) r?.traverse(o => { if (o.isBone && !ref.has(o.name)) ref.set(o.name, o.quaternion.clone()); });
+    const ok = bodies.filter(Boolean), okH = heads.filter(Boolean);
+    if (!ok.length || !okH.length || !ref.size) return;
+    // the body's j_spine4 bind matrix before re-binding: the heads are modelled in that joint's own space
+    const j4 = new Map(ok.map(m => { m.updateMatrixWorld(true); return [m, m.getObjectByName('j_spine4').matrixWorld.clone()]; }));
+    for (const m of ok) rebindTo(m, ref);
+    // the heads' root joint (j_spine4) takes the re-bound body's world orientation there, so the head lines up when
+    // enemies.js mounts it on the body's j_spine4 (same local rotation alone left them turned ~90°, user)
+    ok[0].updateMatrixWorld(true);
+    const rootWorld = new Map([['j_spine4', ok[0].getObjectByName('j_spine4').getWorldQuaternion(new THREE.Quaternion())]]);
+    // (heads aren't re-bound: they take the body's bind matrices below)
+    // each head's meshes bound to its body's own bones (a separate head rig mounted on j_spine4 drifted off the neck
+    // under animation, user): one template per body x head; the head's face joints follow the body's j_head
+    const combos = [];
+    bodies.forEach((body, i) => { if (!body) return;
+      for (const head of okH) {
+        const t = cloneSkinned(body); t.userData.gibSet = 'castle' + (i + 1);
+        const bones = new Map(); t.traverse(o => { if (o.isBone && !bones.has(o.name)) bones.set(o.name, o); });
+        // the body's own inverse bind matrices for each bone (heads and bodies share BO3's bind space, so the head's
+        // vertices sit right with them; the head rig's own re-bound frames left the face turned backwards, user)
+        let bodySkin = null; const inv = new Map();
+        t.traverse(o => { if (!o.isSkinnedMesh) return; bodySkin ??= o; o.skeleton.bones.forEach((b, k) => { if (!inv.has(b)) inv.set(b, o.skeleton.boneInverses[k]); }); });
+        const h = cloneSkinned(head), meshes = []; h.updateMatrixWorld(true); h.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
+        // head space (its j_spine4 at the origin) -> the body's bind space: body j4 x inverse(head j4)
+        const toBody = j4.get(body).clone().multiply(h.getObjectByName('j_spine4').matrixWorld.clone().invert());
+        for (const m of meshes) {
+          m.geometry = m.geometry.clone().applyMatrix4(toBody.clone().multiply(m.matrixWorld));
+          m.position.set(0, 0, 0); m.quaternion.identity(); m.scale.set(1, 1, 1);
+          const mapped = m.skeleton.bones.map(b => bones.get(b.name) ?? bones.get('j_head'));
+          m.bind(new THREE.Skeleton(mapped, mapped.map(b => (inv.get(b) ?? new THREE.Matrix4().copy(b.matrixWorld).invert()).clone())), bodySkin.bindMatrix);
+          m.userData.headMesh = true; m.removeFromParent(); t.add(m);   // dismemberment: kept when the body splits, hidden when beheaded
+        }
+        // blue glowing eyes (user, 2026-11-12: "give them the blue glowing eyes"; BO3's castle zombies glow orange): the
+        // head rig's eyeball joints give the spots, the glow rides the body's j_head and goes with the head on a behead
+        const jh = bones.get('j_head'), eyeL = h.getObjectByName('j_eyeball_le'), eyeR = h.getObjectByName('j_eyeball_ri');
+        if (jh && eyeL && eyeR) { t.updateMatrixWorld(true); const glow = eyeGlow([eyeL, eyeR].map(b => b.getWorldPosition(new THREE.Vector3()).applyMatrix4(toBody)), jh); glow.userData.headMesh = true; jh.add(glow); }
+        combos.push(t);
+      }
+    });
+    e.templates = combos; e.heads = [];
+    api.host?.on('kill', ({ enemy }) => enemy?.root?.traverse(o => { if (o.name === 'castle_zombie_eyes') o.visible = false; }));   // the eyes go out with the zombie
+    // their own gib pieces for the dismemberment mod (same keys as BO1's), re-bound the same way
+    const KEYS = { upclean: 'upclean', lowclean: 'lowclean', behead: 'behead', larmoff_1: 'larmoff', rarmoff_1: 'rarmoff', llegoff_1: 'llegoff', rlegoff_1: 'rlegoff', legsoff_1: 'blegsoff' };
+    const sets = (window.kino.gibSets ??= {});
+    await Promise.all([1, 2].map(k => Promise.all(Object.entries(KEYS).map(async ([key, g]) => [key, await Z(`c_zom_der_zombie_body${k}_g_${g}`)])).then(list => {
+      // a gib piece wears its body's own materials (2026-11-12: each of the 16 files carried its own copy of the body
+      // textures, now 16 px stand-ins in the files; one set of full-size textures on the GPU instead of 17). The neck stump
+      // of a beheaded body is drawn with head 1's skin, so the heads' materials are in the table too
+      const own = new Map(); for (const src of [bodies[k - 1], ...heads]) src?.traverse(o => { if (o.isMesh && o.material?.name && !own.has(o.material.name)) own.set(o.material.name, o.material); });
+      const set = {}; for (const [key, m] of list) if (m) { rebindTo(m, ref); m.traverse(o => { const n = o.isMesh && o.material?.name; if (!n) return; if (own.has(n)) o.material = own.get(n); else own.set(n, o.material); }); set[key] = m; }   /* the stump and torn-edge materials are shared by the set's pieces the same way */
+      sets['castle' + k] = set;
+    })));
+  });
+}
+// A zombie's eye glow: one additive mesh for both eyes, a shallow dome over each that fades to nothing at its rim (no
+// texture, no billboard: one draw a zombie, and the bloom spreads it). Past about 300 units the vertex shader grows each
+// dome about its eye (up to 3x), so the pair still reads as two points across a courtyard instead of dropping under a
+// pixel. Its own small program, built at load with the zombie templates. `eyes` are in the template's world space.
+const EYE_R = .62, EYE_D = .4, EYE_BACK = .15, EYE_COL = [.28, 1.2, 4.2];
+const EYE_MAT = new THREE.ShaderMaterial({
+  name: 'castle_zombie_eyes', vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { grow: { value: .0019 / EYE_R } },
+  vertexShader: 'attribute vec3 eye; uniform float grow; varying vec3 vCol;\nvoid main() {\n  vec4 c = modelViewMatrix * vec4(eye, 1.0), p = modelViewMatrix * vec4(position, 1.0);\n  p.xyz = c.xyz + (p.xyz - c.xyz) * clamp(-c.z * grow, 1.0, 3.0);\n  vCol = color; gl_Position = projectionMatrix * p;\n}',
+  fragmentShader: 'varying vec3 vCol;\nvoid main() {\n  gl_FragColor = vec4(vCol, 1.0);\n  #include <tonemapping_fragment>\n  #include <colorspace_fragment>\n}'
+});
+function eyeGlow(eyes, head) {
+  const hp = head.getWorldPosition(new THREE.Vector3()), f = eyes[0].clone().add(eyes[1]).multiplyScalar(.5).sub(hp).setY(0).normalize(), up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3().crossVectors(f, up);
+  const RINGS = [[0, 1], [.42, .78], [.9, .22], [Math.PI / 2, 0]], SEG = 10, toHead = head.matrixWorld.clone().invert(), pos = [], col = [], mid = [], idx = [];
+  for (const e of eyes) {
+    const base = pos.length / 3, c = e.clone().addScaledVector(f, EYE_BACK), cl = c.clone().applyMatrix4(toHead);
+    for (const [th, k] of RINGS) for (let s = 0; s < SEG; s++) {
+      const ph = s / SEG * Math.PI * 2, p = c.clone().addScaledVector(f, EYE_D * Math.cos(th)).addScaledVector(side, Math.cos(ph) * EYE_R * Math.sin(th)).addScaledVector(up, Math.sin(ph) * EYE_R * Math.sin(th)).applyMatrix4(toHead);
+      pos.push(p.x, p.y, p.z); col.push(EYE_COL[0] * k, EYE_COL[1] * k, EYE_COL[2] * k); mid.push(cl.x, cl.y, cl.z);
+    }
+    for (let r = 0; r < RINGS.length - 1; r++) for (let s = 0; s < SEG; s++) { const a = base + r * SEG + s, b = base + r * SEG + (s + 1) % SEG; idx.push(a, a + SEG, b, b, a + SEG, b + SEG); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('eye', new THREE.Float32BufferAttribute(mid, 3)); g.setIndex(idx);
+  g.computeBoundingSphere(); g.boundingSphere.radius += EYE_R * 3;   // the grown domes stay inside the culling sphere
+  const m = new THREE.Mesh(g, EYE_MAT); m.name = 'castle_zombie_eyes'; m.castShadow = m.receiveShadow = false; m.renderOrder = 3;
+  return m;
+}
 const moveNode = (o, p) => { o.position.copy(o.parent ? o.parent.worldToLocal(p.clone()) : p); o.updateMatrix(); o.updateMatrixWorld(true); };
 
 // ---- The gondola (zm_castle_tram.gsc). Car 1 starts docked and leaves 12 s in while car 2 comes up from the bottom.
@@ -507,6 +545,9 @@ function setupLook(api) {
   let skyModel = null;
   if (scene.fog) scene.fog.color.copy(HORIZON);
   scene.background = HORIZON.clone();
+  const UNDER = new THREE.Box3(new THREE.Vector3(-1900, 0, -3100), new THREE.Vector3(320, 620, -1650));   // the pyramid room and its passages
+  const IN_BASE = [.85 * .55, .95 * .55, 1.18 * .55], IN_WARM = [1.0 * .34, .8 * .34, .58 * .34], IN_GRAV = [.7 * .62, .95 * .62, 1.45 * .62], TINT_WARM = [.98, .95, .92];
+  let under = 0, tint0 = null, tintW = 0;
   let last = performance.now();
   host.on('update', () => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
@@ -517,6 +558,21 @@ function setupLook(api) {
     if (hemi) { hemi.color.setHex(0xc3d0e4); hemi.groundColor.setHex(0x4c4a48); hemi.intensity = 1.0; }
     if (key) { key.color.setHex(0xe9eef7); key.intensity = baked ? 1.45 : 1.25; key.position.set(.45, 1, .3); }   // (baked: daylight only lands where the sky reaches)
     if (fill) { fill.color.setHex(0x74889f); fill.intensity = .4; }
+    // The undercroft (user, 2026-11-12: "big fan of the blue lighting in the underground pyramid room, but that should
+    // only be when anti gravity is on"). The blue was the map-wide cool indoor ambient plus the grade's blue shadows,
+    // not the low gravity. With the camera in the undercroft the indoor ambient is now a dim warm one (the room's own
+    // lights in BO3's data are warm lamps and fire spots, with four small blue ones at the pyramid) and the shadows are
+    // neutral; while the gravity is low (lowgrav.level, 0..1) it turns to the blue. Uniforms only: nothing recompiles.
+    if (baked?.uniforms?.mvIndoor) {
+      under += ((UNDER.containsPoint(camera.position) ? 1 : 0) - under) * Math.min(1, dt * 1.5);
+      const lv = window.kino?.castle?.lowgrav?.level?.() ?? 0, w = under * (1 - lv), g = under * lv, mix = (i, a0, a1, a2) => a0[i] + (a1[i] - a0[i]) * w + (a2[i] - a0[i]) * g;
+      baked.uniforms.mvIndoor.value.set(mix(0, IN_BASE, IN_WARM, IN_GRAV), mix(1, IN_BASE, IN_WARM, IN_GRAV), mix(2, IN_BASE, IN_WARM, IN_GRAV));
+      const post = window.kino?.post, cur = post?.get?.();
+      if (cur?.shadowTint) {
+        if (!tintW) { tint0 ??= [1, 1, 1]; for (let i = 0; i < 3; i++) tint0[i] = cur.shadowTint[i]; }   // (untouched by us: follow the Film look setting)
+        if (Math.abs(w - tintW) > .02 || (w === 0) !== (tintW === 0)) { tintW = w < .005 ? 0 : w; post.set({ shadowTint: tint0.map((v, i) => v + (TINT_WARM[i] - v) * tintW) }); }
+      }
+    }
     if ((timer -= dt) <= 0 && pool.length) {
       timer = .25;
       // score: distance, with lamps behind the camera counted as 2.2x as far (they light less of what you see), and a lit
@@ -1308,12 +1364,17 @@ const TESLA_AREA = new THREE.Box3(new THREE.Vector3(-340, 0, -2600), new THREE.V
 //   Masher (zm_castle_masher_trap.gsc): three buttons (CASTLE_MASHBTN_<n>), 1500, power and the masher gate bought (the
 //   gatehouse door: connect_gatehouse_to_lowercourtyard). For 20 s the gate slams down (116 in 0.25 s, back up, 0.25 s
 //   pause), crushing whatever is under it (CASTLE_MASHZONE). Cooldown 60 s.
-//   Rocket test fire (zm_castle_rocket_trap.gsc): not bought. 60 s after the teleporter is first used, then every 30-240
-//   s (later 90-300): 7 s of warning, 3 s more, then 20 s of exhaust that kills anything on the pad (CASTLE_ROCKETBLAST,
-//   radius 430, and the ring of CASTLE_ROCKETFLAME_ vents); the teleporter is locked meanwhile.
+//   Rocket test fire (zm_castle_rocket_trap.gsc): not bought. 60 s after the teleporter is first used, then after 30-240
+//   s (later 90-300 s plus a 120 s cooldown). As in BO3 (user, 2026-11-12: "make the rocket behave like it does in
+//   actual DE with the closing door"), t = seconds into the test: 0 alarm, teleporter locked; 6 the Ragnarok wall
+//   switch opens (until the burn ends); 7 standing under the engine hurts (25% health per 0.4 s); 9-19 the tunnel's two
+//   blast doors (CASTLE_SM_rocket_tunnel_door_l/r, half discs) slide shut, crushing whoever is between them as they
+//   meet; 20-40 the burn kills anything on the pad (CASTLE_ROCKETBLAST, radius 430, and the ring of
+//   CASTLE_ROCKETFLAME_ vents); 40-47.5 the doors slide home and the teleporter unlocks. The phase is 'warn' then
+//   'fire' and ends with the burn (bows.js starts its magma then); the reopening runs on rocket.re.
 // Co-op: switching a trap on is an event (the switcher pays); its kills run on the host, each player takes its damage
 // on their own client; the host schedules the rocket's test fires (its state goes to everyone).
-function setupTraps(api) {
+export function setupTraps(api) {   // (exported for the test page)
   const { world, session, host, scene, enemies, player, toast, announce, audio, damage, sync } = api, root = world.root;
   const at = n => { const o = root.getObjectByName(n); return o ? o.getWorldPosition(new THREE.Vector3()) : null; };
   const fx = [];
@@ -1366,7 +1427,33 @@ function setupTraps(api) {
   sync.on('mashOn', () => { if (mash.on > session.time) return; mash.on = session.time + 20; mash.cool = mash.on + 60; mash.t = 0; audio?.play?.('buy'); });
   // Rocket test fire
   const blast = at('CASTLE_ROCKETBLAST'), vents = []; root.traverse(o => { if (/^CASTLE_ROCKETFLAME_\d+$/.test(o.name)) vents.push(o.getWorldPosition(new THREE.Vector3())); });
-  const rocket = { armed: null, next: null, phase: null, t0: 0 }, tp = world.teleporters?.find(t => t.name === 'rocketpad');
+  const rocket = { armed: null, next: null, phase: null, t0: 0, re: null, cue: -1, alarm: -1, k: 0 }, tp = world.teleporters?.find(t => t.name === 'rocketpad');
+  // the tunnel's blast doors: each a half disc (local x 0..256 out from its flat edge, y +-256, z 0..19 thick) that slides
+  // along the door line until the flat edges meet. merge-props draws their pieces as instances (no meshes left under the
+  // node), so the collider is a half cylinder of the same size on a scripted mover that follows the slide.
+  const DOOR_SHUT = 10, DOOR_OPEN = 7.5, camera = api.camera;
+  const doors = [['CASTLE_SM_rocket_tunnel_door_l', -24.5, 92.5], ['CASTLE_SM_rocket_tunnel_door_r', 25.5, -92.5]].map(([name, dx, dz]) => {
+    const o = root.getObjectByName(name); if (!o) return null;
+    o.updateWorldMatrix(true, false);
+    const g = new THREE.CylinderGeometry(256, 256, 19, 20, 1, false, 0, Math.PI).rotateX(Math.PI / 2).translate(0, 0, 9.5), solid = new THREE.Mesh(g);
+    solid.matrixWorld.copy(o.matrixWorld);
+    const col = world.addScriptedMover?.([solid], { exact: true }) ?? null; if (col) col.disabled = true;
+    return { o, open: o.getWorldPosition(new THREE.Vector3()), d: new THREE.Vector3(dx, 0, dz), col, p: new THREE.Vector3(), off: new THREE.Vector3() };
+  }).filter(Boolean);
+  // the door model has no back faces (each door showed its ribs and the room behind from one side): its metal is drawn two-sided
+  if (doors.length) { const seen = new Set(); scene.traverse(o => { for (const m of [o.material].flat()) if (m && !seen.has(m) && /a10_blast_door_(rim|quarter|tileable|lrg_gear|grate)/.test(m.name ?? '')) { seen.add(m); m.side = THREE.DoubleSide; } }); }
+  const doorMid = doors.length === 2 ? doors[0].open.clone().add(doors[0].d).add(doors[1].open).add(doors[1].d).multiplyScalar(.5) : null;
+  const doorU = doors.length === 2 ? doors[1].open.clone().sub(doors[0].open).setY(0) : null, doorGap = doorU?.length() ?? 0; doorU?.normalize();
+  const setDoors = k => {   // 0 open .. 1 shut
+    if (k === rocket.k) { for (const d of doors) if (d.col && !d.col.prev.equals(d.col.offset)) d.col.move(d.off); return; }
+    rocket.k = k;
+    for (const d of doors) { d.off.copy(d.d).multiplyScalar(k); moveNode(d.o, d.p.copy(d.open).add(d.off)); if (d.col) { d.col.disabled = k <= 0; d.col.move(d.off); } }
+  };
+  // between the doors: within the gap along the door line and inside their thickness across it
+  const inSlot = (p, k) => { if (!doorMid) return false; const x = p.x - doorMid.x, z = p.z - doorMid.z, along = Math.abs(x * doorU.x + z * doorU.z), across = Math.abs(x * doorU.z - z * doorU.x); return across < 26 && along < doorGap * (1 - k) / 2 + 14 && Math.abs(p.y - doorMid.y) < 256; };
+  const nearRocket = () => !!camera && (camera.position.distanceTo(blast) < 2600 || (!!doorMid && camera.position.distanceTo(doorMid) < 2200));
+  let burn = null, doorHum = null;
+  const hush = () => { burn?.pause(); doorHum?.pause(); burn = doorHum = null; };
   const rocketLight = new THREE.PointLight(0xff7a2a, 0, 1600, 1.4); if (blast) { rocketLight.position.copy(blast).add(new THREE.Vector3(0, 200, 0)); scene.add(rocketLight); }
   const onPad = p => blast && (Math.hypot(p.x - blast.x, p.z - blast.z) < 430 || vents.some(v => Math.hypot(p.x - v.x, p.z - v.z) < 90)) && Math.abs(p.y - blast.y) < 260;
   let zap = 0;
@@ -1396,26 +1483,51 @@ function setupTraps(api) {
     // rocket
     if (!blast) return;
     if (sync.isHost && rocket.next == null && session.flags.has('castle:flag:castleteleporterused')) rocket.next = now + 60 + 30 + Math.random() * 210;
-    if (sync.isHost && rocket.phase == null && rocket.next != null && now >= rocket.next) { rocket.phase = 'warn'; rocket.t0 = now; }
-    if (rocket.phase && !rocket.warned) { rocket.warned = true; if (tp) tp.locked = true; announce?.('ROCKET TEST FIRE', 'CLEAR THE LAUNCH PAD', 4); audio?.play?.('dog_round', .6); }
+    if (sync.isHost && rocket.phase == null && rocket.re == null && rocket.next != null && now >= rocket.next) { rocket.phase = 'warn'; rocket.t0 = now; }
+    if (tp) tp.locked = !!rocket.phase || rocket.re != null;
+    const cue = (n, at, t, fn) => { if (rocket.cue < n && t >= at) { rocket.cue = n; if (t - at < 1.5) fn(); } };   // (a player who joins mid-test hears only what is still current)
     if (rocket.phase) {
-      const t = now - rocket.t0;
-      rocket.phase = t >= 10 ? 'fire' : 'warn';
-      if (t >= 10 && t < 30) {
+      const t = now - rocket.t0, k = Math.min(1, Math.max(0, (t - 9) / DOOR_SHUT));
+      rocket.phase = t >= 20 ? 'fire' : 'warn';
+      cue(0, 0, t, () => { announce?.('ROCKET TEST FIRE', 'CLEAR THE LAUNCH PAD · BLAST DOORS CLOSE IN 9 SECONDS', 5); });
+      const a = t < 20 ? Math.floor(t / 4) : -1; if (a >= 0 && a !== rocket.alarm) { rocket.alarm = a; if (t - a * 4 < 1.5) sfxAt('rocket_alarm', doorMid ?? blast, camera, .5, 4500); }
+      cue(1, 9, t, () => { if (nearRocket()) toast?.('The blast doors are closing · ignition in 11 seconds'); if (doorMid) { sfxAt('rocket_door_start', doorMid, camera, .8, 2600); doorHum = sfx('rocket_door_lp', 0); doorHum.loop = true; } });
+      cue(2, 19, t, () => { doorHum?.pause(); doorHum = null; if (doorMid) sfxAt('rocket_door_stop', doorMid, camera, .9, 2600); });
+      cue(3, 20, t, () => { sfxAt('rocket_ignite', blast, camera, 1, 6000); burn = sfx('rocket_burn_lp', 0); burn.loop = true; });
+      setDoors(k);
+      // caught between the doors as they meet (BO3 kills a player touching both)
+      if (k > 0 && k < 1 && doorGap * (1 - k) < 46) {
+        if (inSlot(feet(), k)) damage(session.maxHealth * 10);
+        if (sync.isHost) for (const z of [...enemies.list]) if (z.kind !== 'panzer' && inSlot(z.root.position, k)) enemies.hurt(z, 1e9, false, false, 'crush');
+      }
+      if (t >= 7 && t < 20 && Math.hypot(feet().x - blast.x, feet().z - blast.z) < 200 && Math.abs(feet().y - blast.y) < 260) damage(session.maxHealth * .625 * dt);
+      if (t >= 20 && t < 40) {
         rocketLight.intensity = 9000 + Math.random() * 3000;
         if (Math.random() < .7) for (const v of [blast, ...vents]) { const sp = new THREE.Sprite(flameMat); sp.position.copy(v).add(new THREE.Vector3((Math.random() - .5) * 60, 20, (Math.random() - .5) * 60)); sp.scale.setScalar(70); scene.add(sp); fx.push({ o: sp, v: new THREE.Vector3((Math.random() - .5) * 60, 260 + Math.random() * 200, (Math.random() - .5) * 60), life: .7 }); }
         if (sync.isHost) for (const z of [...enemies.list]) if (onPad(z.root.position)) enemies.hurt(z, z.kind === 'panzer' ? 1500 * dt : 1e9, false, false, 'fire');
         if (onPad(feet())) damage(session.maxHealth * 2 * dt);
       } else rocketLight.intensity = 0;
-      if (t >= 30 && sync.isHost) { rocket.phase = null; rocket.next = now + 90 + Math.random() * 210; }
+      if (t >= 40 && sync.isHost) { rocket.phase = null; rocket.re = now; rocket.next = now + DOOR_OPEN + 120 + 90 + Math.random() * 210; }
     }
-    if (!rocket.phase && rocket.warned) { rocket.warned = false; if (tp) tp.locked = false; }
+    if (!rocket.phase) {
+      if (rocket.cue >= 0 || rocket.alarm >= 0) {   // the burn just ended (or the test was cut short)
+        if (rocket.cue >= 3 && rocket.re != null && now - rocket.re < 1.5) { if (nearRocket()) toast?.('Rocket test complete · the blast doors are opening'); if (doorMid) { sfxAt('rocket_door_start', doorMid, camera, .8, 2600); doorHum?.pause(); doorHum = sfx('rocket_door_lp', 0); doorHum.loop = true; } }
+        rocket.cue = rocket.alarm = -1; rocketLight.intensity = 0; burn?.pause(); burn = null;
+      }
+      if (rocket.re != null) {
+        const k = 1 - Math.min(1, Math.max(0, (now - rocket.re) / DOOR_OPEN));
+        setDoors(k);
+        if (k <= 0) { rocket.re = null; if (doorHum) { doorHum.pause(); doorHum = null; if (doorMid) sfxAt('rocket_door_stop', doorMid, camera, .9, 2600); } }
+      } else if (rocket.k) setDoors(0);
+    }
+    if (burn && camera) setVol(burn, .85 * Math.max(0, 1 - camera.position.distanceTo(blast) / 5000) ** 1.5);
+    if (doorHum && camera && doorMid) setVol(doorHum, .7 * Math.max(0, 1 - camera.position.distanceTo(doorMid) / 2600) ** 1.5);
   });
   // the rocket: the host's schedule
-  sync.shared('rocket', () => ({ next: rocket.next == null ? null : rocket.next - session.time, phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : 0 }),
-    s => { rocket.next = s.next == null ? null : session.time + s.next; if (s.phase) { if (!rocket.phase) rocket.t0 = session.time - s.t; rocket.phase = s.phase; } else rocket.phase = null; });
-  host.on('reset', () => { ray.on = ray.cool = 0; mash.on = mash.cool = 0; rocket.next = rocket.phase = null; rocket.warned = false; rocketLight.intensity = 0; if (tp) tp.locked = false; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
-  return { inTesla, teslaCells: () => cells.size, state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase } }),
+  sync.shared('rocket', () => ({ next: rocket.next == null ? null : rocket.next - session.time, phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : 0, re: rocket.re == null ? null : session.time - rocket.re }),
+    s => { rocket.next = s.next == null ? null : session.time + s.next; if (s.phase) { if (!rocket.phase) rocket.t0 = session.time - s.t; rocket.phase = s.phase; } else rocket.phase = null; if (s.re == null) rocket.re = null; else if (rocket.re == null) rocket.re = session.time - s.re; });
+  host.on('reset', () => { ray.on = ray.cool = 0; mash.on = mash.cool = 0; rocket.next = rocket.phase = rocket.re = null; rocket.cue = rocket.alarm = -1; hush(); setDoors(0); rocketLight.intensity = 0; if (tp) tp.locked = false; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
+  return { inTesla, teslaCells: () => cells.size, state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : null, door: rocket.k, switch: !!rocket.phase && session.time - rocket.t0 >= 6 } }),
     fireRocket: () => { rocket.next = session.time; } };
 }
 

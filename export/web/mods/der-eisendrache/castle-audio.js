@@ -2,6 +2,7 @@
 // to Ogg in audio/, git-ignored: ripped): plain HTML audio, at the game's volume, silent while the game is muted (M).
 //   sfx(name, vol)               a one-shot
 //   sfxAt(name, pos, cam, vol)   a one-shot that fades with distance (out to 1,500)
+//   setVol(audio, vol)           a playing sound's volume (a loop that follows the player), at the game's volume and mute
 //   music(name, {loop, vol})     one track at a time (the Easter-egg songs, disco, the boss fight); stopMusic(fade)
 import { settings } from '../../settings.js';
 
@@ -10,6 +11,7 @@ let gameAudio = null, track = null;
 export const useGameAudio = a => { gameAudio = a; };
 const level = v => (gameAudio?.enabled === false ? 0 : Math.max(0, Math.min(1, v * (settings.volume ?? 1))));
 export function sfx(name, vol = 1) { const a = new Audio(BASE + name + '.ogg'); a.volume = level(vol); a.play().catch(() => {}); return a; }
+export const setVol = (a, vol) => { if (a) a.volume = level(vol); };
 export function sfxAt(name, pos, camera, vol = 1, range = 1500) { const d = camera?.position ? camera.position.distanceTo(pos) : 0; if (d > range) return null; return sfx(name, vol * (1 - d / range) ** 1.5); }
 export function music(name, { loop = false, vol = .8 } = {}) {
   globalThis.kino?.radio?.heard?.('castle:' + name);   // RADIO.EXE: an egg song joins the radio (mods/radio)

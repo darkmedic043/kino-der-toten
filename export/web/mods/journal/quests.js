@@ -107,7 +107,7 @@ export const JOURNAL = [
     { id: 'ragnarok', name: 'Ragnarok DG-4', kind: 'BUILDABLE', steps: [
       { title: 'The spikes', how: 'The first Panzersoldat to die drops them.', done: L => { const s = L.castle?.craft?.state(); return !!s && (s.built.spike || s.have.spike.includes('body')); }, where: L => L.prompts(/Pick up the spikes/) },
       { title: 'The handle', how: 'Run the Death Ray: when it finishes, the handle falls from one of the Tesla coils.', done: L => { const s = L.castle?.craft?.state(); return !!s && (s.built.spike || s.have.spike.includes('handle')); }, where: L => L.prompts(/Pick up the handle|Activate the Death Ray/) },
-      { title: 'The guards', how: 'During a rocket test fire, pull the wall switch at the rocket pad, then within 20 s the lever on the landing pad\'s console. The guards drop beside it.', done: L => { const s = L.castle?.craft?.state(); return !!s && (s.built.spike || s.have.spike.includes('guards')); }, where: L => L.prompts(/Pull the switch|Pull the lever|Pick up the guards/) },
+      { title: 'The guards', how: 'During a rocket test (from 6 s after the alarm starts until the burn ends), pull the wall switch at the rocket pad and get out through the blast doors before they shut, then within 20 s pull the lever on the landing pad\'s console. The guards drop beside it.', done: L => { const s = L.castle?.craft?.state(); return !!s && (s.built.spike || s.have.spike.includes('guards')); }, where: L => L.prompts(/Pull the switch|Pull the lever|Pick up the guards/) },
       { title: 'Build it', how: 'Build it at its table in the undercroft, or at any workbench once the shield there is built and taken.', done: L => !!L.castle?.craft?.state().built.spike, where: L => L.nodes(/^CASTLE_BENCH_(spike|open_\d+)$/) },
       { title: 'Take it', how: 'Take it from the table: it fills your operator weapon slot (Y).', done: L => window.kino?.operator?.current === 'ragnarok', where: L => L.nodes(/^CASTLE_BENCH_spike$/) },
     ] },
@@ -118,7 +118,7 @@ export const JOURNAL = [
       { title: 'Take it', how: 'Take it from the bench it was built at (again for free if it breaks). H raises it.', done: L => !!window.kino?.rocketShield?.owned, where: L => L.prompts(/Take the Rocket Shield/) },
     ] },
     { id: 'plates', name: 'Pressure plates', kind: 'SIDE EGG', progress: L => (L.castle?.side?.state().plates ?? 0) > 0 ? 1 : 0, steps: [
-      { title: 'The four plates', how: 'Step on each of the undercroft pyramid\'s four pressure plates: with the fourth the gravity goes low for 50 s, and a power-up appears high in the room. The plates rest 60 s, then work again.', where: L => (L.de?.PADS ?? []).filter((p, k) => !L.castle?.side?.state().pads.includes(k)) },
+      { title: 'The four plates', how: 'Stand on each of the undercroft pyramid\'s four pressure plates for 3 seconds: it sinks, its symbol lights and it locks down (step off early and it comes back up). A few seconds after the fourth the gravity goes low for 50 s and a power-up appears high in the room. From then on the low gravity comes back by itself: 50 s on, 60 s off.', where: L => (L.de?.PADS ?? []).filter((p, k) => !L.castle?.side?.state().pads.includes(k)) },
     ] },
     { id: 'plunger', name: 'Clock tower and the plunger', kind: 'SIDE EGG',
       progress: L => { const a = L.castle?.side?.state(), b = L.castle?.side2?.state(); return !a || !b ? 0 : a.plunger ? 3 : b.clock.wallrun ? 2 : b.clock.powered ? 1 : 0; }, steps: [

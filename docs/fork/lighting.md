@@ -64,3 +64,7 @@ User: "shading and lighting doesnt look as close to DE as id like it to", then "
 - **Cache**: `light.json` is fetched with `cache: 'no-cache'` and `light.bin.gz` with `?v=<meta.stamp>` (the bake writes a new stamp each run). Before this the volume could be served from a day-old cache (the browser's or Cloudflare's) next to a new `light.json`.
 - **Levels** at the map's markers indoors (p10/p25/p50/p75/p90 of the lamp term): old bake 0.02 / 0.84 / 1.85 / 3.07 / 4.12 and then halved by the knee; new 1.36 / 1.46 / 1.74 / 3.38 / 4.85, with no indoor marker under .05 (20 before).
 - **Checked** on cropped copies of the map (the great hall and the spawn/undercroft area, `scratch/storm/lt.mjs`), not in a full match: the full map breaks the headless memory rule. Not used yet: the map's lit-fog `ambientColor` (0.245, 0.353, 0.463 in `zm_castle.ents`, against the fork's fog 0x4f5e78).
+
+## Der Eisendrache undercroft and void planes (2026-11-12)
+
+The pyramid room's blue is tied to low gravity: `setupLook` (der-eisendrache `mod.js`) drives `mvIndoor` and the grade's `shadowTint` inside the room's box, warm while gravity is normal, blue as `kino.castle.lowgrav.level()` rises. BO3's black void planes are one unlit black two-sided material (`overlays.js` `blackPlanes`), so the metal look no longer makes mirrors of them. Detail in `waw-ports.md` (same date).
