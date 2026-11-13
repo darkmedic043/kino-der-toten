@@ -181,6 +181,10 @@ export async function bo1Rig(model,holder,entry,data){
       for(const k in target)target[k]*=1-w;add(CLIPS[st.oneshot],w);
       if(!hold&&st.oneshotT>=d)st.oneshot=null;
     }
+    // Hero pose (Armory preset cards, 2026-11-13): one clip held at a fixed frame; its bone offsets are added below.
+    const hero=st.hero;
+    if(hero){const n=CLIPS[hero.clip]??CLIPS.idle,c=[n].flat()[0];for(const k in target)delete target[k];add(c,1);st.oneshot=null;
+      acts[c].time=THREE.MathUtils.clamp(hero.t??0,0,1)*acts[c].getClip().duration;}
     // Ease the weights towards the targets, then normalise (the mixer fills a shortfall with the bind pose).
     let sum=0;for(const n of names){weight[n]+=((target[n]??0)-weight[n])*Math.min(1,dt*12);if(weight[n]<1e-3)weight[n]=0;sum+=weight[n];}
     for(const n of names)acts[n].setEffectiveWeight(sum>0?weight[n]/sum:n===CLIPS.idle?1:0);
@@ -210,6 +214,12 @@ export async function bo1Rig(model,holder,entry,data){
     const ri=H.sides.ri,le=H.sides.le;
     put(ri.arm,X,-R*.14+rel*.35+swap*.6-th*0+toss*-1.6+release*1.4-drink*1.1);put(ri.arm,Y,swing*.9);put(ri.fore,X,-drink*.9);
     put(le.arm,X,rel*.5-st.slap*.25+swap*.4);put(le.fore,X,rel*.3);
+    // hero.bones: {name:[x,y,z]} radians about the character's left/up/forward axes (on an arm -x raises it forward and up, +x lowers it; +y turns to its
+    // left, +z tips its left side up); names hips, low, chest, neck, head, ri./le. + clav arm fore hand leg knee ankle
+    if(hero?.bones)for(const [k,r] of Object.entries(hero.bones)){
+      const [side,part]=k.split('.'),b=part?H.sides[side]?.[part]:k==='low'?low:k==='chest'?chest:H[k];
+      if(b&&Array.isArray(r)){put(b,X,r[0]??0);put(b,Y,r[1]??0);put(b,Z,r[2]??0);}
+    }
 
     // ---- retarget onto the character --------------------------------------------------------
     const hqi=holder.getWorldQuaternion(q2).invert(),hw=holder.getWorldQuaternion(new THREE.Quaternion());
@@ -234,6 +244,7 @@ export async function bo1Rig(model,holder,entry,data){
     // Grip: T5's weapon tag relative to its wrist, carried by the character's hand.
     if(tag&&tWrist){
       m4.copy(tWrist.matrixWorld).invert().multiply(tag.matrixWorld);   // tag in T5 wrist space
+      m4.setPosition(0,0,0);   // the tag's turn only: its offset (14+ units from the wrist on these bodies) floated the gun off the hand (2026-11-13)
       const e=map.get(ri.hand);
       // T5 wrist frame expressed in the character hand's frame (constant): cBind^-1 * tBind
       const rel=e.cBind.clone().invert().multiply(e.tBindInv.clone().invert());
@@ -242,8 +253,17 @@ export async function bo1Rig(model,holder,entry,data){
       frame.multiply(m4);frame.decompose(grip.position,grip.quaternion,grip.scale);
     }
   }
+  // The grip's turn in character space at the standing aim pose, worked out on a copy of the state (holdWeapon, 2026-11-13).
+  function aimTurn(){
+    const save={st:structuredClone({...st,hero:null}),hero:st.hero,weight:{...weight},times:Object.fromEntries(names.map(n=>[n,acts[n].time]))};
+    Object.assign(st,{stance:'',prev:'',oneshot:null,hero:null});st.env.ads=st.target.ads=1;st.env.sprint=st.target.sprint=0;
+    for(let i=0;i<8;i++)update(.05,0);
+    const turn=holder.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(grip.getWorldQuaternion(new THREE.Quaternion()));
+    Object.assign(st,save.st,{hero:save.hero});Object.assign(weight,save.weight);for(const n of names)acts[n].time=save.times[n];
+    update(0,0);return turn;
+  }
   return {
-    hand:grip,bo1:true,stanceAnimated:true,
+    hand:grip,bo1:true,stanceAnimated:true,bones:H,aimTurn,
     hold(value){st.holding=value;},setStance(s){st.stance=s;},
     act(kind,amount=1,dir){if(kind==='recoil')st.recoilV+=amount*12;if(kind==='slap')st.slapV+=amount*9;
       if(kind==='flinch'){st.flinchXV+=(dir?.x??0)*amount*9;st.flinchZV+=(dir?.z??-1)*amount*9;}},

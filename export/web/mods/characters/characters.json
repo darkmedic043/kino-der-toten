@@ -30,6 +30,7 @@
   },
   {
    "id": "honorguard",
+   "heroPose": {"raw": {"j_spine4": [0.35, 0, 0.12], "j_neck": [0.1, 0.2, 0.3], "j_shoulder_le": [-0.9, 0, 0.2]}, "yaw": -15, "cam": {"angle": 25, "center": 0.62}, "note": "A Kino honor guard mid-shamble: hunched, head lolling, a hand reaching for you"},
    "name": "Undead Honor Guard",
    "type": "t5",
    "description": "Play as a Kino zombie. Uses the game's zombie animations, so it shambles.",
@@ -45,6 +46,7 @@
   },
   {
    "id": "female_protogen",
+   "heroPose": {"clip": "idle", "t": 0, "yaw": -10, "bones": {"ri.arm": [-0.9, 0.3, 0], "head": [0, 0.15, 0.25], "le.arm": [0.6, 0, 0]}, "note": "Playful: gun up beside the visor, head tilted, the free arm loose"},
    "name": "Protogen",
    "type": "gltf",
    "motion": "bo1",
@@ -65,6 +67,7 @@
   },
   {
    "id": "zoroark",
+   "heroPose": {"raw": {"body": [0.2, 0, 0], "chest": [0.15, 0.2, 0], "head": [-0.1, 0.25, 0.28], "arm_left": [-0.9, 0.3, 0]}, "yaw": -20, "cam": {"angle": 30, "zoom": 1.3, "center": 0.66}, "note": "The Illusion Fox: low and sly, head cocked, claws reaching"},
    "name": "Zoroark",
    "type": "gltf",
    "model": "models/zoroark/zoroark.glb",
@@ -97,6 +100,7 @@
   },
   {
    "id": "bondrewd",
+   "heroPose": {"clip": "idle", "t": 0, "yaw": -10, "cam": {"angle": 28, "tilt": -0.16}, "bones": {"ri.arm": [0.7, 0, 0], "le.arm": [-0.5, -0.3, 0], "le.hand": [0, 0, 0.4], "head": [0, 0.1, -0.25]}, "note": "The Lord of Dawn presenting something marvellous: gun lowered, an open hand out, the helmet tilted in interest"},
    "name": "Bondrewd",
    "type": "gltf",
    "motion": "bo1",
@@ -1292,6 +1296,7 @@
   },
   {
    "id": "gyro",
+   "heroPose": {"clip": "idle", "t": 0, "yaw": -20, "prop": "steelball", "bones": {"chest": [0, -0.2, 0], "ri.arm": [0.7, 0, 0], "le.arm": [-0.4, -0.5, 0]}, "note": "The Spin: a steel ball held out in his left hand, gun at his hip"},
    "name": "Gyro Zeppeli",
    "type": "gltf",
    "motion": "bo1",
@@ -1361,6 +1366,7 @@
   },
   {
    "id": "experiment",
+   "heroPose": {"clip": "crouch", "t": 0.3, "yaw": -15, "cam": {"center": 0.5, "zoom": 1.05, "tilt": 0.02}, "bones": {"chest": [0.12, 0.15, 0], "head": [-0.15, 0.2, 0.4], "ri.arm": [0.5, 0, 0]}, "note": "Crouched and curious, head tipped right over"},
    "name": "Experiment",
    "type": "gltf",
    "motion": "bo1",
@@ -2237,6 +2243,7 @@
   },
   {
    "id": "scp_ntf",
+   "heroPose": {"clip": "crouchAds", "t": 0, "bones": {"head": [0.05, 0, 0.06]}, "yaw": -25, "cam": {"angle": 40, "center": 0.5}, "note": "Containment breach drill: kneeling, sights up"},
    "name": "Nine-Tailed Fox",
    "type": "gltf",
    "motion": "bo1",
@@ -2290,6 +2297,7 @@
   },
   {
    "id": "scp_chaos",
+   "heroPose": {"clip": "idle", "t": 0, "yaw": -10, "bones": {"ri.arm": [0.6, 0, 0], "chest": [-0.08, -0.3, 0], "head": [-0.12, 0.15, 0], "le.arm": [0.5, 0, 0]}, "note": "Raider swagger: rifle slung low, shoulders turned, chin up"},
    "name": "Chaos Insurgent",
    "type": "gltf",
    "motion": "bo1",
@@ -2396,6 +2404,7 @@
   },
  {
   "id": "deadlock_seven",
+  "heroPose": {"clip": "idle", "t": 0, "yaw": -15, "bones": {"ri.arm": [-1.0, 0, 0], "ri.fore": [1.2, 0, 0], "le.arm": [-1.2, 0, 0]}, "note": "The living storm showing off: rifle hoisted overhead, the other fist up"},
   "name": "Seven",
   "model": "models/deadlock/deadlock_seven.glb?v=3",
   "icon": "models/deadlock/deadlock_seven_icon.webp",
@@ -2638,6 +2647,7 @@
  },
  {
   "id": "deadlock_venator",
+  "heroPose": {"clip": "idle", "t": 0, "cam": {"angle": 22, "tilt": -0.2}, "bones": {"ri.arm": [0.7, 0, 0], "le.arm": [0.5, 0, 0], "neck": [0.3, 0, 0], "head": [0.4, 0, 0]}, "note": "The hunter priest at prayer: weapon held low before him, head bowed"},
   "name": "Venator",
   "model": "models/deadlock/deadlock_venator.glb?v=2",
   "icon": "models/deadlock/deadlock_venator_icon.webp",

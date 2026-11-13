@@ -164,7 +164,7 @@ export async function createCharacter(entry,data){
     if(entry.motion==='bo1'){
       const rig=await bo1Rig(model,holder,entry,data).catch(e=>{console.warn('[bo1-motion]',e);return null;});
       if(rig)return withSprings({root:holder,hand:rig.hand,bo1:true,stanceAnimated:true,clips:[],matched:{idle:'bo1',walk:'bo1',run:'bo1'},missing:gltf.missing??[],
-        hold:rig.hold,setStance:rig.setStance,act:rig.act,pose:rig.pose,update:rig.update,dispose(){holder.removeFromParent();}});
+        hold:rig.hold,setStance:rig.setStance,act:rig.act,pose:rig.pose,update:rig.update,bones:rig.bones,aimTurn:rig.aimTurn,dispose(){holder.removeFromParent();}});
     }
     // A rigged model with no animation clips is animated procedurally.
     if(!gltf.animations.length&&entry.procedural!==false){
@@ -454,7 +454,12 @@ export async function holdWeapon(character,entry,def,hideTags=def?.hideTags){
   restoreImages(model).catch(()=>{});   // (their textures' images may have been freed after the viewmodel's upload: black guns)
   for(const tag of hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
   const grip={...GRIPS[entry.type]??GRIPS.gltf,...entry.weapon},pivot=new THREE.Group();pivot.add(model);
-  if(character.procedural&&!entry.weapon?.rotation){
+  if(character.aimTurn&&!entry.weapon?.rotation){
+    // BO1-motion rigs (2026-11-13): the grip's tag turn put the gun sideways, so as for the procedural rigs the barrel
+    // points forward and the sights up at the standing aim pose (bo1-motion aimTurn), and the gun keeps that turn in the hand
+    const want=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,0,1),new THREE.Vector3(0,1,0),new THREE.Vector3(-1,0,0)));
+    pivot.quaternion.copy((character.gunTurn??=character.aimTurn()).clone().invert().multiply(want));
+  }else if(character.procedural&&!entry.weapon?.rotation){
     // Procedural rigs: settle the aim pose, then point the barrel forward and
     // the sights up in character space, whatever the hand bone's axes are.
     character.hold(true);character.update(0,0);character.root.updateMatrixWorld(true);
@@ -497,26 +502,46 @@ export async function renderPortrait(entry,data,size=160){
 
 // A waist-up hero shot of a character shouldering a weapon, seen from a low 3/4 angle on the gun side, as an image URL
 // (Armory preset cards, 2026-11-13). def is the weapon's def (null: empty hands). Transparent background.
+// entry.heroPose (characters.json, 2026-11-13): the operator's own pose for the Armory preset cards. Keys:
+//   clip ('idle' 'ads' 'crouch' 'crouchAds' 'sprint' 'slide'... = bo1-motion CLIPS), t (0..1 frame), bones
+//   ({hips|low|chest|neck|head|ri.arm|le.fore...: [x,y,z]}, bo1 rigs, bo1-motion.js), raw ({bone name: [x,y,z]} for
+//   rigs without bo1 motion, applied after the clip), yaw (deg, turns the body), gun (false = empty hands),
+//   prop ('steelball' in the left hand), cam {angle deg from the front towards its right, tilt, zoom, center (of height)}
 export async function renderHeroShot(entry,data,def,{width=300,height=380}={}){
+  const hp=entry.heroPose??null,cam=hp?.cam??{};
   const c=await createCharacter(entry,data);await variantTexturesReady();
   c.root.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(c.root);
   const tall=entry.type==='gltf'&&entry.height?entry.height:box.max.y-box.min.y,base=box.min.y;
-  const gun=def?await holdWeapon(c,entry,def).catch(()=>null):null;
-  c.hold?.(!!gun);try{c.pose?.({ads:gun?1:0});}catch{}
+  c.update(0,0);   // a bo1 rig's grip takes its scale on the first update: before it, the gun came out ~1/30 size
+  const gun=def&&hp?.gun!==false?await holdWeapon(c,entry,def).catch(()=>null):null;
+  c.hold?.(!!gun);try{c.pose?.(hp&&c.bo1?{ads:0,hero:hp}:{ads:gun?1:0});}catch{}
   for(let i=0;i<6;i++)c.update(.2,0);   // let the aim envelope settle
+  if(hp?.yaw)c.root.rotation.y+=THREE.MathUtils.degToRad(hp.yaw);
+  c.root.updateMatrixWorld(true);
+  if(hp?.raw)for(const [n,r] of Object.entries(hp.raw)){const b=c.root.getObjectByName(n);if(!b?.parent)continue;
+    const d=new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0]??0,r[1]??0,r[2]??0)),hq=c.root.getWorldQuaternion(new THREE.Quaternion());
+    d.premultiply(hq).multiply(hq.clone().invert());   // character space -> world
+    const pq=b.parent.getWorldQuaternion(new THREE.Quaternion());b.quaternion.premultiply(pq.clone().invert().multiply(d).multiply(pq)).normalize();b.updateWorldMatrix(false,true);}
   const scene=new THREE.Scene();scene.add(c.root);c.root.updateMatrixWorld(true);
+  if(hp?.prop==='steelball'&&c.bones){   // Gyro's steel ball, resting in the left palm
+    const S=c.bones.sides.le,h=S.hand.getWorldPosition(new THREE.Vector3()),f=(S.fingers.mid?.[0]??S.fingers.index?.[0])?.getWorldPosition(new THREE.Vector3());
+    const ball=new THREE.Mesh(new THREE.SphereGeometry(tall*.022,32,20),new THREE.MeshStandardMaterial({color:0xd6d9de,metalness:.85,roughness:.22,emissive:0x26303a}));
+    ball.position.copy(f?h.clone().lerp(f,1.3):h).add(new THREE.Vector3(0,tall*.012,0));scene.add(ball);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(tall*.034,tall*.0025,6,40),new THREE.MeshBasicMaterial({color:0xffd27a,transparent:true,opacity:.55}));   // the Spin
+    ring.position.copy(ball.position);ring.rotation.set(1.2,.3,.4);scene.add(ring);
+  }
   scene.add(new THREE.HemisphereLight(0xe6ddd0,0x2a1d17,1.5));
   const key=new THREE.DirectionalLight(0xffe6c8,2.6);key.position.set(-110,150,130);scene.add(key);
   const rim=new THREE.DirectionalLight(0xd04a38,2.4);rim.position.set(140,70,-110);scene.add(rim);
   const back=new THREE.DirectionalLight(0x8fb0ff,1.1);back.position.set(-60,40,-160);scene.add(back);
-  // the character faces +Z and holds the gun in the right hand (-X): the camera sits front-right and a little low
-  const center=new THREE.Vector3(0,base+tall*.66,0),half=tall*.37,fov=30;
-  const camera=new THREE.PerspectiveCamera(fov,width/height,1,5000),dir=new THREE.Vector3(-Math.sin(.62),-.1,Math.cos(.62)).normalize();
+  // default: the character faces +Z and holds the gun in the right hand (-X), so the camera sits front-right and a little low
+  const center=new THREE.Vector3(0,base+tall*(cam.center??.66),0),half=tall*.37*(cam.zoom??1),fov=30,ang=THREE.MathUtils.degToRad(cam.angle??35.5);
+  const camera=new THREE.PerspectiveCamera(fov,width/height,1,5000),dir=new THREE.Vector3(-Math.sin(ang),cam.tilt??-.1,Math.cos(ang)).normalize();
   camera.position.copy(center).addScaledVector(dir,half/Math.tan(THREE.MathUtils.degToRad(fov/2)));camera.lookAt(center.clone().add(new THREE.Vector3(0,tall*.02,0)));
   const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});
   renderer.setSize(width,height);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
   try{renderer.render(scene,camera);return renderer.domElement.toDataURL('image/webp',.85);}
-  finally{renderer.dispose();renderer.forceContextLoss();c.dispose();}
+  finally{renderer.dispose();renderer.forceContextLoss();c.dispose();scene.traverse(o=>{if(o.isMesh&&!o.isSkinnedMesh&&o.parent===scene){o.geometry.dispose();o.material.dispose();}});}
 }
 
 // Third-person camera that orbits behind the gameplay (eye) camera.
