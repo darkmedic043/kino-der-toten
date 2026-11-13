@@ -7,7 +7,8 @@
 // -> scratch/col-audit/<map>[-rules][-spawn].json (lists by source and clusters)
 // The map entry's propCollision rules (prop-collision.js) are part of the collision unless --no-rules; --rules tries a rule
 // set from a file. --from-spawn floods from the player spawn only and lists the markers it cannot reach. --flood-only stops
-// after the flood (seconds, little memory): points, markers, what was stood on, points under the map. --trace prints the
+// after the flood (seconds, little memory): points, markers, what was stood on, points under the map. --points file.json
+// writes every walked point (other offline tools start from them: the castle's ceiling check). --trace prints the
 // flood's way to the walked point nearest a position (how did it get there?). The full pass holds every drawn triangle near
 // the walked space: about 3 GB for The Giant (docs/fork/custom-maps.md).
 import fs from 'node:fs'; import * as THREE from 'three'; import { MeshBVH } from 'three-mesh-bvh';
@@ -77,6 +78,7 @@ if (FROM_SPAWN) { const lost = []; marks.forEach((m, k) => { const ix = Math.rou
     let ok = false; if (y != null) for (let ax = -3; ax <= 3 && !ok; ax++) for (let az = -3; az <= 3 && !ok; az++) for (const dy of [-40, 0, 40]) if (seen.has(key(ix + ax, iz + az, y + dy))) { ok = true; break; }
     if (!ok) lost.push(markNames[k] + '@' + [m.x, m.y, m.z].map(Math.round)); });
   console.log('markers not reached from the player spawn:', lost.length, 'of', marks.length, '\n ' + lost.join('\n ')); }
+{ const pi = process.argv.indexOf('--points'); if (pi > 0) { fs.writeFileSync(process.argv[pi + 1], JSON.stringify(pts.map(p => p.map(Math.round)))); console.log('walked points ->', process.argv[pi + 1]); } }
 if (process.argv.includes('--flood-only')) { let low = 0, minY = 1e9; for (const y of seen.values()) { if (y < -20) low++; if (y < minY) minY = y; } console.log('flood only: points below y -20:', low, 'lowest', Math.round(minY)); process.exit(0); }
 // ---- drawn geometry (opaque and alpha-tested; blended materials are glass, decals and cards)
 const names = [], nameId = new Map(), sid = s => { if (!nameId.has(s)) { nameId.set(s, names.length); names.push(s); } return nameId.get(s); };

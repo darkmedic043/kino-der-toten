@@ -103,8 +103,43 @@ export function overlayLayers(root, { blend = null, mask = null, glass = null, s
 // took them for dark metal, so they mirrored the blue room light and sparkled like a night sky (user, 2026-11-12:
 // "missing" ceilings). Here they become one unlit black material without fog, drawn from both sides: the planes'
 // winding is mixed, and the ones facing up left gaps that showed the courtyard above from below.
-export function blackPlanes(root, match = /global_diffuse_black|infinite_blackness/) {
+export function blackPlanes(root, match = /global_diffuse_black|infinite_blackness/, ceilings = null) {
   const mat = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false, side: THREE.DoubleSide }); mat.name = 'castle_void'; let n = 0;
   root.traverse(o => { if (o.isMesh && !Array.isArray(o.material) && match.test(o.material?.name ?? '')) { o.material = mat; o.castShadow = false; n++; } });
+  if (ceilings) { const c = voidCeilings(root, mat, ceilings); if (c) console.info('[der-eisendrache] void ceilings:', JSON.stringify(c)); }
   return n;
+}
+
+// Flat black over a lit room still reads as a hole in the roof (user, 2026-11-13: the Juggernog room's ribs with black
+// between them, and gaps beside the planes that showed the rocks and sky above). ceilings.js (.tools/castle-ceilings.mjs:
+// rays from every walkable point of the real model) lists the void triangles that are seen from below, each with the
+// side it is seen from, and flat plugs at ceiling height for the gaps its rays found. Those triangles leave the void
+// meshes and are redrawn, with the plugs, as one mesh in a wall material of the map: lit like the walls around it, one
+// sided (a plug is invisible from above). Triangles are matched by centre, so a rebuild that moves them just leaves
+// them black: rerun the tool after a map rebuild.
+export function voidCeilings(root, voidMat, data) {
+  let donor = null; root.traverse(o => { if (!donor && o.isMesh && !o.isInstancedMesh && !Array.isArray(o.material) && o.material?.name === data.material && o.geometry?.attributes.uv && o.geometry.index) donor = o; });
+  if (!donor || !data.tris?.length) return null;
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), N = new THREE.Vector3(), E = new THREE.Vector3(), m = new THREE.Matrix4(), inv = new THREE.Matrix4();
+  let dens = 1 / 256; { const P = donor.geometry.attributes.position, U = donor.geometry.attributes.uv, I = donor.geometry.index, r = [], ua = new THREE.Vector2(), ub = new THREE.Vector2(), uc = new THREE.Vector2();
+    for (let k = 0; k + 2 < I.count && r.length < 400; k += 3) { const i0 = I.getX(k), i1 = I.getX(k + 1), i2 = I.getX(k + 2); A.fromBufferAttribute(P, i0); B.fromBufferAttribute(P, i1).sub(A); C.fromBufferAttribute(P, i2).sub(A); const wa = B.cross(C).length();
+      ua.fromBufferAttribute(U, i0); ub.fromBufferAttribute(U, i1).sub(ua); uc.fromBufferAttribute(U, i2).sub(ua); const t = Math.abs(ub.cross(uc)); if (wa > 1 && t > 0) r.push(Math.sqrt(t / wa)); }
+    if (r.length) { r.sort((x, y) => x - y); dens = r[r.length >> 1]; } }
+  const table = new Map(); for (const t of data.tris) table.set(t[0] + ',' + t[1] + ',' + t[2], t);
+  const find = (x, y, z) => { const X = Math.round(x), Y = Math.round(y), Z = Math.round(z); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) { const t = table.get((X + i) + ',' + (Y + j) + ',' + (Z + k)); if (t) return t; } return null; };
+  const pos = [], nor = [], uv = [], put = (p, n) => { pos.push(p.x, p.y, p.z); nor.push(n.x, n.y, n.z); const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z); if (ay >= ax && ay >= az) uv.push(p.x * dens, p.z * dens); else if (ax >= az) uv.push(p.z * dens, p.y * dens); else uv.push(p.x * dens, p.y * dens); };
+  const tri = (vx, vy, vz) => { N.subVectors(B, A).cross(E.subVectors(C, A)).normalize(); E.set(vx, vy, vz).sub(A); const f = N.dot(E) < 0; if (f) N.negate(); put(A, N); put(f ? C : B, N); put(f ? B : C, N); };
+  root.updateWorldMatrix(true, false); inv.copy(root.matrixWorld).invert(); const meshes = []; root.traverse(o => { if (o.isMesh && !o.isInstancedMesh && o.material === voidMat) meshes.push(o); }); let moved = 0, gone = 0;
+  for (const o of meshes) { o.updateWorldMatrix(true, false); m.multiplyMatrices(inv, o.matrixWorld); const g = o.geometry, P = g.attributes.position, I = g.index, n = I ? I.count : P.count, keep = [];
+    for (let k = 0; k + 2 < n; k += 3) { const i0 = I ? I.getX(k) : k, i1 = I ? I.getX(k + 1) : k + 1, i2 = I ? I.getX(k + 2) : k + 2; A.fromBufferAttribute(P, i0).applyMatrix4(m); B.fromBufferAttribute(P, i1).applyMatrix4(m); C.fromBufferAttribute(P, i2).applyMatrix4(m);
+      const t = find((A.x + B.x + C.x) / 3, (A.y + B.y + C.y) / 3, (A.z + B.z + C.z) / 3); if (!t) { keep.push(i0, i1, i2); continue; } tri(t[3], t[4], t[5]); moved++; }
+    if (keep.length === n) continue; if (!keep.length) { o.removeFromParent(); gone++; continue; }
+    const g2 = g.clone(); g2.setIndex(keep); g2.boundingBox = null; g2.boundingSphere = null; o.geometry = g2; }
+  if (!moved) return null;
+  for (const [x0, z0, x1, z1, y] of data.patches || []) { A.set(x0, y, z0); B.set(x1, y, z0); C.set(x1, y, z1); tri(x0, y - 100, z0); A.set(x0, y, z0); B.set(x1, y, z1); C.set(x0, y, z1); tri(x0, y - 100, z0); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(Array.from({ length: pos.length / 3 }, (_, i) => i)); geo.computeBoundingBox(); geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, donor.material); mesh.name = 'bsp_void_ceilings'; mesh.castShadow = false; mesh.receiveShadow = donor.receiveShadow; mesh.layers.mask = donor.layers.mask;
+  mesh.matrixAutoUpdate = donor.matrixAutoUpdate; root.add(mesh); mesh.updateMatrix(); mesh.updateMatrixWorld(true);
+  return { triangles: moved, of: data.tris.length, plugs: (data.patches || []).length, voidMeshesEmptied: gone, material: data.material };
 }

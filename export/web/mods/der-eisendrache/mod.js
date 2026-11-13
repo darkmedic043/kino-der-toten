@@ -19,6 +19,7 @@ import { floatingDebris } from '../fx/floating-debris.js';
 import { mergeProps, instanceProps } from './merge-props.js';
 import { carvedDecals } from './carved.js';
 import { overlayLayers, blackPlanes } from './overlays.js';
+import CEILINGS from './ceilings.js';
 import { setupSwitch } from './switch.js';
 import { setupClockWall } from './clock-wall.js';
 import { setupAmbience } from './ambience.js';
@@ -61,7 +62,7 @@ export default async function setup(api) {
     return zones;
   };
   if (world.root) carvedDecals(world.root, api.scene);   // before the props are merged: the nodes it drops must not be instanced
-  if (world.root) blackPlanes(world.root);   // the void planes: unlit black from both sides (overlays.js)
+  if (world.root) blackPlanes(world.root, undefined, /[?&]noCeilings/.test(location.search) ? null : CEILINGS);   // the void planes: unlit black from both sides, real ceilings over the rooms (overlays.js)
   if (world.root && !/[?&]noOverlays/.test(location.search)) console.info('[der-eisendrache] overlay layers:', JSON.stringify(overlayLayers(world.root)));   // snow, decals and cut-outs the map drew solid (overlays.js)
   if (world.root) doorBacks(world.root);   // the blast doors get a back (before the merge: its pieces stay plain meshes)
   if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes); }

@@ -3,12 +3,14 @@
 // with every drawn mesh simplified to about --ratio of its triangles. Collision meshes (COL_/PCOL_/NCOL_/CLIP_) are copied
 // untouched, node names and the scene tree stay, and a mesh whose bounds would move is kept whole (mods measure meshes).
 //   node .tools/map-lite.mjs <map-id> [--size 16] [--ratio .06] [--force]   -> scratch/lite/<map-id>/   (git-ignored; rerun after a map rebuild)
+// --keep <regex> leaves meshes whose material or mesh name matches untouched (a test that needs exact pieces: the castle's void planes).
 import fs from 'node:fs'; import path from 'node:path'; import { spawn } from 'node:child_process';
 import { MeshoptSimplifier } from '../node_modules/meshoptimizer/meshopt_simplifier.js';
 const id = process.argv[2], size = +(process.argv[process.argv.indexOf('--size') + 1] || 16) || 16;
 if (!id) { console.error('usage: node .tools/map-lite.mjs <map-id> [--size 16]'); process.exit(1); }
 const src = `export/web/mods/maps/${id}/tex`, dst = `scratch/lite/${id}/tex`;
 const ratio = +(process.argv[process.argv.indexOf('--ratio') + 1]) || .06;
+const KEEP = process.argv.includes('--keep') ? new RegExp(process.argv[process.argv.indexOf('--keep') + 1]) : null;
 await liteModel(id, process.argv.includes('--ratio') ? ratio : .06);
 if (!fs.existsSync(src)) { console.log(id, 'has no tex/ folder (its textures are inside the GLB)'); process.exit(0); }
 fs.mkdirSync(dst, { recursive: true });
@@ -42,7 +44,7 @@ async function liteModel(id, ratio) {
   const done = new Map(); let tin = 0, tout = 0, tcol = 0, fell = 0, fellT = 0;
   g.meshes.forEach((m, mi) => { for (const p of m.primitives) {
     const A = p.attributes, tris = (p.indices != null ? g.accessors[p.indices].count : g.accessors[A.POSITION].count) / 3, pa = g.accessors[A.POSITION];
-    if (col.has(mi) || (p.mode ?? 4) !== 4 || tris < 12 || pa.componentType !== 5126 || p.targets) { if (col.has(mi)) tcol += tris; else { tin += tris; tout += tris; }
+    if (col.has(mi) || (p.mode ?? 4) !== 4 || tris < 12 || KEEP?.test(g.materials?.[p.material]?.name || '') || KEEP?.test(m.name || '') || pa.componentType !== 5126 || p.targets) { if (col.has(mi)) tcol += tris; else { tin += tris; tout += tris; }
       for (const k in A) A[k] = keep(A[k], 34962); p.indices = keep(p.indices, 34963); continue; }
     const key = p.indices + '|' + Object.entries(A).map(e => e.join(':')).join(','); tin += tris;
     if (!done.has(key)) {
