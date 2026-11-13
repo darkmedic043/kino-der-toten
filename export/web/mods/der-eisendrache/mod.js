@@ -21,6 +21,7 @@ import { carvedDecals } from './carved.js';
 import { overlayLayers, blackPlanes } from './overlays.js';
 import { setupSwitch } from './switch.js';
 import { setupClockWall } from './clock-wall.js';
+import { setupAmbience } from './ambience.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -82,6 +83,7 @@ export default async function setup(api) {
   const craft = setupCraftables(api, { traps, pads }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav, pads, traps }), ee = setupEE(api, { bows, traps }), side2 = setupSide2(api, { bows }), side = setupSide(api, { lowgrav, side2 });
   useGameAudio(api.audio);
   const powerSwitch = setupSwitch(api); const clockWall = setupClockWall(api, { bows, sfxAt }); setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupDebris(api); setupRocketCollision(api); setupCryptBoards(api);
+  const ambience = setupAmbience(api);   // wind, rooms, creaks, birds (ambience.js)
   setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 });   // the Tab scoreboard's tiles
   const bounds = setupBounds(api, { lowgrav });   // after the pads: it watches their flights
   await bows?.ready;   // the spirit wolves too
@@ -91,7 +93,7 @@ export default async function setup(api) {
   await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
   await look;   // the light bake and its lights: before the engine batches the map and compiles its shaders (see setupLook)
   sync.ready();   // a guest catches up on the game's events so far
-  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz, traps, craft, lowgrav, bows, ee, side, side2, sync, bounds, weather };
+  window.kino ??= {}; window.kino.castle = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gondola, pads, pap, bow, panzer, fizz, traps, craft, lowgrav, bows, ee, side, side2, sync, bounds, weather, ambience };
 }
 
 // ---- BO3 fxanim rigs (CASTLE_<name> from the builder's fxanim_rig): bones carry extras.anims[key] = {rot, loc} runs,
