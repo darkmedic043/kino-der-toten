@@ -396,7 +396,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const l=stkList(),nm=x=>esc(stkCat.stickers.find(s=>s.id===x)?.name??x),pic=s=>!s?'':s.shine?`<span class="stk-gold" style="--m:url('${stickerImage(s)}')"><img src="${stickerImage(s)}" alt="" draggable="false"></span>`:`<img src="${stickerImage(s)}" alt="" draggable="false">`;
     if(stkSel>=l.length)stkSel=Math.max(0,l.length-1);const hid=l.map(stkHidden);
     // a sticker on an attachment that isn't fitted now: kept, drawn again once it is
-    const off=l.map(x=>{const a=stickerMount(x);return a&&!stkWorld(x)?(cat?.attachments?.find(y=>y.id===a)?.name??a).toUpperCase():null;});
+    const on=equipped(cat,def,id,profile),off=l.map(x=>{const a=stickerMount(x);return a&&!(x.k.startsWith('@')?stkWorld(x):on.includes(a))?(cat?.attachments?.find(y=>y.id===a)?.name??a).toUpperCase():null;});
     const hint=stkArm?`Tap the gun to place ${nm(stkArm.id)}, or drag it there. Right-click or Esc cancels.`
       :l.length<MAX_STICKERS?'Drag a sticker onto the gun. Drag a placed one to move it.':'All three are placed: drag one to move it, or drop a new one to replace the selected one.';
     el.innerHTML=`<h3>STICKERS · ${l.length} / ${MAX_STICKERS}</h3><p class="stk-hint">${hint}</p>
@@ -420,7 +420,16 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     for(const h of ray.intersectObject(gun,true)){const o=h.object;let shown=true;for(let a=o;a&&a!==scene;a=a.parent)if(!a.visible){shown=false;break;}
       const m=[o.material].flat()[h.face?.materialIndex??0]??[o.material].flat()[0],base=m?.userData?.stickerOf??m?.userData?.camoOf??m;
       if(!shown||!stickerPaintable(base)||m.transparent&&m.opacity<.5||/lens|glass|reticle|red_dot/i.test(base.name??''))continue;
-      return stickerFromHit(gun,h,cam,radius*.18);}
+      const x=stickerFromHit(gun,h,cam,radius*.18);if(x&&!stickerMount(x)){const a=stkTagPart(o,h.face);if(a)x.a=a;}return x;}
+    return null;
+  }
+  // a BO1 viewmodel's built-in attachment under a hit: the fitted attachment whose tag bone (or extraTags) owns the face's first
+  // vertex, walking up the bones. Only fitted ones: a part the gun shows on its own (a Pack-a-Punch dual mag) stays the gun's
+  function stkTagPart(o,f){
+    const si=o.isSkinnedMesh&&o.geometry.attributes.skinIndex,sw=o.geometry.attributes.skinWeight;if(!si||!sw||!f)return null;
+    let bi=0,bw=-1;for(let c=0;c<4;c++){const w=sw.getComponent(f.a,c);if(w>bw){bw=w;bi=si.getComponent(f.a,c);}}
+    const on=equipped(cat,def,id,profile).map(a=>cat.attachments.find(y=>y.id===a)).filter(Boolean);
+    for(let b=o.skeleton?.bones[bi];b?.isBone;b=b.parent){const n=(b.name||'').toLowerCase();const a=on.find(y=>[...(y.tags??[]),...(y.extraTags??[])].some(t=>t.toLowerCase()===n));if(a)return a.id;}
     return null;
   }
   // a placed sticker's centre and normal in world space (through the skin of its nearest vertex)

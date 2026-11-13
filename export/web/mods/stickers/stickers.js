@@ -59,8 +59,9 @@ export function meshKeys(root){const keys=new Map(),seen={};
     if(o.isMesh){const n=pre+(o.name||'mesh');seen[n]=(seen[n]??-1)+1;keys.set(o,n+'#'+seen[n]);}
     for(const c of o.children)walk(c,pre);};
   walk(root,'');return keys;}
-// the attachment a placed sticker sits on (null: on the gun itself)
-export const stickerMount=x=>x?.k?.startsWith('@')?x.k.slice(1,x.k.indexOf('/')):null;
+// the attachment a placed sticker sits on (null: on the gun itself): a mounted model's, or `a`, a BO1 viewmodel's built-in part
+// (its tag bone, set by the Gunsmith on placing)
+export const stickerMount=x=>x?.k?.startsWith('@')?x.k.slice(1,x.k.indexOf('/')):x?.a??null;
 const bufOf=o=>o.geometry?.attributes?.position?.array;
 
 // ---- the material patch -------------------------------------------------------------------------------------------------
