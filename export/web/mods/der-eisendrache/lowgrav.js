@@ -112,6 +112,7 @@ export function setupLowGrav(api) {
     if (!on && glow) { const j = pool.indexOf(glow); if (j >= 0) pool.splice(j, 1); glow = null; }
   }
   const inside = () => BOX.containsPoint(player.getFeetPosition());
+  const heard = () => !camera?.position || BOX.distanceToPoint(camera.position) < 150;   // the start and stop sounds carry no further than the undercroft's doorways (they reached the courtyard above, 2026-11-13)
   const side = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   function wallBeside() {   // the nearest wall left or right of where you're moving (or looking), at chest height: {normal, distance}
     const v = player.velocity, f = Math.hypot(v.x, v.z) > 40 ? new THREE.Vector3(v.x, 0, v.z) : camera.getWorldDirection(new THREE.Vector3()); f.y = 0; f.normalize(); side.crossVectors(f, up).normalize();
@@ -136,8 +137,8 @@ export function setupLowGrav(api) {
   function set(on) {
     if (st.on === on) return; st.on = on; setGlow(on); fx.pulse(on);
     if (hum) { hum.pause(); hum = null; }
-    if (on) { sfxAt('grav_start', PYRAMID, camera, .7, 2600); hum = sfx('grav_loop', 0); hum.loop = true; if (inside()) { announce?.('LOW GRAVITY', '', 2); fx.enter(); } }
-    else if (st.started && st.t > 1) sfxAt('grav_stop', PYRAMID, camera, .45, 2600);
+    if (on) { if (heard()) sfxAt('grav_start', PYRAMID, camera, .7, 2600); hum = sfx('grav_loop', 0); hum.loop = true; if (inside()) { announce?.('LOW GRAVITY', '', 2); fx.enter(); } }
+    else if (st.started && st.t > 1 && heard()) sfxAt('grav_stop', PYRAMID, camera, .45, 2600);
   }
   host.on('update', dt => {
     if (!dt) return;

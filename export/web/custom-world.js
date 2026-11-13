@@ -60,13 +60,22 @@ function footprint(object){
   }
   best.vu0=best.u0;best.vu1=best.u1;best.vw0=best.w0;best.vw1=best.w1;return best;
 }
+// World-space triangle soup of `meshes` (three floats a corner, no index), written straight into one array: the copies
+// the old way made (a non-indexed clone of every mesh, then the merge) held the castle's 7.7 M collision triangles
+// four times over while loading (2026-11-13).
+const cornersOf=o=>(o.geometry.index??o.geometry.attributes.position).count;
 function positionsOf(meshes){
-  const geometries=meshes.map(o=>{
-    const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();
-    for(const name of Object.keys(g.attributes))if(name!=='position')g.deleteAttribute(name);
-    g.morphAttributes={};return g.applyMatrix4(o.matrixWorld);
-  });
-  return geometries.length?mergeGeometries(geometries,false):null;
+  if(!meshes.length)return null;
+  let n=0;for(const o of meshes)n+=cornersOf(o);
+  const out=new Float32Array(n*3),v=new THREE.Vector3();let k=0;
+  for(const o of meshes){const p=o.geometry.attributes.position,ix=o.geometry.index,m=o.matrixWorld,c=cornersOf(o);
+    for(let i=0;i<c;i++){v.fromBufferAttribute(p,ix?ix.getX(i):i).applyMatrix4(m);out[k++]=v.x;out[k++]=v.y;out[k++]=v.z;}}
+  return new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(out,3));
+}
+// The first `meshes` of a soup built by positionsOf([...meshes, ...more]), as a view of the same memory
+function headOf(soup,meshes){
+  let n=0;for(const o of meshes)n+=cornersOf(o);
+  return new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(soup.attributes.position.array.subarray(0,n*3),3));
 }
 
 // Navmesh cache (2026-10-29): generating Nuketown's navmesh froze the loading screen for 5.6 s on every load, so the
@@ -81,7 +90,7 @@ const navDb=()=>new Promise((res,rej)=>{if(!globalThis.indexedDB)return rej(new 
   r.onupgradeneeded=()=>r.result.createObjectStore('nav');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);r.onblocked=()=>rej(new Error('blocked'));});
 function navInWorker(positions,indices,config){return new Promise((res,rej)=>{let w;try{w=new Worker(new URL('./navmesh-worker.js',import.meta.url),{type:'module'});}catch(e){return rej(e);}
   const done=()=>w.terminate();w.onmessage=e=>{done();e.data?.data?res(e.data.data):rej(new Error(e.data?.error??'no reply'));};w.onerror=e=>{done();rej(new Error(e.message||'worker error'));};
-  w.postMessage({positions,indices,config});});}
+  w.postMessage({positions:positions.byteLength<positions.buffer.byteLength?positions.slice():positions,indices,config});});}   // a view would send its whole buffer
 async function navCacheGet(key){try{const db=await navDb();return await new Promise((res,rej)=>{const q=db.transaction('nav','readonly').objectStore('nav').get(key);q.onsuccess=()=>res(q.result??null);q.onerror=()=>rej(q.error);});}catch{return null;}}
 async function navCachePut(key,value){try{const db=await navDb();await new Promise((res,rej)=>{const t=db.transaction('nav','readwrite');t.objectStore('nav').put(value,key);t.oncomplete=res;t.onerror=()=>rej(t.error);});}catch(e){console.warn('[custom-world] navmesh cache',e);}}
 
@@ -123,11 +132,16 @@ export class CustomWorld {
         if(!layer.has(m)){layer.set(m,layer.size);m.polygonOffset=true;m.polygonOffsetFactor=-1;m.polygonOffsetUnits=/decal/i.test(m.name)||m.userData?.decal?-8:-4;}
         o.renderOrder=(/decal/i.test(m.name)||m.userData?.decal?2000:1000)+layer.get(m);}}
     progress('Building collision',35);
-    const solid=positionsOf(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)&&!clipOnly.includes(o)));
+    const base=dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)&&!clipOnly.includes(o));
+    const both=playerOnly.length&&base.length?positionsOf([...base,...playerOnly]):null,solid=both?headOf(both,base):positionsOf(base);   // one array serves both sets
     this.clipCollision=clipOnly.length?new CollisionWorld(positionsOf(clipOnly)):null;   // the player's capsule only (physics)
     if(!solid)throw new Error('The map has no meshes to stand on');
-    this.collision=new CollisionWorld(playerOnly.length?positionsOf([...(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)&&!clipOnly.includes(o))),...playerOnly]):solid);
-    const navSource=navOnly.length?positionsOf([...(dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)&&!clipOnly.includes(o))),...navOnly]):solid;
+    this.collision=new CollisionWorld(both??solid);
+    const navSource=navOnly.length?positionsOf([...base,...navOnly]):solid;
+    // The collision-only meshes of the file (COL_/PCOL_/NCOL_/CLIP_: hidden, never drawn) have been copied into the arrays
+    // above: their own vertex data is let go (the castle's is about 200 MB). The nodes stay, with an empty geometry.
+    {const none=new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(0),3));
+      for(const o of meshes)if(!o.visible&&[COLLISION_NAME,PLAYER_COLLISION_NAME,NAV_ONLY_NAME,CLIP_NAME].some(r=>r.test(rawName(o)))){o.geometry.dispose();o.geometry=none;}}
 
     // RISING_<delay>_<speed>: a mesh (a death plane such as rising lava or cheese) that starts rising after <delay>
     // seconds of game time at <speed> units/s and kills whatever it reaches. Render-only: no collision or navigation.

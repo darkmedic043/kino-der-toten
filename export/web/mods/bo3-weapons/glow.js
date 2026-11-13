@@ -29,6 +29,9 @@ function buildGlow(gun,color,depthTest){
   const mats=[],lights=[],cardTex=glowTexture(color,true),haloTex=glowTexture(color,false);
   const v=new THREE.Vector3();gun.updateMatrixWorld(true);
   gun.traverse(o=>{
+    // BO3's effect cards whose picture is not in the export (an 8 px white stand-in with alpha 0, drawn solid white: the
+    // Der Eisendrache bows' mtl_wpn_t7_zmb_bow_no_e, a white arc beside the bow and a patch at the grip, user 2026-11-13)
+    if(o.isMesh&&/_bow_no_e$/.test(o.material?.name??'')){o.visible=false;return;}
     if(!o.isMesh||!/glow|_ret|lens/i.test(o.material?.name??''))return;
     const bg=o.material.userData.bo3glow;
     if(bg&&!bg.card&&o.material.map){   // BO3's own glow image, scrolling (pulses/sparks travel along the part)

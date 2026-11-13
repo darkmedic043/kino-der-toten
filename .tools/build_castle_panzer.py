@@ -110,6 +110,20 @@ def build_switch():
     (SOUT/'anims.json').write_text(json.dumps(sindex, indent=1))
     print('switch', sindex)
 if sys.argv[1:2] == ['switch']: build_switch(); sys.exit()
+# ---- the clock tower's breakable wall (2026-11-13, user: "whole lot missing here"): the Fire Bow quest's scene
+# p7_fxanim_zm_castle_quest_rune_clock_wall_bundle is a script scene, so the map build never placed it and the tower's top
+# room had a hole to the sky where the rune clock hides. The wall (bricks on 40 joints) and its break clip -> clockwall/
+#   python3 .tools/build_castle_panzer.py clockwall
+def build_clockwall():
+    COUT = ROOT/'export/web/mods/der-eisendrache/clockwall'
+    (COUT/'anims').mkdir(parents=True, exist_ok=True); (COUT/'.gitignore').write_text('*\n')
+    name = 'p7_fxanim_zm_castle_quest_rune_clock_wall_mod'
+    SEM.to_glb(scaled(SEM.read_semodel(GH/'xmodels'/name/f'{name}_LOD0.semodel')), COUT/'wall.glb', texture_loader=webp)
+    print('clockwall', round((COUT/'wall.glb').stat().st_size / 1e6, 2), 'MB')
+    c = anim('break', 'p7_fxanim_zm_castle_quest_rune_clock_wall_anim', COUT)
+    (COUT/'anims.json').write_text(json.dumps({'break': {'duration': c['duration']}}, indent=1))
+    print('clockwall break', c['duration'], 's', len(c['bones']), 'bones', c['notifies'])
+if sys.argv[1:2] == ['clockwall']: build_clockwall(); sys.exit()
 # the storm bow's wall-run wind runes (p7_zm_ctl_rune_wind_emissive is a shader-only card; its reveal mask is the symbol)
 #   python3 .tools/build_castle_panzer.py wind   -> wind/wind.webp (git-ignored)
 if sys.argv[1:2] == ['wind']:

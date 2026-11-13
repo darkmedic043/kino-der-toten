@@ -20,6 +20,7 @@ import { mergeProps, instanceProps } from './merge-props.js';
 import { carvedDecals } from './carved.js';
 import { overlayLayers, blackPlanes } from './overlays.js';
 import { setupSwitch } from './switch.js';
+import { setupClockWall } from './clock-wall.js';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -80,12 +81,13 @@ export default async function setup(api) {
   const gondola = setupGondola(api), pads = setupPads(api), pap = setupPap(api), bow = setupBow(api), panzer = setupPanzer(api), fizz = setupFizz(api), traps = setupTraps(api);
   const craft = setupCraftables(api, { traps, pads }), lowgrav = setupLowGrav(api), bows = setupBows(api, { lowgrav, pads, traps }), ee = setupEE(api, { bows, traps }), side2 = setupSide2(api, { bows }), side = setupSide(api, { lowgrav, side2 });
   useGameAudio(api.audio);
-  const powerSwitch = setupSwitch(api); setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupDebris(api); setupRocketCollision(api); setupCryptBoards(api);
+  const powerSwitch = setupSwitch(api); const clockWall = setupClockWall(api, { bows, sfxAt }); setupRocketPad(api); setupDogRounds(api); setupUndercroftGate(api); setupDebris(api); setupRocketCollision(api); setupCryptBoards(api);
   setupTab(api, { craft, gondola, bow, bows, pap, ee, side, side2 });   // the Tab scoreboard's tiles
   const bounds = setupBounds(api, { lowgrav });   // after the pads: it watches their flights
   await bows?.ready;   // the spirit wolves too
   await pap?.ready;   // the map's own Pack-a-Punch machine
   await powerSwitch?.ready;   // and its power switch
+  await clockWall?.ready;   // and the clock tower's breakable wall
   await bow?.ready;   // the dragon heads join the scene while the map loads (added mid-game, they whited out the frame at times)
   await look;   // the light bake and its lights: before the engine batches the map and compiles its shaders (see setupLook)
   sync.ready();   // a guest catches up on the game's events so far
@@ -1441,6 +1443,7 @@ export function setupTraps(api) {   // (exported for the test page)
   // along the door line until the flat edges meet. merge-props draws their pieces as instances (no meshes left under the
   // node), so the collider is a half cylinder of the same size on a scripted mover that follows the slide.
   const DOOR_SHUT = 10, DOOR_OPEN = 7.5, camera = api.camera;
+  // Heard only down at the rocket (`nearRocket`, 2026-11-13, user: "should only happen when down there"): it played for everyone, anywhere in the castle.
   // Maxis on the PA (vox_maxis_rocket_pa_*, the castle's English voice bank), at the script's times: the test begins,
   // the doors, the count from ten at 9 s, "initiating" as the engine lights; "complete" when the burn ends
   const PA = [[0, 'begin'], [7, 'doors'], ...['ten', 'nine', 'eight', 'seven', 'six', 'five', 'four', 'three', 'two', 'one'].map((n, i) => [9 + i, n]), [19, 'initiating']];
@@ -1519,11 +1522,11 @@ export function setupTraps(api) {   // (exported for the test page)
       const t = now - rocket.t0, k = Math.min(1, Math.max(0, (t - 9) / DOOR_SHUT));
       rocket.phase = t >= 20 ? 'fire' : 'warn';
       cue(0, 0, t, () => { announce?.('ROCKET TEST FIRE', 'CLEAR THE LAUNCH PAD · BLAST DOORS CLOSE IN 9 SECONDS', 5); });
-      const a = t < 20 ? Math.floor(t / 4) : -1; if (a >= 0 && a !== rocket.alarm) { rocket.alarm = a; if (t - a * 4 < 1.5) sfxAt('rocket_alarm', doorMid ?? blast, camera, .5, 4500); }
-      while (rocket.vo + 1 < PA.length && t >= PA[rocket.vo + 1][0]) { rocket.vo++; if (t - PA[rocket.vo][0] < 1) sfx('rocket_pa_' + PA[rocket.vo][1], .7); }
+      const a = t < 20 ? Math.floor(t / 4) : -1; if (a >= 0 && a !== rocket.alarm) { rocket.alarm = a; if (t - a * 4 < 1.5) sfxAt('rocket_alarm', doorMid ?? blast, camera, .5, 2600); }
+      while (rocket.vo + 1 < PA.length && t >= PA[rocket.vo + 1][0]) { rocket.vo++; if (t - PA[rocket.vo][0] < 1 && nearRocket()) sfx('rocket_pa_' + PA[rocket.vo][1], .7); }
       cue(1, 9, t, () => { if (nearRocket()) toast?.('The blast doors are closing · ignition in 11 seconds'); if (doorMid) { sfxAt('rocket_door_start', doorMid, camera, .8, 2600); doorHum = sfx('rocket_door_lp', 0); doorHum.loop = true; } });
       cue(2, 19, t, () => { doorHum?.pause(); doorHum = null; if (doorMid) sfxAt('rocket_door_stop', doorMid, camera, .9, 2600); });
-      cue(3, 20, t, () => { sfxAt('rocket_ignite', blast, camera, 1, 6000); burn = sfx('rocket_burn_lp', 0); burn.loop = true; });
+      cue(3, 20, t, () => { sfxAt('rocket_ignite', blast, camera, 1, 3800); burn = sfx('rocket_burn_lp', 0); burn.loop = true; });
       setDoors(k);
       // caught between the doors as they meet (BO3 kills a player touching both)
       if (k > 0 && k < 1 && doorGap * (1 - k) < 46) {
@@ -1541,7 +1544,7 @@ export function setupTraps(api) {   // (exported for the test page)
     }
     if (!rocket.phase) {
       if (rocket.cue >= 0 || rocket.alarm >= 0) {   // the burn just ended (or the test was cut short)
-        if (rocket.cue >= 3 && rocket.re != null && now - rocket.re < 1.5) { sfx('rocket_pa_complete', .7); if (nearRocket()) toast?.('Rocket test complete · the blast doors are opening'); if (doorMid) { sfxAt('rocket_door_start', doorMid, camera, .8, 2600); doorHum?.pause(); doorHum = sfx('rocket_door_lp', 0); doorHum.loop = true; } }
+        if (rocket.cue >= 3 && rocket.re != null && now - rocket.re < 1.5) { if (nearRocket()) sfx('rocket_pa_complete', .7); if (nearRocket()) toast?.('Rocket test complete · the blast doors are opening'); if (doorMid) { sfxAt('rocket_door_start', doorMid, camera, .8, 2600); doorHum?.pause(); doorHum = sfx('rocket_door_lp', 0); doorHum.loop = true; } }
         rocket.cue = rocket.alarm = rocket.vo = -1; rocketLight.intensity = 0; burn?.pause(); burn = null;
       }
       if (rocket.re != null) {
@@ -1550,14 +1553,14 @@ export function setupTraps(api) {   // (exported for the test page)
         if (k <= 0) { rocket.re = null; if (doorHum) { doorHum.pause(); doorHum = null; if (doorMid) sfxAt('rocket_door_stop', doorMid, camera, .9, 2600); } }
       } else if (rocket.k) setDoors(0);
     }
-    if (burn && camera) setVol(burn, .85 * Math.max(0, 1 - camera.position.distanceTo(blast) / 5000) ** 1.5);
+    if (burn && camera) setVol(burn, .85 * Math.max(0, 1 - camera.position.distanceTo(blast) / 3600) ** 1.5);
     if (doorHum && camera && doorMid) setVol(doorHum, .7 * Math.max(0, 1 - camera.position.distanceTo(doorMid) / 2600) ** 1.5);
   });
   // the rocket: the host's schedule
   sync.shared('rocket', () => ({ next: rocket.next == null ? null : rocket.next - session.time, phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : 0, re: rocket.re == null ? null : session.time - rocket.re }),
     s => { rocket.next = s.next == null ? null : session.time + s.next; if (s.phase) { if (!rocket.phase) rocket.t0 = session.time - s.t; rocket.phase = s.phase; } else rocket.phase = null; if (s.re == null) rocket.re = null; else if (rocket.re == null) rocket.re = session.time - s.re; });
   host.on('reset', () => { ray.on = ray.cool = 0; mash.on = mash.cool = 0; rocket.next = rocket.phase = rocket.re = null; rocket.cue = rocket.alarm = rocket.vo = -1; hush(); setDoors(0); rocketLight.intensity = 0; if (tp) tp.locked = false; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
-  return { inTesla, teslaCells: () => cells.size, state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : null, door: rocket.k, switch: !!rocket.phase && session.time - rocket.t0 >= 6 } }),
+  return { inTesla, teslaCells: () => cells.size, rocketNow: () => { if (sync.isHost && rocket.phase == null && rocket.re == null) rocket.next = session.time; }, state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : null, door: rocket.k, switch: !!rocket.phase && session.time - rocket.t0 >= 6 } }),
     fireRocket: () => { rocket.next = session.time; } };
 }
 

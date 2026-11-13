@@ -393,7 +393,7 @@ MODW = [
 ELEMENTS = {'storm': ('Storm Bow', '#7fd0ff'), 'rune': ('Fire Bow', '#ff6a1a'), 'wolf': ('Wolf Bow', '#9fd8ff'), 'demon': ('Void Bow', '#b06bff')}
 for el, (nm, col) in ELEMENTS.items():
     others = [o for o in ELEMENTS if o != el]
-    drop = '|'.join([f'bow_{o}_(missile|missle)' for o in ['base'] + others] + [f'bow_{o}_(crystals|rocks|arches)' for o in others])
+    drop = '|'.join([f'bow_{o}_(missile|missle)' for o in ['base'] + others] + [f'bow_{o}_(crystals|rocks|arches)' for o in others] + ['bow_no_e$'])   # bow_no_e: effect cards with no picture in the export (drew solid white)
     MODW.append(dict(cls='Wonder weapon', id=f'bo3_bow_{el}', name=nm, up=None, model=f'wpn_t7_zmb_bow_{el}_view', world=f'wpn_t7_zmb_bow_{el}_world',
                      pre='vm_bow_launcher', tpl='crossbow_explosive_zm', drop=drop, noBox=True,
                      stats=dict(clipSize=1, maxAmmo=60, startAmmo=60, damage=1500, minDamage=0, explosionRadius=200, explosionInnerDamage=1500, explosionOuterDamage=400, price=0),
