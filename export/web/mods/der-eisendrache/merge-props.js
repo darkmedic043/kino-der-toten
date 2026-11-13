@@ -8,6 +8,7 @@
 // Worst view: 2,357 -> see docs/fork/performance.md.
 import * as THREE from 'three';
 import { mergeGeometries } from '../../vendor/jsm/utils/BufferGeometryUtils.js';
+import { canFollow } from '../../instance-cull.js';
 
 // (2026-10-17: the gondola cars are merged too: the mod filters their meshes by material name and parent name, which a
 // per-node, per-material merge keeps, and their doors are joint nodes, which keep animating; 246 -> ~70 draws)
@@ -50,17 +51,25 @@ export function mergeProps(root, scene = null) {
 // flying Pack-a-Punch parts, sliding doors) or shows and hides (the pads' blue variants, torn boards) is mirrored the
 // next frame. Worst view 2,016 -> ~1,100 draws.
 const SKIP = /^CASTLE_(TRAM|PTRAM|EE|BQ|PART|DRAGON|PAPPART)/i;   // (PTRAM: the mod collects the gate meshes for colliders after this runs)
+// (2026-11-13) `follow`: a piece whose material can go into a texture array is left to the engine's batches instead
+// (instance-cull.js followers: it stays in the scene graph on no render layer and its instance copies it every frame),
+// single pieces included: ~600 draws a view were pieces with a material of their own. The rest is instanced as before.
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0), M = new THREE.Matrix4(), S = new THREE.Matrix4();
-export function instanceProps(root, scene, host) {
+export function instanceProps(root, scene, host, follow = false) {
+  let followed = 0;
   const groups = new Map(), unit = new THREE.BoxGeometry(1, 1, 1);
-  const consider = top => top.traverse(o => {
+  const consider = (top, f = false) => top.traverse(o => {
     if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || o.isBatchedMesh || Array.isArray(o.material) || o.morphTargetInfluences?.length || o.layers.mask === 0 || o.userData.noInstance) return;
+    if (f && canFollow(o)) { o.userData.batchFollow = true; followed++; return; }
     const box = o.geometry.type === 'BoxGeometry' ? o.geometry.parameters : null;
     const key = [box ? 'box' : o.geometry.uuid, o.material.uuid, o.castShadow, o.receiveShadow, o.renderOrder, o.layers.mask].join('|');
     (groups.get(key) ?? groups.set(key, []).get(key)).push({ o, box, last: new Float64Array(16).fill(NaN), lm: new Float64Array(6).fill(NaN), vis: null, par: null });   // Float64: a Float32 copy never compared equal to the matrix's doubles, so every instance was re-set and re-uploaded every frame (2026-10-17)
   });
-  for (const top of root.children) if (/^(CASTLE_|DOOR_)/i.test(top.name) && !SKIP.test(top.name)) consider(top);
+  for (const top of root.children) if (/^(CASTLE_|DOOR_)/i.test(top.name) && !SKIP.test(top.name)) consider(top, follow);
   for (const top of scene.children) if (/^window_boards$/.test(top.name)) consider(top);
+  // the buyable doors: custom-world moves every door part to the scene (still named DOOR_*), so the loop over the map
+  // root never saw them: about 180 draws at the spawn (a sliding leaf is 10 decal + 8 solid parts). Followers only.
+  if (follow) for (const top of scene.children) if (/^DOOR_/i.test(top.name)) top.traverse(o => { if (o.layers.mask !== 0 && !o.userData.noInstance && !o.userData.batchFollow && canFollow(o)) { o.userData.batchFollow = true; followed++; } });
   const visible = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
   // (2026-10-17) the originals leave the scene graph (the renderer and the matrix walk visited 780 of them a frame for
   // nothing): each remembers its parent node, and its world matrix is the node's times its own local one (recomposed
@@ -94,5 +103,5 @@ export function instanceProps(root, scene, host) {
       if (dirty) { im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); }
     }
   });
-  return { groups: sets.length, instances: sets.reduce((a, s) => a + s.g.length, 0), meshes: sets.length, hidden: sets.reduce((a, s) => a + s.g.length, 0) };
+  return { followed, groups: sets.length, instances: sets.reduce((a, s) => a + s.g.length, 0), meshes: sets.length, hidden: sets.reduce((a, s) => a + s.g.length, 0) };
 }

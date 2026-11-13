@@ -65,7 +65,7 @@ export default async function setup(api) {
   if (world.root) blackPlanes(world.root, undefined, /[?&]noCeilings/.test(location.search) ? null : CEILINGS);   // the void planes: unlit black from both sides, real ceilings over the rooms (overlays.js)
   if (world.root && !/[?&]noOverlays/.test(location.search)) console.info('[der-eisendrache] overlay layers:', JSON.stringify(overlayLayers(world.root)));   // snow, decals and cut-outs the map drew solid (overlays.js)
   if (world.root) doorBacks(world.root);   // the blast doors get a back (before the merge: its pieces stay plain meshes)
-  if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes); }
+  if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host, !!api.map?.textureArrays && !/[?&](noArrays|noBatch|noFollow)\b/.test(location.search)); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes, '; left to the batches:', i.followed); }
   // the map nodes this mod moves (Ragnarok parts, levers, the crate lid, clock hands, floaters, Skadi, the claws, the
   // astroglobe...) set position/rotation and call updateMatrixWorld. The world's optimizeStaticScene turns every map
   // node's matrixAutoUpdate off, and static-freeze leaves nodes already off alone as self-managed, so those moves never

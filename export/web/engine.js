@@ -527,7 +527,7 @@ try{
     const arrays=perfOff.has('noArrays')?0:+(opt('textureArrays')||0),batchMeshes=!!opt('batchMeshes'),skipRe=opt('batchExclude')??entry.mergeExclude,skip=skipRe?new RegExp(skipRe):null;
     // a plain mesh stays out like scene-merge's: under a custom-world marker (doors, movers, traps, risers), noMerge, or
     // an excluded name on it, an ancestor or its material; instanced meshes keep the old rule (noCull only)
-    const keep=o=>{if(o.isInstancedMesh)return false;for(let p=o;p;p=p.parent){if(p.userData.marker||p.userData.noMerge||skip&&skip.test(p.name))return true;}return !!skip&&[o.material].flat().some(m=>skip.test(m?.name??''));};
+    const keep=o=>{if(o.isInstancedMesh||o.userData.batchFollow)return false;for(let p=o;p;p=p.parent){if(p.userData.marker||p.userData.noMerge||skip&&skip.test(p.name))return true;}return !!skip&&[o.material].flat().some(m=>skip.test(m?.name??''));};
     if(arrays&&batchMeshes)await Promise.race([globalThis.kino?.hdMaps,new Promise(r=>setTimeout(r,30000))]).catch(()=>{});
     instanceCull=await createInstanceCuller(world.root??world.mapRoot??scene,{target:scene,renderer,arrays,meshes:batchMeshes,
       exclude:o=>o.userData.noCull||keep(o)});globalThis.kino.instanceCull=instanceCull;
