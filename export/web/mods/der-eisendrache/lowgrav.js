@@ -38,10 +38,10 @@ export function setupLowGrav(api) {
   const cycles = () => (running() ? Math.floor((st.t - st.onAt) / CYC) + 1 : 0);
   // The plates. Each is the map's stand-in slab (CASTLE_GRAVPAD_<n>, matched to its trigger by position), which sinks
   // SINK units in half a second under a player (the game's pad moves 2), a Keeper glyph flat on its top that glows
-  // while it's stood on (brighter as the 3 s run) or locked, and a soft halo on the floor around it. The collision
-  // stays where it is: the player doesn't drop the 2.5 units with the slab.
+  // while it's stood on (brighter as the 3 s run) or locked, and a soft halo on the floor around it. The slab's
+  // collision moves with it (carveSlabs, below): the player sinks the 2.5 units with the plate.
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.4, 'rgba(255,255,255,.3)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
-  const slabs = []; world.root.traverse(o => { if (/^CASTLE_GRAVPAD_/.test(o.name)) { let m = o.isMesh ? o : null; o.traverse(c => { if (!m && c.isMesh) m = c; }); if (m) { m.updateWorldMatrix(true, false); m.geometry.computeBoundingBox(); slabs.push({ o, c: m.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(m.matrixWorld), y0: o.position.y }); } } });
+  const slabs = []; world.root.traverse(o => { if (/^CASTLE_GRAVPAD_/.test(o.name)) { let m = o.isMesh ? o : null; o.traverse(c => { if (!m && c.isMesh) m = c; }); if (m) { m.updateWorldMatrix(true, false); m.geometry.computeBoundingBox(); slabs.push({ o, m, c: m.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(m.matrixWorld), y0: o.position.y }); } } });
   const GLOW = new THREE.Color(0x6fc8ff);
   const flat = (size, y, p, yaw = 0) => { const g = new THREE.PlaneGeometry(size, size); g.rotateX(-Math.PI / 2); g.rotateY(yaw); const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: glowTex, color: 0x000000, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.position.set(p.x, y, p.z); m.visible = false; m.renderOrder = 3; api.scene?.add(m); m.updateMatrixWorld(true); return m; };
   const plates = PADS.map((p, k) => {
@@ -49,6 +49,26 @@ export function setupLowGrav(api) {
     return { slab: at === p ? null : slab, top: p.y + 1.3, glyph: flat(33, p.y + 1.3, at, Math.atan2(PYRAMID.x - at.x, PYRAMID.z - at.z) + Math.PI), halo: flat(120, p.y + 1.25, at), drawn: -1, sunk: -1 };
   });
   host.warmObjects?.push(...plates.flatMap(q => [q.glyph, q.halo]));
+  // The slab's collision. The map's static collision carries each slab as a fixed box (COL_scriptmodels: top and four
+  // sides, 1 above the floor, in a pocket 2 deep), so the plate could not sink under a player. Once, here, those
+  // triangles are pushed under the pocket's floor, and a scripted mover built from the slab's mesh takes their
+  // place: it follows the slab and carries whoever stands on it.
+  const _mv = new THREE.Vector3();
+  (function carveSlabs() {
+    const col = world.collision, pos = col?.geometry?.attributes?.position, idx = col?.geometry?.index; let cut = 0;
+    if (!pos || !col.bvh?.refit || !world.addScriptedMover) return;
+    const n = idx ? idx.count : pos.count, at = i => idx ? idx.getX(i) : i, v = new THREE.Vector3();
+    for (const q of plates) {
+      if (!q.slab) continue;
+      const bb = new THREE.Box3().setFromObject(q.slab.m).expandByScalar(.3), tris = [];
+      for (let i = 0; i < n; i += 3) { let inside = true, top = -Infinity; for (let j = 0; j < 3 && inside; j++) { v.fromBufferAttribute(pos, at(i + j)); inside = bb.containsPoint(v); top = Math.max(top, v.y); } if (inside && top > bb.max.y - 1) tris.push(i); }
+      if (!tris.length || tris.length > 24) continue;   // (not the box expected there: leave the collision as it is)
+      q.col = world.addScriptedMover([q.slab.m], { exact: true }); if (!q.col) continue;
+      const moved = new Set(); for (const i of tris) for (let j = 0; j < 3; j++) { const a = at(i + j); if (!moved.has(a)) { moved.add(a); pos.setY(a, pos.getY(a) - 8); } }
+      cut += tris.length;
+    }
+    if (cut) { col.bvh.refit(); col.invalidateCache?.(); }
+  })();
   host.pending?.push(new Promise(done => new THREE.TextureLoader().load(GLYPHS, tex => {   // (missing: the plates keep the plain glow)
     tex.anisotropy = 4; api.renderer?.initTexture?.(tex);
     plates.forEach((q, k) => { const uv = q.glyph.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, (k + uv.getX(i)) / 4); uv.needsUpdate = true; q.glyph.material.map = tex; });
@@ -61,6 +81,7 @@ export function setupLowGrav(api) {
       const want = running() ? (on ? blink : .16) : locked ? 1 : stood ? .3 + .7 * Math.min(1, st.standT[k] / HOLD) : 0;
       st.lit[k] = Math.abs(want - st.lit[k]) < .004 ? want : THREE.MathUtils.damp(st.lit[k], want, on ? 30 : 5, dt);
       const dn = locked || stood ? 1 : 0; st.down[k] = dn ? Math.min(1, st.down[k] + dt * 2) : Math.max(0, st.down[k] - dt * 2);
+      q.col?.move(_mv.set(0, -SINK * st.down[k], 0));   // (every frame: the mover's carry is the change since its last move)
       if (st.down[k] !== q.sunk) {   // (a node under the map root: its matrix is ours to refresh)
         q.sunk = st.down[k]; const dy = -SINK * q.sunk;
         if (q.slab) { q.slab.o.position.y = q.slab.y0 + dy; q.slab.o.updateMatrix(); q.slab.o.updateMatrixWorld(true); }
@@ -183,7 +204,7 @@ export function setupLowGrav(api) {
     }
   });
   return { state: () => ({ on: st.on, inside: st.inside, left: lowOn() ? Math.round(ON - since()) : resting() ? Math.round(CYC - since()) : null, resting: resting(), pads: [...st.pads], stand: [...st.stand], hold: st.hold >= 0 ? +st.holdT.toFixed(2) : null,
-      triggered: cycles(), running: !!st.run, gravity: player.gravity, floaters: floaters.length, plates: plates.map((q, k) => ({ slab: !!q.slab, lit: +st.lit[k].toFixed(2), down: +st.down[k].toFixed(2) })), fx: fx.state() }), fx,
+      triggered: cycles(), running: !!st.run, gravity: player.gravity, floaters: floaters.length, plates: plates.map((q, k) => ({ slab: !!q.slab, col: !!q.col, lit: +st.lit[k].toFixed(2), down: +st.down[k].toFixed(2) })), fx: fx.state() }), fx,
     level: () => st.k,   // 0..1, eased: the room's light follows it (setupLook)
     force(on = true) { st.started = true; st.onAt = on ? st.t : -1; st.pads = new Set(on ? [0, 1, 2, 3] : []); st.stand.clear(); st.sent.clear(); } };
 }

@@ -172,6 +172,7 @@ export async function setupZombies(api) {   // (exported for the test page)
       }
     });
     e.templates = combos; e.heads = [];
+    const haloSet = () => { EYE_MAT.uniforms.haloOn.value = Math.round(settings.graphics ?? 2) < 1 ? 1 : 0; }; haloSet(); onSettingsChange(haloSet);   // Low graphics has no bloom: the eyes get a drawn halo
     api.host?.on('kill', ({ enemy }) => enemy?.root?.traverse(o => { if (o.name === 'castle_zombie_eyes') o.visible = false; }));   // the eyes go out with the zombie
     // their own gib pieces for the dismemberment mod (same keys as BO1's), re-bound the same way
     const KEYS = { upclean: 'upclean', lowclean: 'lowclean', behead: 'behead', larmoff_1: 'larmoff', rarmoff_1: 'rarmoff', llegoff_1: 'llegoff', rlegoff_1: 'rlegoff', legsoff_1: 'blegsoff' };
@@ -190,25 +191,29 @@ export async function setupZombies(api) {   // (exported for the test page)
 // texture, no billboard: one draw a zombie, and the bloom spreads it). Past about 300 units the vertex shader grows each
 // dome about its eye (up to 3x), so the pair still reads as two points across a courtyard instead of dropping under a
 // pixel. Its own small program, built at load with the zombie templates. `eyes` are in the template's world space.
-const EYE_R = .62, EYE_D = .4, EYE_BACK = .15, EYE_COL = [.28, 1.2, 4.2];
+const EYE_R = .62, EYE_D = .4, EYE_BACK = .15, EYE_COL = [.28, 1.2, 4.2], HALO_R = 2, HALO_K = .3;
 const EYE_MAT = new THREE.ShaderMaterial({
-  name: 'castle_zombie_eyes', vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { grow: { value: .0019 / EYE_R } },
-  vertexShader: 'attribute vec3 eye; uniform float grow; varying vec3 vCol;\nvoid main() {\n  vec4 c = modelViewMatrix * vec4(eye, 1.0), p = modelViewMatrix * vec4(position, 1.0);\n  p.xyz = c.xyz + (p.xyz - c.xyz) * clamp(-c.z * grow, 1.0, 3.0);\n  vCol = color; gl_Position = projectionMatrix * p;\n}',
-  fragmentShader: 'varying vec3 vCol;\nvoid main() {\n  gl_FragColor = vec4(vCol, 1.0);\n  #include <tonemapping_fragment>\n  #include <colorspace_fragment>\n}'
+  name: 'castle_zombie_eyes', vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { grow: { value: .0019 / EYE_R }, haloOn: { value: 0 } },
+  vertexShader: 'attribute vec3 eye; attribute vec3 halo; uniform float grow, haloOn; varying vec3 vCol; varying float vR;\nvoid main() {\n  vec4 c = modelViewMatrix * vec4(eye, 1.0), p = modelViewMatrix * vec4(position, 1.0);\n  float g = clamp(-c.z * grow, 1.0, 3.0);\n  p.xyz = mix(c.xyz + (p.xyz - c.xyz) * g, c.xyz + vec3(halo.xy * g * haloOn, 0.4), halo.z);\n  vCol = color * mix(1.0, haloOn, halo.z); vR = length(halo.xy) / ' + HALO_R.toFixed(2) + '; gl_Position = projectionMatrix * p;\n}',
+  fragmentShader: 'varying vec3 vCol; varying float vR;\nvoid main() {\n  float f = 1.0 - vR;\n  gl_FragColor = vec4(vCol * f * f * f, 1.0);\n  #include <tonemapping_fragment>\n  #include <colorspace_fragment>\n}'
 });
 function eyeGlow(eyes, head) {
   const hp = head.getWorldPosition(new THREE.Vector3()), f = eyes[0].clone().add(eyes[1]).multiplyScalar(.5).sub(hp).setY(0).normalize(), up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3().crossVectors(f, up);
-  const RINGS = [[0, 1], [.42, .78], [.9, .22], [Math.PI / 2, 0]], SEG = 10, toHead = head.matrixWorld.clone().invert(), pos = [], col = [], mid = [], idx = [];
+  const RINGS = [[0, 1], [.42, .78], [.9, .22], [Math.PI / 2, 0]], SEG = 10, toHead = head.matrixWorld.clone().invert(), pos = [], col = [], mid = [], halo = [], idx = [];
   for (const e of eyes) {
     const base = pos.length / 3, c = e.clone().addScaledVector(f, EYE_BACK), cl = c.clone().applyMatrix4(toHead);
     for (const [th, k] of RINGS) for (let s = 0; s < SEG; s++) {
       const ph = s / SEG * Math.PI * 2, p = c.clone().addScaledVector(f, EYE_D * Math.cos(th)).addScaledVector(side, Math.cos(ph) * EYE_R * Math.sin(th)).addScaledVector(up, Math.sin(ph) * EYE_R * Math.sin(th)).applyMatrix4(toHead);
-      pos.push(p.x, p.y, p.z); col.push(EYE_COL[0] * k, EYE_COL[1] * k, EYE_COL[2] * k); mid.push(cl.x, cl.y, cl.z);
+      pos.push(p.x, p.y, p.z); col.push(EYE_COL[0] * k, EYE_COL[1] * k, EYE_COL[2] * k); mid.push(cl.x, cl.y, cl.z); halo.push(0, 0, 0);
     }
     for (let r = 0; r < RINGS.length - 1; r++) for (let s = 0; s < SEG; s++) { const a = base + r * SEG + s, b = base + r * SEG + (s + 1) % SEG; idx.push(a, a + SEG, b, b, a + SEG, b + SEG); }
+    // the soft halo that stands in for the bloom on Low graphics: a fan facing the camera (placed in the shader), off unless `haloOn`
+    const hb = pos.length / 3;
+    for (let s = -1; s < SEG; s++) { const ph = s / SEG * Math.PI * 2, k = HALO_K; pos.push(cl.x, cl.y, cl.z); mid.push(cl.x, cl.y, cl.z); col.push(EYE_COL[0] * k, EYE_COL[1] * k, EYE_COL[2] * k); halo.push(s < 0 ? 0 : Math.cos(ph) * HALO_R, s < 0 ? 0 : Math.sin(ph) * HALO_R, 1); }
+    for (let s = 0; s < SEG; s++) idx.push(hb, hb + 1 + s, hb + 1 + (s + 1) % SEG);
   }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('eye', new THREE.Float32BufferAttribute(mid, 3)); g.setIndex(idx);
-  g.computeBoundingSphere(); g.boundingSphere.radius += EYE_R * 3;   // the grown domes stay inside the culling sphere
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('eye', new THREE.Float32BufferAttribute(mid, 3)); g.setAttribute('halo', new THREE.Float32BufferAttribute(halo, 3)); g.setIndex(idx);
+  g.computeBoundingSphere(); g.boundingSphere.radius += HALO_R * 3;   // the grown domes stay inside the culling sphere
   const m = new THREE.Mesh(g, EYE_MAT); m.name = 'castle_zombie_eyes'; m.castShadow = m.receiveShadow = false; m.renderOrder = 3;
   return m;
 }
@@ -1427,11 +1432,14 @@ export function setupTraps(api) {   // (exported for the test page)
   sync.on('mashOn', () => { if (mash.on > session.time) return; mash.on = session.time + 20; mash.cool = mash.on + 60; mash.t = 0; audio?.play?.('buy'); });
   // Rocket test fire
   const blast = at('CASTLE_ROCKETBLAST'), vents = []; root.traverse(o => { if (/^CASTLE_ROCKETFLAME_\d+$/.test(o.name)) vents.push(o.getWorldPosition(new THREE.Vector3())); });
-  const rocket = { armed: null, next: null, phase: null, t0: 0, re: null, cue: -1, alarm: -1, k: 0 }, tp = world.teleporters?.find(t => t.name === 'rocketpad');
+  const rocket = { armed: null, next: null, phase: null, t0: 0, re: null, cue: -1, alarm: -1, vo: -1, k: 0 }, tp = world.teleporters?.find(t => t.name === 'rocketpad');
   // the tunnel's blast doors: each a half disc (local x 0..256 out from its flat edge, y +-256, z 0..19 thick) that slides
   // along the door line until the flat edges meet. merge-props draws their pieces as instances (no meshes left under the
   // node), so the collider is a half cylinder of the same size on a scripted mover that follows the slide.
   const DOOR_SHUT = 10, DOOR_OPEN = 7.5, camera = api.camera;
+  // Maxis on the PA (vox_maxis_rocket_pa_*, the castle's English voice bank), at the script's times: the test begins,
+  // the doors, the count from ten at 9 s, "initiating" as the engine lights; "complete" when the burn ends
+  const PA = [[0, 'begin'], [7, 'doors'], ...['ten', 'nine', 'eight', 'seven', 'six', 'five', 'four', 'three', 'two', 'one'].map((n, i) => [9 + i, n]), [19, 'initiating']];
   const doors = [['CASTLE_SM_rocket_tunnel_door_l', -24.5, 92.5], ['CASTLE_SM_rocket_tunnel_door_r', 25.5, -92.5]].map(([name, dx, dz]) => {
     const o = root.getObjectByName(name); if (!o) return null;
     o.updateWorldMatrix(true, false);
@@ -1444,7 +1452,24 @@ export function setupTraps(api) {   // (exported for the test page)
   if (doors.length) { const seen = new Set(); scene.traverse(o => { for (const m of [o.material].flat()) if (m && !seen.has(m) && /a10_blast_door_(rim|quarter|tileable|lrg_gear|grate)/.test(m.name ?? '')) { seen.add(m); m.side = THREE.DoubleSide; } }); }
   const doorMid = doors.length === 2 ? doors[0].open.clone().add(doors[0].d).add(doors[1].open).add(doors[1].d).multiplyScalar(.5) : null;
   const doorU = doors.length === 2 ? doors[1].open.clone().sub(doors[0].open).setY(0) : null, doorGap = doorU?.length() ?? 0; doorU?.normalize();
+  // Zombies and the doors: the navmesh doesn't change, so a zombie's path still runs through the shut doors. While a
+  // leaf covers its place on the door line, a zombie is held on the side it came from, clear of the door (the host
+  // moves the zombies; a step of more than 150 past the door is a way round, not a way through).
+  const doorN = doorU ? new THREE.Vector3(doorU.z, 0, -doorU.x) : null, slab = [0, 0];
+  if (doorN) for (const d of doors) { const c = d.open.clone().sub(doorMid).dot(doorN), far = c + 19 * new THREE.Vector3(0, 0, 1).transformDirection(d.o.matrixWorld).dot(doorN); slab[0] = Math.min(slab[0], c, far); slab[1] = Math.max(slab[1], c, far); }
+  const holdZombies = k => {
+    if (!doorN || !sync.isHost) return;
+    const open = doorGap * (1 - k) / 2 - 12, lo = slab[0] - 30, hi = slab[1] + 30, mid = (slab[0] + slab[1]) / 2;
+    for (const z of enemies.list) {
+      const p = z.root.position, x = p.x - doorMid.x, dz = p.z - doorMid.z, c = x * doorN.x + dz * doorN.z, along = Math.abs(x * doorU.x + dz * doorU.z);
+      const at = c <= lo ? -1 : c >= hi ? 1 : 0, covered = k > 0 && along >= open && along < 300 && Math.abs(p.y - doorMid.y) < 300 && c > lo - 150 && c < hi + 150;
+      if (!covered) { z._doorSide = at || (c < mid ? -1 : 1); continue; }
+      const side = z._doorSide ??= at || (c < mid ? -1 : 1);
+      if (at !== side) { const to = (side < 0 ? lo : hi) - c; p.x += to * doorN.x; p.z += to * doorN.z; }
+    }
+  };
   const setDoors = k => {   // 0 open .. 1 shut
+    if (k > 0 || rocket.k > 0) holdZombies(k);
     if (k === rocket.k) { for (const d of doors) if (d.col && !d.col.prev.equals(d.col.offset)) d.col.move(d.off); return; }
     rocket.k = k;
     for (const d of doors) { d.off.copy(d.d).multiplyScalar(k); moveNode(d.o, d.p.copy(d.open).add(d.off)); if (d.col) { d.col.disabled = k <= 0; d.col.move(d.off); } }
@@ -1491,6 +1516,7 @@ export function setupTraps(api) {   // (exported for the test page)
       rocket.phase = t >= 20 ? 'fire' : 'warn';
       cue(0, 0, t, () => { announce?.('ROCKET TEST FIRE', 'CLEAR THE LAUNCH PAD · BLAST DOORS CLOSE IN 9 SECONDS', 5); });
       const a = t < 20 ? Math.floor(t / 4) : -1; if (a >= 0 && a !== rocket.alarm) { rocket.alarm = a; if (t - a * 4 < 1.5) sfxAt('rocket_alarm', doorMid ?? blast, camera, .5, 4500); }
+      while (rocket.vo + 1 < PA.length && t >= PA[rocket.vo + 1][0]) { rocket.vo++; if (t - PA[rocket.vo][0] < 1) sfx('rocket_pa_' + PA[rocket.vo][1], .7); }
       cue(1, 9, t, () => { if (nearRocket()) toast?.('The blast doors are closing · ignition in 11 seconds'); if (doorMid) { sfxAt('rocket_door_start', doorMid, camera, .8, 2600); doorHum = sfx('rocket_door_lp', 0); doorHum.loop = true; } });
       cue(2, 19, t, () => { doorHum?.pause(); doorHum = null; if (doorMid) sfxAt('rocket_door_stop', doorMid, camera, .9, 2600); });
       cue(3, 20, t, () => { sfxAt('rocket_ignite', blast, camera, 1, 6000); burn = sfx('rocket_burn_lp', 0); burn.loop = true; });
@@ -1511,8 +1537,8 @@ export function setupTraps(api) {   // (exported for the test page)
     }
     if (!rocket.phase) {
       if (rocket.cue >= 0 || rocket.alarm >= 0) {   // the burn just ended (or the test was cut short)
-        if (rocket.cue >= 3 && rocket.re != null && now - rocket.re < 1.5) { if (nearRocket()) toast?.('Rocket test complete · the blast doors are opening'); if (doorMid) { sfxAt('rocket_door_start', doorMid, camera, .8, 2600); doorHum?.pause(); doorHum = sfx('rocket_door_lp', 0); doorHum.loop = true; } }
-        rocket.cue = rocket.alarm = -1; rocketLight.intensity = 0; burn?.pause(); burn = null;
+        if (rocket.cue >= 3 && rocket.re != null && now - rocket.re < 1.5) { sfx('rocket_pa_complete', .7); if (nearRocket()) toast?.('Rocket test complete · the blast doors are opening'); if (doorMid) { sfxAt('rocket_door_start', doorMid, camera, .8, 2600); doorHum?.pause(); doorHum = sfx('rocket_door_lp', 0); doorHum.loop = true; } }
+        rocket.cue = rocket.alarm = rocket.vo = -1; rocketLight.intensity = 0; burn?.pause(); burn = null;
       }
       if (rocket.re != null) {
         const k = 1 - Math.min(1, Math.max(0, (now - rocket.re) / DOOR_OPEN));
@@ -1526,7 +1552,7 @@ export function setupTraps(api) {   // (exported for the test page)
   // the rocket: the host's schedule
   sync.shared('rocket', () => ({ next: rocket.next == null ? null : rocket.next - session.time, phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : 0, re: rocket.re == null ? null : session.time - rocket.re }),
     s => { rocket.next = s.next == null ? null : session.time + s.next; if (s.phase) { if (!rocket.phase) rocket.t0 = session.time - s.t; rocket.phase = s.phase; } else rocket.phase = null; if (s.re == null) rocket.re = null; else if (rocket.re == null) rocket.re = session.time - s.re; });
-  host.on('reset', () => { ray.on = ray.cool = 0; mash.on = mash.cool = 0; rocket.next = rocket.phase = rocket.re = null; rocket.cue = rocket.alarm = -1; hush(); setDoors(0); rocketLight.intensity = 0; if (tp) tp.locked = false; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
+  host.on('reset', () => { ray.on = ray.cool = 0; mash.on = mash.cool = 0; rocket.next = rocket.phase = rocket.re = null; rocket.cue = rocket.alarm = rocket.vo = -1; hush(); setDoors(0); rocketLight.intensity = 0; if (tp) tp.locked = false; for (const f of fx) f.o.removeFromParent(); fx.length = 0; });
   return { inTesla, teslaCells: () => cells.size, state: () => ({ ray: { on: ray.on > session.time, cool: Math.max(0, Math.round(ray.cool - session.time)) }, mash: { on: mash.on > session.time, gate: !!gate, buttons: btns.length }, rocket: { next: rocket.next && Math.round(rocket.next - session.time), phase: rocket.phase, t: rocket.phase ? session.time - rocket.t0 : null, door: rocket.k, switch: !!rocket.phase && session.time - rocket.t0 >= 6 } }),
     fireRocket: () => { rocket.next = session.time; } };
 }
