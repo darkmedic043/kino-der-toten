@@ -495,6 +495,30 @@ export async function renderPortrait(entry,data,size=160){
   renderer.dispose();renderer.forceContextLoss();c.dispose();return url;
 }
 
+// A waist-up hero shot of a character shouldering a weapon, seen from a low 3/4 angle on the gun side, as an image URL
+// (Armory preset cards, 2026-11-13). def is the weapon's def (null: empty hands). Transparent background.
+export async function renderHeroShot(entry,data,def,{width=300,height=380}={}){
+  const c=await createCharacter(entry,data);await variantTexturesReady();
+  c.root.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(c.root);
+  const tall=entry.type==='gltf'&&entry.height?entry.height:box.max.y-box.min.y,base=box.min.y;
+  const gun=def?await holdWeapon(c,entry,def).catch(()=>null):null;
+  c.hold?.(!!gun);try{c.pose?.({ads:gun?1:0});}catch{}
+  for(let i=0;i<6;i++)c.update(.2,0);   // let the aim envelope settle
+  const scene=new THREE.Scene();scene.add(c.root);c.root.updateMatrixWorld(true);
+  scene.add(new THREE.HemisphereLight(0xe6ddd0,0x2a1d17,1.5));
+  const key=new THREE.DirectionalLight(0xffe6c8,2.6);key.position.set(-110,150,130);scene.add(key);
+  const rim=new THREE.DirectionalLight(0xd04a38,2.4);rim.position.set(140,70,-110);scene.add(rim);
+  const back=new THREE.DirectionalLight(0x8fb0ff,1.1);back.position.set(-60,40,-160);scene.add(back);
+  // the character faces +Z and holds the gun in the right hand (-X): the camera sits front-right and a little low
+  const center=new THREE.Vector3(0,base+tall*.66,0),half=tall*.37,fov=30;
+  const camera=new THREE.PerspectiveCamera(fov,width/height,1,5000),dir=new THREE.Vector3(-Math.sin(.62),-.1,Math.cos(.62)).normalize();
+  camera.position.copy(center).addScaledVector(dir,half/Math.tan(THREE.MathUtils.degToRad(fov/2)));camera.lookAt(center.clone().add(new THREE.Vector3(0,tall*.02,0)));
+  const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});
+  renderer.setSize(width,height);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
+  try{renderer.render(scene,camera);return renderer.domElement.toDataURL('image/webp',.85);}
+  finally{renderer.dispose();renderer.forceContextLoss();c.dispose();}
+}
+
 // Third-person camera that orbits behind the gameplay (eye) camera.
 export class ThirdPersonCamera {
   constructor(camera){this.camera=new THREE.PerspectiveCamera();this.source=camera;this.distance=105;this.shoulder=38;}

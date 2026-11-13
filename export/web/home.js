@@ -31,6 +31,8 @@ addEventListener('kino-credits',()=>{try{renderProfile();}catch{}});
 import { loadResearchConfig } from './mods/research/research.js';
 import { renderResearch } from './mods/research/pane.js';
 import { mountShop } from './mods/shop/shop-tab.js';
+import { mountBarracks } from './mods/shop/barracks.js';
+import { mountPresets, activePresetName } from './armory-presets.js';
 import { mountPass, PASS_CSS } from './mods/pass/pass-tab.js';
 import { mountXpTokens, fmtLeft, xpLeft, XP_TOKEN_NAMES } from './mods/pass/xp-tokens.js';
 import { loadPass, savePass, loadSeasons, reconcile as reconcilePass, wrapUp as wrapUpPass, tokens as passTokens } from './mods/pass/pass.js';
@@ -44,7 +46,7 @@ function drawResearch(){const el=document.getElementById('research-root');if(el&
 import { getAccount, onAccountChange, renderSignInButton, signOut } from './cloud.js';
 import { renderCareer } from './career-view.js';
 import { loadGums, loadGumProfile, saveGumProfile, activePack, packTiers, canAdd, canRemove, gumById, passGums, unlockedGums } from './mods/gobblegums/gums.js';
-import { loadCharacterRegistry, createCharacter, armsUrl, tintArms, loadCharacterGltf, applyVariants, renderPortrait } from './characters.js';
+import { loadCharacterRegistry, createCharacter, armsUrl, tintArms, loadCharacterGltf, applyVariants, renderPortrait, renderHeroShot } from './characters.js';
 import { FirstPersonArms } from './fp-arms.js';
 import { loadClasses, loadClassProfile, saveClassProfile } from './mods/classes/classes.js';
 import { renderClasses, CLASS_CSS } from './mods/classes/tree-view.js';
@@ -106,10 +108,10 @@ addEventListener('focus',()=>{profile=loadProfile();renderProfile();renderLoadou
 const tabs=[...document.querySelectorAll('#tabs button')],panes=[...document.querySelectorAll('#armory-nav button')];
 // Armory holds Loadout, Classes and Operator as panes. Old links (#loadout, #classes,
 // #character) open the matching pane.
-const PANES={loadout:'loadout',weapons:'weapons',gums:'gums',research:'research',classes:'classes',operator:'operator',character:'operator'};
-let pane=PANES[location.hash.slice(1)]??'loadout';
+const PANES={presets:'presets',barracks:'barracks',loadout:'loadout',weapons:'weapons',gums:'gums',research:'research',classes:'classes',operator:'operator',character:'operator'};
+let pane=PANES[location.hash.slice(1)]??'presets';   // the ARMORY tab opens on the presets (2026-11-13)
 function showTab(name){
-  if(PANES[name]){pane=PANES[name];name='armory';}
+  if(PANES[name]){pane=PANES[name];name='armory';}else if(name==='armory')pane='presets';
   for(const b of tabs)b.classList.toggle('active',b.dataset.tab===name);
   for(const s of document.querySelectorAll('.tab'))s.classList.toggle('active',s.id==='tab-'+name);
   for(const b of panes)b.classList.toggle('active',b.dataset.pane===pane);
@@ -117,6 +119,8 @@ function showTab(name){
   const hash=name==='armory'?pane:name;if(location.hash!=='#'+hash)history.replaceState(null,'','#'+hash);
   stage.active=name==='armory'&&pane==='operator';if(stage.active)stage.start();
   if(name==='armory'&&pane==='research')drawResearch();
+  if(name==='armory'&&pane==='presets')drawPresets().catch(e=>console.warn('[presets]',e));
+  if(name==='armory'&&pane==='barracks')mountBarracks($('barracks-root'),{toast,onChange:()=>{applyMenuTheme();renderProfile();}}).catch(e=>console.warn('[barracks]',e));
   if(name==='shop')mountShop($('shop-root'),{toast,data}).catch(e=>console.warn('[shop]',e));
   if(name==='pass')mountPass($('pass-root'),{toast,data,weaponThumb:thumb}).catch(e=>console.warn('[pass]',e));
   if(name==='career')renderCareer($('career-root'),{mapList,weapons:baseData?.weapons??{}});
@@ -846,16 +850,52 @@ function renderMods(){
     ||'<p class="muted">No mods enabled.</p>';
 }
 
+// ---- Presets (armory-presets.js): three saved set-ups shown when the Armory opens --------------------------
+const classCfgP=loadClasses(new URL('mods/classes/',document.baseURI)).catch(()=>null);
+let classView=null;
+const ART_KEY='kino.presetArt',heroArt=new Map();let heroQueue=Promise.resolve();
+// the card picture: the preset's operator shouldering its starting pistol (rendered once, kept in localStorage, not synced)
+function presetPortrait(snap){
+  const entry=characters.find(c=>c.id===snap.character&&!isLocked(c))??equippedChar();if(!entry)return null;
+  const choice=profile.variants?.[entry.id]??null,wid=snap.loadout?.primary||'',key=JSON.stringify(['v1',entry.id,choice,wid]);
+  if(!heroArt.has(key)){
+    let kept={};try{kept=JSON.parse(localStorage.getItem(ART_KEY))??{};}catch{}
+    heroArt.set(key,kept[key]?Promise.resolve(kept[key]):heroQueue=heroQueue.then(async()=>{
+      const url=await renderHeroShot({...entry,choice},baseData,weapons[wid]??null);
+      try{const k=JSON.parse(localStorage.getItem(ART_KEY))??{},out=Object.fromEntries(Object.entries(k).slice(-7));out[key]=url;localStorage.setItem(ART_KEY,JSON.stringify(out));}catch{}
+      return url;}).catch(e=>{console.warn('[presets] portrait',e);heroArt.delete(key);return null;}));
+  }
+  return heroArt.get(key);
+}
+async function drawPresets(){
+  const cfg=await classCfgP;
+  mountPresets($('presets-root'),{portrait:presetPortrait,
+    describe:snap=>{
+      const cid=snap.cls?.selected,c=cfg?.classes.find(x=>x.id===cid),tree=c?.trees.find(t=>t.id===snap.cls?.loadouts?.[cid]?.action);
+      const op=characters.find(x=>x.id===snap.character),gun=weapons[snap.loadout?.primary];
+      return {cls:c?{name:c.name,color:c.color}:null,lines:[[op&&operatorOf(op).name,gun?.name].filter(Boolean).join(' · '),
+        [tree?.name,Array.isArray(snap.gums)&&snap.gums.length?snap.gums.length+' gums':'Auto gum pack'].filter(Boolean).join(' · ')]};},
+    setProfile:(character,loadout)=>{
+      const c=characters.find(x=>x.id===character);
+      if(c){profile.character=c.id;profile.skins={...profile.skins,[operatorOf(c).id]:c.id};}
+      if(loadout)profile.loadout=loadout;save();},
+    onSwitch:()=>{
+      profile=loadProfile();preview=null;renderProfile();renderLoadout();renderCharacters();
+      const cur=equippedChar();if(cur&&stage.character)showCharacter(cur);
+      classView?.redraw();drawResearch();drawPresets();toast(`${activePresetName()} is active`);},
+    onOpen:()=>showTab('loadout')});
+}
+
 renderProfile();renderMaps();renderHero();renderLoadout();renderCharacters();renderMods();renderCredits();
 showTab(['play','armory','shop','pass','career','social','mods','settings',...Object.keys(PANES)].includes(location.hash.slice(1))?location.hash.slice(1):'play');
 window.menu={profile:()=>profile,thumb,showTab,stage};
 
 // ---- Classes (mods/classes): skill trees; progress in its own storage key ------------------
 try{
-  const classCfg=await loadClasses(new URL('mods/classes/',document.baseURI));
+  const classCfg=await classCfgP;if(!classCfg)throw new Error('classes.json did not load');
   const style=document.createElement('style');style.textContent=CLASS_CSS;document.head.append(style);
   const view=renderClasses($('classes-root'),classCfg,{getState:()=>loadClassProfile(classCfg),setState:s=>saveClassProfile(s)});
-  addEventListener('focus',()=>view.redraw());
+  classView=view;addEventListener('focus',()=>view.redraw());
 }catch(error){console.warn('[classes]',error);$('classes-root').textContent='Classes unavailable: '+error.message;}
 
 // Controller navigation of the menu (gamepad-nav.js): D-pad / stick move the focus ring, A selects, B backs out of

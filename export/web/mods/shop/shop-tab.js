@@ -2,7 +2,7 @@
 // cosmetics: Featured (3 daily slots + the weekly bundle), seven categories, and Credits (challenges and the ledger).
 // Select an item to preview it in the drawer, buy it (two clicks), equip it here or where it lives (camos in the Gunsmith
 // or the Camos tab, outfits in the Operator pane). Rules: shop.js.
-import { loadCatalog, loadShop, saveShop, itemById, slotOf, rotation, listed, buy, toggleEquip, installRewards } from './shop.js';
+import { loadCatalog, loadShop, saveShop, itemById, slotOf, rotation, listed, unowned, buy, toggleEquip, installRewards } from './shop.js';
 import { loadCredits, saveCredits, loadCreditsConfig, currentChallenges, challengeText, nextReset } from '../credits/credits.js';
 import { loadCamos, camoSwatch, fillSwatches, weaponClass } from '../weapon-levels/camo.js';
 import { gunPreview } from '../weapon-levels/gun-preview.js';
@@ -78,11 +78,12 @@ function render(){
   $('sp-cats-select').innerHTML=CATS.map(c=>`<option value="${c.id}"${view===c.id?' selected':''}>${esc(c.name)}</option>`).join('');
   const body=$('sp-body');
   if(view==='featured'){
-    const bundleOwned=r.bundle.every(i=>s.owned.includes(i.id));
-    body.innerHTML=`<h2>TODAY <small>NEW IN ${fmtLeft(r.dailyEnds)}</small></h2><div class="sp-grid">${r.daily.map(i=>card(i,{tag:'TODAY'})).join('')}</div>
-      <h2>WEEKLY BUNDLE <small>NEW IN ${fmtLeft(r.weeklyEnds)}</small></h2><div class="sp-bundle"><div class="row">${r.bundle.map(i=>card(i,{tag:'BUNDLE'})).join('')}</div>
-      <div class="row"><span>All three for <b style="color:#f0c060">${r.bundlePrice.toLocaleString()}</b> credits (${Math.round((cat.bundle?.discount??.3)*100)}% off; anything you own is free)</span>
-      <button class="buy" data-buy="bundle"${bundleOwned?' disabled':''} style="margin-left:auto;min-height:44px;padding:10px 18px;border:1px solid #f0c060;background:#f0c06018;color:#f0c060;font:700 12px/1 inherit;letter-spacing:2px;cursor:pointer">${bundleOwned?'OWNED':'BUY BUNDLE'}</button></div></div>`;
+    const daily=unowned(r.daily,s),bundle=unowned(r.bundle,s),none='<p class="muted small">You own everything here. New items in ';
+    body.innerHTML=`<h2>TODAY <small>NEW IN ${fmtLeft(r.dailyEnds)}</small></h2>${daily.length?`<div class="sp-grid">${daily.map(i=>card(i,{tag:'TODAY'})).join('')}</div>`:none+fmtLeft(r.dailyEnds)+'.</p>'}
+      <h2>WEEKLY BUNDLE <small>NEW IN ${fmtLeft(r.weeklyEnds)}</small></h2>${bundle.length?`<div class="sp-bundle"><div class="row">${bundle.map(i=>card(i,{tag:'BUNDLE'})).join('')}</div>
+      <div class="row"><span>${bundle.length>1?`All ${bundle.length} for`:'Yours for'} <b style="color:#f0c060">${r.bundlePrice.toLocaleString()}</b> credits (${Math.round((cat.bundle?.discount??.3)*100)}% off)</span>
+      <button class="buy" data-buy="bundle" style="margin-left:auto;min-height:44px;padding:10px 18px;border:1px solid #f0c060;background:#f0c06018;color:#f0c060;font:700 12px/1 inherit;letter-spacing:2px;cursor:pointer">BUY BUNDLE</button></div></div>`:none+fmtLeft(r.weeklyEnds)+'.</p>'}
+      <p class="muted small">Things you own leave the shop: equip them in Armory → Barracks.</p>`;
   }else if(view==='credits'){
     const c=loadCredits();currentChallenges(ccfg,c);saveCredits(c);
     const list=kind=>c.challenges[kind].list.map(ch=>`<div class="c${ch.done?' done':''}"><span>${esc(challengeText(ccfg,ch))}</span><small>+${ccfg[kind]}</small><div class="bar"><i style="width:${(100*ch.p/ch.n).toFixed(1)}%"></i></div><span class="muted small">${ch.done?'DONE':`${Math.floor(ch.p).toLocaleString()} / ${ch.n.toLocaleString()}`}</span></div>`).join('');
@@ -91,7 +92,7 @@ function render(){
       <h2>HOW TO EARN</h2><p class="muted small">A match pays ${ccfg.payout.perRoundOver5} per round past 5 and ${ccfg.payout.perKill} per kill (up to ${ccfg.payout.cap}); the first time you reach rounds ${Object.keys(ccfg.milestones).join(', ')} on a map pays ${Object.values(ccfg.milestones).join(' / ')}; weapon prestige pays ${ccfg.prestige[1]} / ${ccfg.prestige[2]} / ${ccfg.prestige[3]} and a player prestige ${ccfg.prestige.player}. Nothing is earned in a game where cheats were used.</p>
       <h2>RECENT</h2><div class="sp-ledger">${c.ledger.slice(0,20).map(l=>`<div><b class="${l.n<0?'neg':''}">${l.n>0?'+':''}${l.n.toLocaleString()}</b> · ${esc(l.why)} · ${new Date(l.t).toLocaleDateString()}</div>`).join('')||'<div>Nothing yet. Play a match.</div>'}</div>`;
   }else{
-    const items=listed(cat,s).filter(i=>i.cat===view),today=[...r.daily,...r.bundle].filter(i=>i.cat===view&&!items.includes(i));
+    const items=listed(cat,s).filter(i=>i.cat===view),today=unowned([...r.daily,...r.bundle],s).filter(i=>i.cat===view&&!items.includes(i));
     body.innerHTML=`<h2>${esc(CATS.find(c=>c.id===view)?.name.toUpperCase())}</h2><div class="sp-grid">${[...today.map(i=>card(i,{tag:'TODAY'})),...items.map(i=>card(i))].join('')}</div>
       ${view==='sound'?'<p class="muted small">Music packs need your own music files; none ship yet.</p>':''}`;
   }

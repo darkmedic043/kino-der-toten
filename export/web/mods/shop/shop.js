@@ -38,11 +38,13 @@ export function rotation(cat,s=loadShop(),now=new Date()){
   const all=cat.items.filter(i=>!i.pass&&i.cat!=='pack');   // pass rewards are never sold; weapon packs stay in their own tab, at full price
   const daily=pick('d'+dayKey(now),all.filter(i=>i.cat!=='bundle'),cat.daily??3);
   const bundle=pick('w'+weekKey(now),all.filter(i=>!daily.includes(i)),cat.bundle?.size??3);
-  const bundlePrice=Math.round(bundle.reduce((a,i)=>a+i.price,0)*(1-(cat.bundle?.discount??.3))/10)*10;
+  const bundlePrice=Math.round(bundle.filter(i=>!s.owned.includes(i.id)).reduce((a,i)=>a+i.price,0)*(1-(cat.bundle?.discount??.3))/10)*10;
   return {daily,bundle,bundlePrice,dailyEnds:nextReset('daily',now),weeklyEnds:nextReset('weekly',now)};
 }
-// Items shown in the always-available catalogue: everything not marked rotating, plus anything owned.
-export const listed=(cat,s=loadShop())=>cat.items.filter(i=>(!i.rotating&&!i.pass)||s.owned.includes(i.id));   // pass items: only once owned (equip them here)
+// Items shown in the always-available catalogue: everything not marked rotating, minus anything owned (owned cosmetics
+// are equipped in Armory → Barracks; 2026-11-13). The seeded rotation keeps its picks, owned ones are just hidden.
+export const listed=(cat,s=loadShop())=>cat.items.filter(i=>!i.rotating&&!i.pass&&!s.owned.includes(i.id));
+export const unowned=(items,s=loadShop())=>items.filter(i=>!s.owned.includes(i.id));
 // Is this item purchasable now (in the catalogue or today's rotation)?
 export function forSale(cat,id,s=loadShop()){const r=rotation(cat,s);const i=itemById(cat)[id];return !!i&&!i.pass&&(!i.rotating||r.daily.includes(i)||r.bundle.includes(i));}
 

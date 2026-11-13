@@ -60,13 +60,24 @@
   <section id="tab-pass" class="tab"><div id="pass-root"></div></section>
   <section id="tab-armory" class="tab">
     <nav class="armory-nav" id="armory-nav">
-      <button data-pane="loadout" class="active">LOADOUT</button>
+      <button data-pane="presets" class="active" id="presets-btn">PRESETS</button>
+      <button data-pane="loadout">LOADOUT</button>
       <button data-pane="weapons">WEAPONS</button>
       <button data-pane="gums">GOBBLEGUMS</button>
       <button data-pane="research">RESEARCH</button>
       <button data-pane="classes">CLASSES</button>
       <button data-pane="operator">OPERATOR</button>
+      <button data-pane="barracks">BARRACKS</button>
     </nav>
+    <section id="pane-presets" class="pane">
+      <header class="tab-head"><span class="eyebrow">PRESETS</span><span class="muted small">Pick a preset to make it active · its operator, loadout, class and gums come with it</span></header>
+      <div id="presets-root"></div>
+    </section>
+
+    <section id="pane-barracks" class="pane">
+      <header class="tab-head"><span class="eyebrow">BARRACKS</span><span class="muted small">Your cosmetics · box colour, hit markers, emblem, calling card and more</span></header>
+      <div id="barracks-root"></div>
+    </section>
     <section id="pane-loadout" class="pane">
       <header class="tab-head"><span class="eyebrow">LOADOUT</span><span class="muted small">Applies to every map at the start of a game</span></header>
       <div class="loadout">

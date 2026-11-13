@@ -7,7 +7,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Area | File |
 |---|---|
 | Hosting, tunnel, Discord auth, cache headers, test browsers | `setup.md` |
-| Main menu, profile, mod loader, settings, keybinds, controller (native DualSense/Xbox, glyphs, menu navigation, aim assist with Deadshot head aim) | `core.md` |
+| Main menu, profile, Armory presets (3 saved set-ups, `armory-presets.js`), mod loader, settings, keybinds, controller (native DualSense/Xbox, glyphs, menu navigation, aim assist with Deadshot head aim) | `core.md` |
 | Custom maps (`CustomWorld`, markers, navmesh, traps, teleporters, floating debris doors, `propCollision` map-entry option, collision audit `.tools/col-audit.mjs`) | `custom-maps.md` |
 | Characters, motion model, procedural rig, FP arms, portraits | `characters.md` |
 | Lighting mod, baked irradiance volume, baked light volume of the BO3 ports (`map-volume.js`, `.tools/bake-map-light.mjs`: rebake after a map rebuild), beams, sun, viewmodel light, mystery box map bulbs, Moon lighting, the post chain (colour grade / film look `grade.js`, depth haze, viewmodel drawn inside the composer) | `lighting.md` |
@@ -27,7 +27,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | Reaper Collection perks: Prismatic Punch, Dam-A-Nade, Magnet Margarita and Electric Cherry implemented (Melon Pass unlocks, research augments; Cherry has no unlock; Magnet Margarita's power-up stash is on the command wheel, `mods/command-wheel`, hold U); Stone Cold Stronghold, Victorious Tortoise, Zombshell and Tactiquilla Sangria Melon Pass Season 1 unlocks (since 2026-11-08); the other 37 working but switched off (cheat `reaper`; one section each, `perks-plus/reaper-perks.js/.json`) | `reaper-perks.md` (mirrored in the Helm note "Perks", `c3fac4fc0b`: when the user asks, re-copy the whole file into it with a PATCH to `127.0.0.1:7690/api/notes/c3fac4fc0b`, `{content, force:true}`, owner token from `~/.config/helm/config.json`; too big for note_write) |
 | Journal: every map's Easter eggs step by step, recorded once done, tracking with on-screen markers (JOURNAL.EXE) | `journal.md` |
 | Research: perk, ammo mod and equipment augments (Phase 5; tabs PERKS / AMMO MODS / EQUIPMENT), one lethal slot (Claymores replace grenades) | `research.md` |
-| Credits, challenges and the Shop tab (Phase 6) | `shop.md` |
+| Credits, challenges and the Shop tab (Phase 6; owned items leave the Shop), Armory → Barracks (equip owned cosmetics) | `shop.md` |
 | The Melon Pass: season pages, tokens, premium (Phase 7); past seasons stay open with shared tokens (`seasons.json`); Season 1 "Storm & Toll" (`s2`, `.tools/build-season-s2.py`) live since 2026-11-08, Season 0 ended and premium 2000 | `pass.md` |
 | Player wiki at `/wiki/` (topic modules built from game data, menu link, checker `.tools/wiki-check.mjs`) | `wiki.md` |
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
