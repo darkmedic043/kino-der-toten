@@ -482,7 +482,7 @@ export async function holdWeapon(character,entry,def,hideTags=def?.hideTags){
 
 // A 3/4 head-and-shoulders portrait of a character as an image URL (for the HUD).
 export async function renderPortrait(entry,data,size=160){
-  const c=await createCharacter(entry,data);await variantTexturesReady();c.hold?.(false);c.update(.016,0);
+  const c=await createCharacter(entry,data);await variantTexturesReady();await restoreImages(c.root).catch(()=>{});c.hold?.(false);c.update(.016,0);
   const scene=new THREE.Scene();scene.add(c.root);c.root.updateMatrixWorld(true);
   scene.add(new THREE.HemisphereLight(0xe6ddd0,0x2a1d17,1.8));
   const key=new THREE.DirectionalLight(0xffe6c8,2.4);key.position.set(80,120,140);scene.add(key);
@@ -510,10 +510,14 @@ export async function renderPortrait(entry,data,size=160){
 export async function renderHeroShot(entry,data,def,{width=300,height=380}={}){
   const hp=entry.heroPose??null,cam=hp?.cam??{};
   const c=await createCharacter(entry,data);await variantTexturesReady();
+  // the menu's operator stage (the primary renderer) frees each texture's pixels after its upload, so this throwaway
+  // context drew a character it had shown black with only the rim lights (2026-11-13): bring them back first
+  await restoreImages(c.root).catch(()=>{});
   c.root.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(c.root);
   const tall=entry.type==='gltf'&&entry.height?entry.height:box.max.y-box.min.y,base=box.min.y;
   c.update(0,0);   // a bo1 rig's grip takes its scale on the first update: before it, the gun came out ~1/30 size
   const gun=def&&hp?.gun!==false?await holdWeapon(c,entry,def).catch(()=>null):null;
+  if(gun)await restoreImages(gun).catch(()=>{});
   c.hold?.(!!gun);try{c.pose?.(hp&&c.bo1?{ads:0,hero:hp}:{ads:gun?1:0});}catch{}
   for(let i=0;i<6;i++)c.update(.2,0);   // let the aim envelope settle
   if(hp?.yaw)c.root.rotation.y+=THREE.MathUtils.degToRad(hp.yaw);

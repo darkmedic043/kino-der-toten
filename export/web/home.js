@@ -857,7 +857,7 @@ const ART_KEY='kino.presetArt',heroArt=new Map();let heroQueue=Promise.resolve()
 // the card picture: the preset's operator shouldering its starting pistol (rendered once, kept in localStorage, not synced)
 function presetPortrait(snap){
   const entry=characters.find(c=>c.id===snap.character&&!isLocked(c))??equippedChar();if(!entry)return null;
-  const choice=profile.variants?.[entry.id]??null,wid=snap.loadout?.primary||'',key=JSON.stringify(['v3',entry.id,choice,wid]);
+  const choice=profile.variants?.[entry.id]??null,wid=snap.loadout?.primary||'',key=JSON.stringify(['v4',entry.id,choice,wid]);
   if(!heroArt.has(key)){
     let kept={};try{kept=JSON.parse(localStorage.getItem(ART_KEY))??{};}catch{}
     heroArt.set(key,kept[key]?Promise.resolve(kept[key]):heroQueue=heroQueue.then(async()=>{
