@@ -44,7 +44,7 @@ export function setupGardener(ctx){
   const plants=[],inv={},pity={},shots=[],drops=[],burred=new Map(),gulped=new Map(),dots=new Map();
   const MELT=['fertilizer','compost','sap','pollen'];
   let feast=0,bloodNext=0,saveUntil=-1,rushUntil=-1,placing=null,sunBank=0,uid=0,beamSent=0;
-  const emptyInv=()=>{for(const k of ITEMS)inv[k]=0;if(S()['garden.stock']){inv.packet=1;inv.fertilizer=1;}};
+  const emptyInv=()=>{for(const k of ITEMS)inv[k]=0;};
   emptyInv();
 
   // ---- pooled effects, all built at load -----------------------------------------------------------------------------
@@ -83,18 +83,17 @@ export function setupGardener(ctx){
   const sunMul=()=>1+sun()*cls.resource.per.plant*(1+(S()['garden.sunPower']??0));
   function power(p){
     const s=S();let k=p.r.power*stagePower(G,s,Math.max(1,p.stage))*sunMul()*(1+(p.spikes??0)+(p.fed??0));
-    if(s['garden.variety'])k*=1+s['garden.variety']*new Set(plants.map(x=>x.r.id)).size;
     if(session.time<rushUntil)k*=1+G.fixtures.bloomRage.power;
     return k;
   }
   function raw(p,z,dmg,plain){
     if(!alive(z))return false;
     if(!plain&&p.r.fx.bone&&Math.random()<.2)dmg*=2;
+    const s=S();if(s['garden.dust']&&z.dustUntil>session.time)dmg*=1+s['garden.dust'];   // Pollen Rounds
     enemies.hurt(z,dmg,false,false,'fortify',false);
     const killed=!alive(z);
     ctx.onHit?.(z,killed);
-    if(killed)session.addPoints?.(50);
-    else if(S()['garden.rootSlow']&&session.time>(z.rootNext??0)){z.rootNext=session.time+1.5;Z.order('root',z,{d:2,k:S()['garden.rootSlow']});}
+    if(killed){session.addPoints?.(50);if(s['garden.windfall'])windfall(s['garden.windfall']);}
     if(!plain)flavour(p,z,dmg);
     return killed;
   }
@@ -117,7 +116,7 @@ export function setupGardener(ctx){
   }
   const free=z=>alive(z)&&!z.swallowed&&!z.thrall&&!(z.netFlags&3)&&!gulped.has(z);
   const within=(p,r,kinds=true)=>enemies.list.filter(z=>free(z)&&z.root.position.distanceTo(p.at)<r&&(kinds||z.kind!=='dog'));
-  const nearest=(p,list)=>list.sort((a,b)=>a.root.position.distanceToSquared(p.at)-b.root.position.distanceToSquared(p.at));
+  const nearest=(p,list)=>{const t=session.time,dust=!!S()['garden.dust'];return list.sort((a,b)=>(dust?((b.dustUntil>t)-(a.dustUntil>t))*1e9:0)+a.root.position.distanceToSquared(p.at)-b.root.position.distanceToSquared(p.at));};   // Pollen Rounds: dusted zombies first
   const chest=z=>z.root.position.clone().addScaledVector(up,42);
   const tip=p=>p.at.clone().addScaledVector(up,p.top);
   function use(p){if(--p.uses<=0)kill(p);}
@@ -142,7 +141,7 @@ export function setupGardener(ctx){
     thorn(p,dt,d){
       if((p.t-=dt)>0)return;p.t=.5;
       const mark=session.time+(p.stage>=3?3:.8);
-      for(const z of nearest(p,within(p,p.r.range)).slice(0,d.targets)){z.thornMark=mark;z.thornK=d.mark+(S()['garden.markBonus']??0);hit(p,z,d.dps*.5);}
+      for(const z of nearest(p,within(p,p.r.range)).slice(0,d.targets)){z.thornMark=mark;z.thornK=d.mark;hit(p,z,d.dps*.5);}
     },
     bulb(){},   // Sunlight and shade are in the shared tick below
     burr(p,dt,d){
@@ -163,7 +162,7 @@ export function setupGardener(ctx){
     },
     mint(){},   // fed by the kill handler, emptied by a pat
     gourd(p,dt,d){
-      const cap=d.swallow+(S()['garden.gourdCap']??0);p.inside??=[];
+      const cap=d.swallow;p.inside??=[];
       if((p.t-=dt)<=0&&p.inside.length<cap){
         const z=nearest(p,within(p,p.r.range,false)).find(z=>z.kind==='zombie'&&!z.ai&&!['barricade','entering','rising'].includes(z.state));
         if(z){p.t=d.gulp;release(z);gulped.set(z,p);p.inside.push(z);p.fuse??=d.fuse;Z.order('swallow',z,{at:p.at.toArray().map(Math.round),pid:p.uid,d:d.fuse+30});pulse(p.at,60,0xff7a2a,.3);audio.play('buy',.1);}
@@ -252,7 +251,6 @@ export function setupGardener(ctx){
     for(const z of p.chewers)release(z);p.chewers.clear();
     if(p.inside?.length){const list=p.inside;p.inside=[];for(const z of list)free2(z);}
     if(opts.uproot)return;
-    if(S()['garden.deathBlast']&&p.stage>0)ctx.blast?.(p.at.clone().addScaledVector(up,20),160,G.fixtures.deathBlast,true);
     if(!opts.silent)dropAt('compost',p.at);
     bench.refresh();
   }
@@ -296,6 +294,7 @@ export function setupGardener(ctx){
     const s=S();if(z&&s['garden.chewHurt'])hit(p,z,s['garden.chewHurt']);
     if(s['garden.dodge']&&Math.random()<s['garden.dodge'])return;
     if(p.r.fx.mulch&&Math.random()<.5)return;
+    if(s['garden.shareBites']&&plants.length>1)p=plants.reduce((a,b)=>b.hits>a.hits?b:a,p);   // Root Network
     p.hits-=1;p.shake=1;if(p.hits<=0)kill(p);
   }
   // zombies stop to chew what they walk into (held as fortifier.js holds them at a wall; the host decides)
@@ -327,6 +326,12 @@ export function setupGardener(ctx){
   Z.zones.push(()=>plants.map(p=>({at:p.at,range:p.r.range,slow:slowOf(p)})));
 
   // ---- ingredients and kills -----------------------------------------------------------------------------------------
+  // Living Shield: a grown plant within 260 takes part of the hit (a hit for every 20 damage)
+  host.on('beforeDamage',e=>{
+    const k=S()['garden.shield'];if(!k||!(e.amount>0)||session.time<saveUntil)return;
+    const f=feet();let p=null,bd=260;for(const o of plants)if(o.stage>0){const d=o.at.distanceTo(f);if(d<bd){bd=d;p=o;}}
+    if(!p)return;const moved=e.amount*k;e.amount-=moved;p.hits-=Math.max(1,Math.round(moved/20));p.shake=1;pulse(p.at,60,0x9fe06a,.3);if(p.hits<=0)kill(p);
+  });
   // The World Root holds you up once a round; hurt with Blood Meal known, you can bleed one out
   host.on('beforeDamage',e=>{
     if(!(e.amount>0))return;
@@ -339,7 +344,14 @@ export function setupGardener(ctx){
   host.on('beforeEnemyDamage',e=>{
     const z=e.enemy;if(!z)return;
     if(e.cause==='bullet'){
-      if(!host.remoteDamage){shots.push({t:session.time,amount:e.amount});if(shots.length>40)shots.shift();}
+      if(!host.remoteDamage){
+        shots.push({t:session.time,amount:e.amount});if(shots.length>40)shots.shift();
+        const s=S(),t=session.time;
+        if(s['garden.dust'])z.dustUntil=t+4;   // Pollen Rounds
+        if(t<rushUntil)e.amount*=1+G.fixtures.bloomRage.power;   // Sap Rush: guns too
+        if(s['garden.sunGun'])e.amount*=1+sun()*cls.resource.per.plant;   // Greenhouse Effect
+        if(e.head&&s['garden.echo'])queueMicrotask(()=>echo(z,s));   // Call and Answer
+      }
       if(z.thornMark>session.time)e.amount*=1+(z.thornK??0);
       if(gulped.has(z))queueMicrotask(()=>{const p=gulped.get(z);if(p&&plants.includes(p))burst(p);});
     }
@@ -351,7 +363,7 @@ export function setupGardener(ctx){
     const z=e.enemy,s=S(),at=z?.root?.position??e.at;if(!at||z?.thrall)return;
     const tags=e.tags??Z.tags(z);
     const close=plants.filter(p=>p.at.distanceTo(at)<G.drops.near);
-    gainSun(G.sunPerKill);
+    gainSun(G.sunPerKill+(s['garden.photo']?1:0));   // Photosynthesis: +1
     for(const p of close){
       if(p.stage>0)p.age+=G.ageKill*p.r.ageRate;
       const inReach=p.at.distanceTo(at)<p.r.range;
@@ -376,7 +388,7 @@ export function setupGardener(ctx){
       if(!near&&d.life>0)continue;
       d.s.removeFromParent();drops.splice(i,1);
       if(near&&d.id==='golden'){session.addPoints?.(G.plants.patriarch.bonus);inv.rare=Math.min(G.drops.cap,(inv.rare??0)+1);inv.mutagen=Math.min(G.drops.cap,(inv.mutagen??0)+1);say('Golden Melon',1.6);audio.play('round',.4);bench.refresh();}
-      else if(near){inv[d.id]=Math.min(G.drops.cap,(inv[d.id]??0)+1);say('+1 '+(G.additives[d.id]?.name??G.items[d.id]?.name),1.1);audio.play('buy',.2);bench.refresh();}
+      else if(near){inv[d.id]=Math.min(G.drops.cap,(inv[d.id]??0)+1);say('+1 '+(G.additives[d.id]?.name??G.items[d.id]?.name),1.1);audio.play('buy',.2);if(d.id==='compost')compostHeap();bench.refresh();}
     }
   }
 
@@ -449,6 +461,30 @@ export function setupGardener(ctx){
   // Seed Catalogue: what you have ever planted stays in the book
   function found(id){const st=ctx.state();st.found??=[];if(!st.found.includes(id)){st.found.push(id);ctx.saveClass?.();}}
 
+  // ---- augments that reach past the garden ----------------------------------------------------------------------------
+  function echo(z,s){   // Call and Answer: every grown plant in reach answers a headshot
+    const t=session.time;if(!alive(z))return;
+    for(const p of plants){
+      if(p.stage<1||t<(p.echoNext??0)||p.at.distanceTo(z.root.position)>=p.r.range||!world.lineClear(tip(p),chest(z)))continue;
+      p.echoNext=t+.5;beam(tip(p),chest(z),0xb8ff7a,.1,.9);if(s['garden.echoDust'])z.dustUntil=t+4;hit(p,z,s['garden.echo']);if(!alive(z))break;
+    }
+  }
+  function windfall(n){   // a plant kill puts rounds back in the held gun's magazine and gives a Sunlight
+    const w=session.weapon,clip=session.def?.clipSize;
+    if(w&&clip>0&&Number.isFinite(w.mag))w.mag=Math.min(clip,w.mag+n);
+    gainSun(1);
+  }
+  function compostHeap(){
+    const k=S()['garden.compost'];if(!k)return;
+    ctx.trimCooldown?.((ctx.getCooldown?.()??0)*k);gainSun(10);
+  }
+  function grab(p,s){   // Strangler Roots
+    const t=session.time;if(p.stage<1||t<(p.grabNext??0))return;
+    const z=nearest(p,within(p,p.r.range)).find(z=>!(z.rootUntil>t));
+    if(!z){p.grabNext=t+.5;return;}
+    p.grabNext=t+Math.max(1,s['garden.grab']);Z.order('root',z,{d:1.5,k:1});beam(tip(p),z.root.position.clone().addScaledVector(up,8),0x6fbf4a,.3,1.6);
+  }
+
   // ---- bloom, uproot, pat --------------------------------------------------------------------------------------------
   function bloom(){
     const s=S(),cost=bloomCost(G,s);
@@ -460,11 +496,12 @@ export function setupGardener(ctx){
       pulse(p.at,110,0xffe27a,.8);
     }
     if(s['garden.bloomRage'])rushUntil=session.time+G.fixtures.bloomRage.time;
+    if(s['garden.bloomHeal']){if(session.health>0)session.health=session.maxHealth;ctx.trimCooldown?.((ctx.getCooldown?.()??0)*.5);}   // Second Bloom
     audio.play('round',.3);say('BLOOM',1.2);bench.refresh();return true;
   }
   function uproot(p){
     const s=S();
-    if(s['garden.refund']){const need=G.rarity[p.r.rarity].needs;if(need)inv[need]=Math.min(G.drops.cap,(inv[need]??0)+1);ctx.trimCooldown?.((ctx.getCooldown?.()??0)*.5);}
+    if(s['garden.compost']&&p.stage>0)dropAt('compost',p.at);   // Compost Heap
     kill(p,{uproot:true});bench.refresh();
   }
   // A pat is any melee swing, seen from the session: mods/melee replaces view.melee after this mod loads.
@@ -489,9 +526,10 @@ export function setupGardener(ctx){
     chew();
     const swing=session.meleeLeft>0;if(swing&&!swinging)patAt=session.time+.18;swinging=swing;
     if(patAt&&session.time>=patAt){patAt=0;pat();}
-    let sunRate=0;
+    let sunRate=0;const s=S();
     for(const p of [...plants]){
       grow(p,dt);
+      if(s['garden.grab'])grab(p,s);
       if(p.r.id==='bulb'&&p.stage>0)sunRate+=p.r.def.sun*stagePower(G,S(),p.stage);
       // growing in, flinching, a bite or a bounce: only the plant's own node moves
       p.pop=Math.min(1,p.pop+dt*2.6);p.shake=Math.max(0,p.shake-dt*4);p.snap=Math.max(0,(p.snap??0)-dt*3.2);p.spring=Math.max(0,(p.spring??0)-dt*3);
@@ -499,6 +537,7 @@ export function setupGardener(ctx){
       p.node.scale.set(k*(1+p.snap*.18),k*(1-p.snap*.14+p.spring*.4)*(p.fit??1),k*(1+p.snap*.18));
       if(p.mesh)p.mesh.rotation.z=Math.sin(session.time*40)*.05*p.shake;
     }
+    if(s['garden.photo']&&session.health>0&&sun()>=50)heal(s['garden.photo']*dt);   // Photosynthesis
     if(sunRate){sunBank+=Math.min(P.bulb.sunCap,sunRate)*dt;if(sunBank>=1){const n=Math.floor(sunBank);sunBank-=n;gainSun(n);}}
     for(const [z,b] of burred){
       if(!alive(z)){

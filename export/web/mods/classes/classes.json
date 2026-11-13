@@ -4149,11 +4149,12 @@
         {
           "id": "gsMixed",
           "a": "oTwin",
-          "b": "oMixed",
-          "name": "Mixed Planting",
-          "desc": "Cross-Pollinate gives +2% more per plant.",
+          "b": "oBurst",
+          "name": "Crossfire",
+          "desc": "Call and Answer hits for 9% and dusts the zombie.",
           "effects": {
-            "garden.variety": 0.02
+            "garden.echo": 0.03,
+            "garden.echoDust": 1
           }
         },
         {
@@ -4161,9 +4162,9 @@
           "a": "tBramble",
           "b": "tRoot",
           "name": "Hedgerow",
-          "desc": "Root Snare slows 10% more.",
+          "desc": "Strangler Roots grabs every 3.5 s.",
           "effects": {
-            "garden.rootSlow": 0.1
+            "garden.grab": -1.5
           }
         },
         {
@@ -4252,12 +4253,12 @@
             },
             {
               "id": "oTwin",
-              "name": "Twin Pods",
+              "name": "Call and Answer",
               "ranks": 1,
-              "icon": "double",
-              "desc": "Wilting plants get 2 more uses.",
+              "icon": "target",
+              "desc": "Your headshots echo: every grown plant that can reach the zombie hits it for 6% of a zombie’s health.",
               "effects": {
-                "garden.wiltUses": 2
+                "garden.echo": 0.06
               },
               "tier": 2,
               "type": "augment"
@@ -4286,12 +4287,12 @@
             },
             {
               "id": "oBurst",
-              "name": "Seed Burst",
+              "name": "Pollen Rounds",
               "ranks": 1,
-              "icon": "bomb",
-              "desc": "A plant that dies bursts for 20% of a zombie’s health, 160 around it.",
+              "icon": "crosshair",
+              "desc": "Zombies you shoot are dusted with pollen for 4 s: plants go for them first and deal +25% damage to them.",
               "effects": {
-                "garden.deathBlast": 1
+                "garden.dust": 0.25
               },
               "tier": 3,
               "type": "augment"
@@ -4309,12 +4310,12 @@
             },
             {
               "id": "oMixed",
-              "name": "Cross-Pollinate",
+              "name": "Windfall",
               "ranks": 1,
-              "icon": "heart",
-              "desc": "Plants deal +4% damage for each different plant in your garden.",
+              "icon": "recycle",
+              "desc": "Every kill by a plant puts 2 rounds back in your magazine and gives 1 more Sunlight.",
               "effects": {
-                "garden.variety": 0.04
+                "garden.windfall": 2
               },
               "tier": 4,
               "type": "augment"
@@ -4334,8 +4335,8 @@
               "id": "oRush",
               "name": "Sap Rush",
               "ranks": 1,
-              "icon": "target",
-              "desc": "Bloom gives every plant +30% damage for 10 s.",
+              "icon": "flame",
+              "desc": "Bloom gives every plant and your guns +30% damage for 10 s.",
               "effects": {
                 "garden.bloomRage": 1
               },
@@ -4469,12 +4470,12 @@
             },
             {
               "id": "tBramble",
-              "name": "Brambles",
+              "name": "Hedge Cover",
               "ranks": 1,
-              "icon": "snare",
-              "desc": "Grudge Thorn’s mark is 15% stronger.",
+              "icon": "shield",
+              "desc": "You take 20% less damage within 260 of a plant.",
               "effects": {
-                "garden.markBonus": 0.15
+                "player.armorNear": 0.2
               },
               "tier": 2,
               "type": "augment"
@@ -4504,12 +4505,12 @@
             },
             {
               "id": "tRind",
-              "name": "Thick Rind",
+              "name": "Root Network",
               "ranks": 1,
               "icon": "nest",
-              "desc": "Hollow Gourds hold 2 more zombies.",
+              "desc": "Your plants share their bites: each bite comes off whichever plant has the most health left.",
               "effects": {
-                "garden.gourdCap": 2
+                "garden.shareBites": 1
               },
               "tier": 3,
               "type": "augment"
@@ -4527,12 +4528,12 @@
             },
             {
               "id": "tRoot",
-              "name": "Root Snare",
+              "name": "Strangler Roots",
               "ranks": 1,
               "icon": "snare",
-              "desc": "Zombies hurt by a plant are slowed 20% for 2 s.",
+              "desc": "Every 5 s each grown plant grabs the nearest zombie in its reach and holds it still for 1.5 s.",
               "effects": {
-                "garden.rootSlow": 0.2
+                "garden.grab": 5
               },
               "tier": 4,
               "type": "augment"
@@ -4550,12 +4551,12 @@
             },
             {
               "id": "tGuard",
-              "name": "Hedge Fighter",
+              "name": "Living Shield",
               "ranks": 1,
-              "icon": "crosshair",
-              "desc": "+12% gun damage within 260 of a plant.",
+              "icon": "wall",
+              "desc": "Within 260 of a grown plant, half the damage you take goes to the nearest one instead (a hit for every 20).",
               "effects": {
-                "player.damageNear": 0.12
+                "garden.shield": 0.5
               },
               "tier": 5,
               "type": "augment"
@@ -4686,12 +4687,12 @@
             },
             {
               "id": "gMove",
-              "name": "Transplant",
+              "name": "Photosynthesis",
               "ranks": 1,
-              "icon": "wrench",
-              "desc": "Uprooting gives back the Seed Packet or Rare Seed and half the cooldown.",
+              "icon": "sprout",
+              "desc": "Your kills give 1 more Sunlight, and with 50 Sunlight or more you heal 3 health a second.",
               "effects": {
-                "garden.refund": 1
+                "garden.photo": 3
               },
               "tier": 2,
               "type": "augment"
@@ -4720,12 +4721,12 @@
             },
             {
               "id": "gStock",
-              "name": "Stocked Shelf",
+              "name": "Compost Heap",
               "ranks": 1,
-              "icon": "gear",
-              "desc": "Start each match with a Seed Packet and a Fertilizer.",
+              "icon": "recycle",
+              "desc": "Picking up compost takes 40% off the bench cooldown and gives 10 Sunlight. Uprooting a grown plant leaves compost too.",
               "effects": {
-                "garden.stock": 1
+                "garden.compost": 0.4
               },
               "tier": 3,
               "type": "augment"
@@ -4746,7 +4747,7 @@
               "name": "Second Bloom",
               "ranks": 1,
               "icon": "heart",
-              "desc": "Bloom also heals every plant fully.",
+              "desc": "Bloom also heals you and every plant fully and takes 50% off the bench cooldown.",
               "effects": {
                 "garden.bloomHeal": 1
               },
@@ -4767,12 +4768,13 @@
             },
             {
               "id": "gStrain",
-              "name": "Hybrid Strain",
+              "name": "Greenhouse Effect",
               "ranks": 1,
-              "icon": "gear",
-              "desc": "Every recipe takes a third ingredient.",
+              "icon": "bolt",
+              "desc": "Sunlight powers your guns as it does your plants (+0.2% damage a point), and you reload 25% faster within 260 of a plant.",
               "effects": {
-                "garden.slots": 1
+                "garden.sunGun": 1,
+                "player.reloadNear": 0.25
               },
               "tier": 5,
               "type": "augment"
