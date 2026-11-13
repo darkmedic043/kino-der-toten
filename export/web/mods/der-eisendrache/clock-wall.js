@@ -62,9 +62,9 @@ export async function loadClockWall(at = WALL_AT) {
   return { holder, rig, set, update, length, tris };
 }
 
-export function setupClockWall({ scene, host, camera, world }, { bows, sfxAt } = {}) {
+export function setupClockWall({ scene, host, camera, world, sync }, { bows, sfxAt } = {}) {
   if (/[?&]noClockWall/.test(location.search)) return null;
-  let wall = null, first = true;
+  let wall = null, first = true, grace = 0;
   const at = new THREE.Vector3().fromArray(WALL_AT);
   const ready = loadClockWall().then(w => {
     if (!w) return;
@@ -79,9 +79,12 @@ export function setupClockWall({ scene, host, camera, world }, { bows, sfxAt } =
   });
   host.on('update', dt => {
     if (!wall) return;
-    const stage = bows?.state?.().rune?.stage ?? 'idle';
-    if (wall.set(stage !== 'idle', first)) sfxAt?.('wall_explo', at, camera, .9, 2600);
-    first = false; wall.update(typeof dt === 'number' ? dt : 1 / 60);
+    const stage = bows?.state?.().rune?.stage ?? 'idle', step = typeof dt === 'number' ? dt : 1 / 60;
+    // A guest gets the game's earlier events a moment after it starts (sync.js, the host's log): a wall broken before it
+    // joined shows broken, without the blast playing again.
+    if (first) grace = sync?.online && !sync.isHost ? 5 : 0;
+    if (wall.set(stage !== 'idle', first || grace > 0)) sfxAt?.('wall_explo', at, camera, .9, 2600);
+    first = false; grace -= step; wall.update(step);
   });
   host.on('reset', () => { first = true; });
   return { ready, model: () => wall?.holder ?? null };

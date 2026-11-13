@@ -41,6 +41,7 @@ try {
   // decoded sounds are the next biggest part of the base game's load: every sound becomes 0.1 s of silence (AUDIO=1 keeps them)
   if (!process.env.REAL && !process.env.AUDIO) await p.addInitScript(() => { for (const C of [globalThis.AudioContext, globalThis.OfflineAudioContext, globalThis.BaseAudioContext]) { if (!C?.prototype?.decodeAudioData || C.prototype.decodeAudioData.tiny) continue;
     const f = function (buf, ok, err) { const b = this.createBuffer(1, 2205, 22050); ok?.(b); return Promise.resolve(b); }; f.tiny = true; C.prototype.decodeAudioData = f; } });
+  if (process.env.INIT) await p.addInitScript(fs.readFileSync(process.env.INIT, 'utf8'));   // INIT=<file>: a script run in the page before the game's own (a stand-in for a system the test page lacks)
   await p.goto('http://127.0.0.1:5190/');
   await p.evaluate(q => { localStorage.clear(); const s = {}; s.graphics = q; s.renderScale = .5; localStorage.setItem('kino.settings', JSON.stringify(s)); }, Q);
   await p.goto('http://127.0.0.1:5190/play.html?map=' + MAP);
