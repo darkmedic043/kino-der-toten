@@ -380,7 +380,7 @@
     {"id": "s2.counterfeit", "name": "Counterfeit", "shop": "pass.s2.camo.counterfeit", "pass": "s2", "challenge": "pass", "procedural": "counterfeit", "scale": 2, "mix": 0.95},
     {"id": "s2.wax", "name": "Wax", "shop": "pass.s2.camo.wax", "pass": "s2", "challenge": "pass", "procedural": "wax", "scale": 2, "mix": 0.95}
   ],
-  "_altNote": "alt: weapon id -> {challenge: replacement}, for guns that can't do a challenge (no headshots from a Thundergun blast, or from launchers and explosive bolts, whose kills are nearly all blasts); progress counts on the replacement",
+  "_altNote": "alt: weapon id -> {challenge: replacement}, for guns that can't do a challenge (no headshots from a Thundergun blast, or from launchers and explosive bolts, whose kills are nearly all blasts); progress counts on the replacement. A replacement is the other challenge's key, or [key, count] where the gun needs its own number (melee weapons: no headshots, and crowd kills come slower by hand)",
   "alt": {
     "thundergun_zm": {
       "headshots": "crowd"
@@ -432,6 +432,24 @@
     },
     "bo3_bow_demon": {
       "headshots": "crowd"
+    },
+    "hive_launcher_zm": {
+      "headshots": "crowd"
+    },
+    "aw_maaws": {
+      "headshots": "crowd"
+    },
+    "aw_mahem": {
+      "headshots": "crowd"
+    },
+    "aw_stingerm7": {
+      "headshots": "crowd"
+    },
+    "melee_knife": {
+      "headshots": ["crowd", 50]
+    },
+    "melee_grave_bell": {
+      "headshots": ["crowd", 100]
     }
   },
   "wrap": {

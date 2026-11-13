@@ -152,10 +152,24 @@ export default async function setup(api){
   const lastHit=new WeakMap();
   host.on('beforeEnemyDamage',e=>{if(e.enemy)lastHit.set(e.enemy,{cause:e.cause,id:session.weapon?.id});});
   const lastKill=new Map(),crowds=new Map();
+  // Kills that land after the shot (2026-11-13): a rocket's blast, a Havoc charge, burning and the Hive's drones kill a moment
+  // (or ten seconds) later, so "while crouched" and "while sliding" were down to luck for them, and the Hive's drones stopped
+  // counting the moment another gun was drawn. Such a kill also counts the stance its gun's last shot was fired in (LATE s);
+  // a cause only one carried gun names ('hive': ownerOf) is that gun's kill whatever is in hand, and a blast or fire kill
+  // with a gun in hand that deals neither goes to the carried gun that does and was fired in the last LATE s (recentOf).
+  const stance=()=>{const mv=window.kino.movement?.state;return {low:!!(mv?.prone||api.player?.crouched),moving:!!(mv?.sliding||mv?.diving)};};
+  const shotStance=new Map();
+  (host.fireHooks??=[]).unshift(()=>{if(session.weapon)shotStance.set(session.weapon.id,{...stance(),t:performance.now()/1000});return false;});
+  const causesOf=(d,gid)=>d?.killCauses??KILL_CAUSES[d?.baseId??gid]??KILL_CAUSES[gid]??[];
+  const SHARED=new Set(['explosion','fire','melee','bullet']);   // causes grenades, perks and other guns deal too: never handed to a stowed gun
+  const ownerOf=cause=>!cause||SHARED.has(cause)||GUN_CAUSES.has(cause)?null:session.inventory?.find(w=>causesOf(data.weapons[w.id],w.id).includes(cause))?.id;
+  const LATE=20,recentOf=cause=>{if(cause!=='explosion'&&cause!=='fire')return null;const t=performance.now()/1000;return session.inventory?.find(w=>causesOf(data.weapons[w.id],w.id).includes(cause)&&t-(shotStance.get(w.id)?.t??-99)<LATE)?.id;};
   host.on('kill',({enemy,head,melee,remote})=>{
     if(remote||(melee&&!data.weapons[session.weapon?.id]?.meleeXp)||cheating()||!session.weapon)return;   // (a melee weapon's own swings count for it: the Grave Bell)
-    const hit=lastHit.get(enemy),cause=hit?.cause,gid=hit?.id&&data.weapons[hit.id]?hit.id:session.weapon.id,gdef=data.weapons[gid];if(!gdef)return;
-    const extra=gdef.killCauses??KILL_CAUSES[gdef.baseId??gid]??KILL_CAUSES[gid]??[];
+    const hit=lastHit.get(enemy),cause=hit?.cause,held=hit?.id&&data.weapons[hit.id]?hit.id:session.weapon.id;
+    const mine=causesOf(data.weapons[held],held).includes(cause)||(cause==='explosion'&&data.weapons[held]?.projectileSpeed>0);
+    const gid=mine?held:ownerOf(cause)??recentOf(cause)??held,gdef=data.weapons[gid];if(!gdef)return;
+    const extra=causesOf(gdef,gid);
     if(!(GUN_CAUSES.has(cause)||extra.includes(cause)||(cause==='explosion'&&gdef.projectileSpeed>0)))return;
     // a gun's other form levels the gun the loadout lists (def.progressAs: the Zap Guns count for the Wave Gun)
     const id=data.weapons[gdef.progressAs]?gdef.progressAs:gid,def=data.weapons[id];
@@ -164,8 +178,8 @@ export default async function setup(api){
     const cr=crowds.get(id),run=cr&&now-cr.t<1.5?cr.n+1:1;crowds.set(id,{t:now,n:run});const crowd=run>=3;
     profile=loadProfile();
     // camo challenges (any gun)
-    const mv=window.kino.movement?.state;
-    const camos=countCamoKill(cats,profile,id,{head,low:!!(mv?.prone||api.player?.crouched),moving:!!(mv?.sliding||mv?.diving),multi,crowd},data.weapons);
+    const st=stance(),shot=cause!=='bullet'?shotStance.get(gid):null,late=shot&&now-shot.t<LATE?shot:null;
+    const camos=countCamoKill(cats,profile,id,{head,low:st.low||!!late?.low,moving:st.moving||!!late?.moving,multi,crowd},data.weapons);
     if(camos.length){const dia=camos.find(c=>c.classMastery),cls=window.kino.camoClass?.(id);
       api.toast(dia?`Diamond camo unlocked for every ${cls??'gun in this class'} · equip it in the Gunsmith`:`${def.name} · ${camos.map(c=>c.name).join(', ')} camo unlocked · equip it in the Gunsmith`,6);}
     if(!available(cat,def,id).length){save();return;}

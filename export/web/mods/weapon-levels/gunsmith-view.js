@@ -9,7 +9,7 @@ import { loadModel } from '../../animation.js';
 import { applyGlow, tickGlow } from '../bo3-weapons/glow.js';
 import { poseIdle } from '../bo3-weapons/pose.js';
 import { mountParts } from './mounts.js';
-import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
+import { loadCamos, camoTexture, applyCamo, camoUnlocked, camoProgress, challengeOf, countOf, equippedCamo, classProgress, camoById, camoTime, camoSwatch, fillSwatches } from './camo.js';
 import { GLOBAL_CAMO_TABS } from './global-camos.js';
 import { loadCharms, loadCharmState, saveCharmState, charmFor, charmLock, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from '../charms/charms.js';
 import { screenFor, makeScreen, screenMount, placeScreen, charmZone, screenPin, partTravel, travelFor } from '../charms/screens.js';
@@ -273,7 +273,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   // work on every gun, from GLOBAL_CAMO_TABS: prestige earned anywhere, shop, special)
   let camoTab='challenge';
   function renderCamos(el){
-    const done=camoUnlocked(cats,profile,id,weapons),p=camoProgress(profile,id),on=equippedCamo(cats,profile,id,weapons)?.id,base=cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward),cp=classProgress(cats,profile,id,weapons);
+    const done=camoUnlocked(cats,profile,id,weapons),p=camoProgress(profile,id),on=equippedCamo(cats,profile,id,weapons)?.id,base=cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward&&!c.shop),cp=classProgress(cats,profile,id,weapons);   // Gold counts the challenge camos only (it read 24 / 41 with the shop and pass camos in)
     const challenge=cats.camos.filter(c=>!c.reward&&!c.shop&&(!c.classMastery||cp)),special=cats.camos.filter(c=>c.reward),shop=cats.camos.filter(c=>c.shop);
     const pr=loadPrestige(),mine=[1,2,3].map(t=>camoById(cats,prestigeCamoId(t,id)));
     const global=GLOBAL_CAMO_TABS.map(t=>({...t,camos:t.list({cats,weapons,id})}));
@@ -301,7 +301,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
             <div class="camo-row"><i class="sw" data-swatch="${c.id}" style="background-image:url(${swatch(c)})${c.anim?`;--a:rgb(${c.anim.c1.map(v=>Math.round(v*255))});--b:rgb(${c.anim.c2.map(v=>Math.round(v*255))})`:''}"></i><div><strong>${esc(c.name)}</strong>
             <div class="pc"><span class="${locked?'neu':'pro'}">${esc(what)}${need>1?` · ${have} / ${need}`:''}</span>${locked&&own&&c.prestige<3&&pr.player.tokens?` <span class="tok" data-token="${c.id}">USE TOKEN</span>`:''}</div>
             ${need>1?`<div class="cbar"><b style="width:${(100*have/need).toFixed(1)}%"></b></div>`:''}</div></div></button>`;}
-        const have=c.reward?(done.has(c.id)?1:0):c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:Math.min(c.count,p[challengeOf(cats,id,c)]??0),need=c.classMastery?cp.total:c.mastery?base.length:c.count;
+        const have=c.reward?(done.has(c.id)?1:0):c.classMastery?cp.done:c.mastery?base.filter(b=>done.has(b.id)).length:locked?Math.min(countOf(cats,id,c),p[challengeOf(cats,id,c)]??0):countOf(cats,id,c),need=c.classMastery?cp.total:c.mastery?base.length:countOf(cats,id,c);
         const what=c.classMastery?`Gold on every ${cp.label.toLowerCase().replace(/s$/,'')}`:c.mastery?'Complete every challenge camo':cats.challenges[challengeOf(cats,id,c)];
         return `<button class="opt camo-opt${on===c.id?' on':''}${locked?' locked':''}" data-camo="${c.id}"><span class="tag">${on===c.id?'EQUIPPED':locked?'LOCKED':''}</span>
           <div class="camo-row"><i class="sw" data-swatch="${c.id}" style="background-image:url(${swatch(c)})"></i><div><strong>${esc(c.name)}</strong>

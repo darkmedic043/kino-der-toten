@@ -206,6 +206,10 @@ export default async function setup(api){
 
   // ---- per frame ----------------------------------------------------------------------------------------------------
   const reserveSeen=new WeakMap(),phantom=new WeakMap();let thermal=[],pools=[];
+  // Ammo pickups (the loot mod's cans, Vulture Aid's drops) add through here: up to the Pack Mule reserve and never down
+  // from it (they capped at the gun's normal maximum, which threw the extra reserve away; 2026-11-13). Returns the gain.
+  function addReserve(w,n){const max=maxOf(w),before=w.reserve??0;if(!max){w.reserve=before+n;return n;}
+    w.reserve=Math.max(before,Math.min(Math.ceil(max*(1+stat('mk.stock'))),before+n));reserveSeen.set(w,w.reserve);return w.reserve-before;}
   host.on('update',dt=>{
     if(!dt||!api.getState?.().active)return;const now=t();
     // Double Time: a shot was fired, shorten the wait for the next one
@@ -327,5 +331,5 @@ export default async function setup(api){
   addEventListener('keydown',e=>{if(e.code==='Escape')setTimeout(renderPanel,0);});
   renderPanel();
 
-  window.kino.research={get equipped(){return list.map(a=>a.id);},get state(){return R;},stat,lockIn,earn};
+  window.kino.research={get equipped(){return list.map(a=>a.id);},get state(){return R;},stat,lockIn,earn,addReserve};
 }

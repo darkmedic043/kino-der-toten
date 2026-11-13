@@ -326,17 +326,22 @@ export function classGuns(weapons,key){return Object.keys(weapons??{}).filter(id
 export const camoProgress=(profile,id)=>profile.camo?.[id]?.p??{};
 // The challenge a camo asks of this gun: camos.json "alt" swaps one for guns that can't do it (2026-10-21: the
 // Thundergun, Wave Gun, Winter's Howl and DG-2 can't score headshots, so their Tiger asks for crowd kills instead)
-export const challengeOf=(cats,id,c)=>cats.alt?.[id]?.[c.challenge]??c.challenge;
+// A swap is the other challenge's key, or [key, count] when the gun needs a different number (2026-11-13: melee).
+const altOf=(cats,id,c)=>cats.alt?.[id]?.[c.challenge];
+export const challengeOf=(cats,id,c)=>{const a=altOf(cats,id,c);return (Array.isArray(a)?a[0]:a)??c.challenge;};
+export const countOf=(cats,id,c)=>{const a=altOf(cats,id,c);return Array.isArray(a)?a[1]:c.count;};
+// done: the gun's own version of the challenge, or the plain one if that was already finished before a swap was added
+export const challengeDone=(cats,p,id,c)=>(p[challengeOf(cats,id,c)]??0)>=countOf(cats,id,c)||(p[c.challenge]??0)>=c.count;
 const baseCamos=cats=>cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward&&!c.shop);   // shop camos are bought (Phase 6)   // reward camos come from a map's reward flag (profile.rewards), not a challenge
 // a gun has Gold (its mastery) when every challenge camo is done
-export function hasMastery(cats,profile,id){const p=camoProgress(profile,id);return baseCamos(cats).every(c=>(p[challengeOf(cats,id,c)]??0)>=c.count);}
+export function hasMastery(cats,profile,id){const p=camoProgress(profile,id);return baseCamos(cats).every(c=>challengeDone(cats,p,id,c));}
 // Diamond progress for a gun's class: guns with Gold / guns in the class
 export function classProgress(cats,profile,id,weapons){
   const key=classOf(weapons,id);if(!weapons||key==='special')return null;
   const guns=classGuns(weapons,key);return {key,label:classLabel(key),done:guns.filter(g=>hasMastery(cats,profile,g)).length,total:guns.length};
 }
 export function camoUnlocked(cats,profile,id,weapons){
-  const p=camoProgress(profile,id),list=baseCamos(cats),done=new Set(list.filter(c=>(p[challengeOf(cats,id,c)]??0)>=c.count).map(c=>c.id));
+  const p=camoProgress(profile,id),list=baseCamos(cats),done=new Set(list.filter(c=>challengeDone(cats,p,id,c)).map(c=>c.id));
   if(list.every(c=>done.has(c.id)))for(const c of cats.camos)if(c.mastery)done.add(c.id);
   const cp=classProgress(cats,profile,id,weapons);
   if(cp&&cp.total&&cp.done===cp.total)for(const c of cats.camos)if(c.classMastery)done.add(c.id);

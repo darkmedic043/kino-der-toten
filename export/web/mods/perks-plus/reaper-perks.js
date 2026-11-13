@@ -391,7 +391,9 @@ export function setupReaperPerks(api, catalogue, base) {
   // ---- Zombshell: bullet hits (8%) leave a slowing field (radius 120, 6 s): zombies in it move at 40% and take +30%.
   //      Research track zs.*: Wide Shell, Hidden Shell (the mod's upgrade: zombies ignore you in a field), Long Shell,
   //      Corrosive, Frequent, Weakened, Sticky, Toxic Bloom.
-  const shells = [];
+  //      One field at a time, and the next one can come ZS_COOLDOWN s after it fades (2026-11-13: with a fast gun the 8%
+  //      a hit kept a field up all the time).
+  const shells = [], ZS_COOLDOWN = 20; let shellReady = 0;
   // ---- Bubble Blink Blast: melee while sprinting teleports you 300 ahead and leaves an afterimage that lures zombies
   //      for 5 s (8); 15 kills recharge it (2 charges upgraded).
   let blinks = 1, blinkKills = 0, meleeWas = 0;
@@ -429,7 +431,7 @@ export function setupReaperPerks(api, catalogue, base) {
       if (has('inferno') && Math.random() < .1) burn(z, up('inferno') ? 6 : 4, zh() * .15, .25);
       if (has('moonshine') && Math.random() < (up('moonshine') ? .1 : .05)) burn(z, 4, zh() * .15);
       if (has('changechews') && e.head && Math.random() < .15) queueMicrotask(() => alive(z) && chew(z));
-      if (has('zombshell') && Math.random() < .08 + stat('zs.chance')) { const at = z.root.position.clone(), r = 120 * (1 + stat('zs.radius')), life = 6 + stat('zs.life');
+      if (has('zombshell') && now() >= shellReady && Math.random() < .08 + stat('zs.chance')) { const at = z.root.position.clone(), r = 120 * (1 + stat('zs.radius')), life = 6 + stat('zs.life'); shellReady = now() + life + ZS_COOLDOWN;
         shells.push({ at, r, until: now() + life, tick: now() + .5, m: keep(disc(at, r, 0x9be36a, .25), life) }); sound('zombshell', 'start', .5); }
       if (has('vigor') && now() - lastVigor > .05) { lastVigor = now(); const at = chest(z), n = Math.max(50, e.amount * .3) * (up('vigor') ? 2 : 1); queueMicrotask(() => { blast(at, 60, n, 'explosion', z); fx(at, .25, 0xffc04a); }); }
       if (up('swarmscotch') && z.swarmed && e.head && Math.random() < .4) startSwarm();
@@ -599,7 +601,7 @@ export function setupReaperPerks(api, catalogue, base) {
     }
     for (let i = wolfDrops.length - 1; i >= 0; i--) { const d = wolfDrops[i]; if (t > d.until) { wolfDrops.splice(i, 1); continue; }
       if (d.s.position.clone().setY(f.y).distanceTo(f) < 60) { d.s.removeFromParent(); wolfDrops.splice(i, 1);
-        if (d.kind === 'points') pts(50); else if (d.kind === 'ammo') { const w = session.weapon, dd = session.def; if (w && dd) w.reserve = Math.min(Math.floor((dd.maxAmmo ?? 0) * 1.5), (w.reserve ?? 0) + Math.ceil((dd.maxAmmo ?? 0) * .1)); } else window.kino?.operator?.addCharge?.(.05); } }
+        if (d.kind === 'points') pts(50); else if (d.kind === 'ammo') { const w = session.weapon, dd = session.def; if (w && dd) w.reserve = Math.max(w.reserve ?? 0, Math.min(Math.floor((dd.maxAmmo ?? 0) * 1.5), (w.reserve ?? 0) + Math.ceil((dd.maxAmmo ?? 0) * .1))); } else window.kino?.operator?.addCharge?.(.05); } }
     // Bull Ice Blast
     if (has('bull_ice')) {
       const jump = !!player.input?.jump, grounded = player.onFloor ?? player.grounded;
@@ -846,6 +848,7 @@ export function setupReaperPerks(api, catalogue, base) {
   chip(() => has('dyingwish') ? [dyingUntil > now() ? 'DYING WISH ' + Math.ceil(dyingUntil - now()) : now() < dyingReady ? 'DW ' + Math.ceil(dyingReady - now()) + 's' : 'DYING WISH', dyingUntil > now() || now() >= dyingReady] : null);
   chip(() => has('guardianangel') ? [angelCharge >= 1 ? 'ANGEL READY' : `ANGEL ${angelKills}/${ANGEL_KILLS}`, angelCharge >= 1] : null);
   chip(() => has('momentum') ? [`MOMENTUM ${Math.round(momentum * 100)}% · ${charges}${killMode ? '' : ' (off)'}`, momentum >= .95 && killMode] : null);
+  chip(() => has('zombshell') ? [shells.length ? 'ZOMBSHELL ' + Math.ceil(Math.max(0, shells[0].until - now())) : now() < shellReady ? 'ZS ' + Math.ceil(shellReady - now()) + 's' : 'ZOMBSHELL', !!shells.length || now() >= shellReady] : null);
   chip(() => has('winterwail') ? [`WAIL ${wails}`, wails > 0] : null);
   chip(() => has('estatic') && up('estatic') ? [`STATIC ${staticCharges}`, staticCharges > 0] : null);
   chip(() => has('moonshine') ? [`SLIDES ${slidesLeft}`, slidesLeft > 0] : null);
@@ -865,7 +868,7 @@ export function setupReaperPerks(api, catalogue, base) {
 
   host.on('reset', () => {
     for (const o of temp) o.o.removeFromParent(); temp.length = 0; for (const [, h] of held) h.glow?.removeFromParent(); held.clear(); for (const [, b] of burning) b.glow?.removeFromParent(); burning.clear();
-    puddles.length = poison.length = lures.length = shells.length = fountains.length = wolfDrops.length = 0;
+    puddles.length = poison.length = lures.length = shells.length = fountains.length = wolfDrops.length = 0; shellReady = 0;
     for (const w of walls) w.m.removeFromParent(); walls.length = 0;
     if (wolf) wolf.s.removeFromParent(); wolf = null; if (spectre) spectre.g.removeFromParent(); spectre = null; if (swarm) swarm.g.removeFromParent(); swarm = null;
     if (ghost.body) ghost.body.body.removeFromParent(); ghost.body = null; if (tomb) tomb.s.removeFromParent(); tomb = null; shRing.removeFromParent(); ringAt = null; stillT = 0; armourHud(false); for (const id of [...teamRings.keys()]) dropTeamRing(id);

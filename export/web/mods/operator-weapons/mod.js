@@ -1,7 +1,7 @@
 // Operator weapons (user, 2026-10-16): special weapons like BO3's Ragnarok DG-4 that sit in a slot of their own, next
 // to the class action skill and independent of it. One at a time; it has its own meter:
-//   - charging: your kills (bullet and melee, as for the class skill) fill it, def.kills of them to full (headshots
-//     count 1.5); def.passive (seconds to full) adds a slow fill over time if set
+//   - charging: your kills (any weapon, equipment or perk of yours) fill it, def.kills of them to full (headshots
+//     count 1.5, a boss 5); def.passive (seconds to full) adds a slow fill over time if set
 //   - Y (Settings: "Operator weapon") pulls it out once the meter reaches def.minCharge (default full). While it's out
 //     your gun is put away, the mouse buttons go to the operator weapon, and the meter is its power: it drains by
 //     def.drain per second plus whatever the weapon spends (ctx.drain); empty, it's put away. Y again puts it away
@@ -24,7 +24,9 @@ export default async function setup(api){
   const {host,session,view,audio}=api;
   const defs=new Map();
   const st={def:null,charge:0,active:null,power:0};
-  const PLAYER_CAUSES=new Set(['bullet','melee']);
+  // Every kill of yours charges it, whatever did the damage (2026-11-13; it was bullets and melee only, so bows, launchers,
+  // wonder weapons, equipment and perks never did), except the operator weapon's own and the map's (traps, the blast doors).
+  const NOT_MINE=new Set(['operator','trap','crush']);
   const kino=window.kino;
 
   function register(def){defs.set(def.id,{minCharge:1,kills:30,drain:0,...def});}
@@ -77,8 +79,10 @@ export default async function setup(api){
 
   host.on('beforeEnemyDamage',e=>{if(e.enemy)e.enemy.lastCause=e.cause;});
   host.on('kill',e=>{
-    if(e.remote||!e.enemy||!st.def||st.active||!PLAYER_CAUSES.has(e.enemy.lastCause))return;
-    addCharge((e.head?1.5:1)/st.def.kills);
+    if(e.remote||!st.def||st.active)return;
+    const cause=e.enemy?e.enemy.lastCause:'bullet';   // no enemy: a co-op guest's own kill, as the host reports it back
+    if(!cause||NOT_MINE.has(cause))return;
+    addCharge((isBoss(e.enemy)||e.kind==='panzer'?5:e.head?1.5:1)/st.def.kills);   // a boss is worth five
   });
   host.on('update',dt=>{
     if(!dt)return;

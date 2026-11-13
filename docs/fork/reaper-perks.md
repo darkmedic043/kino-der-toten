@@ -150,7 +150,7 @@ The held shield blocks from every side and explodes when it breaks. Base blast: 
 
 ### Zombshell (`zs.`)
 
-Shots can drop a slowing field that weakens zombies. Base: 8% chance, radius 120, lasts 6 s, 40% slow, ×1.3 damage taken.
+Shots can drop a slowing field that weakens zombies. Base: 8% chance, radius 120, lasts 6 s, 40% slow, ×1.3 damage taken. **One field at a time, then a 20 s cooldown** (2026-11-13, user: "its constantly activating"; `ZS_COOLDOWN`, `shellReady` in reaper-perks.js: the next field can't roll until the last one's life plus 20 s has passed, so Long Shell lengthens the wait too). The chip reads `ZOMBSHELL n` while a field is up, `ZS ns` (dim) while cooling and `ZOMBSHELL` when ready.
 
 | # | Augment | Kind | Effect |
 |---|---|---|---|
@@ -649,7 +649,7 @@ Events (`host.on`): `kill`, `beforeEnemyDamage` (change `e.amount`, `e.cause`: b
 - **Effect**: Shooting a zombie can create a slowing field that also weakens zombies.
 - **Upgrade** (the mod's double-buy): Zombies ignore you while you stand in the field.
 - **Assets**: machine `cz_vending_zombshell`, bottle, icon, **no jingle**.
-- **As built**: 8% of bullet hits leave a green field where the zombie stood (radius 120, 6 s, the mod's sound): zombies in it move at 40% and take +30% damage. Upgraded: while you stand in one, zombies ignore you.
+- **As built**: 8% of bullet hits leave a green field where the zombie stood (radius 120, 6 s, the mod's sound): zombies in it move at 40% and take +30% damage. After a field there is a 20 s cooldown before the next can appear (2026-11-13; with a fast gun the 8% roll used to keep a field up nearly all the time). Upgraded: while you stand in one, zombies ignore you.
 - **Implementation notes (before building)**: Shooting a zombie can leave a slow-down field where it stands (a few seconds): zombies inside are slowed and take extra damage. Upgrade: zombies ignore the player while the player stands in it (targeting, `enemies` `targetFor`). The mod's zombshell sounds are exported.
 
 ## Perks Melon Zombies already has (assets only)

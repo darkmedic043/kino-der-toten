@@ -595,7 +595,7 @@
    "origin": "Black Ops 4",
    "new": true,
    "status": "implemented (Melon Pass Season 1 unlock, research augments)",
-   "effect": "Shooting a zombie can create a slowing field that also weakens zombies",
+   "effect": "Shooting a zombie can create a slowing field that also weakens zombies (one at a time, 20 s cooldown)",
    "upgrade": "Zombies ignore you while you stand in the field",
    "source": {
     "machine": "cz_vending_zombshell",

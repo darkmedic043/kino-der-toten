@@ -165,7 +165,9 @@ export default async function setup(api) {
     const w = session.weapon, def = session.def; if (!w || !def) return false;
     const max = w.upgraded ? def.upgrade?.maxAmmo ?? def.maxAmmo : def.maxAmmo;
     const n = Math.ceil((w.upgraded ? def.upgrade?.clipSize ?? def.clipSize : def.clipSize ?? 10) * mags);
-    w.reserve = Math.min(max ?? Infinity, (w.reserve ?? 0) + n); toast(`+${n} ammo`); return true;
+    const add = window.kino.research?.addReserve, before = w.reserve ?? 0;   // research: up to Pack Mule's bigger reserve, never down from it
+    const got = add ? add(w, n) : (w.reserve = Math.max(before, Math.min(max ?? Infinity, before + n))) - before;
+    toast(got > 0 ? `+${got} ammo` : 'Ammo full'); return true;
   }
   function giveWeapon(id) {
     if (session.pack?.weapon === session.weapon || session.busy) { toast('Can\'t take it right now'); return false; }

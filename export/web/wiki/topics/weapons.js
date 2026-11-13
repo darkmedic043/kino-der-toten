@@ -233,7 +233,7 @@ export default {
           if (hasSmith(id)) {
             const pc = [1, 2, 3].map(tier => camo.prestigeCamo(`pr${tier}:${id}`)).filter(Boolean);
             const alt = cats.alt?.[id];
-            h += `<h2>Camos</h2>` + c.md(`Camo challenges with this gun: ${cats.camos.filter(x => x.challenge && x.count && !x.reward && !x.shop).map(x => `${x.name} (${num(x.count)} ${(cats.challenges[camo.challengeOf(cats, id, x)] ?? '').toLowerCase()})`).join(', ')}. See [Camos](${c.href('weapons', c.slug('Camos'))}).`) +
+            h += `<h2>Camos</h2>` + c.md(`Camo challenges with this gun: ${cats.camos.filter(x => x.challenge && x.count && !x.reward && !x.shop).map(x => `${x.name} (${num(camo.countOf(cats, id, x))} ${(cats.challenges[camo.challengeOf(cats, id, x)] ?? '').toLowerCase()})`).join(', ')}. See [Camos](${c.href('weapons', c.slug('Camos'))}).`) +
               (pc.length ? `<p>Its own prestige camos (see ${sys(c, 'Weapon prestige')}):</p><p>${pc.map((x, i) => `<span class="swatch" data-swatch="${esc(x.id)}" style="width:42px;height:42px;margin-right:10px;vertical-align:middle"></span><b>${esc(x.name)}</b> <span class="muted">${['Prestige I', 'Prestige II', `Prestige Master, level ${P.masterCamoAt}`][i]}</span>`).join('<br>')}</p>` : '');
             if (alt) h += c.note('This gun can\'t score headshots, so its headshot challenge counts crowd kills instead.', 'tip');
           } else {

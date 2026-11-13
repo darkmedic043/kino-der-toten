@@ -100,7 +100,9 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
       const wonder = def.class === 'special' || def.wonder || /ray_?gun|thunder|tesla|wave|zap/.test(def.baseId ?? def.id ?? '');
       const max = w.upgraded ? def.upgrade?.maxAmmo ?? def.maxAmmo : def.maxAmmo;
       const n = Math.ceil((def.clipSize ?? 10) * .3 * (wonder ? 1 + stat('va.gift') : 1));
-      w.reserve = Math.min(max ?? Infinity, (w.reserve ?? 0) + n); toast?.(`Vulture · +${n} ammo`, 1.2);
+      const add = window.kino.research?.addReserve, before = w.reserve ?? 0;   // research: up to Pack Mule's bigger reserve, never down from it
+      const got = add ? add(w, n) : (w.reserve = Math.max(before, Math.min(max ?? Infinity, before + n))) - before;
+      if (got > 0) toast?.(`Vulture · +${got} ammo`, 1.2);
     } else if (d.kind === 'grenade') { session.grenades = Math.min(window.kino.reaperPerks?.nadeMax?.() ?? 4, session.grenades + 1); toast?.('Vulture · +1 grenade', 1.2); }
     else { const n = d.amount || 10 + Math.round(Math.random() * 20); points(n); }
     if (stat('va.plates')) heal(stat('va.plates'));   // Armor-matic: no armor plates here, so drops patch you up
