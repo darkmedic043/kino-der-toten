@@ -46,7 +46,7 @@ export function setupCoopSkills({api,turrets,fort,eng,gard,Z,chew,sync,A}){
     if(kind==='mine')return {at:vec(o.at)};
     if(kind==='drone')return {at:vec(o.mesh.position)};
     if(kind==='beacon')return {at:vec(o.at)};
-    if(kind==='plant')return {at:vec(o.at),yaw:r1(o.yaw),model:o.model,size:o.size,range:Math.round(o.r.range),shade:+gard.slowOf(o).toFixed(2)};
+    if(kind==='plant')return {at:vec(o.at),yaw:r1(o.yaw),model:o.model,size:o.size*(o.stage>=4?1.25:1),range:Math.round(o.r.range),shade:+gard.slowOf(o).toFixed(2)};
   };
   const byId=new Map();   // id -> my object (strikes reported by the host)
   function sendAll(n,to='all'){for(const [kind,o] of mine()){const e=ids.get(o);if(e)n.send(to,{t:'ab',op:'add',id:e.id,kind,...describe(kind,o)});}}

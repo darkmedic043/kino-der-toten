@@ -53,7 +53,7 @@ const CSS=`
 #gdb .so.wait{background:#5f7a3a;color:#f3ebd0}
 #gdb .so.full{border:2px solid #5f7a3a;background:#f0e4c2}
 #gdb .so img{width:42px;height:42px;object-fit:contain}
-#gdb .lad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;margin-top:auto;border-top:2px solid #2b1d14}
+#gdb .lad{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);width:100%;margin-top:auto;border-top:2px solid #2b1d14}
 #gdb .st{padding:5px 4px 2px;text-align:center;border-left:1px solid #2b1d1444;font-size:13px;line-height:1.15}
 #gdb .st:first-child{border-left:0}
 #gdb .st b{display:block;font:italic 700 14px Georgia,serif}
@@ -166,14 +166,14 @@ export function setupBench({api,cls,G,ctl}){
   }
   function stages(r){
     const S=ctl.S();
-    return G.stages.map((s,i)=>{
+    return G.stages.slice(0,r.cap>=4?5:4).map((s,i)=>{   // Primordial only shows when the plant can get there
       const off=i>r.cap,when=i===0?`${Math.round(r.grow)} s`:i===1?'next':`${Math.round(s.age/r.ageRate)} s`;
       const k=i===0?'No attacks':`${Math.round(stagePower(G,S,i)*100)}% power`;
       return `<div class="st${off?' off':''}"><b>${esc(s.name)}</b>${off?'Won’t reach':when}<br>${off?'&nbsp;':k}</div>`;
     }).join('');
   }
   function sheet(r){
-    const S=ctl.S(),base=recipe(G,{},made(),[]),top=Math.min(3,r.cap);
+    const S=ctl.S(),base=recipe(G,{},made(),[]),top=r.cap;
     const rows=[['Health',`${Math.round(r.hits)} bites`,r.hits>base.hits],['Range',String(Math.round(r.range)),r.range>base.range],['Plots',String(r.plots),false]];
     const dps=plantDps(r,G,S,top);if(dps>0)rows.push(['Best damage',`${Math.round(dps*100)}% zombie/s`,false]);
     if(r.uses)rows.push(['Uses',String(r.uses),r.uses>base.uses]);
@@ -185,7 +185,7 @@ export function setupBench({api,cls,G,ctl}){
     const h=/^(add|tin):(.+)/.exec(hover??'');
     if(h){const x=G.additives[h[2]]??G.items[h[2]];return `<b>${esc(x.name)}.</b> ${esc(x.desc)}`;}
     const w=why(),p=P[made()];
-    return `${esc(p.desc)}${r.cap>=3?`<em>Ancient: ${esc(p.ancient)}</em>`:''}${w?`<em>${esc(w)}</em>`:''}`;
+    return `${esc(p.desc)}${r.cap>=3?`<em>Ancient: ${esc(p.ancient)}</em>`:''}${r.cap>=4&&p.primordial?`<em>Primordial: ${esc(p.primordial)}</em>`:''}${w?`<em>${esc(w)}</em>`:''}`;
   }
   const tins=()=>ctl.adds().map(a=>{const n=(ctl.inv[a]??0)-count(a);return `<div class="tin${n>0?'':' none'}" data-act="add:${a}"><img src="${icon(a)}" alt="${esc(G.additives[a].name)}"><u>${n}</u></div>`;}).join('')
     +Object.keys(G.items).filter(a=>G.items[a].shelf!==false).map(a=>`<div class="tin fixed${ctl.inv[a]>0?'':' none'}" data-act="tin:${a}"><img src="${icon(a)}" alt="${esc(G.items[a].name)}"><u>${ctl.inv[a]??0}</u></div>`).join('');

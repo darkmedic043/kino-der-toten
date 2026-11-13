@@ -43,7 +43,7 @@ export function recipe(G,S,seed,adds=[],sun=0){
   const p=G.plants[seed];if(!p)return null;
   const sum=k=>adds.reduce((n,a)=>n+(G.additives[a]?.[k]??0),0),count=a=>adds.filter(x=>x===a).length;
   const sunMul=1+sun*.002*(1+(S['garden.sunPower']??0));
-  const cap=Math.min(3,G.life[p.life].cap+sum('cap')+(S['garden.stageCap']??0));
+  const cap=Math.min(S['garden.stageCap']?4:3,G.life[p.life].cap+sum('cap')+(S['garden.stageCap']??0));   // 4 = Primordial, only with Overgrowth
   return {
     id:seed,name:p.name,rarity:p.rarity,life:p.life,def:p,adds:[...adds],
     plots:(p.plots??1)+sum('plots'),
@@ -59,7 +59,7 @@ export function recipe(G,S,seed,adds=[],sun=0){
 }
 
 // stage: 0 sprout, then 1 Grown, 2 Mature, 3 Ancient. age counts from the moment it's Grown.
-export function stageAt(G,age,cap){let s=1;for(let i=2;i<=Math.min(3,cap);i++)if(age>=G.stages[i].age)s=i;return s;}
+export function stageAt(G,age,cap){let s=1;for(let i=2;i<=Math.min(G.stages.length-1,cap);i++)if(age>=G.stages[i].age)s=i;return s;}
 export function stagePower(G,S,stage){return G.stages[stage].power*(stage>=2?1+(S['garden.stagePower']??0):1);}
 export function stageHits(G,stage){return G.stages[stage].hits;}
 

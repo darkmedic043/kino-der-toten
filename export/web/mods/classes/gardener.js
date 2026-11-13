@@ -117,6 +117,7 @@ export function setupGardener(ctx){
   const free=z=>alive(z)&&!z.swallowed&&!z.thrall&&!(z.netFlags&3)&&!gulped.has(z);
   const within=(p,r,kinds=true)=>enemies.list.filter(z=>free(z)&&z.root.position.distanceTo(p.at)<r&&(kinds||z.kind!=='dog'));
   const nearest=(p,list)=>{const t=session.time,dust=!!S()['garden.dust'];return list.sort((a,b)=>(dust?((b.dustUntil>t)-(a.dustUntil>t))*1e9:0)+a.root.position.distanceToSquared(p.at)-b.root.position.distanceToSquared(p.at));};   // Pollen Rounds: dusted zombies first
+  const P4=p=>p.stage>=4;   // Primordial (Overgrowth past Ancient): every plant's own extra, the `primordial` line in classes.json
   const chest=z=>z.root.position.clone().addScaledVector(up,42);
   const tip=p=>p.at.clone().addScaledVector(up,p.top);
   function use(p){if(--p.uses<=0)kill(p);}
@@ -141,7 +142,7 @@ export function setupGardener(ctx){
     thorn(p,dt,d){
       if((p.t-=dt)>0)return;p.t=.5;
       const mark=session.time+(p.stage>=3?3:.8);
-      for(const z of nearest(p,within(p,p.r.range)).slice(0,d.targets)){z.thornMark=mark;z.thornK=d.mark;hit(p,z,d.dps*.5);}
+      for(const z of nearest(p,within(p,p.r.range)).slice(0,d.targets*(P4(p)?2:1))){z.thornMark=mark;z.thornK=d.mark*(P4(p)?2:1);hit(p,z,d.dps*.5);}
     },
     bulb(){},   // Sunlight and shade are in the shared tick below
     burr(p,dt,d){
@@ -162,13 +163,13 @@ export function setupGardener(ctx){
     },
     mint(){},   // fed by the kill handler, emptied by a pat
     gourd(p,dt,d){
-      const cap=d.swallow;p.inside??=[];
+      const cap=d.swallow*(P4(p)?2:1);p.inside??=[];
       if((p.t-=dt)<=0&&p.inside.length<cap){
         const z=nearest(p,within(p,p.r.range,false)).find(z=>z.kind==='zombie'&&!z.ai&&!['barricade','entering','rising'].includes(z.state));
         if(z){p.t=d.gulp;release(z);gulped.set(z,p);p.inside.push(z);p.fuse??=d.fuse;Z.order('swallow',z,{at:p.at.toArray().map(Math.round),pid:p.uid,d:d.fuse+30});pulse(p.at,60,0xff7a2a,.3);audio.play('buy',.1);}
       }
       if(d.melt){
-        if(p.inside.length&&(p.melt=(p.melt??d.melt)-dt)<=0){p.melt=d.melt*(p.stage>=3?.5:1);const z=p.inside.shift();free2(z);raw(p,z,z.health+1,true);dropAt(MELT[Math.floor(Math.random()*MELT.length)],p.at);}
+        if(p.inside.length&&(p.melt=(p.melt??d.melt)-dt)<=0){p.melt=d.melt*(P4(p)?.25:p.stage>=3?.5:1);const z=p.inside.shift();free2(z);raw(p,z,z.health+1,true);dropAt(MELT[Math.floor(Math.random()*MELT.length)],p.at);}
         return;
       }
       if(p.inside.length&&(p.fuse-=dt)<=0)burst(p);
@@ -183,18 +184,18 @@ export function setupGardener(ctx){
         p.z2=p.stage>=3?nearest(p,within(p,p.r.range)).find(z=>z!==p.z&&clear(z))??null:null;
       }
       if(!p.z)return;
-      p.heat=Math.min(1,(p.heat??0)+dt/d.rampTime);p.acc=(p.acc??0)+dt;
+      p.heat=Math.min(1,(p.heat??0)+dt/(d.rampTime*(P4(p)?.5:1)));p.acc=(p.acc??0)+dt;
       const from=tip(p);beam(from,chest(p.z),0x8fe8ff,.05,1+p.heat*1.6);if(p.z2&&reach(p.z2))beam(from,chest(p.z2),0x8fe8ff,.05,1);
       if(p.acc>=.25){
         const dps=d.dps*(1+(d.ramp-1)*p.heat)*(nearDial?1+d.sundial:1),two=p.z2;p.acc=0;
-        hit(p,p.z,dps*.25);if(two&&reach(two))hit(p,two,d.dps*.25);
+        hit(p,p.z,dps*.25);if(two&&reach(two))hit(p,two,(P4(p)?dps:d.dps)*.25);
       }
     },
     flower(p,dt,d){
-      if((p.gas=(p.gas??.5)-dt)<=0){p.gas=.5;for(const z of nearest(p,within(p,p.r.range)).slice(0,d.targets))hit(p,z,d.dps*.5);}
+      if((p.gas=(p.gas??.5)-dt)<=0){p.gas=P4(p)?.25:.5;for(const z of nearest(p,within(p,p.r.range)).slice(0,d.targets*(P4(p)?2:1)))hit(p,z,d.dps*.5);}
       if((p.t-=dt)>0)return;
       p.t=d.lureEvery;
-      const list=nearest(p,within(p,d.lureRange,false)).filter(z=>z.kind!=='dog').slice(0,p.stage>=3?20:d.lure),at=p.at.toArray().map(Math.round);
+      const list=nearest(p,within(p,d.lureRange,false)).filter(z=>z.kind!=='dog').slice(0,P4(p)?30:p.stage>=3?20:d.lure),at=p.at.toArray().map(Math.round);
       for(const z of list)Z.order('lure',z,{at,d:d.lureFor});
       if(list.length){pulse(p.at,220,0x58ff6a,1.1);audio.play('round',.25);}
     },
@@ -207,18 +208,18 @@ export function setupGardener(ctx){
       p.bitAt=session.time;hit(p,z,d.bite);
       for(const o of by)hit(p,o,d.bite*.5);
       p.bites=(p.bites??0)+1;
-      if(p.bites>=d.full){p.bites=0;p.t=d.digest;}else p.t=d.every;
+      if(p.bites>=d.full&&!P4(p)){p.bites=0;p.t=d.digest;}else p.t=d.every*(P4(p)?.5:1);
     },
     melon(p,dt,d){
       if((p.t-=dt)>0)return;
       const list=within(p,p.r.range);if(!list.length){p.t=.3;return;}
       let best=null,n=-1;for(const z of list){const c=list.filter(o=>o.root.position.distanceTo(z.root.position)<d.radius).length;if(c>n){n=c;best=z;}}
       p.t=d.every;lob(p,best.root.position.clone(),d.lob,d.split?2:0);
-      if(p.stage>=3)for(const q of [1.2,4.3])lob(p,best.root.position.clone().add(new THREE.Vector3(Math.cos(q)*130,0,Math.sin(q)*130)),d.lob*(d.split?.8:.4));
+      if(p.stage>=3)for(const q of P4(p)?[1.2,2.75,4.3,5.85]:[1.2,4.3])lob(p,best.root.position.clone().add(new THREE.Vector3(Math.cos(q)*130,0,Math.sin(q)*130)),d.lob*(d.split?.8:.4));
     }
   };
   const ingredient=e=>{const t=e.tags;return t&4?'ember':e.kind==='dog'||e.kind==='nova'?'mutagen':t&2?'frost':'fertilizer';};
-  const {ON_KILL,END_ROUND,leave}=moreBehaviours(BEH,{api,G,Z,plants,hit,raw,beam,pulse,within,nearest,chest,tip,use,kill,spread,alive,free,dropAt,feet,ingredient,
+  const {ON_KILL,END_ROUND,leave}=moreBehaviours(BEH,{api,G,Z,P4,plants,hit,raw,beam,pulse,within,nearest,chest,tip,use,kill,spread,alive,free,dropAt,feet,ingredient,
     netId:()=>window.kino.coop?.id??'',lastShot:()=>shots.at(-1)?.amount??0,feast:n=>{feast=Math.min(P.gourmand.mealMax,feast+n);}});
   function lob(p,to,frac,gens=0,from=tip(p),size=1){
     const m=melons.find(x=>x&&!x.parent);const k=frac*power(p),d=p.r.def;
@@ -261,19 +262,19 @@ export function setupGardener(ctx){
     const d=p.r.def,list=p.inside??[],n=list.length,k=power(p),at=p.at.clone().addScaledVector(up,24);
     if(d.thrallFor){   // Puppet Gourd: out they come, on your side
       for(const z of list)free2(z);p.inside=[];
-      for(const z of list)if(alive(z))Z.order('thrall',z,{d:d.thrallFor*(p.stage>=3?1.5:1),power:d.thrallPower*k,hits:8});
+      for(const z of list)if(alive(z))Z.order('thrall',z,{d:d.thrallFor*(P4(p)?2.5:p.stage>=3?1.5:1),power:d.thrallPower*k,hits:8});
       pulse(p.at,120,0x58ff6a,.5);kill(p,{silent:true});dropAt('compost',p.at);return;
     }
     if(d.fling){   // Catapult Gourd: at the biggest crowd in reach
       const all=enemies.list.filter(z=>free(z)&&z.root.position.distanceTo(p.at)<d.fling);
       let best=null,c=-1;for(const z of all){const m=all.filter(o=>o.root.position.distanceTo(z.root.position)<d.radius).length;if(m>c){c=m;best=z;}}
-      const to=(best?.root.position??p.at).clone(),radius=d.radius*(p.stage>=3?1.33:1),tgt=to.toArray().map(Math.round);
+      const to=(best?.root.position??p.at).clone(),radius=d.radius*(P4(p)?1.66:p.stage>=3?1.33:1),tgt=to.toArray().map(Math.round);
       for(const z of list)free2(z);p.inside=[];
       for(const z of list)if(alive(z))Z.order('toss',z,{to:tgt,h:300,d:1.1});
       flights.push({from:at,to,t:0,dur:1.1,m:melons.find(x=>x&&!x.parent),k:d.land*(1+d.perZombie*n)*k,radius,p});
       kill(p,{silent:true});dropAt('compost',p.at);return;
     }
-    const frac=d.burst*(1+d.perZombie*n)*k,radius=d.radius*(p.stage>=3?1.3:1);
+    const frac=d.burst*(1+d.perZombie*n)*k,radius=d.radius*(P4(p)?1.6:p.stage>=3?1.3:1);
     for(const z of list)free2(z);p.inside=[];
     for(const z of list)if(alive(z))raw(p,z,frac*(d.inner-1)*zh());
     ctx.blast?.(at,radius,frac,true);pulse(p.at,radius,0xff7a2a,.5);onBlast(p,p.at,radius);
@@ -285,7 +286,7 @@ export function setupGardener(ctx){
     if(p.stage===0){p.grow-=dt;if(p.grow<=0){setStage(p,1);p.age=0;pulse(p.at,50,0x9fe06a);bench.refresh();}return;}
     p.age+=dt*p.r.ageRate;
     const st=stageAt(G,p.age,p.r.cap);
-    if(st!==p.stage){setStage(p,st);pulse(p.at,90,0xffe27a);audio.play('buy',.25);if(st>=2&&!p.free)say(`${p.r.name} is ${G.stages[st].name}`);bench.refresh();}
+    if(st!==p.stage){setStage(p,st);pulse(p.at,90,0xffe27a);audio.play('buy',.25);if(st>=4){pulse(p.at,180,0xd8ff6a,1.2);audio.play('round',.3);}if(st>=2&&!p.free)say(`${p.r.name} is ${G.stages[st].name}`);bench.refresh();}
     const regen=(p.r.life==='perennial'?G.regen:0)+(S()['garden.regen']??0)/10+(p.r.fx.mulch?.2:0);
     if(regen)p.hits=Math.min(p.maxHits,p.hits+regen*dt);
     BEH[p.r.id]?.(p,dt,p.r.def);
@@ -321,7 +322,7 @@ export function setupGardener(ctx){
   // Shade and sap, per plant; the host applies the slowest one on each zombie (thralls.js), a teammate's through its mirror.
   function slowOf(p){
     if(p.stage===0)return 0;
-    return p.r.slow+(p.r.id==='bulb'?(p.stage>=3?.4:p.r.def.slow)*(1+(S()['garden.slowMul']??0)):0);
+    return p.r.slow+(p.r.id==='bulb'?(P4(p)?.55:p.stage>=3?.4:p.r.def.slow)*(1+(S()['garden.slowMul']??0)):0);
   }
   Z.zones.push(()=>plants.map(p=>({at:p.at,range:p.r.range,slow:slowOf(p)})));
 
@@ -337,8 +338,8 @@ export function setupGardener(ctx){
     if(!(e.amount>0))return;
     if(session.time>bloodNext&&gardenAdds(G,cls,ctx.state()).includes('blood')&&Math.random()<G.drops.blood){bloodNext=session.time+3;dropAt('blood',feet());}
     if(e.amount<session.health)return;
-    const r=plants.find(p=>p.r.id==='worldroot'&&p.stage>0&&!p.saved&&p.at.distanceTo(feet())<p.r.range);if(!r)return;
-    r.saved=true;e.amount=0;session.health=session.maxHealth;saveUntil=session.time+r.r.def.save;pulse(r.at,r.r.range,0x7dff9a,.8);say('The World Root holds you',2);
+    const r=plants.find(p=>p.r.id==='worldroot'&&p.stage>0&&(p.saves??0)<(P4(p)?2:1)&&p.at.distanceTo(feet())<p.r.range);if(!r)return;
+    r.saves=(r.saves??0)+1;e.amount=0;session.health=session.maxHealth;saveUntil=session.time+r.r.def.save;pulse(r.at,r.r.range,0x7dff9a,.8);say('The World Root holds you',2);
   });
   host.on('beforeDamage',e=>{if(session.time<saveUntil)e.amount=0;});
   host.on('beforeEnemyDamage',e=>{
@@ -370,7 +371,7 @@ export function setupGardener(ctx){
       if(inReach&&p.stage>0){if(p.r.fx.blood)heal(8);ON_KILL[p.r.id]?.(p,at,{tags,kind:e.kind});}
       if(p.r.id==='thorn'&&p.at.distanceTo(at)<p.r.range)p.spikes=Math.min(p.r.def.spikeMax,(p.spikes??0)+p.r.def.spike);
       if(p.r.id==='mint'&&p.stage>0&&p.at.distanceTo(at)<p.r.range){
-        const more=1+(s['garden.coin']??0),two=p.stage>=3?2:1;
+        const more=1+(s['garden.coin']??0),two=P4(p)?3:p.stage>=3?2:1;
         p.bank=Math.min(p.r.def.bank*more*two,(p.bank??0)+p.r.def.coin*p.r.power*more*two);
       }
     }
@@ -526,19 +527,20 @@ export function setupGardener(ctx){
     chew();
     const swing=session.meleeLeft>0;if(swing&&!swinging)patAt=session.time+.18;swinging=swing;
     if(patAt&&session.time>=patAt){patAt=0;pat();}
-    let sunRate=0;const s=S();
+    let sunRate=0,dial4=false;const s=S();
     for(const p of [...plants]){
       grow(p,dt);
       if(s['garden.grab'])grab(p,s);
-      if(p.r.id==='bulb'&&p.stage>0)sunRate+=p.r.def.sun*stagePower(G,S(),p.stage);
+      if(p.r.id==='bulb'&&p.stage>0){sunRate+=p.r.def.sun*stagePower(G,S(),p.stage)*(P4(p)?2:1);if(P4(p))dial4=true;}
+      if(P4(p)&&(p.aura=(p.aura??1)-dt)<=0){p.aura=2.5;pulse(p.at,80,0xd8ff6a,1);}   // Primordial: a slow green-gold ring
       // growing in, flinching, a bite or a bounce: only the plant's own node moves
       p.pop=Math.min(1,p.pop+dt*2.6);p.shake=Math.max(0,p.shake-dt*4);p.snap=Math.max(0,(p.snap??0)-dt*3.2);p.spring=Math.max(0,(p.spring??0)-dt*3);
-      const pop=1-Math.pow(1-p.pop,3),k=p.size*(.3+.7*pop);
+      const pop=1-Math.pow(1-p.pop,3),k=p.size*(.3+.7*pop)*(P4(p)?1.25:1);
       p.node.scale.set(k*(1+p.snap*.18),k*(1-p.snap*.14+p.spring*.4)*(p.fit??1),k*(1+p.snap*.18));
       if(p.mesh)p.mesh.rotation.z=Math.sin(session.time*40)*.05*p.shake;
     }
     if(s['garden.photo']&&session.health>0&&sun()>=50)heal(s['garden.photo']*dt);   // Photosynthesis
-    if(sunRate){sunBank+=Math.min(P.bulb.sunCap,sunRate)*dt;if(sunBank>=1){const n=Math.floor(sunBank);sunBank-=n;gainSun(n);}}
+    if(sunRate){sunBank+=Math.min(P.bulb.sunCap*(dial4?2:1),sunRate)*dt;if(sunBank>=1){const n=Math.floor(sunBank);sunBank-=n;gainSun(n);}}
     for(const [z,b] of burred){
       if(!alive(z)){
         unstick(z);

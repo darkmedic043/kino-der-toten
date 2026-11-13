@@ -3323,6 +3323,12 @@
             "power": 2,
             "hits": 2,
             "age": 180
+          },
+          {
+            "name": "Primordial",
+            "power": 2.8,
+            "hits": 2.8,
+            "age": 300
           }
         ],
         "ageKill": 3,
@@ -3367,7 +3373,8 @@
             "spike": 0.02,
             "spikeMax": 0.2,
             "desc": "Hurts every zombie close by and marks it: your bullets hit marked zombies 10% harder. Kills grow its spikes.",
-            "ancient": "Marks last 3 s after a zombie leaves."
+            "ancient": "Marks last 3 s after a zombie leaves.",
+            "primordial": "Thorns reach twice as many zombies and the mark is twice as strong."
           },
           "bulb": {
             "name": "Sundial",
@@ -3381,7 +3388,8 @@
             "slow": 0.25,
             "sunCap": 0.75,
             "desc": "Makes 1 Sunlight every 4 s and slows zombies in its shade by 25%.",
-            "ancient": "Slows by 40%."
+            "ancient": "Slows by 40%.",
+            "primordial": "Makes Sunlight twice as fast and slows by 55%."
           },
           "burr": {
             "name": "Hitchhiker Burr",
@@ -3429,7 +3437,8 @@
             "coin": 10,
             "bank": 600,
             "desc": "Kills close by store points in its leaves, up to 600. Melee it to collect them.",
-            "ancient": "Stores double."
+            "ancient": "Stores double.",
+            "primordial": "Stores triple and pays out by itself at the end of every round."
           },
           "gourd": {
             "name": "Hollow Gourd",
@@ -3448,7 +3457,8 @@
             "inner": 1.5,
             "radius": 200,
             "desc": "Swallows zombies that come close. Shoot it, or wait 12 s, and it bursts: the more it holds, the harder. Bursting ends the plant.",
-            "ancient": "Bursts 30% wider."
+            "ancient": "Bursts 30% wider.",
+            "primordial": "Swallows twice as many and bursts 60% wider."
           },
           "lily": {
             "name": "Prism Lily",
@@ -3465,7 +3475,8 @@
             "sundial": 0.5,
             "sundialRange": 300,
             "desc": "A beam that burns one zombie at a time and heats up to 2.5× on the same target. 50% stronger near a Sundial.",
-            "ancient": "Refracts to a second target."
+            "ancient": "Refracts to a second target.",
+            "primordial": "Heats up twice as fast, and the second beam burns as hot as the first."
           },
           "flower": {
             "name": "Corpse Flower",
@@ -3486,7 +3497,8 @@
             "ancient": "Lures 20 zombies.",
             "raiseEvery": 12,
             "raiseFor": 10,
-            "raisePower": 0.1
+            "raisePower": 0.1,
+            "primordial": "Gasses twice as many twice as often and lures 30."
           },
           "maw": {
             "name": "Glutton Maw",
@@ -3506,7 +3518,8 @@
             "feedMax": 0.3,
             "desc": "Bites a zombie every 3 s for up to 1.5× a zombie’s health. Each kill makes it stronger; after 6 bites it stops to digest for 6 s. A quarter of its meals leave an ingredient that matches what it ate.",
             "ancient": "Each bite also catches its neighbours for half.",
-            "meal": 0.25
+            "meal": 0.25,
+            "primordial": "Bites twice as often and never stops to digest."
           },
           "melon": {
             "name": "Melon Lobber",
@@ -3522,7 +3535,8 @@
             "lob": 0.45,
             "radius": 170,
             "desc": "Lobs an exploding melon every 5 s at the biggest crowd in reach.",
-            "ancient": "Melons split into three."
+            "ancient": "Melons split into three.",
+            "primordial": "Five melons at a time."
           },
           "vine": {
             "name": "Tetherwood",
@@ -3555,7 +3569,8 @@
             "turn": 4,
             "power": 0.08,
             "desc": "Every 8 seconds it puffs, and up to 6 zombies in reach turn on each other for 4 seconds. Three puffs.",
-            "ancient": "Puffs reach twice as far."
+            "ancient": "Puffs reach twice as far.",
+            "primordial": "Turned zombies stay yours twice as long, and it never runs out of puffs."
           },
           "choir": {
             "parents": [
@@ -3619,7 +3634,8 @@
             "echo": 0.5,
             "raisePower": 0.1,
             "desc": "Every 14 seconds it raises a thrall for 10 seconds. Each of its bites hits like half of your last shot.",
-            "ancient": "Raises one every 9 seconds."
+            "ancient": "Raises one every 9 seconds.",
+            "primordial": "Raises one every 5 seconds, twice as strong."
           },
           "rider": {
             "parents": [
@@ -3668,7 +3684,8 @@
             "inner": 1,
             "radius": 120,
             "desc": "Swallows up to 4 zombies and dissolves one every 4 seconds into an ingredient.",
-            "ancient": "Dissolves one every 2 seconds."
+            "ancient": "Dissolves one every 2 seconds.",
+            "primordial": "Swallows twice as many and dissolves one every second."
           },
           "thornmaw": {
             "parents": [
@@ -3693,7 +3710,8 @@
             "spit": 0.25,
             "spikes": 8,
             "desc": "Bites, and every bite grows a spike it spits at the nearest zombie in reach.",
-            "ancient": "Spits at 2 zombies."
+            "ancient": "Spits at 2 zombies.",
+            "primordial": "Bites twice as often, never stops to digest and spits at 4 zombies."
           },
           "bloodweb": {
             "parents": [
@@ -3739,7 +3757,8 @@
             "inner": 1,
             "radius": 120,
             "desc": "Swallows up to 5 zombies, then lets them out on your side for 10 seconds.",
-            "ancient": "They fight for 15 seconds."
+            "ancient": "They fight for 15 seconds.",
+            "primordial": "Swallows twice as many and they fight for 25 seconds."
           },
           "daydream": {
             "parents": [
@@ -3757,7 +3776,8 @@
             "sleep": 12,
             "every": 2,
             "desc": "Zombies that stand in its shade fall asleep for up to 12 seconds, until something hits them. They can’t doze off again for 18 seconds.",
-            "ancient": "Reach grows by half."
+            "ancient": "Reach grows by half.",
+            "primordial": "Puts them to sleep twice as long."
           },
           "solar": {
             "parents": [
@@ -3776,7 +3796,8 @@
             "sweep": 0.9,
             "width": 0.4,
             "desc": "A beam of sunlight sweeps around it, burning every zombie it crosses.",
-            "ancient": "Two beams."
+            "ancient": "Two beams.",
+            "primordial": "Four beams."
           },
           "catapult": {
             "parents": [
@@ -3801,7 +3822,8 @@
             "burst": 0.3,
             "radius": 170,
             "desc": "Swallows up to 5 zombies, then flings them at the biggest crowd within 900. They crush what they land on.",
-            "ancient": "Landing reach grows by a third."
+            "ancient": "Landing reach grows by a third.",
+            "primordial": "Swallows twice as many and lands 66% wider."
           },
           "tick": {
             "parents": [
@@ -3849,7 +3871,8 @@
             "rarity": "legendary",
             "legend": true,
             "limit": 1,
-            "plots": 3
+            "plots": 3,
+            "primordial": "Five melons at a time."
           },
           "worldroot": {
             "recipe": [
@@ -3873,7 +3896,8 @@
             "rarity": "legendary",
             "legend": true,
             "limit": 1,
-            "plots": 3
+            "plots": 3,
+            "primordial": "Holds you up twice a round and grabs three times as hard."
           },
           "kudzu": {
             "recipe": [
@@ -3903,7 +3927,8 @@
             "rarity": "legendary",
             "legend": true,
             "limit": 1,
-            "plots": 3
+            "plots": 3,
+            "primordial": "Spreads every 6 seconds, up to twice as many copies."
           },
           "grave": {
             "recipe": [
@@ -3928,7 +3953,8 @@
             "rarity": "legendary",
             "legend": true,
             "limit": 1,
-            "plots": 3
+            "plots": 3,
+            "primordial": "They burn for 16 seconds and rise twice as fast."
           },
           "gourmand": {
             "recipe": [
@@ -3956,7 +3982,8 @@
             "rarity": "legendary",
             "legend": true,
             "limit": 1,
-            "plots": 3
+            "plots": 3,
+            "primordial": "Bites twice as often and never stops to digest."
           },
           "beanstalk": {
             "recipe": [
@@ -3980,7 +4007,8 @@
             "rarity": "legendary",
             "legend": true,
             "limit": 1,
-            "plots": 3
+            "plots": 3,
+            "primordial": "Pods pay triple and the nest holds you twice as long."
           },
           "overbloom": {
             "recipe": [
@@ -4010,7 +4038,8 @@
             "rarity": "legendary",
             "legend": true,
             "limit": 1,
-            "plots": 3
+            "plots": 3,
+            "primordial": "Infected last 90 seconds."
           }
         },
         "additives": {
@@ -4566,7 +4595,7 @@
               "name": "Overgrowth",
               "ranks": 1,
               "icon": "totem",
-              "desc": "Every plant can grow one stage further and has +50% health.",
+              "desc": "Every plant can grow one stage further and has +50% health. A plant that reaches Ancient can ascend to Primordial: 2.8× power and health, and a power of its own.",
               "effects": {
                 "garden.stageCap": 1,
                 "garden.hits": 0.5

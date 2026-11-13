@@ -6,14 +6,14 @@ import { CollisionWorld } from '../../collision-world.js';
 
 const up=new THREE.Vector3(0,1,0);
 export function moreBehaviours(BEH,x){
-  const {api,G,Z,plants,hit,raw,beam,pulse,within,nearest,chest,tip,use,kill,spread,alive,free,dropAt,netId,feast,lastShot,feet,ingredient}=x;
+  const {api,G,Z,P4,plants,hit,raw,beam,pulse,within,nearest,chest,tip,use,kill,spread,alive,free,dropAt,netId,feast,lastShot,feet,ingredient}=x;
   const {session,enemies,world,player,audio}=api,P=G.plants;
   Object.assign(BEH,{choir:BEH.pod,royalty:BEH.pod,rider:BEH.burr,tick:BEH.burr,pitcher:BEH.gourd,puppet:BEH.gourd,catapult:BEH.gourd,patriarch:BEH.melon});
 
   const maw=BEH.maw,flower=BEH.flower;
   const risen=(p,dt,d,burn)=>{
     if(p.corpses?.length&&(p.raise=(p.raise??0)-dt)<=0){
-      p.raise=d.raiseEvery;Z.raise(p.corpses.shift(),{d:d.raiseFor*(burn&&p.stage>=3?1.5:1),hits:6,power:d.raisePower,burn});pulse(p.at,70,0x58ff6a,.4);
+      p.raise=d.raiseEvery*(burn&&P4(p)?.5:1);Z.raise(p.corpses.shift(),{d:d.raiseFor*(burn&&P4(p)?2:burn&&p.stage>=3?1.5:1),hits:6,power:d.raisePower,burn});pulse(p.at,70,0x58ff6a,.4);
     }
   };
   BEH.flower=(p,dt,d)=>{flower(p,dt,d);risen(p,dt,d,false);};
@@ -28,7 +28,7 @@ export function moreBehaviours(BEH,x){
     gourmand:maw,
     thornmaw(p,dt,d){
       const bit=p.bitAt;maw(p,dt,d);if(p.bitAt===bit)return;
-      for(const z of nearest(p,within(p,p.r.range)).slice(1,p.stage>=3?3:2)){beam(tip(p),chest(z),0xc8e070,.09,.7);hit(p,z,d.spit);}
+      for(const z of nearest(p,within(p,p.r.range)).slice(1,P4(p)?5:p.stage>=3?3:2)){beam(tip(p),chest(z),0xc8e070,.09,.7);hit(p,z,d.spit);}
     },
     vine(p,dt,d){
       if((p.t-=dt)>0)return;
@@ -40,16 +40,16 @@ export function moreBehaviours(BEH,x){
     spore(p,dt,d){
       if((p.t-=dt)>0)return;
       const list=nearest(p,within(p,p.r.range,false)).filter(z=>z.kind==='zombie').slice(0,p.stage>=3?d.puff+3:d.puff);if(!list.length){p.t=.3;return;}
-      p.t=d.every;for(const z of list)Z.order('thrall',z,{temp:true,d:d.turn,power:d.power,hits:4});
-      pulse(p.at,p.r.range,0xb48cff,.7);audio.play('buy',.12);use(p);
+      p.t=d.every;for(const z of list)Z.order('thrall',z,{temp:true,d:d.turn*(P4(p)?2:1),power:d.power,hits:4});
+      pulse(p.at,p.r.range,0xb48cff,.7);audio.play('buy',.12);if(!P4(p))use(p);
     },
     daydream(p,dt,d){
       if((p.t-=dt)>0)return;p.t=d.every;
-      for(const z of within(p,p.r.range,false))if(z.kind==='zombie'&&session.time>(z.dozeNext??0)){z.dozeNext=session.time+d.sleep*1.5;Z.order('sleep',z,{d:d.sleep});}
+      for(const z of within(p,p.r.range,false))if(z.kind==='zombie'&&session.time>(z.dozeNext??0)){const k=P4(p)?2:1;z.dozeNext=session.time+d.sleep*1.5*k;Z.order('sleep',z,{d:d.sleep*k});}
     },
     solar(p,dt,d){
       p.ang=((p.ang??0)+d.sweep*dt)%(Math.PI*2);
-      const rays=p.stage>=3?[p.ang,p.ang+Math.PI]:[p.ang],from=tip(p);
+      const rays=P4(p)?[0,1,2,3].map(i=>p.ang+i*Math.PI/2):p.stage>=3?[p.ang,p.ang+Math.PI]:[p.ang],from=tip(p);
       for(const a of rays)beam(from,from.clone().add(new THREE.Vector3(Math.cos(a)*p.r.range,0,Math.sin(a)*p.r.range)),0xffe28a,.05,1.6);
       if((p.tick=(p.tick??.25)-dt)>0)return;p.tick=.25;
       for(const z of within(p,p.r.range)){
@@ -60,8 +60,8 @@ export function moreBehaviours(BEH,x){
     revenant(p,dt,d){
       if((p.t-=dt)>0)return;
       const z=within(p,p.r.range)[0];if(!z){p.t=.4;return;}
-      p.t=p.stage>=3?9:d.every;
-      Z.raise(p.at.clone().add(new THREE.Vector3(Math.random()*50-25,0,Math.random()*50-25)),{d:d.raiseFor,hits:6,power:d.raisePower,replay:lastShot()*d.echo});
+      p.t=P4(p)?5:p.stage>=3?9:d.every;
+      Z.raise(p.at.clone().add(new THREE.Vector3(Math.random()*50-25,0,Math.random()*50-25)),{d:d.raiseFor,hits:6,power:d.raisePower*(P4(p)?2:1),replay:lastShot()*d.echo});
       pulse(p.at,70,0x58ff6a,.4);
     },
     grave(p,dt,d){
@@ -70,18 +70,18 @@ export function moreBehaviours(BEH,x){
     },
     worldroot(p,dt,d){
       if((p.t-=dt)>0)return;p.t=d.every;
-      for(const z of within(p,p.r.range))if(['barricade','entering'].includes(z.state)){hit(p,z,d.grab*(p.stage>=3?2:1));if(alive(z))Z.order('stagger',z,{d:d.stun});}
+      for(const z of within(p,p.r.range))if(['barricade','entering'].includes(z.state)){hit(p,z,d.grab*(P4(p)?3:p.stage>=3?2:1));if(alive(z))Z.order('stagger',z,{d:d.stun});}
     },
     kudzu(p,dt,d){
       if((p.t-=dt)>0)return;
-      p.kids=(p.kids??[]).filter(q=>plants.includes(q));if(p.kids.length>=d.copies){p.t=1;return;}
+      p.kids=(p.kids??[]).filter(q=>plants.includes(q));if(p.kids.length>=d.copies*(P4(p)?2:1)){p.t=1;return;}
       const q=spread(p,d.spreads[Math.floor(Math.random()*d.spreads.length)],{k:d.copyPower,lifespan:d.copyFor});
-      if(q){p.kids.push(q);p.t=p.stage>=3?12:d.every;}else p.t=1;
+      if(q){p.kids.push(q);p.t=P4(p)?6:p.stage>=3?12:d.every;}else p.t=1;
     },
     overbloom(p,dt,d){
       if(!p.lit){
         const z=nearest(p,within(p,p.r.range,false)).find(z=>z.kind==='zombie');if(!z)return;
-        p.lit=true;p.calm=0;Z.order('thrall',z,{d:d.infectFor,infect:true,power:d.power,hits:d.hitsThrall});pulse(p.at,160,0x7dff9a,.8);audio.play('round',.25);return;
+        p.lit=true;p.calm=0;Z.order('thrall',z,{d:d.infectFor*(P4(p)?2.25:p.stage>=3?1.5:1),infect:true,power:d.power,hits:d.hitsThrall});pulse(p.at,160,0x7dff9a,.8);audio.play('round',.25);return;
       }
       p.calm=enemies.list.some(z=>z.thrall?.infect||z.netFlags&2)?0:p.calm+dt;
       if(p.calm>5)kill(p,{silent:true});
@@ -104,7 +104,7 @@ export function moreBehaviours(BEH,x){
         return;
       }
       if((p.t-=dt)>0)return;
-      if(Math.hypot(f.x-p.at.x,f.z-p.at.z)<p.r.range&&Math.abs(f.y-p.at.y)<50){p.lift=0;p.stay=d.stay;p.nest=nestBox(p.at,top);audio.play('teleport',.5);}
+      if(Math.hypot(f.x-p.at.x,f.z-p.at.z)<p.r.range&&Math.abs(f.y-p.at.y)<50){p.lift=0;p.stay=d.stay*(P4(p)?2:1);p.nest=nestBox(p.at,top);audio.play('teleport',.5);}
       else p.t=.1;
     }
   });
@@ -128,8 +128,9 @@ export function moreBehaviours(BEH,x){
   };
   const END_ROUND={
     patriarch:p=>dropAt('golden',p.at),
-    beanstalk:p=>{session.addPoints?.(P.beanstalk.pods*(p.stage>=3?2:1));pulse(p.at,70,0xffd978,.5);},
-    worldroot:p=>{p.saved=false;},
+    beanstalk:p=>{session.addPoints?.(P.beanstalk.pods*(P4(p)?3:p.stage>=3?2:1));pulse(p.at,70,0xffd978,.5);},
+    worldroot:p=>{p.saves=0;},
+    mint:p=>{if(P4(p)&&p.bank>=1){const n=Math.floor(p.bank);p.bank=0;session.addPoints?.(n);pulse(p.at,70,0xffd978,.5);}},   // Primordial: pays out by itself
   };
   return {ON_KILL,END_ROUND,leave:p=>leave(p,feet(),p.at.y+(p.nestY??0))};
 }
