@@ -2404,7 +2404,7 @@
   },
  {
   "id": "deadlock_seven",
-  "heroPose": {"clip": "idle", "t": 0, "yaw": -15, "bones": {"ri.arm": [-1.0, 0, 0], "ri.fore": [1.2, 0, 0], "le.arm": [-1.2, 0, 0]}, "note": "The living storm showing off: rifle hoisted overhead, the other fist up"},
+  "heroPose": {"clip": "idle", "t": 0, "yaw": -15, "bones": {"ri.arm": [-0.5, -1.2, 0], "le.arm": [-0.5, 1.2, 0]}, "cam": {"zoom": 1.45, "center": 0.58, "tilt": 0.05, "angle": 25}, "note": "Storm Cloud: arms flung wide calling the storm, gun in one hand (arms held in read as a tangle under the halo ring, 2026-11-13)"},
   "name": "Seven",
   "model": "models/deadlock/deadlock_seven.glb?v=3",
   "icon": "models/deadlock/deadlock_seven_icon.webp",
