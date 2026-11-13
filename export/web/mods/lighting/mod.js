@@ -251,7 +251,9 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
   const boxLamps=[];
   // the box glow colour: green, or a shop map-glow (window.kino.boxGlow, Phase 6), applied at runtime (no rebake)
   const BOX_GREEN=new THREE.Color(.25,1,.4),glowC=new THREE.Color();let glowKey=null;
-  const glowCol=()=>{const k=window.kino?.boxGlow??null;if(k!==glowKey){glowKey=k;glowC.copy(k?new THREE.Color(k):BOX_GREEN);for(const l of boxLamps)l.color.set(k??'#44ff6a');}return glowC;};
+  const glowCol=()=>{const k=window.kino?.boxGlow??null;if(k!==glowKey){glowKey=k;glowC.copy(k?new THREE.Color(k):BOX_GREEN);for(const l of boxLamps)l.color.set(k??'#44ff6a');
+    // the beacon column over the box follows it too (2026-11-13; the shop mod tints the plain beam and the open box's light)
+    const bc=k?new THREE.Color(k):new THREE.Color('#a9c8ff');boxBeam?.mesh.material.uniforms.color.value.copy(bc).lerp(new THREE.Color('#fff'),.25);}return glowC;};
   for(const e of world.boxLocations??[]){
     const p=new THREE.Vector3(...e.position),own=mapBulbs.filter(b=>b.loc===e.script_noteworthy).sort((a,b)=>a.pos.distanceTo(p)-b.pos.distanceTo(p))[0];
     if(!own||own.pos.distanceTo(p)>400)continue;
@@ -574,6 +576,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
      for(const b of mapBulbs){const on=moving?(Math.sin(t*23+b.pos.x)>.2?1:0):(world.fireSale||b.loc===here)?1:0;
        const gc=glowCol();for(const m of b.mats){m.emissive?.setRGB(gc.r*on*power,gc.g*on*power,gc.b*on*power);if(m.emissive)m.emissiveIntensity=2.2;}
        if(b.halo){b.halo.material.color.copy(gc);b.halo.material.opacity=on*power*(.8+Math.sin(t*3)*.08);b.halo.visible=on>0;}}}
+    glowCol();   // a changed box glow recolours the lamps, beams and box light
     if(boxBeam){
       // Beam upward from the box: the column is brightest at the box, fading into the air above.
       const p=world.boxBeam.position,key=p.x+','+p.z;

@@ -2,10 +2,12 @@
 //   reticle / hitmarker: #crosshair and #hitmarker text and colour (and the red dot sight's colour)
 //   kill: the colour of the engine's hit burst (effect events in its default blood colour)
 //   hud / frame: CSS variables the hud-bo7 layout reads; sound: window.kino.hitSoundSet (the hud mod's thumps, or its recorded samples)
-//   glow: window.kino.boxGlow (the lighting mod's Mystery Box map bulb and lamp); card: shown in the pause menu
+//   glow: window.kino.boxGlow (Kino's map bulbs, lamp and beacon in the lighting mod) plus, on every map, the box beam,
+//   the light inside the open box and a coloured halo over the active box (boxGlow() below, 2026-11-13); card: shown in the pause menu
 //   killfx: what plays on your kills (kill-fx.js); title: shown with your name on the pause card, the co-op lobby and the
 //   scoreboard (window.kino.titleOf(itemId): peers send an item id, never text); emblem: a badge at the card's left end and
 //   the avatar square on the scoreboard and in the co-op lobby (window.kino.emblemOf(itemId), the same way)
+import * as THREE from 'three';
 import { loadCatalog, cosmetics, installRewards } from './shop.js';
 import { cardSvg, safePath, PLAIN_CARD } from './card.js';
 import { installKillFx } from './kill-fx.js';
@@ -30,6 +32,7 @@ export default async function setup(api){
     // a set with samples (recorded hit sounds, files in sounds/) hands the hud mod their URLs
     const hs=C.sound?.hits;window.kino.hitSoundSet=hs?{...hs,samples:hs.samples?.map(f=>new URL('sounds/'+f,mod.url).href)}:null;
     window.kino.boxGlow=C.glow?.box??null;
+    tintBox();
     // the calling card in the pause menu, under the map title
     const p=loadProfile(),pr=loadPrestige().player.prestige;
     if(C.card||C.emblem){card.innerHTML=cardSvg(C.card??PLAIN_CARD,(p.name??document.querySelector('#account .name')?.textContent)||'Survivor',`${C.title?C.title.title.toUpperCase()+' · ':''}LEVEL ${p.level}${pr?' · '+prestigeName(pr):''}`,C.emblem?.emblem);
@@ -41,6 +44,25 @@ export default async function setup(api){
   const blood=0x9e3023;
   host.on('effect',e=>{if(C.kill&&e.color===blood)e.color=parseInt(C.kill.blood.slice(1),16);});
   const css2=document.createElement('style');css2.textContent='#pause-card{margin:10px 0 4px;max-width:320px}#pause-card svg{display:block;width:100%;height:auto}#pause-card .pc-title{color:#f0c060;font:700 13px/1 \'Barlow Condensed\',Arial Narrow,sans-serif;letter-spacing:.16em;text-transform:uppercase}';document.head.append(css2);
+  // Box glow on every map (only Kino's lighting read it before, 2026-11-13): the plain beam and the open box's light take
+  // the colour, and a halo (made at load, warmed, driven by opacity only) sits over the active box.
+  const {world,mysteryBox,scene}=api;let halo=null;
+  if(scene&&world?.boxBeam){
+    const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),r=g.createRadialGradient(32,32,0,32,32,32);
+    r.addColorStop(0,'rgba(255,255,255,.9)');r.addColorStop(.3,'rgba(255,255,255,.35)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,64,64);
+    const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;
+    halo=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0}));
+    halo.scale.setScalar(150);halo.renderOrder=6;scene.add(halo);host.warmObjects?.push(halo);
+  }
+  function tintBox(){
+    const k=C.glow?.box??null;
+    if(world?.boxBeam){world.boxBeam.material.color.set(k??0x8cacdd);world.boxBeam.material.opacity=k?.18:.1;}
+    for(const b of mysteryBox?.boxes?.values()??[])b.glow?.material.color.set(k??0xd8eaff);
+    if(halo)halo.material.color.set(k??'#ffffff');
+  }
+  let ht=0;
+  host.on('update',dt=>{if(!halo)return;const k=C.glow?.box,p=world.boxBeam.position,on=k&&world.activeBox&&!world.fireSale?1:0;ht+=dt||.016;
+    halo.position.set(p.x,p.y-800+45,p.z);const o=on*(.55+Math.sin(ht*2.4)*.1);halo.material.opacity+=(o-halo.material.opacity)*Math.min(1,(dt||.016)*3);halo.visible=halo.material.opacity>.01;});
   apply();host.on('start',apply);addEventListener('focus',apply);
   installKillFx(api,()=>C.killfx);
   const by=Object.fromEntries(cat.items.map(i=>[i.id,i]));
