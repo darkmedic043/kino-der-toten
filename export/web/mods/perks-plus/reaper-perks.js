@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { zombieHealth } from '../../rules.js';
 import { setupMagnet } from './magnet.js';
+import { perkMeter } from './perk-meters.js';
 
 const UP = new THREE.Vector3(0, 40, 0);
 // the switched-on perks' perk table entries (perks-plus MORE_PERKS adds them; terminal: mods/terminal-booth/desktop.js PERKS)
@@ -844,6 +845,18 @@ export function setupReaperPerks(api, catalogue, base) {
   { const powerup = session.powerup?.bind(session);   // Max Ammo: the bigger belt and tactical slot, filled
     if (powerup) session.powerup = (type, ...rest) => { const r = powerup(type, ...rest); if (type === 'full_ammo' && (has('damnade') || stat('mk.equip'))) { fillLethal(); tacticalBack(Infinity); } return r; }; }
 
+  // ---- perk icon cooldown fills (perk-meters.js): 0 = just used / charging, 1 = ready ----------------------------------
+  const cd = (ready, total) => 1 - Math.max(0, ready - now()) / total;
+  const meter = (id, fn) => perkMeter(S(id), fn);
+  meter('zombshell', () => shells.length ? 0 : cd(shellReady, ZS_COOLDOWN));   // grey while a field is up, then 20 s
+  meter('prismatic', () => walls.length || wallReady === Infinity ? 0 : cd(wallReady, PP_COOLDOWN * (1 - stat('pp.cooldown'))));
+  meter('dyingwish', () => cd(dyingReady, 300));
+  meter('guardianangel', () => angelCharge >= 1 ? 1 : angelKills / ANGEL_KILLS);
+  meter('bloodwolf', () => cd(wolfReady, up('bloodwolf') ? 40 : 60));
+  meter('milk', () => cd(milkReady, up('milk') ? 8 : 15));
+  meter('spectorshot', () => spectre ? 0 : cd(spectreReady, up('spectorshot') ? 20 : 30));
+  meter('winterwail', () => wails / (up('winterwail') ? 4 : 3));
+  meter('bubbleblink', () => { const max = up('bubbleblink') ? 2 : 1; return Math.min(1, (blinks + (blinks < max ? blinkKills / 15 : 0)) / max); });
   // ---- chips ------------------------------------------------------------------------------------------------------------
   chip(() => has('dyingwish') ? [dyingUntil > now() ? 'DYING WISH ' + Math.ceil(dyingUntil - now()) : now() < dyingReady ? 'DW ' + Math.ceil(dyingReady - now()) + 's' : 'DYING WISH', dyingUntil > now() || now() >= dyingReady] : null);
   chip(() => has('guardianangel') ? [angelCharge >= 1 ? 'ANGEL READY' : `ANGEL ${angelKills}/${ANGEL_KILLS}`, angelCharge >= 1] : null);

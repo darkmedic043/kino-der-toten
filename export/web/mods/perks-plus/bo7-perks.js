@@ -5,6 +5,7 @@
 // are adapted: Essence and Salvage -> points, the Field Upgrade -> your class action skill, armor plates -> health.
 // They are sold by the terminal booth's PERKS app on every map (no machine models for them yet).
 import * as THREE from 'three';
+import { perkMeter } from './perk-meters.js';
 
 export const BO7_PERKS = {
   specialty_vultureaid: { name: 'Vulture Aid', price: 3000, color: '#c0392b', icon: 'VA' },
@@ -147,6 +148,9 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
   // BO7-like: a small blue wisp that helps rather than clears the room (user, 2026-10-15: was far too strong and big)
   const WISP_KILLS = 30, WISP_LIFE = 20, WISP_RANGE = 400, WISP_EVERY = 1.4;
   let wisp = null, wispCharge = 0, wispRest = 0, salvations = 3;
+  // perk icon fills (perk-meters.js): Widow's Wine's cooldown; Wisp Tea's rest (first half) then its kill charge (second half)
+  perkMeter(WW, () => 1 - Math.max(0, widowReady - now()) / (40 * (1 - stat('ww.haste'))));
+  perkMeter(WT, () => wisp ? 0 : now() < wispRest ? .5 * (1 - (wispRest - now()) / (120 * (1 - stat('wt.haste')))) : .5 + .5 * wispCharge / WISP_KILLS);
   function summonWisp() {
     const s = sprite(0x1f6bff, 5, .85), core = sprite(0x9fd4ff, 1.8); s.add(core);
     const mask = stat('wt.wrath') ? 'wrath' : stat('wt.salvation') ? 'salvation' : stat('wt.distraction') ? 'distraction' : stat('wt.benevolence') ? 'benevolence' : null;

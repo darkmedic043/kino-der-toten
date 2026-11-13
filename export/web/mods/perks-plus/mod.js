@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { BO7_PERKS, BO7_ICONS, setupBo7Perks } from './bo7-perks.js';
 import { setupReaperPerks, REAPER_ON } from './reaper-perks.js';
+import { setupPerkMeters } from './perk-meters.js';
 export const MORE_PERKS = {
   specialty_longersprint: { name: 'Stamin-Up', price: 2000, color: '#ebbd4b', icon: 'S' },
   specialty_deadshot: { name: 'Deadshot Daiquiri', price: 1500, color: '#9da8ac', icon: 'DS' },
@@ -41,6 +42,7 @@ function addIcons(base) {
 export default function setup(api) {
   const { host, session, player, world, map, audio, mod, enemies, scene, perkInfo, camera, powerups, announce, toast } = api;
   addIcons(mod?.url ?? import.meta.url);
+  setupPerkMeters({ host, session, map, world, perkInfo });   // cooldown fills on the perk icons (perk-meters.js)
   phdFlopper({ host, session, player, world, audio, enemies, scene });
   // the Reaper Collection perks: working; all but REAPER_ON switched off (cheat console only; reaper-perks.js, docs/fork/reaper-perks.md)
   const base = new URL('./', mod?.url ?? import.meta.url);

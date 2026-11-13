@@ -182,6 +182,26 @@ Fire while sprinting, a chance to refund ammo, and points for multi-kills. Base:
 
 `mods/command-wheel` (user, 2026-10-19: "a simple command wheel, this allows me to add stuff to perks without crowding the controls"). Hold **U** (rebindable: Settings → Controls, "Command wheel (hold)") or the middle mouse button: a radial menu opens round the crosshair while the game keeps running; look is frozen and the mouse picks a slice; let go (or click) to use it. 1-8 pick a slice, the mouse wheel steps through them, Esc or right click closes. Phones: a WHEEL toolbar button, shown while there is something on it; slices are tapped. Nothing on it: a toast says so. Other code adds commands with `window.kino.commandWheel.add(id, () => [{ label, sub, icon, color, disabled, use }])` (asked each time it opens; at most 8 slices) and `remove(id)`; `entries()` / `use(i)` for tests. Its only user so far is Magnet Margarita.
 
+## Perk icon cooldowns
+
+`mods/perks-plus/perk-meters.js` (2026-11-13, user: "greyed out and slowly fill up with their respective color to mark its cooldown"). A perk registers `perkMeter(<perk id>, () => 0..1)` (1 = ready, `null` = nothing to show); while it is held, its `#perks` icon is drawn grey (`grayscale(1) brightness(.55)` on a `::before` copy of the icon, clipped above the fill) with the colour rising from the bottom and a 2 px line in the perk's table colour at the edge (`::after`). The engine rebuilds `#perks` whenever its innerHTML differs, so the spans are never touched: one CSS rule per perk title carries `--cd`, `--edge`, `--pc`, updated at 20 Hz in 0.5% steps. No blur or shadow; the grey filter is painted at load on a stand-in icon (`warmHud`).
+
+| Perk | Fill |
+|---|---|
+| Zombshell | grey while a field is up, then its 20 s cooldown |
+| Prismatic Punch | grey while a wall stands, then 45 s (less with `pp.cooldown`) |
+| Dying Wish | 300 s cooldown |
+| Guardian Angel Ale | kills toward the 20-kill recharge |
+| Blood Wolf Bite | 60 s from the summon (40 upgraded) |
+| Muscle Milk | 15 s (8 upgraded) |
+| Spectre Shot | grey while the spectre is out, then 30 s (20) |
+| Winter's Wail | charges left of 3 (4) |
+| Bubble Blink | charges, plus kills toward the next one |
+| Widow's Wine (BO7) | 40 s web cooldown (less with `ww.haste`) |
+| Wisp Tea (BO7) | grey while the wisp is out; the 120 s rest fills the first half, kills toward 30 the second |
+
+Electric Cherry (1.5 s) and Elemental Pop (5 s) are too short to be worth a fill. A new cooldown perk only needs a `perkMeter` line.
+
 ## Where things are
 
 - **Catalogue (tracked)**: `export/web/mods/perks-plus/reaper-perks.json`. Per perk: `name`, `specialty` (the mod's id, e.g. `specialty_cashback`), `origin`, `new` (false = Melon Zombies already has it), `status` (`working, switched off`), `effect`, `upgrade` (the mod author's "All Perks" sheet, lightly tidied), `source` (BO3/mod asset names: machine model, HUD icon image, bottle label image, jingle/sting path). Edit names and effects here.
