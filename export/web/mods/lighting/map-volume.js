@@ -80,7 +80,8 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
   let timer = 0, last = performance.now();
   host.on('warm', () => sweep());
   host.on('update', () => { const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
-    uniforms.mvPower.value += ((session.power ? 1 : powerOff) - uniforms.mvPower.value) * Math.min(1, dt * 1.5);
+    const base = session.power ? 1 : powerOff;   // light.power(base): a map's own say over the powered set (the castle's undercroft ties it to the gravity)
+    uniforms.mvPower.value += ((light.power ? light.power(base) : base) - uniforms.mvPower.value) * Math.min(1, dt * 1.5);
     if ((timer -= dt) <= 0) { timer = 1; sweep(); } });
 
   // CPU lookup, nearest cell: { sky, sun } as the factors the shader applies, lamp = the lamp light there
@@ -95,7 +96,7 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
     out.valid = bin[n * 8 + i + 3]; lamp.setRGB(dec(bin[i]) + dec(bin[j]) * pw, dec(bin[i + 1]) + dec(bin[j + 1]) * pw, dec(bin[i + 2]) + dec(bin[j + 2]) * pw);
     lamp.multiplyScalar(s / (1 + Math.max(lamp.r, lamp.g, lamp.b) * uniforms.mvKnee.value)); return out;   // (the shader's knee)
   };
-  const light = { meta, uniforms, at, patch, sweep };
+  const light = { meta, uniforms, at, patch, sweep, power: null };
   if (window.kino) window.kino.mapLight = light;
   return light;
 }

@@ -550,8 +550,9 @@ function setupLook(api) {
   let skyModel = null;
   if (scene.fog) scene.fog.color.copy(HORIZON);
   scene.background = HORIZON.clone();
+  let underW = 0, gravLv = 0;
   const UNDER = new THREE.Box3(new THREE.Vector3(-1900, 0, -3100), new THREE.Vector3(320, 620, -1650));   // the pyramid room and its passages
-  const IN_BASE = [.85 * .55, .95 * .55, 1.18 * .55], IN_WARM = [1.0 * .34, .8 * .34, .58 * .34], IN_GRAV = [.7 * .62, .95 * .62, 1.45 * .62], TINT_WARM = [.98, .95, .92];
+  const IN_BASE = [.85 * .55, .95 * .55, 1.18 * .55], IN_WARM = [1.0 * .34, .88 * .34, .72 * .34], IN_GRAV = [.7 * .62, .95 * .62, 1.45 * .62], TINT_WARM = [.98, .95, .92];
   let under = 0, tint0 = null, tintW = 0;
   let last = performance.now();
   host.on('update', () => {
@@ -572,6 +573,9 @@ function setupLook(api) {
       under += ((UNDER.containsPoint(camera.position) ? 1 : 0) - under) * Math.min(1, dt * 1.5);
       const lv = window.kino?.castle?.lowgrav?.level?.() ?? 0, w = under * (1 - lv), g = under * lv, mix = (i, a0, a1, a2) => a0[i] + (a1[i] - a0[i]) * w + (a2[i] - a0[i]) * g;
       baked.uniforms.mvIndoor.value.set(mix(0, IN_BASE, IN_WARM, IN_GRAV), mix(1, IN_BASE, IN_WARM, IN_GRAV), mix(2, IN_BASE, IN_WARM, IN_GRAV));
+      // The room's blue ceiling lights (on all the time in BO3) are baked into the volume's powered set there, with a dim
+      // warm copy in the always set (bake-map-light.mjs `gated`): in the undercroft that set follows the gravity.
+      underW = under; gravLv = lv; baked.power ??= base => base + (gravLv - base) * underW;
       const post = window.kino?.post, cur = post?.get?.();
       if (cur?.shadowTint) {
         if (!tintW) { tint0 ??= [1, 1, 1]; for (let i = 0; i < 3; i++) tint0[i] = cur.shadowTint[i]; }   // (untouched by us: follow the Film look setting)

@@ -26,7 +26,13 @@ const MAPS = {
   'the-giant': { lamps: /^GIANT_LAMP_/, cell: 40, range: 650, decay: 1.4, off: 700, on: 2200, color: () => 0xffc58a, sun: [-.35, 1, .45], extra: [] },
   'der-eisendrache': { lamps: /^CASTLE_LAMP_/, cell: 48, range: 620, decay: 1.4, off: 2000, on: 3000,
     color: n => n.extras?.kind === 'electric' ? 0xffd9a8 : 0xffac62, sun: [.45, 1, .3], extra: ['PCOL_props', 'COL_flagstones'],
-    real: { file: 'export_game/bo3/maps/zm_castle/zm_castle.lights.json', gain: 550, minRadius: 30, albedo: .5, bounces: 3, adapt: [6, .45], fill: [1.5, .84, .93, 1.1], outdoor: 1.4 } },
+    real: { file: 'export_game/bo3/maps/zm_castle/zm_castle.lights.json', gain: 550, minRadius: 30, albedo: .5, bounces: 3, adapt: [6, .45], fill: [1.5, .84, .93, 1.1], outdoor: 1.4,
+      // The undercroft (the box = the map mod's UNDER): the game keeps 71 blue ceiling lights on there all the time; the
+      // user wants the blue only while the gravity is low. So in the box the "with the power on" set holds those blue
+      // lights instead (the mod drives mvPower from the gravity while the camera is inside), the always set holds every
+      // other light of the room at full plus a dim warm copy of the blue ones (`keep`: level, r, g, b of their
+      // luminance), and the room fill there is warm (`fill`) and measured against the always set.
+      gated: { box: [[-1900, 0, -3100], [320, 620, -1650]], blue: 1.3, keep: [.5, 1, .97, .9], fill: [1, .95, .88] } } },
 };
 const id = process.argv[2], cfg = MAPS[id];
 if (!cfg) { console.error('usage: bake-map-light.mjs <' + Object.keys(MAPS).join('|') + '> [--cell N]'); process.exit(1); }
@@ -153,8 +159,10 @@ log(`${cands.length} indoor standing cells, ${nFill} fill lights added to ${lamp
 const realFile = cfg.real && !process.argv.includes('--markers') && fs.existsSync(cfg.real.file) ? cfg.real.file : null;
 if (cfg.real && !realFile) log(`no ${cfg.real.file}: falling back to the lamp markers`);
 const GAIN = arg('gain', cfg.real?.gain ?? 1), toMap = v => new THREE.Vector3(v[0], v[2], -v[1]);
+const GATED = cfg.real?.gated, inBox = p => !!GATED && p.x > GATED.box[0][0] && p.y > GATED.box[0][1] && p.z > GATED.box[0][2] && p.x < GATED.box[1][0] && p.y < GATED.box[1][1] && p.z < GATED.box[1][2];
 const real = !realFile ? null : JSON.parse(fs.readFileSync(realFile)).lights.filter(l => (l.states & 1) && l.radius >= cfg.real.minRadius)
   .map(l => ({ p: toMap(l.origin), c: l.color, r: l.radius, d: l.toLight ? toMap(l.toLight).normalize() : null, ci: l.cosInner, co: l.cosOuter }))
+  .map(l => { if (inBox(l.p)) { if (l.c[2] > l.c[0] * GATED.blue) { const lum = (.2126 * l.c[0] + .7152 * l.c[1] + .0722 * l.c[2]) * GATED.keep[0]; l.keep = l.c.map((v, k) => Math.min(v, lum * GATED.keep[1 + k])); } else l.room = true; } return l; })
   .filter(l => l.p.x + l.r > origin.x && l.p.y + l.r > origin.y && l.p.z + l.r > origin.z && l.p.x - l.r < origin.x + X * CELL && l.p.y - l.r < origin.y + Y * CELL && l.p.z - l.r < origin.z + Z * CELL);
 if (real) {
   const share = cfg.off / cfg.on, acc = new Float32Array(N * 3), cv = new THREE.Vector3(); let used = 0;
@@ -170,7 +178,8 @@ if (real) {
       if (top * fall < .004) continue;
       if (d > 34 && hit(cv, toL.clone().divideScalar(d), d - 30)) continue;   // stops short of the light: it may sit in its fixture
       const e = GAIN * fall * Math.min(1, CLAMP / (top * fall)), w = e * top / Math.max(d, 1);
-      for (let k = 0; k < 3; k++) { lampOff[i * 3 + k] += L.c[k] * e * share; lampOn[i * 3 + k] += L.c[k] * e * (1 - share); }
+      if (L.keep) for (let k = 0; k < 3; k++) { lampOff[i * 3 + k] += L.keep[k] * e; lampOn[i * 3 + k] += (L.c[k] - L.keep[k]) * e; }
+      else for (let k = 0; k < 3; k++) { const sh = L.room ? 1 : share; lampOff[i * 3 + k] += L.c[k] * e * sh; lampOn[i * 3 + k] += L.c[k] * e * (1 - sh); }
       acc[i * 3] += toL.x * w; acc[i * 3 + 1] += toL.y * w; acc[i * 3 + 2] += toL.z * w; any = true;
     }
     if (any) used++;
@@ -245,14 +254,17 @@ if (real) {
   // lamp's pool stays a few times brighter than the room around it instead of thirty times.
   const [ref, pw] = [arg('ref', cfg.real.adapt?.[0] ?? 1), arg('adapt', cfg.real.adapt?.[1] ?? 1)];
   if (pw !== 1) for (const i of cells) { const q = i * 3, L = .2126 * (lampOff[q] + lampOn[q]) + .7152 * (lampOff[q + 1] + lampOn[q + 1]) + .0722 * (lampOff[q + 2] + lampOn[q + 2]); if (L <= 0) continue;
-    const k = Math.min(8, Math.pow(L / ref, pw - 1)); for (let c = 0; c < 3; c++) { lampOff[q + c] *= k; lampOn[q + c] *= k; } }
+    const k = Math.min(8, Math.pow(L / ref, pw - 1)); let kOff = k;
+    if (GATED && inBox(cellPos(i, o))) { const L0 = .2126 * lampOff[q] + .7152 * lampOff[q + 1] + .0722 * lampOff[q + 2]; if (L0 > 0) kOff = Math.min(8, Math.pow(L0 / ref, pw - 1)); }   // (the room's own level with the gated lights off)
+    for (let c = 0; c < 3; c++) { lampOff[q + c] *= kOff; lampOn[q + c] *= k; } }
   // and no room is left black: BO3's lightmaps hold bounce light everywhere indoors. `fill: [level, r, g, b]` tops up
   // every cell to `level` (scaled by how far indoors it is, 1 - sky) with that colour, a cool grey against the lamps.
   const fill = cfg.real.fill, fillLevel = arg('fill', fill?.[0] ?? 0);
   if (fillLevel > 0) { const fc = fill?.length > 3 ? fill.slice(1) : [.84, .93, 1.1], fl = .2126 * fc[0] + .7152 * fc[1] + .0722 * fc[2]; let n = 0;
     for (const i of cells) { const q = i * 3, L = .2126 * (lampOff[q] + lampOn[q]) + .7152 * (lampOff[q + 1] + lampOn[q + 1]) + .0722 * (lampOff[q + 2] + lampOn[q + 2]);
-      const short = fillLevel * (1 - Math.min(1, sky[i])) - L; if (short <= 0) continue; n++;
-      for (let c = 0; c < 3; c++) lampOff[q + c] += fc[c] / fl * short; }
+      const gf = GATED && inBox(cellPos(i, o)) ? GATED.fill : null, gl = gf && .2126 * gf[0] + .7152 * gf[1] + .0722 * gf[2];
+      const short = fillLevel * (1 - Math.min(1, sky[i])) - (gf ? .2126 * lampOff[q] + .7152 * lampOff[q + 1] + .0722 * lampOff[q + 2] : L); if (short <= 0) continue; n++;
+      for (let c = 0; c < 3; c++) lampOff[q + c] += (gf ? gf[c] / gl : fc[c] / fl) * short; }
     log(`room fill ${fillLevel}: ${n} cells topped up`); }
   // under the open sky the daylight is already there: `outdoor` caps the lamp level at outdoor / sky (lamps on snow
   // burned it white with bloom on top, 2026-11-12), so a lamp still reads in a doorway but not on the open pad
