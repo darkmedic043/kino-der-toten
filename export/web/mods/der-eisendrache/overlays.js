@@ -15,6 +15,9 @@ import * as THREE from 'three';
 //   SOFT   other prop blend shells with no weights (the roof's oxidised copper plates): a fixed share.
 // Images whose alpha is data, not coverage (tint masks, icicles, the opus tiles) are in neither list and stay solid.
 // Run before the props are merged (instancing groups by material and geometry).
+// Shared by the BO3 ports: another map passes its own image stems on top of these lists (The Giant,
+// mods/the-giant/overlays.js), `snow`/`soft` to replace those two name rules (null = none), and `glass` for images
+// whose alpha is the glass's opacity (a jar, a clock face cover: see-through, no offset, drawn after the decals).
 const BLEND = new Set((
   'mtl_p7_blast_wall_concrete_decal mtl_p7_blast_wall_concrete_decal_02 mtl_p7_bottle_lable_wine_01 ' +
   'mtl_p7_cai_door_wood_rustic_01_stains mtl_p7_cai_street_vendor_02_dirty mtl_p7_ctl_keepers_stone ' +
@@ -59,17 +62,19 @@ const SOFT = [[/copper_floor_01_oxidized_blend$/, .35], [/stone_wall_cut_grout_d
 const SNOW = /snow\w*_blend$/, DARK = /_carved$|weld_01_normal$/;   // carved symbols and normal-only weld seams: their image is white
 const stem = t => (t?.name ?? '').split('/').pop().replace(/^i_/, '').replace(/_c(_\d+)?\.\w+$/, '');
 
-export function overlayLayers(root) {
+export function overlayLayers(root, { blend = null, mask = null, glass = null, snow = SNOW, soft = SOFT } = {}) {
+  const B = blend ? new Set([...BLEND, ...blend]) : BLEND, M = mask ? new Set([...MASK, ...mask]) : MASK, G = new Set(glass ?? []);
   const kind = new Map(), count = { blend: 0, mask: 0, snow: 0, soft: 0 }, up = new THREE.Vector3(), m3 = new THREE.Matrix3(), m4 = new THREE.Matrix4();
   const overlay = (m, units) => { m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = units; m.userData.decal = true; };
   const classify = m => {
     if (!m?.isMeshStandardMaterial || m.transparent || m.alphaTest > 0 || m.visible === false) return null;
     const s = stem(m.map), name = m.name ?? '';
-    if (s && BLEND.has(s)) { overlay(m, -8); if (DARK.test(name)) m.color.multiplyScalar(.22); return 'blend'; }
-    if (s && MASK.has(s)) { m.alphaTest = .4; return 'mask'; }
-    if (SNOW.test(name) && !name.startsWith('wc/')) { overlay(m, -4); m.vertexColors = true; return 'snow'; }
-    const soft = SOFT.find(e => e[0].test(name) && !name.startsWith('wc/'));
-    if (soft) { overlay(m, -4); m.opacity = soft[1]; return 'soft'; }
+    if (s && G.has(s)) { m.transparent = true; m.depthWrite = false; return 'glass'; }
+    if (s && B.has(s)) { overlay(m, -8); if (DARK.test(name)) m.color.multiplyScalar(.22); return 'blend'; }
+    if (s && M.has(s)) { m.alphaTest = .4; return 'mask'; }
+    if (snow?.test(name) && !name.startsWith('wc/')) { overlay(m, -4); m.vertexColors = true; return 'snow'; }
+    const fixed = soft?.find(e => e[0].test(name) && !name.startsWith('wc/'));
+    if (fixed) { overlay(m, -4); m.opacity = fixed[1]; return 'soft'; }
     return null;
   };
   // snow shells: vertex alpha from the world-space normal (an instanced prop: its first instance's turn)
@@ -84,10 +89,10 @@ export function overlayLayers(root) {
     if (!o.isMesh) return;
     for (const m of [o.material].flat()) {
       if (!m) continue; let k = kind.get(m);
-      if (k === undefined) { k = classify(m); kind.set(m, k); if (k) count[k]++; }
+      if (k === undefined) { k = classify(m); kind.set(m, k); if (k) count[k] = (count[k] ?? 0) + 1; }
       if (!k) continue;
       if (k === 'snow') snowAlpha(o);
-      if (k !== 'mask') { o.renderOrder = (k === 'blend' ? 2200 : 1200); o.castShadow = false; }
+      if (k !== 'mask') { o.renderOrder = (k === 'blend' ? 2200 : k === 'glass' ? 2300 : 1200); o.castShadow = false; }
     }
   });
   return count;
@@ -98,8 +103,8 @@ export function overlayLayers(root) {
 // took them for dark metal, so they mirrored the blue room light and sparkled like a night sky (user, 2026-11-12:
 // "missing" ceilings). Here they become one unlit black material without fog, drawn from both sides: the planes'
 // winding is mixed, and the ones facing up left gaps that showed the courtyard above from below.
-export function blackPlanes(root) {
+export function blackPlanes(root, match = /global_diffuse_black|infinite_blackness/) {
   const mat = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false, side: THREE.DoubleSide }); mat.name = 'castle_void'; let n = 0;
-  root.traverse(o => { if (o.isMesh && !Array.isArray(o.material) && /global_diffuse_black|infinite_blackness/.test(o.material?.name ?? '')) { o.material = mat; o.castShadow = false; n++; } });
+  root.traverse(o => { if (o.isMesh && !Array.isArray(o.material) && match.test(o.material?.name ?? '')) { o.material = mat; o.castShadow = false; n++; } });
   return n;
 }

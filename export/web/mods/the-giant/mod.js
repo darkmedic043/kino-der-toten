@@ -12,11 +12,13 @@ import { fixAnnihilatorMaterials } from '../operator-weapons/annihilator.js';
 import { loadMapLight } from '../lighting/map-volume.js';
 import { metalLook } from '../lighting/metal-look.js';
 import { floatingDebris, debrisDoor } from '../fx/floating-debris.js';
+import { giantOverlays } from './overlays.js';
 
 const LINK_TIME = 30, WHERE = { pad0: 'east', pad1: 'south', pad2: 'west' };
 export default async function setup(api) {
   if (api.map?.id !== 'the-giant') return;
   const { world, session, host, toast, announce, audio } = api;
+  if (world.root && !/[?&]noOverlays/.test(location.search)) console.info('[the-giant] overlay layers:', JSON.stringify(giantOverlays(world.root)));   // chalk, gratings, glass and the black backdrop planes the map drew solid (overlays.js); before the engine's static merge
   const at = name => { const o = world.root?.getObjectByName(name); return o ? o.getWorldPosition(new THREE.Vector3()) : null; };
   const pads = Object.keys(WHERE).map(id => ({ id, tp: world.teleporters.find(t => t.name === id), lever: at('GIANT_LEVER_' + id) })).filter(p => p.tp && p.lever);
   const core = at('GIANT_CORE'), papDoor = [...world.doors.values()].find(d => d.name.startsWith('DOOR_pap_0'));
