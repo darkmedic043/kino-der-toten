@@ -33,6 +33,7 @@ The user's fork of luckeyfaraday/kino-der-toten, renamed **Melon Zombies** on th
 | One engine, maps as modules (`engine.js`, `maps/`) | `core.md` (Engine and maps) |
 | Phone/touch support (touch-extras mod, mobile textures, defaults) | `mobile.md` |
 | Porting World at War maps (OpenAssetTools GfxWorld dumper, `build_waw_map.py`, Cheese Cube, Malibu Drive, Nuketown with its quest mod `mods/nuketown`) | `waw-ports.md` |
+| **Porting a Black Ops III map and its weapons: the guide** (working order, export from the running game, Greyhound, scripts, map build, alpha and overlays, blurry textures and upscaling, the light bake, map functions, wonder weapons, performance, tests, release checklist, past mistakes) | `bo3-ports.md` (read it before starting a BO3 port; the history of the two ports is in `waw-ports.md`) |
 | Map release notes for the user (one section per new map or big map update: what's in it, fixes, testing, known limits; template at the end) | Helm note "Map releases" (`f35a1087af`): add a section with `note_edit` on every map release |
 | Custom-map hooks, scoreboard (Tab), moving platforms | `mods/README.md` (end) and `waw-ports.md` |
 | Session history log | `history.md` |
