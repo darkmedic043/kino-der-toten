@@ -106,6 +106,20 @@ export class FirstPersonArms {
         const n=Math.max(3,list.length>>3),c=new THREE.Vector3();for(let i=0;i<n;i++)c.add(list[i]);c.divideScalar(n).sub(h).setLength(list[0].distanceTo(h)).add(h);tipLocal.set(bone,bone.worldToLocal(c));}
     }
 
+    // T5's end of a fingertip: its _3 joint. A BO3 hands rig stops at _2 (no end joint), so there the end is read from the
+    // glove the same way as the character's: the far end of the vertices that joint carries. Without it the tip aim and
+    // the tip's share of the length fit were skipped on every imported gun, and Seven's long straight fingertips stood
+    // out of a fist as stubs (2026-11-13, the 93R Dystopic's first raise).
+    const t5Ends=new Map(),t5Tip=(name,t5)=>{const j=T(`j_${name}_${t5}_3`);return j?pos(j):t5Ends.get(`j_${name}_${t5}_2`)?.clone()??null;};
+    if(this.entry.fpArmsTipAim&&!T('j_index_ri_3')){
+      const lists=new Map(),seen=new Set(),vp=new THREE.Vector3();
+      for(const o of template){const g=o.geometry,P=g.attributes.position;if(seen.has(P))continue;seen.add(P);o.skeleton.update();const si=g.attributes.skinIndex,sw=g.attributes.skinWeight,src=o.skeleton.bones;
+        for(let v=0;v<P.count;v++){let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(v,k);if(w>bw){bw=w;best=si.getComponent(v,k);}}
+          const n=src[best]?.name;if(bw<.6||!n||!/^j_[a-z]+_(le|ri)_2$/.test(n))continue;o.getVertexPosition(v,vp);(lists.get(n)??lists.set(n,[]).get(n)).push(vp.applyMatrix4(o.matrixWorld).clone());}}
+      for(const [n,list] of lists){if(list.length<6)continue;const h=tp(n);list.sort((x,y)=>y.distanceToSquared(h)-x.distanceToSquared(h));
+        const m=Math.max(3,list.length>>3),c=new THREE.Vector3();for(let i=0;i<m;i++)c.add(list[i]);t5Ends.set(n,c.divideScalar(m).sub(h).setLength(list[0].distanceTo(h)).add(h));}
+    }
+
     // Pose each arm over the T5 bind pose, then note how far to slide it so the wrists meet.
     const shift={},boneMap=new Map(),scaleBones=new Map();
     // how far a point moves under a finger scale (about the base knuckle)
@@ -125,8 +139,8 @@ export class FirstPersonArms {
         const a=T(`j_${name}_${t5}_${i}`),b=T(`j_${name}_${t5}_${i+1}`),next=chain[i+1];
         if(a&&b&&next)aim(bone,pos(next).sub(pos(bone)),pos(b).sub(pos(a)));
       });
-      for(const [name,chain] of Object.entries(f)){const i=chain.length-1,bone=chain[i],l=tipLocal.get(bone),a=T(`j_${name}_${t5}_${i}`),b=T(`j_${name}_${t5}_${i+1}`);
-        if(l&&a&&b)aim(bone,bone.localToWorld(l.clone()).sub(pos(bone)),pos(b).sub(pos(a)));}
+      for(const [name,chain] of Object.entries(f)){const i=chain.length-1,bone=chain[i],l=tipLocal.get(bone),a=T(`j_${name}_${t5}_${i}`),b=i===2?t5Tip(name,t5):T(`j_${name}_${t5}_${i+1}`)&&tp(`j_${name}_${t5}_${i+1}`);
+        if(l&&a&&b)aim(bone,bone.localToWorld(l.clone()).sub(pos(bone)),b.sub(pos(a)));}
       shift[t5]=tW.clone().sub(pos(S.hand));
       // fpArmsFingerScale {thumb:.6}: shrink a finger's geometry toward its base knuckle
       // (a gauntlet's long thumb plate that pokes far past the grip)
@@ -145,8 +159,8 @@ export class FirstPersonArms {
         // 3.8 palm) is fitted that much longer, so its tip still lands where the glove's does (on the trigger guard)
         // with fpArmsTipAim the tip's own length is known (to the far end of its mesh), so the fit takes in the tip too, against
         // T5's last segment: Seven's fingertips are half as long again as the glove's and stood out past the grip
-        const tipB=ch.length===3&&tipLocal.has(ch[2])&&T(`j_${name}_${t5}_3`)?ch[2].localToWorld(tipLocal.get(ch[2]).clone()):null;
-        if(tipB){own+=tipB.distanceTo(pos(ch[2]));want+=tp(`j_${name}_${t5}_3`).distanceTo(tp(`j_${name}_${t5}_2`));}
+        const tipT=ch.length===3&&tipLocal.has(ch[2])?t5Tip(name,t5):null,tipB=tipT?ch[2].localToWorld(tipLocal.get(ch[2]).clone()):null;
+        if(tipB){own+=tipB.distanceTo(pos(ch[2]));want+=tipT.distanceTo(tp(`j_${name}_${t5}_2`));}
         if(this.entry.fpArmsFingerFitReach&&name!=='thumb'&&T(`j_mid_${t5}_0`)){const x=tp(`j_mid_${t5}_0`).sub(tW).normalize();want+=Math.max(0,tp(`j_${name}_${t5}_0`).sub(tW).dot(x)-pos(ch[0]).sub(pos(S.hand)).dot(x));}
         const base=pos(ch[0]),k=1+(want/own-1)*(ff===true?1:+ff);(this.fingerFit??={})[`${name}_${t5}`]=+(want/own).toFixed(3);
         if(!this.entry.fpArmsFingerFitLength){ch.forEach(b=>b.traverse(x=>{if(x.isBone)scaleBones.set(x,{base,k});}));continue;}

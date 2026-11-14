@@ -143,7 +143,9 @@ function partMaterial(o, root, cache, match) {
 // side it is seen from, and flat plugs at ceiling height for the gaps its rays found. Those triangles leave the void
 // meshes and are redrawn, with the plugs, as one mesh in a wall material of the map: lit like the walls around it, one
 // sided (a plug is invisible from above); a ceiling triangle is drawn again facing the other way, so it is a stone slab
-// from above too and not a window into the room. Triangles are matched by centre, so a rebuild that moves them just
+// from above too and not a window into the room. `walls` are upright patches placed by hand (the tool's WALLS) behind
+// openings in a vault that no flat plug can close (the Juggernog room's ribs showed the dead space north of it).
+// Triangles are matched by centre, so a rebuild that moves them just
 // leaves them black: the console then warns that the table is stale (.tools/castle-after-rebuild.sh redoes it).
 export function voidCeilings(root, voidMat, data) {
   let donor = null; root.traverse(o => { if (!donor && o.isMesh && !o.isInstancedMesh && !Array.isArray(o.material) && o.material?.name === data.material && o.geometry?.attributes.uv && o.geometry.index) donor = o; });
@@ -167,9 +169,10 @@ export function voidCeilings(root, voidMat, data) {
   if (found.size < data.tris.length * .9) stale();
   if (!moved) return null;
   for (const [x0, z0, x1, z1, y] of data.patches || []) { A.set(x0, y, z0); B.set(x1, y, z0); C.set(x1, y, z1); tri(x0, y - 100, z0); A.set(x0, y, z0); B.set(x1, y, z1); C.set(x0, y, z1); tri(x0, y - 100, z0); }
+  for (const [x0, z0, x1, z1, y0, y1, sx, sy, sz] of data.walls || []) { A.set(x0, y0, z0); B.set(x1, y0, z1); C.set(x1, y1, z1); tri(sx, sy, sz, both); A.set(x0, y0, z0); B.set(x1, y1, z1); C.set(x0, y1, z0); tri(sx, sy, sz, both); }   // upright patches behind openings in a vault
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(Array.from({ length: pos.length / 3 }, (_, i) => i)); geo.computeBoundingBox(); geo.computeBoundingSphere();
   const mesh = new THREE.Mesh(geo, donor.material); mesh.name = 'bsp_void_ceilings'; mesh.castShadow = false; mesh.receiveShadow = donor.receiveShadow; mesh.layers.mask = donor.layers.mask;
   mesh.matrixAutoUpdate = donor.matrixAutoUpdate; root.add(mesh); mesh.updateMatrix(); mesh.updateMatrixWorld(true);
-  return { triangles: moved, entries: found.size, of: data.tris.length, plugs: (data.patches || []).length, voidMeshesEmptied: gone, material: data.material };
+  return { triangles: moved, entries: found.size, of: data.tris.length, plugs: (data.patches || []).length, walls: (data.walls || []).length, voidMeshesEmptied: gone, material: data.material };
 }
