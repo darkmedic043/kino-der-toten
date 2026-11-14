@@ -62,7 +62,7 @@ export default async function setup(api) {
     return zones;
   };
   if (world.root) carvedDecals(world.root, api.scene);   // before the props are merged: the nodes it drops must not be instanced
-  if (world.root) blackPlanes(world.root, undefined, /[?&]noCeilings/.test(location.search) ? null : CEILINGS);   // the void planes: unlit black from both sides, real ceilings over the rooms (overlays.js)
+  if (world.root) blackPlanes(world.root, undefined, /[?&]noCeilings/.test(location.search) ? null : CEILINGS, true);   // the void planes: unlit black from both sides, real ceilings over the rooms, lit colours for the black parts of props (overlays.js)
   if (world.root && !/[?&]noOverlays/.test(location.search)) console.info('[der-eisendrache] overlay layers:', JSON.stringify(overlayLayers(world.root)));   // snow, decals and cut-outs the map drew solid (overlays.js)
   if (world.root) doorBacks(world.root);   // the blast doors get a back (before the merge: its pieces stay plain meshes)
   if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host, !!api.map?.textureArrays && !/[?&](noArrays|noBatch|noFollow)\b/.test(location.search)); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes, '; left to the batches:', i.followed); }

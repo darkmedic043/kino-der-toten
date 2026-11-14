@@ -418,7 +418,12 @@ export class CustomWorld {
     }
     this.buildTraps(markers,place,tasks);this.buildTeleporters(markers);this.buildEggs(markers);
     await Promise.all(tasks);
-    this.boxBeam=new THREE.Mesh(new THREE.CylinderGeometry(8,28,1600,12,1,true),new THREE.MeshBasicMaterial({color:0x8cacdd,transparent:true,opacity:.1,side:THREE.DoubleSide,depthWrite:false}));
+    this.boxBeam=new THREE.Mesh(new THREE.CylinderGeometry(8,28,1600,24,1,true),new THREE.MeshBasicMaterial({color:0x8cacdd,transparent:true,opacity:.1,side:THREE.DoubleSide,depthWrite:false}));
+    // The beacon fades out towards its edges and its top: indoors the plain cylinder was a flat blue patch on the wall behind it (Der Eisendrache's Juggernog room, 2026-11-13).
+    this.boxBeam.material.onBeforeCompile=sh=>{
+      sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying float vBeam;').replace('#include <project_vertex>','#include <project_vertex>\n{vec3 bn=normalize(mat3(modelMatrix)*vec3(normal.x,0.,normal.z)),bv=cameraPosition-(modelMatrix*vec4(transformed,1.)).xyz;bv.y=0.;float be=abs(dot(bn,normalize(bv)));vBeam=be*be*(1.-.8*clamp(position.y/1600.+.5,0.,1.));}');
+      sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vBeam;').replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.a*=vBeam;');
+    };
     this.boxBeam.visible=!!this.boxLocations.length;this.scene.add(this.boxBeam);
     this.activeBox=this.boxLocations.find(b=>b.start)??this.boxLocations[0];this.updateBox();
 

@@ -103,11 +103,38 @@ export function overlayLayers(root, { blend = null, mask = null, glass = null, s
 // took them for dark metal, so they mirrored the blue room light and sparkled like a night sky (user, 2026-11-12:
 // "missing" ceilings). Here they become one unlit black material without fog, drawn from both sides: the planes'
 // winding is mixed, and the ones facing up left gaps that showed the courtyard above from below.
-export function blackPlanes(root, match = /global_diffuse_black|infinite_blackness/, ceilings = null) {
-  const mat = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false, side: THREE.DoubleSide }); mat.name = 'castle_void'; let n = 0;
-  root.traverse(o => { if (o.isMesh && !Array.isArray(o.material) && match.test(o.material?.name ?? '')) { o.material = mat; o.castShadow = false; n++; } });
+export function blackPlanes(root, match = /global_diffuse_black|infinite_blackness/, ceilings = null, props = false) {
+  const mat = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false, side: THREE.DoubleSide }); mat.name = 'castle_void'; let n = 0; const parts = {}, cache = new Map();
+  const plane = o => { if (!props) return true; if (o.isInstancedMesh) return false; for (let p = o; p && p !== root; p = p.parent) if (/^bsp_/.test(p.name)) return true; return false; };
+  root.traverse(o => { if (!o.isMesh || Array.isArray(o.material) || !match.test(o.material?.name ?? '')) return;
+    if (plane(o)) { o.material = mat; o.castShadow = false; n++; } else { const m = partMaterial(o, root, cache, match); o.material = m; const k = m.userData.part ?? 'rock texture'; parts[k] = (parts[k] || 0) + 1; } });
+  if (props) console.info('[der-eisendrache] void planes:', n, 'black prop parts coloured:', JSON.stringify(parts));
   if (ceilings) { const c = voidCeilings(root, mat, ceilings); if (c) console.info('[der-eisendrache] void ceilings:', JSON.stringify(c)); }
   return n;
+}
+
+// The same black material is on parts of placed props, doors and moving pieces (fan covers, the teleporter's copper
+// pipes, sign backs, rock undersides, the pyramid): BO3 keeps a metal's colour in its specular map and leaves the
+// diffuse black (lighting/metal-look.js), and the port has no specular maps. As unlit void they were black cut-outs in
+// lit rooms (user, 2026-11-13). Each gets a lit flat colour by what its prop is (first match of the names up to the
+// map root); a rock takes the rock material beside it, so its underside carries on the rock.
+const PART_KINDS = [   // [name, key, linear colour, roughness, metalness]
+  [/copper|bronze|brass|coil/i, 'copper', [.34, .19, .11], .48, .3],
+  [/rust/i, 'rust', [.2, .12, .075], .8, .05],
+  [/rock_|boulder|tomb|floater|urn|ledge/i, 'stone', [.13, .125, .118], .95, 0],
+  [/foliage|tree|flower/i, 'plant', [.045, .04, .028], 1, 0],
+  [/fan_|teleporter|gantry|trap_|signage|generator|truck|veh_|vent|canister|pipe|metal|light_|beam|bracket|door|MPD/i, 'steel', [.1, .102, .11], .58, .2],
+];
+const PART_ROCK = /rock_|boulder/i, PART_DEFAULT = ['dark', [.05, .048, .045], .9, 0];
+function partMaterial(o, root, cache, match) {
+  let name = ''; for (let p = o; p && p !== root; p = p.parent) name += ' ' + p.name;
+  if (PART_ROCK.test(name) && o.parent && o.parent !== root) { let best = null, size = 0;
+    for (const c of o.parent.children) { const m = c.material; if (c === o || !c.isMesh || !!c.isInstancedMesh !== !!o.isInstancedMesh || !m || Array.isArray(m) || !m.map || m.transparent || m.alphaTest || match.test(m.name ?? '') || /decal|blend|glass/i.test(m.name ?? '')) continue;
+      const k = c.geometry.index?.count ?? c.geometry.attributes.position.count; if (k > size) { size = k; best = m; } }
+    if (best) return best; }
+  const [key, col, rough, metal] = (PART_KINDS.find(k => k[0].test(name)) ?? [null, ...PART_DEFAULT]).slice(1);
+  if (!cache.has(key)) { const m = new THREE.MeshStandardMaterial({ roughness: rough, metalness: metal, side: THREE.DoubleSide }); m.color.setRGB(...col); m.name = 'castle_part_' + key; m.userData.part = key; cache.set(key, m); }
+  return cache.get(key);
 }
 
 // Flat black over a lit room still reads as a hole in the roof (user, 2026-11-13: the Juggernog room's ribs with black
@@ -115,11 +142,13 @@ export function blackPlanes(root, match = /global_diffuse_black|infinite_blackne
 // rays from every walkable point of the real model) lists the void triangles that are seen from below, each with the
 // side it is seen from, and flat plugs at ceiling height for the gaps its rays found. Those triangles leave the void
 // meshes and are redrawn, with the plugs, as one mesh in a wall material of the map: lit like the walls around it, one
-// sided (a plug is invisible from above). Triangles are matched by centre, so a rebuild that moves them just leaves
-// them black: rerun the tool after a map rebuild.
+// sided (a plug is invisible from above); a ceiling triangle is drawn again facing the other way, so it is a stone slab
+// from above too and not a window into the room. Triangles are matched by centre, so a rebuild that moves them just
+// leaves them black: the console then warns that the table is stale (.tools/castle-after-rebuild.sh redoes it).
 export function voidCeilings(root, voidMat, data) {
   let donor = null; root.traverse(o => { if (!donor && o.isMesh && !o.isInstancedMesh && !Array.isArray(o.material) && o.material?.name === data.material && o.geometry?.attributes.uv && o.geometry.index) donor = o; });
-  if (!donor || !data.tris?.length) return null;
+  if (!data.tris?.length) return null;
+  if (!donor) { console.warn('[der-eisendrache] void ceilings: no mesh with the material ' + data.material + ', the ceilings stay black (.tools/castle-after-rebuild.sh)'); return null; }
   const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), N = new THREE.Vector3(), E = new THREE.Vector3(), m = new THREE.Matrix4(), inv = new THREE.Matrix4();
   let dens = 1 / 256; { const P = donor.geometry.attributes.position, U = donor.geometry.attributes.uv, I = donor.geometry.index, r = [], ua = new THREE.Vector2(), ub = new THREE.Vector2(), uc = new THREE.Vector2();
     for (let k = 0; k + 2 < I.count && r.length < 400; k += 3) { const i0 = I.getX(k), i1 = I.getX(k + 1), i2 = I.getX(k + 2); A.fromBufferAttribute(P, i0); B.fromBufferAttribute(P, i1).sub(A); C.fromBufferAttribute(P, i2).sub(A); const wa = B.cross(C).length();
@@ -128,18 +157,19 @@ export function voidCeilings(root, voidMat, data) {
   const table = new Map(); for (const t of data.tris) table.set(t[0] + ',' + t[1] + ',' + t[2], t);
   const find = (x, y, z) => { const X = Math.round(x), Y = Math.round(y), Z = Math.round(z); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) { const t = table.get((X + i) + ',' + (Y + j) + ',' + (Z + k)); if (t) return t; } return null; };
   const pos = [], nor = [], uv = [], put = (p, n) => { pos.push(p.x, p.y, p.z); nor.push(n.x, n.y, n.z); const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z); if (ay >= ax && ay >= az) uv.push(p.x * dens, p.z * dens); else if (ax >= az) uv.push(p.z * dens, p.y * dens); else uv.push(p.x * dens, p.y * dens); };
-  const tri = (vx, vy, vz) => { N.subVectors(B, A).cross(E.subVectors(C, A)).normalize(); E.set(vx, vy, vz).sub(A); const f = N.dot(E) < 0; if (f) N.negate(); put(A, N); put(f ? C : B, N); put(f ? B : C, N); };
-  root.updateWorldMatrix(true, false); inv.copy(root.matrixWorld).invert(); const meshes = []; root.traverse(o => { if (o.isMesh && !o.isInstancedMesh && o.material === voidMat) meshes.push(o); }); let moved = 0, gone = 0;
+  const tri = (vx, vy, vz, back) => { N.subVectors(B, A).cross(E.subVectors(C, A)).normalize(); E.set(vx, vy, vz).sub(A); const f = N.dot(E) < 0; if (f) N.negate(); put(A, N); put(f ? C : B, N); put(f ? B : C, N); if (back) { N.negate(); put(A, N); put(f ? B : C, N); put(f ? C : B, N); } };
+  root.updateWorldMatrix(true, false); inv.copy(root.matrixWorld).invert(); const meshes = []; root.traverse(o => { if (o.isMesh && !o.isInstancedMesh && o.material === voidMat) meshes.push(o); }); let moved = 0, gone = 0; const found = new Set(), both = donor.material.side !== THREE.DoubleSide, stale = () => console.warn(`[der-eisendrache] ceilings.js does not fit this build of the map: ${found.size} of ${data.tris.length} void ceiling triangles found, the rest stay black. Run .tools/castle-after-rebuild.sh (waw-ports.md, void ceilings).`);
   for (const o of meshes) { o.updateWorldMatrix(true, false); m.multiplyMatrices(inv, o.matrixWorld); const g = o.geometry, P = g.attributes.position, I = g.index, n = I ? I.count : P.count, keep = [];
     for (let k = 0; k + 2 < n; k += 3) { const i0 = I ? I.getX(k) : k, i1 = I ? I.getX(k + 1) : k + 1, i2 = I ? I.getX(k + 2) : k + 2; A.fromBufferAttribute(P, i0).applyMatrix4(m); B.fromBufferAttribute(P, i1).applyMatrix4(m); C.fromBufferAttribute(P, i2).applyMatrix4(m);
-      const t = find((A.x + B.x + C.x) / 3, (A.y + B.y + C.y) / 3, (A.z + B.z + C.z) / 3); if (!t) { keep.push(i0, i1, i2); continue; } tri(t[3], t[4], t[5]); moved++; }
+      const t = find((A.x + B.x + C.x) / 3, (A.y + B.y + C.y) / 3, (A.z + B.z + C.z) / 3); if (!t) { keep.push(i0, i1, i2); continue; } tri(t[3], t[4], t[5], both); moved++; found.add(t); }
     if (keep.length === n) continue; if (!keep.length) { o.removeFromParent(); gone++; continue; }
     const g2 = g.clone(); g2.setIndex(keep); g2.boundingBox = null; g2.boundingSphere = null; o.geometry = g2; }
+  if (found.size < data.tris.length * .9) stale();
   if (!moved) return null;
   for (const [x0, z0, x1, z1, y] of data.patches || []) { A.set(x0, y, z0); B.set(x1, y, z0); C.set(x1, y, z1); tri(x0, y - 100, z0); A.set(x0, y, z0); B.set(x1, y, z1); C.set(x0, y, z1); tri(x0, y - 100, z0); }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(Array.from({ length: pos.length / 3 }, (_, i) => i)); geo.computeBoundingBox(); geo.computeBoundingSphere();
   const mesh = new THREE.Mesh(geo, donor.material); mesh.name = 'bsp_void_ceilings'; mesh.castShadow = false; mesh.receiveShadow = donor.receiveShadow; mesh.layers.mask = donor.layers.mask;
   mesh.matrixAutoUpdate = donor.matrixAutoUpdate; root.add(mesh); mesh.updateMatrix(); mesh.updateMatrixWorld(true);
-  return { triangles: moved, of: data.tris.length, plugs: (data.patches || []).length, voidMeshesEmptied: gone, material: data.material };
+  return { triangles: moved, entries: found.size, of: data.tris.length, plugs: (data.patches || []).length, voidMeshesEmptied: gone, material: data.material };
 }
