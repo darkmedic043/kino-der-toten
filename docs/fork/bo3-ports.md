@@ -175,7 +175,7 @@ CustomWorld builds collision and the navmesh from `COL_` meshes only; `PCOL_` me
 
 - Props over 1,500 triangles are decimated (`simplify()`) into `PCOL_props`. In the navmesh layer they added 40 s to the load.
 - Stairs get a two-sided ramp quad per flight; the map entry needs `"stairSmoothing": true` and `"player": {"slopeStick": true}` or the player slides down them.
-- After every collision change: reach check and mobility check (10.2). The navmesh is cached per player by its collision triangles, so a collision change rebuilds it on its own; a change to the navmesh *settings* needs `NAV_CACHE_VERSION` bumped.
+- After every collision change: the full collision check (10.1): the offline flood first, then reach and mobility in a match. The navmesh is cached per player by its collision triangles, so a collision change rebuilds it on its own; a change to the navmesh *settings* needs `NAV_CACHE_VERSION` bumped.
 - Fine-tuning without a rebuild: the map entry's `propCollision` (`mesh`/`box` regexes, `minHeight`), audited with `.tools/col-audit.mjs` (`custom-maps.md`).
 
 ### 2.5 The map entry (`mods/maps.json`)
@@ -444,18 +444,82 @@ Details: `performance.md`. A BO3 map is 10-30 times the size of the maps the eng
 Memory rules first (`CLAUDE.md`): one browser, one page, through `~/.local/bin/lowpri`, `flock scratch/melon/heavy.lock`, browser closed in a `finally`, BO3 closed, and report the renderer's memory with the results.
 
 1. **Engine smoke test** after any engine or mod-setup edit: `MAP=sandbox flock scratch/melon/heavy.lock ~/.local/bin/lowpri node .tools/warm-check.mjs`.
-2. **Collision and reach, offline**: `~/.local/bin/lowpri node .tools/col-audit.mjs <id> --from-spawn` lists markers the player cannot reach; the full pass lists walk-through walls, invisible blockers and floating floors. Then in a page: every spawn point paths to the player with all doors open, and a mobility check (random navmesh points, walk in four directions).
+2. **Collision**: the whole of 10.1, after every build that changes geometry, collision tables or `propCollision`, and again before release.
 3. **Whole map, logic only**: `node .tools/map-lite.mjs <id>` once per rebuild, then `MAP=<id> [FIRST=1] PLAY=scratch/x.js flock scratch/melon/heavy.lock ~/.local/bin/lowpri node .tools/map-test.mjs` plays a real match on a light copy with a memory watchdog (`FIRST=1` on a map's first run, for the navmesh build). For doors, quests, traps, sounds, co-op (`INIT=.tools/play/coop-init.js` with a guest script). **Not for looks, and not for holes.**
 4. **Looks** go on the real GPU (`--use-angle=vulkan --enable-gpu --ignore-gpu-blocklist`) on a cropped piece of the map or a routed test page with the same bloom and tone mapping. A full map at real textures passes 2.5-3.2 GB before it is ready and breaks the memory rule.
 5. **Holes and sight lines**: rays on the real GLB (3.3).
 6. **Performance**: the per-area bench before and after each change, never two games on the card at once.
 7. Then ask the user to play it. Their reports are quoted in the notes with the fix: that list (12) is the real test plan for the next map.
 
+### 10.1 Collision: the full check
+
+Collision is checked three ways, because each one misses what the others find: an offline flood (what the collision lets a player walk), a match on the light copy (what the game does with it), and a walk with the movement mod (jumps, mantles and wall jumps, which the flood does not model). Write the counts into the map's notes each time, so the next change has a before and after.
+
+**A. Offline: `col-audit.mjs`** (Node, no browser; details in `custom-maps.md`, "Prop collision from the map entry")
+
+```
+~/.local/bin/lowpri node .tools/col-audit.mjs <id> --from-spawn --flood-only     # seconds, little memory
+~/.local/bin/lowpri node .tools/col-audit.mjs <id> --from-spawn                  # the full pass
+~/.local/bin/lowpri node .tools/col-audit.mjs <id> --flood-only --trace x,y,z    # how did the flood get there?
+```
+
+The flood walks a 16-unit grid from the spawn with the player's step (18) and drop (110) over the `COL_` and `PCOL_` meshes plus the `propCollision` shapes. It has no doors (door colliders are made at runtime, so it walks the map as if every door were open) and no `CLIP_` meshes (a player clip added against a climb-out does not show in it).
+
+| Result | Meaning | Pass when |
+|---|---|---|
+| Unreached markers | a perk, box spot, wall buy, door, trap, teleporter, Pack-a-Punch or power switch the player cannot walk to | none, or each one explained (reached by teleporter, tram or a quest only) and written down |
+| Points under the map (`--flood-only` counts walked points below y -20; on a map whose floors go lower, read the lowest point it prints instead) | the flood left the playable space: a hole in the floor, a gap between a wall and the terrain, or a prop that works as a step over a wall | none; find the way out with `--trace` |
+| `through` | a step the collision allows that passes through something drawn: walk-through walls and props | none on walls and floors; props left walk-through on purpose (wires, small clutter) listed by model |
+| `ghost` | a step the collision blocks with nothing drawn within 24 units: invisible walls | none, except the map's real clip brushes rebuilt on purpose |
+| `floor` | drawn floor more than 8 units above or below the collision floor: feet sink in, or the player floats | none over 8 on walkable floors; pads and rims over 18 block the way in |
+
+- The lists come by source model and in clusters: fix the model's rule in the builder (2.4) or in `propCollision`, not the single spot.
+- Test a `propCollision` rule set before it goes into `maps.json`: `--rules file.json --flood-only`. The unreached markers and the count of points under the map must be the same as with `--no-rules`; if not, the rule leaks. Boxes around jagged or sloped props become steps (boxes on broken wall ends let the flood climb out of The Giant; boxes on rubble made invisible blocks): keep `box` for upright, box-shaped props, and let `minHeight` drop low shapes.
+- The full pass holds every drawn triangle near the walked space: about 3 GB for The Giant. Run it under the memory cap and alone. **It has never been run on a map of Der Eisendrache's size** (only its flood has): if it does not fit, run the flood on the whole map and the full pass per area.
+- `--points file.json` writes the walked points; the ceiling scan and the detail pass start from them, so a wrong flood also spoils those.
+
+**B. In a match on the light copy** (`map-test.mjs` with a `PLAY` script; the light copy keeps the collision meshes exact)
+
+| Check | How | Pass when |
+|---|---|---|
+| The load line | read `[custom-world]` lines in the console: collision triangle counts, prop collision instances, navmesh build time | counts match the build's; no navmesh error |
+| Zombie reach | from the spawn and from one point in every zone, with all doors open, path every `ZSPAWN` to the player | every spawn reaches every area (Der Eisendrache: all 99) |
+| Reach with doors shut | at the start, path from the spawns of the start zone only | zombies reach the player without a door; no spawn is active in a closed zone |
+| Mobility | 50 random navmesh points; at each hold forward 0.45 s in four directions | the player moves in at least one direction everywhere ("can't move in a lot of spots") |
+| Doors | ray through each doorway before and after buying | blocked before, clear after, pieces gone, zone open |
+| Windows | walk the player into each window; send a zombie through | the player is stopped, the zombie climbs in, boards rebuild |
+| Stairs and ramps | walk up and down every flight, and stand still on it | no slide, no stop at a step, speed kept |
+| Floors that look solid | stand on every grating, catwalk, plank bridge, pad and platform kind | no falling through; none of them drawn more than 8 off the collision |
+| Teleporters, pads, trams | use each one, then stand still 2 s | the player lands on a floor inside the map and stays there |
+| Moving collision | ride every mover; stand in the way of every door or slab that shuts | the player moves with it and is pushed or crushed, never left inside it or pushed out through a thin wall |
+| Bullets | shoot at a solid wall, a solid prop, a fence, glass and foliage with a zombie behind each | walls and solid props stop the shot; fences, glass and foliage do as the original does |
+| Special enemies | spawn the boss in the tightest room and the largest | it reaches the player or uses its fallback; its attacks check line of sight (`world.lineClear`) |
+| Out of bounds | put the player under the map and into every pit or void the map has | the engine's net (600 under the map's bounds: respawn, "You fell out of the map") catches the fall; a map with pits, chasms or low gravity needs its own watcher that returns the player sooner (Der Eisendrache's `setupBounds`) |
+
+**C. By hand, with the movement mod on** (the user, or a GPU page on a cropped area)
+
+The fork's player can do what BO3's cannot: slide, dive, mantle, wall jump, low gravity. The flood knows none of it.
+
+- Along every outer wall, ledge, roof edge and fence: try to mantle and wall-jump over. Anything that works needs a `CLIP_` mesh (player capsule only) or a higher wall in the collision, and a note.
+- Every prop that is solid for the player only (`PCOL_`): zombies and the navmesh ignore it, so check zombies do not visibly walk through large ones on the main routes; a prop zombies must go around belongs in `COL_`.
+- Thin single-sided surfaces (panels, railings, car walls): walk into both sides and get squeezed against them by a mover.
+- Low doorways, beams and stair ceilings: crouch, slide and jump under them (the step-up lifts as far as the ceiling allows).
+- Places where the original has an invisible wall (brush clips are not in the dump): map edges, cliff sides, gaps beside bridges and gondolas. Compare with the original game.
+
+**D. Collision changed at runtime** (code review, each time a mod touches collision)
+
+- A collider pushed onto `world.dynamic` has `.box`, unless it is `window: true` (or `world.setDoors` crashes).
+- `world.collision.invalidateCache()` after any edit of the collision geometry (the player's nearby-triangle cache keeps the old shape otherwise); `world.collision.useCache = false` is the A/B switch when a bug looks like a stale cache.
+- Anything that moves and can be stood on goes through `addScriptedMover` and is moved every frame, not teleported in steps.
+- The navmesh never changes in play: every runtime blocker that zombies must respect needs its own hold or reroute.
+- A collision change in the build changes the navmesh cache key by itself; a change to navmesh *settings* needs `NAV_CACHE_VERSION` bumped, or players keep the old mesh.
+
 ## 11. Release checklist
 
 - [ ] `git status --short` shows no ripped file; new asset folders have a `.gitignore` with `*`; nothing new matches the install manifest's `OWN` list by accident, and own data that players need does match it.
 - [ ] `?v=` bumped once for the final GLB; `build-gz.mjs` and `build-ktx2.mjs` run; light volume, detail table and any ceiling table belong to this GLB.
 - [ ] Explore and zombies modes both start; warm-check clean; no `[mods] slow setups`, no console errors, no "table is stale" warning.
+- [ ] Collision (10.1): flood from the spawn with no unreached marker left unexplained and no point under the map; `through`, `ghost` and `floor` lists empty or explained; reach, mobility, stairs, movers and bullets pass in a match; outer walls tried with mantle and wall jump; the counts are in the map's notes.
 - [ ] Every door, perk, box spot, wall buy, trap, teleporter and the Pack-a-Punch used once in a test match; power on and off; a full round with zombies from every open zone.
 - [ ] Each quest step done through its debug handle and once for real; a guest and a late joiner see the same state.
 - [ ] Every weapon the map can hand out is in the warm-up; the wonder weapon fired, charged, upgraded, and seen from third person.
