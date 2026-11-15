@@ -156,7 +156,7 @@
       "description": "Black Ops III's Stalingrad in flames, ported from the running game: the streets, the department store, the factory and the library, their doors, perks, the Mystery Box, and Pack-a-Punch in Pavlov's House (ride the dragon from a roost). Work in progress.",
       "modes": ["zombies", "explore"],
       "dir": "mods/maps/gorod-krovi/",
-      "model": "gorod-krovi.glb?v=3",
+      "model": "gorod-krovi.glb?v=4",
       "scale": 1,
       "background": "#3a2a24",
       "exposure": 1,

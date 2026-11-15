@@ -574,9 +574,22 @@ def measure_passage(o):
     """The passage at CoD origin o, measured through the collision: the floor below, the narrower of the two horizontal
     axes (walls both sides), and the clear height. -> (floor point at the passage's middle, side direction, CoD axis,
     width, clear height)"""
-    O = g(o).astype(np.float64); near = CTRI[np.linalg.norm(CTRI.mean(1) - O, axis=1) < 320]
-    down = next((h for h in range(4, 300, 4) if seg_blocked(O, O - [0, h, 0], near)), 60)
-    F = O - [0, down - 2, 0]
+    O = g(o).astype(np.float64)
+    # triangles whose box comes within 260 of O across and 420 up/down (by centre, a big street floor triangle was missed)
+    lo, hi = CTRI.min(1), CTRI.max(1); r = np.array([260, 420, 260])
+    near = CTRI[((lo <= O + r) & (hi >= O - r)).all(1)]
+    # the floor under the origin, from a few start heights: a rising gate's origin can sit under the street, where the
+    # first floor down is the level below with the street 8 over it (Gorod Krovi, 2026-11-15: gates 8 high). Keep the
+    # floor nearest the origin with 72+ of headroom, else the one with the most
+    cands = []
+    for lift in (0, 40, 100, 180, 260):
+        S = O + [0, lift, 0]
+        down = next((h for h in range(4, 300, 4) if seg_blocked(S, S - [0, h, 0], near)), None)
+        if down is None: continue
+        Fc = S - [0, down - 2, 0]
+        head = next((h for h in range(8, 240, 4) if seg_blocked(Fc + [0, 2, 0], Fc + [0, h, 0], near)), 240)
+        cands.append((head < 72, abs(Fc[1] - O[1]), -head, Fc))
+    F = min(cands, key=lambda c: c[:3])[3] if cands else O - [0, 58, 0]
     best = None
     for axis in ((1.0, 0.0), (0.0, 1.0)):
         side = g(np.array([-axis[1], axis[0], 0.0])); C = F + [0, 40, 0]
