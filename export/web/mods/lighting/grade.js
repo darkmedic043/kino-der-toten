@@ -25,6 +25,7 @@ export const NEUTRAL={
   chroma:0,         // chromatic aberration, quartic falloff from the centre (corner offset ≈ chroma * 0.5 uv; .0015 ≈ 1 px at 1600 wide)
   sharpen:0,        // unsharp mask strength
   grain:0,          // film grain amplitude in sRGB (0.04 is visible, 0.02 subtle)
+  lut:0,            // how much of the map's own colour cube is applied (lut.png in the map folder, see loadLut; 0 without the file)
   haze:[0,0,0], hazeDensity:0, hazeStart:0,   // depth haze (aerial perspective) in HDR, before AO and bloom
 };
 
@@ -38,7 +39,7 @@ export const GRADES={
   moon:{exposure:.95,black:.045,contrast:1.34,saturation:.92,vibrance:.22,shadowTint:[.82,.9,1.16],highlightTint:[1.06,1.03,.98],vignette:.52,chroma:.003,grain:.034},
   'the-giant':{exposure:.92,black:.045,contrast:1.32,saturation:.94,vibrance:.3,shadowTint:[.82,.94,1.08],highlightTint:[1.12,1.04,.9],vignette:.46,bloom:1.3,haze:[.05,.06,.07],hazeDensity:.0002,hazeStart:300},
   nuketown:{exposure:1.18,black:.06,contrast:1.42,saturation:.42,vibrance:.3,warmth:-.1,shadowTint:[.55,.95,1],highlightTint:[.8,1.02,.98],vignette:.42,chroma:.0025,sharpen:.3,bloom:1.55,grain:.05,haze:[.14,.19,.21],hazeDensity:.00015,hazeStart:500},   // UGX Nuketown Remastered's look (2026-10-27, picked from six variants next to the screenshots; 2026-10-29 matched to the user's gameplay video: paler, more desaturated, a pale haze toward the bright sky, lighter vignette): a heavy teal cast on everything, crushed blacks, fires stay orange (mods/nuketown/atmosphere.js)
-  'gorod-krovi':{exposure:.96,black:.025,contrast:1.2,saturation:.86,vibrance:.2,shadowTint:[.8,.9,1.18],highlightTint:[1.12,1.02,.88],vignette:.46,bloom:1.15,haze:[.07,.075,.095],hazeDensity:.00022,hazeStart:350},   // 2026-11-15: Stalingrad's cold storm dusk with the orange left to the fires; lifted blacks (the first version crushed them)
+  'gorod-krovi':{exposure:1,lut:1,black:0,contrast:1,saturation:1,vibrance:0,shadowTint:[1,1,1],highlightTint:[1,1,1],vignette:.4,bloom:1.15,haze:[.07,.075,.095],hazeDensity:.00022,hazeStart:350},   // 2026-11-15: BO3's own grade for the map (zm_stalingrad.ff's colour cube: a plain tone curve, no tint, the same cube as the castle's), so no split toning or desaturation on top; the colour is the lights' (warm sun, blue-violet sky, the fires)
   'cheese-cube':{vignette:.32,contrast:1.18,black:.025},
   sandbox:{vignette:.32,contrast:1.18,black:.025},
 };
@@ -61,6 +62,9 @@ const FRAG=/* glsl */`precision highp float;
 uniform sampler2D tDiffuse;uniform vec2 texel;uniform float time;
 uniform float exposure,black,contrast,saturation,vibrance,warmth,vignette,vignetteSoft,chroma,sharpen,grain;
 uniform vec3 shadowTint,highlightTint;
+uniform sampler2D tLut;uniform float lut;
+// the map's colour cube as a strip: 32 tiles of blue, red across a tile, green down it
+vec3 lutAt(vec3 c){c=clamp(c,0.,1.);float b=c.b*31.,b0=floor(b),b1=min(b0+1.,31.);vec2 p=vec2((c.r*31.+.5)/1024.,(c.g*31.+.5)/32.);return mix(texture2D(tLut,p+vec2(b0/32.,0.)).rgb,texture2D(tLut,p+vec2(b1/32.,0.)).rgb,b-b0);}
 #include <tonemapping_pars_fragment>
 #include <colorspace_pars_fragment>
 varying vec2 vUv;
@@ -105,6 +109,7 @@ void main(){
   float v=1.-smoothstep(.35,.35+vignetteSoft,sqrt(r2)*1.15);c*=mix(1.,v,vignette);
   // to sRGB, then the curve: crushed blacks and a cubic S around mid grey (keeps 0 and 1 in place)
   c=sRGBTransferOETF(vec4(max(c,0.),1.)).rgb;
+  if(lut>0.)c=mix(c,lutAt(c),lut);   // BO3 grades the display-space picture through the cube
   c=max((c-black)/(1.-black),0.);
   // S-curve; the shadow half pulls at 70% so dark rooms keep their detail (the theatre lost it at full strength)
   c+=(contrast-1.)*mix(vec3(.7),vec3(1.),step(.5,c))*(c-.5)*(1.-4.*(c-.5)*(c-.5));
@@ -113,19 +118,23 @@ void main(){
   gl_FragColor=vec4(clamp(c,0.,1.),1.);
 }`;
 
+// A map's colour cube (BO3's grading LUT, written by .tools/bo3_ff_lut.py as a 1024x32 strip); null when the file is missing.
+export const loadLut=url=>new THREE.TextureLoader().loadAsync(url).then(t=>{t.colorSpace=THREE.NoColorSpace;t.generateMipmaps=false;t.minFilter=t.magFilter=THREE.LinearFilter;t.flipY=false;return t;}).catch(()=>null);
+
 export class GradePass extends Pass{
   constructor(){
     super();
     this.uniforms={tDiffuse:{value:null},toneMappingExposure:{value:1},texel:{value:new THREE.Vector2(1/1600,1/900)},time:{value:0},
       exposure:{value:1},black:{value:0},contrast:{value:1},saturation:{value:1},vibrance:{value:0},warmth:{value:0},vignette:{value:0},vignetteSoft:{value:.55},chroma:{value:0},sharpen:{value:0},grain:{value:0},
-      shadowTint:{value:new THREE.Vector3(1,1,1)},highlightTint:{value:new THREE.Vector3(1,1,1)}};
+      shadowTint:{value:new THREE.Vector3(1,1,1)},highlightTint:{value:new THREE.Vector3(1,1,1)},tLut:{value:null},lut:{value:0}};
     this.material=new THREE.RawShaderMaterial({name:'GradePass',uniforms:this.uniforms,vertexShader:VERT,fragmentShader:FRAG});
     this.quad=new FullScreenQuad(this.material);this._tm=null;this.grade={...NEUTRAL};
   }
+  setLut(t){this.uniforms.tLut.value=t;this.uniforms.lut.value=t?this.grade.lut??0:0;}
   set(g){
     Object.assign(this.grade,g);const u=this.uniforms,G=this.grade;
     for(const k of ['exposure','black','contrast','saturation','vibrance','warmth','vignette','vignetteSoft','chroma','sharpen','grain'])u[k].value=G[k];
-    u.shadowTint.value.fromArray(G.shadowTint);u.highlightTint.value.fromArray(G.highlightTint);
+    u.shadowTint.value.fromArray(G.shadowTint);u.highlightTint.value.fromArray(G.highlightTint);u.lut.value=u.tLut.value?G.lut??0:0;
   }
   setSize(w,h){this.uniforms.texel.value.set(1/Math.max(1,w),1/Math.max(1,h));}
   render(renderer,writeBuffer,readBuffer){

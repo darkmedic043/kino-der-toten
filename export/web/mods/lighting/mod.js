@@ -20,7 +20,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { GradePass, ViewmodelPass, HAZE_SHADER, gradeFor, GRADES } from './grade.js';
+import { GradePass, ViewmodelPass, HAZE_SHADER, gradeFor, GRADES, loadLut } from './grade.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { createFlames, fireFlicker } from '../fx/flames.js';
 import { Sky } from 'three/addons/objects/Sky.js';
@@ -699,6 +699,8 @@ function setupPost(api){
   const size=()=>{const v=renderer.getSize(new THREE.Vector2());return [Math.max(1,v.x),Math.max(1,v.y)];};
   // The look (grade.js): the map's preset at Settings → Film look strength, grain by Settings → Film grain.
   const look=()=>gradeFor(api.map,[0,.5,1][Math.round(settings.filmLook??2)]??1,settings.filmGrain!==false);
+  // The map's own colour cube (BO3's grading LUT, lut.png in the map folder), when its preset asks for one.
+  let lutTex=null;if(gradeFor(api.map,1,false).lut>0&&api.map?.dir)(host.pending??=[]).push(loadLut(api.map.dir+'lut.png').then(t=>{lutTex=t;if(t)renderer.initTexture?.(t);grade?.setLut(t);grade?.set({});}));
   const applyGrade=g=>{if(grade)grade.set(g);const G=grade?.grade??g;if(hazePass){const u=hazePass.uniforms;u.haze.value.fromArray(G.haze);u.hazeDensity.value=G.hazeDensity;u.hazeStart.value=G.hazeStart;}if(bloom)bloom.strength=.28*(G.bloom??1);};
   function build(q){
     composer?.dispose?.();composer=null;builtFor=q;
@@ -743,7 +745,7 @@ function setupPost(api){
     // which the AO must not read) and before bloom and the grade, so it glows, is graded and vignetted with the world.
     viewPass=new ViewmodelPass(viewScene,viewCamera);viewPass.enabled=false;composer.addPass(viewPass);
     bloom=new UnrealBloomPass(new THREE.Vector2(w,h),.28,.32,1.05);composer.addPass(bloom);
-    grade=new GradePass();composer.addPass(grade);applyGrade(look());   // tone mapping, the colour grade and sRGB (replaces OutputPass)
+    grade=new GradePass();grade.setLut(lutTex);composer.addPass(grade);applyGrade(look());   // tone mapping, the colour grade and sRGB (replaces OutputPass)
   }
   window.kino.post={get:()=>grade?.grade,set:applyGrade,reset:()=>applyGrade(look()),gradeFor,GRADES};   // live tuning: kino.post.set({contrast:1.3})
   const resize=()=>{if(!composer)return;const [w,h]=size();composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);};

@@ -346,6 +346,8 @@ BO3 closes unseen space with black planes (`wc/global_diffuse_black`, `infinite_
 
 Export `skybox_<bsp>` and its panorama (8192x4096). BO3 stores it dim (Der Eisendrache uses gain 2.7-3.2). Draw it as an equirectangular lookup by view direction on a sphere that follows the camera, unlit, no fog; fade its horizon band into the fog colour. **Do not set it as `scene.background`** (with texture arrays every map material turned white), and do not use BO3's 96-vertex sky box mesh (it warps).
 
+**Heading.** The panorama's middle column faces heading 307° (BO3 degrees, x toward y), fitted on Der Eisendrache's moon. Add the turn to the lookup's u as Gorod Krovi does (`SKY_TURN = .6028` in `mods/gorod-krovi/look.js`: `u = atan(d.x, -d.z)/2π + .5 + SKY_TURN`), or the sun's glow sits on the wrong side of the map. The glow in the sky art need not be where the sun settings put the sun (Stalingrad: 15° beside it and lower).
+
 ### 3.5 Blurry textures: larger copies first, upscaling last
 
 The build downsizes every texture (2.1), and BO3 props often stretch one small tiling map over a large model. Fixing "some textures are extremely blurry" is three separate tools, in this order:
@@ -381,6 +383,8 @@ Details: `lighting.md`, "Baked light volume for the BO3 ports", and `waw-ports.m
 BO3's lightmaps and probes are not exported. The port rebuilds the light from four things:
 
 1. **The map's look** in the mod's `setupLook`: ambient, hemisphere, key (sun or moon) and fill, retuned every frame; the entry's `background`, `fog`, `exposure`. Read the mood from the game (snowy night, overcast day) and from the sky panorama's horizon colour; fog and background take that colour.
+   - **Take the sun from the game**, not from the sky picture: `python3 -I .tools/bo3_ff_sun.py "<BO3>/zone/<bsp>.ff"` prints its heading, height, colour and the three.js direction. Use that direction for the key light **and** for the bake entry's `sun` (Gorod Krovi's first key came from the opposite side: wrong walls lit, shadows the wrong way).
+   - **Take the grade from the game**: `python3 -I .tools/bo3_ff_lut.py "<BO3>/zone/<bsp>.ff" export/web/mods/maps/<id>/lut.png` writes the map's colour cube and says whether it tints. Give the map a `GRADES` entry with `lut: 1` and neutral `black`, `contrast`, tints and saturation (lighting.md); don't invent a split tone the game doesn't have. The fog settings are not readable yet: fog stays by eye.
 2. **The baked light volume** (4.3): a 3D grid holding lamp light, sky visibility and sun reach, so interiors go dark, lamps light their rooms from any distance and nothing pops.
 3. **A small accent pool** of real point lights near the camera (1-4 by quality) for moving highlights. Its size only changes with the quality setting.
 4. **The grade**: a `GRADES` entry in `mods/lighting/grade.js` or the map entry's `grade`; tune live with `kino.post.set({...})`.

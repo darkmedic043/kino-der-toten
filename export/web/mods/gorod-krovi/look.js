@@ -1,4 +1,6 @@
-// Gorod Krovi's look (2026-11-15, user: "it looked really bad": no sky, everything orange-red with crushed blacks).
+// Gorod Krovi's look (2026-11-15, user: "it looked really bad": no sky, everything orange-red with crushed blacks;
+// later the same day "make the lighting match": the sun, its colour, the sky's heading and the grade now come from
+// the game's own data, docs/fork/waw-ports.md Gorod Krovi, Light).
 // BO3's Stalingrad is a cold blue storm at dusk with a low warm sun behind the smoke; the orange comes from the fires
 // (1,477 lights in the map's own data, baked into the light volume) rather than from the whole scene. So: BO3's own
 // skybox on a sphere (as Der Eisendrache), cool blue-grey sky light, a low warm key from the panorama's sun, a smoky
@@ -15,10 +17,14 @@ export async function prepareLook() {
   if (new URLSearchParams(location.search).get('map') === 'gorod-krovi' && !q('noDetail')) await prepareDetail(DIR);
 }
 
-// the panorama's sun (skybox_zm_stalingrad: a low warm glow through the clouds), as a map direction
-const SUN = new THREE.Vector3(-.35, .31, -.88).normalize();
-const KEY_DIR = new THREE.Vector3(-.35, .62, -.88).normalize();   // (the key a little higher than the sun: at 18° the streets' floors went black)
-const SKY_GAIN = 3, HAZE = 0x3d3c45;
+// BO3's own sun for this map (the sun volume's settings in zm_stalingrad.ff: yaw 311.4, pitch 146.76 = heading 311.4°,
+// 33.2° up, colour 1 / .908 / .546, read as the swatch the artist picked: as linear light it turned every wall olive), as a map direction (BO3 x, y, z -> x, z, -y); the bake uses the same one
+const KEY_DIR = new THREE.Vector3(.553, .548, .627).normalize(), KEY_RGB = [1, .908, .546];
+// the panorama's glow (a low warm sun through the smoke, 17.8° up), 15° to the side of the real sun once the sky is
+// turned the way the game draws it: SKY_TURN is the fraction of a turn added to the panorama's u (heading 307° at its
+// middle column, fitted on Der Eisendrache's moon, whose far-away fx entity gives its true heading)
+const SUN = new THREE.Vector3(.797, .306, .521).normalize(), SKY_TURN = .6028;
+const SKY_GAIN = 3, HAZE = 0x3d3c45, KEY_I = 1.1;
 
 // Textured metals whose colour map is near black (BO3 keeps a metal's colour in its specular map, not exported): the
 // pressed-bronze ceilings of the department store and the factory read as black voids overhead (2026-11-15). Each is
@@ -83,8 +89,9 @@ export function setupLook(api, { detail = true } = {}) {
   const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { map: { value: null }, gain: { value: SKY_GAIN }, haze: { value: new THREE.Color(HAZE) }, sun: { value: SUN } },
     vertexShader: 'varying vec3 vDir;\nvoid main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
-    fragmentShader: `uniform sampler2D map; uniform float gain; uniform vec3 haze, sun; varying vec3 vDir;
-      void main(){ vec3 d = normalize(vDir); vec2 uv = vec2(atan(d.x, -d.z) / 6.2831853 + 0.5, 1.0 - acos(clamp(d.y, -1.0, 1.0)) / 3.1415927);
+    fragmentShader: `#define SKY_TURN ${SKY_TURN}
+uniform sampler2D map; uniform float gain; uniform vec3 haze, sun; varying vec3 vDir;
+      void main(){ vec3 d = normalize(vDir); vec2 uv = vec2(atan(d.x, -d.z) / 6.2831853 + 0.5 + float(SKY_TURN), 1.0 - acos(clamp(d.y, -1.0, 1.0)) / 3.1415927);
         vec3 c = texture2D(map, uv).rgb * gain; c = c / (1.0 + max(max(c.r, c.g), c.b) * 0.45); float band = smoothstep(0.52, 0.62, uv.y);   // (soft roll-off: the sun's disc burned white through the bloom)
         vec3 h = haze + vec3(0.30, 0.17, 0.08) * pow(max(0.0, dot(d, sun)), 4.0);   // the haze warms toward the sun
         c = mix(h, c, band);
@@ -104,9 +111,9 @@ export function setupLook(api, { detail = true } = {}) {
 
   host.on('update', () => {
     sky.position.copy(camera.position);
-    if (ambient) { ambient.color.setHex(0x8792a8); ambient.intensity = .75; }
-    if (hemi) { hemi.color.setHex(0xa9b6cc); hemi.groundColor.setHex(0x4a4038); hemi.intensity = .95; }
-    if (key) { key.color.setHex(0xffc9a0); key.intensity = baked ? 1.35 : 1.1; key.position.copy(KEY_DIR); }
+    if (ambient) { ambient.color.setHex(0x8f8da8); ambient.intensity = .75; }   // (sky light: the panorama's own blue-violet, measured on its upper half)
+    if (hemi) { hemi.color.setHex(0xb0aecc); hemi.groundColor.setHex(0x4a4038); hemi.intensity = .95; }
+    if (key) { key.color.setRGB(...KEY_RGB, THREE.SRGBColorSpace); key.intensity = baked ? KEY_I : .9; key.position.copy(KEY_DIR); }
     if (fill) { fill.color.setHex(0x6a7a96); fill.intensity = .35; }
   });
   return { ready: Promise.all([ready, skyReady]), report, sky, get baked() { return baked; } };

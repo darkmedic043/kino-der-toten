@@ -90,4 +90,4 @@ def main():
     for L in lights: kinds[L['type']] = kinds.get(L['type'], 0) + 1
     print(n, 'lights at zone offset', q, kinds, '->', dst)
 
-main()
+if __name__ == '__main__': main()
