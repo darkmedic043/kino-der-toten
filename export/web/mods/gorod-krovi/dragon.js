@@ -11,8 +11,16 @@
 // shown again if its model fails to load or the ride throws (a rider is then put down at their destination).
 // v1 stand-ins: the craftable (BO3's drop-pod code cylinders and network console parts) is not built: the ride counts
 // as crafted once the power is on (flag dragonridecrafted), unless ?gkDragonCraft asks for the flag to be set by hand
-// (kino.gorod.dragon.craft()). The map dragon's landings (flight_land_N, the fire on the busiest area) are not
-// exported, so it only circles; 'dragon:fire' is never emitted yet. Co-op: solo-first, every client runs its own dragon.
+// (kino.gorod.dragon.craft()). The map dragon's landings (flight_land_N) are not exported, so it circles, and every
+// 60-120 s (15-25 s while this player owns the Guard of Fafnir with its runes done and the bath to go) it makes a fire
+// pass: it leaves its path, swoops over an open street the player is in (the model offset and turned around its mouth,
+// the flight clip still playing), breathes down it for 3 s and flies back. The breath is fx sprites (kino.fx, pooled and
+// warmed by the fx mod; no lights, only fx.flash's pool), gk 'dragon:fire' {origin, dir (unit), dur, len} at the start
+// and 'dragon:fireEnd' after; a player within FIRE.r of the line is burnt through gk.burn (0 while the shield is
+// raised: shield.js counts that as the bath), zombies in it take fire damage. The Gauntlet's street fire
+// (gauntlet-hazard.js, gk 'dragon:hazard' {on, at, dur, fallback}) is followed: the dragon swoops in fast and breathes on
+// that area, without its own damage (the hazard burns players and turns zombies into napalm zombies itself), so the egg
+// quest and the shield's bath share one dragon. Co-op: solo-first, every client runs its own dragon.
 // ?noDragon: no dragon, the teleporters as before.
 import * as THREE from 'three';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
@@ -28,6 +36,7 @@ const SITES = [   // zm_stalingrad's roost scenes: console trigger, console mode
   { id: 'factory', roost: 1, label: 'Factory', trigger: [-2610, 2702, 496], model: [-2619, 2702, 496, 90], platforms: [[-2938.5, 2863, 568], [-2938.5, 2535, 568]] },
   { id: 'judicial', roost: 3, label: 'Judicial', trigger: [0, 5853, 304], model: [0, 5863, 305, 0], platforms: [[168.5, 6191, 376], [-168.5, 6191, 376]] },
 ];
+const FIRE = { hazardSwoop: 1.2, every: [60, 120], hot: [15, 25], swoop: 2.6, leave: 2.6, dur: 3, len: 1500, up: 600, back: 600, past: 250, r: 220, tick: .25, dmg: 12, zdmg: 90 };
 const PAVLOV = [W(-2859, 21437.8, 684), W(-2896.25, 21437.8, 684)];   // s_pavlov_player (the roof)
 const SOUNDS = {   // clip notes -> sounds (dragon-sfx), [name or names, volume]
   'sndnt#evt_dragon_arrival': ['arrival', 1], 'sndnt#evt_dragon_idle_arrival': ['idle_arrival', .8], 'sndnt#evt_dragon_idle': ['idle', .7],
@@ -102,6 +111,7 @@ export default async function setupDragon(api, gk) {
   const D = { phase: 'fly', site: null, key: null, t: 0, wait: 0, rider: false, ejected: false, ejectAt: Infinity, err: null };
   const pos = new THREE.Vector3(), rot = new THREE.Quaternion();
   let fling = null, lastYaw = null, stepped = false;
+  let F = null, swooped = false, fireAt = 0, hotCheck = 0, passes = 0, lastFire = null;   // the fire pass (below)
   working = true;
 
   function play(key) { D.key = key; D.t = 0; rig.play(key, /idle$/.test(key), 1, 0); D.notes = clips[key].notifies?.map(n => [n.name, n.time]) ?? []; }
@@ -118,7 +128,7 @@ export default async function setupDragon(api, gk) {
   }
 
   function summon(site) {
-    if (D.phase !== 'fly') return false;
+    if (D.phase !== 'fly' || F) return false;
     D.phase = 'arrive'; D.site = site; D.wait = 0; D.rider = false; D.ejected = false; D.ejectAt = Infinity;
     siteClips(site).then(() => { if (D.site === site && D.phase === 'arrive') { play(`roost${site.roost}_arrive`); sfx.sfxAt('dragon_alarm', site.trigger, .7); } }).catch(e => broken(e));
     return true;
@@ -152,6 +162,7 @@ export default async function setupDragon(api, gk) {
     if (D.rider || fling) { player.setPosition(dest.clone().add(new THREE.Vector3(0, 2, 0))); session.flags.add('zone:pavlovsb'); gk.emit('dragon:landed', 'pavlovsb'); }
     D.rider = false; fling = null; if (api.features) api.features.flight = false;
     model.visible = false; D.phase = 'off';
+    if (F) { const was = F.stage === 'breath'; F = null; if (was) gk.emit('dragon:fireEnd'); }
   }
 
   // one step of the dragon: its clip, its root, the notes, the phase changes
@@ -163,7 +174,9 @@ export default async function setupDragon(api, gk) {
     if (t >= tb) notes(tb, t); else { notes(tb, dur); notes(-1, t); }
     rootAt(data, t, pos, rot);
     tO.position.set(pos.x, pos.z, -pos.y); tO.quaternion.copy(AX).multiply(rot);
+    if (swooped) { model.position.copy(ALIGN); model.quaternion.identity(); model.updateMatrix(); swooped = false; }
     model.updateMatrixWorld(true);
+    if (F) swoop();
     const s = D.site;
     if (D.phase === 'fly' && D.t >= dur) flyOn();
     else if (D.phase === 'arrive' && D.key.endsWith('arrive') && D.t >= dur) { D.phase = 'idle'; D.wait = 0; play(`roost${s.roost}_idle`); }
@@ -194,15 +207,130 @@ export default async function setupDragon(api, gk) {
     }
     return !!pre?.(dt);
   };
+  // ---- the fire pass: F {stage swoop | breath | leave, t, w (0..1, how far the model has left its path), origin, dir, ...}
+  const mouth = model.getObjectByName('tag_mouth_fx_anim') ?? model.getObjectByName('j_head_anim') ?? body ?? model;
+  const UP = new THREE.Vector3(0, 1, 0), fray = new THREE.Ray(), tv = new THREE.Vector3(), tq = new THREE.Quaternion();
+  const rnd = (a, b) => a + Math.random() * (b - a), jit = r => new THREE.Vector3(rnd(-r, r), rnd(-r, r), rnd(-r, r));
+  const smooth = x => { x = THREE.MathUtils.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  const hot = () => { const s = window.kino?.gorod?.shield?.state?.(), a = window.kino?.rocketShield?.state?.()?.alt; return !!(s && a?.fafnir && s.quest.runes >= 3 && !s.quest.bathed && !s.quest.done); };
+  const schedule = () => { const [a, b] = hot() ? FIRE.hot : FIRE.every; fireAt = session.time + rnd(a, b); };
+  // where to breathe: the player's feet, along the horizontal direction with the longest open street whose origin (up and
+  // back from them) they can see; null if they are under a roof
+  function plan(o) {
+    const feet = o.at ? (Array.isArray(o.at) ? new THREE.Vector3(...o.at) : o.at.clone()) : player.getFeetPosition();
+    if (o.at) { fray.origin.copy(feet).y += 150; fray.direction.set(0, -1, 0); const g = world.raycast(fray, 0, 600); if (g) feet.y += 150 - g.distance; }   // a volume's centre -> its floor
+    const chest = feet.clone().add(new THREE.Vector3(0, 60, 0));
+    const tries = o.dir ? [new THREE.Vector3(o.dir.x ?? o.dir[0], 0, o.dir.z ?? o.dir[2]).normalize()]
+      : Array.from({ length: 12 }, (_, i) => { const a = (i + Math.random() * .3) / 12 * Math.PI * 2; return new THREE.Vector3(Math.cos(a), 0, Math.sin(a)); });
+    let best = null;
+    for (const h of tries) {
+      const origin = feet.clone().addScaledVector(h, -FIRE.back).add(new THREE.Vector3(0, FIRE.up, 0));
+      tv.subVectors(origin, chest); const d = tv.length(); fray.origin.copy(chest); fray.direction.copy(tv).divideScalar(d);
+      if (!o.dir && !o.anyway && world.raycast(fray, 0, d)) continue;   // a roof or a wall between them and the dragon
+      fray.direction.copy(h); const fw = world.raycast(fray, 0, 1500)?.distance ?? 1500;
+      fray.direction.copy(h).negate(); const bk = world.raycast(fray, 0, 1500)?.distance ?? 1500;
+      const score = Math.min(fw, 600) + bk + Math.random() * 100;
+      if (!best || score > best.score) best = { h, origin, score };
+    }
+    if (!best) return o.force && !o.anyway ? plan({ ...o, anyway: true }) : null;
+    return { origin: best.origin, dir: feet.clone().addScaledVector(best.h, FIRE.past).sub(best.origin).normalize(), h: best.h, feet };
+  }
+  function startPass(o = {}) {
+    if (D.phase !== 'fly' || F || D.rider || fling) return false;
+    const p = plan(o); if (!p) return false;
+    const len = o.len ?? FIRE.len; fray.origin.copy(p.origin); fray.direction.copy(p.dir);
+    const reach = world.raycast(fray, 0, len)?.distance ?? Math.min(len, (p.origin.y - p.feet.y) / Math.max(.2, -p.dir.y));
+    F = { stage: 'swoop', t: 0, w: 0, swoopT: o.swoop ?? FIRE.swoop, hurt: o.hurt !== false, why: o.why ?? 'pass', origin: p.origin, dir: p.dir, h: p.h, side: new THREE.Vector3(-p.h.z, 0, p.h.x), dur: o.dur ?? FIRE.dur, len,
+      ground: p.origin.clone().addScaledVector(p.dir, reach), yaw: Math.atan2(-p.h.z, p.h.x), dy: null, pre: false, tick: 0, flash: 0, acc: [0, 0, 0], burnt: 0, hits: 0, zombies: 0 };
+    sfx.sfxAt(Math.random() < .5 ? 'roar0' : 'roar1', p.feet, 1, 8000);
+    return true;
+  }
+  // the model leaves its path: offset and turned (about Y) so the mouth sits at the origin facing along the street
+  function swoop() {
+    const w = F.w; if (w <= 0) return;
+    const m = mouth.getWorldPosition(tv).sub(ALIGN);
+    let dy = F.yaw - yawOf(); dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    if (F.dy != null) { const d = dy - F.dy; dy = F.dy + Math.atan2(Math.sin(d), Math.cos(d)); }   // no flip at +-180
+    F.dy = dy;
+    tq.setFromAxisAngle(UP, w * dy); m.applyQuaternion(tq);
+    model.quaternion.copy(tq); model.position.copy(ALIGN).addScaledVector(F.origin.clone().sub(ALIGN).sub(m), w);
+    model.updateMatrix(); model.updateMatrixWorld(true); swooped = true;
+  }
+  const inLine = (p, out) => { const v = out.copy(p).sub(F.origin), a = v.dot(F.dir); return a > 0 && a < F.len && v.addScaledVector(F.dir, -a).length() < FIRE.r; };
+  function breathe(dt) {
+    const fx = window.kino?.fx, from = mouth.getWorldPosition(new THREE.Vector3());
+    if (fx?.emit) {   // pooled, warmed sprites (fx mod): the stream mouth -> floor, the fire carpet, a little smoke
+      F.acc[0] += dt * 110; F.acc[1] += dt * 45; F.acc[2] += dt * 7;
+      for (; F.acc[0] >= 1; F.acc[0]--) { const u = Math.random(); fx.emit({ key: 'fire', at: from.clone().lerp(F.ground, u).add(jit(8 + u * 50)), vel: F.dir.clone().multiplyScalar(420).add(jit(40)), size: [35 + u * 60, 100 + u * 150], life: rnd(.3, .45), fade: [.04, .6], additive: true, opacity: .9, spin: rnd(-1, 1) }); }
+      for (; F.acc[1] >= 1; F.acc[1]--) { const at = F.ground.clone().addScaledVector(F.h, rnd(-380, 300)).addScaledVector(F.side, rnd(-150, 150)); at.y += rnd(10, 40); fx.emit({ key: 'fire', at, vel: jit(30).setY(rnd(60, 130)), size: [45, rnd(130, 210)], life: rnd(.55, .85), fade: [.06, .55], additive: true, spin: rnd(-1, 1) }); }
+      for (; F.acc[2] >= 1; F.acc[2]--) { const at = F.ground.clone().addScaledVector(F.h, rnd(-300, 250)).addScaledVector(F.side, rnd(-120, 120)); at.y += 80; fx.emit({ key: 'smoke', at, vel: jit(20).setY(rnd(50, 90)), size: [80, rnd(240, 320)], life: rnd(1.3, 1.8), fade: [.15, .6], opacity: .5, color: 0x3e3833, drag: .6 }); }
+    }
+    if ((F.flash -= dt) <= 0 && fx?.flash) { F.flash = .3; fx.flash(F.ground.clone().add(new THREE.Vector3(0, 60, 0)), { color: 0xff7a26, intensity: 7, radius: 900, life: .45 }); }   // the lighting mod's pool, no new light
+    if ((F.tick -= dt) > 0) return; F.tick = FIRE.tick;
+    // the player: shield.js's bath test (feet + 40 within FIRE.r of the line); gk.burn is 0 while the shield is raised
+    if (!F.hurt) return;   // the Gauntlet's fire burns on its own (gauntlet-hazard.js)
+    if (session.phase !== 'reviving' && session.phase !== 'gameover' && inLine(player.getFeetPosition().add(new THREE.Vector3(0, 40, 0)), tv)) {
+      F.hits++; F.burnt += gk.burn ? gk.burn(FIRE.dmg) : (api.damage?.(FIRE.dmg), FIRE.dmg);
+    }
+    for (const z of [...(api.enemies?.list ?? [])]) {   // plain zombies in the fire burn (no points); specials shrug it off
+      if (z.kind !== 'zombie' || z.thrall || !inLine(z.root.position.clone().add(new THREE.Vector3(0, 40, 0)), new THREE.Vector3())) continue;
+      api.enemies.hurt(z, FIRE.zdmg, false, false, 'fire', false); F.zombies++; fx?.burn?.(z.root.position.clone().add(new THREE.Vector3(0, 40, 0)));
+    }
+  }
+  function fireTick(dt) {
+    if (D.phase === 'off') return;
+    if (!F) {
+      if (!(session.phase === 'fighting' || session.phase === 'preparing') || D.phase !== 'fly' || D.rider || fling) return;
+      if (hazardNext) { const h = hazardNext; hazardNext = null; if (followHazard(h)) return; }
+      if (!fireAt) schedule();
+      if (session.time >= hotCheck) { hotCheck = session.time + 1; if (fireAt - session.time > FIRE.hot[1] && hot()) schedule(); }
+      if (session.time >= fireAt && !startPass()) fireAt = session.time + rnd(10, 20);   // the player is under a roof: soon again
+      return;
+    }
+    F.t += dt;
+    if (F.stage === 'swoop') {
+      F.w = smooth(F.t / F.swoopT);
+      if (!F.pre && F.t > F.swoopT - 1.1) { F.pre = true; if (F.hurt) sfx.sfxAt('breath_pre', F.origin, 1, 6000); }   // the hazard plays its own
+      if (F.t >= F.swoopT) {
+        F.stage = 'breath'; F.t = 0; F.w = 1;
+        gk.emit('dragon:fire', { origin: F.origin.clone(), dir: F.dir.clone(), dur: F.dur, len: F.len });
+        if (F.hurt) sfx.sfxAt('breath', F.origin, 1, 6000);
+      }
+    } else if (F.stage === 'breath') {
+      breathe(dt);
+      if (F.t >= F.dur) { F.stage = 'leave'; F.t = 0; gk.emit('dragon:fireEnd'); }
+    } else {
+      F.w = 1 - smooth(F.t / FIRE.leave);
+      if (F.t >= FIRE.leave) { const was = F.why; lastFire = { why: was, burnt: F.burnt, hits: F.hits, zombies: F.zombies, origin: F.origin.toArray().map(Math.round), dir: F.dir.toArray().map(v => +v.toFixed(3)) }; F = null; passes++; if (was === 'pass' || fireAt - session.time < 20) schedule(); }
+    }
+  }
+
+  // the Gauntlet's street fire: fly over and breathe on it (the stand-in in gauntlet-hazard.js keeps the timing)
+  let hazardNext = null;   // a fire that started while the dragon was busy breathing elsewhere
+  function followHazard(e) {
+    const left = (e.dur ?? 10) - (session.time - e.t0);
+    if (left < 2.5 || D.phase !== 'fly' || D.rider || fling) return false;
+    return startPass({ at: e.at, dur: Math.max(1.5, Math.min(4, left - FIRE.hazardSwoop - 1)), swoop: FIRE.hazardSwoop, hurt: false, force: true, why: 'hazard:' + e.area });
+  }
+  gk.on('dragon:hazard', e => {
+    if (!e?.at) return;
+    if (!e.on) { if (hazardNext?.area === e.area) hazardNext = null; return; }
+    const h = { area: e.area, at: e.at.clone(), dur: e.dur, t0: session.time };
+    if (F) hazardNext = h; else followHazard(h);
+  });
+
   host.on('update', dt => { safeStep(Math.min(dt || 1 / 60, .1)); stepped = false;
     for (const s of SITES) for (const b of s.boards) {   // a platform's prompt follows the player while they stand on it
       const f = player.getFeetPosition(), inside = Math.hypot(f.x - b.at.x, f.z - b.at.z) < PLATFORM_R && Math.abs(f.y - b.at.y) < PLATFORM_H;
       b.e.position.copy(inside ? camera.position : b.at);
     }
+    try { fireTick(Math.min(dt || 1 / 60, .1)); } catch (e) { console.error('[gorod-krovi] dragon fire', e); if (F?.stage === 'breath') gk.emit('dragon:fireEnd'); F = null; fireAt = session.time + 60; }
   });
   host.on('reset', () => {
     if (D.phase === 'off') return;
     D.rider = false; fling = null; if (api.features) api.features.flight = false;
+    if (F?.stage === 'breath') gk.emit('dragon:fireEnd');
+    F = null; fireAt = 0; hazardNext = null;
     for (const s of SITES) s.readyAt = 0; flyOn();
   });
 
@@ -214,12 +342,12 @@ export default async function setupDragon(api, gk) {
         if (!session.power) return 'The power must be activated';
         if (!crafted()) return 'The dragon will not answer · something is missing';
         if (D.site === s) return D.phase === 'arrive' ? 'The dragon is on its way' : D.phase === 'idle' ? 'The dragon is waiting · climb on' : 'The dragon is away';
-        if (D.phase !== 'fly') return 'The dragon is busy';
+        if (D.phase !== 'fly' || F) return 'The dragon is busy';
         if (s.readyAt > session.time) return 'The dragon is resting · ' + Math.ceil(s.readyAt - session.time) + 's';
         return 'Call the dragon · ' + COST;
       },
       use() {
-        if (!session.power || !crafted() || D.phase !== 'fly' || s.readyAt > session.time) return false;
+        if (!session.power || !crafted() || D.phase !== 'fly' || F || s.readyAt > session.time) return false;
         if (session.points < COST) { api.toast?.('Not enough points', 2); return false; }
         session.points -= COST; api.audio?.play?.('buy');
         summon(s); api.toast?.('The dragon is coming to the ' + s.label, 3);
@@ -235,7 +363,10 @@ export default async function setupDragon(api, gk) {
 
   const handle = {
     state: () => ({ phase: D.phase, site: D.site?.id ?? null, clip: D.key, t: +D.t.toFixed(2), rider: D.rider, fling: !!fling, ejectAt: D.ejectAt, working, err: D.err, crafted: crafted(),
-      sites: SITES.map(s => ({ id: s.id, ready: s.readyAt <= session.time })) }),
+      sites: SITES.map(s => ({ id: s.id, ready: s.readyAt <= session.time })),
+      fire: F ? { why: F.why, stage: F.stage, t: +F.t.toFixed(2), origin: F.origin.toArray().map(Math.round), dir: F.dir.toArray().map(v => +v.toFixed(3)), burnt: F.burnt, hits: F.hits } : null,
+      nextFire: fireAt ? +(fireAt - session.time).toFixed(1) : null, passes, lastFire }),
+    fire: o => startPass(o ?? {}),   // force a fire pass at the player (or o.at, a Vector3 / [x,y,z]; o.dir horizontal; o.dur, o.len)
     summon: id => summon(SITES.find(s => s.id === id) ?? SITES[1]),
     board, craft: () => gk.setFlag('dragonridecrafted'),
     skip: sec => { for (let k = 0; k < sec * 30; k++) { stepped = false; safeStep(1 / 30); } },   // fast-forward the dragon alone (tests)
