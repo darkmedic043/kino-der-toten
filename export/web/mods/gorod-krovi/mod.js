@@ -33,6 +33,26 @@ export default async function setup(api) {
     return zones;
   };
   const look = setupLook(api);   // sky, lights, bake, detail, metals, overlays (look.js): awaited before the engine batches the map and compiles
-  window.kino ??= {}; window.kino.gorod = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)] };
+  // The map's systems (2026-11-15), one module each in this folder, each `export default async function (api, gk)`,
+  // awaited here so their models and materials are in place before the engine's warm-up. A module that isn't there
+  // yet is skipped. gk: the zone flags (a script flag is session.flags 'gorod:flag:<name>'; clearFlag takes one back,
+  // e.g. activate_bridge once the bridge lifts), the look, and a small event hub between the systems.
+  const hub = new Map();
+  const gk = {
+    flags: () => flags(session), setFlag: f => session.flags.add('gorod:flag:' + f), clearFlag: f => session.flags.delete('gorod:flag:' + f),
+    hasFlag: f => flags(session).has(f), look,
+    on: (e, fn) => { if (!hub.has(e)) hub.set(e, new Set()); hub.get(e).add(fn); return () => hub.get(e).delete(fn); },
+    emit: (e, ...a) => { for (const fn of hub.get(e) ?? []) try { fn(...a); } catch (err) { console.error('[gorod-krovi] ' + e, err); } },
+  };
+  window.kino ??= {}; window.kino.gorod = { flags: () => [...flags(session)], zones: () => [...world.activeZones(session)], gk };
   await look.ready;
+  await Promise.all(PARTS.map(async n => {
+    let m; try { m = await import(`./${n}.js`); } catch (e) { if (!/dynamically imported|Failed to fetch|404/.test(e.message)) console.error(`[gorod-krovi] ${n}.js`, e); return; }
+    const t = performance.now();
+    try { await m.default?.(api, gk); } catch (e) { console.error(`[gorod-krovi] ${n}.js setup`, e); }
+    if (performance.now() - t > 250) console.info(`[gorod-krovi] ${n} setup ${Math.round(performance.now() - t)} ms`);
+  }));
 }
+// zombies (models, anims, spawns), sounds (ambience, emitters), bridge (powered drawbridge), dragon (roosts, the ride,
+// the map dragon), pap (Pavlov's lockdown), bosses (Mangler, Valkyrie drones, the mech), gauntlet, shield, widows
+const PARTS = ['zombies', 'sounds', 'bridge', 'dragon', 'pap', 'bosses', 'gauntlet', 'shield', 'widows'];
