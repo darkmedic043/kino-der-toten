@@ -151,6 +151,28 @@
       "instanceCullPixels": 6
     },
     {
+      "id": "gorod-krovi",
+      "title": "Gorod Krovi",
+      "description": "Black Ops III's Stalingrad in flames, ported from the running game: the streets, the department store, the factory and the library, their doors, perks, the Mystery Box, and Pack-a-Punch in Pavlov's House (ride the dragon from a roost). Work in progress.",
+      "modes": ["zombies", "explore"],
+      "dir": "mods/maps/gorod-krovi/",
+      "model": "gorod-krovi.glb?v=2",
+      "scale": 1,
+      "background": "#3a2a24",
+      "exposure": 1,
+      "nearbySpawns": true,
+      "stairSmoothing": true,
+      "player": { "slopeStick": true },
+      "perkYaw": -90,
+      "machines": "bo3",
+      "fog": 0.0002,
+      "mergeStatic": true,
+      "mergeExclude": "^GOROD_",
+      "textureArrays": 256,
+      "batchMeshes": true,
+      "instanceCullPixels": 6
+    },
+    {
       "id": "malibu-drive",
       "image": "mods/maps/thumbs/malibu-drive.jpg",
       "title": "Malibu Drive",

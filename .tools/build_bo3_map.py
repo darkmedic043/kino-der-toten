@@ -38,6 +38,9 @@ NOT_SOLID = re.compile(r'decal|glass|water|foliage|grass|cobweb|web_|fx_|_fx|ble
 if BSP == 'zm_castle':   # Der Eisendrache's snowy ground is often only a _blend surface (two layers mixed by vertex alpha, nothing
     # under it): without it the navmesh had holes across the courtyard and zombies couldn't cross. Decals stay non-solid.
     NOT_SOLID = re.compile(r'decal|glass|water|foliage|cobweb|web_|fx_|_fx|vista|light_?ray|godray|smoke|fog|ivy|leaves|vine|cloth|curtain', re.I)
+if BSP == 'zm_stalingrad':   # Gorod Krovi: a black box (wc/infinite_blackness, 2390 x 1300 x 708) encloses the start plaza for
+    # the intro; the game hides it after. Drawn and solid here, it walled the spawn in (col-audit: 34 of 36 markers unreachable).
+    SKIP = re.compile(SKIP.pattern + r'|infinite_blackness', re.I)
 
 # ---- textures ----------------------------------------------------------------------------------------------------------
 textures = {}   # image name -> {uri, alpha}
@@ -336,7 +339,16 @@ for name, insts in by_model.items():
     # walkable structure keeps its shape (if it isn't too detailed); other solid props collide as their bounding box,
     # and big irregular ones are left out (a box around them could close a passage)
     if CONVEX.search(base_): pp, tt = convex_hull(pp)   # a smooth bump, no pits to sink into
+    elif BSP == 'zm_stalingrad' and re.search(r'stairs_broken_full_piece|dragon_platform_stairs', base_): pp, tt = convex_hull(pp)
+        # whole staircases in one model (the department store's 2nd-to-3rd floor flight, the library's, the dragon roosts'):
+        # boxed by the rule below they were walls 135-212 high; their hull is a ramp (2026-11-15)
+    elif BSP == 'zm_stalingrad' and re.search(r'facade|bridge_metal', base_): pass   # Gorod Krovi: the department store's storey facades
+        # (dept_store_facade_1st_floor...) matched WALKABLE by 'floor' and, over 6,000 triangles, became their box: a solid
+        # 680 x 680 x 196 block that sealed the store's ground floor and upper storeys (col-audit, 2026-11-15). As they are.
+        # The metal bridges too: the factory's ramp-bridge up to its catwalk (three bridge_metal_piece_main_angled) boxed was a
+        # flight of 54-unit steps, and the catwalk with the box and the AK-117 was cut off.
     elif FLATBOX.search(base_) or (WALKABLE.search(base_) and len(tt) > 6000):   # flat panels and over-detailed walkables: their box
+        if WALKABLE.search(base_) and len(tt) > 6000: print('walkable boxed:', name, len(tt), [round(float(v)) for v in pp.max(0) - pp.min(0)])
         lo3, hi3 = pp.min(0), pp.max(0)
         pp = np.array([[x, y, z] for x in (lo3[0], hi3[0]) for y in (lo3[1], hi3[1]) for z in (lo3[2], hi3[2])])
         tt = BOX_TRIS
@@ -392,6 +404,10 @@ for fl in flights.values():
             np.array([*(a1[:2] - side * half_w), a1[2]]), np.array([*(a1[:2] + side * half_w), a1[2]])]
     col_P.append(g(np.array(quad))); col_T.append(np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]) + n0); n0 += 4; ramps += 1
 print(f'stairs: {ramps} ramps from {len(steps)} treads')
+if BSP == 'zm_stalingrad':   # the department store's broken flight to the 3rd floor starts 46 above the 2nd floor (its first
+    # steps are broken off; the game walks you on a clip ramp that isn't in the data): a ramp from the floor to its lower edge
+    quad = [np.array(q, dtype=np.float64) for q in ((-280, 1456, 221), (-216, 1520, 221), (-140, 1444, 177), (-204, 1380, 177))]
+    col_P.append(g(np.array(quad))); col_T.append(np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]) + n0); n0 += 4
 CP, CT = np.concatenate(col_P).astype(np.float32), np.concatenate(col_T).astype(np.uint32)
 gltf['meshes'].append({'name': 'COL_world', 'primitives': [{'attributes': {'POSITION': accessor(CP, 'VEC3', 34962, True)}, 'indices': accessor(CT.ravel(), 'SCALAR', 34963)}]})
 add_node({'name': 'COL_world', 'mesh': len(gltf['meshes']) - 1})
@@ -447,9 +463,15 @@ MAPCFG = {
         'wnuen': ['wnuen_building'], 'wnuen_bridge': ['wnuen_building'], 'bridge': ['warehouse_building', 'wnuen_building'],
         'outside_south': ['outside_east', 'outside_west']}},
     'zm_castle': {'start': 'start', 'box': 'behind_tram_station_chest', 'groups': {'start': ['start'], 'tram_high': ['start']}},
+    # Gorod Krovi: as Der Eisendrache (every zone its own id, the gorod-krovi mod links them as zm_stalingrad_zones.gsc
+    # does); the three start zones are one
+    'zm_stalingrad': {'start': 'start_A', 'box': 'dept_store_upper_chest', 'groups': {'start_A': ['start'], 'start_B': ['start'], 'start_C': ['start']}},
 }[BSP]
+if BSP == 'zm_stalingrad':   # its wall buys BO3 names that the other two maps don't have (melee_wrench: no stand-in)
+    WEAPONS = {**WEAPONS, 'shotgun_precision': 'bo3_m1887', 'smg_burst': 'bo3_mp7_flanker', 'ar_accurate': 'bo3_sa80'}
 START_ZONE, ZONE_GROUPS = MAPCFG['start'], MAPCFG['groups']
 zname = lambda t: t.removeprefix('zone_').removesuffix('_spawners').removesuffix('_zone')   # receiver_zone / zone_start -> receiver / start
+if BSP == 'zm_stalingrad': zname = lambda t: t.removeprefix('zone_').removesuffix('_spawners').removesuffix('_spawn').removesuffix('_zone')   # Gorod Krovi: yellow_A_spawn
 zid = lambda z: z.replace('_', '')   # CustomWorld reads a marker's zone up to the first underscore
 def zone_ids(z): return [zid(x) for x in ZONE_GROUPS.get(z, [z])]
 zones = {}
@@ -471,11 +493,11 @@ for e in ents:
     cls, tn, sn = e.get('classname', ''), e.get('targetname', ''), e.get('script_noteworthy', '')
     o = vec(e.get('origin')); yaw = vec(e.get('angles'))[1]
     if cls == 'info_player_start': marker('PLAYER_SPAWN', o, yaw); count('PLAYER_SPAWN')
-    elif sn == 'riser_location' and tn.endswith('_spawners'):
+    elif sn == 'riser_location' and (tn.endswith('_spawners') or (BSP == 'zm_stalingrad' and tn.endswith('_spawn') and zname(tn) in zones)):
         # BO3's spawn_location structs are behind the walls (zombies walk from there to a window): CustomWorld would snap
         # them to the nearest walkable spot (the mainframe platform...), so only the windows' spawns and the ground risers
         for z in zone_ids(zname(tn)): marker(f'ZSPAWN_{z}', o, yaw, {'zone': z}); count('ZSPAWN')
-    elif BSP == 'zm_castle' and sn == 'spawn_location' and tn.endswith('_spawners') and floor_below(o):
+    elif (BSP == 'zm_castle' and sn == 'spawn_location' and tn.endswith('_spawners') or BSP == 'zm_stalingrad' and sn == 'spawn_location' and tn.endswith('_spawn') and zname(tn) in zones) and floor_below(o):
         # Der Eisendrache: most zones have no windows; BO3's zombies appear at these points and climb in. Those with
         # floor under them become walk-in spawns (CustomWorld uses only the ones with a navmesh path to the player)
         for z in zone_ids(zname(tn)): marker(f'ZSPAWN_{z}', o, yaw, {'zone': z, 'walk': True}); count('ZSPAWN_walk')
@@ -507,7 +529,7 @@ for e in ents:
                     marker(f'ZSPAWN_{z}', (np.array(o) + d / dist * min(80, dist * .8)).tolist(), yaw, {'zone': z}); count('ZSPAWN_window')
     elif cls.lower() == 'zbarrier_zmcore_magicbox': marker('BOX_start' if sn.startswith(MAPCFG['box']) else 'BOX', o, yaw - 90); count('BOX')   # -90: undo CustomWorld's FACE
     elif cls.startswith('zbarrier_') and cls.endswith('packapunch'): marker('PAP', o, yaw); count('PAP')
-    elif tn == 'use_power_switch':
+    elif tn == 'use_power_switch' or (BSP == 'zm_stalingrad' and tn == 'use_elec_switch'):
         # no angle on the trigger: face out of the nearest wall (level triangles within 60 units, near-vertical, the one
         # closest to the switch); the lever turns yaw + FACE + perkYaw(-90) = yaw, and its front is +Z
         best = None
@@ -541,6 +563,12 @@ done = set()
 # buy gates (BO3 animates them; here they rise). Debris whose only pieces are brush models (their geometry isn't in the
 # dump) get a stand-in: a pile of BO3 rubble at the clip brush.
 GATE_MODELS = {'zbarrier_zm_castle_gate_dropdown_snow': 'p7_fxanim_zm_castle_drop_down_buy_gate_mod'}
+if BSP == 'zm_stalingrad':   # Gorod Krovi's power doors and gates (their fxanim models), and its debris: fxanim scene bundles
+    GATE_MODELS = {'zbarrier_zm_stalingrad_power_door': 'p7_fxanim_zm_stal_power_door_mod', 'zbarrier_zm_stalingrad_power_door_slide_left': 'p7_fxanim_zm_stal_gate_mod',
+                   'zbarrier_zm_stalingrad_power_gate_verticle': 'p7_fxanim_zm_stal_gate_vertical_mod', 'zbarrier_zm_stalingrad_power_gate_verticle_factory': 'p7_fxanim_zm_stal_gate_vertical_b_mod',
+                   'zbarrier_zm_castle_gate_dropdown': 'p7_fxanim_zm_castle_drop_down_buy_gate_mod'}
+SCENE_MODELS = {} if BSP != 'zm_stalingrad' else {   # door_buy_03 has the library and stairs variants of the anims
+    'p7_fxanim_zm_stal_door_buy_library_bundle': 'p7_fxanim_zm_stal_door_buy_03_mod', 'p7_fxanim_zm_stal_door_buy_dept_store_2f_bundle': 'p7_fxanim_zm_stal_door_buy_03_mod'}
 BARRICADE, BARRICADE_W, BARRICADE_H = 'p7_zm_der_barricade_wall_main', 138.6, 92.5   # BO3 plank wall, model X = width, Z = height
 def debris_standin(o):
     """A plank wall filling the passage at a debris clip brush (CoD origin o), measured through the collision: the
@@ -584,6 +612,8 @@ for e in ents:
         if pc == 'script_model': k = door_piece(part['model'], part['origin'], part.get('angles'), vec(part['script_vector']) if part.get('script_vector') else None)
         elif pc.startswith('zbarrier_'): k = door_piece(GATE_MODELS.get(pc, part.get('model')), part['origin'], part.get('angles'), [0, 0, 110])
         elif pc == 'script_brushmodel': brushes.append(vec(part['origin'])); k = None
+        elif pc == 'scriptbundle_scene' and BSP == 'zm_stalingrad' and part.get('scriptbundlename', '').startswith('p7_fxanim_zm_stal_door_buy_'):
+            k = door_piece(SCENE_MODELS.get(part['scriptbundlename'], 'p7_fxanim_zm_stal_door_buy_01_mod'), part['origin'], part.get('angles'), [0, 0, 140])
         else: k = None
         if k is not None: kids.append(k)
     if not kids and brushes and e.get('targetname') == 'zombie_debris':
@@ -604,6 +634,20 @@ for e in ents:
         marker(f'TPDEST_{pad}', MAINFRAME, MAINFRAME_YAW); count('TELEPORT')
     elif m and e.get('script_sound') == 'evt_lever_pull':
         add_node({'name': f'GIANT_LEVER_pad{m[1]}', 'translation': g(vec(e['origin'])).tolist()}); count('LEVER')   # the-giant mod: linking
+# Gorod Krovi's rides as teleporters (gorod-krovi mod): a dragon roost (zm_stalingrad_dragon.gsc, s_dragon_platform_<site>)
+# flies you to Pavlov's House, a separate building far north where Pack-a-Punch is (s_pavlov_player); its sewer
+# (transport_pavlovs_to_fountain) slides you back to the fountain by the start (sewer_ride_end)
+if BSP == 'zm_stalingrad':
+    # The roost structs (s_dragon_platform_*) mark where the dragon lands, on decks the player can't walk to here, and
+    # s_pavlov_player is 380 units over the floor; the pads and landings stand on walked floor next to them instead
+    # (CoD points picked from col-audit's flood, 2026-11-15).
+    PADS = {'factory': (-2944, 2704, 173), 'library': (2832, 2992, 0), 'judicial': (0, 5856, 304)}
+    for site, o in PADS.items():
+        e = next((x for x in ents if x.get('targetname') == f's_dragon_platform_{site}'), None)
+        marker(f'TELEPORT_dragon{site}', list(o), vec(e.get('angles'))[1] if e else 0, {'cost': 500, 'cooldown': 20, 'power': False, 'visual': False})
+        marker(f'TPDEST_dragon{site}', [-3008, 21520, 0], 90, {'zone': 'pavlovsB'}); count('TELEPORT')   # facing Pack-a-Punch
+    marker('TELEPORT_sewer', [-2912, 22384, -159], 90, {'cost': 0, 'cooldown': 5, 'power': False, 'visual': False})   # by transport_pavlovs_to_fountain (in a pit at -370)
+    marker('TPDEST_sewer', [-976, 720, -7], 0, {'zone': 'start'}); count('TELEPORT')   # by sewer_ride_end
 # lamps (the-giant mod lights the nearest few): BO3's buzzing light fixtures and lanterns, merged within 120 units
 lamps = []
 for e in ents:
