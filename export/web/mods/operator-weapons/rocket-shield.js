@@ -11,6 +11,9 @@
 // A map's own shield uses this code through give(alt, health): same raise, bash, blocking, repairs and HUD, one shield at a
 // time, but alt.def's model and clips, and right mouse calls alt.plant() instead of the rockets (no charges). See
 // mods/nuketown/shield.js. alt: {def, name, label, hint, plant(), broke()}. `owned` is the Rocket Shield itself; state().owned either.
+// Pluggable special (2026-11-15, Gorod Krovi's Guard of Fafnir, mods/gorod-krovi/shield.js): an alt with special({play}) fires that on
+// right mouse instead of plant(), spending one of its own charges (alt.charges = the count, shown as pips, +1 a round; it returns
+// false to keep the charge; setCharges(n) refills); alt.maxMul scales the health, alt.toast replaces the pick-up toast.
 import * as THREE from 'three';
 import { ViewWeapon, loadModel } from '../../animation.js';
 import { disposeSkeletons } from '../../runtime-assets.js';
@@ -31,7 +34,7 @@ export function setupRocketShield(api) {
   // perk hooks (perks-plus reaper-perks.js sets .perk: Victorious Tortoise blocks from every side, doubles the
   // health when upgraded and blows up when the shield breaks; Crusader's Ale repairs it with heal())
   const hooks = { perk: null };
-  const MAX = () => SHIELD_MAX * (hooks.perk?.maxMul?.() ?? 1);
+  const MAX = () => SHIELD_MAX * (hooks.perk?.maxMul?.() ?? 1) * (sh?.alt?.maxMul ?? 1);   // alt.maxMul: an upgraded map shield
   const look = () => sh.health > MAX() * 2 / 3 ? 0 : sh.health > MAX() / 3 ? 1 : 2;
   const def = () => sh.alt?.def ?? DEF;
   const modelFor = k => k ? def().worn?.[k - 1] ?? def().model : def().model;
@@ -39,9 +42,9 @@ export function setupRocketShield(api) {
   function reset() { if (sh.raised) lower(); sh.owned = false; sh.alt = null; sh.health = MAX(); sh.charges = CHARGES; hud(); for (const c of tanks) c.visible = false; }
   function give(alt = null, health = null) {
     if (sh.raised) lower();
-    sh.owned = true; sh.alt = alt; sh.health = health ?? MAX(); sh.charges = CHARGES; audio?.play?.('buy', .6);
+    sh.owned = true; sh.alt = alt; sh.health = health ?? MAX(); sh.charges = alt?.special ? alt.charges ?? 0 : CHARGES; audio?.play?.('buy', .6);   // an alt special's own charges
     const key = (binds().shield ?? 'KeyH').replace(/^Key/, '');
-    toast?.(alt ? `${alt.name} · ${key} to raise, then right mouse to plant it` : `Rocket Shield · ${key} to raise`, 3); if (!alt) for (const c of tanks) c.visible = true; hud();
+    toast?.(alt ? alt.toast ?? `${alt.name} · ${key} to raise, then right mouse to plant it` : `Rocket Shield · ${key} to raise`, 3); if (!alt) for (const c of tanks) c.visible = true; hud();
   }
   // a planted shield leaves your hands and keeps its health
   function take() { if (sh.raised) lower(); sh.owned = false; const hp = sh.health; sh.alt = null; hud(); return hp; }
@@ -76,6 +79,7 @@ export function setupRocketShield(api) {
   }
   function boost() {
     if (sh.bash || sh.dash) return;
+    if (sh.alt?.special) { if (sh.charges < 1) { toast?.(sh.alt.empty ?? 'No charges', 1.6); return; } if (sh.alt.special({ play }) !== false) { sh.charges--; hud(); } return; }   // pluggable special (header)
     if (sh.alt) { sh.alt.plant(); return; }
     if (sh.charges < 1) { toast?.(tanks.length ? 'No rocket charges · find nitrous tanks' : 'No rocket charges · one returns each round', 1.6); return; }
     sh.charges--; hud(); play('boostInAnim');
@@ -125,6 +129,7 @@ export function setupRocketShield(api) {
   }
   // nitrous tanks are back each round; maps without them give a charge back instead
   host.on('roundEnd', () => {
+    if (sh.owned && sh.alt?.special && sh.charges < (sh.alt.charges ?? 0)) { sh.charges++; hud(); }   // an alt special: one charge back a round
     if (!sh.owned || sh.alt) return;
     if (tanks.length) for (const c of tanks) c.visible = true;
     else if (sh.charges < CHARGES) { sh.charges++; hud(); }
@@ -192,7 +197,7 @@ export function setupRocketShield(api) {
     const slot = document.querySelector('#bo7-left .extra'); if (slot && el.parentNode !== slot) { slot.append(el); el.classList.remove('free'); }
     el.classList.toggle('on', sh.owned); el.classList.toggle('up', sh.raised); el.classList.toggle('low', sh.health < MAX() / 3);
     el.querySelector('.hp i').style.width = Math.round(Math.max(0, sh.health) / MAX() * 100) + '%';
-    el.querySelector('.ch').innerHTML = Array.from({ length: sh.alt ? 0 : CHARGES }, (_, i) => `<b class="${i < sh.charges ? 'on' : ''}"></b>`).join('');
+    el.querySelector('.ch').innerHTML = Array.from({ length: sh.alt ? sh.alt.special ? sh.alt.charges ?? 0 : 0 : CHARGES }, (_, i) => `<b class="${i < sh.charges ? 'on' : ''}"></b>`).join('');
     el.querySelector('kbd').textContent = (binds().shield ?? 'KeyH').replace(/^Key/, '');
   }
   setTimeout(hud, 800);
@@ -203,6 +208,7 @@ export function setupRocketShield(api) {
     get perk() { return hooks.perk; }, set perk(p) { hooks.perk = p; },
     state: () => ({ owned: sh.owned, alt: sh.alt, max: MAX(), health: Math.round(sh.health), charges: sh.charges, raised: sh.raised, ready: !!sh.vw?.ready }),
     // a map's nitrous tanks (hidden map objects, shown while the shield is owned) and what to say when it breaks
+    setCharges(n) { sh.charges = Math.max(0, n); hud(); },   // an alt special's charges (Max Ammo refills the Guard of Fafnir's)
     setTanks(list, hint) { tanks = list ?? []; if (hint) brokeHint = hint; for (const c of tanks) c.visible = sh.owned; },
     // the raised shield's own viewmodel (Rocket or Zombie Shield), for the characters mod: an operator's own first-person arms
     // re-skin onto it as on the guns (user, 2026-11-04: the Nuketown shield showed the stock arms)

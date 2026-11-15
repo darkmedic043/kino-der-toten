@@ -152,6 +152,7 @@ export default async function setup(api){
   const frags=[];
   function launch(h){
     if(WHOOSH)audio.play(WHOOSH,.6);
+    if(h.id==='frag_grenade_zm'&&window.kino.fragSwap?.(h))return;   // a map's own grenade in the frag slot throws itself (Gorod Krovi: Widow's Wine web grenades, gorod-krovi/widows.js)
     if(h.id==='frag_grenade_zm'){
       const fuse=Math.max(.05,(frag.fuseTime??3.5)-(session.time-h.pinAt));
       const mesh=fragMesh?cloneSkinned(fragMesh):new THREE.Mesh(new THREE.SphereGeometry(3.5,8,6),new THREE.MeshStandardMaterial({color:0x4a5039,roughness:.8}));

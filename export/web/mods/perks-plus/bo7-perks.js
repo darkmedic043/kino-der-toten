@@ -68,6 +68,7 @@ export function setupBo7Perks({ host, session, player, enemies, scene, camera, a
   // fraction (1 = frozen), so it works with whatever else sets its speed; frozen ones can't attack (lureTarget)
   const held = new Map();   // z -> {until, slow, frozenUntil, prev, cocoon}
   function hold(z, dur, slow, frozen = 0, cocoon = false, web = true) {   // web false: a stun (Electric Cherry), no silk
+    if (web && window.kino?.webImmune?.(z)) return;   // a map's enemies that webs never hold (Gorod Krovi: the Mangler, the Valkyrie drones)
     const h = held.get(z) ?? { prev: z.root.position.clone() };
     h.until = Math.max(h.until ?? 0, now() + dur); h.slow = Math.max(h.slow ?? 0, slow); h.frozenUntil = Math.max(h.frozenUntil ?? 0, now() + frozen);
     if (web && !h.web) {   // webbing on the body: a few web sheets at legs, chest and head (more of them when cocooned)
@@ -235,7 +236,7 @@ void main(){ float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a =
   function knock(z, from, dist) { const dir = z.root.position.clone().sub(from).setY(0); if (dir.lengthSq() < 1) return; pushes.push({ z, v: dir.normalize().multiplyScalar(dist / .2), t: .2 }); }
   let boostUntil = 0, meleeWas = 0;
   const backward = () => { const v = player.velocity, f = camera.getWorldDirection(new THREE.Vector3()); return v.x * f.x + v.z * f.z < 0; };   // Stick 'n Move
-  (window.kino ??= {}).bo7Perks = { speedMul: () => (has(MM) && now() < boostUntil && backward() ? 1 + stat('mm.stick') : 1), webBlast, summonWisp, popOn, get wisp() { return wisp; } };
+  (window.kino ??= {}).bo7Perks = { hold, held, speedMul: () => (has(MM) && now() < boostUntil && backward() ? 1 + stat('mm.stick') : 1), webBlast, summonWisp, popOn, get wisp() { return wisp; } };
 
   // ---- damage hooks ------------------------------------------------------------------------------------------------
   host.on('beforeEnemyDamage', e => {
