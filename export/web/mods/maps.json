@@ -162,6 +162,7 @@
       "exposure": 1,
       "nearbySpawns": true,
       "navFile": "bo3-nav.json",
+      "zombieWalls": true,
       "stairSmoothing": true,
       "player": { "slopeStick": true },
       "perkYaw": -90,
