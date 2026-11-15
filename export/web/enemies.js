@@ -75,6 +75,7 @@ export class Enemies {
     const near=!!this.world.entry;let out=[];
     for(const b of this.world.spawnBarriers(this.session)){
       if(b.free){out.push({b,len:0});continue;}
+      const known=this.world.spawnLen?.(b,player);if(known!==undefined){out.push({b,len:near?known:0});continue;}   // walked already by spawnBarriers (custom-world, nearbySpawns)
       const p=this.world.path(b.inside,player);if(p.length>1&&p.at(-1).distanceTo(player)<150)out.push({b,len:near?pathLength(p):0});
     }
     if(near&&out.length>3){out.sort((a,c)=>a.len-c.len);const cap=Math.max(NEAR_SPAWN,out[0].len+1200);out=out.filter((c,i)=>i<3||c.len<=cap);}

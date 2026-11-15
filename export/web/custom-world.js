@@ -305,6 +305,7 @@ export class CustomWorld {
         navMesh=nav.navMesh;console.log(`[custom-world] navmesh built in ${Math.round(performance.now()-t0)} ms`);
         try{navCachePut(navKey,{sig:navSig,data:exportNavMesh(navMesh)});}catch(e){console.warn('[custom-world] navmesh export',e);}}}
     this.nav=navMesh;this.query=new NavMeshQuery(this.nav,{maxNodes:65535});this.query.defaultQueryHalfExtents={x:70,y:100,z:70};
+    if(this.entry.nearbySpawns)this.buildIslands();   // spawnBarriers skips spawn points the player can't walk to without a path query
 
     progress('Placing machines and barricades',65);
     const models=this.data.models,place=async(key,position,yaw,offset=0)=>{
@@ -557,7 +558,12 @@ export class CustomWorld {
   closest(p,extents){const r=this.query.findClosestPoint({x:p.x,y:p.y,z:p.z},extents?{halfExtents:extents}:undefined);return r.success?new THREE.Vector3(r.point.x,r.point.y,r.point.z):null;}
   // long routes on big maps (Malibu Drive) run past Detour's default 256 path polygons and came back cut short: zombies
   // walked to the end of a partial path and stood there
-  path(a,b){const r=this.query.computePath({x:a.x,y:a.y,z:a.z},{x:b.x,y:b.y,z:b.z},{maxPathPolys:4096,maxStraightPathPoints:1024});if(!r.success)return [];
+  // Between two navmesh islands (buildIslands) Detour searches the whole first island before it gives up: 40-120 ms a query
+  // on Gorod Krovi, and every chasing zombie repaths about twice a second (the user's 100 ms update stalls with the player
+  // where they couldn't walk). Those go through a query capped at 2,048 nodes: the same partial path towards the target
+  // (Detour returns the best node it reached), a few ms.
+  path(a,b){const q=this.islands&&this.islandAt(a)!==this.islandAt(b)?(this.queryFar??=new NavMeshQuery(this.nav,{maxNodes:2048})):this.query;
+    const r=q.computePath({x:a.x,y:a.y,z:a.z},{x:b.x,y:b.y,z:b.z},{maxPathPolys:4096,maxStraightPathPoints:1024,halfExtents:this.query.defaultQueryHalfExtents});if(!r.success)return [];
     const pts=r.path.map(p=>new THREE.Vector3(p.x,p.y,p.z)),T=this.traversals,reach=this.entry.zombieWalls?72:40;
     if(T?.length)for(let i=1;i<pts.length;i++){const p=pts[i-1],q=pts[i],t=T.find(t=>p.distanceTo(t.from)<40&&q.distanceTo(t.to)<reach||t.both&&p.distanceTo(t.to)<40&&q.distanceTo(t.from)<reach);if(t)q.hop=t;}   // an off-mesh link's far end (hop: the traversal; with zombieWalls up to 72 away: Recast lands it on the nearest polygon, Nuketown's porch 51 away)
     return pts;}
@@ -582,6 +588,7 @@ export class CustomWorld {
     for(const ref of this.navDisabled)this.nav.setPolyFlags(ref,1);this.navDisabled.clear();
     for(const d of this.dynamic){if(!d.enabled||d.window)continue;const c=d.box.getCenter(new THREE.Vector3()),h=d.box.getSize(new THREE.Vector3()).multiplyScalar(.5);h.x+=5;h.z+=5;const r=this.query.queryPolygons(c,h);for(const ref of r.polyRefs??[])this.navDisabled.add(ref);}
     for(const ref of this.navDisabled)this.nav.setPolyFlags(ref,0);
+    if(this.islands)this.islandsStale=true;   // closed doors split islands: relabel at the next islandAt
   }
   activeZones(session){const zones=new Set(['start']);for(const d of this.doors.values())if(this.isOpen(d,session)){if(d.zone)zones.add(d.zone);for(const z of d.zones??[])zones.add(z);}for(const f of session.flags)if(f.startsWith('zone:'))zones.add(f.slice(5));return zones;}
   zoneAt(){return undefined;}
@@ -643,10 +650,42 @@ export class CustomWorld {
     const pf=this.playerFeet,now=session.time;
     if(this._near&&now-this._near.t<1.5&&this._near.at.distanceTo(pf)<60)return this._near.list;
     const target=this.closest(pf,{x:60,y:120,z:60});
-    const reach=p=>{if(!target)return false;const path=this.path(p,pf),last=path[path.length-1];return !!last&&last.distanceTo(target)<12;};
-    let ok=list.filter(b=>reach(b.inside));
+    const home=this.islandAt(pf),apart=p=>{if(home===undefined)return false;const i=this.islandAt(p);return i!==undefined&&i!==home;};   // on another island: no walk (buildIslands)
+    const reach=p=>{if(!target||apart(p))return false;const path=this.path(p,pf),last=path[path.length-1];return !!last&&last.distanceTo(target)<12;};
+    // nearest first by straight line (a walk is never shorter), with each walk's length kept for spawnChoices (spawnLen):
+    // once 3 points reach the player, the rest are past what enemies.js would pick (its 3 nearest, or within
+    // max(2000, nearest + 1200)) and are not walked. Gorod Krovi (2026-11-15) pathed every point twice a spawn: 13-47
+    // queries over its big navmesh, 100-390 ms (the user's 100 ms spawn hitches)
+    const lens=new Map(),plen=p=>{let d=0;for(let i=1;i<p.length;i++)d+=p[i].distanceTo(p[i-1]);return d;};
+    let ok=[],fails=0;const best=[];
+    for(const {b,d} of list.map(b=>({b,d:b.inside.distanceTo(pf)})).sort((x,y)=>x.d-y.d)){
+      if(best.length>=3&&d>Math.max(2600,best[0]+1800,best[2]))break;
+      if(!target)break;if(apart(b.inside))continue;const path=this.path(b.inside,pf),last=path[path.length-1];
+      if(!last||last.distanceTo(target)>=12){if(++fails>=12&&!ok.length)break;continue;}   // 12 nearest blocked (closed doors): the player is cut off, try the ring of nearby points
+      const len=plen(path);lens.set(b,len);ok.push(b);best.push(len);best.sort((x,y)=>x-y);
+    }
     if(!ok.length)ok=this.nearbyBarriers(pf,reach);
-    this._near={t:now,at:pf.clone(),list:ok};return ok;
+    this._near={t:now,at:pf.clone(),list:ok,lens};return ok;
+  }
+  // The navmesh's islands (2026-11-15): polygons joined by links (off-mesh hops count both ways), labelled once at load
+  // (Gorod Krovi: 26,000 polygons, 323 islands). A path query between two islands searches the whole first
+  // one before it fails (40-120 ms each on Gorod Krovi): spawnBarriers and path() ask islandAt first. A polygon whose flags
+  // are 0 (a closed door's, setDoors) joins nothing, so closed doors split islands; setDoors marks the labels stale and
+  // the next islandAt relabels (40-85 ms on Gorod Krovi, once per door change).
+  buildIslands(){
+    const t0=performance.now(),nav=this.nav,NULL=0xffffffff,label=new Map(),parent=[];
+    const find=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+    const id=r=>{let i=label.get(r);if(i===undefined){i=parent.length;parent.push(i);label.set(r,i);}return i;};
+    const off=new Set();for(let t=0,n=nav.getMaxTiles();t<n;t++){const tile=nav.getTile(t),h=tile.header();if(!h)continue;const base=nav.getPolyRefBase(tile);for(let j=0,c=h.polyCount();j<c;j++)if(!tile.polys(j).flags())off.add(base+j);}   // flags 0: a closed door's
+    for(let t=0,n=nav.getMaxTiles();t<n;t++){const tile=nav.getTile(t),h=tile.header();if(!h)continue;const base=nav.getPolyRefBase(tile);
+      for(let j=0,c=h.polyCount();j<c;j++){const me=id(base+j);if(off.has(base+j))continue;
+        for(let l=tile.polys(j).firstLink(),g=0;l!==NULL&&l>=0&&g<64;g++){const k=tile.links(l),r=k.ref();if(r&&!off.has(r)){const A=find(me),B=find(id(r));if(A!==B)parent[A]=B;}l=k.next();}}}   // l>=0: the binding may hand DT_NULL_LINK back signed
+    for(const [r,i] of label)label.set(r,find(i));
+    this.islands=label;this.islandsStale=false;console.log(`[custom-world] navmesh islands in ${Math.round(performance.now()-t0)} ms`);
+  }
+  islandAt(p){if(!this.islands)return undefined;if(this.islandsStale)this.buildIslands();const r=this.query.findNearestPoly({x:p.x,y:p.y,z:p.z});return r.success?this.islands.get(r.nearestRef):undefined;}
+  // The walk from spawn point `b` to the player measured by the last spawnBarriers (nearbySpawns), or undefined.
+  spawnLen(b,player){const n=this._near;return n&&n.lens?.has(b)&&n.at.distanceTo(player)<60?n.lens.get(b):undefined;
   }
   // Walkable points 450-900 units around `pf` that can reach it (a ring of probes snapped to the navmesh).
   nearbyBarriers(pf,reach){
