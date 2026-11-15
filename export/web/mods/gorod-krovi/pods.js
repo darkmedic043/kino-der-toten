@@ -22,7 +22,7 @@
 import * as THREE from 'three';
 import { settings } from '../../settings.js';
 import { POWERUP_LIFETIME, powerupVisible } from '../../rules.js';
-import { sceneData, makeProp, place, play, step, hidePart, moved, W } from './scene-props.js';
+import { sceneData, makeProp, place, play, step, hidePart, moved, solidOf, W } from './scene-props.js';
 
 const RADIOS = { red: [-2422, 2892, 517], yellow: [2432, 2370, -140], blue: [-58, 5673, 341] };
 const RADIO_NAME = { red: 'factory', yellow: 'library', blue: 'judicial' };
@@ -138,6 +138,14 @@ export default async function setup(api, gk) {
     api.toast?.('A drop pod is coming down · defend it', 3);
     gk.emit('pod:land', site.id);
   }
+  // the landed pod is solid to players and bullets (solidOf: built in its landed pose at each site, dropped when it goes)
+  let podCol = null;
+  function solid(on) {
+    const D = world.dynamic;
+    if (podCol) { const i = D.indexOf(podCol); if (i >= 0) D.splice(i, 1); podCol.collider.geometry.dispose(); podCol = null; }
+    if (on) { try { podCol = solidOf([pod.root], { name: 'gk_pod' }); if (podCol) D.push(podCol); } catch (e) { console.warn('[gorod-krovi] pod collision', e); } }
+    world.collision?.invalidateCache?.();
+  }
   function release() {
     const A = S.active; if (!A) return;
     for (const z of A.attackers.values()) if (z) { z.gkPod = null; if (z.state === 'attack' && z.gkPodSwing) { z.state = 'chase'; z.rig?.play('walk'); } z.gkPodSwing = false; }
@@ -171,7 +179,7 @@ export default async function setup(api, gk) {
   }
   function gone() {
     const A = S.active; if (!A) return;
-    A.state = 'gone'; pod.root.visible = false; pod.rig.stopSide?.(0);
+    A.state = 'gone'; pod.root.visible = false; pod.rig.stopSide?.(0); solid(false);
     if (A.out) A.out.root.visible = false;
     S.active = null;
   }
@@ -227,7 +235,7 @@ export default async function setup(api, gk) {
     const A = S.active; if (!A) return;
     A.t += dt; step(pod, dt);
     if (A.state === 'land' && A.t >= LAND) {
-      A.state = 'defend'; A.t = 0;
+      A.state = 'defend'; A.t = 0; solid(true);
       sfx('pod_spin_' + (1 + Math.floor(Math.random() * 3)), .6, A.site.at, 2500);
       A.hum = sfx('pod_green', .35, A.site.at, 2500, true);
     }
@@ -296,6 +304,8 @@ export default async function setup(api, gk) {
   // ---- the console ------------------------------------------------------------------------------------------------------
   if (con) {
     place(con, CONSOLE); con.root.userData.noMerge = true; scene.add(con.root);
+    try { const c = solidOf([con.root], { name: 'gk_net_console' }); if (c) { world.dynamic.push(c); world.collision?.invalidateCache?.(); } }
+    catch (e) { console.warn('[gorod-krovi] console collision', e); }
     for (const [, tag] of PARTS) hidePart(con, tag);
     hidePart(con, 'tag_dragon_network_console_screen_green');
   }

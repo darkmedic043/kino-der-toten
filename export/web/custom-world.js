@@ -618,7 +618,7 @@ export class CustomWorld {
     return null;
   }
   raycast(ray,near=0,far=Infinity,windows=false){let hit=this.collision.rayIntersect(ray,near,far);
-    for(const m of this.movers??[]){if(m.disabled)continue;const r=new THREE.Ray(ray.origin.clone().sub(m.offset),ray.direction),h=m.collider.rayIntersect(r,near,hit?Math.min(hit.distance,far):far);if(h){h.position.add(m.offset);h.point.add(m.offset);hit=h;}}for(const d of this.dynamic){if(!d.enabled||!d.collider||(!windows&&d.window))continue;const h=d.collider.rayIntersect(ray,near,hit?Math.min(hit.distance,far):far);if(h)hit=h;}return hit;}
+    for(const m of this.movers??[]){if(m.disabled)continue;const r=new THREE.Ray(ray.origin.clone().sub(m.offset),ray.direction),h=m.collider.rayIntersect(r,near,hit?Math.min(hit.distance,far):far);if(h){h.position.add(m.offset);h.point.add(m.offset);hit=h;}}for(const d of this.dynamic){if(!d.enabled||!d.collider||(!windows&&d.window&&!d.shoot))continue;const h=d.collider.rayIntersect(ray,near,hit?Math.min(hit.distance,far):far);if(h)hit=h;}return hit;}
   lineClear(a,b){const v=b.clone().sub(a),dist=v.length();return !this.raycast(new THREE.Ray(a,v.normalize()),1,Math.max(1,dist-4));}
   isOpen(door,session){return session.openDoors.has(door.name)||(door.electric&&session.power);}
   setDoors(session){

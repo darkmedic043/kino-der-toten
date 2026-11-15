@@ -1,10 +1,11 @@
 // Shared loader for Gorod Krovi's scene props (BO3 fxanim models from scene bundles and script models), built by
 // .tools/build_gk_scenes.py into the git-ignored mods/maps/gorod-krovi/scenes/ (ripped: never published).
-// Used by sophia.js and scenes.js. Not a part of its own (not in mod.js PARTS).
+// Used by sophia.js, scenes.js and pods.js. Not a part of its own (not in mod.js PARTS).
 // A prop: { key, root, rig, dur, next, t }. Built in inches, Y-up; clips hold absolute local rotations and offsets
 // from each joint's bind position (userData.bindPosition is set before the clips are made, as gauntlet.js does).
 import * as THREE from 'three';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
+import { CollisionWorld } from '../../collision-world.js';
 
 export const W = (x, y, z) => new THREE.Vector3(x, z, -y);
 const ROOT = new URL('../../', import.meta.url), DIR = 'mods/maps/gorod-krovi/scenes/';
@@ -58,4 +59,36 @@ export function step(P, dt) {
   P.rig.update(dt);
   if (P.next && (P.t -= dt) <= 0) { const n = P.next; P.next = null; play(P, n, { loop: true }); }
   P.root.updateMatrixWorld(true);
+}
+
+// Player collision for a placed script model (2026-11-15, user: "collision on sophia doesnt seem to work": script models
+// aren't in BO3's collision export). Its posed vertices (skinned) binned on a `cell` grid; each cell becomes a solid column
+// from its lowest to its highest vertex: the shape without cables and panel edges to snag on. Returns a world.dynamic entry
+// (null when nothing is solid): window-type, so it never cuts the navmesh (BO3's goes round the model), but `shoot` makes
+// it stop bullets too (custom-world raycast). Build it once the model holds its pose; it does not follow later movement.
+export function solidOf(roots, { cell = 12, name = 'prop', shoot = true } = {}) {
+  const v = new THREE.Vector3(), cols = new Map();
+  for (const r of roots) {
+    r.updateMatrixWorld(true);
+    r.traverse(o => {
+      if (!o.isMesh || !o.geometry?.attributes?.position) return;
+      const pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i); if (o.isSkinnedMesh) o.applyBoneTransform(i, v); v.applyMatrix4(o.matrixWorld);
+        const k = Math.floor(v.x / cell) + ',' + Math.floor(v.z / cell), c = cols.get(k);
+        if (c) { c.count++; if (v.y < c.lo) c.lo = v.y; if (v.y > c.hi) c.hi = v.y; } else cols.set(k, { lo: v.y, hi: v.y, count: 1 });
+      }
+    });
+  }
+  const tris = [], box = new THREE.Box3();
+  for (const [k, c] of cols) {
+    if (c.count < 3 || c.hi - c.lo < 4) continue;   // stray points (collapsed hidden parts)
+    const [i, j] = k.split(',').map(Number), b = new THREE.BoxGeometry(cell, c.hi - c.lo, cell).translate((i + .5) * cell, (c.lo + c.hi) / 2, (j + .5) * cell);
+    const g = b.toNonIndexed(); tris.push(g.attributes.position.array); b.dispose();
+    box.expandByPoint(new THREE.Vector3(i * cell, c.lo, j * cell)).expandByPoint(new THREE.Vector3((i + 1) * cell, c.hi, (j + 1) * cell));
+  }
+  if (!tris.length) return null;
+  const all = new Float32Array(tris.reduce((n, a) => n + a.length, 0)); let o = 0; for (const a of tris) { all.set(a, o); o += a.length; }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(all, 3));
+  return { collider: new CollisionWorld(geo), box, enabled: true, window: true, shoot, name, cells: tris.length };
 }

@@ -9,7 +9,7 @@
 // lines, the ending scene with sophia_anim / trap doors / eye_idle); the clips for those are in the json already.
 // Debug: window.kino.gorod.sophia (also gk.sophia): props, S (state), wake(), sleep().
 import * as THREE from 'three';
-import { sceneData, makeProp, place, hold, hidePart, moved, W } from './scene-props.js';
+import { sceneData, makeProp, place, hold, hidePart, moved, solidOf, W } from './scene-props.js';
 
 const COMPUTER = [340, 4854, 144.5], EYE = [354, 4854.5, 282], EYE_SLEEP = 325;
 const REELS = [   // [tape_02 origin, angles, tape_01 origin] (the radio recorder reel pairs, sophia's recordings)
@@ -19,6 +19,7 @@ const REELS = [   // [tape_02 origin, angles, tape_01 origin] (the radio recorde
   [[373.074, 5364.24, 358.5], [0, 36.3979, 0], [365.336, 5374.89, 358.5]],
   [[-2816.93, 2418.24, 170], [0, 36.3979, 0], [-2824.66, 2428.89, 170]],
 ];
+// Player collision for the computer and its base: solidOf (scene-props.js), since script models aren't in BO3's collision export.
 const TRACK_R = 750, D = Math.PI / 180;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const wrap = a => ((a % 360) + 360) % 360;
@@ -36,6 +37,8 @@ export default async function setup(api, gk) {
   for (const P of [PC, PB]) if (P) { place(P, COMPUTER); scene.add(P.root); }
   hold(PC, 'code_door_open'); hidePart(PC, 'slot_decoder_jnt'); hidePart(PC, 'button_green_jnt');   // scene::init + hidepart
   hold(PB, 'trap_door_open');
+  try { const c = solidOf([PC, PB].filter(Boolean).map(P => P.root), { name: 'sophia' }); if (c) { api.world.dynamic.push(c); api.world.collision?.invalidateCache?.(); } }
+  catch (e) { console.warn('[gorod-krovi] sophia collision', e); }
   REELS.forEach(([o2, a, o1], i) => {
     const t2 = tapes[i * 2], t1 = tapes[i * 2 + 1];
     if (t2) { place(t2, o2, a); scene.add(t2.root); }
