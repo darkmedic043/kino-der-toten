@@ -167,7 +167,12 @@ export class CustomWorld {
       const tokens=m.arg.split('_').filter(Boolean),name=rawName(m.object)+'#'+this.doors.size;
       const cost=+(m.extras.cost??tokens.find(t=>/^\d+$/.test(t))??750);
       const zone=String(m.extras.zone??tokens.find(t=>!/^\d+$/.test(t))??'').toLowerCase()||null;
-      const box=new THREE.Box3().setFromObject(m.object);
+      // (2026-11-15) a door whose pieces stand apart (Gorod Krovi: one buy opens two crate piles 1,350 apart, the
+      // library's two 1,400 apart) gets a blocker and a buy prompt per group of pieces: one box around them all was an
+      // invisible wall across the street between them
+      const groups=doorGroups(m.object),parts=[];
+      for(const obj of groups){
+      const box=new THREE.Box3().setFromObject(obj);
       // The navmesh cut around a closed door covers every polygon the box touches (up to ~48 units beyond it), so
       // the player's collision can be grown the same way (map entry doorMargin / doorHeadroom, in scene units):
       // otherwise you squeeze past the door pieces, or stand on top of them. Only the door's width grows by up to the margin;
@@ -178,9 +183,9 @@ export class CustomWorld {
       const grow=this.entry.doorMargin??0,up=this.entry.doorHeadroom??0;let plug=box.clone(),obb=null,collider;
       // extras.clip [min, max]: the game's own blocker for the door (World at War: its brush models' clip, often a full
       // clip far taller than the visible pieces, which could be jumped or mantled over)
-      const clip=Array.isArray(m.extras.clip)?new THREE.Box3(new THREE.Vector3(...m.extras.clip[0]),new THREE.Vector3(...m.extras.clip[1])):null;
+      const clip=groups.length===1&&Array.isArray(m.extras.clip)?new THREE.Box3(new THREE.Vector3(...m.extras.clip[0]),new THREE.Vector3(...m.extras.clip[1])):null;
       if(grow||up){
-        const f=footprint(m.object),rect=m.extras.clipRect,pile=rect&&Math.min(f.vu1-f.vu0,f.vw1-f.vw0)>20;
+        const f=footprint(obj),rect=groups.length===1&&m.extras.clipRect,pile=rect&&Math.min(f.vu1-f.vu0,f.vw1-f.vw0)>20;
         // a debris pile (no flat side to go by) takes the game's own blocker as it stands, angled brushes and all: the pile's
         // rectangle stood 9° off its doorway and 80 long in Nuketown's ROAD door, out into the room and through the wall
         if(pile){
@@ -234,12 +239,15 @@ export class CustomWorld {
       // when the door opens, then disappear; without one the door disappears at once
       // (2026-10-17) a BO3 door prop is a mesh per material (a sliding door 10-17 draws, Der Eisendrache ~90 a view):
       // pieces under one node sharing a material and the same slide become one mesh with that slide
-      mergeDoorPieces(m.object);
-      const slides=[];m.object.traverse(o=>{const v=o.userData?.move;if(Array.isArray(v)&&v.length===3)slides.push({object:o,base:o.position.clone(),move:new THREE.Vector3(...v)});});
-      const part={object:m.object,collider,box,plug,obb,enabled:true,slides,anim:null};
-      this.doors.set(name,{name,cost,zone,electric:!!m.extras.electric,parts:[part],box});this.dynamic.push(part);
+      mergeDoorPieces(obj);
+      const slides=[];obj.traverse(o=>{const v=o.userData?.move;if(Array.isArray(v)&&v.length===3)slides.push({object:o,base:o.position.clone(),move:new THREE.Vector3(...v)});});
+      const part={object:obj,collider,box,plug,obb,enabled:true,slides,anim:null};parts.push(part);this.dynamic.push(part);
+      }
+      const box=new THREE.Box3();for(const p of parts)box.union(p.box);
+      // extras.zones: every zone the door opens (Gorod Krovi: two triggers sharing their pieces, each with its own zone)
+      this.doors.set(name,{name,cost,zone,zones:(m.extras.zones??[]).map(z=>String(z).toLowerCase()),electric:!!m.extras.electric,parts,box});
       // `scripted`: no buy prompt; a script opens it (session.openDoors.add(name); world.setDoors(session))
-      if(!m.extras.scripted)this.interactions.push({kind:'door',door:name,position:box.getCenter(new THREE.Vector3()),box});
+      if(!m.extras.scripted)for(const p of parts)this.interactions.push({kind:'door',door:name,position:p.box.getCenter(new THREE.Vector3()),box:p.box});
     }
 
     progress('Building navigation for zombies',50);
@@ -575,7 +583,7 @@ export class CustomWorld {
     for(const d of this.dynamic){if(!d.enabled||d.window)continue;const c=d.box.getCenter(new THREE.Vector3()),h=d.box.getSize(new THREE.Vector3()).multiplyScalar(.5);h.x+=5;h.z+=5;const r=this.query.queryPolygons(c,h);for(const ref of r.polyRefs??[])this.navDisabled.add(ref);}
     for(const ref of this.navDisabled)this.nav.setPolyFlags(ref,0);
   }
-  activeZones(session){const zones=new Set(['start']);for(const d of this.doors.values())if(d.zone&&this.isOpen(d,session))zones.add(d.zone);for(const f of session.flags)if(f.startsWith('zone:'))zones.add(f.slice(5));return zones;}
+  activeZones(session){const zones=new Set(['start']);for(const d of this.doors.values())if(this.isOpen(d,session)){if(d.zone)zones.add(d.zone);for(const z of d.zones??[])zones.add(z);}for(const f of session.flags)if(f.startsWith('zone:'))zones.add(f.slice(5));return zones;}
   zoneAt(){return undefined;}
   addMover(def,objects){
     const meshes=[];for(const o of objects)o.traverse(c=>{if(c.isMesh)meshes.push(c);});
@@ -732,6 +740,18 @@ export class CustomWorld {
   }
 }
 
+// A door node's pieces in groups that stand apart (boxes more than 150 apart): one sub-group each, or [node] when they
+// are together (every door before Gorod Krovi)
+function doorGroups(node){
+  node.updateMatrixWorld(true);
+  const kids=node.children.map(o=>({o,b:new THREE.Box3().setFromObject(o)})).filter(k=>!k.b.isEmpty());
+  if(kids.length<2)return [node];
+  const id=kids.map((_,i)=>i),root=i=>id[i]===i?i:(id[i]=root(id[i]));
+  for(let i=0;i<kids.length;i++)for(let j=i+1;j<kids.length;j++)if(kids[i].b.clone().expandByScalar(75).intersectsBox(kids[j].b.clone().expandByScalar(75)))id[root(i)]=root(j);
+  const sets=new Map();for(let i=0;i<kids.length;i++)(sets.get(root(i))??sets.set(root(i),[]).get(root(i))).push(kids[i].o);
+  if(sets.size<2)return [node];
+  return [...sets.values()].map((list,i)=>{const g=new THREE.Group();g.name=node.name+'_part'+i;node.add(g);g.updateMatrixWorld(true);for(const o of list)g.attach(o);return g;});
+}
 // Door pieces merged per parent node, material and `move` (the merged piece slides as its parts did). Geometry is baked
 // into the node's space, so the merged mesh sits at the origin and slides from there. Originals' geometry is kept (other
 // doors may share it).

@@ -37,7 +37,7 @@ const MAPS = {
       // times the torch tint (tame[2..4]).
       gated: { box: [[-1900, 0, -3100], [320, 620, -1650]], blue: 1.3, keep: [.5, 1, .97, .9], fill: [1, .95, .88], tame: [.3, .7, 1.12, .96, .74] } } },
   // Gorod Krovi (2026-11-15): the game's own lights, as the castle; the burning sky comes from the sun direction the map mod uses
-  'gorod-krovi': { lamps: /^GIANT_LAMP_/, cell: 48, range: 620, decay: 1.4, off: 2000, on: 3000, color: () => 0xffb070, sun: [.4, 1, -.35], extra: [],
+  'gorod-krovi': { lamps: /^GOROD_LAMP_/, cell: 48, range: 620, decay: 1.4, off: 2000, on: 3000, color: () => 0xffb070, sun: [-.35, .62, -.88], extra: [],
     real: { file: 'export_game/bo3/maps/zm_stalingrad/zm_stalingrad.lights.json', gain: 550, minRadius: 30, albedo: .5, bounces: 3, adapt: [6, .45], fill: [1.5, .93, .86, .8], outdoor: 1.4 } },
 };
 const id = process.argv[2], cfg = MAPS[id];

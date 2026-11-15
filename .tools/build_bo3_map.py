@@ -570,9 +570,10 @@ if BSP == 'zm_stalingrad':   # Gorod Krovi's power doors and gates (their fxanim
 SCENE_MODELS = {} if BSP != 'zm_stalingrad' else {   # door_buy_03 has the library and stairs variants of the anims
     'p7_fxanim_zm_stal_door_buy_library_bundle': 'p7_fxanim_zm_stal_door_buy_03_mod', 'p7_fxanim_zm_stal_door_buy_dept_store_2f_bundle': 'p7_fxanim_zm_stal_door_buy_03_mod'}
 BARRICADE, BARRICADE_W, BARRICADE_H = 'p7_zm_der_barricade_wall_main', 138.6, 92.5   # BO3 plank wall, model X = width, Z = height
-def debris_standin(o):
-    """A plank wall filling the passage at a debris clip brush (CoD origin o), measured through the collision: the
-    floor below, the narrower of the two horizontal axes (walls both sides), and the clear height. Sinks when bought."""
+def measure_passage(o):
+    """The passage at CoD origin o, measured through the collision: the floor below, the narrower of the two horizontal
+    axes (walls both sides), and the clear height. -> (floor point at the passage's middle, side direction, CoD axis,
+    width, clear height)"""
     O = g(o).astype(np.float64); near = CTRI[np.linalg.norm(CTRI.mean(1) - O, axis=1) < 320]
     down = next((h for h in range(4, 300, 4) if seg_blocked(O, O - [0, h, 0], near)), 60)
     F = O - [0, down - 2, 0]
@@ -585,6 +586,10 @@ def debris_standin(o):
     width, side, (l, r), axis, _ = best
     F = F + side * (l - r) / 2
     up = next((h for h in range(8, 240, 4) if seg_blocked(F + [0, 2, 0], F + [0, h, 0], near)), 120)
+    return F, side, axis, width, up
+def debris_standin(o):
+    """A plank wall filling the passage at a debris clip brush (CoD origin o). Sinks when bought."""
+    F, side, axis, width, up = measure_passage(o)
     height = min(up, 130)
     mi = prop_mesh(BARRICADE)
     if mi is None: return None
@@ -593,15 +598,66 @@ def debris_standin(o):
     node = {'name': BARRICADE, 'mesh': mi, 'translation': F.tolist(), 'rotation': [0, math.sin(r_), 0, math.cos(r_)],
             'scale': [width / BARRICADE_W, height / BARRICADE_H, 1], 'extras': {'move': g([0, 0, -(height + 10)]).tolist()}}
     gltf['nodes'].append(node); count('DEBRIS_STANDIN'); return len(gltf['nodes']) - 1
+# Gorod Krovi's door models are shells (2026-11-15): the fxanim models hold only joints and a global_invisible mesh, and
+# BO3 links the real pieces to their joints from data that isn't exported (zbarrier assets, scene bundles). Stand-ins,
+# fitted to the passage measured through the collision: the buy doors' crate piles from BO3's own crates, the power
+# doors' and gates' from its black metal gate.
+def shell_model(name):
+    path = os.path.join(GH, 'xmodels', name, name + '_LOD0.semodel')
+    if not os.path.exists(path): return False
+    return all(mm['name'] == 'global_invisible' for mm in read_semodel(path)['materials'])
+CRATE, CRATE_W, CRATE_H, CRATE_TOP = 'p7_crate_wood_01', 60.6, 31.1, 'p7_crate_wood_02_iron_cross'
+GATE, GATE_W, GATE_Z0, GATE_H = 'p7_barricade_metal_gate_02_black', 131.8, 3.7, 64.0
+def crate_pile(o, angles):
+    """Rows of crates across the passage at o, up to its clear height (at most 4 rows), the top row iron-cross crates.
+    One node holding them (no mesh), so the door's box is the pile's; the pile sinks when bought."""
+    F, side, axis, width, up = measure_passage(o)
+    rows = max(2, min(4, int(min(up, 130) // CRATE_H)))
+    n = max(1, round(width / CRATE_W)); sx = width / (n * CRATE_W)
+    yaw = math.atan2(axis[0], -axis[1]); r_ = yaw / 2; rot = [0, math.sin(r_), 0, math.cos(r_)]
+    rng = np.random.default_rng(int(abs(o[0]) + abs(o[1])))
+    kids = []
+    for row in range(rows):
+        top = row == rows - 1 and row > 0
+        model = CRATE_TOP if top else CRATE
+        mi = prop_mesh(model)
+        if mi is None: continue
+        cnt = n if not top else max(1, int(width // 44))
+        for k in range(cnt):
+            t = (k + .5) / cnt - .5
+            P = F + side * (t * width) + [0, row * CRATE_H, 0]
+            j = float(rng.uniform(-.12, .12)) if row else 0.0; rj = (yaw + j) / 2
+            sc = [sx * 1.02, 1, 1] if not top else [width / cnt / 38.0 * .9, .9, .9]
+            gltf['nodes'].append({'name': model, 'mesh': mi, 'translation': P.tolist(), 'rotation': [0, math.sin(rj), 0, math.cos(rj)], 'scale': sc,
+                                  'extras': {'move': g([0, 0, -(rows * CRATE_H + 10)]).tolist()}})
+            kids.append(len(gltf['nodes']) - 1)
+    if not kids: return None
+    count('DOOR_STANDIN_crates')
+    gltf['nodes'].append({'name': 'door_pile_standin', 'children': kids}); return len(gltf['nodes']) - 1
+def gate_standin(o):
+    """BO3's black metal gate scaled to the passage at o (its clear height up to 140). Rises when bought."""
+    F, side, axis, width, up = measure_passage(o)
+    height = min(up, 140); mi = prop_mesh(GATE)
+    if mi is None: return None
+    yaw = math.atan2(axis[0], -axis[1]); r_ = yaw / 2; sy = height / (GATE_H - GATE_Z0)
+    node = {'name': GATE, 'mesh': mi, 'translation': (F - [0, GATE_Z0 * sy, 0]).tolist(), 'rotation': [0, math.sin(r_), 0, math.cos(r_)],
+            'scale': [width / GATE_W, sy, 1.5], 'extras': {'move': g([0, 0, height + 10]).tolist()}}
+    gltf['nodes'].append(node); count('DOOR_STANDIN_gate'); return len(gltf['nodes']) - 1
 def door_piece(model, origin, angles, move):
+    if BSP == 'zm_stalingrad' and shell_model(model):
+        return crate_pile(vec(origin), angles) if 'door_buy' in model else gate_standin(vec(origin))
     mi = prop_mesh(model)
     if mi is None: print('  door piece not exported:', model); return None
     r = math.radians(vec(angles)[1]) / 2
     node = {'name': model, 'mesh': mi, 'translation': g(vec(origin)).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]}
     if move: node['extras'] = {'move': g(move).tolist()}
     gltf['nodes'].append(node); return len(gltf['nodes']) - 1
+zones_of = {}   # target -> every trigger's zone (two triggers can share their pieces: one door opening both zones)
+for e in ents:
+    if e.get('targetname') in ('zombie_door', 'zombie_debris'): zones_of.setdefault(e.get('target'), []).append(zid(e.get('script_flag', '').removeprefix('enter_')))
 for e in ents:
     if e.get('targetname') not in ('zombie_door', 'zombie_debris') or (e.get('target'), e.get('script_flag')) in done: continue
+    if BSP == 'zm_stalingrad' and e.get('target') in {t for t, _ in done}: continue   # its pieces are built already, with this trigger's zone
     done.add((e.get('target'), e.get('script_flag')))
     electric = e.get('script_noteworthy') == 'electric_door'
     z = '' if electric and BSP == 'zm_factory' else zid(e.get('script_flag', '').removeprefix('enter_'))
@@ -621,7 +677,10 @@ for e in ents:
             k = debris_standin(o_)
             if k is not None: kids.append(k)
     if not kids: print('  door without pieces:', e.get('script_flag')); continue
-    add_node({'name': f'DOOR_{z or "power"}_{cost}', 'children': kids, 'extras': {'zone': z, 'cost': cost, 'electric': electric}})
+    ex = {'zone': z, 'cost': cost, 'electric': electric}
+    zs = sorted(set(x for x in zones_of.get(e.get('target'), []) if x and x != z))
+    if BSP == 'zm_stalingrad' and zs: ex['zones'] = zs
+    add_node({'name': f'DOOR_{z or "power"}_{cost}', 'children': kids, 'extras': ex})
     count('DOOR')
 # Teleporters (Der Riese): each pad sends you to the mainframe for 1500 (one-way: TELEPORT_<pad> + TPDEST_<pad>)
 MAINFRAME, MAINFRAME_YAW = [-56, 292, 116], 270   # between BO3's origin_teleport_player_0..3 (in front of the mainframe, not inside it)
