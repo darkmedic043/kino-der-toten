@@ -29,7 +29,7 @@ A working order and a set of checks for bringing a Black Ops III zombies map (st
 
 **The order that works**
 
-1. Dump the level and its entities (1.1), read the lights from the fastfile (1.4).
+1. Dump the level and its entities (1.1), list every spawn location (2.3a), read the lights from the fastfile (1.4).
 2. Export textures, prop models, animations and sounds with Greyhound (1.2, 1.3).
 3. Build the map (2) with a first `maps.json` entry, in **explore** mode only.
 4. Collision and navmesh until every area is reachable (2.4, 10).
@@ -140,7 +140,7 @@ For a new bsp add an entry with `start` (the start zone), `box` (the Mystery Box
 | In the `.ents` | Becomes |
 |---|---|
 | `info_player_start` | player spawn |
-| `spawn_location` / `riser_location` structs | `ZSPAWN` markers, zone from `<zone>_spawners`; only window spawns, risers and points with floor under them are kept |
+| `spawn_location` / `riser_location` structs | `ZSPAWN` markers, zone from `<zone>_spawners`; only window spawns, risers and points with floor under them are kept (every kind of spawn location and its checks: 2.3a) |
 | `zbarrier_zmcore_basicwoodbarrier*` | windows (marker 48 above and 40 in from the barrier, opening measured through the collision, spawn 100 units out toward the `exterior_goal`) |
 | `zbarrier_zmcore_magicbox` (any case) | box locations |
 | `zbarrier_*packapunch` | Pack-a-Punch |
@@ -159,6 +159,51 @@ Everything map-specific the mod needs to find is a **named node with the map's p
 - A node the mod will hide at the start carries `extras.hidden` (custom-world hides it before the static merge).
 - Put the prefix in the map entry's `mergeExclude` (`"^CASTLE_"`), or the static merge batches the nodes away and their names with them (three runic circles and four fossil spots vanished this way).
 - A zone id is read up to the first underscore: ids drop their underscores, and markers carry `extras.zone`.
+
+### 2.3a Spawn locations: take every one out of the dump, then decide
+
+A BO3 map holds many more spawn locations than the two the builder turns into markers. List all of them straight after the dump, before the first build, and again after every build:
+
+```
+python3 -I .tools/bo3_spawns.py <bsp>                                              # the inventory, and what looks wrong
+python3 -I .tools/bo3_spawns.py <bsp> --glb export/web/mods/maps/<id>/<id>.glb     # and the built map's markers per zone
+```
+
+It reads the `.ents`, prints the counts, a line per zone and a "to look at" list, and writes `<bsp>.spawns.json` beside the dump: every location with its origin and yaw, in the game's units (inches, Z up; the builder's `g()` converts). Keep that file: a later feature (dog rounds, a boss, co-op respawns) takes its points from there with no new dump.
+
+| Kind | In the `.ents` | The Giant / Der Eisendrache / `zm_stalingrad` dump | In the fork today |
+|---|---|---|---|
+| Map start | `info_player_start` | 1 / 1 / 1 | `PLAYER_SPAWN` (CustomWorld reads one) |
+| Co-op starts | four structs, targetname `initial_spawn_points` (the slot in `script_noteworthy` or `script_int` on some maps) | 4 / 4 / 4 | not built; the World at War ports use them for `PLAYER_SPAWN` |
+| Respawn points | structs `player_respawn_point`: `script_noteworthy` = the zone, `script_int` = a distance, `target` = four spots, one per player | 9 / 29 / 9 points | not built |
+| Zones | `info_volume`s with `script_noteworthy` `player_volume`: targetname = the zone, **`target` = its spawn structs** | 12 zones / 34 / 41 | zone ids of the markers |
+| Zombie spawns | zone structs with `spawn_location` | 50 / 70 / 63 | window spawns; walk-in spawns on Der Eisendrache |
+| Risers | zone structs with `riser_location` | 8 / 5 / 49 | `ZSPAWN` |
+| Dog spawns | `dog_location` | 95 / 121 / 0 | not built |
+| Special enemies | `mechz_location`, `sentinel_location`, `raz_location`, `direwolf_location`... one kind per enemy | 0 / 14 in zones, more at the boss arena / 96 | `CASTLE_MECHZ_<n>` nodes for the Panzersoldat |
+| Holding spots | `wait_location` | 0 / 47 / 49 | not built; read the map's script for what waits there |
+| Entry styles | `custom_spawner_entry <name>` (`crawl`, `boss_riser`) | 0 / 28 / 0 | not built |
+| Windows | `zbarrier_zmcore_basicwoodbarrier*`, an `exterior_goal` that targets it, spawn structs with the same `script_string` | 28 / 29 / 46 | `WINDOW` + a `ZSPAWN` outside |
+| Outside every zone | spawn structs no volume points at: boss arenas, drop pods, lockdowns, quest steps | 0 / 56 / 81 | by hand, with the script (5) |
+| Enemy spawners | `actor_spawner_<map>_<enemy>` | 2 kinds / 6 / 6 | tells which enemies the map has (8) |
+
+Rules:
+
+- **Find a zone's spawn structs through the volume's `target`, never by a name ending.** The Giant and Der Eisendrache name them `<zone>_spawners`; the `zm_stalingrad` dump names them `<zone>_spawn`. `build_bo3_map.py` tests `endswith('_spawners')` in four places (risers, walk-in spawns, window spawns through `zname`, the Panzersoldat points): on a map with another ending it makes no riser or walk-in spawn and prints no error. The tool says so in its "to look at" list; change the builder to follow the targets before the first build.
+- `script_noteworthy` can hold several words (`custom_spawner_entry boss_riser`): split it on spaces, do not compare the whole string.
+- `script_string` `find_flesh` = the zombie goes straight for the players. Any other value is the name of a window set: the barrier with the same `script_string` is the window that struct feeds, and the `exterior_goal` gives the outward side.
+- What becomes a `ZSPAWN`: one per window (80 units out toward the exterior goal, so CustomWorld pairs it: a `WINDOW` needs a `ZSPAWN` within 400), every riser, and, **only on a map with few windows**, the `spawn_location` structs that have floor under them (`floor_below`: collision within 48 under and 60 clear above), marked `extras.walk`. That last branch is written for `zm_castle` alone: a new map of that kind needs its bsp added. Unpaired `spawn_location` structs behind walls are left out on purpose ("spawning everywhere").
+- CustomWorld snaps a `ZSPAWN` to the navmesh within 120 (48 for walk-in ones) and throws when a map has none. `strandedSpawns` moves a spawn that cannot walk to the start; `nearbySpawns` keeps spawns to the player's navmesh island.
+- Kinds the engine has no marker for go into the GLB as the map's own named nodes with `extras.zone` and `extras.yaw` (`CASTLE_MECHZ_<n>` is the pattern), and the map mod picks among those of the open zones, as the script does.
+- A zone with no zombie spawn of its own (the tool lists them) is fed by its neighbours in BO3: check the zone script before adding any.
+- Co-op starts and respawn points are not used yet. A map whose start room can be shut off, or that has a boss arena or a one-way drop, needs them: place them as named nodes and respawn a revived or late-joining player at the point of an open zone.
+
+Checks, each build:
+
+1. The tool's "to look at" list is empty, or every line has a written reason.
+2. `--glb`: one `PLAYER_SPAWN`; the `WINDOW` count equals the dump's windows; every dump zone with zombie spawns has `ZSPAWN`s under its id or under the group it was merged into (`MAPCFG.groups`).
+3. The builder's `markers:` line (`ZSPAWN`, `ZSPAWN_window`, `ZSPAWN_walk`, `WINDOW`) against the tool's totals: a kind at 0 that the dump has is a naming difference, not an empty map.
+4. In a match (10): the load log has no `has no ZSPAWN within 400 units; skipped`; every `ZSPAWN` paths to the player with all doors open; zombies of a newly opened zone start coming from it; none appears inside a wall, on a roof or in plain view beside the player; special enemies arrive from their own points.
 
 ### 2.4 Collision
 
@@ -207,6 +252,7 @@ The map's derived data is matched to the GLB and goes stale with it. Der Eisendr
 6. Light test copy: `node .tools/map-lite.mjs <id> --force`.
 7. Compressed copies: `node .tools/build-gz.mjs` (or the GLB is sent uncompressed), and `node .tools/build-ktx2.mjs` if anything under `textures/` changed.
 8. `MAP=<id> ... node .tools/map-test.mjs` once (10.3).
+9. Spawn markers against the dump: `python3 -I .tools/bo3_spawns.py <bsp> --glb <the new GLB>` (2.3a).
 
 ## 3. Materials and textures
 
@@ -521,6 +567,7 @@ The fork's player can do what BO3's cannot: slide, dive, mantle, wall jump, low 
 - [ ] `git status --short` shows no ripped file; new asset folders have a `.gitignore` with `*`; nothing new matches the install manifest's `OWN` list by accident, and own data that players need does match it.
 - [ ] `?v=` bumped once for the final GLB; `build-gz.mjs` and `build-ktx2.mjs` run; light volume, detail table and any ceiling table belong to this GLB.
 - [ ] Explore and zombies modes both start; warm-check clean; no `[mods] slow setups`, no console errors, no "table is stale" warning.
+- [ ] Spawn locations (2.3a): `bo3_spawns.py` run on the dump and against the built GLB, nothing left unexplained; `<bsp>.spawns.json` kept; no window skipped for a missing `ZSPAWN`; every zone spawns once opened.
 - [ ] Collision (10.1): flood from the spawn with no unreached marker left unexplained and no point under the map; `through`, `ghost` and `floor` lists empty or explained; reach, mobility, stairs, movers and bullets pass in a match; outer walls tried with mantle and wall jump; the counts are in the map's notes.
 - [ ] Every door, perk, box spot, wall buy, trap, teleporter and the Pack-a-Punch used once in a test match; power on and off; a full round with zombies from every open zone.
 - [ ] Each quest step done through its debug handle and once for real; a guest and a late joiner see the same state.
