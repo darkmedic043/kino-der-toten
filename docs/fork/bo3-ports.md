@@ -253,7 +253,7 @@ The map's derived data is matched to the GLB and goes stale with it. Der Eisendr
 4. Detail table: `node .tools/map-detail.mjs <id> --pts <walkable points> --go`.
 5. Any map-specific texture fix-ups (The Giant: `node .tools/giant-chalk.mjs`).
 6. Light test copy: `node .tools/map-lite.mjs <id> --force`.
-7. Compressed copies: `node .tools/build-gz.mjs` (or the GLB is sent uncompressed), and `node .tools/build-ktx2.mjs` if anything under `textures/` changed.
+7. Compressed copies: `node .tools/build-ktx2.mjs mods/maps/<id> --jobs 3` **on every new map and after any texture change**, then `node .tools/build-gz.mjs` (or the GLB is sent uncompressed). With `textureArrays` a texture that has no KTX2 copy is shrunk to the array's layer size (256 px on Gorod Krovi): its first build was played without KTX2 copies and the user called every texture "extremely blurry" (2026-11-15).
 8. `MAP=<id> ... node .tools/map-test.mjs` once (10.3).
 9. Spawn markers against the dump: `python3 -I .tools/bo3_spawns.py <bsp> --glb <the new GLB>` (2.3a).
 
@@ -618,6 +618,9 @@ The fork's player can do what BO3's cannot: slide, dive, mantle, wall jump, low 
 | Runic circles and fossils missing | named nodes merged into batches | `mergeExclude` |
 | A moved prop drawn at its old place | `matrixAutoUpdate` off under the map root | `updateMatrix()` + `updateMatrixWorld(true)` |
 | "Pack is rotated the wrong way" | the machine's yaw is the spot's own | per-location yaw |
+| "Textures are extremely blurry" (Gorod Krovi) | no KTX2 copies: the texture arrays shrank every map texture to 256 px | `build-ktx2.mjs` on the map folder (2.6 step 7) |
+| "Doors are missing" (Gorod Krovi) | BO3 fxanim door models (`p7_fxanim_zm_*_door_*_mod`) are shells: joints and one `global_invisible` mesh, the real pieces come from zbarrier assets/scene bundles that weren't exported | builder: `shell_model()` → `crate_pile` (buy doors) or `gate_standin` (sized from `measure_passage`); export the real pieces when known |
+| Invisible wall across a street; navmesh cut between two doorways | one door's pieces 1,350-1,400 apart in one box (two triggers sharing a target, or one buy opening two piles) | builder dedupes shared targets (`extras.zones`); engine `doorGroups()`: a blocker and prompt per group of pieces more than 150 apart |
 | "Symbols are a bit blown up" | effect card scale guessed | measure against the model |
 | "The noise isn't global, it should only happen down there" | no alias ranges | range checks |
 | T-posed corpses; zombies with backwards feet, drifting heads | posed character models as props; corpse variants as zombies; head bind space | 8 |
