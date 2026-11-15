@@ -53,15 +53,17 @@ python3 -I .tools/bo3_dump_map.py --scan     # after a game update: find the ass
 
 - Output in `export_game/bo3/maps/<bsp>/`: `<bsp>.json` (surfaces, materials with every image and its semantic hash, static models with origin, axes and scale), `<bsp>.positions.bin`, `.vdata.bin`, `.indices.bin`, and `<bsp>.ents` (the entity string: every trigger, struct, spawner and script_model).
 - The process is picked by its comm `Main`. If it says "asset pool table not found", it matched a Steam launcher or the game was updated: pass `--pid`, or run `--scan` and use the address it prints as `--pools`.
-- Check the dump before going on: the surface, vertex and static-model counts should be in the range of the earlier maps (`zm_castle`: 9,330 surfaces, 1.44 M vertices, 33,561 static models, 3,342 entities), and `<bsp>.ents` must contain `info_player_start`.
+- Check the dump before going on: the surface, vertex and static-model counts should be in the range of the earlier maps (`zm_castle`: 9,330 surfaces, 1.44 M vertices, 33,561 static models, 3,342 entities; `zm_stalingrad`: 13,464 surfaces, 1.37 M vertices, 63,577 static models, 4,748 entities, 382 materials, 1,477 lights), and `<bsp>.ents` must contain `info_player_start`.
+- Entity `model` values starting with `*` or `?` (`?1`, `?99`...) are brush models: Gorod Krovi's door triggers are `?N`. Greyhound has nothing for either, so drop both from the export lists (a batch of 130 `?N` names finds 0 assets).
 - **Workshop maps (not verified):** the dump reads whatever map is loaded, so a custom map should dump the same way. Its bsp name is the mod's map name; add it to `MAPCFG` in the builder (2.2).
 
 ### 1.2 Textures, models, animations: Greyhound
 
-Details: `weapons.md`, "Black Ops III assets (Greyhound)". Greyhound 1.46 sits at `C:\greyhound` in BO3's Proton prefix and must be started **inside the game's Steam Runtime container** (`steam-runtime-launch-client --bus-name=com.steampowered.App311210 ... wine 'C:\greyhound\Greyhound.exe'`), or it cannot see the game. `scratch/aw2/gh.sh` is a working driver (session script: copy it).
+Details: `weapons.md`, "Black Ops III assets (Greyhound)". Greyhound 1.46 sits at `C:\greyhound` in BO3's Proton prefix and must be started **inside the game's Steam Runtime container** (`steam-runtime-launch-client --bus-name=com.steampowered.App311210 ... wine 'C:\greyhound\Greyhound.exe'`), or it cannot see the game. `scratch/gk/batch.sh` is the working driver (session script: copy it), with a guard: after Search it crops the label at the top right and clicks Export All only if it reads "Assets found" (reference crops `scratch/gk/found{1,2,3}.ref`, one per digit count, because the label is right-aligned). A paste can silently fail and leave the search empty (2026-11-14): `xdotool windowactivate --sync` before the paste fixed it, and the guard catches the rest.
 
 - One batch = kill Greyhound (`pkill -x Greyhound.exe`, never `-f`), relaunch, Load Game, paste a comma-separated name list into the search box (`xclip` + `ctrl+v`), Search, Export All, wait until `TheHoundsLog.txt` stops growing. Its input dies after one export, so relaunch for every batch.
 - **Never run Export All on an empty search**: it exports the whole game (7.5 GB).
+- Start each list from what is *not* in the export folder yet (`xmodels/<name>/`, `ximages/<name>.png`): Gorod Krovi needed 344 of its 738 map images and 1,391 of its 2,052 model names, everything else was already there from earlier ports. Export folder checks after each list: 0 missing images; 3 models never export (`veh_t7_ref_player_stand` and other editor stand-ins).
 - `greyhound.json`: `exportmodelimg` off (exporting a model with its images froze it); export images in their own batch by name.
 - What to export, in this order:
   1. Every image named in `<bsp>.json`'s materials (the map's own textures).
@@ -69,7 +71,7 @@ Details: `weapons.md`, "Black Ops III assets (Greyhound)". Greyhound 1.46 sits a
   3. The prop models' own textures: read each SEModel's material names and export those (a search by model name also catches `i_mtl_*` images).
   4. fxanim models and their animations (`p7_fxanim_*`): doors, gates, bridges, machines, quest pieces. Scenes spawn pieces that are in neither the static models nor the entities; search the scene's name.
   5. The sky model and its panorama (`skybox_<bsp>`).
-  6. Weapons (7), zombies and bosses (8).
+  6. Weapons (7), zombies and bosses (8). Search by family rather than by name: `c_zom_dlc3` gave Gorod Krovi's zombies with gibs and hats, the dragon, the Mangler (`raz`) and the Valkyrie-drone zombie (354 assets with images); `ai_zm_dlc3` and `dlc3_dragon` their animations (the Mangler's are `ai_zm_dlc3_armored_zombie_*`); `sentinel_drone` the drone; `zmb_dlc3` the weapon models. First-person animation prefixes differ per weapon (`vm_zom_raygun_mk3_*`, `vm_dragon_shield_zm_*`; `vm_zmb` finds nothing), and a weapon's are only in memory once a player holds it (the Gauntlet of Siegfried's were missing with nobody holding it).
 - A Workshop map's or pack's own textures export with no file until its xpaks are hard-linked into BO3's `zone/` (7.1).
 - Greyhound writes models in **centimetres**. The game and the dump are in inches: everything from an SEModel is scaled by 1/2.54 (the builders do this; a new converter must too).
 - Copy what the weapon and equipment builders need into `export_game/bo3/` (`xmodels/<name>/<name>_LOD0.semodel`, `xanims/*.seanim`, `ximages/*.png`); the map builder reads Greyhound's export folder directly (`GH` at the top of `build_bo3_map.py`).
