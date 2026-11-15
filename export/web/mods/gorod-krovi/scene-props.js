@@ -47,6 +47,7 @@ export function hold(P, a, at = 0) {   // still on a frame of a clip (0 = the sc
 export function play(P, a, { loop = false, then = null } = {}) {
   if (!P?.rig.actions[a]) return false;
   globalThis.kino?.staticFreeze?.thaw?.(P.root);
+  if (P.rig.current === a && !(loop && P.loop)) P.rig.current = null;   // Rig.play ignores a loop of its current clip: a held pose (time scale 0) stayed frozen
   P.rig.play(a, loop, 1, loop ? .25 : 0); P.t = P.dur[a] ?? 0; P.next = then; P.loop = loop; return true;
 }
 // a joint (and every joint under it) collapsed to nothing: BO3's hidepart on a skinned fxanim model

@@ -56,6 +56,16 @@ SOUNDS = {
     'shell':      dict(shot='shell_nodebris/exp_shell_nodebris_', vol=.7, range=4500),
     'dirt':       dict(shot='pfx/dirt/mortar/dirt_plume_', vol=.45, range=1500),
 }
+# the sewer ride (gorod-krovi/sewer.js): one file each, written as audio/sewer_<key>.ogg
+RIDE = {'move': 'zm_stalingrad/sewer/sewer_move.', 'open': 'zm_stalingrad/sewer/sewer_open.', 'close': 'zm_stalingrad/sewer/sewer_close.',
+        'rush_start': 'underwater_rail/waterrush_start.', 'rush': 'underwater_rail/waterrush_loop.'}
+# the traps and the gravestones (gorod-krovi/traps.js, challenges.js): one file each, written as audio/<key>.ogg
+FILES = {'trap_crush_0': 'traps/pincher/pincher_00.', 'trap_crush_1': 'traps/pincher/pincher_01.', 'trap_fling': 'traps/flinger/zmb_flinger_trap_03.',
+         'trap_elec_loop': 'zmb/trap/electrical/loop/loop_00.', 'trap_elec_arc_0': 'electrical/arcs_big/big_00.', 'trap_elec_arc_1': 'electrical/arcs_big/big_01.',
+         'trap_elec_stop': 'electrap/electrap_stop.', 'trap_sizzle': 'electrical/sizzle/sizzle_00.', 'trap_ignite': 'electrical/ignite/ignite_00.',
+         'trap_available': 'zm_factory/trap/available.', 'trap_button_0': 'zm_stalingrad/buttons/button_00.', 'trap_button_1': 'zm_stalingrad/buttons/button_01.',
+         'skel_retract': 'challenges/skel_retract.', 'challenge_done': 'zm_island/challenges/challenge_complete.', 'challenge_all': 'zm_island/challenges/challenge_complete_all.',
+         'bones_0': 'skeletons/bones/bones_00.', 'bones_1': 'skeletons/bones/bones_01.'}
 # placed by the map's script (CoD units): the siren all game; Pavlov's basement machine loops, room tone and randoms
 PAV = [(-3271, 21733, -86), (-3078, 22000, -108), (-2765, 21978, -106)]
 EXTRA = [('siren', (-1819, 2705, 1167), None)] + [(f'machine_{i}', p, None) for i, p in enumerate(PAV)] + [
@@ -122,6 +132,14 @@ def audio(sounds):
                 if not names: print('MISSING', k, s['shot']); continue
                 for i, x in enumerate(names): encode(flac(x), OUT / f'amb_{k}_{i}.ogg', pad=True)
                 sounds[k]['n'] = len(names)
+        for k, sub in RIDE.items():
+            name = next((x for x in idx if sub in x), None)
+            if not name: print('MISSING', k, sub); continue
+            encode(flac(name), OUT / f'sewer_{k}.ogg', pad=True)
+        for k, sub in FILES.items():
+            name = next((x for x in idx if sub in x), None)
+            if not name: print('MISSING', k, sub); continue
+            encode(flac(name), OUT / f'{k}.ogg', pad=True)
 
 def main():
     all_ents = ents(); em, skipped = emitters(all_ents); mo = mortars(all_ents)

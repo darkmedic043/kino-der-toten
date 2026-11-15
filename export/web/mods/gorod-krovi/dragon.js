@@ -135,7 +135,7 @@ export default async function setupDragon(api, gk) {
   }
   function board() {
     if (D.phase !== 'idle' || D.rider || session.phase === 'reviving' || session.phase === 'gameover') return false;
-    D.rider = true; D.phase = 'board'; D.boardT = 0; lastYaw = null;
+    D.rider = true; D.phase = 'board'; D.boardT = 0; lastYaw = null; gk.emit('dragon:ride', D.site?.id);
     if (api.features) api.features.flight = true;
     sfx.sfx('mount', .9); api.toast?.('Hold on', 2);
     return true;
@@ -269,8 +269,9 @@ export default async function setupDragon(api, gk) {
     if ((F.tick -= dt) > 0) return; F.tick = FIRE.tick;
     // the player: shield.js's bath test (feet + 40 within FIRE.r of the line); gk.burn is 0 while the shield is raised
     if (!F.hurt) return;   // the Gauntlet's fire burns on its own (gauntlet-hazard.js)
-    if (session.phase !== 'reviving' && session.phase !== 'gameover' && inLine(player.getFeetPosition().add(new THREE.Vector3(0, 40, 0)), tv)) {
-      F.hits++; F.burnt += gk.burn ? gk.burn(FIRE.dmg) : (api.damage?.(FIRE.dmg), FIRE.dmg);
+    if (session.phase !== 'reviving' && session.phase !== 'gameover' && inLine(player.getFeetPosition().clone().add(new THREE.Vector3(0, 40, 0)), tv)) {
+      const n = gk.burn ? gk.burn(FIRE.dmg) : (api.damage?.(FIRE.dmg), FIRE.dmg);
+      F.hits++; F.burnt += n; gk.emit('dragon:burn', { blocked: !n, secs: FIRE.tick });   // challenges 1_6 (burned) and 2_4 (blocked)
     }
     for (const z of [...(api.enemies?.list ?? [])]) {   // plain zombies in the fire burn (no points); specials shrug it off
       if (z.kind !== 'zombie' || z.thrall || !inLine(z.root.position.clone().add(new THREE.Vector3(0, 40, 0)), new THREE.Vector3())) continue;

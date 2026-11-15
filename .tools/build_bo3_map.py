@@ -652,10 +652,12 @@ if BSP == 'zm_stalingrad':   # Gorod Krovi's power doors and gates (their fxanim
 SCENE_MODELS = {} if BSP != 'zm_stalingrad' else {   # door_buy_03 has the library and stairs variants of the anims
     'p7_fxanim_zm_stal_door_buy_library_bundle': 'p7_fxanim_zm_stal_door_buy_03_mod', 'p7_fxanim_zm_stal_door_buy_dept_store_2f_bundle': 'p7_fxanim_zm_stal_door_buy_03_mod'}
 BARRICADE, BARRICADE_W, BARRICADE_H = 'p7_zm_der_barricade_wall_main', 138.6, 92.5   # BO3 plank wall, model X = width, Z = height
-def measure_passage(o):
+def measure_passage(o, yaw=0.0):
     """The passage at CoD origin o, measured through the collision: the floor below, the narrower of the two horizontal
     axes (walls both sides), and the clear height. -> (floor point at the passage's middle, side direction, CoD axis,
-    width, clear height)"""
+    width, clear height). yaw (CoD degrees, the door entity's): the two axes are turned by yaw mod 90, so a door set across
+    a diagonal passage is measured, and faces, along it (Gorod Krovi, 2026-11-15: piles and gates squared to the map's axes
+    stood skewed across four diagonal doorways)"""
     O = g(o).astype(np.float64)
     # triangles whose box comes within 260 of O across and 420 up/down (by centre, a big street floor triangle was missed)
     lo, hi = CTRI.min(1), CTRI.max(1); r = np.array([260, 420, 260])
@@ -673,7 +675,8 @@ def measure_passage(o):
         cands.append((head < 72, abs(Fc[1] - O[1]), -head, Fc))
     F = min(cands, key=lambda c: c[:3])[3] if cands else O - [0, 58, 0]
     best = None
-    for axis in ((1.0, 0.0), (0.0, 1.0)):
+    t_ = math.radians(yaw % 90)
+    for axis in ((math.cos(t_), math.sin(t_)), (-math.sin(t_), math.cos(t_))):
         side = g(np.array([-axis[1], axis[0], 0.0])); C = F + [0, 40, 0]
         ext = [next((k for k in range(4, 220, 4) if seg_blocked(C, C + side * sg * k, near)), None) for sg in (1, -1)]
         open_ = ext.count(None); ext = [x if x is not None else 110 for x in ext]   # no wall within 220: an open side, 110 out
@@ -704,13 +707,13 @@ def shell_model(name):
 CRATE, CRATE_W, CRATE_H, CRATE_TOP = 'p7_crate_wood_01', 60.6, 31.1, 'p7_crate_wood_02_iron_cross'
 GATE, GATE_W, GATE_Z0, GATE_H = 'p7_barricade_metal_gate_02_black', 131.8, 3.7, 64.0
 def crate_pile(o, angles):
+    # rows sit square on each other: the random yaw on the upper rows (up to 7 degrees) read as bent doors (2026-11-15)
     """Rows of crates across the passage at o, up to its clear height (at most 4 rows), the top row iron-cross crates.
     One node holding them (no mesh), so the door's box is the pile's; the pile sinks when bought."""
-    F, side, axis, width, up = measure_passage(o)
+    F, side, axis, width, up = measure_passage(o, vec(angles)[1] if angles else 0.0)
     rows = max(2, min(4, int(min(up, 130) // CRATE_H)))
     n = max(1, round(width / CRATE_W)); sx = width / (n * CRATE_W)
     yaw = math.atan2(axis[0], -axis[1]); r_ = yaw / 2; rot = [0, math.sin(r_), 0, math.cos(r_)]
-    rng = np.random.default_rng(int(abs(o[0]) + abs(o[1])))
     kids = []
     for row in range(rows):
         top = row == rows - 1 and row > 0
@@ -721,7 +724,7 @@ def crate_pile(o, angles):
         for k in range(cnt):
             t = (k + .5) / cnt - .5
             P = F + side * (t * width) + [0, row * CRATE_H, 0]
-            j = float(rng.uniform(-.12, .12)) if row else 0.0; rj = (yaw + j) / 2
+            rj = yaw / 2
             sc = [sx * 1.02, 1, 1] if not top else [width / cnt / 38.0 * .9, .9, .9]
             gltf['nodes'].append({'name': model, 'mesh': mi, 'translation': P.tolist(), 'rotation': [0, math.sin(rj), 0, math.cos(rj)], 'scale': sc,
                                   'extras': {'move': g([0, 0, -(rows * CRATE_H + 10)]).tolist()}})
@@ -729,9 +732,9 @@ def crate_pile(o, angles):
     if not kids: return None
     count('DOOR_STANDIN_crates')
     gltf['nodes'].append({'name': 'door_pile_standin', 'children': kids}); return len(gltf['nodes']) - 1
-def gate_standin(o):
+def gate_standin(o, angles=None):
     """BO3's black metal gate scaled to the passage at o (its clear height up to 140). Rises when bought."""
-    F, side, axis, width, up = measure_passage(o)
+    F, side, axis, width, up = measure_passage(o, vec(angles)[1] if angles else 0.0)
     height = min(up, 140); mi = prop_mesh(GATE)
     if mi is None: return None
     yaw = math.atan2(axis[0], -axis[1]); r_ = yaw / 2; sy = height / (GATE_H - GATE_Z0)
@@ -740,11 +743,12 @@ def gate_standin(o):
     gltf['nodes'].append(node); count('DOOR_STANDIN_gate'); return len(gltf['nodes']) - 1
 def door_piece(model, origin, angles, move):
     if BSP == 'zm_stalingrad' and shell_model(model):
-        return crate_pile(vec(origin), angles) if 'door_buy' in model else gate_standin(vec(origin))
+        return crate_pile(vec(origin), angles) if 'door_buy' in model else gate_standin(vec(origin), angles)
     mi = prop_mesh(model)
     if mi is None: print('  door piece not exported:', model); return None
     r = math.radians(vec(angles)[1]) / 2
     node = {'name': model, 'mesh': mi, 'translation': g(vec(origin)).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]}
+    if BSP == 'zm_stalingrad': node['rotation'] = quat(C @ euler_cod(*vec(angles)) @ C.T)   # its drop-down gates lean (roll -19 and -13): yaw alone stood them upright through the slope
     if move: node['extras'] = {'move': g(move).tolist()}
     gltf['nodes'].append(node); return len(gltf['nodes']) - 1
 zones_of = {}   # target -> every trigger's zone (two triggers can share their pieces: one door opening both zones)

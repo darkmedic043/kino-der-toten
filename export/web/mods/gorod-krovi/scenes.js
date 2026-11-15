@@ -32,6 +32,7 @@ const SCENES = [   // [key, prop, origin, angles, init clip]
   ['letters_r', 'letters_r', [666, 1815, 670], null, 'fall'],
   ...[[0.0299196, 4402.03, 144.7, 180], [-2453.19, 21458.8, 3.06, 270], [-2453.19, 21752.2, 3.06, 270], [-3568.03, 21311.6, 3.06, 90], [-3568.03, 21523.5, 3.06, 90]]
     .map(([x, y, z, yaw], i) => [`flinger_${i + 1}`, 'flinger', [x, y, z], [0, yaw, 0], 'fling']),
+  ['finger_l', 'finger_l', [-1015, 3150, 200], null, 'crush'], ['finger_r', 'finger_r', [-1015, 3150, 200], null, 'crush'],   // the finger trap (traps.js)
   ['tarp', 'tarp', [-2705, 21705, -87], null, 'start'],
   ['drone_window', 'drone_window', [-2230, 3000, 370], null, 'break'],
   ['raz_cage', 'raz_cage', [-510.175, 4998.86, 428.926], null, 'grab'],

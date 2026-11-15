@@ -187,6 +187,7 @@ export function setupSentinel(K) {
     K.boom(at, .25); K.sfxAt(K.pick('sen_break', 6), at, .8);
     if (k.startsWith('arm')) { hideBone(z.bones.get(part.bone)); if (S.A[part.clip]) { play(z, part.clip, false); z.busyUntil = z.t + .9; } }
     if (k === 'face') { hideBone(z.bones.get('tag_faceplate_d0')); K.debris(S.models.veh_t7_dlc3_sentinel_drone_faceplate, at, K.fwd(z.root).multiplyScalar(160).add(V(0, 200, 0))); }
+    gk.emit('sentinel:part', { z, part: k });   // challenges 3_5 (every arm) and 3_6 (the camera)
     if (k === 'camera' || ['armL', 'armR', 'armT'].every(a => z.broken.has(a))) kamikaze(z);
   }
   function kamikaze(z) {

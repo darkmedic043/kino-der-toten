@@ -231,6 +231,7 @@ export default async function setup(api, gk) {
   });
 
   // ---- kills with the shield (step 1) -----------------------------------------------------------------------------
+  host.on('kill', e => { if (!e.remote && (breathing || (rs()?.altHitting && mine()))) gk.emit('shield:kill', e); });   // challenge 2_2
   host.on('kill', e => {
     if (!q.used || q.kills >= QUEST_KILLS || /sentinel/.test(e.enemy?.kind ?? '')) return;
     if (!(breathing || (rs()?.altHitting && mine()))) return;

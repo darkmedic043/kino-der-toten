@@ -64,17 +64,47 @@ function footprint(object){
 // the old way made (a non-indexed clone of every mesh, then the merge) held the castle's 7.7 M collision triangles
 // four times over while loading (2026-11-13).
 const cornersOf=o=>(o.geometry.index??o.geometry.attributes.position).count;
-function positionsOf(meshes){
+function positionsOf(meshes,cut=null,cutN=meshes.length){
   if(!meshes.length)return null;
   let n=0;for(const o of meshes)n+=cornersOf(o);
-  const out=new Float32Array(n*3),v=new THREE.Vector3();let k=0;
-  for(const o of meshes){const p=o.geometry.attributes.position,ix=o.geometry.index,m=o.matrixWorld,c=cornersOf(o);
-    for(let i=0;i<c;i++){v.fromBufferAttribute(p,ix?ix.getX(i):i).applyMatrix4(m);out[k++]=v.x;out[k++]=v.y;out[k++]=v.z;}}
-  return new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(out,3));
+  const out=new Float32Array(n*3),v=new THREE.Vector3(),ends=[];let k=0;
+  for(let j=0;j<meshes.length;j++){const o=meshes[j],p=o.geometry.attributes.position,ix=o.geometry.index,m=o.matrixWorld,c=cornersOf(o),cu=j<cutN?cut:null;
+    for(let i=0;i<c;i++){v.fromBufferAttribute(p,ix?ix.getX(i):i).applyMatrix4(m);out[k++]=v.x;out[k++]=v.y;out[k++]=v.z;
+      if(cu&&i%3===2&&cutTriangle(out,k-9,cu))k-=9;}
+    ends.push(k);}
+  const g=new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(k<out.length?out.slice(0,k):out,3));
+  g.userData.ends=ends;return g;
+}
+// Map entry collisionCut [[x0,y0,z0, x1,y1,z1], ...] (scene units; Gorod Krovi, 2026-11-15, user: "cant climb the dragon
+// when it arrives ... the collision for standing on it is elevated"): the collision taken from the running game kept a
+// solid box 47 high over each dragon roost platform, so the player stood on it at rail height. Triangles with all three
+// corners inside a box are dropped, except flat ones within 8 of the box's floor. Only the solid (COL) meshes are cut:
+// the player-only clip carries the deck's real top (a slab 370-376 at the judicial roost).
+function cutTriangle(a,i,cut){
+  for(const b of cut){let inside=true;
+    for(let c=0;c<9&&inside;c+=3)inside=a[i+c]>=b[0]&&a[i+c]<=b[3]&&a[i+c+1]>=b[1]&&a[i+c+1]<=b[4]&&a[i+c+2]>=b[2]&&a[i+c+2]<=b[5];
+    if(!inside)continue;
+    const top=Math.max(a[i+1],a[i+4],a[i+7]);
+    if(top<b[1]+8&&Math.abs(a[i+1]-a[i+4])+Math.abs(a[i+1]-a[i+7])<1)return false;   // the deck
+    return true;}
+  return false;
+}
+// Map entry opaqueLayers: a regex of material names (BO3 ports, 2026-11-15, user: carpets "fade away when your far enough
+// away"). BO3 lays solid surfaces a fraction of a unit over another one (Gorod Krovi's carpet sits 0.2-0.5 over the
+// floorboards, the rugs on the floors). The depth buffer resolves about d²/2^24 units at distance d (near plane 1): 0.24
+// at 2,000, so past that the floor won and the carpet vanished. Matching solid materials get a polygon offset (constant
+// in depth units, so it holds at any range). Named rather than detected: the collision (the only BVH at load) is BO3's
+// own and does not follow the drawn floors. Returns {materials, names}.
+function opaqueLayers(meshes,pattern){
+  const re=new RegExp(pattern,'i'),names=new Set();
+  for(const o of meshes)for(const m of [o.material].flat()){if(!m||m.transparent||m.polygonOffset||!re.test(m.name??''))continue;
+    m.polygonOffset=true;m.polygonOffsetFactor=-1;m.polygonOffsetUnits=-4;names.add(m.name);}
+  return {materials:names.size,names:[...names]};
 }
 // The first `meshes` of a soup built by positionsOf([...meshes, ...more]), as a view of the same memory
 function headOf(soup,meshes){
   let n=0;for(const o of meshes)n+=cornersOf(o);
+  if(soup.userData.ends)n=soup.userData.ends[meshes.length-1]/3;   // a cut soup: where the first meshes end
   return new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(soup.attributes.position.array.subarray(0,n*3),3));
 }
 
@@ -133,10 +163,11 @@ export class CustomWorld {
         o.renderOrder=(/decal/i.test(m.name)||m.userData?.decal?2000:1000)+layer.get(m);}}
     progress('Building collision',35);
     const base=dedicated.length?dedicated:meshes.filter(o=>!playerOnly.includes(o)&&!navOnly.includes(o)&&!clipOnly.includes(o));
-    const both=playerOnly.length&&base.length?positionsOf([...base,...playerOnly]):null,solid=both?headOf(both,base):positionsOf(base);   // one array serves both sets
+    const cut=entry.collisionCut??null,both=playerOnly.length&&base.length?positionsOf([...base,...playerOnly],cut,base.length):null,solid=both?headOf(both,base):positionsOf(base,cut);   // one array serves both sets
     this.clipCollision=clipOnly.length?new CollisionWorld(positionsOf(clipOnly)):null;   // the player's capsule only (physics)
     if(!solid)throw new Error('The map has no meshes to stand on');
     this.collision=new CollisionWorld(both??solid);
+    if(entry.opaqueLayers)this.layerReport=opaqueLayers(meshes,entry.opaqueLayers);
     const navSource=navOnly.length?positionsOf([...base,...navOnly]):solid;
     // The collision-only meshes of the file (COL_/PCOL_/NCOL_/CLIP_: hidden, never drawn) have been copied into the arrays
     // above: their own vertex data is let go (the castle's is about 200 MB). The nodes stay, with an empty geometry.

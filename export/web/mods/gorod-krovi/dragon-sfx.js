@@ -6,8 +6,8 @@
 //   loop(name, vol)                a loop: {set(vol), stop()}
 import { settings } from '../../settings.js';
 
-const BASE = new URL('../maps/gorod-krovi/dragon/audio/', import.meta.url).href;
-export function makeSfx(api) {
+const BASE0 = new URL('../maps/gorod-krovi/dragon/audio/', import.meta.url).href;
+export function makeSfx(api, BASE = BASE0) {   // BASE: another folder of the map's sounds (traps.js: audio/)
   const level = v => (api.audio?.enabled === false ? 0 : Math.max(0, Math.min(1, v * (settings.volume ?? 1))));
   const sfx = (name, vol = 1) => { const a = new Audio(BASE + name + '.ogg'); a.volume = level(vol); a.play().catch(() => {}); return a; };
   const sfxAt = (name, pos, vol = 1, range = 2500) => { const d = api.camera?.position ? api.camera.position.distanceTo(pos) : 0; return d > range ? null : sfx(name, vol * (1 - d / range) ** 1.5); };

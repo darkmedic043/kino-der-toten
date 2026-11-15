@@ -117,6 +117,10 @@ PROPS = [
     ('letters_r', F+'letters_r_mod', {'fall': F+'letters_r_anim'}),
     # the rest of the map's scenes
     ('flinger', F+'flinger_trap_mod', {'fling': F+'flinger_trap_anim'}),
+    # the finger trap (zm_stalingrad_finger_trap, scene p7_fxanim_zm_stal_finger_trap_bundle at (-1015, 3150, 200)): the robot
+    # hand's two jointed fingers sweep over its palm (the damage triggers ride their tag_mid_animate)
+    ('finger_l', 'p7_zm_sta_robot_finger_01', {'crush': F+'finger_trap_finger_left_anim'}),
+    ('finger_r', 'p7_zm_sta_robot_finger_right_01', {'crush': F+'finger_trap_finger_right_anim'}),
     ('tarp', F+'generator_tarp_mod', {'idle': F+'generator_tarp_idle_anim', 'start': F+'generator_tarp_start_anim', 'end': F+'generator_tarp_end_anim'}),
     ('drone_window', F+'pickups_figure_drone_window_mod', {'break': F+'pickups_figure_drone_window_anim'}),
     ('raz_cage', F+'raz_cage_mod', {'grab': F+'raz_cage_sentinel_grab_anim'}),

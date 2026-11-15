@@ -171,6 +171,7 @@ export function setupRaz(K) {
     const at = K.boneAt(z, pc.at) ?? z.root.position.clone().add(V(0, 60, 0));
     K.debris(S.models[pc.debris], at, K.fwd(z.root).multiplyScalar(-rand(60, 140)).add(V(rand(-60, 60), rand(200, 300), rand(-60, 60))));
     K.sfxAt(K.pick('raz_imp', 4), at, .5);
+    gk.emit('raz:part', { z, part });   // 'head' = the mask (BO3 raz_mask_destroyed: challenge 1_5)
     if (z.state !== 'busy' && S.A[pc.pain]) { z.state = 'busy'; play(z, pc.pain, false); z.busyUntil = z.t + (S.index[pc.pain]?.duration ?? 1.5) * .9; z.busyTick = null; }
   }
   function loseGun(z) {
