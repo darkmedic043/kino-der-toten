@@ -57,6 +57,24 @@ python3 -I .tools/bo3_dump_map.py --scan     # after a game update: find the ass
 - Entity `model` values starting with `*` or `?` (`?1`, `?99`...) are brush models: Gorod Krovi's door triggers are `?N`. Greyhound has nothing for either, so drop both from the export lists (a batch of 130 `?N` names finds 0 assets).
 - **Workshop maps (not verified):** the dump reads whatever map is loaded, so a custom map should dump the same way. Its bsp name is the mod's map name; add it to `MAPCFG` in the builder (2.2).
 
+### 1.1a The collision: `bo3_dump_clip.py` and `bo3_clip.py`
+
+The render dump has no collision: no clip brushes (the invisible walls, the ramps over every staircase) and no static-model collision. The game's own is the `clipMap_t` asset (pool 12), dumped from the running game the same way (first done for Gorod Krovi, 2026-11-15):
+
+```
+python3 -I .tools/bo3_dump_clip.py                    # the map loaded right now, into export_game/bo3/maps/<bsp>/<bsp>.clip.*
+python3 -I .tools/bo3_clip.py <bsp> [--models]        # counts per class (needs numpy: Blender's python)
+```
+
+- Output: `<bsp>.clip.json` (counts, materials with contents flags, submodels, static models, the xmodels' collision surfaces, and the record layout of every `.bin`) and the arrays (`planes`, `brushsides`, `brushes`, `brushverts`, `verts`/`tris`/`partitions`/`aabbtrees` = the triangle soup, the brush BSP, `xmodeltris`). zm_stalingrad: 35,180 brushes, 60,533 sides, 28,565 planes, 213,283 soup triangles, 49,464 static models, 267 submodels, 755 materials.
+- Layout of `clipMap_t` (verified on the live game): name, isInUse, then count/pointer pairs at 0x10 planes (20 B), 0x20 materials (16 B: name, surfaceFlags, contents), 0x30 brushsides (16 B), 0x40 leafbrushnodes (24 B), 0x50 leafbrushes (u16), 0x60 brushverts, 0x70 uinds, 0x80 numBrushes (u16) / 0x88 brushes (0x70 B: mins, contents 0xC, maxs, numsides 0x1C, sides 0x20, axial contents/flags 0x28/0x40, numverts 0x58, verts 0x60), 0xA8 static models (0x70 B), 0xB8 nodes, 0xC8 leafs (56 B), 0xD8 verts, 0xE8 tris, 0xF8 triEdgeIsWalkable, 0x100 partitions (16 B), 0x110 aabbTrees (32 B), 0x120 cmodels (96 B).
+- **Leaf brush lists overrun the count**: the submodels' lists sit after the world's (zm_stalingrad: 35,184 counted, 413 more). The dumper reads up to the furthest end a node points at.
+- **Submodels are left out**: their brushes (the last ones: 34,768-35,179 on zm_stalingrad) are zone volumes, `nav_volume_passable` and the script brush models (door and hatch clips, the dragon boss blocker): the doors are the engine's own.
+- **A brush is its box cut by its side planes**, which is what the game's traces test. The stored `brushverts` disagree with the planes on some brushes (extra 45-degree cuts) and left 9,582 brushes open: `bo3_clip.py` intersects the planes instead (every three, points inside, corners merged within 0.05). 34,768 world brushes = 465,000 triangles in about 50 s. The soup is stored clockwise (flip it); its contents come from the aabb leaf's material.
+- Static models: world = origin + inverse(invScaledAxis) @ local; the xmodel triangles are rebuilt from plane, svec and tvec. A trace checks the instance's contents and the surface's.
+- **Contents flags** (the json's `contentsFlags`): 0x1 solid, 0x10 glass, 0x2000 stops bullets, 0x10000 player clip, 0x20000 monster clip; every `clip_*` material also has 0x400000. Players stop at 0x1 | 0x10 | 0x10000, zombies at 0x1 | 0x10 | 0x20000, bullets at 0x1 | 0x2000. 0x2080 (and 0x82080) is drawn detail you walk through: wooden beams, the bridges' metal trim, grates, the bronze ceiling tiles (12,697 brushes on zm_stalingrad). `clip` is 0x430200 and `clip_nosight` 0x431640: player + monster, no bullets.
+- `bo3_clip.game_collision()` sorts it all into the engine's classes (2.4): stops player, zombies and bullets = `COL`; player and bullets only = `PCOL`; player but not bullets = `CLIP` (plus `NCOL` when it also stops zombies: the stair ramps are both); zombies only = `NCOL`. Static models by instance height: under 18 left out (stepped over), 18-40 `PCOL`, over 40 `COL`.
+
 ### 1.2 Textures, models, animations: Greyhound
 
 Details: `weapons.md`, "Black Ops III assets (Greyhound)". Greyhound 1.46 sits at `C:\greyhound` in BO3's Proton prefix and must be started **inside the game's Steam Runtime container** (`steam-runtime-launch-client --bus-name=com.steampowered.App311210 ... wine 'C:\greyhound\Greyhound.exe'`), or it cannot see the game. `scratch/gk/batch.sh` is the working driver (session script: copy it), with a guard: after Search it crops the label at the top right and clicks Export All only if it reads "Assets found" (reference crops `scratch/gk/found{1,2,3}.ref`, one per digit count, because the label is right-aligned). A paste can silently fail and leave the search empty (2026-11-14): `xdotool windowactivate --sync` before the paste fixed it, and the guard catches the rest.
@@ -115,6 +133,22 @@ BO3 ships its scripts compiled inside the fastfiles; nothing here extracts or de
 | Some images (only a normal map, or nothing) | Lilac-blue sheets, solid white cards, invisible overlays | Drop, hide or paint a stand-in (3.4) |
 | Weapon files (damage, speeds, charge times) | - | Numbers from a comparable weapon, tuned by eye, marked as ours |
 | Lighting-state switches | - | Bake the normal-play state only (4.3) |
+
+### 1.7 The AI navmesh: `bo3_dump_navmesh.py`
+
+BO3's zombies walk a Havok AI navmesh (Havok 2014.2.0-r1 packfiles, loaded in place), and its traversals (mantles, jump-ups, staircases) are user edges on it. Our generated navmesh (from `COL_` meshes, 2.4) misses whatever the collision misses and has no traversals, so a BO3 port can take the game's own instead (first done for Gorod Krovi, 2026-11-15).
+
+```
+python3 -I .tools/bo3_dump_navmesh.py --web export/web/mods/maps/<id>             # from the running game (same pool table as 1.1)
+python3 -I .tools/bo3_dump_navmesh.py --from-raw --map <bsp> --web export/web/mods/maps/<id>   # decode the saved raw copy again
+```
+
+- Raw copy first (`export_game/bo3/maps/<bsp>/nav_raw/`: the navmesh asset of pool 97 and its six blobs, the navvolume of pool 98 for flying AI, not decoded), then `<bsp>.navmesh.json` (faces, edges, neighbours, clusters, settings, traversals) and, with `--web`, `bo3-nav.json` in the map folder (git-ignored ripped data; never let `OWN` in install-manifest.mjs match it).
+- Layout (blob 3 = `hkaiNavMesh`): faces 16 bytes (`startEdge, startUserEdge, numEdges, numUserEdges, cluster`), edges 20 bytes (`a, b, oppEdge, oppFace` (-1 = boundary)`, flags, cost`), vertices hkVector4 in metres (x 39.37 = inches, game axes, Z up). Faces wind counter-clockwise from above; fan them as `[f0, fk, fk+1]` or Recast sees them face down and builds nothing. Generation settings (blob 0): character height 72, step 18, max slope 36.6 degrees (ours is 48). Erosion radius 0: the mesh runs up to the walls (Havok keeps clearance at query time), so our Recast erosion stays on.
+- Traversals (blob 1, 80-byte user-edge pairs): two edge segments, two faces, two `.ents` node indices (the `node_negotiation_begin`/`_end` pair: its `animscript`, `mantle_over_48`, `jump_up_160`...) and a direction (3 = both ways). Gorod Krovi: 120 (mantles 59, jump-ups 57, one staircase). Each becomes a link 20 inside its two faces, both ways, with `over: [.5, start + h]` for `mantle_over_<h>`. The 27 negotiation pairs with no user edge are `air_buy_gate` with the AIRBORNE spawnflag, 45-110 over the mesh: the flying AI's, left out.
+- Map entry `"navFile": "bo3-nav.json"` (custom-world.js): the navmesh is built from those floor polygons (no span clipping) instead of the collision, with the usual settings and erosion, and the links become off-mesh connections (`this.traversals`, so `path()` marks hops and enemies.js plays them). Missing file: generated as before. The cache signature covers the triangles and links, so a new dump rebuilds by itself.
+- Closed doors still block: `refreshNav()` (from `setDoors`) switches off the polygons under closed doors and every link whose line passes through a closed door (Detour's `queryPolygons` never returns link polygons). `world.navBlock(id, box|null)` blocks a box by name on top of the doors (Gorod Krovi's bridge while raised).
+- Gaps to expect: about 2% of Gorod Krovi's mesh area has no collision floor under it (props the clipMap holds that `COL_world` lacks, ledges, the bridge deck); zombies stand on the navmesh there. Spawn closets are separate islands (zombies enter through their windows), and Pavlov's House is reached only by the dragon.
 
 ## 2. Building the map
 
@@ -227,6 +261,8 @@ CustomWorld builds collision and the navmesh from `COL_` meshes only; `PCOL_` me
 - Script structs are often not on a floor (the dragon roosts are on decks no one can walk to, Pavlov's landing is 380 units up): put a marker made from one on walked floor next to it, picked from the flood's `--points`.
 - **Name rules hit the wrong props**: the prop rules go by model name, so check what each catches on a new map. On Gorod Krovi `WALKABLE` caught the department store's storey facades (`dept_store_facade_1st_floor`...) by the word `floor`; over 6,000 triangles they became their bounding box, a solid 680 x 680 x 196 block that sealed the store (the flood showed a diamond of unreached floor inside the reached street). The build log prints `walkable boxed:` for every prop that rule boxes; read the list. To find which prop a blocking wall belongs to, cast a ray in col-audit (the hit triangle's corners), look for a drawn triangle with the same corners (none = a prop in `COL_world` or a builder ramp), then list the props whose placement and size fit. Gorod Krovi's list also boxed its metal ramp-bridges (54-unit steps: the factory catwalk cut off) and whole staircases in one model (walls; their hull is a ramp). A staircase whose lowest step is broken off needs a ramp quad (BO3 had a clip ramp there). Try a ramp before rebuilding: push its triangles into `cp`/`ci` in a copy of col-audit (just before `const cgeo`) and rerun the flood.
 - Fine-tuning without a rebuild: the map entry's `propCollision` (`mesh`/`box` regexes, `minHeight`), audited with `.tools/col-audit.mjs` (`custom-maps.md`).
+- **The game's collision instead of the render triangles: `--game-clip`** (opt-in, 2026-11-15; needs the clip dump of 1.1a). `COL_world` then holds the game's world brushes and soup that stop player, zombies and bullets, and three more meshes come with it: `PCOL_gameclip`, `CLIP_gameclip`, `NCOL_gameclip`. The props keep the rules above, except anything with `stair` in its name (the game's clip ramps take over) and the dept-store ramp quad. `--game-clip-models` also replaces the props with the static models' own collision (heavy: 2.3 million triangles on Gorod Krovi, mostly rubble and corpses). Gorod Krovi with `--game-clip`: `COL` 292,000 triangles (the render `COL_world` had 1.15 million), `CLIP` 57,000, `NCOL` 54,000.
+- Why (Gorod Krovi comparison, 2026-11-15, inside the player zones): the render collision missed 56% of BO3's exposed clip-brush area by over 12 units, almost all walls (the invisible walls), and 34% of the static models' solid collision. 1.9% of ours had no game collision within 12 units (windows, burnt wood piles, the dragon platform, broken stair hulls, ceiling tiles drawn but not solid). Stairs: BO3 walks the player on a clip ramp over every flight. Our department store flights were within 4 units of it, but the broken flights were 13-66 off, and `stairs_broken_full_piece` and the library's broken stairs up to 192 and 105.
 
 ### 2.5 The map entry (`mods/maps.json`)
 
@@ -562,7 +598,7 @@ The fork's player can do what BO3's cannot: slide, dive, mantle, wall jump, low 
 - A collider pushed onto `world.dynamic` has `.box`, unless it is `window: true` (or `world.setDoors` crashes).
 - `world.collision.invalidateCache()` after any edit of the collision geometry (the player's nearby-triangle cache keeps the old shape otherwise); `world.collision.useCache = false` is the A/B switch when a bug looks like a stale cache.
 - Anything that moves and can be stood on goes through `addScriptedMover` and is moved every frame, not teleported in steps.
-- The navmesh never changes in play: every runtime blocker that zombies must respect needs its own hold or reroute.
+- The navmesh's shape never changes in play: a runtime blocker zombies must respect needs its own hold or reroute, or `world.navBlock(id, box)` to switch off the polygons (and links) under it while it stands (1.7).
 - A collision change in the build changes the navmesh cache key by itself; a change to navmesh *settings* needs `NAV_CACHE_VERSION` bumped, or players keep the old mesh.
 
 ## 11. Release checklist

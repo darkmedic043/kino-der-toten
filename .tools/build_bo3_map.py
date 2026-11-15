@@ -268,39 +268,52 @@ for m in info['models']:   # exact duplicates (same model, place and axes: 413 o
     if k in _seen: continue
     _seen.add(k); by_model.setdefault(m['name'], []).append(m)
 mesh_cache = {}
-def prop_mesh(name):   # a BO3 model as a glTF mesh (cached), or None if Greyhound didn't export it
-    if name in mesh_cache: return mesh_cache[name]
+def prop_mesh(name, hide=()):   # a BO3 model as a glTF mesh (cached), or None if Greyhound didn't export it
+    # hide: bone names whose faces are left out (a script model's parts BO3 hides at the start: lights of other states)
+    key = (name, tuple(sorted(hide))) if hide else name
+    if key in mesh_cache: return mesh_cache[key]
     path = os.path.join(GH, 'xmodels', name, name + '_LOD0.semodel')
-    if not os.path.exists(path): mesh_cache[name] = None; return None
+    if not os.path.exists(path): mesh_cache[key] = None; return None
     model = read_semodel(path)
+    hidden = {i for i, b in enumerate(model['bones']) if b['name'] in hide}
     prims = []
     for mesh in model['meshes']:
         if not mesh['faces']: continue
         pos = (g(np.array(mesh['pos'])) * CM).astype(np.float32); nrm = g(np.array(mesh['nrm'])); nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-6)
         uv = np.array([u[0] for u in mesh['uv']], dtype=np.float32)
         faces = np.array(mesh['faces'], dtype=np.uint32)[:, [0, 2, 1]]
+        if hidden:
+            off = np.array([bool(w) and max(w, key=lambda x: x[1])[0] in hidden for w in mesh['w']])
+            faces = faces[~off[faces].any(axis=1)]
+            if not len(faces): continue
         mm = model['materials'][mesh['mats'][0]] if mesh['mats'] else {'name': 'none'}
         overlay = bool(re.search(r'decal', mm['name'], re.I))
         mat = material(('prop', mm['name']), mm['name'], texture(mm.get('diffuse'), PROP_TEX), texture(mm.get('normal'), PROP_TEX), overlay=overlay,
                        fallback=builtin_color(mm.get('diffuse'), mm['name']))
         prims.append({'attributes': {'POSITION': accessor(pos, 'VEC3', 34962, True), 'NORMAL': accessor(nrm.astype(np.float32), 'VEC3', 34962),
                                      'TEXCOORD_0': accessor(uv, 'VEC2', 34962)}, 'indices': accessor(faces.ravel(), 'SCALAR', 34963), 'material': mat})
-    if not prims: mesh_cache[name] = None; return None
+    if not prims: mesh_cache[key] = None; return None
     tris, base, P_all = [], 0, []
     for mesh in model['meshes']:
         if not mesh['faces']: continue
         P_all.append(g(np.array(mesh['pos'])) * CM); tris.append(np.array(mesh['faces'])[:, [0, 2, 1]] + base); base += len(mesh['pos'])
-    if P_all: prop_geo[name] = (np.concatenate(P_all), np.concatenate(tris))
-    gltf['meshes'].append({'name': name, 'primitives': prims}); mesh_cache[name] = len(gltf['meshes']) - 1
-    return mesh_cache[name]
+    if P_all and not hide: prop_geo[name] = (np.concatenate(P_all), np.concatenate(tris))
+    gltf['meshes'].append({'name': name, 'primitives': prims}); mesh_cache[key] = len(gltf['meshes']) - 1
+    return mesh_cache[key]
 instances, skipped = 0, []
 # skinned characters placed as static props (Der Eisendrache's zombie corpses, soldier and gib parts): a static model
 # can't be posed, so they stood in their bind pose (user: "T-posing messes"); left out
 POSED_CHARACTER = re.compile(r'^c_(zom_.*corpse|zom_zod_zombie_fem_body|54i_.*spawn|ger_winter_soldier)', re.I)
+# Gorod Krovi's frozen bodies (c_zom_dlc3_rus_corpse*_fb: 252 static models, most laid flat in the snow) are drawn in
+# their bind pose by BO3 itself (one model name for every copy: nothing poses them), so they go in as BO3 shows them, and
+# the soldiers' helmets lying about (single-bone props the regex caught). No collision: their prop_geo is dropped after.
+STIFF = re.compile(r'^c_zom_dlc3_rus_corpse\d+_fb$|^c_ger_winter_soldier_\d+_helm$', re.I) if BSP == 'zm_stalingrad' else None
+stiff = set()
 for name, insts in sorted(by_model.items()):
-    if POSED_CHARACTER.search(name): continue
+    if POSED_CHARACTER.search(name) and not (STIFF and STIFF.search(name)): continue
     mesh_i = prop_mesh(name)
     if mesh_i is None: skipped.append(name); continue
+    if POSED_CHARACTER.search(name): stiff.add(name)
     cells = {}
     for it in insts:
         o = np.array(it['origin']); cells.setdefault(tuple(np.floor(o[:2] / 2048).astype(int)), []).append(it)
@@ -315,7 +328,48 @@ for name, insts in sorted(by_model.items()):
             'TRANSLATION': accessor(np.array(T, dtype=np.float32), 'VEC3'), 'ROTATION': accessor(np.array(R, dtype=np.float32), 'VEC4'),
             'SCALE': accessor(np.array(S, dtype=np.float32), 'VEC3')}}}})
         instances += len(group)
-print(f'props: {len(by_model) - len(skipped)} models, {instances} instances' + (f', {len(skipped)} not exported' if skipped else ''))
+for name in stiff: prop_geo.pop(name, None)   # the frozen bodies: seen, not collided with (as before they were placed)
+print(f'props: {len(by_model) - len(skipped)} models, {instances} instances' + (f', {len(skipped)} not exported' if skipped else '')
+      + (f' ({len(stiff)} frozen-body models)' if stiff else ''))
+if BSP == 'zm_stalingrad':
+    # Gorod Krovi's script models that just stand there (BO3 places them in Radiant as script_model entities, so they are
+    # not in the GfxWorld's static models): trap switch boxes, the pneumatic tube terminals, the Easter egg's rigged
+    # buttons, banners, gravestones, the drop pod consoles... Static instanced nodes like the props, in their state at the
+    # start (parts BO3 hides then are left out), and NOT added to by_model: no collision, the collision pass is unchanged.
+    # Left to the mods: Sophia's eye (gorod-krovi/sophia.js), the flinger traps (scenes.js), the dragon consoles and
+    # incubator (dragon.js, gauntlet.js); left out: things that appear or go mid-game (the challenge rewards pr_g_*, the
+    # lit bridge lights, the boss arena blockers), Pavlov's lockdown shutters and gate (their open/closed state is the
+    # lockdown's), the wall map's lit screen (all of it is lit parts) and the dragon network consoles' twins.
+    SCRIPT_PROPS = {   # model -> bones hidden at the start
+        'p7_zm_sta_trap_control_box': ('tag_green_light', 'tag_red_light'),
+        'p7_zm_sta_pneumatic_tube_switch': ('tag_buttons_on',), 'p7_zm_sta_pneumatic_tube_switch_lever': (),
+        'p7_fxanim_zm_stal_rigged_button_mod': (), 'p7_fxanim_zm_stal_dragon_console_antenna_mod': (),
+        'p7_fxanim_zm_stal_dragon_hazard_fountain_banner_01_smod': (), 'p7_fxanim_zm_stal_dragon_hazard_fountain_banner_02_smod': (),
+        'p7_fxanim_zm_stal_dragon_hazard_library_banner_01_smod': (), 'p7_zm_ctl_light_warning_floor_off': (),
+        'p7_zm_ctl_safe_standing_door': (), 'p7_zm_der_pswitch_handle': (), 'p7_zm_sta_pile_wood_burnt_small_04': (),
+        'p7_zm_sta_robot_head_02': (), **{f'p7_zm_sta_challenge_tomb_single_0{i}': () for i in range(1, 5)},
+        'p7_zm_sta_dragon_network_data_terminal': tuple(f'tag_dragon_network_console_terminal_light_green_0{i}' for i in range(1, 5)) + ('tag_dragon_network_console_terminal_screen_green',),
+        **{f'p7_zm_sta_drop_pod_console_{c}': ('tag_screen_main_green', 'tag_screen_eye') for c in ('blue', 'red', 'yellow')},
+        'p7_zm_sta_wall_map_shelf': ('wall_map_shelf_button_green',) + tuple(f'wall_map_shelf_figure_0{i}' for i in range(1, 7)),
+    }
+    sm_by, sm_n = {}, 0
+    for e in ents:
+        if e.get('classname') != 'script_model' or e.get('model') not in SCRIPT_PROPS: continue
+        if e.get('targetname') in ('bridge_light_on',) or (e.get('targetname') or '').startswith('pr_g_'): continue
+        o = vec(e['origin']); a = [float(x) for x in (e.get('angles') or '0 0 0').split()]
+        R = euler_cod(*a); sm_by.setdefault(e['model'], []).append({'origin': o, 'axes': list(R.T.ravel()), 'scale': float(e.get('modelscale', 1))})
+    for name, insts in sorted(sm_by.items()):
+        mesh_i = prop_mesh(name, SCRIPT_PROPS[name])
+        if mesh_i is None: skipped.append(name); continue
+        T, R, S = [], [], []
+        for it in insts:
+            M = np.array(it['axes']).reshape(3, 3).T
+            T.append(g(it['origin'])); R.append(quat(C @ M @ C.T)); S.append([it['scale']] * 3)
+        add_node({'name': f'prop_{name}_script', 'mesh': mesh_i, 'extensions': {'EXT_mesh_gpu_instancing': {'attributes': {
+            'TRANSLATION': accessor(np.array(T, dtype=np.float32), 'VEC3'), 'ROTATION': accessor(np.array(R, dtype=np.float32), 'VEC4'),
+            'SCALE': accessor(np.array(S, dtype=np.float32), 'VEC3')}}}})
+        sm_n += len(insts)
+    print(f'script models: {len(sm_by)} models, {sm_n} instances')
 # Der Eisendrache builds much of the castle from big props (stone walls, columns, arches, rock faces, roofs): they
 # collide as their own mesh (up to 1,500 triangles; boxes around them, or railings and furniture, cut the navmesh into
 # islands the zombies couldn't leave). The Giant: unchanged.
@@ -327,13 +381,32 @@ pcol_P, pcol_T, pn0, pcol_props = [], [], 0, 0
 CLUTTER = re.compile(r'debris|rubble|brick|rock_|stone_pile|plank|board|crate|box|barrel|bucket|basket|sack|bag|pile|hay|log|branch|bone|skull|helmet|ammo|shell|tool|pot|pan|chair_.*broken|broken|scrap|junk|tire|ladder|cart_wheel|wheel', re.I)
 HULL = re.compile(r'boulder|granite', re.I)
 decimated = 0
-tri = np.concatenate(solid); used, inv = np.unique(tri.ravel(), return_inverse=True)
-col_P.append(Pg[used].astype(np.float64)); col_T.append(inv.reshape(-1, 3)); n0 = len(used)
+# --game-clip (opt-in, 2026-11-15): the level's collision comes from the game's clipMap (.tools/bo3_dump_clip.py, then
+# .tools/bo3_clip.py) instead of the render triangles: world brushes and the terrain soup by their contents flags, so the
+# clip ramps over the stairs and BO3's invisible player/monster clip walls are in, and drawn-only detail (beams, trim,
+# grates, ceiling tiles) is out. Props still collide by the rules below unless --game-clip-models also takes the static
+# models' own collision (heavy: about 2.3 million triangles on zm_stalingrad). bo3-ports.md 2.4.
+GAME_MODELS = '--game-clip-models' in argv; GAME_CLIP = GAME_MODELS or '--game-clip' in argv
+def tri_mesh(T):   # (n, 3, 3) CoD-space triangles -> glTF positions and indices, shared corners merged
+    if not len(T): return np.zeros((0, 3)), np.zeros((0, 3), np.int64)
+    used, inv = np.unique(g(T.reshape(-1, 3)).astype(np.float32), axis=0, return_inverse=True)
+    t = inv.reshape(-1, 3); t = t[(t[:, 0] != t[:, 1]) & (t[:, 0] != t[:, 2]) & (t[:, 1] != t[:, 2])]   # slivers the merge closed
+    return used.astype(np.float64), t
+if GAME_CLIP:
+    from bo3_clip import game_collision
+    game = game_collision(SRC, BSP, lo, hi, models=GAME_MODELS)
+    pp, tt = tri_mesh(game.get('COL', np.zeros((0, 3, 3))))
+    col_P.append(pp); col_T.append(tt); n0 = len(pp)
+    print('game clip:', {k: len(v) for k, v in game.items()})
+else:
+    tri = np.concatenate(solid); used, inv = np.unique(tri.ravel(), return_inverse=True)
+    col_P.append(Pg[used].astype(np.float64)); col_T.append(inv.reshape(-1, 3)); n0 = len(used)
 for name, insts in by_model.items():
     player_only = False
     base_ = re.sub(r'_snow(?=_|$)', '', name)   # a snowy variant collides like the plain one (NO_COLLIDE's 'snow' is for snow piles)
+    if GAME_MODELS or (GAME_CLIP and re.search(r'stair', base_)): continue   # the game's clip ramps (or model collision) instead
+    pp, tt = prop_geo.get(name, (None, None))
     if name not in prop_geo or NO_COLLIDE.search(base_) or 'stair_step' in name: continue   # steps: ramps below
-    pp, tt = prop_geo[name]
     size = pp.max(0) - pp.min(0)
     if size.max() < 24 and 'sandbag' not in name: continue   # small stuff (sandbags pile up under the windows)
     # walkable structure keeps its shape (if it isn't too detailed); other solid props collide as their bounding box,
@@ -404,7 +477,7 @@ for fl in flights.values():
             np.array([*(a1[:2] - side * half_w), a1[2]]), np.array([*(a1[:2] + side * half_w), a1[2]])]
     col_P.append(g(np.array(quad))); col_T.append(np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]) + n0); n0 += 4; ramps += 1
 print(f'stairs: {ramps} ramps from {len(steps)} treads')
-if BSP == 'zm_stalingrad':   # the department store's broken flight to the 3rd floor starts 46 above the 2nd floor (its first
+if BSP == 'zm_stalingrad' and not GAME_CLIP:   # the department store's broken flight to the 3rd floor starts 46 above the 2nd floor (its first
     # steps are broken off; the game walks you on a clip ramp that isn't in the data): a ramp from the floor to its lower edge
     quad = [np.array(q, dtype=np.float64) for q in ((-280, 1456, 221), (-216, 1520, 221), (-140, 1444, 177), (-204, 1380, 177))]
     col_P.append(g(np.array(quad))); col_T.append(np.array([[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]) + n0); n0 += 4
@@ -417,6 +490,13 @@ if pcol_P:
     gltf['meshes'].append({'name': 'PCOL_props', 'primitives': [{'attributes': {'POSITION': accessor(PP, 'VEC3', 34962, True)}, 'indices': accessor(PT.ravel(), 'SCALAR', 34963)}]})
     add_node({'name': 'PCOL_props', 'mesh': len(gltf['meshes']) - 1})
     print(f'player-only collision: {len(PT)} triangles ({pcol_props} props)')
+if GAME_CLIP:   # the game's other classes, each its own mesh (custom-world.js: PCOL_ player + bullets, CLIP_ player only,
+    # NCOL_ navmesh only: monster clip, and the player + monster clip ramps that stop no bullets, which are in CLIP_ too)
+    for cls in ('PCOL', 'CLIP', 'NCOL'):
+        if not len(game.get(cls, ())): continue
+        pp, tt = tri_mesh(game[cls])
+        gltf['meshes'].append({'name': f'{cls}_gameclip', 'primitives': [{'attributes': {'POSITION': accessor(pp.astype(np.float32), 'VEC3', 34962, True)}, 'indices': accessor(tt.astype(np.uint32).ravel(), 'SCALAR', 34963)}]})
+        add_node({'name': f'{cls}_gameclip', 'mesh': len(gltf['meshes']) - 1})
 CTRI = CP[CT].astype(np.float64)   # (n, 3, 3) collision triangles in glTF space
 def seg_blocked(a, b, tris):   # does the segment a->b cross any triangle (Moller-Trumbore, vectorised)
     d = b - a; e1 = tris[:, 1] - tris[:, 0]; e2 = tris[:, 2] - tris[:, 0]
@@ -518,6 +598,8 @@ for e in ents:
         # the window's own spawner (same script_string) can be far away; CustomWorld wants a ZSPAWN within 400 units
         # outside it: one on the way there, 250 units out
         sp = [x for x in ents if x.get('script_noteworthy') in ('spawn_location', 'riser_location') and x.get('script_string') == e.get('script_string')]
+        if BSP == 'zm_stalingrad':   # only zone spots (zone_init): drop pods and lockdown structs share the window sets (bossarena got 19 ZSPAWNs, pavlovsB 20); round spawns: mods/gorod-krovi/spawns.js
+            sp = [x for x in sp if x.get('targetname', '').endswith('_spawn') and zname(x['targetname']) in zones]
         goal = next((x for x in ents if x.get('targetname') == 'exterior_goal' and x.get('target') == e.get('targetname')), None)
         if sp:
             t = np.array(vec(sp[0]['origin'])); d = t - np.array(o); d[2] = 0; dist = np.linalg.norm(d)

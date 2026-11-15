@@ -7,8 +7,10 @@
 // setup, never added or removed mid-game). Collision: an invisible deck while flat, two invisible walls at the pivots
 // while raised (scripted movers switched with `disabled`). Flags: activatebridge while open (spawning may use the bridge
 // zones), and on the first use activateyellow / activateredbrick for good (BO3's add_zone_flags). gk events
-// 'bridge:open' / 'bridge:closed'. v1 limits: zombies can't cross (traversal links are baked into the navmesh at build
-// time and can't be toggled), no switch scene or machinery anim, the switch lamps are emissive boxes (no lights added).
+// 'bridge:open' / 'bridge:closed'. Zombies: BO3's navmesh (map entry navFile, bo3-ports.md 1.7) runs across the gap, so
+// the middle of the deck is switched off with world.navBlock while the leaves are up: zombies cross only while it is flat
+// (the generated navmesh has no deck at all: there they never cross). v1 limits: no switch scene or machinery anim, the
+// switch lamps are emissive boxes (no lights added).
 // Co-op: solo-first (each client runs its own bridge). Debug: kino.gorod.bridge.{state, use, force(open)}.
 import * as THREE from 'three';
 import { makeSfx } from './dragon-sfx.js';
@@ -59,10 +61,14 @@ export default async function setupBridge(api, gk) {
 
   const B = { state: 'idle', t: 0, open: 0, first: !gk.hasFlag('activateyellow'), kills: 0, flung: null, landAt: 0, forced: null };
   const flat = () => B.forced ?? (B.state === 'run' && B.t >= T_DOWN && B.t < T_FLING + T_UP * .5);
+  // the navmesh across the middle of the gap, off while raised (a strip: any path across has a polygon there)
+  const gapNav = new THREE.Box3().setFromPoints([W(MEET - 20, Y0 - 8, TOP - 40), W(MEET + 20, Y1 + 8, TOP + 40)]);
+  let navFlat = null;
   const setCollision = () => {
     const f = flat();
     if (deck) deck.disabled = !f; if (walls) walls.disabled = f;
     world.collision?.invalidateCache?.();
+    if (f !== navFlat) { navFlat = f; world.navBlock?.('gk-bridge', f ? null : gapNav); }
   };
   const pose = (k, jitter = 0) => {   // k 0 = raised, 1 = flat
     for (const g of [L, R]) { g.rotation.z = g.userData.up * (1 - k); g.position.y = TOP + jitter; g.updateMatrix(); g.updateMatrixWorld(true); }

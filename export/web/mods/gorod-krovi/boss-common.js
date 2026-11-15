@@ -74,7 +74,7 @@ export function makeKit(api, gk) {
   kit.boneAt = (z, name) => { const b = z.bones?.get(name) ?? z.root.getObjectByName(name); return b ? b.getWorldPosition(V()) : null; };
   kit.ground = p => world.closest?.(p, { x: 200, y: 300, z: 200 }) ?? p.clone();
   kit.clear = (a, b) => world.lineClear(a, b);
-  kit.zones = () => world.activeZones(session);
+  kit.zones = () => gk?.activeZones?.() ?? world.activeZones(session);   // BO3's raz/sentinel locations: the active zones (spawns.js)
   kit.zoneAt = p => world.zoneAt?.(p.clone().add(V(0, 35, 0)));
   kit.inArena = p => p.y > -60 && p.y < 300 && p.z > 600 && p.z < 3200 && p.x > -1700 && p.x < 1700;
 

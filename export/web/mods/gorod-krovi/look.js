@@ -39,6 +39,25 @@ function liftDarkMetal(root) {
   return n;
 }
 
+// The flood water (2026-11-15, user: "i cant see through the water"): the basement and the low streets stand in about a
+// foot of murky green water in BO3 (surface at z -180 over wet rubble at -192), which is see-through there; the build
+// drew it as an opaque floor. Made a glossy see-through layer here, before the engine batches the map (the batches key
+// on transparency and opacity). Water decals, stains and the distant waterfall card stay as they are.
+const WATER = /(^|\/)t7_(zm_sta_)?water_(?!.*(decal|stain|puddle|backscatter))|^wc\/t7_water/;
+function seeThroughWater(root) {
+  const done = new Set(); let n = 0;
+  root.traverse(o => { if (!o.isMesh) return; const ms = [o.material].flat();
+    if (!ms.some(m => WATER.test(m?.name ?? '') && !/waterfall|decal|stain/.test(m.name))) return;
+    o.castShadow = false;
+    for (const m of ms) { if (done.has(m) || !WATER.test(m?.name ?? '') || /waterfall|decal|stain/.test(m.name)) continue; done.add(m);
+      const op = /opacity_60/.test(m.name) ? .6 : .55;
+      m.transparent = true; m.opacity = op; m.depthWrite = false;
+      m.roughness = .12; m.metalness = 0; if (m.color) m.color.multiplyScalar(.85); n++; }
+    o.renderOrder = Math.max(o.renderOrder, 1);
+  });
+  return n;
+}
+
 export function setupLook(api, { detail = true } = {}) {
   const { scene, world, session, host, camera } = api, report = {};
   if (world.root) {
@@ -49,6 +68,7 @@ export function setupLook(api, { detail = true } = {}) {
     metalLook(world.root);
     report.darkMetal = liftDarkMetal(world.root);
     if (detail) applyDetail(world.root);
+    report.water = seeThroughWater(world.root);
     if (!q('noOverlays')) report.overlays = overlayLayers(world.root, { soft: null });
   }
   const kids = scene.children;

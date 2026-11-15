@@ -38,7 +38,8 @@ const MAPS = {
       gated: { box: [[-1900, 0, -3100], [320, 620, -1650]], blue: 1.3, keep: [.5, 1, .97, .9], fill: [1, .95, .88], tame: [.3, .7, 1.12, .96, .74] } } },
   // Gorod Krovi (2026-11-15): the game's own lights, as the castle; the burning sky comes from the sun direction the map mod uses
   'gorod-krovi': { lamps: /^GOROD_LAMP_/, cell: 48, range: 620, decay: 1.4, off: 2000, on: 3000, color: () => 0xffb070, sun: [-.35, .62, -.88], extra: [],
-    real: { file: 'export_game/bo3/maps/zm_stalingrad/zm_stalingrad.lights.json', gain: 550, minRadius: 30, albedo: .5, bounces: 3, adapt: [6, .45], fill: [1.5, .93, .86, .8], outdoor: 1.4 } },
+    // 2026-11-15 (user: "absurdly dark"): Stalingrad's lights are about 7x weaker than the castle's in the game's data (median colour 32 vs 241: BO3 evens that out with its per-map exposure), and most indoor standing cells get no direct lamp at all, so the room fill sets the indoor level: gain 550 -> 1400, fill 1.5 -> 2.6 (gameplay markers' lamp median 1.64 -> 2.77, DE's 2.6)
+    real: { file: 'export_game/bo3/maps/zm_stalingrad/zm_stalingrad.lights.json', gain: 1400, minRadius: 30, albedo: .5, bounces: 3, adapt: [6, .45], fill: [2.6, .93, .86, .8], outdoor: 1.4 } },
 };
 const id = process.argv[2], cfg = MAPS[id];
 if (!cfg) { console.error('usage: bake-map-light.mjs <' + Object.keys(MAPS).join('|') + '> [--cell N]'); process.exit(1); }

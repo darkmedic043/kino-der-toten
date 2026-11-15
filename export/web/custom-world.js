@@ -257,8 +257,17 @@ export class CustomWorld {
     // (4 meant) and pinched every doorway to a single vertex, so each zone was an island joined only by one-way hops and
     // paths ended at the zone line (zombies rescued next to the player, spawns starved; 2026-10-28). A map entry
     // `navBounds: [[x0,z0],[x1,z1]]` sets the span outright, `navCell` the cell size.
-    let positions=navSource.attributes.position.array,bounds=new THREE.Box3().setFromBufferAttribute(navSource.attributes.position);
-    {const e=this.entry,span=e.navBounds?new THREE.Box3(new THREE.Vector3(e.navBounds[0][0],-Infinity,e.navBounds[0][1]),new THREE.Vector3(e.navBounds[1][0],Infinity,e.navBounds[1][1])):markers.length?new THREE.Box3():null;
+    // map entry navFile (Gorod Krovi: bo3-nav.json from .tools/bo3_dump_navmesh.py, git-ignored ripped data): the navmesh is
+    // built from the game's own navmesh (its floor polygons in scene units) instead of the collision, no span clipping, and
+    // its traversals join the links below; generated from the collision as usual when the file is missing (bo3-ports.md 1.7)
+    const navFile=this.entry.navFile?await fetch(dir+this.entry.navFile).then(r=>r.ok?r.json():null).catch(()=>null):null;
+    if(this.entry.navFile&&!navFile)console.warn(`[custom-world] no ${this.entry.navFile}: navmesh generated from the collision`);
+    let positions,bounds;
+    if(navFile){const V=navFile.vertices,T=navFile.triangles;positions=new Float32Array(T.length*3);
+      for(let i=0;i<T.length;i++)for(let k=0;k<3;k++)positions[i*3+k]=V[T[i]*3+k];
+      bounds=new THREE.Box3().setFromArray(positions);console.log(`[custom-world] navmesh from ${this.entry.navFile}: ${T.length/3} triangles, ${navFile.links?.length??0} links`);}
+    else{positions=navSource.attributes.position.array;bounds=new THREE.Box3().setFromBufferAttribute(navSource.attributes.position);}
+    if(!navFile){const e=this.entry,span=e.navBounds?new THREE.Box3(new THREE.Vector3(e.navBounds[0][0],-Infinity,e.navBounds[0][1]),new THREE.Vector3(e.navBounds[1][0],Infinity,e.navBounds[1][1])):markers.length?new THREE.Box3():null;
       if(span&&!e.navBounds){for(const m of markers)span.expandByPoint(m.position);span.expandByScalar(e.navMargin??600);span.min.y=-Infinity;span.max.y=Infinity;}
       const full=bounds.getSize(new THREE.Vector3()),want=span&&span.getSize(new THREE.Vector3());
       if(span&&(e.navBounds||full.x*full.z>4*want.x*want.z)){const src=positions,keep=[];
@@ -282,6 +291,7 @@ export class CustomWorld {
     // one-way off-mesh links: a path may cross there, and a zombie hops the gap like a narrow doorway (enemies.js)
     // path() marks the point a link ends at (`hop`), and enemies.js walks a zombie straight to it
     this.traversals=markers.filter(m=>m.type==='TRAVERSE'&&Array.isArray(m.extras.to)).map(m=>({from:m.position.clone(),to:new THREE.Vector3(...m.extras.to),both:!!m.extras.both,over:m.extras.over??null}));   // over: [t, top] of the props it crosses (enemies.js hopOver)
+    for(const l of navFile?.links??[])this.traversals.push({from:new THREE.Vector3(...l.from),to:new THREE.Vector3(...l.to),both:!!l.both,over:l.over??null,anim:l.anim});
     // map entry traversalDrop (scene units): both ends drop onto the ground below, up to that far, as CoD drops its path
     // nodes (Nuketown's float about 33 over it, and Detour only links an end within 18 of the navmesh: 118 of its 132
     // links were never wired, and with the fences in the navmesh the yards were cut off)
@@ -585,11 +595,29 @@ export class CustomWorld {
       if(open&&p.enabled&&p.slides?.length){p.enabled=false;p.anim={t0:session.time};continue;}   // collision off now, slide in updateMovers
       if(!open){p.anim=null;for(const sl of p.slides??[])sl.object.position.copy(sl.base);}
       p.enabled=!open;if(!p.anim)p.object.visible=!open;}}
+    this.refreshNav();
+  }
+  // Navmesh flags: the polygons under closed doors (enabled non-window blocks) and navBlock boxes are switched off (0),
+  // and so is an off-mesh link (a traversal) whose line passes through one: queryPolygons never returns link polygons,
+  // and BO3's traversals cross some door lines.
+  refreshNav(){
     for(const ref of this.navDisabled)this.nav.setPolyFlags(ref,1);this.navDisabled.clear();
-    for(const d of this.dynamic){if(!d.enabled||d.window)continue;const c=d.box.getCenter(new THREE.Vector3()),h=d.box.getSize(new THREE.Vector3()).multiplyScalar(.5);h.x+=5;h.z+=5;const r=this.query.queryPolygons(c,h);for(const ref of r.polyRefs??[])this.navDisabled.add(ref);}
+    const boxes=[];for(const d of this.dynamic){if(!d.enabled||d.window)continue;const b=d.box.clone();b.min.x-=5;b.min.z-=5;b.max.x+=5;b.max.z+=5;boxes.push(b);}
+    for(const b of this.navBlocks?.values()??[])boxes.push(b);
+    for(const b of boxes){const r=this.query.queryPolygons(b.getCenter(new THREE.Vector3()),b.getSize(new THREE.Vector3()).multiplyScalar(.5));for(const ref of r.polyRefs??[])this.navDisabled.add(ref);}
+    if(boxes.length)for(const {ref,t} of this.linkPolys()){const d=t.to.clone().sub(t.from),len=d.length(),ray=new THREE.Ray(t.from,d.divideScalar(len||1)),at=new THREE.Vector3();
+      if(boxes.some(b=>ray.intersectBox(b,at)&&at.distanceTo(t.from)<=len))this.navDisabled.add(ref);}
     for(const ref of this.navDisabled)this.nav.setPolyFlags(ref,0);
     if(this.islands)this.islandsStale=true;   // closed doors split islands: relabel at the next islandAt
   }
+  // Block (box: a THREE.Box3 in scene units) or free (null) the navmesh under a box by name, on top of the doors: Gorod
+  // Krovi's bridge while it is raised (mods/gorod-krovi/bridge.js)
+  navBlock(id,box){this.navBlocks??=new Map();if(box)this.navBlocks.set(id,box.clone());else if(!this.navBlocks.delete(id))return;if(this.nav)this.refreshNav();}
+  // the off-mesh links' polygons with their traversal (offMeshConnections' userId = index in this.traversals)
+  linkPolys(){if(this._linkPolys)return this._linkPolys;const out=[],nav=this.nav;
+    for(let t=0,n=nav.getMaxTiles();t<n;t++){const tile=nav.getTile(t),h=tile.header();if(!h)continue;const base=nav.getPolyRefBase(tile);
+      for(let i=0,c=h.offMeshConCount();i<c;i++){const o=tile.offMeshCons(i),tr=this.traversals[o.userId()];if(tr)out.push({ref:base+o.poly(),t:tr});}}
+    return this._linkPolys=out;}
   activeZones(session){const zones=new Set(['start']);for(const d of this.doors.values())if(this.isOpen(d,session)){if(d.zone)zones.add(d.zone);for(const z of d.zones??[])zones.add(z);}for(const f of session.flags)if(f.startsWith('zone:'))zones.add(f.slice(5));return zones;}
   zoneAt(){return undefined;}
   addMover(def,objects){

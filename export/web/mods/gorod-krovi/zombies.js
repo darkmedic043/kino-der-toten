@@ -1,50 +1,26 @@
-// Gorod Krovi's zombies (2026-11-15): BO3's Russian zombies and the spawn fixes the build can't make.
+// Gorod Krovi's zombies (2026-11-15): BO3's Russian zombies (their spawns: spawns.js).
 // Models: c_zom_dlc3_rus_zombies_body1-4 with heads 1-4 and their hats (helmet, officer cap, ushanka), built by
 // .tools/build_gorod_zombies.py into mods/maps/gorod-krovi/zombies/ (git-ignored, ripped), driven by BO1's ai_zombie_*
 // clips as Der Eisendrache's: every skeleton re-bound to BO1's rest rotations (rebindTo), the head and hat meshes bound to
 // the body's own bones (heads share the body's bind space; a hat is modelled in j_head's space), one template per
 // body x head x hat, glowing orange eyes (BO3's), and gib sets for the dismemberment mod (body2 has only its upper
 // pieces: its legs are body1's, as in BO3). ?bo1Zombies keeps the BO1 ones.
-// Spawns: the build gives a window the zone of the nearest player volume, and 20 of the 46 sit in another zone than the
-// one BO3 feeds them from (the department store floors, the judicial building, the factory, red brick...): their group is
-// set here from BO3's own window sets. The build also turned the window feeders (68 spawn and riser spots whose
-// script_string names a window: in BO3 a zombie there walks to its window and climbs in) into free walk-in and riser
-// spawns; they are switched off here, so those zombies come through the windows.
-// Tables: scratch/gk/agents/zombies-tables.py from export_game/bo3/maps/zm_stalingrad/zm_stalingrad.spawns.json, in the
-// map's coordinates (BO3 x, z, -y).
+// Spawns: BO3's zone manager, spot structs and window walks, in spawns.js (2026-11-15; it replaced the window regrouping
+// and the feeder switch-off this file did before).
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { settings, onSettingsChange } from '../../settings.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-
-const WINDOWS = [[-331,47,-1884,"departmentstore"],[278,47,-1896,"departmentstore"],[326,207,-1853,"alleyb"],[598,207,-1582,"departmentstorefloor2a"],[380,367,-1788,"departmentstorefloor3c"],[-904,207,-1981,"departmentstorefloor2b"],[-447,207,-2091,"departmentstorefloor2b"],[331,367,-1408,"departmentstorefloor3b"],[-853,367,-2031,"departmentstorefloor3a"],[841,367,-2070,"departmentstorefloor3c"],[530,47,-2245,"alleyb"],[-580,-93,-971,"start"],[543,31,-1036,"start"],[547,31,16,"start"],[11,31,396,"start"],[-691,31,16,"start"],[651,335,-5196,"judicialb"],[-651,335,-5196,"judicialb"],[-715,175,-5000,"judiciala"],[280,175,-5155,"judiciala"],[2084,-129,-1764,"librarya"],[2603,-129,-1952,"librarya"],[1888,31,-3598,"libraryb"],[-2175,527,-2001,"factoryc"],[-2432,351,-3397,"factoryb"],[-2212,191,-2647,"factorya"],[-2160,527,-3395,"factoryc"],[-2152,191,-1999,"factorya"],[-2025,371,-3377,"factoryarm"],[299,-161,-3165,"bunker"],[-185,-161,-3603,"bunker"],[-843,191,-3420,"redbrickb"],[-670,191,-2893,"redbricka"],[-257,191,-3280,"redbricka"],[-804,351,-3395,"redbrickc"],[69,31,-3131,"yellowb"],[624,191,-3267,"yellowc"],[1039,-129,-3267,"yellowa"],[827,31,-3448,"yellowb"],[-3449,31,-21470,"pavlovsb"],[-3449,31,-21294,"pavlovsb"],[-2579,31,-21694,"pavlovsb"],[-2579,31,-21470,"pavlovsb"],[-3210,191,-21027,"pavlovsb"],[-2986,191,-21027,"pavlovsb"],[-3449,191,-21386,"pavlovsb"]];
-const FEEDERS = [[-4374,-69,-21455],[-4367,-48,-21345],[-4324,-72,-21954],[-4295,-72,-20836],[-4262,-72,-21191],[-4195,-72,-21744],[-3625,-70,-20025],[-3499,-72,-20093],[-3320,-62,-20175],[-3192,-72,-20030],[-2830,-72,-20154],[-2576,-70,-20005],[-2435,-64,-3284],[-2336,320,-3737],[-2321,440,-3516],[-2291,496,-1561],[-2290,160,-1679],[-2162,496,-3758],[-1920,160,-3040],[-1704,-72,-21745],[-1698,-57,-21969],[-1689,-72,-20972],[-1685,-72,-22218],[-1666,-72,-21516],[-1652,-72,-21349],[-1129,0,-3282],[-1006,180,-2178],[-988,320,-3467],[-916,336,-2270],[-889,160,-2838],[-866,176,-2352],[-866,304,-4929],[-862,144,-5278],[-788,0,-31],[-768,144,-5274],[-698,0,-152],[-698,304,-5083],[-461,-124,-1228],[-442,20,-2130],[-395,-124,-1158],[-352,-191,-3799],[-279,160,-3520],[-146,0,525],[61,8,-3269],[81,0,550],[425,16,-1768],[432,160,-3502],[466,176,-5423],[470,176,-5517],[499,-192,-3043],[517,176,-2026],[665,0,-964],[673,0,-100],[690,10,198],[708,339,-1500],[711,0,-1080],[718,304,-4962],[730,16,-2074],[770,336,-1677],[853,176,-1722],[868,304,-4934],[915,336,-1812],[927,-160,-3424],[929,0,-3279],[2100,0,-3596],[2176,-162,-1761],[2272,0,-3693],[3215,-160,-2139]];
+import setupSpawns from './spawns.js';
 
 const DIR = new URL('../maps/gorod-krovi/zombies/', import.meta.url).href, P = 'c_zom_dlc3_rus_zombies_';
 const HATS = { 1: ['helmet', 'officercap', 'ushanka'], 2: ['officercap', 'ushanka'], 3: ['helmet', 'officercap', 'ushanka'], 4: ['helmet'] };
 const GIBS = { upclean: 'upclean', lowclean: 'lowclean', behead: 'behead', larmoff_1: 'larmoff', rarmoff_1: 'rarmoff', llegoff_1: 'llegoff', rlegoff_1: 'rlegoff', legsoff_1: 'blegsoff' };
 
 export default async function setup(api, gk) {
-  fixSpawns(api.world);
+  await setupSpawns(api, gk);   // round spawns from BO3's zones (spawns.js)
   if (new URLSearchParams(location.search).has('bo1Zombies') || !api.enemies) return;
   await setupModels(api);   // awaited: templates and gib sets in place before the shader warm-up
-}
-
-function fixSpawns(world) {
-  let regrouped = 0, off = 0;
-  for (const b of world.barriers) {
-    if (b.boards?.length) {
-      const p = b.position; let best = null, bd = 80;
-      for (const w of WINDOWS) { const d = Math.hypot(w[0] - p.x, w[1] - p.y, w[2] - p.z); if (d < bd) { bd = d; best = w; } }
-      if (!best) continue;
-      const zones = best[3].split('|');
-      if (!zones.includes(b.group)) { b.group = zones[0]; regrouped++; }
-    } else {
-      const p = b.outside ?? b.position;
-      if (FEEDERS.some(f => Math.hypot(f[0] - p.x, f[2] - p.z) < 40 && Math.abs(f[1] - p.y) < 90)) { b.group = 'window_feeder'; off++; }   // never active
-    }
-  }
-  console.info(`[gorod-krovi] zombies: ${regrouped} windows moved to BO3's zone, ${off} window feeders off`);
 }
 
 async function setupModels(api) {
