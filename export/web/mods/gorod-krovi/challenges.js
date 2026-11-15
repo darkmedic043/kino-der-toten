@@ -103,7 +103,7 @@ export default async function setupChallenges(api, gk) {
   gk.on('dragon:ride', site => { if (site) addSet('1_2', site); });
   gk.on('raz:gun', () => add('1_3'));
   gk.on('raz:part', ({ part }) => { if (part === 'head') add('1_5'); });
-  gk.on('pod:green', () => add('1_4'));   // pods.js (when built): a pod finished while still green
+  gk.on('pod:green', () => add('1_4'));   // pods.js: a pod won while its lamp is still green
   gk.on('dragon:burn', ({ blocked, secs }) => {
     if (blocked) { add('2_4', secs); return; }
     const t = live('1_6'); if (t) t.watch = session.time;   // burned: 5 s without going down
@@ -215,6 +215,7 @@ export default async function setupChallenges(api, gk) {
   });
   host.on('reset', () => { draw(); S.log.length = 0; });
   draw();
+  gk.on('parts:ready', () => { if (S.tiers.every(t => !t.n && !t.done)) draw(); });   // the parts load in parallel: gk.pods may come after this setup
 
   const handle = {
     state: () => ({ grave: G, tiers: S.tiers.map(t => ({ id: t.id, text: BY[t.id].text, n: +t.n.toFixed(2), need: BY[t.id].need, done: t.done, claimed: t.claimed, watch: t.watch, set: [...t.set] })),

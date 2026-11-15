@@ -9,9 +9,9 @@
 // rider moves with the dragon in the same frame. Assets (ripped, git-ignored): maps/gorod-krovi/dragon/.
 // The roost teleporters (TELEPORT_dragon*, built from the map) stay as the fallback: hidden while the dragon works,
 // shown again if its model fails to load or the ride throws (a rider is then put down at their destination).
-// v1 stand-ins: the craftable (BO3's drop-pod code cylinders and network console parts) is not built: the ride counts
-// as crafted once the power is on (flag dragonridecrafted), unless ?gkDragonCraft asks for the flag to be set by hand
-// (kino.gorod.dragon.craft()). The map dragon's landings (flight_land_N) are not exported, so it circles, and every
+// The craftable (drop-pod code cylinders and the network console's parts) is pods.js; without it (scene assets missing,
+// a co-op client) the ride counts as crafted once the power is on (flag dragonridecrafted), unless ?gkDragonCraft asks
+// for the flag to be set by hand (kino.gorod.dragon.craft()). The map dragon's landings (flight_land_N) are not exported, so it circles, and every
 // 60-120 s (15-25 s while this player owns the Guard of Fafnir with its runes done and the bath to go) it makes a fire
 // pass: it leaves its path, swoops over an open street the player is in (the model offset and turned around its mouth,
 // the flight clip still playing), breathes down it for 3 s and flies back. The breath is fx sprites (kino.fx, pooled and
@@ -67,7 +67,7 @@ export default async function setupDragon(api, gk) {
   const tps = world.teleporters.map((tp, i) => ({ tp, i })).filter(({ tp }) => /^TELEPORT_dragon/i.test(tp.name ?? ''));
   const dest = tps[0]?.tp.to?.position?.clone?.() ?? W(-3008, 21520, 0);   // the teleporters' landing (pavlovsB)
   const crafted = () => gk.hasFlag('dragonridecrafted');
-  if (!q.has('gkDragonCraft')) host.on('update', () => { if (session.power && !crafted()) gk.setFlag('dragonridecrafted'); });   // v1: crafted with the power
+  if (!q.has('gkDragonCraft')) host.on('update', () => { if (session.power && !crafted() && !gk.pods?.crafts) gk.setFlag('dragonridecrafted'); });   // without pods.js (missing assets, co-op client): crafted with the power
   // the fallback: the teleporters, locked until the ride is crafted
   let working = false;
   for (const { tp } of tps) Object.defineProperties(tp, { locked: { get: () => !crafted(), configurable: true }, lockedText: { value: 'Something is missing here', writable: true, configurable: true } });

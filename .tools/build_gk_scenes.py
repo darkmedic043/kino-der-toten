@@ -89,7 +89,7 @@ def prop_anim(name, roots, loop=False):
 
 F = 'p7_fxanim_zm_stal_'
 H = F+'dragon_hazard_'
-LOOPS = {'idle', 'idle2', 'end_idle'}
+LOOPS = {'idle', 'idle2', 'end_idle', 'spin'}
 # key -> (model, {clip key: anim name}); keys are what the modules ask for
 PROPS = [
     # Sophia (zm_stalingrad_ee_main / _sophia): the computer, its base (trap doors for the ending), her eye screen
@@ -128,6 +128,15 @@ PROPS = [
     ('aperture_front', F+'robot_arm_aperture_door_front_mod', {'open': F+'robot_arm_aperture_door_front_anim'}),
     ('sewer_gate', F+'sewer_gate_mod', {'down': F+'sewer_gate_down_anim', 'up': F+'sewer_gate_up_anim'}),
     ('sewer_switch', F+'sewer_switch_mod', {'flip': F+'sewer_switch_anim'}),
+    # the drop pods (zm_stalingrad_drop_pod, pods.js): the landing (scene dp_01_bundle: falls from 4,700 out and 10,500 up),
+    # the spin while it charges, the stop, the arms, the hatch
+    ('pod', F+'pack_a_punch_pod_mod', {'land': F+'pack_a_punch_dp_01_anim', 'spin': F+'pack_a_punch_dp_spin_loop_anim',
+        'spin_end': F+'pack_a_punch_dp_spin_end_anim', 'arms_up': F+'pack_a_punch_dp_arms_up_anim', 'hatch': F+'pack_a_punch_dp_hatch_anim'}),   # the capacity meter (dp_meter_N clips) is one joint pulled 9.58 down when empty: pods.js moves it itself
+    # the dragon network console (the dragonride craftable's table, dragonride_fuse_box) and its three parts
+    ('net_console', 'p7_zm_sta_dragon_network_console', {}),
+    ('net_part1', 'p7_zm_sta_dragon_network_console_part01', {}),
+    ('net_part2', 'p7_zm_sta_dragon_network_console_part02', {}),
+    ('net_part3', 'p7_zm_sta_dragon_network_console_part03', {}),
 ]
 data = {}
 for key, model_name, anims in PROPS:

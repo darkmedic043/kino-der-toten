@@ -3,8 +3,8 @@
 // build gives every door and debris pile its whole flag as its zone (dept_to_yellow -> depttoyellow), every spawner its
 // BO3 zone without underscores (yellow_A -> yellowa; the three start zones are "start"); world.activeZones is replaced
 // here: an open door sets its flag, the power sets power_on, and both zones of every pair whose flag is set are active.
-// Pavlov's House (Pack-a-Punch) is reached by the dragon roosts' teleporters (500) and left by its sewer; the dragon
-// ride's craftable is not built here: Pavlov's three zones turn on together once a player has landed there (the roost
+// Pavlov's House (Pack-a-Punch) is reached by the dragon roosts (500) once the ride is crafted (pods.js: drop pods give
+// its three parts) and left by its sewer; Pavlov's three zones turn on together once a player has landed there (the roost
 // teleporters' destination sets zone:pavlovsb).
 import { setupLook, prepareLook } from './look.js';
 
@@ -52,9 +52,10 @@ export default async function setup(api) {
     try { await m.default?.(api, gk); } catch (e) { console.error(`[gorod-krovi] ${n}.js setup`, e); }
     if (performance.now() - t > 250) console.info(`[gorod-krovi] ${n} setup ${Math.round(performance.now() - t)} ms`);
   }));
+  gk.emit('parts:ready');   // every part is set up (challenges.js redraws then: its draw needs gk.pods etc.)
 }
 // zombies (models, anims, spawns), sounds (ambience, emitters), bridge (powered drawbridge), dragon (roosts, the ride,
 // the map dragon), pap (Pavlov's lockdown), bosses (Mangler, Valkyrie drones, the mech), gauntlet, shield, widows,
 // sophia (the S.O.P.H.I.A. computer, her eye, the tape reels), scenes (BO3's scene-bundle props and the dragon hazards),
 // dogfight (the planes overhead), sewer (the ride out of Pavlov's)
-const PARTS = ['zombies', 'sounds', 'bridge', 'dragon', 'pap', 'bosses', 'gauntlet', 'shield', 'widows', 'sophia', 'scenes', 'dogfight', 'sewer', 'traps', 'challenges'];
+const PARTS = ['zombies', 'sounds', 'bridge', 'dragon', 'pap', 'bosses', 'gauntlet', 'shield', 'widows', 'sophia', 'scenes', 'dogfight', 'sewer', 'traps', 'pods', 'challenges'];

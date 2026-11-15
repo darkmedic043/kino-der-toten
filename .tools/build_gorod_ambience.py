@@ -65,7 +65,13 @@ FILES = {'trap_crush_0': 'traps/pincher/pincher_00.', 'trap_crush_1': 'traps/pin
          'trap_elec_stop': 'electrap/electrap_stop.', 'trap_sizzle': 'electrical/sizzle/sizzle_00.', 'trap_ignite': 'electrical/ignite/ignite_00.',
          'trap_available': 'zm_factory/trap/available.', 'trap_button_0': 'zm_stalingrad/buttons/button_00.', 'trap_button_1': 'zm_stalingrad/buttons/button_01.',
          'skel_retract': 'challenges/skel_retract.', 'challenge_done': 'zm_island/challenges/challenge_complete.', 'challenge_all': 'zm_island/challenges/challenge_complete_all.',
-         'bones_0': 'skeletons/bones/bones_00.', 'bones_1': 'skeletons/bones/bones_01.'}
+         'bones_0': 'skeletons/bones/bones_00.', 'bones_1': 'skeletons/bones/bones_01.',
+         # the drop pods (gorod-krovi/pods.js)
+         'pod_insert': 'zm_stalingrad/pod/insert.', 'pod_incoming': 'zm_stalingrad/pod/incoming.', 'pod_hatch': 'zm_stalingrad/pod/hatch.',
+         'pod_green': 'zm_stalingrad/pod/pod_green_lp.', 'pod_shutdown': 'zm_stalingrad/pod/shutdown.', 'pod_alarm': 'zm_stalingrad/pod/status_change_alarm.',
+         'pod_spin_1': 'zm_stalingrad/pod/spin_lyr_1.', 'pod_spin_2': 'zm_stalingrad/pod/spin_lyr_2.', 'pod_spin_3': 'zm_stalingrad/pod/spin_lyr_3.',
+         'pod_pulse_0': 'pod/green_pulse/green_pulse_00.', 'pod_pulse_1': 'pod/green_pulse/green_pulse_04.', 'pod_pulse_2': 'pod/green_pulse/green_pulse_08.',
+         'pod_explode': 'exp/prop/barrel/explo/exp_barrel_00.', 'part_pickup': 'arrow_quest/zmb_fossil_pickup.', 'craft': 'buildable/turbine/turbine_pulse.'}
 # placed by the map's script (CoD units): the siren all game; Pavlov's basement machine loops, room tone and randoms
 PAV = [(-3271, 21733, -86), (-3078, 22000, -108), (-2765, 21978, -106)]
 EXTRA = [('siren', (-1819, 2705, 1167), None)] + [(f'machine_{i}', p, None) for i, p in enumerate(PAV)] + [
