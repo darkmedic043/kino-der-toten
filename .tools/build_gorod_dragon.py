@@ -106,6 +106,9 @@ def build_anims():
             index[c['name']] = {'duration': c['duration'], 'notes': [[x['name'], x['time']] for x in c['notifies'] if not x['name'].startswith(('dlc3/', 'fxexp'))]}
     for key in ('flight_idle_a_1', 'flight_idle_b_1'):
         c = anim(key, f'ai_zm_dlc3_dragon_{key}', 2); index[key] = {'duration': c['duration'], 'notes': []}
+    # Dragon Strike's flight (strike.js through dragon.js strike()): its 'fireball' notes time the four shots
+    c = anim('dragon_strike_1', 'ai_zm_dlc3_dragon_strike_1', 2)
+    index['dragon_strike_1'] = {'duration': c['duration'], 'notes': [[x['name'], x['time']] for x in c['notifies'] if not x['name'].startswith(('dlc3/', 'fxexp'))]}
     (OUT/'anims.json').write_text(json.dumps(index, indent=1))
 
 SOUNDS = {   # bank path fragment -> our name

@@ -25,6 +25,7 @@
 import * as THREE from 'three';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { makeSfx } from './dragon-sfx.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 const DIR = new URL('../maps/gorod-krovi/dragon/', import.meta.url).href;
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);   // CoD (x, y, z up) -> the map's (x, z, -y)
@@ -294,7 +295,7 @@ export default async function setupDragon(api, gk) {
       if (!F.pre && F.t > F.swoopT - 1.1) { F.pre = true; if (F.hurt) sfx.sfxAt('breath_pre', F.origin, 1, 6000); }   // the hazard plays its own
       if (F.t >= F.swoopT) {
         F.stage = 'breath'; F.t = 0; F.w = 1;
-        gk.emit('dragon:fire', { origin: F.origin.clone(), dir: F.dir.clone(), dur: F.dur, len: F.len });
+        gk.emit('dragon:fire', { origin: F.origin.clone(), dir: F.dir.clone(), dur: F.dur, len: F.len, why: F.why });
         if (F.hurt) sfx.sfxAt('breath', F.origin, 1, 6000);
       }
     } else if (F.stage === 'breath') {
@@ -362,6 +363,40 @@ export default async function setupDragon(api, gk) {
   }
   flyOn();
 
+  // ---- the Dragon Strike's own dragon (_zm_weap_dragon_strike: c_zom_dlc3_dragon_body_airstrike spawned at the strike's sky
+  // point, 1000 out and 2000 up from the target, angles + pitch 25, playing ai_zm_dlc3_dragon_strike_1 once). A second copy
+  // of the model (same geometry and materials: no new programs) with its own rig; the clip has no root track, so tag_origin
+  // rests and the flight is tag_body_anim's. o.onNote(name, throat) for every note (strike.js fires on 'fireball'),
+  // o.onEnd() when the clip ends. Several strikes at once each get their own copy.
+  const strikes = [], spare = [];
+  let strikeClip = null;
+  async function strike(o) {
+    strikeClip ??= loadAnimation(DIR + 'anims/dragon_strike_1.json');
+    const data = await strikeClip;
+    let S = spare.pop();
+    if (!S) {
+      const m = cloneSkinned(model); m.name = 'gorod-dragon-strike';
+      m.traverse(b => { if (b.isBone && b.userData.bindPosition) b.userData.bindPosition = new THREE.Vector3().copy(b.userData.bindPosition); });
+      const t0 = m.getObjectByName('tag_origin'); t0.position.set(0, 0, 0); t0.quaternion.copy(AX);
+      S = { m, throat: m.getObjectByName('tag_throat_fx') ?? m.getObjectByName('tag_mouth_fx_anim') ?? m, rig: null };
+      S.rig = new Rig(m, n => { S.onNote?.(n, S.throat.getWorldPosition(new THREE.Vector3())); const snd = SOUNDS[n]; if (snd) sfx.sfxAt(Array.isArray(snd[0]) ? snd[0][Math.floor(Math.random() * snd[0].length)] : snd[0], (body ? S.m.getObjectByName(body.name) : S.m).getWorldPosition(new THREE.Vector3()), snd[1], 9000); });
+      S.rig.add('dragon_strike_1', data);
+    }
+    S.onNote = o.onNote; S.onEnd = o.onEnd; S.t = 0; S.dur = data.duration;
+    S.m.position.copy(o.origin);
+    S.m.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (o.yaw ?? 0) * Math.PI / 180).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -(o.pitch ?? 25) * Math.PI / 180));
+    S.m.visible = true; scene.add(S.m);
+    S.rig.play('dragon_strike_1', false, 1, 0); S.rig.update(0); S.m.updateMatrixWorld(true);
+    strikes.push(S); return S;
+  }
+  function strikeStep(dt) {
+    for (const S of [...strikes]) {
+      S.t += dt; S.rig.update(dt); S.m.updateMatrixWorld(true);
+      if (S.t >= S.dur) { strikes.splice(strikes.indexOf(S), 1); S.m.visible = false; scene.remove(S.m); spare.push(S); const e = S.onEnd; S.onNote = S.onEnd = null; e?.(); }
+    }
+  }
+  host.on('update', dt => { if (strikes.length) try { strikeStep(Math.min(dt || 1 / 60, .1)); } catch (e) { console.error('[gorod-krovi] dragon strike', e); for (const S of strikes.splice(0)) { S.m.visible = false; scene.remove(S.m); S.onEnd?.(); } } });
+
   const handle = {
     state: () => ({ phase: D.phase, site: D.site?.id ?? null, clip: D.key, t: +D.t.toFixed(2), rider: D.rider, fling: !!fling, ejectAt: D.ejectAt, working, err: D.err, crafted: crafted(),
       sites: SITES.map(s => ({ id: s.id, ready: s.readyAt <= session.time })),
@@ -373,6 +408,8 @@ export default async function setupDragon(api, gk) {
     skip: sec => { for (let k = 0; k < sec * 30; k++) { stepped = false; safeStep(1 / 30); } },   // fast-forward the dragon alone (tests)
     seat: () => seat?.getWorldPosition(new THREE.Vector3()), body: bodyPos, model, sites: SITES, pavlov: PAVLOV, dest,
     break: e => broken(e ?? new Error('test')),
+    strike,   // the Dragon Strike's airstrike dragon (strike.js)
+    strikes: () => strikes.length,
   };
   gk.dragon = handle; if (window.kino?.gorod) window.kino.gorod.dragon = handle;
 }

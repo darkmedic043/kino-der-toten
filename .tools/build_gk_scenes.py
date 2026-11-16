@@ -137,6 +137,15 @@ PROPS = [
     ('net_part1', 'p7_zm_sta_dragon_network_console_part01', {}),
     ('net_part2', 'p7_zm_sta_dragon_network_console_part02', {}),
     ('net_part3', 'p7_zm_sta_dragon_network_console_part03', {}),
+    # the Dragon Strike lockbox (zm_stalingrad_dragon_strike, strike.js): the console (nixie tubes tag_nixie_red/green_0-3)
+    # and the scene bundle at its tag_animate (the console's moving parts and the controller in its cradle)
+    ('strike_console', 'p7_zm_sta_dragon_strike_console', {}),
+    ('strike_console_fx', F+'dragon_strike_console_mod', {'idle': F+'dragon_strike_console_idle_anim', 'stop': F+'dragon_strike_console_stop_anim'}),
+    ('strike_controller', F+'dragon_strike_console_controller_mod', {'idle': F+'dragon_strike_console_controller_idle_anim', 'stop': F+'dragon_strike_console_controller_stop_anim'}),
+    # the Dragon Strike upgrade's banners (dragonstrike_ee_banner: script-placed, so not in the map build) and Pavlov's MG42
+    # (pavlov_turret, a script_vehicle: mg.js)
+    ('strike_banner', F+'dragon_hazard_library_banner_01_smod', {}),
+    ('mg42', 'veh_t7_turret_mg42', {}),
 ]
 data = {}
 for key, model_name, anims in PROPS:

@@ -3,7 +3,7 @@
 machines, the mortar barrages and the zm_stalingrad bank's wind, battle, creak and drip sounds, for
 mods/gorod-krovi/sounds.js. The pattern is build_castle_ambience.py (Der Eisendrache).
 
-  python3 -I .tools/build_gorod_ambience.py [--no-audio]
+  python3 -I .tools/build_gorod_ambience.py [--no-audio | --files]
 
 Reads export_game/bo3/maps/zm_stalingrad/zm_stalingrad.ents: script_structs with script_sound (`looper` = a loop at a
 point, `line_emitter` = a loop along origin -> targetOrigin, `random` = one-shots every script_wait_min..max seconds)
@@ -71,7 +71,19 @@ FILES = {'trap_crush_0': 'traps/pincher/pincher_00.', 'trap_crush_1': 'traps/pin
          'pod_green': 'zm_stalingrad/pod/pod_green_lp.', 'pod_shutdown': 'zm_stalingrad/pod/shutdown.', 'pod_alarm': 'zm_stalingrad/pod/status_change_alarm.',
          'pod_spin_1': 'zm_stalingrad/pod/spin_lyr_1.', 'pod_spin_2': 'zm_stalingrad/pod/spin_lyr_2.', 'pod_spin_3': 'zm_stalingrad/pod/spin_lyr_3.',
          'pod_pulse_0': 'pod/green_pulse/green_pulse_00.', 'pod_pulse_1': 'pod/green_pulse/green_pulse_04.', 'pod_pulse_2': 'pod/green_pulse/green_pulse_08.',
-         'pod_explode': 'exp/prop/barrel/explo/exp_barrel_00.', 'part_pickup': 'arrow_quest/zmb_fossil_pickup.', 'craft': 'buildable/turbine/turbine_pulse.'}
+         'pod_explode': 'exp/prop/barrel/explo/exp_barrel_00.', 'part_pickup': 'arrow_quest/zmb_fossil_pickup.', 'craft': 'buildable/turbine/turbine_pulse.',
+         # Dragon Strike (gorod-krovi/strike.js)
+         'strike_activate': 'uin/dragon_strike/dragon_strike_activate.', 'strike_error': 'uin/dragon_strike/dragon_strike_error.',
+         'strike_start_cry': 'dragon_strike/strike_start_cry.', 'strike_exit_cry': 'dragon_strike/strike_exit_cry.',
+         'strike_launch_0': 'dragon_strike/launch/dragon_fire_short_00.', 'strike_launch_1': 'dragon_strike/launch/dragon_fire_short_01.',
+         'strike_launch_2': 'dragon_strike/launch/dragon_fire_short_02.', 'strike_launch_3': 'dragon_strike/launch/dragon_fire_short_03.',
+         'strike_fireball': 'dragon_strike/fireball_main.', 'strike_fireball_close': 'dragon_strike/fireball_close.',
+         'strike_flare': 'incendiary/flare/wpn_incindiary_flare_00.', 'strike_button_2': 'zm_stalingrad/buttons/button_02.',
+         'strike_deny': 'quest/scenarios/ui/button_deny.',
+         # the mounted MG42 (gorod-krovi/mg.js)
+         'mg_first': 'turret/mg42/wpn_mg42_mn_firstshot.', 'mg_loop': 'turret/mg42/wpn_MG42_mn_Loop.', 'mg_last': 'turret/mg42/wpn_MG42_mn_LastShot.',
+         'mg_overheat': 'wpn/turret/overheat/overheat.'}
+FILES_ONLY = '--files' in sys.argv   # only (re)encode FILES, keep everything else
 # placed by the map's script (CoD units): the siren all game; Pavlov's basement machine loops, room tone and randoms
 PAV = [(-3271, 21733, -86), (-3078, 22000, -108), (-2765, 21978, -106)]
 EXTRA = [('siren', (-1819, 2705, 1167), None)] + [(f'machine_{i}', p, None) for i, p in enumerate(PAV)] + [
@@ -129,6 +141,7 @@ def audio(sounds):
         def flac(name):
             nonlocal n; off, size = idx[name]; p = pathlib.Path(tmp) / f'{n}.flac'; n += 1; p.write_bytes(m[off:off + size]); return p
         for k, s in SOUNDS.items():
+            if FILES_ONLY: break
             if 'loop' in s:
                 name = next((x for x in idx if s['loop'][0] in x), None)
                 if not name: print('MISSING', k, s['loop']); continue
@@ -139,6 +152,7 @@ def audio(sounds):
                 for i, x in enumerate(names): encode(flac(x), OUT / f'amb_{k}_{i}.ogg', pad=True)
                 sounds[k]['n'] = len(names)
         for k, sub in RIDE.items():
+            if FILES_ONLY: break
             name = next((x for x in idx if sub in x), None)
             if not name: print('MISSING', k, sub); continue
             encode(flac(name), OUT / f'sewer_{k}.ogg', pad=True)
@@ -152,6 +166,7 @@ def main():
     sounds = {k: {a: b for a, b in s.items() if a in ('vol', 'range', 'bed', 'wait')} | dict(loop='loop' in s) for k, s in SOUNDS.items()}
     OUT.mkdir(parents=True, exist_ok=True)
     js = OUT / 'ambience.json'
+    if FILES_ONLY: audio(sounds); return
     if '--no-audio' in sys.argv:
         old = json.loads(js.read_text())['sounds'] if js.exists() else {}
         for k in sounds: sounds[k]['n'] = old.get(k, {}).get('n', 0)
