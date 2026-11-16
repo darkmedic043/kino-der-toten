@@ -11,11 +11,15 @@
 //   library -> the first time chandelier 1 breaks and falls with the ceiling debris, after that chandelier 2 rocks
 //   (dragon_lands) and goes back to its idle; department_store -> the wall crashes in (once); fountain and
 //   opera_street -> the wreckage sways (gusty); red_brick / yellow (barracks, armory) -> the A and R letters fall (once).
-// Power on: the robot arm's aperture doors open (front, then the back one 0.66 s later). Visual only: no collision
-// changes, no sounds (their notetracks are BO3 sound aliases), no fx. Left out: the elevator trap (script-played),
+// Power on: the robot arm's aperture doors open (front, then the back one 0.66 s later). They have no collision in BO3
+// either: what blocks the way is the electric door red_brick_to_factory_bridge_door, only an invisible clip brush (*119,
+// a 161 x 12.5 x 148 slab 170 in front of the front aperture), opened by the power. The map builder skips doors without a
+// model piece, so it is built here: a player wall plus a navmesh block until the power is on (2026-11-15). No sounds (their notetracks are BO3 sound aliases), no fx. Left out: the elevator trap (script-played),
 // the dogfight dragons, tracer fire, the pickups blob/nuke. Debug: window.kino.gorod.scenes (also gk.scenes).
 import { sceneData, makeProp, place, hold, play, running, step, W } from './scene-props.js';
 import { AREAS } from './gauntlet-hazard.js';
+import * as THREE from 'three';
+import { CollisionWorld } from '../../collision-world.js';
 
 const LIB = [2100, 2328, 304];
 const SCENES = [   // [key, prop, origin, angles, init clip]
@@ -46,7 +50,18 @@ const AREA_R = 700;
 
 export default async function setup(api, gk) {
   if (api.map?.id !== 'gorod-krovi') return;
-  const { host, scene, session, camera } = api;
+  const { host, scene, session, camera, world } = api;
+  // the bridge door (*119, CoD origin -1261 3092 233, long side at CoD yaw 75.2): shut until the power is on
+  const doorGeo = new THREE.BoxGeometry(161, 148, 12.5).rotateY(75.2 * Math.PI / 180).translate(...W(-1261, 3092, 233).toArray());
+  const bridgeDoor = { collider: new CollisionWorld(doorGeo.toNonIndexed()), box: new THREE.Box3().setFromBufferAttribute(doorGeo.attributes.position), enabled: !session.power, window: true };
+  world?.dynamic?.push(bridgeDoor);
+  let doorShut = null;
+  const shutDoor = () => {
+    const sh = !session.power; if (sh === doorShut) return;
+    doorShut = sh; bridgeDoor.enabled = sh; world?.collision?.invalidateCache?.();
+    world?.navBlock?.('gk-bridge-door', sh ? bridgeDoor.box.clone().expandByScalar(8) : null);
+  };
+  shutDoor(); host.on('update', shutDoor);
   const J = await sceneData();
   if (!J?.props) { console.warn('[gorod-krovi] scenes: assets missing (run .tools/build_gk_scenes.py)'); return; }
   const P = {};

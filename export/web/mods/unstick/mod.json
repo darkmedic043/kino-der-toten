@@ -1,0 +1,5 @@
+{
+  "name": "Unstick",
+  "description": "A safety net for collision traps: after 3.5 s of trying to move without getting anywhere (no zombies around), and jumping works when wedged in a V, the player is put back where they last walked freely.",
+  "script": "mod.js"
+}

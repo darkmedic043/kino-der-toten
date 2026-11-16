@@ -656,7 +656,40 @@ if BSP == 'zm_stalingrad':   # Gorod Krovi's power doors and gates (their fxanim
 SCENE_MODELS = {} if BSP != 'zm_stalingrad' else {   # door_buy_03 has the library and stairs variants of the anims
     'p7_fxanim_zm_stal_door_buy_library_bundle': 'p7_fxanim_zm_stal_door_buy_03_mod', 'p7_fxanim_zm_stal_door_buy_dept_store_2f_bundle': 'p7_fxanim_zm_stal_door_buy_03_mod'}
 BARRICADE, BARRICADE_W, BARRICADE_H = 'p7_zm_der_barricade_wall_main', 138.6, 92.5   # BO3 plank wall, model X = width, Z = height
-def measure_passage(o, yaw=0.0):
+_CLIPB = []
+def door_line(parts, near):
+    """The door line from its clip brushes (script_brushmodel *N): the brush nearest the piece at CoD near (within 60)
+    that is a slab (under 48 thick, 60+ long) -> (CoD yaw of its long side, length, CoD centre), else None. Gorod Krovi, 2026-11-15: the alley gate's walls
+    along its diagonal doorway have no collision, so measuring picked the corridor (286 wide, turned 90 degrees: "door
+    here still is twisted"), and the library street gate stood 336 wide through its walls"""
+    if not _CLIPB:
+        f = lambda k, dt, w: np.fromfile(os.path.join(SRC, f'{BSP}.clip.{k}.bin'), dtype=dt).reshape(-1, w)
+        _CLIPB.extend([json.load(open(os.path.join(SRC, BSP + '.clip.json')))['cmodels'], f('brushes', '<i4', 23), f('brushsides', '<i4', 3), f('planes', '<f4', 4)])
+    cm, BR, SD, PL = _CLIPB
+    best = None
+    for part in parts:
+        if not str(part.get('model', '')).startswith('*'): continue
+        o = vec(part['origin'])
+        for bi in cm[int(part['model'][1:])]['brushes']:
+            b = BR[bi]; mins, maxs = b[0:3].view('<f4'), b[4:7].view('<f4'); ns, fs = int(b[7]), int(b[8])
+            hs = [PL[SD[fs + k][0]] for k in range(ns)]; hs = [h for h in hs if abs(h[2]) < .1]
+            hs += [np.array([1, 0, 0, maxs[0]]), np.array([-1, 0, 0, -mins[0]]), np.array([0, 1, 0, maxs[1]]), np.array([0, -1, 0, -mins[1]])]
+            pairs = [(a[3] + c[3], a, c) for i, a in enumerate(hs) for c in hs[i + 1:] if a[0] * c[0] + a[1] * c[1] < -.99]
+            if len(pairs) < 2: continue
+            # extent along each normal direction = the tightest pair facing that way (the box sides only bound the slab)
+            ext = {}
+            for w, a, c in pairs:
+                k = round(math.degrees(math.atan2(a[1], a[0])) % 180)
+                ext[k] = min(ext.get(k, 1e9), w)
+            thin_k = min(ext, key=ext.get); thin = ext[thin_k]
+            lk = (thin_k + 90) % 180; long_ = min((v for k, v in ext.items() if abs((k - lk + 90) % 180 - 90) < 3), default=None)
+            if long_ is None or thin > 48 or long_ < 60: continue
+            a, c = next((a, c) for w, a, c in pairs if round(math.degrees(math.atan2(a[1], a[0])) % 180) == thin_k and abs(w - thin) < .5)
+            mid = o + a[:3] * (a[3] - c[3]) / 2   # the slab's middle, across its thickness (CoD)
+            dist = math.hypot(mid[0] - near[0], mid[1] - near[1])
+            if dist < 60 and (best is None or dist < best[3]): best = (float(lk), float(long_), mid, dist)
+    return best
+def measure_passage(o, yaw=0.0, line=None):
     """The passage at CoD origin o, measured through the collision: the floor below, the narrower of the two horizontal
     axes (walls both sides), and the clear height. -> (floor point at the passage's middle, side direction, CoD axis,
     width, clear height). yaw (CoD degrees, the door entity's): the two axes are turned by yaw mod 90, so a door set across
@@ -679,14 +712,18 @@ def measure_passage(o, yaw=0.0):
         cands.append((head < 72, abs(Fc[1] - O[1]), -head, Fc))
     F = min(cands, key=lambda c: c[:3])[3] if cands else O - [0, 58, 0]
     best = None
+    if line is not None: o = np.array([line[2][0], line[2][1], o[2]])   # the door's clip slab sets the middle
     t_ = math.radians(yaw % 90)
-    for axis in ((math.cos(t_), math.sin(t_)), (-math.sin(t_), math.cos(t_))):
+    axes = ((math.cos(t_), math.sin(t_)), (-math.sin(t_), math.cos(t_)))
+    if line is not None: l_ = math.radians(line[0]); axes = ((math.sin(l_), -math.cos(l_)),)   # its side (-ay, ax) along the slab
+    for axis in axes:
         side = g(np.array([-axis[1], axis[0], 0.0])); C = F + [0, 40, 0]
         ext = [next((k for k in range(4, 220, 4) if seg_blocked(C, C + side * sg * k, near)), None) for sg in (1, -1)]
         open_ = ext.count(None); ext = [x if x is not None else 110 for x in ext]   # no wall within 220: an open side, 110 out
         if best is None or (open_, sum(ext)) < (best[4], best[0]): best = (sum(ext), side, ext, axis, open_)
-    width, side, (l, r), axis, _ = best
-    F = F + side * (l - r) / 2
+    width, side, (l, r), axis, open_ = best
+    if line is not None and (open_ or width > line[1] * 1.4): width = line[1] + 6   # no walls found: the slab's own length
+    else: F = F + side * (l - r) / 2
     up = next((h for h in range(8, 240, 4) if seg_blocked(F + [0, 2, 0], F + [0, h, 0], near)), 120)
     return F, side, axis, width, up
 def debris_standin(o):
@@ -710,11 +747,11 @@ def shell_model(name):
     return all(mm['name'] == 'global_invisible' for mm in read_semodel(path)['materials'])
 CRATE, CRATE_W, CRATE_H, CRATE_TOP = 'p7_crate_wood_01', 60.6, 31.1, 'p7_crate_wood_02_iron_cross'
 GATE, GATE_W, GATE_Z0, GATE_H = 'p7_barricade_metal_gate_02_black', 131.8, 3.7, 64.0
-def crate_pile(o, angles):
+def crate_pile(o, angles, line=None):
     # rows sit square on each other: the random yaw on the upper rows (up to 7 degrees) read as bent doors (2026-11-15)
     """Rows of crates across the passage at o, up to its clear height (at most 4 rows), the top row iron-cross crates.
     One node holding them (no mesh), so the door's box is the pile's; the pile sinks when bought."""
-    F, side, axis, width, up = measure_passage(o, vec(angles)[1] if angles else 0.0)
+    F, side, axis, width, up = measure_passage(o, vec(angles)[1] if angles else 0.0, line)
     rows = max(2, min(4, int(min(up, 130) // CRATE_H)))
     n = max(1, round(width / CRATE_W)); sx = width / (n * CRATE_W)
     yaw = math.atan2(axis[0], -axis[1]); r_ = yaw / 2; rot = [0, math.sin(r_), 0, math.cos(r_)]
@@ -736,18 +773,28 @@ def crate_pile(o, angles):
     if not kids: return None
     count('DOOR_STANDIN_crates')
     gltf['nodes'].append({'name': 'door_pile_standin', 'children': kids}); return len(gltf['nodes']) - 1
-def gate_standin(o, angles=None):
+def gate_standin(o, angles=None, line=None):
     """BO3's black metal gate scaled to the passage at o (its clear height up to 140). Rises when bought."""
-    F, side, axis, width, up = measure_passage(o, vec(angles)[1] if angles else 0.0)
+    F, side, axis, width, up = measure_passage(o, vec(angles)[1] if angles else 0.0, line)
     height = min(up, 140); mi = prop_mesh(GATE)
     if mi is None: return None
     yaw = math.atan2(axis[0], -axis[1]); r_ = yaw / 2; sy = height / (GATE_H - GATE_Z0)
     node = {'name': GATE, 'mesh': mi, 'translation': (F - [0, GATE_Z0 * sy, 0]).tolist(), 'rotation': [0, math.sin(r_), 0, math.cos(r_)],
             'scale': [width / GATE_W, sy, 1.5], 'extras': {'move': g([0, 0, height + 10]).tolist()}}
     gltf['nodes'].append(node); count('DOOR_STANDIN_gate'); return len(gltf['nodes']) - 1
-def door_piece(model, origin, angles, move):
-    if BSP == 'zm_stalingrad' and shell_model(model):
-        return crate_pile(vec(origin), angles) if 'door_buy' in model else gate_standin(vec(origin), angles)
+# The real pieces BO3's zbarriers link to the shells' link joint (which sits at the shell's origin), and how the open anims
+# move that joint (Greyhound export of 2026-11-14; CoD inches, the piece's own axes): the power door sinks 96 into the floor
+# (p7_fxanim_zm_stal_power_door_down_anim), the alley gate slides 111 to its left (gate_open), the vertical gates sink 93
+# (gate_vertical_open). They replace the black-gate stand-ins (2026-11-15, user: "door here still is twisted")
+REAL_PIECES = {'p7_fxanim_zm_stal_power_door_mod': ('p7_zm_sta_power_door', [0, 0, -96]), 'p7_fxanim_zm_stal_gate_mod': ('p7_zm_sta_gate', [-111, 0, 0]),
+               'p7_fxanim_zm_stal_gate_vertical_mod': ('p7_zm_sta_gate_vertical', [0, 0, -93]), 'p7_fxanim_zm_stal_gate_vertical_b_mod': ('p7_zm_sta_gate_vertical', [0, 0, -93])}
+def door_piece(model, origin, angles, move, line=None):
+    if BSP == 'zm_stalingrad' and model in REAL_PIECES and os.path.exists(os.path.join(GH, 'xmodels', REAL_PIECES[model][0])):
+        model, lm = REAL_PIECES[model]; yw = math.radians(vec(angles)[1] if angles else 0.0)
+        move = [lm[0] * math.cos(yw) - lm[1] * math.sin(yw), lm[0] * math.sin(yw) + lm[1] * math.cos(yw), lm[2]]
+        count('DOOR_REAL_' + model)
+    elif BSP == 'zm_stalingrad' and shell_model(model):
+        return crate_pile(vec(origin), angles, line) if 'door_buy' in model else gate_standin(vec(origin), angles, line)
     mi = prop_mesh(model)
     if mi is None: print('  door piece not exported:', model); return None
     r = math.radians(vec(angles)[1]) / 2
@@ -767,13 +814,15 @@ for e in ents:
     z = '' if electric and BSP == 'zm_factory' else zid(e.get('script_flag', '').removeprefix('enter_'))
     cost = int(float(e.get('zombie_cost', 750)))
     kids, brushes = [], []
-    for part in by_target.get(e.get('target'), []):
+    parts_ = by_target.get(e.get('target'), [])
+    slab = lambda part: door_line([q for q in parts_ if q.get('classname') == 'script_brushmodel'], vec(part['origin'])) if BSP == 'zm_stalingrad' else None
+    for part in parts_:
         pc = part.get('classname', '')
-        if pc == 'script_model': k = door_piece(part['model'], part['origin'], part.get('angles'), vec(part['script_vector']) if part.get('script_vector') else None)
-        elif pc.startswith('zbarrier_'): k = door_piece(GATE_MODELS.get(pc, part.get('model')), part['origin'], part.get('angles'), [0, 0, 110])
+        if pc == 'script_model': k = door_piece(part['model'], part['origin'], part.get('angles'), vec(part['script_vector']) if part.get('script_vector') else None, slab(part))
+        elif pc.startswith('zbarrier_'): k = door_piece(GATE_MODELS.get(pc, part.get('model')), part['origin'], part.get('angles'), [0, 0, 110], slab(part))
         elif pc == 'script_brushmodel': brushes.append(vec(part['origin'])); k = None
         elif pc == 'scriptbundle_scene' and BSP == 'zm_stalingrad' and part.get('scriptbundlename', '').startswith('p7_fxanim_zm_stal_door_buy_'):
-            k = door_piece(SCENE_MODELS.get(part['scriptbundlename'], 'p7_fxanim_zm_stal_door_buy_01_mod'), part['origin'], part.get('angles'), [0, 0, 140])
+            k = door_piece(SCENE_MODELS.get(part['scriptbundlename'], 'p7_fxanim_zm_stal_door_buy_01_mod'), part['origin'], part.get('angles'), [0, 0, 140], slab(part))
         else: k = None
         if k is not None: kids.append(k)
     if not kids and brushes and e.get('targetname') == 'zombie_debris':
