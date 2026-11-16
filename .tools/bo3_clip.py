@@ -4,7 +4,7 @@
 #   python3 -I .tools/bo3_clip.py <bsp> [--models]      (needs numpy: Blender's python has it)
 # All output is in CoD space (inches, Z up), faces wound counter-clockwise seen from outside (normal = outward).
 # Contents flags and what our engine does with each class: docs/fork/bo3-ports.md 1.1a.
-import json, os, sys
+import json, os, re, sys
 import numpy as np
 
 SOLID, GLASS, BULLET, PLAYER, MONSTER = 0x1, 0x10, 0x2000, 0x10000, 0x20000
@@ -139,7 +139,10 @@ def xmodel_tris(D, name, cache={}):
 
 def smodel_tris(D, lo=None, hi=None, keep=None):
     """Static models' collision in world space: tris (n, 3, 3), contents per tri, model name per tri (keep(smodel): a
-    filter). world = origin + inverse(invScaledAxis) @ local."""
+    filter). CoD multiplies row vectors (local = (world - origin) @ invScaledAxis), so world = origin + local @ inverse(invScaledAxis)
+    (as build_waw_map.py does). Until 2026-11-15 this applied the inverse's transpose, which turned every rotated model the other
+    way: 21,383 of zm_stalingrad's 49,464 instances had collision that did not match their look (a flat floor plate stood up
+    as a wall across the factory roost stairs; the bounds check absmin/absmax now fits all but meshes with bone-local parts)."""
     out, cont, names = [], [], []
     for sm in D['json']['staticModels']:
         o = np.array(sm['origin'])
@@ -147,7 +150,7 @@ def smodel_tris(D, lo=None, hi=None, keep=None):
         if keep is not None and not keep(sm): continue
         A = np.linalg.inv(np.array(sm['invScaledAxis']).reshape(3, 3))
         for tri, c in xmodel_tris(D, sm['model']):
-            w = tri @ A.T + o
+            w = tri @ A + o
             if np.linalg.det(A) < 0: w = w[:, [0, 2, 1]]
             ic = sm['contents'] & 0xFFFFFFFF   # a trace tests the instance's contents, then the surface's: both must match
             out.append(w); cont.append(np.full(len(w), (c & ic) or ic, np.int64)); names += [sm['model']] * len(w)
@@ -158,7 +161,10 @@ def in_box(T, lo, hi):   # triangles whose centre is inside the box
     c = T.mean(1); return np.all((c >= lo) & (c <= hi), 1)
 
 STEP, OBSTACLE = 18, 40   # BO3 steps the player up 18 units; props from 40 high are obstacles the navmesh goes round
-def game_collision(src, bsp, lo=None, hi=None, models=True, log=print):
+# under STEP high but a floor (a plate over a hole, the robot hand's 12-high floor plates): kept when at least LOW_W wide and
+# not loose clutter you only step over (it would make the floors bumpy)
+LOW_W, LOW_CLUTTER = 48, re.compile(r'debris|rubble|chopped|book|splinter|lath|brittle|ember|pile|trim|pipe|conduit|shell|ammo|corpse|brick', re.I)
+def game_collision(src, bsp, lo=None, hi=None, models=True, simple=0, taken=None, log=print):
     """The game's collision in our engine's classes, CoD space: {'COL': tris, 'PCOL': ..., 'CLIP': ..., 'NCOL': ...}.
     World brushes and the soup by their contents (player + monster clip, which stops no bullets, goes to both CLIP and
     NCOL); static models (models=True) by instance height: under STEP left out (stepped over: rubble, splinters, books,
@@ -182,10 +188,32 @@ def game_collision(src, bsp, lo=None, hi=None, models=True, log=print):
             put(name, T[p & b]); put('CLIP', T[p & ~b]); put('NCOL', T[p & m & ~b] if name == 'COL' else T[:0])
             kept += int(p.sum())
         log(f'game clip: static models {kept} collision triangles from {int((h >= STEP).sum())} of {len(h)} instances (under {STEP} high left out)')
+    elif simple:
+        # --game-clip-simple N (2026-11-15, Gorod Krovi: "collision doesn't follow the actual look"): only the static models
+        # whose collision is hand-made and light (at most N triangles: the boxes and slabs of beams, plates, panels, columns,
+        # railings) take the game's collision; heavy model collision (rubble piles, corpses, burnt wood: 2.4 million
+        # triangles on zm_stalingrad) stays with the builder's prop rules. Instances under STEP high are left out unless
+        # they are wide floor pieces (LOW_W, LOW_CLUTTER). The models taken are added to `taken` (the builder skips their rules).
+        J = D['json']; kept = 0; size = {}
+        for sm in J['staticModels']:
+            if sm['model'] not in size: size[sm['model']] = sum(len(t) for t, c in xmodel_tris(D, sm['model']))
+        def keep(s, lo_h, hi_h):   # light collision, standing at least STEP high or a low floor piece; then by class height
+            n = size[s['model']]
+            if not n or n > simple: return False
+            h = s['absmax'][2] - s['absmin'][2]; w = max(s['absmax'][0] - s['absmin'][0], s['absmax'][1] - s['absmin'][1])
+            return (h >= STEP or (w >= LOW_W and not LOW_CLUTTER.search(s['model']))) and lo_h <= h < hi_h
+        for name, test in (('PCOL', lambda s: keep(s, 0, OBSTACLE)), ('COL', lambda s: keep(s, OBSTACLE, 1e9))):
+            T, c, _ = smodel_tris(D, lo, hi, test)
+            if lo is not None: k = in_box(T, lo, hi); T, c = T[k], c[k]
+            p, m, b = stops(c)
+            put(name, T[p & b]); put('CLIP', T[p & ~b]); put('NCOL', T[p & m & ~b] if name == 'COL' else T[:0])
+            kept += int(p.sum())
+        if taken is not None: taken.update(k for k, n in size.items() if n and n <= simple)
+        log(f'game clip: {kept} collision triangles from the simple static models (at most {simple} each)')
     return {k: np.concatenate(v) for k, v in out.items()}
 
 if __name__ == '__main__':
     bsp = sys.argv[1]
     src = os.path.join(os.path.dirname(__file__), '..', 'export_game', 'bo3', 'maps', bsp)
-    out = game_collision(src, bsp, models='--models' in sys.argv)
+    out = game_collision(src, bsp, models='--models' in sys.argv, simple=int(sys.argv[sys.argv.index('--simple') + 1]) if '--simple' in sys.argv else 0)
     for k, v in out.items(): print(f'{k}: {len(v)} triangles')

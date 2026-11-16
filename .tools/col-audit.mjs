@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// usage: ~/.local/bin/lowpri node .tools/col-audit.mjs <map-id> [--step 16] [--from-spawn] [--flood-only] [--no-rules | --rules file.json] [--trace x,y,z]
+// usage: ~/.local/bin/lowpri node .tools/col-audit.mjs <map-id> [--step 16] [--from-spawn] [--flood-only] [--no-rules | --rules file.json] [--trace x,y,z] [--glb file.glb]
 // Offline collision audit: floods the space a player can walk (collision meshes only), then looks for
 //   through : a step the collision allows that passes through drawn geometry (walk-through walls and props)
 //   ghost   : a step the collision blocks with nothing drawn within 24 units of the hit (invisible blockers)
@@ -11,10 +11,11 @@
 // writes every walked point (other offline tools start from them: the castle's ceiling check). --trace prints the
 // flood's way to the walked point nearest a position (how did it get there?). The full pass holds every drawn triangle near
 // the walked space: about 3 GB for The Giant (docs/fork/custom-maps.md).
+// Collision = COL_, PCOL_ and CLIP_ (the player stands on CLIP_ ramps); --glb audits another copy of the map.
 import fs from 'node:fs'; import * as THREE from 'three'; import { MeshBVH } from 'three-mesh-bvh';
 const id = process.argv[2], arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? +process.argv[i + 1] : d; };
 const STEP = arg('step', 16), dir = `export/web/mods/maps/${id}/`, t0 = Date.now(), log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, ...a);
-const glb = fs.readFileSync(dir + id + '.glb'), jsonLen = glb.readUInt32LE(12), gltf = JSON.parse(glb.toString('utf8', 20, 20 + jsonLen)), bin0 = 20 + jsonLen + 8;
+const glb = fs.readFileSync(process.argv.includes('--glb') ? process.argv[process.argv.indexOf('--glb') + 1] : dir + id + '.glb'), jsonLen = glb.readUInt32LE(12), gltf = JSON.parse(glb.toString('utf8', 20, 20 + jsonLen)), bin0 = 20 + jsonLen + 8;
 const TYPES = { 5126: Float32Array, 5125: Uint32Array, 5123: Uint16Array, 5121: Uint8Array, 5120: Int8Array, 5122: Int16Array }, COMPS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
 function accessor(i) {
   const a = gltf.accessors[i], v = gltf.bufferViews[a.bufferView], T = TYPES[a.componentType], n = a.count * COMPS[a.type], off = glb.byteOffset + bin0 + (v.byteOffset ?? 0) + (a.byteOffset ?? 0);
@@ -44,7 +45,7 @@ if (RULES) { const extra = [], by = {};
       for (const m of instMatrices(n, i)) { const e0 = extra.length; if (placeShape(s, m.elements, RULES.minHeight, extra)) { added++; by[model] = (by[model] ?? 0) + 1; owners.push([e0 / 9, extra.length / 9, model, m.elements[12], m.elements[13], m.elements[14]]); } } } });
   for (let k = 0; k < extra.length; k++) cp.push(extra[k]); for (let k = 0; k < extra.length / 3; k++) ci.push(k); cv = nExtra = extra.length / 3;
   log('prop collision rules:', added, 'placed,', extra.length / 9, 'triangles ·', Object.entries(by).sort((x, y) => y[1] - x[1]).map(e => e.join(' x')).join(', ')); }
-gltf.nodes.forEach((n, i) => { if (n.mesh == null || !/^(COL_|PCOL_)/.test(n.name ?? '')) return; const m = world(i), v = new THREE.Vector3();
+gltf.nodes.forEach((n, i) => { if (n.mesh == null || !/^(COL_|PCOL_|CLIP_)/.test(n.name ?? '')) return; const m = world(i), v = new THREE.Vector3();
   for (const p of gltf.meshes[n.mesh].primitives) { const P = accessor(p.attributes.POSITION), I = accessor(p.indices);
     for (let k = 0; k < P.length; k += 3) { v.set(P[k], P[k + 1], P[k + 2]).applyMatrix4(m); cp.push(v.x, v.y, v.z); } for (let k = 0; k < I.length; k++) ci.push(I[k] + cv); cv += P.length / 3; } });
 const cgeo = new THREE.BufferGeometry(); cgeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(cp), 3)); cgeo.setIndex(new THREE.BufferAttribute(new Uint32Array(ci), 1));

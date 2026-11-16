@@ -386,7 +386,11 @@ decimated = 0
 # clip ramps over the stairs and BO3's invisible player/monster clip walls are in, and drawn-only detail (beams, trim,
 # grates, ceiling tiles) is out. Props still collide by the rules below unless --game-clip-models also takes the static
 # models' own collision (heavy: about 2.3 million triangles on zm_stalingrad). bo3-ports.md 2.4.
-GAME_MODELS = '--game-clip-models' in argv; GAME_CLIP = GAME_MODELS or '--game-clip' in argv
+GAME_MODELS = '--game-clip-models' in argv; GAME_SIMPLE = int(argv[argv.index('--game-clip-simple') + 1]) if '--game-clip-simple' in argv else 0
+GAME_CLIP = GAME_MODELS or GAME_SIMPLE or '--game-clip' in argv
+# --game-clip-simple N (2026-11-15): the static models whose game collision is at most N triangles (hand-made boxes and
+# slabs: beams, plates over holes, panels, columns) take it, the rest keep the rules below (bo3_clip.py; bo3-ports.md 2.4)
+game_taken = set()
 def tri_mesh(T):   # (n, 3, 3) CoD-space triangles -> glTF positions and indices, shared corners merged
     if not len(T): return np.zeros((0, 3)), np.zeros((0, 3), np.int64)
     used, inv = np.unique(g(T.reshape(-1, 3)).astype(np.float32), axis=0, return_inverse=True)
@@ -394,7 +398,7 @@ def tri_mesh(T):   # (n, 3, 3) CoD-space triangles -> glTF positions and indices
     return used.astype(np.float64), t
 if GAME_CLIP:
     from bo3_clip import game_collision
-    game = game_collision(SRC, BSP, lo, hi, models=GAME_MODELS)
+    game = game_collision(SRC, BSP, lo, hi, models=GAME_MODELS, simple=GAME_SIMPLE, taken=game_taken)
     pp, tt = tri_mesh(game.get('COL', np.zeros((0, 3, 3))))
     col_P.append(pp); col_T.append(tt); n0 = len(pp)
     print('game clip:', {k: len(v) for k, v in game.items()})
@@ -404,7 +408,7 @@ else:
 for name, insts in by_model.items():
     player_only = False
     base_ = re.sub(r'_snow(?=_|$)', '', name)   # a snowy variant collides like the plain one (NO_COLLIDE's 'snow' is for snow piles)
-    if GAME_MODELS or (GAME_CLIP and re.search(r'stair', base_)): continue   # the game's clip ramps (or model collision) instead
+    if GAME_MODELS or name in game_taken or (GAME_CLIP and re.search(r'stair', base_)): continue   # the game's clip ramps (or model collision) instead
     pp, tt = prop_geo.get(name, (None, None))
     if name not in prop_geo or NO_COLLIDE.search(base_) or 'stair_step' in name: continue   # steps: ramps below
     size = pp.max(0) - pp.min(0)
@@ -748,7 +752,8 @@ def door_piece(model, origin, angles, move):
     if mi is None: print('  door piece not exported:', model); return None
     r = math.radians(vec(angles)[1]) / 2
     node = {'name': model, 'mesh': mi, 'translation': g(vec(origin)).tolist(), 'rotation': [0, math.sin(r), 0, math.cos(r)]}
-    if BSP == 'zm_stalingrad': node['rotation'] = quat(C @ euler_cod(*vec(angles)) @ C.T)   # its drop-down gates lean (roll -19 and -13): yaw alone stood them upright through the slope
+    # Gorod Krovi's drop-down gates carry roll -19 and -13 in the map; stood with it they read as bent doors (user, twice,
+    # 2026-11-15: "please place them normally"), so they stand upright on their yaw like every other door piece
     if move: node['extras'] = {'move': g(move).tolist()}
     gltf['nodes'].append(node); return len(gltf['nodes']) - 1
 zones_of = {}   # target -> every trigger's zone (two triggers can share their pieces: one door opening both zones)
