@@ -61,7 +61,7 @@ export function makeKit(api, gk) {
   kit.playerCount = () => Math.max(1, Math.min(4, sync.players().length || 1));
   kit.nearest = p => sync.nearest(p) ?? { id: sync.me, pos: player.getFeetPosition() };
   kit.posOf = id => sync.players().find(q => q.id === id)?.pos ?? null;
-  kit.hitPlayer = (id, n) => { if (n > 0) sync.hitPlayer(id, Math.round(n)); };
+  kit.hitPlayer = (id, n, kind = '') => { if (n > 0) sync.hitPlayer(id, Math.max(1, Math.round(n * (gk?.dmgScale?.(kind, id) ?? 1)))); };   // kind: 'raz' / 'sentinel' / 'nikolai', ':blast' for explosions (wearables.js halves some)
   // every standing player within r of p (feet + 40), with the distance: fn(id, d, pos)
   kit.playersNear = (p, r, fn) => { for (const q of sync.players()) { if (q.down) continue; const d = q.pos.clone().add(V(0, 40, 0)).distanceTo(p); if (d <= r) fn(q.id, d, q.pos); } };
   // a shove for the local player (the knock-backs): along `dir`, off the floor

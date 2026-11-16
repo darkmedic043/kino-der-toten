@@ -171,6 +171,7 @@ export function setupGauntletWeapon(api, gk, A) {
       A.sound('scream' + (1 + Math.floor(Math.random() * 5)), .6);
     }
     function recall() {
+      if (whelp?.ee) return;   // carrying for the Easter egg (ee.js): it comes back by itself
       mode.busy = 'recall'; mode.t = 0; swing = null; juke = null;
       if (whelp) whelp.home = true; else mode.t = 9;
     }
@@ -216,15 +217,17 @@ export function setupGauntletWeapon(api, gk, A) {
       const g = w.g, owner = feet();
       camera.getWorldDirection(fwd); const f2 = fwd.clone().setY(0).normalize(), right = new THREE.Vector3(-f2.z, 0, f2.x);
       let goal;
-      if (w.home) goal = camera.position.clone().addScaledVector(fwd, 30).add(new THREE.Vector3(0, -12, 0));
+      // w.ee (ee.js): {goal, speed, tick(w, dt, dist)}: flies where the Easter egg sends it, no leash, no fighting
+      if (w.ee) goal = w.ee.goal;
+      else if (w.home) goal = camera.position.clone().addScaledVector(fwd, 30).add(new THREE.Vector3(0, -12, 0));
       else if (w.fetch) goal = w.fetch.carry ? owner.clone().add(new THREE.Vector3(0, 40, 0)) : w.fetch.item.root.position.clone().add(new THREE.Vector3(0, 20, 0));
       else { if ((w.roof -= dt) <= 0 || w.roofH == null) { w.roof = .5; const up = world.raycast?.(new THREE.Ray(owner.clone().add(new THREE.Vector3(0, 40, 0)), new THREE.Vector3(0, 1, 0)), 0, 120); w.roofH = up ? Math.max(45, up.distance + 40 - 22) : 95; }   // under a low ceiling it flies lower
         goal = owner.clone().addScaledVector(f2, 70).addScaledVector(right, 60).add(new THREE.Vector3(0, Math.min(95, w.roofH) + Math.sin(session.time * 1.7) * 6, 0)); }
       // leash: never further than 300 (2D) from the player, unless fetching
       const to = goal.clone().sub(g.position), dist = to.length();
-      const speed = w.home ? 900 : w.fetch ? 520 : Math.min(600, 80 + dist * 3);
+      const speed = w.ee ? (w.ee.speed ?? 400) : w.home ? 900 : w.fetch ? 520 : Math.min(600, 80 + dist * 3);
       g.position.addScaledVector(to.normalize(), Math.min(dist, speed * dt));
-      if (!w.fetch && !w.home) { const o = g.position.clone().sub(owner).setY(0); if (o.length() > LEASH) { o.setLength(LEASH); g.position.x = owner.x + o.x; g.position.z = owner.z + o.z; } }
+      if (!w.fetch && !w.home && !w.ee) { const o = g.position.clone().sub(owner).setY(0); if (o.length() > LEASH) { o.setLength(LEASH); g.position.x = owner.x + o.x; g.position.z = owner.z + o.z; } }
       // facing: the target, else where it flies, else the player's view
       const face = w.target && enemies.list.includes(w.target) ? chest(w.target).sub(g.position) : dist > 10 ? to.clone() : f2.clone();
       if (face.lengthSq() > 1) { const yaw = Math.atan2(-face.z, face.x); let dy = yaw - g.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); g.rotation.y += dy * Math.min(1, dt * 8); }
@@ -236,6 +239,7 @@ export function setupGauntletWeapon(api, gk, A) {
       }
       if ((w.flap -= dt) <= 0) { w.flap = 1.4 + Math.random(); A.soundAt('flap' + (1 + Math.floor(Math.random() * 3)), g.position, .3, 1200); }
       w.rig?.update(dt);
+      if (w.ee) { w.ee.tick?.(w, dt, dist); return; }
       if (w.home) return;
       // power-ups: fetch the nearest within 2000 when there is nothing to shoot
       if (w.fetch) {
@@ -280,7 +284,7 @@ export function setupGauntletWeapon(api, gk, A) {
       held += dt;
       if (mode.busy === 'release') {
         mode.t += dt;
-        if (!whelp && mode.t >= .3) whelp = spawnWhelp();
+        if (!whelp && mode.t >= .3) { whelp = spawnWhelp(); gk.emit('whelp:release', whelp); }   // ee.js may take it over (w.ee)
         if (mode.t >= (A.J?.flame?.durations?.altDropAnim ?? .5)) { mode.busy = null; equip('punch'); }
       } else if (mode.busy === 'recall') {
         mode.t += dt;
@@ -299,6 +303,7 @@ export function setupGauntletWeapon(api, gk, A) {
         swing.t += dt;
         if (swing.hit != null && swing.t >= swing.hit) {
           swing.hit = null; camera.getWorldDirection(fwd);
+          gk.emit('gauntlet:melee', { origin: camera.position.clone(), dir: fwd.clone(), punch: !!swing.punch });   // ee.js: the key 6 safe
           if (swing.punch) { const n = punchAt(camera.position.clone().addScaledVector(fwd, PUNCH_AHEAD).add(new THREE.Vector3(0, -20, 0)), PUNCH_R); if (n) audio.play('hit', .6); }
           else { let best = null, bd = 110;
             for (const z of enemies.list) { const o = chest(z).sub(camera.position), d = o.length(); if (d < bd && (d < 40 || o.normalize().dot(fwd) > .3)) { best = z; bd = d; } }

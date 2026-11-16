@@ -126,16 +126,17 @@ export default async function setup(api, gk) {
   function setMeter(k) { if (!meter || !meterBind) return; meter.position.copy(meterBind); meter.position.z -= 9.582 * (1 - k); }
   for (const P of partModels) if (P) { P.root.visible = false; P.root.userData.noMerge = true; scene.add(P.root); }
 
-  function call(site, radio) {
-    const A = S.active = { site, radio, state: 'land', t: 0, health: (nPlayers() > 1 ? 50 : 65) * HIT, max: (nPlayers() > 1 ? 50 : 65) * HIT,
+  // ee: the main Easter egg's pod (ee.js): {need, harassers(), box (THREE.Box3 score volume), yaw, onWin(at), onLose(why)}
+  function call(site, radio, ee = null) {
+    const A = S.active = { site, radio, ee, need: ee?.need ?? KILLS, state: 'land', t: 0, health: (nPlayers() > 1 ? 50 : 65) * HIT, max: (nPlayers() > 1 ? 50 : 65) * HIT,
       kills: 0, attackers: new Map(), wave: null, waveIn: 0, alarm: false, hum: null, out: null, reward: null, ends: 0 };
     A.waveIn = (() => { const d = flat(W(...RADIOS[radio]), site.at); return d < 1500 ? 5 : d < 3000 ? 8 : 10; })();
-    place(pod, site.origin, [0, 225, 0]); pod.root.visible = true; globalThis.kino?.staticFreeze?.thaw?.(pod.root);
+    place(pod, site.origin, [0, ee?.yaw ?? 225, 0]); pod.root.visible = true; globalThis.kino?.staticFreeze?.thaw?.(pod.root);
     pod.rig.stopSide?.(0); hidePart(pod, 'tag_hatch', false); lamp('green'); setMeter(0);
     play(pod, 'land', { then: 'spin' });
     sfx('pod_incoming', .8, site.at, 6000);
     S.log.push({ site: site.id, radio, at: +session.time.toFixed(1) });
-    api.toast?.('A drop pod is coming down · defend it', 3);
+    if (!ee) api.toast?.('A drop pod is coming down · defend it', 3);
     gk.emit('pod:land', site.id);
   }
   // the landed pod is solid to players and bullets (solidOf: built in its landed pose at each site, dropped when it goes)
@@ -158,6 +159,7 @@ export default async function setup(api, gk) {
     release(); A.state = 'open'; A.t = 0;
     play(pod, 'spin_end', { then: null }); A.hatchAt = pod.dur.spin_end ?? 1.67;
     sfx('pod_shutdown', .7, A.site.at, 3000);
+    if (A.ee) { gk.emit('pod:won', { site: A.site.id, green, ee: true }); return; }
     session.addPoints ? session.addPoints(500) : (session.points += 500);
     S.retired.add(A.site.id); for (const t of TWINS[A.site.id] ?? []) S.retired.add(t);
     if (green) gk.emit('pod:green', A.site.id);
@@ -172,9 +174,9 @@ export default async function setup(api, gk) {
     for (const z of [...enemies.list]) if (z.root.position.distanceTo(A.site.at) < BLAST && z.kind === 'zombie') enemies.hurt(z, 1e6, false, false, 'explosion', false);
     const feet = player.getFeetPosition();
     if (feet.distanceTo(A.site.at) < BLAST && session.phase !== 'reviving') api.damage?.(15);
-    S.resting.set(A.site.id, session.time + REST);
-    gone(); gk.emit('pod:lost', { site: A.site.id, why });
-    api.toast?.(why === 'pavlov' ? 'The drop pod was abandoned' : 'The drop pod was destroyed', 3);
+    if (!A.ee) S.resting.set(A.site.id, session.time + REST);
+    gone(); gk.emit('pod:lost', { site: A.site.id, why, ee: !!A.ee }); A.ee?.onLose?.(why);
+    if (!A.ee) api.toast?.(why === 'pavlov' ? 'The drop pod was abandoned' : 'The drop pod was destroyed', 3);
     return true;
   }
   function gone() {
@@ -228,7 +230,7 @@ export default async function setup(api, gk) {
   host.on('kill', e => {
     const A = S.active, z = e?.enemy; if (A?.state !== 'defend' || !z || e.remote) return;
     const p = z.root.position;
-    if (flat(p, A.site.vol) < VOLUME_R && Math.abs(p.y - A.site.vol.y) < 260) { A.kills++; setMeter(A.kills / KILLS); if (A.kills >= KILLS) win(); }
+    if (A.ee?.box ? A.ee.box.containsPoint(p) : flat(p, A.site.vol) < VOLUME_R && Math.abs(p.y - A.site.vol.y) < 260) { A.kills++; setMeter(A.kills / A.need); if (A.kills >= A.need) win(); }
   });
 
   function tickPod(dt) {
@@ -243,7 +245,7 @@ export default async function setup(api, gk) {
       if (A.hum) A.hum.volume = level(.35 * Math.max(0, 1 - camera.position.distanceTo(A.site.at) / 2500));
       tickLure(A, dt);
       if (!A.wave && A.t >= A.waveIn && gk.bosses?.zombieWave) {
-        A.wave = gk.bosses.zombieWave({ points: A.site.harass, total: Infinity, maxAlive: () => 3 + players().filter(p => !p.down).length, interval: 2.5,
+        A.wave = gk.bosses.zombieWave({ points: A.site.harass, total: Infinity, maxAlive: A.ee?.harassers ?? (() => 3 + players().filter(p => !p.down).length), interval: A.ee ? .3 : 2.5,
           until: () => S.active !== A || A.state !== 'defend',
           onSpawn: z => { z.gkHarasser = true; gk.hazard?.runner?.(z) ?? (z.speed = Math.max(z.speed ?? 0, 205)); if (!z.rise) enemies.riseAt?.(z, z.root.position.clone()); } });
       }
@@ -262,6 +264,7 @@ export default async function setup(api, gk) {
     }
   }
   function reward(A) {
+    if (A.ee) { A.ends = session.time + 2; A.ee.onWin?.(A.site.at.clone().add(new THREE.Vector3(0, 32, 0))); return; }
     const at = A.site.at.clone().add(new THREE.Vector3(0, 53 + 32, 0));
     if (S.parts >= PARTS.length) {
       const type = POWERUPS[Math.floor(Math.random() * POWERUPS.length)];
@@ -347,6 +350,9 @@ export default async function setup(api, gk) {
         attackers: S.active.attackers.size, harassers: S.active.wave?.list?.size ?? 0, reward: S.active.reward, lamp: lampShown } : null, log: S.log }),
     cylinder: (colour = null) => { S.cyl = null; return dropCylinder(player.getFeetPosition(), colour); },
     give: colour => { S.held = colour; return true; },
+    callEE: (site, ee) => { if (S.active) return false; site.slots ??= Array.from({ length: SLOTS }, (_, i) => { const a = i / SLOTS * Math.PI * 2; return W(site.origin[0] + Math.cos(a) * SLOT_R, site.origin[1] + Math.sin(a) * SLOT_R, site.origin[2]); });
+      site.at ??= W(...site.origin); site.vol ??= site.at; call(site, 'blue', ee); return true; },
+    busy: () => !!S.active,
     call: id => { const s = sites.find(x => x.id === id) ?? sites.filter(open)[0]; if (!s || S.active) return false; call(s, 'blue'); return true; },
     win: () => { const A = S.active; if (!A || (A.state !== 'land' && A.state !== 'defend')) return false; A.state = 'defend'; win(); return true; },
     lose: (why = 'health') => lose(why),

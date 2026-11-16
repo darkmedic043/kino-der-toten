@@ -146,6 +146,31 @@ PROPS = [
     # (pavlov_turret, a script_vehicle: mg.js)
     ('strike_banner', F+'dragon_hazard_library_banner_01_smod', {}),
     ('mg42', 'veh_t7_turret_mg42', {}),
+    # the side Easter eggs (eggs.js, wearables.js): Samantha's figure and the arm that drags it down, the anthem PA
+    # speakers, the three wearables, the time-attack wall buy's chalk (only the wrench is in the export)
+    ('figure_sam', 'p7_zm_sta_figure_samantha_01', {}),
+    ('skel_arm', 'c_zom_dlc1_skeleton_zombie_body_s_rarm', {}),
+    ('arm_bone', 'p7_skulls_bones_arm_lower', {}),
+    ('speaker_pa', 'p7_zm_ctl_speaker_pa', {}),
+    ('wear_raz', 'c_zom_dlc3_player_raz_facemask', {}),
+    ('wear_sentinel', 'c_zom_dlc3_player_sentinel_drone_hat', {}),
+    ('wear_wings', 'c_zom_dlc3_player_wings', {}),
+    ('wrench', 'wpn_t7_loot_wrench_world', {}),
+    # the main Easter egg (ee.js): the wall map (screen, shelf + drawer, the six key figures), the pneumatic tube
+    # terminals' levers and the cylinder, Sophia's code rings, the safe door and the library debris, the rigged
+    # buttons, the ray-gun ball, the keycard, the data terminal, Nikolai's weapon core
+    ('wall_map', 'p7_zm_sta_wall_map_screen', {}),
+    ('map_shelf', 'p7_zm_sta_wall_map_shelf', {'drawer_open': F+'wall_map_drawer_open_anim', 'drawer_close': F+'wall_map_drawer_close_anim'}),
+    *[(f'key_{i}', f'p7_zm_sta_wall_map_figure_0{i}_{n}', {}) for i, n in enumerate(('blob', 'nuke', 'soldier', 'drone', 'symbol', 'pod'), 1)],
+    ('tube_lever', 'p7_zm_sta_pneumatic_tube_switch_lever', {}),
+    ('tube', F+'pneumatic_tube_mod', {'drop': F+'pneumatic_tube_drop_anim', 'idle': F+'pneumatic_tube_idle_anim'}),
+    *[(f'code_ring_{i}', F+f'computer_sophia_code_ring_0{i}_mod', {}) for i in range(1, 7)],
+    ('safe_door', 'p7_zm_ctl_safe_standing_door', {}),
+    ('burnt_pile', 'p7_zm_sta_pile_wood_burnt_small_04', {}),
+    ('rigged_button', F+'rigged_button_mod', {'extend': F+'rigged_button_extend_anim', 'retract': F+'rigged_button_retract_anim'}),
+    ('ray_ball', F+'ray_gun_ball_mod', {}),
+    ('keycard', 'p7_zm_ctl_keycard_ee', {}),
+    ('weapon_core', 'veh_t7_dlc3_mech_nikolai_weapon_core', {}),
 ]
 data = {}
 for key, model_name, anims in PROPS:

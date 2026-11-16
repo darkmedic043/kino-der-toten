@@ -78,6 +78,8 @@ export function setupRaz(K) {
   // ---- brain
   function think(z, dt, pl) {
     z.t += dt; for (const k in z.cool) z.cool[k] -= dt;
+    // ee.js (the main Easter egg's kited Mangler): z.ee(z, dt) -> null = its own brain, false = hold, {at, run} = walk there
+    if (z.ee) { const g = z.ee(z, dt); if (g === false) return; if (g) { const k = g.run ? 'sprint' : 'walk'; play(z, k); K.walkTo(z, g.at, S.index[k]?.speed || (g.run ? 170 : 64), dt); return; } }
     if (!z.target || (z.retarget = (z.retarget ?? 0) - dt) <= 0) { z.retarget = 1; z.target = K.nearest(z.root.position); }
     const tp = K.posOf(z.target.id) ?? pl, pos = z.root.position, dist = pos.distanceTo(tp);
     if (z.state === 'intro') { K.face(z.root, tp); if (z.t >= z.introUntil) { z.state = 'chase'; z.repath = 0; } return; }
@@ -115,7 +117,7 @@ export function setupRaz(K) {
     if (n === 'melee_fire') {
       K.sfxAt(z.gunOff ? 'raz_melee_start' : K.pick('raz_gunhand_melee', 4), pos, .8);
       const f = K.fwd(z.root);
-      K.playersNear(pos.clone().add(V(0, 40, 0)), 105, (id, d, q) => { const to = q.clone().sub(pos).setY(0); if (to.length() < 30 || to.normalize().dot(f) > .6) K.hitPlayer(id, 75); });
+      K.playersNear(pos.clone().add(V(0, 40, 0)), 105, (id, d, q) => { const to = q.clone().sub(pos).setY(0); if (to.length() < 30 || to.normalize().dot(f) > .6) K.hitPlayer(id, 75, 'raz'); });
       for (const o of [...enemies.list]) if (!o.special && o !== z && o.root.position.distanceTo(pos) < 90 && Math.abs(o.root.position.y - pos.y) < 50) enemies.hurt(o, o.health + 1, false, true, 'explosion', false);   // gibs zombies in the way
     }
     if (/muz_flash/.test(n) && !z.gunOff) fire(z);
@@ -145,7 +147,7 @@ export function setupRaz(K) {
   }
   function blow(z, p, shot) {
     shot.life = 0; K.boom(p, .7); K.sfxAt(K.pick('raz_imp', 4), p, 1);
-    K.playersNear(p, 128, (id, d) => K.hitPlayer(id, 100 - 50 * d / 128));
+    K.playersNear(p, 128, (id, d) => K.hitPlayer(id, 100 - 50 * d / 128, 'raz:blast'));
     if (K.meIn(p, 100) && K.player.onFloor !== false) K.shove(K.player.getFeetPosition().clone().sub(p), rand(200, 500));
     for (const b of world.barriers ?? []) if (b.count > 0 && b.inside && b.inside.distanceTo(p) < 100) world.setBoards?.(b, 0);
   }
@@ -184,7 +186,7 @@ export function setupRaz(K) {
     // stand-in for the right shoulder pad (c_zom_dlc3_raz_s_rightshoulderpad isn't exported): the left one, mirrored
     const pad = K.debris(S.models.c_zom_dlc3_raz_s_leftshoulderpad, K.boneAt(z, 'j_shoulder_ri') ?? at, out.clone().add(V(0, 320, 0))); if (pad) pad.o.scale.x = -1;
     K.boom(at, .6); K.sfx(K.pick('raz_imp', 4), 1);
-    K.playersNear(at, 128, (id, d) => K.hitPlayer(id, Math.floor(35 * (1 - d * d / 16384)) + 15));
+    K.playersNear(at, 128, (id, d) => K.hitPlayer(id, Math.floor(35 * (1 - d * d / 16384)) + 15, 'raz:blast'));
     for (const o of [...enemies.list]) { if (o.special || o === z) continue; const d = o.root.position.distanceTo(at); if (d < 128) enemies.hurt(o, z.maxHealth * (.5 - .25 * d / 128), false, false, 'explosion', false); }
     z.health = z.health > z.maxHealth * .25 ? z.maxHealth * .25 : Math.max(1, z.health - z.maxHealth * .33);
     z.berserk = true;

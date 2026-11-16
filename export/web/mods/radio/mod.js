@@ -25,6 +25,9 @@ export const SONGS = [
   { id: 'dead_again', title: 'Dead Again', artist: 'Elena Siegman', map: 'der-eisendrache', mapName: 'Der Eisendrache', egg: 'The three teddy bears', url: 'mods/der-eisendrache/audio/dead_again.ogg', keys: ['castle:dead_again'] },
   { id: 'malibu_intro', title: 'Age of Apocalypse (Intro)', artist: 'Malibu Drive', map: 'malibu-drive', mapName: 'Malibu Drive', egg: 'The Bifrost down to Earth', url: 'mods/maps/malibu-drive/sounds/malibu_drive_intro_song.ogg', keys: ['malibu:intro'] },
   { id: 'malibu_ending', title: 'The Avengers Saved Malibu', artist: 'Malibu Drive', map: 'malibu-drive', mapName: 'Malibu Drive', egg: 'The antidote (the main Easter egg)', url: 'mods/maps/malibu-drive/sounds/malibu_ending_music.ogg', keys: ['malibu:ending'] },
+  { id: 'dead_ended', title: 'Dead Ended', artist: 'Malukah & Kevin Sherwood', map: 'gorod-krovi', mapName: 'Gorod Krovi', egg: 'The three vodka bottles', url: 'mods/maps/gorod-krovi/audio/mus_dead_ended.ogg', keys: ['gorod:dead_ended'] },
+  { id: 'gk_ace_of_spades', title: 'Ace of Spades', artist: 'Motörhead', map: 'gorod-krovi', mapName: 'Gorod Krovi', egg: 'The three ace cards (or the anthem speakers)', url: 'mods/maps/gorod-krovi/audio/mus_ace_of_spades.ogg', keys: ['gorod:ace_of_spades'] },
+  { id: 'samanthas_sorrows', title: "Samantha's Sorrows", artist: 'Kevin Sherwood', map: 'gorod-krovi', mapName: 'Gorod Krovi', egg: "Samantha's music box", url: 'mods/maps/gorod-krovi/audio/mus_sam.ogg', keys: ['gorod:sam'] },
 ];
 const BY_ID = Object.fromEntries(SONGS.map(s => [s.id, s])), BY_KEY = Object.fromEntries(SONGS.flatMap(s => s.keys.map(k => [k, s])));
 

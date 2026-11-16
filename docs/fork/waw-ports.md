@@ -420,4 +420,23 @@ BO3's `zm_stalingrad`, exported from the running game (history 2026-11-14) and b
     - Upgrade: 20+10n strike kills, 10 s, n of the four banners (`strike_banner` props) stay and must be hit by a fireball (within 300), every player presses again: stage 4 starts the upgrade lockdown (waves [18,4] [20,5] [22,6]) and the strike refills after each use; 15+5n strike kills during it gives `draconiteavailable` and the upgraded strike, short = press again.
     - MG42 (`pavlov_turret` prop, 1000, not during a lockdown): held at the gun 30 s or until use again, 140° arc, ~1150 rpm, overheat 2.5 s, cooldown 15 s x share used, `mg:kill` (challenge 3_4). `host.gunBlocked` + `host.hideViewmodel` while mounted.
     - Events `strike:kill`, `strike:called`, `strike:stage`, `pap:lockdown` (start/wave/end/fail, kind). Debug `kino.gorod.strike` (`state`, `give`, `call`, `press`, `stage`, `setKills`), `kino.gorod.mg`, `kino.gorod.pap`. Tests `scratch/gk/strike/play.js` (the whole quest), `play2.js` (kills), `play3.js` (aim, reuse, Max Ammo).
+  - **Side eggs, wearables, main Easter egg** (2026-11-15; `eggs.js`, `wearables.js`, `ee.js`; spec in `scratch/gk/spec/side-eggs.md` and `ee.md`, from `zm_stalingrad_ee_main`, `_wearables` and friends; no VO: subtitles are toasts in my own words; sounds from `.tools/build_gk_eggs_audio.py` into the git-ignored `audio/`):
+    - Side eggs (`eggs.js`): the three songs on the radio list (radio/mod.js), the Sam, the logs, the time-attack rounds (`TIME_ATTACK`). `kino.gorod.eggs`.
+    - Wearables (`wearables.js`): Mangler helmet (5 cannons + 5 masks), Valkyrie hat (5 drones with all arms off + 5 cameras), dragon wings (shield, Gauntlet, Strike, a ride from each roost). They halve that enemy's damage through `gk.dmgScale(kind, id)` (boss-common `kit.hitPlayer`) and `gk.burn`, and are lost at game over. The wings' roost pads fly the player to Pavlov's roof. `kino.gorod.wear`.
+    - Main egg (`ee.js`, host/solo):
+      - **Generator and tubes:** a Valkyrie killed in Pavlov's basement charges the generator (360 s a run, the next one needs a use after a round). Six tube levers (BO3's output table) route the air through all six stations to the jammed tube, which drops the cylinder.
+      - **Code and figures:** S.O.P.H.I.A.'s six code rings turn when shot (code 060764; a wrong code locks until the next round), then a pause. The six map figures are findable any time: shoot the blob, a Strike on the library puddle, the eye trap on the debris, shield breath into the factory pipe, shoot the sewer switch, the Gauntlet punch on the safe. They go on the war-map shelf.
+      - **The six tasks**, from the map button (refused in a Valkyrie round or a lockdown):
+        - EE drop pod (`pods.callEE`), then the whelp fetches the cargo (`w.ee` in gauntlet-weapon.js), then it goes in the drawer.
+        - Valkyrie escort (`z.ee` hook, arms hidden, `eeEscort` makes it immune to players, zombies wear down 1500 HP, 60 s stopped = fail).
+        - Mangler capture (raz `z.ee`).
+        - Rigged buttons in the flashed order.
+        - The anomaly ball (PaP hits only, three steps).
+        - The data terminal under the Mangler-only lockdown (`pap.start({razOnly})`, 180 s, every living player in the room).
+
+        Captures end in the raz_cage `grab`. A fail retries after the next round.
+      - **The ending:** the weapon core via the whelp to Nikolai's mech, she leaves, the hatch (every living player on it 1 s), the arena console, then `gk.bosses.nikolai()`. A win gives every perk and emits `ee:done`.
+      - **Pause:** spawns off and the zombies killed back into the round; a lockdown ending while paused keeps spawns off.
+      - **Debug:** `kino.gorod.ee` (`state`, `skip(stage)`, `gen`, `solve`, `code`, `keys`, `scenario(k)`, `use(text)`, `tp`, `ents`, `ball`, `pods`, `pap`). Lite-map runs: `scratch/gk/ee-play.js` (whole flow) and `ee-scen*.js` (tasks), renderer peak ~1.9 GB.
+      - **Not yet played start to finish in a real match;** the tube/lever/terminal props are stand-ins where the export has no model.
   - Missing assets (Greyhound): the real door pieces, `veh_t7_drone_raps`, the Widow's Wine bottle and power-up, the dragon's landing/fire clips.

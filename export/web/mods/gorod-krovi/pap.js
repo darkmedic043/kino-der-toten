@@ -80,6 +80,16 @@ export default async function setupPap(api, gk) {
   // one wave: zombies, Manglers, (final) drones; next() when every part is dead
   function wave(i, sides) {
     const B = gk.bosses, final = i === 3, nn = n(), P = L.P;
+    if (P.razOnly) {   // the main Easter egg's download (ee.js): Manglers only, charging at once; after three waves every side, no cap, until finish()
+      const T = P.razOnly(nn), rPts = pts(sides.flatMap(s => RAZ[s])).map(p => snap(p));
+      const finished = () => { L.step = { t: 3, then: next }; };
+      const w = B?.razWave?.({ points: rPts, total: final ? Infinity : T.total, maxAlive: T.alive, interval: L.razInt, onSpawn: z => { z.berserk = true; }, onDone: finished });
+      L.waves = w ? [w] : []; if (!w) L.step = { t: 10, then: next };
+      L.razInt = Math.max(.1, L.razInt - .1 * nn);
+      gk.emit('pap:lockdown', 'wave', i, final ? 'all' : sides[0]);
+      api.toast?.(final ? 'Every side is open' : `The ${sides[0]} side is open`, 3);
+      return;
+    }
     const zTotal = final ? P.waves[2][0] + P.waves[2][1] * nn * 2 : P.waves[i][0] + P.waves[i][1] * nn;
     const R = P.raz?.(nn), D = final ? P.drones?.(nn) : null;
     const parts = []; let left = 0; const finished = () => { if (--left === 0) L.step = { t: .5 + 2.5, then: next }; };
@@ -100,7 +110,7 @@ export default async function setupPap(api, gk) {
   }
   function next() {
     L.i++;
-    if (L.i > 3) return finish();
+    if (L.i > 3) return L.P.razOnly ? null : finish();
     const sides = L.i === 3 ? ['east', 'north', 'west'] : [L.order[L.i]];
     // alarm 3 s (every 0.9 s), 3 s more, then the side opens
     let k = 0; const ring = () => { if (L.state !== 'active') return; sfx.sfx('lockdown_alarm', .7); if (++k < 4) setTimeout(ring, 900); }; ring();
@@ -117,7 +127,7 @@ export default async function setupPap(api, gk) {
     const P = typeof kind === 'string' ? LOCKDOWNS[kind] : kind; if (!P) return false;
     L.state = 'active'; L.kind = typeof kind === 'string' ? kind : (o.name ?? 'custom'); L.P = { ...P, ...o };
     L.i = -1; L.made = 0; L.order = ['east', 'north', 'west'].sort(() => Math.random() - .5);
-    L.delay = roundDelay(); L.razInt = P.raz?.(n())?.interval ?? 1;
+    L.delay = roundDelay(); L.razInt = P.razOnly?.(n())?.delay ?? P.raz?.(n())?.interval ?? 1;
     gk.clearFlag('lockdowncomplete');
     L.saved = { spawn: enemies.autoSpawn, rounds: enemies.autoRounds }; enemies.autoSpawn = false; enemies.autoRounds = false;
     api.announce?.('Lockdown', "HOLD PAVLOV'S HOUSE", 4); sfx.sfx('lockdown_alarm', .8);

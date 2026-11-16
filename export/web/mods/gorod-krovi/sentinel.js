@@ -97,6 +97,8 @@ export function setupSentinel(K) {
   function think(z, dt, pl) {
     z.t += dt; for (const k in z.cool) z.cool[k] -= dt;
     K.loopVol(z.hum, z.root.position, .35);
+    // ee.js (the escorted drone): z.ee(z, dt) -> null = its own brain, false = hold, {at, speed} = fly there (no attacks)
+    if (z.ee) { const g = z.ee(z, dt); if (g === false) return; if (g) { fly(z, g.at, g.speed ?? 88, dt); return; } }
     if (!z.target || (z.retarget = (z.retarget ?? 0) - dt) <= 0) { z.retarget = 1.5; z.target = K.nearest(z.root.position); }
     const tp = K.posOf(z.target.id) ?? pl, pos = z.root.position;
     if (z.state === 'intro') {   // down from 5,000 over 3 s, then a second's pause
@@ -138,7 +140,7 @@ export function setupSentinel(K) {
     const from = (bone && !z.broken.has(bone) && K.boneAt(z, bone)) || K.boneAt(z, 'tag_laser') || eyeOf(z), tp = chest(K.posOf(z.target?.id) ?? K.player.getFeetPosition());
     const hit = K.clear(from, tp), end = hit ? tp : (world.raycast(new THREE.Ray(from, tp.clone().sub(from).normalize()), 0, from.distanceTo(tp))?.position ?? tp);
     K.line('blue', from, end, .12); K.sprite('blue', end, 30, { life: .2, fade: true });
-    if (hit && z.target) K.hitPlayer(z.target.id, dmg);
+    if (hit && z.target) K.hitPlayer(z.target.id, dmg, 'sentinel');
     if (dmg >= 30) K.sfxAt('sen_main_fire_fire', from, .5);
   }
   function beamTick(z, dt) {
@@ -199,7 +201,7 @@ export function setupSentinel(K) {
     const p = eyeOf(z);
     z.hum?.pause(); z.hum = null;
     K.boom(p, .8); K.sfxAt(K.pick('sen_break', 6), p, 1);
-    K.playersNear(p, 110, id => K.hitPlayer(id, 60));
+    K.playersNear(p, 110, id => K.hitPlayer(id, 60, 'sentinel:blast'));
     for (const o of [...enemies.list]) if (!o.special && o.root.position.distanceTo(p) < 140) enemies.hurt(o, Math.ceil(o.maxHealth * .25), false, false, 'explosion', false);
     for (const r of [...(z.risers ?? [])]) enemies.hurt(r, r.health + 1, false, false, 'explosion', false);
     z.root.visible = false;   // the wreck falls (its own model), the record stays in enemies.dead until it times out
@@ -208,6 +210,7 @@ export function setupSentinel(K) {
   }
   function damage(e) {
     const z = e.enemy;
+    if (z.eeEscort) { e.amount = 0; return; }   // the main egg's escorted drone: players can't hurt it
     if (z.state === 'intro' && z.t < 2) { e.amount = 0; return; }   // out of reach while it comes down
     if (z.t - (z.lastDodge ?? -9) > 3 && z.state === 'fly' && Math.random() < .25 && !z.beam) {   // a roll aside
       z.lastDodge = z.t; const l = Math.random() < .5; play(z, l ? 'dodge_l_v2' : 'dodge_r_v2', false); z.busyUntil = z.t + .9;
