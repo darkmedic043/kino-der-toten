@@ -312,6 +312,7 @@ Details: `materials.md` ("Der Eisendrache: grey sheets...", "overlay layers draw
 | Glass | `glass`, `window_pane` | `BLEND`, alpha .28, roughness .15, double-sided, no depth write |
 | Water | by hand in the mod's `setupLook` | opacity about .3, tinted, no depth write, drawn after the level |
 | Design in alpha on a white image (carvings, chalk, runes) | found by eye | overlay named `<name>_decal`; or rebuild the image with its `_r` reveal mask as alpha (`giant-chalk.mjs`: ffmpeg `alphamerge`) |
+| Decal shaped by its reveal map (a `decal` material, not `_blend`, with image slot `34d849d5` = `_r`; its colour map is a whole opaque tile, e.g. the concrete cracks use `i_t7_concrete_bare_light_01_c`) | slot `34d849d5` in the dump's material images | the builder's `texture(..., reveal)` writes colour alpha x reveal into `tex-src/` (`$white_diffuse` decals: white, tinted by name). Without it each decal is a solid pale slab (Gorod Krovi 2026-11-16, 23k triangles of cracks; only `zm_stalingrad` uses it so far, the older maps keep their output until someone rebuilds them on purpose) |
 | Alpha is data | everything else | **opaque** |
 
 Checks:

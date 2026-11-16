@@ -44,12 +44,28 @@ if BSP == 'zm_stalingrad':   # Gorod Krovi: a black box (wc/infinite_blackness, 
 
 # ---- textures ----------------------------------------------------------------------------------------------------------
 textures = {}   # image name -> {uri, alpha}
-def texture(name, size):
+REVEAL = '34d849d5'
+def texture(name, size, reveal=None):
     name = (name or '').split('\\')[-1].split('/')[-1].replace('.png', '')
-    if not name or name.startswith('$'): return None
-    key = (name, size)
+    reveal = (reveal or '').split('\\')[-1].split('/')[-1].replace('.png', '')
+    if reveal.startswith('$') or not os.path.exists(os.path.join(GH, 'ximages', reveal + '.png')): reveal = ''
+    if not name or (name.startswith('$') and not (reveal and name == '$white_diffuse')): return None
+    key = (name, size, reveal)
     if key in textures: return textures[key]
     src = os.path.join(GH, 'ximages', name + '.png')
+    if reveal:
+        # a BO3 decal whose shape is its reveal map (_r): the colour image is a whole tile of plain material (the concrete
+        # cracks: i_t7_concrete_bare_light_01_c, opaque) and the game cuts it out with the reveal. Without it each decal
+        # was a solid pale slab over the wall or floor (2026-11-16, 23k triangles of cracks alone). Alpha = colour alpha x
+        # reveal; '$white_diffuse' decals (the blood puddles) become white cut by the reveal, tinted by name in material()
+        rv = os.path.join(GH, 'ximages', reveal + '.png')
+        out = os.path.join(OUT, 'tex-src', f'{name.lstrip("$")}__{reveal}.png'); os.makedirs(os.path.dirname(out), exist_ok=True)
+        if not os.path.exists(out) or os.path.getmtime(out) < os.path.getmtime(rv):
+            wh = subprocess.run(['magick', 'identify', '-format', '%wx%h', rv if name.startswith('$') else src], capture_output=True, text=True).stdout.strip()
+            base = ['-size', wh, 'xc:white'] if name.startswith('$') else [src]
+            subprocess.run(['magick', *base, '-alpha', 'on', '(', '+clone', '-alpha', 'extract', '(', rv, '-alpha', 'off', '-colorspace', 'gray', '-resize', wh + '!', ')',
+                            '-compose', 'multiply', '-composite', ')', '-alpha', 'off', '-compose', 'copy_opacity', '-composite', out], check=True)
+        src, name = out, f'{name.lstrip("$")}__{reveal}'
     if not os.path.exists(src): textures[key] = None; print('  missing texture', name); return None
     with open(src, 'rb') as f: head = f.read(32)
     alpha = head[25] in (4, 6)   # PNG colour type with alpha
@@ -105,6 +121,10 @@ PAINT = [(r'blood', [.32, .03, .03]), (r'grey_?drk|grey_?dk|gray_?dark|dark_?gre
          (r'grey|gray|_gry', [.35, .35, .35]), (r'white', [.78, .78, .76]), (r'red', [.4, .07, .06]), (r'green', [.16, .26, .13]),
          (r'blue', [.1, .16, .3]), (r'yellow|caution', [.62, .5, .1]), (r'orange', [.6, .3, .08]), (r'rust|brown', [.36, .2, .1])]
 def name_tint(name):
+    if BSP == 'zm_stalingrad' and re.search(r'white', name, re.I) and not re.search(r'blood', name, re.I):
+        # Gorod Krovi: BO3's own "paint_white" constant is 0.44 grey (fastfile, mtl_p7_zm_ctl_comm_equip_set_paint_white);
+        # at .78 (x the micro detail's 1/bright, so 1.0) the radio room's machines were white boxes (2026-11-16)
+        return [.44, .44, .43]
     for pat, col in PAINT:
         if re.search(pat, name, re.I): return col
     return builtin_color('', name)
@@ -193,7 +213,7 @@ for (mi, cell), parts in groups.items():
     mat = info['materials'][mi]
     imgs = {i['hash']: i['name'] for i in mat['images']}
     overlay = bool(re.search(r'_blend|decal', mat['name'], re.I))
-    m = material(('bsp', mi), mat['name'], texture(imgs.get(COLOR), TEX), texture(imgs.get(NORMAL), NORMAL_TEX), two_sided=bool(NOT_SOLID.search(mat['name'])) and not overlay,
+    m = material(('bsp', mi), mat['name'], texture(imgs.get(COLOR), TEX, imgs.get(REVEAL) if BSP == 'zm_stalingrad' and re.search(r'decal', mat['name'], re.I) and not re.search(r'_blend', mat['name'], re.I) else None), texture(imgs.get(NORMAL), NORMAL_TEX), two_sided=bool(NOT_SOLID.search(mat['name'])) and not overlay,
                  overlay=overlay, fallback=builtin_color(imgs.get(COLOR), mat['name']))
     pos = Pg[used] + Ng[used] * (.12 if overlay else 0)   # overlays sit a hair above the surface they cover (no z-fighting)
     prim = {'attributes': {'POSITION': accessor(pos.astype(np.float32), 'VEC3', 34962, True), 'NORMAL': accessor(Ng[used], 'VEC3', 34962),

@@ -24,7 +24,7 @@ const KEY_DIR = new THREE.Vector3(.553, .548, .627).normalize(), KEY_RGB = [1, .
 // turned the way the game draws it: SKY_TURN is the fraction of a turn added to the panorama's u (heading 307° at its
 // middle column, fitted on Der Eisendrache's moon, whose far-away fx entity gives its true heading)
 const SUN = new THREE.Vector3(.797, .306, .521).normalize(), SKY_TURN = .6028;
-const SKY_GAIN = 3, HAZE = 0x3d3c45, KEY_I = 1.1;
+const SKY_GAIN = 2, HAZE = 0x3d3c45, KEY_I = 1.1;
 
 // Textured metals whose colour map is near black (BO3 keeps a metal's colour in its specular map, not exported): the
 // pressed-bronze ceilings of the department store and the factory read as black voids overhead (2026-11-15). Each is
@@ -82,7 +82,10 @@ export function setupLook(api, { detail = true } = {}) {
   const [key, fill] = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
   let baked = null;
   // the light left indoors: a neutral, slightly warm grey (the fires and bulbs are in the bake's lamp light)
-  const ready = loadMapLight(api, { skyFloor: .62, indoor: [1.0, .96, .92], sunFloor: .14, strength: 1, powerOff: .7, knee: .12 }).catch(() => null).then(l => { baked = l; report.bake = !!l; });
+  // 2026-11-16 (user, with a BO3 video: "everything seems off and weird"): the floors .62/.14, ambient .75 and hemi .95 sat
+  // on top of the bake's room fill and lit every room alike (flat, beige); lower floors, a cooler indoor tint and a softer
+  // knee give the shade back (frame brightness 85 -> 74, the video's median 54; ambient and hemi below too)
+  const ready = loadMapLight(api, { skyFloor: .42, indoor: [.93, .95, 1.03], sunFloor: .1, strength: 1, powerOff: .7, knee: .17 }).catch(() => null).then(l => { baked = l; report.bake = !!l; });
 
   // the sky: BO3's panorama, sampled per pixel by view direction (an equirectangular scene.background turns every map
   // material white here; DE's notes), stored dim so drawn at SKY_GAIN, its horizon band fading into the haze
@@ -111,8 +114,8 @@ uniform sampler2D map; uniform float gain; uniform vec3 haze, sun; varying vec3 
 
   host.on('update', () => {
     sky.position.copy(camera.position);
-    if (ambient) { ambient.color.setHex(0x8f8da8); ambient.intensity = .75; }   // (sky light: the panorama's own blue-violet, measured on its upper half)
-    if (hemi) { hemi.color.setHex(0xb0aecc); hemi.groundColor.setHex(0x4a4038); hemi.intensity = .95; }
+    if (ambient) { ambient.color.setHex(0x8f8da8); ambient.intensity = .58; }   // (sky light: the panorama's own blue-violet, measured on its upper half)
+    if (hemi) { hemi.color.setHex(0xb0aecc); hemi.groundColor.setHex(0x4a4038); hemi.intensity = .68; }
     if (key) { key.color.setRGB(...KEY_RGB, THREE.SRGBColorSpace); key.intensity = baked ? KEY_I : .9; key.position.copy(KEY_DIR); }
     if (fill) { fill.color.setHex(0x6a7a96); fill.intensity = .35; }
   });

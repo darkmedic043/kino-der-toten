@@ -39,7 +39,10 @@ const MAPS = {
   // Gorod Krovi (2026-11-15): the game's own lights, as the castle; the burning sky comes from the sun direction the map mod uses
   'gorod-krovi': { lamps: /^GOROD_LAMP_/, cell: 48, range: 620, decay: 1.4, off: 2000, on: 3000, color: () => 0xffb070, sun: [.553, .548, .627], extra: [],
     // 2026-11-15 (user: "absurdly dark"): Stalingrad's lights are about 7x weaker than the castle's in the game's data (median colour 32 vs 241: BO3 evens that out with its per-map exposure), and most indoor standing cells get no direct lamp at all, so the room fill sets the indoor level: gain 550 -> 1400, fill 1.5 -> 2.6 (gameplay markers' lamp median 1.64 -> 2.77, DE's 2.6)
-    real: { file: 'export_game/bo3/maps/zm_stalingrad/zm_stalingrad.lights.json', gain: 1400, minRadius: 30, albedo: .5, bounces: 3, adapt: [6, .45], fill: [2.6, .93, .86, .8], outdoor: 1.4 } },
+    // 2026-11-16 (user: "everything seems off and weird", with a BO3 video): fill 2.6 + adapt .45 lit every room to the same level
+    // (flat beige, no shade; frame brightness 85 vs the video's median 54): fill 2.6 -> 1.4, adapt .45 -> .6, so lamps and fires
+    // make pools again and unlit corners fall off, without the 11-15 blackness
+    real: { file: 'export_game/bo3/maps/zm_stalingrad/zm_stalingrad.lights.json', gain: 1400, minRadius: 30, albedo: .5, bounces: 3, adapt: [6, .6], fill: [1.4, .93, .86, .8], outdoor: 1.4 } },
 };
 const id = process.argv[2], cfg = MAPS[id];
 if (!cfg) { console.error('usage: bake-map-light.mjs <' + Object.keys(MAPS).join('|') + '> [--cell N]'); process.exit(1); }
