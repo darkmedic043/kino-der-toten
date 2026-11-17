@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { CollisionWorld } from '../../collision-world.js';
+import { fitSkinnedBounds } from '../../skinned-bounds.js';
 
 export const W = (x, y, z) => new THREE.Vector3(x, z, -y);
 const ROOT = new URL('../../', import.meta.url), DIR = 'mods/maps/gorod-krovi/scenes/';
@@ -29,9 +30,42 @@ export async function makeProp(J, key, onNote = () => {}) {
       if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = true; }
     });
     for (const [a, u] of Object.entries(d.animations ?? {})) P.rig.add(a, await loadAnimation(abs(u)));
+    autoCull(root);
     return P;
   } catch (e) { console.warn('[gorod-krovi] scene prop', key, e?.message ?? e); return null; }
 }
+
+// ---- view culling for rigged props -------------------------------------------------------------------------------
+// A rigged model loads with frustum culling off (its bounds are the bind pose's), so every scene prop on the map was
+// drawn each frame from anywhere, and once more into the sun's actor shadow map (sun.js): about 450 + 600 draws a frame
+// (2026-11-17). A prop at rest gets its posed bounds (skinned-bounds.js) and is culled like any mesh; when a joint
+// moves again (its world matrix changed) it goes back to always drawn until it rests. cullTick runs from mod.js.
+const CULL = []; let cullAt = 0;
+export function autoCull(root) {
+  if (!root || CULL.some(c => c.root === root)) return;
+  const nodes = []; root.traverse(o => { if (!o.isMesh) nodes.push(o); });
+  CULL.push({ root, nodes, sig: NaN, still: 0, fit: false });
+}
+function signature(c) {
+  let s = 0;
+  for (let i = 0; i < c.nodes.length; i++) { const e = c.nodes[i].matrixWorld.elements; s += (e[12] + e[13] * 1.7 + e[14] * 2.3 + e[0] * 31 + e[5] * 37 + e[10] * 41) * (1 + i % 13); }
+  return s;
+}
+const setCull = (c, on) => { c.fit = on; c.root.traverse(o => { if (o.isMesh) o.frustumCulled = on; }); };
+// a clip is about to move the prop: always drawn from this frame on (the tick alone would notice up to a quarter second late)
+const wake = root => { const c = CULL.find(c => c.root === root); if (c) { c.sig = NaN; c.still = 0; if (c.fit) setCull(c, false); } };
+export function cullTick() {
+  let fitted = false;
+  for (let k = Math.min(8, CULL.length); k > 0; k--) {
+    const c = CULL[cullAt = (cullAt + 1) % CULL.length], s = signature(c);
+    if (s !== c.sig) { c.sig = s; c.still = 0; if (c.fit) setCull(c, false); continue; }
+    if (c.fit || ++c.still < 3 || fitted) continue;
+    fitted = true; fitSkinnedBounds(c.root);   // (one prop a frame: the fit walks every vertex)
+    c.root.traverse(o => { if (o.isSkinnedMesh && o.boundingSphere) o.boundingSphere.radius = o.boundingSphere.radius * 1.15 + 12; });
+    setCull(c, true);
+  }
+}
+export const cullState = () => ({ props: CULL.length, culled: CULL.filter(c => c.fit).length });
 
 // BO3 origin + angles (pitch yaw roll, degrees) -> the prop's root
 const D = Math.PI / 180;
@@ -43,11 +77,12 @@ export function place(P, origin, angles = [0, 0, 0]) {
 export const moved = o => { o.updateMatrix(); o.updateMatrixWorld(true); };
 export function hold(P, a, at = 0) {   // still on a frame of a clip (0 = the scene's init pose)
   if (!P) return; if (!P.rig.actions[a]) { moved(P.root); return; }
+  wake(P.root);
   P.rig.play(a, false, 0, 0); if (at) P.rig.actions[a].time = at; P.rig.update(0); P.next = null; P.loop = false; moved(P.root);
 }
 export function play(P, a, { loop = false, then = null } = {}) {
   if (!P?.rig.actions[a]) return false;
-  globalThis.kino?.staticFreeze?.thaw?.(P.root);
+  globalThis.kino?.staticFreeze?.thaw?.(P.root); wake(P.root);
   if (P.rig.current === a && !(loop && P.loop)) P.rig.current = null;   // Rig.play ignores a loop of its current clip: a held pose (time scale 0) stayed frozen
   P.rig.play(a, loop, 1, loop ? .25 : 0); P.t = P.dur[a] ?? 0; P.next = then; P.loop = loop; return true;
 }

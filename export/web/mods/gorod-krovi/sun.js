@@ -81,9 +81,9 @@ export function setupSun(api, { key, dir, regions = [], sky = null }) {
   const staticRoot = new THREE.Object3D(), dynRoot = new THREE.Object3D();   // fake roots: children lists only (never .add: it would reparent)
   // static: the map, its batches, the doors (redrawn when one opens) and the perk machines; the rest (zombies, players,
   // the dragon, the quest props that animate, window boards) is drawn into the dynamic map near the camera
-  const isStatic = c => c === world.root || /^(DOOR_|machine_)/.test(c.name) || batches().has(c);
+  const isStatic = c => c === world.root || /^(DOOR_|machine_|booths_|gorod-dragon-console-)/.test(c.name) || batches().has(c);
   let batchSet = null, batchList = null;
-  const batches = () => { const b = globalThis.kino?.instanceCull?.batches; if (b !== batchList) { batchList = b; batchSet = new Set(b ?? []); } return batchSet; };
+  const batches = () => { const b = globalThis.kino?.instanceCull?.batches; if (b !== batchList) { batchList = b; batchSet = new Set(b ?? []); if (b) globalThis.kino.instanceCull.cullShadowCasters?.(true); } return batchSet; };
   const seen = new WeakSet();
   function tag(root, stat) {
     root.traverse(o => { if (!o.isMesh || seen.has(o)) return; seen.add(o);
@@ -137,6 +137,7 @@ export function setupSun(api, { key, dir, regions = [], sky = null }) {
       const t0 = performance.now(), ic = globalThis.kino?.instanceCull; want = false; lastStatic = t0;
       ic?.restore?.();   // every batched prop, not just the ones the camera keeps (the map is drawn once for the whole area)
       base.call(this, [key], staticRoot, cam);
+      ic?.reapply?.();   // back to what the camera keeps, before this frame's main draw
       stats.static++; stats.staticMs = Math.round(performance.now() - t0);
     }
     if (dyn.castShadow && lights.includes(dyn)) { base.call(this, [dyn], dynRoot, cam); stats.dyn++; }

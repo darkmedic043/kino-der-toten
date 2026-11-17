@@ -255,12 +255,14 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
     }
   }
 
+  let lastArgs=null;
   return {
     meshes:list.length,sources,instances,detached,buildMs,batches:list.map(e=>e.mesh),
     get drawn(){return drawn;},followers:followers.length,get released(){return released;},get shown(){let n=0;for(const f of followers)if(f.vis&&!f.off)n++;return n;},
     // camera: the render camera; height: drawing-buffer height in px; pixels: the smallest instance kept (0 = all)
     update(camera,height,pixels,force=false){
       if(!list.length)return false;
+      lastArgs=[camera,height,pixels];
       if(followers.length)sync();
       camera.updateMatrixWorld();const p=camera.getWorldPosition(C),dir=camera.getWorldDirection(DIR);
       const k=height/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2))*(camera.zoom??1),key=pixels+'|'+Math.round(k)+'|'+camera.aspect.toFixed(2);
@@ -284,6 +286,12 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
       }
       return true;
     },
+    // Shadow casters are culled by size only, so a prop behind the camera keeps its shadow. A map that draws its shadow
+    // maps with the cull lifted (restore() before the draw, reapply() after: Gorod Krovi's sun, mods/gorod-krovi/sun.js)
+    // switches the view test on for them too: without it every prop in range was drawn whichever way the camera faced.
+    cullShadowCasters(on=true){for(const e of list)e.frustum=on||!e.mesh.castShadow;lastPos=null;},
+    // the last update again (after a restore(), in the same frame)
+    reapply(){return lastArgs?this.update(lastArgs[0],lastArgs[1],lastArgs[2],true):false;},
     // every instance back on (e.g. before a bake that renders the whole map)
     restore(){for(const e of list){for(let i=0;i<e.n;i++)if(!e.mask[i]&&(!e.alive||e.alive[i])){e.mask[i]=1;e.mesh.setVisibleAt(e.ids[i],true);}e.kept=e.n;e.mesh.visible=true;}lastPos=null;drawn=instances;},
   };

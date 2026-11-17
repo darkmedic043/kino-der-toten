@@ -25,6 +25,7 @@
 import * as THREE from 'three';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { makeSfx } from './dragon-sfx.js';
+import { autoCull } from './scene-props.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 const DIR = new URL('../maps/gorod-krovi/dragon/', import.meta.url).href;
@@ -104,7 +105,7 @@ export default async function setupDragon(api, gk) {
       const c = consoleModel.clone(true), [x, y, z, yaw] = s.model;
       c.position.copy(W(x, y, z)); c.rotation.y = yaw * Math.PI / 180; c.name = 'gorod-dragon-console-' + s.id;
       c.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = false; });
-      scene.add(c); c.updateMatrixWorld(true);
+      scene.add(c); c.updateMatrixWorld(true); autoCull(c);   // rigged and never moving: culled off screen (scene-props.js)
     }
   }
 

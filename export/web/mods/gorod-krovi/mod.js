@@ -7,6 +7,7 @@
 // its three parts) and left by its sewer; Pavlov's three zones turn on together once a player has landed there (the roost
 // teleporters' destination sets zone:pavlovsb).
 import { setupLook, prepareLook } from './look.js';
+import { cullTick, cullState } from './scene-props.js';
 
 // sharper textures: the map's detail.json (map-detail.js), read before the map loads
 export async function prepare(data) {
@@ -56,6 +57,7 @@ export default async function setup(api) {
     try { await m.default?.(api, gk); } catch (e) { console.error(`[gorod-krovi] ${n}.js setup`, e); }
     if (performance.now() - t > 250) console.info(`[gorod-krovi] ${n} setup ${Math.round(performance.now() - t)} ms`);
   }));
+  api.host?.on?.('update', cullTick); window.kino.gorod.propCull = cullState;   // scene props at rest are culled off screen (scene-props.js)
   gk.emit('parts:ready');   // every part is set up (challenges.js redraws then: its draw needs gk.pods etc.)
 }
 // zombies (models, anims, spawns), sounds (ambience, emitters), bridge (powered drawbridge), dragon (roosts, the ride,
