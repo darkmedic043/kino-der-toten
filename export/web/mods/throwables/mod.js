@@ -13,7 +13,7 @@
 // One lethal slot (2026-10-28): while Claymores are held, G places a claymore instead (no frags).
 // Frag augments (research mod, window.kino.equipAug): frag.radius, cluster, self, sticky, recycle, stun, bleed, fire.
 import * as THREE from 'three';
-import { loadModel } from '../../animation.js';
+import { loadModel, loadAnimation } from '../../animation.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 const RELEASE=.12;       // seconds into the throw clip when the item leaves the hand
@@ -30,14 +30,28 @@ export default async function setup(api){
   // (equipment other mods add with a `standInModel`, the BO3 Trip Mine and Smoke Grenade, ride the same rig)
   const STAND_IN={frag_grenade_zm:frag?.worldModel,zombie_cymbal_monkey:eq.zombie_cymbal_monkey?.projectileModel,
     ...Object.fromEntries(Object.entries(eq).filter(([,d])=>d.standInModel).map(([id,d])=>[id,d.standInModel]))};
+  // BO3's throw rigs (2026-11-17, user: "make it so the tripmine, gersch, and monkey bomb uses the proper throwing animation"):
+  // pull the pin (twist the Gersh, none for the mine), hold, BO3's own throw with the item leaving the hand at the clip's
+  // fastest hand frame (rig.release). The mine is the spider-mine viewmodel itself; the Gersh and the monkey ride on the
+  // grenade's tag_weapon in place of the BO3 frag. Built by .tools/build_bo3_throws.py (data.throwRigs, bo3-equipment).
+  // squeeze: x/y scale about the camera while a rig is out = BO3's wider viewmodel FOV (our view camera is 51°, so its cocked arm sat off screen); hold: where the hold stops (fraction of the pull, or of the throw for the spider mine, whose idle is an off-screen rest frame)
+  const RIG_LOOK={frag:{squeeze:.76,hold:{at:.8}},tactical:{squeeze:.76,hold:{at:1}},spider:{squeeze:.76,hold:{clip:'fireAnim',at:.3}}};
+  const RIG_OF={tripmine_zm:'spider',zombie_black_hole_bomb:'tactical',zombie_cymbal_monkey:'frag'};
+  const rigFor=id=>{const r=data.throwRigs?.[RIG_OF[id]];return r&&(r.ownModel||STAND_IN[id]||(id==='zombie_black_hole_bomb'&&eq[id]?.worldModel))?r:null;};
+  if(rigFor('zombie_black_hole_bomb'))STAND_IN.zombie_black_hole_bomb=eq.zombie_black_hole_bomb.worldModel;
   const handModels={};
-  for(const [id,url] of Object.entries(STAND_IN))if(url&&qed)handModels[id]=await loadModel(url).catch(()=>null);
+  for(const [id,url] of Object.entries(STAND_IN))if(url&&(qed||rigFor(id)))handModels[id]=await loadModel(url).catch(()=>null);
   const fragMesh=handModels.frag_grenade_zm;
   // load-time warm-up (2026-10-29): the in-hand models are skinned clones under the QED viewmodel and the thrown frag a
   // world clone; a hidden copy of each in the view scene and one in the engine's warm group compile their programs and
   // vertex layouts behind the loading screen (the m67's first draw froze the first throw for 2 s on Windows/D3D11)
   {const warm=new THREE.Group();
     for(const m of Object.values(handModels))if(m){if(viewScene){const v=cloneSkinned(m);v.visible=false;v.traverse(o=>{o.frustumCulled=false;});viewScene.add(v);}warm.add(m.clone(true));}
+    // the rigs: arms, viewmodel and clips are loaded here so view.equip finds them cached; the arms and viewmodel warmed like the rest
+    for(const r of new Set(Object.keys(RIG_OF).map(rigFor).filter(Boolean))){
+      const [hands,gun]=await Promise.all([loadModel(r.handsModel),loadModel(r.model)].map(p=>p.catch(()=>null)));
+      for(const m of [hands,gun])if(m){if(viewScene){const v=cloneSkinned(m);v.visible=false;v.traverse(o=>{o.frustumCulled=false;});viewScene.add(v);}}
+      await Promise.all(Object.values(r.animations).map(u=>loadAnimation(u).catch(()=>null)));}
     (host.warmObjects??=[]).push(warm);}
   const cue=k=>Object.keys(audio.manifest).find(x=>x.endsWith(k));
   const PIN=cue('grenade/foley/pin/pin'),WHOOSH=cue('grenade/foley/throw/gren_throw');
@@ -69,14 +83,15 @@ export default async function setup(api){
   addEventListener('blur',()=>{if(held)held.released=true;});
 
   // ---- the hand ------------------------------------------------------------------------
-  const viewDef=id=>STAND_IN[id]&&qed&&handModels[id]?{...qed,id:'held:'+id,name:eq[id]?.name??id}:eq[id];
+  const viewDef=id=>{const r=rigFor(id);if(r&&(r.ownModel||handModels[id]))return {adsInTime:.2,adsOutTime:.2,...r,...RIG_LOOK[RIG_OF[id]],id:'held:'+id,name:eq[id]?.name??id};   // animation.js divides by adsIn/OutTime: without them the aim blend is NaN and fp.js zeroes the pivot
+    return STAND_IN[id]&&qed&&handModels[id]?{...qed,id:'held:'+id,name:eq[id]?.name??id}:eq[id];};
   let inHand=null;
   function dress(id){
     inHand?.removeFromParent();inHand=null;
     const gun=view.gun;if(!gun)return;
-    const standIn=!!handModels[id]&&viewDef(id)!==eq[id];
+    const def=viewDef(id),standIn=!!handModels[id]&&def!==eq[id]&&!def.ownModel;
     gun.traverse(o=>{if(o.isMesh)o.visible=!standIn;});
-    if(standIn){const bone=gun.getObjectByName('j_gun')??gun,model=cloneSkinned(handModels[id]);   // skinned models need SkeletonUtils
+    if(standIn){const bone=gun.getObjectByName('j_gun')??gun.getObjectByName('tag_weapon')??gun,model=cloneSkinned(handModels[id]);   // skinned models need SkeletonUtils
       // centre the model on the grip point (model origins vary), sized to fit the hand
       const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3()).length();
       model.position.sub(box.getCenter(new THREE.Vector3()));
@@ -123,7 +138,7 @@ export default async function setup(api){
 
   async function begin(id,key){
     held={id,key,released:false,throwing:false,ready:false};
-    const keep=window.kino.freeThrow?.();   // Free Throw (Mule Kick augment)
+    const keep=window.kino.freeThrow?.();held.spent=!keep&&id!=='zombie_cymbal_monkey';   // Free Throw (Mule Kick augment)
     if(id==='frag_grenade_zm'){if(!keep)session.grenades--;}
     else if(id===window.kino.lethalExtra?.id){if(!keep)window.kino.lethalExtra.spend();}
     else if(id!=='zombie_cymbal_monkey'){if(!keep)tac().count--;}     // monkeys are spent by features.throwMonkey
@@ -131,7 +146,15 @@ export default async function setup(api){
     try{await view.equip(viewDef(id));}catch(err){console.warn('[throwables]',err);}
     if(!held)return;
     dress(id);view.mode='throw';
-    const r=view.rig,holdKey=r?.actions.holdFireAnim?'holdFireAnim':'fireAnim',t=holdFrame(holdKey);held.lobbed=!throwClipOk();
+    const r=view.rig,vd=viewDef(id);
+    if(vd.release!=null){   // a BO3 rig: the pull-pin runs to its hold point (RIG_LOOK), the mine is held on a frame of its throw
+      held.rig=vd;const pin=vd.animations.holdFireAnim!==vd.animations.idleAnim&&r?.actions.holdFireAnim,H=vd.hold??{};
+      held.lobbed=false;held.pinAt=session.time;held.ready=true;
+      if(H.clip==='fireAnim'&&r?.actions.fireAnim){held.holdKey='fireAnim';held.holdT=(H.at??0)*(r.data.fireAnim?.duration??0);r.play('fireAnim',false,0,.12);r.actions.fireAnim.time=held.holdT;}   // the hand comes up holding the mine and waits
+      else if(pin){const d=r.data.holdFireAnim?.duration??0;held.holdKey='holdFireAnim';held.endT=d-1/60;held.holdT=Math.min(held.endT,(H.at??1)*d);r.play('holdFireAnim',false,1.6*(window.kino.throwSpeed?.()??1),.05);}
+      else{held.holdKey='idleAnim';held.holdT=0;r?.play('idleAnim',true,1,.1);}
+      return;}
+    const holdKey=r?.actions.holdFireAnim?'holdFireAnim':'fireAnim',t=holdFrame(holdKey);held.lobbed=!throwClipOk();
     held.holdKey=holdKey;held.holdT=t;held.pinAt=session.time;held.ready=true;
     // run the pull-pin clip up to the hold frame (or ease straight into it on the throw clip)
     if(holdKey==='holdFireAnim'){r.play('holdFireAnim',false,1.6*(window.kino.throwSpeed?.()??1),.05);}
@@ -139,11 +162,23 @@ export default async function setup(api){
     if(id==='frag_grenade_zm'&&PIN)setTimeout(()=>held?.id===id&&audio.play(PIN,.8),250);
   }
 
+  // a weapon swap before the throw puts the item away (2026-11-17, user: "if you swap weapons before throwing the lethal or
+  // tactical, it cancels it instead of throwing it"): the spent item comes back, then the swap goes through. Once the throw
+  // has started it finishes (the swap is refused while busy, as before).
+  function cancel(){
+    const h=held;if(!h||h.throwing)return false;held=null;inHand?.removeFromParent();inHand=null;session.equipmentLeft=0;
+    if(h.spent){if(h.id==='frag_grenade_zm')session.grenades++;else if(h.id===window.kino.lethalExtra?.id)window.kino.lethalExtra.refund?.();else if(tac())tac().count++;}
+    return true;
+  }
+  const swap=session.switchWeapon;
+  session.switchWeapon=function(...a){cancel();return swap.apply(this,a);};
+
   function release(){
     const h=held;h.throwing=true;const r=view.rig,pace=window.kino.throwSpeed?.()??1;   // Fast Pitcher
-    let len=r?.data.fireAnim?.duration||.4,at=RELEASE;
+    const from=h.holdKey==='fireAnim'?h.holdT:0;   // the spider mine's throw goes on from its hold frame
+    let len=(r?.data.fireAnim?.duration||.4)-from,at=Math.max(.02,(h.rig?.release??RELEASE)-from);
     if(h.lobbed){const a=r?.actions[h.holdKey];if(a)a.timeScale=0;h.lob={t:0,T:LOB/pace};len=LOB;at=LOB_RELEASE;}   // the hand holds its pose under the lob
-    else if(r?.actions.fireAnim){r.play('fireAnim',false,pace,.04);r.actions.fireAnim.time=0;r.actions.fireAnim.timeScale=pace;}
+    else if(r?.actions.fireAnim){if(!from)r.play('fireAnim',false,pace,.04);r.actions.fireAnim.time=from;r.actions.fireAnim.timeScale=pace;}
     setTimeout(()=>{if(held===h){hideItem();launch(h);}},at*1000/pace);
     setTimeout(async()=>{if(held!==h)return;held=null;session.equipmentLeft=0;await api.equipView?.();},Math.max(len,.3)*1000/pace+80);
   }
@@ -184,17 +219,18 @@ export default async function setup(api){
   host.on('update',dt=>{
     if(!dt)return;
     const fm=window.kino.fpMotion;if(fm&&fm.throwPose!==lobPose)fm.throwPose=lobPose;
+    const sq=(held&&view.def?.id==='held:'+held.id&&view.def.squeeze)||1;if(view.pivot.scale.x!==sq)view.pivot.scale.set(sq,sq,1);   // BO3 rig drawn at BO3's FOV
     if(held){
       if(held.lob)held.lob.t+=dt;
       session.equipmentLeft=Math.max(session.equipmentLeft,.2);
       if(session.phase==='reviving'||session.phase==='gameover'){held=null;session.equipmentLeft=0;}
       else if(held.ready&&!held.throwing){
         const a=view.rig?.actions[held.holdKey];
-        if(held.holdKey==='holdFireAnim'&&a&&a.time>=held.holdT)a.timeScale=0;     // stop on the hold frame
+        if(held.holdKey==='holdFireAnim'&&a&&!(held.released&&held.endT!=null)&&a.time>=held.holdT)a.timeScale=0;     // stop on the hold frame
         const since=session.time-held.pinAt;
         if(held.id==='frag_grenade_zm'&&since>=(frag.fuseTime??3.5)){const at=camera.position.clone();held=null;session.equipmentLeft=0;explode(at,true);api.equipView?.();}
         // a tap before the lobbed item is up: the pull-pin runs on fast to the hold pose first (a lob from there started off screen)
-        else if(held.released&&since>=.25){if(held.lobbed&&held.holdKey==='holdFireAnim'&&a&&a.time<held.holdT-.02)a.timeScale=Math.max(a.timeScale,4.5);else release();}
+        else if(held.released&&since>=.25){if((held.lobbed||held.rig)&&held.holdKey==='holdFireAnim'&&a&&a.time<(held.endT??held.holdT)-.02)a.timeScale=Math.max(a.timeScale,4.5);else release();}
       }
     }
     for(const g of [...frags]){

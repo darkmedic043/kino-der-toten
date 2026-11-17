@@ -23,7 +23,7 @@ const up = new THREE.Vector3(0, 1, 0);
 const url = p => new URL(p, import.meta.url).href;
 const TRIP = url('models/tripmine.glb'), SMOKE = url('models/smoke.glb');
 const SOUNDS = ['plant', 'trip', 'arm', 'zap', 'zap2', 'link', 'short', 'smoke_start', 'smoke_loop', 'smoke_end', 'smoke_bounce'];
-const TRIP_REACH = 650, TRIP_SPEED = 1100, LASER = 240, WIRE_RANGE = 300, WIRE_CHARGES = 10, WIRE_LIFE = 60, WIRE_COOL = 1.5;
+const TRIP_REACH = 650, TRIP_SPEED = 1100, LASER = 240, WIRE_RANGE = 300, WIRE_CHARGES = 10, WIRE_LIFE = 60, WIRE_COOL = 1.5, WIRE_LINKS = 2;
 const CLOUD_R = 200, CLOUD_LIFE = 12, CLOUD_GROW = 1.2, FIND = 75, REVEAL = 1.2;
 
 export async function prepare(data) {
@@ -33,6 +33,9 @@ export async function prepare(data) {
   data.equipment.tripmine_zm = { id: 'tripmine_zm', name: 'Trip Mines', worldModel: TRIP, standInModel: TRIP, lethal: true,
     explosionRadius: 190, explosionInnerDamage: 500, explosionOuterDamage: 120 };
   data.equipment.smoke_zm = { id: 'smoke_zm', name: 'Smoke Grenades', worldModel: SMOKE, standInModel: SMOKE, tactical: true };
+  // BO3's first-person throw rigs (.tools/build_bo3_throws.py, git-ignored): the throwables mod holds the Trip Mine, Gersh and Monkey on them
+  const r = await fetch(url('models/throws.json')).catch(() => null);
+  if (r?.ok) data.throwRigs = (await r.json().catch(() => ({}))).rigs;
   return data;
 }
 
@@ -119,13 +122,14 @@ export default async function setup(api) {
     // beam direction: out from a wall, ahead along the floor (the way it was thrown), down from a ceiling
     const along = Math.abs(n.y) < .6 ? n.clone() : n.y > 0 ? f.face.clone() : new THREE.Vector3(0, -1, 0);
     const top = at.clone().addScaledVector(n, Math.abs(n.y) < .6 ? 10 : 22);
-    const m = { g, at: at.clone(), n, top, along, armAt: now() + (aug('trip.quick') ? .25 : 1), armed: false, beams: [], pair: null, boomAt: 0 };
+    const m = { g, at: at.clone(), n, top, along, armAt: now() + (aug('trip.quick') ? .25 : 1), armed: false, beams: [], links: new Set(), burnt: new Set(), linkAt: 0, boomAt: 0 };
     mines.push(m); play('plant', .6);
     const cap = session.tripMax?.() + 1 || 4;
     while (mines.length > cap) removeMine(mines[0], false);
   }
   function arm(m) {
     m.armed = true; play('arm', .45);
+    if (aug('trip.tether')) return;   // Live Wire mines carry no laser and never go off: they only make wires
     const dirs = [m.along];
     if (aug('trip.grid')) { const axis = Math.abs(m.n.y) < .6 ? up : m.n; for (const a of [-.44, .44]) dirs.push(m.along.clone().applyAxisAngle(axis, a)); }   // Laser Grid: ±25°
     for (const d of dirs) {
@@ -138,7 +142,7 @@ export default async function setup(api) {
     if (spark) features?.effect?.(m.top, 0x8fd4ff, 10);
     m.g.removeFromParent(); for (const b of m.beams) b.mesh.removeFromParent();
     mines = mines.filter(x => x !== m);
-    if (m.pair) { const w = m.pair; removeWire(w, false); }
+    for (const w of [...m.links]) removeWire(w, false);
   }
   function detonate(m) {
     const def = { ...tripDef, explosionRadius: tripDef.explosionRadius * (1 + aug('trip.radius')),
@@ -166,7 +170,19 @@ export default async function setup(api) {
     return false;
   }
 
-  // Live Wire
+  // Live Wire (2026-11-17, user: "make it so the tripmine wire augment can arc between more than 2 tripmines, and also make it
+  // so they cant blow up so you can throw them and connect them before the blow up"): every armed mine wires itself to its two
+  // nearest armed mines in reach with a clear line (a chain or a ring through any number, not one pair), and with the augment no mine has a laser or
+  // explodes. A wire that shorts out goes alone (that pair never rewires); a mine left with no wire after that goes with it (a mine never wired waits).
+  const reachOf = () => WIRE_RANGE * (1 + aug('trip.radius'));
+  const linked = (a, b) => [...a.links].some(w => w.a === b || w.b === b);
+  // at most WIRE_LINKS wires on a mine, nearest first: a fence (chain or ring) through every mine, not a full mesh (6 mines = 6 wires, not 15)
+  function linkAll(m) {
+    if (m.links.size >= WIRE_LINKS) return;   // only a mine never wired looks for partners (it can take a wired mine's free end); a wire lost to a short isn't replaced
+    const near = mines.filter(o => o !== m && o.armed && !o.boomAt && o.links.size < WIRE_LINKS && !m.burnt.has(o) && !linked(m, o) && o.top.distanceTo(m.top) < reachOf())
+      .sort((a, b) => a.top.distanceTo(m.top) - b.top.distanceTo(m.top));
+    for (const o of near) { if (m.links.size >= WIRE_LINKS) break; if (o.links.size < WIRE_LINKS && world.lineClear(m.top, o.top)) link(m, o); }
+  }
   function link(a, b) {
     for (const m of [a, b]) { for (const x of m.beams) x.mesh.removeFromParent(); m.beams = []; }
     const core = new THREE.Mesh(wireGeo, wireMat), d = b.top.clone().sub(a.top);
@@ -175,13 +191,14 @@ export default async function setup(api) {
     const arc = new THREE.Line(geo, arcMat); arc.frustumCulled = false;
     scene.add(core, arc);
     const w = { a, b, core, arc, pts, kills: 0, charges: WIRE_CHARGES, until: now() + WIRE_LIFE, cool: new WeakMap(), jitter: 0 };
-    a.pair = b.pair = w; wires.push(w); play('link', .55);
+    a.links.add(w); b.links.add(w); a.wired = b.wired = true; wires.push(w); play('link', .55);
   }
   function removeWire(w, shorted) {
     if (!wires.includes(w)) return;
     wires = wires.filter(x => x !== w); w.core.removeFromParent(); w.arc.removeFromParent(); w.arc.geometry.dispose();
-    w.a.pair = w.b.pair = null;
-    if (shorted) { play('short', .7); for (const m of [w.a, w.b]) removeMine(m, true); salvage(w.kills); }
+    w.a.links.delete(w); w.b.links.delete(w);
+    if (shorted) { play('short', .7); w.a.burnt.add(w.b); w.b.burnt.add(w.a);   // a burnt pair never rewires
+      for (const m of [w.a, w.b]) if (!m.links.size && mines.includes(m)) removeMine(m, true); salvage(w.kills); }
   }
   function updateWire(w, dt) {
     if (now() > w.until || w.charges <= 0) return removeWire(w, true);
@@ -213,6 +230,7 @@ export default async function setup(api) {
     owned: () => !!session.tripsOwned,
     count: () => session.trips ?? 0,
     spend() { session.trips = Math.max(0, (session.trips ?? 0) - 1); },
+    refund() { session.trips = (session.trips ?? 0) + 1; },   // a held mine put away (weapon swap before the throw)
     launch: throwMine,
     quick() {   // controller / touch: thrown at once, no hold
       if (!api.getState?.().active || session.busy || session.phase === 'gameover' || !(session.trips > 0)) return false;
@@ -325,12 +343,11 @@ export default async function setup(api) {
       if (!mines.includes(m)) continue;
       if (!m.armed) { if (t >= m.armAt) arm(m); continue; }
       if (m.boomAt) { if (t >= m.boomAt) detonate(m); continue; }
-      if (aug('trip.tether') && !m.pair) {
-        const other = mines.filter(o => o !== m && o.armed && !o.pair && !o.boomAt && o.top.distanceTo(m.top) < WIRE_RANGE * (1 + aug('trip.radius')) && world.lineClear(m.top, o.top))
-          .sort((a, b) => a.top.distanceTo(m.top) - b.top.distanceTo(m.top))[0];
-        if (other) { link(m, other); continue; }
+      if (aug('trip.tether')) {   // a mine wires up once armed, rechecking each second until it has a partner
+        if (!m.wired && t >= m.linkAt) { m.linkAt = t + 1; for (const b of m.beams) b.mesh.removeFromParent(); m.beams = []; linkAll(m); }
+        continue;
       }
-      if (!m.pair && crosses(m)) { m.boomAt = t + .2; play('trip', .8); }
+      if (!m.links.size && crosses(m)) { m.boomAt = t + .2; play('trip', .8); }
     }
     for (const w of [...wires]) updateWire(w, dt);
     for (const c of [...clouds]) {
