@@ -13,11 +13,13 @@ export function roundPopulation(round, rules = {}, players=1) {
 // Dual wield (not upstream): each gun has its own mag. weapon.mag stays the pair's total (what every refill, mod and
 // HUD reads) and weapon.magL is the left gun's share; the right gun holds the rest. The left gun's mag is half the clip
 // (rounded down), and ammo added to the total tops the right gun up first, then the left. firesBoth: the XMG's trigger
-// fires both guns together (its aim button is lockdown), the other dual guns fire one per trigger.
+// fires both guns together (its aim button is lockdown), the other dual guns fire one per trigger. def.clipLeft: a pair
+// whose guns differ (the Ray Gun Mk3: 3 left, 15 right) sets the left gun's mag; def.fireTimeLeft its rate.
 export const firesBoth=def=>!!(def?.dualWield&&def.lockdown);
+export const leftClip=def=>def.clipLeft??Math.floor(def.clipSize/2);
 export function dualMags(w,def){
   if(!w||!def?.dualWield)return null;
-  const half=Math.floor(def.clipSize/2),right=def.clipSize-half;
+  const half=leftClip(def),right=def.clipSize-half;
   let left=Math.max(0,Math.min(w.magL??Math.floor(w.mag/2),half,w.mag));if(w.mag-left>right)left=Math.min(half,w.mag-right);
   w.magL=left;return {left,right:w.mag-left};
 }
@@ -105,7 +107,7 @@ export class Session {
   fire(){
     if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||(this.reloadLeft>0&&!this.reloadSpares(this.hand))||this.fireLeft>0||this.handMag()===0)return false;
     if(this.hand==='left'&&this.def.dualWield)this.weapon.magL--;
-    this.weapon.mag--;this.shots++;this.fireLeft=this.def.fireTime*(firesBoth(this.def)?2:1)/(this.perks.has('specialty_rof')?1.33:1);return true;
+    this.weapon.mag--;this.shots++;this.fireLeft=(this.hand==='left'&&this.def.dualWield&&this.def.fireTimeLeft||this.def.fireTime)*(firesBoth(this.def)?2:1)/(this.perks.has('specialty_rof')?1.33:1);return true;
   }
   // rounds in one gun of a dual pair (the whole mag otherwise)
   handMag(hand=this.hand){const m=dualMags(this.weapon,this.def);return m?m[hand==='left'?'left':'right']:this.weapon.mag;}
@@ -119,7 +121,7 @@ export class Session {
   reload(){
     if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||this.reloadLeft>0||this.weapon.reserve<=0||this.weapon.mag>=this.def.clipSize)return false;
     // dual wield: only the guns that aren't full reload (reloadHand 'left', 'right' or 'both'), the other one keeps firing
-    const m=!this.def.segmentedReload&&dualMags(this.weapon,this.def),half=Math.floor(this.def.clipSize/2);
+    const m=!this.def.segmentedReload&&dualMags(this.weapon,this.def),half=leftClip(this.def);
     this.reloadHand=m?(m.left<half&&m.right<this.def.clipSize-half?'both':m.left<half?'left':'right'):null;
     this.reloadEmpty=m&&this.reloadHand!=='both'?m[this.reloadHand]===0:this.weapon.mag===0;this.reloadInterrupted=false;
     this.setReloadStage(this.def.segmentedReload?(this.def.reloadStartTime>0?'start':'shell'):'magazine');return true;
@@ -132,7 +134,7 @@ export class Session {
   finishReloadStage(){
     const stage=this.reloadStage,d=this.def;
     const add=stage==='start'?d.reloadStartAdd:stage==='shell'?Math.max(1,d.reloadAmmoAdd):stage==='magazine'?d.clipSize:0;
-    const m=stage==='magazine'&&this.reloadHand&&this.reloadHand!=='both'&&dualMags(this.weapon,d),half=Math.floor(d.clipSize/2);
+    const m=stage==='magazine'&&this.reloadHand&&this.reloadHand!=='both'&&dualMags(this.weapon,d),half=leftClip(d);
     // one gun of a pair: only its own mag fills (the left's share is raised itself, the total would top the right up first)
     const amount=Math.min(add,m?(this.reloadHand==='left'?half-m.left:d.clipSize-half-m.right):d.clipSize-this.weapon.mag,this.weapon.reserve);
     if(m&&this.reloadHand==='left')this.weapon.magL=m.left+amount;this.weapon.mag+=amount;this.weapon.reserve-=amount;

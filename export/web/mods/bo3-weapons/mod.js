@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { applyGlow, tickGlow } from './glow.js';
 import { setupAw } from './aw.js';
+import { setupMk3 } from './mk3.js';
 import { applyKits } from './aw-kits.js';
 
 const BASE=new URL('./',import.meta.url).href;
@@ -63,7 +64,7 @@ export default async function setup(api){
   const weaponSound=audio.weapon.bind(audio);
   audio.weapon=(kind,def,...rest)=>{
     if(kind==='shot'&&isMod(def)){   // the mod's own fire sounds: a random variant (MR23: its own last shot)
-      const m=MS[modId(def)];if(m?.shots?.length){const last=(session.weapon?.mag??1)<=0&&m.last?.length;const list=last?m.last:session.weapon?.upgraded&&m.upShots?.length?m.upShots:m.shots;
+      const m=MS[modId(def)];if(m?.shots?.length){const lh=def.dualWield&&session.lastHand==='left'&&m.leftShots?.length,last=!lh&&(def.dualWield?session.handMag?.('right'):session.weapon?.mag??1)<=0&&m.last?.length;const list=lh?m.leftShots:last?m.last:session.weapon?.upgraded&&m.upShots?.length?m.upShots:m.shots;   // leftShots: a dual gun's own left-hand sound (the Mk3)
         // rapid fire: each shot fades the previous one's tail out (it otherwise stacks up loud: the MR23's sample
         // rings for 1.5 s at 12 shots/s), and a small random pitch/level keeps it from sounding like one loop
         const ctx=audio.ctx;if(prevShot&&ctx){const g=prevShot.g.gain;g.cancelScheduledValues(ctx.currentTime);g.setValueAtTime(g.value,ctx.currentTime);g.linearRampToValueAtTime(0,ctx.currentTime+.12);prevShot.src.stop(ctx.currentTime+.13);prevShot=null;}
@@ -227,4 +228,5 @@ export default async function setup(api){
   host.on('reset',()=>{pending.length=0;setHum(false);});
   window.kino.bo3={fire,arcs,pending,play,sounds:S};
   setupAw(api);   // the Advanced Warfare guns' form swap and lockdown
+  if(data.weapons.bo3_raygun_mk3)setupMk3(api,{play,sounds:MS.bo3_raygun_mk3});   // the Ray Gun Mk3's orbs and beam (mk3.js)
 }
