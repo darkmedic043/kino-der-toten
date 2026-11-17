@@ -407,6 +407,7 @@ export class CustomWorld {
       if(m.type==='WALLBUY'){
         const ids=Object.keys(this.data.weapons),weapon=String(m.extras.weapon??'')||ids.filter(k=>m.arg.startsWith(k)||m.arg.startsWith(k.replace(/_zm$/,''))).sort((a,b)=>b.length-a.length)[0];
         if(!this.data.weapons[weapon]){this.warn(`${rawName(m.object)}: unknown weapon`);continue;}
+        if(entry.wallPrices?.[weapon])this.data.weapons[weapon].price=entry.wallPrices[weapon];   // a BO1 box-only stand-in (price 50) at its BO3 wall gun's price
         this.interactions.push({kind:'wallbuy',weapon,position:m.position.clone()});
         tasks.push(loadModel(this.data.weapons[weapon].worldModel).then(o=>{if(!o)return;o.position.copy(m.position);o.rotation.y=m.yaw+Math.PI/2;
           for(const tag of this.data.weapons[weapon].hideTags??[]){const bone=o.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}this.scene.add(o);
