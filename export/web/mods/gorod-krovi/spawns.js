@@ -45,7 +45,7 @@ export default async function setupSpawns(api, gk) {
     zones.set(name, zone);
   }
   for (const [a, b, flag] of T.links) if (zones.has(a) && zones.has(b)) zones.get(a).out.push({ to: zones.get(b), flag });
-  const stats = { spawns: [], arrived: 0, lost: 0 };
+  const stats = { spawns: [], arrived: 0, lost: 0, moved: 0, ownSide: 0 };
   const missingWin = [...zones.values()].flatMap(z => z.spots).filter(e => e.set && !e.win).length;
 
   // flags: gk.flags() (doors, power, script flags, add_zone_flags already folded in)
@@ -114,16 +114,26 @@ export default async function setupSpawns(api, gk) {
       z.root.rotation.y = THREE.MathUtils.degToRad(e.yaw ?? 0);
       if (z.state === 'barricade') { z.state = 'chase'; z.barrier = null; }   // no riser clip: up in place
       z.gkSpot = e.id;
-      if (e.win && z.kind !== 'dog') { z.gkWin = e.win; z.gkSince = performance.now(); }
+      if (e.win && z.kind !== 'dog') {
+        const w = e.win, home = world.islandAt?.(z.root.position), out = world.islandAt?.(w.outside);
+        if (home === undefined || out === undefined || home === out) { z.gkWin = w; z.gkSince = performance.now(); }
+        else if (e.kind !== 'r') { z.root.position.copy(w.outside); z.gkWin = w; z.gkSince = performance.now(); stats.moved++; }   // the spot snapped onto another navmesh island than its window's outside (factory_A_zone#1 lands inside the factory, 54 from the sill, and walked away from it for 30 s): it appears outside the window, as BO3's does
+      }
       stats.spawns.push({ id: e.id, zone: e.zone, kind: e.kind, set: e.set, at: e.spot.toArray().map(Math.round), round: session.round, t: Math.round(session.time ?? 0) });
       if (stats.spawns.length > 400) stats.spawns.shift();
       return z;
     };
     // the walk to the window: lureTarget is the point every chaser steers to (enemies.js); there, the window's barricade state
     const lure0 = enemies.lureTarget?.bind(enemies);
+    // a window between two zones players walk in (judicial A/B, yellow C/D, red brick A/B): with a player on its outer side and
+    // none on the inner, the zombie is already on their side, so it chases instead of climbing in away from them and back
+    const up = new THREE.Vector3(0, 35, 0), sides = w => w.gkSides ??= [world.zoneAt(w.outside.clone().add(up)), world.zoneAt(w.inside.clone().add(up))];
+    const pz = { t: -1, set: new Set() }, playerZones = () => { const t = performance.now(); if (t - pz.t > 250) { pz.t = t; pz.set = new Set(players().map(p => world.zoneAt(p.clone().add(up)))); } return pz.set; };
+    const ownSide = w => { const [o, i] = sides(w); if (!o || !i || o === i) return false; const s = playerZones(); return s.has(o) && !s.has(i); };
     enemies.lureTarget = z => {
       const w = z.gkWin;
-      if (w && z.state === 'chase') {
+      if (w && z.state === 'chase' && ownSide(w)) { z.gkWin = null; stats.ownSide++; }
+      else if (w && z.state === 'chase') {
         const o = w.outside, p = z.root.position, d = Math.hypot(o.x - p.x, o.z - p.z), age = performance.now() - z.gkSince;
         const done = z.path?.length > 1 && z.pathIndex >= z.path.length && d < 120;   // the navmesh ends short of the sill
         const lost = age > 6000 && (z.path?.length ?? 0) < 2 || age > 30000;            // no walk there: put it at the window
