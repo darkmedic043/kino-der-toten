@@ -245,14 +245,14 @@
    },
    {
     "position": [
-     2471.7,
+     1931,
      -160,
-     -3331.2
+     -2992
     ],
-    "yaw": 0,
+    "yaw": 90,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "library: 2026-11-16, BO3's gum machine stands among the shelves at (2318,-160,-3189), where no wall within 260 is flat to 10, so this is the nearest wall flat within 16 over 36 wide and 75 high (scratch/mk3/gumspots3.js), 209 from the machine"
+    "note": "library: 2026-11-17: moved to the lower floor's west wall (the user: terminals out of bounds); the old spot (2472,-160,-3331) was boxed in by crates, its prompt out of reach in a walk test (scratch/gk/booth-walk.js). Before: 2026-11-16, BO3's gum machine stands among the shelves at (2318,-160,-3189), where no wall within 260 is flat to 10, so this is the nearest wall flat within 16 over 36 wide and 75 high (scratch/mk3/gumspots3.js), 209 from the machine"
    },
    {
     "position": [
@@ -300,14 +300,14 @@
    },
    {
     "position": [
-     618.3,
-     16,
-     -2337.8
+     605,
+     1,
+     -2381
     ],
-    "yaw": -45,
+    "yaw": -135,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "department store: 2026-11-16: at BO3's zbarrier_zmcore_bgb_machine spot (zm_stalingrad.ents), moved to the nearest flat wall (scratch/mk3/gumspots.js: wall flat within 6 over 44 wide and 100 high, level floor, 100 clear in front, 26 to the sides, 110 headroom, no prompt within 80), 70 from the machine"
+    "note": "department store: 2026-11-17: moved 47 to the plain wall beside the old spot (618,16,-2338), which stood behind a desk 40 off the walkable floor (spawn flood, scratch/gk/booth-scan2.js). Before: 2026-11-16: at BO3's zbarrier_zmcore_bgb_machine spot (zm_stalingrad.ents), moved to the nearest flat wall (scratch/mk3/gumspots.js: wall flat within 6 over 44 wide and 100 high, level floor, 100 clear in front, 26 to the sides, 110 headroom, no prompt within 80), 70 from the machine"
    }
   ]
  }

@@ -75,6 +75,7 @@ export default async function setup(api, gk) {
   host.on('roundEnd', () => { if (B.rounds > 0 && --B.rounds === 0) B.next = st.t + 45 + Math.random() * 15; });
 
   let acc = 0; st.t = 0;
+  const SIREN = [75, 15], sirenGain = () => Math.max(0, Math.min(1, (SIREN[0] + SIREN[1] - st.t) / SIREN[1]));   // the air-raid siren winds down after the opening (user: "make it so the siren in the back eventually stops"): full for 75 s of play, faded out over 15 s, then silent for the match
   host.on('update', dt => {
     acc += typeof dt === 'number' ? dt : 1 / 60; if (acc < .2 || !camera?.position) return;
     const step = Math.min(acc, 1), c = camera.position; acc = 0; st.t += step;
@@ -83,7 +84,7 @@ export default async function setup(api, gk) {
     for (const L of loops) {
       let g = L.s.bed ? bedGain(L.s.bed) : 0;
       for (const e of L.em) { const f = fall(dist(c, e), L.s.range); if (f > g) g = f; }
-      L.want = L.dead ? 0 : g * L.s.vol; if (L.want > .004) live.push(L);
+      L.want = L.dead ? 0 : g * L.s.vol * (L.key === 'siren' ? sirenGain() : 1); if (L.want > .004) live.push(L);
     }
     live.sort((a, b) => b.want - a.want); for (let i = MAX; i < live.length; i++) live[i].want = 0;
     for (const L of loops) {
