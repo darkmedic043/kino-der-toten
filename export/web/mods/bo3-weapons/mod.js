@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { applyGlow, tickGlow } from './glow.js';
 import { setupAw } from './aw.js';
 import { setupMk3 } from './mk3.js';
+import { setupRelics } from './relics.js';
 import { applyKits } from './aw-kits.js';
 
 const BASE=new URL('./',import.meta.url).href;
@@ -229,4 +230,5 @@ export default async function setup(api){
   window.kino.bo3={fire,arcs,pending,play,sounds:S};
   setupAw(api);   // the Advanced Warfare guns' form swap and lockdown
   if(data.weapons.bo3_raygun_mk3)setupMk3(api,{play,sounds:MS.bo3_raygun_mk3});   // the Ray Gun Mk3's orbs and beam (mk3.js)
+  setupRelics(api);   // the GKZ-45 Mk3's relic trial on Gorod Krovi (relics.js)
 }

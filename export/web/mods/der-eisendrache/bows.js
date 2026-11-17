@@ -38,6 +38,7 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { createFlames, fireFlicker } from '../fx/flames.js';
 import { settings } from '../../settings.js';
+import { earnRelic } from '../bo3-weapons/relics.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);   // BO3 (CoD) coordinates -> the map's
 const BASE = 'bo3_wrath_ancients', isBow = id => id === BASE || /^bo3_bow_/.test(id ?? '');
@@ -99,12 +100,12 @@ const HINT = {
 const CREST = { crown: 'Crown', door: 'Door', griffon: 'Griffon', heart: 'Heart', horn: 'Horn', stag: 'Stag' };
 const RUNE = { ulla: 'Ulla', zor: 'Zor', oth: 'Oth', mar: 'Mar', uja: 'Uja', lor: 'Lor' };
 
-export function setupBows(api, { lowgrav, pads, traps } = {}) {
+export function setupBows(api, { lowgrav, pads, traps, offMap = false } = {}) {   // offMap: another map (a relic bow, bo3-weapons/relics.js): the weapon only
   const { world, session, host, player, camera, enemies, scene, audio, toast, announce, data, sync } = api;
   const kino = window.kino, root = world.root;
   // cached: getObjectByName walks the whole castle, and the per-frame update looked names up every frame (15% of the
   // CPU on Der Eisendrache, 2026-10-17). A miss is retried after 5 s; a node that left the scene is looked up again.
-  const nodes = new Map(), node = n => { const c = nodes.get(n), now = performance.now(); if (c && (c.o ? c.o.parent : now < c.retry)) return c.o; const o = root.getObjectByName(n) ?? null; nodes.set(n, { o, retry: now + 5000 }); return o; };
+  const nodes = new Map(), node = n => { if (offMap) return null; const c = nodes.get(n), now = performance.now(); if (c && (c.o ? c.o.parent : now < c.retry)) return c.o; const o = root.getObjectByName(n) ?? null; nodes.set(n, { o, retry: now + 5000 }); return o; };
   const showNode = (n, on = true) => { const o = typeof n === 'string' ? node(n) : n; if (o && o.visible !== on) { o.visible = on; o.updateMatrixWorld(true); } };
   const moveNode = (o, p) => { if (!o) return; o.parent.updateMatrixWorld(true); o.position.copy(o.parent.worldToLocal(p.clone())); o.updateMatrixWorld(true); };
   const me = () => sync.me, feet = () => player.getFeetPosition();
@@ -138,10 +139,10 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   // ---- props: the broken arrow (the bow's projectile model) and the waiting bows (world models) ------------------------
   const def = el => data.weapons['bo3_bow_' + el], models = {};
   async function model(key, url) { if (!url) return null; if (models[key] !== undefined) return models[key]; models[key] = null; const m = await loadModel(url).catch(() => null); if (m) { m.visible = false; scene.add(m); } models[key] = m; return m; }
-  for (const el of Object.keys(Q)) { model('arrow:' + el, def(el)?.projectileModel); model('bow:' + el, def(el)?.worldModel); }
+  if (!offMap) for (const el of Object.keys(Q)) { model('arrow:' + el, def(el)?.projectileModel); model('bow:' + el, def(el)?.worldModel); }
   const looseAt = el => { const s = st[el]; return s.stage === 'steps' ? Q[el].arrow : s.stage === 'place' ? Q[el].reforge : Q[el].pedestal; };
   // the burial chamber's ledge: solid while it stands
-  const ledgeBox = (() => { const [a, b] = Q.wolf.ledge, bx = new THREE.Box3().setFromPoints([a, b]), size = bx.getSize(new THREE.Vector3()), geo = new THREE.BoxGeometry(size.x, size.y, size.z); geo.translate(...bx.getCenter(new THREE.Vector3()).toArray()); const d = { collider: new CollisionWorld(geo), box: bx, enabled: false, window: true }; world.dynamic.push(d); return d; })();
+  const ledgeBox = (() => { const [a, b] = Q.wolf.ledge, bx = new THREE.Box3().setFromPoints([a, b]), size = bx.getSize(new THREE.Vector3()), geo = new THREE.BoxGeometry(size.x, size.y, size.z); geo.translate(...bx.getCenter(new THREE.Vector3()).toArray()); const d = { collider: new CollisionWorld(geo), box: bx, enabled: false, window: true }; if (!offMap) world.dynamic.push(d); return d; })();
   const skadiNode = node('CASTLE_BQ_skadi_0'), wheel = node('CASTLE_SM_aq_rp_clock_wheel'), wheelQ = wheel?.quaternion.clone();
   // fxanim rigs whose bind pose is their pieces scattered (the platform, the urn): left hidden; the ledge is a stone slab
   // in the floor's material, the urn a glow
@@ -240,7 +241,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   sync.on('bqUse', (d, ctx) => {
     const el = d.el, s = st[el], step = stepOf(el);
     if (d.what === 'place' && s.stage === 'place' && s.owner === ctx.by) { s.stage = 'souls'; s.souls = 0; audio?.play?.('box', .6); if (sync.isHost) api.powerups?.spawn?.('full_ammo', Q[el].pedestal.clone()); tell(el, 'The arrow is in place', 3); return; }
-    if (d.what === 'take' && (s.stage === 'ready' && s.owner === ctx.by || s.stage === 'spawned')) { if (s.stage === 'ready') { s.stage = 'spawned'; s.owner = null; } if (ctx.mine) give(el); return; }
+    if (d.what === 'take' && (s.stage === 'ready' && s.owner === ctx.by || s.stage === 'spawned')) { if (s.stage === 'ready') { s.stage = 'spawned'; s.owner = null; } if (ctx.mine) { give(el); earnRelic(api, ['bo3_bow_' + el, BASE]); } return; }
     if (s.owner !== ctx.by) return;
     if (step === 'reforge' && d.what === 'reforge') { announce?.(Q[el].name.toUpperCase(), 'ARROW REFORGED', 2.5); return next(el, ctx); }
     if (el === 'rune' && step === 'clock' && d.what === 'clock') {   // BO3 function_88082ccd: a random fireplace; the wheel turns to it
@@ -324,7 +325,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   });
 
   // ---- interactions (the uses) -----------------------------------------------------------------------------------------
-  const I = (p, text, use, hidden) => world.addInteraction({ position: p.clone(), text, hidden, use() { if (hidden()) return false; use(); return true; } });
+  const I = (p, text, use, hidden) => offMap ? null : world.addInteraction({ position: p.clone(), text, hidden, use() { if (hidden()) return false; use(); return true; } });
   const owner = el => st[el].owner === me(), holding = () => isBow(session.weapon?.id), hasBow = () => session.inventory.some(w => isBow(w.id));
   for (const el of Object.keys(Q)) {
     const s = st[el], q = Q[el];
@@ -429,7 +430,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
     let sh = null; if (pr) { sh = pr.bowShot; pr.bowShot = null; } else { sh = shot && performance.now() - shot.at < 6000 ? shot : null; shot = null; }   // untagged: testShot()
     const flung = sh?.flung || !!pads?.flying?.(), run = sh?.run || !!lowgrav?.state?.().running, from = sh?.from ?? feet();
     // starts (anyone)
-    for (const el of ['storm', 'rune', 'demon']) if (st[el].stage === 'idle' && near(p, Q[el].start, Q[el].startR)) sync.act('bqStart', { el });
+    if (!offMap) for (const el of ['storm', 'rune', 'demon']) if (st[el].stage === 'idle' && near(p, Q[el].start, Q[el].startR)) sync.act('bqStart', { el });
     // the owner's quest targets
     const step = el => owner(el) ? stepOf(el) : null;
     if (step('storm') === 'beacons') Q.storm.beacons.forEach((b, k) => { if (near(p, b, BEACON_R) && !st.storm.d.lit?.has(k)) sync.act('bqHit', { el: 'storm', k }); });
@@ -552,7 +553,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   let skadi = null;
   const beaconFire = Q.storm.beacons.map(b => b.clone().add(new THREE.Vector3(0, 10, 0))), beaconGlow = Q.storm.beacons.map(b => b.clone().add(new THREE.Vector3(0, 200, 0)));   // among the pyre's logs (the beacon point is its middle), in its flames
   host.on('update', dt => {
-    if (!dt) return;
+    if (!dt || offMap) return;   // offMap: no quest visuals
     want.clear(); const t = performance.now() / 1000;
     for (const [el, s] of Object.entries(st)) {
       const q = Q[el], step = stepOf(el), my = owner(el);
@@ -669,7 +670,7 @@ export function setupBows(api, { lowgrav, pads, traps } = {}) {
   // no recoil on the bows (user 2026-11-12: "make it so wrath of ancients and any other bows dont have recoil"): def.noRecoil
   // drops the engine's camera climb, the viewmodel push (animation.js) and the movement mod's fire kick (fp.js)
   for (const id of BOW_IDS) for (const d of [data.weapons?.[id], data.weapons?.[id]?.upgrade]) if (d) Object.assign(d, { impactExplode: true, noRecoil: true });
-  host.on('warmWeapons', ids => { if (data.weapons?.[BASE]) ids.add(BASE); });   // every game hands this one out; the upgrades load when taken (same programs)
+  host.on('warmWeapons', ids => { if (!offMap && data.weapons?.[BASE]) ids.add(BASE); });   // every game hands this one out; the upgrades load when taken (same programs)
   const FLIGHT = [{ speed: 2500, gravity: 460 }, { speed: 3400, gravity: 300 }, { speed: 4400, gravity: 160 }];   // quick, part, full draw (units/s, units/s²)
   const FLAME = { base: [0xff7a22, 0xffc98a], rune: [0xff5a14, 0xffb870], storm: [0x5fb8ff, 0xd8f0ff], wolf: [0x8fd0ff, 0xe8f6ff], demon: [0xa45cff, 0xe2ccff] };   // flame, core
   const TIP = 140, UP = new THREE.Vector3(0, 1, 0), AX = new THREE.Vector3(1, 0, 0), tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();   // TIP: the head, along tag_clip_<el> (the nocked arrow spans x 0..146 there)

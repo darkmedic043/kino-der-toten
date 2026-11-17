@@ -4,6 +4,7 @@ import { settings, onSettingsChange } from '../../settings.js';
 import { setupCraftables } from './craftables.js';
 import { setupLowGrav } from './lowgrav.js';
 import { setupBows } from './bows.js';
+import { earnRelic } from '../bo3-weapons/relics.js';
 import { setupEE } from './ee.js';
 import { setupSide } from './side.js';
 import { setupSide2 } from './side2.js';
@@ -45,7 +46,7 @@ export async function prepare(data) {
 }
 
 export default async function setup(api) {
-  if (api.map?.id !== 'der-eisendrache') return;
+  if (api.map?.id !== 'der-eisendrache') { offMapBows(api); return; }
   const { world, session } = api;
   const flags = s => {
     const f = new Set(['alwayson']);
@@ -1013,7 +1014,7 @@ function setupBow(api) {
     }
   });
   world.addInteraction({ position: spot.clone().add(new THREE.Vector3(0, 30, 0)), hidden: () => !charged() || taken(), text: () => 'Take Wrath of the Ancients',
-    use() { if (!def) return false; session.flags.add('castle:bow:taken:' + sync.me); session.giveWeapon(BOW); api.equipView?.(); announce?.('WRATH OF THE ANCIENTS', '', 3); audio?.play?.('box'); return true; } });
+    use() { if (!def) return false; session.flags.add('castle:bow:taken:' + sync.me); session.giveWeapon(BOW); api.equipView?.(); announce?.('WRATH OF THE ANCIENTS', '', 3); audio?.play?.('box'); earnRelic(api, BOW); return true; } });
   let t = 0;
   host.on('update', dt => {
     dt = dt || 1 / 60; t += dt;
@@ -1623,4 +1624,17 @@ function setupBounds({ world, player, host, session, damage, toast, audio }, { l
   });
   host.on('reset', () => { safe.length = 0; air = 0; t = 0; });
   return { state: () => ({ safe: safe.length, air: Math.round(air * 10) / 10, floor, fallen }) };
+}
+
+// The bows on other maps (2026-11-17, relics: bo3-weapons/relics.js): a bow picked as the starting weapon draws, flies,
+// burns and bursts with its element as it does here. bows.js runs in its offMap mode (the weapon only: no quests, props,
+// prompts or castle colliders). In a co-op room it always runs: the host deals a teammate's element damage.
+function offMapBows(api) {
+  const isBow = id => id === BOW || /^bo3_bow_/.test(id ?? '');
+  if (!api.data?.weapons?.[BOW] || !api.host) return;
+  let start = null; try { start = JSON.parse(localStorage.getItem('kino.mods.progression'))?.loadout?.primary; } catch {}
+  if (!isBow(start) && !window.kino?.coop?.id) return;
+  api.sync ??= createSync(api);
+  const bows = setupBows(api, { offMap: true });
+  window.kino ??= {}; window.kino.offMapBows = bows;   // testing handle (kino.castle stays the castle's alone)
 }

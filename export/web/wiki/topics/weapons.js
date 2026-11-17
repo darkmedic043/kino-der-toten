@@ -173,12 +173,13 @@ export default {
           const u = up(d);
           const where = [];
           for (const map of walls.get(id) ?? []) where.push(`Wall buy on ${mapLink(c, map)}`);
-          if (id !== 'cheese_gun') {
+          if (pr?.relic) where.push('Your starting weapon once earned (a relic: Loadout → Starting weapon)');   // relics: loadout only, never the box list
+          if (id !== 'cheese_gun' && !pr?.relic) {
             if (pool.has(id) && pr) where.push(`${sys(c, 'Mystery Box')} (in it by default)`);
             else if (pr) where.push(`${sys(c, 'Mystery Box')} (switch it on in your box list)`);
           }
           if (DE_BOWS.includes(id)) where.push(`Quest on ${mapLink(c, 'der-eisendrache')}`);
-          const unlock = pr ? (pr.kit ? `Yours from the start${hasSmith(id) && (pr.gunsmith ?? 1) > 1 ? ` · its Gunsmith opens at player level ${pr.gunsmith}` : ''}` : `Player level ${pr.level}`) : DE_BOWS.includes(id) ? 'Quest only' : 'This map only';
+          const unlock = pr?.relic ? `Relic · ${pr.relic}` : pr ? (pr.kit ? `Yours from the start${hasSmith(id) && (pr.gunsmith ?? 1) > 1 ? ` · its Gunsmith opens at player level ${pr.gunsmith}` : ''}` : `Player level ${pr.level}`) : DE_BOWS.includes(id) ? 'Quest only' : 'This map only';
           const price = walls.has(id) ? `${num(d.price)} · ammo ${num(d.ammoPrice ?? Math.ceil(d.price / 2))}` : null;
           const box = c.infobox({
             title: titleOf(id), color: colorOf(id),
