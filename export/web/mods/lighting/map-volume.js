@@ -11,12 +11,29 @@
 //
 //   const light = await loadMapLight(api, { skyFloor, indoor, sunFloor, strength, powerOff });   // null without a bake (or ?noBake)
 //   light.at(pos) -> { sky, sun, lamp } (CPU lookup: the viewmodel light)
+// `sunShadow` (Gorod Krovi's sun.js, 2026-11-16): the first directional light casts a real shadow map and the second is a
+// shadow-only light (intensity 0) of the things that move; inside the first map's square the baked sun mask gives way to
+// the map, and the second map's shadow is multiplied into the first light (the second light's own shadow lookup is skipped).
 import * as THREE from 'three';
 
 // (the chunk is read at compile time: the lighting mod adds its light clamp to it when it loads)
 const DIR_INFO = 'getDirectionalLightInfo( directionalLight, directLight );';
+// (sunShadow) mvCast: the factor on the shadow-casting sun. Inside its map (faded over the last 2%) the map's own lookup,
+// which three applies next, replaces the bake's mask; a surface that doesn't take shadows keeps the mask. The moving
+// things' map is faded out towards its edges (it follows the camera: no hard line where its shadows stop).
+const SUN_SHADOW = `float mvCast=mvSun;
+#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+if(receiveShadow){vec3 sc=vDirectionalShadowCoord[0].xyz/vDirectionalShadowCoord[0].w;vec2 se=min(sc.xy,1.-sc.xy);
+  mvCast=mix(mvSun,1.,smoothstep(0.,.02,min(se.x,se.y))*step(sc.z,1.));
+  #if NUM_DIR_LIGHT_SHADOWS > 1
+  {DirectionalLightShadow s1=directionalLightShadows[1];vec4 c1=vDirectionalShadowCoord[1];vec2 e1=min(c1.xy,1.-c1.xy);
+   mvCast*=mix(1.,getShadow(directionalShadowMap[1],s1.shadowMapSize,s1.shadowIntensity,s1.shadowBias,s1.shadowRadius,c1),smoothstep(0.,.12,min(e1.x,e1.y)));}
+  #endif
+}
+#endif
+`;
 
-export async function loadMapLight({ scene, world, session, host }, { skyFloor = .3, indoor = [1.1, .98, .84], sunFloor = .12, strength = 1, powerOff = .3, knee = 0, dir = world?.entry?.dir } = {}) {
+export async function loadMapLight({ scene, world, session, host }, { skyFloor = .3, indoor = [1.1, .98, .84], sunFloor = .12, strength = 1, powerOff = .3, knee = 0, sunShadow = false, dir = world?.entry?.dir } = {}) {
   if (!dir || /[?&]noBake\b/.test(location.search) || !THREE.ShaderChunk.lights_fragment_begin.includes(DIR_INFO)) return null;
   const base = new URL(dir.replace(/\/?$/, '/'), document.baseURI);
   // A rebake must reach players on their next load: light.json is re-checked every time (an ETag match answers 304), and the
@@ -62,7 +79,9 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
          vec4 a=textureLod(mvA,uvw,0.),b=textureLod(mvB,uvw,0.);vec3 c=textureLod(mvC,uvw,0.).rgb*2.-1.;
          mvSun=mix(1.,mix(mvSunFloor,1.,a.a),mvIn);mvSky=mix(vec3(1.),mix(mvIndoor,vec3(1.),b.a),mvIn);
          mvLamp=(a.rgb*a.rgb+b.rgb*b.rgb*mvPower)*mvScale*mvIn;mvDir=normalize(mix(vec3(0.,1.,0.),c,mvIn));}
-        ` + THREE.ShaderChunk.lights_fragment_begin.replace(DIR_INFO, DIR_INFO + ' directLight.color *= mvSun;'))
+        ` + (sunShadow ? SUN_SHADOW + THREE.ShaderChunk.lights_fragment_begin.replace(DIR_INFO, DIR_INFO + ' directLight.color *= UNROLLED_LOOP_INDEX == 0 ? mvCast : mvSun;')
+          .replace('( UNROLLED_LOOP_INDEX < NUM_DIR_LIGHT_SHADOWS )', '( UNROLLED_LOOP_INDEX < 1 )')
+          : THREE.ShaderChunk.lights_fragment_begin.replace(DIR_INFO, DIR_INFO + ' directLight.color *= mvSun;')))
         .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
         #if defined( RE_IndirectDiffuse )
           // soft knee (opts.knee): a lamp's light levels off towards 1/knee instead of burning pale surfaces white next to it
@@ -70,7 +89,7 @@ export async function loadMapLight({ scene, world, session, host }, { skyFloor =
           irradiance*=mvSky;irradiance+=mvLamp*mix(.45,1.,max(dot(mvN,mvDir),0.))*mvStrength;
         #endif`);
     };
-    m.customProgramCacheKey = () => (ownKey ? ownKey() : prevSrc) + '|maplight';
+    m.customProgramCacheKey = () => (ownKey ? ownKey() : prevSrc) + (sunShadow ? '|maplight+sun' : '|maplight');
     m.needsUpdate = true; return true;
   }
   // every lit material in the world scene, now (before the shader warm-up) and as things appear (zombies, drops, players)

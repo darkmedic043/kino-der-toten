@@ -10,6 +10,7 @@ import { loadMapLight } from '../lighting/map-volume.js';
 import { metalLook } from '../lighting/metal-look.js';
 import { prepareDetail, applyDetail } from '../../map-detail.js';
 import { overlayLayers } from '../der-eisendrache/overlays.js';
+import { setupSun } from './sun.js';
 
 const DIR = 'mods/maps/gorod-krovi/';
 const q = s => new RegExp(`[?&]${s}`).test(location.search);
@@ -24,7 +25,7 @@ const KEY_DIR = new THREE.Vector3(.553, .548, .627).normalize(), KEY_RGB = [1, .
 // turned the way the game draws it: SKY_TURN is the fraction of a turn added to the panorama's u (heading 307° at its
 // middle column, fitted on Der Eisendrache's moon, whose far-away fx entity gives its true heading)
 const SUN = new THREE.Vector3(.797, .306, .521).normalize(), SKY_TURN = .6028;
-const SKY_GAIN = 2, HAZE = 0x3d3c45, KEY_I = 1.1;
+const SKY_GAIN = 2, HAZE = 0x3d3c45, KEY_I = 2;   // (KEY_I 1.1 -> 2 on 2026-11-16 with the real shadows: at 1.1 the sun barely showed against the sky light)
 
 // Textured metals whose colour map is near black (BO3 keeps a metal's colour in its specular map, not exported): the
 // pressed-bronze ceilings of the department store and the factory read as black voids overhead (2026-11-15). Each is
@@ -85,19 +86,28 @@ export function setupLook(api, { detail = true } = {}) {
   // 2026-11-16 (user, with a BO3 video: "everything seems off and weird"): the floors .62/.14, ambient .75 and hemi .95 sat
   // on top of the bake's room fill and lit every room alike (flat, beige); lower floors, a cooler indoor tint and a softer
   // knee give the shade back (frame brightness 85 -> 74, the video's median 54; ambient and hemi below too)
-  const ready = loadMapLight(api, { skyFloor: .42, indoor: [.93, .95, 1.03], sunFloor: .1, strength: 1, powerOff: .7, knee: .17 }).catch(() => null).then(l => { baked = l; report.bake = !!l; });
+  // 2026-11-16 (user: "i want a sun above ... shadows needs real shadows"): the key light casts real shadows (sun.js), set
+  // up once the bake's regions are known and before the engine batches the map (the batches key on castShadow)
+  let sun = null; const wantSun = !!api.renderer && !q('noSun');
+  const ready = loadMapLight(api, { skyFloor: .42, indoor: [.93, .95, 1.03], sunFloor: .1, strength: 1, powerOff: .7, knee: .17, sunShadow: wantSun }).catch(() => null).then(l => { baked = l; report.bake = !!l;
+    if (wantSun && key) { sun = setupSun(api, { key, dir: KEY_DIR, regions: (l?.meta?.regions ?? []).map(r => ({ ...r, cell: l.meta.cell })), sky }); report.sun = sun?.report ?? false; } });
 
   // the sky: BO3's panorama, sampled per pixel by view direction (an equirectangular scene.background turns every map
   // material white here; DE's notes), stored dim so drawn at SKY_GAIN, its horizon band fading into the haze
   const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { map: { value: null }, gain: { value: SKY_GAIN }, haze: { value: new THREE.Color(HAZE) }, sun: { value: SUN } },
+    side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { map: { value: null }, gain: { value: SKY_GAIN }, haze: { value: new THREE.Color(HAZE) }, sun: { value: SUN },
+      disc: { value: KEY_DIR }, discColor: { value: new THREE.Color().setRGB(1, .84, .6, THREE.SRGBColorSpace) } },
     vertexShader: 'varying vec3 vDir;\nvoid main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
     fragmentShader: `#define SKY_TURN ${SKY_TURN}
-uniform sampler2D map; uniform float gain; uniform vec3 haze, sun; varying vec3 vDir;
+uniform sampler2D map; uniform float gain; uniform vec3 haze, sun, disc, discColor; varying vec3 vDir;
       void main(){ vec3 d = normalize(vDir); vec2 uv = vec2(atan(d.x, -d.z) / 6.2831853 + 0.5 + float(SKY_TURN), 1.0 - acos(clamp(d.y, -1.0, 1.0)) / 3.1415927);
         vec3 c = texture2D(map, uv).rgb * gain; c = c / (1.0 + max(max(c.r, c.g), c.b) * 0.45); float band = smoothstep(0.52, 0.62, uv.y);   // (soft roll-off: the sun's disc burned white through the bloom)
         vec3 h = haze + vec3(0.30, 0.17, 0.08) * pow(max(0.0, dot(d, sun)), 4.0);   // the haze warms toward the sun
         c = mix(h, c, band);
+        // the sun itself, where the key light comes from (2026-11-16): a disc dimmed by the smoke, a tight glow and a wide
+        // warm bloom of the sky around it (after the roll-off: the disc is meant to reach the bloom)
+        float cd = max(0.0, dot(d, disc)), dk = smoothstep(0.99984, 0.99990, cd);   // (about 2 degrees across: games draw the sun larger than it is)
+        c += discColor * (dk * 7.0 + pow(cd, 900.0) * 1.6 + pow(cd, 60.0) * 0.32 + pow(cd, 8.0) * 0.07) * smoothstep(-0.02, 0.05, d.y);
         gl_FragColor = vec4(c, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -116,8 +126,8 @@ uniform sampler2D map; uniform float gain; uniform vec3 haze, sun; varying vec3 
     sky.position.copy(camera.position);
     if (ambient) { ambient.color.setHex(0x8f8da8); ambient.intensity = .58; }   // (sky light: the panorama's own blue-violet, measured on its upper half)
     if (hemi) { hemi.color.setHex(0xb0aecc); hemi.groundColor.setHex(0x4a4038); hemi.intensity = .68; }
-    if (key) { key.color.setRGB(...KEY_RGB, THREE.SRGBColorSpace); key.intensity = baked ? KEY_I : .9; key.position.copy(KEY_DIR); }
+    if (key) { key.color.setRGB(...KEY_RGB, THREE.SRGBColorSpace); key.intensity = baked ? KEY_I : .9; if (!sun) key.position.copy(KEY_DIR); }   // (sun.js places it over the area)
     if (fill) { fill.color.setHex(0x6a7a96); fill.intensity = .35; }
   });
-  return { ready: Promise.all([ready, skyReady]), report, sky, get baked() { return baked; } };
+  return { ready: Promise.all([ready, skyReady]), report, sky, get baked() { return baked; }, get sun() { return sun; } };
 }
