@@ -2,6 +2,7 @@
 //   const debris = floatingDebris(api, { models: ['p7_crate_wood_01', ...] });
 //   debris.block(door);            an existing door: its own pieces are taken off the render layers, debris hangs in their place
 //   debris.block(door, [box3]);    a door made at runtime (debrisDoor below): debris fills the given passage boxes
+//   debris.block(door, [box3], m);  the boxes in frame m (Matrix4, a turned doorway: Gorod Krovi's diagonal piles)
 // Pieces use copies of the props' materials (same textures, the baked light applies), one InstancedMesh per prop part
 // and door (2026-11-13: each piece part was a draw of its own, 25-40 a door and ~125 in a castle view), `noCull` and
 // under a `noMerge` group in world.root, so the scene merge and the instance culler leave them alone and keep the
@@ -81,7 +82,7 @@ export function floatingDebris({ world, session, host, camera }, { models = [], 
     return { c, W, H, k, t, box };
   }
 
-  function block(door, boxes) {
+  function block(door, boxes, frame) {   // frame: a Matrix4 the boxes are in (a diagonal doorway: boxes in its turned frame; default the world)
     if (!door) return null;
     if (!boxes) {
       const own = door.parts.flatMap(p => p.slides?.length ? p.slides.map(s => s.object) : [p.object]);
@@ -89,7 +90,7 @@ export function floatingDebris({ world, session, host, camera }, { models = [], 
       for (const o of own) o.traverse(x => { x.layers.mask = 0; });   // the stand-in stays as the door's collision and nav plug, undrawn
     }
     if (!boxes.length) return null;
-    const group = new THREE.Group(); group.name = 'FDEBRIS_' + door.name; group.userData.noMerge = true; group.matrixAutoUpdate = false; world.root.add(group); group.updateMatrixWorld(true);
+    const group = new THREE.Group(); group.name = 'FDEBRIS_' + door.name; group.userData.noMerge = true; group.matrixAutoUpdate = false; if (frame) group.matrix.copy(frame); world.root.add(group); group.updateMatrixWorld(true);
     const list = [], fills = boxes.map(b => fill(group, b, list)), n = fills.length * 26, meshes = [];
     // one InstancedMesh per part of each prop used here; a piece is an instance in each of its prop's parts
     const sphere = new THREE.Sphere(new THREE.Box3().setFromPoints(list.map(e => e.pos)).getCenter(new THREE.Vector3()), 400);
@@ -103,7 +104,7 @@ export function floatingDebris({ world, session, host, camera }, { models = [], 
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.boundingSphere = new THREE.Sphere(new THREE.Box3().setFromPoints(base.map(b => b.p)).getCenter(new THREE.Vector3()), 400);
     const mat = new THREE.PointsMaterial({ map: dot, color: glow, size: 5.5, sizeAttenuation: true, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
     const motes = new THREE.Points(geo, mat); motes.matrixAutoUpdate = false; motes.renderOrder = 3; group.add(motes);
-    const b = { door, group, list, meshes, motes, base, mat, centre: new THREE.Box3().setFromPoints(base.map(x => x.p)).getCenter(new THREE.Vector3()), open: 0, shown: true };
+    const b = { door, group, list, meshes, motes, base, mat, centre: new THREE.Box3().setFromPoints(base.map(x => x.p)).getCenter(new THREE.Vector3()).applyMatrix4(group.matrixWorld), open: 0, shown: true };
     pose(b, 0, true); blocks.push(b); return b;
   }
 
