@@ -256,14 +256,14 @@
    },
    {
     "position": [
-     549.7,
-     15.7,
-     -1217.0
+     473,
+     8,
+     -1193
     ],
-    "yaw": 45,
+    "yaw": -45,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "start area: 2026-11-16: at BO3's zbarrier_zmcore_bgb_machine spot (zm_stalingrad.ents), moved to the nearest flat wall (scratch/mk3/gumspots.js: wall flat within 6 over 44 wide and 100 high, level floor, 100 clear in front, 26 to the sides, 110 headroom, no prompt within 80), 93 from the machine; slid 5 to its right on 2026-11-17, since its tap wing (local x -31) touched the white pillar 29 to its left (8 put it under something that snap pressed against, 36 off the wall)"
+    "note": "start area, the corner room right of the Department Store gate: 2026-11-17 (user: the booth was out of bounds, \"put it right here\", with a screenshot), on the plain diagonal wall between the two sandbag piles, the low fenced wall and its barricade to the right; it stood at [549.7, 15.7, -1217] yaw 45 since 2026-11-16, outside that fence (the nearest flat wall to BO3's gum machine spot, but out of bounds). Wall flat from 24 left to 30 right of the centre, sandbags below 30 beyond (scratch/gk/room-probe4.js)"
    },
    {
     "position": [
@@ -308,17 +308,6 @@
     "model": "terminal_booth_compact.glb",
     "light": false,
     "note": "department store: 2026-11-16: at BO3's zbarrier_zmcore_bgb_machine spot (zm_stalingrad.ents), moved to the nearest flat wall (scratch/mk3/gumspots.js: wall flat within 6 over 44 wide and 100 high, level floor, 100 clear in front, 26 to the sides, 110 headroom, no prompt within 80), 70 from the machine"
-   },
-   {
-    "position": [
-     207,
-     8,
-     -1164
-    ],
-    "yaw": 24,
-    "model": "terminal_booth_compact.glb",
-    "light": false,
-    "note": "start arcade, by the first door: 2026-11-17 (user: a terminal in the starting room near the 1st door), on the slanted wall right of the Department Store gate, between the trap switch (127,-1130) and the wall-buy (268,-1188); the only wall by the gate with room (scratch/gk/booth-scan.js)"
    }
   ]
  }
