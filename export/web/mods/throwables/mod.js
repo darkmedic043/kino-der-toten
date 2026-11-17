@@ -32,13 +32,16 @@ export default async function setup(api){
     ...Object.fromEntries(Object.entries(eq).filter(([,d])=>d.standInModel).map(([id,d])=>[id,d.standInModel]))};
   // BO3's throw rigs (2026-11-17, user: "make it so the tripmine, gersch, and monkey bomb uses the proper throwing animation"):
   // pull the pin (twist the Gersh, none for the mine), hold, BO3's own throw with the item leaving the hand at the clip's
-  // fastest hand frame (rig.release). The mine is the spider-mine viewmodel itself; the Gersh and the monkey ride on the
-  // grenade's tag_weapon in place of the BO3 frag. Built by .tools/build_bo3_throws.py (data.throwRigs, bo3-equipment).
+  // fastest hand frame (rig.release). The mine is the spider-mine viewmodel itself; the monkey rides on the grenade's
+  // tag_weapon in place of the BO3 frag; the Gersh keeps its own BO1 animation (OWN_LOOK below). Built by .tools/build_bo3_throws.py (data.throwRigs, bo3-equipment).
   // squeeze: x/y scale about the camera while a rig is out = BO3's wider viewmodel FOV (our view camera is 51°, so its cocked arm sat off screen); hold: where the hold stops (fraction of the pull, or of the throw for the spider mine, whose idle is an off-screen rest frame)
   const RIG_LOOK={frag:{squeeze:.76,hold:{at:.8}},tactical:{squeeze:.76,hold:{at:1}},spider:{squeeze:.76,hold:{clip:'fireAnim',at:.3}}};
-  const RIG_OF={tripmine_zm:'spider',zombie_black_hole_bomb:'tactical',zombie_cymbal_monkey:'frag'};
-  const rigFor=id=>{const r=data.throwRigs?.[RIG_OF[id]];return r&&(r.ownModel||STAND_IN[id]||(id==='zombie_black_hole_bomb'&&eq[id]?.worldModel))?r:null;};
-  if(rigFor('zombie_black_hole_bomb'))STAND_IN.zombie_black_hole_bomb=eq.zombie_black_hole_bomb.worldModel;
+  const RIG_OF={tripmine_zm:'spider',zombie_cymbal_monkey:'frag'};
+  // the Gersh keeps its own BO1 animation (user 2026-11-17: "i want the gersch to use the actual throw animation designed for the gersch"): the pull-pin
+  // (out, cover flips down, switch pressed, raised) stops raised in view at .8, runs on to the wind-up at its end on release, then the throw clip
+  // (the device has left the hand at its first frame: tag_weapon sits far overhead; the arm follows through). Arms and device are one model: no hide, no fade.
+  const OWN_LOOK={zombie_black_hole_bomb:{release:.03,hold:{at:.8},ownModel:true,keepItem:true,snap:true}};
+  const rigFor=id=>{const r=data.throwRigs?.[RIG_OF[id]];return r&&(r.ownModel||STAND_IN[id])?r:null;};
   const handModels={};
   for(const [id,url] of Object.entries(STAND_IN))if(url&&(qed||rigFor(id)))handModels[id]=await loadModel(url).catch(()=>null);
   const fragMesh=handModels.frag_grenade_zm;
@@ -83,7 +86,8 @@ export default async function setup(api){
   addEventListener('blur',()=>{if(held)held.released=true;});
 
   // ---- the hand ------------------------------------------------------------------------
-  const viewDef=id=>{const r=rigFor(id);if(r&&(r.ownModel||handModels[id]))return {adsInTime:.2,adsOutTime:.2,...r,...RIG_LOOK[RIG_OF[id]],id:'held:'+id,name:eq[id]?.name??id};   // animation.js divides by adsIn/OutTime: without them the aim blend is NaN and fp.js zeroes the pivot
+  const viewDef=id=>{if(OWN_LOOK[id]&&eq[id])return {adsInTime:.2,adsOutTime:.2,...eq[id],...OWN_LOOK[id],id:'held:'+id};
+    const r=rigFor(id);if(r&&(r.ownModel||handModels[id]))return {adsInTime:.2,adsOutTime:.2,...r,...RIG_LOOK[RIG_OF[id]],id:'held:'+id,name:eq[id]?.name??id};   // animation.js divides by adsIn/OutTime: without them the aim blend is NaN and fp.js zeroes the pivot
     return STAND_IN[id]&&qed&&handModels[id]?{...qed,id:'held:'+id,name:eq[id]?.name??id}:eq[id];};
   let inHand=null;
   function dress(id){
@@ -178,8 +182,8 @@ export default async function setup(api){
     const from=h.holdKey==='fireAnim'?h.holdT:0;   // the spider mine's throw goes on from its hold frame
     let len=(r?.data.fireAnim?.duration||.4)-from,at=Math.max(.02,(h.rig?.release??RELEASE)-from);
     if(h.lobbed){const a=r?.actions[h.holdKey];if(a)a.timeScale=0;h.lob={t:0,T:LOB/pace};len=LOB;at=LOB_RELEASE;}   // the hand holds its pose under the lob
-    else if(r?.actions.fireAnim){if(!from)r.play('fireAnim',false,pace,.04);r.actions.fireAnim.time=from;r.actions.fireAnim.timeScale=pace;}
-    setTimeout(()=>{if(held===h){hideItem();launch(h);}},at*1000/pace);
+    else if(r?.actions.fireAnim){if(!from)r.play('fireAnim',false,pace,h.rig?.snap?0:.04);r.actions.fireAnim.time=from;r.actions.fireAnim.timeScale=pace;}
+    setTimeout(()=>{if(held===h){if(!h.rig?.keepItem)hideItem();launch(h);}},at*1000/pace);
     setTimeout(async()=>{if(held!==h)return;held=null;session.equipmentLeft=0;await api.equipView?.();},Math.max(len,.3)*1000/pace+80);
   }
 

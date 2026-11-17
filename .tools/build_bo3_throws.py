@@ -3,7 +3,8 @@ export/web/mods/bo3-equipment/models/ (git-ignored: from the user's own BO3 inst
 
     python3 .tools/build_bo3_throws.py [export_dir]   (default export_game/bo3)
 
-The throwables mod (mods/throwables) holds the Trip Mine, the Gersch Device and the Monkey Bomb on these rigs
+The throwables mod (mods/throwables) holds the Trip Mine and the Monkey Bomb on these rigs (the Gersch went back to
+its own BO1 animation the same day; the tactical rig is built but unused)
 (user 2026-11-17: "make it so the tripmine, gersch, and monkey bomb uses the proper throwing animation"): pull
 the pin (or twist), hold, throw, with the item leaving the hand in view. The frag and tactical rigs carry the
 item's own model on tag_weapon in place of BO3's grenade; the spider mine (BO3's own trip mine) is its own model.
