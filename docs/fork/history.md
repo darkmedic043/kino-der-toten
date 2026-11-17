@@ -608,3 +608,4 @@
 - 2026-11-17: Gorod Krovi dragon fire less punishing: the street fire waits 1.6 s and then burns 0.8% of max health a tick (was 2% from the first frame), the breath pass 5 a tick (was 12) (waw-ports.md).
 - 2026-11-17: Gorod Krovi: the vodka bottles' looping hum removed (the repeating noise in the Department Store), dragon strafes every 75-105 s at 25% (was 35-45 s at 35%) and breath passes every 150-240 s (was 60-120), a ninth terminal booth by the first door (waw-ports.md, props.md)
 - 2026-11-17: Gorod Krovi start-area booth moved from outside the fence right of the Department Store gate (out of bounds) to the corner room's wall the user pointed at; the extra gate booth from earlier the same day was dropped (props.md)
+- 2026-11-17: Gorod Krovi teleports (Gersh Device, QED, Anywhere But Here) land in bounds: `world.playerSpots()` (spawns.js, the inside spots of the enabled zones' windows) replaces the zombie spawn spots there (waw-ports.md)

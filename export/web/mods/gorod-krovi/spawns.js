@@ -86,6 +86,10 @@ export default async function setupSpawns(api, gk) {
   };
   // get_zone_from_position: the zone whose volume holds p (the smallest box where they overlap), as our zone id
   world.zoneAt = p => { let best = null, bv = Infinity; for (const z of zones.values()) if (z.box.containsPoint(p)) { const s = z.box.getSize(new THREE.Vector3()), v = s.x * s.y * s.z; if (v < bv) { bv = v; best = z; } } return best?.id; };
+  // where a teleport may put the player (Gersh Device, QED, Anywhere But Here; world.playerSpots): the inside spot of each
+  // boarded window of an enabled zone. The zones' spots above are BO3's zombie spawn spots, mostly outside the play space,
+  // and the teleports took the player there (2026-11-17, user: "gersch/qed can teleport player out of bounds")
+  world.playerSpots = () => { tick(); const set = new Set(); for (const n of enabled) for (const e of zones.get(n)?.spots ?? []) if (e.win?.inside && !e.win.submerged) set.add(e.win); return [...set].map(b => b.inside); };
   gk.activeZones = () => { tick(); return new Set([...st.active].map(n => zones.get(n)?.id).filter(Boolean)); };
 
   if (enemies) {

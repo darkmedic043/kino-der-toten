@@ -108,7 +108,7 @@ export default async function setup(api){
   // somewhere else in the active part of the map: the inside spot of a barricade window
   // safe (Safe Passage): the spot farthest from any zombie, a full magazine and 3 s untouchable
   function teleportPlayer(safe=false){
-    const feet=player.getFeetPosition(),spots=(world.spawnBarriers?.(session)??world.barriers??[]).map(b=>b.inside).filter(p=>p&&p.distanceTo(feet)>300);
+    const feet=player.getFeetPosition(),spots=(world.playerSpots?.(session)??(world.spawnBarriers?.(session)??world.barriers??[]).map(b=>b.inside)).filter(p=>p&&p.distanceTo(feet)>300);   // playerSpots: a map whose spawn list is outside the play space (Gorod Krovi) says where a player may land
     const away=p=>Math.min(Infinity,...enemies.list.map(z=>z.root.position.distanceTo(p)));
     const p=safe?spots.sort((a,b)=>away(b)-away(a))[0]:spots[Math.floor(Math.random()*spots.length)];if(!p)return;
     const q=world.closest?.(p.clone(),{x:40,y:60,z:40})??p;player.setPosition(q.clone().add(new THREE.Vector3(0,3,0)));

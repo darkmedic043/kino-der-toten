@@ -289,7 +289,7 @@ export default async function setup(api){
   }
   // Anywhere But Here: to a random window's inside spot in the open part of the map (far from here when it can), then a
   // concussive blast tosses the zombies there away (the thralls' toss order, which a guest's host carries out)
-  function spots(){const f=feet(),list=(api.world?.spawnBarriers?.(session)??[]).map(b=>b.inside).filter(Boolean);
+  function spots(){const f=feet(),list=(api.world?.playerSpots?.(session)??(api.world?.spawnBarriers?.(session)??[]).map(b=>b.inside)).filter(Boolean);   // playerSpots: Gorod Krovi's spawn spots are outside the play space
     const far=list.filter(p=>p.distanceTo(f)>500);return far.length?far:list.filter(p=>p.distanceTo(f)>150);}
   function anywhere(g){
     const s=spots(),to=s[Math.floor(Math.random()*s.length)].clone().add(new THREE.Vector3(0,4,0));
