@@ -41,6 +41,9 @@ export async function prepare(data){
   // the akimbo Atlas's fire clips flip each gun 25 degrees and bring it back over half a second, so the pair floated
   // (user, 2026-10-26): half the kick (animation.js dualFireKick), the whole clip played in 0.3 s (dualFireTime)
   for(const d of [data.weapons.aw_atlas45_dw,data.weapons.aw_atlas45_dw?.upgrade])if(d)Object.assign(d,{dualFireKick:.5,dualFireTime:.3});
+  // the Heloderma Bow draws like Der Eisendrache's bows (user 2026-11-17: "give the haloderma bow the bow mechanics";
+  // der-eisendrache/bows.js runs on every map for it): its charge clip pulls the string and holds at full draw
+  for(const d of [data.weapons.bo3_bow,data.weapons.bo3_bow?.upgrade])if(d?.animations?.reloadAnim)d.animations.chargeAnim??=d.animations.reloadAnim;
   data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons).filter(id=>!built.weapons[id].noBox)])];   // noBox: quest weapons (Der Eisendrache's bow)
 }
 

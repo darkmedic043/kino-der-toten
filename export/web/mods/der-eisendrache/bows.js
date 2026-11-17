@@ -41,7 +41,7 @@ import { settings } from '../../settings.js';
 import { earnRelic } from '../bo3-weapons/relics.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);   // BO3 (CoD) coordinates -> the map's
-const BASE = 'bo3_wrath_ancients', isBow = id => id === BASE || /^bo3_bow_/.test(id ?? '');
+const BASE = 'bo3_wrath_ancients', HELO = 'bo3_bow', castleBow = id => id === BASE || /^bo3_bow_/.test(id ?? ''), isBow = id => id === HELO || castleBow(id);   // the Heloderma (bo3-weapons, a box gun on every map) draws like them; the quests only count castleBow
 const SOULS = 20, PAINT_SPOTS = ['cannon', 'clock', 'hall', 'living'];
 // volumes: BO3's brushes aren't in the dump; cylinders around their origins (r across, h up and down)
 const V = (p, r, h = 120) => ({ p, r, h });
@@ -326,7 +326,7 @@ export function setupBows(api, { lowgrav, pads, traps, offMap = false } = {}) { 
 
   // ---- interactions (the uses) -----------------------------------------------------------------------------------------
   const I = (p, text, use, hidden) => offMap ? null : world.addInteraction({ position: p.clone(), text, hidden, use() { if (hidden()) return false; use(); return true; } });
-  const owner = el => st[el].owner === me(), holding = () => isBow(session.weapon?.id), hasBow = () => session.inventory.some(w => isBow(w.id));
+  const owner = el => st[el].owner === me(), holding = () => castleBow(session.weapon?.id), hasBow = () => session.inventory.some(w => castleBow(w.id));
   for (const el of Object.keys(Q)) {
     const s = st[el], q = Q[el];
     for (const at of new Set([q.arrow, q.reforge, q.pedestal])) I(at, () => s.stage === 'steps' ? 'Pick up the broken arrow' : s.stage === 'place' ? 'Take the reforged arrow' : `Claim the ${q.name}`, () => sync.act('bqTake', { el }),
@@ -656,7 +656,7 @@ export function setupBows(api, { lowgrav, pads, traps, offMap = false } = {}) { 
 
   function give(el) {
     const q = Q[el], id = 'bo3_bow_' + el; if (!data.weapons[id]) return;
-    const i = session.inventory.findIndex(w => isBow(w.id)); if (i >= 0) { session.slot = i; session.inventory.splice(i, 1); session.slot = Math.min(session.slot, Math.max(0, session.inventory.length - 1)); }
+    const i = session.inventory.findIndex(w => castleBow(w.id)); if (i >= 0) { session.slot = i; session.inventory.splice(i, 1); session.slot = Math.min(session.slot, Math.max(0, session.inventory.length - 1)); }
     session.giveWeapon(id); api.equipView?.();
     announce?.(q.name.toUpperCase(), 'WRATH OF THE ANCIENTS', 3); audio?.play?.('box');
   }
