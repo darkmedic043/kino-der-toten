@@ -1,7 +1,7 @@
 // Gorod Krovi's side Easter eggs (zm_stalingrad_audio / _vo / _timer, spec scratch/gk/spec/side-eggs.md, 2026-11-15).
 //   Music (§1): gk.music. A song egg is ignored (and stays unused) while another song plays or the boss fights hold the
 //     music (gk.music.override); each song unlocks in RADIO.EXE (kino.radio.heard 'gorod:<song>').
-//   Dead Ended (§2): use the three vodka bottles (each hums ee_mus_lp until used). Ace of Spades (§3): use the three
+//   Dead Ended (§2): use the three vodka bottles (silent since 2026-11-17: their ee_mus_lp loop played over and over in the Department Store). Ace of Spades (§3): use the three
 //     ace cards. Pianos (§6): use, a random spooky piano, 200 s rest.
 //   Sophia's tape reels (§7): logs 1-4 used while looking at them, log 5 shot; the reels roll while the log plays;
 //     repeatable.
@@ -191,7 +191,7 @@ export default async function setupEggs(api, gk) {
   gk.on('ee:done', () => { if (charName() !== 'richtofen') later(6, () => voice('abcd_introduction_x', { vol: .9 })); });
 
   // ---- the dragon's street fire (BO3 dragon_strafe on the idle flight loop) --------------------------------------------
-  const ST = { t: 40 };
+  const ST = { t: 90 };
   let riding = false; gk.on('dragon:ride', () => { riding = true; }); gk.on('dragon:landed', () => { riding = false; });
   function strafe(area) {
     const h = gk.hazard; if (!h || h.active()) return false;
@@ -332,11 +332,10 @@ export default async function setupEggs(api, gk) {
     for (const t of [...timers]) if (session.time >= t.at) { timers.delete(t); try { t.fn(); } catch (err) { console.error('[gorod-krovi] eggs', err); } }
     if (session.phase === 'over') return;
     // the bottles hum while unused
-    for (const b of bottles) if (!b.done && !b.hum) b.hum = voice('ee_mus_lp', { at: b.at, loop: true, range: 450, vol: .7 });
     // the dragon's street fire
     if (!q.has('gkNoStrafe') && (ST.t -= dt) <= 0) {
-      ST.t = 35 + Math.random() * 10;
-      if ((session.round >= 5 || gk.hasFlag('departmentstoreupperopen')) && Math.random() < .35 && !riding) strafe();
+      ST.t = 75 + Math.random() * 30;   // was 35-45 s at 35% (2026-11-17, user: the dragon burns the map too often)
+      if ((session.round >= 5 || gk.hasFlag('departmentstoreupperopen')) && Math.random() < .25 && !riding) strafe();
     }
     // monkeys landing in the fire
     for (const p of api.features?.projectiles ?? []) if (p.monkey && p.stuck && !seen.has(p)) { seen.add(p); monkeyLanded(p); }
@@ -359,7 +358,7 @@ export default async function setupEggs(api, gk) {
     S.bottles = S.cards = 0; for (const b of bottles) { b.done = false; b.e.off = false; b.hum = null; }
     Object.assign(SAM, { step: 0, areas: new Set(), timed: [], i: 0, fails: 0 }); figOff(); samMove = null;
     Object.assign(S.logs, { stage: 0, i: 0, downs: 0, talk: false }); glow.visible = false; if (logTarget) disarm(logTarget);
-    Object.assign(TA, { reward: 0, bought: 0 }); if (wrench) wrench.root.visible = false; ST.t = 40;
+    Object.assign(TA, { reward: 0, bought: 0 }); if (wrench) wrench.root.visible = false; ST.t = 90;
   });
   // the reels: sophia.js places them; hand them to the spin once every part is up
   gk.on('parts:ready', () => {

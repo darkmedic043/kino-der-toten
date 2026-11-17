@@ -37,7 +37,7 @@ const SITES = [   // zm_stalingrad's roost scenes: console trigger, console mode
   { id: 'factory', roost: 1, label: 'Factory', trigger: [-2610, 2702, 496], model: [-2619, 2702, 496, 90], platforms: [[-2938.5, 2863, 568], [-2938.5, 2535, 568]] },
   { id: 'judicial', roost: 3, label: 'Judicial', trigger: [0, 5853, 304], model: [0, 5863, 305, 0], platforms: [[168.5, 6191, 376], [-168.5, 6191, 376]] },
 ];
-const FIRE = { hazardSwoop: 1.2, every: [60, 120], hot: [15, 25], swoop: 2.6, leave: 2.6, dur: 3, len: 1500, up: 600, back: 600, past: 250, r: 220, tick: .25, dmg: 5, zdmg: 90 };   // dmg per tick on the player: 20 a second (was 12 = 48 a second, 2026-11-17, user: less punishing)
+const FIRE = { hazardSwoop: 1.2, every: [150, 240], hot: [15, 25], swoop: 2.6, leave: 2.6, dur: 3, len: 1500, up: 600, back: 600, past: 250, r: 220, tick: .25, dmg: 5, zdmg: 90 };   // dmg per tick on the player: 20 a second (was 12 = 48 a second, 2026-11-17, user: less punishing)
 const PAVLOV = [W(-2859, 21437.8, 684), W(-2896.25, 21437.8, 684)];   // s_pavlov_player (the roof)
 const SOUNDS = {   // clip notes -> sounds (dragon-sfx), [name or names, volume]
   'sndnt#evt_dragon_arrival': ['arrival', 1], 'sndnt#evt_dragon_idle_arrival': ['idle_arrival', .8], 'sndnt#evt_dragon_idle': ['idle', .7],
