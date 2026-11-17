@@ -1,6 +1,6 @@
 // The dragon's fire on the streets and the napalm zombies (BO3 zm_stalingrad_dragon_strafe / _zm_ai_napalm, spec
 // scratch/gk/spec/gauntlet.md step 1-2). A burn: 10 s of fire over one of BO3's eight burn volumes; a player inside
-// takes 2% of their health every 0.1 s (through the shield's gk.burn when it is there: the held shield blocks it), and
+// takes 0.8% of their health every 0.1 s after a 1.6 s warning (through the shield's gk.burn when it is there: the held shield blocks it), and
 // every ordinary zombie that walks into it catches fire and becomes a napalm zombie: 3/4 health, sprints, burns, and
 // blows up when it dies (128 around: 70 to 30 damage to a player, kills ordinary zombies), leaving nothing.
 // The map's dragon doesn't strafe yet (dragon.js only circles), so this module carries its own stand-in: while the egg
@@ -17,6 +17,9 @@ export const AREAS = {
   alley: W(21, 2534, -49), factory: W(-2129, 2645, 355), library: W(2315, 2851, -43), department_store: W(-5, 1723, 384),
 };
 const R = 320, DY = 220, BLAST = 128;
+// the street fire's bite on the player (2026-11-17, user: "make getting burnt by the dragon less punishing"): was 2% of max
+// health every 0.1 s from the first frame; now 0.8% (8% a second), and nothing for the first GRACE s while the dragon swoops in
+const BURN = .008, GRACE = 1.6;
 export const inArea = (name, p) => { const c = AREAS[name]; return !!c && Math.hypot(p.x - c.x, p.z - c.z) < R && Math.abs(p.y - c.y) < DY; };
 const tough = z => !!z?.boss || /raz|sentinel|mech|nikolai|mangler|panzer/.test(z?.kind ?? '');
 
@@ -79,7 +82,7 @@ export function setupHazard(api, gk, { want, sound } = {}) {
       if ((b.tick -= dt) <= 0) {
         b.tick = .1;
         const feet = player.getFeetPosition();
-        if (inArea(b.area, feet) && !player.down && !session.down) { const n = Math.max(1, Math.round((session.maxHealth ?? 100) * .02)); gk.burn?.(n) ?? api.damage?.(n); }
+        if (b.t >= GRACE && inArea(b.area, feet) && !player.down && !session.down) { const n = Math.max(1, Math.round((session.maxHealth ?? 100) * BURN)); gk.burn?.(n) ?? api.damage?.(n); }
         for (const z of [...enemies.list]) if (inArea(b.area, z.root.position)) napalm(z);
       }
       if (b.t >= b.dur) stop();
