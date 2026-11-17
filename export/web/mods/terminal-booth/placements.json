@@ -256,14 +256,14 @@
    },
    {
     "position": [
-     546.2,
+     549.7,
      15.7,
-     -1213.5
+     -1217.0
     ],
     "yaw": 45,
     "model": "terminal_booth_compact.glb",
     "light": false,
-    "note": "start area: 2026-11-16: at BO3's zbarrier_zmcore_bgb_machine spot (zm_stalingrad.ents), moved to the nearest flat wall (scratch/mk3/gumspots.js: wall flat within 6 over 44 wide and 100 high, level floor, 100 clear in front, 26 to the sides, 110 headroom, no prompt within 80), 93 from the machine"
+    "note": "start area: 2026-11-16: at BO3's zbarrier_zmcore_bgb_machine spot (zm_stalingrad.ents), moved to the nearest flat wall (scratch/mk3/gumspots.js: wall flat within 6 over 44 wide and 100 high, level floor, 100 clear in front, 26 to the sides, 110 headroom, no prompt within 80), 93 from the machine; slid 5 to its right on 2026-11-17, since its tap wing (local x -31) touched the white pillar 29 to its left (8 put it under something that snap pressed against, 36 off the wall)"
    },
    {
     "position": [
