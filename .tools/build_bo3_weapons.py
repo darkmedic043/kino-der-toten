@@ -209,6 +209,8 @@ SND_ROOTS = [(SND, 'mod/'), (SRC/'sounds'/'skye_ports', 'aw/')]
 all_wavs = {}
 for root, pre in SND_ROOTS:
     if root.is_dir(): all_wavs.update({w.name.split('.')[0]: (w, pre+str(w.relative_to(root)).split('.')[0]) for w in root.rglob('*.wav')})
+# the Ray Gun Mk3's own (FLAC straight out of zm_stalingrad.all.sabl: .tools/extract_sabl.py <bank> sounds/mk3 mk3 mkiii orb_damage)
+if (SRC/'sounds'/'mk3').is_dir(): all_wavs.update({w.stem: (w, 'mk3/'+w.stem) for w in (SRC/'sounds'/'mk3').glob('*.flac')})
 audio_keys = {}
 def snd(stem):
     w, key = all_wavs.get(stem, (None, None))
@@ -240,7 +242,8 @@ GLOW_MAPS = {
 }
 # notetrack aliases with no file of that name in the mod's bank (its alias table isn't exportable):
 # stand-ins from the same bank, copied to sounds/codolbf/weapons/_generic/ (see docs/fork/weapons.md)
-NOTE_ALIAS = {'ins1': 'fly_cloth_01', 'ins2': 'fly_cloth_02', 'ins3': 'fly_cloth_03', 'weap_raise_plr': 'weap_ariarm27_raise_plr',
+NOTE_ALIAS = {'fly_mk3_reload_rh': 'fly_mkiii_reload', 'fly_mk3_reload_lh': 'fly_mkiii_reload_lh_00', 'fly_mk3_reload_lh_gears': 'fly_mkiii_reload_lh_gears',   # the Mk3's markers name the bank's 'mkiii' files
+              'fly_mk3_reload_lh_first': 'fly_mkiii_reload_lh_first', 'fly_mk3_reload_rh_first': 'fly_mkiii_reload_rh_first', 'ins1': 'fly_cloth_01', 'ins2': 'fly_cloth_02', 'ins3': 'fly_cloth_03', 'weap_raise_plr': 'weap_ariarm27_raise_plr',
               # AS50 and 93R reload foley isn't in the mod's banks (base-game aliases): other guns' bolt and mag sounds
               'wpfoly_as50_reload_chamber_v1': 'sr2_boltpull1', 'wpfoly_as50_reload_open_v1': 'sr2_boltpull2', 'wpfoly_as50_reload_clipout_v1': 'm240_boxout',
               'wpfoly_as50_reload_lift_v1': 'm240_coverup1', 'wpfoly_as50_reload_clipin_v1': 'm240_boxin', '93r_clipout': 'js2_clipout', '93r_clipin': 'js2_clipin',
@@ -398,6 +401,26 @@ for el, (nm, col) in ELEMENTS.items():
                      pre='vm_bow_launcher', tpl='crossbow_explosive_zm', drop=drop, noBox=True,
                      stats=dict(clipSize=1, maxAmmo=60, startAmmo=60, damage=1500, minDamage=0, explosionRadius=200, explosionInnerDamage=1500, explosionOuterDamage=400, price=0),
                      roles=MODW[-1]['roles'], ads=MODW[-1]['ads'], shots=MODW[-1]['shots'], glow=col, projectile=f'wpn_t7_zmb_bow_{el}_projectile', offset=[0, -2, 0], element=el))
+# Gorod Krovi's Ray Gun Mk3 (GKZ-45 Mk3; BO3 zm_stalingrad, exported with Greyhound): two guns, one per hand. The right
+# (Mark III) fires a fast hitscan beam, the left (GKZ-45) a slow lobbed shot that opens a vortex; shooting the vortex with
+# the right gun charges it (mods/bo3-weapons/mk3.js). Each hand its own mag (clipLeft, rules.js dualMags) and rate (fireTimeLeft).
+# Only Gorod Krovi's box hands it out (noBox here; mods/gorod-krovi/mod.js prepare adds it there). Numbers are ours, tuned
+# against the fork's Ray Gun (the wikis disagree on BO3's).
+MODW += [
+  dict(cls='Wonder weapon', id='bo3_raygun_mk3', name='GKZ-45 Mk3', up='Maelstrom of Eris', model='wpn_t7_zmb_dlc3_raygun_mk3_view', world='wpn_t7_zmb_dlc3_raygun_mk3_world',
+       pre='vm_zom_raygun_mk3_dw', tpl='ray_gun_zm', noBox=True,
+       stats=dict(clipSize=18, clipLeft=3, maxAmmo=210, startAmmo=210, damage=1000, minDamage=1000, range=999999, fireTime=.15, fireTimeLeft=.9, automatic=True,
+                  fireType='Full Auto', projectileSpeed=0, explosionRadius=0, explosionInnerDamage=0, explosionOuterDamage=0, headMultiplier=1, price=950, mk3=True),
+       upStats=dict(clipSize=35, clipLeft=5, maxAmmo=300, startAmmo=300, fireTimeLeft=.7),
+       roles=dict(idle='rh_idle', fire='rh_fire', reload='rh_reload', reloadEmpty='rh_reload_empty', rais='pullout', firstRaise='first_raise', drop='putaway',
+                  sprintIn='sprint_in', sprintLoop='sprint_loop', sprintOut='sprint_out'),
+       ads=('vm_zom_raygun_mk3_dw_ads_up', 'vm_zom_raygun_mk3_dw_ads_down'),
+       left=dict(model='wpn_t7_zmb_dlc3_raygun_mk3_dw_view', idle='lh_idle', fire='lh_fire', reload='lh_reload'), upLeft='wpn_t7_zmb_dlc3_raygun_mk3_dw_view_upg',
+       upModel='wpn_t7_zmb_dlc3_raygun_mk3_upg_view', upWorld='wpn_t7_zmb_dlc3_raygun_mk3_upg_world',
+       shots=['wpn_mk3_rh_fire'], last=['wpn_mk3_rh_fire_last'], leftShots=['wpn_mk3_lh_fire'], glow='#7dff6a',
+       extra=['wpn_mk3_orb_creation_00', 'wpn_mk3_orb_loop', 'wpn_mk3_orb_activated_loop', 'wpn_mk3_orb_disappear', 'wpn_orb_damage_00', 'wpn_orb_damage_01',
+              'wpn_orb_damage_02', 'wpn_orb_damage_03', 'wpn_mk3_rh_act', 'wpn_mk3_lh_act', 'fly_mkiii_reload_lh_gears']),
+]
 # ---- the Advanced Warfare pack (workshop 1793220683, Skye's s1_ ports: models vm_s1_*/wm_s1_*, clips am_s1_<gun>_*,
 # sounds skye_ports/s1_<gun>/; its streamed images need the pack's xpaks hard-linked into BO3's zone folder while
 # Greyhound exports, see docs/fork/weapons.md). Each has its own Pack-a-Punched model (_up).
@@ -665,7 +688,7 @@ for w in MODW:
                **({'attachAnims': attach_anims} if attach_anims else {}), **({'lockdown': True} if w.get('lockdown') else {})}
     if w.get('projectile'): common2['projectileModel'] = model(w['projectile'], 'part_'+w['projectile'])[0]   # fired as the rocket
     up = {**common2, 'name': w.get('up'), 'clipSize': int(t['clipSize']*1.5), 'maxAmmo': int(t['maxAmmo']*1.5), 'startAmmo': int(t['maxAmmo']*1.5),
-          'damage': t['damage']*2.2, 'minDamage': t['minDamage']*2.2}
+          'damage': t['damage']*2.2, 'minDamage': t['minDamage']*2.2, **w.get('upStats', {})}
     for k in ('bo3', 'modWeapon', 'price'): up.pop(k, None)
     if w.get('left'):   # dual wield (animation.js): the left gun's own clips ride on top of the right's; ADS is off
         lw = w['left']   # suffix: a single gun's bones renamed as the left hand's (lw['out'] names the copy)
@@ -696,6 +719,8 @@ for w in MODW:
     modsounds[w['id']] = {'shots': [k for k in map(snd, w['shots']) if k], 'last': [k for k in map(snd, w.get('last', [])) if k],
                           'notes': {n: k for n in sorted(notes) if (k := snd(st := n.removeprefix('sndnt#')) or snd(st+'_r') or snd(st+'1') or snd(NOTE_ALIAS.get(st, '')))}}
     if w.get('upShots'): modsounds[w['id']]['upShots'] = [k for k in map(snd, w['upShots']) if k]
+    if w.get('leftShots'): modsounds[w['id']]['leftShots'] = [k for k in map(snd, w['leftShots']) if k]   # a dual pair's left gun (the Mk3's GKZ-45)
+    if w.get('extra'): modsounds[w['id']]['extra'] = {k: v for k in w['extra'] if (v := snd(k))}   # sounds a mod plays itself (the Mk3's vortex)
     print(w['id'], 'anims', len(A2), 'sounds', len(modsounds[w['id']]['shots']), '+', len(modsounds[w['id']]['notes']), 'notes of', len(notes))
 # ---- operator weapons (mods/operator-weapons), not guns: the Ragnarok DG-4 (BO3's talon spikes, exported from
 # zm_castle with its vm_talon_spike_* clips) on the same arms, as a def for its own ViewWeapon, plus the planted prop
