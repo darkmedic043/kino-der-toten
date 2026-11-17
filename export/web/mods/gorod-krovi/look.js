@@ -69,19 +69,21 @@ function seeThroughWater(root) {
 export function setupLook(api, { detail = true } = {}) {
   const { scene, world, session, host, camera } = api, report = {};
   if (world.root) {
+    // the map root and the buy doors' parts, which custom-world moves onto the scene (gates and power doors kept the normal-as-colour paint, 2026-11-17)
+    const doorParts = [...(world.doors?.values() ?? [])].flatMap(d => d.parts.map(p => p.object)).filter(o => { for (let p = o.parent; p; p = p.parent) if (p === world.root) return false; return true; }), root = { traverse: f => { world.root.traverse(f); for (const o of doorParts) o.traverse(f); } };
     // BO3's global_invisible (clip and hint surfaces the game never draws) is in the build as near-black solid faces:
     // hidden here, still in the collision.
-    let hid = 0; world.root.traverse(o => { if (o.isMesh && [o.material].flat().every(m => /^global_invisible$/.test(m?.name ?? ''))) { o.visible = false; hid++; } });
+    let hid = 0; root.traverse(o => { if (o.isMesh && [o.material].flat().every(m => /^global_invisible$/.test(m?.name ?? ''))) { o.visible = false; hid++; } });
     report.invisible = hid;
     // decals whose only exported image is their normal map, built with it as their colour (map v=10): saturated blue sheets
     // (the start gate's peeling paint, 2026-11-17). The builder drops their colour since; hidden here until the next rebuild.
-    let nrm = 0; world.root.traverse(o => { if (o.isMesh && o.visible && [o.material].flat().every(m => NORMAL_AS_COLOUR.test(m?.name ?? ''))) { o.visible = false; nrm++; } });
+    let nrm = 0; root.traverse(o => { if (o.isMesh && o.visible && [o.material].flat().every(m => NORMAL_AS_COLOUR.test(m?.name ?? ''))) { o.visible = false; nrm++; } });
     report.normalDecals = nrm;
-    metalLook(world.root);
-    report.darkMetal = liftDarkMetal(world.root);
-    if (detail) applyDetail(world.root);
-    report.water = seeThroughWater(world.root);
-    if (!q('noOverlays')) report.overlays = overlayLayers(world.root, { soft: null });
+    metalLook(root);
+    report.darkMetal = liftDarkMetal(root);
+    if (detail) applyDetail(root);
+    report.water = seeThroughWater(root);
+    if (!q('noOverlays')) report.overlays = overlayLayers(root, { soft: null });
   }
   const kids = scene.children;
   const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
