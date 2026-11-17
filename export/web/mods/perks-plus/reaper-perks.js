@@ -861,7 +861,6 @@ export function setupReaperPerks(api, catalogue, base) {
   chip(() => has('dyingwish') ? [dyingUntil > now() ? 'DYING WISH ' + Math.ceil(dyingUntil - now()) : now() < dyingReady ? 'DW ' + Math.ceil(dyingReady - now()) + 's' : 'DYING WISH', dyingUntil > now() || now() >= dyingReady] : null);
   chip(() => has('guardianangel') ? [angelCharge >= 1 ? 'ANGEL READY' : `ANGEL ${angelKills}/${ANGEL_KILLS}`, angelCharge >= 1] : null);
   chip(() => has('momentum') ? [`MOMENTUM ${Math.round(momentum * 100)}% · ${charges}${killMode ? '' : ' (off)'}`, momentum >= .95 && killMode] : null);
-  chip(() => has('zombshell') ? [shells.length ? 'ZOMBSHELL ' + Math.ceil(Math.max(0, shells[0].until - now())) : now() < shellReady ? 'ZS ' + Math.ceil(shellReady - now()) + 's' : 'ZOMBSHELL', !!shells.length || now() >= shellReady] : null);
   chip(() => has('winterwail') ? [`WAIL ${wails}`, wails > 0] : null);
   chip(() => has('estatic') && up('estatic') ? [`STATIC ${staticCharges}`, staticCharges > 0] : null);
   chip(() => has('moonshine') ? [`SLIDES ${slidesLeft}`, slidesLeft > 0] : null);
