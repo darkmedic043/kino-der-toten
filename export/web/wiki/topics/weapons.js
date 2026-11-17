@@ -173,7 +173,7 @@ export default {
           const u = up(d);
           const where = [];
           for (const map of walls.get(id) ?? []) where.push(`Wall buy on ${mapLink(c, map)}`);
-          if (pr?.relic) where.push('Your starting weapon once earned (a relic: Loadout → Starting weapon)');   // relics: loadout only, never the box list
+          if (pr?.relic) where.push(`${sys(c, 'Mystery Box')} once earned (a relic: it joins your box list on every map)`);   // relics: in the box list once owned
           if (id !== 'cheese_gun' && !pr?.relic) {
             if (pool.has(id) && pr) where.push(`${sys(c, 'Mystery Box')} (in it by default)`);
             else if (pr) where.push(`${sys(c, 'Mystery Box')} (switch it on in your box list)`);

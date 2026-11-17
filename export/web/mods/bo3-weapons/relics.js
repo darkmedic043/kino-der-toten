@@ -1,14 +1,14 @@
 // Relics (2026-11-17, user: "a cool way to unlock the elemental bows, including the base bows too, and the gkz-45 mk3 so
-// that you can put them in your loadout"): wonder weapons earned once in their own map, then pickable as the starting
-// weapon on every map. Account unlocks: profile.rewards['relic.<id>'] (cloud-synced like the Stark suits; a cheat game
+// that you can put them in your loadout"; then: "they should just be unlockable to be put in your mystery boxs loadout"):
+// wonder weapons earned once in their own map, then in the player's Mystery Box list on every map (switched on when earned).
+// Account unlocks: profile.rewards['relic.<id>'] (cloud-synced like the Stark suits; a cheat game
 // earns nothing, mods/stark/unlocks.js grant). progression.json lists them with `unlock` (the reward key) and `relic` (how
-// to earn it, shown on the locked card); profile.js isRelic / relicLocked / canStart let them into the starting slot and
-// keep them off the Mystery Box list.
+// to earn it, shown on the locked card); profile.js isRelic / relicLocked / boxItems let them into the box list once owned.
 //   Wrath of the Ancients  Der Eisendrache: claim the bow behind the castle (mods/der-eisendrache/mod.js setupBow)
 //   the four elemental bows Der Eisendrache: claim the finished bow from its pedestal (bows.js 'take'); the base bow too
 //   GKZ-45 Mk3            Gorod Krovi: 115 kills with it (or the Maelstrom of Eris) in one game (below)
-// Off Der Eisendrache a bow in hand still draws, flies, burns and bursts with its element: the castle mod runs bows.js in
-// its offMap mode on other maps (mods/der-eisendrache/mod.js).
+// Off Der Eisendrache a bow out of the box still draws, flies, burns and bursts with its element: the castle mod runs bows.js in
+// its offMap mode on other maps once a bow relic is owned (mods/der-eisendrache/mod.js).
 import { grant } from '../stark/unlocks.js';
 
 export const RELICS = {
@@ -30,7 +30,7 @@ export function earnRelic(api, ids, { delay = 3.4 } = {}) {
     api.audio?.play?.('box');
     const fx = window.kino?.fx, p = api.player?.getFeetPosition?.();
     if (fx?.emit && p) for (let i = 0; i < 3; i++) fx.emit({ key: 'glow', at: p.clone().setY(p.y + 40 + i * 30), size: [60, 420 - i * 90], life: .6 + i * .2, fade: [.05, .8], additive: true, color: COLOR[got[0]] ?? 0xffd070 });
-    api.toast?.(`${got.map(name).join(', ')}: ${got.length > 1 ? 'relics now' : 'now a relic'} you can start with (Armory → Loadout → Starting weapon)`, 8);
+    api.toast?.(`${got.map(name).join(', ')}: ${got.length > 1 ? 'are' : 'is'} now in your Mystery Box on every map (Armory → Loadout → Mystery Box)`, 8);
   }, delay * 1000);
   return got;
 }
@@ -44,7 +44,7 @@ export function setupRelics(api) {
   host.on('reset', () => { kills = 0; told = false; done = owned(); });
   host.on('update', () => {
     if (done || told || !session.inventory?.some(w => w.id === 'bo3_raygun_mk3')) return;
-    told = true; api.toast?.(`Relic trial · ${MK3_KILLS} kills with the GKZ-45 Mk3 this game makes it yours on every map`, 6);
+    told = true; api.toast?.(`Relic trial · ${MK3_KILLS} kills with the GKZ-45 Mk3 this game puts it in your Mystery Box on every map`, 6);
   });
   host.on('kill', e => {
     if (done || e.remote || session.weapon?.id !== 'bo3_raygun_mk3') return;

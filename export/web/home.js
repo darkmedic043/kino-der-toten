@@ -10,7 +10,7 @@ import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
 import { startSocial, onSocial, request, accept, decline, cancel, remove, statusText } from './social.js';
 import { mergePatch, resolveWeapons, withCore, isCoreMod } from './mod-loader.js';
-import { loadProfile, saveProfile, loadProgression, soonLocked, packLocked, passLocked, ownsItem, xpToNext, levelNeed, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, isRelic, relicLocked, canStart, boxItems, setBoxItem, boxMin } from './profile.js';
+import { loadProfile, saveProfile, loadProgression, soonLocked, packLocked, passLocked, ownsItem, xpToNext, levelNeed, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, isRelic, relicLocked, boxItems, setBoxItem, boxMin } from './profile.js';
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
@@ -362,19 +362,19 @@ const gunsmithHas=id=>gunsmith&&weapons[id]&&!gunSoon(weapons[id])&&(weapons[id]
 function openLoadoutGunsmith(id,onClose){
   const l=validLoadout(config,profile,weapons),own=[l.primary].filter(w=>w&&gunsmithHas(w)&&smithOpen(w));
   const ids=[...own,...Object.keys(weapons).filter(w=>!own.includes(w)&&!w.includes('upgraded')&&!weapons[w].meleeSlot&&gunsmithHas(w)&&smithOpen(w))];   // (melee weapons: their own Gunsmith, from the melee slot)
-  openGunsmith({cat:gunsmith,weapons,profile,id,ids:ids.includes(id)?ids:[id],label:w=>w===l.primary?'STARTING WEAPON':isRelic(cfgW(w))?'RELIC':'BOX / WALL GUN',
+  openGunsmith({cat:gunsmith,weapons,profile,id,ids:ids.includes(id)?ids:[id],label:w=>w===l.primary?'STARTING PISTOL':isRelic(cfgW(w))?'RELIC · BOX GUN':'BOX / WALL GUN',
     onChange:()=>save(),onClose:onClose??(()=>{focus={id,isWeapon:true};renderLoadout();})});
 }
 loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;{const st=loadProfile();if(migrateWeaponLevels(c,weapons,st)){saveProfile(st);profile.weaponXp=st.weaponXp;}}   // 30-level track: old saves keep their attachments
   const st=document.createElement('style');st.textContent=GUNSMITH_CSS;document.head.append(st);renderLoadout();}).catch(e=>console.warn('[gunsmith]',e));
 // One starting slot, pistols only; the Mystery Box card edits what the box can give you.
-const slots=[{key:'primary',label:'STARTING WEAPON'},{key:'melee',label:'MELEE'},{key:'box',label:'MYSTERY BOX'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
+const slots=[{key:'primary',label:'STARTING PISTOL'},{key:'melee',label:'MELEE'},{key:'box',label:'MYSTERY BOX'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
 let activeSlot='primary',focus=null,meleeCatalog=null;
 fetchJson('mods/melee/melee.json').then(c=>{meleeCatalog=c;renderLoadout();}).catch(e=>console.warn('[melee]',e));
 const weaponList=()=>config.weapons.filter(w=>weapons[w.id]).map(w=>({...w,level:unlockLevel(w)}));
 // a weapon pack gun (progression.json pack): the lock names the pack, sold in the Shop's Weapon packs tab
 const PACKS={aw:'Advanced Warfare Weapon Pack'},packOf=id=>{const w=config.weapons.find(x=>x.id===id);return packLocked(w)?w.pack:null;};
-const pistolList=()=>weaponList().filter(w=>(isPistol(weapons[w.id])&&!passLocked(w)||isRelic(w))&&!soonLocked(w));   // a coming-soon pistol isn't offered; relics show locked until earned
+const pistolList=()=>weaponList().filter(w=>isPistol(weapons[w.id])&&!soonLocked(w)&&!passLocked(w));   // a coming-soon pistol isn't offered
 const cfgW=id=>config.weapons.find(w=>w.id===id);
 function slotState(key,u,l){
   if(key==='primary')return {value:l.primary};
@@ -461,8 +461,8 @@ function renderPicker(u,l){
   if(activeSlot==='box'){renderBoxPicker(u);return;}
   if(activeSlot==='melee'){renderMeleePicker(l);return;}
   const isTac=activeSlot==='tactical',isWeapon=!activeSlot.startsWith('bonus')&&!isTac,current=slotState(activeSlot,u,l).value??'';
-  $('picker-title').textContent={primary:'STARTING WEAPON',tactical:'TACTICAL',bonus0:'BONUS',bonus1:'SECOND BONUS'}[activeSlot];
-  $('picker-hint').textContent=isWeapon?`${pistolList().filter(w=>u.weapons.includes(w.id)).length} / ${pistolList().length} unlocked · a pistol, or a relic earned in a map · other guns come from the Mystery Box and walls`:isTac?`${u.tactical.length} / ${tacList().length} unlocked`:`${u.bonuses.length} / ${config.bonuses.length} unlocked`;
+  $('picker-title').textContent={primary:'STARTING PISTOL',tactical:'TACTICAL',bonus0:'BONUS',bonus1:'SECOND BONUS'}[activeSlot];
+  $('picker-hint').textContent=isWeapon?`${pistolList().filter(w=>u.weapons.includes(w.id)).length} / ${pistolList().length} unlocked · other guns come from the Mystery Box and walls`:isTac?`${u.tactical.length} / ${tacList().length} unlocked`:`${u.bonuses.length} / ${config.bonuses.length} unlocked`;
   let options=isWeapon?pistolList().map(w=>({id:w.id,level:w.level})):isTac?tacList().map(t=>({id:t.id,level:t.level})):config.bonuses.map(b=>({id:b.id,level:b.level}));
   $('picker-cats').hidden=true;   // one class now (pistols); the class tabs are used by the Mystery Box list
   if(activeSlot!=='primary')options.unshift({id:'',level:1});
@@ -474,12 +474,12 @@ function renderPicker(u,l){
       el.innerHTML=o.id?`<div class="thumb"></div><strong>${esc(d.name)}</strong><div class="badges">${weaponBadges(o.id)}</div>`:`<div class="thumb"></div><strong>None</strong><small>Start with one weapon</small>`;if(o.id)fillThumb(el.querySelector('.thumb'),o.id);}
     else if(isTac){el.innerHTML=o.id?`<div class="thumb"></div><strong>${esc(tacById[o.id].name)}</strong><small>${esc(tacById[o.id].description)}</small>`:`<div class="thumb"></div><strong>None</strong><small>No tactical</small>`;if(o.id)fillThumb(el.querySelector('.thumb'),o.id);}
     else el.innerHTML=o.id?`<strong>${esc(bonusById[o.id].name)}</strong><small>${esc(bonusById[o.id].description)}</small>`:'<strong>None</strong><small>No bonus</small>';
-    if(!unlocked)el.insertAdjacentHTML('beforeend',isWeapon&&relicLocked(cfgW(o.id))?'<span class="lock">RELIC</span>':isWeapon&&packOf(o.id)?`<span class="lock">${esc(packOf(o.id).toUpperCase())} PACK</span>`:`<span class="lock">LV ${o.level}</span>`);
+    if(!unlocked)el.insertAdjacentHTML('beforeend',isWeapon&&packOf(o.id)?`<span class="lock">${esc(packOf(o.id).toUpperCase())} PACK</span>`:`<span class="lock">LV ${o.level}</span>`);
     el.addEventListener('mouseenter',()=>isTac?renderTactical(o.id,unlocked):renderDetail(o.id,isWeapon,unlocked,o.level));
     // hovering previews; leaving goes back to the weapon actually in the slot (with its Gunsmith)
     el.addEventListener('mouseleave',()=>{const now=slotState(activeSlot,unlocks(config,unlockLvl(profile),weapons),validLoadout(config,profile,weapons)).value??'';isTac?renderTactical(now,true):renderDetail(now,isWeapon,true,1);});
     el.addEventListener('click',()=>{
-      if(!unlocked){toast(isWeapon&&relicLocked(cfgW(o.id))?'Relic · '+cfgW(o.id).relic:isWeapon&&packOf(o.id)?`In the ${PACKS[packOf(o.id)]??'weapon pack'}: buy it in the Shop`:`Reach level ${o.level} to unlock`);return;}
+      if(!unlocked){toast(isWeapon&&packOf(o.id)?`In the ${PACKS[packOf(o.id)]??'weapon pack'}: buy it in the Shop`:`Reach level ${o.level} to unlock`);return;}
       if(o.id&&o.id===other){toast('Already in your other slot');return;}
       const lo=profile.loadout;
       if(activeSlot==='primary'){lo.primary=o.id;lo.secondary='';}else if(isTac)lo.tactical=o.id;
@@ -609,7 +609,7 @@ function renderDetail(id,isWeapon,unlocked,level,opts={}){
     ${bar('DAMAGE',Math.log10(Math.max(10,d.damage*pellets)),Math.log10(3000),Math.round(d.damage)+(pellets>1?'×'+pellets:''))}
     ${bar('FIRE RATE',rpm,1000,rpm)}${bar('MAGAZINE',d.clipSize,100,d.clipSize)}${bar('RESERVE',d.maxAmmo,600,d.maxAmmo)}${bar('RELOAD',1/Math.max(.3,d.reloadTime),1/.8,(d.reloadTime??0).toFixed(1)+'s')}
     <p>${d.upgrade?`Pack-a-Punch: <b>${esc(d.upgrade.name)}</b>`:'Cannot be upgraded'} · ${esc(d.fireType??'')}</p>
-    <p class="muted">${rarityLine(id)}${unlocked?(isRelic(cfgW(id))?'Relic · unlocked: can be your starting weapon':'Unlocked'):soonLocked(cfgW(id))?'Coming soon':relicLocked(cfgW(id))?'Relic · '+esc(cfgW(id).relic):passLocked(config.weapons.find(w=>w.id===id))?'A Melon Pass Season 1 reward':packOf(id)?`In the ${esc(PACKS[packOf(id)]??'weapon pack')} (Shop)`:'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}${config.weapons.find(w=>w.id===id)?.kit?' · first kit':''}</p>
+    <p class="muted">${rarityLine(id)}${unlocked?(isRelic(cfgW(id))?'Relic · earned: it can go in your Mystery Box':'Unlocked'):soonLocked(cfgW(id))?'Coming soon':relicLocked(cfgW(id))?'Relic · '+esc(cfgW(id).relic):passLocked(config.weapons.find(w=>w.id===id))?'A Melon Pass Season 1 reward':packOf(id)?`In the ${esc(PACKS[packOf(id)]??'weapon pack')} (Shop)`:'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}${config.weapons.find(w=>w.id===id)?.kit?' · first kit':''}</p>
     ${gunsmith&&gunsmithHas(id)&&!smithOpen(id)?`<p class="muted gs-locked">Gunsmith opens at level ${gunsmithLevel(config,id)}</p>`:''}<div class="gunsmith-slot"></div>${unlocked?`<div data-prestige-host="${id}">${prestigeSlot(id)}</div>`:''}`;
   fillThumb(el.querySelector('.thumb'),id);
   // Weapon levels and attachments (mods/weapon-levels).
@@ -658,10 +658,10 @@ function renderWeaponCard(){
   renderDetail(id,true,unlocked,weaponLevel[id],{el,smith:true,onClose:()=>{wpFocus=id;renderWeapons();}});
   const actions=document.createElement('div');actions.className='wp-actions';
   const loadout=validLoadout(config,profile,weapons).primary===id;
-  if(unlocked&&canStart(config,weapons,id))actions.insertAdjacentHTML('beforeend',`<button data-act="start" ${loadout?'disabled':''}>${loadout?'STARTING WEAPON':'SET AS STARTING WEAPON'}</button>`);
+  if(unlocked&&isPistol(weapons[id]))actions.insertAdjacentHTML('beforeend',`<button data-act="start" ${loadout?'disabled':''}>${loadout?'STARTING PISTOL':'SET AS STARTING PISTOL'}</button>`);
   if(it)actions.insertAdjacentHTML('beforeend',`<button data-act="box" class="${it.on?'on':''}">${it.on?'IN MYSTERY BOX · REMOVE':'ADD TO MYSTERY BOX'}</button>`);
   actions.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
-    if(b.dataset.act==='start'){profile.loadout.primary=id;save();toast(weapons[id].name+' is your starting weapon');}
+    if(b.dataset.act==='start'){profile.loadout.primary=id;save();toast(weapons[id].name+' is your starting pistol');}
     if(b.dataset.act==='box'){const err=toggleBoxItem(id);if(err)toast(err);}
     renderLoadout();});
   if(actions.children.length)el.querySelector('h2')?.after(actions);

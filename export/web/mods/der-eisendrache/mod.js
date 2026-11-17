@@ -1626,14 +1626,13 @@ function setupBounds({ world, player, host, session, damage, toast, audio }, { l
   return { state: () => ({ safe: safe.length, air: Math.round(air * 10) / 10, floor, fallen }) };
 }
 
-// The bows on other maps (2026-11-17, relics: bo3-weapons/relics.js): a bow picked as the starting weapon draws, flies,
+// The bows on other maps (2026-11-17, relics: bo3-weapons/relics.js): an earned bow out of the Mystery Box draws, flies,
 // burns and bursts with its element as it does here. bows.js runs in its offMap mode (the weapon only: no quests, props,
 // prompts or castle colliders). In a co-op room it always runs: the host deals a teammate's element damage.
 function offMapBows(api) {
-  const isBow = id => id === BOW || /^bo3_bow_/.test(id ?? '');
   if (!api.data?.weapons?.[BOW] || !api.host) return;
-  let start = null; try { start = JSON.parse(localStorage.getItem('kino.mods.progression'))?.loadout?.primary; } catch {}
-  if (!isBow(start) && !window.kino?.coop?.id) return;
+  let owned = false; try { owned = Object.entries(JSON.parse(localStorage.getItem('kino.mods.progression'))?.rewards ?? {}).some(([k, v]) => v && /^relic\.bow/.test(k)); } catch {}
+  if (!owned && !window.kino?.coop?.id) return;   // a bow relic can come out of this player's box
   api.sync ??= createSync(api);
   const bows = setupBows(api, { offMap: true });
   window.kino ??= {}; window.kino.offMapBows = bows;   // testing handle (kino.castle stays the castle's alone)
