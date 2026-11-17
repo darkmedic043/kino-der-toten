@@ -164,8 +164,14 @@ export default async function setupStrike(api, gk) {
 
   // ---- aiming -------------------------------------------------------------------------------------------------------------
   const ringMat = new THREE.MeshBasicMaterial({ color: 0x5cff6a, transparent: true, opacity: .8, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, blending: THREE.AdditiveBlending });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(34, 46, 40).rotateX(-Math.PI / 2), ringMat);
-  ring.name = 'gk_strike_marker'; ring.frustumCulled = false; ring.renderOrder = 5; ring.userData.noMerge = true;
+  // the marker: a centre ring, and the area each fireball burns (K.fire round its landing spot, 2026-11-17, user: "make the
+  // dragon fire more accurately represent where the fire is landing"; the 46-unit ring alone hid a 300-unit kill zone)
+  const fillMat = ringMat.clone(); fillMat.opacity = .12;
+  const ring = new THREE.Group(), mk = (g, m) => { const o = new THREE.Mesh(g.rotateX(-Math.PI / 2), m); o.frustumCulled = false; o.renderOrder = 5; o.userData.noMerge = true; ring.add(o); return o; };
+  mk(new THREE.RingGeometry(34, 46, 40), ringMat);
+  const zone = new THREE.Group(); ring.add(zone);
+  zone.add(mk(new THREE.RingGeometry(.95, 1, 64), ringMat), mk(new THREE.CircleGeometry(1, 64), fillMat));
+  ring.name = 'gk_strike_marker'; ring.userData.noMerge = true;
   host.warmObjects?.push(ring);
   const tmpR = new THREE.Ray();
   // function_c7832a90: a sky point 1000 out (away from the player) and 2000 up whose line to the spot + 96 is clear; 4 headings
@@ -181,14 +187,19 @@ export default async function setupStrike(api, gk) {
     const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
     tmpR.set(camera.position.clone(), dir);
     const h = world.raycast(tmpR, 1, AIM);
-    return h ? (h.point?.clone?.() ?? camera.position.clone().addScaledVector(dir, h.distance)) : camera.position.clone().addScaledVector(dir, AIM);
+    const p = h ? (h.point?.clone?.() ?? camera.position.clone().addScaledVector(dir, h.distance)) : camera.position.clone().addScaledVector(dir, AIM);
+    return groundBelow(p.addScaledVector(dir, -20)) ?? p;   // a wall or a crate's side: the floor in front of it
+  }
+  function groundBelow(p, up = 40, far = 800) {
+    const g = world.raycast(new THREE.Ray(p.clone().add(new THREE.Vector3(0, up, 0)), new THREE.Vector3(0, -1, 0)), 0, far);
+    return g?.point ? g.point.clone() : null;
   }
   function aimTick() {
     if (!S.aim) return;
     if (session.phase === 'reviving' || session.phase === 'gameover' || !S.ammo) return stopAim();
     const p = aimPoint(); S.aim.at = p; S.aim.sky = skyFor(p);
-    ring.position.copy(p).add(new THREE.Vector3(0, 8, 0)); ring.updateMatrixWorld(true);
-    ringMat.color.setHex(S.aim.sky ? (S.owned === 'upgraded' ? 0xffb030 : 0x5cff6a) : 0xff3a1a);
+    ring.position.copy(p).add(new THREE.Vector3(0, 8, 0)); zone.scale.setScalar(kind().fire + 50); ring.updateMatrixWorld(true);   // + the fireballs' ±50 spread
+    ringMat.color.setHex(S.aim.sky ? (S.owned === 'upgraded' ? 0xffb030 : 0x5cff6a) : 0xff3a1a); fillMat.color.copy(ringMat.color);
   }
   function startAim() {
     if (S.busy) { sfx('strike_error', .7); api.toast?.('The dragon is still out', 2); return; }
@@ -240,7 +251,12 @@ export default async function setupStrike(api, gk) {
       if (strike.fired >= 4) return;
       strike.fired++; S.from = cod(from).map(Math.round);
       let to = null;
-      for (let k = 0; k < 6; k++) { to = at.clone().add(new THREE.Vector3(Math.random() * 100 - 50, 0, Math.random() * 100 - 50)); if (!world.lineClear(from, to)) break; }
+      for (let k = 0; k < 6; k++) {   // until the line from the throat is clear (was inverted before 2026-11-17: fireballs went through roofs)
+        to = at.clone().add(new THREE.Vector3(Math.random() * 100 - 50, 0, Math.random() * 100 - 50)); to = groundBelow(to, 60, 200) ?? to;
+        if (world.lineClear(from, to.clone().add(new THREE.Vector3(0, 8, 0)))) break;
+      }
+      const dir = to.clone().sub(from), len = dir.length(), hit = world.raycast(new THREE.Ray(from.clone(), dir.normalize()), 1, len);
+      if (hit?.point && hit.distance < len - 8) to = hit.point.clone();   // still blocked: it bursts where it hits, and burns there
       balls.push({ strike, from: from.clone(), to, p: from.clone(), t: 0, dur: Math.max(.25, from.distanceTo(to) / SPEED), K });
     };
     const finish = () => {
@@ -268,8 +284,9 @@ export default async function setupStrike(api, gk) {
   }
   function impact(b) {
     const fx = window.kino?.fx, at = b.to, K = b.K, st = b.strike;
-    st.landed++;
+    st.landed++; log(`impact ${cod(at).map(Math.round)} (aimed ${cod(st.at).map(Math.round)})`);
     fx?.explosion?.(at.clone().add(new THREE.Vector3(0, 20, 0)), 1.3);
+    firePatch(at, K.fire);
     fx?.flash?.(at.clone().add(new THREE.Vector3(0, 80, 0)), { color: 0xff7a26, intensity: 8, radius: 1100, life: .6 });
     sfx(camera.position.distanceTo(at) < 900 ? 'strike_fireball_close' : 'strike_fireball', 1, at, 6000);
     for (const z of [...enemies.list]) {
@@ -291,6 +308,22 @@ export default async function setupStrike(api, gk) {
       if (!left) { gk.setFlag('dragonstage3started'); sfx('strike_exit_cry', .8); lights(4 - n()); gk.emit('strike:stage', 3); api.toast?.('The console stirs', 3); }
       else sfx('strike_button_2', 1);
     }
+  }
+  // flames over the burn radius, on the floor, for about a second (every zombie inside dies at the impact)
+  function firePatch(at, r) {
+    const fx = window.kino?.fx; if (!fx?.emit) return;
+    for (const [delay, count] of [[0, 18], [180, 12], [400, 8]]) setTimeout(() => {
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2, d = r * Math.sqrt(Math.random()) * .95;
+        const p = at.clone().add(new THREE.Vector3(Math.cos(a) * d, 0, Math.sin(a) * d)), g = groundBelow(p, 80, 220);
+        if (!g) continue;
+        fx.emit({ key: 'fire', at: g.add(new THREE.Vector3(0, 22, 0)), vel: new THREE.Vector3(0, 40, 0), size: [60, 150], life: .7 + Math.random() * .6, fade: [.05, .55], additive: true, opacity: .85, spin: Math.random() * 2 - 1 });
+      }
+      if (!delay) for (let i = 0; i < 24; i++) {   // the rim: where the burn stops
+        const a = i / 24 * Math.PI * 2, g = groundBelow(at.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)), 80, 220);
+        if (g) fx.emit({ key: 'glow', at: g.add(new THREE.Vector3(0, 6, 0)), size: [60, 110], life: .9, fade: [.05, .7], additive: true, color: 0xff6a1a, opacity: .7 });
+      }
+    }, delay);
   }
   function killed(st) {
     st.kills++;

@@ -37,6 +37,14 @@ export default function setup(api){
   const capsuleAt=(feetPos,height)=>{const c=new Capsule(new THREE.Vector3(),new THREE.Vector3(),player.radius);
     c.start.set(feetPos.x,feetPos.y+player.radius,feetPos.z);c.end.set(feetPos.x,feetPos.y+Math.max(.01,height-2*player.radius)+player.radius,feetPos.z);return c;};
   const fits=(feetPos,height)=>{const hit=player.worldOctree.capsuleIntersect(capsuleAt(feetPos,height));return !hit||hit.depth<=player.skin*2;};
+  // a ground snap may only move the body where it fits all the way down (2026-11-17, Gorod Krovi: a slide off a stair or
+  // ramp edge snapped up to 40 units down through the flight, into the space under it: stuck, or pushed out somewhere
+  // else, or through the floor and back to the spawn)
+  // Resting on a slope or a step's edge the rounded bottom dips into it (up to radius*(1-ny)): that is allowed, sinking
+  // deeper or meeting anything that faces down is not.
+  const clearDrop=(from,drop,ny=1)=>{const h=player.currentHeight,cap=4+player.radius*(1-Math.min(1,Math.abs(ny)));
+    for(let d=Math.min(6,drop);;d=Math.min(drop,d+6)){const c=player.worldOctree.capsuleIntersect(capsuleAt(from.clone().addScaledVector(down,d),h));
+      if(c&&c.depth>player.skin*2&&(c.depth>cap||c.normal.y<-.2))return false;if(d>=drop)return true;}};
 
   // ---- Prone ------------------------------------------------------------------------
   function setProne(on){
@@ -199,9 +207,10 @@ export default function setup(api){
       const base_=slideSpeed(slide.t),reach=player.stepHeight+4+base_*dt*1.5;
       const hit=!state.jumped&&player.velocity.y<=60?ray(feet().addScaledVector(up,4),down,reach+4):null;
       const n=hit?.triangle?.getNormal(new THREE.Vector3());
-      if(hit&&n&&Math.abs(n.y)>.45){
+      const drop=hit?Math.max(0,hit.distance-4-player.skin):0;
+      if(hit&&n&&Math.abs(n.y)>.45&&(drop<1||clearDrop(feet(),drop,n.y))){
         if(n.y<0)n.negate();
-        moveFeet(feet().addScaledVector(down,Math.max(0,hit.distance-4-player.skin)));
+        moveFeet(feet().addScaledVector(down,drop));
         player.onFloor=player.grounded=true;player.velocity.y=0;player._syncCamera();state.airTime=0;
         const downhill=n.x*slide.dir.x+n.z*slide.dir.z;   // >0 going downhill
         slide.boost=THREE.MathUtils.clamp(slide.boost+downhill*player.gravity*.9*dt,-slide.start,420);
@@ -214,7 +223,8 @@ export default function setup(api){
     // Stairs: stepping off an edge snaps down onto the step below.
     if(wasGrounded&&!player.onFloor&&!state.jumped&&player.velocity.y<=0){
       const hit=ray(feet().addScaledVector(up,2),down,player.stepHeight+4);
-      if(hit&&normalY(hit)>.6){moveFeet(feet().addScaledVector(down,Math.max(0,hit.distance-2-player.skin)));player.onFloor=player.grounded=true;player.velocity.y=0;player._syncCamera();}
+      const drop=hit?Math.max(0,hit.distance-2-player.skin):0;
+      if(hit&&normalY(hit)>.6&&(drop<1||clearDrop(feet(),drop,normalY(hit)))){moveFeet(feet().addScaledVector(down,drop));player.onFloor=player.grounded=true;player.velocity.y=0;player._syncCamera();}
     }
     if(player.onFloor!==wasGrounded&&!state.jumped)state.stairs=.35;state.stairs=Math.max(0,state.stairs-dt);
     if(player.onFloor){state.airTime=0;state.jumped=false;state.wallJumps=0;state.lastWall=null;}else state.airTime+=dt;

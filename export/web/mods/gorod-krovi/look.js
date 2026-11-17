@@ -30,6 +30,7 @@ const SKY_GAIN = 2, HAZE = 0x3d3c45, KEY_I = 2;   // (KEY_I 1.1 -> 2 on 2026-11-
 // Textured metals whose colour map is near black (BO3 keeps a metal's colour in its specular map, not exported): the
 // pressed-bronze ceilings of the department store and the factory read as black voids overhead (2026-11-15). Each is
 // lifted to about sRGB 85 from its texture's measured average (sRGB 0-255; the map's tex/ at 512 px), bronze tinted.
+const NORMAL_AS_COLOUR = /^(t7_zm_sta_decal_damage_paint_peeling_normal|mtl_veh_t7_dlc3_tank_tiger_decal_blast_01|mtl_veh_t7_dlc3_tank_tiger_bullet_dent_decal|mtl_veh_t7_decal_bolt_10_other_gloss|mtl_veh_t7_dlc_decal_edge_trim_dead|mtl_veh_t7_dlc_dmg_dents_decal_reveal)$/;
 const DARK_METAL = { t7_zm_sta_metal_bronze_ceiling_tile: 28, t7_metal_planter_top_trim: 32, t7_metal_truss_01: 43, t7_zm_isl_metal_treadplate_01_alpha: 23,
   mtl_p7_barrel_metal_55gal_lid: 33, mtl_p7_can_metal_cube_01_smal: 19, mtl_p7_chalkboard_vintage_metal: 33, mtl_p7_light_chandelier_vintage_01_metal: 33,
   mtl_p7_zm_ctl_radio_reciever_02_metal_02: 33, mtl_p7_zm_der_cabinet_lab_bottom_metal_01: 25, mtl_veh_t7_mil_tank_tiger_tread: 42, mtl_veh_t7_mil_tank_tiger_treads_alpha: 42 };
@@ -72,6 +73,10 @@ export function setupLook(api, { detail = true } = {}) {
     // hidden here, still in the collision.
     let hid = 0; world.root.traverse(o => { if (o.isMesh && [o.material].flat().every(m => /^global_invisible$/.test(m?.name ?? ''))) { o.visible = false; hid++; } });
     report.invisible = hid;
+    // decals whose only exported image is their normal map, built with it as their colour (map v=10): saturated blue sheets
+    // (the start gate's peeling paint, 2026-11-17). The builder drops their colour since; hidden here until the next rebuild.
+    let nrm = 0; world.root.traverse(o => { if (o.isMesh && o.visible && [o.material].flat().every(m => NORMAL_AS_COLOUR.test(m?.name ?? ''))) { o.visible = false; nrm++; } });
+    report.normalDecals = nrm;
     metalLook(world.root);
     report.darkMetal = liftDarkMetal(world.root);
     if (detail) applyDetail(world.root);

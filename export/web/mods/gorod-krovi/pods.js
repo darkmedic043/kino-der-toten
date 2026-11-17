@@ -346,7 +346,7 @@ export default async function setup(api, gk) {
     state: () => ({ chance: +S.chance.toFixed(2), made: S.made, cylinder: S.cyl ? { colour: S.cyl.colour, at: S.cyl.at.toArray().map(Math.round), age: +S.cyl.age.toFixed(1) } : null,
       held: S.held, parts: S.parts, carried: [...S.carried], placed: [...S.placed], crafted: S.crafted, open: sites.filter(open).map(s => s.id),
       retired: [...S.retired], resting: [...S.resting].filter(([, t]) => t > session.time).map(([k]) => k),
-      active: S.active ? { site: S.active.site.id, state: S.active.state, t: +S.active.t.toFixed(1), health: S.active.health, max: S.active.max, kills: S.active.kills,
+      active: S.active ? { site: S.active.site.id, at: S.active.site.at.toArray().map(Math.round), state: S.active.state, t: +S.active.t.toFixed(1), health: S.active.health, max: S.active.max, kills: S.active.kills,
         attackers: S.active.attackers.size, harassers: S.active.wave?.list?.size ?? 0, reward: S.active.reward, lamp: lampShown } : null, log: S.log }),
     cylinder: (colour = null) => { S.cyl = null; return dropCylinder(player.getFeetPosition(), colour); },
     give: colour => { S.held = colour; return true; },

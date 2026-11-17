@@ -10,6 +10,8 @@
 // step.where(L) -> [Vector3] puts markers on the screen while the quest is tracked (only once the step is recorded);
 // spots already dealt with this match are left out, so only what is still to do is marked.
 
+import * as THREE from 'three';
+
 const n = v => [v].flat().filter(Boolean);
 const mq = L => L.malibu?.()?.quests?.flags?.();   // Malibu Drive's quest flags (malibu-drive/quests.js)
 const nt = L => globalThis.kino?.nuketown?.state?.();   // Nuketown's quest state (nuketown/mod.js)
@@ -18,6 +20,41 @@ const ntPart = (craft, part) => {   // a part of a Nuketown buildable, any order
   return { title: part, how: `The ${part.toLowerCase()} lies at one of three spots, a different one each game.`,
     done: L => !!of(L)?.built || !!item(L)?.got, where: L => { const q = item(L); return !q || q.got || of(L).built ? [] : [q.at]; } };
 };
+// Gorod Krovi (2026-11-17): every module puts its state on kino.gorod (ee/eggs/wear: getters; shield, strike, pods,
+// challenges: state() functions; gauntlet: .state is the step's name, .S the rest). Spots are BO3 (CoD) coordinates.
+const gkr = () => globalThis.kino?.gorod;
+const gf = f => !!gkr()?.gk?.hasFlag?.(f);
+const cw = (x, y, z) => new THREE.Vector3(x, z, -y);   // CoD -> map (scene-props.js W)
+const wv = a => a ? new THREE.Vector3(...a) : null;   // a rounded world position from a debug state
+const eeS = () => gkr()?.ee?.state;
+const eeSpots = re => (gkr()?.ee?.spots?.() ?? []).filter(s => re.test(s.text)).map(s => wv(s.at));
+const GK_KEYS = [[-77, 3575, 346], [1794, 3022, -156], [2664.15, 2624.27, -159], [-2344, 2604, 226], [-4744, 22440, -378], [-614, 3452, -148]];
+const GK_SOPHIA = cw(299, 4854, 186), GK_MAPBTN = cw(-398.75, 4764, 182);
+const GK_EE = [   // ee.js: one check per step, in order
+  () => gf('generator_charged'), () => gf('tube_puzzle_complete'), () => gf('ee_cylinder_acquired'), () => gf('key_placement'),
+  () => (eeS()?.keys?.length ?? 0) >= 6, () => gf('keys_placed'), () => gf('scenarios_complete'), () => gf('weapon_cores_delivered'),
+  () => gf('sophia_escaped'), () => ['arena', 'done'].includes(eeS()?.stage) || gf('ee_complete'), () => gf('ee_complete') || eeS()?.stage === 'done'];
+const linear = checks => () => { let i = 0; while (i < checks.length && checks[i]()) i++; return i; };
+const shield = () => gkr()?.shield?.state?.();
+const gauntlet = () => gkr()?.gauntlet;
+const GAUNTLET_NO = { boards: 0, egg: 1, carry: 2, placed: 2, bathed: 2, cooled: 2, napalm: 3, pierce: 4, melee: 5, incubate: 6, lockdown: 6, hot: 6, collect: 6, done: 7 };
+const pods = () => gkr()?.pods?.state?.();
+const GK_RADIOS = { red: [-2422, 2892, 517], yellow: [2432, 2370, -140], blue: [-58, 5673, 341] };
+const podWhere = L => {   // the network's current part: the cylinder, its radio, the pod, the part, the console
+  const s = pods(); if (!s || s.crafted) return [];
+  if (s.active) return [wv(s.active.at)];   // the pod, then its part (both there)
+  if (s.carried?.length) return [cw(-91, 3237, -132)];
+  if (s.held) return [cw(...GK_RADIOS[s.held] ?? GK_RADIOS.red)];
+  return s.cylinder ? [wv(s.cylinder.at)] : [];
+};
+const strike = () => gkr()?.strike?.state?.();
+const eggs = () => gkr()?.eggs?.state;
+const wear = () => gkr()?.wear?.state;
+const GK_LOGS = [[-4530, 3266, 410], [-488, 1135, 55], [3153, 3502, 248], [-3264, 21623, 58], [306, 1748, 53], [-124, 3430, 290], [-738, 1453, 357], [-48, 4653, 637], [-3095, 21612, 705], [-824, 2641, -32]];
+const GK_WEAR = { raz: [-1046.15, 1755.65, 240.234], sentinel: [110.271, 1690.54, 242], wings: [-738.994, 1454.91, 385.103] };
+const wearQuest = (k, name, steps) => ({ id: 'wear-' + k, name, kind: 'WEARABLE', steps: [...steps,
+  { title: 'Wear it', how: `The ${name} waits on its stand on the department store's upper floor once unlocked: press use to put it on.`, done: L => wear()?.worn === k, where: L => wear()?.open?.includes(k) && wear()?.worn !== k ? [cw(...GK_WEAR[k])] : [] }] });
+
 const at = (L, name) => { const k = L.malibu?.()?.kit, e = k?.one(name); return e ? [k.center(e)] : []; };   // a Malibu entity's spot
 const bowStage = (L, el) => {   // Der Eisendrache bow quest -> steps done: start, arrow, its own steps, place, souls, take
   const s = L.castle?.bows?.state()?.[el], Q = L.castle?.bows?.sites?.[el]; if (!s || !Q) return 0;
@@ -285,6 +322,93 @@ export const JOURNAL = [
     ] },
     { id: 'nt-free-perk', name: 'The closet', kind: 'SIDE EGG', steps: [
       { title: 'A free perk', how: 'A perk bottle waits in the closet beside the yellow house\'s back: drink it.', done: L => !!nt(L)?.freePerk, where: L => { const s = nt(L); return s && !s.freePerk ? [s.freePerkAt] : []; } },
+    ] },
+  ] },
+  { map: 'gorod-krovi', title: 'Gorod Krovi', quests: [
+    { id: 'gk-main', name: 'Love and War', kind: 'MAIN QUEST', progress: linear(GK_EE), steps: [
+      { title: 'The generator', how: 'Kill a Valkyrie drone in Pavlov\'s basement, next to the generator: its power charges it.', where: L => [cw(-2724, 21764, -116)] },
+      { title: 'The tubes', how: 'Start the generator (it runs for six minutes), then pull the levers at the six pneumatic tube terminals (Dragon Command, library, department store, barracks, factory, armory) so the air runs from the green source through every tube to the jammed one.', where: L => eeSpots(/Pull the lever|Start the generator/) },
+      { title: 'The master cylinder', how: 'Take the master cylinder out of the jammed tube.', where: L => eeSpots(/master cylinder/) },
+      { title: 'The password', how: 'Insert the master cylinder at S.O.P.H.I.A. in Dragon Command, shoot or knife the six rings to 0 6 0 7 6 4, then confirm. A wrong code locks it until the next round.', where: L => [GK_SOPHIA] },
+      { title: 'Six figures', how: 'Find the six figures for the war map, in any order: shoot the anomaly over the alley; call a Dragon Strike on the puddle in the library street; run the library\'s eye trap; breathe the Guard of Fafnir\'s fire into the factory pipe; shoot the sewer switch behind Pavlov\'s; punch the safe in the red brick basement with the Gauntlet.', where: L => { const k = eeS()?.keys ?? []; return GK_KEYS.filter((_, i) => !k.includes(i)).map(p => cw(...p)); } },
+      { title: 'Place the figures', how: 'Press the button by the war map in Dragon Command.', where: L => [GK_MAPBTN] },
+      { title: 'Six tasks', how: 'Press "Start the next task" at the war map button, six times: defend a pod, escort a drone, kill a Mangler, timed buttons, a pursuit and the terminal last. Not during a Valkyrie round or a lockdown; a failed task can be retried after the next round.', where: L => { const s = eeSpots(/./); return s.length ? s : [GK_MAPBTN]; } },
+      { title: 'The weapon core', how: 'Take the weapon core from S.O.P.H.I.A., then release the whelp in the start-area square: it flies off with it.', where: L => { const s = eeSpots(/weapon core/); return s.length ? s : [cw(-95, -241, 52)]; } },
+      { title: 'Sophia leaves', how: 'Go to S.O.P.H.I.A. and watch her leave.', where: L => [GK_SOPHIA] },
+      { title: 'The hatch', how: 'Everyone stands on the hatch in Dragon Command.', where: L => [cw(355, 4853, 149)] },
+      { title: 'Nikolai', how: 'Wake the machine in the arena and win the fight.', where: L => [cw(54, -1440, 54)] },
+    ] },
+    { id: 'gk-pods', name: 'The dragon network', kind: 'MAP QUEST', steps: [
+      { title: 'The power', how: 'Turn on the power in the department store.', done: L => !!L.session?.power, where: L => L.power() },
+      ...[['Transmitter', 0], ['Code book', 1], ['Map', 2]].map(([t, i]) => ({ title: t, how: 'A risen zombie drops a code cylinder: insert it at the radio of its colour (red factory, yellow library, blue judicial), defend the pod that lands until it opens (15 kills around it), take its part and place it at the network console in the bunker under Dragon Command. Parts come in order: transmitter, code book, map.',
+        done: L => !!pods()?.crafted || !!pods()?.placed?.includes(i), where: L => (pods()?.placed?.length ?? 0) === i ? podWhere(L) : [] })),
+      { title: 'Ride the dragon', how: 'Call the dragon at a roost (500) and ride it to Pavlov\'s.', done: L => gf('dragonpavlovfirsttime'), where: L => gf('dragonridecrafted') ? L.prompts(/^Call the dragon|^Ride the dragon/) : [] },
+    ] },
+    { id: 'gk-shield', name: 'Guard of Fafnir', kind: 'BUILDABLE', steps: [
+      ...[['dolly', 'head'], ['door', 'pelvis'], ['clamp', 'window']].map(([k, w]) => ({ title: `The dragon ${w}`, how: `The dragon ${w} lies at one of three spots, a different one each game.`,
+        done: L => !!shield()?.built || !!shield()?.have?.includes(k), where: L => L.prompts(new RegExp(`^Pick up the dragon ${w}`)) })),
+      { title: 'Build it', how: 'With all three parts, build it at the table in the bunker.', done: L => !!shield()?.built, where: L => shield()?.built ? [] : [cw(-431.25, 3541.5, -132)] },
+      { title: 'Take it', how: 'Take the Guard of Fafnir from the table.', done: L => !!shield()?.quest?.used || gf('dragon_shield_used'), where: L => L.prompts(/^Take the Guard of Fafnir/) },
+    ] },
+    { id: 'gk-shield-up', name: 'Guard of Fafnir upgrade', kind: 'WEAPON UPGRADE', progress: linear([() => gf('drshup_step_1_done') || (shield()?.quest?.kills ?? 0) >= 50, () => (shield()?.quest?.runes ?? 0) >= 3, () => !!shield()?.quest?.bathed || gf('drshup_bathed_in_flame'), () => !!shield()?.quest?.done || gf('drshup_quest_done')]), steps: [
+      { title: '50 kills', how: 'Kill 50 zombies with the shield, bashing or breathing fire.' },
+      { title: 'The runes', how: 'Breathe fire on the three runes (judicial, factory, library) from close enough, looking at them.', where: L => (gkr()?.shield?.runes ?? []).filter(r => !r.hit).map(r => r.p.clone()) },
+      { title: 'Bathe in flame', how: 'Stand in the dragon\'s fire pass with the shield raised, and take no hit.' },
+      { title: 'Quench it', how: 'Quench the shield in the start-area fountain.', where: L => [cw(606, 503, 101)] },
+    ] },
+    { id: 'gk-gauntlet', name: 'Gauntlet of Siegfried', kind: 'WONDER WEAPON', progress: L => { const g = gauntlet(); return !g ? 0 : g.state === 'done' && g.S?.given ? 8 : GAUNTLET_NO[g.state] ?? 0; }, steps: [
+      { title: 'The boards', how: 'Shoot or knife the boards in the sewer room under Pavlov\'s.', where: L => n(gauntlet()?.positions?.BOARDS) },
+      { title: 'The dragon egg', how: 'Take the egg that rolls out.', where: L => n(gauntlet()?.positions?.EGG_PICK) },
+      { title: 'Cook it', how: 'Lay the egg on one of the four cook spots (fountain, opera street, red brick, yellow house) and let the dragon\'s fire burn over it. It cools for a full round: then take it back.', where: L => { const g = gauntlet(); if (!g) return []; return g.state === 'carry' ? Object.values(g.spots ?? {}) : n(g.spots?.[g.S?.spot]); } },
+      { title: 'Napalm kills', how: 'Kill napalm zombies (5 solo, 2 more per player).' },
+      { title: 'Piercing kills', how: 'Kill zombies with bullets that went through another zombie first (two kills on one shot).' },
+      { title: 'Melee kills', how: 'Kill zombies with melee; the Guard of Fafnir\'s breath counts.' },
+      { title: 'The incubator', how: 'Place the egg in the incubator in Pavlov\'s sewer and defend it until it\'s full, wait a round, then take the egg.', where: L => n(gauntlet()?.positions?.INC_PROMPT) },
+      { title: 'The grave', how: 'Dig at the grave by the fountain and take the Gauntlet of Siegfried before it sinks back.', where: L => n(gauntlet()?.positions?.GRAVE) },
+    ] },
+    { id: 'gk-strike', name: 'Dragon Strike', kind: 'MAP QUEST', progress: linear([() => gf('dragonpavlovfirsttime'), () => gf('dragonstrikeunlocked'), () => gf('dragonstrikequestcomplete'), () => gf('dragonstrikeacquired') || !!strike()?.owned]), steps: [
+      { title: 'Reach Pavlov\'s', how: 'Ride the dragon to Pavlov\'s.' },
+      { title: 'The console', how: 'Every player activates the Dragon Strike console on Pavlov\'s second floor (a press only holds while that player stays on the floor).', where: L => [cw(-3218.23, 21374.2, 160)] },
+      { title: 'The lockdown', how: 'Survive the lockdown that follows.' },
+      { title: 'Take it', how: 'Take the Dragon Strike from the console.', where: L => [cw(-3218.23, 21374.2, 160)] },
+    ] },
+    { id: 'gk-strike-up', name: 'Dragon Strike upgrade', kind: 'WEAPON UPGRADE', progress: linear([() => (strike()?.stage ?? 0) >= 2, () => gf('dragonstage3started'), () => gf('dragonstage4started') || gf('draconiteavailable'), () => gf('draconiteavailable'), () => strike()?.owned === 'upgraded']), steps: [
+      { title: 'Strike kills', how: 'Kill zombies with the Dragon Strike (30 solo, 10 more per player).' },
+      { title: 'The banners', how: 'Hit each banner left in the library with a Dragon Strike fireball.', where: L => (strike()?.banners ?? []).filter(b => b.live && !b.hit).map(b => cw(...b.at)) },
+      { title: 'The console again', how: 'Activate the Dragon Strike upgrade at the console on Pavlov\'s second floor: a lockdown starts.', where: L => [cw(-3218.23, 21374.2, 160)] },
+      { title: 'The lockdown', how: 'Kill zombies with the Dragon Strike during the lockdown (20 solo, 5 more per player; it refills after each use). Too few, and you press the console again.' },
+      { title: 'Take it', how: 'Take the upgraded Dragon Strike from the console.', where: L => [cw(-3218.23, 21374.2, 160)] },
+    ] },
+    wearQuest('raz', 'Mangler Helmet', [
+      { title: 'Arm cannons', how: 'Shoot the arm cannon off five Manglers.', done: L => (wear()?.raz?.arms ?? 0) >= 5 || !!wear()?.open?.includes('raz') },
+      { title: 'Face masks', how: 'Shoot the face mask off five Manglers.', done: L => (wear()?.raz?.masks ?? 0) >= 5 || !!wear()?.open?.includes('raz') }]),
+    wearQuest('sentinel', 'Valkyrie Hat', [
+      { title: 'Drone arms', how: 'Shoot all three arms off five Valkyrie drones.', done: L => (wear()?.sentinel?.arms ?? 0) >= 5 || !!wear()?.open?.includes('sentinel') },
+      { title: 'Drone cameras', how: 'Shoot the camera off five Valkyrie drones.', done: L => (wear()?.sentinel?.cams ?? 0) >= 5 || !!wear()?.open?.includes('sentinel') }]),
+    wearQuest('wings', 'Dragon Wings', [
+      { title: 'The shield', how: 'Use the Guard of Fafnir.', done: L => !!wear()?.wings?.shield || !!wear()?.open?.includes('wings') },
+      { title: 'The Gauntlet', how: 'Take the Gauntlet of Siegfried.', done: L => !!wear()?.wings?.gauntlet || !!wear()?.open?.includes('wings') },
+      { title: 'The Dragon Strike', how: 'Take the Dragon Strike.', done: L => !!wear()?.wings?.strike || !!wear()?.open?.includes('wings') },
+      { title: 'Every roost', how: 'Ride the dragon from each roost: library, factory and judicial.', done: L => (wear()?.wings?.roosts?.length ?? 0) >= 3 || !!wear()?.open?.includes('wings') }]),
+    { id: 'gk-dead-ended', name: 'Dead Ended (music egg)', kind: 'SIDE EGG', progress: L => eggs()?.songs?.includes('dead_ended') ? 1 : 0, steps: [
+      { title: 'Three bottles', how: 'Find and use the three vodka bottles.', where: L => (eggs()?.bottles ?? 3) < 3 ? [[2302, 2202.5, -121], [-85.5, 1357, 56.5], [35.5, 2542.5, -119]].map(p => cw(...p)) : [] },
+    ] },
+    { id: 'gk-ace', name: 'Ace of Spades (music egg)', kind: 'SIDE EGG', progress: L => eggs()?.songs?.includes('ace_of_spades') ? 1 : 0, steps: [
+      { title: 'Three cards', how: 'Find and use the three playing cards.', where: L => (eggs()?.cards ?? 3) < 3 ? [[-501.5, 5647, 342], [-2481.5, 3040.5, 348], [-2861.5, 21796, 41]].map(p => cw(...p)) : [] },
+    ] },
+    { id: 'gk-sam', name: 'Samantha\'s Sorrows', kind: 'SIDE EGG', progress: L => { const t = eggs()?.sam?.step ?? 0; return t >= 8 ? 4 : t >= 6 ? 3 : t >= 4 ? 2 : t >= 1 ? 1 : 0; }, steps: [
+      { title: 'Into the fire', how: 'Throw a monkey bomb into three different areas while the dragon\'s fire burns there.', where: L => { const s = eggs()?.sam; if (!s || s.step) return []; const a = gauntlet()?.areas ?? {}, b = gkr()?.gk?.hazard?.active?.()?.area; const left = Object.keys(a).filter(k => !s.areas.includes(k)); return (left.includes(b) ? [b] : left).map(k => a[k].clone()); } },
+      { title: 'The figure', how: 'Use the figure that rises behind the fountain.', where: L => [3, 5].includes(eggs()?.sam?.step) ? [cw(342.843, -226.074, -3.056)] : [] },
+      { title: 'Five figures', how: 'Shoot five figures around the map, one at a time, each within 90 s. A miss sends you back to the fountain figure.', where: L => { const s = eggs()?.sam; if (s?.step === 5) return [cw(342.843, -226.074, -3.056)]; const p = s?.step === 4 && s.timed?.[s.i]; return p ? [cw(p[0], p[1], p[2])] : []; } },
+      { title: 'The last figure', how: 'Use the figure that appears by the fountain.', where: L => eggs()?.sam?.step === 6 ? [cw(335.553, -235.839, 0.341)] : [] },
+    ] },
+    { id: 'gk-logs', name: 'Ethereal 935 logs', kind: 'SIDE EGG', progress: L => { const s = eggs()?.logs?.stage ?? 0; return s >= 4 ? 2 : s >= 2 ? 1 : 0; }, steps: [
+      { title: 'First contact', how: 'From round 14, two round ends bring the voices.' },
+      { title: 'Ten logs', how: 'Shoot the glowing logs one after another.', where: L => { const s = eggs()?.logs; return s?.stage === 2 && GK_LOGS[s.i] ? [cw(...GK_LOGS[s.i])] : []; } },
+    ] },
+    { id: 'gk-time', name: 'Time attack', kind: 'SIDE EGG', steps: [
+      ...[[5, 'Wrench'], [10, 'Ritual Dagger'], [15, 'Fire Axe'], [20, 'Sword']].map(([r, w], i) => ({ title: `Round ${r}`, how: `Finish round ${r} under the time limit: the ${w} goes up on the alley tunnel wall.`,
+        done: L => ((eggs()?.timeAttack ?? eggs()?.ta)?.reward ?? 0) > i, where: L => ((eggs()?.timeAttack ?? eggs()?.ta)?.reward ?? 0) > i ? L.prompts(new RegExp(`^Buy ${w}`)) : [] })),
     ] },
   ] },
 ];

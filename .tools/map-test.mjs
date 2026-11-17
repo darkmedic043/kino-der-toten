@@ -5,6 +5,7 @@
 // PLAY: a file whose text is one async expression evaluated in the page once the match has started; its JSON result is printed.
 // Without PLAY the match idles SECS seconds and the round, zombies alive and player position are printed every 5 s.
 // Exit code 2 = stopped by the watchdog (the last lines say at what load step), 3 = the map never became ready.
+// ROUTE=/mods/movement/mod.js=scratch/old.js[,...]: serve a file of your own in place of the game's (an A/B run of a code change).
 import { chromium } from '../node_modules/playwright-core/index.mjs'; import { execSync } from 'node:child_process'; import fs from 'node:fs'; import path from 'node:path'; import http from 'node:http';
 const MAP = process.env.MAP || 'sandbox', LIMIT = +(process.env.LIMIT || (process.env.FIRST ? 2600 : 2300)), ALL = +(process.env.ALL || 4500), SECS = +(process.env.SECS || 20), Q = +(process.env.Q || 1);
 const lite = `scratch/lite/${MAP}/tex`, useLite = !process.env.REAL && fs.existsSync(lite);
@@ -41,6 +42,8 @@ try {
   // decoded sounds are the next biggest part of the base game's load: every sound becomes 0.1 s of silence (AUDIO=1 keeps them)
   if (!process.env.REAL && !process.env.AUDIO) await p.addInitScript(() => { for (const C of [globalThis.AudioContext, globalThis.OfflineAudioContext, globalThis.BaseAudioContext]) { if (!C?.prototype?.decodeAudioData || C.prototype.decodeAudioData.tiny) continue;
     const f = function (buf, ok, err) { const b = this.createBuffer(1, 2205, 22050); ok?.(b); return Promise.resolve(b); }; f.tiny = true; C.prototype.decodeAudioData = f; } });
+  for (const pair of (process.env.ROUTE || '').split(',').filter(Boolean)) { const [u, f] = pair.split('=');   // ROUTE=/mods/x.js=scratch/old.js[,...]: serve a file in place of one of the game's (A/B runs)
+    await p.route(x => x.pathname === u, r => r.fulfill({ body: fs.readFileSync(f), contentType: 'text/javascript' })); }
   if (process.env.INIT) await p.addInitScript(fs.readFileSync(process.env.INIT, 'utf8'));   // INIT=<file>: a script run in the page before the game's own (a stand-in for a system the test page lacks)
   await p.goto('http://127.0.0.1:5190/');
   await p.evaluate(q => { localStorage.clear(); const s = {}; s.graphics = q; s.renderScale = .5; localStorage.setItem('kino.settings', JSON.stringify(s)); }, Q);

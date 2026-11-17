@@ -445,7 +445,7 @@ export class CustomWorld {
         // powerProp:false = the map has its own switch, moved by its mod (Nuketown's levers)
         if(entry.powerProp!==false){
           const panel=new THREE.Mesh(new THREE.BoxGeometry(22,34,6),new THREE.MeshStandardMaterial({color:0x3b3f3a,roughness:.7,metalness:.4}));
-          panel.position.copy(m.position);panel.rotation.y=m.yaw+FACE;panel.translateZ(-4);this.scene.add(panel);this.powerPanel=panel;
+          panel.position.copy(m.position);panel.rotation.y=m.yaw+FACE+(entry.perkYaw??0)*Math.PI/180;panel.translateZ(-4);this.scene.add(panel);this.powerPanel=panel;   // turned with its lever (perkYaw too: edge-on on the BO3 ports before 2026-11-17)
           tasks.push(place('zombie_power_lever_handle',m.position,m.yaw,(entry.perkYaw??0)*Math.PI/180).then(o=>{this.powerHandle=o;}));
         }
       }

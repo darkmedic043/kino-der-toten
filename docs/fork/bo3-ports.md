@@ -454,7 +454,7 @@ The marker contract is in `mods/README.md` and `custom-maps.md`; the builder's e
 | Windows | boards inside the wall line, zombie climbs through, opening width 48-72 |
 | Doors and debris | prompt, cost, pieces move and hide, collision gone, the zone opens; two triggers sharing a target are one door; a door with no pieces in the dump is skipped by the builder, so list those and add them in the mod |
 | Power | switch model and pose (the off pose can be the `start` clip's first frame, not `idle`), power doors, lamps and perk machines follow |
-| Perks | all machines stand upright, face the room (`perkYaw`), right models (`machines: "bo3"`); two on one spot slide apart |
+| Perks | all machines stand upright, face the room (`perkYaw`, which also turns the stand-in power panel since 2026-11-17: it stood edge-on to its lever), right models (`machines: "bo3"`); two on one spot slide apart |
 | Mystery Box | every location, start location right, beacon not shining through walls |
 | Pack-a-Punch | the map's own machine model and animations if it has one (awaited in setup so it is warmed), its quest lock (`papLocked`), moving locations (`movePap`) |
 | Wall buys | every chalk has a weapon in `WEAPONS`; the gun model hangs on the wall and is culled at range |
