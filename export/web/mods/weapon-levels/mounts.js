@@ -7,6 +7,8 @@
 // the part sits in the gun's own space (tag_weapon at rest: x forward, y left, z up), so one list of coordinates works
 // whichever bone carries it. Optional rot (degrees), scale (number or [x,y,z]). They share one material: no clones.
 // On an off-hand gun (opts.mirror) y and the x rotation flip, so a part on the outside of one gun is on the outside of both.
+// A part made for one gun of a pair (mount.hand 'right'/'left', the GKZ-45 Mk3's kit) is modelled in that gun's own space:
+// it goes only on that gun, never mirrored. A mount may be a list (one attachment, a part on each gun).
 // A part with a laser (a material named *emit_beam_<colour>) gets a beam from that emitter: aimLasers steers it.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
@@ -48,7 +50,7 @@ function addBeam(part,gun){
   src.geometry.computeBoundingBox();
   const colour=src.material.name.split('emit_beam_')[1],at=src.geometry.boundingBox.getCenter(new THREE.Vector3()),beam=new THREE.Mesh(beamGeometry(),beamMaterial(BEAM_COLOUR[colour]??0xff2a20));
   beam.position.copy(at);beam.frustumCulled=false;beam.renderOrder=3;beam.userData.laser=colour;
-  src.parent.add(beam);(gun.userData.beams??=[]).push(beam);
+  src.parent.add(beam);(gun.userData.beams??=live()).push(beam);
 }
 // Steer every beam on a gun at the crosshair (the point `to`, world space): beams leave a gun held off-centre and meet
 // where the shots go. When the gun points well away (reload, sprint) the beam just follows the barrel.
@@ -66,17 +68,21 @@ export function aimLasers(gun,to,opacity=1){
 export const laserColour=gun=>gun?.userData.beams?.[0]?.userData.laser??null;
 export const beamWarm=()=>{const m=new THREE.Mesh(beamGeometry(),beamMaterial(BEAM_COLOUR.red));m.frustumCulled=false;return m;};   // for host.warmObjects
 
+// lists of live objects in userData copy as [] (three's Object3D.copy JSON-copies userData: a clone of the hands rig with
+// the gun on it, fp-arms.js ArmSetArms, serialised the parts' textures and threw on their released images, 2026-11-18)
+const live=()=>Object.defineProperty([],'toJSON',{value:()=>[]});
 export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>true,{mirror=false}={}){
   if(!gun)return;
   const run=gun.userData.mountRun=(gun.userData.mountRun??0)+1;   // a newer call (equip fires twice on some guns) replaces this one, or its parts stack on top
-  for(const o of gun.userData.mounts??[])o.removeFromParent();gun.userData.mounts=[];gun.userData.beams=[];
+  for(const o of gun.userData.mounts??[])o.removeFromParent();gun.userData.mounts=live();gun.userData.beams=live();
   // def.fixedParts: always-on parts that are their own model (the AS50's scope), mounted the same way
-  for(const [mid,m] of [...(def?.fixedParts??[]).map((m,i)=>['fixed'+i,m]),...ids.map(id=>[id,def?.mounts?.[id]])]){
+  for(const [mid,m] of [...(def?.fixedParts??[]).map((m,i)=>['fixed'+i,m]),...ids.flatMap(id=>[def?.mounts?.[id]].flat().map(m=>[id,m]))]){
+    if(m?.hand&&(m.hand==='left')!==mirror)continue;
     const bone=m&&[m.tag,m.tag+'1',m.tag+'_le',m.tag.replace(/\d+$/,d=>+d+1)].map(n=>gun.getObjectByName(n)).find(Boolean);if(!bone)continue;   // left models number their bones one up, or add _le
     let part=await loadModel(m.model).catch(()=>null);if(!part||!stillCurrent()||gun.userData.mountRun!==run)return;
     if(m.node){   // one node of a shared model: nothing below needs patching
       part=part.getObjectByName(m.node);if(!part)continue;
-      part.removeFromParent();part.matrixAutoUpdate=false;part.matrix.copy(placement(gun,bone,m,mirror));
+      part.removeFromParent();part.matrixAutoUpdate=false;part.matrix.copy(placement(gun,bone,m,mirror&&!m.hand));
       part.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});part.userData.mountId=mid;bone.add(part);gun.userData.mounts.push(part);addBeam(part,gun);continue;
     }
     part.updateMatrixWorld(true);let root=null;part.traverse(o=>{if(!root&&o.isBone)root=o;});

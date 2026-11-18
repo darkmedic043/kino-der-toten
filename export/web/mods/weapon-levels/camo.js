@@ -289,7 +289,7 @@ vec3 camoTexTri(vec2 off){ vec3 c=camoPlanar(camoMap,off);return camoBlend>0.?mi
   m.customProgramCacheKey=()=>(orig.customProgramCacheKey?.()??'')+(camo.anim?'|camo-anim':camo.glow?'|camo-pap':'|camo');
   m.needsUpdate=true;matCache.set(key,m);return m;
 }
-export const isBody=m=>!!m&&!SKIP.test(m.name??'')&&!!m.map&&!wrapOf(m.name)?.skip;
+export const isBody=m=>!!m&&!SKIP.test((m.name??'').replace(/raygun_mk3/g,'raygun'))&&!!m.map&&!wrapOf(m.name)?.skip;   // the GKZ-45 Mk3's own materials hit `_mk` (user 2026-11-18: no camo showed)
 // Paint `root` with `camo` (an entry from camos.json) or restore it (null).
 export function applyCamo(root,camo){
   // charms and gun screens (userData.charm, mods/charms) hang under the gun but keep their own materials (2026-11-08: the

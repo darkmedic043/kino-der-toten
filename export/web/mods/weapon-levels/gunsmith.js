@@ -31,7 +31,7 @@ export function available(cat,def,id){
   const hidden=new Set((pristine.get(def)?.hideTags)??def?.hideTags??[]);
   const smith=own.length||def?.gunsmith===true||Object.keys(def?.mounts??{}).length||def?.statAttachments?.length||cat.attachments.some(a=>!a.generic&&a.tags.some(t=>hidden.has(t)));
   if(!smith)return own;
-  const pad=Math.max(0,(cat.padTo??0)-own.length);
+  const pad=def?.gunsmithPad===false?0:Math.max(0,(cat.padTo??0)-own.length);   // a gun with its own full kit opts out (the GKZ-45 Mk3)
   return pad?[...own,...cat.attachments.filter(a=>a.generic).slice(0,pad)]:own;
 }
 function ownAttachments(cat,def,id){
@@ -116,7 +116,7 @@ export function grantWeaponXp(cat,def,id,profile,amount){
   return unlockedAttachments(cat,def,id,profile).slice(before);
 }
 
-const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','pellets','pelletSpread','pierce','adsRecoilScale','explosionRadius','projectileSpeed','suppressed','automatic','fireType','attachments','attachment','mounted',
+const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','pellets','pelletSpread','pierce','adsRecoilScale','explosionRadius','projectileSpeed','suppressed','automatic','fireType','attachments','attachment','mounted','clipLeft','fireTimeLeft',
   'animations','raiseTime','dropTime','sprintInTime','sprintLoopTime','sprintOutTime','reloadStartTime','reloadEndTime'];   // the last row: attachments with their own clips (attachClips)
 function snapshot(obj){if(!pristine.has(obj)){const s={};for(const k of STAT_FIELDS)s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);pristine.set(obj,s);}return pristine.get(obj);}
 function restore(obj){const s=snapshot(obj);for(const k of STAT_FIELDS){if(s[k]===undefined)delete obj[k];else obj[k]=structuredClone(s[k]);}}
@@ -151,7 +151,7 @@ function applyStats(obj,list,cat,show){
     const s=a.stats??{};
     if(s.damageMul){if(obj.damage)obj.damage=Math.round(obj.damage*s.damageMul);if(obj.minDamage)obj.minDamage=Math.round(obj.minDamage*s.damageMul);}
     if(s.rangeMul&&obj.range)obj.range=Math.round(obj.range*s.rangeMul);
-    if(s.clipMul&&obj.clipSize){const before=obj.clipSize;obj.clipSize=Math.round(before*s.clipMul);if(obj.maxAmmo)obj.maxAmmo+=obj.clipSize-before;}
+    if(s.clipMul&&obj.clipSize){const before=obj.clipSize,left=obj.clipLeft??0;obj.clipSize=left+Math.round((before-left)*s.clipMul);if(obj.maxAmmo)obj.maxAmmo+=obj.clipSize-before;}   // a pair with its own left mag (clipLeft): the right gun's
     if(s.reloadMul){if(obj.reloadTime)obj.reloadTime=+(obj.reloadTime*s.reloadMul).toFixed(2);if(obj.reloadEmptyTime)obj.reloadEmptyTime=+(obj.reloadEmptyTime*s.reloadMul).toFixed(2);}
     if(s.adsFov)obj.adsFov=s.adsFov;else if(s.adsFovMul&&obj.adsFov)obj.adsFov=Math.round(obj.adsFov*s.adsFovMul);
     if(s.headMul&&obj.headMultiplier)obj.headMultiplier=+(obj.headMultiplier*s.headMul).toFixed(2);
@@ -164,6 +164,8 @@ function applyStats(obj,list,cat,show){
     if(s.projectileMul&&obj.projectileSpeed)obj.projectileSpeed=Math.round(obj.projectileSpeed*s.projectileMul);
     if(s.suppressed)obj.suppressed=true;
     if(s.fireMul&&obj.fireTime)obj.fireTime=+(obj.fireTime/s.fireMul).toFixed(4);
+    if(s.clipLeftAdd&&obj.clipLeft!=null){obj.clipLeft+=s.clipLeftAdd;obj.clipSize+=s.clipLeftAdd;if(obj.maxAmmo)obj.maxAmmo+=s.clipLeftAdd;}   // a pair whose guns differ (rules.js leftClip): the left gun's own mag
+    if(s.fireLeftMul&&obj.fireTimeLeft)obj.fireTimeLeft=+(obj.fireTimeLeft/s.fireLeftMul).toFixed(4);
     if(s.auto){obj.automatic=true;obj.fireType='Full Auto';}   // the ROC's MFS Warhead Autoloader
     if(s.reserveMul){if(obj.maxAmmo)obj.maxAmmo=Math.round(obj.maxAmmo*s.reserveMul);if(obj.startAmmo)obj.startAmmo=Math.round(obj.startAmmo*s.reserveMul);}   // the Havoc's Bandolier
     if(a.scope)obj.scope=a.scope;

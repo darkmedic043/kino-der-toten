@@ -663,7 +663,7 @@ async function warmWeapons(){
     const [hands,...models]=await Promise.all([def.handsModel?loadModel(def.handsModel):null,loadModel(def.model),def.leftModel?loadModel(def.leftModel):null]);
     if(performance.now()-t0>WEAPON_WARM_MS){late++;return;}
     if(hands)group.add(hands);   // a BO3 gun's own arms
-    for(const gun of models)if(gun){group.add(gun);try{mods.emit('warmWeapon',{def,gun,wait:p=>waits.push(p)});}catch(error){console.warn('[warm-weapons]',error);}done++;}
+    for(const [i,gun] of models.entries())if(gun){group.add(gun);try{mods.emit('warmWeapon',{def,gun,left:i===1,wait:p=>waits.push(p)});}catch(error){console.warn('[warm-weapons]',error);}done++;}
   });
   await Promise.race([Promise.allSettled(loads),new Promise(r=>setTimeout(r,WEAPON_WARM_MS))]);
   if(waits.length)await Promise.race([Promise.allSettled(waits),new Promise(r=>setTimeout(r,Math.max(500,WEAPON_WARM_MS-(performance.now()-t0))))]);

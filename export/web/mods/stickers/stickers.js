@@ -30,6 +30,7 @@ const shopOwned=k=>{try{const o=JSON.parse(localStorage.getItem('kino.mods.shop'
 export function stickerOwned(s){if(!s)return false;if(s.soon&&!devSoon())return false;return !s.unlock||devSoon()||shopOwned(s.unlock);}
 export function stickerLock(s){return !s||stickerOwned(s)?'':s.soon?'SOON':s.pass?'PASS':'LOCKED';}
 // the placed stickers on a gun that the player still owns
+export const leftKey=id=>id+':L';   // a dual-wield pair's left gun (def.leftModel) has its own list (Gunsmith, 2026-11-18)
 export function stickersFor(cat,state,gunId){return (state?.on?.[gunId]??[]).filter(x=>stickerOwned(cat?.stickers.find(s=>s.id===x.id))).slice(0,MAX_STICKERS);}
 export const stickerImage=s=>new URL(s.image,new URL('./',import.meta.url)).href;
 

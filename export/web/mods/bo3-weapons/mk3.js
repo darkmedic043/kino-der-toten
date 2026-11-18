@@ -28,6 +28,13 @@ const CAUGHT = 2, NEAR = 64, RISE = 42, DISS_AT = .55, DISS_T = 1.05;   // marke
 
 export const isMk3Def = (data, def) => !!(def?.mk3 || data.weapons[def?.baseId ?? def?.id]?.mk3);
 
+// The Gunsmith kit (mk3-kit.js, user 2026-11-18): attachment ids on def.attachments ('a+b', gunsmith.js applyStats)
+const has = (def, id) => (def?.attachments ?? '').split('+').includes(id);
+const kitOf = def => ({ horizon: has(def, 'mk3_horizon'), cap: has(def, 'mk3_capacitor'), dark: has(def, 'mk3_darkmatter') });
+// Event Horizon Coil: vortices 40% wider, 1.5 s longer, and they drag zombies in; Overcharge Capacitor: a beam charges
+// a vortex from 3x as far, a black hole pulses every 0.3 s; Dark Matter Rounds: a beam kill may leave a small vortex
+const HORIZON = { radius: 1.4, life: 1.5, pull: 70, stop: 30 }, CAP = { reach: 3, pulse: .3 }, DARK = { chance: .25, gap: 1.2 };
+
 // the zombies' patch: x = black (BO3's blacken, with a violet rim), y = dissolve (noise on the bind-pose position, a
 // glowing violet edge). Uniform-gated, so one program does both and an unmarked frame costs a few ALU ops
 function patchVoid(sh, u) {
@@ -226,7 +233,7 @@ export function setupMk3(api, { play, sounds }) {
     if (!isMk3(def) || session.lastHand !== 'left') return false;   // the right gun: the engine's hitscan (beam drawn on 'shot')
     const t = tune(def), from = muzzle(true), v = forward.clone().multiplyScalar(SPEED); v.y += LIFT;
     const m = orbVisual(); m.lg.visible = false; m.g.scale.setScalar(.3); m.g.position.copy(from); scene.add(m.g);
-    shots.push({ pos: from, vel: v, life: FLIGHT, t, vis: m });
+    shots.push({ pos: from, vel: v, life: FLIGHT, t, k: kitOf(def), vis: m });
     snd('wpn_mk3_lh_act', { gain: .5 });
     return true;
   });
@@ -237,10 +244,13 @@ export function setupMk3(api, { play, sounds }) {
   };
   function land(s, p, normal) {
     s.vis.g.removeFromParent(); dropVisual(s.vis);
-    const at = p.clone().addScaledVector(normal ?? new THREE.Vector3(0, 1, 0), 32);   // like BO3: 32 off what it hit
+    openOrb(p.clone().addScaledVector(normal ?? new THREE.Vector3(0, 1, 0), 32), s.t, s.k);   // like BO3: 32 off what it hit
+  }
+  function openOrb(at, t, k = {}) {
     if (orbs.length >= MAX_ORBS) endOrb(orbs[0]);
     const vis = orbVisual(); vis.lg.visible = false; vis.g.position.copy(at); vis.g.scale.setScalar(.01); scene.add(vis.g);
-    const o = { at, t: s.t, vis, life: ORB_LIFE, next: PULSE, charged: false, age: 0, big: 0, spark: 0, loop: snd('wpn_mk3_orb_loop', { gain: .55, at, loop: true }) };
+    const life = ORB_LIFE + (k.horizon ? HORIZON.life : 0), radius = RADIUS * (k.horizon ? HORIZON.radius : 1);
+    const o = { at, t, k, radius, vis, life, next: PULSE, charged: false, age: 0, big: 0, spark: 0, loop: snd('wpn_mk3_orb_loop', { gain: .55, at, loop: true }) };
     orbs.push(o); snd('wpn_mk3_orb_creation_00', { gain: .8, at });
     fx()?.emit({ key: 'glow', at: at.clone(), size: [20, 120], life: .35, fade: [.02, .8], additive: true, color: SMALL.glow });
   }
@@ -252,7 +262,7 @@ export function setupMk3(api, { play, sounds }) {
   }
   function charge(o) {   // a right-gun beam through the vortex (BO3: type 2, the model hidden, the large effect)
     if (o.charged) return;
-    o.charged = true; o.life = ORB_LIFE; o.next = 0; o.vis.ball.visible = false; o.vis.lg.visible = true; o.big = 0;
+    o.charged = true; o.life = ORB_LIFE + (o.k.horizon ? HORIZON.life : 0) + (o.k.cap ? 1 : 0); o.next = 0; o.vis.ball.visible = false; o.vis.lg.visible = true; o.big = 0;
     stop(o.loop); o.loop = snd('wpn_mk3_orb_activated_loop', { gain: .65, at: o.at, loop: true });
     fx()?.emit({ key: 'glow', at: o.at.clone(), size: [40, 300], life: .4, fade: [.02, .8], additive: true, color: LARGE.core });
     fx()?.flash?.(o.at.clone(), { color: LARGE.cloud, intensity: 4, radius: 500, life: .5 });
@@ -261,7 +271,7 @@ export function setupMk3(api, { play, sounds }) {
     const dmg = o.charged ? o.t.charged : o.t.pulse; let hit = 0;
     for (const z of [...enemies.list]) {
       const c = z.root.position.clone(); c.y += z.kind === 'dog' ? 18 : 40;
-      if (c.distanceTo(o.at) > RADIUS || !world.lineClear(o.at, c)) continue;
+      if (c.distanceTo(o.at) > o.radius || !world.lineClear(o.at, c)) continue;
       hit++;
       if (z.health > dmg) { enemies.hurt(z, dmg, false, false, 'mk3'); if (alive(z)) mark(z, o.charged); }
       else if (o.charged) disintegrate(z);
@@ -278,12 +288,23 @@ export function setupMk3(api, { play, sounds }) {
     b.m.material = beamMat[t === TUNE.pap ? 'pap' : 'base']; b.m.position.copy(from); b.m.lookAt(end);
     b.m.scale.set(1.4, 1.4, from.distanceTo(end)); b.m.visible = true; b.t = .07;
     fx()?.emit({ key: 'glow', at: end.clone(), size: [16, 4], life: .15, fade: [.01, .9], additive: true, color: t.beam });
-    const ray = new THREE.Ray(e.origin, e.direction), p = new THREE.Vector3();
+    const ray = new THREE.Ray(e.origin, e.direction), p = new THREE.Vector3(), k = kitOf(e.def), reach = CHARGE_HIT * (k.cap ? CAP.reach : 1);
+    beamShot = { at: now(), k, t };
     for (const o of orbs) {
       const along = o.at.clone().sub(e.origin).dot(e.direction);
-      if (along < 0 || along > e.distance + CHARGE_HIT) continue;
-      if (ray.closestPointToPoint(o.at, p).distanceTo(o.at) < CHARGE_HIT) charge(o);
+      if (along < 0 || along > e.distance + reach) continue;
+      if (ray.closestPointToPoint(o.at, p).distanceTo(o.at) < reach) charge(o);
     }
+  });
+
+  // Dark Matter Rounds: a zombie the beam kills may fold into a small vortex where it fell (not more than one per 1.2 s)
+  let beamShot = null, darkAt = -9;
+  host.on('kill', e => {
+    const z = e.enemy; if (!z || e.remote || host.remoteDamage || !beamShot?.k.dark || now() - beamShot.at > .06 || session.lastHand === 'left') return;
+    if (now() - darkAt < DARK.gap || Math.random() >= DARK.chance) return;
+    darkAt = now(); const at = z.root.position.clone(); at.y += 40;
+    openOrb(at, beamShot.t, { ...beamShot.k, horizon: false });
+    fx()?.emit({ key: 'glow', at: at.clone(), size: [70, 6], life: .35, fade: [.01, .9], additive: true, color: LARGE.cloud });
   });
 
   // ---- the screen tint near a vortex (BO3: visionset + blur overlay, 0.25 s in, held 2 s, 0.25 s out) -------------
@@ -349,7 +370,13 @@ export function setupMk3(api, { play, sounds }) {
         f.emit({ key: 'glow', at, vel: o.at.clone().sub(at).multiplyScalar(1.8).add(tmp.set(-Math.sin(a) * 60, 0, Math.cos(a) * 60)), size: [5, 1], life: .45, fade: [.15, .5], additive: true, color: SMALL.spark });
       }
       if (o.at.distanceTo(camera.position) < NEAR + 24) near = true;   // BO3 measures 64 from the player's origin; the orb floats 32 up
-      if ((o.next -= dt) <= 0) { o.next += PULSE; pulse(o); }
+      if ((o.next -= dt) <= 0) { o.next += o.charged && o.k.cap ? CAP.pulse : PULSE; pulse(o); }
+      if (o.k.horizon && !host.remoteDamage) for (const z of enemies.list) {   // Event Horizon Coil: drawn in along the ground, stopping short of the core
+        if (z.dead || z.state === 'dead') continue;
+        tmp.copy(o.at).sub(z.root.position); tmp.y = 0; const d = tmp.length();
+        if (d > o.radius || d < HORIZON.stop) continue;
+        z.root.position.addScaledVector(tmp.divideScalar(d), Math.min(d - HORIZON.stop, HORIZON.pull * (o.charged ? 1.8 : 1) * dt)); z.repath = 1;
+      }
       if (o.life <= 0) endOrb(o);
     }
     for (const [z, h] of held) if (h.until <= t0 || !enemies.list.includes(z)) release(z, h);

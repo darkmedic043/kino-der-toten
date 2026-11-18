@@ -2320,6 +2320,44 @@
       "desc": "Sharkskin grips with a tooth on the butt. 25% faster reloads, and a melee on a debtor collects its debt on the spot.",
       "stats": {"reloadMul": 0.75},
       "replaces": ["tag_dc_grips"]
+    },
+    {
+      "id": "mk3_cells",
+      "name": "Eris Cell Bank",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom: brass power cells clamped under the beam gun and on both cheeks of the vortex gun. Beam magazine +50%, and two more black holes per load.",
+      "stats": {"clipMul": 1.5, "clipLeftAdd": 2}
+    },
+    {
+      "id": "mk3_prism",
+      "name": "Eris Prism",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom: three crystal shards round the beam gun's barrel split the beam. Each shot goes through 3 more zombies.",
+      "stats": {"pierce": 3}
+    },
+    {
+      "id": "mk3_horizon",
+      "name": "Event Horizon Coil",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom: a clawed coil on the vortex gun's mouth. Black holes are 40% wider, last 1.5 s longer and drag zombies into them."
+    },
+    {
+      "id": "mk3_capacitor",
+      "name": "Overcharge Capacitor",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom: glowing tubes on the beam gun's back. Beam hits charge a black hole from 3 times as far, charged holes pulse twice as fast and last a second longer, and the vortex gun fires 30% faster.",
+      "stats": {"fireLeftMul": 1.3}
+    },
+    {
+      "id": "mk3_darkmatter",
+      "name": "Dark Matter Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: beam kills have a 1 in 4 chance to collapse into a small black hole where the zombie fell (at most one every 1.2 s)."
     }
   ],
   "ironSights": {
