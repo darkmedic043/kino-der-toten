@@ -65,11 +65,22 @@ export function setupFafnir(api) {
   const chest = z => z.root.position.clone().add(new THREE.Vector3(0, z.kind === 'dog' ? 20 : 40, 0));
   const maxHp = z => kino.equipFx?.maxHp?.(z) ?? z.maxHealth ?? z.health;
   const stun = (z, s) => kino.equipFx?.stun?.(z, s);
-  function snd(name, vol = .9) { const a = new Audio(SND + name + '.ogg'); a.volume = Math.max(0, Math.min(1, vol)); a.play().catch(() => audio?.play?.('explosion', .5)); }
+  // the breath sound is the map dragon's own roar (8 s, mean -6.5 dB): through the game's mixer (master and volume settings) at a
+  // low gain, faded out after `len` s (user, 2026-11-17: "make the shield less loud, it is extremely loud"; it played at .8 outside the mixer)
+  function snd(name, vol = .3, len = 1.4, fade = .5) {
+    const a = new Audio(SND + name + '.ogg'), ctx = audio?.ctx, master = audio?.master;
+    let g = null;
+    try { if (ctx && master) { g = ctx.createGain(); g.gain.value = vol; ctx.createMediaElementSource(a).connect(g).connect(master); } } catch { g = null; }
+    if (!g) a.volume = Math.min(1, vol * .42);   // the mixer's master gain is .42
+    a.play().then(() => {
+      if (g) { const t = ctx.currentTime + len; g.gain.setValueAtTime(vol, t); g.gain.linearRampToValueAtTime(0, t + fade); }
+      setTimeout(() => { if (!g) a.volume = 0; a.pause(); a.src = ''; }, (len + fade) * 1000 + 50);
+    }).catch(() => audio?.play?.('explosion', .3));
+  }
   function breathe(play, upg) {
     if (breath) return false;   // one at a time: keeps the charge
     const dir = fwd(), origin = camera.position.clone().addScaledVector(dir, 30).add(new THREE.Vector3(0, -10, 0));
-    play('boostInAnim'); snd('breath', .8);
+    play('boostInAnim'); snd('breath');
     breath = { t: 0, origin, dir, upg, kills: 0, out: false, end: 0 };
     const list = enemies.list.map(z => ({ z, d: chest(z).distanceTo(origin) })).sort((a, b) => a.d - b.d);
     for (const { z, d } of list) {
