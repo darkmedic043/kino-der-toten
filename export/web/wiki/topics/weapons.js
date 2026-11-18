@@ -266,6 +266,10 @@ export default {
         how: 'Taken from a shield station on Nuketown.',
         rows: [['Health', '1,500, then it breaks'], ['Planted', 'Zombies tear at it: 35 hits']],
         text: 'A car door on a dolly. Press **H** to raise it and again to lower it.\n\n- Raised, it blocks hits from the front; on your back, hits from behind.\n- **Left mouse** bashes the two nearest zombies in front of you. Bash kills are what unlock it.\n- **Right mouse** plants it on the ground in front of you. Zombies stop at it and tear at it instead of walking through.\n- Press **F** next to your planted shield to take it back with the health it has left.\n- A Carpenter repairs it, in your hands or planted.\n- It shares the shield slot with the Rocket Shield: taking one replaces the other.' },
+      { title: 'Guard of Fafnir', color: '#ff6a3d', home: 'gorod-krovi', price: 25000, kills: 250,
+        how: 'Built from three parts at the bunker table on Gorod Krovi.',
+        rows: [['Health', '1,500, then it breaks'], ['Fire charges', '3 (5 upgraded)']],
+        text: 'A shield with a dragon\'s head on it. Press **H** to raise it and again to lower it.\n\n- Raised, it blocks hits from the front; on your back, hits from behind.\n- **Left mouse** bashes the two nearest zombies in front of you.\n- **Right mouse** breathes fire out to about 30 m: zombies close by are flung and killed, farther ones are gibbed or knocked down and set alight. Bosses take a share of their health and a stun. The first kill pays as normal, the second 30 points, the rest 10.\n- A charge comes back each round and a Max Ammo refills them. Breath and bash kills both count toward the Armory.\n- On Gorod Krovi it can be upgraded (1.5x health, 5 charges). The Armory sells the plain one.' },
     ];
     for (const o of OPS) pages.push({
       id: ctx.slug(o.title), title: o.title, group: 'Operator weapons', color: o.color, sub: mapTitle[o.home] ?? '',
