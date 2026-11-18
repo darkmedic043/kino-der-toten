@@ -290,6 +290,19 @@ function frameOf(tilt,yaw){
 // bones: points, hand points, and bins over (x, z) of the outermost surface toward the face. Shared by the search and a
 // player's pinned spot (dragged in the Gunsmith, 2026-11-07), so a drag re-evaluates one spot a frame, not the sampling.
 const preps=new Map(),samples=new Map();
+// Parts parked away from the gun (2026-11-17, user's M1 Irons screen floating off the gun: its speedloader waits 41 in behind the
+// gun in the idle frame, so the gun's length, and a player's pin along it, stretched back there; the Gunsmith folds such parts
+// away, bo3-weapons/pose.js): only points of bones whose own points touch the gun body (grown from the body as pose.js does) count.
+function attached(pts,pb,root){
+  const box=new Map();for(let i=0;i<pts.length;i+=3){const b=pb[i/3]??null;let q=box.get(b);if(!q)box.set(b,q=[1e9,1e9,1e9,-1e9,-1e9,-1e9,0]);
+    for(let k=0;k<3;k++){if(pts[i+k]<q[k])q[k]=pts[i+k];if(pts[i+k]>q[k+3])q[k+3]=pts[i+k];}q[6]++;}
+  let big=null;for(const [b,q] of box)if(!big||q[6]>box.get(big)[6])big=b;
+  const body=b=>b===null||b===root||b===big||/^(j_gun|tag_weapon|tag_barrel)$/.test(b?.name),R=1.6,near=(a,c)=>a[0]-R<=c[3]&&c[0]<=a[3]+R&&a[1]-R<=c[4]&&c[1]<=a[4]+R&&a[2]-R<=c[5]&&c[2]<=a[5]+R;
+  const reached=[...box.keys()].filter(body),rest=new Set([...box.keys()].filter(b=>!body(b)));
+  for(let i=0;i<reached.length;i++){const a=box.get(reached[i]);for(const b of rest)if(near(a,box.get(b))){rest.delete(b);reached.push(b);}}
+  if(!rest.size){pts.pb=pb;return pts;}
+  const out=[],ob=[];for(let i=0;i<pts.length;i+=3)if(!rest.has(pb[i/3]??null)){out.push(pts[i],pts[i+1],pts[i+2]);ob.push(pb[i/3]);}
+  out.pb=ob;return out;}
 function prepOf(gun,root,{key,hands,unit=1,tilt=20,yaw=42}){
   const hidden=[];gun.traverse(b=>{if(b.isBone&&b.scale.x<1e-3)hidden.push(b.name);});
   const sk=[key,handsSig(hands),unit,hidden.join(',')].join('|'),pk=sk+'|'+tilt+'|'+yaw;if(preps.has(pk))return preps.get(pk);
@@ -297,7 +310,7 @@ function prepOf(gun,root,{key,hands,unit=1,tilt=20,yaw=42}){
   // the sampling (the slow part) is shared by every face angle; only the bins below depend on it
   let S=samples.get(sk);
   if(!S){inv.copy(root.matrixWorld).invert();const pb=[],pts=visiblePoints(gun,null,gun.parent,pb,unit,inv,.6);if(pts.length<9)return null;
-    S={pts,pb,hp:hands?visiblePoints(hands,gun,hands.parent,null,unit,inv):[]};if(samples.size>12)samples.delete(samples.keys().next().value);samples.set(sk,S);}
+    S={pts:attached(pts,pb,root),pb,hp:hands?visiblePoints(hands,gun,hands.parent,null,unit,inv):[]};S.pb=S.pts.pb;if(samples.size>12)samples.delete(samples.keys().next().value);samples.set(sk,S);}
   const {pts,pb,hp}=S;
   // bins over (x, z): the outermost surface toward the face (max p.n), and whether loose or moving parts are there
   const loose=new Map(),kindOf=b=>{if(!b||b===root)return 0;if(!loose.has(b)){let k=2;for(let p=b;p&&p!==root&&p!==gun;p=p.parent)if(LOOSE.test(p.name)||FIDGET.test(p.name))k=1;loose.set(b,k);}return loose.get(b);};
