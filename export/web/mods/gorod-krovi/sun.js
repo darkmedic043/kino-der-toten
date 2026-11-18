@@ -25,6 +25,7 @@ const V = new THREE.Vector3(), V2 = new THREE.Vector3(), M = new THREE.Matrix4()
 const solid = m => !!m && !m.transparent && !(m.alphaTest > 0) && !(m.blending > 1) && m.depthWrite !== false && m.colorWrite !== false && !m.polygonOffset
   && !m.isShaderMaterial && !m.isMeshBasicMaterial && !m.isSpriteMaterial && !m.isPointsMaterial && !m.isLineBasicMaterial;
 
+const SHAFTS = { strength: .012, density: .0015, g: .3, far: 2600, dust: .4, lift: 5, sky: .3, indoor: 2.5, white: .5 };
 export function setupSun(api, { key, dir, regions = [], sky = null }) {
   const { scene, renderer, camera, host, world, session } = api;
   if (!renderer || !key || q('noSun')) return null;
@@ -112,6 +113,7 @@ export function setupSun(api, { key, dir, regions = [], sky = null }) {
   function apply() {
     const qq = sunQuality(); if (qq === lastQ) return; lastQ = qq;
     key.castShadow = qq >= 1; dyn.castShadow = qq >= 2;   // (a change recompiles the lit shaders: settings only)
+    globalThis.kino?.shafts?.add(key, SHAFTS);   // real light shafts through the smoke (lighting/shafts.js)
     if (area >= 0) { size(); redraw(); }
     report.quality = qq;
   }

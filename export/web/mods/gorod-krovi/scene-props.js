@@ -42,6 +42,7 @@ export async function makeProp(J, key, onNote = () => {}) {
 // moves again (its world matrix changed) it goes back to always drawn until it rests. cullTick runs from mod.js.
 const CULL = []; let cullAt = 0;
 export function autoCull(root) {
+  const VC = globalThis.kino?.visCull; if (VC) { VC.add(root); return; }   // (the engine's culler does this for every map since 2026-11-17, vis-cull.js; the code below runs only with ?noVisCull)
   if (!root || CULL.some(c => c.root === root)) return;
   const nodes = []; root.traverse(o => { if (!o.isMesh) nodes.push(o); });
   CULL.push({ root, nodes, sig: NaN, still: 0, fit: false });
@@ -53,7 +54,7 @@ function signature(c) {
 }
 const setCull = (c, on) => { c.fit = on; c.root.traverse(o => { if (o.isMesh) o.frustumCulled = on; }); };
 // a clip is about to move the prop: always drawn from this frame on (the tick alone would notice up to a quarter second late)
-const wake = root => { const c = CULL.find(c => c.root === root); if (c) { c.sig = NaN; c.still = 0; if (c.fit) setCull(c, false); } };
+const wake = root => { globalThis.kino?.visCull?.wake(root); const c = CULL.find(c => c.root === root); if (c) { c.sig = NaN; c.still = 0; if (c.fit) setCull(c, false); } };
 export function cullTick() {
   let fitted = false;
   for (let k = Math.min(8, CULL.length); k > 0; k--) {
@@ -65,7 +66,7 @@ export function cullTick() {
     setCull(c, true);
   }
 }
-export const cullState = () => ({ props: CULL.length, culled: CULL.filter(c => c.fit).length });
+export const cullState = () => { const s = globalThis.kino?.visCull?.stats(); return s ? { props: s.groups, culled: s.resting, hidden: s.hidden } : { props: CULL.length, culled: CULL.filter(c => c.fit).length }; };
 
 // BO3 origin + angles (pitch yaw roll, degrees) -> the prop's root
 const D = Math.PI / 180;

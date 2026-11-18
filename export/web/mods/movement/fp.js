@@ -262,7 +262,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     const brX=Math.sin(s.breathT*.7)*bAmp*.5*cm,brY=Math.sin(s.breathT)*bAmp*cm,brP=Math.sin(s.breathT)*bAmp*.02*cm;
     // ---- stance blends
     const ease=(x,to,rate)=>x+(to-x)*Math.min(1,dt*rate);
-    s.slide=ease(s.slide,state.sliding?1:0,state.sliding?12:6);
+    s.slide=ease(s.slide,state.sliding||state.rolling?1:0,state.sliding||state.rolling?12:6);   // a combat roll tucks the gun the same way
     s.dive=ease(s.dive,state.diving?1:0,state.diving?10:5);
     s.reload=ease(s.reload??0,session.reloadLeft>0&&view.mode==='reload'&&(view.reloadHand??'both')==='both'?1:0,session.reloadLeft>0?9:6);   // reloads bring the gun in and turn it toward you (BO7); not when one of two dual guns reloads alone
     const mt=state.mantling,mk=mt?Math.sin(Math.min(1,mt.t)*Math.PI):0;   // up and back down over the climb

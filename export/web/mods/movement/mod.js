@@ -7,7 +7,8 @@
 // - Mantle: jump at a ledge up to chest height to climb over it.
 // - First-person head bob, landing dip (real falls only) and strafe roll.
 // - Black Ops 7 omnimovement: sprint and slide in any direction, dive (hold
-//   crouch while sprinting). (Wall jump exists but is off: WALL_JUMP.)
+//   crouch while sprinting), wall jump (a fresh jump in the air beside a wall with no
+//   ledge to mantle; up to 3, each weaker), slide cancel, combat roll (crouch as you land a fall).
 //   First-person gun and hand animation for all of it is in fp.js.
 import * as THREE from 'three';
 import { Capsule } from 'three/addons/math/Capsule.js';
@@ -23,7 +24,7 @@ export default function setup(api){
   const base={groundAcceleration:player.groundAcceleration,airAcceleration:player.airAcceleration,crouchHeight:player.crouchHeight,crouchEyeHeight:player.crouchEyeHeight,crouchSpeed:player.crouchSpeed};
   const PRONE={height:Math.max(player.radius*2+2,30),eye:17,speed:45};
   const up=new THREE.Vector3(0,1,0),down=new THREE.Vector3(0,-1,0);
-  const state={prone:false,sliding:false,mantling:null,diving:null,wallJumps:0,wallKick:0,airTime:0,jumped:false,grounded:true,stairs:0};
+  const state={prone:false,sliding:false,mantling:null,diving:null,rolling:null,wallJumps:0,wallKick:0,airTime:0,jumped:false,grounded:true,stairs:0};
   window.kino.movement={player,settings:m,state};
 
   const ray=(origin,dir,far)=>player.worldOctree.rayIntersect?.(new THREE.Ray(origin,dir),0,far);
@@ -63,13 +64,16 @@ export default function setup(api){
   // Tap: toggle crouch. Hold: prone. Tap while sprinting: slide.
   // (Rebinding "Crouch" in Settings re-sends the key as KeyC, so this follows it.)
   const CROUCH_KEYS=new Set(['KeyC','ControlLeft','ControlRight']),HOLD=.35;
-  const controls={crouch:false,held:false,holdTime:0,sprinting:false};
+  const controls={crouch:false,held:false,holdTime:0,sprinting:false,pressAt:-9};
+  let clock=0;   // game time (update dt)
+  const piloting=()=>document.body.classList.contains('mech-pilot');   // the Pilot's mech neither wall jumps nor rolls
   const canAct=()=>window.kino.debug.getState().active&&!['reviving','gameover'].includes(session.phase)&&!state.mantling;
   // Hold time is counted in game time (update dt), so it matches what you see.
-  addEventListener('keydown',e=>{if(!CROUCH_KEYS.has(e.code)||e.repeat||!canAct())return;controls.held=true;controls.holdTime=0;});
+  addEventListener('keydown',e=>{if(!CROUCH_KEYS.has(e.code)||e.repeat||!canAct())return;controls.held=true;controls.holdTime=0;controls.pressAt=clock;});
   addEventListener('keyup',e=>{
     if(!CROUCH_KEYS.has(e.code)||!controls.held)return;controls.held=false;
-    if(!canAct()||controls.holdTime>=HOLD)return;   // a hold already went prone
+    if(!canAct()||controls.holdTime>=HOLD||state.rolling)return;   // a hold already went prone
+    if(state.sliding){if(slide.t>SLIDE.cancelAfter){state.sliding=false;controls.crouch=false;host.emit('slideCancel');}return;}   // slide cancel: a tap stands up out of the slide with the speed it has
     if(state.prone){setProne(false);controls.crouch=true;}
     else if(controls.sprinting&&!state.diving&&(player.onFloor||state.airTime<.25))startSlide();   // ground contact flickers on slopes
     else controls.crouch=!controls.crouch;
@@ -97,13 +101,16 @@ export default function setup(api){
   }
 
   // ---- Slide ------------------------------------------------------------------------------------
-  // A long, smooth slide: speed eases out along a curve (not linear friction),
-  // with a little steering, ending in a crouch.
-  const SLIDE={duration:1.35,maxSpeed:490,endSpeed:130,steer:.18};
-  const slide={t:0,dir:new THREE.Vector3(),start:0,boost:0};
+  // A short, snappy slide (BO7): a burst that decays fast along a curve (not linear friction), with a little
+  // steering, ending in a crouch. A jump or a crouch tap cancels it; a slide started within `again` seconds of the
+  // last one gets almost no burst (weak), so chained slides stay slower than a sprint.
+  const SLIDE={duration:.85,maxSpeed:480,endSpeed:150,steer:.18,burst:1.45,weak:1.12,curve:1.7,again:1.5,cancelAfter:.15,jumpKeep:.88};
+  const slide={t:0,dir:new THREE.Vector3(),start:0,boost:0,cool:0,was:false,carry:0,carryT:0};
+  // Combat roll (BO7): crouch pressed within `window` seconds before landing a real fall rolls along the move direction.
+  const ROLL={duration:.45,fallSpeed:520,speed:260,window:.35,damage:.5};
   function startSlide(){
     const v=player.velocity,h=Math.hypot(v.x,v.z);if(h<160||state.prone)return;
-    state.sliding=true;slide.t=0;slide.boost=0;slide.dir.set(v.x/h,0,v.z/h);slide.mul=window.kino?.slideMul?.()??1;slide.start=Math.min(SLIDE.maxSpeed,Math.max(h,220)*1.6)*slide.mul;
+    state.sliding=true;slide.t=0;slide.boost=0;slide.dir.set(v.x/h,0,v.z/h);slide.mul=window.kino?.slideMul?.()??1;slide.start=Math.min(SLIDE.maxSpeed,Math.max(h,220)*(slide.cool>0?SLIDE.weak:SLIDE.burst))*slide.mul;
     controls.crouch=true;host.emit('slide');
   }
   // ---- Dive (BO6/BO7): a low forward leap in the move direction, landing prone ------------
@@ -115,36 +122,53 @@ export default function setup(api){
     player.velocity.set(d.x*speed,250,d.z*speed);player.onFloor=player.grounded=false;
     host.emit('dive');
   }
-  // ---- Wall jump (BO7): jump while airborne next to a wall to kick off it (disabled) ---------
-  const WALL_JUMP=false;
-  const WALL={reach:20,max:3,cooldown:.28,out:290,up:.95};
+  // ---- Wall jump (BO7): jump while airborne next to a wall to kick off it --------------------
+  // Back on 2026-11-17 (off since 2026-10-05: it fired when the user meant to mantle). A mantle always wins now: the
+  // jump press tries the mantle first, and a wall whose top this jump could still mantle (now, or higher on the way
+  // up) never kicks. Up to 3 kicks before touching the ground, each weaker.
+  const WALL_JUMP=true;
+  const WALL={reach:20,max:3,cooldown:.28,out:290,up:.95,chain:[1,.86,.72]};
+  function ledgeAbove(d,dist){
+    const f=feet(),more=player.velocity.y>0?player.velocity.y**2/(2*player.gravity):0,reach=74+more+8;
+    const probe=f.clone().addScaledVector(d,dist+player.radius+6).addScaledVector(up,reach+4);
+    const top=ray(probe,down,reach+4-(player.stepHeight+2));if(!top||normalY(top)<.6)return false;
+    return fits(new THREE.Vector3(probe.x,probe.y-top.distance+player.skin*2,probe.z),player.height);
+  }
   function tryWallJump(){
     if(state.wallJumps>=WALL.max||state.wallKick>0)return false;
     let best=null;
     for(const hgt of [22,46])for(let i=0;i<12;i++){const a=i/12*Math.PI*2,d=new THREE.Vector3(Math.cos(a),0,Math.sin(a)),f=feet().addScaledVector(up,hgt);
-      const h=ray(f,d,player.radius+WALL.reach);if(!h||Math.abs(normalY(h))>.3)continue;if(!best||h.distance<best.h.distance)best={h,d};}
+      const h=ray(f,d,player.radius+WALL.reach);if(!h||Math.abs(normalY(h))>.3)continue;if(!best||h.distance<best.dist)best={dist:h.distance,d,n:h.normal?.clone()??h.triangle?.getNormal(new THREE.Vector3())??d.clone().negate()};}   // the normal is read now: the hit's triangle is a scratch object the next ray overwrites
     if(!best)return false;
-    const n=(best.h.normal?.clone()??best.h.triangle?.getNormal(new THREE.Vector3()))??best.d.clone().negate();n.y=0;n.normalize();if(n.dot(best.d)>0)n.negate();
+    const n=best.n;n.y=0;n.normalize();if(n.dot(best.d)>0)n.negate();
     if(state.lastWall&&state.lastWall.dot(n)>.9&&state.wallJumps>0)return false;   // not the same wall twice in a row
-    const v=player.velocity,into=v.x*n.x+v.z*n.z;
+    if(ledgeAbove(best.d,best.dist))return false;   // a ledge to mantle: no kick
+    const v=player.velocity,into=v.x*n.x+v.z*n.z,k=WALL.chain[state.wallJumps]??.7;
     const along=new THREE.Vector3(v.x-n.x*into,0,v.z-n.z*into).multiplyScalar(.85);
-    player.velocity.set(along.x+n.x*WALL.out,player.jumpSpeed*WALL.up,along.z+n.z*WALL.out);
+    player.velocity.set(along.x+n.x*WALL.out*k,player.jumpSpeed*WALL.up*k,along.z+n.z*WALL.out*k);
     state.wallJumps++;state.wallKick=WALL.cooldown;state.lastWall=n;state.jumped=true;
     host.emit('walljump',{normal:n});return true;
   }
-  const slideSpeed=t=>{const u=Math.min(1,t/SLIDE.duration);return SLIDE.endSpeed+(slide.start-SLIDE.endSpeed)*(1-u)**1.7;};
+  const slideSpeed=t=>{const u=Math.min(1,t/SLIDE.duration);return SLIDE.endSpeed+(slide.start-SLIDE.endSpeed)*(1-u)**SLIDE.curve;};
+  function startRoll(){
+    const d=moveDir(),h=Math.hypot(player.velocity.x,player.velocity.z);
+    state.rolling={t:0,dir:d.clone(),speed:Math.max(h,ROLL.speed)};state.sliding=false;controls.held=false;controls.crouch=false;
+    host.emit('roll');
+  }
+  host.on('fall',e=>{if(state.rolling&&state.rolling.t<.3&&!e.dive)e.amount*=ROLL.damage;});   // the fall-damage mod's event: a roll takes half
 
   // ---- Wrapped controller update ----------------------------------------------------------
   const originalUpdate=player.update.bind(player);
   let prevJump=false;
   player.update=(dt,input)=>{
     const down_=['reviving','gameover'].includes(session.phase);
-    if(down_){if(state.prone)setProne(false);state.sliding=false;state.mantling=null;controls.crouch=false;}
+    if(down_){if(state.prone)setProne(false);state.sliding=false;state.mantling=null;state.rolling=null;controls.crouch=false;}
+    clock+=dt;if(slide.was&&!state.sliding)slide.cool=SLIDE.again;slide.was=state.sliding;if(!state.sliding)slide.cool=Math.max(0,slide.cool-dt);
     // Holding crouch long enough goes prone.
-    if(controls.held){controls.holdTime+=dt;
+    if(controls.held&&!state.rolling){controls.holdTime+=dt;
       // holding crouch while sprinting dives (a quick tap still slides)
       if(controls.sprinting&&!state.diving&&!state.mantling&&!state.prone&&controls.holdTime>=DIVE_HOLD&&(player.onFloor||state.airTime<.2)){controls.held=false;startDive();}
-      else if(!state.prone&&!state.mantling&&!state.diving&&controls.holdTime>=HOLD){state.sliding=false;setProne(true);}}
+      else if(!state.prone&&!state.mantling&&!state.diving&&controls.holdTime>=HOLD&&(player.onFloor||player.velocity.y>-ROLL.fallSpeed*.6)){state.sliding=false;setProne(true);}}   // held through a real fall: kept for the roll
     // Mantling: a short scripted climb that overrides movement.
     if(state.mantling){
       const mt=state.mantling;mt.t=Math.min(1,mt.t+dt/mt.duration);
@@ -168,6 +192,7 @@ export default function setup(api){
     state.wallKick=Math.max(0,state.wallKick-dt);
     if(input&&!down_){
       input={...input};lastInput={forward:input.forward??0,strafe:input.strafe??0};
+      if(state.rolling){input.jump=false;input.jumpPressed=false;input.sprint=false;state.rolling.t+=dt;if(state.rolling.t>=ROLL.duration)state.rolling=null;}
       const jumpNow=!!(input.jump||input.jumpPressed),horizontal=Math.hypot(player.velocity.x,player.velocity.z);
       controls.sprinting=!!input.sprint&&horizontal>170;   // uphill sprinting is slower
       // Sprinting cancels a toggled crouch, as in Call of Duty.
@@ -179,9 +204,9 @@ export default function setup(api){
       }
       // Jump from prone or crouch stands up instead; a jump mid-slide becomes a slide-jump.
       if(jumpNow&&!prevJump&&(state.prone||(controls.crouch&&!state.sliding))){if(state.prone)setProne(false);controls.crouch=false;input.jump=false;input.jumpPressed=false;}
-      else if(jumpNow&&!prevJump&&(player.onFloor||state.airTime<.1)){state.jumped=true;if(state.sliding){state.sliding=false;controls.crouch=false;}}
-      // Wall jump is off (user request, 2026-10-05: it fired when they meant to mantle); WALL_JUMP turns it back on.
-      else if(WALL_JUMP&&jumpNow&&!prevJump&&!player.onFloor&&state.airTime>.12&&!state.prone&&tryWallJump()){input.jump=false;input.jumpPressed=false;}
+      else if(jumpNow&&!prevJump&&(player.onFloor||state.airTime<.1)){state.jumped=true;if(state.sliding){state.sliding=false;controls.crouch=false;slide.carry=Math.hypot(player.velocity.x,player.velocity.z)*SLIDE.jumpKeep;slide.carryT=0;}}
+      // Wall jump: only when the press found no ledge to mantle (above) and the wall has none in reach (tryWallJump).
+      else if(WALL_JUMP&&jumpNow&&!prevJump&&!player.onFloor&&state.airTime>.12&&!state.prone&&!piloting()&&tryWallJump()){input.jump=false;input.jumpPressed=false;}
       if(state.sliding){
         slide.t+=dt/(slide.mul??1);input.sprint=false;   // Tribologist: faster and farther (same curve, stretched)
         player.groundAcceleration=40;   // the slide curve drives the speed, not friction
@@ -191,14 +216,24 @@ export default function setup(api){
       // so every step riser doesn't cost speed.
       if(!state.sliding)player.groundAcceleration=state.stairs>0?original.groundAcceleration:base.groundAcceleration;
       // The crouch key's own state drives crouching (tap toggles, hold is prone).
-      input.crouch=controls.crouch||state.prone||state.sliding;
+      input.crouch=controls.crouch||state.prone||state.sliding||!!state.rolling;
       if(state.prone)input.sprint=false;
       prevJump=jumpNow;
     }
     // Small drops (stairs) keep full ground control; only real jumps and falls steer weakly.
     player.airAcceleration=!state.jumped&&state.airTime<.2?original.groundAcceleration:base.airAcceleration;
-    const wasGrounded=player.onFloor;
+    const wasGrounded=player.onFloor,fallV=player.velocity.y;
     const result=originalUpdate(dt,input);
+    // Slide jump: the hop out of a slide keeps the slide's speed along its path (air control would bleed it off).
+    if(slide.carry>0){slide.carryT+=dt;
+      if((player.onFloor&&slide.carryT>.1)||state.sliding||state.diving||state.wallKick>0||slide.carryT>1.2)slide.carry=0;
+      else if(!player.onFloor){const h=Math.hypot(player.velocity.x,player.velocity.z);if(h>1&&h<slide.carry){const k=slide.carry/h;player.velocity.x*=k;player.velocity.z*=k;}}
+    }
+    // Combat roll: a real fall landed with crouch just pressed.
+    if(!wasGrounded&&player.onFloor&&fallV<-ROLL.fallSpeed&&!state.rolling&&!state.prone&&!state.sliding&&!state.diving&&!down_&&!piloting()&&(controls.held||clock-controls.pressAt<=ROLL.window))startRoll();
+    if(state.rolling){const r=state.rolling,sp=r.speed*(1-.25*Math.min(1,r.t/ROLL.duration)),actual=Math.hypot(player.velocity.x,player.velocity.z);
+      if(r.t>.1&&actual<sp*.35)state.rolling=null;   // ran into something
+      else{player.velocity.x=r.dir.x*sp;player.velocity.z=r.dir.z*sp;}}
     // Slide: apply the eased speed along the slide direction, steering slightly toward input.
     if(state.sliding){
       const want=moveDir();slide.dir.lerp(want,SLIDE.steer*dt*4).normalize();
@@ -230,7 +265,7 @@ export default function setup(api){
     if(player.onFloor){state.airTime=0;state.jumped=false;state.wallJumps=0;state.lastWall=null;}else state.airTime+=dt;
     return result;
   };
-  host.on('reset',()=>{setProne(false);state.sliding=false;state.mantling=null;state.diving=null;controls.crouch=false;});
+  host.on('reset',()=>{setProne(false);state.sliding=false;state.mantling=null;state.diving=null;state.rolling=null;slide.carry=0;slide.cool=0;controls.crouch=false;});
   setupFirstPerson(api,state);
 
   // ---- Slide sound ----------------------------------------------------------------------------------
@@ -253,7 +288,7 @@ export default function setup(api){
 
   // ---- Camera feel ------------------------------------------------------------------------------
   let phase=0,dip=0,dipV=0,roll=0,wasGrounded=true,lastVy=0,bobBlend=0,fallTime=0,crouchOffset=0;
-  let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0,stairVel=0,nanOnce=false,camPitch=0;
+  let lastEye=player._eyeHeight,lastFeetY=player.getFeetPosition().y,stairOffset=0,stairVel=0,nanOnce=false,camPitch=0,rollCam=0,rollPitch=0;
   const downRay=new THREE.Ray(new THREE.Vector3(),new THREE.Vector3(0,-1,0));
   function flatUnderfoot(){
     const col=api.world?.collision;if(!col?.raycastFirst)return false;
@@ -301,18 +336,21 @@ export default function setup(api){
       stairVel+=(-w*w*stairOffset-2*w*stairVel)*h;stairOffset=THREE.MathUtils.clamp(stairOffset+stairVel*h,-24,24);
     }
     else stairOffset+=(0-stairOffset)*Math.min(1,dt*11);
-    camera.position.y+=y+dip+crouchOffset+stairOffset;
+    // combat roll: the view tucks down and forward and comes back up (no head motion with head bob off, only the tuck)
+    rollCam+=((state.rolling?Math.sin(Math.min(1,state.rolling.t/ROLL.duration)*Math.PI):0)-rollCam)*Math.min(1,dt*20);
+    const rp=settings.headBob===false?0:-rollCam*.3;camera.rotation.x+=rp-rollPitch;rollPitch=rp;
+    camera.position.y+=y+dip+crouchOffset+stairOffset-rollCam*8;
     camera.position.x+=Math.cos(camera.rotation.y)*side;camera.position.z-=Math.sin(camera.rotation.y)*side;
     // the whole view sways with the gun (fp.js: bank into turns and strafes, slide and dive cant, sprint cadence, the
     // landing nod, the fire kick, a sprint/slide FOV kick); the pitch is applied as a difference, the mouse owns the base
     const cam=window.kino.fpMotion?.cam;
-    camera.rotation.z=roll+Math.cos(phase)*.004*bob*bobBlend+(cam?.roll??0);
+    camera.rotation.z=roll+Math.cos(phase)*.004*bob*bobBlend+(cam?.roll??0)+(settings.headBob===false?0:rollCam*.07);
     if(cam){camera.rotation.x+=cam.pitch-camPitch;camPitch=cam.pitch;host.fovOffset=cam.fov;}
     // (2026-10-17) a non-finite value here poisons the camera for good (every later frame reads it back): report once
     // what it was and start the feel over
     if(!Number.isFinite(camera.rotation.z+camera.position.x+camera.position.y+camera.position.z)){
       if(!nanOnce){nanOnce=true;console.error('[movement] non-finite camera feel',JSON.stringify({dt,speed,grounded,phase,bob,bobBlend,roll,dip,dipV,crouchOffset,stairOffset,stairVel,y,side,ry:camera.rotation.y,eye,jump,lastEye,feetY,lastFeetY,fallTime,lastVy,vel:v.toArray()}));}
-      phase=dip=dipV=roll=bobBlend=crouchOffset=stairOffset=stairVel=0;camPitch=0;camera.rotation.z=0;if(!Number.isFinite(camera.rotation.x))camera.rotation.x=0;   /* the controller resyncs the position next frame */
+      phase=dip=dipV=roll=bobBlend=crouchOffset=stairOffset=stairVel=rollCam=rollPitch=0;camPitch=0;camera.rotation.z=0;if(!Number.isFinite(camera.rotation.x))camera.rotation.x=0;   /* the controller resyncs the position next frame */
     }
   });
 
@@ -331,6 +369,7 @@ export default function setup(api){
       const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=900;const ng=c.createGain();ng.gain.value=volume*.6;n.buffer=b;n.connect(lp).connect(ng).connect(out);n.start(t);
     }
     host.on('dive',()=>{play('fly/gear/cloth/',.8);play('fly/melee/melee_swing/',.55);setTimeout(()=>play('fly/gear/rattle/',.45),90);});
+    host.on('roll',()=>{play('fly/gear/cloth/',.7);play(Math.random()<.65?'fly/bodyfall/wood/':'fly/bodyfall/dirt/',.6);});
     host.on('diveLand',()=>{
       const wood=Math.random()<.65;play(wood?'fly/bodyfall/wood/':'fly/bodyfall/dirt/',1);
       play('fly/gear/rattle/',.7);setTimeout(()=>play('fly/gear/weapon/',.55),60);thump(.9);

@@ -28,6 +28,7 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { bakeVolume, loadVolume, patchMaterial } from './baked.js';
 import { settings, onSettingsChange } from '../../settings.js';
+import { createShafts } from './shafts.js';
 import { setupMoon } from './moon.js';
 
 const SWAP=.25;
@@ -45,6 +46,8 @@ const SWAP=.25;
 const LIGHT_CLAMP='3.2';
 // Light beams live in their own scene, drawn by the volumetric pass (setupPost).
 const volScene=new THREE.Scene();
+// Real light shafts from the shadow-casting lights (shafts.js), drawn by the same pass.
+const shafts=createShafts();
 // Volumetric beams: each beam is a slightly oversized cone drawn back faces
 // only; for every pixel the shader marches the view ray through the cone and
 // integrates a smooth density (Gaussian across the beam, fading along it,
@@ -107,7 +110,7 @@ const quality=()=>Math.min(coarse?1:3,THREE.MathUtils.clamp(Math.round(settings.
 export default async function setup(api){
   const {scene,camera,session,data,host,renderer}=api;
   const kino=!api.map||api.map.id==='kino';   // the engine passes every map's entry, Kino's included
-  if(window.kino)window.kino.volumeBeam=beamCone;   // for other maps' lights (drawn by the volumetric pass, Medium and up)
+  if(window.kino){window.kino.volumeBeam=beamCone;window.kino.shafts=shafts;}   // for other maps' lights (drawn by the volumetric pass, Medium and up)
   // Light fixtures placed in the static map (chandeliers, sconces, hanging lamps,
   // mirror bulbs, stage lamps...), baked from kino.gltf's nodes.
   const fixtures=kino?await fetch(new URL('fixtures.json',import.meta.url)).then(r=>r.ok?r.json():[]).catch(()=>[]):[];
@@ -390,6 +393,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
   const sun=new THREE.DirectionalLight(0xfff0da,0);sun.castShadow=true;sun.position.copy(center).addScaledVector(sunDir,extent*1.5);sun.target.position.copy(center);
   Object.assign(sun.shadow.camera,{left:-extent,right:extent,top:extent,bottom:-extent,near:1,far:extent*3.2});sun.shadow.camera.updateProjectionMatrix();
   sun.shadow.bias=-.0002;sun.shadow.normalBias=1.4;sun.shadow.autoUpdate=false;sun.shadow.needsUpdate=true;scene.add(sun,sun.target);
+  shafts.add(sun,{strength:.045,density:.0015,g:.3,far:2600,dust:.4,lift:3,sky:.35,white:.25});   // real shafts in day mode (the sun only casts shadows then)
   let sunSig='',wasDay=null;
   // Sun shafts: trace sunlight down onto the map on a grid; spots it reaches
   // that still have a roof overhead are under a hole. Neighbouring spots form
@@ -563,7 +567,8 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
     if(q>=2&&frame%(q>=3?2:3)===0)for(const l of spots)l.shadow.needsUpdate=true;
     if((tagTimer-=dt)<=0){tagTimer=1;tagShadows(scene);singlePass(scene);}
     for(const b of beams){
-      const on=q>=1?level(b.s):0,u=b.mesh.material.uniforms;u.time.value=t;u.strength.value+=(on*b.strength*.45-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
+      const on=q>=1?level(b.s):0,u=b.mesh.material.uniforms,real=b.s.kind==='sun'&&q>=2&&shafts.covers(sun);b.live=on>0;   // real: the sun's own shafts are drawn (shafts.js), so its baked cones stay dark
+      u.time.value=t;u.strength.value+=((real?0:on)*b.strength*.45-u.strength.value)*Math.min(1,dt*4);b.mesh.visible=u.strength.value>.002;
       b.dust.visible=q>=2&&b.mesh.visible;if(b.dust.visible)b.dust.material.opacity=Math.min(.2,u.strength.value*1.4);}   // the motes move in their shader (makeBeam)
     dustTime.value=t;
     if(volume){const u=volume.uniforms.bakedPowerMix;u.value+=((session.power?1:0)-u.value)*Math.min(1,dt*1.5);}
@@ -607,7 +612,7 @@ function setupKino(api,fixtures=[],volume=null,baking=false,cage=null,bulbNormal
       sum+=c;keyDir.addScaledVector(toL.normalize(),c);mix.add(tmp.copy(l.color).multiplyScalar(c));
     }
     // Sunlight: standing inside a sun shaft.
-    for(const b of beams)if(b.s.kind==='sun'&&b.mesh.visible){const rel=cam.clone().sub(b.top),a=rel.dot(b.dir);if(a>0&&a<b.len&&rel.addScaledVector(b.dir,-a).length()<b.r){const c=.12;sum+=c;keyDir.addScaledVector(sunDir,c);mix.add(tmp.setRGB(1,.95,.86).multiplyScalar(c));}}
+    for(const b of beams)if(b.s.kind==='sun'&&(b.mesh.visible||b.live)){const rel=cam.clone().sub(b.top),a=rel.dot(b.dir);if(a>0&&a<b.len&&rel.addScaledVector(b.dir,-a).length()<b.r){const c=.12;sum+=c;keyDir.addScaledVector(sunDir,c);mix.add(tmp.setRGB(1,.95,.86).multiplyScalar(c));}}
     // Baked lamps: their light at the camera (irradiance ≈ what a surface facing them receives).
     if(volume){const c=volume.sample(cam,volume.uniforms.bakedPowerMix.value);const lum=(c.r+c.g+c.b)/3;if(lum>0){const w=lum*.06;sum+=w;mix.add(tmp.copy(c).multiplyScalar(w/Math.max(lum,1e-4)));}}
     const target=THREE.MathUtils.clamp(.22+sum*8,.22,1.3);gunLevel+=(target-gunLevel)*Math.min(1,dt*3);
@@ -672,21 +677,24 @@ class VolumetricPass extends Pass{
   constructor(volScene,camera){
     super();this.volScene=volScene;this.camera=camera;this.needsSwap=false;
     this.target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType});
-    this.quad=new FullScreenQuad(new THREE.ShaderMaterial({uniforms:{tVol:{value:null}},transparent:true,depthTest:false,depthWrite:false,blending:THREE.AdditiveBlending,
+    this.quad=new FullScreenQuad(new THREE.ShaderMaterial({uniforms:{tVol:{value:null},texel:{value:new THREE.Vector2()}},transparent:true,depthTest:false,depthWrite:false,blending:THREE.AdditiveBlending,
       vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
-      fragmentShader:'uniform sampler2D tVol;varying vec2 vUv;void main(){gl_FragColor=vec4(texture2D(tVol,vUv).rgb,1.);}'}));
+      fragmentShader:'uniform sampler2D tVol;uniform vec2 texel;varying vec2 vUv;void main(){gl_FragColor=vec4((texture2D(tVol,vUv+texel).rgb+texture2D(tVol,vUv-texel).rgb+texture2D(tVol,vUv+texel*vec2(1.,-1.)).rgb+texture2D(tVol,vUv+texel*vec2(-1.,1.)).rgb)*.25,1.);}'}));   // four bilinear taps = a 4x4 box over the half-size light: smooths the shafts' sample jitter
     this.forward=new THREE.Vector3();
   }
   setSize(w,h){this.target.setSize(Math.max(1,Math.floor(w/2)),Math.max(1,Math.floor(h/2)));}
   render(renderer,writeBuffer,readBuffer){
-    if(!this.volScene.children.some(o=>o.visible))return;
+    shafts.scale=quality()>=2?1:0;   // High and Ultra
+    const beams=this.volScene.children.some(o=>o.visible),lit=shafts.active(this.camera);
+    if(!beams&&!lit.length&&!shafts.needsWarm())return;
     const cam=this.camera;cam.getWorldDirection(this.forward);
     for(const o of this.volScene.children){const u=o.material?.uniforms;if(!u)continue;
       u.depthTex.value=readBuffer.depthTexture;u.resolution.value.set(this.target.width,this.target.height);u.near.value=cam.near;u.far.value=cam.far;u.camForward.value.copy(this.forward);}
     const old=renderer.getRenderTarget(),oldClear=renderer.autoClear;
     renderer.setRenderTarget(this.target);renderer.setClearColor(0x000000,0);renderer.clear(true,false,false);renderer.autoClear=false;
-    renderer.render(this.volScene,cam);
-    renderer.setRenderTarget(readBuffer);this.quad.material.uniforms.tVol.value=this.target.texture;this.quad.render(renderer);
+    if(beams)renderer.render(this.volScene,cam);
+    shafts.render(renderer,lit,readBuffer.depthTexture,cam,performance.now()/1000%3600);
+    renderer.setRenderTarget(readBuffer);this.quad.material.uniforms.tVol.value=this.target.texture;this.quad.material.uniforms.texel.value.set(1/this.target.width,1/this.target.height);this.quad.render(renderer);
     renderer.setRenderTarget(old);renderer.autoClear=oldClear;
   }
   dispose(){this.target.dispose();this.quad.dispose();}

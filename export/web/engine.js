@@ -7,7 +7,7 @@
 // fork's zombies.js, which were two copies of this loop.
 import * as THREE from 'three';
 import { textureMemoryStats, setPrimaryRenderer, pendingImages, pendingImageCount } from './texture-memory.js';   // first: frees decoded texture images once uploaded
-import './skinned-bounds.js';   // fast SkinnedMesh bounds for every rigged model (no hitch when a zombie first draws)
+import './skinned-bounds.js';import {createVisCull} from './vis-cull.js';   // fast SkinnedMesh bounds for every rigged model (no hitch when a zombie first draws)
 import { PlayerController } from './player-controller.js';
 import { ViewWeapon, pendingModels, loadModel } from './animation.js';
 import { Enemies } from './enemies.js';
@@ -41,7 +41,7 @@ const renderer=new THREE.WebGLRenderer({antialias:!profile.mobile,powerPreferenc
 setupKtx2(renderer);   // GPU-compressed copies of the textures for every glTF loaded from here on (ktx2.js)
 renderer.setPixelRatio(Math.min(devicePixelRatio,profile.mobile?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
 // smallest instanced prop drawn, in screen pixels, by graphics quality (Low..Ultra; instance-cull.js)
-const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null;
+const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null,visCull=null;
 // three draws a transparent double-sided material in two passes and flags it needsUpdate before each, which re-checks
 // its program twice a draw (on The Giant, a glass material and the viewmodel's decals: ~10% of a frame). One pass
 // looks the same here. Every material is single-pass from creation (the Material.prototype override below, 2026-11-01).
@@ -506,6 +506,7 @@ try{
   features=map.createFeatures({scene,world,data,session,enemies,player,camera,audio,effect,damage,toast});
   await Promise.all([enemies.load(),equipView(),audio.load(),powerups.load(),perkDrink.load(),mysteryBox.load(),features.load()]);player.update(.05,{});
   await map.ready?.();
+  if(!new URLSearchParams(location.search).has('noVisCull')){visCull=createVisCull(renderer,scene);globalThis.kino.visCull=visCull;}
   progress('Loading mods',95);await mods.start({melee,renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,tick:update,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});
   // Performance for big ported maps (docs/fork/performance.md). A/B switches for benchmarks: ?noMerge ?noBatch ?noFreeze
   const perfOff=new URLSearchParams(location.search);
@@ -556,6 +557,7 @@ try{
   // from the renderer's object walk, see still-skeletons.js)
   if(!perfOff.has('noFreeze')&&world.root&&world.root.updateMatrixWorld===THREE.Object3D.prototype.updateMatrixWorld){staticFreeze=createStaticFreeze(scene);globalThis.kino.staticFreeze=staticFreeze;console.info('[static-freeze]',staticFreeze.frozen,'frozen,',staticFreeze.skips,'subtrees skipped');}
   if(!perfOff.has('noFreeze'))console.info('[still-skeletons] bones hidden:',hideBones(scene));
+  visCull?.start();
   ready=true;
   progress('Ready',100);$('loading').hidden=true;$('start').disabled=contextLost;$('menu-status').textContent=contextLost?'Graphics paused. Waiting for the browser to restore the game…':touchControls.mode?'Tap to start':'Click to capture the mouse · Esc to pause';
 }catch(error){console.error(error);errors.push(String(error));$('load-label').textContent='Unable to start: '+error.message;$('menu-status').textContent='See the browser console for details';}
@@ -918,7 +920,7 @@ function renderFrame(now){
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
   if((singlePassTimer-=dt)<=0){singlePassTimer=1;if(ready&&!NO_STILL){stillSkeletons(scene);hideBones(scene);}for(const c of viewScene.children)if(!Object.hasOwn(c,'updateMatrixWorld'))c.updateMatrixWorld=skipHidden;}   // (2026-10-25) hideBones each second too: the zombies' ~2,600 bones left projectObject's walk
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
-  update(dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
+  update(dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);visCull?.update(mods.camera??camera);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
   const viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
   keepPrograms();gpuEnd(gq,now);if(playing){fenceFrame(now);pollFences();}
   if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(firstDraw.late.length?firstDraw.late.splice(0):renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;if(session.round!==evRound){evRound=session.round;perf.event?.('round'+evRound);}const zn=enemies?.list?.length??0;if(zn>evZ)perf.event?.('spawn');evZ=zn;if(session.def!==evDef){evDef=session.def;perf.event?.('equip:'+(evDef?.id??'?'));}

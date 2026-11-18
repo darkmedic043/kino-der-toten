@@ -315,3 +315,42 @@ Measured on the light copy at Ultra, 1280x720, at the spawn (triangle counts of 
 Instances drawn 39,358 -> 29,773 and 31,845 -> 9,287. Frame times of these headless runs are not usable (two capped cores, shared with other sessions' tests): the user's next play session's log is the real check. Left: toward the map the main pass is unchanged in draws (no occlusion culling: about 250 window-board meshes, the quest props in view, wall guns), the booths' InstancedMeshes draw every booth (1.09 M triangles) whenever their joint bounds are in view, and the actor map still redraws the wall-buy guns and window boards near the player (about 180 draws).
 
 **`.tools/pass-tally.mjs`** (`[MAP=gorod-krovi] [Q=ultra] [QUERY='&noSun'] [VIEWS='[{"name","pos","yaw"}]'] [ROUTE=/a.js=scratch/b.js,...] [DETAIL=1] [DUMP=1] [REAL=1] flock scratch/melon/heavy.lock ~/.local/bin/lowpri node .tools/pass-tally.mjs`): the real engine on the GPU with the desktop profile, on the map's light copy (`map-lite.mjs`) and with map-test's memory stubs (16 px bitmaps, silent audio, forced GC); wraps `renderer.renderBufferDirect` and prints triangles and draws per render target and shadow map (`rt WxH #n`, `shadow:<light name>`), with `DETAIL=1` the top objects of each, plus the sun's stats, the culler's drawn instances and Gorod's prop cull. The lighting composer draws the scene once a frame, alternating two targets: add `#1` and `#2`. Memory: ready in 116-132 s, renderer 2.4 GB steady, 2.8 GB peak while loading (watchdog at 3.0 GB; without the stubs Gorod at Ultra passed 4.4 GB while loading, the known footprint of full-size decoded images and sounds). The watchdog reads the largest Chromium renderer on the host, so another session's browser test stops the run: wait for it.
+
+
+## Lighting audit and the engine's visibility culler (2026-11-17, user: "check how shadows light and everything is baked in, and how it affects the fps, make it so the fps is way nicer, and to change the engine if needed")
+
+**Audit: what the light costs.** From the user's own samples in the client log (RTX 4070 Ti Super, Rind on D3D11, Ultra, 2560x1369) the JS render time is about **13 µs per draw call on every map**: Kino 685 calls = 7.8 ms (105 fps), Gorod Krovi 865 = 13.1 ms, 1,232 = 18.7 ms, 2,338 = 30.8 ms (28 fps). The game is bound by the CPU's draw-call count, not by the GPU and not by the light:
+
+- the **baked light** (Kino's irradiance volume, the BO3 ports' light volume, lightmaps in vertex colours) is a few texture reads in shaders that run anyway: no draw calls, nothing measurable per frame;
+- **shadow maps** cost their redraws: 3-6 ms of CPU in 26-53 ms host frames (Kino's nearest spots and the day sun; Gorod's actor map every frame, its static sun map only when sun.js asks);
+- the **post chain** (beams at half size, haze, GTAO on Ultra, bloom, grade) is 0.1-0.4 ms of CPU a pass and the scene is drawn once a frame;
+- the biggest avoidable cost was **small resting props drawn although hidden behind walls**: a rigged prop is one draw per surface, and three only culls against the view frustum.
+
+So no bake was removed and nothing was moved to another renderer (WebGPU or another engine means rewriting every `onBeforeCompile` patch of the lit materials, the batches and the bakes: weeks, and no fewer draw calls by itself). The engine got occlusion culling instead.
+
+**`vis-cull.js`** (`createVisCull(renderer, scene)`, made by the engine before the mods start; `kino.visCull`; `?noVisCull` leaves it out; `kino.visCull.enabled = false` switches it off live):
+
+- At `start()` (after the warm-up) it groups the scene's loose props: every root under the scene or the map root that is not a batch, an InstancedMesh, the map itself, a light, a sprite or a mesh with its own render callbacks. A mod adds late ones with `kino.visCull.add(root)`, keeps a thing out with `kino.visCull.exclude(node)` or `userData.noVisCull`, and calls `kino.visCull.wake(node)` when it starts moving something.
+- **Rest detection**: a group whose meshes' world matrices have not changed for a moment is resting; a resting rigged mesh gets bounds from its posed bones and `frustumCulled = true` (rigged models load with it off). A group that moves is shown and left alone until it rests again.
+- **Occlusion queries**: each frame the front faces of the resting groups' boxes in view are drawn with colour and depth writes off (raw GL from a driver mesh's `onAfterRender`, after the opaque pass, so the map's depth is there) inside `ANY_SAMPLES_PASSED_CONSERVATIVE` queries; results arrive a few frames later. No sample passed = `userData.occluded = true` on the group's meshes; a hidden group is tested every frame and shown the frame a sample passes, a camera inside a box counts as visible.
+- **How a mesh is skipped**: `THREE.Frustum.prototype.intersectsObject` is patched to answer false for an occluded mesh, but only while the engine draws the world scene with the main camera (the wrapped `renderer.render`); inside the wrapped `renderer.shadowMap.render` the flag is off, so **hidden props still cast their shadows**. Nothing is removed from the scene and no `.visible` is touched.
+- `kino.visCull.stats()` = `{groups, resting, hidden, hiddenMeshes, inView, tested, pending, flips}` (`flips` should not grow under a still camera), `describe(n)` lists the groups.
+- Bug found by the A/B switch: dropping the pending queries on disable deleted queries that were already back in the free list, so after re-enabling nothing was hidden for seconds. Only the still-pending ones are deleted now.
+
+Measured in one page, the switch alternated over ten windows a view (`AB=`), Ultra, 1280x720, host GTX 1660 Ti on two capped cores (relative only):
+
+| view | draw calls off -> on | render CPU ms off -> on |
+|---|---|---|
+| Gorod Krovi spawn, toward the map (zombies up) | about 2,150 -> 1,067 | 43-45 -> 32-35 |
+| Gorod department store | 1,094-1,229 -> 738-875 | 26-37 -> 19-29 |
+| Gorod yellow house | 1,271-1,494 -> 911-1,133 | 33-43 -> 22-27 |
+| Gorod, views with nothing to hide | equal | equal |
+| Kino theatre (two directions) | 528 -> 460, 439 -> 318 | 14.0 -> 13.2, 10.9 -> 10.3 |
+| Kino lobby | 1,155 -> 912 | 18.1 -> 17.2 |
+| Kino alley, dressing room | 979 -> 797, 830 -> 673 | 15.3 -> 14.2, 16.4 -> 15.4 |
+
+Found at load: Gorod 292 groups / 2,384 meshes in about 120 ms, Kino 463 groups / 1,013 meshes in 47 ms. Renderer memory unchanged (Gorod light copy 2.75-2.78 GB peak, Kino 2.5 GB). At 13 µs a call the worst Gorod view should lose about 14 ms a frame on the user's PC: a projection until their next session's `perf` rows say so.
+
+**`.tools/pass-tally.mjs` options added**: a view's `pitch`; `EVAL=<js>` (run once after ready, printed); `AB='<js lvalue>'` (per view the value is set false/true alternately over ten windows in the same page and frame time, render CPU and calls are printed for both: two separate runs differ by 30% from host load alone); `SHOTS=<folder>` (a frame per view), `SHOT_AB=<lvalue>` (frames `_off`/`_on`), `SHOT_SET='js|js|...'` (frames `_0`, `_1`, ... after each snippet, for tuning a look). `QUERY` must start with `&` (`QUERY='&noVisCull'`): without it the page never loads.
+
+Still-camera check on the live files (Gorod spawn, three reads 4 s apart): `flips` 169, 169, 169, so nothing flickers; Kino's first 4 s after ready hide 186 groups (186 flips, the initial pass).
