@@ -8,7 +8,37 @@
     "multi": "Multi-kills (2+ within 1.5 s)",
     "cheese": "Buy the ending of Cheese Cube Unlimited",
     "shop": "Buy it in the Shop",
-    "crowd": "Crowd kills (3+ within 1.5 s)"
+    "crowd": "Crowd kills (3+ within 1.5 s)",
+    "rg_splash": "Kills by a bolt's splash (not the bolt itself)",
+    "rg_far": "Kills 1,500+ units away",
+    "rg_triple": "Bolts that kill 3+",
+    "rg_air": "Kills by a bolt fired in mid-air",
+    "rg_close": "Kills within 120 units",
+    "tg_far": "Kills 400+ units away",
+    "tg_five": "Blasts that kill 5+",
+    "tg_point": "Kills within 100 units",
+    "tg_air": "Kills while in mid-air",
+    "tg_clear": "Blasts that kill every zombie within 400 (4+)",
+    "wh_freeze": "Zombies frozen solid",
+    "wh_shatter": "Statues shattered",
+    "wh_shard": "Kills by a shattering statue's ice",
+    "wh_crumple": "Statues crumbled by walking into them",
+    "wh_wall": "Blasts that freeze 4+",
+    "dg_arc": "Kills further down the chain (after the first)",
+    "dg_max": "Shots that chain the full number of zombies",
+    "dg_long": "Kills of a first target 700+ units away",
+    "dg_close": "Shots that kill with a zombie within 80 units",
+    "dg_last": "Kills with the last shot in the gun",
+    "wv_cook": "Zombies cooked by the Wave Gun",
+    "wv_zap": "Zap Gun kills",
+    "wv_crowd": "Wave Gun shots that cook 4+",
+    "wv_swap": "Kills within 3 s of combining or splitting",
+    "wv_dual": "Zap Gun kills with both guns within 1 s",
+    "mk_orb": "Kills by a vortex orb",
+    "mk_beam": "Kills by the beam",
+    "mk_charged": "Kills by a charged orb",
+    "mk_tandem": "Kills with both guns within 2 s",
+    "mk_swarm": "Orbs that kill 5+"
   },
   "camos": [
     {
@@ -380,23 +410,15 @@
     {"id": "s2.counterfeit", "name": "Counterfeit", "shop": "pass.s2.camo.counterfeit", "pass": "s2", "challenge": "pass", "procedural": "counterfeit", "scale": 2, "mix": 0.95},
     {"id": "s2.wax", "name": "Wax", "shop": "pass.s2.camo.wax", "pass": "s2", "challenge": "pass", "procedural": "wax", "scale": 2, "mix": 0.95}
   ],
-  "_altNote": "alt: weapon id -> {challenge: replacement}, for guns that can't do a challenge (no headshots from a Thundergun blast, or from launchers and explosive bolts, whose kills are nearly all blasts); progress counts on the replacement. A replacement is the other challenge's key, or [key, count] where the gun needs its own number (melee weapons: no headshots, and crowd kills come slower by hand)",
+  "_altNote": "alt: weapon id -> {challenge: replacement}, for guns that can't do a challenge (no headshots from a Thundergun blast, or from launchers and explosive bolts, whose kills are nearly all blasts); progress counts on the replacement. A replacement is the other challenge's key, or [key, count] where the gun needs its own number (melee weapons: no headshots, and crowd kills come slower by hand). [key, count, was]: was is the replacement this one took over from; a camo already finished on it stays finished (camo.js keepDone). The wonder weapons' own keys (rg_ tg_ wh_ dg_ wv_ mk_) are counted by their mods through kino.camoTally, not by kills",
   "alt": {
-    "thundergun_zm": {
-      "headshots": "crowd"
-    },
-    "microwavegun_zm": {
-      "headshots": "crowd"
-    },
-    "freezegun_zm": {
-      "headshots": "crowd"
-    },
-    "tesla_gun_zm": {
-      "headshots": "crowd"
-    },
-    "microwavegundw_zm": {
-      "headshots": "crowd"
-    },
+    "ray_gun_zm": {"kills": ["rg_splash", 300], "headshots": ["rg_far", 150], "low": ["rg_triple", 50], "moving": ["rg_air", 75], "multi": ["rg_close", 150]},
+    "thundergun_zm": {"kills": ["tg_far", 250], "headshots": ["tg_five", 60, "crowd"], "low": ["tg_point", 200], "moving": ["tg_air", 75], "multi": ["tg_clear", 30]},
+    "freezegun_zm": {"kills": ["wh_freeze", 400], "headshots": ["wh_shatter", 250, "crowd"], "low": ["wh_shard", 100], "moving": ["wh_crumple", 50], "multi": ["wh_wall", 40]},
+    "tesla_gun_zm": {"kills": ["dg_arc", 500], "headshots": ["dg_max", 30, "crowd"], "low": ["dg_long", 100], "moving": ["dg_close", 100], "multi": ["dg_last", 150]},
+    "microwavegun_zm": {"kills": ["wv_cook", 400], "headshots": ["wv_zap", 300, "crowd"], "low": ["wv_crowd", 50], "moving": ["wv_swap", 100], "multi": ["wv_dual", 100]},
+    "bo3_raygun_mk3": {"kills": ["mk_orb", 400], "headshots": ["mk_beam", 300], "low": ["mk_charged", 100], "moving": ["mk_tandem", 100], "multi": ["mk_swarm", 40]},
+    "microwavegundw_zm": {"kills": ["wv_cook", 400], "headshots": ["wv_zap", 300, "crowd"], "low": ["wv_crowd", 50], "moving": ["wv_swap", 100], "multi": ["wv_dual", 100]},
     "havoc_zm": {
       "headshots": "crowd"
     },

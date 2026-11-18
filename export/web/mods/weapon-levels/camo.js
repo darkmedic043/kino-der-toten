@@ -331,7 +331,14 @@ const altOf=(cats,id,c)=>cats.alt?.[id]?.[c.challenge];
 export const challengeOf=(cats,id,c)=>{const a=altOf(cats,id,c);return (Array.isArray(a)?a[0]:a)??c.challenge;};
 export const countOf=(cats,id,c)=>{const a=altOf(cats,id,c);return Array.isArray(a)?a[1]:c.count;};
 // done: the gun's own version of the challenge, or the plain one if that was already finished before a swap was added
-export const challengeDone=(cats,p,id,c)=>(p[challengeOf(cats,id,c)]??0)>=countOf(cats,id,c)||(p[c.challenge]??0)>=c.count;
+// (2026-11-18: the wonder weapons' own five; the plain counts keep running, so the camos done when a gun's swaps last
+// changed are listed in p._kept by keepDone, the first count after the change, and until then the plain one still counts)
+const sigOf=(cats,id)=>JSON.stringify(cats.alt?.[id]??null);
+// A swap's third entry is the swap it replaced ([key, count, was]: the crowd kills the wonder guns had), done at the camo's count.
+const doneBefore=(cats,p,id,c)=>{const was=altOf(cats,id,c)?.[2];return (p[c.challenge]??0)>=c.count||!!was&&(p[was]??0)>=c.count;};
+export const challengeDone=(cats,p,id,c)=>(p[challengeOf(cats,id,c)]??0)>=countOf(cats,id,c)||altOf(cats,id,c)!=null&&(p._sig===sigOf(cats,id)?(p._kept??[]).includes(c.id):doneBefore(cats,p,id,c));
+function keepDone(cats,p,id){const sig=sigOf(cats,id);if(p._sig===sig)return;const kept=new Set(p._kept??[]);
+  for(const c of baseCamos(cats))if(altOf(cats,id,c)!=null&&doneBefore(cats,p,id,c))kept.add(c.id);p._kept=[...kept];p._sig=sig;}
 const baseCamos=cats=>cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.reward&&!c.shop);   // shop camos are bought (Phase 6)   // reward camos come from a map's reward flag (profile.rewards), not a challenge
 // a gun has Gold (its mastery) when every challenge camo is done
 export function hasMastery(cats,profile,id){const p=camoProgress(profile,id);return baseCamos(cats).every(c=>challengeDone(cats,p,id,c));}
@@ -354,12 +361,14 @@ export function equippedCamo(cats,profile,id,weapons){
   const on=profile.camo?.[id]?.on;if(!on)return null;
   return camoUnlocked(cats,profile,id,weapons).has(on)?camoById(cats,on)??null:null;
 }
-// Count one kill. flags: {head, low, moving, multi}. Returns camos newly unlocked.
+// Count one kill. flags: {head, low, moving, multi, crowd}, or {tally:{key:n}} for a gun's own challenge events alone
+// (window.kino.camoTally). Returns camos newly unlocked.
 export function countCamoKill(cats,profile,id,flags,weapons){
   profile.camo??={};const e=profile.camo[id]??={p:{}};e.p??={};
-  const before=camoUnlocked(cats,profile,id,weapons);
-  const add=k=>{e.p[k]=(e.p[k]??0)+1;};
-  add('kills');if(flags.head)add('headshots');if(flags.low)add('low');if(flags.moving)add('moving');if(flags.multi)add('multi');if(flags.crowd)add('crowd');
+  const before=camoUnlocked(cats,profile,id,weapons);keepDone(cats,e.p,id);
+  const add=(k,n=1)=>{e.p[k]=(e.p[k]??0)+n;};
+  if(flags.tally){for(const [k,n] of Object.entries(flags.tally))if(n>0)add(k,n);}
+  else{add('kills');if(flags.head)add('headshots');if(flags.low)add('low');if(flags.moving)add('moving');if(flags.multi)add('multi');if(flags.crowd)add('crowd');}
   const after=camoUnlocked(cats,profile,id,weapons);
   return cats.camos.filter(c=>after.has(c.id)&&!before.has(c.id));
 }

@@ -12,6 +12,7 @@
 //   after a while.
 import * as THREE from 'three';
 import { loadAnimation } from '../../animation.js';
+import { kitHas } from '../weapon-levels/wonder-kits.js';
 
 const BASE=new URL('./',import.meta.url).href;
 const TUNE={base:{radius:120,inner:60,outer:600,dmgIn:1000,dmgOut:500,shatter:180,shIn:500,shOut:250},
@@ -85,26 +86,39 @@ export default async function setup(api){
     const clipData=deathData.filter(Boolean)[Math.floor(Math.random()*deathData.filter(Boolean).length)];
     if(clipData&&z.rig){const key='freeze_death';try{if(!z.rig.actions?.[key])z.rig.add(key,clipData);z.rig.play(key,false,1,.05);}catch(e){console.warn('[wonder-weapons]',e);}}
     iceOver(z.root);z.life=99;   // the statue stays until it shatters or crumbles
-    statues.push({z,t:0,at:z.root.position.clone()});play(pick('projectile/freeze/freeze',3),{gain:.8,at:z.root.position});
+    statues.push({z,t:0,at:z.root.position.clone(),kit:curKit});tally('wh_freeze');play(pick('projectile/freeze/freeze',3),{gain:.8,at:z.root.position});
   }
   function removeStatue(s,how,pap){
+    if(!statues.includes(s))return;
     statues.splice(statues.indexOf(s),1);const z=s.z,at=z.root.position.clone().addScaledVector(up,35);
     for(let i=0;i<(how==='shatter'?26:14);i++)puff(at.clone().add(new THREE.Vector3((Math.random()-.5)*30,(Math.random()-.5)*50,(Math.random()-.5)*30)),
       new THREE.Vector3((Math.random()-.5)*(how==='shatter'?420:120),Math.random()*(how==='shatter'?260:60),(Math.random()-.5)*(how==='shatter'?420:120)),.6+Math.random()*.5,8,how==='shatter'?18:12,0xcfeaff);
     z.root.visible=false;z.life=Math.min(z.life,.05);
     if(how==='shatter'){
-      play(pick('zombie/shatter/shatter',3),{gain:1,at});
-      const t=pap?TUNE.pap:TUNE.base;
-      for(const o of [...enemies.list]){const d=o.root.position.distanceTo(z.root.position);if(d<t.shatter&&!host.remoteDamage)enemies.hurt(o,THREE.MathUtils.lerp(t.shIn,t.shOut,d/t.shatter),false,false,'explosion');}
+      play(pick('zombie/shatter/shatter',3),{gain:1,at});tally('wh_shatter');
+      const t=pap||s.kit?.pap?TUNE.pap:TUNE.base,k=s.kit??{},r=t.shatter*(k.compressor?1.6:1),mul=k.compressor?2:1;
+      let shards=0;
+      for(const o of [...enemies.list]){const d=o.root.position.distanceTo(z.root.position);if(d<r&&!host.remoteDamage){
+        if(k.frostbite)killedBy.set(o,true);   // Frostbite Rounds: the ice's kills freeze too
+        enemies.hurt(o,THREE.MathUtils.lerp(t.shIn,t.shOut,d/r)*mul,false,false,'explosion');
+        if(enemies.list.includes(o))killedBy.delete(o);else shards++;}}
+      if(shards)tally('wh_shard',shards);
     }else play(pick('zombie/collapse/collapse',3),{gain:.9,at});
   }
 
   // ---- firing ----------------------------------------------------------------------------------
   let lastShots=session.shots;
   const killedBy=new WeakMap();
+  // Kit (weapon-levels/wonder-kits.js): the attachments of the shot that froze a statue go with it
+  let curKit=null;
+  const tally=(k,n=1)=>window.kino.camoTally?.('freezegun_zm',k,n);
   host.on('kill',({enemy})=>{if(enemy&&killedBy.get(enemy))freeze(enemy);});
   function fire(){
-    const def=session.def,pap=!!session.weapon?.upgraded,t=pap?TUNE.pap:TUNE.base;
+    const def=session.def,pap=!!session.weapon?.upgraded,has=a=>kitHas(def,a);
+    curKit={pap,coil:has('wh_coil'),compressor:has('wh_compressor'),frostbite:has('wh_frostbite')};
+    const t={...(pap?TUNE.pap:TUNE.base)};
+    if(has('wh_nozzle')){t.radius*=1.4;t.outer*=1.3;t.inner*=1.3;}   // Blizzard Nozzle: 40% wider, 30% further
+    let frozen=0;
     const origin=camera.position.clone(),dir=camera.getWorldDirection(new THREE.Vector3());
     const wall=world.raycast(new THREE.Ray(origin.clone(),dir.clone()),1,t.outer);
     blastFx(origin.clone().addScaledVector(dir,25).addScaledVector(up,-6),dir,wall?Math.max(60,wall.distance):t.outer,t);
@@ -120,10 +134,12 @@ export default async function setup(api){
       const ratio=THREE.MathUtils.clamp((outer2-d2)/(outer2-inner2),0,1),dmg=Math.round(THREE.MathUtils.lerp(t.dmgOut,t.dmgIn,ratio));
       if(host.remoteDamage)continue;
       killedBy.set(z,true);enemies.hurt(z,dmg,false,false,'freeze');
-      if(enemies.list.includes(z)){killedBy.delete(z);z.speed=Math.max(z.kind==='dog'?120:34,z.speed*.6);   // slowed a step
+      if(!enemies.list.includes(z))frozen++;
+      if(enemies.list.includes(z)){killedBy.delete(z);z.speed=Math.max(z.kind==='dog'?120:curKit.coil?20:34,z.speed*(curKit.coil?.35:.6));   // slowed a step (the Permafrost Coil: to a crawl)
         for(let i=0;i<5;i++)puff(c.clone().add(new THREE.Vector3((Math.random()-.5)*24,(Math.random()-.5)*40,(Math.random()-.5)*24)),up.clone().multiplyScalar(20),.5,6,14,0xbfe6ff);}
       play(pick('projectile/impact/impact',4),{gain:.6,at:c});
     }
+    if(frozen>=4)tally('wh_wall');
   }
 
   host.on('update',dt=>{
@@ -132,8 +148,8 @@ export default async function setup(api){
     // other damage shatters statues: explosions are caught by radius, bullets by the shot ray
     const feet=api.player.getFeetPosition();
     for(const s of [...statues]){s.t+=dt;
-      if(feet.distanceTo(s.z.root.position)<34){removeStatue(s,'crumple');continue;}
-      if(s.t>12)removeStatue(s,'crumple');}
+      if(feet.distanceTo(s.z.root.position)<34){tally('wh_crumple');removeStatue(s,s.kit?.compressor?'shatter':'crumple');continue;}   // the Shard Compressor's statues shatter when walked into
+      if(s.t>(s.kit?.coil?25:12))removeStatue(s,'crumple');}   // the Permafrost Coil's last 25 s
     for(const p of [...parts]){p.t+=dt;const u=p.t/p.life;
       if(u>=1){scene.remove(p.sp??p.ring);(p.sp??p.ring).material.dispose();p.ring?.geometry.dispose();parts.splice(parts.indexOf(p),1);continue;}
       if(p.sp){p.vel.multiplyScalar(Math.exp(-dt*3));p.sp.position.addScaledVector(p.vel,dt);p.sp.scale.setScalar(p.s0+(p.s1-p.s0)*Math.sqrt(u));p.sp.material.opacity=1-u;}

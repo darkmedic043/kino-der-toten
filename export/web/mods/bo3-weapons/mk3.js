@@ -267,8 +267,17 @@ export function setupMk3(api, { play, sounds }) {
     fx()?.emit({ key: 'glow', at: o.at.clone(), size: [40, 300], life: .4, fade: [.02, .8], additive: true, color: LARGE.core });
     fx()?.flash?.(o.at.clone(), { color: LARGE.cloud, intensity: 4, radius: 500, life: .5 });
   }
+  // the Mk3's own camo challenges (camos.json alt, kino.camoTally): orb kills, beam kills, charged kills, both guns
+  // within 2 s, orbs that kill 5+
+  const tally = (k, n = 1) => window.kino.camoTally?.('bo3_raygun_mk3', k, n);
+  let orbHit = false, orbKillAt = -9, beamKillAt = -9;
+  function orbKill(o, charged) {
+    tally('mk_orb'); if (charged) tally('mk_charged');
+    if (o && ++o.kills === 5) tally('mk_swarm');
+    orbKillAt = now(); if (orbKillAt - beamKillAt < 2) { tally('mk_tandem'); orbKillAt = beamKillAt = -9; }
+  }
   function pulse(o) {   // BO3: more health than the pulse's damage: hurt; otherwise only a charged pulse kills
-    const dmg = o.charged ? o.t.charged : o.t.pulse; let hit = 0;
+    const dmg = o.charged ? o.t.charged : o.t.pulse; let hit = 0;o.kills ??= 0;orbHit = true;
     for (const z of [...enemies.list]) {
       const c = z.root.position.clone(); c.y += z.kind === 'dog' ? 18 : 40;
       if (c.distanceTo(o.at) > o.radius || !world.lineClear(o.at, c)) continue;
@@ -276,7 +285,9 @@ export function setupMk3(api, { play, sounds }) {
       if (z.health > dmg) { enemies.hurt(z, dmg, false, false, 'mk3'); if (alive(z)) mark(z, o.charged); }
       else if (o.charged) disintegrate(z);
       else mark(z, false);
+      if (!enemies.list.includes(z)) orbKill(o, o.charged);
     }
+    orbHit = false;
     if (hit) snd('wpn_orb_damage_0' + Math.floor(Math.random() * 4), { gain: o.charged ? .8 : .45, at: o.at });
   }
 
@@ -299,6 +310,10 @@ export function setupMk3(api, { play, sounds }) {
 
   // Dark Matter Rounds: a zombie the beam kills may fold into a small vortex where it fell (not more than one per 1.2 s)
   let beamShot = null, darkAt = -9;
+  host.on('kill', e => {   // a beam kill: the right gun's shot this frame
+    if (!e.enemy || e.remote || e.melee || orbHit || !beamShot || now() - beamShot.at > .06 || session.lastHand === 'left' || !isMk3(session.def)) return;
+    tally('mk_beam'); beamKillAt = now(); if (beamKillAt - orbKillAt < 2) { tally('mk_tandem'); orbKillAt = beamKillAt = -9; }
+  });
   host.on('kill', e => {
     const z = e.enemy; if (!z || e.remote || host.remoteDamage || !beamShot?.k.dark || now() - beamShot.at > .06 || session.lastHand === 'left') return;
     if (now() - darkAt < DARK.gap || Math.random() >= DARK.chance) return;
@@ -330,7 +345,8 @@ export function setupMk3(api, { play, sounds }) {
       for (let k = 1, n = Math.max(1, Math.ceil(span / 12)); k <= n && !done; k++) {
         const p = s.pos.clone().addScaledVector(dir, span * k / n);
         for (const z of enemies.list) if (touches(z, p, 6)) {
-          enemies.hurt(z, s.t.direct, false, false, 'bullet'); slow(z, s.t.slow, s.t.slowT);
+          orbHit = true; enemies.hurt(z, s.t.direct, false, false, 'bullet'); orbHit = false;
+          if (enemies.list.includes(z)) slow(z, s.t.slow, s.t.slowT); else orbKill(null, false);
           land(s, p, dir.clone().negate().setY(.4).normalize()); done = true; break;
         }
       }

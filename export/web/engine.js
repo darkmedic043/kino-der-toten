@@ -252,7 +252,8 @@ function shoot(hand='right',pressed=primaryPressed){
   if(map.fire?.(session.def,forward))return true;   // a map's own weapons (Moon's Wave Gun / Zap Guns)
   for(const f of mods.fireHooks??[])if(f(session.def,forward,{ads:aiming()}))return true;   // a mod's own projectiles (bo7-weapons: the Grimhawk)
   if(base==='thundergun_zm'){
-    for(const z of [...enemies.list]){const d=z.root.position.clone().add(new THREE.Vector3(0,40,0)).sub(camera.position);if(d.length()<600&&d.normalize().dot(forward)>.65&&world.lineClear(camera.position,z.root.position.clone().add(new THREE.Vector3(0,40,0))))enemies.hurt(z,100000,false,false,'thunder');}
+    const reach=session.def.thunderRange??600,cone=session.def.thunderCone??.65;   // the Storm Choke (weapon-levels/wonder-kits.js)
+    for(const z of [...enemies.list]){const d=z.root.position.clone().add(new THREE.Vector3(0,40,0)).sub(camera.position);if(d.length()<reach&&d.normalize().dot(forward)>cone&&world.lineClear(camera.position,z.root.position.clone().add(new THREE.Vector3(0,40,0))))enemies.hurt(z,100000,false,false,'thunder');}
     effect(camera.position.clone().addScaledVector(forward,100),0xb9d8e5,22);return true;
   }
   if(session.def.projectileSpeed>0){features.shoot(session.def,forward);return true;}

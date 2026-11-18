@@ -4,6 +4,7 @@
 // visible shockwave to each shot and throws the zombies it kills.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { kitHas } from '../weapon-levels/wonder-kits.js';
 
 export default async function setup(api){
   const {host,data,scene,camera,audio,world,mysteryBox}=api;
@@ -49,7 +50,7 @@ export default async function setup(api){
   const blasts=[];
   const dustGeometry=()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(48*3),3));return g;};
 
-  function blast(upgraded){
+  function blast(upgraded,range=RANGE){
     const forward=camera.getWorldDirection(new THREE.Vector3()),up=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion),right=new THREE.Vector3().crossVectors(forward,up);
     const origin=camera.position.clone().addScaledVector(forward,34).addScaledVector(up,-9).addScaledVector(right,7),aim=origin.clone().add(forward);
     const tint=upgraded?0xffd9a0:0xcfe6ff,group=new THREE.Group();group.position.copy(origin);group.lookAt(aim);
@@ -61,16 +62,16 @@ export default async function setup(api){
     const flash=new THREE.Sprite(new THREE.SpriteMaterial({map:glow,color:tint,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));group.add(flash);
     const dustGeo=dustGeometry(),dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({color:0xd8d0c0,size:3,map:glow,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:.8}));group.add(dust);
     const motes=Array.from({length:48},()=>{const a=Math.random()*Math.PI*2,s=Math.sqrt(Math.random())*SPREAD;return {dir:new THREE.Vector3(Math.cos(a)*s,Math.sin(a)*s,1).normalize(),speed:900+Math.random()*900,d:Math.random()*20};});
-    scene.add(group);blasts.push({group,cone,rings,flash,dust,motes,t:0});
+    scene.add(group);blasts.push({group,cone,rings,flash,dust,motes,t:0,range});
     for(const m of energy)m.emissiveIntensity=6;
     screenFlash(upgraded);
     camera.rotation.x=Math.min(1.48,camera.rotation.x+.035);
   }
   function updateBlasts(dt){
     for(const b of [...blasts]){
-      b.t+=dt;const u=Math.min(1,b.t/LIFE),reach=RANGE*(1-(1-u)**3);
+      b.t+=dt;const u=Math.min(1,b.t/LIFE),reach=b.range*(1-(1-u)**3);
       b.cone.scale.set(reach*SPREAD,reach*SPREAD,reach);b.cone.material.opacity=(window.kino?.fx?.thunder?.35:.55)*(1-u)**1.5;b.cone.material.map.offset.y-=dt*3.5;
-      for(const r of b.rings){const v=THREE.MathUtils.clamp((b.t-r.delay)/(LIFE-r.delay),0,1),d=RANGE*(1-(1-v)**2.4);
+      for(const r of b.rings){const v=THREE.MathUtils.clamp((b.t-r.delay)/(LIFE-r.delay),0,1),d=b.range*(1-(1-v)**2.4);
         r.mesh.position.z=d;r.mesh.scale.setScalar(Math.max(.01,d*SPREAD*.92));r.mesh.material.opacity=v>0?.6*(1-v)**1.3:0;}
       b.flash.scale.setScalar(Math.max(0,70*(1-b.t/.14)));
       const pos=b.dust.geometry.attributes.position;b.motes.forEach((m,i)=>{m.d+=m.speed*dt;m.speed*=Math.exp(-dt*4);pos.setXYZ(i,m.dir.x*m.d,m.dir.y*m.d,m.dir.z*m.d);});pos.needsUpdate=true;b.dust.material.opacity=.8*(1-u);
@@ -88,7 +89,7 @@ export default async function setup(api){
   }
   // The game plays the shot sound once per trigger pull, so it marks each blast.
   const weaponSound=audio.weapon.bind(audio);
-  audio.weapon=(kind,d,...rest)=>{if(kind==='shot'&&(d?.baseId??d?.id)==='thundergun_zm')blast(!!d.upgraded);return weaponSound(kind,d,...rest);};
+  audio.weapon=(kind,d,...rest)=>{if(kind==='shot'&&(d?.baseId??d?.id)==='thundergun_zm')blast(!!d.upgraded,d.thunderRange??RANGE);return weaponSound(kind,d,...rest);};
 
   // --- Thrown zombies ------------------------------------------------------
   const flying=[];
@@ -97,7 +98,31 @@ export default async function setup(api){
     const z=e.enemy;if(!z?.thunderFling||!z.root)return;z.thunderFling=false;
     const away=z.root.position.clone().sub(camera.position);away.y=0;const distance=away.length();if(distance<1)away.set(0,0,1);away.normalize();
     const power=1-Math.min(1,distance/RANGE);z.life=Math.max(z.life??0,4.5);
-    flying.push({z,v:away.clone().multiplyScalar(650+950*power).setY(320+320*power),axis:new THREE.Vector3(away.z,0,-away.x),base:z.root.quaternion.clone(),tilt:0,spin:2.4+Math.random()*2.2,t:0});
+    flying.push({z,v:away.clone().multiplyScalar(650+950*power).setY(320+320*power),axis:new THREE.Vector3(away.z,0,-away.x),base:z.root.quaternion.clone(),tilt:0,spin:2.4+Math.random()*2.2,t:0,
+      turbine:kitHas(api.session.def,'tg_turbine')});
+    // the gun's own camo challenges (camos.json alt): distance, mid-air, and the blast's count (shot, checked in update)
+    const tally=(k,n)=>window.kino.camoTally?.('thundergun_zm',k,n);
+    if(distance>=400)tally('tg_far');else if(distance<=100)tally('tg_point');
+    if(api.player&&!api.player.isGrounded)tally('tg_air');
+    if(shot)shot.kills++;
+  });
+  // Kit (weapon-levels/wonder-kits.js): Static Air stuns the zombies just outside the cone; a shot's kills are counted
+  // for the Tiger and Red Tiger challenges (5+ kills; every zombie within 400 killed, 4+)
+  let shot=null;
+  (host.fireHooks??=[]).push(d=>{
+    if((d?.baseId??d?.id)!=='thundergun_zm')return false;
+    const at=camera.position,fwd=camera.getWorldDirection(new THREE.Vector3()),reach=d.thunderRange??RANGE,list=api.enemies.list.filter(z=>z.health>0);
+    shot={t:performance.now(),kills:0,near:list.filter(z=>z.root.position.distanceTo(at)<400)};
+    if(kitHas(d,'tg_static')&&!host.remoteDamage){const fx=window.kino.equipFx;
+      for(const z of list){const to=z.root.position.clone().setY(z.root.position.y+40).sub(at),len=to.length();
+        if(len<reach*1.4&&to.normalize().dot(fwd)>.35){fx?.stun(z,3);window.kino.fx?.emit?.({key:'glow',at:z.root.position.clone().setY(z.root.position.y+45),size:[30,8],life:.35,fade:[.02,.8],additive:true,color:0x9fd8ff});}}}
+    return false;
+  });
+  host.on('update',()=>{
+    if(!shot||performance.now()-shot.t<150)return;
+    const s=shot;shot=null;
+    if(s.kills>=5)window.kino.camoTally?.('thundergun_zm','tg_five');
+    if(s.kills>=4&&s.near.length>=4&&s.near.every(z=>!api.enemies.list.includes(z)))window.kino.camoTally?.('thundergun_zm','tg_clear');
   });
   const ray=new THREE.Ray(),down=new THREE.Vector3(0,-1,0),q=new THREE.Quaternion();
   function updateFlying(dt){
@@ -107,6 +132,7 @@ export default async function setup(api){
       const step=new THREE.Vector3(f.v.x,0,f.v.z).multiplyScalar(dt),len=step.length();
       if(len>0){ray.origin.copy(p).y+=30;ray.direction.copy(step).normalize();if(world.raycast(ray,0,len+14)){f.v.x*=-.15;f.v.z*=-.15;}else p.add(step);}
       f.v.y-=1400*dt;p.y+=f.v.y*dt;
+      if(f.turbine&&!host.remoteDamage)for(const o of [...api.enemies.list])if(o!==f.z&&o.health>0&&Math.hypot(o.root.position.x-p.x,o.root.position.z-p.z)<42&&Math.abs(o.root.position.y-p.y)<70)api.enemies.hurt(o,1e6,false,false,'thunder');   // the Gale Turbine
       if(f.v.y<0){ray.origin.copy(p).y+=40;ray.direction.copy(down);const ground=world.raycast(ray,0,45);
         if(ground){p.y=ground.position.y;flying.splice(flying.indexOf(f),1);window.kino?.fx?.knockback?.(p.clone());}}
       f.tilt=Math.min(1.35,f.tilt+f.spin*dt);

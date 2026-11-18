@@ -20,6 +20,7 @@ import { setupMk3 } from './mk3.js';
 import { setupRelics } from './relics.js';
 import { applyKits } from './aw-kits.js';
 import { applyMk3Kit } from './mk3-kit.js';
+import { kitHas } from '../weapon-levels/wonder-kits.js';
 
 const BASE=new URL('./',import.meta.url).href;
 const TUNE={base:{first:1000,aim:70,arc:300,kills:10},pap:{first:1200,aim:90,arc:420,kills:24}};
@@ -120,9 +121,15 @@ export default async function setup(api){
 
   // ---- the shot ---------------------------------------------------------------------------------
   const pending=[];   // chained kills, a beat apart
+  // the DG-2's Gunsmith kit (weapon-levels/wonder-kits.js) and its own camo challenges (camos.json alt, kino.camoTally)
+  const tally=(k,n=1)=>window.kino.camoTally?.('tesla_gun_zm',k,n);
+  let shotCount=0;
   function fire(){
     flash=1;   // the bulbs and arcs flare
-    const pap=!!session.weapon?.upgraded,t=pap?TUNE.pap:TUNE.base;
+    const def=session.def,has=a=>kitHas(def,a),dg=(def?.baseId??def?.id)==='tesla_gun_zm';
+    const pap=!!session.weapon?.upgraded,t={...(pap?TUNE.pap:TUNE.base)};
+    if(has('dg_conductor')){t.first*=1.5;t.arc*=1.5;}   // Long Conductor
+    if(has('dg_coil'))t.kills=Math.round(t.kills*1.6);   // Coil Stack
     const origin=camera.position.clone(),dir=camera.getWorldDirection(new THREE.Vector3());
     flux(.7);
     // first target: the zombie nearest the aim line
@@ -140,12 +147,31 @@ export default async function setup(api){
       for(const z of enemies.list){if(chain.includes(z))continue;const d=center(z).distanceTo(at);if(d<nd&&world.lineClear(at,center(z))){nd=d;next=z;}}
       if(!next)break;chain.push(next);from=next;
     }
-    chain.forEach((z,i)=>pending.push({z,from:i?chain[i-1]:null,at:i*.12}));
+    const feet=api.player.getFeetPosition();
+    const shot={dg,n:chain.length,max:t.kills,left:chain.length,kills:0,cells:has('dg_cells'),last:(session.weapon?.mag??1)===0,
+      far:first.root.position.distanceTo(feet)>=700,close:enemies.list.some(z=>z.root.position.distanceTo(feet)<=80),
+      prongs:has('dg_prongs')&&++shotCount%3===0};   // Storm Prongs: every third shot
+    chain.forEach((z,i)=>pending.push({z,from:i?chain[i-1]:null,at:i*.12,shot,i}));
+  }
+  function shotDone(s,at){
+    if(s.prongs&&!host.remoteDamage){   // a bolt from the sky where the chain began: everything within 200 dies
+      bolt(at.clone().addScaledVector(up,900).add(new THREE.Vector3((Math.random()-.5)*120,0,(Math.random()-.5)*120)),at,.45);flux(1,at);
+      play('projectile/impact/proj_impact',{gain:1,at});
+      for(const z of [...enemies.list])if(z.root.position.distanceTo(at)<200){enemies.hurt(z,1e6,false,false,'tesla');if(!enemies.list.includes(z))s.kills++;}}
+    if(!s.dg)return;
+    if(s.close&&s.kills)tally('dg_close');
+    if(s.n>=s.max&&s.kills>=s.n)tally('dg_max');
+    if(s.cells&&s.kills>=6&&session.weapon&&(session.def?.baseId??session.def?.id)==='tesla_gun_zm')
+      session.weapon.mag=Math.min(session.def.clipSize??3,(session.weapon.mag??0)+1);   // Recharge Cells: the bulb comes back
   }
   function zap(p){
     const c=center(p.z),a=p.from?center(p.from):muzzle();bolt(a,c);
     flux(p.from?.55:.7,c);play('projectile/impact/proj_impact',{gain:.8,at:c});
-    if(!host.remoteDamage&&enemies.list.includes(p.z))enemies.hurt(p.z,1e6,false,false,'tesla');
+    if(!host.remoteDamage&&enemies.list.includes(p.z)){enemies.hurt(p.z,1e6,false,false,'tesla');
+      const s=p.shot;if(s&&!enemies.list.includes(p.z)){s.kills++;
+        if(s.dg){if(p.i>0)tally('dg_arc');else if(s.far)tally('dg_long');if(s.last)tally('dg_last');}}}
+    if(p.shot&&--p.shot.left===0)shotDone(p.shot,p.shot.at??c);
+    if(p.shot&&p.i===0)p.shot.at=p.z.root.position.clone();
   }
 
   // ---- the DG-2's own lights: glowing bulbs (one goes dark per shot), pulsing tubes, the power

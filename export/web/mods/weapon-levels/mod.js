@@ -13,10 +13,11 @@ import { loadPrestige, savePrestige, loadPrestigeRules, weaponTier, grantMasterX
 import { openGunsmith } from './gunsmith-view.js';
 import { previewDef } from './gunsmith.js';
 import { foldAkimbo } from './akimbo.js';
+import { applyWonderKits, setupWonderKits } from './wonder-kits.js';
 import { loadCatalog, applyAttachments, grantWeaponXp, weaponProgress, xpToNext, maxLevel, available, renderGunsmith, GUNSMITH_CSS, migrateWeaponLevels, nextUnlock } from './gunsmith.js';
 
 // dual-wield pairs fold into their single gun's Akimbo attachment before anything reads the weapon list
-export function prepare(data){return foldAkimbo(data);}
+export async function prepare(data){await applyWonderKits(data);return foldAkimbo(data);}   // the wonder weapons' own kits (wonder-kits.js)
 
 export default async function setup(api){
   const {data,session,host,view,audio}=api;
@@ -147,7 +148,7 @@ export default async function setup(api){
   // Havoc charge that finishes a zombie after a swap still counts for it), and besides the plain gun causes a weapon
   // can name its own (KILL_CAUSES, or def.killCauses): the Wave Gun's 'wave', the DG-2's 'tesla', Winter's Howl
   // shatters, the ROC's and Havoc's blasts and fire. Grenades are still credited to a held launcher (known limit).
-  const KILL_CAUSES={microwavegun_zm:['wave'],tesla_gun_zm:['tesla'],freezegun_zm:['explosion'],roc_zm:['explosion','fire'],havoc_zm:['explosion','fire']};
+  const KILL_CAUSES={microwavegun_zm:['wave'],tesla_gun_zm:['tesla'],freezegun_zm:['explosion'],bo3_raygun_mk3:['mk3'],roc_zm:['explosion','fire'],havoc_zm:['explosion','fire']};
   const GUN_CAUSES=new Set(['bullet','projectile','thunder','flame','freeze']);
   const lastHit=new WeakMap();
   host.on('beforeEnemyDamage',e=>{if(e.enemy)lastHit.set(e.enemy,{cause:e.cause,id:session.weapon?.id});});
@@ -164,6 +165,18 @@ export default async function setup(api){
   const SHARED=new Set(['explosion','fire','melee','bullet']);   // causes grenades, perks and other guns deal too: never handed to a stowed gun
   const ownerOf=cause=>!cause||SHARED.has(cause)||GUN_CAUSES.has(cause)?null:session.inventory?.find(w=>causesOf(data.weapons[w.id],w.id).includes(cause))?.id;
   const LATE=20,recentOf=cause=>{if(cause!=='explosion'&&cause!=='fire')return null;const t=performance.now()/1000;return session.inventory?.find(w=>causesOf(data.weapons[w.id],w.id).includes(cause)&&t-(shotStance.get(w.id)?.t??-99)<LATE)?.id;};
+  function announceCamos(camos,id,def){
+    if(camos.length){const dia=camos.find(c=>c.classMastery),cls=window.kino.camoClass?.(id);
+      api.toast(dia?`Diamond camo unlocked for every ${cls??'gun in this class'} · equip it in the Gunsmith`:`${def.name} · ${camos.map(c=>c.name).join(', ')} camo unlocked · equip it in the Gunsmith`,6);}
+  }
+  // A gun's own camo challenges (camos.json alt, 2026-11-18: the wonder weapons): the gun's code counts its events,
+  // kino.camoTally('tesla_gun_zm','dg_arc',n). Not with cheats on; a form's id counts for its progressAs gun.
+  window.kino.camoTally=(gid,key,n=1)=>{
+    const gdef=data.weapons[gid];if(!gdef||!key||!(n>0)||cheating())return;
+    const id=data.weapons[gdef.progressAs]?gdef.progressAs:gid;profile=loadProfile();
+    announceCamos(countCamoKill(cats,profile,id,{tally:{[key]:n}},data.weapons),id,data.weapons[id]);save();
+  };
+  setupWonderKits(api);   // the Ray Gun kit's effects and its challenges
   host.on('kill',({enemy,head,melee,remote})=>{
     if(remote||(melee&&!data.weapons[session.weapon?.id]?.meleeXp)||cheating()||!session.weapon)return;   // (a melee weapon's own swings count for it: the Grave Bell)
     const hit=lastHit.get(enemy),cause=hit?.cause,held=hit?.id&&data.weapons[hit.id]?hit.id:session.weapon.id;
@@ -179,9 +192,7 @@ export default async function setup(api){
     profile=loadProfile();
     // camo challenges (any gun)
     const st=stance(),shot=cause!=='bullet'?shotStance.get(gid):null,late=shot&&now-shot.t<LATE?shot:null;
-    const camos=countCamoKill(cats,profile,id,{head,low:st.low||!!late?.low,moving:st.moving||!!late?.moving,multi,crowd},data.weapons);
-    if(camos.length){const dia=camos.find(c=>c.classMastery),cls=window.kino.camoClass?.(id);
-      api.toast(dia?`Diamond camo unlocked for every ${cls??'gun in this class'} · equip it in the Gunsmith`:`${def.name} · ${camos.map(c=>c.name).join(', ')} camo unlocked · equip it in the Gunsmith`,6);}
+    announceCamos(countCamoKill(cats,profile,id,{head,low:st.low||!!late?.low,moving:st.moving||!!late?.moving,multi,crowd},data.weapons),id,def);
     if(!available(cat,def,id).length){save();return;}
     const xp=(cat.xp.kill+(head?cat.xp.headshot:0))*(window.kino.xpMul?.('weaponXp')??window.kino.boost?.weaponXp??1),cap=maxLevel(cat,def,id),wasMax=weaponProgress(profile,id).level>=cap;
     const lvBefore=weaponProgress(profile,id).level,news=grantWeaponXp(cat,def,id,profile,xp);

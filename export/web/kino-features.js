@@ -61,13 +61,14 @@ export class KinoFeatures {
     for(const p of this.projectiles){if(!p.stuck||!(p.monkey||p.def.lure)||p.life<=0)continue;const d=z.root.position.distanceTo(p.mesh.position);if(d<distance&&d<(p.monkey?reach:1536)){nearest=p.mesh.position;distance=d;}}
     return nearest;
   }
-  blast(position,def,{playerDamage=true,score=true}={}){
+  blast(position,def,{playerDamage=true,score=true,direct=null}={}){   // direct: the zombie the projectile struck (kino.blastHooks)
     const radius=def.explosionRadius??200;
     this.effect(position,def.id==='ray_gun_zm'?0x8df565:0xffb347,25);this.audio.play('explosion',.6);
     const caught=[];
     for(const z of [...this.enemies.list]){const point=z.root.position.clone().addScaledVector(up,25),d=point.distanceTo(position);if(d<radius&&this.world.lineClear(position,point))caught.push(z),this.enemies.hurt(z,THREE.MathUtils.lerp(def.explosionInnerDamage,def.explosionOuterDamage,d/radius),false,false,'explosion',score);}
     const feet=this.player.getFeetPosition().addScaledVector(up,30),distance=feet.distanceTo(position);
-    if(playerDamage&&!this.session.perks?.has('specialty_flakjacket')&&distance<radius&&this.world.lineClear(position,feet))this.damage(Math.min(180,def.explosionInnerDamage)*(1-distance/radius));
+    if(playerDamage&&!def.noSelfSplash&&!this.session.perks?.has('specialty_flakjacket')&&distance<radius&&this.world.lineClear(position,feet))this.damage(Math.min(180,def.explosionInnerDamage)*(1-distance/radius));
+    for(const f of window.kino?.blastHooks??[])f({position,def,caught,direct});   // the Ray Gun kit (weapon-levels/wonder-kits.js)
     return caught;   // the zombies it reached (those gone from enemies.list were killed)
   }
   // a monkey's or claymore's blast plus its equipment augments (research mod: window.kino.equipAug / equipFx)
@@ -121,7 +122,7 @@ export class KinoFeatures {
             if(hit)this.enemies.hurt(hit.z,p.def.damage,hit.head,false,'projectile');
           }else{
             if(hit)this.enemies.hurt(hit.z,p.def.damage,hit.head,false,'explosion');
-            this.blast(p.mesh.position,p.def);this.remove(p,this.projectiles);continue;
+            this.blast(p.mesh.position,p.def,{direct:hit?.z});this.remove(p,this.projectiles);continue;
           }
         }else p.mesh.position.add(travel);
       }

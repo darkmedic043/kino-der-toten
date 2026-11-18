@@ -4,6 +4,7 @@
 // weapons whose special effects are added through mod events.
 import * as THREE from 'three';
 import { loadModel, loadAnimation } from '../../animation.js';
+import { kitHas } from '../weapon-levels/wonder-kits.js';
 
 const IDS=['microwavegundw_zm','microwavegun_zm','minigun_zm'];
 const UPGRADE_NAMES={microwavegundw_zm:"Porter's Zap Guns",microwavegun_zm:"Porter's Mark II Ray Gun"};
@@ -46,7 +47,19 @@ export default async function setup(api){
   const current=()=>session.weapon?.id;
 
   // Zap Guns: any hit kills.
-  host.on('beforeEnemyDamage',e=>{if(current()==='microwavegundw_zm'&&e.cause==='bullet'&&e.enemy)e.amount=Math.max(e.amount,e.enemy.health+1);});
+  host.on('beforeEnemyDamage',e=>{if(current()==='microwavegundw_zm'&&e.cause==='bullet'&&e.enemy)e.amount=Math.max(e.amount,e.enemy.health+1);
+    if(e.enemy)causeOf.set(e.enemy,{cause:e.cause,hand:session.lastHand});});
+  // the Wave Gun's own camo challenges (camos.json alt, kino.camoTally; the Zap Guns' progress is the Wave Gun's)
+  const causeOf=new WeakMap(),tally=(k,n=1)=>window.kino.camoTally?.('microwavegun_zm',k,n);
+  let swappedAt=-1e9;const handAt={left:-1e9,right:-1e9};
+  host.on('kill',({enemy,melee,remote})=>{
+    const id=current();if(!enemy||melee||remote||!pair[id])return;
+    const c=causeOf.get(enemy),now=performance.now();
+    if(now-swappedAt<3000&&(c?.cause==='wave'||c?.cause==='bullet'))tally('wv_swap');
+    if(id!=='microwavegundw_zm'||c?.cause!=='bullet')return;
+    tally('wv_zap');const h=c.hand==='left'?'left':'right';handAt[h]=now;
+    if(now-handAt[h==='left'?'right':'left']<1000){tally('wv_dual');handAt.left=handAt.right=-1e9;}   // one count per pair of kills
+  });
 
   // Wave Gun: a microwave cone that cooks every zombie in front of you.
   const waves=[];
@@ -59,7 +72,7 @@ export default async function setup(api){
   const WRITHE={j_spineupper:.1,j_spine4:.12,j_neck:.2,j_head:.3,j_clavicle_le:.15,j_clavicle_ri:.15,j_shoulder_le:.5,j_shoulder_ri:.5,j_elbow_le:.55,j_elbow_ri:.55,j_wrist_le:.4,j_wrist_ri:.4};
   const cooking=[];let cookSound=false,dingAt=-1;
   const v3=new THREE.Vector3(),jit=new THREE.Quaternion(),eul=new THREE.Euler();
-  function cook(z,forward){
+  function cook(z,forward,o={}){
     const body=z.root.children[0];if(!body||z.kind==='dog')return;
     const death=z.rig.actions.death;if(death){death.time=.04;death.timeScale=0;}
     z.life=99;cookSound=true;
@@ -75,7 +88,8 @@ export default async function setup(api){
     z.root.updateMatrixWorld(true);
     const ankleY=()=>ankles.reduce((a,b)=>a+b.getWorldPosition(v3).y,0)/(ankles.length||1);
     const up=session.weapon.upgraded;
-    cooking.push({z,t:0,D:up?.8+Math.random()*.5:1.1+Math.random()*.8,swell,writhe,ankles,ankleY,ground:ankles.length?ankleY():0,dir:forward.clone().setY(0).normalize(),steam:0});
+    tally('wv_cook');
+    cooking.push({z,t:0,D:(up?.8+Math.random()*.5:1.1+Math.random()*.8)*(o.fast?.5:1),pressure:!!o.pressure,swell,writhe,ankles,ankleY,ground:ankles.length?ankleY():0,dir:forward.clone().setY(0).normalize(),steam:0});
   }
   function unswell(c){for(const s of c.swell)s.b.scale.copy(s.base);for(const w of c.writhe)if(w.set)w.b.quaternion.copy(w.base);}
   function burst(c){
@@ -86,6 +100,8 @@ export default async function setup(api){
       for(let i=0;i<4;i++)fx.emit?.({key:'cloud',at:chest.clone().add(fx.jitter(10)),vel:fx.jitter(90).addScaledVector(c.dir,40),size:[14,Math.random()*20+40],life:.8+Math.random()*.5,fade:[.03,.7],color:0x7a0c08,opacity:.85,gravity:-60,drag:2.5,spin:Math.random()-.5});
       fx.emit?.({key:'smoke',at:chest.clone(),vel:new THREE.Vector3(0,25,0),size:[20,70],life:1.2,fade:[.05,.8],color:0xd8dde0,opacity:.4,drag:2});}
     window.kino?.dismemberment?.burst?.(z,c.dir);   // arms, legs and head fly off (BO1's gib models)
+    if(c.pressure&&!host.remoteDamage)for(const o of [...enemies.list])if(o.health>0&&o.root.position.distanceTo(z.root.position)<120){   // the Pressure Cooker: the burst cooks its neighbours (theirs don't chain)
+      enemies.hurt(o,o.health+1,false,false,'wave');if(o.state==='dead')cook(o,c.dir);}
     z.root.visible=false;z.life=Math.min(z.life,.05);
   }
   let lastShots=session.shots;
@@ -93,11 +109,15 @@ export default async function setup(api){
     if(session.shots!==lastShots){
       const fired=session.shots>lastShots;lastShots=session.shots;
       if(fired&&current()==='microwavegun_zm'){
-        const forward=camera.getWorldDirection(new THREE.Vector3()),range=session.weapon.upgraded?1400:1000;
+        // the Gunsmith kit (weapon-levels/wonder-kits.js): Twin Magnetron (50% further, cooks twice as fast), Wide Dish, Pressure Cooker
+        const def=session.def,has=a=>kitHas(def,a),mag=has('wv_magnetron'),o={fast:mag,pressure:has('wv_pressure')};
+        const forward=camera.getWorldDirection(new THREE.Vector3()),range=(session.weapon.upgraded?1400:1000)*(mag?1.5:1),dot=has('wv_dish')?.66:.78;
+        let cooked=0;
         for(const z of [...enemies.list]){
           const delta=z.root.position.clone().add(new THREE.Vector3(0,35,0)).sub(camera.position),d=delta.length();
-          if(d<range&&delta.normalize().dot(forward)>.78&&world.lineClear(camera.position,enemies.headPosition(z))){enemies.hurt(z,z.health+1,false,false,'wave');if(z.state==='dead')cook(z,forward);}
+          if(d<range&&delta.normalize().dot(forward)>dot&&world.lineClear(camera.position,enemies.headPosition(z))){enemies.hurt(z,z.health+1,false,false,'wave');if(z.state==='dead'){cook(z,forward,o);cooked++;}}
         }
+        if(cooked>=4)tally('wv_crowd');
         if(cookSound){cookSound=false;audio.play('moon/wpn/microwave/rifle/microwave_cooking',.7);}
         const ring=new THREE.Mesh(new THREE.ConeGeometry(60,160,24,1,true),new THREE.MeshBasicMaterial({color:0xbfe8ff,transparent:true,opacity:.35,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
         ring.position.copy(camera.position).addScaledVector(forward,120);ring.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),forward);scene.add(ring);waves.push({ring,forward,life:.45});
@@ -130,6 +150,7 @@ export default async function setup(api){
   const pair={microwavegundw_zm:'microwavegun_zm',microwavegun_zm:'microwavegundw_zm'};
   const {view}=api;let swap=null;
   function exchange(w,next){
+    swappedAt=performance.now();
     const nd=data.weapons[next],up=w.upgraded?{...nd,...nd.upgrade}:nd;
     const stash={mag:w.mag,reserve:w.reserve};
     // The first swap gives the other form the same share of its ammo as this one has left.

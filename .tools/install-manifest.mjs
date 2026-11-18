@@ -33,6 +33,7 @@ const OWN = [
   /^mods\/melon-weapons\/[^/]+\.glb$/,                             // fork originals: Debt Collector, Hive Launcher (.tools/build-debt-collector.py, build-hive-launcher.py)
   /^mods\/melee\/grave_bell_(view|world)\.glb$/,                   // fork original: the Grave Bell (.tools/build-grave-bell.py)
   /^mods\/bo3-weapons\/(parts\/(aw|mk3)_attachments\.glb|aw-kits\.json)$/,    // the AW guns' Gunsmith parts, built in Blender for this fork (.tools/build_aw_attachments.py, the GKZ-45 Mk3's .tools/build_mk3_attachments.py); not the guns
+  /^mods\/weapon-levels\/(parts\/wonder_attachments\.glb|wonder-mounts\.json)$/,    // the wonder weapons' Gunsmith parts (.tools/build_wonder_attachments.py); own models, not the guns
 ];
 // game code under these is still map-specific data (custom map folders hold a converted map, not code)
 const NEVER = [/^mods\/maps\/[^/]+\//];

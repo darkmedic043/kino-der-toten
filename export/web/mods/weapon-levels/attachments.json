@@ -2358,6 +2358,192 @@
       "slot": "ammo",
       "tags": [],
       "desc": "Custom: beam kills have a 1 in 4 chance to collapse into a small black hole where the zombie fell (at most one every 1.2 s)."
+    },
+    {
+      "id": "rg_canister",
+      "name": "Twin Canister",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom: a second green energy canister clamped beside the first. Magazine +50%.",
+      "stats": {"clipMul": 1.5}
+    },
+    {
+      "id": "rg_accelerator",
+      "name": "Particle Accelerator",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom: copper rings round the emitter. Bolts fly 80% faster and hit 50% harder on a direct hit.",
+      "stats": {"projectileMul": 1.8, "damageMul": 1.5}
+    },
+    {
+      "id": "rg_lens",
+      "name": "Wide Splash Lens",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom: a ribbed glass lens on the muzzle. The splash is 75% wider, and your own splash can no longer hurt you.",
+      "stats": {"blastMul": 1.75, "set": {"noSelfSplash": true}}
+    },
+    {
+      "id": "rg_coil",
+      "name": "Overclock Coil",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom: a glowing coil in the grip. Fires 30% faster and reloads 20% faster.",
+      "stats": {"fireMul": 1.3, "reloadMul": 0.8}
+    },
+    {
+      "id": "rg_venom",
+      "name": "Venom Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: each bolt's splash leaves a toxic green pool for 3 s that eats at every zombie standing in it."
+    },
+    {
+      "id": "tg_chamber",
+      "name": "Third Air Chamber",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom: an extra brass air tank on the side. Magazine +50% (3 blasts, 6 Pack-a-Punched).",
+      "stats": {"clipMul": 1.5}
+    },
+    {
+      "id": "tg_turbine",
+      "name": "Gale Turbine",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom: a fan cage over the barrel. Zombies the blast flings knock down and kill the zombies they crash into."
+    },
+    {
+      "id": "tg_choke",
+      "name": "Storm Choke",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom: a flared bell on the muzzle. The blast reaches 50% further (900 units).",
+      "stats": {"set": {"thunderRange": 900}}
+    },
+    {
+      "id": "tg_bellows",
+      "name": "Pressure Bellows",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom: leather bellows on the back. Reloads 40% faster and fires 30% faster.",
+      "stats": {"reloadMul": 0.6, "fireMul": 1.3}
+    },
+    {
+      "id": "tg_static",
+      "name": "Static Air",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: the blast's edge carries a charge. Zombies just outside the kill cone, up to 40% beyond its reach and to the sides, are stunned for 3 s."
+    },
+    {
+      "id": "wh_tank",
+      "name": "Cryo Reservoir",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom: a frosted tank of liquid nitrogen. Magazine +50%.",
+      "stats": {"clipMul": 1.5}
+    },
+    {
+      "id": "wh_coil",
+      "name": "Permafrost Coil",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom: a frost coil round the barrel. Statues stand for 25 s instead of 12, and zombies the blast doesn't kill slow to a crawl."
+    },
+    {
+      "id": "wh_nozzle",
+      "name": "Blizzard Nozzle",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom: a wide frosted nozzle. The freezing blast is 40% wider and reaches 30% further."
+    },
+    {
+      "id": "wh_compressor",
+      "name": "Shard Compressor",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom: a compressor on the back. Shattering statues throw ice 60% further for twice the damage, and walking into a statue shatters it instead of crumbling it."
+    },
+    {
+      "id": "wh_frostbite",
+      "name": "Frostbite Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: zombies killed by a statue's flying ice freeze into statues of their own, so shatters can chain."
+    },
+    {
+      "id": "dg_rack",
+      "name": "Fourth Bulb",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom: a fourth glass bulb on the rack. One more shot per load (8 Pack-a-Punched).",
+      "stats": {"clipMul": 1.34}
+    },
+    {
+      "id": "dg_conductor",
+      "name": "Long Conductor",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom: a longer copper conductor. Reaches its first zombie from 50% further, and every arc jumps 50% further."
+    },
+    {
+      "id": "dg_prongs",
+      "name": "Storm Prongs",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom: forked prongs on the muzzle. Every third shot calls lightning down on its first zombie, killing everything within 200 units."
+    },
+    {
+      "id": "dg_coil",
+      "name": "Coil Stack",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom: a stack of coils behind the bulbs. Each shot chains through 60% more zombies (16, or 38 Pack-a-Punched)."
+    },
+    {
+      "id": "dg_cells",
+      "name": "Recharge Cells",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: a shot that kills 6 or more gives its bulb back."
+    },
+    {
+      "id": "wv_cells",
+      "name": "Ion Cell Pack",
+      "slot": "mag",
+      "tags": [],
+      "desc": "Custom: ion cells on the gun, and on both Zap Guns when split. Magazine +50% in both forms.",
+      "stats": {"clipMul": 1.5}
+    },
+    {
+      "id": "wv_magnetron",
+      "name": "Twin Magnetron",
+      "slot": "barrel",
+      "tags": [],
+      "desc": "Custom: a second magnetron on top. The wave reaches 50% further and cooks zombies twice as fast."
+    },
+    {
+      "id": "wv_dish",
+      "name": "Wide Dish",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Custom: a wide emitter dish. The wave's cone is about 40% wider."
+    },
+    {
+      "id": "wv_capacitor",
+      "name": "Zap Capacitors",
+      "slot": "stock",
+      "tags": [],
+      "desc": "Custom: capacitors on both Zap Guns. Both forms fire 30% faster.",
+      "stats": {"fireMul": 1.3, "fireLeftMul": 1.3}
+    },
+    {
+      "id": "wv_pressure",
+      "name": "Pressure Cooker",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Custom: a cooked zombie's burst cooks every zombie within 120 units, so a crowd goes up one after another."
     }
   ],
   "ironSights": {
