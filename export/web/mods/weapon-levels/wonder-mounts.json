@@ -1,0 +1,83 @@
+{
+ "_v": "1",
+ "ray_gun_zm": {
+  "rg_canister": [
+   {"node": "part_rg_canister", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "rg_accelerator": [
+   {"node": "part_rg_accelerator", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "rg_lens": [
+   {"node": "part_rg_lens", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "rg_coil": [
+   {"node": "part_rg_coil", "tag": "j_gun", "at": [0,0,0]}
+  ]
+ },
+ "thundergun_zm": {
+  "tg_chamber": [
+   {"node": "part_tg_chamber", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "tg_choke": [
+   {"node": "part_tg_choke", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "tg_turbine": [
+   {"node": "part_tg_turbine", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "tg_bellows": [
+   {"node": "part_tg_bellows", "tag": "j_gun", "at": [0,0,0]}
+  ]
+ },
+ "freezegun_zm": {
+  "wh_tank": [
+   {"node": "part_wh_tank", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "wh_nozzle": [
+   {"node": "part_wh_nozzle", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "wh_coil": [
+   {"node": "part_wh_coil", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "wh_compressor": [
+   {"node": "part_wh_compressor", "tag": "j_gun", "at": [0,0,0]}
+  ]
+ },
+ "tesla_gun_zm": {
+  "dg_rack": [
+   {"node": "part_dg_rack", "tag": "tag_weapon", "at": [0,0,0], "scale": 4}
+  ],
+  "dg_conductor": [
+   {"node": "part_dg_conductor", "tag": "tag_weapon", "at": [0,0,0], "scale": 4}
+  ],
+  "dg_prongs": [
+   {"node": "part_dg_prongs", "tag": "tag_weapon", "at": [0,0,0], "scale": 4}
+  ],
+  "dg_coil": [
+   {"node": "part_dg_coil", "tag": "tag_weapon", "at": [0,0,0], "scale": 4}
+  ]
+ },
+ "microwavegun_zm": {
+  "wv_cells": [
+   {"node": "part_wv_cells", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "wv_dish": [
+   {"node": "part_wv_dish", "tag": "j_gun", "at": [0,0,0]}
+  ],
+  "wv_capacitor": [
+   {"node": "part_wv_cap_r", "tag": "j_rear_gun", "at": [0,0,0]}
+  ],
+  "wv_magnetron": [
+   {"node": "part_wv_magnetron", "tag": "j_gun", "at": [0,0,0]}
+  ]
+ },
+ "microwavegundw_zm": {
+  "wv_cells": [
+   {"node": "part_wv_cells_r", "tag": "j_gun", "at": [0,0,0], "hand": "right"},
+   {"node": "part_wv_cells_l", "tag": "j_gun1", "at": [0,0,0], "hand": "left"}
+  ],
+  "wv_capacitor": [
+   {"node": "part_wv_cap_r", "tag": "j_gun", "at": [0,0,0], "hand": "right"},
+   {"node": "part_wv_cap_l", "tag": "j_gun1", "at": [0,0,0], "hand": "left"}
+  ]
+ }
+}

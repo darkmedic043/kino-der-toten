@@ -29,8 +29,9 @@ export async function applyWonderKits(data){
   for(const [id,k] of Object.entries(KITS)){
     const d=data.weapons?.[id];if(!d)continue;const kit=KITS[k.as]??k;
     for(const x of [d,d.upgrade]){if(!x)continue;
-      // the Pack-a-Punched gun: its own placements when it has its own model (Ray Gun, DG-2), else the base gun's
-      const m=x===d?placed[id]:placed[id+':upgrade']??(!x.model||x.model===d.model?placed[id]:null);
+      // the Pack-a-Punched gun: its own placements if listed, else the base gun's (the Ray Gun's and DG-2's upgraded models
+      // share the base geometry and bones)
+      const m=x===d?placed[id]:placed[id+':upgrade']??placed[id];
       Object.assign(x,{statAttachments:kit.ids,gunsmithPad:false,mounts:mountsOf(m),slotNames:kit.slots});}
   }
 }

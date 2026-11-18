@@ -290,6 +290,26 @@ vec3 camoTexTri(vec2 off){ vec3 c=camoPlanar(camoMap,off);return camoBlend>0.?mi
   m.needsUpdate=true;matCache.set(key,m);return m;
 }
 export const isBody=m=>!!m&&!SKIP.test((m.name??'').replace(/raygun_mk3/g,'raygun'))&&!!m.map&&!wrapOf(m.name)?.skip;   // the GKZ-45 Mk3's own materials hit `_mk` (user 2026-11-18: no camo showed)
+// Vital parts keep their own look under every camo (user 2026-11-18: "not affecting the magazine nd other vital parts like
+// the meter on the raygun"): materials of their own (the Ray Gun's canisters, Winter's Howl's cryo canisters, the DG-2's
+// bulbs and power line, the Thundergun's chamber and wires, the Mk3's orb and energy parts, gauges and dials) ...
+const VITAL=/ray_gun_battery|freeze_gun_ammo|dg2_(bulb|power)|thundergun_(chamber|wires|mesh)|mk3_rh_rear_off|mk3_.*cradle|mk3_lh_front_e|gauge|dialface/;
+// ... and parts painted with the body's material, found by the bone that carries them: magazines on every gun (tag_clip
+// and the bigger mags), the Ray Gun's meter (tag_switch, its needle j_arrow, the knob tag_knob) and battery, the
+// Thundergun's canisters (tag_clip2), Winter's Howl's ammo drum (j_ammo), the Wave Gun's needles, the DG-2's bulbs
+const VITAL_BONE=/^(tag_clip\d?|tag_ext_clip|tag_extended_clip|tag_clip_extended|tag_dual_clip|tag_double_clip|tag_duel_clip|tag_drum|tag_switch|j_arrow|tag_knob|tag_battery_\d|j_ammo|j_needle\d?|tag_bulb_\d)$/;
+const vitalCache=new WeakMap();
+// a skinned mesh's main bone: the one most of its indexed vertices hang on (a few hundred sampled)
+function vitalPart(o){
+  if(vitalCache.has(o))return vitalCache.get(o);
+  let res=false;const g=o.geometry,si=g?.attributes.skinIndex,sw=g?.attributes.skinWeight;
+  if(o.isSkinnedMesh&&si&&sw&&o.skeleton){
+    const n=g.index?g.index.count:si.count,step=Math.max(1,Math.floor(n/400)),votes=new Map();
+    for(let j=0;j<n;j+=step){const i=g.index?g.index.getX(j):j;let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}votes.set(best,(votes.get(best)??0)+1);}
+    let top=-1,tv=0;for(const [b,v] of votes)if(v>tv){tv=v;top=b;}
+    res=VITAL_BONE.test(o.skeleton.bones[top]?.name??'');}
+  vitalCache.set(o,res);return res;
+}
 // Paint `root` with `camo` (an entry from camos.json) or restore it (null).
 export function applyCamo(root,camo){
   // charms and gun screens (userData.charm, mods/charms) hang under the gun but keep their own materials (2026-11-08: the
@@ -298,7 +318,7 @@ export function applyCamo(root,camo){
   if(root)walk(root,o=>{
     if(!o.isMesh)return;
     const list=Array.isArray(o.material)?o.material:[o.material];
-    const next=list.map(m=>{const orig=m?.userData?.camoOf??m;if(!isBody(orig))return m;return camo?camoMaterial(orig,camo):orig;});
+    const vital=vitalPart(o),next=list.map(m=>{const orig=m?.userData?.camoOf??m;if(!isBody(orig))return m;if(VITAL.test(orig.name??""))return orig;return camo&&!vital?camoMaterial(orig,camo):orig;});
     o.material=Array.isArray(o.material)?next:next[0];
   });
   if(root?.userData?.kinoStickers)restick(root);   // stickers (mods/stickers) sit on top of whatever camo the gun has
