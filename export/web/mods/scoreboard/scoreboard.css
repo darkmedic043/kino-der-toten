@@ -46,6 +46,16 @@
 #scoreboard .sb-parts i.placed b{background:#3a372a;border-color:#c9a23a;color:#e6c35a}
 #scoreboard .sb-parts i.placed u{color:#c9a23a}
 #scoreboard .sb-build em{display:block;font-style:normal;font-size:10px;letter-spacing:.2em;color:#9a9a96}
+#scoreboard .sb-track{min-width:260px;padding:7px 12px 8px;border-left:3px solid var(--c);background:#26262499}
+#scoreboard .sb-track span{display:flex;justify-content:space-between;gap:12px;font-size:9px;letter-spacing:.26em;color:#9a9a96;text-transform:uppercase}
+#scoreboard .sb-track span i{font-style:normal;color:#dededa;letter-spacing:.12em}
+#scoreboard .sb-track b{display:block;margin-top:3px;font:600 17px/1.1 Impact,'Arial Narrow',sans-serif;letter-spacing:.05em;color:#dededa}
+#scoreboard .sb-track em{display:block;margin-top:1px;font-style:normal;font-size:12px;letter-spacing:.08em;color:var(--c)}
+#scoreboard .sb-track small{display:block;margin-top:4px;font-size:11px;letter-spacing:.04em;color:#9a9a96}
+#scoreboard .sb-bar{position:relative;height:5px;margin:6px 0 2px;background:#ffffff1c}
+#scoreboard .sb-bar u{position:absolute;left:0;top:0;bottom:0;background:var(--c)}
+#scoreboard .sb-bar i{position:absolute;top:-2px;width:2px;height:9px;margin-left:-1px;background:#ffffff40}
+#scoreboard .sb-bar i.done{background:var(--m)}
 #scoreboard .sb-none{color:#6d6d68;font-size:12px;letter-spacing:.08em}
 body.touch-mode #scoreboard .sb-panel{gap:6px;max-height:96vh;overflow:hidden}
 body.touch-mode #scoreboard .sb-head h2{font-size:24px}

@@ -277,6 +277,7 @@ All other fork files are new: `home.*`, `zombies.*`, `custom-world.js`,
 - `world.slideMover(id, to 0..1, seconds, now)`, `world.enableMover(id, on)`: drive a `manual` `MOVER_` platform (movers.json `manual: true`); `enableMover(id,false)` hides it and removes its collision. Resets restore them.
 - `kino.exfil.status()` / `.start()` (mods/exfil): the exfil window and run; `kino.classes.grantXp(n)` / `kino.progression.grant(n)`: class and account XP from other mods.
 - `kino.scoreboard.addCollectible({id, label, value(), done?()})`: a tile in the Tab scoreboard's collectibles strip.
+- `kino.scoreboard.addTracker({id, label, state()})`: a live card in the Tab scoreboard's TASKS strip, above the collectibles. `state()` returns null (hidden) or `{title, value, when?, detail?, color?, progress?: 0..1, marks?: [{at, color, done}]}`; T.E.D.D. Tasks registers one.
 - `host.prompts.push({find(camera) -> {text, distance} | null, use() -> bool})` (any map, `host` = the mod's host): a use prompt the engine shows as `F <text>` when it is the nearest; F calls `use()`. The terminal booth's desktop uses it.
 
 ## Scoreboard (`mods/scoreboard`)

@@ -149,6 +149,7 @@ export default async function setup(api) {
   });
   host.on('beforeDamage', e => { if (run?.task.streak && e.amount > 0) run.streak = 0; });
   host.on('update', dt => {
+    board();
     subscribe();
     if (session.phase === 'gameover') { if (run) { run = null; ring.removeFromParent(); } drawHud(); return; }
     if (!run && booths().length && session.round >= next) newOffer();
@@ -160,6 +161,25 @@ export default async function setup(api) {
     drawHud();
   });
   host.on('reset', () => { next = FIRST; offer = null; last = null; if (run) { run = null; ring.removeFromParent(); } drawHud(); });
+
+  // ---- Tab board (user 2026-11-17: "can you add task tracking in the tab menu"): the running task, an offer waiting, or the next one's round
+  const fmt = n => Math.round(n).toLocaleString();
+  function boardState() {
+    if (!booths().length) return null;   // no terminals on this map: no tasks
+    if (run) {
+      const t = tierOf(run.task, run.count), goal = run.task.tiers[Math.min(3, t + 1)], max = run.task.tiers[3], out = run.task.zone && !inZone();
+      return { title: run.task.name, when: clock(Math.ceil(Math.max(0, run.ends - session.time))) + ' LEFT', color: t >= 0 ? TIERS[t].color : '#7dffa6',
+        value: `${run.count} / ${goal} ${run.task.unit}${t >= 0 ? ' · ' + TIERS[t].name : ''}`, progress: run.count / max,
+        marks: run.task.tiers.map((v, i) => ({ at: v / max, color: TIERS[i].color, done: run.count >= v })),
+        detail: out ? 'Get back in the ring: kills outside it do not count.' : run.task.streak ? `Current chain ${run.streak}. ${run.task.text}` : t >= 3 ? 'Legendary reached.' : `${goal - run.count} more for ${TIERS[t + 1].name}. ${run.task.text}` };
+    }
+    const lastLine = last ? `Last task: ${last.task.name}, ${last.tier >= 0 ? TIERS[last.tier].name : 'failed'} (${last.count}, round ${last.round}).` : '';
+    if (offer) return { title: offer.task.name, when: 'OFFER WAITING', value: `${fmt(teddPrice(session.round))} POINTS AT ANY TERMINAL`, detail: [offer.task.text, lastLine].filter(Boolean).join(' ') };
+    return { title: 'NO TASK', when: `NEXT OFFER ROUND ${next}`, color: '#6c6c68', value: next > session.round ? `${next - session.round} ROUND${next - session.round > 1 ? 'S' : ''} TO GO` : 'SOON', detail: lastLine || 'Tasks are offered in TASKS.EXE on the terminals.' };
+  }
+  let onBoard = false;
+  const board = () => { if (!onBoard && window.kino.scoreboard?.addTracker) { onBoard = true; window.kino.scoreboard.addTracker({ id: 'tedd', label: 'T.E.D.D. TASK', state: boardState }); } };
+  board();
 
   const info = t => ({ id: t.id, name: t.name, text: t.text, unit: t.unit, tiers: t.tiers, zone: !!t.zone, streak: !!t.streak });
   window.kino.tedd = {

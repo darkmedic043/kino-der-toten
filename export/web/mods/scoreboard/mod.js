@@ -7,13 +7,16 @@
 // A quick tap (touch buttons send a synthetic Tab) toggles it instead of holding.
 // (A quests section with Tab + 1-9 tracking was here for a day; the user found the board weird with it, 2026-10-19:
 // quests and tracking live in the journal, the board shows what you have collected.)
+// TASKS strip (user 2026-11-17: "can you add task tracking in the tab menu"): live trackers mods register above the collectibles
+//   kino.scoreboard.addTracker({id, label, state(): null | {title, value, when?, detail?, color?, progress?: 0..1, marks?: [{at: 0..1, color, done}]}})
+//   (null hides it; T.E.D.D. Tasks registers one: the running task, an offer waiting, or the next offer's round)
 export default async function setup(api){
   const {host,session,world,mod}=api;
   const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('scoreboard.css',mod.url).href;document.head.append(css);
   const root=document.createElement('div');root.id='scoreboard';document.body.append(root);
   const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const collectibles=new Map();
-  window.kino.scoreboard={addCollectible(def){collectibles.set(def.id,def);return def;},removeCollectible(id){collectibles.delete(id);},get:id=>collectibles.get(id)};   // get: the journal reads maps' tiles (The Giant)
+  const collectibles=new Map(),trackers=new Map();
+  window.kino.scoreboard={addCollectible(def){collectibles.set(def.id,def);return def;},removeCollectible(id){collectibles.delete(id);},addTracker(def){trackers.set(def.id,def);return def;},removeTracker(id){trackers.delete(id);},get:id=>collectibles.get(id)};   // get: the journal reads maps' tiles (The Giant)
 
   // ---- stats ---------------------------------------------------------------------------------------
   let downs=0,revives=0,lastPhase=session.phase;
@@ -38,17 +41,20 @@ export default async function setup(api){
   const row=(i,name,s,cls,tag,av,tt)=>`<tr class="${cls}"><td class="sb-n">${i}</td><td><div class="sb-who"><i>${av}</i><div>${esc(name)}${tt?`<small>${esc(tt)}</small>`:''}${tag?`<em>${tag}</em>`:''}</div></div></td><td class="sb-score">${s?s.p.toLocaleString():'—'}</td><td>${s?s.k:'—'}</td><td>${s?s.d:'—'}</td><td>${s?s.r??0:'—'}</td><td>${s?s.h:'—'}</td></tr>`;
   const tile=(label,value,done,cls='',style='')=>`<div class="sb-tile${done?' done':''}${cls?' '+cls:''}"${style?` style="${style}"`:''}><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
   const build=(label,parts,value,done)=>`<div class="sb-tile sb-build${done?' done':''}"><span>${esc(label)}</span><div class="sb-parts">${parts.map(p=>`<i class="${esc(p.state)}" title="${esc(p.label)}"><b>${esc(p.short??p.label.slice(0,2))}</b><u>${esc(p.label)}</u></i>`).join('')}</div><em>${esc(value)}</em></div>`;
+  const track=(c,s)=>`<div class="sb-track" style="--c:${esc(s.color||'#7dffa6')}"><span>${esc(c.label)}${s.when?`<i>${esc(s.when)}</i>`:''}</span><b>${esc(s.title)}</b><em>${esc(s.value)}</em>${s.progress!=null?`<div class="sb-bar"><u style="width:${(Math.max(0,Math.min(1,s.progress))*100).toFixed(1)}%"></u>${(s.marks??[]).map(m=>`<i class="${m.done?'done':''}" style="left:${(m.at*100).toFixed(1)}%;--m:${esc(m.color||'#fff')}"></i>`).join('')}</div>`:''}${s.detail?`<small>${esc(s.detail)}</small>`:''}</div>`;
   function html(){
     const net=window.kino.coop,me=mine(),rows=[row(1,localName()||'You',me,'me',net?.id&&net.id===net.hostId?'HOST':'',avatar(localName()),window.kino.cosmetics?.equipped?.title?.title)];
     for(const p of net?.players?.values?.()??[]){if(p.id===net.id)continue;rows.push(row(rows.length+1,p.name,peers.get(p.id),'',p.id===net.hostId?'HOST':'',emblemImg(window.kino.emblemOf?.(window.kino.coopInfo?.(p.id)?.em))??esc((p.name||'?')[0].toUpperCase()),window.kino.titleOf?.(window.kino.coopInfo?.(p.id)?.tt)));}
     const tiles=[];
     for(const g of world?.eggs?.values?.()??[]){const found=g.items.filter(i=>i.found).length;tiles.push(tile('Easter egg · '+g.name,`${found} / ${g.items.length}`,!!g.done));}
     for(const c of collectibles.values()){let v='',done=false,parts=null;try{v=c.value();done=!!c.done?.();parts=c.parts?.();}catch{}tiles.push(parts?build(c.label,parts,v,done):tile(c.label,v,done));}
+    const tracks=[];for(const c of trackers.values()){let s=null;try{s=c.state();}catch{}if(s)tracks.push(track(c,s));}
     const objective=document.getElementById('moon-objective')?.textContent?.trim();
     return `<div class="sb-panel"><div class="sb-head"><div><small>${net?.id?'CO-OP':'SOLO'}</small><h2>${esc(mapTitle())}</h2></div>
       <div class="sb-meta"><div><b>${clock()}</b><span>TIME</span></div><div class="sb-round"><b>${session.round}</b><span>ROUND</span></div></div></div>
       ${objective?`<p class="sb-objective">${esc(objective)}</p>`:''}
       <table><thead><tr><th></th><th>PLAYER</th><th>SCORE</th><th>KILLS</th><th>DOWNS</th><th>REVIVES</th><th>HEADSHOTS</th></tr></thead><tbody>${rows.join('')}</tbody></table>
+      ${tracks.length?`<div class="sb-collect sb-tasks"><h3>TASKS</h3><div class="sb-tiles">${tracks.join('')}</div></div>`:''}
       <div class="sb-collect"><h3>COLLECTIBLES</h3><div class="sb-tiles">${tiles.join('')||'<span class="sb-none">Nothing collected yet</span>'}</div></div></div>`;
   }
 
