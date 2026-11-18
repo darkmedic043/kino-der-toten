@@ -35,8 +35,9 @@ const SIG_NODES = 400;  // nodes sampled for the rest signature
 const HIDE_AFTER = 2, VISIBLE_BUDGET = 64, HIDDEN_BUDGET = 512, JUMP = 100, STALE_MOVE = 48;
 
 let main = false;       // true while the world scene is drawn with the main camera
+let skipBaked = false;   // set around a shadow pass by its owner (api.skipBaked)
 const baseIntersects = THREE.Frustum.prototype.intersectsObject;
-THREE.Frustum.prototype.intersectsObject = function (o) { return main && o.userData.occluded === true ? false : baseIntersects.call(this, o); };
+THREE.Frustum.prototype.intersectsObject = function (o) { return (main && o.userData.occluded === true) || (skipBaked && o.userData.shadowBaked === true) ? false : baseIntersects.call(this, o); };
 
 const _b = new THREE.Box3(), _v = new THREE.Vector3(), _pv = new THREE.Matrix4(), _fr = new THREE.Frustum(), _m16 = new Float32Array(16);
 // (a mesh with its own render callbacks is left alone: it may do its work there, and would stop when hidden)
@@ -172,7 +173,7 @@ export function createVisCull(renderer, scene) {
   function signature(g) {
     let s = 0; const n = g.nodes;
     for (let i = 0; i < n.length; i++) { const e = n[i].matrixWorld.elements; s += (e[12] + e[13] * 1.7 + e[14] * 2.3 + e[0] * 31 + e[5] * 37 + e[10] * 41) * (1 + i % 13); }
-    for (let i = 0; i < g.meshes.length; i++) s += g.meshes[i].geometry.attributes.position.version * 7;   // (a mesh redrawn by rewriting its vertices)
+    for (let i = 0; i < g.meshes.length; i++) { const p = g.meshes[i].geometry.attributes.position; s += (p.version ?? p.data?.version ?? 0) * 7; }   // (a mesh redrawn by rewriting its vertices)
     return s;
   }
   function show(g) { if (!g.hidden) return; flips++; g.hidden = false; g.strikes = 0; for (const m of g.meshes) m.userData.occluded = false; }
@@ -255,6 +256,7 @@ export function createVisCull(renderer, scene) {
     start, update,
     add(root) { if (!root || known.has(root)) return; if (!started) { explicit.push(root); return; } const ms = meshesOf(root, []); if (ms.length) register([root], ms, true); },
     wake(node) { if (!node) return; let o = node; for (let i = 0; o && i < 40; i++, o = o.parent) { const g = byNode.get(o); if (g) { wakeGroup(g); break; } } node.traverse?.(c => { const g = byNode.get(c); if (g && (g.rest || g.hidden)) wakeGroup(g); }); },
+    skipBaked(on) { skipBaked = !!on; },   // a shadow pass that leaves out meshes whose shadow is already in a draw-once map (userData.shadowBaked; a map's sun, gorod-krovi/sun.js)
     exclude(node) { if (!node) return; node.userData.noVisCull = true; node.traverse(c => { const g = byNode.get(c); if (g) { const i = groups.indexOf(g); if (i >= 0) drop(i); } }); },
     stats() { let resting = 0, hidden = 0, hm = 0; for (const g of groups) { resting += +g.rest; if (g.hidden) { hidden++; hm += g.meshes.length; } } return { groups: groups.length, resting, hidden, hiddenMeshes: hm, inView, tested, pending: pq.length - ph, flips }; },
     describe(limit = 40) { return groups.map(g => ({ name: g.roots[0].name || g.roots[0].parent?.name || g.roots[0].type, roots: g.roots.length, meshes: g.meshes.length, rigged: g.meshes.filter(m => m.isSkinnedMesh).length, size: Math.round(diag(g.box)), rest: g.rest, hidden: g.hidden, occl: g.occl })).sort((a, b) => b.meshes - a.meshes).slice(0, limit); },

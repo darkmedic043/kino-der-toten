@@ -108,6 +108,52 @@ export function setupSun(api, { key, dir, regions = [], sky = null }) {
     for (const c of dy) tag(c, false);
   }
 
+  // ---- resting props are drawn into the static map (2026-11-18) -----------------------------------------------------
+  // The dynamic map redrew every prop near the camera each frame: the window boards and the rigged quest props, about
+  // 1,000 shadow casters that never move, 180-400 draw calls a frame (45% of the frame's calls). The engine's visibility
+  // culler knows which groups are at rest: those are drawn into the static map with the town and left out of the dynamic
+  // pass (userData.shadowBaked, vis-cull.js skipBaked) until one moves or changes what it shows; it then goes back to the
+  // dynamic map at once and the static map is redrawn without it a moment later. A group that does this twice stays dynamic.
+  // The quest props and booths go in as soon as they rest and get two chances; window boards one (a window under attack
+  // keeps changing); anything else (perk machines, wall guns, an idle teammate) must have rested for 15 s and gets one;
+  // zombies, the map's own movers and what the static root already holds never.
+  const BAKE = /^(gk_scene_|gk_bridge|terminal_booth)/, SOON = /^window_boards/, NEVER = /^(zombie|gorod-dragon|gk_dogfight|gk_scene_chand|gk_scene_chain|character_mannequin|DOOR_|machine_|booths_)/, baked = new Map();
+  let bakeOn = !q('noBake'), dirtyFast = 0, dirtySlow = 0;
+  const topOf = o => { while (o.parent && o.parent !== scene) o = o.parent; return o; };
+  const visSig = g => { let s = 0; for (let i = 0; i < g.meshes.length; i++) { let v = 0; for (let o = g.meshes[i]; o && o.visible; o = o.parent) if (o.parent === scene) { v = 1; break; } s += v * (i % 31 + 1); } return s; };   // which meshes show (boards come and go by .visible; a removed prop shows nothing)
+  const wanted = (g, now) => { if (!g.rest) return false; const n = g.sunName ??= topOf(g.roots[0]).name || '';
+    if (NEVER.test(n)) return false;
+    return BAKE.test(n) ? (g.sunWakes || 0) < 2 : !g.sunWakes && (SOON.test(n) || (g.sunRest > 0 && now - g.sunRest > 15000)); };
+  function unbake(g, own) { baked.delete(g); for (const m of g.meshes) m.userData.shadowBaked = false; if (own) g.sunWakes = (g.sunWakes || 0) + 1; }
+  let bakeGen = 0;
+  const _bc = new THREE.Vector3(), _bs = new THREE.Vector3();
+  function inMap(g) {   // wholly inside the static map (outside it nothing is shadowed: such a prop stays in the dynamic map)
+    const c = key.shadow.camera, v = g.box.getCenter(_bc).applyMatrix4(c.matrixWorldInverse), r = g.box.getSize(_bs).length() / 2;
+    return Math.abs(v.x - (c.left + c.right) / 2) <= (c.right - c.left) / 2 - r && Math.abs(v.y - (c.top + c.bottom) / 2) <= (c.top - c.bottom) / 2 - r && -v.z >= c.near && -v.z <= c.far;
+  }
+  const shown = r => { for (let o = r; o && o.visible; o = o.parent) if (o.parent === scene) return true; return false; };   // (the pass checks from the root down only)
+  function bakeList() {   // at a static draw: the roots of the groups at rest
+    for (const g of baked.keys()) for (const m of g.meshes) m.userData.shadowBaked = false;
+    baked.clear(); dirtyFast = dirtySlow = 0; bakeGen++;
+    const vc = globalThis.kino?.visCull, out = [];
+    if (!bakeOn || !vc?.enabled || !vc.skipBaked) return out;
+    key.shadow.updateMatrices(key);
+    const now = performance.now();
+    for (const g of vc.groups) { if (!wanted(g, now)) continue; const s = visSig(g);
+      if (!s || !inMap(g) || !g.roots.every(shown)) { g.sunNo = bakeGen; continue; }
+      baked.set(g, s); for (const m of g.meshes) m.userData.shadowBaked = true; for (const r of g.roots) out.push(r); }
+    return out;
+  }
+  function bakeCheck(slow, now) {
+    const vc = globalThis.kino?.visCull;
+    for (const [g, s] of baked) if (!g.rest || !vc?.enabled) { unbake(g, !g.rest); dirtyFast ||= now; } else if (slow && visSig(g) !== s) { unbake(g, true); dirtySlow ||= now; }
+    // came to rest since the last static draw: into the next one (soon while nothing is in yet, as after loading)
+    if (slow && vc) for (const g of vc.groups) { if (!g.rest) g.sunRest = 0; else if (!g.sunRest) g.sunRest = now; }
+    if (slow && bakeOn && !dirtySlow && vc?.enabled && vc.skipBaked) for (const g of vc.groups) if (!baked.has(g) && g.sunNo !== bakeGen && wanted(g, now)) { dirtySlow = now; break; }
+    const since = now - lastStatic;
+    if ((dirtyFast && now - dirtyFast > 1500 && since > 4000) || (dirtySlow && now - dirtySlow > 1500 && since > (baked.size ? 30000 : 4000))) redraw();
+  }
+
   // ---- quality ----------------------------------------------------------------------------------------------------
   let lastQ = -1;
   function apply() {
@@ -138,11 +184,13 @@ export function setupSun(api, { key, dir, regions = [], sky = null }) {
     if (key.castShadow && key.shadow.needsUpdate && lights.includes(key)) {
       const t0 = performance.now(), ic = globalThis.kino?.instanceCull; want = false; lastStatic = t0;
       ic?.restore?.();   // every batched prop, not just the ones the camera keeps (the map is drawn once for the whole area)
+      const keep = staticRoot.children; staticRoot.children = keep.concat(bakeList());
       base.call(this, [key], staticRoot, cam);
+      staticRoot.children = keep; stats.baked = baked.size;
       ic?.reapply?.();   // back to what the camera keeps, before this frame's main draw
       stats.static++; stats.staticMs = Math.round(performance.now() - t0);
     }
-    if (dyn.castShadow && lights.includes(dyn)) { base.call(this, [dyn], dynRoot, cam); stats.dyn++; }
+    if (dyn.castShadow && lights.includes(dyn)) { const vc = globalThis.kino?.visCull; vc?.skipBaked?.(true); try { base.call(this, [dyn], dynRoot, cam); } finally { vc?.skipBaked?.(false); } stats.dyn++; }
   };
 
   let timer = 0;
@@ -152,13 +200,14 @@ export function setupSun(api, { key, dir, regions = [], sky = null }) {
   host.on('update', dt => {
     dt = Math.min(dt || .016, .1);
     if (dyn.castShadow) placeDyn();
+    const slow = (timer - dt) <= 0; if (baked.size || slow) bakeCheck(slow, performance.now());
     if ((timer -= dt) <= 0) { timer = 1; batches(); refresh();
       const i = regionAt(camera.position); if (i !== area) fit(i);
       const s = `${session.openDoors?.size ?? 0}|${session.power ? 1 : 0}`; if (s !== sig) { if (sig) { redraw(); again = 3; } sig = s; }   // (and once more when the door's pieces have gone)
       if (again > 0 && --again === 0) redraw(); }
   });
   placeDyn(); refresh();
-  const out = { key, dyn, report, stats, redraw, fit, get area() { return area; }, get texel() { return texel; } };
+  const out = { key, dyn, report, stats, redraw, fit, baked, get bake() { return bakeOn; }, set bake(v) { bakeOn = !!v; redraw(); }, get area() { return area; }, get texel() { return texel; } };
   if (window.kino) window.kino.gkSun = out;
   return out;
 }
