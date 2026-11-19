@@ -26,11 +26,18 @@ A working order and a set of checks for bringing a Black Ops III zombies map (st
 - **Memory.** Blender builds, the light bake and ray tools run under `systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=1G nice -n 15 <cmd>` (the castle's after-rebuild steps and its light bake run with a 6 GB cap), one at a time. Browser tests go through `~/.local/bin/lowpri` and `flock scratch/melon/heavy.lock`, one page at a time.
 - **BO3 has to be running for the dump and for Greyhound, and closed for tests.** It holds about 4.4 of the card's 6 GB; a test started beside it loses its WebGL context.
 - **The user starts the game.** Ask them to launch BO3 with the launch option `STEAM_COMPAT_LAUNCHER_SERVICE=proton %command%` and load the map (solo match, any round). For a boss or special enemy, ask them to play until one has spawned: its animations are only in memory after that.
+- **Make the first game session the only one.** Gorod Krovi needed three launches because each ask covered one thing. Before telling the user they can close BO3, finish everything that needs the running game: the level dump (1.1), the collision dump (1.1a), the navmesh dump (1.7), the spawn list (2.3a), the Greyhound exports (1.2, 1.3, and 7.1 for the map's weapons), and the reference pictures below. The lights (1.4), sun and grade cube (4.1) come from the fastfile and need no game.
+- **Write the wanted-export list as a file before asking** (`scratch/<map>/greyhound-wanted.md`) and check every item against `export_game/bo3/` first: twice the user was asked to start the game for files that were already on disk.
+- **Ask for a reference of the real map in that session**: a short unpaused walk through each area, as a video or screenshots, from the user. A session can't capture it itself (X11 capture is black, Spectacle caught the pause menu). Without it the brightness was tuned blind twice (4.3).
+- **Shared files.** `build_bo3_map.py`, `build_bo3_weapons.py` and `maps.json` are edited by sessions working on other maps: commit only your own hunks, and agree a rebuild with any session that has a bake or a look pass on the map, because a rebuild makes both stale.
+- **Long jobs run as their own unit** (`systemd-run --user --unit=<name> -p MemoryMax=...`, log to a file), not as a child of the session: two audits were lost when the session restarted.
+- **Don't hand the map over on trust.** Before the user is told to look: a GPU look check with the look module in, the KTX2 copies and the detail pass built (2.6), and the collision numbers of 2.6 step 10 passing. Say plainly when a build has not been run in a browser.
 
 **The order that works**
 
-1. Dump the level and its entities (1.1), list every spawn location (2.3a), read the lights from the fastfile (1.4).
-2. Export textures, prop models, animations and sounds with Greyhound (1.2, 1.3).
+1. In one game session: dump the level and its entities (1.1), the collision (1.1a) and the navmesh (1.7), list every spawn location (2.3a), get the reference pictures. Read the lights from the fastfile (1.4).
+2. Export textures, prop models, animations and sounds with Greyhound (1.2, 1.3), in the same session.
+   - **Inventory before the first build**, from the dump and the scripts, with counts, into the map's notes: script models, scene bundles, corpse and helmet models, doors with no visible pieces, `_smod` fxanim models, the box list and the map's wonder weapons, gobblegum machine spots, flood-water and carpet/rug materials, brushes a script switches on or off. Each of these was found on Gorod Krovi by the user as a missing or broken thing instead.
 3. Build the map (2) with a first `maps.json` entry, in **explore** mode only.
 4. Collision and navmesh until every area is reachable (2.4, 10).
 5. Materials: alpha, overlays, missing colours, void planes (3).
@@ -74,6 +81,8 @@ python3 -I .tools/bo3_clip.py <bsp> [--models]        # counts per class (needs 
 - Static models: world = origin + inverse(invScaledAxis) @ local; the xmodel triangles are rebuilt from plane, svec and tvec. A trace checks the instance's contents and the surface's.
 - **Contents flags** (the json's `contentsFlags`): 0x1 solid, 0x10 glass, 0x2000 stops bullets, 0x10000 player clip, 0x20000 monster clip; every `clip_*` material also has 0x400000. Players stop at 0x1 | 0x10 | 0x10000, zombies at 0x1 | 0x10 | 0x20000, bullets at 0x1 | 0x2000. 0x2080 (and 0x82080) is drawn detail you walk through: wooden beams, the bridges' metal trim, grates, the bronze ceiling tiles (12,697 brushes on zm_stalingrad). `clip` is 0x430200 and `clip_nosight` 0x431640: player + monster, no bullets.
 - `bo3_clip.game_collision()` sorts it all into the engine's classes (2.4): stops player, zombies and bullets = `COL`; player and bullets only = `PCOL`; player but not bullets = `CLIP` (plus `NCOL` when it also stops zombies: the stair ramps are both); zombies only = `NCOL`. Static models by instance height: under 18 left out (stepped over), 18-40 `PCOL`, over 40 `COL`.
+
+- **Self-test a new collision dump before building from it**: for every static-model instance, transform its collision and compare the bounds with the dump's own `absmin`/`absmax`. On Gorod Krovi 21,383 of 49,464 instances failed until the row-vector fix (2.4): every rotated prop collided in the wrong place, and it took a user report to notice.
 
 ### 1.2 Textures, models, animations: Greyhound
 
@@ -133,6 +142,11 @@ BO3 ships its scripts compiled inside the fastfiles; nothing here extracts or de
 | Some images (only a normal map, or nothing) | Lilac-blue sheets, solid white cards, invisible overlays | Drop, hide or paint a stand-in (3.4) |
 | Weapon files (damage, speeds, charge times) | - | Numbers from a comparable weapon, tuned by eye, marked as ours |
 | Lighting-state switches | - | Bake the normal-play state only (4.3) |
+| `_smod` fxanim static models (planes circling, swinging things) | The prop is there but frozen | The loop is compiled into the map: a stand-in motion in the map mod |
+| Baked lightmaps (only 1x1 probes are readable) | - | The fork's own bake (4.3) |
+| Per-surface colour tints | Props of one model all the same shade | Left out, or a tint by node name in the look module |
+| Parts the game mirrors at run time (the Mangler's right shoulder pad) | A one-sided boss | Mirror the part in the builder or the mod |
+| The wall-buy price table | A wall gun for 50 points | `wallPrices` in the map entry (2.5) |
 
 ### 1.7 The AI navmesh: `bo3_dump_navmesh.py`
 
@@ -156,11 +170,14 @@ Details: `waw-ports.md`, both "Black Ops III maps" sections. **`build_bo3_map.py
 
 ### 2.1 The command
 
+**One build script per map, from the first build**: `.tools/build-<map>.sh` (copy `.tools/build-gorod-krovi.sh`). It holds every flag, runs under the memory cap, and fails when a collision layer (`COL_`, `PCOL_`, `CLIP_`) is missing from the result. Never retype a build line or copy one from prose: Gorod Krovi's v=6 and v=9 were both built from the short command that used to stand here, without `--game-clip`, and both shipped with walkable out-of-bounds areas, props without collision and broken stairs ("old issues have come back").
+
 ```
-systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=1G nice -n 15 \
-  blender -b -P .tools/build_bo3_map.py -- <bsp> <map-id> --tex 512 --prop-tex 256
+systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=2G nice -n 15 \
+  blender -b -P .tools/build_bo3_map.py -- <bsp> <map-id> --tex 512 --prop-tex 256 --game-clip --game-clip-simple 64
 ```
 
+- That line is what the script contains for a map with a clip dump (1.1a); a map without one leaves the two `--game-clip` flags out and gets its collision from the render triangles (2.4).
 - Blender is only there for its Python with numpy. Output: `export/web/mods/maps/<map-id>/<map-id>.glb` and `tex/` (external WebP, names carry their size).
 - **Texture sizes are a VRAM decision, not a quality one.** The defaults (`--tex 1024 --normal-tex 512 --prop-tex 512`) put Der Eisendrache at 5.8 of 6 GB and it ran out; `--tex 512 --prop-tex 256` is what both maps ship with. A rebuild with other sizes regenerates every texture. Sharpness comes back through the detail pass (3.5), which spends memory only where a player can see it.
 - Axes and units: CoD inches, Z up, to glTF Y up: (x, y, z) -> (x, z, -y), winding flipped. The same conversion is needed for every coordinate copied from a script or the `.ents` (the castle's `bows.js` has `W(x,y,z)` for it).
@@ -267,6 +284,10 @@ CustomWorld builds collision and the navmesh from `COL_` meshes only; `PCOL_` me
 - **Static-model rotation (fixed 2026-11-15)**: CoD multiplies row vectors (`local = (world - origin) @ invScaledAxis`), so `world = origin + local @ inverse(invScaledAxis)` (`smodel_tris`, as `build_waw_map.py` does). Until then `bo3_clip.py` applied the transpose, which turns a rotated model the other way: 21,383 of zm_stalingrad's 49,464 instances had collision off their look. Example: a flat floor plate at the factory roost stood up as a 92-unit wall across the stairs. Check a change by comparing each instance's transformed collision bounds against its `absmin`/`absmax`: after the fix all fit, except for 347 instances with bone-local parts (corpses, the MG42, barbed wire).
 - **Auditing a game-clip build**: `col-audit.mjs` loads `CLIP_` too since 2026-11-15, because the player stands on the clip ramps. `--glb file` audits another copy, e.g. the previous version gunzipped from its `.glb.gz`. `--flood-only` has no `collisionCut`, so roost platforms show as unreached; check them with a walk test. The v6 flood's 811,000 points had 396,000 below y -20 (leaks under the map).
 
+- **Doors, in this order** (Gorod Krovi went through all four the wrong way round): (a) place the game's real gate and door models where they are exported, and read the open move from the door's open animation; (b) a buy door whose model is a shell (1.6) becomes floating debris from the map's own rubble, with the invisible pile as collision and path block; (c) a stand-in is the last resort: upright, and its line comes from the door's own clip slab, never from a measured passage (a diagonal doorway or a wall without collision breaks the measurement: "gate twisted through its walls"); (d) list the doors that have no pieces at all and add their blockers in the mod (a hatch that looks shut but is decoration: the real blocker was an invisible brush).
+- **Brushes a script switches are solid in the dump.** Anything a script removes at some point (a keep-off volume over a platform, a power door) must be cut with the map entry's `collisionCut` or handled by the mod. Cut only `COL_` meshes.
+- **Props the mod places have no collision.** Scene props and script models are not in the clip dump: build a collider from the posed model in the mod (and see 10.1 D).
+
 ### 2.5 The map entry (`mods/maps.json`)
 
 Start from Der Eisendrache's entry. Fields a BO3 port needs:
@@ -282,6 +303,10 @@ Start from Der Eisendrache's entry. Fields a BO3 port needs:
 - **Bump `?v=` on every rebuild.** Players (and the service cache) keep the old GLB otherwise: the first port's machines stayed huge for everyone until `?v=2`.
 - `textureArrays` must match the level texture size the atlas can hold (The Giant 512, Der Eisendrache 256); see 9.
 
+- `zombieWalls: true`: traversals arc over what stands in their way and zombies take no straight shortcut through a wall, door or clip (a map with fences and ledges between its areas).
+- `wallPrices: {"<weapon id>": price}`: a BO1 gun that stands in for a BO3 wall gun and is box-only in BO1's data costs 50 points unless it is priced here.
+- `opaqueLayers: "<regex of material names>"`: thin opaque layers lying on a floor (carpets, rugs) lose the depth test at range and "fade away when you're far enough"; named here they are drawn as layers. Don't detect them automatically against the collision mesh: that flags whole floors.
+
 ### 2.6 After every rebuild
 
 The map's derived data is matched to the GLB and goes stale with it. Der Eisendrache has `.tools/castle-after-rebuild.sh` for this; a new map needs the same list (copy the script when it has a void-ceiling table):
@@ -292,9 +317,10 @@ The map's derived data is matched to the GLB and goes stale with it. Der Eisendr
 4. Detail table: `node .tools/map-detail.mjs <id> --pts <walkable points> --go`.
 5. Any map-specific texture fix-ups (The Giant: `node .tools/giant-chalk.mjs`).
 6. Light test copy: `node .tools/map-lite.mjs <id> --force`.
-7. Compressed copies: `node .tools/build-ktx2.mjs mods/maps/<id> --jobs 3` **on every new map and after any texture change**, then `node .tools/build-gz.mjs` (or the GLB is sent uncompressed). With `textureArrays` a texture that has no KTX2 copy is shrunk to the array's layer size (256 px on Gorod Krovi): its first build was played without KTX2 copies and the user called every texture "extremely blurry" (2026-11-15).
+7. Compressed copies: `node .tools/build-ktx2.mjs mods/maps/<id> --jobs 3` **on every new map and after any texture change**, then `node .tools/build-gz.mjs` (**before looking at anything**: while an old `.glb.gz` exists the server sends that, so the OLD map is what loads; a rebuild once gave a byte-identical picture this way). With `textureArrays` a texture that has no KTX2 copy is shrunk to the array's layer size (256 px on Gorod Krovi): its first build was played without KTX2 copies and the user called every texture "extremely blurry" (2026-11-15).
 8. `MAP=<id> ... node .tools/map-test.mjs` once (10.3).
 9. Spawn markers against the dump: `python3 -I .tools/bo3_spawns.py <bsp> --glb <the new GLB>` (2.3a).
+10. **Collision numbers against the previous version**, before `?v=` goes out: the build log's `game clip:` line, the flood's unreached markers and its points under the map (`col-audit.mjs <id> --flood-only`; Gorod Krovi: 9,532 on a good build, about 396,000 on one built without `--game-clip`), and `stuck-audit.mjs` (0 enterable, 0 mantle traps; 10.1 E). A number that jumps means a flag was lost: stop and rebuild with the map's script.
 
 ## 3. Materials and textures
 
@@ -323,6 +349,9 @@ Checks:
 - Prop vertex colours from Greyhound are all 255: a prop's snow layer cannot use vertex alpha (the castle derives it from the world normal).
 - The engine draws every material in a single pass, so a transparent double-sided material costs one program, not two; that program must still exist before the warm-up (9).
 
+- **Flood water**: look for water materials in the material list at the inventory, before the user finds an opaque basement.
+- **Thin opaque layers** (carpets, rugs) go in the map entry's `opaqueLayers` (2.5).
+
 ### 3.2 Materials with no usable colour
 
 | Case | Symptom | Fix |
@@ -337,6 +366,8 @@ Checks:
 
 - **Metal:** BO3 keeps a metal's colour in its specular map with a black diffuse, and the builder exports neither specular nor gloss. `metalLook(world.root)` (`mods/lighting/metal-look.js`) is a stand-in by material name. The real fix, exporting the specular and gloss images in the builder, **has not been done**: it is the first thing to try on a new map, before its materials are tuned around the stand-in.
 - A missing texture is found faster from the list than by eye: compare the images named in `<bsp>.json` with what Greyhound wrote, and write the unexported ones into the map's notes (Der Eisendrache has 15).
+
+- **Look passes must cover door parts.** A buy door's parts are moved out of the map root at load, so a pass that walks only `world.root` misses them (Gorod Krovi: gates drawn blue from a normal-only decal). The look harness kept doors under the root and hid it: check one door close up in the real game.
 
 ### 3.3 Void planes and holes
 
@@ -408,6 +439,8 @@ systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=2G nice -n 15 \
 
 - **Add the map to `MAPS` in `bake-map-light.mjs`** (lamp regex, cell size 40-48, lamp range and levels, sun direction, extra occluder meshes). Its numbers must match the map mod's `LAMP` table.
 - **Use the game's own lights** (`real: {file, gain, ...}`): true positions, colours, radii and spot cones. Without the file the bake falls back to the lamp markers plus invented fill lights and says so. `gain` is set once so lit rooms land at a sensible level; `adapt`, `fill` and `outdoor` are the three knobs that fixed "everything is WAY too dark" and "snow shines off really bad, blinding" (an uncapped lamp term outdoors).
+- **Tuning brightness, with targets** (Gorod Krovi was tuned blind twice, once far too dark, once washed out): (a) compare the map's lights with an earlier port's (median radius-weighted intensity) and scale `gain` by the ratio; (b) compare the marker medians in `light.json`; (c) compare frame brightness with the user's reference frames (0) on matching views, `ffmpeg -i frame.png -vf signalstats,metadata=print:file=- -f null -` and read `YAVG` (Gorod Krovi: BO3 54, our washed-out version 85, after the fix 74).
+- **Don't cure darkness with the floor.** Raising `fill`, `adapt` or `skyFloor` lights every cell alike and flattens the map. Raise the lamps (`gain`) and the key light, and keep the dark corners dark.
 - Bake only lights whose `states` mask has bit 0 (normal play). Lights of other states belong to late quest scenes; switching states at runtime would need new shader text on every lit material, so it was decided against.
 - A room whose light changes in play (the castle's undercroft: warm until the low-gravity event, then blue) is a `gated` box: its lights go in the powered set with a dim copy in the always set, and the mod drives the power value. Data and uniforms only.
 - Bake with `--out` into scratch first and compare on a cropped GPU page before copying over the live files (`light.json`, `light.bin.gz` next to the GLB).
@@ -427,6 +460,13 @@ systemd-run --user --scope -q -p MemoryMax=6G -p MemorySwapMax=2G nice -n 15 \
 - Any change to the shader text of lit materials makes every player's next load fully cold. Prefer uniforms, material properties and data.
 - Emissive parts (bulbs, runes, glowing weapons) need the bloom threshold in mind (1.05): tune glow levels on a routed GPU page with the same bloom and tone mapping, not by numbers.
 - Not used yet: BO3's lit-fog colour in the `.ents` (`ambientColor`).
+
+- **Where a look may be judged**: on the real GPU, on the full map or a cropped page with the real textures. Never on the light copy (16 px textures), on SwiftShader, in `map-test.mjs` (phone emulation, capped at Medium) or within 2 s of a test teleport (the fx mod's teleport lightning is in the frame).
+
+### 4.6 The sun: shadows and rays
+
+- **An outdoor map gets a real shadowed sun** on the pattern of `mods/gorod-krovi/sun.js`: one static whole-map shadow map, redrawn only when a door opens, the power comes on or the area changes, plus a small per-frame map for what moves. Traps: the sliced shader warm-up asks for every shadow map on each slice, so draw once at `warm` and then only on request; call `kino.instanceCull.cullShadowCasters(true)` and draw between `restore()` and `reapply()`; resting props are `shadowBaked` (CLAUDE.md, Culling and Visibility culler). Register the light with `kino.shafts.add(light, {...})` for ray-marched sun rays (`lighting.md`, Real light shafts).
+- **A map that keeps the engine's shadowless key light still gets sun rays**: add it to `MAPS` in `mods/lighting/sun-shafts.js`. That draws the map's depth from the key light once at load (again on a door or the power) and feeds the same shaft pass; nothing lit changes and no shader is added. Solid meshes block the light, cut-out and see-through materials pass it; a mesh that must not block (a sky shell built as map geometry) gets `userData.noSunShafts`. Check the depth picture with `kino.sunShafts.debug()` and tune `kino.sunShafts.entry` live. The depth map covers the play area (spawn, zombie spawns, interactions, box spots), so those must exist before the `warm` event; `kino.sunShafts.stats.area` says `play` when it found them. Keep `strength` low and let `indoor` carry the rays: in open air the pass only adds an even haze (lighting.md, Sun rays on maps without a shadow-casting sun).
 
 ## 5. Scripts: from GSC to mod code
 
@@ -471,6 +511,11 @@ Moving or showing anything on a BO3 port (see `CLAUDE.md`, "Der Eisendrache plac
 - Repeated props are instanced or followers in the texture-array batches: move, show and hide through the **node**, never through a mesh's material or visibility. A mod that needs a prop's meshes later puts its node prefix in merge-props' `SKIP`.
 - A clone of an instanced prop needs `layers.set(0)` on its meshes (the originals sit on no render layer).
 
+- **Interactables go on flood points.** A booth, machine or anything with a prompt is placed on ground the flood (10.1 A) reaches from the spawn, and each one is checked by a walk with the real controls until its prompt shows. "Flush to a wall and level" is not a test: Gorod Krovi's terminals stood out of reach.
+- **Teleport destinations.** The Gersch Device, the QED and Anywhere But Here take a random barricade window. On a port whose windows come from BO3 spawn spots most of that list is out of bounds: give the map its own in-bounds list (`world.playerSpots`) and test every spot.
+- **Window spawn spots**: check every one. Is the spot on the outside of its window, and does the window sit between two walkable areas?
+- **Wall buys**: price BO1 stand-ins in `wallPrices` (2.5).
+
 ## 7. Wonder weapons, special weapons and equipment
 
 Details: `weapons.md` ("Black Ops III assets (Greyhound) and the Wunderwaffe DG-2", the bows), `advanced-warfare.md` (Workshop packs). Before building one, check it is not already here: `mods/bo3-weapons/weapons.json` (DG-2, Wrath of the Ancients and the four elemental bows, the Advanced Warfare pack), operator weapons (Ragnarok DG-4, Annihilator, rocket shield), `mods/wonder-weapons/` (BO1's), `mods/bo3-equipment/`.
@@ -514,6 +559,9 @@ The build gives a gun that shoots like its template. What makes it the wonder we
 - **Menus**: an entry in `mods/progression/progression.json` `weapons` for the loadout picker, the game logo (`games.json`), a weapon picture; Gunsmith kits only if it takes attachments.
 - **Operator weapons and shields** (Ragnarok, rocket shield) are their own ViewWeapon defs with craftable parts placed from the `.ents` (`craftables.js`).
 - Rerun `node .tools/build-gz.mjs` after the build. Outputs are git-ignored; `weapons.json` under `bo3-weapons` is generated.
+
+- **Build the map's box wonder weapon with the map**, not when the user asks where it is.
+- **Effects come from the client script** (`_c.gsc`/csc of the weapon): read it before writing a wonder weapon's effect. An invented one was rewritten a day later.
 
 ## 8. Zombies, bosses, sound, effects
 
@@ -609,6 +657,14 @@ The fork's player can do what BO3's cannot: slide, dive, mantle, wall jump, low 
 - The navmesh's shape never changes in play: a runtime blocker zombies must respect needs its own hold or reroute, or `world.navBlock(id, box)` to switch off the polygons (and links) under it while it stands (1.7).
 - A collision change in the build changes the navmesh cache key by itself; a change to navmesh *settings* needs `NAV_CACHE_VERSION` bumped, or players keep the old mesh.
 
+**E. Stuck spots, slides and the test tools**
+
+- **`stuck-audit.mjs`** next to the flood: `~/.local/bin/lowpri node .tools/stuck-audit.mjs <id> <points.json>` drops the game's own player controller on every walked point and every ledge a jump or mantle reaches, and reports spots it can't leave (`ENTERABLE` = reachable from open ground; mantle traps). Target: 0 and 0. Its limit: runtime colliders (doors, scene props, debris) are not in an offline test. The `mods/unstick` mod is the safety net in play, not the fix.
+- **Slide test**: slide and slide-jump over stair edges and ramps in a match (the slide's snap once put the player inside a step).
+- **`map-test.mjs`**: `ROUTE=/mods/x/mod.js=scratch/old.js` serves a file of your own in place of the game's, for an old-against-new run of a code change. Gotchas: the player is invulnerable by default and the round must be live for hazards to hurt; fixed sleeps fail because the page runs slower than real time (wait on state); it emulates a phone at Medium; its memory watchdog counts every Chromium on the host, so every session must hold `scratch/melon/heavy.lock`.
+- Checking for a leftover browser: `pgrep -f "[m]s-playwright/chrom"` (without the brackets the check matches itself).
+- **Ask the user for the position with every collision report**: `kino.debug.getState().player.feet` typed in the console. A screenshot alone cost a whole audit to locate.
+
 ## 11. Release checklist
 
 - [ ] `git status --short` shows no ripped file; new asset folders have a `.gitignore` with `*`; nothing new matches the install manifest's `OWN` list by accident, and own data that players need does match it.
@@ -618,6 +674,9 @@ The fork's player can do what BO3's cannot: slide, dive, mantle, wall jump, low 
 - [ ] Collision (10.1): flood from the spawn with no unreached marker left unexplained and no point under the map; `through`, `ghost` and `floor` lists empty or explained; reach, mobility, stairs, movers and bullets pass in a match; outer walls tried with mantle and wall jump; the counts are in the map's notes.
 - [ ] Every door, perk, box spot, wall buy, trap, teleporter and the Pack-a-Punch used once in a test match; power on and off; a full round with zombies from every open zone.
 - [ ] Each quest step done through its debug handle and once for real; a guest and a late joiner see the same state.
+- [ ] Quests and Easter eggs played start to finish, or listed as untested in the release note.
+- [ ] Every looping sound heard in a game, with its range checked on foot.
+- [ ] The collision numbers of 2.6 step 10 written into the release note.
 - [ ] Every weapon the map can hand out is in the warm-up; the wonder weapon fired, charged, upgraded, and seen from third person.
 - [ ] No light added, removed or hidden in play; no new shader text on lit materials after the warm-up.
 - [ ] Walked the map on the GPU looking for: white or grey sheets, solid decals, black holes overhead, flicker on overlays, missing models at script-spawn spots, T-posed bodies, props drawn at the wrong place after moving.
@@ -646,7 +705,8 @@ The fork's player can do what BO3's cannot: slide, dive, mantle, wall jump, low 
 | Every map material white | panorama set as `scene.background` | 3.4 |
 | "Lighting popping in and out", "light pop-in is insane" | a light pool following the camera | the baked volume |
 | "Snow shines off really bad, blinding" | uncapped lamp light outdoors, bloom | `outdoor` cap, bloom 1.0 |
-| "Everything is WAY too dark" | a knee that halved every room | the game's own lights, `fill`, `adapt` |
+| "Everything is WAY too dark" | a knee that halved every room | the game's own lights and `gain`; `fill`/`adapt` only a little (they flatten the map, 4.3) |
+| Flat, washed-out light | `fill` / `skyFloor` raised to cure darkness | raise lamps, not the floor; measure against reference frames (4.3) |
 | A room stayed blue whatever the mod did | the colour was in the baked lamp light | a `gated` box in the bake |
 | "Preparing shaders" took 2 minutes; "insane lag" | the bake's shader patch arrived late; a loop in the shader | await in setup; straight-line lookup |
 | Freezes in play | a light under a hidden group; things compiled at first use | 4.5, 9 |
@@ -677,3 +737,16 @@ The fork's player can do what BO3's cannot: slide, dive, mantle, wall jump, low 
 | Host out of memory during a scan or build | two heavy jobs at once, or no cap | one at a time, under `systemd-run` |
 | Spawn walled in, 34 of 36 markers unreachable (Gorod Krovi) | the intro's black box (`infinite_blackness`) drawn and solid | `SKIP` it for that map (2.4) |
 | Department store sealed (Gorod Krovi): its floors unreached from the street, revive and wall buys inside | facade props matched `WALKABLE` by `floor` and collided as their box | keep facades as they are; read the `walkable boxed:` lines (2.4) |
+| "Old issues have come back": stairs broken, out of bounds reachable, props without collision | a rebuild from a command without `--game-clip` (Gorod Krovi v=6, v=9) | the map's build script (2.1); the collision numbers (2.6 step 10) |
+| Doors or gates blue, or with blue splatter | a normal-only decal on door parts, which leave the map root | look passes cover door parts (3.2) |
+| Gate twisted or through its walls | stand-in measured along a diagonal passage | real gate models; the door's clip slab for the line (2.4) |
+| A door that looks shut can be walked through | the hatch is decoration; the real blocker is an invisible brush the builder skipped | blocker in the mod (2.4) |
+| Collision floats above a platform | a keep-off brush the script removes | `collisionCut` on `COL_` only (2.4) |
+| Everything rotated collides in the wrong place | transpose in `bo3_clip.py` (fixed) | the `absmin`/`absmax` self-test on new dumps (1.1a) |
+| Terminals out of reach | placed by wall fit, not by reachability | flood points and a walk-to-prompt test (6) |
+| Teleports land out of bounds | the window list is BO3's spawn spots | `world.playerSpots` (6) |
+| Player stuck between props | V-shaped gaps; slide snap without a fit check | `stuck-audit.mjs`, `mods/unstick` (10.1 E) |
+| Carpets vanish at range | depth precision on thin opaque layers | `opaqueLayers` (2.5) |
+| Planes or other props frozen | `_smod` loops are compiled into the map | stand-in motion in the mod (1.6) |
+| The rebuilt map looks exactly like the old one | a stale `.glb.gz` is what the server sends | `build-gz.mjs` before looking (2.6 step 7) |
+| The user was asked to launch the game three times | each ask covered one export | one session, one checklist (0) |

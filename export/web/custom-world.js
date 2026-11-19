@@ -12,6 +12,7 @@ import { propCollision } from './prop-collision.js';
 import { optimizeStaticScene } from './scene-optimizer.js';
 import { loadModel } from './animation.js';
 import { assetManager } from './runtime-assets.js';
+import { embeddedHd } from './map-detail.js';
 
 const PERKS={jugg:'specialty_armorvest',juggernog:'specialty_armorvest',armorvest:'specialty_armorvest',revive:'specialty_quickrevive',quickrevive:'specialty_quickrevive',
   speedcola:'specialty_fastreload',speed:'specialty_fastreload',sleight:'specialty_fastreload',fastreload:'specialty_fastreload',doubletap:'specialty_rof',rof:'specialty_rof',
@@ -135,6 +136,7 @@ export class CustomWorld {
     progress('Loading '+entry.title,15);
     const gltf=await new GLTFLoader(assetManager).loadAsync(dir+entry.model);
     const root=gltf.scene;root.scale.setScalar(entry.scale??1);this.scene.add(root);root.updateMatrixWorld(true);
+    if(entry.hd)await embeddedHd(root,dir);   // larger copies of the blurriest embedded textures (map-detail.js, .tools/map-hd.mjs)
     this.prepareLights(root,entry.scale??1);
     this.root=root;
 

@@ -83,6 +83,7 @@
         "zombies",
         "explore"
       ],
+      "hd": true,
       "dir": "mods/maps/cheese-cube/",
       "model": "cheese-cube.glb?v=3",
       "scale": 1,
@@ -186,6 +187,7 @@
       "title": "Malibu Drive",
       "description": "ZK's World at War Avengers map, ported from its compiled zones: Tony Stark's Malibu house, the beach, the city and the Cheese Cube. Work in progress.",
       "modes": ["zombies", "explore"],
+      "hd": true,
       "dir": "mods/maps/malibu-drive/",
       "model": "malibu-drive.glb?v=11",
       "scale": 1,
@@ -212,6 +214,7 @@
         "zombies",
         "explore"
       ],
+      "hd": true,
       "dir": "mods/maps/nuketown/",
       "model": "nuketown.glb?v=12",
       "scale": 1,

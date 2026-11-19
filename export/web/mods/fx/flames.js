@@ -1,11 +1,15 @@
 // Fire for every map's fixtures (2026-10-27, user: "make the fire look like actual fire"): candles, wall torches,
 // fire pits, burning debris, hurricane lamps. Replaces the one smooth teardrop sprite per fixture (which read as a
 // candle everywhere) with four instanced billboard layers, one draw call each:
-//   - flames: a teardrop body eaten from the top by scrolling noise, so tongues form, stretch and break off; graded
-//     from a dark red edge through orange and yellow to a white core (candles keep a blue base); bigger fires are
-//     several overlapping sub-flames of different heights and rates
+//   - flames (reworked 2026-11-19, user: "make the flames more realistic"): a plume that draws in as it rises, its
+//     heat eaten more and more by rising turbulence read from one tiling noise texture (flameNoise: three reads a
+//     pixel instead of twelve hashed noise evaluations), so the base is a solid bed, the middle splits into tongues
+//     that lean and sway and the top is licks that pinch off; coloured by temperature in light units for the bloom
+//     (dark red skin, orange, yellow body, a near-white core low down); candles and lamps (under 26 units tall) stay
+//     one calm teardrop with a blue base; bigger fires are several overlapping sub-flames of different heights
 //   - embers: sparks that rise out of the fire on a turbulent path and twinkle out
-//   - smoke: soft noise-broken puffs rising and spreading above torches and fires, warm underneath while young,
+//   - smoke: soot-grey billows (two scales of the same noise texture break the edge and thin the inside) rising and
+//     spreading above torches and fires, lit warm from underneath only while young,
 //     fogged like the world (normal blending, drawn before the flames)
 //   - glow: a soft additive halo on each fire that breathes with the flicker (light bleed on the fixture itself and
 //     on fires the point-light pool can't reach)
@@ -47,6 +51,32 @@ const GLSL_BILLBOARD = /* glsl */`
     vec3 right = normalize(cross(toP, up));
     mv.xyz += right * (corner.x * wh.x) + up * ((corner.y - yBase) * wh.y); return mv; }`;
 
+// One tiling noise texture for every flame and smoke shader (made once on the CPU, uploaded at load): a texture read
+// is far cheaper than hashing noise per pixel, and the channels can hold richer shapes. 128², wraps both ways:
+// R, G = two smooth cloud fields (4 octaves from 4 cells), B = ridged noise (thin bright veins: the filaments of a
+// flame), A = a finer cloud field (from 8 cells).
+let noiseTex = null;
+export function flameNoise(renderer) {
+  if (noiseTex) return noiseTex;
+  const N = 128, data = new Uint8Array(N * N * 4);
+  let s = 1234567; const rand = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const lattice = per => { const a = new Float32Array(per * per); for (let i = 0; i < a.length; i++) a[i] = rand(); return a; };
+  const sample = (a, per, x, y) => { const xi = Math.floor(x), yi = Math.floor(y); let fx = x - xi, fy = y - yi; fx = fx * fx * fx * (fx * (fx * 6 - 15) + 10); fy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
+    const x0 = ((xi % per) + per) % per, y0 = ((yi % per) + per) % per, x1 = (x0 + 1) % per, y1 = (y0 + 1) % per;
+    return (a[y0 * per + x0] * (1 - fx) + a[y0 * per + x1] * fx) * (1 - fy) + (a[y1 * per + x0] * (1 - fx) + a[y1 * per + x1] * fx) * fy; };
+  const field = (base, oct, ridged) => { const lats = []; for (let o = 0; o < oct; o++) lats.push(lattice(base << o)); const out = new Float32Array(N * N); let lo = 1e9, hi = -1e9;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { let v = 0, amp = .5;
+      for (let o = 0; o < oct; o++) { const per = base << o; let n = sample(lats[o], per, x / N * per, y / N * per); if (ridged) { n = 1 - Math.abs(n * 2 - 1); n *= n; } v += n * amp; amp *= .5; }
+      out[y * N + x] = v; lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    for (let i = 0; i < out.length; i++) out[i] = (out[i] - lo) / (hi - lo); return out; };
+  const R = field(4, 4), G = field(4, 4), B = field(4, 4, true), A = field(8, 3);
+  for (let i = 0; i < N * N; i++) { data[i * 4] = R[i] * 255; data[i * 4 + 1] = G[i] * 255; data[i * 4 + 2] = B[i] * 255; data[i * 4 + 3] = A[i] * 255; }
+  noiseTex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat); noiseTex.wrapS = noiseTex.wrapT = THREE.RepeatWrapping; noiseTex.magFilter = THREE.LinearFilter;
+  noiseTex.minFilter = THREE.LinearMipmapLinearFilter; noiseTex.generateMipmaps = true; noiseTex.needsUpdate = true; noiseTex.name = 'flame-noise';
+  renderer?.initTexture?.(noiseTex);   // on the GPU before the first flame is drawn
+  return noiseTex;
+}
+
 const quad = () => {
   const g = new THREE.InstancedBufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute([-.5, 0, 0, .5, 0, 0, .5, 1, 0, -.5, 1, 0], 3));
@@ -60,7 +90,7 @@ const inst = (g, name, arr, n) => { g.setAttribute(name, new THREE.InstancedBuff
 export function createFlames({ scene, renderer, low = false, name = 'flames', fade = 2600 } = {}) {
   const fires = [];   // {p, kind, size, hot, seed, sub, embers, smoke, glow, aspect, rate}
   const u = { time: { value: 0 }, px: { value: 1 }, fogColor: { value: new THREE.Color(0, 0, 0) }, fogDensity: { value: 0 }, flash: { value: 0 }, fade: { value: fade },
-    gain: { value: .55 }, core: { value: .25 }, alpha: { value: .9 }, glowK: { value: .4 }, soot: { value: .75 }, erode: { value: 1.15 }, ...softUniforms() };   // tuning: brightness, white-core share, flame opacity, halo strength, how much the tips darken what's behind
+    gain: { value: 1 }, core: { value: 1 }, alpha: { value: 1 }, glowK: { value: .4 }, soot: { value: .6 }, erode: { value: 1 }, smokeK: { value: 1 }, tNoise: { value: flameNoise(renderer) }, ...softUniforms() };   // tuning: brightness, white-core share, flame opacity, halo strength, how much the tips darken what's behind
   const common = { transparent: true, depthWrite: false, depthTest: true, fog: false };
 
   // the flame body blends premultiplied (ONE, ONE_MINUS_SRC_ALPHA): the bright inside adds light, the thin tips and the
@@ -68,44 +98,48 @@ export function createFlames({ scene, renderer, low = false, name = 'flames', fa
   // old flames read as glowing cut-outs
   const flameMat = new THREE.ShaderMaterial({ ...common, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation, uniforms: u,
     vertexShader: /* glsl */`attribute vec3 at; attribute vec4 fl;   // fl: height, aspect, phase, hot
-      attribute float rate; uniform float px, fade; varying vec2 vUv; varying float vPhase, vHot, vA, vRate, vSoftR;
+      attribute float rate; uniform float px, fade; varying vec2 vUv; varying float vPhase, vHot, vA, vRate, vSoftR, vCalm;
       ${GLSL_BILLBOARD} ${SOFT_VERT}
       void main(){ vUv = vec2(uv.x * 2.0 - 1.0, uv.y); vPhase = fl.z; vHot = fl.w; vRate = rate;
-        float h = fl.x, w = h / fl.y;
+        float h = fl.x, w = h / fl.y; vCalm = smoothstep(26.0, 13.0, h);   // candles and lamps burn steadily: one clean teardrop
         vec4 mv = billboard(at, vec2(w, h), position.xy, 0.0); float d = max(10.0, -mv.z);
         // keep a far flame at least a few pixels tall (it would otherwise shimmer at sub-pixel size), dimmer to match
         float pxh = h * 700.0 * px / d, k = max(1.0, 4.0 * px / max(pxh, 0.01));
         if (k > 1.0) { mv = billboard(at, vec2(w, h) * k, position.xy, 0.0); }
         vA = smoothstep(fade, fade * 0.3, d) / (k * k); vSoft = softMat * mv; vSoftR = clamp(h * 0.14, 4.0, 40.0);
         gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: /* glsl */`uniform float time, gain, core, alpha, soot, erode; varying vec2 vUv; varying float vPhase, vHot, vA, vRate, vSoftR;
-      ${GLSL_NOISE} ${GLSL_FLICKER} ${SOFT_FRAG}
+    fragmentShader: /* glsl */`uniform float time, gain, core, alpha, soot, erode; uniform sampler2D tNoise; varying vec2 vUv; varying float vPhase, vHot, vA, vRate, vSoftR, vCalm;
+      ${GLSL_FLICKER} ${SOFT_FRAG}
       void main(){ vec2 p = vUv; float t = time * vRate + vPhase, fk = flicker(time, vPhase);
-        float y = p.y / (0.76 + 0.24 * fk);                                 // the flame breathes: taller as the flicker peaks
-        // turbulence rising through the flame: slow eddies (warp) bend the body and the licks, finer noise rides on them;
-        // the erosion grows with height, so the base is solid and the top breaks into tongues that pinch off and fade
-        vec2 q = vec2(p.x * 1.6 + vPhase * 0.37, y * 2.2 - t * 1.9);
-        vec2 warp = vec2(fbm(q * 0.8 + vec2(3.1, -t * 0.35)), fbm(q * 0.8 + vec2(-7.3, -t * 0.5))) - 0.5;
-        float n = fbm(q + warp * 1.4), n2 = fbm(q * 2.7 + warp * 2.2 + vec2(5.2, -t * 1.2));
-        float sway = sin(t * 1.1 + y * 3.5) * 0.07 * y + warp.x * 0.6 * y;
-        float w = mix(0.78, 0.06, smoothstep(0.0, 1.0, y));                 // a teardrop: wide at the base, a point at the top
-        float body = 1.0 - abs(p.x + sway) / w;                              // 1 on the axis, 0 at the edge
-        float f = body * (1.0 - y) * 1.7 - ((n - 0.32) * (0.5 + 1.7 * y) + (n2 - 0.45) * (0.25 + 0.55 * y)) * erode;
-        // the erosion can push f above 0 outside the tongue (low noise); mask by the body and the top, or the quad shows as a pale box
-        float a = smoothstep(0.0, 0.13, f) * smoothstep(0.0, 0.1, p.y) * smoothstep(-0.1, 0.25, body) * smoothstep(1.0, 0.8, y) * vA * softFade(vSoftR, 0.15); if (a < 0.01) discard;
-        // how deep inside the flame: a thin dark red skin, orange, yellow; the white core sits low in the flame (the
-        // hottest part is just above the fuel), the tips are only ever red-orange
-        float dd = clamp(f * 0.75, 0.0, 1.0), low = smoothstep(0.8, 0.25, y);
-        vec3 col = mix(vec3(0.7, 0.07, 0.01), vec3(1.0, 0.38, 0.04), smoothstep(0.0, 0.3, dd));
-        col = mix(col, vec3(1.0, 0.72, 0.16), smoothstep(0.42, 0.85, dd) * (0.5 + 0.5 * low));
-        col = mix(col, vec3(1.0, 0.93, 0.66), smoothstep(0.78, 1.0, dd) * low * (0.3 + 0.7 * vHot) * core);
-        col = mix(col, vec3(0.35, 0.55, 1.2), (1.0 - vHot) * smoothstep(0.3, 0.0, p.y) * smoothstep(0.0, 0.5, dd) * 0.8);   // a candle's blue base
-        // the body is optically thick: it covers what is behind it (and the sub-flames behind it) instead of adding to
-        // it, so a fire of several overlapping sub-flames stays flame-coloured rather than summing to a white blob;
-        // soot is the share of that cover (1 = plain cover, 0 = pure additive light); the thin skin and the tongue tips
-        // cover less and are dark red, so they read as translucent and smoky
-        float op = a * alpha * mix(0.4, 0.95, dd);
-        gl_FragColor = vec4(col * gain * (0.8 + 0.4 * vHot) * fk * op, op * soot);
+        float y = p.y / (0.8 + 0.2 * fk);                                   // the flame breathes: taller as the flicker peaks
+        // large slow eddies lean the whole body and bend the paths the turbulence climbs along
+        vec4 n0 = texture2D(tNoise, vec2(vPhase * 0.31 + p.x * 0.09, y * 0.2 - t * 0.17));
+        float sway = ((n0.r - 0.5) * 0.7 + sin(t * 1.3 + y * 3.0) * 0.06) * y * mix(1.0, 0.35, vCalm);
+        // the plume draws in as it rises: the noise is read in plume space, so its columns converge and the tongues lean inward
+        float w = mix(mix(0.9, 0.34, pow(y, 0.8)), 0.04 + 0.6 * smoothstep(-0.03, 0.2, y) * (1.0 - 0.94 * smoothstep(0.16, 0.98, y)), vCalm);   // a candle is a teardrop: round at the wick, widest a fifth of the way up
+        float xs = (p.x + sway + (n0.a - 0.5) * 0.22 * (1.0 - vCalm)) / w, env = 1.0 - xs * xs;
+        // rising turbulence: gas speeds up as it climbs, so the features stretch with height (y^.7) and outrun the base
+        float yy = pow(y + 0.03, 0.7);
+        vec2 q = vec2(xs * w * 0.42 + xs * 0.12 + vPhase * 1.7, yy * 0.5 - t * 0.46), warp = (n0.gb - 0.5) * 0.19;
+        vec4 n1 = texture2D(tNoise, q + warp), n2 = texture2D(tNoise, q * 2.7 + warp * 2.3 + vec2(0.37, -t * 0.5));
+        float turb = n1.r * 0.5 + n1.b * 0.22 + n2.a * 0.28;                // big billows, filaments, fine breakup
+        // heat: full across the fuel bed, falling with height; the turbulence eats it more and more on the way up, so the
+        // base is a solid bed, the middle splits into tongues and the top is licks that pinch off and burn out
+        float heat = mix(pow(max(env, 0.0), 0.8) * (1.0 - y * 0.72), env * (1.0 - y * 0.55), vCalm);
+        float f = heat * mix(1.25, 1.7, vCalm) + (turb - 0.54) * (0.45 + 3.1 * y) * erode * mix(1.0, 0.22, vCalm) - y * mix(0.5, 0.0, vCalm);
+        float yb = (0.1 * xs * xs + (n1.a - 0.5) * 0.07) * (1.0 - vCalm);                            // the bed is round: its near edge dips, the sides lift
+        yb = max(yb, 0.0); float a = smoothstep(0.0, 0.16, f) * smoothstep(yb, yb + mix(0.2, 0.07, vCalm), p.y) * smoothstep(-0.05, 0.3, env) * smoothstep(1.0, 0.82, y) * vA * softFade(vSoftR, 0.15); if (a < 0.008) discard;
+        // colour by temperature, in light units the bloom and the tone map work on: a thin dark red skin, orange, a
+        // yellow body and a near-white core low in the flame (the hottest gas is just above the fuel); tips stay red-orange
+        float dd = clamp(f * 0.5 + (n2.b - 0.45) * 0.3 + (n1.r - 0.5) * 0.25, 0.0, 1.0) * mix(0.6, 1.0, smoothstep(0.0, 0.16, p.y - yb)), low = smoothstep(0.85, 0.15, y);
+        vec3 col = mix(vec3(0.38, 0.03, 0.0), vec3(1.3, 0.28, 0.02), smoothstep(0.0, 0.3, dd));
+        col = mix(col, vec3(2.0, 0.8, 0.08), smoothstep(0.3, 0.75, dd) * (0.45 + 0.55 * low));
+        col = mix(col, vec3(2.6, 1.7, 0.5), smoothstep(0.72, 1.0, dd) * low * (0.35 + 0.65 * vHot) * core);
+        col = mix(col, vec3(0.25, 0.45, 1.2), (1.0 - vHot) * smoothstep(0.2, 0.02, p.y) * 0.75);   // a candle's blue base
+        // premultiplied: the thick body covers what is behind it (overlapping cards saturate instead of summing to a
+        // white blob), the thin skin and the tips are mostly added light with a little soot
+        float op = a * alpha * mix(0.3, 0.92, smoothstep(0.0, 0.6, dd));
+        gl_FragColor = vec4(col * gain * (0.75 + 0.25 * vHot) * (0.55 + 0.5 * fk) * op, op * soot * mix(0.25, 1.0, dd));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }` });
@@ -140,13 +174,17 @@ export function createFlames({ scene, renderer, low = false, name = 'flames', fa
         vec4 mv = modelViewMatrix * vec4(w, 1.0); float d = max(10.0, -mv.z); mv.xy += position.xy * s - vec2(0.0, s * 0.5);
         vA = (1.0 - t) * (1.0 - t) * smoothstep(0.0, 0.15, t) * smoothstep(fade, fade * 0.3, d) * smoothstep(15.0, 70.0, d);
         vT = t; vSeed = seed.z; vFog = d; vUv2 = uv; vSoft = softMat * mv; vSoftR = clamp(s * 0.3, 8.0, 90.0); gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: /* glsl */`uniform vec3 fogColor; uniform float fogDensity, time, flash; varying float vA, vT, vSeed, vFog, vSoftR; varying vec2 vUv2;
-      ${GLSL_NOISE} ${SOFT_FRAG}
+    fragmentShader: /* glsl */`uniform vec3 fogColor; uniform float fogDensity, time, flash, smokeK; uniform sampler2D tNoise; varying float vA, vT, vSeed, vFog, vSoftR; varying vec2 vUv2;
+      ${SOFT_FRAG}
       void main(){ vec2 p = (vUv2 - 0.5) * 2.0; float r = length(p);
-        float n = fbm(p * 1.8 + vec2(vSeed * 9.0, -time * 0.25 + vSeed * 4.0));
-        float a = smoothstep(1.0, 0.2, r + (n - 0.45) * 0.9) * vA * 0.42 * softFade(vSoftR, 0.0); if (a < 0.004) discard;
-        float f = 1.0 - exp(-fogDensity * fogDensity * vFog * vFog);
-        vec3 col = mix(vec3(0.05, 0.05, 0.055), vec3(0.5, 0.2, 0.05), (1.0 - vT) * (1.0 - vT) * smoothstep(0.6, -0.2, p.y) * 0.9) + flash * vec3(0.1, 0.12, 0.15);
+        // a puff is a billow, not a disc: two noise scales break its edge and thin its inside, turning slowly as it rises
+        vec2 o = vec2(vSeed * 3.1, vSeed * 7.3 - time * 0.035);
+        vec4 n = texture2D(tNoise, p * 0.21 + o), n2 = texture2D(tNoise, p * 0.55 + o * 1.7 + (n.rg - 0.5) * 0.12);
+        float dens = smoothstep(1.0, 0.1, r + (n.r - 0.5) * 1.0 + (n2.a - 0.5) * 0.4) * (0.55 + 0.45 * n2.r) * smoothstep(1.0, 0.72, r);
+        float a = dens * vA * 0.5 * smokeK * softFade(vSoftR, 0.0); if (a < 0.004) discard;
+        float f = 1.0 - exp(-fogDensity * fogDensity * vFog * vFog), young = (1.0 - vT) * (1.0 - vT) * (1.0 - vT);
+        // soot grey, a little lighter where it is thin; lit warm from underneath only while it is young and close to the fire
+        vec3 col = mix(vec3(0.028, 0.027, 0.03), vec3(0.1, 0.095, 0.09), n.g * (1.0 - dens * 0.5)) + vec3(0.5, 0.17, 0.03) * young * smoothstep(0.7, -0.7, p.y) * 0.55 + flash * vec3(0.1, 0.12, 0.15);
         gl_FragColor = vec4(mix(col, fogColor, f), a * (1.0 - f * 0.6));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

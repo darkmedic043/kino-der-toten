@@ -29,6 +29,7 @@ import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { bakeVolume, loadVolume, patchMaterial } from './baked.js';
 import { settings, onSettingsChange } from '../../settings.js';
 import { createShafts } from './shafts.js';
+import { setupSunShafts } from './sun-shafts.js';
 import { createPostFx } from './post-fx.js';
 import { setupMoon } from './moon.js';
 
@@ -116,6 +117,7 @@ export default async function setup(api){
   // mirror bulbs, stage lamps...), baked from kino.gltf's nodes.
   const fixtures=kino?await fetch(new URL('fixtures.json',import.meta.url)).then(r=>r.ok?r.json():[]).catch(()=>[]):[];
   if(renderer)setupPost(api);
+  if(renderer&&!kino&&api.map?.id!=='moon')setupSunShafts(api,shafts,quality);   // sun rays on maps whose key light casts no shadows (sun-shafts.js)
   // First-person weapons are lit by their own scene: a flat ambient 2.8 plus
   // one light, which bleached every gun to grey-white. Give them a softer
   // ambient and a key/fill/rim set so metal and wood keep their contrast.

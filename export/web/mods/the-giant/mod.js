@@ -11,10 +11,18 @@ import { binds } from '../../settings.js';
 import { fixAnnihilatorMaterials } from '../operator-weapons/annihilator.js';
 import { loadMapLight } from '../lighting/map-volume.js';
 import { metalLook } from '../lighting/metal-look.js';
+import { prepareDetail, applyDetail } from '../../map-detail.js';
 import { floatingDebris, debrisDoor } from '../fx/floating-debris.js';
 import { giantOverlays } from './overlays.js';
 
 const LINK_TIME = 30, WHERE = { pad0: 'east', pad1: 'south', pad2: 'west' };
+// Sharper textures (2026-11-19, user: "clean up the maps with more ehish textures"): the map's detail.json tiles the 83
+// materials that stretched one small "micro" detail map over a whole prop and redirects the blurriest colour maps to
+// larger copies (map-detail.js, .tools/map-detail.mjs; ?noDetail for an A/B).
+export async function prepare(data) {
+  if (new URLSearchParams(location.search).get('map') === 'the-giant' && !/[?&]noDetail/.test(location.search)) await prepareDetail('mods/maps/the-giant/');
+  return data;
+}
 export default async function setup(api) {
   if (api.map?.id !== 'the-giant') return;
   const { world, session, host, toast, announce, audio } = api;
@@ -321,6 +329,7 @@ function setupLook(api) {
   world.root?.traverse(o => { if (!o.isMesh) return; for (const m of [o.material].flat()) if (/t7_water_zm_der_vats/.test(m?.name ?? '')) {
     Object.assign(m, { transparent: true, opacity: .32, depthWrite: false, roughness: .12, metalness: 0 }); m.color?.setHex(0x7fb0aa); m.needsUpdate = true; o.renderOrder = 2; } });
   metalLook(world.root);
+  applyDetail(world.root);
   const kids = scene.children;
   const ambient = kids.find(o => o.isAmbientLight), hemi = kids.find(o => o.isHemisphereLight);
   const dirs = kids.filter(o => o.isDirectionalLight && !o.castShadow).sort((a, b) => b.intensity - a.intensity);
