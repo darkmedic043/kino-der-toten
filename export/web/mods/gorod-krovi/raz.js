@@ -105,7 +105,7 @@ export function setupRaz(K) {
     if (dist < 120) K.turn(z.root, K.yawTo(pos, tp), 5, dt);
     // stuck or left far behind: back in at a spot near the players (BO3 cleans up a raz past 2,500)
     z.away = (w.lost && dist > 200) || dist > 2500 ? (z.away ?? 0) + dt : 0;
-    if (z.away > 6) { z.away = 0; const sp = pickSpot(); if (sp) { pos.copy(K.ground(sp.p)); z.path = []; z.repath = 0; } }
+    if (z.away > 6) { z.away = 0; const sp = pickSpot(); if (sp && sp.p.distanceTo(tp) < dist) { pos.copy(K.ground(sp.p)); z.path = []; z.repath = 0; } }   // only to a spot nearer than where it stands (in the boss arena the nearest spots are the main map's, 20,000 away: it left the fight for good, 2026-11-18)
   }
   function busy(z, k, tick, cool) {
     z.state = 'busy'; play(z, k, false); z.busyUntil = z.t + (S.index[k]?.duration ?? 1.5) * .95; z.busyTick = tick;
