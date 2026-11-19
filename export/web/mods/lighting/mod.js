@@ -31,6 +31,7 @@ import { settings, onSettingsChange } from '../../settings.js';
 import { createShafts } from './shafts.js';
 import { setupSunShafts } from './sun-shafts.js';
 import { createPostFx } from './post-fx.js';
+import { smokeVolume } from './smoke-volume.js';
 import { setupMoon } from './moon.js';
 
 const SWAP=.25;
@@ -708,6 +709,7 @@ function setupPost(api){
   const {renderer,scene,camera,host,viewScene,viewCamera}=api;
   let composer=null,renderPass=null,volPass=null,hazePass=null,viewPass=null,gtao=null,bloom=null,grade=null,builtFor=-1;
   const fx=createPostFx(api);   // motion blur, depth of field while aiming, reflections (post-fx.js)
+  const smoke=smokeVolume(api);   // the smoke grenade's volumes: a pass that ray-marches them against the frame's depth (smoke-volume.js)
   const size=()=>{const v=renderer.getSize(new THREE.Vector2());return [Math.max(1,v.x),Math.max(1,v.y)];};
   // The look (grade.js): the map's preset at Settings → Film look strength, grain by Settings → Film grain.
   const look=()=>gradeFor(api.map,[0,.5,1][Math.round(settings.filmLook??2)]??1,settings.filmGrain!==false);
@@ -715,7 +717,7 @@ function setupPost(api){
   let lutTex=null;if(gradeFor(api.map,1,false).lut>0&&api.map?.dir)(host.pending??=[]).push(loadLut(api.map.dir+'lut.png').then(t=>{lutTex=t;if(t)renderer.initTexture?.(t);grade?.setLut(t);grade?.set({});}));
   const applyGrade=g=>{if(grade)grade.set(g);const G=grade?.grade??g;if(hazePass){const u=hazePass.uniforms;u.haze.value.fromArray(G.haze);u.hazeDensity.value=G.hazeDensity;u.hazeStart.value=G.hazeStart;}if(bloom)bloom.strength=.28*(G.bloom??1);};
   function build(q){
-    composer?.dispose?.();composer=null;builtFor=q;
+    composer?.dispose?.();composer=null;builtFor=q;smoke.low=q<1;
     if(q<1)return;
     const [w,h]=size(),target=new THREE.WebGLRenderTarget(w,h,{type:THREE.HalfFloatType,samples:4});
     target.depthTexture=new THREE.DepthTexture(w,h);   // the volumetric beams, the AO and the haze read the scene depth
@@ -755,6 +757,7 @@ function setupPost(api){
       composer.addPass(gtao);
     }else gtao=null;
     composer.addPass(fx.motion);
+    smoke.attach(renderPass,q);composer.addPass(smoke.pass);   // before the weapon, so the gun in your hands is not fogged
     // The first-person weapon joins the frame here, after the AO (its depth is in the view camera's projection,
     // which the AO must not read) and before bloom and the grade, so it glows, is graded and vignetted with the world.
     viewPass=new ViewmodelPass(viewScene,viewCamera);viewPass.enabled=false;composer.addPass(viewPass);composer.addPass(fx.dof);
@@ -765,7 +768,7 @@ function setupPost(api){
   const resize=()=>{if(!composer)return;const [w,h]=size();composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);};
   addEventListener('resize',()=>setTimeout(resize,200));
   onSettingsChange((s,key)=>{if(key==='graphics'||key===null)build(quality());if(key==='renderScale')setTimeout(resize,50);if(key==='filmLook'||key==='filmGrain')applyGrade(look());});
-  build(quality());fx.warm();
+  build(quality());fx.warm();smoke.warm();
   // opts.drawView: draw the viewmodel (opts.viewScene/viewCamera, default the engine's) inside the chain; returns
   // true when it did, so the engine skips its own draw.
   host.renderWorld=(sceneToDraw,cam,opts)=>{

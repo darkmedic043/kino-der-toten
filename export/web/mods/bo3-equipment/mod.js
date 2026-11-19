@@ -11,20 +11,22 @@
 // electric wire instead of lasers. It shocks each zombie that touches it at most every 1.5 s (100 + 8% max health, 0.5 s
 // stun, 40% slow for 2.5 s; bosses take a flat 300 and are not stunned) and shorts out after 10 shocks or 60 s, taking
 // both mines with it. Mines left without a partner keep their lasers and explode as usual.
-// Smoke Grenade: bounces, pops into a 200-wide cloud for 12 s. Zombies lose players inside it (window.kino.concealed,
-// read by the multiplayer mod's targetFor) and search the cloud's rim, unless they are already within 75. A shot gives
-// your position away for 1.2 s (not with Ghost). In co-op the cloud is sent to everyone; augment effects stay with the
-// thrower's own clouds.
+// Smoke Grenade: bounces, then pops into smoke that fills the space for 12 s the way Counter-Strike 2's does (a flood
+// fill through the map's collision, drawn as a volume: ../lighting/smoke-volume.js). Zombies lose every player inside it
+// (window.kino.concealed, read by the multiplayer mod's targetFor) and mill about its open edge; shooting does not give
+// you away and nothing hurts you in there. Ghost keeps you hidden for 3 s after you step out. In co-op the cloud is sent
+// to everyone (each client fills it through the same collision); augment effects stay with the thrower's own clouds.
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { smokeVolume } from '../lighting/smoke-volume.js';
 
 const up = new THREE.Vector3(0, 1, 0);
 const url = p => new URL(p, import.meta.url).href;
 const TRIP = url('models/tripmine.glb'), SMOKE = url('models/smoke.glb');
 const SOUNDS = ['plant', 'trip', 'arm', 'zap', 'zap2', 'link', 'short', 'smoke_start', 'smoke_loop', 'smoke_end', 'smoke_bounce'];
 const TRIP_REACH = 650, TRIP_SPEED = 1100, LASER = 240, WIRE_RANGE = 300, WIRE_CHARGES = 10, WIRE_LIFE = 60, WIRE_COOL = 1.5, WIRE_LINKS = 2;
-const CLOUD_R = 200, CLOUD_LIFE = 12, CLOUD_GROW = 1.2, FIND = 75, REVEAL = 1.2;
+const CLOUD_R = 200, CLOUD_LIFE = 12, CLOUD_GROW = 1.3, GHOST = 3;
 
 export async function prepare(data) {
   const have = await Promise.all([TRIP, SMOKE].map(u => fetch(u, { method: 'HEAD' }).then(r => r.ok, () => false)));
@@ -54,13 +56,7 @@ export default async function setup(api) {
   const play = (k, v = .7) => audio.play(`bo3eq_${k}`, v);
 
   const [tripSrc, smokeSrc] = await Promise.all([loadModel(TRIP), loadModel(SMOKE)]);
-  // soft puff for the cloud: a CanvasTexture drawn once and uploaded now (never redrawn)
-  const puff = (() => {
-    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
-    const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.5, 'rgba(255,255,255,.55)'); r.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = r; g.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; renderer?.initTexture?.(t); return t;
-  })();
-  const puffMat = new THREE.SpriteMaterial({ map: puff, color: 0x9a9da0, transparent: true, opacity: .8, depthWrite: false, fog: true });
+  const vol = smokeVolume(api);   // the smoke itself (shared with the lighting mod, which draws it)
   const laserMat = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: .75, depthWrite: false, blending: THREE.AdditiveBlending });
   const wireMat = new THREE.MeshBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending });
   const arcMat = new THREE.LineBasicMaterial({ color: 0xbfeaff, transparent: true, opacity: .9, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -68,7 +64,7 @@ export default async function setup(api) {
   const wireGeo = new THREE.CylinderGeometry(.45, .45, 1, 6, 1, true).translate(0, .5, 0);
   // warm-up: every program these draw mid-game, compiled behind the loading screen
   {
-    const w = new THREE.Group(); w.add(cloneSkinned(tripSrc), cloneSkinned(smokeSrc), new THREE.Sprite(puffMat), new THREE.Mesh(beamGeo, laserMat), new THREE.Mesh(wireGeo, wireMat));
+    const w = new THREE.Group(); w.add(cloneSkinned(tripSrc), cloneSkinned(smokeSrc), new THREE.Mesh(beamGeo, laserMat), new THREE.Mesh(wireGeo, wireMat));
     const lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 1, 0)]); w.add(new THREE.Line(lg, arcMat));
     (host.warmObjects ??= []).push(w);
   }
@@ -239,20 +235,14 @@ export default async function setup(api) {
   };
 
   // ---- Smoke Grenade -----------------------------------------------------------------------------------------------------
-  let clouds = [], revealedUntil = 0, chokeTick = 0;
+  let clouds = [], ghostUntil = 0, lastAt = null, chokeTick = 0;
   const throwSmoke = () => {
     const mesh = cloneSkinned(smokeSrc), { vel } = launchFrom(mesh, 520, 160);
     flying.push({ kind: 'smoke', mesh, vel, life: aug('smoke.quick') ? .6 : 1.2, spin: new THREE.Vector3(Math.random() * 8, Math.random() * 8, 0) });
   };
   function addCloud(at, r, dur, mine) {
-    const group = new THREE.Group(); group.position.copy(at); scene.add(group);
-    const mat = puffMat.clone(), sprites = [];
-    for (let i = 0; i < 22; i++) {
-      const s = new THREE.Sprite(mat), a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r * .8;
-      s.userData.home = new THREE.Vector3(Math.cos(a) * d, 20 + Math.random() * r * .55, Math.sin(a) * d); s.userData.size = r * (.7 + Math.random() * .5);
-      s.position.copy(s.userData.home); s.scale.setScalar(1); group.add(s); sprites.push(s);
-    }
-    const c = { at: at.clone(), r, born: now(), until: now() + dur, mine, group, mat, sprites, k: 0, tick: 0, quick: mine && aug('smoke.quick') > 0 };
+    const quick = mine && aug('smoke.quick') > 0;
+    const c = { at: at.clone(), r, born: now(), until: now() + dur, mine, quick, vol: vol.spawn(at, r, { grow: quick ? .4 : CLOUD_GROW }) };
     if (mine) {
       play('smoke_start', .7);
       // audio.native resolves to the source: a cloud that ended first stops it as soon as it arrives
@@ -262,36 +252,36 @@ export default async function setup(api) {
     clouds.push(c); return c;
   }
   function endCloud(c) {
-    c.ended = true; c.group.removeFromParent(); c.mat.dispose(); try { c.loop?.stop(); } catch {} c.loop = null;
+    c.ended = true; vol.release(c.vol); try { c.loop?.stop(); } catch {} c.loop = null;
     if (c.mine) play('smoke_end', .5);
     clouds = clouds.filter(x => x !== c);
   }
-  const inside = (c, p) => c.k > .6 && now() < c.until - .5 && Math.hypot(p.x - c.at.x, p.z - c.at.z) < c.r && p.y - c.at.y > -80 && p.y - c.at.y < 160;
+  // p = a point at someone's feet: in the smoke once the front has passed it, until the cloud thins out
+  const inside = (c, p) => now() < c.until - .5 && vol.filled(c.vol, p);
+  const hidden = p => clouds.some(c => inside(c, p));
   function pop(f) {
     const r = CLOUD_R * (1 + aug('smoke.radius')), dur = CLOUD_LIFE * (1 + aug('smoke.long')), at = f.mesh.position.clone();
     f.mesh.removeFromParent();
     addCloud(at, r, dur, true);
     const net = kino.coop; if (net?.id) net.send('all', { t: 'smoke', at: [at.x, at.y, at.z], r, dur });
   }
-  // players a zombie can't see: inside a grown cloud and further than FIND from it
-  kino.concealed = (z, pos, id) => {
-    if (!clouds.length || !pos) return false;
-    if (id == null && now() < revealedUntil) return false;
-    for (const c of clouds) if (inside(c, pos) && Math.hypot(z.root.position.x - pos.x, z.root.position.z - pos.z) > FIND) return true;
-    return false;
-  };
-  host.on('shot', () => { if (clouds.length && !aug('smoke.ghost')) revealedUntil = now() + REVEAL; });   // Ghost: shots don't give you away
+  // players a zombie can't see: anyone inside the smoke, whatever they do in there (Ghost: and for a moment after)
+  kino.concealed = (z, pos, id) => !!pos && ((id == null && now() < ghostUntil) || hidden(pos));
+  // nothing hurts you while you stand in the smoke
+  host.on('beforeDamage', e => { if (clouds.length && e.amount > 0 && hidden(feet())) e.amount = 0; });
   const lure = enemies.lureTarget?.bind(enemies);
   enemies.lureTarget = z => {
     const prev = lure ? lure(z) : null;
-    if (prev || !clouds.length) return prev;
+    if (prev || (!clouds.length && now() >= ghostUntil)) return prev;
     const f = feet(), v = enemies.targetFor?.(z, f) ?? { position: f };
     if (!kino.concealed(z, v.position, v.id)) { z.smokeSearch = null; return null; }
-    const c = clouds.find(c => inside(c, v.position)) ?? clouds[0];
+    const c = clouds.find(c => inside(c, v.position)) ?? null;
     let s = z.smokeSearch;
-    if (!s || s.c !== c || now() > s.until) {   // search the rim on the zombie's side, a new spot every few seconds
-      const a = Math.atan2(z.root.position.z - c.at.z, z.root.position.x - c.at.x) + (Math.random() - .5) * 1.4, d = c.r * (.75 + Math.random() * .35);
-      s = z.smokeSearch = { c, until: now() + 2.5 + Math.random() * 2, at: new THREE.Vector3(c.at.x + Math.cos(a) * d, c.at.y, c.at.z + Math.sin(a) * d) };
+    if (!s || (c && s.c !== c) || now() > s.until) {   // mill about the smoke's open edge on the zombie's side, a new spot every few seconds
+      const zp = z.root.position, rim = c?.vol.rim, at = new THREE.Vector3();
+      if (rim?.length) { let best = null, bd = Infinity; for (let i = 0; i < 6; i++) { const p = rim[Math.random() * rim.length | 0], d = p.distanceToSquared(zp); if (d < bd) { bd = d; best = p; } } at.copy(best); }
+      else { const o = c?.at ?? lastAt ?? v.position, a = Math.atan2(zp.z - o.z, zp.x - o.x) + (Math.random() - .5) * 1.4, d = (c?.r ?? CLOUD_R) * (.75 + Math.random() * .35); at.set(o.x + Math.cos(a) * d, o.y, o.z + Math.sin(a) * d); }
+      s = z.smokeSearch = { c: c ?? s?.c ?? null, until: now() + 2.5 + Math.random() * 2, at };
     }
     return s.at;
   };
@@ -352,12 +342,9 @@ export default async function setup(api) {
     for (const w of [...wires]) updateWire(w, dt);
     for (const c of [...clouds]) {
       if (t >= c.until) { endCloud(c); continue; }
-      c.k = c.quick ? 1 : Math.min(1, (t - c.born) / CLOUD_GROW);
-      const fade = Math.min(1, (c.until - t) / 1.5);
-      c.mat.opacity = .8 * fade * Math.min(1, c.k * 1.5);
-      const e = 1 - (1 - c.k) ** 2;
-      for (const s of c.sprites) { s.scale.setScalar(s.userData.size * (.3 + .7 * e)); s.position.copy(s.userData.home).multiplyScalar(.4 + .6 * e); s.position.y += Math.sin(t * .6 + s.id) * 3; }
+      c.vol.fade = Math.min(1, (c.until - t) / 1.8);
     }
+    if (clouds.length) { const f = feet(), c = clouds.find(c => inside(c, f)); if (c) { lastAt = c.at; if (aug('smoke.ghost')) ghostUntil = t + GHOST * aug('smoke.ghost'); } }
     // Choking Cloud: every half second, once per zombie however many of your clouds it stands in
     const choke = aug('smoke.choke'), f = fx();
     if (choke && f && clouds.some(c => c.mine) && (chokeTick -= dt) <= 0) {
@@ -371,7 +358,7 @@ export default async function setup(api) {
     for (const w of [...wires]) removeWire(w, false);
     for (const m of [...mines]) removeMine(m, false);
     for (const c of [...clouds]) { c.mine = false; endCloud(c); }
-    revealedUntil = 0;
+    ghostUntil = 0; lastAt = null;
   });
 
   kino.bo3eq = { flying: () => flying, mines: () => mines, wires: () => wires, clouds: () => clouds };   // debug handle (tests)

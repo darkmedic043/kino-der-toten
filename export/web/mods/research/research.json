@@ -3038,7 +3038,7 @@
     {
      "name": "Ghost",
      "kind": "major",
-     "desc": "Firing from inside the smoke doesn't give you away.",
+     "desc": "Zombies keep losing you for 3 seconds after you leave the smoke.",
      "effects": {
       "smoke.ghost": 1
      },
