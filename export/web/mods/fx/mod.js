@@ -6,12 +6,15 @@
 // green = Ray Gun, tan = a wall hit) and leaves the rest to the cubes.
 // Sprites are pooled; no lights are added (that would recompile every shader).
 import * as THREE from 'three';
+import { setupContactShadows } from './contact-shadows.js';
+import { softSprite, softCheck } from './soft.js';
 
 const TEX='textures/';
 const up=new THREE.Vector3(0,1,0);
 
 export default function setup(api){
   const {host,scene,camera}=api;
+  setupContactShadows(api);   // soft ground patches under zombies and players (contact-shadows.js)
   const loader=new THREE.TextureLoader(),tex={},renderer=api.renderer;
   // Every sprite clones its texture (its own atlas offset) and disposes the clone when re-keyed; three shares the GPU
   // texture between clones of one image, but the last clone's dispose deleted it, so each explosion, blood burst or
@@ -35,7 +38,7 @@ export default function setup(api){
   const live=[],free=[];
   function sprite(key,{additive=false,color=0xffffff,opacity=1}={}){
     let s=free.pop();
-    if(!s){s=new THREE.Sprite(new THREE.SpriteMaterial({depthWrite:false,transparent:true,fog:true}));s.frustumCulled=false;s.renderOrder=5;}
+    if(!s){s=new THREE.Sprite(softSprite(new THREE.SpriteMaterial({depthWrite:false,transparent:true,fog:true})));s.frustumCulled=false;s.renderOrder=5;}
     const m=s.material;
     if(m.userData.key!==key){m.map?.dispose?.();m.map=tex[key].clone();m.userData.key=key;}
     const [c,r]=GRID[key];m.map.repeat.set(1/c,1/r);
@@ -53,7 +56,7 @@ export default function setup(api){
     const n=GRID[p.key][0]*GRID[p.key][1];cell(s,p.cellIndex??Math.floor(Math.random()*n));
     live.push({s,t:0,...p,vel:p.vel?.clone()??new THREE.Vector3(),n,base:p.opacity??1});
   }
-  host.on('update',dt=>{
+  host.on('update',dt=>{softCheck();
     if(!dt)return;
     for(let i=live.length-1;i>=0;i--){
       const p=live[i];p.t+=dt;const k=p.t/p.life;

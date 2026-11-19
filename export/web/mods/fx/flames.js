@@ -12,6 +12,7 @@
 // fireFlicker(t, seed) is the one flicker curve: the flames use it in GLSL and the maps' fire lights on the CPU, so
 // a torch and its light pulse together. Quads are view-aligned and anchored at the fixture point; they never pop
 // at the screen edge or hit the point-sprite size cap the old Points did.
+import { softUniforms, softCheck, SOFT_VERT, SOFT_FRAG } from './soft.js';
 import * as THREE from 'three';
 
 // per fixture kind: flame height (world units), sub-flames, hot (1 = white core, lower = cooler, bluer base),
@@ -59,7 +60,7 @@ const inst = (g, name, arr, n) => { g.setAttribute(name, new THREE.InstancedBuff
 export function createFlames({ scene, renderer, low = false, name = 'flames', fade = 2600 } = {}) {
   const fires = [];   // {p, kind, size, hot, seed, sub, embers, smoke, glow, aspect, rate}
   const u = { time: { value: 0 }, px: { value: 1 }, fogColor: { value: new THREE.Color(0, 0, 0) }, fogDensity: { value: 0 }, flash: { value: 0 }, fade: { value: fade },
-    gain: { value: .55 }, core: { value: .25 }, alpha: { value: .9 }, glowK: { value: .4 }, soot: { value: .75 }, erode: { value: 1.15 } };   // tuning: brightness, white-core share, flame opacity, halo strength, how much the tips darken what's behind
+    gain: { value: .55 }, core: { value: .25 }, alpha: { value: .9 }, glowK: { value: .4 }, soot: { value: .75 }, erode: { value: 1.15 }, ...softUniforms() };   // tuning: brightness, white-core share, flame opacity, halo strength, how much the tips darken what's behind
   const common = { transparent: true, depthWrite: false, depthTest: true, fog: false };
 
   // the flame body blends premultiplied (ONE, ONE_MINUS_SRC_ALPHA): the bright inside adds light, the thin tips and the
@@ -67,18 +68,18 @@ export function createFlames({ scene, renderer, low = false, name = 'flames', fa
   // old flames read as glowing cut-outs
   const flameMat = new THREE.ShaderMaterial({ ...common, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation, uniforms: u,
     vertexShader: /* glsl */`attribute vec3 at; attribute vec4 fl;   // fl: height, aspect, phase, hot
-      attribute float rate; uniform float px, fade; varying vec2 vUv; varying float vPhase, vHot, vA, vRate;
-      ${GLSL_BILLBOARD}
+      attribute float rate; uniform float px, fade; varying vec2 vUv; varying float vPhase, vHot, vA, vRate, vSoftR;
+      ${GLSL_BILLBOARD} ${SOFT_VERT}
       void main(){ vUv = vec2(uv.x * 2.0 - 1.0, uv.y); vPhase = fl.z; vHot = fl.w; vRate = rate;
         float h = fl.x, w = h / fl.y;
         vec4 mv = billboard(at, vec2(w, h), position.xy, 0.0); float d = max(10.0, -mv.z);
         // keep a far flame at least a few pixels tall (it would otherwise shimmer at sub-pixel size), dimmer to match
         float pxh = h * 700.0 * px / d, k = max(1.0, 4.0 * px / max(pxh, 0.01));
         if (k > 1.0) { mv = billboard(at, vec2(w, h) * k, position.xy, 0.0); }
-        vA = smoothstep(fade, fade * 0.3, d) / (k * k);
+        vA = smoothstep(fade, fade * 0.3, d) / (k * k); vSoft = softMat * mv; vSoftR = clamp(h * 0.14, 4.0, 40.0);
         gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: /* glsl */`uniform float time, gain, core, alpha, soot, erode; varying vec2 vUv; varying float vPhase, vHot, vA, vRate;
-      ${GLSL_NOISE} ${GLSL_FLICKER}
+    fragmentShader: /* glsl */`uniform float time, gain, core, alpha, soot, erode; varying vec2 vUv; varying float vPhase, vHot, vA, vRate, vSoftR;
+      ${GLSL_NOISE} ${GLSL_FLICKER} ${SOFT_FRAG}
       void main(){ vec2 p = vUv; float t = time * vRate + vPhase, fk = flicker(time, vPhase);
         float y = p.y / (0.76 + 0.24 * fk);                                 // the flame breathes: taller as the flicker peaks
         // turbulence rising through the flame: slow eddies (warp) bend the body and the licks, finer noise rides on them;
@@ -91,7 +92,7 @@ export function createFlames({ scene, renderer, low = false, name = 'flames', fa
         float body = 1.0 - abs(p.x + sway) / w;                              // 1 on the axis, 0 at the edge
         float f = body * (1.0 - y) * 1.7 - ((n - 0.32) * (0.5 + 1.7 * y) + (n2 - 0.45) * (0.25 + 0.55 * y)) * erode;
         // the erosion can push f above 0 outside the tongue (low noise); mask by the body and the top, or the quad shows as a pale box
-        float a = smoothstep(0.0, 0.13, f) * smoothstep(0.0, 0.1, p.y) * smoothstep(-0.1, 0.25, body) * smoothstep(1.0, 0.8, y) * vA; if (a < 0.01) discard;
+        float a = smoothstep(0.0, 0.13, f) * smoothstep(0.0, 0.1, p.y) * smoothstep(-0.1, 0.25, body) * smoothstep(1.0, 0.8, y) * vA * softFade(vSoftR, 0.15); if (a < 0.01) discard;
         // how deep inside the flame: a thin dark red skin, orange, yellow; the white core sits low in the flame (the
         // hottest part is just above the fuel), the tips are only ever red-orange
         float dd = clamp(f * 0.75, 0.0, 1.0), low = smoothstep(0.8, 0.25, y);
@@ -131,19 +132,19 @@ export function createFlames({ scene, renderer, low = false, name = 'flames', fa
       }` });
 
   const smokeMat = new THREE.ShaderMaterial({ ...common, blending: THREE.NormalBlending, uniforms: u,
-    vertexShader: /* glsl */`attribute vec3 at, seed; attribute float size; uniform float time, px, fade; varying float vA, vT, vSeed, vFog; varying vec2 vUv2;
-      ${GLSL_BILLBOARD}
+    vertexShader: /* glsl */`attribute vec3 at, seed; attribute float size; uniform float time, px, fade; varying float vA, vT, vSeed, vFog, vSoftR; varying vec2 vUv2;
+      ${GLSL_BILLBOARD} ${SOFT_VERT}
       void main(){ float dur = 3.2 + 2.8 * seed.y, t = fract(time / dur + seed.x), ph = seed.z * 6.2832;
         vec3 w = at + vec3(sin(time * 0.5 + ph) * size * 0.35 * t + sin(ph) * size * 0.2, t * size * (2.6 + 1.6 * seed.z), cos(time * 0.4 + ph) * size * 0.35 * t + cos(ph) * size * 0.2);
         float s = size * (0.55 + 1.9 * t);
         vec4 mv = modelViewMatrix * vec4(w, 1.0); float d = max(10.0, -mv.z); mv.xy += position.xy * s - vec2(0.0, s * 0.5);
         vA = (1.0 - t) * (1.0 - t) * smoothstep(0.0, 0.15, t) * smoothstep(fade, fade * 0.3, d) * smoothstep(15.0, 70.0, d);
-        vT = t; vSeed = seed.z; vFog = d; vUv2 = uv; gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: /* glsl */`uniform vec3 fogColor; uniform float fogDensity, time, flash; varying float vA, vT, vSeed, vFog; varying vec2 vUv2;
-      ${GLSL_NOISE}
+        vT = t; vSeed = seed.z; vFog = d; vUv2 = uv; vSoft = softMat * mv; vSoftR = clamp(s * 0.3, 8.0, 90.0); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: /* glsl */`uniform vec3 fogColor; uniform float fogDensity, time, flash; varying float vA, vT, vSeed, vFog, vSoftR; varying vec2 vUv2;
+      ${GLSL_NOISE} ${SOFT_FRAG}
       void main(){ vec2 p = (vUv2 - 0.5) * 2.0; float r = length(p);
         float n = fbm(p * 1.8 + vec2(vSeed * 9.0, -time * 0.25 + vSeed * 4.0));
-        float a = smoothstep(1.0, 0.2, r + (n - 0.45) * 0.9) * vA * 0.42; if (a < 0.004) discard;
+        float a = smoothstep(1.0, 0.2, r + (n - 0.45) * 0.9) * vA * 0.42 * softFade(vSoftR, 0.0); if (a < 0.004) discard;
         float f = 1.0 - exp(-fogDensity * fogDensity * vFog * vFog);
         vec3 col = mix(vec3(0.05, 0.05, 0.055), vec3(0.5, 0.2, 0.05), (1.0 - vT) * (1.0 - vT) * smoothstep(0.6, -0.2, p.y) * 0.9) + flash * vec3(0.1, 0.12, 0.15);
         gl_FragColor = vec4(mix(col, fogColor, f), a * (1.0 - f * 0.6));
@@ -153,14 +154,14 @@ export function createFlames({ scene, renderer, low = false, name = 'flames', fa
 
   const glowMat = new THREE.ShaderMaterial({ ...common, blending: THREE.AdditiveBlending, uniforms: u,
     vertexShader: /* glsl */`attribute vec3 at; attribute vec3 gl;   // gl: size, phase, hot
-      uniform float fade; varying float vA, vPhase, vHot; varying vec2 vUv2;
-      ${GLSL_BILLBOARD}
+      uniform float fade; varying float vA, vPhase, vHot, vSoftR; varying vec2 vUv2;
+      ${GLSL_BILLBOARD} ${SOFT_VERT}
       void main(){ vec4 mv = modelViewMatrix * vec4(at, 1.0); float d = max(10.0, -mv.z); mv.xy += position.xy * gl.x - vec2(0.0, gl.x * 0.5);
-        vA = smoothstep(fade, fade * 0.3, d) * smoothstep(25.0, 110.0, d); vPhase = gl.y; vHot = gl.z; vUv2 = uv; gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: /* glsl */`uniform float time, glowK; varying float vA, vPhase, vHot; varying vec2 vUv2;
-      ${GLSL_FLICKER}
+        vA = smoothstep(fade, fade * 0.3, d) * smoothstep(25.0, 110.0, d); vPhase = gl.y; vHot = gl.z; vUv2 = uv; vSoft = softMat * mv; vSoftR = clamp(gl.x * 0.3, 8.0, 80.0); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: /* glsl */`uniform float time, glowK; varying float vA, vPhase, vHot, vSoftR; varying vec2 vUv2;
+      ${GLSL_FLICKER} ${SOFT_FRAG}
       void main(){ vec2 p = (vUv2 - 0.5) * 2.0; float r = length(p * vec2(1.0, 0.85)); if (r > 1.0) discard;
-        float a = pow(1.0 - r, 2.6) * vA * (0.75 + 0.25 * flicker(time, vPhase)) * 0.16 * glowK * (0.5 + 0.5 * vHot);
+        float a = pow(1.0 - r, 2.6) * vA * (0.75 + 0.25 * flicker(time, vPhase)) * 0.16 * glowK * (0.5 + 0.5 * vHot) * softFade(vSoftR, 0.1);
         gl_FragColor = vec4(vec3(1.0, 0.5, 0.16) * 1.6 * a, a);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -242,7 +243,7 @@ export function createFlames({ scene, renderer, low = false, name = 'flames', fa
   const size2 = new THREE.Vector2();
   /** per frame: dt, and optionally the scene's fog (for the smoke) and a lightning flash 0..1 */
   function update(dt, { fog = null, flash = 0 } = {}) {
-    u.time.value += dt;
+    u.time.value += dt; softCheck();
     u.px.value = renderer.getPixelRatio() * (renderer.getSize(size2).y / 900);
     if (fog) { u.fogColor.value.copy(fog.color); u.fogDensity.value = fog.density ?? 0; }
     u.flash.value = flash;

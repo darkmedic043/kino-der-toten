@@ -15,6 +15,7 @@
 // for wet or polished ground. A map entry's `reflect: {water:[...], floors:[...]}` adds them at load.
 import * as THREE from 'three';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { softU, soft } from '../fx/soft.js';
 import { settings } from '../../settings.js';
 
 const VS = /* glsl */`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
@@ -113,7 +114,17 @@ export function createPostFx(api) {
   const back = (r, quad, from, to) => { quad.material.uniforms.tDiffuse.value = from.texture; draw(r, quad, to); };
   let sceneRT = null, cam = api.camera, drawView = false, viewCam = api.viewCamera, time = 0, last = 0, dt = 1 / 60;
   // The buffer the scene pass drew into holds this frame's depth (the composer alternates its two buffers).
-  const track = renderPass => { const f = renderPass.render.bind(renderPass); renderPass.render = (r, wb, rb, ...a) => { sceneRT = rb; return f(r, wb, rb, ...a); }; };
+  // Soft particles (mods/fx/soft.js): after the scene pass, its depth is copied at half size as view distance; next
+  // frame's sprites read it through softMat (their view space → this frame's clip space) and fade near solid things.
+  const softQ = new FullScreenQuad(mat(/* glsl */`#include <packing>
+uniform sampler2D tDepth;uniform float near,far;varying vec2 vUv;void main(){gl_FragColor=vec4(-perspectiveDepthToViewZ(texture2D(tDepth,vUv).x,near,far),0.,0.,1.);}`, { tDepth: { value: null }, near: { value: 1 }, far: { value: 1000 } }));
+  const softRT = new THREE.WebGLRenderTarget(1, 1, { format: THREE.RedFormat, type: THREE.HalfFloatType, depthBuffer: false });
+  const softVP = new THREE.Matrix4(); let softHave = false;
+  const softPre = c => { c.updateWorldMatrix(true, false); softU.softMat.value.multiplyMatrices(softVP, c.matrixWorld); softU.softOn.value = softHave && soft.enabled ? 1 : 0; softU.tSoft.value = softRT.texture; };
+  const softPost = (r, rb, c) => { softHave = false; if (!rb?.depthTexture || !c?.isPerspectiveCamera || !soft.enabled) return;
+    fit(softRT, Math.max(1, rb.width >> 1), Math.max(1, rb.height >> 1)); const u = softQ.material.uniforms; u.tDepth.value = rb.depthTexture; u.near.value = c.near; u.far.value = c.far;
+    draw(r, softQ, softRT); softVP.multiplyMatrices(c.projectionMatrix, c.matrixWorldInverse); softHave = true; soft.stamp = performance.now(); };
+  const track = renderPass => { const f = renderPass.render.bind(renderPass); renderPass.render = (r, wb, rb, ...a) => { sceneRT = rb; softPre(renderPass.camera); const out = f(r, wb, rb, ...a); softPost(r, rb, renderPass.camera); return out; }; };
   const frame = (c, dv, vc) => { cam = c; drawView = dv; viewCam = vc ?? viewCam; const n = performance.now(); dt = Math.min(.1, Math.max(.002, (n - last) / 1000)); last = n; time += dt; stats.motion = stats.dof = stats.ssr = 0; };
 
   // ---- motion blur
@@ -193,6 +204,7 @@ export function createPostFx(api) {
   const warm = () => { try {
     const a = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 }), b = rt(); b.setSize(4, 4); a.depthTexture = new THREE.DepthTexture(4, 4);
     for (const q of [motionQ, dofQ, ssrQ]) draw(renderer, q, b);
+    { const c = new THREE.WebGLRenderTarget(4, 4, { format: THREE.RedFormat, type: THREE.HalfFloatType, depthBuffer: false }); draw(renderer, softQ, c); c.dispose(); }
     back(renderer, copyQ, b, a); back(renderer, blendQ, b, a); a.depthTexture.dispose(); a.dispose(); b.dispose();
   } catch (e) { console.warn('[post-fx] warm', e); } };
   K.postFx = { motion: motionU, dof: dofU, ssr: ssrU, config, stats, rules, addWater, addFloor };
