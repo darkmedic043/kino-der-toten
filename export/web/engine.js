@@ -501,7 +501,7 @@ try{
   mods.mapId=entry.id;data=await mods.load(await map.loadData());session=new (map.Session??KinoSession)(data);
   world=await map.loadWorld(progress);
   const spawn=map.spawn();
-  player=new PlayerController(camera,world.physics,{spawn:spawn.position,spawnIsEye:false,radius:14,height:70,eyeHeight:60,moveSpeed:190,sprintSpeed:285,crouchSpeed:95,gravity:800,jumpHeight:39,fallResetY:(world.bounds?.min.y??0)-800,maxSubSteps:12,groundSnapSpeed:10,...map.player});
+  player=new PlayerController(camera,world.physics,{spawn:spawn.position,spawnIsEye:false,radius:14,height:70,eyeHeight:60,moveSpeed:190,sprintSpeed:285,crouchSpeed:95,gravity:800,jumpHeight:39,fallResetY:(world.bounds?.min.y??0)-800,maxSubSteps:12,groundSnapSpeed:10,interpolate:!/[?&]noLerp\b/.test(location.search),...map.player});
   camera.rotation.set(0,spawn.yaw-Math.PI/2,0);world.setDoors(session);
   progress('Loading weapons and the undead',80);view=new ViewWeapon(viewScene,data,(name,def)=>audio.notify(name,def));enemies=new (map.Enemies??Enemies)(scene,world,data,session,{damage,kill,hit,sound:(kind,p)=>audio.play(kind,Math.max(0,1-p.distanceTo(camera.position)/1000))});
   world.actors=()=>enemies.list;

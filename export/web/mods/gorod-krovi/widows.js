@@ -21,6 +21,7 @@
 //   throws a plain frag there).
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { mergeGeometries } from '../../vendor/jsm/utils/BufferGeometryUtils.js';
 import { CollisionWorld } from '../../collision-world.js';
 import { createSync } from '../der-eisendrache/sync.js';
 import { sfxAt } from '../der-eisendrache/castle-audio.js';
@@ -83,14 +84,34 @@ export default async function setup(api, gk) {
 }
 
 // ---- Der Wunderfizz ----------------------------------------------------------------------------------------------------
+// The machine's GLB is skinned to one bone that never moves, so it is drawn as plain meshes, its 23 parts merged into
+// one mesh per material (2026-11-19). The three machines were `model.clone()`s before, which share the first one's
+// skeleton: its bone stays at the world origin, so all three were drawn there, stacked, instead of at their spots, and
+// nothing culled them (66 skinned draws in the sun's shadow pass from anywhere on the map). Named `machine_...`: the
+// sun (sun.js) draws its shadow once into the static map.
+function plainFizz(model) {
+  let rigid = true; model.updateMatrixWorld(true); model.traverse(s => { if (s.isSkinnedMesh && s.skeleton.bones.length !== 1 || s.isMesh && Array.isArray(s.material)) rigid = false; });
+  if (!rigid) return model;   // a rig with real bones: its own copy from loadModel, skinned as it is
+  const out = new THREE.Group(), M = new THREE.Matrix4(), by = new Map();
+  model.traverse(s => { if (!s.isMesh) return;
+    if (s.isSkinnedMesh) M.multiplyMatrices(s.skeleton.bones[0].matrixWorld, s.skeleton.boneInverses[0]).multiply(s.bindMatrix); else M.copy(s.matrixWorld);
+    const g = s.geometry.clone(); g.deleteAttribute('skinIndex'); g.deleteAttribute('skinWeight'); g.applyMatrix4(M);
+    if (!by.has(s.material)) by.set(s.material, []); by.get(s.material).push(g); });
+  for (const [material, list] of by) { const keys = Object.keys(list[0].attributes).filter(k => list.every(g => g.attributes[k]));
+    for (const g of list) for (const k of Object.keys(g.attributes)) if (!keys.includes(k)) g.deleteAttribute(k);
+    const mixed = list.some(g => !!g.index !== !!list[0].index), src = mixed ? list.map(g => g.index ? g.toNonIndexed() : g) : list;
+    const one = src.length > 1 ? mergeGeometries(src, false) : src[0];
+    for (const g of one ? [one] : src) { g.computeBoundingSphere(); g.computeBoundingBox(); out.add(new THREE.Mesh(g, material)); } }
+  return out;
+}
 async function setupFizz(api, sync, D) {
   const { world, session, host, scene, toast, announce, audio, camera } = api;
-  const model = await loadModel(D.fizz).catch(() => null);
+  const models = await Promise.all(SPOTS.map(() => loadModel(D.fizz).catch(() => null)));
   const ray = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
-  const machines = SPOTS.map(s => {
+  const machines = SPOTS.map((s, i) => {
     const p = s.p.clone(); ray.origin.copy(p).y += 40; const g = world.raycast?.(ray, 0, 120); if (g && Math.abs(g.position.y - p.y) < 40) p.y = g.position.y;   // on the floor under the struct
-    const yaw = s.yaw * R, o = model ? model.clone() : null;   // the BO3 machine GLBs face +Z: rotation.y is BO3's yaw (custom-world perkYaw -90 + FACE)
-    if (o) { o.position.copy(p); o.rotation.y = yaw; o.traverse(m => { m.castShadow = true; }); scene.add(o); o.updateMatrix(); o.updateMatrixWorld(true); }
+    const yaw = s.yaw * R, o = models[i] ? plainFizz(models[i]) : null;   // the BO3 machine GLBs face +Z: rotation.y is BO3's yaw (custom-world perkYaw -90 + FACE)
+    if (o) { o.name = 'machine_wunderfizz_' + i; o.position.copy(p); o.rotation.y = yaw; o.traverse(m => { m.castShadow = true; m.receiveShadow = true; }); scene.add(o); o.updateMatrix(); o.updateMatrixWorld(true); }
     const box = new THREE.BoxGeometry(74, 110, 57).translate(0, 55, -.85).rotateY(yaw).translate(p.x, p.y, p.z);   // the machine's bounds
     world.dynamic?.push({ collider: new CollisionWorld(box), box: new THREE.Box3().setFromBufferAttribute(box.attributes.position), enabled: true, window: true });
     return { o, p, slot: FIZZ_SLOT.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).add(p), yaw, scale: 1, start: true };

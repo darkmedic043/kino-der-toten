@@ -232,6 +232,11 @@ export class PlayerController {
     this.onLadder = false;
     this.enabled = true;
     this._accumulator = 0;
+    // fork (2026-11-19): draw the camera between the last two fixed steps (see update and _syncCamera)
+    this.interpolate = options.interpolate === true;
+    this._lerpK = 0;
+    this._prevStart = new THREE.Vector3();
+    this._lastStart = new THREE.Vector3();
     this._jumpBufferTimer = 0;
     this._coyoteTimer = 0;
     this._jumpHeld = false;
@@ -394,11 +399,16 @@ export class PlayerController {
 
     let steps = 0;
     while (this._accumulator >= this.fixedTimeStep && steps < this.maxSubSteps) {
+      this._prevStart.copy(this.collider.start);
       this._stepFixed(this.fixedTimeStep);
       this._accumulator -= this.fixedTimeStep;
       steps += 1;
     }
 
+    // fork: a frame falls between two fixed steps, so the camera is drawn that far back towards the step before. Without
+    // it a frame shows whole steps only (0 or 1 at 144 Hz, 1 or 2 at 100 Hz): the view judders at a steady frame rate.
+    if (steps) this._lastStart.copy(this.collider.start);
+    this._lerpK = this.interpolate ? 1 - Math.min(1, this._accumulator / this.fixedTimeStep) : 0;
     this._syncCamera();
     return this.state;
   }
@@ -879,8 +889,17 @@ export class PlayerController {
   }
 
   _syncCamera() {
-    const feetY = this.collider.start.y - this.radius;
-    this.camera.position.set(this.collider.start.x, feetY + this._eyeHeight, this.collider.start.z);
+    const s = this.collider.start, k = this._lerpK;
+    let x = s.x, y = s.y - this.radius + this._eyeHeight, z = s.z;
+    if (this.interpolate) {
+      const p = this._prevStart, l = this._lastStart;
+      // moved outside a step (a platform, a mantle, a teleport): both ends move with it, so it shows in full at once;
+      // a jump of over 60 units inside one step (the fall reset) is not blended either
+      if (l.x !== s.x || l.y !== s.y || l.z !== s.z) { p.x += s.x - l.x; p.y += s.y - l.y; p.z += s.z - l.z; l.copy(s); }
+      if (p.distanceToSquared(s) > 3600) p.copy(s);
+      if (k > 0) { x -= (s.x - p.x) * k; y -= (s.y - p.y) * k; z -= (s.z - p.z) * k; }
+    }
+    this.camera.position.set(x, y, z);
   }
 }
 

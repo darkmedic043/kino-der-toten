@@ -7,6 +7,7 @@
 // Sprites are pooled; no lights are added (that would recompile every shader).
 import * as THREE from 'three';
 import { setupContactShadows } from './contact-shadows.js';
+import { setupDeathPhysics } from './death-physics.js';
 import { softSprite, softCheck } from './soft.js';
 
 const TEX='textures/';
@@ -15,6 +16,7 @@ const up=new THREE.Vector3(0,1,0);
 export default function setup(api){
   const {host,scene,camera}=api;
   setupContactShadows(api);   // soft ground patches under zombies and players (contact-shadows.js)
+  setupDeathPhysics(api);     // the killing hit pushes the body and kicks its spine (death-physics.js)
   const loader=new THREE.TextureLoader(),tex={},renderer=api.renderer;
   // Every sprite clones its texture (its own atlas offset) and disposes the clone when re-keyed; three shares the GPU
   // texture between clones of one image, but the last clone's dispose deleted it, so each explosion, blood burst or

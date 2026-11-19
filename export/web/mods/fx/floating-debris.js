@@ -3,13 +3,17 @@
 //   debris.block(door);            an existing door: its own pieces are taken off the render layers, debris hangs in their place
 //   debris.block(door, [box3]);    a door made at runtime (debrisDoor below): debris fills the given passage boxes
 //   debris.block(door, [box3], m);  the boxes in frame m (Matrix4, a turned doorway: Gorod Krovi's diagonal piles)
-// Pieces use copies of the props' materials (same textures, the baked light applies), one InstancedMesh per prop part
-// and door (2026-11-13: each piece part was a draw of its own, 25-40 a door and ~125 in a castle view), `noCull` and
-// under a `noMerge` group in world.root, so the scene merge and the instance culler leave them alone and keep the
-// props' textures loaded. The copies matter: a material shared with a batch or a plain mesh flips its program per draw.
+// Pieces use copies of the props' materials (same textures, the baked light applies). On a map with texture-array
+// batches (2026-11-19) every piece part is a plain mesh marked `batchFollow`: it rides in the engine's follower batches
+// (instance-cull.js), which draw every door's debris in a few calls and cull each piece on its own (Gorod Krovi's six
+// doors cost 220 draw calls from the spawn as instanced meshes, one per prop part and door). A part whose material can't
+// go into a texture array, and every part on a map without the batches, is still one InstancedMesh per prop part and
+// door, `noCull`. Both sit under a `noMerge` group in world.root, so the scene merge leaves them alone. The copies
+// matter: a material shared with a batch or a plain mesh flips its program per draw.
 // Everything is made in setup and visible at load, so the warm-up compiles it; nothing is added or removed in play.
 import * as THREE from 'three';
 import { CollisionWorld } from '../../collision-world.js';
+import { canFollow } from '../../instance-cull.js';
 
 const P = new THREE.Vector3(), Q = new THREE.Quaternion(), E = new THREE.Euler(), S = new THREE.Vector3(), M = new THREE.Matrix4();
 const rng = seed => { let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
@@ -39,8 +43,9 @@ function slabs(objects) {
   return out;
 }
 
-export function floatingDebris({ world, session, host, camera }, { models = [], glow = 0x9fd4ff, seed = 11 } = {}) {
-  const kinds = [], rand = rng(seed), blocks = [], copies = new Map();
+export function floatingDebris({ world, session, host, camera, map }, { models = [], glow = 0x9fd4ff, seed = 11 } = {}) {
+  const kinds = [], rand = rng(seed), blocks = [], copies = new Map(), stats = { followers: 0, instanced: 0 };
+  const follow = !!map?.textureArrays && !/[?&](noArrays|noBatch|noFollow)\b/.test(location.search);
   // clone() keeps neither the shader hooks nor userData's objects
   const own = m => { let c = copies.get(m); if (!c) { c = m.clone(); c.userData = { ...m.userData }; c.onBeforeCompile = m.onBeforeCompile; c.customProgramCacheKey = m.customProgramCacheKey; copies.set(m, c); } return c; };
   // one centred copy of each prop's geometry (the culler frees the originals' buffers once it has batched them)
@@ -52,7 +57,7 @@ export function floatingDebris({ world, session, host, camera }, { models = [], 
     const parts = src.filter(o => !Array.isArray(o.material)).map(o => { const g = o.geometry.clone(); g.computeBoundingBox(); box.union(g.boundingBox); return { g, material: own(o.material) }; });
     if (!parts.length) continue;
     const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()), d = [size.x, size.y, size.z].sort((a, b) => b - a);
-    for (const p of parts) { p.g.translate(-c.x, -c.y, -c.z); p.g.computeBoundingBox(); p.g.computeBoundingSphere(); }
+    for (const p of parts) { p.g.translate(-c.x, -c.y, -c.z); p.g.computeBoundingBox(); p.g.computeBoundingSphere(); p.follow = follow && canFollow(new THREE.Mesh(p.g, p.material)); }
     kinds.push({ model, parts, long: d[0], plank: d[0] > d[1] * 2.6 });
   }
   if (!kinds.length) kinds.push({ model: 'box', parts: [{ g: new THREE.BoxGeometry(1, .8, .9), material: new THREE.MeshStandardMaterial({ color: 0x6b5a48, roughness: .9 }) }], long: 1, plank: false });
@@ -95,9 +100,11 @@ export function floatingDebris({ world, session, host, camera }, { models = [], 
     // one InstancedMesh per part of each prop used here; a piece is an instance in each of its prop's parts
     const sphere = new THREE.Sphere(new THREE.Box3().setFromPoints(list.map(e => e.pos)).getCenter(new THREE.Vector3()), 400);
     for (const kind of new Set(list.map(e => e.kind))) {
-      const mine = list.filter(e => e.kind === kind), ims = kind.parts.map(p => { const im = new THREE.InstancedMesh(p.g, p.material, mine.length);
-        im.name = 'fdebris_' + kind.model; im.userData.noCull = true; im.matrixAutoUpdate = false; im.castShadow = false; im.receiveShadow = true; im.boundingSphere = sphere; group.add(im); im.matrixWorld.copy(group.matrixWorld); meshes.push(im); return im; });
-      mine.forEach((e, i) => { e.ims = ims; e.i = i; });
+      const mine = list.filter(e => e.kind === kind), ims = kind.parts.filter(p => !p.follow).map(p => { const im = new THREE.InstancedMesh(p.g, p.material, mine.length);
+        im.name = 'fdebris_' + kind.model; im.userData.noCull = true; im.matrixAutoUpdate = false; im.castShadow = false; im.receiveShadow = true; im.boundingSphere = sphere; group.add(im); im.matrixWorld.copy(group.matrixWorld); meshes.push(im); stats.instanced++; return im; });
+      mine.forEach((e, i) => { e.ims = ims; e.i = i;
+        // the followers: one plain mesh per part, never drawn itself (the batch copies its world matrix and visibility)
+        e.fol = kind.parts.filter(p => p.follow).map(p => { const m = new THREE.Mesh(p.g, p.material); m.name = 'fdebris_' + kind.model; m.userData.batchFollow = true; m.matrixAutoUpdate = false; m.castShadow = false; m.receiveShadow = true; group.add(m); stats.followers++; return m; }); });
     }
     const pos = new Float32Array(n * 3), base = [];
     fills.forEach((f, fi) => { for (let i = 0; i < 26; i++) { const p = new THREE.Vector3(); p[f.k] = f.box.min[f.k] + rand() * f.W; p.y = f.box.min.y + 6 + rand() * (f.H + 6); p[f.t] = f.c[f.t] + (rand() - .5) * 46; base.push({ p, ph: rand() * 6.28, w: .5 + rand() * .9, r: 3 + rand() * 6 }); p.toArray(pos, (fi * 26 + i) * 3); } });
@@ -118,6 +125,7 @@ export function floatingDebris({ world, session, host, camera }, { models = [], 
       E.set(e.rot.x + Math.sin(time * e.w * .7 + e.ph) * e.wob + e.spin.x * ease, e.rot.y + Math.sin(time * e.w * .45 + e.ph * 2) * e.wob * 1.6 + e.spin.y * ease, e.rot.z + Math.cos(time * e.w * .6 + e.ph) * e.wob + e.spin.z * ease);
       S.setScalar(e.s * (1 - ease * ease)); M.compose(P, Q.setFromEuler(E), S);
       for (const im of e.ims) M.toArray(im.instanceMatrix.array, e.i * 16);
+      for (const m of e.fol) { m.matrix.copy(M); m.matrixWorld.multiplyMatrices(b.group.matrixWorld, M); }
     }
     for (const im of b.meshes) im.instanceMatrix.needsUpdate = true;
     const a = b.motes.geometry.attributes.position, lift = k * 120;
@@ -137,5 +145,5 @@ export function floatingDebris({ world, session, host, camera }, { models = [], 
     }
   });
   host.on('reset', () => { for (const b of blocks) { b.open = world.isOpen(b.door, session) ? 1 : 0; pose(b, performance.now() / 1000, true); } });
-  return { block, blocks, kinds };
+  return { block, blocks, kinds, stats };
 }
