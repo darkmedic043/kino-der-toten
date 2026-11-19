@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { MeshoptSimplifier } from './vendor/meshopt_simplifier.js';
 import { imageOf, dropImage, hasImage, restoreImages } from './texture-memory.js';
+import { settings } from './settings.js';
 
 // three r185 bug: WebGLRenderer.setProgram tests `object.colorTexture` on a BatchedMesh, but the class keeps it in
 // `_colorsTexture`; for a batch without colours `undefined !== null` held, so every batched draw looked its program up
@@ -170,7 +171,7 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
     const first=e.sources[0];let mat,layerOf=null,layerTex=null;
     if(e.arr){   // texture-array batch: layers per map source, a layer pair per instance
       const maps=new Map(),normals=new Map();for(const o of e.sources){const m=o.material;if(m.map&&!maps.has(m.map.source))maps.set(m.map.source,maps.size);if(m.normalMap&&!normals.has(m.normalMap.source))normals.set(m.normalMap.source,normals.size);}
-      let mapArray=null,normalArray=null;const cs=first.material.map?.colorSpace,an=k=>e.sources.reduce((a,o)=>Math.max(a,o.material[k]?.anisotropy??1),4);
+      let mapArray=null,normalArray=null;const cs=first.material.map?.colorSpace,an=k=>e.sources.reduce((a,o)=>Math.max(a,o.material[k]?.anisotropy??1),Math.min(renderer?.capabilities.getMaxAnisotropy?.()??4,[4,4,16,16][settings.graphics]??4));   // (2026-11-19) 16x on High and Ultra: floors and walls stay sharp at grazing angles
       if((first.material.map??first.material.normalMap)?.isCompressedTexture){   // the textures behind each source, in layer order
         const tex=src=>{const out=[];for(const s of src.keys())out.push(e.sources.map(o=>o.material).flatMap(m=>[m.map,m.normalMap]).find(t=>t?.source===s));return out;};
         if(maps.size)mapArray=compressedArray(tex(maps),cs,an('map'));if(normals.size)normalArray=compressedArray(tex(normals),THREE.NoColorSpace,an('normalMap'));

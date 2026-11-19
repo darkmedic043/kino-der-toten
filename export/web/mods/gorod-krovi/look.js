@@ -53,7 +53,7 @@ function liftDarkMetal(root) {
 // on transparency and opacity). Water decals, stains and the distant waterfall card stay as they are.
 const WATER = /(^|\/)t7_(zm_sta_)?water_(?!.*(decal|stain|puddle|backscatter))|^wc\/t7_water/;
 function seeThroughWater(root) {
-  const done = new Set(); let n = 0;
+  const done = new Set(), flats = [], B = new THREE.Box3(); let n = 0;
   root.traverse(o => { if (!o.isMesh) return; const ms = [o.material].flat();
     if (!ms.some(m => WATER.test(m?.name ?? '') && !/waterfall|decal|stain/.test(m.name))) return;
     o.castShadow = false;
@@ -62,7 +62,14 @@ function seeThroughWater(root) {
       m.transparent = true; m.opacity = op; m.depthWrite = false;
       m.roughness = .12; m.metalness = 0; if (m.color) m.color.multiplyScalar(.85); n++; }
     o.renderOrder = Math.max(o.renderOrder, 1);
+    o.updateWorldMatrix(true, false); B.setFromObject(o); if (B.max.y - B.min.y < 30 && !B.isEmpty()) flats.push({ y: B.max.y, r: [B.min.x, B.min.z, B.max.x, B.max.z] });
   });
+  // (2026-11-19) the flood mirrors the town (lighting/post-fx.js): one rule per stretch of water, from the meshes'
+  // own bounds; sheets at the same level that touch or lie within 150 units are one stretch
+  const pools = [];
+  for (const f of flats.sort((a, b) => a.y - b.y)) { let p = pools.find(p => Math.abs(p.y - f.y) < 6 && f.r[0] < p.r[2] + 150 && f.r[2] > p.r[0] - 150 && f.r[1] < p.r[3] + 150 && f.r[3] > p.r[1] - 150);
+    if (p) { p.r[0] = Math.min(p.r[0], f.r[0]); p.r[1] = Math.min(p.r[1], f.r[1]); p.r[2] = Math.max(p.r[2], f.r[2]); p.r[3] = Math.max(p.r[3], f.r[3]); p.y = Math.max(p.y, f.y); } else pools.push({ y: f.y, r: [...f.r] }); }
+  for (const p of pools) window.kino?.postFx?.addWater({ y: p.y, rect: p.r, strength: .8, ripple: .045, scale: .018, reach: 3500 });
   return n;
 }
 

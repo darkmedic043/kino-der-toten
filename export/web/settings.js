@@ -4,7 +4,7 @@
 const KEY='kino.settings';
 // Phones start on Low graphics without HD textures (the lighting and HD texture work is heavy there); a saved choice wins.
 const COARSE=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,gunMotion:1,casinoFx:2,renderScale:1,graphics:COARSE?0:2,filmLook:2,filmGrain:true,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,fpsCap:COARSE?30:0,padSensitivity:1,padAimAssist:1,padGlyphs:0,padVibration:true,padTriggers:true,padLightbar:true,binds:{}};
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,gunMotion:1,casinoFx:2,renderScale:1,autoRes:0,graphics:COARSE?0:2,filmLook:2,filmGrain:true,motionBlur:1,dof:true,reflections:true,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,fpsCap:COARSE?30:0,padSensitivity:1,padAimAssist:1,padGlyphs:0,padVibration:true,padTriggers:true,padLightbar:true,binds:{}};
 // Rebindable actions and the key each game page listens for. game-menu.js
 // translates a rebound key into its default so the game code stays unchanged.
 export const ACTIONS=[
@@ -29,6 +29,7 @@ export function setSetting(key,value){settings[key]=value;try{localStorage.setIt
 addEventListener('kino-cloud-pulled',()=>{try{Object.assign(settings,DEFAULTS,JSON.parse(localStorage.getItem(KEY))??{});settings.binds={...settings.binds};migrate();}catch{}for(const fn of listeners)fn(settings,null);});
 addEventListener('storage',e=>{if(e.key!==KEY)return;try{Object.assign(settings,DEFAULTS,JSON.parse(e.newValue)??{});migrate();}catch{}for(const fn of listeners)fn(settings,null);});
 
+const AUTO_RES=[0,30,45,60,75,90,120,144];   // the stops of the Automatic resolution slider (auto-res.js)
 const FIELDS=[
   {key:'sensitivity',tab:'controls',label:'Mouse sensitivity',type:'range',min:.1,max:3,step:.05,format:v=>v.toFixed(2)+'×'},
   {key:'adsSensitivity',tab:'controls',label:'Aim-down-sights sensitivity',type:'range',min:.1,max:2,step:.05,format:v=>v.toFixed(2)+'×'},
@@ -47,9 +48,13 @@ const FIELDS=[
   {key:'volume',tab:'audio',label:'Master volume',type:'range',min:0,max:1.5,step:.05,format:v=>Math.round(v*100)+'%'},
   {key:'music',tab:'audio',label:'Background music',type:'toggle',hint:'Ambient soundtrack; Easter-egg songs always play'},
   {key:'renderScale',tab:'graphics',label:'Render resolution',type:'range',min:.5,max:1.5,step:.05,format:v=>Math.round(v*100)+'%',hint:'Lower it for more FPS'},
+  {key:'autoRes',tab:'graphics',label:'Automatic resolution',type:'range',min:0,max:7,step:1,toInput:v=>Math.max(0,AUTO_RES.indexOf(v)),fromInput:i=>AUTO_RES[i]??0,format:v=>v>0?'Hold '+v+' FPS':'Off',hint:'Lowers the render resolution (down to half) while the graphics card is what keeps the game under this frame rate, and raises it again when there is room'},
   {key:'graphics',tab:'graphics',label:'Graphics quality',type:'range',min:0,max:3,step:1,format:v=>['Low','Medium','High','Ultra'][v]??v,hint:'Medium: bloom and light beams. High: + light shadows. Ultra: + ambient occlusion (heavy). Lower it for more FPS'},
   {key:'filmLook',tab:'graphics',label:'Film look',type:'range',min:0,max:2,step:1,format:v=>['Off','Light','Full'][Math.round(v)]??'Full',hint:'The colour grade: deep blacks, cool shadows and warm light, a vignette and a little sharpening, as in Black Ops 3. Needs Medium graphics or higher'},
   {key:'filmGrain',tab:'graphics',label:'Film grain',type:'toggle',hint:'Fine animated grain over the picture (part of the film look)'},
+  {key:'motionBlur',tab:'graphics',label:'Motion blur',type:'range',min:0,max:2,step:1,format:v=>['Off','Light','Full'][Math.round(v)]??'Light',hint:'Blurs the world, not the gun, with fast turns, slides and dives. Needs Medium graphics or higher'},
+  {key:'dof',tab:'graphics',label:'Aim depth of field',type:'toggle',hint:'While you aim, the part of the gun nearest your eye and things far from what you aim at go soft. Needs Medium graphics or higher'},
+  {key:'reflections',tab:'graphics',label:'Reflections',type:'toggle',hint:'Water and wet ground mirror the scene. Needs High graphics or higher'},
   {key:'daytime',tab:'graphics',label:'Daytime (Kino)',type:'toggle',hint:'Sunlight and sky; off for the original night'},
   {key:'hdTextures',tab:'graphics',label:'HD textures',type:'toggle',hint:'AI-upscaled map textures (Kino). Uses more video memory'},
   {key:'showFps',tab:'gameplay',label:'Show FPS counter',type:'toggle'},

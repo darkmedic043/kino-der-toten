@@ -29,6 +29,7 @@ import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { bakeVolume, loadVolume, patchMaterial } from './baked.js';
 import { settings, onSettingsChange } from '../../settings.js';
 import { createShafts } from './shafts.js';
+import { createPostFx } from './post-fx.js';
 import { setupMoon } from './moon.js';
 
 const SWAP=.25;
@@ -704,6 +705,7 @@ class VolumetricPass extends Pass{
 function setupPost(api){
   const {renderer,scene,camera,host,viewScene,viewCamera}=api;
   let composer=null,renderPass=null,volPass=null,hazePass=null,viewPass=null,gtao=null,bloom=null,grade=null,builtFor=-1;
+  const fx=createPostFx(api);   // motion blur, depth of field while aiming, reflections (post-fx.js)
   const size=()=>{const v=renderer.getSize(new THREE.Vector2());return [Math.max(1,v.x),Math.max(1,v.y)];};
   // The look (grade.js): the map's preset at Settings → Film look strength, grain by Settings → Film grain.
   const look=()=>gradeFor(api.map,[0,.5,1][Math.round(settings.filmLook??2)]??1,settings.filmGrain!==false);
@@ -716,7 +718,7 @@ function setupPost(api){
     const [w,h]=size(),target=new THREE.WebGLRenderTarget(w,h,{type:THREE.HalfFloatType,samples:4});
     target.depthTexture=new THREE.DepthTexture(w,h);   // the volumetric beams, the AO and the haze read the scene depth
     composer=new EffectComposer(renderer,target);composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);
-    renderPass=new RenderPass(scene,camera);composer.addPass(renderPass);
+    renderPass=new RenderPass(scene,camera);fx.track(renderPass);composer.addPass(renderPass);
     volPass=new VolumetricPass(volScene,camera);composer.addPass(volPass);
     // Sanitise the HDR frame (a light right against a surface can overflow half-float to Inf, and the bloom blur
     // smears NaN/Inf into black blocks) and add the map's depth haze. This is the chain's first swap pass, so the
@@ -735,6 +737,7 @@ function setupPost(api){
       r.setClearColor(cc,ca);r.autoClear=ac;r.setRenderTarget(old);hazePass.uniforms.tHeat.value=heatRT.texture;return true;};
     const heatClear=new THREE.Color();
     composer.addPass(hazePass);
+    if(q>=2)composer.addPass(fx.ssr);
     if(q>=3){gtao=new GTAOPass(scene,camera,w,h);gtao.output=GTAOPass.OUTPUT.Default;gtao.blendIntensity=1;
       gtao.updateGtaoMaterial({radius:28,distanceExponent:1.5,thickness:12,scale:1,samples:q>=3?16:10,distanceFallOff:1});
       gtao.updatePdMaterial({lumaPhi:10,depthPhi:2,normalPhi:3,radius:4,rings:2,samples:q>=3?16:8});
@@ -749,9 +752,10 @@ function setupPost(api){
       gtao.render=(...args)=>{const d=sceneTarget?.depthTexture;if(d){gtao.gtaoMaterial.uniforms.tDepth.value=d;gtao.pdMaterial.uniforms.tDepth.value=d;}aoRender(...args);};
       composer.addPass(gtao);
     }else gtao=null;
+    composer.addPass(fx.motion);
     // The first-person weapon joins the frame here, after the AO (its depth is in the view camera's projection,
     // which the AO must not read) and before bloom and the grade, so it glows, is graded and vignetted with the world.
-    viewPass=new ViewmodelPass(viewScene,viewCamera);viewPass.enabled=false;composer.addPass(viewPass);
+    viewPass=new ViewmodelPass(viewScene,viewCamera);viewPass.enabled=false;composer.addPass(viewPass);composer.addPass(fx.dof);
     bloom=new UnrealBloomPass(new THREE.Vector2(w,h),.28,.32,1.05);composer.addPass(bloom);
     grade=new GradePass();grade.setLut(lutTex);composer.addPass(grade);applyGrade(look());   // tone mapping, the colour grade and sRGB (replaces OutputPass)
   }
@@ -759,7 +763,7 @@ function setupPost(api){
   const resize=()=>{if(!composer)return;const [w,h]=size();composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);};
   addEventListener('resize',()=>setTimeout(resize,200));
   onSettingsChange((s,key)=>{if(key==='graphics'||key===null)build(quality());if(key==='renderScale')setTimeout(resize,50);if(key==='filmLook'||key==='filmGrain')applyGrade(look());});
-  build(quality());
+  build(quality());fx.warm();
   // opts.drawView: draw the viewmodel (opts.viewScene/viewCamera, default the engine's) inside the chain; returns
   // true when it did, so the engine skips its own draw.
   host.renderWorld=(sceneToDraw,cam,opts)=>{
@@ -770,6 +774,7 @@ function setupPost(api){
     if(!composer){renderer.render(sceneToDraw,cam);return false;}
     renderPass.camera=cam;volPass.camera=cam;if(gtao)gtao.camera=cam;
     viewPass.enabled=!!opts?.drawView;if(opts?.viewScene){viewPass.viewScene=opts.viewScene;viewPass.viewCamera=opts.viewCamera??viewCamera;}
+    fx.frame(cam,viewPass.enabled,viewPass.viewCamera);
     const [w,h]=size();if(composer.renderTarget1.width!==Math.floor(w*renderer.getPixelRatio()))resize();
     composer.render();return viewPass.enabled;
   };

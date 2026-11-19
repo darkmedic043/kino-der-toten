@@ -52,6 +52,6 @@ export function installGameMenu({renderer,audio,pixelRatio,started=()=>false}){
   const fps=document.createElement('div');fps.id='fps-counter';document.body.append(fps);
   let frames=0,last=performance.now();
   const tick=now=>{frames++;if(now-last>=500){fps.textContent=Math.round(frames*1000/(now-last))+' FPS';frames=0;last=now;}if(settings.showFps)requestAnimationFrame(tick);};
-  const apply=()=>{renderer.setPixelRatio(pixelRatio*settings.renderScale);volume();fps.hidden=!settings.showFps;if(settings.showFps){last=performance.now();frames=0;requestAnimationFrame(tick);}};
+  const apply=()=>{renderer.setPixelRatio(pixelRatio*settings.renderScale*(window.kino?.autoRes?.factor??1));volume();fps.hidden=!settings.showFps;if(settings.showFps){last=performance.now();frames=0;requestAnimationFrame(tick);}};
   onSettingsChange(apply);apply();
 }

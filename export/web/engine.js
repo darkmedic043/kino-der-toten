@@ -25,6 +25,7 @@ import { configureKinoAssets, assetDiagnostics } from './runtime-assets.js';
 import { ModHost } from './mod-loader.js';
 import { settings } from './settings.js';
 import { installGameMenu } from './game-menu.js';
+import { createAutoRes } from './auto-res.js';
 import { createPerfDiag } from './perf-diag.js';
 import { setupKtx2, ktx2Stats } from './ktx2.js';
 import { stillSkeletons, hideBones } from './still-skeletons.js';
@@ -98,6 +99,7 @@ let timerExt=null,gpuQ=[];try{timerExt=new URLSearchParams(location.search).has(
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.6;renderer.autoClear=false;
 document.body.prepend(renderer.domElement);
 installGameMenu({renderer,audio,pixelRatio:Math.min(devicePixelRatio,profile.mobile?1:1.5),started:()=>started&&session?.phase!=='gameover'});
+const autoRes=createAutoRes({renderer,pixelRatio:Math.min(devicePixelRatio,profile.mobile?1:1.5)});   // Settings → Automatic resolution (auto-res.js)
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x101319);
 const ambient=new THREE.AmbientLight(0xb3bcc7,1.2),hemi=new THREE.HemisphereLight(0xd2d9e3,0x574236,2.0);scene.add(ambient,hemi);
 const keyLight=new THREE.DirectionalLight(0xffdfb1,1.5);keyLight.position.set(.4,1,.2);scene.add(keyLight);
@@ -453,7 +455,7 @@ function getState(){
 function fullState(){return {map:entry?.id,ready,active,started,input:{touch:touchControls.getState(),primary,ads},...(session?session.snapshot():{}),player:player?{...player.state,rotation:camera.rotation.toArray().slice(0,3),position:camera.position.toArray(),feet:player.getFeetPosition().toArray()}:null,enemies:enemies?.snapshot()??[],prompt:promptText,
   barriers:world?.barriers?.map(b=>({id:b.id,count:b.count,boards:map.boardCount(b),position:b.position.toArray(),inside:b.inside.toArray(),group:b.group}))??[],
   performance:{fps,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},viewmodelReady:view?.ready??false,...(map?.state?.()??{}),errors:[...errors,...mods.errors]};}
-globalThis.kino={mods,debug:{textureMemory:textureMemoryStats,ktx2:ktx2Stats,getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,
+globalThis.kino={mods,autoRes,debug:{textureMemory:textureMemoryStats,ktx2:ktx2Stats,getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,
   giveWeapon:id=>{session.giveWeapon(id);equipView();},spawnEnemy:(p,kind)=>enemies.spawn(vector(p),null,kind).id,clearEnemies:()=>{for(const z of [...enemies.list])enemies.hurt(z,999999);},collectPowerup:collect,
   step:seconds=>{for(let t=0;t<seconds;t+=1/60)update(Math.min(1/60,seconds-t));},navigationPath:(a,b)=>world.path(vector(a),vector(b)).map(v=>v.toArray()),
   setAutoSpawn:value=>{enemies.autoSpawn=value;enemies.autoRounds=value;},setInvulnerable:value=>{session.effects.invulnerable=value?Infinity:0;},damageEnemy:(id,n=999999)=>{const z=enemies.list.find(z=>z.id===id);if(z)enemies.hurt(z,n);},
@@ -882,7 +884,7 @@ function gpuEnd(q,now){if(!timerExt)return;const gl=renderer.getContext();if(q){
   const o=gpuQ[0];if(!o||o.next==null)return;
   try{if(!gl.getQueryParameter(o.q,gl.QUERY_RESULT_AVAILABLE))return;
     const ok=!gl.getParameter(timerExt.GPU_DISJOINT_EXT),ns=ok?gl.getQueryParameter(o.q,gl.QUERY_RESULT):0;gl.deleteQuery(o.q);gpuQ.shift();
-    if(ok)perf.gpu?.(ns/1e6,o.next-o.now);}
+    if(ok){perf.gpu?.(ns/1e6,o.next-o.now);autoRes.gpu(ns/1e6);}}
   catch{timerExt=null;}}
 // GPU-process latency per frame: a fence after each frame's last command, polled from the frame loop and from a 10 ms
 // heartbeat timer (so a frame that finishes while the frame loop is stalled is still timed). A hitch with the main
@@ -923,7 +925,7 @@ function renderFrame(now){
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
   update(dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);visCull?.update(mods.camera??camera);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
   const viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
-  keepPrograms();gpuEnd(gq,now);if(playing){fenceFrame(now);pollFences();}
+  keepPrograms();gpuEnd(gq,now);autoRes.frame(dt*1000,performance.now()-t0,playing);if(playing){fenceFrame(now);pollFences();}
   if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(firstDraw.late.length?firstDraw.late.splice(0):renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;if(session.round!==evRound){evRound=session.round;perf.event?.('round'+evRound);}const zn=enemies?.list?.length??0;if(zn>evZ)perf.event?.('spawn');evZ=zn;if(session.def!==evDef){evDef=session.def;perf.event?.('equip:'+(evDef?.id??'?'));}
     // the uploads and GL work of the frame before the gap (the culprit when the GPU process stalls) and of this frame
     perf.frame(now,t1-t0,performance.now()-t1,[lastFirstDraws,firstDraw.n,...lastFirstNames],texUp,lastTex);}else{programCount=renderer.info.programs.length;perf.pause();}
