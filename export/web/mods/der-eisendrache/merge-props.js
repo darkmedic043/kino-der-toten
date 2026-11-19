@@ -67,6 +67,8 @@ export function instanceProps(root, scene, host, follow = false) {
   });
   for (const top of root.children) if (/^(CASTLE_|DOOR_)/i.test(top.name) && !SKIP.test(top.name)) consider(top, follow);
   for (const top of scene.children) if (/^window_boards$/.test(top.name)) consider(top);
+  // the gondola cars and their gates (2026-11-18): rigid pieces on animated joints, about 170 draws from the spawn (a door joint is 17 pieces). Followers only: they stay in the scene graph, where the gondola collects its colliders.
+  if (follow) for (const top of root.children) if (/^CASTLE_P?TRAM/i.test(top.name)) top.traverse(o => { if (o.layers.mask !== 0 && !o.userData.noInstance && !o.userData.batchFollow && canFollow(o)) { o.userData.batchFollow = true; followed++; } });
   // the buyable doors: custom-world moves every door part to the scene (still named DOOR_*), so the loop over the map
   // root never saw them: about 180 draws at the spawn (a sliding leaf is 10 decal + 8 solid parts). Followers only.
   if (follow) for (const top of scene.children) if (/^DOOR_/i.test(top.name)) top.traverse(o => { if (o.layers.mask !== 0 && !o.userData.noInstance && !o.userData.batchFollow && canFollow(o)) { o.userData.batchFollow = true; followed++; } });
