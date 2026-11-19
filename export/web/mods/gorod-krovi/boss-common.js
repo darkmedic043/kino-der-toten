@@ -153,7 +153,8 @@ export function makeKit(api, gk) {
   kit.walkTo = (z, goal, speed, dt, { stopAt = 12 } = {}) => {   // along the navmesh to goal; returns the distance left
     const pos = z.root.position;
     z.repath -= dt;
-    if (z.repath <= 0 || !z.path.length) { z.repath = .5; z.path = world.path(pos, goal) ?? []; z.pathIndex = 1; }
+    const link = z.path[z.pathIndex], hop = !!link?.hop && Math.hypot(link.x - pos.x, link.z - pos.z) > 12;   // crossing a traversal link, off the navmesh: no new plan until it lands (one made mid-link starts from the near side again, and it shuffled at the link for good, 2026-11-18)
+    if ((z.repath <= 0 && !hop) || !z.path.length) { z.repath = .5; z.path = world.path(pos, goal) ?? []; z.pathIndex = 1; }
     const to = z.path[z.pathIndex] ?? goal, d = to.clone().sub(pos); d.y = 0;
     if (d.length() < 12 && z.pathIndex < z.path.length - 1) z.pathIndex++;
     if (d.length() > 1) { d.normalize(); pos.addScaledVector(d, Math.min(speed * dt, Math.max(0, to.distanceTo(pos)))); kit.turn(z.root, kit.yawTo(pos, to), 5, dt); }

@@ -182,7 +182,7 @@ export class Enemies {
         const delta=target.clone().sub(z.root.position),horizontal=Math.hypot(delta.x,delta.z);
         // round corners: move on to the next path point a little early (not before a traversal, whose start must be reached)
         const after=z.path[z.pathIndex+1];
-        if(horizontal<10||(after&&!after.hop&&horizontal<24)){z.pathIndex++;z.wallHits=0;}
+        if(horizontal<10||(after&&!after.hop&&horizontal<24&&this.cutClear(z,after))){z.pathIndex++;z.wallHits=0;}
         else{
           // steer: the walking direction turns toward the path point at a capped rate (faster than the body, so it holds the
           // navmesh), the pace drops in a sharp turn, and speed builds up and dies down instead of switching on and off
@@ -243,6 +243,9 @@ export class Enemies {
     if(this.autoRounds!==false&&s.phase==='fighting'&&s.spawned>=s.total&&this.list.every(z=>z.tempo)){if(s.dogRound)this.onKill?.(null,'full_ammo',this.lastDogDeath??player);s.nextRound();this.nextSpawn=0;this.lastDogDeath=null;}
   }
   // zombieWalls: nothing solid (map, doors, clip) on the line between two feet positions at knee or chest height
+  // a path corner is cut early only where the navmesh runs straight on to the point after it (custom maps, 2026-11-18: at a
+  // wall's end both corners were skipped and the zombie walked at the far point through the wall, shuffling there for seconds)
+  cutClear(z,after){if(!this.world.navClear)return true;if(z.cutAt!==after){z.cutAt=after;z.cutOk=this.world.navClear(z.root.position,after);}return z.cutOk;}
   walkClear(a,b,heights=[24,50]){
     const clip=this.world.clipCollision;
     for(const h of heights){const p=a.clone(),q=b.clone();p.y+=h;q.y+=h;if(!this.world.lineClear(p,q))return false;

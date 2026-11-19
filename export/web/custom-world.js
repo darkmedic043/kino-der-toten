@@ -609,6 +609,8 @@ export class CustomWorld {
     const pts=r.path.map(p=>new THREE.Vector3(p.x,p.y,p.z)),T=this.traversals,reach=this.entry.zombieWalls?72:40;
     if(T?.length)for(let i=1;i<pts.length;i++){const p=pts[i-1],q=pts[i],t=T.find(t=>p.distanceTo(t.from)<40&&q.distanceTo(t.to)<reach||t.both&&p.distanceTo(t.to)<40&&q.distanceTo(t.from)<reach);if(t)q.hop=t;}   // an off-mesh link's far end (hop: the traversal; with zombieWalls up to 72 away: Recast lands it on the nearest polygon, Nuketown's porch 51 away)
     return pts;}
+  // does the navmesh run straight from a to b (no boundary between)? enemies.js asks before it cuts a path corner (2026-11-18)
+  navClear(a,b){const s=this.query.findNearestPoly({x:a.x,y:a.y,z:a.z},{halfExtents:{x:22,y:36,z:22}});if(!s.success||!s.nearestRef)return true;const r=this.query.raycast(s.nearestRef,s.nearestPoint,{x:b.x,y:b.y,z:b.z});return !r.success||r.t>1;}
   // is the point over a closed door's block? `pad` grows its footprint (the mantle asks, or it lands on top of the blocker)
   closedDoorAt(p,pad=0){
     for(const d of this.dynamic){

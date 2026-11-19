@@ -751,7 +751,7 @@ function setupDebris(api) {
 function setupUndercroftGate({ world, session }) {
   if (!world.doors || world.doors.has(UC_GATE.name)) return;
   const box = new THREE.Box3(new THREE.Vector3(...UC_GATE.min), new THREE.Vector3(...UC_GATE.max)), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
-  const g = new THREE.Group(); g.name = 'UCGATE_start_undercroft';
+  const g = new THREE.Group(); g.name = 'UCGATE_start_undercroft'; g.userData.noMerge = true;   // it moves: kept out of the engine's static batches (they drew it shut for good, 2026-11-18)
   const ref = world.doors.get('DOOR_connectcourtyardtorooftop_750')?.parts[0]?.object;
   let meshes = 0; ref?.traverse(o => { if (o.isMesh) meshes++; });
   if (meshes) {
