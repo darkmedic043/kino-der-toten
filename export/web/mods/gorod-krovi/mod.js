@@ -8,6 +8,7 @@
 // teleporters' destination sets zone:pavlovsb).
 import { setupLook, prepareLook } from './look.js';
 import { cullTick, cullState } from './scene-props.js';
+import { posedBodies } from '../../posed-bodies.js';
 
 // sharper textures: the map's detail.json (map-detail.js), read before the map loads
 export async function prepare(data) {
@@ -37,6 +38,9 @@ export default async function setup(api) {
     if (zones.has('pavlovsb')) { zones.add('pavlovsa'); zones.add('pavlovsc'); }
     return zones;
   };
+  // the 252 frozen soldiers lie and hang as bodies do instead of standing stiff in their bind pose (posed-bodies.js); first,
+  // so the shadow tags, the detail pass and the batching below see them as part of the map
+  await posedBodies(api, { url: 'mods/maps/gorod-krovi/bodies.glb?v=1', stiff: /^prop_c_zom_dlc3_rus_corpse/ });
   const look = setupLook(api);   // sky, lights, bake, detail, metals, overlays (look.js): awaited before the engine batches the map and compiles
   // The map's systems (2026-11-15), one module each in this folder, each `export default async function (api, gk)`,
   // awaited here so their models and materials are in place before the engine's warm-up. A module that isn't there

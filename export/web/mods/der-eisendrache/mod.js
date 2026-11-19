@@ -18,6 +18,7 @@ import { prepareDetail, applyDetail } from '../../map-detail.js';
 import { metalLook } from '../lighting/metal-look.js';
 import { floatingDebris } from '../fx/floating-debris.js';
 import { mergeProps, instanceProps } from './merge-props.js';
+import { posedBodies } from '../../posed-bodies.js';
 import { carvedDecals } from './carved.js';
 import { overlayLayers, blackPlanes } from './overlays.js';
 import CEILINGS from './ceilings.js';
@@ -65,6 +66,9 @@ export default async function setup(api) {
   if (world.root) carvedDecals(world.root, api.scene);   // before the props are merged: the nodes it drops must not be instanced
   if (world.root) blackPlanes(world.root, undefined, /[?&]noCeilings/.test(location.search) ? null : CEILINGS, true);   // the void planes: unlit black from both sides, real ceilings over the rooms, lit colours for the black parts of props (overlays.js)
   if (world.root && !/[?&]noOverlays/.test(location.search)) console.info('[der-eisendrache] overlay layers:', JSON.stringify(overlayLayers(world.root)));   // snow, decals and cut-outs the map drew solid (overlays.js)
+  // the castle's dead soldiers, their helmets and the loose limbs: the map build leaves them out (they would stand stiff in
+  // their bind pose), so they come from bodies.glb, lying and hanging as bodies do (posed-bodies.js, .tools/build_posed_bodies.py)
+  await posedBodies(api, { url: 'mods/maps/der-eisendrache/bodies.glb?v=1' });
   if (world.root) doorBacks(world.root);   // the blast doors get a back (before the merge: its pieces stay plain meshes)
   if (world.root && !/[?&]noMergeProps/.test(location.search)) { const r = mergeProps(world.root, api.scene), i = instanceProps(world.root, api.scene, api.host, !!api.map?.textureArrays && !/[?&](noArrays|noBatch|noFollow)\b/.test(location.search)); console.info('[der-eisendrache] prop pieces merged:', r.merged, 'into', r.made, '; instanced:', i.hidden, 'meshes of', i.instances, 'props into', i.meshes, '; left to the batches:', i.followed); }
   // the map nodes this mod moves (Ragnarok parts, levers, the crate lid, clock hands, floaters, Skadi, the claws, the

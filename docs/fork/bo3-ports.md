@@ -269,7 +269,7 @@ CustomWorld builds collision and the navmesh from `COL_` meshes only; `PCOL_` me
 | `FLATBOX`, `CONVEX`, `HULL` | gratings and planks, pads, boulders | walk-through gratings, snagging on boulder meshes |
 | `STRUCTURAL` | walls, columns, statues: mesh up to 1,500 triangles | - |
 | `CLUTTER` and the size limits | player-only props must be at least 40 high, at most 360 across | "can't move in a lot of spots": too much prop collision cut areas off from the spawns |
-| `POSED_CHARACTER` | corpses and posed bodies left out | T-posed corpses standing in rooms |
+| `POSED_CHARACTER` | corpses and posed bodies left out of the map GLB; they come back posed from `build_posed_bodies.py` (2.7) | T-posed corpses standing in rooms |
 
 - Props over 1,500 triangles are decimated (`simplify()`) into `PCOL_props`. In the navmesh layer they added 40 s to the load.
 - Stairs get a two-sided ramp quad per flight; the map entry needs `"stairSmoothing": true` and `"player": {"slopeStick": true}` or the player slides down them.
@@ -321,6 +321,19 @@ The map's derived data is matched to the GLB and goes stale with it. Der Eisendr
 8. `MAP=<id> ... node .tools/map-test.mjs` once (10.3).
 9. Spawn markers against the dump: `python3 -I .tools/bo3_spawns.py <bsp> --glb <the new GLB>` (2.3a).
 10. **Collision numbers against the previous version**, before `?v=` goes out: the build log's `game clip:` line, the flood's unreached markers and its points under the map (`col-audit.mjs <id> --flood-only`; Gorod Krovi: 9,532 on a good build, about 396,000 on one built without `--game-clip`), and `stuck-audit.mjs` (0 enterable, 0 mantle traps; 10.1 E). A number that jumps means a flag was lost: stop and rebuild with the map's script.
+
+### 2.7 Bodies in the scenery: `build_posed_bodies.py`
+
+A BO3 map places its dead soldiers as static models of full character rigs, and a static model comes out of the export in its **bind pose**: arms out, legs straight, lying in the snow like a shop dummy (Gorod Krovi has 252, Der Eisendrache 83 plus helmets and loose limbs). The pose each body has in the game is not in anything the dump or Greyhound gives, so the bodies are posed here, after the map build, without touching the map GLB:
+
+- `~/.local/opt/blender/5.2/python/bin/python3.13 -I .tools/build_posed_bodies.py <map-id> [--preview <dir>] [--stiff <out.glb>]` (about 4 s, Blender's python only for numpy). It reads the placements from the level dump (`models`, 1.1), the models and BO3's zombie death clips from Greyhound, and writes `mods/maps/<map-id>/bodies.glb` (ripped: stays in the git-ignored map folder, never in the install manifest's `OWN`). A new map is one entry in its `MAPS` table: the dump name, a regex for the full-body models (`posed`), one for rigid pieces placed as they are (`rigid`: helmets, loose limbs), `tex` (False when the map GLB already has the models' materials, the file then carries no textures) and texture caps.
+- **A body on the ground** (its long axis under 0.62 from level) takes the last frame of one of 21 death clips, turned so the body lies along the axis the mapper gave it, face up, face down or on its side as placed, with the torso resting on the ground the stiff body lay on. Only clips that end flat are used (`FLAT`), mirrored copies double the set, and each body takes the least-used pose that no body within 320 units has.
+- **A body that stands, leans or hangs** keeps the mapper's transform and goes limp: head, arms, spine and knees give way toward gravity as seen from the model (`limp_pose`).
+- The poses are written as plain instanced meshes (no skeleton), one node per model and pose: `body_<model>_<up|down|side|limp><n>`.
+- In the map mod, **before** anything that tags or patches the map's meshes: `await posedBodies(api, { url: 'mods/maps/<map-id>/bodies.glb?v=1', stiff: /^prop_<model prefix>/ })` (`posed-bodies.js`). It removes the map's stiff copies when `stiff` is given (Gorod Krovi, whose build keeps them), gives a posed mesh the map's own material of the same name when there is one, and adds the lot under the map root, where the engine batches them like any placed prop: same draw calls as before. `?stiffBodies` loads the map without it (A/B); `kino.posedBodies` = `{bodies, meshes, replaced}`.
+- Not needed after a map rebuild (it reads the dump, not the GLB); bump the `?v=` on its URL when the file changes and rerun `build-gz.mjs`.
+- Check with `--preview` (a contact sheet of every pose from above and from the side) and in the game on the light copy: the posed bodies should sit on the ground about as often as the stiff ones did (Gorod: 137 of 226 lying bodies within 6 units of the floor, 132 of 232 before; the rest are the mapper's own, on props without collision or half under rubble). The light-copy harness forces every bitmap to 16 px, so a batch that mixes its textures with full-size ones logs `texSubImage3D: source sub-rectangle ... invalid` there: a harness artefact, not a game error.
+- **Leave alone** props that are modelled in their pose even though they carry a rig: `p7_ven_charred_body_advanced` (Gorod's 51 burnt bodies, arms drawn up as burnt bodies are), mannequins, bone piles.
 
 ## 3. Materials and textures
 
