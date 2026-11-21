@@ -14,6 +14,11 @@
 //
 //   const vol = smokeVolume(api);                 // one per page, shared by the lighting mod and the smoke grenade
 //   const c = vol.spawn(at, radius, { grow });    // radius = how wide it would get on open ground
+//   vol.spawn(at, r, { kind, max, prio, tint, sigma, clear, puff, speed, glow, wisp })   // a cloud with a look of its own
+//     (Kino's Nova 6 gas): at most `max` clouds of a `kind` (4; the oldest of the kind makes room), a full pool gives
+//     up the oldest cloud of the lowest prio (1) but never one above the newcomer (null then); tint [r,g,b], sigma and
+//     clear replace the config's for this cloud, puff = its alpha on Low, speed = how fast it churns, glow = the least
+//     light it is drawn with, wisp 0..1 = thick billows with thin gaps between them instead of an even fill
 //   vol.filled(c, position)                       // is this point in the smoke (after the front passed it)
 //   c.fade = 0..1; vol.release(c);                // thin it out, then free its slot
 //   vol.hole(position, radius)                    // an explosion blows a hole that closes again
@@ -24,7 +29,7 @@ import * as THREE from 'three';
 import { Pass } from 'three/addons/postprocessing/Pass.js';
 
 const NX = 40, NY = 20, NZ = 40, N = NX * NY * NZ, CELL = 20, SX = 20, SY = 5, SZ = 20;
-const SOFT = 60, UP = 1.6, DOWN = 1.1, POOL = 4, HOLES = 3, PUFFS = 160;
+const SOFT = 60, UP = 1.6, DOWN = 1.1, POOL = 6, HOLES = 3, PUFFS = 160;
 const DI = [1, -1, 0, 0, 0, 0], DJ = [0, 0, 1, -1, 0, 0], DK = [0, 0, 0, 0, 1, -1], STEP = [CELL, CELL, CELL * UP, CELL * DOWN, CELL, CELL];
 const DIRS = DI.map((x, d) => new THREE.Vector3(x, DJ[d], DK[d]));
 
@@ -55,7 +60,7 @@ const VERT = /* glsl */`varying vec3 vWorld;void main(){vec4 w=modelMatrix*vec4(
 const FRAG = /* glsl */`precision highp float;precision highp sampler3D;
 #include <packing>
 uniform sampler3D tVol,tNoise;uniform sampler2D tDepth;
-uniform vec3 gridMin,gridSize,boxLo,boxHi,camDir,lightDir,tint;uniform vec2 res;uniform float near,far,time,fade,clearR,sigma,seed;uniform vec4 holes[${HOLES}];
+uniform vec3 gridMin,gridSize,boxLo,boxHi,camDir,lightDir,tint;uniform vec2 res;uniform float near,far,time,fade,clearR,sigma,seed,wisp;uniform vec4 holes[${HOLES}];
 varying vec3 vWorld;
 float shape(vec3 p,vec2 v,out float n){
   n=texture(tNoise,p*(1./230.)+vec3(time*.011,-time*.019,time*.007)+seed).r*.68+texture(tNoise,p*(1./74.)+vec3(-time*.027,-time*.05,time*.013)-seed).r*.32;
@@ -71,7 +76,7 @@ void main(){
     if(t>=tf||T<.02)break;
     vec3 p=cameraPosition+rd*t;vec2 v=texture(tVol,(p-gridMin)/gridSize).rg;float len=18.;
     if(v.r>.03){
-      float d=shape(p,v,n)*smoothstep(clearR*.15,clearR,t);
+      float d=shape(p,v,n)*smoothstep(clearR*.15,clearR,t);d*=mix(1.,smoothstep(.34,.66,n)*2.,wisp);
       for(int h=0;h<${HOLES};h++)d*=smoothstep(holes[h].w*.5,max(holes[h].w,.001),distance(p,holes[h].xyz));
       if(d>.004){
         len=min(9.,tf-t+.5);
@@ -117,8 +122,8 @@ function create(api) {
 
   const boxGeo = new THREE.BoxGeometry(1, 1, 1).translate(.5, .5, .5), volScene = new THREE.Scene();
   const puffGeo = new THREE.PlaneGeometry(1, 1);
-  const puffU = { time: { value: 0 }, clearR: { value: config.clear }, tint: { value: new THREE.Color() }, puffA: { value: .8 }, puffSize: { value: 1.5 } };
-  const puffMaterial = () => new THREE.ShaderMaterial({ uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), time: puffU.time, clearR: puffU.clearR, tint: puffU.tint, puffA: puffU.puffA, puffSize: puffU.puffSize, fade: { value: 1 } },
+  const puffU = { time: { value: 0 }, puffSize: { value: 1.5 } };
+  const puffMaterial = () => new THREE.ShaderMaterial({ uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), time: puffU.time, clearR: { value: config.clear }, tint: { value: new THREE.Color() }, puffA: { value: .8 }, puffSize: puffU.puffSize, fade: { value: 1 } },
     vertexShader: PUFF_VS, fragmentShader: PUFF_FS, transparent: true, depthWrite: false, fog: true });
   const puffMesh = () => {
     const g = new THREE.InstancedBufferGeometry(); g.index = puffGeo.index; g.setAttribute('position', puffGeo.getAttribute('position'));
@@ -132,7 +137,7 @@ function create(api) {
     const u = { tVol: { value: tex }, tNoise: { value: noise }, tDepth: { value: null }, gridMin: { value: new THREE.Vector3() }, gridSize: { value: new THREE.Vector3(NX * CELL, NY * CELL, NZ * CELL) },
       boxLo: { value: new THREE.Vector3() }, boxHi: { value: new THREE.Vector3() }, camDir: { value: new THREE.Vector3(0, 0, -1) }, lightDir: { value: new THREE.Vector3(.3, .9, .25).normalize() },
       tint: { value: new THREE.Color() }, res: { value: new THREE.Vector2(1, 1) }, near: { value: 1 }, far: { value: 1000 }, time: { value: 0 }, fade: { value: 1 }, clearR: { value: config.clear },
-      sigma: { value: config.sigma }, seed: { value: id * .37 }, holes: { value: holes.map(h => h.v) } };
+      sigma: { value: config.sigma }, wisp: { value: 0 }, seed: { value: id * .37 }, holes: { value: holes.map(h => h.v) } };
     const box = new THREE.Mesh(boxGeo, new THREE.ShaderMaterial({ uniforms: u, vertexShader: VERT, fragmentShader: FRAG, side: THREE.BackSide, depthTest: false, depthWrite: false, transparent: true, toneMapped: false,
       premultipliedAlpha: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor }));
     box.frustumCulled = false; box.visible = false; volScene.add(box);
@@ -205,11 +210,14 @@ function create(api) {
 
   const clouds = [];
   function spawn(at, r = 200, opts = {}) {
-    let s = slots.find(s => !s.cloud); if (!s) { s = slots.reduce((a, b) => (a.used < b.used ? a : b)); release(s.cloud); }
+    const kind = opts.kind ?? 'smoke', prio = opts.prio ?? 1, oldest = l => l.reduce((a, b) => (a.slot.used < b.slot.used ? a : b)), same = clouds.filter(c => c.kind === kind);
+    if (same.length >= (opts.max ?? 4)) release(oldest(same));
+    let s = slots.find(s => !s.cloud);
+    if (!s) { const low = Math.min(...clouds.map(c => c.prio)); if (low > prio) return null; const v = oldest(clouds.filter(c => c.prio === low)); s = v.slot; release(v); }
     s.cost.fill(Infinity); s.gc.fill(Infinity); s.state.fill(0); s.wall.fill(0); s.gk.fill(0); s.data.fill(0); s.hc.length = s.hi.length = 0; s.used = ++stats.clouds;
     const c = { slot: s, at: at.clone(), r, min: new THREE.Vector3(at.x - (SX + .5) * CELL, at.y + 14 - (SY + .5) * CELL, at.z - (SZ + .5) * CELL), grow: opts.grow ?? 1.3, expect: r + SOFT * .5,
       budget: Math.round(2 / 3 * Math.PI * (r + SOFT * .5) ** 3 / UP / CELL ** 3), maxCost: Math.min(1.9 * r, (SX - 2) * CELL), popped: 0, doneCost: 0, front: 0, frontMax: Infinity, done: false, rim: null, fade: 1, tick: 0,
-      lo: [SX, SY, SZ], hi: [SX, SY, SZ], growing: true, dead: false };
+      lo: [SX, SY, SZ], hi: [SX, SY, SZ], growing: true, dead: false, kind, prio, tint: opts.tint, sigma: opts.sigma, clear: opts.clear, puff: opts.puff, speed: opts.speed ?? 1, glow: opts.glow ?? 0, wisp: opts.wisp ?? 0 };
     const u0 = SX + NX * (SY + NY * SZ); s.cost[u0] = 0; s.anchor[u0] = u0; push(s, 0, u0); s.cloud = c;
     s.u.gridMin.value.copy(c.min); s.box.visible = true; s.puffs.geometry.instanceCount = 0; clouds.push(c);
     advance(c, config.ms); write(c); return c;
@@ -226,7 +234,7 @@ function create(api) {
     for (const h of holes) if (h.r) { h.age += dt; const k = 1 - h.age / config.holeLife; if (k <= 0) { h.r = 0; h.v.w = 0; h.age = 9; } else h.v.w = h.r * Math.min(1, h.age * 8) * Math.sqrt(k); }
     if (!clouds.length) return;
     const g = K.vmLight?.gain ?? .6, lk = config.light ?? (.14 + Math.min(1.2, Math.max(.08, g)));   // as bright as the place it is in
-    puffU.time.value = time; puffU.clearR.value = config.clear; puffU.puffA.value = config.puff[0]; puffU.puffSize.value = config.puff[1]; puffU.tint.value.setRGB(config.tint[0] * lk, config.tint[1] * lk, config.tint[2] * lk);
+    puffU.time.value = time; puffU.puffSize.value = config.puff[1];
     for (const c of clouds) {
       const s = c.slot;
       if (c.growing) {
@@ -235,7 +243,9 @@ function create(api) {
         if (f !== c.front || c.tick === 0) { c.front = f; write(c); }
         if (c.done && c.front >= c.frontMax) c.growing = false;
       }
-      s.u.fade.value = s.puffs.material.uniforms.fade.value = c.fade; s.u.time.value = time; s.u.tint.value.copy(puffU.tint.value);
+      const t = c.tint ?? config.tint, l = Math.max(lk, c.glow), pu = s.puffs.material.uniforms;
+      s.u.fade.value = pu.fade.value = c.fade; s.u.time.value = time * c.speed; s.u.tint.value.setRGB(t[0] * l, t[1] * l, t[2] * l);
+      pu.tint.value.copy(s.u.tint.value); pu.clearR.value = c.clear ?? config.clear; pu.puffA.value = c.puff ?? config.puff[0];
       s.puffs.visible = self.low;
     }
     stats.cells = clouds.reduce((n, c) => n + c.popped, 0);
@@ -252,7 +262,7 @@ function create(api) {
   const drawClouds = (r, cam, depth, w, h) => {
     if (target.width !== w || target.height !== h) target.setSize(w, h);
     cam.getWorldDirection(v0); camPos.setFromMatrixPosition(cam.matrixWorld);
-    for (const s of slots) { if (!s.box.visible) continue; const u = s.u; u.tDepth.value = depth; u.res.value.set(w, h); u.near.value = cam.near; u.far.value = cam.far; u.camDir.value.copy(v0); u.clearR.value = config.clear; u.sigma.value = config.sigma;
+    for (const s of slots) { if (!s.box.visible) continue; const u = s.u; u.tDepth.value = depth; u.res.value.set(w, h); u.near.value = cam.near; u.far.value = cam.far; u.camDir.value.copy(v0); u.clearR.value = s.cloud?.clear ?? config.clear; u.sigma.value = s.cloud?.sigma ?? config.sigma; u.wisp.value = s.cloud?.wisp ?? 0;
       s.box.renderOrder = -camPos.distanceTo(s.cloud?.at ?? camPos); }
     const old = r.getRenderTarget(), cc = r.getClearColor(clear), ca = r.getClearAlpha(), ac = r.autoClear;
     r.setRenderTarget(target); r.setClearColor(0x000000, 0); r.autoClear = true; r.render(volScene, cam);

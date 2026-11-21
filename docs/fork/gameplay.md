@@ -185,3 +185,13 @@ Every zombie died with the same clip on the spot, whatever killed it. The killin
 - **Turn**: the death clip falls one fixed way (to the zombie's side). The first death with each clip measures where the head ends up relative to the root (after 1.7 s, kept per clip data object: the dismemberment mod's gib deaths are measured separately); later bodies turn by up to 63 degrees in the first .3 s so that the fall goes along the hit. A hit from the clip's far side only gets part of the way.
 - Applies to kinds `zombie`, `dog`, `nova` (dogs and Novas slide only); `z.noDeathPhysics = true` opts a zombie out. The Thundergun (cause `thunder`) throws its own bodies and is skipped; a body that something else moves by more than a unit is left alone. Nothing is created per death but a small record: no materials, lights or shaders, at most the 12 bodies the engine keeps.
 - Test: `scratch/fx6/deaths.js` on the sandbox (a zombie killed by a faked shot, blast or melee: slide distance, hop, final pose against the plain clip, shots at .15 and .4 s).
+
+## Nova 6 crawler gas (2026-11-21, `maps/kino.js`, user: "make the nova 6 crawler gas actual gas and not just a static")
+
+A Nova crawler shot dead (`z.gasDeath`: bullet, not melee, not a Nuke) used to leave a still translucent green sphere for 7 s. It now leaves a cloud in the smoke volume (lighting.md, Smoke volume): it spreads from the body in about 1.1 s, stops at walls and pours through doorways, churns (noise at 2.2x), has thick and thin parts (`wisp`), is thin enough to see through (`sigma` .03 against the Smoke Grenade's .06) and thins out over its last 3 s of 8.
+
+- Settings in `GAS` at the top of the map module, live as `kino.novaGas` (`r` 120, `life` 8, `fadeOut` 3, `look` = the spawn options: tint [.62,.74,.24], `glow` .5 so it shows in the dark theatre).
+- **Blur**: the screen blur (`ctx.setFilter('blur(3px)')`) is on while `smokeVol.filled(cloud, feet)` and the cloud's fade is over .3, so it follows the real shape (a wall between you and the body keeps you clear) and not a 125-unit radius.
+- At most 3 gas clouds (a fourth replaces the oldest), and they never take a Smoke Grenade's slot. With no room, or without the volume, the old sphere stands in.
+- Low graphics draws it as the volume's puffs (alpha .4). The gas hides nobody and does no damage, as before.
+- **Checked**: look on the sandbox map (Medium: ray-marched, Low: puffs; frames in `scratch/gas/f/`); the kill path on Kino's 16 px copy with `.tools/map-test.mjs` (`PLAY=scratch/gas/play.js`): cloud at 0.5 s, blur on inside it, fade .62 at 6.2 s, freed by 8.8 s, five kills in a row leave 3 clouds.

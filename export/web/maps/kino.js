@@ -12,6 +12,11 @@ export async function createMap(ctx,entry){
   renderer.toneMappingExposure=2.05;scene.fog=new THREE.FogExp2(0x14181b,.00032);camera.far=14000;camera.updateProjectionMatrix();
   camera.position.set(-101,168,1256);camera.lookAt(160,170,850);
   const traps=[],gasClouds=[],meteors=new Set();
+  // Nova 6 gas (2026-11-21): a crawler shot dead leaves a cloud in the smoke volume (mods/lighting/smoke-volume.js): it spreads from the body, stops at
+  // walls, churns and thins out; the old still sphere only stands in when the volume has no room. Seen and tuned live in kino.novaGas.
+  const GAS={r:120,life:8,fadeOut:3,look:{kind:'gas',max:3,prio:0,grow:1.1,tint:[.62,.74,.24],sigma:.03,clear:60,puff:.4,speed:2.2,glow:.5,wisp:1}};
+  (window.kino??={}).novaGas=GAS;
+  const endGas=g=>{if(g.cloud)window.kino?.smokeVol?.release(g.cloud);if(g.mesh){g.mesh.removeFromParent();g.mesh.geometry.dispose();g.mesh.material.dispose();}};
   let spawn,teleportPending=0,linkUntil=0,returnAt=0,cooldownUntil=0,tripRoom=null;
   // Co-op: the pad's link is shared and everyone on the stage pad goes along, to the same room after (group-trip.js).
   groupTrip.on('kino:link',d=>{const s=S();s.teleporter=d.state;if(d.state==='linking')linkUntil=s.time+30;});
@@ -90,9 +95,10 @@ export async function createMap(ctx,entry){
     },
     onKill(z){
       if(!z.gasDeath)return;
-      const mesh=new THREE.Mesh(new THREE.SphereGeometry(75,12,8),new THREE.MeshBasicMaterial({color:0x8ca345,transparent:true,opacity:.14,depthWrite:false}));
-      mesh.scale.set(1.65,.6,1.65);mesh.position.copy(z.root.position).add(new THREE.Vector3(0,28,0));scene.add(mesh);gasClouds.push({mesh,position:z.root.position.clone(),life:7});
-      ctx.effect(mesh.position,0x9eb652,15);audio.play('explosion');
+      const at=z.root.position.clone(),cloud=window.kino?.smokeVol?.spawn(at,GAS.r,GAS.look)??null;let mesh=null;
+      if(!cloud){mesh=new THREE.Mesh(new THREE.SphereGeometry(75,12,8),new THREE.MeshBasicMaterial({color:0x8ca345,transparent:true,opacity:.14,depthWrite:false}));mesh.scale.set(1.65,.6,1.65);mesh.position.copy(at).add(new THREE.Vector3(0,28,0));scene.add(mesh);}
+      gasClouds.push({mesh,cloud,position:at,life:GAS.life});
+      ctx.effect(at.clone().add(new THREE.Vector3(0,28,0)),0x9eb652,15);audio.play('explosion');
       for(const other of [...ctx.enemies.list])if(other.root.position.distanceTo(z.root.position)<96)ctx.enemies.hurt(other,other.maxHealth,false,false,'explosion');
       if(ctx.player.getFeetPosition().distanceTo(z.root.position)<96)ctx.damage(45);
     },
@@ -109,11 +115,16 @@ export async function createMap(ctx,entry){
       if(cooldownUntil&&s.time>cooldownUntil){cooldownUntil=0;s.teleporter='unlinked';}
       for(const tr of traps)if(s.time<tr.end){tr.mesh.rotation.y+=dt*3;for(const z of [...ctx.enemies.list])if(z.root.position.distanceTo(tr.position)<100)ctx.enemies.hurt(z,99999,false,false,'electric');if(feet.distanceTo(tr.position)<75)ctx.damage(dt*100);}else tr.mesh.visible=false;
       let gassed=false;
-      for(const g of [...gasClouds]){g.life-=dt;g.mesh.material.opacity=.14*Math.min(1,g.life/2);g.mesh.rotation.y+=dt*.2;if(feet.distanceTo(g.position)<125)gassed=true;if(g.life<=0){g.mesh.removeFromParent();g.mesh.geometry.dispose();g.mesh.material.dispose();gasClouds.splice(gasClouds.indexOf(g),1);}}
+      for(const g of [...gasClouds]){
+        g.life-=dt;
+        if(g.cloud){if(g.cloud.dead)g.life=0;else{g.cloud.fade=Math.max(0,Math.min(1,g.life/GAS.fadeOut));if(g.cloud.fade>.3&&window.kino.smokeVol.filled(g.cloud,feet))gassed=true;}}
+        else{g.mesh.material.opacity=.14*Math.min(1,g.life/2);g.mesh.rotation.y+=dt*.2;if(feet.distanceTo(g.position)<125)gassed=true;}
+        if(g.life<=0){endGas(g);gasClouds.splice(gasClouds.indexOf(g),1);}
+      }
       ctx.setFilter(gassed?'blur(3px)':'');
     },
     reset(){
-      for(const group of [traps,gasClouds]){for(const item of group){item.mesh.removeFromParent();item.mesh.geometry?.dispose();item.mesh.material?.dispose();}group.length=0;}
+      for(const g of gasClouds)endGas(g);gasClouds.length=0;for(const item of traps){item.mesh.removeFromParent();item.mesh.geometry?.dispose();item.mesh.material?.dispose();}traps.length=0;
       meteors.clear();teleportPending=0;returnAt=0;linkUntil=0;cooldownUntil=0;tripRoom=null;
     },
     hudEffects:()=>returnAt?'<span>RETURN IN '+Math.ceil(returnAt-S().time)+'</span>':'',
