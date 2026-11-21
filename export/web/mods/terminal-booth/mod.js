@@ -489,6 +489,7 @@ export default async function setup(api){
         armory:()=>window.kino.armory?.status(),armoryBuy:id=>window.kino.armory?.buy(id)??'ARMORY.EXE is not installed',
         bank:()=>window.kino.bank?.status(),bankAct:(a,n)=>window.kino.bank?.act(a,n)??'BANK.EXE is not installed',
         tasks:()=>window.kino.tedd?.status(),taskAct:a=>window.kino.tedd?.act(a,b)??'TASKS.EXE is not installed',
+        forge:()=>window.kino.wonderForge?.status(),forgeAct:(a,k)=>window.kino.wonderForge?.act(a,k)??'FORGE.EXE is not installed',
         gums:()=>window.kino.gobblegums?.status(),gumRoll:()=>window.kino.gobblegums?.roll()??'Gobblegums are not installed',
         arsenal:()=>window.kino.ammoMods?.status(),buyMod:id=>window.kino.ammoMods?.buy(id)??'Ammo mods are not installed',upgradeMod:()=>window.kino.ammoMods?.upgrade()??'Ammo mods are not installed',
         power:()=>!!session.power,points:()=>session.points,

@@ -444,6 +444,7 @@ export function setupBows(api, { lowgrav, pads, traps, offMap = false } = {}) { 
     // the element (everyone sees it; the host's zombies take it)
     const el = pr ? elOf(pr.def.id) : elOf(session.weapon?.id), ch = sh?.k ? { el: sh.el, k: +sh.k.toFixed(2) } : null;
     lastImpact = { p: p.toArray().map(Math.round), el, charged: ch, flung, run };
+    host.emit?.('bowImpact', { p: p.toArray(), el, k: sh?.k ?? 0, full: !!sh?.full, from: from.toArray?.() ?? null });   // mods/wonder-forge counts the kills of each burst (emitted before bowFx, whose blast kills come synchronously)
     sync.fx('bowFx', { p: sync.a(p), el, ch, eye: sync.a(sh?.eye ?? camera.position) });
   });
   // the obelisk takes magma for 7.5 s after a rocket test fire (zm_castle_rocket_trap.gsc)

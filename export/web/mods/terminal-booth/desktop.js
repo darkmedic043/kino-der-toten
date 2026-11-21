@@ -18,6 +18,8 @@
 //   scorestreaks later); opts.armory() -> status, opts.armoryBuy(id) -> true | 'reason'.
 // TASKS.EXE (mods/tedd-tasks, under GUMS): T.E.D.D.'s timed tasks (BO7). From round 9 an offer waits here; START pays
 //   for it, the HUD tracks it, and the reward chest lands in front of this terminal. opts.tasks() -> status, opts.taskAct(action).
+// FORGE.EXE (mods/wonder-forge, under TASKS): upgradable wonder weapons. Attune one to an upgrade whose relic you own, finish
+//   that upgrade's challenges, forge it here. opts.forge() -> status, opts.forgeAct(action, 'weapon:path').
 // JOURNAL.EXE (mods/journal, top of the right column): every map's Easter eggs step by step, recorded once done;
 //   TRACK puts the current step on the HUD with markers. opts.journal() -> status, opts.journalTrack(map, quest | null).
 // Home screen (2026-10-17, user): the icons sit on a phone-style cell grid (cells of at least 108x112 px, stretched to fill
@@ -245,6 +247,19 @@ const CSS = `
 #melonterm .exf .call{align-self:flex-start;margin-top:6px}
 #melonterm .exf ul{margin:0;padding:0;list-style:none;font-size:21px}#melonterm .exf li{padding-left:22px;position:relative}#melonterm .exf li::before{content:'>';position:absolute;left:2px;color:var(--g2)}
 #melonterm .exf .msg{border:0;background:none;padding:0}
+#melonterm .fge .lead{margin:0;font-size:21px;color:var(--g2)}
+#melonterm .fge h3{margin:0;font:inherit;font-size:28px;letter-spacing:2px;color:#b6ffcb}
+#melonterm .fge .wpn{display:flex;align-items:center;gap:14px;margin-top:6px}#melonterm .fge .wpn .state{font-size:19px}
+#melonterm .fge .paths{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+#melonterm .fge .path{font:inherit;text-align:left;padding:5px 10px;border:2px solid var(--c);background:#03160a;color:var(--c);cursor:pointer}
+#melonterm .fge .path b{display:block;font-size:24px;font-weight:normal}#melonterm .fge .path small{display:block;font-size:18px;opacity:.85}
+#melonterm .fge .path.on{outline:2px solid var(--c);outline-offset:2px;background:#0a2614}
+#melonterm .fge .path.lock{border-style:dashed;border-color:var(--dim);color:var(--dim)}
+#melonterm .fge .sel{display:flex;flex-direction:column;gap:8px;border-top:2px solid var(--line);padding-top:10px;margin-top:4px}#melonterm .fge .sel h3{color:var(--c)}
+#melonterm .fge .ch{display:grid;grid-template-columns:1fr max-content;gap:2px 12px}#melonterm .fge .ch.ok span{color:var(--c)}
+#melonterm .fge .ch p{grid-column:1/-1;margin:0;font-size:19px;color:var(--dim)}
+#melonterm .fge .ch .meter{grid-column:1/-1;height:6px;background:#0d2a17;border:1px solid var(--line)}#melonterm .fge .ch .meter i{display:block;height:100%;background:var(--c)}
+#melonterm .fge .row{display:flex;gap:12px}
 #melonterm .task{display:flex;align-items:center;gap:10px;padding:5px 10px;border-top:2px solid var(--line);background:#04180c;font-size:19px}
 #melonterm .task button{font:inherit;font-size:19px;color:var(--g);background:#062a14;border:2px solid var(--g2);padding:0 10px;cursor:pointer}
 #melonterm .task button:hover{background:var(--g);color:var(--bg)}
@@ -319,6 +334,9 @@ const TASKS_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-render
   <rect x="15" y="2" width="2" height="4"/><rect x="13" y="1" width="6" height="2"/><rect x="6" y="6" width="20" height="16"/><rect x="9" y="10" width="5" height="4" fill="#031208"/>
   <rect x="18" y="10" width="5" height="4" fill="#031208"/><rect x="11" y="11" width="2" height="2"/><rect x="20" y="11" width="2" height="2"/><rect x="10" y="17" width="12" height="2" fill="#031208"/>
   <rect x="3" y="11" width="3" height="6"/><rect x="26" y="11" width="3" height="6"/><rect x="11" y="23" width="10" height="3"/><rect x="8" y="26" width="16" height="4"/></svg>`;
+const FORGE_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
+  <path d="M3 10h19c0 3 3 4 7 4v3c-5 0-7 1-8 4H11c-1-3-3-4-8-4z"/><rect x="12" y="21" width="8" height="3"/><rect x="7" y="24" width="18" height="4"/>
+  <rect x="20" y="2" width="2" height="5" fill="#ffd36b"/><rect x="25" y="5" width="2" height="2" fill="#ffd36b"/><rect x="15" y="4" width="2" height="2" fill="#ffd36b"/></svg>`;
 const EXFIL_ICON = `<svg viewBox="0 0 32 32" width="40" height="40" shape-rendering="crispEdges" fill="#7dffa6">
   <rect x="4" y="6" width="24" height="2"/><rect x="15" y="8" width="2" height="3"/><rect x="9" y="11" width="15" height="7"/><rect x="6" y="13" width="3" height="3"/>
   <rect x="2" y="12" width="4" height="2"/><rect x="11" y="12" width="5" height="3" fill="#031208"/><rect x="11" y="19" width="2" height="3"/><rect x="20" y="19" width="2" height="3"/>
@@ -355,6 +373,7 @@ function build() {
         <button class="app" data-app="stark"><div class="sq">${STARK_ICON}</div><span>STARK</span></button>
         <button class="app" data-app="gums"><div class="sq">${GUMS_ICON}</div><span>GUMS</span></button>
         <button class="app off" data-app="tasks"><div class="sq">${TASKS_ICON}</div><span>TASKS</span></button>
+        <button class="app off" data-app="forge"><div class="sq">${FORGE_ICON}</div><span>FORGE</span></button>
         <button class="app" data-app="radio"><div class="sq">${RADIO_ICON}</div><span>RADIO</span></button>
         <button class="app" data-app="journal"><div class="sq">${JOURNAL_ICON}</div><span>JOURNAL</span></button>
         <button class="app" data-app="armory"><div class="sq">${ARMORY_ICON}</div><span>ARMORY</span></button>
@@ -403,6 +422,10 @@ function build() {
         <div class="title"><span>TASKS.EXE · T.E.D.D.</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="exf tsk"></div>
       </div>
+      <div class="win" data-win="forge" hidden>
+        <div class="title"><span>FORGE.EXE · WONDER WEAPONS</span><span class="grow"></span><button data-close title="Close">×</button></div>
+        <div class="exf fge"></div>
+      </div>
       <div class="win" data-win="exfil" hidden>
         <div class="title"><span>EXFIL.EXE</span><span class="grow"></span><button data-close title="Close">×</button></div>
         <div class="exf"></div>
@@ -423,6 +446,7 @@ function build() {
   const amWin = $('[data-win=armory]'), amBody = $('.arm'); let amState = '', amMsg = ['', ''], amTab = 'operators', amShown = 0;
   const bkWin = $('[data-win=bank]'), bkBody = $('.bnk'), bkIcon = $('[data-app=bank]'); let bkState = '', bkMsg = ['', ''];
   const tkWin = $('[data-win=tasks]'), tkBody = $('.tsk'), tkIcon = $('[data-app=tasks]'); let tkState = '', tkMsg = '';
+  const fgWin = $('[data-win=forge]'), fgBody = $('[data-win=forge] .fge'), fgIcon = $('[data-app=forge]'); let fgState = '', fgMsg = ['', ''], fgSel = null;
   let opts = null, shown = 0, clock = 0, lastState = '';
 
   // Keep the game from seeing key presses and clicks while the desktop is up. Key releases still go through, so a
@@ -431,10 +455,10 @@ function build() {
   for (const t of ['click', 'mousedown', 'mouseup', 'pointerdown', 'wheel', 'contextmenu']) root.addEventListener(t, e => e.stopPropagation());
 
   function key(e) {
-    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden || !rdWin.hidden || !tkWin.hidden) closeApp(); else close(); return; }
+    if (e.code === 'Escape') { e.preventDefault(); if (!win.hidden || !exWin.hidden || !arWin.hidden || !stWin.hidden || !gmWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden || !rdWin.hidden || !tkWin.hidden || !fgWin.hidden) closeApp(); else close(); return; }
     if (!rdWin.hidden) { if (e.code === 'Space') { e.preventDefault(); radioDo('toggle'); } return; }
     if (!gmWin.hidden) { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); gumRoll(); } return; }
-    if (!arWin.hidden || !stWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden || !tkWin.hidden) return;
+    if (!arWin.hidden || !stWin.hidden || !bkWin.hidden || !amWin.hidden || !jnWin.hidden || !tkWin.hidden || !fgWin.hidden) return;
     if (!exWin.hidden) { if (e.code === 'Enter') { e.preventDefault(); callExfil(); } return; }
     if (win.hidden) { if (e.code === 'Enter') { e.preventDefault(); openApp('perks'); } return; }
     if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); buy(shown); return; }
@@ -487,7 +511,8 @@ function build() {
     say(String(r || 'TRANSACTION FAILED').toUpperCase(), 'bad');
   }
   function openApp(name) {
-    bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = tkWin.hidden = true;
+    bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = tkWin.hidden = fgWin.hidden = true;
+    if (name === 'forge') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; fgState = ''; fgMsg = ['', '']; fgWin.hidden = false; drawForge(); $('.open').textContent = '[FORGE.EXE]'; opts.onApp?.(name); return; }
     if (name === 'tasks') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; tkState = ''; tkMsg = ''; tkWin.hidden = false; drawTasks(); $('.open').textContent = '[TASKS.EXE]'; opts.onApp?.(name); return; }
     if (name === 'radio') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; rdState = ''; rdMsg = ['', '']; rdWin.hidden = false; drawRadio(); $('.open').textContent = '[RADIO.EXE]'; opts.onApp?.(name); return; }
     if (name === 'journal') { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = true; jnState = ''; jnMsg = ''; jnWin.hidden = false; drawJournal(); $('.open').textContent = '[JOURNAL.EXE]'; opts.onApp?.(name); return; }
@@ -503,7 +528,7 @@ function build() {
     if (gated()) say(gateMsg(), 'bad'); else say('> SELECT A PERK'); renderGrid(); select(shown); win.hidden = false; $('.open').textContent = '[PERKS.EXE]';
     opts.onApp?.(name); grid.querySelector(`[data-i="${shown}"]`)?.focus({ preventScroll: true });
   }
-  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = tkWin.hidden = true; $('.open').textContent = ''; }
+  function closeApp() { win.hidden = exWin.hidden = arWin.hidden = stWin.hidden = gmWin.hidden = bkWin.hidden = amWin.hidden = jnWin.hidden = rdWin.hidden = tkWin.hidden = fgWin.hidden = true; $('.open').textContent = ''; }
   // ---- STARK.EXE: the Iron Man armors (mods/stark) ---------------------------------------------------------------
   const MARK = { mk1: 'I', mk3: 'III', mk4: 'IV', mk5: 'V', mk6: 'VI', wm: 'WM', mk16: 'XVI', mk33: 'XXXIII', mk42: 'XLII' };
   function starkDo(action, id) {
@@ -826,6 +851,42 @@ function build() {
       tkMsg = String(r).toUpperCase(); drawTasks();
     });
   }
+  // ---- FORGE.EXE: upgradable wonder weapons (mods/wonder-forge) -----------------------------------------------------
+  function drawForge() {
+    const st = opts?.forge?.() ?? null, key = JSON.stringify(st) + fgSel + fgMsg.join();
+    const ws = st?.weapons ?? [], live = ws.some(w => w.held && w.paths.some(p => p.ready && !p.forged && p.unlocked));
+    fgIcon.classList.toggle('off', !ws.some(w => w.held || w.attuned)); fgIcon.classList.toggle('live', live);
+    if (fgWin.hidden || key === fgState) return; fgState = key;
+    if (!st) { fgBody.innerHTML = '<h2>WONDER FORGE</h2><div class="state no">FORGE.EXE IS NOT INSTALLED</div>'; return; }
+    const all = ws.flatMap(w => w.paths.map(p => ({ w, p })));
+    let sel = all.find(x => x.p.key === fgSel) ?? all.find(x => x.w.attuned === x.p.id) ?? all.find(x => x.w.held && x.p.unlocked) ?? all[0];
+    if (sel) fgSel = sel.p.key;
+    const pathTag = (w, p) => !p.unlocked ? 'LOCKED' : p.forged ? 'FORGED' : p.ready ? 'READY' : w.attuned === p.id ? 'ATTUNED' : `${p.challenges.filter(c => c.n >= c.goal).length}/${p.challenges.length}`;
+    const weapon = w => `<div class="wpn"><h3>${esc(w.name.toUpperCase())}</h3><span class="state ${w.held ? 'go' : 'no'}">${w.held ? 'IN YOUR HANDS' : 'NOT IN YOUR INVENTORY'}</span></div>
+      <div class="paths">${w.paths.map(p => `<button class="path${p.unlocked ? '' : ' lock'}${p.key === fgSel ? ' on' : ''}" data-sel="${p.key}" style="--c:${p.color}"><b>${esc(p.name.toUpperCase())}</b><small>${esc(p.sub)}</small><small>${pathTag(w, p)}</small></button>`).join('')}</div>`;
+    let body = '';
+    if (sel) {
+      const { w, p } = sel, at = w.attuned === p.id;
+      const chs = p.challenges.map(c => `<div class="ch${c.n >= c.goal ? ' ok' : ''}" style="--c:${p.color}"><span>${c.n >= c.goal ? '■' : '□'} ${esc(c.name)}</span><span>${c.n} / ${c.goal} ${esc(c.unit)}</span><p>${esc(c.text)}</p><div class="meter"><i style="width:${Math.round(100 * c.n / c.goal)}%"></i></div></div>`).join('');
+      const why = !p.unlocked ? `EARN THE ${p.name.toUpperCase()} ON DER EISENDRACHE FIRST (IT BECOMES A RELIC)` : p.forged ? 'FORGED THIS MATCH' : !p.installed ? 'NOT INSTALLED' : '';
+      body = `<div class="sel" style="--c:${p.color}"><h3>${esc(p.name.toUpperCase())} · ${esc(p.sub)}</h3>
+        ${why ? `<div class="state no">${esc(why)}</div>` : at ? '<div class="state go">ATTUNED · ITS CHALLENGES ARE COUNTING</div>' : '<div class="state no">NOT ATTUNED · ATTUNE IT TO START COUNTING</div>'}
+        ${chs}
+        <div class="row"><button class="buy" data-act="attune"${!p.unlocked || p.forged || at ? ' disabled' : ''}>${at ? 'ATTUNED' : 'ATTUNE'}</button>
+        <button class="buy" data-act="forge"${!p.unlocked || p.forged || !p.ready || !w.held || !p.installed ? ' disabled' : ''}>FORGE ${esc(p.name.toUpperCase())}</button></div>
+        <div class="msg ${fgMsg[1]}">${esc(fgMsg[0])}</div></div>`;
+    }
+    keepScroll(fgBody).innerHTML = `<h2>WONDER FORGE</h2>
+      <p class="lead">Attune a wonder weapon to an upgrade you have earned before, finish its challenges on any map, then forge it here.</p>
+      ${ws.map(weapon).join('')}${body}`;
+    for (const b of fgBody.querySelectorAll('[data-sel]')) b.addEventListener('click', () => { fgSel = b.dataset.sel; fgMsg = ['', '']; drawForge(); });
+    for (const b of fgBody.querySelectorAll('[data-act]:not([disabled])')) b.addEventListener('click', () => {
+      const r = opts.forgeAct?.(b.dataset.act, fgSel) ?? 'FORGE.EXE is not installed';
+      fgMsg = r === true ? [b.dataset.act === 'forge' ? 'FORGED' : 'ATTUNED', 'ok'] : [String(r).toUpperCase(), 'bad'];
+      if (r === true && b.dataset.act === 'forge') { close(); return; }
+      drawForge();
+    });
+  }
   // ---- EXFIL.EXE --------------------------------------------------------------------------------------------
   const exfilStatus = () => opts?.exfil?.() ?? { available: false, reason: 'Exfil is not installed' };
   function drawExfil() {
@@ -862,7 +923,7 @@ function build() {
     $('[data-app=perks]').classList.toggle('off', gated());
     if (!win.hidden && state !== lastState) { const was = lastState.includes('gate'); renderGrid(); select(shown); if (gated()) say(gateMsg(), 'bad'); else if (was) say('> SELECT A PERK'); }
     lastState = state;
-    drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory(); drawJournal(); drawRadio(); drawTasks();
+    drawExfil(); drawArsenal(); drawStark(); drawGums(); drawBank(); drawArmory(); drawJournal(); drawRadio(); drawTasks(); drawForge();
     $('[data-app=stark]').classList.toggle('off', !opts.stark?.()?.unlocked);
     $('.exlive').hidden = !exIcon.classList.contains('live');
   }
@@ -882,7 +943,7 @@ function build() {
   const desk = $('.desk'), appsEl = $('.apps'), cellsEl = $('.cells'), apps = [...appsEl.querySelectorAll('.app')];
   const PAD = 20, ICON_W = 96, ICON_H = 110, MIN_W = 108, MIN_H = 112, STORE = 'kino.mods.terminal';
   // default: shop apps down the left column, map apps up the right column (negative = from the far edge)
-  const HOME = { perks: [0, 0], arsenal: [0, 1], stark: [0, 2], gums: [0, 3], tasks: [0, 4], journal: [-1, -4], armory: [-1, -3], bank: [-1, -2], exfil: [-1, -1], radio: [-1, -5] };
+  const HOME = { perks: [0, 0], arsenal: [0, 1], stark: [0, 2], gums: [0, 3], tasks: [0, 4], forge: [0, 5], journal: [-1, -4], armory: [-1, -3], bank: [-1, -2], exfil: [-1, -1], radio: [-1, -5] };
   let home = { cols: 1, rows: 1, cw: MIN_W, ch: MIN_H, key: '' }, cells = {}, drag = null, swallowClick = false;
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) ?? {}; } catch { return {}; } };
   const save = layout => { try { const d = load(); d.layout = { ...(d.layout ?? {}), [home.key]: layout }; localStorage.setItem(STORE, JSON.stringify(d)); } catch {} };

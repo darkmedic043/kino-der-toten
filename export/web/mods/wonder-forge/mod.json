@@ -1,0 +1,5 @@
+{
+  "name": "Wonder Forge",
+  "description": "FORGE.EXE at the terminal: with an upgradable wonder weapon in hand (Wrath of the Ancients), attune it to an upgrade you have earned before as a relic and finish that upgrade's own challenges on any map to forge it (Storm, Fire, Wolf or Void Bow).",
+  "script": "mod.js"
+}
