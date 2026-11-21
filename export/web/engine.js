@@ -19,6 +19,7 @@ import { PerkDrink } from './perk-drink.js';
 import { MysteryBox } from './mystery-box.js';
 import { createInstanceCuller } from './instance-cull.js';
 import { createStaticFreeze } from './static-freeze.js';
+import { createWallChalk } from './wall-chalk.js';
 import { mergeStaticMeshes } from './scene-merge.js';
 import { createZombieTouch } from './zombies-touch.js';
 import { configureKinoAssets, assetDiagnostics } from './runtime-assets.js';
@@ -109,7 +110,7 @@ const viewScene=new THREE.Scene(),viewCamera=new THREE.PerspectiveCamera(51,inne
 viewScene.matrixAutoUpdate=false;   // (2026-10-25) the root never moves; composing it each frame forced the whole view tree through the walk (skipHidden below)
 viewScene.add(new THREE.AmbientLight(0xe1d9c7,2.8));const vl=new THREE.DirectionalLight(0xffefc8,2);vl.position.set(0,4,2);viewScene.add(vl);
 const muzzle=new THREE.PointLight(0xffc276,0,240,1);scene.add(muzzle);
-let entry,map,data,world,session,player,enemies,view,powerups,perkDrink,mysteryBox,features,ready=false,active=false,started=false,primary=false,primaryPressed=false,ads=false,leftPressed=false,lastTouchAim=false;
+let entry,map,data,world,wallChalk,session,player,enemies,view,powerups,perkDrink,mysteryBox,features,ready=false,active=false,started=false,primary=false,primaryPressed=false,ads=false,leftPressed=false,lastTouchAim=false;
 let prompt=null,promptText='',toastUntil=0,announcementUntil=0,hitUntil=0,flashUntil=0;
 let lastPhase='',lastRound=0,frameTime=0,frameCount=0,fps=0,debugVisible=false,repairLeft=0,burstLeft=0;
 const particles=[],grenades=[];
@@ -324,7 +325,7 @@ const shop={
     const cost=owned?(owned.upgraded?4500:d.ammoPrice??Math.ceil(d.price/2)):d.price;
     if(!pay(cost))return false;
     if(owned)owned.reserve=owned.upgraded?d.upgrade?.maxAmmo??d.maxAmmo:d.maxAmmo;
-    else {session.giveWeapon(d.id);equipView();}toast(owned?'Ammo replenished':d.name);return true;
+    else {session.giveWeapon(d.id);equipView();}toast(owned?'Ammo replenished':d.name);wallChalk?.bought(id,camera.position);return true;
   },
   perkPrompt(id){const p=perkInfo[id];if(!p)return '';return session.perks.has(id)?p.name+' equipped':!session.power&&id!=='specialty_quickrevive'?'The power must be activated':p.name+' · '+session.perkPrice;},
   buyPerk(id){
@@ -365,7 +366,7 @@ function moveTo(position,yaw){player.setPosition(position.clone());if(yaw!=null)
 function reset(){
   pendingMelee=null;lastReloadSerial=0;reloadShot=false;
   touchControls.reset();mousePrimary=mouseAim=false;toastUntil=0;announcementUntil=0;hitUntil=0;flashUntil=0;primary=false;primaryPressed=false;ads=false;keys.clear();
-  session.reset();ambient.intensity=1.2;map.beforeReset?.();enemies.reset();world.reset(session);
+  session.reset();ambient.intensity=1.2;map.beforeReset?.();enemies.reset();world.reset(session);wallChalk?.reset();
   const spawn=map.spawn();player.setSpawn(spawn.position);player.respawn();camera.rotation.set(0,spawn.yaw-Math.PI/2,0);
   powerups.reset();perkDrink.stop();mysteryBox.reset();features.reset();
   for(const group of [particles,grenades]){for(const item of group){item.mesh.removeFromParent();item.mesh.traverse?.(o=>{o.geometry?.dispose();o.material?.dispose();});}group.length=0;}
@@ -500,6 +501,7 @@ try{
   progress('Loading game data',6);
   mods.mapId=entry.id;data=await mods.load(await map.loadData());session=new (map.Session??KinoSession)(data);
   world=await map.loadWorld(progress);
+  try{wallChalk=createWallChalk({renderer,scene,world,data});(globalThis.kino??={}).wallChalk=wallChalk;}catch(e){console.warn('[wall-chalk]',e);}   // chalk drawn from each wall gun, models hidden until bought (wall-chalk.js)
   const spawn=map.spawn();
   player=new PlayerController(camera,world.physics,{spawn:spawn.position,spawnIsEye:false,radius:14,height:70,eyeHeight:60,moveSpeed:190,sprintSpeed:285,crouchSpeed:95,gravity:800,jumpHeight:39,fallResetY:(world.bounds?.min.y??0)-800,maxSubSteps:12,groundSnapSpeed:10,interpolate:!/[?&]noLerp\b/.test(location.search),...map.player});
   camera.rotation.set(0,spawn.yaw-Math.PI/2,0);world.setDoors(session);
@@ -510,7 +512,7 @@ try{
   await Promise.all([enemies.load(),equipView(),audio.load(),powerups.load(),perkDrink.load(),mysteryBox.load(),features.load()]);player.update(.05,{});
   await map.ready?.();
   if(!new URLSearchParams(location.search).has('noVisCull')){visCull=createVisCull(renderer,scene);globalThis.kino.visCull=visCull;}
-  progress('Loading mods',95);await mods.start({melee,renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,tick:update,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});
+  progress('Loading mods',95);await mods.start({melee,renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,tick:update,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});wallChalk?.connect();
   // Performance for big ported maps (docs/fork/performance.md). A/B switches for benchmarks: ?noMerge ?noBatch ?noFreeze
   const perfOff=new URLSearchParams(location.search);
   // this runs 1-3 s of main-thread work: show it, and let the page paint between steps (a frozen page showed a black

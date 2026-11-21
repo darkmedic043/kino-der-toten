@@ -10,6 +10,7 @@ import { generateTiledNavMesh } from '@recast-navigation/generators';
 import { CollisionWorld } from './collision-world.js';
 import { propCollision } from './prop-collision.js';
 import { optimizeStaticScene } from './scene-optimizer.js';
+import { takeMapChalk } from './wall-chalk.js';
 import { loadModel } from './animation.js';
 import { assetManager } from './runtime-assets.js';
 import { embeddedHd } from './map-detail.js';
@@ -150,6 +151,7 @@ export class CustomWorld {
       markers.push({type:m[1].toUpperCase().replace('SPAWN_PLAYER','PLAYER_SPAWN').replace('PACKAPUNCH','PAP'),arg:(m[2]??'').toLowerCase(),extras:o.userData,object:o,
         position:o.getWorldPosition(new THREE.Vector3()),yaw:worldYaw(o)});
     });
+    this.wallChalk=takeMapChalk(root,markers.filter(m=>m.type==='WALLBUY'));   // the map's own weapon chalk near its wall buys: redrawn from the gun each one gives (wall-chalk.js)
     const meshes=[];root.traverse(o=>{if(o.isMesh&&!o.userData.marker)meshes.push(o);});
     const dedicated=meshes.filter(o=>COLLISION_NAME.test(rawName(o))),playerOnly=meshes.filter(o=>PLAYER_COLLISION_NAME.test(rawName(o))),navOnly=meshes.filter(o=>NAV_ONLY_NAME.test(rawName(o))),clipOnly=meshes.filter(o=>CLIP_NAME.test(rawName(o)));
     for(const o of [...dedicated,...playerOnly,...navOnly,...clipOnly])o.visible=false;

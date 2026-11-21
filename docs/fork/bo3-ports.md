@@ -510,7 +510,7 @@ The marker contract is in `mods/README.md` and `custom-maps.md`; the builder's e
 | Perks | all machines stand upright, face the room (`perkYaw`, which also turns the stand-in power panel since 2026-11-17: it stood edge-on to its lever), right models (`machines: "bo3"`); two on one spot slide apart |
 | Mystery Box | every location, start location right, beacon not shining through walls |
 | Pack-a-Punch | the map's own machine model and animations if it has one (awaited in setup so it is warmed), its quest lock (`papLocked`), moving locations (`movePap`) |
-| Wall buys | every chalk has a weapon in `WEAPONS`; the gun model hangs on the wall and is culled at range |
+| Wall buys | every chalk has a weapon in `WEAPONS`; the map's own chalk at each wall buy is replaced by a drawing of the gun sold, and the gun (sized, turned flat onto the old drawing) stays hidden until bought (`wall-chalk.js`, custom-maps.md; `kino.wallChalk.chalk` should equal the number of wall buys and `noWall` be 0); culled at range |
 | Traps | cost, power, zone shape, cooldown; no light per trap zone |
 | Teleporters, pads, trams | cost, cooldown, destination, players inside a moving thing move with it and cannot be pushed out through thin walls |
 | Moving collision | anything that moves and can be stood on goes through `addScriptedMover`; colliders on `world.dynamic` need `.box` unless `window: true`; call `world.collision.invalidateCache()` after editing collision at runtime |
