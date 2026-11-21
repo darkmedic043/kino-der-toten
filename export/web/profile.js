@@ -57,6 +57,7 @@ export const passLocked=w=>!!w?.unlock&&!ownsItem(w.unlock);
 // rolled where it is in the map's own box pool (Gorod Krovi's Mk3, needed to earn it).
 export const isRelic=w=>!!w?.relic;
 export const relicLocked=w=>isRelic(w)&&passLocked(w);
+export const noBox=w=>!!w?.noBox;   // forge-only upgrades (the element bows): never in the box list, only made in a match through FORGE.EXE or the map's quest
 // weapons: ids known to the current game data (unknown unlock entries are skipped).
 export function unlocks(config,level,weapons){
   return {
@@ -90,7 +91,8 @@ export function boxItems(config,profile,data){
   const on=new Set(l.boxOn??[]),off=new Set(l.boxOff??[]);
   const pass=new Set([...config.weapons,...config.tactical??[],...config.lethal??[]].filter(w=>w.unlock).map(w=>w.id));   // pass rewards and relics join the box when owned
   const item=(id,kind)=>({id,kind,rarity:rarityOf(config,id),on:!off.has(id)&&(pool.has(id)||on.has(id)||pass.has(id))});
-  const items=[...u.weapons.filter(id=>!/upgraded/.test(id)&&!data.weapons?.[id]?.soon).map(id=>item(id,'weapon')),   // soon guns stay out of the box even with the dev flag (no tier top-up)
+  const nb=new Set(config.weapons.filter(noBox).map(w=>w.id));
+  const items=[...u.weapons.filter(id=>!/upgraded/.test(id)&&!data.weapons?.[id]?.soon&&!nb.has(id)).map(id=>item(id,'weapon')),   // soon guns stay out of the box even with the dev flag (no tier top-up)
     ...u.tactical.filter(id=>data.equipment?.[id]).map(id=>item(id,'tactical')),
     ...u.lethal.filter(id=>data.equipment?.[id]).map(id=>item(id,'lethal'))];
   // each weapon tier keeps its minimum switched on: a short tier is topped up in list order (`forced`)
@@ -118,6 +120,6 @@ export function setBoxItem(profile,data,id,on){
 export function boxFilter(config,profile,data){
   const items=boxItems(config,profile,data),known=new Set([...config.weapons,...config.tactical??[],...config.lethal??[]].map(w=>w.id));
   const on=new Set(items.filter(i=>i.on).map(i=>i.id)),weights=Object.fromEntries((config.rarities??[]).map(r=>[r.id,r.weight??1]));
-  const pool=new Set(data.boxPool??[]),relic=new Set(config.weapons.filter(isRelic).map(w=>w.id));
-  return {allowed:id=>on.has(id)||!known.has(id)||relic.has(id)&&pool.has(id),weight:id=>weights[rarityOf(config,id)]??1,extra:[...on]};
+  const pool=new Set(data.boxPool??[]),relic=new Set(config.weapons.filter(isRelic).map(w=>w.id)),nb=new Set(config.weapons.filter(noBox).map(w=>w.id));
+  return {allowed:id=>!nb.has(id)&&(on.has(id)||!known.has(id)||relic.has(id)&&pool.has(id)),weight:id=>weights[rarityOf(config,id)]??1,extra:[...on]};
 }

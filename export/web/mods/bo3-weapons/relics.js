@@ -15,6 +15,7 @@ export const RELICS = {
   bo3_wrath_ancients: 'relic.bow', bo3_bow_rune: 'relic.bow_rune', bo3_bow_storm: 'relic.bow_storm',
   bo3_bow_wolf: 'relic.bow_wolf', bo3_bow_demon: 'relic.bow_demon', bo3_raygun_mk3: 'relic.raygun_mk3',
 };
+const FORGE = new Set(['bo3_bow_rune', 'bo3_bow_storm', 'bo3_bow_wolf', 'bo3_bow_demon']);   // upgrades: never in the box, forged in a match (mods/wonder-forge)
 const COLOR = { bo3_wrath_ancients: 0xff7a22, bo3_bow_rune: 0xff5a14, bo3_bow_storm: 0x5fb8ff, bo3_bow_wolf: 0x8fd0ff, bo3_bow_demon: 0xa45cff, bo3_raygun_mk3: 0x7dff6a };
 export const MK3_KILLS = 115;
 
@@ -30,7 +31,9 @@ export function earnRelic(api, ids, { delay = 3.4 } = {}) {
     api.audio?.play?.('box');
     const fx = window.kino?.fx, p = api.player?.getFeetPosition?.();
     if (fx?.emit && p) for (let i = 0; i < 3; i++) fx.emit({ key: 'glow', at: p.clone().setY(p.y + 40 + i * 30), size: [60, 420 - i * 90], life: .6 + i * .2, fade: [.05, .8], additive: true, color: COLOR[got[0]] ?? 0xffd070 });
-    api.toast?.(`${got.map(name).join(', ')}: ${got.length > 1 ? 'are' : 'is'} now in your Mystery Box on every map (Armory → Loadout → Mystery Box)`, 8);
+    const box = got.filter(id => !FORGE.has(id)), forge = got.filter(id => FORGE.has(id));
+    const say = (l, what) => l.length ? `${l.map(name).join(', ')}: ${what}` : '';
+    api.toast?.([say(box, `${box.length > 1 ? 'are' : 'is'} now in your Mystery Box on every map (Armory → Loadout → Mystery Box)`), say(forge, `can now be forged from a Wrath of the Ancients at any terminal (FORGE.EXE) on every map`)].filter(Boolean).join(' · '), 8);
   }, delay * 1000);
   return got;
 }

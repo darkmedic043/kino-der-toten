@@ -10,7 +10,7 @@ import { poseIdle } from './mods/bo3-weapons/pose.js';
 import { renderSettings } from './settings.js';
 import { startSocial, onSocial, request, accept, decline, cancel, remove, statusText } from './social.js';
 import { mergePatch, resolveWeapons, withCore, isCoreMod } from './mod-loader.js';
-import { loadProfile, saveProfile, loadProgression, soonLocked, packLocked, passLocked, ownsItem, xpToNext, levelNeed, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, isRelic, relicLocked, boxItems, setBoxItem, boxMin } from './profile.js';
+import { loadProfile, saveProfile, loadProgression, soonLocked, packLocked, passLocked, ownsItem, xpToNext, levelNeed, unlocks, validLoadout, cloudReady, unlockLevel, unlockLvl, gunsmithLevel, rarityOf, isPistol, isRelic, relicLocked, noBox, boxItems, setBoxItem, boxMin } from './profile.js';
 import { loadCatalog as loadGunsmith, renderGunsmith, GUNSMITH_CSS } from './mods/weapon-levels/gunsmith.js';
 import { openGunsmith } from './mods/weapon-levels/gunsmith-view.js';
 import { loadCamos, camoUnlocked, weaponClass, CLASSES, classOf as classOfIn } from './mods/weapon-levels/camo.js';
@@ -362,7 +362,7 @@ const gunsmithHas=id=>gunsmith&&weapons[id]&&!gunSoon(weapons[id])&&(weapons[id]
 function openLoadoutGunsmith(id,onClose){
   const l=validLoadout(config,profile,weapons),own=[l.primary].filter(w=>w&&gunsmithHas(w)&&smithOpen(w));
   const ids=[...own,...Object.keys(weapons).filter(w=>!own.includes(w)&&!w.includes('upgraded')&&!weapons[w].meleeSlot&&gunsmithHas(w)&&smithOpen(w))];   // (melee weapons: their own Gunsmith, from the melee slot)
-  openGunsmith({cat:gunsmith,weapons,profile,id,ids:ids.includes(id)?ids:[id],label:w=>w===l.primary?'STARTING PISTOL':isRelic(cfgW(w))?'RELIC · BOX GUN':'BOX / WALL GUN',
+  openGunsmith({cat:gunsmith,weapons,profile,id,ids:ids.includes(id)?ids:[id],label:w=>w===l.primary?'STARTING PISTOL':noBox(cfgW(w))?'RELIC · FORGE UPGRADE':isRelic(cfgW(w))?'RELIC · BOX GUN':'BOX / WALL GUN',
     onChange:()=>save(),onClose:onClose??(()=>{focus={id,isWeapon:true};renderLoadout();})});
 }
 loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=c;{const st=loadProfile();if(migrateWeaponLevels(c,weapons,st)){saveProfile(st);profile.weaponXp=st.weaponXp;}}   // 30-level track: old saves keep their attachments
@@ -609,7 +609,7 @@ function renderDetail(id,isWeapon,unlocked,level,opts={}){
     ${bar('DAMAGE',Math.log10(Math.max(10,d.damage*pellets)),Math.log10(3000),Math.round(d.damage)+(pellets>1?'×'+pellets:''))}
     ${bar('FIRE RATE',rpm,1000,rpm)}${bar('MAGAZINE',d.clipSize,100,d.clipSize)}${bar('RESERVE',d.maxAmmo,600,d.maxAmmo)}${bar('RELOAD',1/Math.max(.3,d.reloadTime),1/.8,(d.reloadTime??0).toFixed(1)+'s')}
     <p>${d.upgrade?`Pack-a-Punch: <b>${esc(d.upgrade.name)}</b>`:'Cannot be upgraded'} · ${esc(d.fireType??'')}</p>
-    <p class="muted">${rarityLine(id)}${unlocked?(isRelic(cfgW(id))?'Relic · earned: it can go in your Mystery Box':'Unlocked'):soonLocked(cfgW(id))?'Coming soon':relicLocked(cfgW(id))?'Relic · '+esc(cfgW(id).relic):passLocked(config.weapons.find(w=>w.id===id))?'A Melon Pass Season 1 reward':packOf(id)?`In the ${esc(PACKS[packOf(id)]??'weapon pack')} (Shop)`:'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}${config.weapons.find(w=>w.id===id)?.kit?' · first kit':''}</p>
+    <p class="muted">${rarityLine(id)}${unlocked?(noBox(cfgW(id))?'Relic · earned: forge it from a Wrath of the Ancients at a terminal (FORGE.EXE), never in the Mystery Box':isRelic(cfgW(id))?'Relic · earned: it can go in your Mystery Box':'Unlocked'):soonLocked(cfgW(id))?'Coming soon':relicLocked(cfgW(id))?'Relic · '+esc(cfgW(id).relic):passLocked(config.weapons.find(w=>w.id===id))?'A Melon Pass Season 1 reward':packOf(id)?`In the ${esc(PACKS[packOf(id)]??'weapon pack')} (Shop)`:'Unlocks at level '+(weaponLevel[id]??level)}${weapons[id].baseId?' · modded':''}${config.weapons.find(w=>w.id===id)?.kit?' · first kit':''}</p>
     ${gunsmith&&gunsmithHas(id)&&!smithOpen(id)?`<p class="muted gs-locked">Gunsmith opens at level ${gunsmithLevel(config,id)}</p>`:''}<div class="gunsmith-slot"></div>${unlocked?`<div data-prestige-host="${id}">${prestigeSlot(id)}</div>`:''}`;
   fillThumb(el.querySelector('.thumb'),id);
   // Weapon levels and attachments (mods/weapon-levels).

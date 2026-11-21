@@ -419,6 +419,7 @@
       "rarity": "wonder",
       "level": 1,
       "unlock": "relic.bow_rune",
+      "noBox": true,
       "relic": "Der Eisendrache: finish the Fire Bow quest and claim it from its pedestal"
     },
     {
@@ -426,6 +427,7 @@
       "rarity": "wonder",
       "level": 1,
       "unlock": "relic.bow_storm",
+      "noBox": true,
       "relic": "Der Eisendrache: finish the Storm Bow quest and claim it from its pedestal"
     },
     {
@@ -433,6 +435,7 @@
       "rarity": "wonder",
       "level": 1,
       "unlock": "relic.bow_wolf",
+      "noBox": true,
       "relic": "Der Eisendrache: finish the Wolf Bow quest and claim it from its pedestal"
     },
     {
@@ -440,6 +443,7 @@
       "rarity": "wonder",
       "level": 1,
       "unlock": "relic.bow_demon",
+      "noBox": true,
       "relic": "Der Eisendrache: finish the Void Bow quest and claim it from its pedestal"
     },
     {
