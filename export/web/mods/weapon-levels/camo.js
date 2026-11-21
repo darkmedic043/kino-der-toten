@@ -333,7 +333,7 @@ export function weaponClass(d){
   if(/mp40|mp5k|mpl|pm63|ak74u|spectre|g11/.test(b))return 'Submachine gun';return 'Rifle';
 }
 export const CLASSES=[['ar','ASSAULT RIFLES',['Rifle']],['smg','SMGS',['Submachine gun']],['shotgun','SHOTGUNS',['Shotgun']],['lmg','LMGS',['Light machine gun']],
-  ['sniper','SNIPERS',['Sniper rifle']],['pistol','PISTOLS',['Pistol']],['launcher','LAUNCHERS',['Launcher']],['special','SPECIALS',['Wonder weapon','Death Machine','Special']]];   // Special: BO7's class (the Grimhawk)
+  ['sniper','SNIPERS',['Sniper rifle']],['pistol','PISTOLS',['Pistol']],['launcher','LAUNCHERS',['Launcher']],['wonder','WONDER WEAPONS',['Wonder weapon']],['special','SPECIALS',['Death Machine','Special']]];   // Special: BO7's class (the Grimhawk)   // wonder: own group since 2026-11-21
 export const classOf=(weapons,id)=>{const d=weapons?.[id];return d?CLASSES.find(c=>c[2].includes(weaponClass(d)))?.[0]??'special':'special';};
 export const classLabel=key=>CLASSES.find(c=>c[0]===key)?.[1]??key;
 // the guns of a class that count toward Diamond (no Pack-a-Punch entries)
@@ -364,7 +364,7 @@ const baseCamos=cats=>cats.camos.filter(c=>!c.mastery&&!c.classMastery&&!c.rewar
 export function hasMastery(cats,profile,id){const p=camoProgress(profile,id);return baseCamos(cats).every(c=>challengeDone(cats,p,id,c));}
 // Diamond progress for a gun's class: guns with Gold / guns in the class
 export function classProgress(cats,profile,id,weapons){
-  const key=classOf(weapons,id);if(!weapons||key==='special')return null;
+  const key=classOf(weapons,id);if(!weapons||key==='special'||key==='wonder')return null;   // wonder weapons have their own camo challenges, no Diamond
   const guns=classGuns(weapons,key);return {key,label:classLabel(key),done:guns.filter(g=>hasMastery(cats,profile,g)).length,total:guns.length};
 }
 export function camoUnlocked(cats,profile,id,weapons){
