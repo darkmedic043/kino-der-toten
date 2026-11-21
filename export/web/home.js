@@ -511,7 +511,7 @@ const rarityLine=id=>{const r=rarityById[rarityOf(config,id)];return r?`<b class
 const lethalById=Object.fromEntries((config.lethal??[]).map(t=>[t.id,t]));
 let boxTab=null;
 function boxTabs(){
-  const tiers=[...(config.rarities??[])].reverse().map(r=>({key:r.id,label:r.name.toUpperCase(),color:r.color,kind:'weapon',all:weaponList().filter(w=>rarityOf(config,w.id)===r.id)}));
+  const tiers=[...(config.rarities??[])].reverse().map(r=>({key:r.id,label:r.name.toUpperCase(),color:r.color,kind:'weapon',all:weaponList().filter(w=>rarityOf(config,w.id)===r.id&&!noBox(w))}));   // forge-only upgrades (element bows) never show here
   return [...tiers,{key:'tactical',label:'TACTICALS',kind:'tactical',all:tacList()},{key:'lethal',label:'LETHALS',kind:'lethal',all:(config.lethal??[]).filter(t=>data.equipment?.[t.id])}].filter(t=>t.all.length);
 }
 // The melee slot: every entry in melee.json is a choice; the mod reads profile.loadout.melee at the start of a match
