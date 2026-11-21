@@ -6,6 +6,10 @@
 // Without PLAY the match idles SECS seconds and the round, zombies alive and player position are printed every 5 s.
 // Exit code 2 = stopped by the watchdog (the last lines say at what load step), 3 = the map never became ready.
 // ROUTE=/mods/movement/mod.js=scratch/old.js[,...]: serve a file of your own in place of the game's (an A/B run of a code change).
+// Frame-rate work: PROFILE=out.cpuprofile records a CPU profile of the PLAY step (node .tools/profile-summary.mjs out.cpuprofile),
+// a PLAY script can call `await __cpu()` = CPU ms used so far by {r: the page's main thread, g: the GPU process} (frame cost that the
+// host's other load can't blur: take it before and after a stretch and divide by the frames drawn). UNCAP=1 lifts the 60 FPS limit, RS=1 sets the render scale (default 0.5), DESK=1 uses a desktop page instead of the phone profile.
+// HEAP=out.heapprofile samples the PLAY step's allocations, collected ones included (node .tools/heap-summary.mjs out.heapprofile): where the garbage comes from. QS=a&b adds query switches to the game's URL.
 import { chromium } from '../node_modules/playwright-core/index.mjs'; import { execSync } from 'node:child_process'; import fs from 'node:fs'; import path from 'node:path'; import http from 'node:http';
 const MAP = process.env.MAP || 'sandbox', LIMIT = +(process.env.LIMIT || (process.env.FIRST ? 2600 : 2300)), ALL = +(process.env.ALL || 4500), SECS = +(process.env.SECS || 20), Q = +(process.env.Q || 1);
 const lite = `scratch/lite/${MAP}/tex`, useLite = !process.env.REAL && fs.existsSync(lite);
@@ -13,7 +17,7 @@ const mem = () => { try { const r = execSync("ps -C chrome -o rss=,args=").toStr
   return [Math.round(Math.max(0, ...r.filter(x => x[1]).map(x => x[0]))), Math.round(r.reduce((a, x) => a + x[0], 0))]; } catch { return [0, 0]; } };
 // A profile kept between runs (scratch/lite/profile): the map's navmesh stays in its IndexedDB, so only a map's first run
 // builds it (the build is the load's memory peak: the castle's needs FIRST=1, which lifts the renderer limit to 3300 MB once).
-const b = await chromium.launchPersistentContext('scratch/lite/profile', { executablePath: process.env.HOME + '/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome', args: ['--use-angle=vulkan', '--enable-gpu', '--ignore-gpu-blocklist', '--disk-cache-size=1048576', '--js-flags=--expose-gc'], viewport: { width: 640, height: 360 }, hasTouch: true, isMobile: true });
+const b = await chromium.launchPersistentContext('scratch/lite/profile', { executablePath: process.env.HOME + '/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome', args: ['--use-angle=vulkan', '--enable-gpu', '--ignore-gpu-blocklist', '--disk-cache-size=1048576', '--js-flags=--expose-gc', ...(process.env.UNCAP ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : [])], viewport: { width: 640, height: 360 }, ...(process.env.DESK ? {} : { hasTouch: true, isMobile: true }) });
 const net = new Map();
 let code = 0, label = '', peak = [0, 0], stopped = false, model = 'real'; const closers = [], t0 = Date.now(), secs = () => ((Date.now() - t0) / 1000).toFixed(0);
 let gcIv = null, over = 0; const HOLD = +(process.env.HOLD || 6), HARD = +(process.env.HARD || (process.env.FIRST ? 3600 : 3000));
@@ -44,10 +48,15 @@ try {
     const f = function (buf, ok, err) { const b = this.createBuffer(1, 2205, 22050); ok?.(b); return Promise.resolve(b); }; f.tiny = true; C.prototype.decodeAudioData = f; } });
   for (const pair of (process.env.ROUTE || '').split(',').filter(Boolean)) { const [u, f] = pair.split('=');   // ROUTE=/mods/x.js=scratch/old.js[,...]: serve a file in place of one of the game's (A/B runs)
     await p.route(x => x.pathname === u, r => r.fulfill({ body: fs.readFileSync(f), contentType: 'text/javascript' })); }
+  // CPU time from /proc (10 ms ticks): the renderer with the most memory is the game's page; its main thread has tid = pid
+  await p.exposeFunction('__cpu', () => { const o = { r: 0, g: 0 }; try { const ps = execSync("ps -C chrome -o pid=,rss=,args=").toString().split('\n').filter(Boolean).map(l => { const m = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(l); return m && { pid: m[1], rss: +m[2], args: m[3] }; }).filter(Boolean);
+    const ticks = f => { const t = fs.readFileSync(f, 'utf8'); const a = t.slice(t.lastIndexOf(')') + 2).split(' '); return (+a[11] + +a[12]) * 10; };
+    const rend = ps.filter(x => / --type=renderer/.test(x.args)).sort((a, b) => b.rss - a.rss)[0], gpu = ps.find(x => / --type=gpu-process/.test(x.args));
+    if (rend) o.r = ticks(`/proc/${rend.pid}/task/${rend.pid}/stat`); if (gpu) o.g = ticks(`/proc/${gpu.pid}/stat`); } catch (e) { o.err = String(e).slice(0, 80); } return o; });
   if (process.env.INIT) await p.addInitScript(fs.readFileSync(process.env.INIT, 'utf8'));   // INIT=<file>: a script run in the page before the game's own (a stand-in for a system the test page lacks)
   await p.goto('http://127.0.0.1:5190/');
-  await p.evaluate(q => { localStorage.clear(); const s = {}; s.graphics = q; s.renderScale = .5; localStorage.setItem('kino.settings', JSON.stringify(s)); }, Q);
-  await p.goto('http://127.0.0.1:5190/play.html?map=' + MAP);
+  await p.evaluate(([q, rs]) => { localStorage.clear(); const s = {}; s.graphics = q; s.renderScale = rs; localStorage.setItem('kino.settings', JSON.stringify(s)); }, [Q, +(process.env.RS || .5)]);
+  await p.goto('http://127.0.0.1:5190/play.html?map=' + MAP + (process.env.QS ? '&' + process.env.QS : ''));
   // NET=1: what the page downloads, by folder and 5 s slice (MB), and every file over 8 MB: shows which step a memory peak belongs to
   if (process.env.NET) p.on('response', r => { const n = +(r.headers()['content-length'] || 0), u = new URL(r.url()), k = `${String(Math.floor(secs() / 5) * 5).padStart(3)} s ${u.pathname.split('/').slice(1, 3).join('/')}`;
     net.set(k, (net.get(k) || 0) + n); if (n > 8e6) console.log(`  net ${secs()} s ${(n / 1048576).toFixed(0)} MB ${u.pathname.slice(-70)}`); });
@@ -60,8 +69,12 @@ try {
     const m = mem(); console.log(`${MAP} ready in ${secs()} s; renderer ${m[0]} MB, all ${m[1]} MB; model: ${model}; textures: ${useLite ? served + ' lite, ' + missed + ' real' : 'real'}`);
     console.log(JSON.stringify(await p.evaluate(() => { const a = kino.mods.api, r = a.renderer; return { label: document.getElementById('load-label')?.textContent, programs: r?.info?.programs?.length, geometries: r?.info?.memory?.geometries, textures: r?.info?.memory?.textures, heapMB: Math.round((performance.memory?.usedJSHeapSize || 0) / 1e6) }; })));
     await p.evaluate(() => { document.getElementById('start')?.click(); const D = kino.debug; D.setActive(true); D.setInvulnerable(true); });
+    let heap = null; if (process.env.HEAP) { heap = await b.newCDPSession(p); await heap.send('HeapProfiler.enable'); await heap.send('HeapProfiler.startSampling', { samplingInterval: 8192, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true }); }
+    let cdp = null; if (process.env.PROFILE) { cdp = await b.newCDPSession(p); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
     if (process.env.PLAY) console.log('PLAY', JSON.stringify(await p.evaluate(fs.readFileSync(process.env.PLAY, 'utf8'))));
-    else for (let t = 0; t < SECS && !stopped; t += 5) { await new Promise(r => setTimeout(r, 5000)); const s = await p.evaluate(() => { const a = kino.mods.api, st = kino.debug.getState(); return { round: a.session?.round, alive: a.enemies?.list?.filter(z => !z.dead).length ?? st.zombies, pos: a.player?.position?.toArray().map(Math.round) }; }).catch(e => ({ err: String(e).slice(0, 80) })); const m = mem(); console.log(`  +${t + 5} s`, JSON.stringify(s), `renderer ${m[0]} MB`); }
+    if (!process.env.PLAY) for (let t = 0; t < SECS && !stopped; t += 5) { await new Promise(r => setTimeout(r, 5000)); const s = await p.evaluate(() => { const a = kino.mods.api, st = kino.debug.getState(); return { round: a.session?.round, alive: a.enemies?.list?.filter(z => !z.dead).length ?? st.zombies, pos: a.player?.position?.toArray().map(Math.round) }; }).catch(e => ({ err: String(e).slice(0, 80) })); const m = mem(); console.log(`  +${t + 5} s`, JSON.stringify(s), `renderer ${m[0]} MB`); }
+    if (cdp && !stopped) { const { profile } = await cdp.send('Profiler.stop'); fs.writeFileSync(process.env.PROFILE, JSON.stringify(profile)); }
+    if (heap && !stopped) { const { profile } = await heap.send('HeapProfiler.stopSampling'); fs.writeFileSync(process.env.HEAP, JSON.stringify(profile)); }
   }
   console.log(lines.join('\n')); if (tex3) console.log(`${tex3} texture-array warnings from the 16 px copies (test only)`);
 } catch (e) { if (!stopped) { code = code || 1; console.log('FAILED', String(e).slice(0, 300)); } }

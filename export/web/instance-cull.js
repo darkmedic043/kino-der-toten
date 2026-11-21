@@ -16,6 +16,23 @@ import { settings } from './settings.js';
 // `_colorsTexture`; for a batch without colours `undefined !== null` held, so every batched draw looked its program up
 // again (getProgram/getParameters ~15% of a Giant frame). Give the class the name the renderer reads.
 if(!('colorTexture' in THREE.BatchedMesh.prototype))Object.defineProperty(THREE.BatchedMesh.prototype,'colorTexture',{configurable:true,get(){return this._colorsTexture;}});
+// three r185: a batch with perObjectFrustumCulled (or sortObjects) rewrites its index texture and marks it for upload on
+// every render call, every pass and shadow map included, although the list of drawn instances rarely changes from one call
+// to the next (63 texSubImage2D a frame on The Giant with a still camera, 2026-11-21). Here the list is compared with the
+// one last sent and the upload is dropped when it is the same. `valid` = how many entries of `last` are known to match the
+// GPU's copy. ?batchUploads / kino.instanceCull.batchUploads.guard=false for the old behaviour (performance.md).
+export const batchUploads={guard:!new URLSearchParams(globalThis.location?.search??'').has('batchUploads'),sent:0,kept:0};
+{const P=THREE.BatchedMesh.prototype,stock=P.onBeforeRender,kept=new WeakMap(),guard=batchUploads;
+  P.onBeforeRender=function(renderer,scene,camera,geometry,material){
+    if(!this._visibilityChanged&&!this.perObjectFrustumCulled&&!this.sortObjects)return;
+    const tex=this._indirectTexture,v=tex.version;
+    stock.call(this,renderer,scene,camera,geometry,material);
+    if(tex.version===v||!guard.guard)return;
+    const data=tex.image.data,n=this._multiDrawCount;let st=kept.get(tex);
+    if(!st||st.last.length!==data.length)kept.set(tex,st={last:new data.constructor(data.length),valid:0});
+    else if(n<=st.valid){const last=st.last;let i=0;while(i<n&&data[i]===last[i])i++;if(i===n){tex.version=v;guard.kept++;return;}}
+    st.last.set(n===data.length?data:data.subarray(0,n));st.valid=n;guard.sent++;
+  };}
 
 const M=new THREE.Matrix4(),W=new THREE.Matrix4(),C=new THREE.Vector3(),S=new THREE.Vector3(),Q=new THREE.Quaternion(),COL=new THREE.Color();
 const F=new THREE.Frustum(),PV=new THREE.Matrix4(),DIR=new THREE.Vector3(),LAST_DIR=new THREE.Vector3();
@@ -294,6 +311,7 @@ export async function createInstanceCuller(root,{exclude=o=>o.userData.noCull,ta
     // the last update again (after a restore(), in the same frame)
     reapply(){return lastArgs?this.update(lastArgs[0],lastArgs[1],lastArgs[2],true):false;},
     // every instance back on (e.g. before a bake that renders the whole map)
+    batchUploads,
     restore(){for(const e of list){for(let i=0;i<e.n;i++)if(!e.mask[i]&&(!e.alive||e.alive[i])){e.mask[i]=1;e.mesh.setVisibleAt(e.ids[i],true);}e.kept=e.n;e.mesh.visible=true;}lastPos=null;drawn=instances;},
   };
 }

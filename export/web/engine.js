@@ -29,7 +29,7 @@ import { installGameMenu } from './game-menu.js';
 import { createAutoRes } from './auto-res.js';
 import { createPerfDiag } from './perf-diag.js';
 import { setupKtx2, ktx2Stats } from './ktx2.js';
-import { stillSkeletons, hideBones } from './still-skeletons.js';
+import { stillSkeletons, hideBones, shareSkeletons } from './still-skeletons.js';import { createRigLod } from './rig-lod.js';import { fastUniforms, uniformStats } from './uniform-fast.js';
 import { padOnly } from './seat.js';   // Rind split screen: a controller-only half has no focus to lose
 
 export const vector=a=>new THREE.Vector3().fromArray(a);
@@ -43,7 +43,7 @@ const renderer=new THREE.WebGLRenderer({antialias:!profile.mobile,powerPreferenc
 setupKtx2(renderer);   // GPU-compressed copies of the textures for every glTF loaded from here on (ktx2.js)
 renderer.setPixelRatio(Math.min(devicePixelRatio,profile.mobile?1:1.5));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;
 // smallest instanced prop drawn, in screen pixels, by graphics quality (Low..Ultra; instance-cull.js)
-const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null,visCull=null;
+const CULL_PIXELS=[6,4,3,2];let instanceCull=null,staticFreeze=null,visCull=null,rigLod=null;
 // three draws a transparent double-sided material in two passes and flags it needsUpdate before each, which re-checks
 // its program twice a draw (on The Giant, a glass material and the viewmodel's decals: ~10% of a frame). One pass
 // looks the same here. Every material is single-pass from creation (the Material.prototype override below, 2026-11-01).
@@ -88,7 +88,7 @@ let lastTex={n:0,kb:0,mip:0,gl:{}};const fences=[];let fenceSupported=null;   //
   texUp.gl={};const count=(name,kb)=>{const f=gl[name];if(typeof f!=='function')return;gl[name]=function(...a){const glc=texUp.gl;glc[name]=(glc[name]||0)+1;if(kb){const k=kb(a);if(k)glc[name+'KB']=(glc[name+'KB']||0)+k;}return f.apply(this,a);};};
   const bytes=a=>{const d=a.find(x=>x&&typeof x==='object'&&'byteLength' in x);return d?Math.round(d.byteLength/1024):typeof a[1]==='number'?Math.round(a[1]/1024):0;};
   count('bufferData',bytes);count('bufferSubData',bytes);for(const n of ['createBuffer','createTexture','deleteBuffer','deleteTexture','createVertexArray','deleteVertexArray','createFramebuffer','createRenderbuffer','renderbufferStorageMultisample','compileShader','linkProgram','getError','finish','flush','readPixels','clientWaitSync','getProgramParameter','getShaderParameter','getUniformLocation','getParameter','getBufferSubData','blitFramebuffer','invalidateFramebuffer'])count(n);}
-const NO_STILL=new URLSearchParams(location.search).has('noStill');   // A/B switch for still-skeletons.js
+const NO_STILL=new URLSearchParams(location.search).has('noStill');const NO_SHARE=new URLSearchParams(location.search).has('noShare');const FAST_UNIFORMS=!new URLSearchParams(location.search).has('slowUniforms');   // A/B switch for still-skeletons.js
 const NO_WARM_DRAW=new URLSearchParams(location.search).has('noWarmDraw'),NO_SLICE=new URLSearchParams(location.search).has('noSlice'),NO_GPU_WAIT=new URLSearchParams(location.search).has('noGpuWait'),NO_HUD_WARM=new URLSearchParams(location.search).has('noHudWarm'),NO_PAINT_WARM=new URLSearchParams(location.search).has('noPaintWarm'),NO_WEAPON_WARM=new URLSearchParams(location.search).has('noWeaponWarm'),WEAPON_WARM_MS=8000;   // A/B switches for warmShaders' draw pass and warmHud
 // Single pass from the first draw, not after the sweep: three drew a new transparent double-sided material (the Mech's arc
 // bolts, built when the mech lands) with its back faces then its front faces until the sweep reached it, each side a
@@ -512,6 +512,8 @@ try{
   await Promise.all([enemies.load(),equipView(),audio.load(),powerups.load(),perkDrink.load(),mysteryBox.load(),features.load()]);player.update(.05,{});
   await map.ready?.();
   if(!new URLSearchParams(location.search).has('noVisCull')){visCull=createVisCull(renderer,scene);globalThis.kino.visCull=visCull;}
+  globalThis.kino.uniforms=uniformStats;
+  if(!new URLSearchParams(location.search).has('noRigLod')){rigLod=createRigLod({enemies,share:!NO_SHARE});globalThis.kino.rigLod=rigLod;for(const k of ['templates','heads'])for(const t of enemies[k]??[])rigLod.prepare(t);for(const k of ['dog','quad','quadHead'])rigLod.prepare(enemies[k]);}   // rig-lod.js: zombies cost only what is in view
   progress('Loading mods',95);await mods.start({melee,renderer,data,session,world,player,enemies,scene,camera,audio,features,mysteryBox,powerups,view,viewScene,perkDrink,toast,announce,equipView,damage,getState,setActive,reset,tick:update,map:entry,shop,perkInfo:map.perkInfo??perkInfo,viewCamera});wallChalk?.connect();
   // Performance for big ported maps (docs/fork/performance.md). A/B switches for benchmarks: ?noMerge ?noBatch ?noFreeze
   const perfOff=new URLSearchParams(location.search);
@@ -557,7 +559,7 @@ try{
   // a custom map's static objects stop recomputing their matrices every frame (Kino's world.js freezes its own root)
   // rigged props that never move keep their bone textures instead of re-uploading them every frame (still-skeletons.js;
   // the whole scene: Der Eisendrache's 461 still props sit outside world.root). Late arrivals join on the 1 s sweep.
-  if(!NO_STILL)stillSkeletons(scene);
+  if(!NO_STILL){if(!NO_SHARE)shareSkeletons(scene);stillSkeletons(scene);}
   // (2026-10-17: the whole scene, with the walk cut short under static subtrees; bones with nothing attached are hidden
   // from the renderer's object walk, see still-skeletons.js)
   if(!perfOff.has('noFreeze')&&world.root&&world.root.updateMatrixWorld===THREE.Object3D.prototype.updateMatrixWorld){staticFreeze=createStaticFreeze(scene);globalThis.kino.staticFreeze=staticFreeze;console.info('[static-freeze]',staticFreeze.frozen,'frozen,',staticFreeze.skips,'subtrees skipped');}
@@ -923,9 +925,9 @@ function renderFrame(now){
   if(lastRendered&&now-lastRendered<interval-1)return;
   lastRendered=now;const dt=Math.min((now-previous)/1000,.06);previous=now;frameTime+=dt;frameCount++;renderedFrames++;
   if(frameTime>.75){fps=Math.round(frameCount/frameTime);frameTime=0;frameCount=0;}
-  if((singlePassTimer-=dt)<=0){singlePassTimer=1;if(ready&&!NO_STILL){stillSkeletons(scene);hideBones(scene);}for(const c of viewScene.children)if(!Object.hasOwn(c,'updateMatrixWorld'))c.updateMatrixWorld=skipHidden;}   // (2026-10-25) hideBones each second too: the zombies' ~2,600 bones left projectObject's walk
+  if((singlePassTimer-=dt)<=0){singlePassTimer=1;if(ready&&!NO_STILL){if(!NO_SHARE)shareSkeletons(scene);stillSkeletons(scene);hideBones(scene);}if(ready&&FAST_UNIFORMS)fastUniforms(renderer);for(const c of viewScene.children)if(!Object.hasOwn(c,'updateMatrixWorld'))c.updateMatrixWorld=skipHidden;}   // (2026-10-25) hideBones each second too: the zombies' ~2,600 bones left projectObject's walk
   const playing=active&&started,t0=performance.now();mods.profiling=playing;
-  update(dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);visCull?.update(mods.camera??camera);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
+  update(dt);rigLod?.update(mods.camera??camera,dt);const t1=performance.now();const gq=gpuBegin(playing);staticFreeze?.tick();instanceCull?.update(mods.camera??camera,renderer.domElement.height,entry?.instanceCullPixels??CULL_PIXELS[settings.graphics]??3);visCull?.update(mods.camera??camera);renderer.info.reset();renderer.clear();const drawView=ready&&started&&!mods.hideViewmodel;
   const viewDrawn=mods.renderWorld?mods.renderWorld(scene,mods.camera??camera,{viewScene,viewCamera,drawView}):(renderer.render(scene,mods.camera??camera),false);if(drawView&&!viewDrawn){renderer.clearDepth();renderer.render(viewScene,viewCamera);}
   keepPrograms();gpuEnd(gq,now);autoRes.frame(dt*1000,performance.now()-t0,playing);if(playing){fenceFrame(now);pollFences();}
   if(playing){perf.firstDraws?.(firstDraw.n);const n=renderer.info.programs.length;if(n>programCount)perf.programs(firstDraw.late.length?firstDraw.late.splice(0):renderer.info.programs.slice(programCount).map(p=>p.name||String(p.cacheKey).split(',')[0]||'?'));programCount=n;if(session.round!==evRound){evRound=session.round;perf.event?.('round'+evRound);}const zn=enemies?.list?.length??0;if(zn>evZ)perf.event?.('spawn');evZ=zn;if(session.def!==evDef){evDef=session.def;perf.event?.('equip:'+(evDef?.id??'?'));}
