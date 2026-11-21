@@ -79,3 +79,7 @@ User reports: pausing froze the game and desynced it (hits from nothing, everyon
 ## Gum hooks (2026-11-06)
 
 For the Season 1 gums (gobblegums.md): `kino.puBy` is the remote player id while the host runs a power-up grab for that remote (null otherwise); a host `onCollect` that returns `'defused'` sends `pu` with `skip:1` and clients don't run it; `kino.coopReviveAll(extra)` sends `{t:'revive',...extra}` to every downed, not-dead remote and returns the count. The gobblegums mod's own messages are `{t:'gum',op,...}`.
+- **Voice lines (2026-11-21, `mods/operator-voice`)**:
+  - Each player's operator line is sent as `{t:'vox', v: voice id, f: clip, n: name}` to `'all'`.
+  - Receivers play it from the sender's avatar (`window.kino.coopRemote(id)`, added to the multiplayer mod).
+  - Operator-voice sets up before multiplayer, so it hooks `kino.coop.on('vox')` and `on('joined')` at `ready`/`start`.

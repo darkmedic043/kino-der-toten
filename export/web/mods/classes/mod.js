@@ -144,7 +144,7 @@ export default async function setup(api){
     if(cooldown===0)ready();
   });
   let wasPowered=powered();
-  function ready(){if(!powered())return;audio.play('buy',.35);api.toast?.(act.name+' ready',1.2);hud();}
+  function ready(){if(!powered())return;audio.play('buy',.35);host.emit('abilityReady',{act:act.id});api.toast?.(act.name+' ready',1.2);hud();}
   function use(){
     if(!powered()&&!actionUp()&&!other?.always){notReady();return;}
     const was=actionUp();(other?other.deploy:deploy)();

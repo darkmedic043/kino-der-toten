@@ -1,0 +1,5 @@
+{
+  "name": "Operator voices",
+  "description": "Your operator says lines during a match (kills, rounds, perks, the box, Pack-a-Punch, downs...). Lines per operator in voices/<id>/lines.json; teammates hear them in co-op.",
+  "script": "mod.js"
+}

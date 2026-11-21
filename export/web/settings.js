@@ -4,7 +4,7 @@
 const KEY='kino.settings';
 // Phones start on Low graphics without HD textures (the lighting and HD texture work is heavy there); a saved choice wins.
 const COARSE=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
-export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,music:false,headBob:true,gunMotion:1,casinoFx:2,renderScale:1,autoRes:0,graphics:COARSE?0:2,filmLook:2,filmGrain:true,motionBlur:1,dof:true,reflections:true,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,fpsCap:COARSE?30:0,padSensitivity:1,padAimAssist:1,padGlyphs:0,padVibration:true,padTriggers:true,padLightbar:true,binds:{}};
+export const DEFAULTS={sensitivity:1,adsSensitivity:1,invertY:false,fov:78,volume:1,voiceVolume:1,voiceChat:2,voiceSubs:true,music:false,headBob:true,gunMotion:1,casinoFx:2,renderScale:1,autoRes:0,graphics:COARSE?0:2,filmLook:2,filmGrain:true,motionBlur:1,dof:true,reflections:true,hdTextures:!COARSE,daytime:true,devConsole:false,showFps:false,fpsCap:COARSE?30:0,padSensitivity:1,padAimAssist:1,padGlyphs:0,padVibration:true,padTriggers:true,padLightbar:true,binds:{}};
 // Rebindable actions and the key each game page listens for. game-menu.js
 // translates a rebound key into its default so the game code stays unchanged.
 export const ACTIONS=[
@@ -46,6 +46,9 @@ const FIELDS=[
   {key:'casinoFx',tab:'gameplay',label:'Casino effects',type:'range',min:0,max:2,step:1,format:v=>['Minimal','Reduced','Full'][Math.round(v)]??'Full',hint:'The Gambler class: how much of the screen its games take over (bulbs, flashes, the table felt)'},
   {key:'fov',tab:'gameplay',label:'Field of view',type:'range',min:60,max:110,step:1,format:v=>v+'°'},
   {key:'volume',tab:'audio',label:'Master volume',type:'range',min:0,max:1.5,step:.05,format:v=>Math.round(v*100)+'%'},
+  {key:'voiceVolume',tab:'audio',label:'Operator voice volume',type:'range',min:0,max:1.5,step:.05,format:v=>Math.round(v*100)+'%',hint:'Lines your operator says in a match (operators with recorded lines only)'},
+  {key:'voiceChat',tab:'audio',label:'Operator chatter',type:'range',min:0,max:3,step:1,format:v=>['Off','Rare','Normal','Chatty'][Math.round(v)]??'Normal',hint:'How often your operator talks: big moments only on Rare, every little thing on Chatty'},
+  {key:'voiceSubs',tab:'audio',label:'Voice subtitles',type:'toggle',hint:'Show what your operator (and teammates\' operators) say as a caption'},
   {key:'music',tab:'audio',label:'Background music',type:'toggle',hint:'Ambient soundtrack; Easter-egg songs always play'},
   {key:'renderScale',tab:'graphics',label:'Render resolution',type:'range',min:.5,max:1.5,step:.05,format:v=>Math.round(v*100)+'%',hint:'Lower it for more FPS'},
   {key:'autoRes',tab:'graphics',label:'Automatic resolution',type:'range',min:0,max:7,step:1,toInput:v=>Math.max(0,AUTO_RES.indexOf(v)),fromInput:i=>AUTO_RES[i]??0,format:v=>v>0?'Hold '+v+' FPS':'Off',hint:'Lowers the render resolution (down to half) while the graphics card is what keeps the game under this frame rate, and raises it again when there is room'},

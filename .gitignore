@@ -65,3 +65,6 @@ Thumbs.db
 /export/web/mods/stickers/images/smiley.png
 # the Kurb charm's scan: user, 2026-11-07: "kurb scan doesnt go in" (never commit or install it)
 /export/web/mods/charms/models/kurb.glb
+
+# operator voice lines ripped from their games (Deadlock: Valve): local only, never published
+export/web/mods/operator-voice/voices/deadlock_*/

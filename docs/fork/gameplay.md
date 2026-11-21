@@ -195,3 +195,26 @@ A Nova crawler shot dead (`z.gasDeath`: bullet, not melee, not a Nuke) used to l
 - At most 3 gas clouds (a fourth replaces the oldest), and they never take a Smoke Grenade's slot. With no room, or without the volume, the old sphere stands in.
 - Low graphics draws it as the volume's puffs (alpha .4). The gas hides nobody and does no damage, as before.
 - **Checked**: look on the sandbox map (Medium: ray-marched, Low: puffs; frames in `scratch/gas/f/`); the kill path on Kino's 16 px copy with `.tools/map-test.mjs` (`PLAY=scratch/gas/play.js`): cloud at 0.5 s, blur on inside it, fade .62 at 6.2 s, freed by 8.8 s, five kills in a row leave 3 clouds.
+
+## Operator voice lines (2026-11-21, `mods/operator-voice`, user: "add voice lines to operators", then "scour through it all, pick what you'd think would be good")
+
+- An operator speaks when `mods/operator-voice/voices/<voice id>/lines.json` exists (`voice id` = the characters.json entry's `voice`, else its `id`): `{event: [{f: clip file, t: caption}]}`. No folder = a silent operator. Only Seven (`deadlock_seven`) has one so far: 320 lines in 39 events, cut from a 70-minute recording of Deadlock's Seven lines that the user supplied. **Ripped audio: `voices/deadlock_*/` is git-ignored and outside the Rind manifest's OWN list. Never commit or publish it.**
+- **Events** (`EVENTS` in mod.js, each `[priority 0-3, chance at Normal, own cooldown s]`):
+  - Match: start, roundStart, roundEnd, roundEndTeam (half of co-op round ends), dogRound, lastZombie (`spawned >= total` with one zombie alive).
+  - Kills: kill, headshot, meleeKill, multiKill (4 kills in 2.2 s), streak (every 40 kills), eliteKill and boss (on sight). A boss is `z.boss` or a kind in `ELITE`; never a health threshold, since plain zombies pass any fixed number at high rounds.
+  - Health: hurt (hits of 20+), lowHealth (under 35), down, revived, reviveTeammate, gameOver.
+  - Weapons and shopping: reload, noAmmo, wallBuy, boxSpin (a wrapped `mysteryBox.start`), box (taken), pap.
+  - Items and abilities: perk, powerup, gum, ability (`abilityUsed`), abilityReady (new host event from `mods/classes` `ready()`).
+  - Map: door, power, horde (12 or more zombies within 650), idle (50 s without a kill), inspect, exfil and exfilWin (`exfilStart`/`exfilEnd`), easterEgg, teammateJoined (net `joined`).
+  - A new event needs an entry in `EVENTS`, a trigger in mod.js, and lines.
+- **Pacing**:
+  - Priority 3 always plays and cuts off the current line. Lower priorities wait while a line is playing.
+  - Every line also waits for a global gap (`GAP`: 9 / 4.5 / 2.5 s for Rare / Normal / Chatty) and rolls its chance, scaled by `CHANCE`.
+  - Each event deals from a shuffled bag, so no line repeats until all of them have played.
+  - `kino.voice.say(ev, force)` plays a line from the console (`force` skips the checks).
+- **Caption**: plain text with no blur or shadow, so it adds no new Skia shader mid-game. It is painted by `warmHud`. Settings → Voice subtitles turns it off.
+- **Co-op**: your line goes out as `{t:'vox', v, f, n}` to the room. Teammates play it from your body (`kino.coopRemote(id).root`, fading out by 2200 units), with your operator's name on the caption. Their client loads that voice's lines.json on first use.
+- **New voice**:
+  1. Transcribe the recording. The method used: faster-whisper medium.en on CUDA, run on silence-split ranges, because its own VAD merged minutes of speech. The scripts are in `scratch/voice/`.
+  2. Write `picks.json`, `{event: [{s, e, t}]}`.
+  3. Run `python3 .tools/build-voice.py <audio> picks.json export/web/mods/operator-voice/voices/<id>`. It produces mono, loudness-normalised (-16 LUFS) Vorbis clips with 20/50 ms fades.
