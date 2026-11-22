@@ -163,9 +163,9 @@ export function setupZombieShield(api) {
   host.on('reset', reset);
 
   return {
-    held: () => !!rs()?.state?.().alt,
+    held: () => rs()?.state?.().alt === alt,   // this shield only: the Guard of Fafnir is an alt on the same code (it showed as OWNED here, 2026-11-22)
     planted: () => stands.some(s => s.on && s.by === me()),
-    damaged() { const s = rs()?.state?.(); return !!s?.alt && s.health < s.max; },
+    damaged() { const s = rs()?.state?.(); return s?.alt === alt && s.health < s.max; },
     repair() { rs()?.heal(Infinity); },
     give() { if (!alt.def) { toast('The shield model is missing', 2); return false; } rs()?.give(alt); return true; },
     reset, stands,
