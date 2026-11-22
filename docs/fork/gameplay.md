@@ -198,7 +198,7 @@ A Nova crawler shot dead (`z.gasDeath`: bullet, not melee, not a Nuke) used to l
 
 ## Operator voice lines (2026-11-21, `mods/operator-voice`, user: "add voice lines to operators", then "scour through it all, pick what you'd think would be good")
 
-- An operator speaks when `mods/operator-voice/voices/<voice id>/lines.json` exists (`voice id` = the characters.json entry's `voice`, else its `id`): `{event: [{f: clip file, t: caption}]}`. No folder = a silent operator. Only Seven (`deadlock_seven`) has one so far: 320 lines in 39 events, cut from a 70-minute recording of Deadlock's Seven lines that the user supplied. **Ripped audio: `voices/deadlock_*/` is git-ignored and outside the Rind manifest's OWN list. Never commit or publish it.**
+- An operator speaks when `mods/operator-voice/voices/<voice id>/lines.json` exists (`voice id` = the characters.json entry's `voice`, else its `id`): `{event: [{f: clip file, t: caption}]}`. No folder = a silent operator. Seven (`deadlock_seven`, 320 lines) and Venator (`deadlock_venator`, 194 lines from a 38-minute recording, 2026-11-22, picks in `scratch/voice/venator/picks.txt`, every clip re-transcribed against its caption) have one, both in 39 events. Seven's were cut from a 70-minute recording of Deadlock's Seven lines that the user supplied. **Ripped audio: `voices/deadlock_*/` is git-ignored and outside the Rind manifest's OWN list. Never commit or publish it.**
 - **Events** (`EVENTS` in mod.js, each `[priority 0-3, chance at Normal, own cooldown s]`):
   - Match: start, roundStart, roundEnd, roundEndTeam (half of co-op round ends), dogRound, lastZombie (`spawned >= total` with one zombie alive).
   - Kills: kill, headshot, meleeKill, multiKill (4 kills in 2.2 s), streak (every 40 kills), eliteKill and boss (on sight). A boss is `z.boss` or a kind in `ELITE`; never a health threshold, since plain zombies pass any fixed number at high rounds.
@@ -218,6 +218,14 @@ A Nova crawler shot dead (`z.gasDeath`: bullet, not melee, not a Nuke) used to l
   1. Transcribe the recording. The method used: faster-whisper medium.en on CUDA, run on silence-split ranges, because its own VAD merged minutes of speech. The scripts are in `scratch/voice/`.
   2. Write `picks.json`, `{event: [{s, e, t}]}`.
   3. Run `python3 .tools/build-voice.py <audio> picks.json export/web/mods/operator-voice/voices/<id>`. It produces mono, loudness-normalised (-16 LUFS) Vorbis clips with 20/50 ms fades.
+- **Conversations between two operators** (2026-11-22, user: "set up a system where 2 characters can interact"):
+  - Data: `voices/<voice id>/convos.json`, `[{id, lines: [{v: voice id of the speaker, f: clip, t: caption}]}]`, clips in that folder's `convo/`. A conversation lives in ONE operator's folder (either one; `convoFor` reads both players' folders). Venator's folder holds his three with Seven (`seven_vatican`, `seven_friend`, `seven_benediction`).
+  - When: co-op only, both operators within 1400 units, neither down. 14 s after the start (chance = chatter's `CONVO` + .25) and after a round end (4.5 s later, at most one every 150 s). Chance by chatter: Off 0, Rare .2, Normal .4, Chatty .65. Each conversation plays once a match per pair.
+  - Who starts: the player with the lower co-op id sends `{t:'convo', o: folder, k: convo id, who: {voice id: player id}}`, and both clients play the same lines in order (gap 0.28 s after each clip). Your lines come from you; a teammate's lines come from their body, with the right name on the caption. `kino.coopRemotes()` (multiplayer mod) lists the teammates.
+  - Pacing: while a conversation plays, single lines below priority 3 wait. A priority-3 line (or `say(ev, true)`) cuts the conversation off.
+  - Console: `kino.voice.convo('deadlock_seven')` plays one of your conversations with that operator (or with a conversation id) solo, both voices from you. `kino.voice.convos()` lists your folder's.
+  - Build: `python3 .tools/build-voice.py --convos <audio> convos-picks.json <voice folder>`, picks `[{id, lines: [{v, s, e, t}]}]`. Only `convo/*.ogg` is replaced; lines mode leaves `convo/` alone.
+  - Finding a pair's lines in a mixed recording (the Venator interactions track has both speakers and many heroes): a GMM-UBM speaker score (`scratch/voice/gmm.py`, `score.py`, MFCC + deltas, 32 components, trained on each operator's own clips; 99% right on held-in clips), then word timestamps (`words.py`) to cut the turns apart. The rest of that track (about 79 exchanges with heroes who aren't operators yet) is uncut.
 
 ## Sound that cuts out: the audio watchdog (2026-11-22, `engine.js`, user: "audio completely cut off, can you fix this")
 

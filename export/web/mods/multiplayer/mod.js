@@ -475,6 +475,7 @@ export default async function setup(api){
     return {p:pct,op:window.kino.characterEntry?.name??registry.find(e=>e.id===profile.character)?.name??null,cls:c?.cls?.name??null,lvl:c?.state?.level??null,in:!!st.started,cd:(({c1,c2,pattern,image})=>c1?{c1,c2,pattern,image}:null)(window.kino.cosmetics?.equipped?.card??{}),tt:window.kino.cosmetics?.equipped?.title?.id??null,em:window.kino.cosmetics?.equipped?.emblem?.id??null};   // cd: the calling card (shop); tt/em: the title's and emblem's item ids (shown through titleOf/emblemOf, never as sent text or paths)
   }
   window.kino.coopRemote=id=>remotes.get(id)??null;   // operator-voice plays a teammate's line from their body
+  window.kino.coopRemotes=()=>[...remotes.values()];   // operator-voice: which operators are in the match (two-operator conversations)
   window.kino.coopInfo=id=>lobby.info[id]??null;   // the scoreboard reads peers' titles here
   function renderLobby(){
     if(lobby.go){lob.hidden=true;return;}

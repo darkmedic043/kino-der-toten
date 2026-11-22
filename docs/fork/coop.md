@@ -83,3 +83,4 @@ For the Season 1 gums (gobblegums.md): `kino.puBy` is the remote player id while
   - Each player's operator line is sent as `{t:'vox', v: voice id, f: clip, n: name}` to `'all'`.
   - Receivers play it from the sender's avatar (`window.kino.coopRemote(id)`, added to the multiplayer mod).
   - Operator-voice sets up before multiplayer, so it hooks `kino.coop.on('vox')` and `on('joined')` at `ready`/`start`.
+  - Two-operator conversations (2026-11-22): the lower co-op id sends `{t:'convo', o: folder, k: convo id, who: {voice id: player id}}` and both sides play the lines in turn; `kino.coopRemotes()` lists teammate records (gameplay.md).

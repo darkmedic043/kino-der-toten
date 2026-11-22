@@ -3,6 +3,11 @@
 // else its id) holding lines.json, {event: [{f: file, t: caption}]}, and the
 // clips. Operators without a folder stay silent. In co-op the line is sent to
 // teammates, who hear it from your position.
+// Conversations: voices/<voice id>/convos.json, [{id, lines: [{v, f, t}]}],
+// lines from two operators (v = the speaker's voice id; every clip sits in
+// that folder). In co-op, when two operators with a conversation stand near
+// each other, the one with the lower player id starts it at the match start or
+// between rounds and the others hear it from the speakers' bodies.
 // Settings: Audio > Operator voice volume / Operator chatter (Off, Rare,
 // Normal, Chatty). docs/fork/gameplay.md "Operator voice lines".
 import { loadCharacterRegistry } from '../../characters.js';
@@ -28,16 +33,21 @@ export default async function setup(api){
   const { host, audio, session, enemies, camera, mysteryBox, mod } = api;
   await cloudReady;
   const id = loadProfile().character;
-  const entry = (await loadCharacterRegistry({ all: true })).find(c => c.id === id);
+  const registry = await loadCharacterRegistry({ all: true });
+  const entry = registry.find(c => c.id === id);
+  const voiceOf = e => e ? e.voice ?? e.id : null;
+  const nameOf = v => (registry.find(c => voiceOf(c) === v)?.name ?? 'Operator').toUpperCase();
   const lines = await loadLines(entry?.voice ?? id);
   const voices = new Map();   // voice id -> lines (teammates' voices load on first use)
   if (lines) voices.set(entry?.voice ?? id, lines);
   const voiceId = entry?.voice ?? id, name = (entry?.name ?? 'Operator').toUpperCase();
 
-  async function loadLines(v){
+  async function loadLines(v, file = 'lines.json'){
     if (!v) return null;
-    try { const r = await fetch(new URL(`voices/${v}/lines.json`, mod.url));if (!r.ok) return null;return await r.json(); } catch { return null; }
+    try { const r = await fetch(new URL(`voices/${v}/${file}`, mod.url));if (!r.ok) return null;return await r.json(); } catch { return null; }
   }
+  const convoSets = new Map();   // voice id -> its conversations
+  const loadConvos = v => { if (!convoSets.has(v)) convoSets.set(v, loadLines(v, 'convos.json').then(a => Array.isArray(a) ? a : []));return convoSets.get(v); };
   const buffers = new Map();
   const buffer = (v, f) => {
     if (!audio.ctx) return null;
@@ -59,7 +69,8 @@ export default async function setup(api){
   };
   host.on('warmHud', on => { cap.textContent = on ? 'WARM: up' : '';cap.style.opacity = on ? '1' : '0'; });
 
-  let current = null;
+  let current = null, convoRun = 0, talking = false, lastAny = -99;
+  const now = () => performance.now() / 1000;
   async function play(v, line, position, who){
     if (!audio.ctx || !audio.enabled || !audio.master) return null;
     const buf = await buffer(v, line.f);if (!buf) return null;
@@ -83,20 +94,80 @@ export default async function setup(api){
     const line = Object.values(set).flat().find(l => l.f === m.f);if (!line) return;
     const r = window.kino.coopRemote?.(from);
     play(m.v, line, r?.root?.position, m.n);
+  });window.kino.coop.on('convo', async m => {
+    if (!m?.o || !m.k) return;
+    const c = (await loadConvos(m.o)).find(c => c.id === m.k);if (c) playConvo(m.o, c, m.who ?? {});
   });window.kino.coop.on('joined', p => { if (p?.id && p.id !== window.kino.coop.id) setTimeout(() => window.kino.voice?.say?.('teammateJoined'), 1500); }); };
   hookCoop();host.on('ready', hookCoop);host.on('start', hookCoop);
-  window.kino.voice = { lines, say };
-  if (!lines) return;
+
+  // ---- conversations between two operators ----
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const speakersOf = c => new Set(c.lines.map(l => l.v));
+  async function playConvo(folder, c, who){
+    const run = ++convoRun, me = net()?.id;talking = true;
+    const bufs = await Promise.all(c.lines.map(l => buffer(folder, l.f)));
+    try {
+      for (let i = 0; i < c.lines.length; i++) {
+        const l = c.lines[i], buf = bufs[i];
+        if (run !== convoRun || !buf) return;
+        const mine = l.v === voiceId && (!me || who[l.v] === me), r = mine ? null : window.kino.coopRemote?.(who[l.v]);
+        await play(folder, l, mine ? null : r?.root?.position ?? null, nameOf(l.v));
+        await wait(buf.duration * 1000 + 280);
+      }
+    } finally { if (run === convoRun) { talking = false;lastAny = now(); } }
+  }
+  const heard = new Set();   // conversations already played this match
+  async function convoFor(mateVoice){
+    const out = [];
+    for (const folder of new Set([voiceId, mateVoice])) for (const c of await loadConvos(folder)) {
+      const sp = speakersOf(c);
+      if (sp.size === 2 && sp.has(voiceId) && sp.has(mateVoice)) out.push({ folder, c });
+    }
+    return out;
+  }
+  let convoAt = -999;
+  async function startConvo(){
+    const coop = net();if (!coop || talking || !started || session.phase === 'reviving') return false;
+    const level = Math.round(settings.voiceChat ?? 2);if (!level) return false;
+    for (const r of (window.kino.coopRemotes?.() ?? []).sort(() => Math.random() - .5)) {
+      const v = voiceOf(r.entry);
+      if (!v || v === voiceId || !r.root || r.down || r.dead || String(r.id) < String(coop.id)) continue;   // the lower id starts it
+      if (r.root.position.distanceTo(camera.position) > 1400) continue;
+      const all = (await convoFor(v)).filter(x => !heard.has(x.folder + '/' + x.c.id));if (!all.length) continue;
+      const { folder, c } = all[Math.floor(Math.random() * all.length)];
+      heard.add(folder + '/' + c.id);convoAt = now();
+      const who = { [voiceId]: coop.id, [v]: r.id };
+      coop.send('all', { t: 'convo', o: folder, k: c.id, who });
+      playConvo(folder, c, who);
+      return true;
+    }
+    return false;
+  }
+  const CONVO = [0, .2, .4, .65];   // chance between rounds, per chatter setting
+  host.on('start', () => { heard.clear();convoAt = -999;setTimeout(() => { if (Math.random() < CONVO[Math.round(settings.voiceChat ?? 2)] + .25) startConvo(); }, 14000); });
+  host.on('roundEnd', () => setTimeout(() => { if (now() - convoAt > 150 && Math.random() < CONVO[Math.round(settings.voiceChat ?? 2)]) startConvo(); }, 4500));
+  // kino.voice.convo('deadlock_seven' | conversation id) plays one here, the other speaker unplaced (testing)
+  async function convo(arg){
+    const pool = [];
+    for (const folder of new Set([voiceId, arg].filter(Boolean))) for (const c of await loadConvos(folder)) pool.push({ folder, c });
+    const list = pool.filter(x => !arg || x.c.id === arg || speakersOf(x.c).has(arg));
+    const x = list[Math.floor(Math.random() * list.length)];if (!x) return null;
+    playConvo(x.folder, x.c, {});return x.c.id;
+  }
+  let started = false;
+  window.kino.voice = { lines, say, convo, convos: () => loadConvos(voiceId) };
+  if (!lines) { host.on('start', () => started = true);host.on('reset', () => started = false);return; }
 
   // a shuffled bag per event, so the same line doesn't come twice in a row
   const bags = {};
   const pick = ev => { const all = lines[ev];if (!all?.length) return null;let bag = bags[ev];if (!bag?.length) { bag = bags[ev] = [...all].sort(() => Math.random() - .5);if (bag[0] === bags[ev + ':last'] && bag.length > 1) bag.push(bag.shift()); }const l = bag.shift();bags[ev + ':last'] = l;return l; };
-  const lastAt = {};let lastAny = -99;
-  const now = () => performance.now() / 1000;
+  const lastAt = {};
   function say(ev, force = false){
     const spec = EVENTS[ev] ?? [1, 1, 0], level = Math.round(settings.voiceChat ?? 2);
-    if (!lines[ev]?.length || (!level && !force)) return false;
+    if (!lines?.[ev]?.length || (!level && !force)) return false;
     const [prio, chance, cool] = spec, t = now();
+    if (talking && prio < 3 && !force) return false;
+    if (prio === 3 || force) convoRun++, talking = false;   // a down or game over cuts a conversation short
     if (!force) {
       if (t - (lastAt[ev] ?? -99) < cool) return false;
       const busy = current && audio.ctx && audio.ctx.currentTime < current.end;
@@ -113,7 +184,7 @@ export default async function setup(api){
   }
 
   // ---- game moments ----
-  let started = false, startAt = 0;
+  let startAt = 0;
   host.on('start', () => { started = true;startAt = now();setTimeout(() => say('start'), 1600); });
   host.on('reset', () => { started = false;streak = 0;recent.length = 0; });
   host.on('roundEnd', () => { lastOne = true;setTimeout(() => say(net() && lines.roundEndTeam && Math.random() < .5 ? 'roundEndTeam' : 'roundEnd'), 900); });
