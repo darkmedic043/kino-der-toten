@@ -218,3 +218,42 @@ A Nova crawler shot dead (`z.gasDeath`: bullet, not melee, not a Nuke) used to l
   1. Transcribe the recording. The method used: faster-whisper medium.en on CUDA, run on silence-split ranges, because its own VAD merged minutes of speech. The scripts are in `scratch/voice/`.
   2. Write `picks.json`, `{event: [{s, e, t}]}`.
   3. Run `python3 .tools/build-voice.py <audio> picks.json export/web/mods/operator-voice/voices/<id>`. It produces mono, loudness-normalised (-16 LUFS) Vorbis clips with 20/50 ms fades.
+
+## Sound that cuts out: the audio watchdog (2026-11-22, `engine.js`, user: "audio completely cut off, can you fix this")
+
+The report: in a solo Gorod Krovi game on Rind (Windows) all sound stopped and stayed off until a reload. The client log of that game
+has no script error, no lost context and no failed promise, so nothing crashed; it shows a pause of about 16 s (the window lost focus)
+about 40 s before the reload. That leaves three ways the whole game goes silent, all through the one master gain or its context
+(`audio.js`: every sound → `audio.master` → destination), and the log could not tell which it was:
+
+1. **The browser stopped the AudioContext.** Chrome suspends a context on its own after an output-device error (a headset switching
+   off, Windows changing the default device). The engine resumed the context only on the next click on the pause menu.
+2. **The engine left it suspended.** `suspendRendering` (tab hidden, `pagehide`) pauses the audio even where nothing else pauses
+   (co-op's `keepRunning`), and `resumeRendering` never resumed it: a co-op player who looked away came back to a running, silent game.
+   Reproduced headless on the live engine before the fix.
+3. **The M key.** Upstream's hard-coded mute toggle sits next to the gobblegum keys (N, J), its only notice was a 2.5 s "Sound off"
+   toast, and it also fired while typing in a text box.
+
+What the engine does now (`audioGuard`, `audioCheck`, `audioPause`, `toggleMute`, after the `pagehide` listeners):
+
+- **Watchdog.** On the context's `statechange` and `error` events, on `devicechange`, and once a second: if the game is running
+  (`active`, or `mods.keepRunning()` in co-op, tab visible, match started) and the context is not `running`, it is resumed. A context
+  that says `running` with a `currentTime` that has not moved for 3 s is restarted (suspend, then resume; at most 5 times a session).
+  After 6 s without success a toast says the sound device is not answering. A paused solo game stays suspended as before.
+- **Own pauses are stamped.** The engine pauses through `audioPause()` (not `audio.pause()`), which records the time: a `statechange`
+  within 500 ms of it is the tail of our own pause and is resumed without a report.
+- **On record.** Each incident sends `ev: "audio"` to the client log (`why`: `state`, `error`, `tick`, `stall`, `device`, then `back`
+  with the ms it took; `mute` for the M key; at most 8 a session), so the next report can be read from
+  `~/.local/share/kino/client-log.jsonl`.
+- **M key.** Ignored in text boxes; while muted a small "SOUND OFF · PRESS M" badge stays at the top of the screen (plain text, no
+  blur, so no new HUD shader), and the toast names the key. The volume setting is kept (game-menu.js wraps `audio.enabled`).
+
+Rules: pause the game's audio only through `audioPause()`; a mod must not suspend `audio.ctx` while the game runs (the watchdog brings
+it straight back). `kino.audioGuard` holds the counters (`fixes`, `kicks`, `sent`).
+
+Test: `scratch/audio/test.mjs` (session script: sandbox map on the phone profile, `--autoplay-policy=no-user-gesture-required`, the
+client-log beacons routed away from the real log). Before: a context suspended behind the game's back stayed suspended, as did co-op
+after hidden → visible. After: back in about 55 ms (statechange) or within a second (tick); a normal pause stays silent; pause and
+play again at once reports nothing; a frozen clock is restarted once. Not reproduced on the user's Windows machine: the cause of that
+one game is not known, the fix covers all three. Memory: the sandbox on the phone profile held 1.2 GB of renderer memory; the same
+page on a desktop profile took 4.2 GB (don't drop `hasTouch`/`isMobile` from a sandbox test).

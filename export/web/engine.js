@@ -159,7 +159,7 @@ function announce(title,small=(map?.announceTitle??entry?.title??'Zombies').toUp
 function setActive(value){
   active=!!value&&ready&&session.phase!=='gameover';$('menu').hidden=active;document.body.classList.toggle('menu-open',!active);keys.clear();primary=false;primaryPressed=false;ads=false;reloadShot=false;reloadHeld=0;
   mousePrimary=mouseAim=false;touchControls.reset();touchControls.setEnabled(active&&session.phase!=='reviving',active);
-  if(active&&audio.ctx)audio.start();else if(!active&&!mods.keepRunning?.())audio.pause();   // keepRunning: co-op, where the menu pauses nothing
+  if(active&&audio.ctx)audio.start();else if(!active&&!mods.keepRunning?.())audioPause();   // keepRunning: co-op, where the menu pauses nothing
   if(active){if(!started){started=true;tracePlay();announce('Round 1','SURVIVE');audio.play('round');mods.emit('start');}else if(session.phase==='preparing')announce('Round '+session.round,'PREPARE YOURSELF');}
   else if(started&&session.phase!=='gameover'){$('start').innerHTML='RESUME GAME <span>→</span>';$('restart').hidden=false;$('menu-status').textContent='Paused · Round '+session.round;}
 }
@@ -168,10 +168,46 @@ $('start').addEventListener('click',start);$('restart').addEventListener('click'
 renderer.domElement.addEventListener('click',()=>{if(!active)start();});
 // mods.keepActive: a mod's UI (the terminal booth) frees the cursor without pausing the game
 document.addEventListener('pointerlockchange',()=>{if((touchControls.mode||mods.keepActive)&&!document.pointerLockElement)return;setActive(document.pointerLockElement===renderer.domElement);});
-function suspendRendering(){perf.pause();renderer.setAnimationLoop(null);if(ready){setActive(false);document.exitPointerLock?.();}audio.pause();}
+function suspendRendering(){perf.pause();renderer.setAnimationLoop(null);if(ready){setActive(false);document.exitPointerLock?.();}audioPause();}
 function resumeRendering(){previous=performance.now();lastRendered=0;if(!document.hidden&&!contextLost)renderer.setAnimationLoop(renderFrame);}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendRendering();else resumeRendering();});
 addEventListener('pagehide',suspendRendering);addEventListener('pageshow',resumeRendering);
+// Audio watchdog (2026-11-22, gameplay.md "Sound that cuts out"): the sound must never stay dead while the game runs. The browser can
+// stop an AudioContext on its own (an output-device error: a headset switching off, Windows changing device), and suspendRendering
+// pauses it even where nothing else pauses (co-op); until now only the next click on the menu resumed it. On the context's own
+// statechange/error events and once a second, a context that is not running while the game is (active, or kept running in co-op) is
+// resumed, and one that says running with a frozen clock is restarted. Each incident goes to the client log (ev audio).
+const audioGuard={ctx:null,own:-1e9,clock:-1,stall:0,bad:0,noted:0,sent:0,kicks:0,fixes:0};
+function audioPause(){audioGuard.own=performance.now();audio.pause();}
+function audioNote(why,extra={}){if(audioGuard.sent++<8)diag('audio',{why,state:audio.ctx?.state,active,muted:!audio.enabled,...extra});}
+function audioKick(c){const g=audioGuard;if(g.kicks++>=5)return;g.own=performance.now();c.suspend().then(()=>c.resume()).catch(()=>{});}
+function audioCheck(why='tick'){
+  const c=audio.ctx,g=audioGuard;if(!c)return;
+  if(g.ctx!==c){g.ctx=c;c.addEventListener('statechange',()=>audioCheck('state'));c.addEventListener('error',()=>audioCheck('error'));}
+  if(!ready||!started||document.hidden||c.state==='closed'||!(active||mods.keepRunning?.())){g.clock=-1;g.stall=0;g.bad=0;return;}
+  if(why==='error'){audioNote('error');if(c.state==='running')audioKick(c);}
+  if(c.state!=='running'){
+    const own=performance.now()-g.own<500;   // the tail of our own pause (pause, then play again at once): resume without a report
+    if(why==='tick')g.bad++;
+    if(!g.noted&&(why==='tick'?g.bad>=2:!own)){g.noted=performance.now();if(why!=='error')audioNote(why);}
+    c.resume().catch(()=>{});
+    if(g.bad===6)toast('Sound device is not answering: trying to bring it back',4);
+    return;
+  }
+  if(g.noted){audioNote('back',{ms:Math.round(performance.now()-g.noted)});g.noted=0;g.fixes++;}
+  g.bad=0;if(why!=='tick')return;
+  if(c.currentTime!==g.clock){g.clock=c.currentTime;g.stall=0;return;}
+  if(++g.stall>=3){g.stall=0;audioNote('stall');audioKick(c);}
+}
+setInterval(audioCheck,1000);try{navigator.mediaDevices?.addEventListener?.('devicechange',()=>audioCheck('device'));}catch{}
+// M mutes: the mute shows for as long as it is on and is not taken from a text box
+let muteEl=null;
+function toggleMute(){
+  audio.enabled=!audio.enabled;
+  if(!muteEl){muteEl=document.createElement('div');muteEl.id='mute-badge';muteEl.textContent='SOUND OFF · PRESS M';
+    muteEl.style.cssText='position:fixed;top:8px;left:0;right:0;margin:auto;width:max-content;z-index:30;padding:3px 10px;font:700 11px Arial,Helvetica,sans-serif;letter-spacing:1px;color:#ffd9a0;background:rgba(0,0,0,.55);border:1px solid rgba(255,190,110,.5);pointer-events:none';document.body.append(muteEl);}
+  muteEl.hidden=audio.enabled;toast(audio.enabled?'Sound on':'Sound off: press M to turn it back on',audio.enabled?2.5:4);audioNote('mute');
+}
 // (2026-10-27) Leaving the page (Rind loads every match in the same window; the menu link too): give the GPU memory back now.
 // A navigated-away document keeps its WebGL context, textures and JS heap until the browser gets round to collecting it,
 // and the next match then loads beside the old one (a reload began with 2.7 GB of the old heap still there and froze for
@@ -197,7 +233,7 @@ addEventListener('keydown',e=>{
   if(e.code==='Digit5'&&session.toggleAttachment())equipView();
   if(['Digit1','Digit2','Digit3'].includes(e.code)){session.switchWeapon(+e.code.at(-1)-1);equipView();}
   if(e.code==='KeyQ'){session.switchWeapon();equipView();}
-  if(e.code==='KeyM'){audio.enabled=!audio.enabled;toast(audio.enabled?'Sound on':'Sound off');}
+  if(e.code==='KeyM'&&!e.target?.closest?.('input,textarea,select'))toggleMute();
   if(e.code==='F3'){debugVisible=!debugVisible;$('debug').hidden=!debugVisible;}
   if(e.code==='Escape'){setActive(false);document.exitPointerLock?.();}
   map?.keydown?.(e);
@@ -456,7 +492,7 @@ function getState(){
 function fullState(){return {map:entry?.id,ready,active,started,input:{touch:touchControls.getState(),primary,ads},...(session?session.snapshot():{}),player:player?{...player.state,rotation:camera.rotation.toArray().slice(0,3),position:camera.position.toArray(),feet:player.getFeetPosition().toArray()}:null,enemies:enemies?.snapshot()??[],prompt:promptText,
   barriers:world?.barriers?.map(b=>({id:b.id,count:b.count,boards:map.boardCount(b),position:b.position.toArray(),inside:b.inside.toArray(),group:b.group}))??[],
   performance:{fps,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},viewmodelReady:view?.ready??false,...(map?.state?.()??{}),errors:[...errors,...mods.errors]};}
-globalThis.kino={mods,autoRes,debug:{textureMemory:textureMemoryStats,ktx2:ktx2Stats,getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,
+globalThis.kino={mods,autoRes,audioGuard,debug:{textureMemory:textureMemoryStats,ktx2:ktx2Stats,getState,setActive,pause:()=>setActive(false),resume:()=>setActive(true),reset,teleportPlayer:p=>player.setPosition(vector(p)),lookAt:p=>camera.lookAt(vector(p)),damagePlayer:damage,grantPoints:n=>session.points+=n,interact,shoot,reload,melee,
   giveWeapon:id=>{session.giveWeapon(id);equipView();},spawnEnemy:(p,kind)=>enemies.spawn(vector(p),null,kind).id,clearEnemies:()=>{for(const z of [...enemies.list])enemies.hurt(z,999999);},collectPowerup:collect,
   step:seconds=>{for(let t=0;t<seconds;t+=1/60)update(Math.min(1/60,seconds-t));},navigationPath:(a,b)=>world.path(vector(a),vector(b)).map(v=>v.toArray()),
   setAutoSpawn:value=>{enemies.autoSpawn=value;enemies.autoRounds=value;},setInvulnerable:value=>{session.effects.invulnerable=value?Infinity:0;},damageEnemy:(id,n=999999)=>{const z=enemies.list.find(z=>z.id===id);if(z)enemies.hurt(z,n);},
