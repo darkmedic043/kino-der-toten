@@ -173,7 +173,7 @@ export default {
           const u = up(d);
           const where = [];
           for (const map of walls.get(id) ?? []) where.push(`Wall buy on ${mapLink(c, map)}`);
-          if (pr?.relic && pr.noBox) where.push('A relic upgrade, never in the Mystery Box: once earned, forge it from a Wrath of the Ancients at any terminal (FORGE.EXE) by finishing its challenges');   // forge-only upgrades
+          if (pr?.relic && pr.noBox) where.push('A relic upgrade, never in the Mystery Box: once earned, forge it from a Wrath of the Ancients at any terminal (FORGE.EXE) by finishing its challenges again in every match');   // forge-only upgrades
           else if (pr?.relic) where.push(`${sys(c, 'Mystery Box')} once earned (a relic: it joins your box list on every map)`);   // relics: in the box list once owned
           if (id !== 'cheese_gun' && !pr?.relic) {
             if (pool.has(id) && pr) where.push(`${sys(c, 'Mystery Box')} (in it by default)`);

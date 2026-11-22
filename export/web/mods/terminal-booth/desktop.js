@@ -877,7 +877,7 @@ function build() {
         <div class="msg ${fgMsg[1]}">${esc(fgMsg[0])}</div></div>`;
     }
     keepScroll(fgBody).innerHTML = `<h2>WONDER FORGE</h2>
-      <p class="lead">Attune a wonder weapon to an upgrade you have earned before, finish its challenges on any map, then forge it here.</p>
+      <p class="lead">Attune a wonder weapon to an upgrade you have earned before, finish its challenges on any map, then forge it here. Challenges start over every match.</p>
       ${ws.map(weapon).join('')}${body}`;
     for (const b of fgBody.querySelectorAll('[data-sel]')) b.addEventListener('click', () => { fgSel = b.dataset.sel; fgMsg = ['', '']; drawForge(); });
     for (const b of fgBody.querySelectorAll('[data-act]:not([disabled])')) b.addEventListener('click', () => {
