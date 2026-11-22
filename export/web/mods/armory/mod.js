@@ -1,6 +1,6 @@
 // The Armory (ARMORY.EXE on the terminal booth, user 2026-10-17): special gear bought outside the map it comes from,
-// in tabs: OPERATOR WEAPONS (the Ragnarok DG-4, the Annihilator), SHIELDS (the rocket shield, Nuketown's zombie shield, Gorod Krovi's Guard of Fafnir) and SCORESTREAKS (to come). Each item has
-// to be earned on its home map first: find it there (Der Eisendrache: take it from its bench; The Giant: the Fly Trap; Nuketown: a shield station; Gorod Krovi: the bunker table), then get item.kills kills
+// in tabs: OPERATOR WEAPONS (the Ragnarok DG-4, the Annihilator, Gorod Krovi's Gauntlet of Siegfried), SHIELDS (the rocket shield, Nuketown's zombie shield, Gorod Krovi's Guard of Fafnir) and SCORESTREAKS (to come). Each item has
+// to be earned on its home map first: find it there (Der Eisendrache: take it from its bench; The Giant: the Fly Trap; Nuketown: a shield station; Gorod Krovi: the bunker table for the shield, the grave by the fountain for the Gauntlet), then get item.kills kills
 // with it. After that every other map sells it at a terminal for item.price (mains power on). It can't be bought on
 // its home map: you build it there. Progress is account-wide in kino.mods.armory (cloud.js TRACKED).
 // window.kino.armory: {status(), buy(id) -> true | 'reason', found(id)}
@@ -15,6 +15,10 @@ export const TABS = [
     { id: 'annihilator', name: 'Annihilator', home: 'the-giant', homeName: 'The Giant', price: 25000, kills: 150, color: '#f2c14e',
       blurb: "Seraph's revolver. Six depleted-uranium rounds a cylinder, eighteen to a charge.",
       specs: ['Operator weapon slot: Y to pull it out once charged (bought fully charged)', '18 shots: each goes through every zombie in its path', 'One-shot headshots to round 24; kills disintegrate', 'Right mouse aims, V pistol-whips', 'Recharges from your kills'] },
+    { id: 'dragon_gauntlet', name: 'Gauntlet of Siegfried', home: 'gorod-krovi', homeName: 'Gorod Krovi', price: 30000, kills: 200, color: '#ff7a2a',
+      icon: 'M6 11V6a1.5 1.5 0 0 1 3 0v4V4.5a1.5 1.5 0 0 1 3 0V10V5a1.5 1.5 0 0 1 3 0v5V7.5a1.5 1.5 0 0 1 3 0V15c0 3.5-2.8 6-6.2 6C8.5 21 6 18.5 6 15z',
+      blurb: 'A dragon whelp hatched from the egg, riding a gauntlet. It breathes fire, and it hunts for you.',
+      specs: ['Operator weapon slot: Y to pull it out once charged (bought fully charged)', 'Left mouse: a cone of flame (500 units) that burns zombies down; V swipes', 'Right mouse sends the whelp out: it spits fireballs and fetches power-ups; you punch (V jukes forward)', 'Right mouse again calls it back to the arm', 'Recharges from your kills'] },
   ] },
   { id: 'shields', name: 'SHIELDS', items: [
     { id: 'rocket_shield', name: 'Rocket Shield', home: 'der-eisendrache', homeName: 'Der Eisendrache', price: 20000, kills: 250, color: '#ff9a3a', icon: SHIELD_ICON,
@@ -94,6 +98,7 @@ export default async function setup(api) {
     if (host.gunBlocked) return 'Lower what you are holding first';
     if (id === 'zombie_shield' && !kino.zombieShield?.ready) return 'The shield model is missing';
     if (id === 'fafnir_shield' && !kino.fafnir?.ready) return 'The shield model is missing';
+    if (id === 'dragon_gauntlet' && !kino.dragonGauntlet?.ready) return 'The gauntlet model is missing';
     if (!session.spend(item.price)) return 'Not enough points';
     if (ITEMS[id].tab === 'operators') kino.operator?.give(id, { full: true });
     else if (id === 'rocket_shield') kino.rocketShield?.give();

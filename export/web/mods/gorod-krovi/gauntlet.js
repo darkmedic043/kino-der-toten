@@ -3,7 +3,8 @@
 // .tools/build_gk_gauntlet.py into mods/maps/gorod-krovi/gauntlet/ (git-ignored: ripped): both viewmodels on Dempsey's
 // arms with their clips, the whelp and its clips, the egg, the world model, the boards and incubator fxanim props with
 // their clips, HUD icons and 29 sounds from the map's bank.
-// The weapon itself is gauntlet-weapon.js (an operator weapon: Y), the street fire and napalm zombies gauntlet-hazard.js.
+// The weapon itself is gauntlet-weapon.js (an operator weapon: Y), its assets gauntlet-kit.js (shared with the Armory's copy on
+// other maps, operator-weapons/gauntlet.js), the street fire and napalm zombies gauntlet-hazard.js.
 //
 // The quest (solo-first: it runs on each player's own game; N = 3 + 2 per player, 5 solo):
 //   0  shoot or knife the boards in Pavlov's sewer room: the egg rolls out; take it
@@ -23,10 +24,9 @@ import * as THREE from 'three';
 import { loadModel, loadAnimation, Rig } from '../../animation.js';
 import { setupGauntletWeapon, ID } from './gauntlet-weapon.js';
 import { setupHazard, AREAS, inArea } from './gauntlet-hazard.js';
+import { gauntletKit, abs } from './gauntlet-kit.js';
 
 const W = (x, y, z) => new THREE.Vector3(x, z, -y);
-const ROOT = new URL('../../', import.meta.url), DIR = 'mods/maps/gorod-krovi/gauntlet/';
-const abs = u => (typeof u === 'string' ? new URL(u, ROOT).href : u);
 const BOARDS = W(-3074, 22313, 10), EGG_PICK = W(-2937, 22415, -110), EGG_REST = W(-2923.75, 22423.1, -142.1);
 const COOK = { fountain: W(215, 764.25, 23.5), opera_street: W(-70, 3917.25, 29.5), red_brick: W(-890.75, 3321.25, 346.1), yellow: W(1102.25, 2837.5, 188.8) };
 const COOK_NAME = { fountain: 'the fountain', opera_street: 'opera street', red_brick: 'red brick', yellow: 'the yellow house' };
@@ -40,80 +40,11 @@ export default async function setup(api, gk) {
   if (api.map?.id !== 'gorod-krovi') return;
   const { host, scene, viewScene, world, session, enemies, audio, player, camera, renderer } = api;
   const kino = window.kino ??= {};
-  let J = null;
-  try { const r = await fetch(abs(DIR + 'gauntlet.json')); if (!r.ok) throw new Error(r.status); J = await r.json(); }
-  catch { console.warn('[gorod-krovi] gauntlet: no assets (python3 -I .tools/build_gk_gauntlet.py); stand-ins'); }
-  if (J) {   // web-root URLs -> absolute
-    for (const m of ['flame', 'punch']) { const d = J[m]; for (const k of ['model', 'worldModel', 'handsModel']) d[k] = abs(d[k]); for (const k in d.animations) d.animations[k] = abs(d.animations[k]); }
-    J.whelp.model = abs(J.whelp.model); for (const k in J.whelp.animations) J.whelp.animations[k] = abs(J.whelp.animations[k]);
-    J.egg = abs(J.egg); J.world = abs(J.world); for (const k in J.textures) J.textures[k] = abs(J.textures[k]); for (const k in J.sounds) J.sounds[k] = abs(J.sounds[k]);
-  }
-
-  // ---- sounds: BO3's, through the game's audio (muted with it) -------------------------------------------------------
-  const key = n => 'gk_gauntlet/' + n;
-  if (audio?.manifest) for (const [n, u] of Object.entries(J?.sounds ?? {})) audio.manifest[key(n)] ??= { url: u };
-  const has = n => !!J?.sounds?.[n] && !!audio?.manifest;
-  const live = () => audio?.enabled !== false && audio?.ctx?.state === 'running';
-  const sound = (n, v = 1, at = null, range = 2500) => {
-    if (at) { const d = camera.position.distanceTo(at); if (d > range) return; v *= (1 - d / range) ** 1.5; }
-    if (has(n)) audio.play(key(n), v); };
-  const A = {
-    J, sound, soundAt: (n, p, v = 1, r = 2500) => sound(n, v, p, r),
-    loop(n, v = 1) { if (!has(n) || !live()) return { stop() {} }; let src = null, dead = false;
-      audio.native(key(n), v, true).then(s => { if (dead) s.stop(); else src = s; }).catch(() => {});
-      return { stop() { dead = true; try { src?.stop(); } catch {} } }; },
-    warmSounds() { if (audio?.ctx) for (const n of Object.keys(J?.sounds ?? {})) audio.buffer?.(key(n)).catch(() => {}); },
-  };
-
-  // ---- materials: glowing trim, the whelp's eyes, the glass (shared by every copy, so fixed once) ---------------------
-  const tl = new THREE.TextureLoader(), tex = u => { const t = tl.load(u); t.colorSpace = THREE.SRGBColorSpace; return t; };
-  const glowE = J?.textures?.glow_e ? tex(J.textures.glow_e) : null;
-  const fixed = new WeakSet();
-  function fixMat(m) {
-    if (!m || fixed.has(m)) return; fixed.add(m); const n = m.name ?? '';
-    if (/gauntlet_dragon_glass/.test(n)) { m.transparent = true; m.opacity = .3; m.depthWrite = false; m.color?.set(0xffc080); }
-    else if (/gauntlet_dragon_(yel|red|glo|blu1?)$/.test(n)) { m.emissiveMap = /glo$/.test(n) && glowE ? glowE : m.map; m.emissive?.set(0xffffff); m.emissiveIntensity = .9; }
-    else if (/whelp_e|dragon_eye/.test(n)) { m.emissiveMap = m.map; m.emissive?.set(0xffffff); m.emissiveIntensity = 1.2; }
-  }
-  A.fix = (root, mode = 'flame') => root.traverse(o => {
-    if (!o.isMesh) return; for (const m of [o.material].flat()) fixMat(m);
-    // the punch form's model still carries the whelp on its bones (BO3 hides it): the whelp has gone out
-    if ([o.material].flat().some(m => /c_zom_dlc3_dragon/.test(m?.name ?? ''))) o.visible = mode !== 'punch';
-  });
-
-  // ---- the flame's sprites (BO1's flamethrower flipbooks, as mods/weapon-levels/flamer.js), made at setup ----------
-  const sheets = {
-    base: { tex: tex(abs('textures/fxt_fire_flame_base_01.png')), cols: 4, rows: 4, frames: 16, anim: true, add: true },
-    lick: { tex: tex(abs('textures/fxt_fire_flame_lick.png')), cols: 4, rows: 4, frames: 16, anim: false, add: true },
-    smoke: { tex: tex(abs('textures/fxt_smk_flamethrower.png')), cols: 8, rows: 8, frames: 64, anim: true, add: false },
-  };
-  const pool = { list: [] };
-  pool.frame = (p, f) => { const { cols, rows } = p.sh; f = Math.min(p.sh.frames - 1, f); p.tex.offset.set((f % cols) / cols, 1 - (Math.floor(f / cols) + 1) / rows); };
-  function make(kind) {
-    const sh = sheets[kind], t = sh.tex.clone(); t.repeat.set(1 / sh.cols, 1 / sh.rows);
-    const mat = new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, blending: sh.add ? THREE.AdditiveBlending : THREE.NormalBlending });
-    const p = { kind, sh, tex: t, sprite: new THREE.Sprite(mat), vel: new THREE.Vector3(), alive: false }; p.sprite.renderOrder = 4; pool.list.push(p); return p;
-  }
-  pool.spawn = (kind, pos, vel, life, s0, s1) => {
-    let p = pool.list.find(p => !p.alive && p.kind === kind);
-    if (!p) { if (pool.list.length > 260) return null; p = make(kind); }
-    if (p.sprite.parent !== scene) scene.add(p.sprite);
-    p.alive = true; p.t = 0; p.life = life; p.size0 = s0; p.size1 = s1; p.sprite.visible = true;
-    p.sprite.position.copy(pos); p.vel.copy(vel); p.sprite.material.rotation = Math.random() * 6.28; p.spin = (Math.random() - .5) * 2;
-    pool.frame(p, p.sh.anim ? 0 : Math.floor(Math.random() * p.sh.frames)); return p;
-  };
-  for (const k of ['base', 'lick', 'smoke']) for (let i = 0; i < 24; i++) make(k);
-  host.warmObjects?.push(...['base', 'lick', 'smoke'].map(k => pool.list.find(p => p.kind === k).sprite));
-  A.pool = pool;
-
-  // ---- the whelp: a model per release (clips shared) -----------------------------------------------------------------
-  A.whelpClips = {};
-  if (J) await Promise.all(Object.entries(J.whelp.animations).map(async ([k, u]) => { try { A.whelpClips[k] = await loadAnimation(u); } catch {} }));
-  A.whelpModel = async () => { if (!J) return null; const m = await loadModel(J.whelp.model); A.fix(m); m.scale.setScalar(1 / 2.54); m.traverse(o => { o.frustumCulled = false; o.castShadow = false; }); return m; };
+  const A = await gauntletKit(api), J = A.J, sound = A.sound;
 
   // ---- models in the world: the egg, the gauntlet over the grave; the viewmodels warmed hidden in the view scene -------
   const moved = o => { o.updateMatrix(); o.updateMatrixWorld(true); };
-  const [eggM, worldM, whelpM, flameV, punchV, hands] = J ? await Promise.all([J.egg, J.world, J.whelp.model, J.flame.model, J.punch.model, J.flame.handsModel].map(u => loadModel(u).catch(() => null))) : [];
+  const [eggM, worldM] = J ? await Promise.all([J.egg, J.world].map(u => loadModel(u).catch(() => null))) : [];
   const CM = 1 / 2.54;   // the world-side GLBs are in Greyhound's centimetres; the map is in inches (viewmodels stay as built)
   let egg = eggM; if (eggM) eggM.scale.setScalar(CM);
   if (!egg) egg = new THREE.Mesh(new THREE.SphereGeometry(7, 14, 10).scale(1, 1.35, 1), new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: .7 }));
@@ -124,8 +55,6 @@ export default async function setup(api, gk) {
   egg.visible = false; scene.add(egg);
   const relic = worldM ?? new THREE.Mesh(new THREE.BoxGeometry(14, 10, 22), new THREE.MeshStandardMaterial({ color: 0x6a3a1c, metalness: .6, roughness: .5 }));
   if (worldM) { A.fix(relic); relic.scale.setScalar(CM); } relic.visible = false; relic.traverse(o => { o.castShadow = false; }); scene.add(relic);
-  for (const v of [flameV, punchV, hands]) if (v) { A.fix(v); v.visible = false; viewScene?.add(v); }
-  if (whelpM) { A.fix(whelpM); host.warmObjects?.push(whelpM); }
   // ---- BO3's fxanim props: the boards over the egg's hole (and the egg's roll out), the incubator (and its egg) --------
   // built in inches, Y-up; their clips are delta clips (offsets from each joint's bind pose); stand-ins without assets
   const props = {};
@@ -164,7 +93,6 @@ export default async function setup(api, gk) {
   if (!BD) { for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(56, 6, 2), wood); b.position.set(0, -14 + i * 12, 0); b.rotation.z = (i - 1) * .12; boards.add(b); }
     boards.rotation.y = Math.atan2(-(EGG_PICK.z - BOARDS.z), EGG_PICK.x - BOARDS.x) + Math.PI / 2; scene.add(boards); moved(boards); }   // facing the egg's rest
   if (!IN) { const incub = new THREE.Mesh(new THREE.CylinderGeometry(16, 20, 22, 10), stone); incub.position.copy(INC).add(new THREE.Vector3(0, 11, 0)); scene.add(incub); moved(incub); }
-  for (const t of [glowE, ...Object.values(sheets).map(s => s.tex)]) if (t) { const done = () => renderer?.initTexture?.(t); t.image ? done() : (host.pending ??= []).push?.(new Promise(r => { const i = setInterval(() => { if (t.image) { clearInterval(i); done(); r(); } }, 50); setTimeout(() => { clearInterval(i); r(); }, 8000); })); }
 
   // ---- the weapon and the fire -----------------------------------------------------------------------------------------
   const weapon = setupGauntletWeapon(api, gk, A);
@@ -314,7 +242,7 @@ export default async function setup(api, gk) {
       if (!S.relicUp) { S.relicUp = true; S.relicT = 0; relic.visible = true; put(relic, REWARD.clone().add(new THREE.Vector3(0, 30, 0))); sound('attach', .7, REWARD); return true; }
       S.relicUp = false; relic.visible = false; give(); return true;
     } });
-  function give() { if (!kino.operator?.give?.(ID, { full: true })) return false; S.given = true; sound('scream1', .6); gk.emit('gauntlet:given'); return true; }
+  function give() { if (!kino.operator?.give?.(ID, { full: true })) return false; S.given = true; kino.armory?.found(ID); sound('scream1', .6); gk.emit('gauntlet:given'); return true; }   // found: the Armory's unlock (mods/armory)
 
   // ---- every frame -----------------------------------------------------------------------------------------------------
   host.on('update', dt => {

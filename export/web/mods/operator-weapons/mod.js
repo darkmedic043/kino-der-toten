@@ -20,6 +20,7 @@ import { setupRocketShield } from './rocket-shield.js';
 import { setupZombieShield } from './zombie-shield.js';
 import { setupFafnir } from './fafnir.js';
 import { setupAnnihilator } from './annihilator.js';
+import { setupGauntletAway } from './gauntlet.js';
 
 export default async function setup(api){
   const {host,session,view,audio}=api;
@@ -155,6 +156,7 @@ export default async function setup(api){
   setupAnnihilator(api,kino.operator);   // The Giant's Fly Trap prize; the cheat console elsewhere
   kino.rocketShield=setupRocketShield(api);   // BO3's rocket shield: built on Der Eisendrache, bought at the Armory elsewhere
   kino.fafnir=setupFafnir(api);   // Gorod Krovi's Guard of Fafnir (dragon breath on the same shield code): built there, bought at the Armory elsewhere
+  kino.dragonGauntlet=setupGauntletAway(api);   // Gorod Krovi's Gauntlet of Siegfried: taken there after the egg quest, bought at the Armory elsewhere
   kino.zombieShield=setupZombieShield(api);   // Nuketown's car door: the same shield code with a plant; taken there, bought at the Armory elsewhere
   kino.cheats?.addCommand?.('operator',{usage:'operator <id|none>',text:'Give an operator weapon, charged: '+[...defs.keys()].join(', '),cheat:true,
     run:([id])=>{if(!id||id==='none'){take();return 'Operator weapon removed';}const m=[...defs.keys()].find(k=>k.startsWith(id.toLowerCase()));if(!m)return 'Unknown: '+[...defs.keys()].join(', ');give(m,{full:true});return defs.get(m).name+' (charged)';}});
