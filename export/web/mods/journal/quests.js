@@ -304,7 +304,7 @@ export const JOURNAL = [
     { id: 'nt-rake', name: 'Rake Trap', kind: 'BUILDABLE', steps: [
       ...['Axe', 'Rake', 'Rope'].map(part => ntPart('rake', part)),
       { title: 'Build it', how: 'With all three parts press use at any of the three rake stations and stay close for 3 seconds.', done: L => !!nt(L)?.rake?.built, where: L => { const s = nt(L)?.rake; return s?.built ? [] : s?.stations ?? []; } },
-      { title: 'Take it', how: 'Take a rake from any of the stations. You carry one at a time, and the stations never run out.', done: L => { const s = nt(L); return !!s?.heldRake || s?.rakesDown > 0; }, where: L => L.prompts(/^Pick up Rake/) },
+      { title: 'Take it', how: 'Take a rake from any of the stations. You carry one at a time, and the stations never run out. Taking one also finds the Rake Trap Bloodstreak for ARMORY.EXE.', done: L => { const s = nt(L); return !!s?.heldRake || s?.rakesDown > 0; }, where: L => L.prompts(/^Pick up Rake/) },
       { title: 'Place it', how: 'The claymore key sets it down at your feet. A zombie that steps on it dies; it lasts 20 hits, you can have five down, and a placed rake can be picked up and moved.', done: L => nt(L)?.rakesDown > 0 },
     ] },
     { id: 'nt-shield', name: 'Zombie Shield', kind: 'BUILDABLE', steps: [

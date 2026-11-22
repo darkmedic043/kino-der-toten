@@ -3,19 +3,18 @@
 //     original's single rand). All parts are shared by the team, as in Der Eisendrache.
 //   - Three stations for each: with all parts press use at any of them, stay close for 3 s, and the finished item shows on
 //     all three (ENT_rake_hidings / ENT_hidings_shield).
-//   - The rake trap: take a rake from a station (one in hand, five down per player), place it with the claymore key. A zombie
-//     stepping on it dies with its head off, the handle swings up and falls back; after 20 uses it breaks. A placed rake can
-//     be picked up and moved.
+//   - The rake trap: take a rake from a station (one in hand), place it with the claymore key. The rakes themselves are
+//     mods/bloodstreaks/rake.js (window.kino.rakes, on every map since the Rake Trap became a Bloodstreak, 2026-11-22): five
+//     down per player, a zombie stepping on one dies with its head off, it breaks after 20. Taking one marks the Rake Trap
+//     found for the Armory's BLOODSTREAKS tab; kills with your rakes unlock it.
 //   - The Zombie Shield (shield.js): the map's car door on a dolly, carried on the Rocket Shield's code and planted as in BO2.
 //     A station repairs a damaged one.
 //   - The electric water trap: two switches, 1000 points, power needed, 30 s on, 60 s cooling; kills every zombie in the water
 //     and shocks players standing in it.
 import * as THREE from 'three';
-import { binds } from '../../settings.js';
 import { makeSparkSheet } from './fx.js';
 import { setupShield } from './shield.js';
 
-const RAKE = { perPlayer: 5, pool: 12, uses: 20, reach: 40, swing: .14, fall: .55, angle: 1.15 };
 const BUILD = { time: 3, reach: 110 };
 const CRAFTS = {
   rake: { label: 'Rake Trap', item: 'Rake', hidings: 'rake_hidings',
@@ -32,14 +31,11 @@ const CRAFTS = {
     ],
     stations: [[-1445, 1750, -286], [1482, 1736, 481], [-2301, 1436, 301]] },
 };
-// the rake model as it stands at the first station: entity origin and yaw, to bring its baked geometry back to model space
-const RAKE_MODEL = { origin: [-1550, 1729, 1362], yaw: 90 };
 const TRAP = { switches: [[-346, 1753, 1436], [-199, 1728, 1861]], lamps: [[-350, 1765, 1437], [-176, 1727, 1876]], box: [[-402, 1692.6, 1462], [-250, 1708.7, 1681.9]],
   cost: 1000, time: 30, cooldown: 60, tick: .25, hurt: 5, hurtEvery: .5 };
 
 const css = `#nt-bar{position:fixed;left:50%;top:62%;width:240px;height:8px;margin-left:-120px;background:#0009;border:1px solid #fff5;z-index:30;pointer-events:none}
-#nt-bar i{display:block;height:100%;width:0;background:#ffd98a}
-#nt-carry{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);padding:4px 12px;background:#0008;color:#ffe9c0;font:600 14px/1.3 sans-serif;letter-spacing:.04em;border-radius:3px;z-index:30;pointer-events:none}`;
+#nt-bar i{display:block;height:100%;width:0;background:#ffd98a}`;
 
 export function setupBuildables(c) {
   const { api, world, session, host, root, sync, nodesOf, moved, show, V, sound, sfx, toast, announce, player, inBox } = c;
@@ -61,18 +57,16 @@ export function setupBuildables(c) {
       parts: d.parts.map(q => { const spots = q.spots.map(a => V(...a)); return { ...q, spots, nodes: bySpot(q.node, spots) }; }) };
   });
   const [rakeCraft, shieldCraft] = crafts;
-  const b = { build: null, held: false, rakes: [], trap: { on: 0, cool: 0, tick: 0, hurt: 0, by: null } };
+  const rakes = () => globalThis.kino?.rakes;
+  const b = { build: null, trap: { on: 0, cool: 0, tick: 0, hurt: 0, by: null } };
   const pop = (name, at, gain = .8, range = 1100) => { const d = at.distanceTo(player.getFeetPosition()); if (d < range) sound(name, gain * (1 - d / range) ** 2); };
 
   // ---- HUD
   const style = document.createElement('style'); style.textContent = css; document.head.append(style);
   const bar = document.createElement('div'); bar.id = 'nt-bar'; bar.hidden = true; bar.innerHTML = '<i></i>';
-  const carry = document.createElement('div'); carry.id = 'nt-carry'; carry.hidden = true;
-  document.body.append(bar, carry);
+  document.body.append(bar);
   const fill = bar.firstChild;
-  const keyName = () => (binds().claymore ?? 'Digit4').replace(/^(Digit|Key)/, '');
-  const paintCarry = () => { carry.hidden = !b.held; if (b.held) carry.textContent = `Rake · press ${keyName()} to place it at your feet`; };
-  host.on('warmHud', on => { bar.hidden = !on; carry.hidden = !on; if (on) carry.textContent = 'Rake'; else paintCarry(); });
+  host.on('warmHud', on => { bar.hidden = !on; });
 
   // ---- parts and stations
   sync.on('ntCraftPick', d => {
@@ -111,81 +105,14 @@ export function setupBuildables(c) {
     if (x.t >= BUILD.time) { b.build = null; bar.hidden = true; sync.act('ntBuilt', { c: x.cr.key, at: x.i }); }
   };
 
-  // ---- the rake: RAKE_MODEL is at the handle's end and the head 72 along +z; the instances pivot on the head, handle along -z
-  const { origin: ro, yaw } = RAKE_MODEL, rakeLength = 72;
-  const parts = [];
-  for (const n of rakeCraft.hidden[0]) n.traverse(m => {
-    if (!m.isMesh) return;
-    const g = m.geometry.clone().translate(-ro[0], -ro[1], -ro[2]).rotateY(-yaw * Math.PI / 180).translate(0, 0, -rakeLength);
-    parts.push({ g, material: m.material });
-  });
-  const mineOut = () => b.rakes.filter(r => r.on && r.by === sync.me).length;
-  for (let i = 0; i < RAKE.pool; i++) {
-    const r = { i, id: 0, on: false, by: null, uses: 0, t: -1, wait: 0, group: new THREE.Group(), tilt: new THREE.Group(), head: new THREE.Vector3() };
-    for (const q of parts) { const m = new THREE.Mesh(q.g, q.material); m.frustumCulled = false; r.tilt.add(m); }
-    r.group.add(r.tilt); r.group.visible = false; scene.add(r.group); b.rakes.push(r);
-    world.addInteraction({ position: r.head, nuketown: true, hidden: () => !r.on || b.held, text: () => 'Pick up Rake',
-      use() { sync.act('ntRakeTake', { id: r.id }); return true; } });
-  }
-  host.warmObjects?.push?.(b.rakes[0].group);
-  const setTilt = (r, a) => { r.tilt.rotation.x = a; r.tilt.updateMatrix(); r.tilt.updateMatrixWorld(true); };
-  const rakeOff = r => { r.on = false; r.group.visible = false; r.t = -1; };
-  sync.on('ntRakePlace', (d, ctx) => {
-    const r = b.rakes.find(x => !x.on) ?? b.rakes[0];
-    Object.assign(r, { on: true, id: d.id, by: ctx.by, uses: RAKE.uses, t: -1, wait: 0 });
-    r.group.position.fromArray(d.at); r.group.rotation.y = d.yaw; r.group.visible = true; setTilt(r, 0);
-    r.group.updateMatrix(); r.group.updateMatrixWorld(true);
-    r.head.copy(r.group.position).add(V(0, 12, 0));
-    pop('rake_fall', r.head);
-  });
-  sync.on('ntRakeTake', (d, ctx) => {
-    const r = b.rakes.find(x => x.on && x.id === d.id); if (!r) return;
-    rakeOff(r);
-    if (ctx.mine) { b.held = true; paintCarry(); sfx('buy', .4); }
-  });
-  sync.on('ntRakeHit', d => {
-    const r = b.rakes.find(x => x.on && x.id === d.id); if (!r) return;
-    r.t = 0; r.uses--; pop('rake_hit_0' + (d.n % 3), r.head);
-  });
-  const placeRake = () => {
-    if (!player.grounded) { toast('Stand on the ground to place the rake', 2); return false; }
-    const f = player.getFeetPosition(), d = (api.mods?.camera ?? api.camera)?.getWorldDirection?.(V(0, 0, 0)) ?? V(0, 0, -1);
-    // the head goes ahead of the player and the handle lies back toward their feet, so a zombie coming at them steps on it
-    const yaw = Math.atan2(d.x, d.z), head = f.clone().addScaledVector(d.setY(0).normalize(), rakeLength * .8);
-    const ground = world.raycast?.(new THREE.Ray(head.clone().add(V(0, 30, 0)), V(0, -1, 0)), 0, 70);
-    if (!ground) { toast('No room for the rake here', 2); return false; }
-    head.y += 30 - ground.distance;
-    b.held = false; paintCarry();
-    sync.act('ntRakePlace', { id: Math.floor(Math.random() * 1e9), at: [head.x, head.y + 1, head.z], yaw });
-    return true;
-  };
-  const rakeTick = dt => {
-    for (const r of b.rakes) {
-      if (!r.on) continue;
-      r.wait -= dt;
-      if (r.t >= 0) {
-        r.t += dt;
-        const k = r.t < RAKE.swing ? r.t / RAKE.swing : Math.max(0, 1 - (r.t - RAKE.swing) / RAKE.fall);
-        setTilt(r, RAKE.angle * k * (2 - k));
-        if (r.t > RAKE.swing + RAKE.fall) { r.t = -1; setTilt(r, 0); if (r.uses <= 0) { pop('zombie_shield_break', r.head); rakeOff(r); } }
-      }
-      if (!sync.isHost || r.t >= 0 || r.wait > 0) continue;
-      for (const z of enemies.list) {
-        if (z.rising || z.dead) continue;
-        const q = z.root.position;
-        if (Math.abs(q.y - r.head.y) > 50 || (q.x - r.head.x) ** 2 + (q.z - r.head.z) ** 2 > RAKE.reach ** 2) continue;
-        r.wait = RAKE.swing + RAKE.fall; sync.act('ntRakeHit', { id: r.id, n: Math.floor(Math.random() * 3) });
-        sync.hurt(z, 1e7, { by: r.by }, { head: true, cause: 'trap' });
-        break;
-      }
-    }
-  };
   for (const [i, at] of rakeCraft.stations.entries()) world.addInteraction({
     position: at.clone().add(V(0, 6, 0)), nuketown: true,
-    hidden: () => !rakeCraft.built || b.held, text: () => mineOut() >= RAKE.perPlayer ? 'Five rakes down: pick one up first' : 'Pick up Rake',
-    use() { if (mineOut() >= RAKE.perPlayer) return false; b.held = true; paintCarry(); sfx('buy', .4); toast(`Rake: press ${keyName()} to place it`, 4); return true; },
+    hidden: () => !rakeCraft.built || !rakes()?.ready || rakes().hand > 0, text: () => rakes().mineOut() >= 5 ? 'Five rakes down: pick one up first' : 'Pick up Rake',
+    use() {
+      const r = rakes(); if (!r || r.mineOut() >= 5) return false;
+      r.give(1); sfx('buy', .4); globalThis.kino?.armory?.found?.('rake_trap'); return true;
+    },
   });
-  if (features) { const orig = features.placeClaymore; features.placeClaymore = (...a) => (b.held && session.phase !== 'reviving' ? placeRake() : orig?.call(features, ...a)); }   // bound: the original reads this.events (every claymore press threw, 2026-11-01)
 
   // ---- the shield
   const shield = setupShield(c, shieldCraft, pop);
@@ -234,21 +161,20 @@ export function setupBuildables(c) {
   };
 
   const reset = () => {
-    b.build = null; b.held = false; bar.hidden = true; paintCarry(); shield.reset();
+    b.build = null; bar.hidden = true; rakes()?.reset(); shield.reset();
     for (const cr of crafts) { cr.have.clear(); cr.built = false; for (const n of cr.hidden) show(n, false); for (const q of cr.parts) for (const n of q.nodes) show(n, false); }
-    for (const r of b.rakes) rakeOff(r);
     Object.assign(b.trap, { on: 0, cool: 0, tick: 0, hurt: 0, by: null }); sheet.value = 0; paintLamps();
     if (sync.isHost) sync.act('ntCraftPick', Object.fromEntries(crafts.map(cr => [cr.key, Math.floor(Math.random() * 3)])));
   };
   let powered = false;
   const tick = (dt, p) => {
     if (!!session.power !== powered) { powered = !!session.power; paintLamps(); }
-    buildTick(dt, p); rakeTick(dt); shield.tick(); trapTick(dt, p);
+    buildTick(dt, p); shield.tick(); trapTick(dt, p);
   };
   // journal and Tab: `at` is where the part lies this game
   const state = () => ({
     rake: craftState(rakeCraft), shield: craftState(shieldCraft),
-    shieldOwned: shield.held(), heldRake: b.held, rakesDown: b.rakes.filter(r => r.on).length,
+    shieldOwned: shield.held(), heldRake: (rakes()?.hand ?? 0) > 0, rakesDown: rakes()?.down() ?? 0,
     trap: { switches: TRAP.switches.map(a => V(...a)), on: b.trap.on > 0, cooling: b.trap.on <= 0 && b.trap.cool > 0, ready: !!session.power && b.trap.cool <= 0 },
   });
   const craftState = cr => ({ label: cr.label, built: cr.built, stations: cr.stations, parts: cr.parts.map(q => ({ name: q.name, got: cr.have.has(q.id), at: q.spots[cr.chosen] })) });

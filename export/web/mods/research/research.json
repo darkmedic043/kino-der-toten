@@ -3099,6 +3099,88 @@
      "id": "e.smoke.smokebomb"
     }
    ]
+  },
+  {
+   "id": "rake_trap",
+   "name": "Rake Trap",
+   "kind": "bloodstreak",
+   "color": "#d0402e",
+   "armory": "rake_trap",
+   "armoryKills": 100,
+   "augments": [
+    {
+     "name": "Long Handle",
+     "kind": "minor",
+     "desc": "Your rakes reach 25% farther for a zombie stepping near the head.",
+     "effects": {
+      "rake.reach": 0.25
+     },
+     "id": "b.rake.longhandle"
+    },
+    {
+     "name": "Whiplash",
+     "kind": "major",
+     "desc": "The swinging handle takes up to 2 more zombies standing round the head with it.",
+     "effects": {
+      "rake.sweep": 2
+     },
+     "id": "b.rake.whiplash"
+    },
+    {
+     "name": "Hardwood",
+     "kind": "minor",
+     "desc": "Your rakes last 50% longer before they break (30 hits).",
+     "effects": {
+      "rake.uses": 0.5
+     },
+     "id": "b.rake.hardwood"
+    },
+    {
+     "name": "Live Wire",
+     "kind": "major",
+     "desc": "Every hit sends a shock that stuns zombies near the rake for 2.5s.",
+     "effects": {
+      "rake.shock": 2.5
+     },
+     "id": "b.rake.livewire"
+    },
+    {
+     "name": "Hair Trigger",
+     "kind": "minor",
+     "desc": "Your rakes are ready to swing again 40% sooner.",
+     "effects": {
+      "rake.reset": 0.4
+     },
+     "id": "b.rake.hairtrigger"
+    },
+    {
+     "name": "Blood Harvest",
+     "kind": "major",
+     "desc": "Kills by your rakes add a quarter of their blood to the Bloodstreak meter.",
+     "effects": {
+      "rake.blood": 0.25
+     },
+     "id": "b.rake.bloodharvest"
+    },
+    {
+     "name": "Tool Shed",
+     "kind": "minor",
+     "desc": "The Rake Trap Bloodstreak gives one more rake (4).",
+     "effects": {
+      "rake.extra": 1
+     },
+     "id": "b.rake.toolshed"
+    },
+    {
+     "name": "Tetanus",
+     "kind": "major",
+     "desc": "Every hit makes zombies near the rake bleed 6% of their max health a second for 4s.",
+     "effects": {
+      "rake.bleed": 0.06
+     },
+     "id": "b.rake.tetanus"
+    }
+   ]
   }
  ]
 }

@@ -3,7 +3,8 @@
 // the next augment on a track, one research at a time across all tracks; switching keeps progress. Research XP comes from
 // kills and rounds (×activeMul while its item is active). The i-th augment costs trackCost[i]. Finishing a track
 // (mastery) opens a second Minor slot for that item. Equip one Major and one Minor (two once mastered) per item; the
-// game reads the equipped set at match start.
+// game reads the equipped set at match start. Bloodstreak tracks (kind 'bloodstreak', `armory: <item id>`) open once that
+// streak is unlocked in the Armory (mods/armory: found on its map, then `armoryKills` kills with it).
 // Store: kino.mods.research = {active: augId | null, progress: {augId: xp}, done: [augId],
 //   equip: {itemId: {major, minor, minor2}}}, cloud-synced (cloud.js TRACKED), its own key (progression saves can't touch it).
 export const RESEARCH_KEY='kino.mods.research';
@@ -26,10 +27,16 @@ export const nextOnTrack=(cfg,r,itemId)=>cfg.items.find(i=>i.id===itemId)?.augme
 export const mastered=(cfg,r,itemId)=>!nextOnTrack(cfg,r,itemId);
 // items marked `soon` (built, not released yet: user 2026-11-05) are shown but can't be researched
 export const isSoon=(cfg,itemId)=>!!cfg.items.find(i=>i.id===itemId)?.soon;
+// a Bloodstreak track still locked in the Armory (read straight from its store: the menu has no armory module loaded)
+export function armoryLocked(cfg,itemId){
+  const it=cfg.items.find(i=>i.id===itemId);if(!it?.armory)return false;
+  let rec=null;try{rec=JSON.parse(localStorage.getItem('kino.mods.armory'))?.items?.[it.armory];}catch{}
+  return !(rec?.found&&(rec.kills??0)>=(it.armoryKills??0));
+}
 
 // Start (or switch to) researching an augment: only the next one on its track. Returns a reason when it can't.
 export function startResearch(cfg,r,augId){
-  const a=augById(cfg)[augId];if(!a)return 'Unknown augment';if(isSoon(cfg,a.item))return 'Coming soon';if(r.done.includes(augId))return 'Already researched';
+  const a=augById(cfg)[augId];if(!a)return 'Unknown augment';if(isSoon(cfg,a.item))return 'Coming soon';if(armoryLocked(cfg,a.item))return `Unlock the ${a.itemName} in the Armory first`;if(r.done.includes(augId))return 'Already researched';
   if(nextOnTrack(cfg,r,a.item)?.id!==augId)return 'Research the augments before it on this track first';
   r.active=augId;return null;
 }
@@ -43,7 +50,7 @@ export function grantResearchXp(cfg,r,amount,isActive){
   // carry on down the same track automatically, as BO7 does; a mastered track moves on to the next item that isn't
   // (same kind first: perk or ammo mod), so research never stalls mid-match. The XP past the cost carries over.
   const next=nextOnTrack(cfg,r,a.item),item=cfg.items.find(i=>i.id===a.item);
-  const order=[...cfg.items.filter(i=>i.kind===item?.kind),...cfg.items.filter(i=>i.kind!==item?.kind)].filter(i=>!i.soon);
+  const order=[...cfg.items.filter(i=>i.kind===item?.kind),...cfg.items.filter(i=>i.kind!==item?.kind)].filter(i=>!i.soon&&!armoryLocked(cfg,i.id));
   const after=next??order.map(i=>nextOnTrack(cfg,r,i.id)).find(Boolean)??null;
   r.active=after?.id??null;if(after&&over>0)r.progress[after.id]=(r.progress[after.id]??0)+over;
   return {...a,mastery:!next,next:after};

@@ -29,7 +29,7 @@ export default async function setup(api){
     perkFx={};ammoFx={};eqFx={};list=equippedAugments(cfg,loadResearch());
     for(const a of list){
       if(a.itemKind==='perk'){const f=perkFx[a.item]??={};for(const [k,v] of Object.entries(a.effects))f[k]=(f[k]??0)+v;}
-      else if(a.itemKind==='equipment')for(const [k,v] of Object.entries(a.effects))eqFx[k]=(eqFx[k]??0)+v;
+      else if(a.itemKind==='equipment'||a.itemKind==='bloodstreak')for(const [k,v] of Object.entries(a.effects))eqFx[k]=(eqFx[k]??0)+v;
       else (ammoFx[a.item]??=[]).push(a.effects);
     }
   }
@@ -41,7 +41,7 @@ export default async function setup(api){
   // equipment is active while you carry it (the lethal slot's frags or Claymores, the tactical slot's item)
   const carries=id=>id==='frag_grenade_zm'?!session.claymoresOwned&&!session.tripsOwned&&session.grenades>0:id==='claymore_zm'?!!session.claymoresOwned:id==='tripmine_zm'?!!session.tripsOwned
     :id==='zombie_cymbal_monkey'?!!session.monkeysOwned||session.monkeys>0:window.kino.tactical?.id===id||session.equipment===id;
-  const isActive=item=>has(item)||session.weapon?.ammoMod?.id===item||carries(item);
+  const isActive=item=>has(item)||!!window.kino.bloodstreaks?.active?.(item)||session.weapon?.ammoMod?.id===item||carries(item);
   let R=loadResearch(),saveT=null;
   host.on('start',()=>{R=loadResearch();});
   function earn(xp){

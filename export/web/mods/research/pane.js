@@ -2,7 +2,7 @@ import { keepScroll } from '../../keep-scroll.js';
 // Armory → Research (roadmap Phase 5, BO7 style): three tabs (PERKS, AMMO MODS, EQUIPMENT: tacticals and lethals); pick an item; its 8 augments form a linear track
 // researched in order, one at a time across all items; the end of the track (mastery) opens a second Minor slot.
 // Equip one Major and one Minor (two once mastered) per item. Rules and store: research.js. Touch-sized; one column on phones.
-import { loadResearch, saveResearch, startResearch, toggleEquip, costOf, researchOpen, nextOnTrack, mastered, augById, isSoon } from './research.js';
+import { loadResearch, saveResearch, startResearch, toggleEquip, costOf, researchOpen, nextOnTrack, mastered, augById, isSoon, armoryLocked } from './research.js';
 
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 export const RESEARCH_CSS=`
@@ -48,20 +48,20 @@ export const RESEARCH_CSS=`
 .rs-list h4{width:100%}.rs-item{flex:1 1 40%;min-width:0}.rs-slots{grid-template-columns:minmax(0,1fr)}}`;
 
 let sel=null,tab='perk';
-const TABS=[['perk','PERKS'],['ammo','AMMO MODS'],['equipment','EQUIPMENT']];
-const HEAD={perk:'PERK AUGMENTS · WORK WHILE YOU HAVE THE PERK',ammo:'AMMO MOD AUGMENTS · WORK WHILE THE MOD IS ON YOUR GUN',equipment:'EQUIPMENT AUGMENTS · WORK WHEN YOU USE IT'};
-const carry=a=>a.itemKind==='perk'?'you have '+esc(a.itemName):a.itemKind==='equipment'?'you carry '+esc(a.itemName):esc(a.itemName)+' is on your gun';
+const TABS=[['perk','PERKS'],['ammo','AMMO MODS'],['equipment','EQUIPMENT'],['bloodstreak','BLOODSTREAKS']];
+const HEAD={perk:'PERK AUGMENTS · WORK WHILE YOU HAVE THE PERK',ammo:'AMMO MOD AUGMENTS · WORK WHILE THE MOD IS ON YOUR GUN',equipment:'EQUIPMENT AUGMENTS · WORK WHEN YOU USE IT',bloodstreak:'BLOODSTREAK AUGMENTS · WORK ON THE STREAKS YOU EARN'};
+const carry=a=>a.itemKind==='bloodstreak'?esc(a.itemName)+' is in your hands or set down':a.itemKind==='perk'?'you have '+esc(a.itemName):a.itemKind==='equipment'?'you carry '+esc(a.itemName):esc(a.itemName)+' is on your gun';
 // root: the pane's element; cfg: research.json; level: the unlock level (profile.js unlockLvl); toast: the menu's toast
 export function renderResearch(root,{cfg,level,toast}){
   const r=loadResearch(),items=cfg.items,open=researchOpen(cfg,level),by=augById(cfg),inTab=items.filter(i=>i.kind===tab).sort((a,b)=>(a.group==='lethal')-(b.group==='lethal'));   // equipment: tacticals listed first
   if(!inTab.some(i=>i.id===sel))sel=inTab[0]?.id??items[0].id;
   const it=items.find(i=>i.id===sel)??items[0],act=r.active&&by[r.active],eq=r.equip[it.id]??{},m=mastered(cfg,r,it.id),next=nextOnTrack(cfg,r,it.id);
   const doneN=i=>i.augments.filter(a=>r.done.includes(a.id)).length;
-  const group=(label,list)=>(label?`<h4>${label}</h4>`:'')+list.map(i=>`<button class="rs-item${i.id===it.id?' on':''}" data-item="${esc(i.id)}" style="--c:${i.color}"><i></i><b>${esc(i.name)}</b>${act?.item===i.id?'<span class="dot" title="Researching"></span>':''}<small class="${doneN(i)===8?'m':''}">${i.soon?'SOON':doneN(i)===8?'MASTERED':doneN(i)+'/8'}</small></button>`).join('');
+  const group=(label,list)=>(label?`<h4>${label}</h4>`:'')+list.map(i=>`<button class="rs-item${i.id===it.id?' on':''}" data-item="${esc(i.id)}" style="--c:${i.color}"><i></i><b>${esc(i.name)}</b>${act?.item===i.id?'<span class="dot" title="Researching"></span>':''}<small class="${doneN(i)===8?'m':''}">${i.soon?'SOON':armoryLocked(cfg,i.id)?'LOCKED':doneN(i)===8?'MASTERED':doneN(i)+'/8'}</small></button>`).join('');
   const slot=(k,label,locked)=>{const a=by[eq[k]];return `<div class="rs-slot${a&&!locked?' full':''}${locked?' locked':''}"><small>${label}</small>${locked?'Master the track':esc(a?.name??'Empty')}</div>`;};
-  const soon=!!it.soon;
+  const gated=armoryLocked(cfg,it.id),soon=!!it.soon||gated;   // gated: a Bloodstreak not unlocked in the Armory yet
   const step=(a,i)=>{const done=r.done.includes(a.id),now=r.active===a.id,isNext=next?.id===a.id,on=Object.values(eq).includes(a.id),cost=costOf(cfg,{...a,index:i}),xp=r.progress[a.id]??0;
-    const st=on?'EQUIPPED':done?'RESEARCHED':now?'RESEARCHING':soon?'COMING SOON':isNext?(xp?'PAUSED':'NEXT'):'LOCKED';
+    const st=on?'EQUIPPED':done?'RESEARCHED':now?'RESEARCHING':soon?(gated?'ARMORY LOCKED':'COMING SOON'):isNext?(xp?'PAUSED':'NEXT'):'LOCKED';
     const btn=done?`<button data-equip="${esc(a.id)}" class="${on?'on':''}">${on?'UNEQUIP':'EQUIP'}</button>`:isNext&&!now&&!soon?`<button data-research="${esc(a.id)}"${open?'':' disabled'}>${xp?'RESUME':'RESEARCH'}</button>`:'';
     return `<div class="rs-step ${a.kind}${done?' done':''}${now?' now':''}${!done&&!isNext?' locked':''}${on?' eq':''}"><span class="st">${i+1} · ${a.kind.toUpperCase()} · ${st}</span>
       <div class="act">${btn}</div><strong>${esc(a.name)}</strong><p>${esc(a.desc)}</p>${done?'':`<div class="bar"><i style="width:${(100*xp/cost).toFixed(1)}%"></i></div><span class="st">${Math.floor(xp).toLocaleString()} / ${cost.toLocaleString()} RESEARCH XP</span>`}</div>`;};
@@ -73,7 +73,7 @@ export function renderResearch(root,{cfg,level,toast}){
     <div class="rs-list">${listHtml}</div>
     <div class="rs-main" style="--c:${it.color}">
       ${open?'':`<div class="rs-lock">Research opens at level ${cfg.unlockLevel}.</div>`}
-      ${soon?`<div class="rs-lock">${esc(it.name)} is coming soon. Its augments are shown here, but they can't be researched yet.</div>`:''}
+      ${gated?`<div class="rs-lock">Unlock the ${esc(it.name)} in the Armory first (ARMORY.EXE on a terminal: find it on its map, then ${it.armoryKills} kills with it). Its augments are shown here, but they can't be researched yet.</div>`:it.soon?`<div class="rs-lock">${esc(it.name)} is coming soon. Its augments are shown here, but they can't be researched yet.</div>`:''}
       <div class="rs-active">${act?`RESEARCHING <b>${esc(act.name)}</b> · ${esc(act.itemName)} ${act.index+1}/8 · ${Math.floor(r.progress[act.id]??0).toLocaleString()} / ${costOf(cfg,act).toLocaleString()} XP · ×${cfg.activeMul} while ${carry(act)}<div class="bar"><i style="width:${(100*(r.progress[act.id]??0)/costOf(cfg,act)).toFixed(1)}%"></i></div>`
         :`Nothing is being researched. Each perk, ammo mod, tactical and lethal has a track of 8 augments, researched in order with XP from kills and rounds (×${cfg.activeMul} while the item is active). One at a time; switching keeps progress.`}</div>
       <div class="rs-head"><h2>${esc(it.name)}</h2><span>${HEAD[it.kind]??''}</span></div>

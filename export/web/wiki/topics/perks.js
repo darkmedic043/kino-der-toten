@@ -134,7 +134,7 @@ export default {
       id: 'research', title: 'Research', group: G.research, color: '#d6a94a', sub: 'Augments for perks and ammo mods',
       keywords: 'augment augments major minor mastery',
       html: () => {
-        const perkItems = research.items.filter(i => i.kind === 'perk'), ammoItems = research.items.filter(i => i.kind !== 'perk');
+        const perkItems = research.items.filter(i => i.kind === 'perk'), ammoItems = research.items.filter(i => i.kind === 'ammo'), eqItems = research.items.filter(i => i.kind === 'equipment'), bsItems = research.items.filter(i => i.kind === 'bloodstreak');
         const link = i => ctx.find('perks', slug(i.name)) ? ctx.link('perks', slug(i.name), i.name) : esc(i.name);
         const list = arr => table(['Item', 'Major augments', 'Minor augments'], arr.map(i => [link(i) + (i.soon ? ' (coming soon)' : ''),
           i.augments.filter(a => a.kind === 'major').map(a => esc(a.name)).join(', '), i.augments.filter(a => a.kind !== 'major').map(a => esc(a.name)).join(', ')]), { cls: 'compact' });
@@ -154,8 +154,9 @@ export default {
 ## Equipping
 
 - Per item, equip **one Major and one Minor** augment you have finished. Finish the whole track (**mastery**) to open a **second Minor** slot.
-- Your augments are locked in when a match starts. A perk's augments work while you have that perk; an ammo mod's while that mod is on your gun.`) +
-          `<h2>Perk tracks</h2>${list(perkItems)}<h2>Ammo mod tracks</h2>${list(ammoItems)}`;
+- Your augments are locked in when a match starts. A perk's augments work while you have that perk; an ammo mod's while that mod is on your gun; equipment's when you use it.
+- **Bloodstreaks** have tracks too, but each opens only once that streak is unlocked in **ARMORY.EXE** on a terminal booth (the Rake Trap: build it on Nuketown and take a rake, then ${bsItems[0]?.armoryKills ?? 100} kills with your rakes). Its augments work on the rakes you set down, and travel with each rake to your teammates' games.`) +
+          `<h2>Perk tracks</h2>${list(perkItems)}<h2>Ammo mod tracks</h2>${list(ammoItems)}` + (eqItems.length ? `<h2>Equipment tracks</h2>${list(eqItems)}` : '') + (bsItems.length ? `<h2>Bloodstreak tracks</h2>${list(bsItems)}` : '');
       },
     };
 

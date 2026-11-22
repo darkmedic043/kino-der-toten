@@ -15,7 +15,7 @@
 // RADIO.EXE (mods/radio, above JOURNAL): the maps' Easter-egg songs once their eggs are done; a player, a queue, a
 //   cooldown after each song; opts.radio() -> status, opts.radioAct(action, arg).
 // ARMORY.EXE (mods/armory, above BANK): tabs of special gear bought off its home map (operator weapons, shields,
-//   scorestreaks later); opts.armory() -> status, opts.armoryBuy(id) -> true | 'reason'.
+//   Bloodstreaks: equipped, not bought); opts.armory() -> status, opts.armoryBuy(id) -> true | 'reason'.
 // TASKS.EXE (mods/tedd-tasks, under GUMS): T.E.D.D.'s timed tasks (BO7). From round 9 an offer waits here; START pays
 //   for it, the HUD tracks it, and the reward chest lands in front of this terminal. opts.tasks() -> status, opts.taskAct(action).
 // FORGE.EXE (mods/wonder-forge, under TASKS): upgradable wonder weapons. Attune one to an upgrade whose relic you own, finish
@@ -708,7 +708,7 @@ function build() {
   const gearIcon = it => `<svg class="gear" viewBox="0 0 24 24" fill="none" stroke="${it.color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px ${it.color})"><path d="${it.icon ?? 'M7 12h10M12 7v10'}"/></svg>`;
   function armoryBuy(it) {
     const r = opts.armoryBuy?.(it.id) ?? 'ARMORY.EXE is not installed';
-    amMsg = r === true ? [`${it.name.toUpperCase()} ISSUED`, 'ok'] : [String(r).toUpperCase(), 'bad'];
+    amMsg = r === true ? [`${it.name.toUpperCase()} ${!it.streak ? 'ISSUED' : it.equipped ? 'TAKEN OFF' : 'EQUIPPED'}`, 'ok'] : [String(r).toUpperCase(), 'bad'];
     amState = ''; status(); drawArmory();
   }
   function drawArmory() {
@@ -717,26 +717,26 @@ function build() {
     const key = JSON.stringify([st, amMsg, amTab, amShown]); if (key === amState) return; amState = key;
     const tab = st.tabs.find(t => t.id === amTab) ?? st.tabs[0];
     const tabs = `<div class="tabs">${st.tabs.map(t => `<button data-tab="${t.id}" class="${t.id === tab.id ? 'on' : ''} ${t.soon ? 'soon' : ''}">${esc(t.name)}</button>`).join('')}</div>`;
-    const msg = `<div class="msg ${amMsg[1]}">${esc(amMsg[0] || (tab.soon ? '> OFFLINE' : st.power ? '> HOVER AN ITEM · CLICK TO BUY' : '> ACCESS DENIED · RESTORE MAINS POWER'))}</div>`;
+    const msg = `<div class="msg ${amMsg[1]}">${esc(amMsg[0] || (tab.soon ? '> OFFLINE' : tab.items.some(i => i.streak) ? '> CLICK A BLOODSTREAK TO EQUIP IT OR TAKE IT OFF · 3 SLOTS' : st.power ? '> HOVER AN ITEM · CLICK TO BUY' : '> ACCESS DENIED · RESTORE MAINS POWER'))}</div>`;
     if (tab.soon || !tab.items.length) {
       amBody.innerHTML = `${tabs}<div class="soonbox">${esc(tab.name)}<br>COMING SOON</div>${msg}`;
     } else {
       const it = tab.items[Math.min(amShown, tab.items.length - 1)];
-      const tag = i => i.why === 'home' ? 'BUILD HERE' : !i.unlocked ? 'LOCKED' : i.why === 'power' ? 'NO POWER' : '';
-      const label = it.why === 'home' ? `BUILD IT HERE ON ${it.homeName.toUpperCase()}` : !it.unlocked ? 'LOCKED' : it.why === 'owned' ? 'OWNED'
+      const tag = i => i.streak ? (!i.unlocked ? 'LOCKED' : i.equipped ? 'SLOT ' + i.slot : '') : i.why === 'home' ? 'BUILD HERE' : !i.unlocked ? 'LOCKED' : i.why === 'power' ? 'NO POWER' : '';
+      const label = it.streak ? (!it.unlocked ? 'LOCKED' : it.equipped ? `EQUIPPED · SLOT ${it.slot} · CLICK TO TAKE OFF` : it.slots >= 3 ? 'ALL 3 SLOTS FULL' : 'EQUIP') : it.why === 'home' ? `BUILD IT HERE ON ${it.homeName.toUpperCase()}` : !it.unlocked ? 'LOCKED' : it.why === 'owned' ? 'OWNED'
         : it.why === 'power' ? 'NEEDS POWER' : it.why === 'points' ? 'NOT ENOUGH POINTS' : `BUY · ${it.price.toLocaleString()}`;
       const unlock = it.unlocked ? `<div class="status"><span>UNLOCKED · ${it.have.toLocaleString()} KILLS</span></div>`
-        : `<h3>UNLOCK</h3><ul><li style="${it.found ? `color:${it.color}` : ''}">${it.found ? '[X]' : '[ ]'} Find it on ${esc(it.homeName)}</li>
+        : `<h3>UNLOCK</h3><ul><li style="${it.found ? `color:${it.color}` : ''}">${it.found ? '[X]' : '[ ]'} ${esc(it.findText ?? 'Find it on ' + it.homeName)}</li>
            <li>${it.have.toLocaleString()} / ${it.kills.toLocaleString()} kills with it${it.found ? '' : ' (after finding it)'}</li></ul>
            <div class="prog"><i style="width:${100 * it.have / it.kills}%"></i></div>`;
       const shownBefore = amBody.querySelector('.tile.on')?.dataset.i;
-      keepScroll(amBody).innerHTML = `${tabs}<div class="perks"><div class="left"><div class="grid">${tab.items.map((i, k) => `<button class="tile ${i.unlocked && i.why !== 'home' ? '' : 'locked'} ${i.owned ? 'owned' : ''} ${k === amShown ? 'on' : ''}" data-i="${k}" title="${esc(i.name)}">${gearIcon(i)}<span class="tag">${tag(i)}</span></button>`).join('')}</div>${msg}</div>
+      keepScroll(amBody).innerHTML = `${tabs}<div class="perks"><div class="left"><div class="grid">${tab.items.map((i, k) => `<button class="tile ${i.unlocked && i.why !== 'home' ? '' : 'locked'} ${i.owned || i.equipped ? 'owned' : ''} ${k === amShown ? 'on' : ''}" data-i="${k}" title="${esc(i.name)}">${gearIcon(i)}<span class="tag">${tag(i)}</span></button>`).join('')}</div>${msg}</div>
         <div class="detail"><div class="head"><div class="big" style="border-color:${it.color}">${gearIcon(it)}</div><div>
-          <h2 style="color:${it.color}">${esc(it.name.toUpperCase())}</h2><div class="blurb">${esc(it.blurb)}</div><div class="price">${it.price.toLocaleString()} PTS</div></div></div>
+          <h2 style="color:${it.color}">${esc(it.name.toUpperCase())}</h2><div class="blurb">${esc(it.blurb)}</div><div class="price">${it.streak ? `${it.cost} BLOOD` : `${it.price.toLocaleString()} PTS`}</div></div></div>
           <button class="buy ${it.unlocked ? '' : 'locked'}" ${it.why ? 'disabled' : ''}>${label}</button>
           ${unlock}
           <h3>SPECS</h3><ul>${it.specs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
-          <div class="note">* Not sold on ${esc(it.homeName)}: build it there.</div></div></div>`;
+          <div class="note">${it.streak ? '* Earned with kills in a match, never bought. Works on every map once unlocked.' : `* Not sold on ${esc(it.homeName)}: build it there.`}</div></div></div>`;
       if (shownBefore !== undefined && +shownBefore !== amShown) amBody.querySelector('.detail').scrollTop = 0;   // a different item's details start at the top
       for (const t of amBody.querySelectorAll('.tile')) { t.addEventListener('mouseenter', () => { amShown = +t.dataset.i; drawArmory(); }); t.addEventListener('click', () => armoryBuy(tab.items[+t.dataset.i])); }
       amBody.querySelector('.buy').addEventListener('click', () => armoryBuy(it));

@@ -1,0 +1,5 @@
+{
+  "name": "Bloodstreaks",
+  "description": "Kills fill a blood meter; the streaks equipped in ARMORY.EXE (up to three) are earned at their cost and used from the command wheel. First streak: Nuketown's Rake Trap, unlocked by building it there and 100 rake kills. Also runs the rake traps on every map.",
+  "script": "mod.js"
+}
