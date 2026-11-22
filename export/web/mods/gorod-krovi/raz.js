@@ -34,7 +34,9 @@ const segDist = (p, a, b) => { const ab = b.clone().sub(a), t = Math.max(0, Math
 export function setupRaz(K) {
   const { world, session, scene, enemies, gk } = K;
   let S = null;
-  const ready = loadSet('raz', MODELS).then(s => { S = s.models.c_zom_dlc3_raz_fb ? s : null; if (S) { const w = build(V(), 0, true); w.root.removeFromParent(); K.host.warmObjects.push(w.root); } return S; });
+  const ready = loadSet('raz', MODELS).then(s => { S = s.models.c_zom_dlc3_raz_fb ? s : null; if (S) { const w = build(V(), 0, true); w.root.removeFromParent(); K.host.warmObjects.push(w.root);
+    // the armour pieces that fly off are models of their own: the helmet compiled its program when the first one was shot off (a 5.3 s freeze, 2026-11-22)
+    for (const m of MODELS.slice(1)) if (S.models[m]) { const c = cloneSkinned(S.models[m]); c.scale.setScalar(.001); K.host.warmObjects.push(c); } } return S; });
   const spots = Object.entries(RAZ_SPOTS).flatMap(([zone, l]) => l.map(([x, y, z, yaw]) => ({ p: V(x, y, z), yaw: yaw * Math.PI / 180, zone })));
 
   function build(at, yaw, mirror = false) {

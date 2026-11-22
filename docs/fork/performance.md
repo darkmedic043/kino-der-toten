@@ -425,3 +425,33 @@ What is left, by the last profile (GC 13.8% self, `setProgram` 29% inclusive, `u
 - three-mesh-bvh's `raycastFirst` allocates typed-array views per ray (about 8% of the remaining garbage), `movement/fp.js:205` another 2.5%, and the engine's texture-upload wrappers use rest arguments.
 - About 800 texture binds a frame come from three allocating texture units per draw.
 - Not measured on D3D11 or on the user's RTX 4070 Ti Super; the host numbers are ANGLE Vulkan at a small resolution, where the CPU side dominates.
+
+## Freezes at the first use of something (2026-11-22, user: "fixx up anyu freezes that happoen in the game with certain things")
+
+Source: the `perf` rows of the user's own games in the client log, 11-19 to 11-22 (Rind, D3D11, Ultra), read for `progs`
+(programs linked after `ready`) next to their hitches and `long` tasks. On that machine one late program costs 0.7-7.8 s.
+Five causes found and fixed; each fix moves the work to the load.
+
+| What the player saw | Late work | Cause | Fix |
+|---|---|---|---|
+| 2.8-7.8 s freeze the first time a gun with a charm came up, every match | `MeshStandard:charm` / `charm_chain`, view scene | the chain's and the charm's meshes were built at the first hang, on no scene at load | `mods/charms/mod.js` keeps a hidden `charm_warm` group in the view scene: the chain's two meshes (`chainWarm()`, charms.js) and the body of every charm the profile has on a gun, textures `initTexture`d |
+| 5.3 s when a Mangler's helmet was first shot off (Gorod Krovi) | `MeshStandard:mtl_c_zom_dlc3_rus_raz_helmet` | the armour pieces that fly off are models of their own, only the whole Mangler was in the warm-up | `gorod-krovi/raz.js`: a clone of every debris model in `host.warmObjects` |
+| 0.7 s when the power came on (Gorod Krovi) | `MeshStandard:` on `gk_bridge` | the bridge lamps' green material was on no mesh until then | `gorod-krovi/bridge.js`: a hidden spare lamp wears it from the start |
+| about 1 s when the Ray Gun Mk3 (GKZ-45 Mk3) was first raised | `…raygun_mk3_lh_glow_mid` on the left gun | the warm-up gave both guns their glow materials, play only patched `view.gun`: the left gun drew its unpatched material for the first time | `bo3-weapons/mod.js` `updateModGlow` patches `view.leftGun` too (it also never glowed before) |
+| 80-110 ms hitches on box spins and near wall guns | a gun's HD textures, all in one frame | `hd-weapons` `preload` called `initTexture` for every map of the gun in one loop | one texture per frame (`nextFrame`), only those not on the GPU yet |
+
+**Rule: a material is compiled at load only if it is on a mesh the warm-up can reach.** A material kept in a variable for
+later (a lamp's other colour, a debris model, a part built on first use) compiles at its first draw. Put a hidden mesh
+wearing it in the scene, or a copy in `host.warmObjects`. A patch the `warmWeapon` handler applies to a viewmodel must be
+applied in play to the same objects (both guns of a dual weapon), or the warm-up compiled a material play never draws.
+
+Tests (phone profile, the desktop one does not fit this host's memory cap): Gorod Krovi's light copy with
+`scratch/freeze/play-gk.js` (power on, a Mangler's armour broken): 1 + 1 late programs before, 0 after. The sandbox with
+`scratch/freeze/play-sb.js` and a charm set by `INIT`: the charm program late before, at load after (150 → 152 programs
+at Ready); the left Mk3 lit; a wall gun's textures 4.8 MB in the worst frame before, 1.3 MB after. The weapon warm-up
+itself (`warmWeapons`, desktop only) could not be run here.
+
+Not explained: a 3.7 s stall with the Gambler's ante wheel open and a 3.0 s one at an AW gun's unlock toast, both in the
+same minute of one Kino match (11-21): no program, upload or long script in either (`mt` = the gap), so they look like
+the GPU process or the driver, as in the 10-29 trace work. A `MeshDepth:` program for the terminal booth's coolant on
+Gorod Krovi shared a long task with the charm chain; it did not reproduce on the light copy.

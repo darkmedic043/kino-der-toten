@@ -1,12 +1,19 @@
 // Weapon charms in first person (2026-11-06): the charm picked for the held gun in the Gunsmith hangs off its left side
 // and swings. The system is in charms.js; this hangs it on the viewmodel. Right-hand gun only (dual wield: not the left).
 import * as THREE from 'three';
-import { loadCharms, loadCharmState, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, screenOverride } from './charms.js';
+import { loadCharms, loadCharmState, charmFor, charmModel, charmReach, charmUnit, gunAnchor, CharmRig, chainWarm, screenOverride } from './charms.js';
 import { screenFor, makeScreen, screenMount, placeScreen, charmZone, partTravel, travelFor } from './screens.js';
 
 export default async function setup(api){
   const {host,session,viewScene}=api;const view=api.view;
   const cat=await loadCharms();
+  // Warm-up (2026-11-22): the chain and the body of every charm the player has on a gun wait hidden in the view scene, so
+  // the load's shader pass compiles them with the view scene's lights and their textures are on the GPU before play. The
+  // chain was built at the first hang and its program compiled then: a 2.8-7.8 s freeze at the start of the user's matches.
+  {const warm=new THREE.Group();warm.name='charm_warm';warm.visible=false;warm.userData.charm=true;warm.add(chainWarm());viewScene.add(warm);
+    const st=loadCharmState(),used=[...new Set(Object.keys(st.on).map(id=>charmFor(cat,st,id)).filter(Boolean))];
+    await Promise.all(used.map(c=>charmModel(c).then(body=>{if(!body)return;warm.add(body.object);
+      body.object.traverse(o=>{for(const m of [o.material].flat())if(m)for(const v of Object.values(m))if(v?.isTexture&&v.image)try{api.renderer?.initTexture(v);}catch{}});}).catch(()=>{})));}
   let rig=null,gun=null,root=null,anchor=null,bone=null,gunId=null,token=0;
   const camPrev=new THREE.Matrix4(),D=new THREE.Matrix4(),g=new THREE.Vector3(),q=new THREE.Quaternion();
   let camFresh=true,last=0,hungAt=0;

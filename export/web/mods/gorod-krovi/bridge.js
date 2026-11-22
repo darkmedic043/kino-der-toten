@@ -52,6 +52,9 @@ export default async function setupBridge(api, gk) {
   const green = lampMat(true), red = lampMat(false);
   const lamps = SWITCHES.map(a => { const m = new THREE.Mesh(new THREE.BoxGeometry(5, 5, 5), red); m.position.copy(W(a[0], a[1], a[2] + 26)); root.add(m); return m; });
   for (const o of [L, R]) for (const c of o.children) { c.castShadow = c.receiveShadow = true; }
+  // the lamp colour not shown at load, on a hidden lamp: the load's warm-up only reaches materials that are on a mesh (the
+  // green one compiled when the power came on, 0.7 s, 2026-11-22)
+  { const spare = new THREE.Mesh(lamps[0].geometry, green); spare.position.copy(lamps[0].position); spare.visible = false; spare.userData.noVisCull = true; root.add(spare); }
   scene.add(root); root.updateMatrixWorld(true);
 
   // collision: an invisible deck (flat) and two walls (raised), never in the scene

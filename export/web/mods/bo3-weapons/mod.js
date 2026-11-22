@@ -226,9 +226,11 @@ export default async function setup(api){
   let modLit=null;
   function updateModGlow(){
     const def=view?.def,gun=view?.gun;if(!gun||!isMod(def)){modLit=null;return;}
-    if(modLit?.gun!==gun){   // viewmodels are cached: build once per gun object
-      modLit={gun,glow:applyGlow(gun,data.weapons[modId(def)]?.glow)};}
-    tickGlow(modLit.glow,session.time,modFlash,{aim:view.aim??0});
+    if(modLit?.gun!==gun||modLit.leftGun!==view.leftGun){   // viewmodels are cached: build once per gun object
+      // the left gun of a dual weapon too: the warm-up lit it but play never did, so its unlit glow material compiled
+      // when the gun was first raised (the GKZ-45 Mk3's left hand, 1 s, 2026-11-22)
+      const c=data.weapons[modId(def)]?.glow,leftGun=view.leftGun??null;modLit={gun,leftGun,glow:applyGlow(gun,c),left:leftGun?applyGlow(leftGun,c):null};}
+    tickGlow(modLit.glow,session.time,modFlash,{aim:view.aim??0});if(modLit.left)tickGlow(modLit.left,session.time,modFlash,{aim:view.aim??0});
   }
   let modFlash=0;
   // the engine's weapon warm-up (warmWeapons): each gun compiles with its glow materials in place, as equipped

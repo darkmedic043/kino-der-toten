@@ -79,6 +79,9 @@ const parts=()=>{
   ringGeo??=new THREE.TorusGeometry(.11,.026,6,14);
   metal??=new THREE.MeshStandardMaterial({color:0xb8b8b8,metalness:.85,roughness:.35,name:'charm_chain'});
 };
+// the chain's two meshes for the load's shader warm-up (mod.js keeps them hidden in the view scene): the chain is built
+// when a charm is first hung, and its program compiled then, mid-game (2026-11-22)
+export function chainWarm(){parts();const g=new THREE.Group();g.add(new THREE.Mesh(ringGeo,metal),new THREE.Mesh(linkGeo,metal));return g;}
 
 // ---- where it hangs -----------------------------------------------------------------------------------------------------
 // In the gun's root bone space (BO1: inches, x forward, y left = the side the camera sees, z up), from the visible

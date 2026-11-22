@@ -35,6 +35,7 @@ export default async function setup(api){
   const {data,renderer,viewScene,camera,host,mysteryBox,world}=api;
   if(!renderer||!viewScene)return;
   const done=new Set(),uploaded=new Set();let busy=null;
+  const nextFrame=()=>new Promise(r=>{const t=setTimeout(r,120);requestAnimationFrame(()=>{clearTimeout(t);r();});});
   // Fetch models and animations, then compile with the weapon scene's own
   // lights (out of sight) and upload textures, in one batch.
   // upload=false (the load-time batch) skips texture uploads: every gun's HD
@@ -47,10 +48,15 @@ export default async function setup(api){
     const [roots]=await Promise.all([Promise.all(models.map(u=>loadModel(u).catch(()=>null))),...anims.map(u=>loadAnimation(u).catch(()=>null))]);
     const holder=new THREE.Group();holder.position.set(0,-5000,0);for(const r of roots)if(r)holder.add(r);
     viewScene.add(holder);
-    try{await renderer.compileAsync(viewScene,camera);
-      if(upload)holder.traverse(o=>{for(const m of [o.material].flat())if(m)for(const k of ['map','normalMap','emissiveMap','alphaMap'])if(m[k])renderer.initTexture(m[k]);});}
+    try{await renderer.compileAsync(viewScene,camera);}
     catch(e){console.warn('[preload]',ids,e);}
     viewScene.remove(holder);
+    // The textures go up one a frame, with the holder out of the scene (2026-11-22): all of a gun's in one loop was 250-300 MB
+    // in a single frame, the 80-110 ms hitch of every box spin and wall gun on the client log. A gun taken before the
+    // last one is up uploads the rest when drawn, as before.
+    if(upload){const todo=new Set(),up=t=>!!renderer.properties.get(t).__webglTexture;
+      holder.traverse(o=>{for(const m of [o.material].flat())if(m)for(const [k,v] of Object.entries(m))if(k!=='envMap'&&v?.isTexture&&v.image&&!v.isCubeTexture&&!v.isRenderTargetTexture&&!up(v))todo.add(v);});
+      for(const t of todo){if(up(t))continue;try{renderer.initTexture(t);}catch(e){console.warn('[preload]',ids,e);}await nextFrame();}}
   }
   const queue=id=>{busy=(busy??Promise.resolve()).then(()=>preload([id]));};
   // The box: its weapon is chosen when the spin starts.
