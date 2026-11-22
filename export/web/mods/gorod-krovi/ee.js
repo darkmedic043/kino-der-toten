@@ -738,7 +738,7 @@ export default async function setupEE(api, gk) {
     let order;
     do order = shuffle(['pod', 'escort', 'mangler', 'timed', 'pursue']); while (order.some((k, i) => (k === 'escort' && (order[i + 1] === 'mangler' || order[i - 1] === 'mangler'))));
     order.push('terminal'); S.order = order; note('scenarios ' + order.join(' '));
-    let i = 0, fails = 0, prevOk = true;
+    let i = 0, fails = 0, prevOk = true; S.task = 0;   // S.task: tasks done (the Tab board, tab.js)
     while (i < order.length) {
       shelfButton(gk.bosses?.sentinelRound?.().active || lockdown() ? 'red' : 'green');
       mapBtn.text = 'Start the next task'; mapBtn.hit = false; mapBtn.on = true;
@@ -755,7 +755,7 @@ export default async function setupEE(api, gk) {
       let ok = false;
       try { ok = await SCEN[k](fails); } catch (e) { if (e === ABORT) throw e; console.error('[gorod-krovi] ee scenario ' + k, e); ok = false; }
       gk.clearFlag('ee_round'); S.scen = null; prevOk = ok;
-      if (ok) { i++; fails = 0; sfx(i === 6 ? 'ui_finish_all' : 'ui_yay', .9); tell(`Task ${i} of 6 complete`, 3); note('done ' + k); unpause(); }
+      if (ok) { i++; S.task = i; fails = 0; sfx(i === 6 ? 'ui_finish_all' : 'ui_yay', .9); tell(`Task ${i} of 6 complete`, 3); note('done ' + k); unpause(); }
       else {
         fails++; sfx('ui_deny', 1); note('failed ' + k);
         say(['Disappointing. We will try again after the next wave.', 'Again? After the next wave, then.', 'I am losing patience. Next wave.'][Math.min(2, fails - 1)], 4);
@@ -847,7 +847,7 @@ export default async function setupEE(api, gk) {
     for (const s of spots) { s.on = false; s.onUse = null; }
     for (const t of armed) disarm(t); armed.clear();
     for (const l of loops) l.a.pause(); loops.clear();
-    S.whelp = null; S.scen = null; S.fight = 'reset';
+    S.whelp = null; S.scen = null; S.fight = 'reset'; S.task = 0;
     if (S.paused) { S.paused = false; if (PZ.saved) { enemies.autoSpawn = PZ.saved.spawn; enemies.autoRounds = PZ.saved.rounds; } PZ.saved = null; }
     Object.assign(G, { charged: false, on: false, kills: false }); G.loop?.stop(); G.loop = null; T.solved = false; T.lit = false; T.air?.stop();
     initModels(); S.armedKeys = true; S.revealed = new Set(); armKeys();
@@ -870,7 +870,7 @@ export default async function setupEE(api, gk) {
   host.on('gameOver', () => { for (const l of loops) l.a.pause(); });
 
   const dbg = {
-    get state() { return { stage: S.stage, paused: S.paused, scen: S.scen, order: S.order, keys: [...S.keys], placed: [...S.placed], generator: { ...G, loop: !!G.loop }, tubes: { order: T.order, set: Object.fromEntries(tubeKeys.map(k => [k, tubes[k].set])), flow: T.lit ? walk() : [], solved: T.solved }, rings: ringState.map(r => r.step), error: S.error, log: S.log.slice(-20) }; },
+    get state() { return { stage: S.stage, paused: S.paused, scen: S.scen, task: S.task ?? 0, order: S.order, keys: [...S.keys], placed: [...S.placed], generator: { ...G, loop: !!G.loop }, tubes: { order: T.order, set: Object.fromEntries(tubeKeys.map(k => [k, tubes[k].set])), flow: T.lit ? walk() : [], solved: T.solved }, rings: ringState.map(r => r.step), error: S.error, log: S.log.slice(-20) }; },
     log: () => S.log.slice(),
     skip(stage) {   // start from a stage, with what comes before it given (keys found, flags set)
       const i = STAGES.indexOf(stage); if (i < 0) return STAGES;

@@ -67,5 +67,5 @@ export default async function setup(api) {
 // zombies (models, anims, spawns), sounds (ambience, emitters), bridge (powered drawbridge), dragon (roosts, the ride,
 // the map dragon), pap (Pavlov's lockdown), bosses (Mangler, Valkyrie drones, the mech), gauntlet, shield, widows,
 // sophia (the S.O.P.H.I.A. computer, her eye, the tape reels), scenes (BO3's scene-bundle props and the dragon hazards),
-// dogfight (the planes overhead), sewer (the ride out of Pavlov's), air (the town's fires, smoke and falling ash)
-const PARTS = ['zombies', 'sounds', 'bridge', 'dragon', 'pap', 'bosses', 'gauntlet', 'shield', 'widows', 'sophia', 'scenes', 'dogfight', 'sewer', 'traps', 'debris', 'power', 'pods', 'strike', 'mg', 'challenges', 'eggs', 'wearables', 'ee', 'air'];
+// dogfight (the planes overhead), sewer (the ride out of Pavlov's), air (the town's fires, smoke and falling ash), tab (the Tab board's tiles)
+const PARTS = ['zombies', 'sounds', 'bridge', 'dragon', 'pap', 'bosses', 'gauntlet', 'shield', 'widows', 'sophia', 'scenes', 'dogfight', 'sewer', 'traps', 'debris', 'power', 'pods', 'strike', 'mg', 'challenges', 'eggs', 'wearables', 'ee', 'air', 'tab'];
