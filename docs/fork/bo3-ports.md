@@ -370,7 +370,7 @@ Checks:
 | Case | Symptom | Fix |
 |---|---|---|
 | Built-in maps (`$white_diffuse`, `$gray_color`, `$color_black_NN`), pure-white tint masks | white props, white stair trim | colour from the material name (`TINTS`, `PAINT` in the builder); add names the new map brings |
-| "Micro" detail maps (`i_t7_micro_*`, near-white, meant to tile) | flat pale props, blurry boulders | name tint divided by the texture's brightness, then tiled by the detail pass (3.5) |
+| "Micro" detail maps (`i_t7_micro_*`, near-white, meant to tile) | flat pale props, blurry boulders | name tint divided by the texture's brightness, then tiled by the detail pass (3.5). The detail maps have colours of their own (wood is orange) and the clip at 1 shifts hues: check the saturated results and set them from measured averages, as Gorod Krovi's `tidy` does (materials.md, "the clean-up pass") |
 | Only a normal map was exported (some decals, `*_carved`) | lilac-blue or grey sheets | drop the decal, or build an overlay from the normal map's slope (`carved.js`) |
 | No image at all (`core_*` placeholders, effect cards, `_no_e`) | grey slabs, solid white cards | `SKIP` in the builder, or hide in the mod |
 | Model with one tiled colour map and nothing else (Pack-a-Punch rocks, the power switch) | "textures seem to be missing" | colour by material name over a tile; darken by normal slope (`ROCK_CARVE`) |
