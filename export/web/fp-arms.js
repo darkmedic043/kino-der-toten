@@ -302,6 +302,19 @@ export class FirstPersonArms {
       // from its file and recolour the hand parts when it lands (a frame or two; the configured colour until then)
       let like=null;if(likeMat)model.traverse(o=>{if(like||!o.isMesh)return;for(const m of [o.material].flat())if(m&&likeMat.test(m.name??'')){like=m;break;}});
       if(like?.map?.source){const base=like.color.clone(),mats=this.skinMats;imageOf(like.map.source).then(img=>{const avg=imageAverage(img);if(!avg)return;const c=toneOf(base.multiply(avg));for(const m of mats)m.color.copy(c);}).catch(()=>{});}}
+    // Upper-arm stretch (retarget mode; fpArmsStretchUpper: false turns it off, and fpArmsUpper: false, the Captain, whose
+    // pauldron is skinned to the upper arm, keeps the plain elbow half): the arm is sized by its palm, so on a rig with longer arms
+    // its own upper arm, hung back from the elbow at its own length, ends short of the rig's shoulder. A BO7 rig's left
+    // arm reaches far forward from a shoulder under the camera, and the cut end of the upper arm sat in the bottom left of
+    // the frame as a ring (2026-11-24, user: "some guns still show this back part"). The upper arm's vertices are stretched
+    // away from the elbow along the arm, by as much as makes the arm's shoulder-to-wrist length the rig's, plus 10%, and the
+    // upper arm is kept to 12% short of its shoulder (not only its elbow half), so its end sits at the rig's own shoulder, under
+    // the camera (half an arm stretched 2.6x still showed its rim on the Drake; the whole arm brought the pauldron into view).
+    // Everything not below the elbow stretches (twist and clavicle weights too, or the deltoid pinched back into view); at most 3x.
+    const upperStretch={};if(rt&&this.entry.fpArmsStretchUpper!==false&&this.entry.fpArmsUpper!==false)for(const [t5,S] of Object.entries(sides)){
+      const e=pos(S.fore),ou=pos(S.arm).distanceTo(e),of=e.distanceTo(pos(S.hand));if(ou<1e-4||!T('j_shoulder_'+t5)||!T('j_elbow_'+t5)||!T('j_wrist_'+t5))continue;
+      const ru=tp('j_shoulder_'+t5).distanceTo(tp('j_elbow_'+t5)),rf=tp('j_elbow_'+t5).distanceTo(tp('j_wrist_'+t5)),k=Math.min(3,1.1*(ru+rf-of)/(.88*ou));
+      if(k>1.05){const below=new Set();S.fore.traverse(b=>below.add(b));upperStretch[t5]={e,dir:pos(S.arm).sub(e).divideScalar(ou),k,below};}}
     const innerR={};if(plateMat){const lists={};for(const t5 of Object.keys(sides))lists[t5]=[];const vp=new THREE.Vector3();
       model.traverse(o=>{if(!o.isSkinnedMesh||plateMat.test([o.material].flat()[0]?.name??''))return;o.skeleton.update();const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight,src=o.skeleton.bones;
         for(let v=0;v<g.attributes.position.count;v++){let S=null,w=0;for(let k=0;k<4;k++){const b=src[si.getComponent(v,k)],s=keepBones.get(b);if(s&&(b===s.fore||(b?.parent===s.fore&&b!==s.hand))){w+=sw.getComponent(v,k);S??=s;}}if(!S||w<=.5)continue;
@@ -319,7 +332,7 @@ export class FirstPersonArms {
       const keepV=new Uint8Array(count),wp=new THREE.Vector3();
       for(let v=0;v<count;v++){const S=sideOf[v];if(!S||weightOf[v]<=.5)continue;
         o.getVertexPosition(v,wp);wp.applyMatrix4(o.matrixWorld);const a=pos(S.arm),e=pos(S.fore),ax=e.clone().sub(a),t=wp.clone().sub(a).dot(ax)/ax.lengthSq();
-        keepV[v]=this.entry.fpArmsUpper||t>.5?1:0;}
+        keepV[v]=this.entry.fpArmsUpper||t>(upperStretch[S.t5]?.12:.5)?1:0;}
       for(let t=0;t<idx.length;t+=3)if(keepV[idx[t]]&&keepV[idx[t+1]]&&keepV[idx[t+2]])tris.push(idx[t],idx[t+1],idx[t+2]);
       if(!tris.length)return;
       const used=[...new Set(tris)],remap=new Map(used.map((v,i)=>[v,i]));
@@ -327,6 +340,7 @@ export class FirstPersonArms {
       const skinThis=!!skinMat&&skinMat.test([o.material].flat()[0]?.name??''),handFlag=skinThis?new Uint8Array(used.length):null;
       used.forEach((v,i)=>{
         o.getVertexPosition(v,v3);v3.applyMatrix4(o.matrixWorld);
+        {const S=sideOf[v],u=upperStretch[S.t5];if(u){let w=1;for(let k=0;k<4;k++)if(u.below.has(src[si.getComponent(v,k)]))w-=sw.getComponent(v,k);const t=w&&v3.clone().sub(u.e).dot(u.dir);if(t>0)v3.addScaledVector(u.dir,t*(u.k-1)*w);}}   // (the upper-arm stretch above)
         if(handFlag){const hs=handSets.get(sideOf[v]);let hw=0;for(let k=0;k<4;k++)if(hs?.has(src[si.getComponent(v,k)]))hw+=sw.getComponent(v,k);handFlag[i]=hw>.5?1:0;}
         if(rt){const S=sideOf[v];
           {const d=new THREE.Vector3();for(let k=0;k<4;k++){const w=sw.getComponent(v,k),sc=w&&scaleBones.get(src[si.getComponent(v,k)]);if(sc)d.addScaledVector(scaleOff(v3,sc),w);}v3.add(d);}   // (fpArmsFingerScale, every layer by its weights)

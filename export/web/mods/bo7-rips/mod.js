@@ -17,11 +17,11 @@ export async function prepare(data){
   // not on an akimbo pair (bo7_<g>_dw, folded into the gun's Akimbo attachment): BO7 has no akimbo sprint clips
   // viewFov: these rigs are framed for IW's viewmodel field of view (FOV 80 on 4:3 = about 64° vertical), not BO1's 51°;
   // drawn at 51° and pushed forward to fit, the cut ends of the sleeves showed (2026-11-24)
-  // stockClear: the hip turn about the support hand that drops the stock out of the bottom right corner (movement/fp.js measureFrame);
-  // not on the launchers, which sit on the shoulder
+  // (no stockClear: the hip turn about the support hand pointed every gun up (user: "certain guns begin to aim up"); the
+  // "back part" was the cut end of an operator's upper arm (Venator), now stretched to the rig's shoulder in fp-arms.js; BO7 itself shows the stock in the corner)
   // partSlots: the Gunsmith's slot markers find each slot's stock part by its head bone (gunsmith-view.js partOf)
   const PART_SLOTS={b7_base_barrel:'barrel',b7_base_mag:'mag',b7_base_grip:'grip',b7_base_stock:'stock'};
-  for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=!d.dualWield&&!!d.animations?.sprintLoopAnim;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];d.partSlots=PART_SLOTS;if(!d.dualWield&&!d.id?.startsWith('bo7_me_')&&d.weaponClass!=='Launcher')d.stockClear??=.14;}
+  for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=!d.dualWield&&!!d.animations?.sprintLoopAnim;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];d.partSlots=PART_SLOTS;}
   Object.assign(data.weapons,built.weapons);
   // their own prestige camos (P1, P2, the animated Master) instead of the generated ones (.tools/build_bo7_prestige.py)
   const pr=await fetch(BASE+'prestige.json').then(r=>r.ok?r.json():null).catch(()=>null);
@@ -63,9 +63,27 @@ export default async function setup(api){
   // CBRS-3 turns its helical mag every third of it (rechamberParts 3). The shot that ends a set holds the trigger for
   // rechamberTime and plays its last-shot kick + rechamber clip; counted from the mag, so a reload starts a fresh set.
   let rechamberNext=false,burstShots=0,burstAt=-1;
+  // Special mechanics (docs/fork/bo7-rips.md, Special mechanics):
+  // chargeTime (the XR-3 Ion, def.automatic): each burst waits for the trigger to be held that long; held, it charges again
+  //   after the burst's pause (about one burst every 0.525 s). Let go mid-charge and the charge starts over.
+  // overheat (the MK.78's Heatshield belt): every shot adds 1/overheat of the heat; full, the gun locks for overheatLock s;
+  //   it cools 0.25 s after the last shot at 65% a second.
+  // fabricator (the Carbon 57's Fabricator Mag): no manual reload; a second after the last shot it prints rounds from the
+  //   reserve back into the magazine, 20 a second.
+  let charge=0,chargeSeen=-9,heat=0,lockUntil=0,lastShot=-9,printAcc=0;
+  const now=()=>session.time??performance.now()/1e3;
   const fire0=session.fire.bind(session);
   session.fire=(...a)=>{
+    const d0=session.def,t=now();
+    if(d0?.overheat&&t<lockUntil)return false;
+    if(d0?.chargeTime&&!d0.dualWield&&session.fireLeft<=0&&!(session.reloadLeft>0)&&session.handMag()>0&&!(burstShots>0&&t-burstAt<=(d0.fireTime??.1)*2+.05)){
+      if(t-chargeSeen>.08)charge=0;chargeSeen=t;
+      if(!charge){charge=t+d0.chargeTime;chargeCue(d0);}
+      if(t<charge)return false;
+      charge=0;}
     const ok=fire0(...a),d=session.def,w=session.weapon;
+    if(ok){lastShot=t;printAcc=0;}
+    if(ok&&d?.overheat){heat=Math.min(1,heat+1/d.overheat);if(heat>=1){lockUntil=t+(d.overheatLock??1.9);session.fireLeft=Math.max(session.fireLeft,d.overheatLock??1.9);ventCue();}}
     if(ok&&w&&(d?.rechamberEvery||d?.rechamberParts)&&!d.dualWield){
       const n=d.rechamberEvery||Math.max(1,Math.round(d.clipSize/d.rechamberParts)),spent=d.clipSize-w.mag;
       if(w.mag>0&&spent>0&&spent%n===0){session.fireLeft=Math.max(session.fireLeft,d.rechamberTime??.8);rechamberNext=true;}}
@@ -73,7 +91,33 @@ export default async function setup(api){
     if(ok&&d?.burstDelay&&d.burstCount&&!d.dualWield){const t=session.time??performance.now()/1e3;
       burstShots=t-burstAt>(d.fireTime??.1)*2+.05?1:burstShots+1;burstAt=t;
       if(burstShots>=d.burstCount){burstShots=0;session.fireLeft=Math.max(session.fireLeft,(d.fireTime??.1)+d.burstDelay);}}
+    // belt fed (def.beltFed, the Akita's akimbo pair): every shot feeds a round from the reserve into the gun that fired, so it never reloads
+    if(ok&&d?.beltFed&&w&&w.reserve>0&&w.mag<d.clipSize){w.reserve--;w.mag++;if(d.dualWield&&session.hand==='left')w.magL=(w.magL??0)+1;}
     return ok;};
+  // the fabricator: no manual reload while its magazine prints
+  const reload0=session.reload.bind(session);
+  session.reload=(...a)=>session.def?.fabricator?false:reload0(...a);
+  let lastT=null;
+  host.on('update',()=>{
+    const d=session.def,w=session.weapon,t=now(),dt=Math.min(.1,Math.max(0,t-(lastT??t)));lastT=t;
+    if(heat>0&&t-lastShot>.25)heat=Math.max(0,heat-.65*dt);
+    if(d?.fabricator&&w&&w.reserve>0&&w.mag<d.clipSize&&t-lastShot>1){printAcc+=20*dt;while(printAcc>=1&&w.reserve>0&&w.mag<d.clipSize){printAcc--;w.reserve--;w.mag++;}}
+    hud(d);});
+  // the heat bar under the crosshair (plain fills: no new blur or shadow radii, CLAUDE.md HUD paint warm-up)
+  const bar=document.createElement('div'),fill=document.createElement('div');
+  bar.style.cssText='position:fixed;left:50%;top:calc(50% + 46px);width:120px;height:5px;margin-left:-60px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.25);pointer-events:none;display:none;z-index:5';
+  fill.style.cssText='height:100%;width:0;background:#ffb030';bar.appendChild(fill);document.body.appendChild(bar);
+  let shown=false,warm=false;
+  function hud(d){const on=warm||(!!d?.overheat&&heat>0.01);if(on!==shown){shown=on;bar.style.display=on?'block':'none';}
+    if(on){const locked=now()<lockUntil;fill.style.width=(warm?60:Math.round(heat*100))+'%';fill.style.background=locked?'#ff3b2a':'#ffb030';}}
+  host.on('warmHud',on=>{warm=!!on;hud(session.def);});
+  function chargeCue(d){const ctx=audio.ctx,out=audio.master;if(!ctx||!out)return;   // the charge: a short rising whine
+    const o=ctx.createOscillator(),g=ctx.createGain(),t=ctx.currentTime,len=d.chargeTime??.25;o.type='sawtooth';
+    o.frequency.setValueAtTime(320,t);o.frequency.exponentialRampToValueAtTime(1400,t+len);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.06,t+len*.8);g.gain.linearRampToValueAtTime(0,t+len+.05);
+    o.connect(g).connect(out);o.start(t);o.stop(t+len+.06);}
+  function ventCue(){const ctx=audio.ctx,out=audio.master;if(!ctx||!out)return;   // the overheat: a burst of high-passed noise
+    const n=ctx.createBuffer(1,ctx.sampleRate*.9,ctx.sampleRate),c=n.getChannelData(0);for(let i=0;i<c.length;i++)c[i]=(Math.random()*2-1)*(1-i/c.length);
+    const src=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();src.buffer=n;f.type='highpass';f.frequency.value=2500;g.gain.value=.35;src.connect(f).connect(g).connect(out);src.start();}
   const shoot0=view.shoot.bind(view);
   view.shoot=(o={})=>{shoot0(o);if(!rechamberNext)return;rechamberNext=false;
     const r=view.rig,k=o.ads&&r?.actions?.adsRechamberAnim?'adsRechamberAnim':'rechamberAnim';

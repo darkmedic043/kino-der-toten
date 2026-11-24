@@ -118,7 +118,7 @@ export function grantWeaponXp(cat,def,id,profile,amount){
 }
 
 const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','pellets','pelletSpread','pierce','adsRecoilScale','explosionRadius','projectileSpeed','suppressed','automatic','fireType','attachments','attachment','mounted','clipLeft','fireTimeLeft','thunderRange','thunderCone','noSelfSplash',
-  'projectileType','projectileModel','projectileSpeedUp','projectileLifetime','fuseTime','explosionInnerDamage','explosionOuterDamage','rechamberTime','incendiary','backlash',   // BO7 fire mods and ammo (mods/bo7-rips)
+  'projectileType','projectileModel','projectileSpeedUp','projectileLifetime','fuseTime','explosionInnerDamage','explosionOuterDamage','rechamberTime','incendiary','backlash','chargeTime','beltFed','overheat','overheatLock','fabricator',   // BO7 fire mods, ammo and kits (mods/bo7-rips)
   'animations','raiseTime','dropTime','sprintInTime','sprintLoopTime','sprintOutTime','reloadStartTime','reloadEndTime'];   // the last row: attachments with their own clips (attachClips)
 function snapshot(obj){if(!pristine.has(obj)){const s={};for(const k of STAT_FIELDS)s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);pristine.set(obj,s);}return pristine.get(obj);}
 function restore(obj){const s=snapshot(obj);for(const k of STAT_FIELDS){if(s[k]===undefined)delete obj[k];else obj[k]=structuredClone(s[k]);}}
@@ -233,7 +233,7 @@ export function applyAttachments(cat,weapons,profile){
   for(const [id,def] of Object.entries(weapons)){
     if(!def||typeof def!=='object')continue;
     restore(def);restoreLook(def);if(def.upgrade){restore(def.upgrade);restoreLook(def.upgrade);}
-    const ids=equipped(cat,def,weapons[def.progressAs]?def.progressAs:id,profile);   // a gun's other form wears its attachments (the Zap Guns, the Wave Gun's)
+    const ids=[...equipped(cat,def,weapons[def.progressAs]?def.progressAs:id,profile),...(def.builtInAtts??[]).filter(a=>cat.attachments.some(x=>x.id===a))];   // other forms wear the gun's (the Zap Guns); builtInAtts: always fitted (the DS20 Mirage's launcher)
     if(!ids.length)continue;
     const list=ids.map(a=>cat.attachments.find(x=>x.id===a));
     wearLook(def,list);if(def.upgrade)wearLook(def.upgrade,list);

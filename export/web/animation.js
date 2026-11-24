@@ -198,7 +198,7 @@ export class ViewWeapon {
   shoot({ads=false,empty=false,hand='right'}={}){
     if(!this.ready||this.meleeLeft>0)return;
     let key=ads?(empty?'adsLastShotAnim':'adsFireAnim'):(empty?'lastShotAnim':'fireAnim');
-    const r=this.rig,speed=k=>this.def.dualWield&&this.def.dualFireTime?this.clipSpeed(k,this.def.dualFireTime):1;
+    const r=this.rig,speed=k=>this.def.dualWield&&this.def.dualFireTime?this.clipSpeed(k,this.def.dualFireTime):this.def.fireClipTime?Math.max(1,this.clipSpeed(k,this.def.fireClipTime)):1;   // fireClipTime: a bolt/pump clip sped up to the gun's rate
     if(hand==='left'&&this.leftBones){   // the left gun's own slot; a clip holding both guns (sprint) gives way to the idle
       const lk=empty&&r.actions['L:lastShotAnim']?'L:lastShotAnim':'L:fireAnim';if(!r.actions[lk])return;
       if(this.leftCover.has(r.current)){r.play('idleAnim',true,1,0);this.mode='idle';}
@@ -240,6 +240,7 @@ export class ViewWeapon {
       if(this.meleeRoot){this.meleeRoot.visible=false;this.root.visible=true;}}
     if(this.mode==='reload'&&!reloading)this.mode='idle';
     if(['fire','raise','sprintOut'].includes(this.mode)&&finished)this.mode='idle';
+    if(this.mode==='sprintOut'){this.sprintOutT=(this.sprintOutT??0)+dt;if(ads&&this.sprintOutT>=(this.def.sprintToFire??.22)){this.mode='idle';this.rig.play(empty&&this.rig.actions.emptyIdleAnim?'emptyIdleAnim':'idleAnim',true,1,.15);}}else this.sprintOutT=0;   // ADS cuts a long sprint-out clip (BO7's run .84 s) after the sprint-to-fire time
     if(this.mode==='sprintIn'&&finished){this.mode='sprint';this.rig.play(sprintKey('Loop'),true,this.clipSpeed(sprintKey('Loop'),this.def.sprintLoopTime),.04);}
     if(['idle','fire'].includes(this.mode)&&sprint){this.mode='sprintIn';if(!this.rig.play(sprintKey('In'),false,this.clipSpeed(sprintKey('In'),this.def.sprintInTime),.06)){this.mode='sprint';this.rig.play(this.rig.actions[sprintKey('Loop')]?sprintKey('Loop'):'idleAnim');}}
     if(['sprint','sprintIn'].includes(this.mode)&&!sprint){this.mode='sprintOut';if(!this.rig.play(sprintKey('Out'),false,this.clipSpeed(sprintKey('Out'),this.def.sprintOutTime),.04))this.mode='idle';}

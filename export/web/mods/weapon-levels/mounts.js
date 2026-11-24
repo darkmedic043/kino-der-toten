@@ -104,6 +104,16 @@ function muzzleFlash(gun,bone,part){
   TMP.multiplyMatrices(bone.matrix,part.matrix).multiply(f.matrixWorld).decompose(TV,TQ,TS);
   flash.position.copy(TV);flash.quaternion.copy(TQ);flash.updateMatrix();
 }
+// BO7 holo sights carry a second surface of the body material across the window (a dot grid drawn by the game's holo
+// shader, opaque here): hide a non-lens surface that sits inside a lens's box
+function paneHide(part){
+  const box=o=>{const P=o.geometry.attributes.position,I=o.geometry.index,b=new THREE.Box3(),v=new THREE.Vector3();if(!P)return b;const n=I?I.count:P.count;for(let k=0;k<n;k++){v.fromBufferAttribute(P,I?I.getX(k):k);b.expandByPoint(v);}return b;};
+  const ms=[];part.traverse(o=>{if(o.isMesh&&o.visible&&/sat_/.test(o.material?.name??''))ms.push(o);});
+  const lens=ms.filter(o=>o.material.name.startsWith('reflex_lens'));if(!lens.length)return;
+  const lb=lens.map(box).map(b=>b.expandByScalar(Math.max(.05,b.getSize(new THREE.Vector3()).length()*.08)));
+  const body=ms.filter(o=>!lens.includes(o)).map(o=>[o,box(o)]).sort((a,b)=>b[1].getSize(new THREE.Vector3()).length()-a[1].getSize(new THREE.Vector3()).length());
+  for(const [o,b] of body.slice(1))if(!b.isEmpty()&&lb.some(l=>l.containsBox(b)))o.visible=false;
+}
 export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>true,{mirror=false}={}){
   if(!gun)return;
   syncTagGroups(gun,def,mirror);
@@ -124,7 +134,9 @@ export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>t
     if(m.offset)for(let i=0;i<3;i++)part.matrix.elements[12+i]+=m.offset[i];   // a gun without the part's tag: placed off another bone (AW red dots)
     part.traverse(o=>{if(!o.isMesh)return;o.frustumCulled=false;const mm=o.material=o.material.clone(),n=mm.name??'';
       if(/reticle|_ret1$|reflex_ret$/.test(n))o.visible=false;
-      else if(/lens|eotech_ret$/.test(n)){mm.name='reflex_lens '+n;Object.assign(mm,{transparent:true,depthWrite:false,opacity:.12,roughness:.05,metalness:0});o.renderOrder=2;}});
+      else if(/lens|eotech_ret$|^mtl_sat_.*(_trans|_glass)$/.test(n)){mm.name='reflex_lens '+n;Object.assign(mm,{transparent:true,depthWrite:false,opacity:.12,roughness:.05,metalness:0});o.renderOrder=2;
+        if(/^(mtl_|att_)?sat_/.test(n)){for(const k of ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap'])mm[k]=null;mm.color?.setRGB(.55,.7,.75);mm.emissive?.setRGB(0,0,0);mm.opacity=/scope_lens_reflection|holo_screen/.test(n)?.03:.05;}}});   // BO7 glass: its maps are the lens shader's masks (a grid on the holo screen), drawn as clear tinted glass
+    paneHide(part);
     part.userData.mountId=mid;bone.add(part);gun.userData.mounts.push(part);
     if(def?.flashFollowsMuzzle&&/^tag_(silencer|flash)/.test(m.tag))muzzleFlash(gun,bone,part);
   }

@@ -94,7 +94,7 @@ export class Session {
   }
   update(dt){
     if(this.phase==='gameover')return;
-    this.time+=dt;this.fireLeft=Math.max(0,this.fireLeft-dt);this.fireLeftL=Math.max(0,(this.fireLeftL??0)-dt);this.meleeLeft=Math.max(0,this.meleeLeft-dt);
+    this.time+=dt;this.fireOver=this.fireLeft>0?Math.max(0,dt-this.fireLeft):0;this.fireOverL=(this.fireLeftL??0)>0?Math.max(0,dt-this.fireLeftL):0;this.fireLeft=Math.max(0,this.fireLeft-dt);this.fireLeftL=Math.max(0,(this.fireLeftL??0)-dt);this.meleeLeft=Math.max(0,this.meleeLeft-dt);   // fireOver: how far into this frame the gun came ready (fire() takes it off the next wait, so a held trigger keeps the gun's real rate between frames)
     this.drops.observe(this);
     if(this.drinking){this.drinkLeft=Math.max(0,this.drinkLeft-dt);if(!this.drinkLeft){this.perks.add(this.drinking);this.drinking=null;this.health=this.maxHealth;}}
     let reloadDt=dt;
@@ -107,7 +107,7 @@ export class Session {
   fire(){
     if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||(this.reloadLeft>0&&!this.reloadSpares(this.hand))||this.fireLeft>0||this.handMag()===0)return false;
     if(this.hand==='left'&&this.def.dualWield)this.weapon.magL--;
-    this.weapon.mag--;this.shots++;this.fireLeft=(this.hand==='left'&&this.def.dualWield&&this.def.fireTimeLeft||this.def.fireTime)*(firesBoth(this.def)?2:1)/(this.perks.has('specialty_rof')?1.33:1);return true;
+    this.weapon.mag--;this.shots++;const ft=(this.hand==='left'&&this.def.dualWield&&this.def.fireTimeLeft||this.def.fireTime)*(firesBoth(this.def)?2:1)/(this.perks.has('specialty_rof')?1.33:1);this.fireLeft=ft-Math.min(this.fireOver??0,ft*.5);this.fireOver=0;return true;
   }
   // rounds in one gun of a dual pair (the whole mag otherwise)
   handMag(hand=this.hand){const m=dualMags(this.weapon,this.def);return m?m[hand==='left'?'left':'right']:this.weapon.mag;}
@@ -115,8 +115,8 @@ export class Session {
   // mods that wrap it (fire-rate boosts adjust fireLeft after a shot) time that gun.
   fireHand(hand){
     if(hand!=='left'||!this.def.dualWield)return this.fire();
-    this.hand='left';[this.fireLeft,this.fireLeftL]=[this.fireLeftL??0,this.fireLeft];
-    try{return this.fire();}finally{this.hand='right';[this.fireLeft,this.fireLeftL]=[this.fireLeftL,this.fireLeft];}
+    this.hand='left';[this.fireLeft,this.fireLeftL]=[this.fireLeftL??0,this.fireLeft];[this.fireOver,this.fireOverL]=[this.fireOverL??0,this.fireOver??0];
+    try{return this.fire();}finally{this.hand='right';[this.fireLeft,this.fireLeftL]=[this.fireLeftL,this.fireLeft];[this.fireOver,this.fireOverL]=[this.fireOverL,this.fireOver];}
   }
   reload(){
     if(this.phase==='gameover'||this.phase==='reviving'||this.drinking||this.meleeLeft>0||this.reloadLeft>0||this.weapon.reserve<=0||this.weapon.mag>=this.def.clipSize)return false;

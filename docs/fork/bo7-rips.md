@@ -324,13 +324,51 @@ The BO7 HUD dial draws the gun's world model, and so do third person, the Myster
   `_rec` name's folder without the suffix when it exists. Upright models (melees) are laid on their side in the icon.
 Check: `scratch/bo7/thumbraw.mjs` (`RAW=1` = bind, no hideTags), `thumbcol.mjs` (one colour per mesh), `icons.js` with `DESK=1`.
 
-## Stock at the hip (fixed 2026-11-24, user: "some guns still show this back part")
+## Stock at the hip and the arm's cut end (2026-11-24)
 
-BO7's own hip poses run the stock past the cheek (M8A1: the stock 1-6 units under the eye, up to 0.6 behind the camera), so at our
-64° view its back end filled the bottom right corner. `mod.js` sets `stockClear .14` on every gun except pistols, melees, akimbo pairs
-and launchers (they sit on the shoulder); the movement mod turns the gun down about the left hand at the hip by that much
-(movement.md, Stock clear). Checked in Sandbox as Venator: M8A1, AK-27, CBRS-3, VS Recon, Pistol (no turn) at hip, ADS (unchanged)
-and sprint; hip sweep of LMG, shotguns, SMGs, sniper, crossbow, launchers.
+The user's "some guns still show this back part" (M8A1 at the hip) was first read as the stock: BO7's hip poses run the stock
+past the cheek, so commit 77ad404 added `def.stockClear` (fp.js: turn the gun down about the support hand at the hip, the least
+angle that clears what is within 10 units of the camera) at .14 on all long guns. That pointed most guns up at the hip (user:
+"certain guns begin to aim up", the Echo 12), and the blob was still there. **`mod.js` no longer sets `stockClear`**: the mechanism
+stays in fp.js, unused (BO7 itself shows the stock in the bottom right corner; reference frames `scratch/bo7/ref/`).
+The blob was the **cut end of Venator's upper arm** (operators with their own model, `fpArmsRetarget`): his arm is sized by his
+palm and is shorter than BO7's rig arm, whose shoulder sits only about 10 units under the camera, so the elbow half of his upper
+arm ended in the bottom left of the frame. Fixed in `fp-arms.js` (characters.md, Upper-arm stretch). The default character hides
+it: test arms as Venator (`scratch/bo7/venator-init.js`).
+
+## Special mechanics (2026-11-24)
+
+The user asked for every gun's fire mode, rpm, mag and reload to be checked against BO7's real data. `FIX` in
+`build_bo7_rips.py` holds the rates that differ from the dump or the clips (source: CODMunity's launch records):
+- `rpm`: Aden 48, Coral 56, Drake 43, Caspian 86, Corso 75, Hades (MK.78) 480 (the dump had Warzone's 652), Hildr 408, Oman 308.
+  A bolt or pump clip longer than the shot interval plays faster to fit (`fireClipTime`, animation.js `shoot`).
+- `burstDelay`: the pause after a burst, fitted so that n shots plus the pause give the gun's effective rate.
+- `rules.js` carries the frame's leftover time into the next shot (`fireOver`/`fireOverL`, at most half a shot), so guns faster than
+  the frame rate keep their rpm.
+
+`mod.js` handles:
+- **XR-3 Ion** (baltic, `chargeTime .25`, `automatic`): each pull charges, then fires a burst. Held, it fires a burst about every
+  0.525 s. Let go mid-charge and the charge starts over. A rising whine plays while it charges.
+- **MK.78 Heatshield belt** (`overheat`, kit `b7_mag_heatshield`): every shot adds 1/overheat of the heat. When full, the gun locks
+  for `overheatLock` s. It cools 0.25 s after the last shot, at 65% a second. A plain heat bar sits under the crosshair (shown in
+  `warmHud`), and a vent hiss plays.
+- **Carbon 57 Fabricator Mag** (`fabricator`, kit `b7_mag_fabricator`): no manual reload. A second after the last shot it prints
+  reserve rounds back into the magazine, 20 a second.
+- **DS20 Mirage** (vulture): its launcher is part of the gun (`BUILTIN_UBGL`, `def.builtInAtts`). It is always fitted, with no unlock
+  and no separate launcher model, and the Gunsmith shows it as built in.
+- **Akita akimbo** (`AKIMBO_EXTRA`, also the Kogot-7): the dump has no Akimbo unlock for them, but the clips exist, so the pair is
+  built anyway. The Akita's pair is belt fed (`beltFed`): every shot feeds a round from the reserve, so it never reloads.
+
+Animation fixes in `animation.js`:
+- **Sprint to ADS**: sprint-out is cut short when aiming, after `def.sprintToFire` (default .22 s). Before, the aim and the clip
+  drifted apart.
+
+Sight fix in `mounts.js`:
+- **Holo sights**: these carry a second body-material surface across the window (BO7 draws it with a holo shader; here it was
+  opaque). It is now hidden when it lies inside a lens's box.
+
+Checked: every gun fired a full magazine and reloaded in Sandbox (`scratch/bo7/`).
+Left as they are, because they match BO7: the TR51, the Sokol, the A.R.C. M1, the AAROW, and the Gremlin's 52-round magazine.
 
 ## Known limits / next
 
