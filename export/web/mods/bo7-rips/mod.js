@@ -1,20 +1,54 @@
 // Black Ops 7 guns from the user's own rips (.tools/build_bo7_rips.py; docs/fork/bo7-rips.md). The build writes
 // weapons.json (defs + sound lists); everything it points at is git-ignored. This adds the guns to the Mystery Box
 // and plays their own sounds: a layered shot per trigger pull, reload foley on the clips' AudioOneShot@ markers.
+import {loadModel} from '../../animation.js';
 const BASE=new URL('./',import.meta.url).href;
 let built=null;
+const VIEW_FOV=64,VIEW_OFFSET={};   // hip framing at that FOV, per weapon class (right, up, z: negative = forward), [0,0,0] if not listed
 
 export async function prepare(data){
   const r=await fetch(BASE+'weapons.json').catch(()=>null);
   if(!r?.ok){console.info('[bo7-rips] not built: run .tools/build_bo7_rips.py');return;}
   built=await r.json();
+  // lazyLoad: hd-weapons' load-time preload skips them (44 view models ran a page out of memory, 2026-11-24)
+  // ownSprint: their own walk_to_sprint / sprint_loop / sprint_to_walk clips play instead of the motion layer's pose (animation.js, fp.js)
+  // viewFov: these rigs are framed for IW's viewmodel field of view (FOV 80 on 4:3 = about 64° vertical), not BO1's 51°;
+  // drawn at 51° and pushed forward to fit, the cut ends of the sleeves showed (2026-11-24)
+  for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=true;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];}
   Object.assign(data.weapons,built.weapons);
   data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons)])];
 }
 
 export default async function setup(api){
   if(!built)return;
-  const {session,audio,view}=api;
+  const {session,audio,view,host,data,renderer,mysteryBox}=api;
+  const ours=id=>!!built.weapons[id];
+  // the viewmodel camera takes the held gun's viewFov (51° = the engine's own, BO1's); perk bottles and shields keep 51°
+  const vc=api.viewCamera,baseFov=vc?.fov??51;
+  host.on('update',()=>{if(!vc)return;const busy=api.perkDrink?.current||window.kino?.operator?.handle?.view||window.kino?.rocketShield?.view||window.kino?.knuckles?.active;
+    const f=(!busy&&view?.def?.viewFov)||baseFov;if(vc.fov!==f){vc.fov=f;vc.updateProjectionMatrix();}});
+
+  // Memory (docs/fork/bo7-rips.md, Loading): every gun in the box would load its viewmodel (~28 MB each) in the engine's
+  // weapon warm-up. One BO7 gun warms the shared shader programs; the others load when the box rolls them (prefetch(),
+  // during the spin) or when given. Guns already held stay in the warm-up.
+  host.on('warmWeapons',ids=>{
+    const held=new Set((session.inventory??[]).map(w=>w.id));let rep=null;
+    for(const id of [...ids])if(ours(id)&&!held.has(id)){rep??=id;ids.delete(id);}
+    if(rep&&![...ids].some(ours))ids.add(rep);
+  });
+  const fetched=new Set();
+  function prefetch(id){
+    const def=data.weapons[id];if(!ours(id)||!def?.model||fetched.has(id))return;fetched.add(id);
+    const urls=[def.model];
+    for(const a of globalThis.kino?.weaponLevels?.profile?.attachments?.[id]??[])if(def.mounts?.[a]?.model)urls.push(def.mounts[a].model);
+    // textures upload one a frame while the box spins, not all on the frame the gun is taken
+    Promise.all(urls.map(u=>loadModel(u).catch(()=>null))).then(models=>{
+      const tex=new Set();for(const m of models)m?.traverse(o=>{for(const mat of [o.material??[]].flat())for(const v of Object.values(mat))if(v?.isTexture)tex.add(v);});
+      const list=[...tex],step=()=>{const t=list.shift();if(!t)return;try{renderer?.initTexture?.(t);}catch{}requestAnimationFrame(step);};step();
+    });
+  }
+  if(mysteryBox?.start){const start=mysteryBox.start.bind(mysteryBox);
+    mysteryBox.start=(e,...rest)=>{const ok=start(e,...rest);if(ok){const r=mysteryBox.at(e);if(r&&!r.teddy)prefetch(r.weapon);}return ok;};}
   const S=built.sounds??{},buffers=new Map();
   const own=def=>S[def?.baseId??def?.id];
   const buffer=url=>{const ctx=audio.ctx;if(!ctx)return null;

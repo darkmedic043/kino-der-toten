@@ -285,7 +285,7 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     // hip poses: gone by the time the sights are up ((1-aim)^2: before the reflex dot shows at aim .85; it used to hang in
     // the air while the gun was still swinging in from the sprint pose or the reload tilt)
     const hp=(1-aim)*(1-aim),sb=s.sprintBlend*hp,sw=s.sprintBlend*s.bobAmp*hp;
-    if(sb>.001&&!def?.armPump){   // (the knife pumps its arms instead, below)
+    if(sb>.001&&!def?.armPump&&!def?.ownSprint){   // (the knife pumps its arms instead, below; def.ownSprint: the gun's own sprint clips play, animation.js)
       const SP=def?.dualWield?SPRINT.dual:SPRINT,rig=frame.rig,lenK=THREE.MathUtils.clamp(frame.len/32,.5,1.15)*rig;   // a pistol drops less than a rifle; a 2.2x rig is 2.2x further away
       // heavy (hv): deeper, more canted, swung across less, rocking more with each stride
       sprintQ.setFromEuler(sprintE.set(SP.rot[0]*sb*(1+hv*.5)+Math.cos(ph*2)*.025*sw*(1+hv),SP.rot[1]*sb*(1-hv*.45)+Math.sin(ph)*.05*sw,SP.rot[2]*sb*(1+hv*.6)+Math.sin(ph)*.06*sw*(1+hv*.8)));

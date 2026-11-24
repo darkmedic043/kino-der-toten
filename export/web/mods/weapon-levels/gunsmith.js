@@ -30,6 +30,7 @@ export function available(cat,def,id){
   // (the crossbow carries a scope tag its built-in optic rules out)
   const hidden=new Set((pristine.get(def)?.hideTags)??def?.hideTags??[]);
   const smith=own.length||def?.gunsmith===true||Object.keys(def?.mounts??{}).length||def?.statAttachments?.length||cat.attachments.some(a=>!a.generic&&a.tags.some(t=>hidden.has(t)));
+  if(def?.attachOrder){const o=def.attachOrder,at=a=>{const i=o.indexOf(a.id);return i<0?o.length:i;};own.sort((a,b)=>at(a)-at(b));}   // the BO7 rips: their own unlock order
   if(!smith)return own;
   const pad=def?.gunsmithPad===false?0:Math.max(0,(cat.padTo??0)-own.length);   // a gun with its own full kit opts out (the GKZ-45 Mk3)
   return pad?[...own,...cat.attachments.filter(a=>a.generic).slice(0,pad)]:own;

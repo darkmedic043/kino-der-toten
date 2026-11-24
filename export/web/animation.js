@@ -234,8 +234,8 @@ export class ViewWeapon {
     if(!this.ready)return;
     this.rig.update(dt);this.meleeRig?.update(dt);this.meleeLeft=Math.max(0,this.meleeLeft-dt);
     const action=this.rig.actions[this.rig.current],finished=!action?.isRunning();
-    // sprintPose (mods/movement/fp.js): no sprint clips; the idle grip keeps playing and the motion layer poses the sprint
-    const sprintKey=phase=>{if(this.sprintPose)return 'sprintPoseAnim';const key='sprint'+phase+(empty?'Empty':'')+'Anim';return this.rig.actions[key]?key:'sprint'+phase+'Anim';};
+    // sprintPose (mods/movement/fp.js): no sprint clips; the idle grip keeps playing and the motion layer poses the sprint (except a def.ownSprint gun: its clips play)
+    const sprintKey=phase=>{if(this.sprintPose&&!this.def?.ownSprint)return 'sprintPoseAnim';const key='sprint'+phase+(empty?'Empty':'')+'Anim';return this.rig.actions[key]?key:'sprint'+phase+'Anim';};
     if(this.mode==='melee'&&this.meleeLeft===0){for(const [k,model] of Object.entries(this.knives))model.visible=k===this.def.heldKnife;this.meleeType=null;this.mode='idle';
       if(this.meleeRoot){this.meleeRoot.visible=false;this.root.visible=true;}}
     if(this.mode==='reload'&&!reloading)this.mode='idle';

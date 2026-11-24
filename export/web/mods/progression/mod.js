@@ -21,7 +21,8 @@ export default async function setup(api){
 
   // The menu may have changed the profile in another tab; re-read on focus.
   let profile=loadProfile();
-  addEventListener('focus',()=>{if(!api.getState().started){profile=loadProfile();renderMenu();renderHud();}});
+  let menuReady=false;   // focus can fire during setup's await (alt-tab while loading): renderMenu needs the panel below
+  addEventListener('focus',()=>{if(menuReady&&!api.getState().started){profile=loadProfile();renderMenu();renderHud();}});
   let saveTimer=0;
   // Weapon XP and attachments belong to the weapon-levels mod, which saves them
   // itself; take the stored ones so this (older) copy never overwrites them.
@@ -134,7 +135,7 @@ export default async function setup(api){
       <a class="edit" href="./">Main menu · change loadout</a>`;
   }
   panel.addEventListener('click',e=>e.stopPropagation());
-  renderMenu();
+  renderMenu();menuReady=true;
 
   window.kino.progression={get profile(){return profile;},grant,save,reset:()=>{localStorage.removeItem('kino.mods.progression');location.reload();}};
 }

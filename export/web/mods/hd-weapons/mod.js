@@ -69,7 +69,7 @@ export default async function setup(api){
   const coarse=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches;
   if(!coarse){
     const t0=performance.now();
-    const ids=[...new Set([...(api.session.inventory??[]).map(w=>w.id),...wallbuys.map(w=>w.id),...(data.boxPool??Object.keys(mysteryBox?.models??{}))])].filter(id=>data.weapons[id]);
+    const ids=[...new Set([...(api.session.inventory??[]).map(w=>w.id),...wallbuys.map(w=>w.id),...(data.boxPool??Object.keys(mysteryBox?.models??{})).filter(id=>!data.weapons[id]?.lazyLoad)])].filter(id=>data.weapons[id]);   // lazyLoad box guns (bo7-rips: 44 view models) load when rolled (line below: queue on a spin)
     // every model download starts now; the batches below compile and register them as they land, moving the loading
     // bar (this was one 8-9 s step of the 'Loading mods' stage on the host, 2026-10-29)
     const allDefs=ids.flatMap(id=>{const d=data.weapons[id];return [d,d.upgrade?{...d,...d.upgrade}:null].filter(Boolean);});

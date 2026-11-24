@@ -3,11 +3,13 @@
   "games": {
     "bo1": { "name": "Call of Duty: Black Ops", "logo": "games/bo1.webp" },
     "aw": { "name": "Call of Duty: Advanced Warfare", "logo": "games/aw.webp" },
-    "codol": { "name": "Call of Duty Online", "logo": "games/codol.webp" }
+    "codol": { "name": "Call of Duty Online", "logo": "games/codol.webp" },
+    "bo7": { "name": "Call of Duty: Black Ops 7", "logo": "games/bo7.webp" }
   },
   "base": "bo1",
-  "prefixes": { "aw_": "aw" },
+  "prefixes": { "aw_": "aw", "bo7_": "bo7" },
   "weapons": {
+    "bo7": ["grimhawk_zm", "siren_zm", "havoc_zm", "roc_zm", "xm325_zm"],
     "bo1": ["microwavegundw_zm", "microwavegun_zm", "minigun_zm", "freezegun_zm", "melee_knife"],
     "codol": ["bo3_mr23_tesla", "bo3_aug_octopus", "bo3_m1014_jellyfish", "bo3_p90_orbit", "bo3_g18_death", "bo3_m240_ice", "bo3_as50_rare",
       "bo3_uzi_irradiated", "bo3_93r_dystopic", "bo3_aa12_btf", "bo3_rpd_ornate", "bo3_spas12_irradiated", "bo3_mp7_flanker", "bo3_tommy_modern",

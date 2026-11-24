@@ -17,7 +17,7 @@ const mem = () => { try { const r = execSync("ps -C chrome -o rss=,args=").toStr
   return [Math.round(Math.max(0, ...r.filter(x => x[1]).map(x => x[0]))), Math.round(r.reduce((a, x) => a + x[0], 0))]; } catch { return [0, 0]; } };
 // A profile kept between runs (scratch/lite/profile): the map's navmesh stays in its IndexedDB, so only a map's first run
 // builds it (the build is the load's memory peak: the castle's needs FIRST=1, which lifts the renderer limit to 3300 MB once).
-const b = await chromium.launchPersistentContext('scratch/lite/profile', { executablePath: process.env.HOME + '/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome', args: ['--use-angle=vulkan', '--enable-gpu', '--ignore-gpu-blocklist', '--disk-cache-size=1048576', '--js-flags=--expose-gc', ...(process.env.UNCAP ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : [])], viewport: { width: 640, height: 360 }, ...(process.env.DESK ? {} : { hasTouch: true, isMobile: true }) });
+const b = await chromium.launchPersistentContext('scratch/lite/profile', { executablePath: process.env.HOME + '/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome', args: ['--use-angle=vulkan', '--enable-gpu', '--ignore-gpu-blocklist', '--disk-cache-size=1048576', '--js-flags=--expose-gc', ...(process.env.UNCAP ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : [])], viewport: { width: +(process.env.VW || 640), height: +(process.env.VH || 360) }, ...(process.env.DESK ? {} : { hasTouch: true, isMobile: true }) });
 const net = new Map();
 let code = 0, label = '', peak = [0, 0], stopped = false, model = 'real'; const closers = [], t0 = Date.now(), secs = () => ((Date.now() - t0) / 1000).toFixed(0);
 let gcIv = null, over = 0; const HOLD = +(process.env.HOLD || 6), HARD = +(process.env.HARD || (process.env.FIRST ? 3600 : 3000));
@@ -41,8 +41,9 @@ try {
     if (useLite && rel.startsWith('tex/')) { if (fs.existsSync(path.join(`scratch/lite/${MAP}`, rel))) { served++; return r.continue({ url: base + rel }); } missed++; }
     r.continue(); });
   // every image decoded at 16 px (weapons, zombies, the HUD's models): full-size bitmaps of every gun alone cost 2-3 GB (performance.md)
-  if (!process.env.REAL) await p.addInitScript(() => { const cib = globalThis.createImageBitmap, tiny = { resizeWidth: 16, resizeHeight: 16 };
-    globalThis.createImageBitmap = (src, ...a) => a.length > 1 ? cib(src, ...a.slice(0, 4), { ...a[4], ...tiny }) : cib(src, { ...a[0], ...tiny }); });
+  // KEEPIMG=<regex>: once the PLAY script sets globalThis.__keepImg, images whose blob type matches stay full size (KEEPIMG=webp: the BO7 rips' textures of a gun given after the load, for a look check)
+  if (!process.env.REAL) await p.addInitScript(keep => { const cib = globalThis.createImageBitmap, tiny = { resizeWidth: 16, resizeHeight: 16 }, re = keep && new RegExp(keep);
+    globalThis.createImageBitmap = (src, ...a) => re && globalThis.__keepImg && re.test(src?.type ?? '') ? cib(src, ...a) : a.length > 1 ? cib(src, ...a.slice(0, 4), { ...a[4], ...tiny }) : cib(src, { ...a[0], ...tiny }); }, process.env.KEEPIMG || '');
   // decoded sounds are the next biggest part of the base game's load: every sound becomes 0.1 s of silence (AUDIO=1 keeps them)
   if (!process.env.REAL && !process.env.AUDIO) await p.addInitScript(() => { for (const C of [globalThis.AudioContext, globalThis.OfflineAudioContext, globalThis.BaseAudioContext]) { if (!C?.prototype?.decodeAudioData || C.prototype.decodeAudioData.tiny) continue;
     const f = function (buf, ok, err) { const b = this.createBuffer(1, 2205, 22050); ok?.(b); return Promise.resolve(b); }; f.tiny = true; C.prototype.decodeAudioData = f; } });
@@ -55,7 +56,7 @@ try {
     if (rend) o.r = ticks(`/proc/${rend.pid}/task/${rend.pid}/stat`); if (gpu) o.g = ticks(`/proc/${gpu.pid}/stat`); } catch (e) { o.err = String(e).slice(0, 80); } return o; });
   if (process.env.INIT) await p.addInitScript(fs.readFileSync(process.env.INIT, 'utf8'));   // INIT=<file>: a script run in the page before the game's own (a stand-in for a system the test page lacks)
   await p.goto('http://127.0.0.1:5190/');
-  await p.evaluate(([q, rs]) => { localStorage.clear(); const s = {}; s.graphics = q; s.renderScale = rs; localStorage.setItem('kino.settings', JSON.stringify(s)); }, [Q, +(process.env.RS || .5)]);
+  await p.evaluate(([q, rs, SET]) => { localStorage.clear(); const s = {}; s.graphics = q; s.renderScale = rs; Object.assign(s, JSON.parse(SET)); localStorage.setItem('kino.settings', JSON.stringify(s)); }, [Q, +(process.env.RS || .5), process.env.SET || '{}']);
   await p.goto('http://127.0.0.1:5190/play.html?map=' + MAP + (process.env.QS ? '&' + process.env.QS : ''));
   // NET=1: what the page downloads, by folder and 5 s slice (MB), and every file over 8 MB: shows which step a memory peak belongs to
   if (process.env.NET) p.on('response', r => { const n = +(r.headers()['content-length'] || 0), u = new URL(r.url()), k = `${String(Math.floor(secs() / 5) * 5).padStart(3)} s ${u.pathname.split('/').slice(1, 3).join('/')}`;

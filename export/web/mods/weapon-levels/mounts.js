@@ -71,8 +71,39 @@ export const beamWarm=()=>{const m=new THREE.Mesh(beamGeometry(),beamMaterial(BE
 // lists of live objects in userData copy as [] (three's Object3D.copy JSON-copies userData: a clone of the hands rig with
 // the gun on it, fp-arms.js ArmSetArms, serialised the parts' textures and threw on their released images, 2026-11-18)
 const live=()=>Object.defineProperty([],'toJSON',{value:()=>[]});
+// Guns with swappable parts inside the model (BO7 rips, def.tagGroups; docs/fork/bo7-rips.md): a part's bones are named
+// <head>__<bone> and hang from the bones the clips move, so they follow the head's hide state here, after the
+// engine and the Gunsmith hid def.hideTags; a hidden part's meshes (materials <head>~...) stop drawing. def.tagMoves
+// {head:{tag:[x,y,z,qx,qy,qz,qw]}} put the gun's own tags where a fitted part has them (the muzzle on a longer barrel),
+// def.tagRest puts them back.
+const TAGS=new WeakMap(),TMP=new THREE.Matrix4(),TV=new THREE.Vector3(),TQ=new THREE.Quaternion(),TS=new THREE.Vector3();
+export function syncTagGroups(gun,def){
+  if(!gun||!def?.tagGroups)return;
+  let by=TAGS.get(gun);if(!by){by=new Map();gun.traverse(o=>{if(o.isBone&&!by.has(o.name))by.set(o.name,o);});TAGS.set(gun,by);}   // first call: before any part is mounted
+  const shown=h=>{const b=by.get(h);return !b||b.scale.x>1e-3;};
+  // the heads themselves (b7_base_<slot>, b7_<slot>_<kind>): straight from the def, since a cached viewmodel keeps the
+  // last loadout's scales and the engine only hides tags when it builds one
+  const hide=new Set(def.hideTags??[]);
+  for(const [n,b] of by)if(n.startsWith('b7_')&&!n.includes('__'))b.scale.setScalar(hide.has(n)?1e-6:1);
+  for(const [n,b] of by){const i=n.indexOf('__');if(i>0)b.scale.setScalar(shown(n.slice(0,i))?1:1e-6);}
+  gun.traverse(o=>{if(!o.isMesh)return;const i=(o.material?.name??'').indexOf('~');if(i>0)o.visible=shown(o.material.name.slice(0,i));});
+  const put=(n,v)=>{const b=by.get(n);if(b&&v){b.position.set(v[0],v[1],v[2]);b.quaternion.set(v[3],v[4],v[5],v[6]);b.updateMatrix();}};
+  const fl=by.get('tag_flash');if(fl?.userData.rest)put('tag_flash',fl.userData.rest);   // a muzzle moved it last time
+  for(const [n,v] of Object.entries(def.tagRest??{}))put(n,v);
+  for(const [h,list] of Object.entries(def.tagMoves??{}))if(by.get(h)&&shown(h))for(const [n,v] of Object.entries(list))put(n,v);
+}
+// def.flashFollowsMuzzle: a mounted muzzle's own flash bone moves the gun's tag_flash out to its end (tracers, flash)
+function muzzleFlash(gun,bone,part){
+  let f=null;part.traverse(o=>{if(!f&&o.isBone&&/^tag_flash/.test(o.name))f=o;});
+  const flash=gun.getObjectByName('tag_flash');if(!f||!flash||flash.parent!==bone.parent)return;
+  // f.matrixWorld is still in the part's own space (updated before part.matrix was set), part.matrix takes it to the bone's
+  flash.userData.rest??=[...flash.position.toArray(),...flash.quaternion.toArray()];
+  TMP.multiplyMatrices(bone.matrix,part.matrix).multiply(f.matrixWorld).decompose(TV,TQ,TS);
+  flash.position.copy(TV);flash.quaternion.copy(TQ);flash.updateMatrix();
+}
 export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>true,{mirror=false}={}){
   if(!gun)return;
+  syncTagGroups(gun,def);
   const run=gun.userData.mountRun=(gun.userData.mountRun??0)+1;   // a newer call (equip fires twice on some guns) replaces this one, or its parts stack on top
   for(const o of gun.userData.mounts??[])o.removeFromParent();gun.userData.mounts=live();gun.userData.beams=live();
   // def.fixedParts: always-on parts that are their own model (the AS50's scope), mounted the same way
@@ -92,6 +123,7 @@ export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>t
       if(/reticle|_ret1$|reflex_ret$/.test(n))o.visible=false;
       else if(/lens|eotech_ret$/.test(n)){mm.name='reflex_lens '+n;Object.assign(mm,{transparent:true,depthWrite:false,opacity:.12,roughness:.05,metalness:0});o.renderOrder=2;}});
     part.userData.mountId=mid;bone.add(part);gun.userData.mounts.push(part);
+    if(def?.flashFollowsMuzzle&&/^tag_(silencer|flash)/.test(m.tag))muzzleFlash(gun,bone,part);
   }
   // stickers placed on attachments (mods/stickers): the parts arrive after the gun's stickers were applied
   if(gun.userData.kinoStickers)restick(gun);

@@ -2544,6 +2544,1057 @@
       "slot": "ammo",
       "tags": [],
       "desc": "Custom: a cooked zombie's burst cooks every zombie within 120 units, so a crowd goes up one after another."
+    },
+    {
+      "id": "b7_barrel_velocity",
+      "name": "Velocity Barrel",
+      "slot": "barrel",
+      "tags": [
+        "b7_barrel_velocity"
+      ],
+      "desc": "A longer barrel: 25% more range.",
+      "stats": {
+        "rangeMul": 1.25
+      },
+      "replaces": [
+        "b7_base_barrel"
+      ]
+    },
+    {
+      "id": "b7_barrel_jump",
+      "name": "Jump Barrel",
+      "slot": "barrel",
+      "tags": [
+        "b7_barrel_jump"
+      ],
+      "desc": "A short barrel: tighter hip fire, 10% less range.",
+      "stats": {
+        "hipSpreadMul": 0.85,
+        "rangeMul": 0.9
+      },
+      "replaces": [
+        "b7_base_barrel"
+      ]
+    },
+    {
+      "id": "b7_barrel_range",
+      "name": "Long Range Barrel",
+      "slot": "barrel",
+      "tags": [
+        "b7_barrel_range"
+      ],
+      "desc": "The longest barrel: 35% more range and a little more damage, looser hip fire.",
+      "stats": {
+        "rangeMul": 1.35,
+        "damageMul": 1.05,
+        "hipSpreadMul": 1.1
+      },
+      "replaces": [
+        "b7_base_barrel"
+      ]
+    },
+    {
+      "id": "b7_barrel_highcal",
+      "name": "Heavy Calibre Barrel",
+      "slot": "barrel",
+      "tags": [
+        "b7_barrel_highcal"
+      ],
+      "desc": "A heavy barrel: 12% more damage and 10% more on headshots.",
+      "stats": {
+        "damageMul": 1.12,
+        "headMul": 1.1
+      },
+      "replaces": [
+        "b7_base_barrel"
+      ]
+    },
+    {
+      "id": "b7_barrel_mixbarrel",
+      "name": "Balanced Barrel",
+      "slot": "barrel",
+      "tags": [
+        "b7_barrel_mixbarrel"
+      ],
+      "desc": "An all-rounder: 15% more range, tighter hip fire.",
+      "stats": {
+        "rangeMul": 1.15,
+        "hipSpreadMul": 0.9
+      },
+      "replaces": [
+        "b7_base_barrel"
+      ]
+    },
+    {
+      "id": "b7_barrel_recoil",
+      "name": "Recoil Barrel",
+      "slot": "barrel",
+      "tags": [
+        "b7_barrel_recoil"
+      ],
+      "desc": "A ported barrel: 15% less aimed recoil.",
+      "stats": {
+        "adsRecoilScale": 0.85
+      },
+      "replaces": [
+        "b7_base_barrel"
+      ]
+    },
+    {
+      "id": "b7_barrel_sprintout",
+      "name": "CQB Barrel",
+      "slot": "barrel",
+      "tags": [
+        "b7_barrel_sprintout"
+      ],
+      "desc": "A stubby barrel: much tighter hip fire, 15% less range.",
+      "stats": {
+        "hipSpreadMul": 0.8,
+        "rangeMul": 0.85
+      },
+      "replaces": [
+        "b7_base_barrel"
+      ]
+    },
+    {
+      "id": "b7_barrel_reload",
+      "name": "Quick Barrel",
+      "slot": "barrel",
+      "tags": [
+        "b7_barrel_reload"
+      ],
+      "desc": "A light barrel: 10% faster reloads.",
+      "stats": {
+        "reloadMul": 0.9
+      },
+      "replaces": [
+        "b7_base_barrel"
+      ]
+    },
+    {
+      "id": "b7_mag_extmag",
+      "name": "Extended Mag",
+      "slot": "mag",
+      "tags": [
+        "b7_mag_extmag"
+      ],
+      "desc": "A third more rounds per magazine; reloads slightly slower.",
+      "stats": {
+        "clipMul": 1.33,
+        "reloadMul": 1.08
+      },
+      "replaces": [
+        "b7_base_mag"
+      ]
+    },
+    {
+      "id": "b7_mag_extmag2",
+      "name": "Extended Mag II",
+      "slot": "mag",
+      "tags": [
+        "b7_mag_extmag2"
+      ],
+      "desc": "Two thirds more rounds per magazine; reloads slower.",
+      "stats": {
+        "clipMul": 1.67,
+        "reloadMul": 1.18
+      },
+      "replaces": [
+        "b7_base_mag"
+      ]
+    },
+    {
+      "id": "b7_mag_fastmag",
+      "name": "Fast Mag",
+      "slot": "mag",
+      "tags": [
+        "b7_mag_fastmag"
+      ],
+      "desc": "A slick magazine: 20% faster reloads.",
+      "stats": {
+        "reloadMul": 0.8
+      },
+      "replaces": [
+        "b7_base_mag"
+      ]
+    },
+    {
+      "id": "b7_mag_flipmag",
+      "name": "Flip Mag",
+      "slot": "mag",
+      "tags": [
+        "b7_mag_flipmag"
+      ],
+      "desc": "Two mags taped together: 25% faster reloads.",
+      "stats": {
+        "reloadMul": 0.75
+      },
+      "replaces": [
+        "b7_base_mag"
+      ]
+    },
+    {
+      "id": "b7_mag_fastmag2",
+      "name": "Fast Mag II",
+      "slot": "mag",
+      "tags": [
+        "b7_mag_fastmag2"
+      ],
+      "desc": "A pull-tab magazine: 35% faster reloads.",
+      "stats": {
+        "reloadMul": 0.65
+      },
+      "replaces": [
+        "b7_base_mag"
+      ]
+    },
+    {
+      "id": "b7_mag_beltfed",
+      "name": "Belt Feed",
+      "slot": "mag",
+      "tags": [
+        "b7_mag_beltfed"
+      ],
+      "desc": "A belt in place of the box: twice the rounds, much slower reloads.",
+      "stats": {
+        "clipMul": 2,
+        "reloadMul": 1.35
+      },
+      "replaces": [
+        "b7_base_mag"
+      ]
+    },
+    {
+      "id": "b7_mag_extmag_9x19",
+      "name": "Extended Mag (9mm)",
+      "slot": "mag",
+      "tags": [
+        "b7_mag_extmag_9x19"
+      ],
+      "desc": "Rechambered in 9mm with a longer magazine: a third more rounds.",
+      "stats": {
+        "clipMul": 1.33,
+        "reloadMul": 1.05
+      },
+      "replaces": [
+        "b7_base_mag"
+      ]
+    },
+    {
+      "id": "b7_mag_extmag2_9x19",
+      "name": "Extended Mag II (9mm)",
+      "slot": "mag",
+      "tags": [
+        "b7_mag_extmag2_9x19"
+      ],
+      "desc": "Rechambered in 9mm with a long magazine: two thirds more rounds.",
+      "stats": {
+        "clipMul": 1.67,
+        "reloadMul": 1.15
+      },
+      "replaces": [
+        "b7_base_mag"
+      ]
+    },
+    {
+      "id": "b7_mag_fastmag_9x19",
+      "name": "Fast Mag (9mm)",
+      "slot": "mag",
+      "tags": [
+        "b7_mag_fastmag_9x19"
+      ],
+      "desc": "Rechambered in 9mm: 20% faster reloads.",
+      "stats": {
+        "reloadMul": 0.8
+      },
+      "replaces": [
+        "b7_base_mag"
+      ]
+    },
+    {
+      "id": "b7_grip_mixgrip",
+      "name": "Balanced Grip",
+      "slot": "grip",
+      "tags": [
+        "b7_grip_mixgrip"
+      ],
+      "desc": "A stippled grip: tighter hip fire and 10% less aimed recoil.",
+      "stats": {
+        "hipSpreadMul": 0.9,
+        "adsRecoilScale": 0.9
+      },
+      "replaces": [
+        "b7_base_grip"
+      ]
+    },
+    {
+      "id": "b7_grip_quickdraw",
+      "name": "Quickdraw Grip",
+      "slot": "grip",
+      "tags": [
+        "b7_grip_quickdraw"
+      ],
+      "desc": "A thin grip: 15% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.85
+      },
+      "replaces": [
+        "b7_base_grip"
+      ]
+    },
+    {
+      "id": "b7_grip_quickdraw2",
+      "name": "Quickdraw Grip II",
+      "slot": "grip",
+      "tags": [
+        "b7_grip_quickdraw2"
+      ],
+      "desc": "A skeletal grip: 20% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.8
+      },
+      "replaces": [
+        "b7_base_grip"
+      ]
+    },
+    {
+      "id": "b7_grip_sprintout",
+      "name": "CQB Grip",
+      "slot": "grip",
+      "tags": [
+        "b7_grip_sprintout"
+      ],
+      "desc": "A tacky grip: 10% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.9
+      },
+      "replaces": [
+        "b7_base_grip"
+      ]
+    },
+    {
+      "id": "b7_grip_sprintout2",
+      "name": "Ergonomic Grip",
+      "slot": "grip",
+      "tags": [
+        "b7_grip_sprintout2"
+      ],
+      "desc": "A rubber grip: 5% more headshot damage.",
+      "stats": {
+        "headMul": 1.05
+      },
+      "replaces": [
+        "b7_base_grip"
+      ]
+    },
+    {
+      "id": "b7_grip_handling",
+      "name": "Handling Grip",
+      "slot": "grip",
+      "tags": [
+        "b7_grip_handling"
+      ],
+      "desc": "A rubber grip: tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.88
+      },
+      "replaces": [
+        "b7_base_grip"
+      ]
+    },
+    {
+      "id": "b7_grip_mobility",
+      "name": "Mobility Grip",
+      "slot": "grip",
+      "tags": [
+        "b7_grip_mobility"
+      ],
+      "desc": "A light grip: tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.9
+      },
+      "replaces": [
+        "b7_base_grip"
+      ]
+    },
+    {
+      "id": "b7_stock_adsmove",
+      "name": "Tactical Stock",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_adsmove"
+      ],
+      "desc": "An adjustable stock: 15% less aimed recoil.",
+      "stats": {
+        "adsRecoilScale": 0.85
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_stock_flinch",
+      "name": "Heavy Stock",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_flinch"
+      ],
+      "desc": "A padded stock: 25% less aimed recoil, looser hip fire.",
+      "stats": {
+        "adsRecoilScale": 0.75,
+        "hipSpreadMul": 1.1
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_stock_hipfiremove",
+      "name": "Light Stock",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_hipfiremove"
+      ],
+      "desc": "A skeleton stock: 20% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.8
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_stock_mixstock",
+      "name": "Balanced Stock",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_mixstock"
+      ],
+      "desc": "Tighter hip fire and 10% less aimed recoil.",
+      "stats": {
+        "adsRecoilScale": 0.9,
+        "hipSpreadMul": 0.9
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_stock_mixstock2",
+      "name": "Balanced Stock II",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_mixstock2"
+      ],
+      "desc": "A full stock: 20% less aimed recoil.",
+      "stats": {
+        "adsRecoilScale": 0.8
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_stock_moverecovery",
+      "name": "Recovery Stock",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_moverecovery"
+      ],
+      "desc": "10% less aimed recoil, tighter hip fire.",
+      "stats": {
+        "adsRecoilScale": 0.9,
+        "hipSpreadMul": 0.92
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_stock_movespeed",
+      "name": "Runner Stock",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_movespeed"
+      ],
+      "desc": "A minimal stock: 15% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.85
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_stock_quickdraw",
+      "name": "Quickdraw Stock",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_quickdraw"
+      ],
+      "desc": "A short stock: 10% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.9
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_stock_quickdraw2",
+      "name": "Quickdraw Stock II",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_quickdraw2"
+      ],
+      "desc": "A folding stock: 15% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.85
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_stock_sprintout",
+      "name": "CQB Stock",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_sprintout"
+      ],
+      "desc": "A collapsed stock: 12% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.88
+      },
+      "replaces": [
+        "b7_base_stock"
+      ]
+    },
+    {
+      "id": "b7_muzzle_suppressor",
+      "name": "Suppressor",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "Silences the gun; 10% less range.",
+      "stats": {
+        "suppressed": true,
+        "rangeMul": 0.9
+      }
+    },
+    {
+      "id": "b7_muzzle_mono_suppressor",
+      "name": "Monolithic Suppressor",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "A long can: silenced, with 10% more range.",
+      "stats": {
+        "suppressed": true,
+        "rangeMul": 1.1
+      }
+    },
+    {
+      "id": "b7_muzzle_brake",
+      "name": "Muzzle Brake",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "15% less aimed recoil, a little more range.",
+      "stats": {
+        "adsRecoilScale": 0.85,
+        "rangeMul": 1.05
+      }
+    },
+    {
+      "id": "b7_muzzle_comp",
+      "name": "Compensator",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "20% less aimed recoil.",
+      "stats": {
+        "adsRecoilScale": 0.8
+      }
+    },
+    {
+      "id": "b7_muzzle_mixmuzzle",
+      "name": "Flash Guard",
+      "slot": "muzzle",
+      "tags": [],
+      "desc": "10% less aimed recoil, a little more range.",
+      "stats": {
+        "adsRecoilScale": 0.9,
+        "rangeMul": 1.05
+      }
+    },
+    {
+      "id": "b7_laser_focuslaser",
+      "name": "Focus Laser",
+      "slot": "laser",
+      "tags": [],
+      "desc": "A small laser box: 25% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.75
+      }
+    },
+    {
+      "id": "b7_laser_hipaccuracy",
+      "name": "Hip Accuracy Laser",
+      "slot": "laser",
+      "tags": [],
+      "desc": "A wide laser: 35% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.65
+      }
+    },
+    {
+      "id": "b7_laser_strelok",
+      "name": "Strelok Laser",
+      "slot": "laser",
+      "tags": [],
+      "desc": "20% tighter hip fire and 5% more headshot damage.",
+      "stats": {
+        "hipSpreadMul": 0.8,
+        "headMul": 1.05
+      }
+    },
+    {
+      "id": "b7_laser_mixlaser",
+      "name": "Combo Laser",
+      "slot": "laser",
+      "tags": [],
+      "desc": "20% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.8
+      }
+    },
+    {
+      "id": "b7_laser_mixlaser2",
+      "name": "Combo Laser II",
+      "slot": "laser",
+      "tags": [],
+      "desc": "30% tighter hip fire.",
+      "stats": {
+        "hipSpreadMul": 0.7
+      }
+    },
+    {
+      "id": "b7_under_recoil",
+      "name": "Vertical Grip",
+      "slot": "under",
+      "tags": [],
+      "desc": "20% less aimed recoil.",
+      "stats": {
+        "adsRecoilScale": 0.8
+      }
+    },
+    {
+      "id": "b7_under_sway",
+      "name": "Angled Grip",
+      "slot": "under",
+      "tags": [],
+      "desc": "Tighter hip fire and 10% less aimed recoil.",
+      "stats": {
+        "hipSpreadMul": 0.85,
+        "adsRecoilScale": 0.9
+      }
+    },
+    {
+      "id": "b7_under_focus",
+      "name": "Short Grip",
+      "slot": "under",
+      "tags": [],
+      "desc": "15% less aimed recoil.",
+      "stats": {
+        "adsRecoilScale": 0.85
+      }
+    },
+    {
+      "id": "b7_under_mixunder",
+      "name": "Short Angled Grip",
+      "slot": "under",
+      "tags": [],
+      "desc": "Tighter hip fire and 10% less aimed recoil.",
+      "stats": {
+        "hipSpreadMul": 0.9,
+        "adsRecoilScale": 0.9
+      }
+    },
+    {
+      "id": "b7_under_mixunder2",
+      "name": "Handstop Grip",
+      "slot": "under",
+      "tags": [],
+      "desc": "15% less aimed recoil, tighter hip fire.",
+      "stats": {
+        "adsRecoilScale": 0.85,
+        "hipSpreadMul": 0.9
+      }
+    },
+    {
+      "id": "b7_ammo_fmj",
+      "name": "FMJ Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "Rounds go through the first zombie; 10% more range.",
+      "stats": {
+        "rangeMul": 1.1,
+        "pierce": 1
+      }
+    },
+    {
+      "id": "b7_ammo_velocity",
+      "name": "High Velocity Rounds",
+      "slot": "ammo",
+      "tags": [],
+      "desc": "20% more range.",
+      "stats": {
+        "rangeMul": 1.2
+      }
+    },
+    {
+      "id": "b7_optic_dualzoom01",
+      "name": "Dual Zoom",
+      "slot": "optic",
+      "tags": [],
+      "scope": "acog",
+      "desc": "A magnified scope: 10% more headshot damage.",
+      "stats": {
+        "adsFov": 30,
+        "headMul": 1.1
+      }
+    },
+    {
+      "id": "b7_optic_fourx01",
+      "name": "4× Scope",
+      "slot": "optic",
+      "tags": [],
+      "scope": "acog",
+      "desc": "A magnified scope: 10% more headshot damage.",
+      "stats": {
+        "adsFov": 30,
+        "headMul": 1.1
+      }
+    },
+    {
+      "id": "b7_optic_fourx02",
+      "name": "4× Scope Mk2",
+      "slot": "optic",
+      "tags": [],
+      "scope": "acog",
+      "desc": "A magnified scope: 10% more headshot damage.",
+      "stats": {
+        "adsFov": 30,
+        "headMul": 1.1
+      }
+    },
+    {
+      "id": "b7_optic_holo01",
+      "name": "Holographic Sight",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A holographic ring and dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_holo02",
+      "name": "Holographic Sight Mk2",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A holographic ring and dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_holo_range01",
+      "name": "Range Holo",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A holographic sight with a range readout.",
+      "stats": {
+        "adsFovMul": 0.88
+      }
+    },
+    {
+      "id": "b7_optic_hybrid01",
+      "name": "Hybrid Sight",
+      "slot": "optic",
+      "tags": [],
+      "scope": "acog",
+      "desc": "A magnified scope with a dot on top: 10% more headshot damage.",
+      "stats": {
+        "adsFov": 30,
+        "headMul": 1.1
+      }
+    },
+    {
+      "id": "b7_optic_hybrid02",
+      "name": "Hybrid Sight Mk2",
+      "slot": "optic",
+      "tags": [],
+      "scope": "acog",
+      "desc": "A magnified scope with a dot on top: 10% more headshot damage.",
+      "stats": {
+        "adsFov": 30,
+        "headMul": 1.1
+      }
+    },
+    {
+      "id": "b7_optic_microreflex01",
+      "name": "Micro Reflex",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A tiny red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_microreflex02",
+      "name": "Micro Reflex Mk2",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A tiny red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_microreflex03",
+      "name": "Micro Reflex Mk3",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A tiny red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_microreflex04",
+      "name": "Micro Reflex Mk4",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A tiny red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_microreflex05",
+      "name": "Micro Reflex Mk5",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A tiny red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_microreflex06",
+      "name": "Micro Reflex Mk6",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A tiny red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_mm_scanner01",
+      "name": "MMS Scanner",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A multi-mode scanner sight.",
+      "stats": {
+        "adsFovMul": 0.85
+      }
+    },
+    {
+      "id": "b7_optic_rangefinder01",
+      "name": "Rangefinder",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A sight with a range readout.",
+      "stats": {
+        "adsFovMul": 0.85
+      }
+    },
+    {
+      "id": "b7_optic_reflex01",
+      "name": "Reflex Sight",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_reflex02",
+      "name": "Reflex Sight Mk2",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_reflex03",
+      "name": "Reflex Sight Mk3",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_reflex04",
+      "name": "Reflex Sight Mk4",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_reflex05",
+      "name": "Reflex Sight Mk5",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_reflex06",
+      "name": "Reflex Sight Mk6",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A red dot. Slightly tighter zoom.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_scope_snpr01",
+      "name": "Sniper Scope",
+      "slot": "optic",
+      "tags": [],
+      "scope": "lps",
+      "desc": "A high magnified scope: 15% more headshot damage.",
+      "stats": {
+        "adsFov": 26,
+        "headMul": 1.15
+      }
+    },
+    {
+      "id": "b7_optic_targetfinder01",
+      "name": "Target Finder",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A boxy sight that marks targets.",
+      "stats": {
+        "adsFovMul": 0.85
+      }
+    },
+    {
+      "id": "b7_optic_thermal01",
+      "name": "Thermal Scope",
+      "slot": "optic",
+      "tags": [],
+      "scope": "ir",
+      "desc": "A thermal scope: zombies glow white.",
+      "stats": {
+        "adsFov": 28
+      }
+    },
+    {
+      "id": "b7_optic_thermal_holo01",
+      "name": "Thermal Holo",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A holographic sight with a heat-tinted glass.",
+      "stats": {
+        "adsFovMul": 0.92
+      }
+    },
+    {
+      "id": "b7_optic_thermal_scope01",
+      "name": "Thermal Sniper Scope",
+      "slot": "optic",
+      "tags": [],
+      "scope": "ir",
+      "desc": "A long thermal scope.",
+      "stats": {
+        "adsFov": 28
+      }
+    },
+    {
+      "id": "b7_optic_threex01",
+      "name": "3× Scope",
+      "slot": "optic",
+      "tags": [],
+      "scope": "acog",
+      "desc": "A magnified scope.",
+      "stats": {
+        "adsFov": 34
+      }
+    },
+    {
+      "id": "b7_optic_twox01",
+      "name": "2× Scope",
+      "slot": "optic",
+      "tags": [],
+      "scope": "reflex",
+      "desc": "A low magnified scope.",
+      "stats": {
+        "adsFovMul": 0.72
+      }
+    },
+    {
+      "id": "b7_optic_varizoom01",
+      "name": "Variable Zoom",
+      "slot": "optic",
+      "tags": [],
+      "scope": "vzoom",
+      "desc": "A long variable-zoom scope.",
+      "stats": {
+        "adsFov": 16
+      }
+    },
+    {
+      "id": "b7_optic_varizoom02",
+      "name": "Variable Zoom Mk2",
+      "slot": "optic",
+      "tags": [],
+      "scope": "vzoom",
+      "desc": "A long variable-zoom scope.",
+      "stats": {
+        "adsFov": 16
+      }
     }
   ],
   "ironSights": {

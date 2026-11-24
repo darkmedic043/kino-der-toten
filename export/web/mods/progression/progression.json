@@ -738,6 +738,226 @@
       "pack": "aw",
       "rarity": "legendary",
       "level": 50
+    },
+    {
+      "id": "bo7_alcor",
+      "rarity": "uncommon",
+      "level": 2
+    },
+    {
+      "id": "bo7_atlas",
+      "rarity": "uncommon",
+      "level": 6
+    },
+    {
+      "id": "bo7_orion",
+      "rarity": "rare",
+      "level": 10
+    },
+    {
+      "id": "bo7_timir",
+      "rarity": "rare",
+      "level": 14
+    },
+    {
+      "id": "bo7_bear",
+      "rarity": "uncommon",
+      "level": 4
+    },
+    {
+      "id": "bo7_bengal",
+      "rarity": "uncommon",
+      "level": 7
+    },
+    {
+      "id": "bo7_civet",
+      "rarity": "uncommon",
+      "level": 10
+    },
+    {
+      "id": "bo7_cobra",
+      "rarity": "rare",
+      "level": 12
+    },
+    {
+      "id": "bo7_gecko",
+      "rarity": "rare",
+      "level": 15
+    },
+    {
+      "id": "bo7_hyena",
+      "rarity": "rare",
+      "level": 18
+    },
+    {
+      "id": "bo7_komodo",
+      "rarity": "rare",
+      "level": 21
+    },
+    {
+      "id": "bo7_marmot",
+      "rarity": "rare",
+      "level": 24
+    },
+    {
+      "id": "bo7_orca",
+      "rarity": "epic",
+      "level": 26
+    },
+    {
+      "id": "bo7_puma",
+      "rarity": "epic",
+      "level": 29
+    },
+    {
+      "id": "bo7_zebra",
+      "rarity": "epic",
+      "level": 32
+    },
+    {
+      "id": "bo7_kite",
+      "rarity": "rare",
+      "level": 6
+    },
+    {
+      "id": "bo7_albatross",
+      "rarity": "rare",
+      "level": 9
+    },
+    {
+      "id": "bo7_condor",
+      "rarity": "rare",
+      "level": 12
+    },
+    {
+      "id": "bo7_egret",
+      "rarity": "rare",
+      "level": 14
+    },
+    {
+      "id": "bo7_emu",
+      "rarity": "rare",
+      "level": 17
+    },
+    {
+      "id": "bo7_falcon",
+      "rarity": "rare",
+      "level": 20
+    },
+    {
+      "id": "bo7_finch",
+      "rarity": "epic",
+      "level": 23
+    },
+    {
+      "id": "bo7_hawk",
+      "rarity": "epic",
+      "level": 26
+    },
+    {
+      "id": "bo7_heron",
+      "rarity": "epic",
+      "level": 29
+    },
+    {
+      "id": "bo7_kiwi",
+      "rarity": "epic",
+      "level": 32
+    },
+    {
+      "id": "bo7_macaw",
+      "rarity": "epic",
+      "level": 34
+    },
+    {
+      "id": "bo7_vulture",
+      "rarity": "epic",
+      "level": 37
+    },
+    {
+      "id": "bo7_wren",
+      "rarity": "epic",
+      "level": 40
+    },
+    {
+      "id": "bo7_akita",
+      "rarity": "rare",
+      "level": 9
+    },
+    {
+      "id": "bo7_corso",
+      "rarity": "rare",
+      "level": 17
+    },
+    {
+      "id": "bo7_husky",
+      "rarity": "epic",
+      "level": 26
+    },
+    {
+      "id": "bo7_shepherd",
+      "rarity": "epic",
+      "level": 34
+    },
+    {
+      "id": "bo7_kara",
+      "rarity": "epic",
+      "level": 16
+    },
+    {
+      "id": "bo7_samar",
+      "rarity": "epic",
+      "level": 24
+    },
+    {
+      "id": "bo7_scotia",
+      "rarity": "legendary",
+      "level": 31
+    },
+    {
+      "id": "bo7_solomon",
+      "rarity": "legendary",
+      "level": 39
+    },
+    {
+      "id": "bo7_hades",
+      "rarity": "epic",
+      "level": 21
+    },
+    {
+      "id": "bo7_hildr",
+      "rarity": "legendary",
+      "level": 33
+    },
+    {
+      "id": "bo7_typhon",
+      "rarity": "legendary",
+      "level": 45
+    },
+    {
+      "id": "bo7_aden",
+      "rarity": "epic",
+      "level": 18
+    },
+    {
+      "id": "bo7_baltic",
+      "rarity": "epic",
+      "level": 26
+    },
+    {
+      "id": "bo7_caspian",
+      "rarity": "epic",
+      "level": 33
+    },
+    {
+      "id": "bo7_coral",
+      "rarity": "legendary",
+      "level": 40
+    },
+    {
+      "id": "bo7_drake",
+      "rarity": "legendary",
+      "level": 48
     }
   ],
   "bonuses": [
