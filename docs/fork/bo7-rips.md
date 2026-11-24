@@ -82,6 +82,20 @@ built are skipped (`unlocks()` needs a def), so a checkout without the rips is u
 Weapon pictures show the Black Ops 7 logo: `weapon-levels/games.json` maps the `bo7_` prefix (and the five Blender
 rebuilds in `mods/bo7-weapons`) to `games/bo7.webp`, cropped from the image the user sent (git-ignored like the other logos).
 
+## Weapon pictures and the Gunsmith view (fixed 2026-11-24, user: "icons and overall gunsmith icons are busted")
+
+Static views (menu thumbnails, Gunsmith, third person, Mystery Box) pose the gun with its idle clip through
+`bo3-weapons/pose.js` `poseIdle` (the defs are `lazyWorld`), which folds the parts the idle frame parks away from the
+gun. Two things kept the BO7 spare reload mag (`j_mag2`, about 60 units under the gun) out of that fold, so the
+picture framed gun + mag: a tiny gun at the top, the mag as a speck below. (1) The fold grows the gun's body from
+`j_gun`/`tag_weapon`/`tag_barrel`, which carry no vertices on these rigs (the receiver hangs on `tag_sling`, the
+Velox on `tag_pistol_offset`): with no body bone it now grows from the bones with vertices nearest the root (not the
+one with the most: Peacekeeper, REV-46 and Velox spare mags outweigh the receiver). (2) The viewmodels' mag parts
+(`b7_base_mag__j_mag2`...) hang on a `j_mag2` that is itself parked: folded parts now collapse onto the root bone's
+position, not their parent's. Folded bones carry `userData.poseFolded`, which `syncTagGroups` (mounts.js) leaves alone,
+or the Gunsmith re-showed the spare mag next to the real one. Check: `scratch/bo7/thumbrender.mjs` (all 44 as menu
+pictures, `WJ=` another weapons.json), `scratch/bo7/smith.mjs` (Gunsmith screenshots).
+
 ## Sounds (`mod.js`)
 
 - Each shot is the close shot + a mechanism layer + the low end, mixed by ffmpeg into one ogg (3 variants, plus a last

@@ -31,10 +31,16 @@ export async function poseIdle(model,def,{force=false}={}){   // force: a BO1 gu
     for(let i=0;i<SI.count;i++){let k=0;for(let c=1;c<4;c++)if(SW.getComponent(i,c)>SW.getComponent(i,k))k=c;
       const bone=m.skeleton.bones[SI.getComponent(i,k)];if(!boxes.has(bone))boxes.set(bone,new THREE.Box3());
       boxes.get(bone).expandByPoint(m.getVertexPosition(i,v).applyMatrix4(m.matrixWorld));}});
-  const reached=[...boxes.keys()].filter(isBody),rest=new Set([...boxes.keys()].filter(n=>!isBody(n)));
+  // no vertices on the body bones (the BO7 rips hang the receiver on tag_sling or tag_pistol_offset): grow from the bones
+  // with vertices nearest the root in the hierarchy (not the one with the most: a parked spare mag can outweigh the receiver)
+  const depth=n=>{let d=0;for(let p=n;p&&p!==root;p=p.parent)d++;return d;};
+  const reached=[...boxes.keys()].filter(isBody);if(!reached.length&&boxes.size){const d=Math.min(...[...boxes.keys()].map(depth));reached.push(...[...boxes.keys()].filter(n=>depth(n)===d));}
+  const rest=new Set([...boxes.keys()].filter(n=>!reached.includes(n)));
   for(let i=0;i<reached.length;i++){const box=boxes.get(reached[i]),near=box.clone().expandByScalar(4),joint=box.clone().expandByScalar(12);
     for(const n of rest)if(near.intersectsBox(boxes.get(n))||n.parent===reached[i]&&joint.containsPoint(n.getWorldPosition(v))){rest.delete(n);reached.push(n);}}
-  if(reached.length&&rest.size){for(const n of rest){n.position.set(0,0,0);n.scale.setScalar(1e-6);}model.userData.looseParts=[...rest].map(n=>n.name);}
+  // folded onto the root, not the parent bone: the BO7 rips' spare mags hang on a j_mag2 that is itself parked 60 units below
+  const at=root?.getWorldPosition(new THREE.Vector3());
+  if(reached.length&&rest.size){for(const n of rest){if(at&&n.parent&&!rest.has(n.parent))n.position.copy(n.parent.worldToLocal(at.clone()));else n.position.set(0,0,0);n.scale.setScalar(1e-6);n.userData.poseFolded=true;}model.userData.looseParts=[...rest].map(n=>n.name);}
   // left as is: stopping the action would restore the bind pose
   model.userData.bo3Posed=true;model.updateMatrixWorld(true);return model;
 }

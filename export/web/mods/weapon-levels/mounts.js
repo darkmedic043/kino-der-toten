@@ -85,7 +85,7 @@ export function syncTagGroups(gun,def){
   // last loadout's scales and the engine only hides tags when it builds one
   const hide=new Set(def.hideTags??[]);
   for(const [n,b] of by)if(n.startsWith('b7_')&&!n.includes('__'))b.scale.setScalar(hide.has(n)?1e-6:1);
-  for(const [n,b] of by){const i=n.indexOf('__');if(i>0)b.scale.setScalar(shown(n.slice(0,i))?1:1e-6);}
+  for(const [n,b] of by){const i=n.indexOf('__');if(i>0&&!b.userData.poseFolded)b.scale.setScalar(shown(n.slice(0,i))?1:1e-6);}   // poseFolded: a static view's loose part (pose.js), the spare mag
   gun.traverse(o=>{if(!o.isMesh)return;const i=(o.material?.name??'').indexOf('~');if(i>0)o.visible=shown(o.material.name.slice(0,i));});
   const put=(n,v)=>{const b=by.get(n);if(b&&v){b.position.set(v[0],v[1],v[2]);b.quaternion.set(v[3],v[4],v[5],v[6]);b.updateMatrix();}};
   const fl=by.get('tag_flash');if(fl?.userData.rest)put('tag_flash',fl.userData.rest);   // a muzzle moved it last time
