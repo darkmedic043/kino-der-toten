@@ -74,13 +74,18 @@ const WORDS=[[['Ashen','Cobalt','Feral','Hollow','Jagged','Molten','Phantom','Sh
 const prestigeCache=new Map();
 // pr<tier>:<gun id> → a camo entry like camos.json's. Each gun's colours, styles and names come from camo-table.js
 // (.tools/build-prestige-camos.py); a gun missing there falls back to a hash of its id.
+// PRESTIGE_OWN[gun] = {names:[3], tex:[3 urls], glow: url of the Master's glow mask, c1, c2}: a gun's own prestige camos
+// from its game (the BO7 rips register theirs in prepare, docs/fork/bo7-rips.md); the Master drifts and its bright parts pulse.
+export const PRESTIGE_OWN={};
 export function prestigeCamo(id){
   if(prestigeCache.has(id))return prestigeCache.get(id);
   const m=/^pr([123]):(.+)$/.exec(id??'');if(!m)return null;
-  const tier=+m[1],owner=m[2],seed=hashStr(owner),T=PRESTIGE_TABLE[owner];
+  const tier=+m[1],owner=m[2],seed=hashStr(owner),T=PRESTIGE_TABLE[owner],O=PRESTIGE_OWN[owner];
+  if(O?.tex?.[tier-1]){const c={id,name:O.names[tier-1],prestige:tier,owner,seed,cls:'special',texture:O.tex[tier-1],scale:O.scale?.[tier-1]??2,mix:.95,
+    ...(tier===3&&O.glow?{anim:{c1:O.c1??[1,.4,1],c2:O.c2??[.3,.6,1]},glow:O.glow}:{})};prestigeCache.set(id,c);return c;}
   const e=T??(()=>{const r=rng(seed),[a,b]=WORDS[tier-1],h=seed%360;return {cls:'special',h,h2:(h+150)%360,styles:[1,2,3].map(t=>PRESTIGE_STYLES[t][Math.floor(r()*6)]),names:[1,2,3].map(t=>WORDS[t-1][0][Math.floor(r()*WORDS[t-1][0].length)]+' '+WORDS[t-1][1][Math.floor(r()*WORDS[t-1][1].length)])};})();
   const [h,h2,tone=0]=e.pal?.[tier-1]??[e.h,e.h2],style=e.styles[tier-1],spec={tier,style,seed,h,h2,tone,cls:e.cls};   // pal: per-tier colours, spread within each design
-  const c={id,name:e.names[tier-1],prestige:tier,owner,seed,style,cls:e.cls,procedural:'prestige',spec,scale:tier===3?1.6:2.2,mix:.94,
+  const c={id,name:O?.names?.[tier-1]??e.names[tier-1],prestige:tier,owner,seed,style,cls:e.cls,procedural:'prestige',spec,scale:tier===3?1.6:2.2,mix:.94,
     ...(tier===2&&!['mosaic','carbon'].includes(style)?{metal:true}:{}),
     ...(tier===3?{anim:{c1:artRgb(h,1,.55),c2:artRgb(h2,1,.6)},glow:{procedural:'prestige-glow',spec,seed,tier}}:{})};
   prestigeCache.set(id,c);return c;

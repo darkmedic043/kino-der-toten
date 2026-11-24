@@ -161,6 +161,32 @@ are projected triplanar in bind-pose gun space like the AW guns (weapon-levels.m
 `ammo|_display|_lens|_reticle` so sights and screens stay bare. The textures themselves were audited
 (`scratch/bo7/tex-audit.py`): every view material has colour, normal and ORM except `mtl_sat_ar_heron_screen`.
 
+## Prestige camos (2026-11-24, user: "make sure the prestige camos are the ones that are from the game")
+
+Each BO7 gun wears its own three prestige camos from the game (P1, P2, and the Master = BO7's level-250 camo) in place of the
+fork's generated `pr1:`/`pr2:`/`pr3:` camos. The ids and rules stay the same (weapon-levels.md Prestige); only the look and the name change.
+- **Names**: the fandom wiki refused automated fetches (402), so they come from the codmunity.gg prestige tracker
+  (`scratch/bo7/prest/bo7-prestige-camos.tsv`; orders 1 = P1, 2 = P2, 6 = level 250). Typos "Wavelenght" and "Cherised" corrected.
+- **Patterns**: the rips have 173 `camo_sat_camo_prestige_NNN_c.webp` with no gun mapping, so each name was matched by eye
+  against the game's camo icons (codmunity CDN, scratch only) with a colour-histogram shortlist. The mapping is
+  `.tools/bo7-prestige.json` (names + pattern numbers only, committed). Unsure matches: Momiji 153, Shattered 105,
+  Burner 151, Rocket Box 189, Moonlit 043, Ravenous 126, and Vivid Wave + Weaponized 115 sharing 014.
+- **Plain-colour camos** (Moss, Concrete, Brick, Jasper, Clay, Sand, Plum, Ocean, Leaf, Azalea, Mud, Lavender, Olive, Onyx,
+  Sulfur) are the icon's colour with a little grain (`{"flat":"#hex"}`).
+- **Colour masks**: a few patterns were ripped as pink/blue masks (Lotus 099, Luna 098) or grey (Hexed 063), or in the wrong colours
+  (Overdrive 060, Cyborg 009). An `fx` ffmpeg filter in the json recolours them toward the icon.
+- **Missing from the rips**: Abducted (albatross), Shimmer (shepherd), Scallywag (typhon), Arsenal (solomon), Potion (heron).
+  They keep the generated animated camo under the game's name (`tex` null).
+- **Master animation**: BO7's are layered animated materials. They are approximated with the fork's `|camo-anim` program:
+  the pattern drifts and its brightest parts pulse between two colours. The glow mask is the top ~18% of the pattern's own
+  brightness (a fixed cut-off gave black masks on dark patterns). The colours come from the json `glow` field, or else the two
+  commonest saturated hues among the bright pixels.
+- **Build**: `python3 -I .tools/build_bo7_prestige.py` writes `camos/` (163 files, 16 MB) and `prestige.json` (both
+  git-ignored: ripped). `mod.js` `prepare` loads `prestige.json` into `PRESTIGE_OWN` (camo.js), so the menu, the game
+  and the wiki all see them. To change a match, edit the json, delete the old file under `camos/` (outputs are cached
+  by name) and rerun.
+- Checked: Gunsmith PRESTIGE tab on the AK-27 (Lotus, Master, drifting) and Echo 12 (Zombies, P1, swatch); Sandbox warm-check clean.
+
 ## Look test (full textures, Seven's arms)
 
 The map test shrinks every image to 16 px. `KEEPIMG=webp` keeps images whose blob type matches full size once the PLAY

@@ -2,6 +2,7 @@
 // weapons.json (defs + sound lists); everything it points at is git-ignored. This adds the guns to the Mystery Box
 // and plays their own sounds: a layered shot per trigger pull, reload foley on the clips' AudioOneShot@ markers.
 import {loadModel} from '../../animation.js';
+import {PRESTIGE_OWN} from '../weapon-levels/camo.js';
 const BASE=new URL('./',import.meta.url).href;
 let built=null;
 const VIEW_FOV=64,VIEW_OFFSET={};   // hip framing at that FOV, per weapon class (right, up, z: negative = forward), [0,0,0] if not listed
@@ -16,6 +17,9 @@ export async function prepare(data){
   // drawn at 51° and pushed forward to fit, the cut ends of the sleeves showed (2026-11-24)
   for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=true;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];}
   Object.assign(data.weapons,built.weapons);
+  // their own prestige camos (P1, P2, the animated Master) instead of the generated ones (.tools/build_bo7_prestige.py)
+  const pr=await fetch(BASE+'prestige.json').then(r=>r.ok?r.json():null).catch(()=>null);
+  if(pr)for(const [id,e] of Object.entries(pr))if(built.weapons[id])PRESTIGE_OWN[id]=e;
   data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons)])];
 }
 
