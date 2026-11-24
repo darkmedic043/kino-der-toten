@@ -48,8 +48,9 @@ export function setupFirstPerson(api,state){
 // is perspective, a low gun pointing away rises toward the horizon)
 const SPRINT={pos:[.3,-2,1],rot:[.15,.45,.3],dual:{pos:[0,-1.2,.6],rot:[.1,0,0]}};   // (dual wield: both guns drop and come in, no cant)
 const sprintQ=new THREE.Quaternion(),tmpQ=new THREE.Quaternion(),sprintE=new THREE.Euler(),sprintG=new THREE.Vector3(),sprintT=new THREE.Vector3();
+const turnQ=new THREE.Quaternion(),X_AXIS=new THREE.Vector3(1,0,0);
 const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-8.2),wrists:12.5,arm:23.7};
-  const frame={id:null,target:new THREE.Vector3(),cur:new THREE.Vector3(),tries:0,rig:1,len:30,oneHanded:false};   // rig: the viewmodel's scale (BO3 rigs 2.2); len: the gun's length in BO1 units
+  const frame={id:null,target:new THREE.Vector3(),cur:new THREE.Vector3(),tries:0,rig:1,len:30,oneHanded:false,turn:0,turnAt:new THREE.Vector3()};   // rig: the viewmodel's scale (BO3 rigs 2.2); len: the gun's length in BO1 units
   const measureFrame=()=>{   // once per weapon, at idle (the pivot carries the engine's offset: we read world positions)
     const root=view.root,vc=api.viewCamera;if(!root||!vc)return false;vc.updateMatrixWorld(true);const inv=vc.matrixWorldInverse;
     const at=n=>{const o=root.getObjectByName(n);return o?o.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv):null;};
@@ -67,6 +68,23 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     frame.target.copy(FRAME.bo7).multiplyScalar(frame.rig);
     frame.oneHanded=gb.distanceToPoint(wl)>6*frame.rig;   // the left hand is off the gun (a one-handed BO3 pistol: the arm hangs): no hand lag (by the gun's box: by the grip's distance the Ray Gun, held at its front, counted as one-handed)
     view.sprintPose=true;   // every rig: the BO7 pose below (imported BO3 rigs' own sprint clips put the gun off the screen)
+    // Stock clear (def.stockClear = the most it may turn, rad; the BO7 rips, 2026-11-24, user: "some guns still show this back
+    // part"): BO7's hip poses run the stock past the cheek, 1-6 units under the eye, so its back end filled the bottom right
+    // corner at our 64° view. The gun turns about the support hand (rear down, muzzle toward the crosshair) by the least
+    // angle that takes all but a sliver of what is within 10 units of the camera out of the frame. A pistol has none: no turn.
+    frame.turn=0;
+    if(def?.stockClear&&view.gun){
+      const G=wl.clone(),pts=[],p=new THREE.Vector3(),tv=Math.tan(THREE.MathUtils.degToRad(vc.fov/2)),th=tv*vc.aspect;
+      view.gun.updateMatrixWorld(true);
+      view.gun.traverse(o=>{if(!o.isMesh||!o.geometry?.attributes?.position)return;for(let q=o;q;q=q.parent)if(!q.visible)return;
+        const n=o.geometry.attributes.position.count;
+        for(let i=0;i<n;i+=3){o.getVertexPosition(i,p);if(o.isSkinnedMesh)o.applyBoneTransform(i,p);p.applyMatrix4(o.matrixWorld).applyMatrix4(inv);
+          if(-p.z>.05&&-p.z<10)pts.push(p.x,p.y-G.y,p.z-G.z);}});
+      const inFrame=a=>{const c=Math.cos(a),sn=Math.sin(a);let k=0;
+        for(let i=0;i<pts.length;i+=3){const y=G.y+pts[i+1]*c-pts[i+2]*sn,z=G.z+pts[i+1]*sn+pts[i+2]*c;if(-z>.05&&Math.abs(pts[i])<th*-z&&Math.abs(y)<tv*-z)k++;}return k;};
+      const k0=inFrame(0);
+      if(k0>40){let a=0;while(a+.01<=def.stockClear+1e-6&&inFrame(a)>Math.max(20,k0*.04))a+=.01;frame.turn=a;frame.turnAt.copy(G);}
+    }
     return true;};
   // underbarrel parts the support hand holds: the attachment's shown tag, the hand's spot under the part (gun frame) and the wrist roll
   // (at(box, centre): where the wrist goes, view space at idle. A vertical grip: held at mid height from its left face, the
@@ -274,6 +292,9 @@ const FRAME={bo7:new THREE.Vector3(.3,.1,-2.8),grip:new THREE.Vector3(2.6,-4.6,-
     if(frame.id!==view.currentId){if(view.mode==='idle'&&++frame.tries>2&&measureFrame()){frame.id=view.currentId;frame.tries=0;}}
     frame.cur.lerp(frame.id===view.currentId?frame.target:frame.cur,Math.min(1,dt*8));
     P.addScaledVector(frame.cur,1-aim);
+    // stock clear (measureFrame): the turn about the support hand, gone by the time the sights are up and while the gun's own sprint plays
+    const tk=frame.id===view.currentId?frame.turn*(1-aim)*(1-aim)*(1-THREE.MathUtils.clamp(s.sprintBlend,0,1)):0;
+    if(tk>.001){turnQ.setFromAxisAngle(X_AXIS,tk);P.sub(frame.turnAt).applyQuaternion(turnQ).add(frame.turnAt);R.setFromQuaternion(tmpQ.setFromEuler(R).premultiply(turnQ));}
     // look lag, bank, airborne float, landing and steps
     P.x+=yl*4*hip;P.y+=pl*4*hip+lf*.06+dp*.04+sy*.5*hip;P.z+=0;
     R.y+=yl*hipR;R.x+=pl*hipR+lf*-.004+sy*-.02*hipR;R.z+=rl*hipR;

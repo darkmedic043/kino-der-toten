@@ -17,9 +17,11 @@ export async function prepare(data){
   // not on an akimbo pair (bo7_<g>_dw, folded into the gun's Akimbo attachment): BO7 has no akimbo sprint clips
   // viewFov: these rigs are framed for IW's viewmodel field of view (FOV 80 on 4:3 = about 64° vertical), not BO1's 51°;
   // drawn at 51° and pushed forward to fit, the cut ends of the sleeves showed (2026-11-24)
+  // stockClear: the hip turn about the support hand that drops the stock out of the bottom right corner (movement/fp.js measureFrame);
+  // not on the launchers, which sit on the shoulder
   // partSlots: the Gunsmith's slot markers find each slot's stock part by its head bone (gunsmith-view.js partOf)
   const PART_SLOTS={b7_base_barrel:'barrel',b7_base_mag:'mag',b7_base_grip:'grip',b7_base_stock:'stock'};
-  for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=!d.dualWield&&!!d.animations?.sprintLoopAnim;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];d.partSlots=PART_SLOTS;}
+  for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=!d.dualWield&&!!d.animations?.sprintLoopAnim;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];d.partSlots=PART_SLOTS;if(!d.dualWield&&!d.id?.startsWith('bo7_me_')&&d.weaponClass!=='Launcher')d.stockClear??=.14;}
   Object.assign(data.weapons,built.weapons);
   // their own prestige camos (P1, P2, the animated Master) instead of the generated ones (.tools/build_bo7_prestige.py)
   const pr=await fetch(BASE+'prestige.json').then(r=>r.ok?r.json():null).catch(()=>null);

@@ -324,6 +324,14 @@ The BO7 HUD dial draws the gun's world model, and so do third person, the Myster
   `_rec` name's folder without the suffix when it exists. Upright models (melees) are laid on their side in the icon.
 Check: `scratch/bo7/thumbraw.mjs` (`RAW=1` = bind, no hideTags), `thumbcol.mjs` (one colour per mesh), `icons.js` with `DESK=1`.
 
+## Stock at the hip (fixed 2026-11-24, user: "some guns still show this back part")
+
+BO7's own hip poses run the stock past the cheek (M8A1: the stock 1-6 units under the eye, up to 0.6 behind the camera), so at our
+64° view its back end filled the bottom right corner. `mod.js` sets `stockClear .14` on every gun except pistols, melees, akimbo pairs
+and launchers (they sit on the shoulder); the movement mod turns the gun down about the left hand at the hip by that much
+(movement.md, Stock clear). Checked in Sandbox as Venator: M8A1, AK-27, CBRS-3, VS Recon, Pistol (no turn) at hip, ADS (unchanged)
+and sprint; hip sweep of LMG, shotguns, SMGs, sniper, crossbow, launchers.
+
 ## Known limits / next
 
 - Only LOD0 was ripped; world models are decimated copies of it.
