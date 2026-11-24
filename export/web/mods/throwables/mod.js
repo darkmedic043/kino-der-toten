@@ -40,7 +40,10 @@ export default async function setup(api){
   // the Gersh keeps its own BO1 animation (user 2026-11-17: "i want the gersch to use the actual throw animation designed for the gersch"): the pull-pin
   // (out, cover flips down, switch pressed, raised) stops raised in view at .8, runs on to the wind-up at its end on release, then the throw clip
   // (the device has left the hand at its first frame: tag_weapon sits far overhead; the arm follows through). Arms and device are one model: no hide, no fade.
-  const OWN_LOOK={zombie_black_hole_bomb:{release:.03,hold:{at:.8},ownModel:true,keepItem:true,snap:true}};
+  // the QED the same way (2026-11-24, user: "bring back the actual animation for the QED"): its pull-pin twists the device in
+  // both hands (.2-.7 of 1.87 s) and then winds it up off the right edge; held at .7, the throw (0.23 s) is the empty arm's follow-through
+  const OWN_LOOK={zombie_black_hole_bomb:{release:.03,hold:{at:.8},ownModel:true,keepItem:true,snap:true},
+    zombie_quantum_bomb:{release:.03,hold:{at:.7},ownModel:true,keepItem:true,snap:true}};
   const rigFor=id=>{const r=data.throwRigs?.[RIG_OF[id]];return r&&(r.ownModel||STAND_IN[id])?r:null;};
   const handModels={};
   for(const [id,url] of Object.entries(STAND_IN))if(url&&(qed||rigFor(id)))handModels[id]=await loadModel(url).catch(()=>null);
