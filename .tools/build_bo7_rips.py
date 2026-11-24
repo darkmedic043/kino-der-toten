@@ -225,14 +225,17 @@ def build(parts, out_name, light=False, rename=None, keep=None, animated=frozens
     return WEB+'models/'+str(out.relative_to(MOD/'models'))+ver(out), rest
 
 # ---- animations ---------------------------------------------------------------------------------------
-ARM_RENAME = {'j_gun': 'tag_weapon', 'tag_weapon_right': 'tag_weapon_right_iw', 'tag_weapon': 'tag_weapon_iw'}
+ARM_RENAME = {'j_gun': 'tag_weapon', 'tag_weapon_right': 'tag_weapon_right_iw', 'tag_weapon': 'tag_weapon_iw',
+              'tag_weapon_left': 'tag_weapon1'}   # the left wrist's gun tag: where an akimbo pair's second gun hangs (animation.js)
 # BO7 numbers finger joints 1..4 from the knuckle where BO1 uses 0..3 (its meta* joints are the extra bases): shifted so
 # the operators' first-person arms (fp-arms.js) find BO1's names, as the BO3 import does
 ARM_RENAME.update({f'j_{f}_{s}_{k}': f'j_{f}_{s}_{k-1}' for f in ['index', 'mid', 'ring', 'pinky', 'thumb'] for s in ['le', 'ri'] for k in (1, 2, 3, 4)})
 
-def clip(name, arms_rest, gun_rest, loop=False, then=None, base=None):
+def clip(name, arms_rest, gun_rest, loop=False, then=None, base=None, gun_rename=None, keep=None, write=True):
     """one clip; `then` appends a second clip after it (a pump or bolt gun's rechamber after its fire: the engine plays
-    one fire clip a shot); `base` = a clip whose first frame this one is added onto (see below)"""
+    one fire clip a shot); `base` = a clip whose first frame this one is added onto (see below); gun_rename: the gun's
+    bone names in the model the clip drives (an akimbo pair's left gun, bones suffixed _le); keep(name): which (output)
+    bones stay; write=False: only return the data"""
     a = castlib.animation(EXP/'animations'/(name+'.cast'))
     fps = a['fps'] or 30
     by = {}
@@ -269,9 +272,11 @@ def clip(name, arms_rest, gun_rest, loop=False, then=None, base=None):
         if bone in ('tag_origin', 'tag_sync'): continue
         nm = ARM_RENAME.get(bone, bone)
         arm = nm in arms_rest
-        if not arm and bone not in gun_rest: continue
-        rest = arms_rest[nm] if arm else gun_rest[bone]
-        b = {'name': nm if arm else bone, 'rot': None, 'pos': None}
+        if not arm: nm = (gun_rename or {}).get(bone, bone)
+        if not arm and nm not in gun_rest: continue
+        if keep and not keep(nm): continue
+        rest = arms_rest[nm] if arm else gun_rest[nm]
+        b = {'name': nm, 'rot': None, 'pos': None}
         if 'rq' in cs:
             c = cs['rq']; modes[c['mode']] = modes.get(c['mode'], 0)+1
             v = c['values'].reshape(-1, 4)
@@ -295,8 +300,11 @@ def clip(name, arms_rest, gun_rest, loop=False, then=None, base=None):
     dur = max(last, 1)/fps
     data = {'name': name, 'fps': fps, 'loop': loop, 'duration': round(dur, 4),
             'notifies': [{'name': n, 'time': round(f/fps, 4)} for n, f in a['notes']], 'bones': out}
-    p = MOD/'animations'/(name.replace('+', '_')+'.json'); p.write_text(json.dumps(data, separators=(',', ':')))
     if set(modes) - {'relative', 'absolute'}: print('  ', name, 'curve modes', modes)
+    return write_clip(data) if write else (None, data)
+
+def write_clip(data):
+    p = MOD/'animations'/(data['name'].replace('+', '_')+'.json'); p.write_text(json.dumps(data, separators=(',', ':')))
     return WEB+'animations/'+p.name+ver(p), data
 
 # ---- sounds -------------------------------------------------------------------------------------------
@@ -447,7 +455,7 @@ def gun_attachments(g, c, gid, bones, part_dir):
                 if kind in ('fmj', 'velocity'): stat.append(aid); order.append(aid)
                 continue
             if slot in PART:
-                if kind == 'akimbo': continue   # a second gun: not a part (dual wield would need its own def)
+                if kind == 'akimbo': order.append('akimbo'); continue   # a second gun: its own pair def (build_akimbo)
                 aid = f'b7_{PART_SLOT[slot][1]}_{kind}'
                 cands = [x for x in PART[slot].get(kind, []) if (part_dir/(f'sat_vm_{c}_{g}_'+x)).is_dir()]
                 spare = sorted(p.name[len(f'sat_vm_{c}_{g}_'):] for p in part_dir.glob(f'sat_vm_{c}_{g}_{PART_SLOT[slot][0]}_*')
@@ -484,6 +492,10 @@ def animated_bones(pre):
     return frozenset(out)
 
 hands_url, arms_rest = build(['viewhands_base_iw8'], 'bo7_viewhands', rename=ARM_RENAME) if '--sounds' not in sys.argv else (None, None)
+# the left arm (everything under j_clavicle_le, by the names the clips use): an akimbo pair's left clips drive only these
+_hsk = load_model('viewhands_base_iw8')[0]
+def _under(i, top): return i >= 0 and (_hsk[i]['name'] == top or _under(_hsk[i]['parent'], top))
+LEFT_ARM = frozenset(ARM_RENAME.get(b['name'], b['name']) for i, b in enumerate(_hsk) if _under(i, 'j_clavicle_le'))
 weapons, sounds = {}, {}
 if GUNS == ['all']: GUNS = list(GUN)
 old = MOD/'weapons.json'   # a run with some guns keeps the others already built
@@ -545,6 +557,57 @@ def sprint_base(pre, role):
     pose = pre+'sprint_offset_additive'
     return [pre+'idle', pose] if role == 'sprintLoopAnim' and (EXP/'animations'/(pose+'.cast')).exists() else pre+'idle'
 
+# ---- Akimbo (docs/fork/bo7-rips.md, Akimbo) ---------------------------------------------------------------------------
+# BO7 draws akimbo as two viewmodels, each a whole rig: the r clips hold the right gun up with the left arm down off the
+# screen, the l clips the mirror. The shared bones (torso, spine) are identical in both. Here they become one rig, as the
+# fork's dual wield wants (animation.js): the right clips without the left arm, the left clips with only the left arm,
+# its gun tag (tag_weapon_left -> tag_weapon1, where the second gun hangs; it sits on the gun in every akimbo clip, as
+# j_gun does) and the second gun's bones; clips that hold both guns (raise, drop, inspect) are the two halves joined.
+# The second gun is the same parts built again with its bones suffixed _le (j_gun1 its root), so the clips find it.
+# The pair def (bo7_<g>_dw, akimboOf) is folded into the single gun as its Akimbo attachment (weapon-levels akimbo.js).
+AKIMBO_SIDED = [('idleAnim', 'idleAnimLeft', 'idle', True), ('fireAnim', 'fireAnimLeft', 'fire', False),
+                ('lastShotAnim', 'lastShotAnimLeft', 'fire_last', False), ('reloadAnim', 'reloadAnimLeft', 'reload', False),
+                ('reloadEmptyAnim', 'reloadEmptyAnimLeft', 'reload_empty', False)]
+AKIMBO_BOTH = [('raiseAnim', 'raise'), ('firstRaiseAnim', 'raise_first'), ('quickRaiseAnim', 'raise_quick'),
+               ('dropAnim', 'drop'), ('quickDropAnim', 'drop_quick'), ('inspectAnim', 'inspect')]
+
+def build_akimbo(g, parts, single, gun_rest, bones):
+    G = GUN[g]; c = G['cls']; pre = f'sat_vm_{c}_{g}_'
+    side = next((pre+x for x in ('akimbo_', '') if (EXP/'animations'/(pre+x+'r_idle.cast')).exists()), None)
+    if not side or not (EXP/'animations'/(side+'l_idle.cast')).exists(): print('  ', g, 'akimbo: no clips'); return
+    has = lambda n: (EXP/'animations'/(n+'.cast')).exists()
+    lren = {n: 'j_gun1' if n == 'j_gun' else n+'_le' for n in bones}
+    lclips = [side+'l_'+nm for *_, nm, _ in AKIMBO_SIDED]+[side+'l_'+nm for _, nm in AKIMBO_BOTH]
+    anim = animated_bones(pre) | {cc['bone'] for f in lclips if has(f) for cc in castlib.animation(EXP/'animations'/(f+'.cast'))['curves']}
+    left, left_rest = build(parts, f'bo7_{g}_left', animated=frozenset(anim), rename=lren)
+    right_only = lambda n: n not in LEFT_ARM
+    left_only = lambda n: n in LEFT_ARM or (n.endswith('_le') and n not in arms_rest) or n == 'j_gun1'
+    A, LA, T = {}, {}, {}
+    for role, lrole, nm, loop in AKIMBO_SIDED:
+        if not has(side+'r_'+nm): continue
+        A[role], d = clip(side+'r_'+nm, arms_rest, gun_rest, loop, keep=right_only); T[role] = d['duration']
+        if has(side+'l_'+nm): LA[lrole], _ = clip(side+'l_'+nm, arms_rest, left_rest, loop, gun_rename=lren, keep=left_only)
+    for role, nm in AKIMBO_BOTH:
+        if not has(side+'r_'+nm): continue
+        _, r = clip(side+'r_'+nm, arms_rest, gun_rest, keep=right_only, write=False)
+        if has(side+'l_'+nm):
+            _, l = clip(side+'l_'+nm, arms_rest, left_rest, gun_rename=lren, keep=left_only, write=False)
+            r = {**r, 'name': f'{side}both_{nm}', 'duration': max(r['duration'], l['duration']), 'bones': r['bones']+l['bones']}
+        A[role], _ = write_clip(r); T[role] = r['duration']
+    if 'idleAnim' not in A or 'idleAnimLeft' not in LA: print('  ', g, 'akimbo: no idle'); return
+    A['emptyIdleAnim'] = A['idleAnim']
+    for k in ('lastShotAnim', 'reloadEmptyAnim'): A.setdefault(k, A['fireAnim' if k == 'lastShotAnim' else 'reloadAnim'])
+    times = {'raiseTime': T.get('raiseAnim', single['raiseTime']), 'dropTime': T.get('dropAnim', single['dropTime']),
+             'reloadTime': round(T.get('reloadAnim', 2.5)*.8, 3), 'reloadEmptyTime': round(T.get('reloadEmptyAnim', T.get('reloadAnim', 3))*.8, 3),
+             'inspectTime': T.get('inspectAnim', single.get('inspectTime'))}
+    pair = lambda d: {**d, **times, 'clipSize': d['clipSize']*2, 'startAmmo': d['startAmmo']*2, 'maxAmmo': d['maxAmmo']*2,
+                      'animations': A, 'leftModel': left, 'leftAnimations': LA, 'dualWield': True}
+    no = ('sprintInTime', 'sprintLoopTime', 'sprintOutTime')   # no akimbo sprint clips: the motion layer's sprint pose
+    wid = 'bo7_'+g
+    weapons[wid+'_dw'] = {**{k: v for k, v in pair(single).items() if k not in no}, 'id': wid+'_dw', 'akimboOf': wid, 'noBox': True,
+                          'upgrade': {k: v for k, v in pair(single['upgrade']).items() if k not in no}}
+    print(f'  {g}: akimbo pair', len(A), 'clips +', len(LA), 'left')
+
 def build_gun(g):
     G = GUN[g]; c = G['cls']; pre = f'sat_vm_{c}_{g}_'
     gid = f'sat_{c}_{g}_mp'
@@ -596,6 +659,8 @@ def build_gun(g):
                    'tagMoves': X['moves'], 'tagRest': X['tag_rest'], 'flashFollowsMuzzle': True})
     weapons[wid] = {'id': wid, 'name': G['name'], 'price': G['price'], 'model': view, 'worldModel': world, 'lazyWorld': True, **common, **st,
                     'upgrade': {'name': G['up'], 'model': view, 'worldModel': world, **common, **{**st, **G['up_stats']}}}
+    weapons.pop(wid+'_dw', None)
+    if 'akimbo' in order: build_akimbo(g, parts, weapons[wid], gun_rest, X['bones'])
 
 if '--sounds' in sys.argv:   # sounds only: markers from the clips already built, models left alone
     for g in GUNS:
@@ -606,7 +671,11 @@ if '--sounds' in sys.argv:   # sounds only: markers from the clips already built
     (MOD/'weapons.json').write_text(json.dumps({'weapons': weapons, 'sounds': sounds}, indent=1)); print('wrote sounds'); sys.exit()
 if '--new' in sys.argv: GUNS = [g for g in GUNS if 'bo7_'+g not in weapons]   # only guns not built yet
 failed = []
-def save(): (MOD/'weapons.json').write_text(json.dumps({'weapons': weapons, 'sounds': sounds}, indent=1))
+def save():
+    for w in weapons.values():   # one hands model for every gun: guns not rebuilt this run take its new version too
+        for d in (w, w.get('upgrade') or {}):
+            if 'handsModel' in d: d['handsModel'] = hands_url
+    (MOD/'weapons.json').write_text(json.dumps({'weapons': weapons, 'sounds': sounds}, indent=1))
 for g in GUNS:
   try:
     build_gun(g); save()   # after every gun, so a later failure keeps the ones done

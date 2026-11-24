@@ -12,10 +12,11 @@ export async function prepare(data){
   if(!r?.ok){console.info('[bo7-rips] not built: run .tools/build_bo7_rips.py');return;}
   built=await r.json();
   // lazyLoad: hd-weapons' load-time preload skips them (44 view models ran a page out of memory, 2026-11-24)
-  // ownSprint: their own walk_to_sprint / sprint_loop / sprint_to_walk clips play instead of the motion layer's pose (animation.js, fp.js)
+  // ownSprint: their own walk_to_sprint / sprint_loop / sprint_to_walk clips play instead of the motion layer's pose (animation.js, fp.js);
+  // not on an akimbo pair (bo7_<g>_dw, folded into the gun's Akimbo attachment): BO7 has no akimbo sprint clips
   // viewFov: these rigs are framed for IW's viewmodel field of view (FOV 80 on 4:3 = about 64° vertical), not BO1's 51°;
   // drawn at 51° and pushed forward to fit, the cut ends of the sleeves showed (2026-11-24)
-  for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=true;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];}
+  for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=!d.dualWield;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];}
   Object.assign(data.weapons,built.weapons);
   // their own prestige camos (P1, P2, the animated Master) instead of the generated ones (.tools/build_bo7_prestige.py)
   const pr=await fetch(BASE+'prestige.json').then(r=>r.ok?r.json():null).catch(()=>null);

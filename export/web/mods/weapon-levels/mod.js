@@ -71,9 +71,9 @@ export default async function setup(api){
     const hidden=new Set(def?.hideTags??[]);
     view.gun?.traverse(o=>{if(o.isBone&&o.scale.x<1e-3&&attachmentTags.has(o.name)&&!hidden.has(o.name))o.scale.setScalar(1);});
     // the engine hides tags on the right gun only: the off-hand gun copies its attachment bones (BO1's left models
-    // number theirs one up: tag_long_barrel1, tag_flash3 for tag_flash2)
+    // number theirs one up: tag_long_barrel1, tag_flash3 for tag_flash2; imported ones add _le)
     if(def?.akimboOn&&view.leftGun&&view.gun)view.gun.traverse(b=>{if(!b.isBone||!(attachmentTags.has(b.name)||hidden.has(b.name)))return;
-      const o=[b.name,b.name+'1',b.name.replace(/\d+$/,d=>+d+1)].map(n=>view.leftGun.getObjectByName(n)).find(x=>x?.isBone);
+      const o=[b.name,b.name+'1',b.name+'_le',b.name.replace(/\d+$/,d=>+d+1)].map(n=>view.leftGun.getObjectByName(n)).find(x=>x?.isBone);
       if(o){o.scale.copy(b.scale);o.updateMatrix();}});
     flamer.placePilot();
     mountParts(def);

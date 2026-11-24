@@ -143,6 +143,28 @@ BO7 parts are separate models, so the build makes three kinds (`gun_attachments(
 come from `scratch/bo7/catalogue.py <attachments.json> <the gun's gunsmith.json>` (rerun-safe; rerun when a build prints
 an id the catalogue lacks).
 
+## Akimbo (2026-11-24, user: "make sure akimbos work as attachments like normal")
+
+The five guns whose Gunsmith lists akimbo (alcor, atlas, orion, timir, bear) get the fork's normal Akimbo attachment:
+the build writes a pair def `bo7_<g>_dw` (`akimboOf`, `noBox`, `dualWield`, clip and ammo doubled) and
+`weapon-levels/akimbo.js` folds it into the single gun's `def.akimbo`, worn like any other attachment (unlocked by
+weapon level; `akimbo` is in `attachOrder`). Each gun has its own trigger (right mouse = left gun), mag (`weapon.magL`)
+and clips, as the AW pairs.
+- **Clips** (`build_akimbo()`): BO7 has two sets, `sat_vm_<c>_<g>_akimbo_r_*`/`_l_*` (orion, bear) and
+  `sat_vm_pi_<g>_r_*`/`_l_*` (alcor, atlas, timir). Each is a whole rig with the other arm hanging off screen, so the R
+  clips drop the left arm's bones (`LEFT_ARM` = everything under `j_clavicle_le`) and the L clips keep only the left
+  arm, `tag_weapon1` and the left gun's bones (not the hands' own `_le` leg bones, which matched the suffix at first).
+  Idle, fire, last shot, reload and empty reload are sided; raise, drop and inspect are the two halves joined into one
+  clip (`{side}both_<role>`). No akimbo sprint clips exist, so a pair has `ownSprint` off (mod.js).
+- **Left gun**: the same parts rebuilt as `bo7_<g>_left.glb` with every bone suffixed `_le` and `j_gun` renamed
+  `j_gun1` (the mixer binds tracks by name, so names must not clash); animation.js hangs it on the hands bone
+  `tag_weapon1` (`tag_weapon_left` renamed by `ARM_RENAME`; it sits exactly on the gun in every clip). mounts.js
+  `syncTagGroups(gun, def, mirror)` strips `_le` when matching part groups, the weapon-levels mod looks up `_le` bones
+  for the left gun's hidden tags, and the muzzle flash falls back to `tag_flash_le`.
+- Checked in Sandbox (`scratch/bo7/akimbo.js`, one gun per run; frames in `scratch/bo7/akf/`): orion, bear, alcor.
+  Mags split and refill (orion 30/15, bear 60/30, alcor 14/7), each trigger fires its own gun, both reload. Renderer
+  1.4 GB for one gun, 2.1 GB for two in one run (load footprint, not growth).
+
 ## Loading and memory (why 44 guns don't load 44 guns)
 
 - **Warm-up**: the engine's `warmWeapons` would load every box gun's view model (about 28 MB each). The mod's

@@ -77,9 +77,12 @@ const live=()=>Object.defineProperty([],'toJSON',{value:()=>[]});
 // {head:{tag:[x,y,z,qx,qy,qz,qw]}} put the gun's own tags where a fitted part has them (the muzzle on a longer barrel),
 // def.tagRest puts them back.
 const TAGS=new WeakMap(),TMP=new THREE.Matrix4(),TV=new THREE.Vector3(),TQ=new THREE.Quaternion(),TS=new THREE.Vector3();
-export function syncTagGroups(gun,def){
+export function syncTagGroups(gun,def,mirror=false){
   if(!gun||!def?.tagGroups)return;
-  let by=TAGS.get(gun);if(!by){by=new Map();gun.traverse(o=>{if(o.isBone&&!by.has(o.name))by.set(o.name,o);});TAGS.set(gun,by);}   // first call: before any part is mounted
+  // first call: before any part is mounted. An akimbo pair's second gun (mirror) has every bone suffixed _le (BO7 rips,
+  // .tools/build_bo7_rips.py build_akimbo): keyed by the right gun's names, so the def's lists fit both
+  const key=n=>mirror&&n.endsWith('_le')?n.slice(0,-3):n;
+  let by=TAGS.get(gun);if(!by){by=new Map();gun.traverse(o=>{if(o.isBone&&!by.has(key(o.name)))by.set(key(o.name),o);});TAGS.set(gun,by);}
   const shown=h=>{const b=by.get(h);return !b||b.scale.x>1e-3;};
   // the heads themselves (b7_base_<slot>, b7_<slot>_<kind>): straight from the def, since a cached viewmodel keeps the
   // last loadout's scales and the engine only hides tags when it builds one
@@ -95,7 +98,7 @@ export function syncTagGroups(gun,def){
 // def.flashFollowsMuzzle: a mounted muzzle's own flash bone moves the gun's tag_flash out to its end (tracers, flash)
 function muzzleFlash(gun,bone,part){
   let f=null;part.traverse(o=>{if(!f&&o.isBone&&/^tag_flash/.test(o.name))f=o;});
-  const flash=gun.getObjectByName('tag_flash');if(!f||!flash||flash.parent!==bone.parent)return;
+  const flash=gun.getObjectByName('tag_flash')??gun.getObjectByName('tag_flash_le');if(!f||!flash||flash.parent!==bone.parent)return;
   // f.matrixWorld is still in the part's own space (updated before part.matrix was set), part.matrix takes it to the bone's
   flash.userData.rest??=[...flash.position.toArray(),...flash.quaternion.toArray()];
   TMP.multiplyMatrices(bone.matrix,part.matrix).multiply(f.matrixWorld).decompose(TV,TQ,TS);
@@ -103,7 +106,7 @@ function muzzleFlash(gun,bone,part){
 }
 export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>true,{mirror=false}={}){
   if(!gun)return;
-  syncTagGroups(gun,def);
+  syncTagGroups(gun,def,mirror);
   const run=gun.userData.mountRun=(gun.userData.mountRun??0)+1;   // a newer call (equip fires twice on some guns) replaces this one, or its parts stack on top
   for(const o of gun.userData.mounts??[])o.removeFromParent();gun.userData.mounts=live();gun.userData.beams=live();
   // def.fixedParts: always-on parts that are their own model (the AS50's scope), mounted the same way
