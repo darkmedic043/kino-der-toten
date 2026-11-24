@@ -230,13 +230,30 @@ ARM_RENAME = {'j_gun': 'tag_weapon', 'tag_weapon_right': 'tag_weapon_right_iw', 
 # the operators' first-person arms (fp-arms.js) find BO1's names, as the BO3 import does
 ARM_RENAME.update({f'j_{f}_{s}_{k}': f'j_{f}_{s}_{k-1}' for f in ['index', 'mid', 'ring', 'pinky', 'thumb'] for s in ['le', 'ri'] for k in (1, 2, 3, 4)})
 
-def clip(name, arms_rest, gun_rest, loop=False, then=None):
+def clip(name, arms_rest, gun_rest, loop=False, then=None, base=None):
     """one clip; `then` appends a second clip after it (a pump or bolt gun's rechamber after its fire: the engine plays
-    one fire clip a shot)"""
+    one fire clip a shot); `base` = a clip whose first frame this one is added onto (see below)"""
     a = castlib.animation(EXP/'animations'/(name+'.cast'))
     fps = a['fps'] or 30
     by = {}
     for c in a['curves']: by.setdefault(c['bone'], {})[c['prop']] = c
+    if base:
+        # BO7's walk/sprint clips are offsets the game adds onto the idle pose: every arm bone and j_gun at identity, only
+        # the clavicles and tag_weapon moving (a few degrees and inches), though Cast marks the rotations "absolute".
+        # Played as poses they snapped the arms to bind and dropped the gun under the screen (user 2026-11-24: "sprint
+        # anim is severely broken"). So each bone becomes base frame 0 rotated by the clip's rotation (local) and moved
+        # by its offset; bones the clip lacks hold the base pose.
+        # The loop is a small bob around the held sprint pose (sprint_offset_additive = walk_to_sprint's last frame =
+        # sprint_to_walk's first), so it gets both: idle * sprint pose * bob. Bases apply innermost first.
+        for bn in reversed([base] if isinstance(base, str) else base):
+            b0 = castlib.animation(EXP/'animations'/(bn+'.cast'))
+            for c in b0['curves']:
+                v0 = np.asarray(c['values']).reshape(-1, 4 if c['prop'] == 'rq' else 1)[0]
+                o = by.setdefault(c['bone'], {}).get(c['prop'])
+                if o is None: by[c['bone']][c['prop']] = {**c, 'frames': np.asarray([0]), 'values': v0.copy()}; continue
+                v = np.asarray(o['values']).reshape(-1, 4 if c['prop'] == 'rq' else 1)
+                v = np.stack([qmul(v0, q) for q in v]) if c['prop'] == 'rq' else v+v0
+                by[c['bone']][c['prop']] = {**o, 'mode': c['mode'], 'values': v.reshape(-1)}
     if then:
         b2 = castlib.animation(EXP/'animations'/(then+'.cast')); off = max(int(c['frames'][-1]) for c in a['curves'] if len(c['frames']))+1
         a['notes'] = list(a['notes'])+[(n, f+off) for n, f in b2['notes']]
@@ -522,6 +539,12 @@ def gun_sounds(g, c, notes):
     print(f'  {g}: {len(S["shots"])} shots, {len(S["last"])} last, {len(S["notes"])} foley notes')
     return S
 
+def sprint_base(pre, role):
+    """what a sprint clip is added onto (clip(base=)): the idle pose, and for the loop the held sprint pose too"""
+    if not role.startswith('sprint'): return None
+    pose = pre+'sprint_offset_additive'
+    return [pre+'idle', pose] if role == 'sprintLoopAnim' and (EXP/'animations'/(pose+'.cast')).exists() else pre+'idle'
+
 def build_gun(g):
     G = GUN[g]; c = G['cls']; pre = f'sat_vm_{c}_{g}_'
     gid = f'sat_{c}_{g}_mp'
@@ -540,7 +563,7 @@ def build_gun(g):
     for role, nm, loop in ROLES:
         full = pre.replace('sat_vm_', 'sat_vm_')+nm
         if not (EXP/'animations'/(full+'.cast')).exists(): print('  no clip', full); continue
-        A[role], d = clip(full, arms_rest, gun_rest, loop); T[role] = d['duration']
+        A[role], d = clip(full, arms_rest, gun_rest, loop, base=sprint_base(pre, role)); T[role] = d['duration']
         notes |= {n['name'] for n in d['notifies']}
     A.setdefault('emptyIdleAnim', A['idleAnim'])
     seg = {}

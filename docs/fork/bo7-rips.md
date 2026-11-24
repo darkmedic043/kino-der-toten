@@ -51,7 +51,13 @@ Run Python with `-I` and keep scripts outside the rips folder (it imports `castl
   an operator weapon, the Rocket Shield or the knuckles are up). Checked on kite, bear, aden, hades, corso, alcor: hip
   and ADS (`scratch/bo7/frame7.js`).
 - Sprint: `def.ownSprint` plays the guns' own `walk_to_sprint` / `sprint_loop` / `sprint_to_walk` (animation.js
-  `sprintKey`); the motion layer's procedural sprint pose is skipped for them (fp.js; movement.md).
+  `sprintKey`); the motion layer's procedural sprint pose is skipped for them (fp.js; movement.md). These clips are
+  **additive** in BO7 (2026-11-24, user: "sprint anim is severely broken": the arms snapped to bind and the gun fell
+  under the screen): every arm bone and j_gun is keyed at identity and only the clavicles and tag_weapon move, though
+  Cast calls the rotations "absolute". The build bakes them onto poses (`clip(base=)`, `sprint_base`): each bone =
+  idle frame 0 × the clip's local rotation, positions summed. The loop is a bob around zero over the held sprint pose
+  (`sprint_offset_additive`, = walk_to_sprint's last frame = sprint_to_walk's first), so it gets idle × that pose × bob.
+  Other BO7 clips named `*_additive` / walk / jog / super sprint work the same way if they are ever used.
 - `reloadTime` = 0.8 × the clip (the mag fills before the clip's tail ends).
 - Shell-by-shell guns (a `reload_loop` clip: the M10 Breacher, `corso`) get BO1's segmented reload: `reload_start` /
   `reload_loop` / `reload_end` as `reloadStartAnim` / `reloadAnim` / `reloadEndAnim`, one shell per loop, firing
