@@ -201,6 +201,10 @@ def build(parts, out_name, light=False, rename=None, keep=None, animated=frozens
             else: w = [[(wb_of(0), 1.)]]*len(pos)
             fc = m['f']
             if decimate: pos, nrm, uv, w, fc = simplify(pos, None if nrm is None else np.asarray(nrm), np.asarray(uv), w, fc, decimate)
+            # Cast stores triangles counter-clockwise (normals agree with the winding), but SEM.to_glb flips every face
+            # for SEModel's clockwise CoD winding: pre-swap, or the gun is inside out (the far side's inside showed
+            # through the near side, user 2026-11-24 "transparent when you look at them at front")
+            fc = np.asarray(fc)[:, [0, 2, 1]]
             meshes.append({'pos': [tuple(p) for p in pos.tolist()], 'nrm': [tuple(n) for n in nrm.tolist()] if nrm is not None else None,
                            'uv': [[tuple(u)] for u in np.asarray(uv).tolist()], 'w': w,
                            'faces': [tuple(f) for f in np.asarray(fc).tolist()], 'mats': [mi]})

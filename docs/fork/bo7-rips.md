@@ -187,6 +187,14 @@ fork's generated `pr1:`/`pr2:`/`pr3:` camos. The ids and rules stay the same (we
   by name) and rerun.
 - Checked: Gunsmith PRESTIGE tab on the AK-27 (Lotus, Master, drifting) and Echo 12 (Zombies, P1, swatch); Sandbox warm-check clean.
 
+## Winding (fixed 2026-11-24, user: "transparent when you look at them at front")
+
+Cast stores triangles counter-clockwise (every face's winding agrees with its normals: 11,637 of 11,637 on the Coda 9
+receiver), but `semodel_to_glb.to_glb` flips each face for SEModel's clockwise CoD winding, so every BO7 model came out inside
+out: the near side was culled and the inside of the far side showed through. `build()` now pre-swaps the faces. The models
+already built were fixed in place by `scratch/bo7/wind/flip-glbs.mjs` (149 GLBs; it also re-versions the `?v=` md5s in
+weapons.json). It is its own inverse, so never run it on a fresh build.
+
 ## Look test (full textures, Seven's arms)
 
 The map test shrinks every image to 16 px. `KEEPIMG=webp` keeps images whose blob type matches full size once the PLAY
