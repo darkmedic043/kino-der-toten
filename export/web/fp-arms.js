@@ -315,6 +315,7 @@ export class FirstPersonArms {
       const e=pos(S.fore),ou=pos(S.arm).distanceTo(e),of=e.distanceTo(pos(S.hand));if(ou<1e-4||!T('j_shoulder_'+t5)||!T('j_elbow_'+t5)||!T('j_wrist_'+t5))continue;
       const ru=tp('j_shoulder_'+t5).distanceTo(tp('j_elbow_'+t5)),rf=tp('j_elbow_'+t5).distanceTo(tp('j_wrist_'+t5)),k=Math.min(3,1.1*(ru+rf-of)/(.88*ou));
       if(k>1.05){const below=new Set();S.fore.traverse(b=>below.add(b));upperStretch[t5]={e,dir:pos(S.arm).sub(e).divideScalar(ou),k,below};}}
+    const belowElbow=new Map();for(const S of Object.values(sides)){const set=new Set();S.fore.traverse(b=>set.add(b));belowElbow.set(S,set);}   // (fpUpper below)
     const innerR={};if(plateMat){const lists={};for(const t5 of Object.keys(sides))lists[t5]=[];const vp=new THREE.Vector3();
       model.traverse(o=>{if(!o.isSkinnedMesh||plateMat.test([o.material].flat()[0]?.name??''))return;o.skeleton.update();const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight,src=o.skeleton.bones;
         for(let v=0;v<g.attributes.position.count;v++){let S=null,w=0;for(let k=0;k<4;k++){const b=src[si.getComponent(v,k)],s=keepBones.get(b);if(s&&(b===s.fore||(b?.parent===s.fore&&b!==s.hand))){w+=sw.getComponent(v,k);S??=s;}}if(!S||w<=.5)continue;
@@ -337,10 +338,11 @@ export class FirstPersonArms {
       if(!tris.length)return;
       const used=[...new Set(tris)],remap=new Map(used.map((v,i)=>[v,i]));
       const P=new Float32Array(used.length*3),UV=g.attributes.uv?new Float32Array(used.length*2):null,SI=new Uint16Array(used.length*4),SW=new Float32Array(used.length*4),v3=new THREE.Vector3();
-      const skinThis=!!skinMat&&skinMat.test([o.material].flat()[0]?.name??''),handFlag=skinThis?new Uint8Array(used.length):null;
+      const skinThis=!!skinMat&&skinMat.test([o.material].flat()[0]?.name??''),handFlag=skinThis?new Uint8Array(used.length):null,UP=new Float32Array(used.length);
       used.forEach((v,i)=>{
         o.getVertexPosition(v,v3);v3.applyMatrix4(o.matrixWorld);
         {const S=sideOf[v],u=upperStretch[S.t5];if(u){let w=1;for(let k=0;k<4;k++)if(u.below.has(src[si.getComponent(v,k)]))w-=sw.getComponent(v,k);const t=w&&v3.clone().sub(u.e).dot(u.dir);if(t>0)v3.addScaledVector(u.dir,t*(u.k-1)*w);}}   // (the upper-arm stretch above)
+        {const bs=belowElbow.get(sideOf[v]);let w=1;for(let k=0;k<4;k++)if(bs?.has(src[si.getComponent(v,k)]))w-=sw.getComponent(v,k);UP[i]=Math.max(0,w);}   // the vertex's share above the elbow (fpArmsUpperCut)
         if(handFlag){const hs=handSets.get(sideOf[v]);let hw=0;for(let k=0;k<4;k++)if(hs?.has(src[si.getComponent(v,k)]))hw+=sw.getComponent(v,k);handFlag[i]=hw>.5?1:0;}
         if(rt){const S=sideOf[v];
           {const d=new THREE.Vector3();for(let k=0;k<4;k++){const w=sw.getComponent(v,k),sc=w&&scaleBones.get(src[si.getComponent(v,k)]);if(sc)d.addScaledVector(scaleOff(v3,sc),w);}v3.add(d);}   // (fpArmsFingerScale, every layer by its weights)
@@ -367,7 +369,7 @@ export class FirstPersonArms {
       for(const [pf,list] of palmLists){if(list.length>=8)pf.bIdx.push({k:parts.length,idx:Uint32Array.from(list)});}palmLists.clear();
       const geo=new THREE.BufferGeometry();
       geo.setAttribute('position',new THREE.BufferAttribute(P,3));if(UV)geo.setAttribute('uv',new THREE.BufferAttribute(UV,2));
-      geo.setAttribute('skinIndex',new THREE.BufferAttribute(SI,4));geo.setAttribute('skinWeight',new THREE.BufferAttribute(SW,4));
+      geo.setAttribute('skinIndex',new THREE.BufferAttribute(SI,4));geo.setAttribute('skinWeight',new THREE.BufferAttribute(SW,4));geo.setAttribute('fpUpper',new THREE.BufferAttribute(UP,1));
       geo.setIndex(tris.map(v=>remap.get(v)));geo.computeVertexNormals();
       // The viewmodel lights are strong; tone the arms down to sit with the gun. fpArmsTone: a factor, or [r,g,b] to
       // also warm them (the viewmodel light reads cooler than the map's on light fur)
@@ -385,13 +387,17 @@ export class FirstPersonArms {
       // the full cut) outside melee attacks and 1 during them. Bondrewd Premium's knife idle holds the fur 2 units
       // from the lens, inside the 5-unit cut, which opened a hole in the fur there; the cut is only for the lunge.
       const near=this.entry.fpArmsNearCut,inner=skinOn&&likeMat?(skin.innerCut??(near?near+3:0)):near;
-      const nearCut=(material,n=near)=>{if(!n)return;
+      // fpArmsUpperCut (view units, default 24; 0 = off): the upper arm (a vertex's share above the elbow, fpUpper) is cut
+      // this near instead: as Seven, the AW pistols and SMGs (Atlas 45, PDW, KF5) showed a chunk of upper arm in the bottom
+      // left corner at the hip, 16-21 units away (2026-11-24, user: "some guns, like the m1 irons, have the shoulder in my face").
+      const upperCut=this.entry.fpArmsUpperCut??24;
+      const nearCut=(material,n=near)=>{if(!n&&!upperCut)return;n=n||0;const u=Math.max(n,upperCut);
         material.onBeforeCompile=sh=>{
           sh.uniforms.uFpCut=this.cutU;
-          sh.vertexShader=sh.vertexShader.replace('void main() {','varying float vFpDepth;\nvoid main() {').replace('#include <project_vertex>','#include <project_vertex>\n\tvFpDepth=-mvPosition.z;');
-          sh.fragmentShader=sh.fragmentShader.replace('void main() {',`varying float vFpDepth;\nuniform float uFpCut;\nvoid main() {\n\tif(vFpDepth<${n.toFixed(2)}*uFpCut)discard;`);
+          sh.vertexShader=sh.vertexShader.replace('void main() {','attribute float fpUpper;\nvarying float vFpDepth;\nvarying float vFpUp;\nvoid main() {').replace('#include <project_vertex>','#include <project_vertex>\n\tvFpDepth=-mvPosition.z;vFpUp=fpUpper;');
+          sh.fragmentShader=sh.fragmentShader.replace('void main() {',`varying float vFpDepth;\nvarying float vFpUp;\nuniform float uFpCut;\nvoid main() {\n\tif(vFpDepth<mix(${n.toFixed(2)},${u.toFixed(2)},step(.5,vFpUp))*uFpCut)discard;`);
         };
-        material.customProgramCacheKey=()=>'fpNearCut'+n;};
+        material.customProgramCacheKey=()=>'fpNearCut'+n+'/'+u;};
       const cutAt=likeMat&&likeMat.test(material.name??'')?near:inner;
       nearCut(material,cutAt);
       // fpArmsHandSkin: the hand's triangles go to their own part in the plain fur-coloured material (the attributes and

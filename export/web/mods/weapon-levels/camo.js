@@ -298,11 +298,11 @@ export const isBody=m=>!!m&&!SKIP.test((m.name??'').replace(/raygun_mk3/g,'raygu
 // Vital parts keep their own look under every camo (user 2026-11-18: "not affecting the magazine nd other vital parts like
 // the meter on the raygun"): materials of their own (the Ray Gun's canisters, Winter's Howl's cryo canisters, the DG-2's
 // bulbs and power line, the Thundergun's chamber and wires, the Mk3's orb and energy parts, gauges and dials) ...
-const VITAL=/ray_gun_battery|freeze_gun_ammo|dg2_(bulb|power)|thundergun_(chamber|wires|mesh)|mk3_rh_rear_off|mk3_.*cradle|mk3_lh_front_e|gauge|dialface/;
+const VITAL=/ray_gun_battery|freeze_gun_ammo|dg2_(bulb|power)|thundergun_(chamber|wires|mesh)|mk3_rh_rear_off|mk3_.*cradle|mk3_lh_front_e|gauge|dialface|^b7_(base_)?mag|^b7_ubgl|^mtl_ammo|_mag(_|$)|_sights?$|reticle/;   // BO7 rips (2026-11-24, user: "make sure camo applying is proper on em"): mag parts (b7_base_mag~, b7_mag_*, mtl_sat_*_mag), the rounds, the iron sights, the underbarrel launcher, the reticle stencil
 // ... and parts painted with the body's material, found by the bone that carries them: magazines on every gun (tag_clip
 // and the bigger mags), the Ray Gun's meter (tag_switch, its needle j_arrow, the knob tag_knob) and battery, the
 // Thundergun's canisters (tag_clip2), Winter's Howl's ammo drum (j_ammo), the Wave Gun's needles, the DG-2's bulbs
-const VITAL_BONE=/^(tag_clip\d?|tag_ext_clip|tag_extended_clip|tag_clip_extended|tag_dual_clip|tag_double_clip|tag_duel_clip|tag_drum|tag_switch|j_arrow|tag_knob|tag_battery_\d|j_ammo|j_needle\d?|tag_bulb_\d)$/;
+const VITAL_BONE=/^(?:.*__)?(j_mag\d|tag_clip\d?|tag_ext_clip|tag_extended_clip|tag_clip_extended|tag_dual_clip|tag_double_clip|tag_duel_clip|tag_drum|tag_switch|j_arrow|tag_knob|tag_battery_\d|j_ammo|j_needle\d?|tag_bulb_\d)$/;
 const vitalCache=new WeakMap();
 // a skinned mesh's main bone: the one most of its indexed vertices hang on (a few hundred sampled)
 function vitalPart(o){
@@ -319,7 +319,9 @@ function vitalPart(o){
 export function applyCamo(root,camo){
   // charms and gun screens (userData.charm, mods/charms) hang under the gun but keep their own materials (2026-11-08: the
   // gold camo was painted over a screen's textured housing; the user saw it as a texture glitch)
-  const walk=(o,fn)=>{if(o.userData?.charm)return;fn(o);for(const c of o.children)walk(c,fn);};
+  // mounted attachments (mounts.js: optics, lasers, muzzles, grips) keep theirs too: in play they arrive after the camo and
+  // stayed plain, but a camo picked in the Gunsmith after they were mounted painted them (2026-11-24)
+  const walk=(o,fn)=>{if(o.userData?.charm||o.userData?.mountId!=null)return;fn(o);for(const c of o.children)walk(c,fn);};
   if(root)walk(root,o=>{
     if(!o.isMesh)return;
     const list=Array.isArray(o.material)?o.material:[o.material];

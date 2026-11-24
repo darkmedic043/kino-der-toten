@@ -168,7 +168,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const stock=new Set(previewDef(cat,def,id,[]).hideTags??[]),bigMag=MAG_TAGS.some(t=>stock.has(t)&&!hidden.has(t)&&gun.getObjectByName(t));
     gun.traverse(o=>{if(o.isSkinnedMesh&&domBone(o)?.name==='tag_clip')o.visible=!bigMag;});
     // imported guns: attachment models mounted on their tags
-    if(def?.mounts){const g=gun,gl=gunL,m=previewDef(cat,def,id,ids).mounted??[];mountParts(g,def,m,()=>gun===g);if(gl)mountParts(gl,def,m,()=>gunL===gl,{mirror:true});}   // the left gun as in game (weapon-levels mod.js)
+    if(def?.mounts||def?.tagGroups){const g=gun,gl=gunL,pd=previewDef(cat,def,id,ids),m=pd.mounted??[];mountParts(g,pd,m,()=>gun===g);if(gl)mountParts(gl,pd,m,()=>gunL===gl,{mirror:true});}   // the left gun as in game (weapon-levels mod.js); the previewed def, whose hideTags show the fitted BO7 part swaps (the base def's hid them all again in syncTagGroups)
   }
   async function loadGun(){
     def=weapons[id];const token=id;
@@ -590,6 +590,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     if(s.clipMul)out.push(['pro',`Magazine +${Math.round((s.clipMul-1)*100)}%`]);
     if(s.reserveMul)out.push(['pro',`Reserve ammo +${Math.round((s.reserveMul-1)*100)}%`]);
     if(s.pierce)out.push(['pro',`Pierces ${s.pierce} more`]);
+    if(s.pierceAdd)out.push(['pro',`Pierces ${s.pierceAdd} more zombie${s.pierceAdd>1?'s':''}`]);
     if(s.clipLeftAdd)out.push(['pro',`Left gun +${s.clipLeftAdd} rounds`]);
     if(s.fireLeftMul)out.push(['pro',`Left gun fire rate +${Math.round((s.fireLeftMul-1)*100)}%`]);
     if(s.reloadMul)out.push([s.reloadMul<1?'pro':'con',`Reload ${s.reloadMul<1?'−':'+'}${Math.round(Math.abs(1-s.reloadMul)*100)}%`]);

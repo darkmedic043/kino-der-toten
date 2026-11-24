@@ -3234,10 +3234,10 @@
       "name": "FMJ Rounds",
       "slot": "ammo",
       "tags": [],
-      "desc": "Rounds go through the first zombie; 10% more range.",
+      "desc": "Rounds go through one more zombie; 10% more range.",
       "stats": {
         "rangeMul": 1.1,
-        "pierce": 1
+        "pierceAdd": 1
       }
     },
     {
@@ -3268,6 +3268,7 @@
     {"id": "b7_ammo_db", "name": "Dragon's Breath", "slot": "ammo", "tags": [], "desc": "12 gauge incendiary shells: every zombie a pellet hits catches fire (55 damage a second for 3 s). 25% less range.", "stats": {"set": {"incendiary": true}, "rangeMul": 0.75}},
     {"id": "b7_ammo_slug", "name": "Slug Rounds", "slot": "ammo", "tags": [], "desc": "One heavy slug instead of buckshot: 6x a pellet's damage, 2.5x the range, better headshots.", "stats": {"set": {"pellets": 1}, "damageMul": 6, "rangeMul": 2.5, "headMul": 1.5}},
     {"id": "b7_ammo_short", "name": "Short Shells", "slot": "ammo", "tags": [], "desc": "Shorter 12 gauge shells: 50% more in each magazine, 20% less range, 10% less damage.", "stats": {"clipMul": 1.5, "rangeMul": 0.8, "damageMul": 0.9}},
+    {"id": "b7_ammo_bolt_explode", "name": "Explosive Bolts", "slot": "ammo", "tags": [], "desc": "NX Ravager bolts burst where they land instead of sticking for 1.5 s first.", "stats": {"set": {"impactExplode": true}}},
     {"id": "b7_kit_backlash", "name": "Backlash Launcher Kit", "slot": "ammo", "tags": [], "desc": "Echo 12 conversion kit: each shot is one explosive round that sticks where it lands and blows 0.15 s later (your own blasts can't hurt you). Pack-a-Punched, the rounds burst on impact.", "stats": {"set": {"backlash": true}}},
     {
       "id": "b7_optic_dualzoom01",
@@ -3618,6 +3619,7 @@
     }
   ],
   "ironSights": {
+    "bo7_crossbow": ["b7_base_optic"],
     "galil_zm": [
       "tag_iron_sights",
       "tag_front_sight"

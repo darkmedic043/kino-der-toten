@@ -498,6 +498,14 @@ ROLES = [('idleAnim', 'idle', True), ('fireAnim', 'fire', False), ('lastShotAnim
          ('dropAnim', 'drop', False), ('quickDropAnim', 'drop_quick', False), ('adsUpAnim', 'ads_up', False), ('adsDownAnim', 'ads_down', False),
          ('sprintInAnim', 'walk_to_sprint', False), ('sprintLoopAnim', 'sprint_loop', True), ('sprintOutAnim', 'sprint_to_walk', False),
          ('inspectAnim', 'inspect', False)]
+# the rips name the ADS clips three ways: fire_last_ads (M10 Breacher, Siren), fire_ads_last (41 guns), ads_fire_last / ads_rechamber
+# (Hawker HX); a role whose clip was missing fell back to the hip fireAnim (animation.js shoot), so the last shot in ADS, or every ADS
+# shot on the Hawker and Strider, played the hip clip, a bolt gun's whole hip rechamber with it (user 2026-11-24: "the chamber for some
+# guns breaks the animation"). A bolt gun with no plain ADS fire clip kicks with its ADS last-shot clip.
+CLIP_ALIAS = {'fire_ads': ['fire_ads', 'ads_fire', 'fire_ads_last', 'ads_fire_last', 'fire_last_ads'], 'fire_last_ads': ['fire_last_ads', 'fire_ads_last', 'ads_fire_last'],
+              'rechamber_ads': ['rechamber_ads', 'ads_rechamber']}
+def clip_name(pre, nm):
+    return next((x for x in CLIP_ALIAS.get(nm, [nm]) if (EXP/'animations'/(pre+x+'.cast')).exists()), nm)
 
 # ---- Gunsmith attachments (docs/fork/bo7-rips.md, Attachments) ----------------------------------------------------
 # A gun's list is <pipeline>/dumps/gunsmith.json (refs like sat_mag_extmag_ar_kite, class optics like sat_reflex01_ar),
@@ -610,6 +618,8 @@ def gun_attachments(g, c, gid, bones, part_dir):
     cal = next((r.split('_')[2] for r in refs if r.startswith('sat_ammo_')), None)
     variants, mounts, stat, order, used, optics = [], {}, [], [], {}, 0
     for r in refs:
+        if r == 'sat_ammo_crossbow_bolt_explode': stat.append('b7_ammo_bolt_explode'); order.append('b7_ammo_bolt_explode'); continue   # the NX Ravager's Explosive Bolts
+        if r.endswith(tail) and optic_model(r[4:-len(tail)]): r = r[:-len(g)-1]   # a gun-specific optic (the NX Ravager's twox01/varizoom01, the Orion's reflex01): read as a shared one below
         if r.endswith(tail):
             sk = r[4:-len(tail)]; slot, _, kind = sk.partition('_')
             if slot == 'ammo':
@@ -651,6 +661,7 @@ def gun_attachments(g, c, gid, bones, part_dir):
             mounts[aid] = {'model': url, 'tag': tag}; order.append(aid)
         elif r.startswith('sat_') and r.count('_') >= 2 and r.rsplit('_', 1)[0] != 'sat':
             ref = r[4:].rsplit('_', 1)[0]; model = optic_model(ref)
+            if 'b7_optic_'+ref in mounts: continue   # listed twice (the Orion: sat_reflex01_pi and sat_reflex01_pi_orion)
             if not model or not has_model('sat_vm_'+model) or optics >= MAX_OPTICS: continue
             aid = 'b7_optic_'+ref; url, tag = mount_glb(model)
             if tag not in bones: tag = 'tag_reflex'
@@ -817,6 +828,7 @@ def build_gun(g):
     swap = {v[0].split('_'+c+'_'+g+'_')[1].split('_')[0] for v in variants}   # slots that have variants: their stock part gets hide bones
     parts = [pre+'rec']+[(pre+p, 'base', 'b7_base_'+PART_SLOT[{'pgrip': 'grip'}.get(p, p)][1]) if p in swap else pre+p for p in base_parts]+variants
     if any(k != BUILTIN_UBGL.get(g) for k in UBGL.get(g, [])): parts.append(('sat_vm_ub_gl_01', 'base', 'b7_ubgl'))   # the launcher, hidden until one is fitted
+    if any(a.startswith('b7_optic_') for a in mounts): parts = [(x, 'base', 'b7_base_optic') if isinstance(x, str) and x[len(pre):] in ('reflex', 'scope') else x for x in parts]   # a stock sight that is its own model (the NX Ravager's): folds away under a fitted optic (attachments.json ironSights)
     view, gun_rest = build(parts, f'bo7_{g}_view', animated=animated_bones(pre))
     X = build.extra
     print(f'  {g}: {len(variants)} part variants, {len(mounts)} mounted, {len(stat_atts)} stat-only;', ' '.join(order))
@@ -824,7 +836,7 @@ def build_gun(g):
     world, _ = build([wpre+'rec']+[wpre+p for p in ('bar', 'mag', 'pgrip', 'stock', *EXTRA_PARTS.get(g, [])) if model_dir(wpre+p).is_dir()], f'bo7_{g}_world', light=True, decimate=WORLD_KEEP, extras=REST)
     A, T, notes = {}, {}, set()
     for role, nm, loop in ([] if G['pair_only'] else ROLES):
-        full = pre.replace('sat_vm_', 'sat_vm_')+nm
+        full = pre+clip_name(pre, nm)
         if not (EXP/'animations'/(full+'.cast')).exists(): print('  no clip', full); continue
         A[role], d = clip(full, arms_rest, gun_rest, loop, base=sprint_base(pre, role)); T[role] = d['duration']
         notes |= {n['name'] for n in d['notifies']}
@@ -845,6 +857,7 @@ def build_gun(g):
     fire_len, rech = 0, {}
     if g in RECHAMBER:   # rechambers every few shots, not after each (mod.js): the clip is the last-shot kick, then the rechamber
         for role, nm, rc in (('rechamberAnim', 'fire_last', 'rechamber'), ('adsRechamberAnim', 'fire_last_ads', 'rechamber_ads')):
+            nm, rc = clip_name(pre, nm), clip_name(pre, rc)
             if not (EXP/'animations'/(pre+nm+'.cast')).exists(): nm = 'fire_last'
             if not (EXP/'animations'/(pre+rc+'.cast')).exists(): rc = 'rechamber'
             A[role], d = clip(pre+nm, arms_rest, gun_rest, then=pre+rc); notes |= {n['name'] for n in d['notifies']}
@@ -852,6 +865,7 @@ def build_gun(g):
         rech.update(RECHAMBER[g])
     elif G['stats']['fireType'] == 'Single Shot' and (EXP/'animations'/(pre+'rechamber.cast')).exists():   # pump and bolt guns
         for role, nm, rc in (('fireAnim', 'fire', 'rechamber'), ('adsFireAnim', 'fire_ads', 'rechamber_ads')):
+            nm, rc = clip_name(pre, nm), clip_name(pre, rc)
             if not (EXP/'animations'/(pre+nm+'.cast')).exists(): continue
             if not (EXP/'animations'/(pre+rc+'.cast')).exists(): rc = 'rechamber'
             A[role], d = clip(pre+nm, arms_rest, gun_rest, then=pre+rc); notes |= {n['name'] for n in d['notifies']}; fire_len = max(fire_len, d['duration'])

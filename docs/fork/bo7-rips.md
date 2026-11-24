@@ -370,6 +370,13 @@ Sight fix in `mounts.js`:
 Checked: every gun fired a full magazine and reloaded in Sandbox (`scratch/bo7/`).
 Left as they are, because they match BO7: the TR51, the Sokol, the A.R.C. M1, the AAROW, and the Gremlin's 52-round magazine.
 
+## Pack-a-Punch view, camo exclusions, pierce, ADS clip names (2026-11-24)
+
+- **Pack-a-Punch broke the view** (user: "pack a punch seems to completely break fpv"): the upgraded def is `{...d,...d.upgrade}`, and the build gives each upgrade its own `viewOffset` ([2,-.5,-7]), which beat the class offset `prepare()` sets on the base: the gun jumped and the arm's shoulder swung into view. `prepare()` now copies the base offset onto `d.upgrade`. Checked as Venator and Seven: the Kite's PaP frames match the base.
+- **Camo leaves parts alone** (user: "make sure camo applying is proper on em"): camo.js `VITAL` keeps the mags (`b7_mag`, `b7_base_mag`, `_mag`), rounds (`mtl_ammo`), iron sights (`_sights`), the underbarrel launcher (`b7_ubgl`) and the reticle stencil on their own materials, and `VITAL_BONE` takes BO7's part-prefixed bones (`<part>__j_mag1`). Mounted parts (`userData.mountId`: optics, lasers, muzzles, grips) are skipped too: in play they arrive after the camo and stayed plain, but the Gunsmith painted them when a camo was picked after mounting. Checked: Kite and Alcor in tiger and gold, arms and mag plain.
+- **Pierce**: `PIERCE` in mod.js (sniper 3, LMG 2, rifle 1; Zeus 2) sets `def.pierce` on base and upgrade unless the def has its own; projectiles pierce nothing. FMJ is now `pierceAdd: 1` (gunsmith.js adds it to the gun's own, the Gunsmith lists "Pierces 1 more zombie").
+- **ADS last-shot and rechamber clips** (user: "the chamber for some guns breaks the animation"): the rips name them three ways (`fire_last_ads`, `fire_ads_last`, `ads_fire_last`/`ads_rechamber`); a role whose clip was missing fell back to the hip fire clip. `clip_name()` in the build tries each spelling (`CLIP_ALIAS`).
+
 ## Known limits / next
 
 - Only LOD0 was ripped; world models are decimated copies of it.

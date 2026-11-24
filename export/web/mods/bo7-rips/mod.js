@@ -6,6 +6,7 @@ import {loadModel} from '../../animation.js';
 import {PRESTIGE_OWN} from '../weapon-levels/camo.js';
 const BASE=new URL('./',import.meta.url).href;
 let built=null;
+const PIERCE={'Sniper rifle':3,'Light machine gun':2,Rifle:1},PIERCE_ID={bo7_zeus:2,bo7_zeus_dw:2};   // zombies a bullet goes on through (engine.js def.pierce): our own pick by class, the dumps have no penetration (2026-11-24, user: "make sure pierce is also taken into account"); SMGs, pistols and pellets stop at the first; FMJ adds one (attachments.json pierceAdd)
 const VIEW_FOV=64,VIEW_OFFSET={};   // hip framing at that FOV, per weapon class (right, up, z: negative = forward), [0,0,0] if not listed
 
 export async function prepare(data){
@@ -21,7 +22,8 @@ export async function prepare(data){
   // "back part" was the cut end of an operator's upper arm (Venator), now stretched to the rig's shoulder in fp-arms.js; BO7 itself shows the stock in the corner)
   // partSlots: the Gunsmith's slot markers find each slot's stock part by its head bone (gunsmith-view.js partOf)
   const PART_SLOTS={b7_base_barrel:'barrel',b7_base_mag:'mag',b7_base_grip:'grip',b7_base_stock:'stock'};
-  for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=!d.dualWield&&!!d.animations?.sprintLoopAnim;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];d.partSlots=PART_SLOTS;}
+  for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=!d.dualWield&&!!d.animations?.sprintLoopAnim;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];if(d.upgrade)d.upgrade.viewOffset=d.viewOffset;d.partSlots=PART_SLOTS;const pc=PIERCE_ID[d.id]??(d.projectileType?0:PIERCE[d.weaponClass]??0);if(pc)for(const x of [d,d.upgrade])if(x)x.pierce??=pc;   // the upgrade's own built viewOffset ([2,-.5,-7]) had won over this on Pack-a-Punch: the gun jumped and the arm swung its shoulder into view (2026-11-24, user: "pack a punch seems to completely break fpv")
+  }
   Object.assign(data.weapons,built.weapons);
   // their own prestige camos (P1, P2, the animated Master) instead of the generated ones (.tools/build_bo7_prestige.py)
   const pr=await fetch(BASE+'prestige.json').then(r=>r.ok?r.json():null).catch(()=>null);

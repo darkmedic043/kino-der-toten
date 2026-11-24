@@ -161,6 +161,7 @@ function applyStats(obj,list,cat,show){
     if(s.pelletMul&&obj.pellets)obj.pellets=Math.round(obj.pellets*s.pelletMul);
     if(s.pelletSpreadMul)obj.pelletSpread=+((obj.pelletSpread??.055)*s.pelletSpreadMul).toFixed(4);   // .055 is the engine's default
     if(s.pierce)obj.pierce=Math.max(obj.pierce??0,s.pierce);
+    if(s.pierceAdd)obj.pierce=(obj.pierce??0)+s.pierceAdd;   // on top of the gun's own (the BO7 rifles already pierce one: FMJ makes it two)
     if(s.adsRecoilScale)obj.adsRecoilScale=s.adsRecoilScale;
     if(s.blastMul&&obj.explosionRadius)obj.explosionRadius=Math.round(obj.explosionRadius*s.blastMul);
     if(s.projectileMul&&obj.projectileSpeed)obj.projectileSpeed=Math.round(obj.projectileSpeed*s.projectileMul);
