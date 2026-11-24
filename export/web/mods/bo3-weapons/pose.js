@@ -7,8 +7,8 @@ import * as THREE from 'three';
 import { loadAnimation, makeClip } from '../../animation.js';
 
 export const needsPose=def=>!!(def?.lazyWorld&&def.animations?.idleAnim);
-export async function poseIdle(model,def,{force=false}={}){   // force: a BO1 gun too (the Gunsmith's shell-loaded guns)
-  if(!model||!(needsPose(def)||force&&def?.animations?.idleAnim)||model.userData.bo3Posed)return model;
+export async function poseIdle(model,def,{force=false}={}){   // force: a BO1 gun too (the Gunsmith's shell-loaded guns); restPose (glTF scene extras): a model whose bind is already the rest pose (the BO7 world models)
+  if(!model||!(needsPose(def)||force&&def?.animations?.idleAnim)||model.userData.bo3Posed||model.userData.restPose)return model;
   const data=await loadAnimation(def.animations.idleAnim).catch(()=>null);if(!data)return model;
   // The root bone (j_gun, or the first bone: tag_weapon on these guns) stays put, as ViewWeapon anchors
   // it: its bind carries a 90 degree roll that the animation's root track resets, which left the

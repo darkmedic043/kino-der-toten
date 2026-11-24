@@ -265,6 +265,12 @@ export default async function setup(api) {
     addCloud(at, r, dur, true);
     const net = kino.coop; if (net?.id) net.send('all', { t: 'smoke', at: [at.x, at.y, at.z], r, dur });
   }
+  // a smoke cloud at a point from any source (the BO7 Smoke Launcher underbarrel, mods/bo7-rips): k scales the radius and life
+  kino.smokeAt = (at, k = 1) => {
+    const r = CLOUD_R * k * (1 + aug('smoke.radius')), dur = CLOUD_LIFE * k * (1 + aug('smoke.long'));
+    addCloud(at, r, dur, true);
+    const net = kino.coop; if (net?.id) net.send('all', { t: 'smoke', at: [at.x, at.y, at.z], r, dur });
+  };
   // players a zombie can't see: anyone inside the smoke, whatever they do in there (Ghost: and for a moment after)
   kino.concealed = (z, pos, id) => !!pos && ((id == null && now() < ghostUntil) || hidden(pos));
   // nothing hurts you while you stand in the smoke

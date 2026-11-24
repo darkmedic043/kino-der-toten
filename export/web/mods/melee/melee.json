@@ -91,6 +91,42 @@
         "ossuary": { "swing": 0.8, "window": 1.3 },
         "belfry": { "tolls": 3, "every": 1.2, "radius": 260 }
       }
+    },
+    "bo7_knife": {
+      "name": "Tactical Knife", "upgradeName": "Last Word", "description": "BO7's knife: fast slashes and a lunge, on its own swing clips.",
+      "base": "bo7_me_knife", "ownClips": true,
+      "damage": 300, "heavyMul": 2, "swing": 0.5, "swingDelay": 0.17, "heavy": 0.6, "heavyDelay": 0.22,
+      "reach": 105, "lunge": 190, "moveSpeed": 1.12, "sprintSpeed": 1.15
+    },
+    "mace": {
+      "name": "Mace", "upgradeName": "Blunt Instrument", "description": "Slow, heavy swings that hit hard. The heavy blow cracks anything in front of you.",
+      "base": "bo7_me_castor", "ownClips": true,
+      "damage": 380, "heavyMul": 2.4, "swing": 0.8, "swingDelay": 0.32, "heavy": 0.85, "heavyDelay": 0.38,
+      "reach": 110, "lunge": 150, "moveSpeed": 1.0, "sprintSpeed": 1.02
+    },
+    "katana": {
+      "name": "Katana", "upgradeName": "Sakura Fall", "description": "Long, clean cuts with good reach.",
+      "base": "bo7_me_nashira", "ownClips": true,
+      "damage": 330, "heavyMul": 2.1, "swing": 0.62, "swingDelay": 0.22, "heavy": 0.72, "heavyDelay": 0.3,
+      "reach": 125, "lunge": 180, "moveSpeed": 1.08, "sprintSpeed": 1.1
+    },
+    "h311_saw": {
+      "name": "H311-SAW", "upgradeName": "Hell's Kitchen", "description": "A chainsaw. Slow to bring around, savage once it connects.",
+      "base": "bo7_me_saiph", "ownClips": true,
+      "damage": 420, "heavyMul": 2.2, "swing": 0.85, "swingDelay": 0.3, "heavy": 0.9, "heavyDelay": 0.36,
+      "reach": 115, "lunge": 140, "moveSpeed": 0.98, "sprintSpeed": 1.0
+    },
+    "flatline": {
+      "name": "Flatline MK.II", "upgradeName": "Code Blue", "description": "A shock baton: quick jabs and a charged strike.",
+      "base": "bo7_me_shockbaton", "ownClips": true,
+      "damage": 320, "heavyMul": 2.2, "swing": 0.62, "swingDelay": 0.2, "heavy": 0.66, "heavyDelay": 0.26,
+      "reach": 105, "lunge": 170, "moveSpeed": 1.08, "sprintSpeed": 1.1
+    },
+    "arcblade": {
+      "name": "Arcblade", "upgradeName": "Arc Flash", "description": "A curved blade, quick in the hand.",
+      "base": "bo7_me_wasat", "ownClips": true,
+      "damage": 310, "heavyMul": 2.1, "swing": 0.52, "swingDelay": 0.18, "heavy": 0.62, "heavyDelay": 0.24,
+      "reach": 110, "lunge": 185, "moveSpeed": 1.1, "sprintSpeed": 1.12
     }
   }
 }

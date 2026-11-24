@@ -118,6 +118,7 @@ export function grantWeaponXp(cat,def,id,profile,amount){
 }
 
 const STAT_FIELDS=['damage','minDamage','range','fireTime','clipSize','maxAmmo','startAmmo','reloadTime','reloadEmptyTime','adsFov','headMultiplier','hideTags','scope','hipSpread','pellets','pelletSpread','pierce','adsRecoilScale','explosionRadius','projectileSpeed','suppressed','automatic','fireType','attachments','attachment','mounted','clipLeft','fireTimeLeft','thunderRange','thunderCone','noSelfSplash',
+  'projectileType','projectileModel','projectileSpeedUp','projectileLifetime','fuseTime','explosionInnerDamage','explosionOuterDamage','rechamberTime','incendiary','backlash',   // BO7 fire mods and ammo (mods/bo7-rips)
   'animations','raiseTime','dropTime','sprintInTime','sprintLoopTime','sprintOutTime','reloadStartTime','reloadEndTime'];   // the last row: attachments with their own clips (attachClips)
 function snapshot(obj){if(!pristine.has(obj)){const s={};for(const k of STAT_FIELDS)s[k]=obj[k]===undefined?undefined:structuredClone(obj[k]);pristine.set(obj,s);}return pristine.get(obj);}
 function restore(obj){const s=snapshot(obj);for(const k of STAT_FIELDS){if(s[k]===undefined)delete obj[k];else obj[k]=structuredClone(s[k]);}}

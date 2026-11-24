@@ -123,7 +123,7 @@ export function setupFlamer(api){
       spawn('smoke',at,fwd.clone().multiplyScalar(90).add(new THREE.Vector3(0,30,0)),1.1+Math.random()*.4,12,44);
     }
   }
-  const stats={scorches:0,hits:0};window.kino.flamer=stats;
+  const stats={scorches:0,hits:0,ignite};window.kino.flamer=stats;   // ignite: Dragon's Breath shells set zombies alight too (mods/bo7-rips)
   function scorch(){
     aimInfo();stats.scorches++;stats.reach=reach;
     for(const z of [...enemies.list]){

@@ -29,6 +29,8 @@ MOD = ROOT/'export/web/mods/bo7-rips'
 WEB = 'mods/bo7-rips/'
 CM = 1/2.54
 WORLD_KEEP = .1   # share of the world model's triangles kept (simplify())
+REST = {'restPose': True}   # world models: their bind pose is the gun at rest (the spare mag inside the gun), so pose.js poseIdle leaves them be;
+                                # the viewmodel's idle frame tilted the 1911's slide in every static view (2026-11-24)
 for sub in ['models', 'animations', 'audio']: (MOD/sub).mkdir(parents=True, exist_ok=True)
 
 # colour / normal / ORM WebPs by material name, from every pipeline output folder that has them
@@ -66,33 +68,83 @@ def qrot(q, v):   # v: (3,) or (n,3)
     u, w = np.asarray(q[:3]), q[3]; v = np.asarray(v, float)
     t = 2*np.cross(u, v); return v + w*t + np.cross(u, t)
 
+BLUEPRINT = {'oman': ('polarb', 'redteeth', 'techwar', 'bamboo'), 'otter': ('pforce', 'arctic', 'evhunter', 'training')}   # preferred, for one look
+_ALL = None
+def model_dir(name):
+    """a model's export folder by its stock name. Guns ripped only as blueprints answer too: the MXR-17's stock parts are
+    att_<name>; the Warden 308's and RK-9's only exist as <slot>_<blueprint>_vm_sat_<c>_<g>_<part> (the stock mesh with the
+    stock colour maps, a blueprint's overlay on top), BLUEPRINT[g] first so the parts share one"""
+    global _ALL
+    p = EXP/'models'/name
+    if p.is_dir(): return p
+    if (EXP/'models'/('att_'+name)).is_dir(): return EXP/'models'/('att_'+name)
+    # a melee ripped as one model (the Katana: sat_vm_me_nashira; its wpn_ copy is an empty bone, so the knife came out with 0 verts)
+    if name.endswith('_rec') and '_me_' in name and (EXP/'models'/name[:-4]).is_dir(): return EXP/'models'/name[:-4]
+    if name.endswith('_rec') and (EXP/'models'/('wpn_'+name[:-4])).is_dir(): return EXP/'models'/('wpn_'+name[:-4])   # the AAROW: one model
+    m = __import__('re').match(r'sat_(vm|wm)_([a-z]{2})_([a-z0-9]+)_(.+)$', name)
+    if not m: return p
+    v, c, g, part = m.groups()
+    if _ALL is None: _ALL = sorted(x.name for x in (EXP/'models').iterdir())
+    head, tail = f'sat_{v}_{c}_{g}_{part.split("_")[0]}_', f'_{v}_sat_{c}_{g}_{part}'
+    cands = [x for x in _ALL if x.startswith(head) and x.endswith(tail)]
+    pref = BLUEPRINT.get(g, ())
+    cands.sort(key=lambda x: next((i for i, b in enumerate(pref) if f'_{b}_' in x), 99))
+    return EXP/'models'/cands[0] if cands else p
+
 def load_model(name):
-    roots = castlib.load(EXP/'models'/name/(name+'_LOD0.cast'))
+    d = model_dir(name)
+    roots = castlib.load(d/(d.name+'_LOD0.cast'))
     m = next(n for r in roots for n in r.walk() if n.type == 'model')
     return castlib.skeleton(m), castlib.meshes(m), castlib.materials(m)
 
 def simplify(pos, nrm, uv, w, faces, keep):
     """Quadric decimation (fast-simplification) of one mesh down to about `keep` of its triangles, for the world model
-    (the Mystery Box display and third person). Each new vertex takes the normal, UV and weights of the nearest original
-    vertex merged into it; UV seams are split vertices, so the simplifier keeps them as borders."""
+    (the Mystery Box display, third person, the HUD icon). The game splits a vertex at every UV seam and hard edge, and
+    decimated as-is each split was an open border the simplifier tore: slides came out with holes, spikes and flipped
+    faces (user 2026-11-24, "gun icons are severely broken"). So the mesh is welded by position first, decimated, and
+    every corner of a new face takes the attributes (normal, UV, weights) of the original vertex merged into it whose
+    own faces lie nearest that face: the seam's split comes back on the side the face is on."""
     import fast_simplification as FS
     f = np.asarray(faces, dtype=np.int64)
     if len(f) < 400: return pos, nrm, uv, w, faces
-    p = np.asarray(pos, dtype=np.float32)
-    _, _, col = FS.simplify(p, f, 1-keep, return_collapses=True)
-    p2, f2, mp = FS.replay_simplification(p, f, col)
-    d = np.linalg.norm(p - p2[mp], axis=1)
-    order = np.lexsort((d, mp)); first = np.ones(len(order), bool); first[1:] = mp[order][1:] != mp[order][:-1]
-    src = np.empty(len(p2), np.int64); src[mp[order][first]] = order[first]
-    return p2, None if nrm is None else np.asarray(nrm)[src], np.asarray(uv)[src], [w[i] for i in src], f2
+    p = np.asarray(pos, dtype=np.float64)
+    # welded only within one bone's piece: across bones (a round against its mag) the pieces must stay apart, or a
+    # face spans both and stretches when they move apart in the pose
+    dom = np.array([max(v, key=lambda e: e[1])[0] for v in w], np.float64)[:, None]
+    _, first, inv = np.unique(np.hstack([np.round(p, 4), dom]), axis=0, return_index=True, return_inverse=True); inv = inv.reshape(-1)
+    pw, fw = p[first].astype(np.float32), inv[f]
+    fw = fw[(fw[:, 0] != fw[:, 1]) & (fw[:, 1] != fw[:, 2]) & (fw[:, 0] != fw[:, 2])]
+    if len(fw) < 400: return pos, nrm, uv, w, faces
+    used = np.unique(fw); re = np.full(len(pw), -1, np.int64); re[used] = np.arange(len(used))   # only vertices a face uses: replay_simplification
+    pw, fw, inv = pw[used], re[fw], re[inv]                                                       # breaks on a loose one (wren, 2026-11-24)
+    _, _, col = FS.simplify(pw, fw, 1-keep, return_collapses=True)
+    p2, f2, mp = FS.replay_simplification(pw, fw, col)
+    if not len(f2): return pos, nrm, uv, w, faces
+    # where each original vertex's faces lie: the mean of their centroids
+    cen = p[f].mean(1); acc = np.zeros_like(p); cnt = np.zeros(len(p))
+    for k in range(3): np.add.at(acc, f[:, k], cen); np.add.at(cnt, f[:, k], 1)
+    side = acc/np.maximum(cnt, 1)[:, None]
+    out_of = np.where(inv >= 0, mp[np.maximum(inv, 0)], -1)   # original vertex -> output vertex (-1: only in faces welded flat)
+    order = np.argsort(out_of, kind='stable'); order = order[out_of[order] >= 0]; starts = np.searchsorted(out_of[order], np.arange(len(p2)+1))
+    fc2 = np.asarray(p2, np.float64)[f2].mean(1)
+    src, key, nf = [], {}, np.empty_like(f2)
+    for t in range(len(f2)):
+        for k in range(3):
+            o = f2[t, k]; cands = order[starts[o]:starts[o+1]]
+            i = int(cands[np.argmin(((side[cands]-fc2[t])**2).sum(1))]) if len(cands) > 1 else int(cands[0])
+            if (o, i) not in key: key[(o, i)] = len(src); src.append((o, i))
+            nf[t, k] = key[(o, i)]
+    so = np.array([o for o, _ in src]); si = np.array([i for _, i in src])
+    return np.asarray(p2)[so], None if nrm is None else np.asarray(nrm)[si], np.asarray(uv)[si], [w[i] for i in si], nf
 
-def quantize_glb(path):
+def quantize_glb(path, extras=None):
     """Smaller vertex data in a written GLB: 16-bit indices where they fit, joints as bytes (under 256 bones), weights as normalized bytes summing to
     255, normals as normalized signed bytes (KHR_mesh_quantization, which three's GLTFLoader reads). 56 -> 32 bytes a
     vertex; positions and UVs stay float (UVs run past 0..1)."""
     import struct
     raw = path.read_bytes(); n = struct.unpack('<I', raw[12:16])[0]
     j = json.loads(raw[20:20+n]); b0 = 20+n+8; binc = raw[b0:b0+struct.unpack('<I', raw[20+n:24+n])[0]]
+    if extras: j['scenes'][j.get('scene', 0)].setdefault('extras', {}).update(extras)   # three: gltf.scene.userData
     acc, bvs = j['accessors'], j['bufferViews']
     if any(len(sk['joints']) > 255 for sk in j.get('skins', [])): return
     if len({a['bufferView'] for a in acc}) != len(acc): raise SystemExit('quantize_glb: accessors share buffer views')
@@ -134,7 +186,7 @@ def quantize_glb(path):
     body = struct.pack('<II', len(js), 0x4E4F534A)+js+struct.pack('<II', len(out), 0x004E4942)+bytes(out)
     path.write_bytes(struct.pack('<III', 0x46546C67, 2, 12+len(body))+body)
 
-def build(parts, out_name, light=False, rename=None, keep=None, animated=frozenset(), decimate=None):
+def build(parts, out_name, light=False, rename=None, keep=None, animated=frozenset(), decimate=None, extras=None):
     """Cast models -> one engine GLB. parts[0] is the base; each later part's root bone is a bone of the same name
     in what's built so far and is merged into it (its other bones and its meshes follow it there).
     A part given as (name, 'base'|'var', head) is a swappable Gunsmith part (docs/fork/bo7-rips.md, Attachments):
@@ -213,7 +265,7 @@ def build(parts, out_name, light=False, rename=None, keep=None, animated=frozens
            'meshes': meshes, 'materials': mats}
     out = MOD/'models'/(out_name+'.glb'); out.parent.mkdir(parents=True, exist_ok=True)
     SEM.to_glb(sem, out, texture_loader=tex_loader(light), rename=rename)
-    quantize_glb(out)
+    quantize_glb(out, extras)
     print('model', out.relative_to(MOD), f'{out.stat().st_size/1e6:.1f} MB', len(bones), 'bones', sum(len(m['pos']) for m in meshes), 'verts')
     rest = {}   # local rest position (inches) by (renamed) bone name, for the clips
     for i, b in enumerate(bones):
@@ -257,12 +309,22 @@ def clip(name, arms_rest, gun_rest, loop=False, then=None, base=None, gun_rename
                 v = np.asarray(o['values']).reshape(-1, 4 if c['prop'] == 'rq' else 1)
                 v = np.stack([qmul(v0, q) for q in v]) if c['prop'] == 'rq' else v+v0
                 by[c['bone']][c['prop']] = {**o, 'mode': c['mode'], 'values': v.reshape(-1)}
+    m = __import__('re').match(r'(sat_vm_[a-z]+_[a-z0-9]+_)', name)
+    if not __import__('os').environ.get('NOFILL') and not base and not keep and not gun_rename and m and name != m[1]+'idle' and (EXP/'animations'/(m[1]+'idle.cast')).exists():
+        # bones the clip doesn't key at all hold the idle pose: the AAROW's, CBRS-3's and Ryden's fire, the TR51's raise etc. leave out j_gun
+        # (child of the right wrist), which then sat at its bind far off screen (the launcher vanished on every shot)
+        for c in castlib.animation(EXP/'animations'/(m[1]+'idle.cast'))['curves']:
+            if c['bone'] != 'j_gun' or (c['bone'] in by and not by[c['bone']].get('_fill')): continue   # only j_gun: filling every idle bone left the whole rig at its bind (2026-11-24)
+            v0 = np.asarray(c['values']).reshape(-1, 4 if c['prop'] == 'rq' else 1)[0]
+            by.setdefault(c['bone'], {'_fill': True})[c['prop']] = {**c, 'frames': np.asarray([0]), 'values': v0.copy()}
+        for cs in by.values(): cs.pop('_fill', None)
     if then:
         b2 = castlib.animation(EXP/'animations'/(then+'.cast')); off = max(int(c['frames'][-1]) for c in a['curves'] if len(c['frames']))+1
-        a['notes'] = list(a['notes'])+[(n, f+off) for n, f in b2['notes']]
+        k2 = fps/(b2['fps'] or 30)   # fire clips are 60 fps, rechambers 30: joined unscaled, the rechamber ran at double speed (2026-11-24)
+        a['notes'] = list(a['notes'])+[(n, f*k2+off) for n, f in b2['notes']]
         for c in b2['curves']:
             o = by.setdefault(c['bone'], {}).get(c['prop'])
-            fr = np.asarray(c['frames'])+off
+            fr = np.asarray(c['frames'])*k2+off
             if o is None: by[c['bone']][c['prop']] = {**c, 'frames': fr}; continue
             by[c['bone']][c['prop']] = {**o, 'frames': np.concatenate([np.asarray(o['frames']), fr]),
                                         'values': np.concatenate([np.asarray(o['values']).reshape(-1), np.asarray(c['values']).reshape(-1)])}
@@ -322,8 +384,11 @@ def ogg(srcs, out, gains=None, force=False):
         subprocess.run(cmd, check=True)
     return WEB+str(out.relative_to(MOD))
 
+SND_NAME = {'serval': 'orca', 'knife': 'combat_knife', 'shockbaton': 'shock_baton', 'ballisticknife': 'ballistic_knife'}   # the Gremlin's bank names its shots after its internal codename
 def bank(cls, gun):
     p = EXP/'sndbanks'/'csv'/f'weapon_sat_{cls}_{gun}_plr.all.csv'
+    if not p.exists(): p = EXP/'sndbanks'/'csv'/f'weapon_sat_{gun}_plr.all.csv'   # the NX Ravager's bank leaves out the class
+    if not p.exists(): p = EXP/'sndbanks'/'csv'/f'weapon_sat_{cls}_{SND_NAME.get(gun, gun)}.all.csv'   # melees: no _plr
     rows = {}
     if p.exists():
         for r in csv.DictReader(p.open()): rows.setdefault(r['name'], []).append(EXP/'sounds'/(r['file']+'.wav'))
@@ -344,9 +409,33 @@ CLS = {
     'sn': ('Sniper rifle', 600, 600, 4000, 8, .3, 1200, 1200, 1, 2000, [2, -.5, -7]),
     'sh': ('Shotgun', 160, 15, 300, 1, .28, 300, 30, 8, 1500, [2, -.5, -7]),
     'pi': ('Pistol', 120, 80, 700, 3.5, .12, 260, 180, 1, 500, [1.5, -.5, -5]),
+    'la': ('Launcher', 1500, 0, 8000, 1, .4, 2500, 0, 1, 2000, [2, -.5, -7]),   # direct-hit damage; the blast is in PROJ
+    'sl': ('Special', 1200, 1200, 8000, 2, .33, 2400, 2400, 1, 1500, [2, -.5, -7]),
 }
+# launchers and the crossbow fire the engine's projectiles (kino-features.js shoot: rocket flies straight, grenade arcs, a bolt
+# sticks and bursts after fuseTime). BO7's own projectile models weren't ripped: BO1's rocket, grenade and bolt.
+# maxAmmo is raised from the multiplayer dump's (8 rockets) to zombies numbers.
+# Guns that rechamber every few shots (bo7-rips mod.js): the Echo 12 is a double barrel that pumps after both barrels,
+# the CBRS-3 turns its 60-round helical mag every third of it (rechamberParts: clip/parts, so the Mk II's 90 turn at 30)
+RECHAMBER = {'husky': {'rechamberEvery': 2}, 'marmot': {'rechamberParts': 3}}
+
+PROJ_CLS = {'la', 'sl'}
+PROJ = {
+    'fang': ({'projectileType': 'rocket', 'projectileSpeed': 2500, 'projectileModel': 'models/projectile_at4.glb', 'projectileLifetime': 7,
+              'explosionRadius': 240, 'explosionInnerDamage': 900, 'explosionOuterDamage': 150, 'maxAmmo': 16, 'startAmmo': 10},
+             {'explosionRadius': 300, 'explosionInnerDamage': 2200, 'explosionOuterDamage': 400, 'maxAmmo': 24, 'startAmmo': 24, 'clipSize': 2}),
+    'polis': ({'projectileType': 'grenade', 'fireTime': .5, 'projectileSpeed': 2400, 'projectileSpeedUp': 10, 'projectileModel': 'models/projectile_m203grenade.glb',
+               'projectileLifetime': 30, 'explosionRadius': 200, 'explosionInnerDamage': 600, 'explosionOuterDamage': 90, 'maxAmmo': 24, 'startAmmo': 15},
+              {'fireTime': .45, 'explosionRadius': 250, 'explosionInnerDamage': 1400, 'explosionOuterDamage': 220, 'maxAmmo': 36, 'startAmmo': 36, 'clipSize': 5}),
+    'crossbow': ({'projectileType': 'bolt', 'projectileSpeed': 4180, 'projectileSpeedUp': 90, 'projectileModel': 'models/t5_weapon_crossbow_bolt.glb',
+                  'projectileLifetime': 30, 'fuseTime': 1.5, 'explosionRadius': 160, 'explosionInnerDamage': 400, 'explosionOuterDamage': 75, 'maxAmmo': 24, 'startAmmo': 15},
+                 {'explosionRadius': 230, 'explosionInnerDamage': 1100, 'explosionOuterDamage': 200, 'maxAmmo': 36, 'startAmmo': 36, 'clipSize': 3}),
+}
+EXTRA_PARTS = {'polis': ['scope'], 'crossbow': ['reflex']}   # their stock sights are separate models
 BURST_DM = (120, 90, 200, 150)   # the burst marksman rifles: per shot
-AUTO = {'ar', 'sm', 'lm'}; AUTO_GUNS = {'atlas'}   # the CODA 9 is a machine pistol
+AUTO = {'ar', 'sm', 'lm'}; AUTO_GUNS = {'atlas', 'akita'}   # the CODA 9 is a machine pistol, the Akita an auto shotgun
+SEMI_GUNS = {'emu'}   # the TR51 Para is semi-auto (full auto only with its Fallen Angel barrel); the dump's firetype is empty
+BURST_DELAY = .12   # pause after a burst before the next one may start (the M8A1's 'moderate burst cooldown', ~0.12 s)
 TWINS = {'zeus', 'atria', 'carina', 'nembus', 'sargas'}   # already in the fork as Blender rebuilds (mods/bo7-weapons, weapons.md)
 UP = {   # Pack-a-Punch names (the fork's own)
     'albatross': 'Actuated Neutralizer 94000', 'condor': 'Peacemaker Mk Infinity', 'egret': 'Egret Eradicator', 'emu': 'Paranormal TR-5100',
@@ -359,7 +448,8 @@ UP = {   # Pack-a-Punch names (the fork's own)
     'bear': 'VST Grizzly Maul', 'bengal': 'Sturmwolf Rudelfuhrer', 'civet': 'Very Mean Person', 'cobra': 'King Cobra-25',
     'gecko': 'REV-46 Revenant', 'hyena': 'Kogot Cackler', 'komodo': 'Razorback Dragon', 'marmot': 'Groundhog Doomsday',
     'orca': 'Ryden Leviathan', 'puma': 'Carbon Copy Killer', 'zebra': 'Dravec Stampede',
-    'aden': 'Hawker Hellfire', 'baltic': 'XR-3 Ionic Storm', 'caspian': 'Shadow Soul Keeper', 'coral': 'Strider 3000', 'drake': 'VS Reckoning'}
+    'aden': 'Hawker Hellfire', 'baltic': 'XR-3 Ionic Storm', 'caspian': 'Shadow Soul Keeper', 'coral': 'Strider 3000', 'drake': 'VS Reckoning',
+    'eagle': 'MXR-17 Raptor Talon', 'oman': 'Warden of the Grave', 'otter': 'RK-9 Riverkiller', 'serval': 'Gremlin Gang'}
 VIEW = {}   # per-gun hip view offsets, where the class's doesn't fit (tuned in Sandbox)
 WDUMP = json.loads((PIPE/'dumps'/'weapons.json').read_text()) if (PIPE/'dumps'/'weapons.json').exists() else {}
 
@@ -369,23 +459,26 @@ def gun_table():
         _, c, *rest = gid.split('_'); g = '_'.join(rest[:-1] if rest[-1] in ('mp', 'zm') else rest)
         if c not in CLS or g in TWINS or g.endswith('exotic'): continue
         pre = f'sat_vm_{c}_{g}_'
-        if not ((EXP/'models'/(pre+'rec')).is_dir() and (EXP/'animations'/(pre+'idle.cast')).exists()
-                and (EXP/'sndbanks'/'csv'/f'weapon_sat_{c}_{g}_plr.all.csv').exists()): continue
+        # pair_only: the Gremlin has only akimbo clips (it is always two guns in BO7): its def is the pair (build_akimbo)
+        pair_only = not (EXP/'animations'/(pre+'idle.cast')).exists() and (EXP/'animations'/(pre+'akimbo_r_idle.cast')).exists()
+        if not (model_dir(pre+'rec').is_dir() and ((EXP/'animations'/(pre+'idle.cast')).exists() or pair_only)
+                and bank(c, g)): continue
         f = (WDUMP.get(gid) or {}).get('fields', {})
-        if f.get('type') != 'bullet': continue
+        if f.get('type') != ('projectile' if c in PROJ_CLS else 'bullet'): continue
         num = lambda k, d: float(f[k]) if f.get(k) not in (None, '-') else d
         wc, dmg, mn, rng, head, ref, udmg, umn, pel, price, view = CLS[c]
         ft, burst = num('firetime', ref), int(num('burstcount', 0))
-        fire = '3-Round Burst' if burst >= 2 else 'Full Auto' if (c in AUTO or g in AUTO_GUNS) else 'Single Shot'
+        fire = f'{burst}-Round Burst' if burst >= 2 else 'Full Auto' if (c in AUTO or g in AUTO_GUNS) and g not in SEMI_GUNS else 'Single Shot'
         if c == 'dm' and burst >= 2: dmg, mn, udmg, umn = BURST_DM
         k = min(1.6, max(.75, (ft/ref)**.7))
         clip_, mx = int(num('clipsize', 30)), int(num('maxammo', 270))
         st = {'clipSize': clip_, 'startAmmo': int(num('startammo', mx*.75)), 'maxAmmo': mx, 'damage': round(dmg*k), 'minDamage': round(mn*k),
-              'range': rng, 'fireTime': ft, 'headMultiplier': head, 'pellets': pel, 'fireType': fire, 'automatic': fire == 'Full Auto'}
+              'range': rng, 'fireTime': ft, 'headMultiplier': head, 'pellets': pel, 'fireType': fire, 'automatic': fire == 'Full Auto', **({'burstCount': burst, 'burstDelay': BURST_DELAY} if burst >= 2 else {})}
         uclip = round(clip_*1.5) if clip_ > 2 else clip_
         up = {'clipSize': uclip, 'maxAmmo': round(mx*1.33), 'startAmmo': round(mx*1.33), 'damage': round(udmg*k), 'minDamage': round(umn*k), 'headMultiplier': head+1}
+        if g in PROJ: st.update(PROJ[g][0]); up.update(PROJ[g][1])
         out[g] = {'name': NAMES.get(gid, {}).get('name') or g, 'up': UP.get(g, (NAMES.get(gid, {}).get('name') or g)+' Mk II'), 'cls': c,
-                  'wclass': wc, 'price': price, 'view': VIEW.get(g, view), 'stats': st, 'up_stats': up}
+                  'wclass': wc, 'price': price, 'view': VIEW.get(g, view), 'stats': st, 'up_stats': up, 'pair_only': pair_only}
     return out
 GUN = gun_table()
 ROLES = [('idleAnim', 'idle', True), ('fireAnim', 'fire', False), ('lastShotAnim', 'fire_last', False), ('adsFireAnim', 'fire_ads', False),
@@ -403,7 +496,7 @@ ROLES = [('idleAnim', 'idle', True), ('fireAnim', 'fire', False), ('lastShotAnim
 PART_SLOT = {'bar': ('bar', 'barrel'), 'mag': ('mag', 'mag'), 'grip': ('pgrip', 'grip'), 'stock': ('stock', 'stock')}
 PART = {
     'bar': {'velocity': ['bar_long', 'bar_velocity'], 'jump': ['bar_short', 'bar_jump'], 'range': ['bar_xlong', 'bar_range', 'bar_long'],
-            'highcal': ['bar_heavy', 'bar_highcal'], 'mixbarrel': ['bar_med', 'bar_mix', 'bar_mixbarrel'], 'sprintout': ['bar_short']},
+            'highcal': ['bar_heavy', 'bar_hvy', 'bar_highcal'], 'mixbarrel': ['bar_med', 'bar_mix', 'bar_mixbarrel'], 'sprintout': ['bar_short']},
     'mag': {'extmag': ['mag_lrg', 'mag_large', 'mag_ext', 'ext_mag'], 'extmag2': ['mag_xlrg', 'mag_drum', 'mag_xlong', 'mag_xlarge'],
             'fastmag': ['mag_fast', 'mag_short', 'mag_flip'], 'flipmag': ['mag_flip', 'mag_fast', 'mag_short'], 'fastmag2': ['mag_fast2', 'mag_short', 'mag_flip']},
     'grip': {'mixgrip': ['pgrip_light'], 'quickdraw': ['pgrip_quick'], 'quickdraw2': ['pgrip_tac'], 'sprintout': ['pgrip_cqb'], 'sprintout2': ['pgrip_rcvr']},
@@ -429,7 +522,7 @@ def optic_model(ref):
     fam = {'varizoom': 'variablezoom'}.get(m.group(1), m.group(1))
     return f'optic_{fam}_{m.group(2)}'
 
-def has_model(n): return (EXP/'models'/n/(n+'_LOD0.cast')).exists()
+def has_model(n): d = model_dir(n); return (d/(d.name+'_LOD0.cast')).exists()
 
 def mount_glb(model):
     """a shared attachment model (optic, muzzle, laser, foregrip): built once into models/att/, its root bone sits on the tag"""
@@ -438,6 +531,62 @@ def mount_glb(model):
     else: url, _ = build(['sat_vm_'+model], 'att/'+model)
     sk, _, _ = load_model('sat_vm_'+model)
     return url, sk[0]['name']
+
+# ---- Underbarrel grenade launchers (docs/fork/bo7-rips.md, Underbarrel launchers) ------------------------------------
+# BO7 has four (sat_ub_gl_<kind>): Standard ("40mm Grenades"), High Explosive ("40mm Fuse Grenades"), Drill Charge and
+# Smoke. One launcher model (sat_vm_ub_gl_01, its root on the barrel's tag_grenade_launcher) goes into the gun's own model
+# as a hidden part (head b7_ubgl, shown by any of the four), so the gun's ubgl_* clips move its grenade and lever. The
+# launcher is a second form like the AW Energy Launcher (gunsmith.js energyLauncher, key 5): ubgl_to_grenade plays into
+# it, ubgl_from_grenade back. What each kind fires is our own pick (no launcher data in the dumps); `upgrade` applies on a
+# Pack-a-Punched gun.
+UBGL = {}   # g: [kinds] (filled by gun_attachments)
+UBGL_KIND = {
+    'std': {'name': 'Grenade Launcher', 'damage': 300, 'explosionRadius': 300, 'explosionInnerDamage': 600, 'explosionOuterDamage': 100,
+            'upgrade': {'explosionRadius': 340, 'explosionInnerDamage': 1300, 'explosionOuterDamage': 220}},
+    'he': {'name': 'HE Launcher', 'damage': 250, 'explosionRadius': 400, 'explosionInnerDamage': 850, 'explosionOuterDamage': 160,
+           'upgrade': {'explosionRadius': 440, 'explosionInnerDamage': 1800, 'explosionOuterDamage': 340}},
+    'dc': {'name': 'Drill Charge Launcher', 'projectileType': 'bolt', 'fuseTime': 1.0, 'damage': 200, 'explosionRadius': 220,
+           'explosionInnerDamage': 1500, 'explosionOuterDamage': 250, 'upgrade': {'explosionInnerDamage': 3200, 'explosionOuterDamage': 500, 'fuseTime': .7}},
+    'smoke': {'name': 'Smoke Launcher', 'damage': 60, 'explosionRadius': 10, 'explosionInnerDamage': 0, 'explosionOuterDamage': 0,
+              'smokeLauncher': 1, 'noSelfSplash': True, 'upgrade': {'smokeLauncher': 1.3}},
+}
+UBGL_ROLES = [('idleAnim', 'idle', True), ('fireAnim', 'fire', False), ('reloadAnim', 'reload', False), ('adsReloadAnim', 'reload_ads', False),
+              ('raiseAnim', 'raise', False), ('quickRaiseAnim', 'raise_quick', False), ('dropAnim', 'drop', False), ('quickDropAnim', 'drop_quick', False),
+              ('inspectAnim', 'inspect', False), ('attachInAnim', 'to_grenade', False)]
+UBGL_SND = EXP/'sounds'/'sat'/'wpn'/'ar'/'vulture'/'ubgl'   # the DS20 Mirage's built-in launcher: the only launcher shots in the rips
+
+def ubgl_sounds(c, g, notes):
+    """the launcher form's sounds: shared shots (shot + mechanism + low end) and the gun's own ubgl foley"""
+    shot, mech, lfe = (sorted(UBGL_SND.glob(f'wpn_ar_vulture_ubgl_{k}*.wav')) for k in ('shot_', 'mech_', 'lfe'))
+    S = {'shots': [ogg([f]+([mech[i % len(mech)]] if mech else [])+lfe[:1], MOD/'audio'/'ubgl'/f'shot_{i}.ogg', [1, .8, .7][:1+bool(mech)]+[.7]) for i, f in enumerate(shot)],
+         'last': [], 'notes': {}}
+    B = bank(c, g)
+    for n in sorted(notes):
+        if '@' not in n: continue
+        files = [f for f in B.get(n.split('@', 1)[1], []) if f.exists()]
+        if files: S['notes'][n] = [ogg([f], MOD/'audio'/g/'foley'/(f.name.split('.')[0]+'.ogg')) for f in files]
+    print(f'  {g}: launcher {len(S["shots"])} shots, {len(S["notes"])} foley notes')
+    return S
+
+def ubgl_form(g, pre, gun_rest, notes):
+    """-> the gun's attachAnims for its launchers ({att id: {animations (the gun's way out), alt (the launcher form)}})"""
+    LA, LT, unotes = {}, {}, set()
+    for role, nm, loop in UBGL_ROLES:
+        if (EXP/'animations'/(pre+'ubgl_'+nm+'.cast')).exists():
+            LA[role], d = clip(pre+'ubgl_'+nm, arms_rest, gun_rest, loop); LT[role] = d['duration']; unotes |= {n['name'] for n in d['notifies']}
+    for k, v in (('emptyIdleAnim', 'idleAnim'), ('adsFireAnim', 'fireAnim'), ('lastShotAnim', 'fireAnim'), ('adsLastShotAnim', 'fireAnim'),
+                 ('reloadEmptyAnim', 'reloadAnim'), ('firstRaiseAnim', 'raiseAnim')):
+        if v in LA: LA.setdefault(k, LA[v])
+    GA = {}
+    if (EXP/'animations'/(pre+'ubgl_from_grenade.cast')).exists():
+        GA['attachOutAnim'], d = clip(pre+'ubgl_from_grenade', arms_rest, gun_rest); notes |= {n['name'] for n in d['notifies']}
+    sounds['bo7_'+g+'_ubgl'] = ubgl_sounds(GUN[g]['cls'], g, unotes)
+    times = {'raiseTime': LT.get('raiseAnim', .6), 'dropTime': LT.get('dropAnim', .5), 'inspectTime': LT.get('inspectAnim'),
+             'reloadTime': round(LT.get('reloadAnim', 2.5)*.85, 3), 'reloadEmptyTime': round(LT.get('reloadAnim', 2.5)*.85, 3)}
+    off = {'ownSprint': False, 'burstCount': 0, 'burstDelay': 0, 'rechamberEvery': 0, 'rechamberParts': 0, 'bo7Sounds': 'bo7_'+g+'_ubgl'}
+    return {'b7_ub_gl_'+k: {'animations': GA, 'alt': {'animations': LA, **times, **off, 'id': f'bo7_ubgl_{k}', **UBGL_KIND[k]}} for k in UBGL.get(g, [])}
+
+MOUNT_ALT = {'tag_grip_attach': ['tag_underbarrel_attach'], 'tag_folding_grip': ['tag_underbarrel_attach'], 'tag_laser_attach': ['tag_laser_attach2']}
 
 def gun_attachments(g, c, gid, bones, part_dir):
     """-> (variants [(part model, 'var', head)], mounts {att id: {model, tag}}, stat ids, order [att ids])"""
@@ -452,12 +601,14 @@ def gun_attachments(g, c, gid, bones, part_dir):
             sk = r[4:-len(tail)]; slot, _, kind = sk.partition('_')
             if slot == 'ammo':
                 kind = kind.split('_', 1)[1]; aid = f'b7_ammo_{kind}'
-                if kind in ('fmj', 'velocity'): stat.append(aid); order.append(aid)
+                if kind in ('fmj', 'velocity', 'db', 'slug', 'short'): stat.append(aid); order.append(aid)   # db = Dragon's Breath
                 continue
+            if slot == 'firemod':   # fire mods: stats/behaviour only (attachments.json b7_firemod_*), no model
+                aid = 'b7_firemod_'+kind.split('_')[0]; stat.append(aid); order.append(aid); continue
             if slot in PART:
                 if kind == 'akimbo': order.append('akimbo'); continue   # a second gun: its own pair def (build_akimbo)
                 aid = f'b7_{PART_SLOT[slot][1]}_{kind}'
-                cands = [x for x in PART[slot].get(kind, []) if (part_dir/(f'sat_vm_{c}_{g}_'+x)).is_dir()]
+                cands = [x for x in PART[slot].get(kind, []) if model_dir(f'sat_vm_{c}_{g}_'+x).is_dir()]
                 spare = sorted(p.name[len(f'sat_vm_{c}_{g}_'):] for p in part_dir.glob(f'sat_vm_{c}_{g}_{PART_SLOT[slot][0]}_*')
                                if '_sat_vm_' not in p.name and has_model(p.name) and p.name.count('_') == len(f'sat_vm_{c}_{g}_{PART_SLOT[slot][0]}_x'.split('_'))-1)
                 taken = used.setdefault(slot, set())
@@ -471,9 +622,19 @@ def gun_attachments(g, c, gid, bones, part_dir):
                     if model: break
             elif slot == 'laser': model = LASER.get(kind)
             elif slot == 'underbarrel': model = UNDER.get(kind); slot = 'under'
-            else: continue   # ub_gl_* (grenade launchers), firemod_*: not done yet
+            elif slot == 'ub' and kind == 'crossbar': model = 'ub_crossbar_01'; slot = 'under'
+            elif slot == 'ub' and kind.startswith('gl_'):   # the underbarrel launchers: a part of the gun's model + a second form (UBGL)
+                aid = f'b7_ub_{kind}'
+                if (EXP/'animations'/f'sat_vm_{c}_{g}_ubgl_idle.cast').exists() and 'tag_grenade_launcher' in bones:
+                    UBGL.setdefault(g, []).append(kind[3:]); order.append(aid)
+                else: print('   ', aid, 'no launcher clips or tag: left out')
+                continue
+            else: continue
             if not model or not has_model('sat_vm_'+model): print('   ', slot, kind, 'no model'); continue
             aid = f'b7_{slot}_{kind}'; url, tag = mount_glb(model)
+            if tag not in bones:   # the snipers name their grip point tag_underbarrel_attach; a gun with no laser point keeps the stats
+                tag = next((t for t in MOUNT_ALT.get(tag, []) if t in bones), None)
+                if not tag: stat.append(aid); order.append(aid); print('   ', aid, 'no tag on this gun: stats only'); continue
             mounts[aid] = {'model': url, 'tag': tag}; order.append(aid)
         elif r.startswith('sat_') and r.count('_') >= 2 and r.rsplit('_', 1)[0] != 'sat':
             ref = r[4:].rsplit('_', 1)[0]; model = optic_model(ref)
@@ -481,7 +642,11 @@ def gun_attachments(g, c, gid, bones, part_dir):
             aid = 'b7_optic_'+ref; url, tag = mount_glb(model)
             if tag not in bones: tag = 'tag_reflex'
             mounts[aid] = {'model': url, 'tag': tag}; order.append(aid); optics += 1
+    for aid in KITS.get(g, []): stat.append(aid); order.append(aid)
     return variants, mounts, stat, order
+
+# behaviour kits the rips have no unlock for (attachments.json): the Echo 12's Backlash Launcher Kit
+KITS = {'husky': ['b7_kit_backlash']}
 
 def animated_bones(pre):
     """bone names any of the gun's clips move (a variant's bone of that name hangs from the real one)"""
@@ -521,7 +686,7 @@ def raise_first_files(c, g, markers):
 
 def gun_sounds(g, c, notes):
     """the gun's sound lists from its bank: shots, last shots and the clips' foley markers"""
-    B = bank(c, g); sd = EXP/'sounds'/'sat'/'wpn'/c/g; P = f'wpn_{c}_{g}_fire_plr'
+    B = bank(c, g); sd = EXP/'sounds'/'sat'/'wpn'/c/g; P = f'wpn_{c}_{SND_NAME.get(g, g)}_fire_plr'
     def alias(*names, hip=True):   # first alias of the list the bank has files for; hip only (no ADS copies) when there are both
         for n in names:
             fs = list(dict.fromkeys(f for f in B.get(P+n, []) if f.exists()))
@@ -582,10 +747,10 @@ def build_akimbo(g, parts, single, gun_rest, bones):
     left, left_rest = build(parts, f'bo7_{g}_left', animated=frozenset(anim), rename=lren)
     right_only = lambda n: n not in LEFT_ARM
     left_only = lambda n: n in LEFT_ARM or (n.endswith('_le') and n not in arms_rest) or n == 'j_gun1'
-    A, LA, T = {}, {}, {}
+    A, LA, T, notes = {}, {}, {}, set()
     for role, lrole, nm, loop in AKIMBO_SIDED:
         if not has(side+'r_'+nm): continue
-        A[role], d = clip(side+'r_'+nm, arms_rest, gun_rest, loop, keep=right_only); T[role] = d['duration']
+        A[role], d = clip(side+'r_'+nm, arms_rest, gun_rest, loop, keep=right_only); T[role] = d['duration']; notes |= {n['name'] for n in d['notifies']}
         if has(side+'l_'+nm): LA[lrole], _ = clip(side+'l_'+nm, arms_rest, left_rest, loop, gun_rename=lren, keep=left_only)
     for role, nm in AKIMBO_BOTH:
         if not has(side+'r_'+nm): continue
@@ -593,7 +758,7 @@ def build_akimbo(g, parts, single, gun_rest, bones):
         if has(side+'l_'+nm):
             _, l = clip(side+'l_'+nm, arms_rest, left_rest, gun_rename=lren, keep=left_only, write=False)
             r = {**r, 'name': f'{side}both_{nm}', 'duration': max(r['duration'], l['duration']), 'bones': r['bones']+l['bones']}
-        A[role], _ = write_clip(r); T[role] = r['duration']
+        A[role], _ = write_clip(r); T[role] = r['duration']; notes |= {n['name'] for n in r['notifies']}
     if 'idleAnim' not in A or 'idleAnimLeft' not in LA: print('  ', g, 'akimbo: no idle'); return
     A['emptyIdleAnim'] = A['idleAnim']
     for k in ('lastShotAnim', 'reloadEmptyAnim'): A.setdefault(k, A['fireAnim' if k == 'lastShotAnim' else 'reloadAnim'])
@@ -607,49 +772,66 @@ def build_akimbo(g, parts, single, gun_rest, bones):
     weapons[wid+'_dw'] = {**{k: v for k, v in pair(single).items() if k not in no}, 'id': wid+'_dw', 'akimboOf': wid, 'noBox': True,
                           'upgrade': {k: v for k, v in pair(single['upgrade']).items() if k not in no}}
     print(f'  {g}: akimbo pair', len(A), 'clips +', len(LA), 'left')
+    return notes
 
 def build_gun(g):
     G = GUN[g]; c = G['cls']; pre = f'sat_vm_{c}_{g}_'
     gid = f'sat_{c}_{g}_mp'
-    base_parts = [p for p in ('bar', 'mag', 'pgrip', 'stock') if (EXP/'models'/(pre+p)).is_dir()]
+    base_parts = [p for p in ('bar', 'mag', 'pgrip', 'stock') if model_dir(pre+p).is_dir()]+[p for p in EXTRA_PARTS.get(g, []) if model_dir(pre+p).is_dir()]
     # the receiver alone first, for its bone names (optic tags), then the Gunsmith list
     rec_bones = {b['name'] for b in load_model(pre+'rec')[0]}
+    for p in base_parts: rec_bones |= {b['name'] for b in load_model(pre+p)[0]}   # the Warden and MXR-17 carry the muzzle tag on the barrel
     variants, mounts, stat_atts, order = gun_attachments(g, c, gid, rec_bones, EXP/'models')
     swap = {v[0].split('_'+c+'_'+g+'_')[1].split('_')[0] for v in variants}   # slots that have variants: their stock part gets hide bones
     parts = [pre+'rec']+[(pre+p, 'base', 'b7_base_'+PART_SLOT[{'pgrip': 'grip'}.get(p, p)][1]) if p in swap else pre+p for p in base_parts]+variants
+    if UBGL.get(g): parts.append(('sat_vm_ub_gl_01', 'base', 'b7_ubgl'))   # the launcher, hidden until one is fitted
     view, gun_rest = build(parts, f'bo7_{g}_view', animated=animated_bones(pre))
     X = build.extra
     print(f'  {g}: {len(variants)} part variants, {len(mounts)} mounted, {len(stat_atts)} stat-only;', ' '.join(order))
     wpre = f'sat_wm_{c}_{g}_'
-    world, _ = build([wpre+'rec']+[wpre+p for p in ('bar', 'mag', 'pgrip', 'stock') if (EXP/'models'/(wpre+p)).is_dir()], f'bo7_{g}_world', light=True, decimate=WORLD_KEEP)
+    world, _ = build([wpre+'rec']+[wpre+p for p in ('bar', 'mag', 'pgrip', 'stock', *EXTRA_PARTS.get(g, [])) if model_dir(wpre+p).is_dir()], f'bo7_{g}_world', light=True, decimate=WORLD_KEEP, extras=REST)
     A, T, notes = {}, {}, set()
-    for role, nm, loop in ROLES:
+    for role, nm, loop in ([] if G['pair_only'] else ROLES):
         full = pre.replace('sat_vm_', 'sat_vm_')+nm
         if not (EXP/'animations'/(full+'.cast')).exists(): print('  no clip', full); continue
         A[role], d = clip(full, arms_rest, gun_rest, loop, base=sprint_base(pre, role)); T[role] = d['duration']
         notes |= {n['name'] for n in d['notifies']}
-    A.setdefault('emptyIdleAnim', A['idleAnim'])
+    A.setdefault('emptyIdleAnim', A.get('idleAnim'))
+    if 'reloadAnim' not in A and not G['pair_only']:   # the Warden 308: one clip per rounds loaded (reload_1..8); the full one for both
+        ns = sorted(int(x.stem.rsplit('_', 1)[1]) for x in (EXP/'animations').glob(pre+'reload_[0-9].cast'))
+        if ns:
+            A['reloadAnim'], d = clip(pre+f'reload_{ns[-1]}', arms_rest, gun_rest); T['reloadAnim'] = d['duration']; notes |= {n['name'] for n in d['notifies']}
+            A['reloadEmptyAnim'], T['reloadEmptyAnim'] = A['reloadAnim'], T['reloadAnim']
     seg = {}
     if (EXP/'animations'/(pre+'reload_loop.cast')).exists():   # shell by shell (the M10 Breacher), as BO1's Ithaca
         for role, nm in (('reloadStartAnim', 'reload_start'), ('reloadAnim', 'reload_loop'), ('reloadEndAnim', 'reload_end')):
             if (EXP/'animations'/(pre+nm+'.cast')).exists(): A[role], d = clip(pre+nm, arms_rest, gun_rest); T[role] = d['duration']; notes |= {n['name'] for n in d['notifies']}
         A['reloadEmptyAnim'] = A['reloadAnim']; T['reloadEmptyAnim'] = T['reloadAnim']
         seg = {'segmentedReload': True, 'reloadAmmoAdd': 1, 'reloadStartAdd': 0, 'reloadStartTime': T.get('reloadStartAnim', .5), 'reloadEndTime': T.get('reloadEndAnim', .6)}
-    fire_len = 0
-    if G['stats']['fireType'] == 'Single Shot' and (EXP/'animations'/(pre+'rechamber.cast')).exists():   # pump and bolt guns
+    fire_len, rech = 0, {}
+    if g in RECHAMBER:   # rechambers every few shots, not after each (mod.js): the clip is the last-shot kick, then the rechamber
+        for role, nm, rc in (('rechamberAnim', 'fire_last', 'rechamber'), ('adsRechamberAnim', 'fire_last_ads', 'rechamber_ads')):
+            if not (EXP/'animations'/(pre+nm+'.cast')).exists(): nm = 'fire_last'
+            if not (EXP/'animations'/(pre+rc+'.cast')).exists(): rc = 'rechamber'
+            A[role], d = clip(pre+nm, arms_rest, gun_rest, then=pre+rc); notes |= {n['name'] for n in d['notifies']}
+            rech['rechamberTime'] = round(max(rech.get('rechamberTime', 0), d['duration']*.95), 3)
+        rech.update(RECHAMBER[g])
+    elif G['stats']['fireType'] == 'Single Shot' and (EXP/'animations'/(pre+'rechamber.cast')).exists():   # pump and bolt guns
         for role, nm, rc in (('fireAnim', 'fire', 'rechamber'), ('adsFireAnim', 'fire_ads', 'rechamber_ads')):
             if not (EXP/'animations'/(pre+nm+'.cast')).exists(): continue
             if not (EXP/'animations'/(pre+rc+'.cast')).exists(): rc = 'rechamber'
             A[role], d = clip(pre+nm, arms_rest, gun_rest, then=pre+rc); notes |= {n['name'] for n in d['notifies']}; fire_len = max(fire_len, d['duration'])
+    att_anims = ubgl_form(g, pre, gun_rest, notes) if UBGL.get(g) else {}
     sounds['bo7_'+g] = gun_sounds(g, c, notes)
     st = dict(G['stats'])
     if fire_len: st['fireTime'] = round(max(st['fireTime'], fire_len*.95), 3)
+    st.update(rech)
     common = {'explosionRadius': 0, 'explosionInnerDamage': 0, 'explosionOuterDamage': 0,
               'projectileSpeed': 0, 'adsInTime': .25, 'adsOutTime': .25, 'adsFov': 50.0,
               'raiseTime': T.get('raiseAnim', .6), 'dropTime': T.get('dropAnim', .5), 'sprintInTime': T.get('sprintInAnim', .3),
               'sprintLoopTime': T.get('sprintLoopAnim', .8), 'sprintOutTime': T.get('sprintOutAnim', .3), 'sprintOffset': [0, 0, 0], 'sprintRotation': [0, 0, 0],
               'reloadTime': round(T.get('reloadAnim', 2.5)*.8, 3), 'reloadEmptyTime': round(T.get('reloadEmptyAnim', 3)*.8, 3), 'inspectTime': T.get('inspectAnim'),
-              'hideTags': [v[2] for v in variants], 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands_url, 'animations': A, 'weaponClass': G['wclass'], 'bo7': True,
+              'hideTags': [v[2] for v in variants]+(['b7_ubgl'] if att_anims else []), **({'attachAnims': att_anims} if att_anims else {}), 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands_url, 'animations': A, 'weaponClass': G['wclass'], 'bo7': True,
               'viewOffset': G.get('view', [2, -.5, -7]), **seg}
     if seg: common['reloadTime'] = common['reloadEmptyTime'] = T['reloadAnim']
     wid = 'bo7_'+g
@@ -660,7 +842,56 @@ def build_gun(g):
     weapons[wid] = {'id': wid, 'name': G['name'], 'price': G['price'], 'model': view, 'worldModel': world, 'lazyWorld': True, **common, **st,
                     'upgrade': {'name': G['up'], 'model': view, 'worldModel': world, **common, **{**st, **G['up_stats']}}}
     weapons.pop(wid+'_dw', None)
-    if 'akimbo' in order: build_akimbo(g, parts, weapons[wid], gun_rest, X['bones'])
+    if G['pair_only']:   # the pair is the gun: own id, in the box, no Akimbo attachment to fit
+        notes |= build_akimbo(g, parts, weapons[wid], gun_rest, X['bones']) or set()
+        p = weapons.pop(wid+'_dw', None)
+        if not p: raise RuntimeError(g+': pair-only gun without akimbo clips')
+        for d in (p, p['upgrade']):
+            d.pop('akimboOf', None); d.pop('noBox', None); d['id'] = wid; d['attachOrder'] = [a for a in d['attachOrder'] if a != 'akimbo']
+        p['upgrade'].pop('id'); weapons[wid] = p; sounds[wid] = gun_sounds(g, c, notes)
+    elif 'akimbo' in order: build_akimbo(g, parts, weapons[wid], gun_rest, X['bones'])
+
+# ---- melees (docs/fork/bo7-rips.md, Melees) ---------------------------------------------------------------------------
+# A melee is a def bo7_me_<g> with BO7's own clips on the BO7 hands: idle, raise, drop, sprint, inspect, two light swings
+# (meleeAnim, backslashAnim: the fork's slash and backhand) and a heavy one (meleeChargeAnim). It is never in the box: the
+# melee mod (mods/melee, melee.json entries with `ownClips`) builds its melee_<key> on it and plays these clips.
+MELEES = {   # g: (light swing clips, heavy swing clips), the first that exists
+    'knife': (['melee_hit_01', 'melee_hit_02'], ['swipe_heavy_01']),
+    'castor': (['melee_hit_01', 'melee_hit_02'], ['heavy_melee_01']),
+    'nashira': (['melee_slash_01', 'melee_slash_02'], ['heavy_slash_01']),
+    'saiph': (['swing_hit_01', 'swing_hit_02'], ['swing_heavy_01']),
+    'shockbaton': (['melee_hit_01', 'melee_hit_02'], ['melee_hit_03']),
+    'wasat': (['melee_hit_01', 'melee_hit_02'], ['swipe_heavy_01']),
+}
+def build_melee(g):
+    c, pre = 'me', f'sat_vm_me_{g}_'
+    view, gun_rest = build([pre+'rec'], f'bo7_me_{g}_view', animated=animated_bones(pre))
+    wpre = f'sat_wm_me_{g}_'
+    world = build([wpre+'rec'], f'bo7_me_{g}_world', light=True, decimate=WORLD_KEEP, extras=REST)[0] if model_dir(wpre+'rec').is_dir() else None
+    A, T, notes = {}, {}, set()
+    light, heavy = MELEES[g]
+    roles = [(r, n, l) for r, n, l in ROLES if r in ('idleAnim', 'raiseAnim', 'firstRaiseAnim', 'quickRaiseAnim', 'dropAnim', 'quickDropAnim',
+                                                     'sprintInAnim', 'sprintLoopAnim', 'sprintOutAnim', 'inspectAnim')]
+    roles += [('meleeAnim', light[0], False), ('backslashAnim', light[1], False), ('meleeChargeAnim', heavy[0], False)]
+    for role, nm, loop in roles:
+        if not (EXP/'animations'/(pre+nm+'.cast')).exists(): print('  no clip', pre+nm); continue
+        A[role], d = clip(pre+nm, arms_rest, gun_rest, loop, base=sprint_base(pre, role)); T[role] = d['duration']
+        notes |= {n['name'] for n in d['notifies']}
+    wid = 'bo7_me_'+g
+    sounds[wid] = gun_sounds(g, c, notes)
+    d = {'id': wid, 'name': NAMES.get(f'sat_me_{g}_mp', {}).get('name') or g, 'model': view, 'worldModel': world, 'lazyWorld': True, 'bo7': True,
+         'bo7Melee': True, 'noBox': True, 'weaponClass': 'Melee', 'handsModel': hands_url, 'animations': A, 'hideTags': [], 'sounds': {}, 'notetrackSounds': {},
+         'raiseTime': T.get('raiseAnim', .6), 'dropTime': T.get('dropAnim', .5), 'sprintInTime': T.get('sprintInAnim', .3),
+         'sprintLoopTime': T.get('sprintLoopAnim', .8), 'sprintOutTime': T.get('sprintOutAnim', .3), 'sprintOffset': [0, 0, 0], 'sprintRotation': [0, 0, 0],
+         'inspectTime': T.get('inspectAnim'), 'viewOffset': [0, 0, 0], 'clipSize': 1, 'startAmmo': 0, 'maxAmmo': 0, 'damage': 0, 'minDamage': 0,
+         'fireTime': 1, 'fireType': 'Single Shot', 'automatic': False, 'projectileSpeed': 0, 'explosionRadius': 0, 'explosionInnerDamage': 0,
+         'explosionOuterDamage': 0, 'pellets': 1, 'range': 100, 'headMultiplier': 1, 'adsFov': 50.0, 'adsInTime': .25, 'adsOutTime': .25,
+         'attachOrder': [], 'statAttachments': [], 'mounts': {},
+         # the swings' own lengths: melee.json's swing / heavy times are set near these
+         'meleeClipTimes': {'light': round(T.get('meleeAnim', .5), 3), 'back': round(T.get('backslashAnim', .5), 3), 'heavy': round(T.get('meleeChargeAnim', .9), 3)}}
+    d['upgrade'] = {k: v for k, v in d.items() if k not in ('id', 'upgrade')}
+    weapons[wid] = d
+    print(f'  {g}: melee, {len(A)} clips', d['meleeClipTimes'])
 
 if '--sounds' in sys.argv:   # sounds only: markers from the clips already built, models left alone
     for g in GUNS:
@@ -678,7 +909,7 @@ def save():
     (MOD/'weapons.json').write_text(json.dumps({'weapons': weapons, 'sounds': sounds}, indent=1))
 for g in GUNS:
   try:
-    build_gun(g); save()   # after every gun, so a later failure keeps the ones done
+    (build_melee if g in MELEES else build_gun)(g); save()   # after every gun, so a later failure keeps the ones done
   except Exception as e:
     import traceback; traceback.print_exc(); failed.append(g); print('  FAILED', g, e)
 if failed: print('failed:', ' '.join(failed))

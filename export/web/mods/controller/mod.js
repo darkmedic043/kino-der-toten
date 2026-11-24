@@ -120,7 +120,7 @@ ${['xbox','ps','nintendo','generic'].map(brandCss).join('\n')}`;
     const cls=weaponClass(def);
     if(cls==='Death Machine')return trigger.vibration(2,8,20);
     if(def.automatic||def.fireType==='Full Auto'){const amp=cls==='Light machine gun'?7:cls==='Submachine gun'?4:cls==='Wonder weapon'?6:5;return trigger.vibration(2,amp,Math.min(40,Math.max(6,Math.round(1/(def.fireTime||.1)))));}
-    if(def.fireType==='3-Round Burst')return trigger.weapon(2,6,6);
+    if(/Round Burst$/.test(def.fireType??''))return trigger.weapon(2,6,6);
     if(cls==='Shotgun'||cls==='Launcher')return trigger.weapon(3,7,8);
     if(cls==='Sniper rifle')return trigger.weapon(2,5,7);
     if(cls==='Wonder weapon')return /thundergun|microwave/.test(def.baseId??def.id)?trigger.feedback(3,8):trigger.weapon(2,6,5);

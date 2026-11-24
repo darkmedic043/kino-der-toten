@@ -17,7 +17,8 @@ import { loadStickers, loadStickerState, saveStickerState, stickersFor, leftKey,
 import { loadPrestige, savePrestige, weaponTier, prestigeCamoId, spendToken, RULES as PRESTIGE, TIER_NAMES } from '../prestige/prestige.js';
 import { available, equipped, unlockedAttachments, weaponProgress, xpToNext, maxLevel, toggle, previewDef, unlockLevelOf, nextUnlock } from './gunsmith.js';
 
-const SLOT_ORDER=['optic','muzzle','barrel','mag','under','grip','stock','laser','ammo','akimbo'];
+const SLOT_ORDER=['optic','muzzle','barrel','mag','under','grip','stock','laser','ammo','firemod','akimbo'];
+const NO_PART=new Set(['camo','charm','sticker','ammo','firemod','akimbo']);
 const ANCHORS={optic:['tag_scope_rail','tag_flatrail','tag_iron_sights','tag_iron_sight','tag_elbit','tag_aimpoint','tag_scope_colt'],
   muzzle:['tag_suppressor','tag_silencer','tag_flash'],mag:['tag_clip','tag_ext_clip','tag_extended_clip'],
   under:['tag_foregrip','tag_grenade_launcher','tag_m203','tag_flame_unit','tag_masterkey','tag_grip']};
@@ -234,13 +235,13 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   }
   const home=new Map();
   const anchorOf=s=>{
-    if(!gun||!ANCHORS[s])return null;   // the camo row has no part to point at
+    if(!gun||NO_PART.has(s))return null;   // the cosmetic rows and akimbo have no part to point at
     const part=partCentre(s);if(part)return part;
     if(home.has(s))return gun.localToWorld(home.get(s).clone());
     // the named fallback (a tag or anchor bone), looked up once per gun: BO3 guns land here every frame, and a name search
     // through their hierarchy per slot per frame was most of the Gunsmith's lag on them
     const key=gun.uuid+'|'+s;let b=anchorObj.get(key);
-    if(b===undefined){b=null;const own=available(cat,def,id).filter(a=>a.slot===s).flatMap(a=>a.tags);for(const n of [...own,...ANCHORS[s]]){b=gun.getObjectByName(n);if(b)break;}anchorObj.set(key,b??null);}
+    if(b===undefined){b=null;const own=available(cat,def,id).filter(a=>a.slot===s).flatMap(a=>[...a.tags,def?.mounts?.[a.id]?.tag].filter(Boolean));for(const n of [...own,...(ANCHORS[s]??[])]){b=gun.getObjectByName(n);if(b)break;}anchorObj.set(key,b??null);}
     return b?b.getWorldPosition(new THREE.Vector3()):null;
   };
   const anchorObj=new Map();
@@ -745,14 +746,17 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     for(const a of available(cat,def,id))for(const t of [...a.tags,...(a.extraTags??[])])if(hidden.has(t)&&!tagSlots.has(t))tagSlots.set(t,a.slot);
     return tagSlots;
   }
-  // which slot a mesh belongs to: the dominant bone of its first indexed vertex
+  // which slot a mesh belongs to: the dominant bone of its first indexed vertex. A mounted model (mounts.js) is its
+  // attachment's slot; a part swap's bones are named head__bone (BO7 rips) and the head is the attachment's tag, or one of
+  // def.partSlots (the stock part of a slot, shown until a variant is fitted)
   const partCache=new WeakMap();
   function partOf(o){
     if(partCache.has(o))return partCache.get(o);
     let res=null;const g=o.geometry,si=g.attributes.skinIndex,sw=g.attributes.skinWeight;
+    for(let p=o;p&&p!==gun;p=p.parent)if(p.userData.mountId){res=cat.attachments.find(x=>x.id===p.userData.mountId)?.slot??null;partCache.set(o,res);return res;}
     if(o.isSkinnedMesh&&si&&sw){const i=g.index?g.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const wv=sw.getComponent(i,k);if(wv>bw){bw=wv;best=si.getComponent(i,k);}}
-      const bone=o.skeleton.bones[best]?.name;
-      res=partTags().get(bone)??null;}
+      const bone=o.skeleton.bones[best]?.name??'',head=bone.split('__')[0];
+      res=partTags().get(bone)??partTags().get(head)??def?.partSlots?.[head]??null;}
     partCache.set(o,res);return res;
   }
   function close(){if(!alive)return;alive=false;charmRig?.dispose();screenObj?.dispose();removeEventListener('pointermove',stkMoveH);removeEventListener('pointerup',stkUpH);removeEventListener('pointermove',scrMoveH);removeEventListener('pointerup',scrUpH);cancelAnimationFrame(scrRaf);stkGhost?.remove();

@@ -958,6 +958,41 @@
       "id": "bo7_drake",
       "rarity": "legendary",
       "level": 48
+    },
+    {
+      "id": "bo7_otter",
+      "rarity": "rare",
+      "level": 18
+    },
+    {
+      "id": "bo7_serval",
+      "rarity": "epic",
+      "level": 26
+    },
+    {
+      "id": "bo7_eagle",
+      "rarity": "epic",
+      "level": 30
+    },
+    {
+      "id": "bo7_oman",
+      "rarity": "epic",
+      "level": 28
+    },
+    {
+      "id": "bo7_crossbow",
+      "rarity": "rare",
+      "level": 20
+    },
+    {
+      "id": "bo7_fang",
+      "rarity": "epic",
+      "level": 24
+    },
+    {
+      "id": "bo7_polis",
+      "rarity": "epic",
+      "level": 33
     }
   ],
   "bonuses": [

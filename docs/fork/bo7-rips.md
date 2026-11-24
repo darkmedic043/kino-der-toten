@@ -176,8 +176,8 @@ and clips, as the AW pairs.
 - **Box prefetch**: `mysteryBox.start` is wrapped; while the box spins, the rolled gun's model (and the mounts of the
   player's attachments for it) loads and its textures upload one per frame (`renderer.initTexture`), so taking it costs
   no hitch.
-- **World models** are decimated to 10 % (`WORLD_KEEP`, fast-simplification, attributes taken from the nearest merged
-  vertex; meshes under 400 faces kept): the AK's 7.8 MB → 0.7 MB. The box loads every world model, so this matters.
+- **World models** are decimated to 10 % (`WORLD_KEEP`, fast-simplification; meshes under 400 faces kept): the AK's
+  7.8 MB → 0.7 MB. The box loads every world model, so this matters. The mesh is welded first (see World models below).
 - **Quantization** (`quantize_glb`): uint16 indices, uint8 joints and weights, int8 normals (`KHR_mesh_quantization`);
   the AK's view model 41 → 28 MB.
 
@@ -234,6 +234,95 @@ MAP=sandbox KEEPIMG=webp Q=2 PLAY=scratch/bo7/frame7.js INIT=scratch/bo7/seven-i
   SET='{"fov":90}' flock scratch/melon/heavy.lock ~/.local/bin/lowpri node .tools/map-test.mjs
 ```
 Three guns per page: six with full textures passed the watchdog (renderer 2.48 GB); three peak at 2.1-2.2 GB.
+
+## Launchers, crossbow, the last guns and melees (2026-11-24, user: "add in launchers nd crossbow, melee, the missing guns")
+
+- **Clip reuse**: none. The four guns still missing (tasman, mammoth, stoat, terrier) have no clips in the rips and borrow
+  none from another gun (no shared `sat_vm_*` prefix, no reference in their dumps); they need exporting from the game.
+- **New guns**: eagle (MXR-17), oman (Warden 308), otter (RK-9), serval (Gremlin), fang (AAROW 109), polis (A.R.C. M1),
+  crossbow (NX Ravager). Some recs live only in a blueprint folder (`BLUEPRINT`, `model_dir` searches it) or as
+  `wpn_<name>` without `_rec` (the AAROW, the Katana). `rec_bones` takes every base part's bones, or muzzle and
+  underbarrel tags on the barrel part read as "no tag on this gun" (oman 6 -> 21 mounted parts, eagle 5 -> 20).
+  The Warden has only `reload_1..8`: the highest is its reload. eagle has no sprint clips, so `ownSprint` needs
+  `sprintLoopAnim` (mod.js).
+- **Gremlin** (serval) is always a pair (`pair_only`: no single-gun clips exist), clip 52 = 2 x 26. Its shots are
+  named after its old codename (`wpn_sm_orca_fire_plr*`): `SND_NAME` maps codenames to bank names (also the melees).
+- **Projectile guns** (`PROJ_CLS` = classes `la` Launcher, `sl` Special; `PROJ` per gun, stock then Pack-a-Punch
+  fields): the engine's `projectileSpeed` path (kino-features.js) with BO1's projectile models. AAROW = rocket
+  (`projectile_at4`), A.R.C. M1 = grenade (`projectile_m203grenade`, fireTime .5: the dump's .1 was a full-auto rate),
+  NX Ravager = bolt that sticks and blows after 1.5 s (`t5_weapon_crossbow_bolt`). Their stock sights are separate
+  models (`EXTRA_PARTS`). No Gunsmith kits, no `fire_last_ads` or `reload_empty` clips.
+- **Melees** (`MELEES`, `build_melee()`): knife (Tactical Knife), castor (Mace), nashira (Katana), saiph (H311-SAW),
+  shockbaton (Flatline MK.II), wasat (Arcblade) as `bo7_me_<g>` defs (`bo7Melee`, `noBox`; mod.js leaves `noBox`
+  out of the box pool). Light swing, backhand and heavy are the game's own clips (`meleeAnim`, `backslashAnim`,
+  `meleeChargeAnim`). They are melee-slot entries in `mods/melee/melee.json` with `ownClips` (weapons.md Dedicated
+  melee), picked in the loadout's melee picker; not in the gun list or the box. Most have no foley in the rips.
+- Not done: maru (Executioner's Duet, two blades with separate l_/r_ clips) and the ballistic knife (a projectile
+  gun in BO7's files); the wonder weapons and their twins (zeus, atria, carina, nembus, sargas) left out on purpose.
+
+## Gun behaviour (2026-11-24, user: "make sure the guns behave correctly ... the m8a1 should be a 4 round burst, ... echo 12 ... the cbrs requires you to turn the mag every 1/3 of the mag")
+
+- **Bursts**: `fireType` is `<n>-Round Burst` from the dump's burst count (the M8A1's 4), with `burstCount` and
+  `burstDelay` (`BURST_DELAY` .12 s). engine.js takes the count from `burstCount` (was hard-wired to 3), the controller's
+  trigger feel matches any `Round Burst`. mod.js holds the trigger `fireTime + burstDelay` after a burst's last shot, or
+  quick clicks chained bursts.
+- **Fire modes the dump leaves empty**: `AUTO_GUNS` (the CODA 9 machine pistol `atlas`, the Akita auto shotgun),
+  `SEMI_GUNS` (TR51 Para `emu`: full auto only with its Fallen Angel barrel in the game).
+- **Rechamber every few shots** (`RECHAMBER`, mod.js `session.fire` wrapper): the Echo 12 (`husky`, `rechamberEvery 2`:
+  a double barrel that pumps after both) and the CBRS-3 (`marmot`, `rechamberParts 3`: the helical mag turns at every
+  third). The shot that ends a set holds the trigger for `rechamberTime` and plays `rechamberAnim` (fire_last kick +
+  the rechamber clip; `adsRechamberAnim` aimed); counted from the mag, so a reload starts a fresh set. Pump and bolt
+  guns keep the rechamber joined onto every fire clip.
+- **The CBRS float** (user: "the firing for the cbrs causing the gun to clip and float around"): several fire/raise
+  clips (the CBRS-3's, AAROW's, Ryden's, TR51's raise) don't key `j_gun`, which then sat at its bind. `clip()` fills
+  only `j_gun` from the idle's first frame (filling every unkeyed bone left the whole rig at its bind; `NOFILL=1` turns
+  it off). Joined clips (fire + rechamber) scale the second clip's frames by fps: fire clips are 60 fps, rechambers 30,
+  and the rechamber ran at double speed.
+
+## Underbarrels, fire mods, ammo, kits (2026-11-24, user: "make sure all attachments are properly imported, like the echo-12 launcher upgrade, firing mods, underbarrel launchers")
+
+- **Underbarrel launchers** (`b7_ub_gl_std|he|dc|smoke`): only on guns with `sat_vm_<c>_<g>_ubgl_*` clips and a
+  `tag_grenade_launcher` (13 ARs; eagle has the clips but no tag: left out, the build prints it). The launcher model
+  `sat_vm_ub_gl_01` is merged under head bone `b7_ubgl` (hidden until fitted). The attachment is `underbarrel: "awgl"`,
+  the Advanced Warfare alt form (gunsmith.js `energyLauncher`): key 5 switches; `attachAnims[id].alt` carries the
+  launcher's own clips (idle/fire/reload/raise/drop/inspect from `ubgl_*`, `to_grenade` = attachInAnim,
+  `ubgl_from_grenade` = attachOutAnim), its sounds (`bo7Sounds: bo7_<g>_ubgl`: the vulture's shared ubgl shots + the
+  gun's own foley) and the round (`UBGL_KIND`, figures our own; Pack-a-Punch fields in `upgrade`). 1 round, 6 reserve.
+  Drill Charge = a bolt that sticks and blows after 1 s; Smoke = its blast is swapped for a smoke cloud
+  (`def.smokeLauncher`, bo3-equipment `kino.smokeAt`, co-op relayed).
+- **Fire mods** (slot `firemod`, "Fire Mod", gunsmith-view SLOT_ORDER after ammo, no part to show): stat-only from the
+  gun's gunsmith slot `firemod` (`b7_firemod_<kind>`: Recoil Springs, Rapid Fire, Lightweight Trigger, Rapid Bolt,
+  Quick Charge, Pump Guide Rod, the CBRS-3's Turnkey Rapid Drum = shorter `rechamberTime`).
+- **Ammo**: FMJ, High Velocity, Dragon's Breath (`incendiary`: a pellet that hits sets the zombie alight with the
+  flamethrower's burn, `kino.flamer.ignite`, 55/s for 3 s), Slug (one pellet, x6 damage, x2.5 range), Short Shells.
+- **Kits** (`KITS`): the Echo 12's Backlash Launcher Kit (`b7_kit_backlash`, `def.backlash`): mod.js's fire hook sends
+  each shot as one explosive round that sticks and blows 0.15 s later; Pack-a-Punched it bursts on impact. Our own
+  figures: the rips have no data for it.
+- **Crossbar Grip** (`ub_crossbar_01`) fitted as an underbarrel part on hades, hildr, typhon.
+- New `STAT_FIELDS` in gunsmith.js so removing these restores the def.
+- Checked in Sandbox (`scratch/bo7/ubgl-test.js`, `ubgl-init.js` plans): Kite with each launcher (switch, fire, reload,
+  back; std killed 3, drill 2, smoke 60 impact), Echo 12 Backlash (3 kills), Dragon's Breath (burn ticks after the
+  hit), Corso slug (1380 a hit). Renderer peak 1.4-1.7 GB. Spawned zombies rise from 50 under the floor
+  (`state 'rising'`): a hitscan test must wait for `state !== 'rising'` or its rays pass over them.
+
+## World models and the HUD icon (fixed 2026-11-24, user: "gun icons are also severely broken", the Velox 5.7 with two slides)
+
+The BO7 HUD dial draws the gun's world model, and so do third person, the Mystery Box and the menu pictures. Three faults:
+- **Decimation tore the meshes.** The game splits a vertex at every UV seam and hard edge; decimated as-is, every split was
+  an open border, so slides came out with holes, spikes and faces turned the wrong way (the Velox's slide in two pieces,
+  drawn one-sided). `simplify()` now welds by position first, but only within one bone's piece: welded across bones (a
+  round against its mag), a face spans both and stretches in the pose (the 1911's rounds drew streaks). Each corner of a
+  new face takes the normal, UV and weights of the merged original vertex whose own faces lie nearest that face, so
+  seams split again on the right side.
+- **The idle pose tilted them.** `poseIdle` (bo3-weapons/pose.js) poses a BO3 world model with the viewmodel's idle frame
+  because BO3's bind parks parts. A BO7 world model's bind is already the gun at rest (the spare mag inside the gun),
+  and the idle frame tilted the 1911's slide. The build writes glTF scene extras `{restPose: true}` (`REST`,
+  `quantize_glb(extras)`) on world models; three puts them in the scene's `userData` and `poseIdle` skips such a model.
+- **The HUD icon drew the model raw**: no pose, no `hideTags`, so every alternative part showed. `hud-bo7` `gunIcon` now
+  calls `poseIdle` and hides `def.hideTags` as `holdWeapon` does.
+- **The Katana was empty**: its rec points at `wpn_sat_vm_me_nashira`, an empty folder; `model_dir` now takes a melee
+  `_rec` name's folder without the suffix when it exists. Upright models (melees) are laid on their side in the icon.
+Check: `scratch/bo7/thumbraw.mjs` (`RAW=1` = bind, no hideTags), `thumbcol.mjs` (one colour per mesh), `icons.js` with `DESK=1`.
 
 ## Known limits / next
 

@@ -434,7 +434,7 @@ function update(dt){
       view.pivot.visible=(!session.weaponUnavailable||view.mode==='throw')&&!map.hideViewmodel?.();view.input={sprint,ads,fire:primary};   // this frame's input, for mods (inspect cancels on sprint/aim; operator weapons read touch/pad fire)
       perkDrink.update(dt,session);
       if((!sprint||mods.sprintFire?.())&&session.phase!=='reviving'&&!mods.holdFire?.()&&(primaryPressed||(primary&&session.def.automatic)||burstLeft>0||reloadShot)){   // holdFire: a mod handles the fire button (bows: hold to draw on touch)
-        if(shoot(dualSwap()?'left':'right')){reloadShot=false;if(burstLeft>0)burstLeft--;else if(session.def.fireType==='3-Round Burst')burstLeft=2;}
+        if(shoot(dualSwap()?'left':'right')){reloadShot=false;if(burstLeft>0)burstLeft--;else if(/Round Burst$/.test(session.def.fireType??''))burstLeft=(session.def.burstCount??3)-1;}
         if(firesBoth(session.def))shoot('left');   // the XMG: one trigger, both guns
       }
       // dual wield: the aim button is the other gun's trigger (the left one, or the right one with a mouse)

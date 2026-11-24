@@ -15,6 +15,7 @@
 // places those panels around the on-screen buttons).
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
+import { poseIdle } from '../bo3-weapons/pose.js';
 import { loadPrestige, prestigeColor, prestigeName, prestigeShort, isPrestigeMaster, masterLook } from '../prestige/prestige.js';
 
 export default async function setup(api){
@@ -101,6 +102,7 @@ export default async function setup(api){
     pivot.add(model);scene.add(pivot);pivot.updateMatrixWorld(true);
     let box=new THREE.Box3().setFromObject(pivot),size=box.getSize(new THREE.Vector3());
     if(size.z>size.x){pivot.rotation.y=Math.PI/2;pivot.updateMatrixWorld(true);box=new THREE.Box3().setFromObject(pivot);size=box.getSize(new THREE.Vector3());}
+    if(size.y>size.x*1.5){pivot.rotation.z=-Math.PI/2;pivot.updateMatrixWorld(true);box=new THREE.Box3().setFromObject(pivot);size=box.getSize(new THREE.Vector3());}   // upright (the BO7 katana): laid on its side
     const c=box.getCenter(new THREE.Vector3()),half=Math.max(size.x/2,size.y)*1.08,cam=new THREE.OrthographicCamera(-half,half,half/2,-half/2,-5000,5000);
     cam.position.set(c.x,c.y,c.z+1000);cam.lookAt(c);iconBox.position.set(c.x+half*4,c.y,c.z);scene.add(iconBox);
     const prevRT=renderer.getRenderTarget(),prevColor=renderer.getClearColor(new THREE.Color()),prevAlpha=renderer.getClearAlpha(),prevAuto=renderer.autoClear;
@@ -116,6 +118,8 @@ export default async function setup(api){
     if(gunIcons.has(id))return gunIcons.get(id);
     const p=(async()=>{
       const def=data.weapons[id],url=def?.iconModel??def?.worldModel;const model=url&&await loadModel(url).catch(()=>null);if(!model)return null;   // iconModel: the Combat Knife's world model is a Bowie (melee.json thumbModel)
+      // as third person holds it (characters.js holdWeapon): imported guns posed, optional parts hidden; drawn raw, the BO7 guns showed every alternative part at once
+      await poseIdle(model,def);for(const tag of def.hideTags??[]){const bone=model.getObjectByName(tag);if(bone)bone.scale.setScalar(1e-6);}
       return drawIcon(model);
     })().catch(e=>{console.warn('bo7-hud gun icon',id,e);return null;});
     gunIcons.set(id,p);return p;
