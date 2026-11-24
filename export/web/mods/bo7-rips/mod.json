@@ -1,0 +1,5 @@
+{
+  "name": "BO7 weapons (rips)",
+  "description": "Black Ops 7 guns converted from the user's own rips (.tools/build_bo7_rips.py): BO7 model, arms, animations and sounds. Pilot: the AK-27, in the Mystery Box.",
+  "script": "mod.js"
+}

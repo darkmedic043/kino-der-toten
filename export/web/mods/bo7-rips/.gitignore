@@ -1,0 +1,6 @@
+# Built from the user's own Black Ops 7 rips by .tools/build_bo7_rips.py: not redistributable.
+weapons.json
+models/
+animations/
+audio/
+textures/
