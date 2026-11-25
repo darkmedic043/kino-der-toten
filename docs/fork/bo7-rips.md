@@ -296,6 +296,10 @@ Three guns per page: six with full textures passed the watchdog (renderer 2.48 G
   grip to work the bolt, the gun swung into the camera with it (every bolt and pump gun). The fill now skips
   `ads_(up|down)$`; no BO7 ADS pose cast keys `j_gun`, so those clips carry only `tag_ads` (checked: 110 of 110).
   Check: `scratch/bo7/rech.js` (hip and ADS fire frames, guns from `window.__GUNS` via an `INIT` script).
+  GOTCHA: the first fix patched the clip files by hand after the build had written weapons.json, so their `?v=` hashes
+  went stale and players kept the cached broken clips (served `max-age=3600, stale-while-revalidate` = days; user: "the
+  chambering for all rifles seem to be busted, even for the hawker"). A file edited outside the build needs its `?v=`
+  in weapons.json recomputed (md5 of the file, first 8 hex), then `build-gz`.
 
 ## Underbarrels, fire mods, ammo, kits (2026-11-24, user: "make sure all attachments are properly imported, like the echo-12 launcher upgrade, firing mods, underbarrel launchers")
 
