@@ -326,8 +326,11 @@ function thumb(id){
         // framed from the gun's own box turned with the pivot: every corner must fit the view, the near ones included
         // (a long barrel turned toward the camera was cut off when only the box's middle was fitted)
         const pivot=new THREE.Group();pivot.add(model);thumbScene.add(pivot);pivot.updateMatrixWorld(true);
-        const box=new THREE.Box3().setFromObject(pivot),center=box.getCenter(new THREE.Vector3());
-        pivot.rotation.set(.12,-.35,THREE.MathUtils.degToRad(def.thumbRoll??me?.thumbRoll??0));center.applyEuler(pivot.rotation);pivot.position.sub(center);pivot.updateMatrixWorld(true);   // thumbRoll (melee.json): a tall melee lies along the frame
+        let box=new THREE.Box3().setFromObject(pivot),sz=box.getSize(new THREE.Vector3());
+        const upright=me&&(def.thumbRoll??me.thumbRoll)==null&&sz.y>Math.max(sz.x,sz.z)*1.5;   // an upright melee (BO7's katana, mace, chainsaw) is laid on its side, as hud-bo7 does
+        if(upright&&sz.x<sz.z){model.rotation.y+=Math.PI/2;pivot.updateMatrixWorld(true);box=new THREE.Box3().setFromObject(pivot);}   // ... flat side to the camera (the Flatline showed its tape, not its grip)
+        const center=box.getCenter(new THREE.Vector3());
+        pivot.rotation.set(.12,-.35,upright?-Math.PI/2:THREE.MathUtils.degToRad(def.thumbRoll??me?.thumbRoll??0));center.applyEuler(pivot.rotation);pivot.position.sub(center);pivot.updateMatrixWorld(true);   // thumbRoll (melee.json): a tall melee lies along the frame
         const tv=Math.tan(THREE.MathUtils.degToRad(thumbCamera.fov/2)),th=tv*thumbCamera.aspect,c=new THREE.Vector3();let dist=0;
         for(let i=0;i<8;i++){c.set(i&1?box.max.x:box.min.x,i&2?box.max.y:box.min.y,i&4?box.max.z:box.min.z).applyMatrix4(pivot.matrixWorld);dist=Math.max(dist,c.z+Math.abs(c.x)/th,c.z+Math.abs(c.y)/tv);}
         thumbCamera.position.set(0,0,dist*1.04);thumbCamera.lookAt(0,0,0);
@@ -370,6 +373,7 @@ loadGunsmith(new URL('mods/weapon-levels/',document.baseURI)).then(c=>{gunsmith=
 // One starting slot, pistols only; the Mystery Box card edits what the box can give you.
 const slots=[{key:'primary',label:'STARTING PISTOL'},{key:'melee',label:'MELEE'},{key:'box',label:'MYSTERY BOX'},{key:'bonus0',label:'BONUS 1'},{key:'bonus1',label:'BONUS 2'}];
 let activeSlot='primary',focus=null,meleeCatalog=null;
+const meleeArt=key=>{const m=meleeCatalog?.melees[key];return !!(m?.thumbModel??m?.worldModel??weapons['melee_'+key]?.worldModel);};   // BO7's melees (ownClips) have no model in melee.json: their picture is the rip's world model, on the melee_<key> def (mods/melee prepare)
 fetchJson('mods/melee/melee.json').then(c=>{meleeCatalog=c;renderLoadout();}).catch(e=>console.warn('[melee]',e));
 const weaponList=()=>config.weapons.filter(w=>weapons[w.id]).map(w=>({...w,level:unlockLevel(w)}));
 // a weapon pack gun (progression.json pack): the lock names the pack, sold in the Shop's Weapon packs tab
@@ -394,7 +398,7 @@ function renderLoadout(){
       const m=meleeCatalog?.melees[st.value]&&!meleeSoon(meleeCatalog.melees[st.value])?meleeCatalog.melees[st.value]:meleeCatalog?.melees[meleeCatalog.default];   // a soon melee falls back (mods/melee)
       const mk=m===meleeCatalog?.melees[st.value]?st.value:meleeCatalog?.default,smith=meleeSmith(mk);
       el.innerHTML=`<span class="label">${s.label}</span><div class="thumb"></div><strong>${esc(m?.name??'')}</strong><small>${esc(m?.hint??'Tap melee to stab, hold it to draw')}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
-      if(m?.worldModel)fillThumb(el.querySelector('.thumb'),'melee_'+mk);
+      if(meleeArt(mk))fillThumb(el.querySelector('.thumb'),'melee_'+mk);
       el.addEventListener('click',e=>{if(smith&&e.target.closest('.slot-gs')){openMeleeGunsmith(mk);return;}activeSlot='melee';focus=null;renderLoadout();});$('slots').append(el);continue;
     }
     if(s.key==='box'){
@@ -529,7 +533,7 @@ function renderMeleePicker(l){
     const el=document.createElement('button'),locked=meleeSoon(m);el.className='opt'+(id===l.melee&&!locked?' selected':'')+(locked?' locked':'');
     const smith=!locked&&meleeSmith(id);
     el.innerHTML=`<div class="thumb"></div><strong>${esc(m.name)}</strong><small>${locked?`<b style="letter-spacing:1px">${m.unlock?'MELON PASS':'COMING SOON'}</b> · `:''}${esc(m.description)}</small>${smith?'<span class="slot-gs">GUNSMITH</span>':''}`;
-    if(m.worldModel)fillThumb(el.querySelector('.thumb'),'melee_'+id);
+    if(meleeArt(id))fillThumb(el.querySelector('.thumb'),'melee_'+id);
     if(locked){el.disabled=true;el.style.cssText='border-style:dashed;opacity:.55;cursor:not-allowed';el.title='Coming soon';}
     else el.addEventListener('click',e=>{if(smith&&e.target.closest('.slot-gs')){openMeleeGunsmith(id);return;}profile.loadout.melee=id;save();renderLoadout();});
     grid.append(el);
