@@ -1,0 +1,95 @@
+{
+ "rip": "bo7_atria",
+ "mounts": {
+  "gh_rangefinder": {
+   "model": "grimhawk_twin.glb?v=58347b50",
+   "tag": "j_gun",
+   "node": "gh_rangefinder",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "gh_hawkeye": {
+   "model": "grimhawk_twin.glb?v=58347b50",
+   "tag": "j_gun",
+   "node": "gh_hawkeye",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "gh_expanse": {
+   "model": "grimhawk_twin.glb?v=58347b50",
+   "tag": "j_mag1",
+   "node": "gh_expanse",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "extmag": {
+   "model": "grimhawk_twin.glb?v=58347b50",
+   "tag": "j_mag1",
+   "node": "extmag",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "dualmag": {
+   "model": "grimhawk_twin.glb?v=58347b50",
+   "tag": "j_mag1",
+   "node": "dualmag",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "gh_longbarrel": {
+   "model": "grimhawk_twin.glb?v=58347b50",
+   "tag": "j_gun",
+   "node": "gh_longbarrel",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "suppressor": {
+   "model": "grimhawk_twin.glb?v=58347b50",
+   "tag": "j_gun",
+   "node": "suppressor",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "grip": {
+   "model": "grimhawk_twin.glb?v=58347b50",
+   "tag": "j_gun",
+   "node": "grip",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "laser": {
+   "model": "grimhawk_twin.glb?v=58347b50",
+   "tag": "j_gun",
+   "node": "laser",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  }
+ }
+}

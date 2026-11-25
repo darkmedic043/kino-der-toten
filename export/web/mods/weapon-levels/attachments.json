@@ -143,6 +143,9 @@
       "tags": [
         "tag_gh_expanse"
       ],
+      "replaces": [
+        "b7_base_mag"
+      ],
       "desc": "A fan-shaped flechette drum: 35 rounds, a little slower to reload.",
       "stats": {
         "clipMul": 1.4,
@@ -173,6 +176,9 @@
         "tag_extended_clip",
         "tag_clip_extended",
         "tag_ammo_expander"
+      ],
+      "replaces": [
+        "b7_base_mag"
       ],
       "extraTags": [
         "j_bigammo"
@@ -245,6 +251,9 @@
         "tag_dual_clip",
         "tag_double_clip",
         "tag_duel_clip"
+      ],
+      "replaces": [
+        "b7_base_mag"
       ],
       "desc": "Taped mags: reloads 30% faster.",
       "stats": {
@@ -558,6 +567,9 @@
       "tags": [
         "tag_sr_deflect"
       ],
+      "replaces": [
+        "b7_base_mag"
+      ],
       "desc": "BO7's prestige magazine. Orbs ricochet off walls and leap from zombie to zombie instead of passing through, and fly 50% faster (about 48 m of travel). 9 rounds, slower to fire.",
       "stats": {
         "clipMul": 1.5,
@@ -570,6 +582,9 @@
       "slot": "mag",
       "tags": [
         "tag_sr_overclock"
+      ],
+      "replaces": [
+        "b7_base_mag"
       ],
       "desc": "A hot, finned cell that reaches full charge in half the time. Only 4 rounds.",
       "stats": {
@@ -678,6 +693,7 @@
       ],
       "desc": "BO7's skeleton grip. 7% faster on your feet with the Havoc in hand.",
       "replaces": [
+        "b7_base_grip",
         "tag_hv_grip"
       ]
     },
@@ -767,6 +783,7 @@
         "reloadMul": 0.85
       },
       "replaces": [
+        "b7_base_grip",
         "tag_hv_grip"
       ]
     },
@@ -885,6 +902,9 @@
       "tags": [
         "tag_ro_mfs"
       ],
+      "replaces": [
+        "b7_base_mag"
+      ],
       "desc": "BO7's prestige magazine: a drum autoloader. Full auto, 15 rounds and a faster cycle, but a wider spread from the hip.",
       "stats": {
         "auto": true,
@@ -906,6 +926,7 @@
         "hipSpreadMul": 0.8
       },
       "replaces": [
+        "b7_base_grip",
         "tag_ro_grip"
       ]
     },
@@ -921,6 +942,7 @@
         "reloadMul": 0.8
       },
       "replaces": [
+        "b7_base_grip",
         "tag_ro_grip"
       ]
     },
@@ -936,6 +958,7 @@
         "hipSpreadMul": 0.7
       },
       "replaces": [
+        "b7_base_stock",
         "tag_ro_stock"
       ]
     },
@@ -948,6 +971,7 @@
       ],
       "desc": "A bare strut with a stiff spring and no buffer. Every shot shoves you back along your aim; fire at your feet to cannon-jump.",
       "replaces": [
+        "b7_base_stock",
         "tag_ro_stock"
       ]
     },
@@ -1042,6 +1066,9 @@
       "tags": [
         "tag_xm_leyden"
       ],
+      "replaces": [
+        "b7_base_mag"
+      ],
       "desc": "The overheat belt (BO7's prestige mag): a 500-round canister under the handguard, fed straight from your reserve so it never reloads, but about 55 rounds of sustained fire overheat it (a 1.9 s lockout) and its coils glow as the heat builds. Custom: when it overheats the stored charge leaps from the gun as lightning that chains through up to six nearby zombies.",
       "stats": {
         "clipMul": 8.334
@@ -1062,6 +1089,7 @@
         "rangeMul": 1.25
       },
       "replaces": [
+        "b7_base_barrel",
         "tag_xm_barrel"
       ]
     },
@@ -1083,6 +1111,9 @@
       "slot": "mag",
       "tags": [
         "tag_xm_fastbelt"
+      ],
+      "replaces": [
+        "b7_base_mag"
       ],
       "desc": "A short 50-round belt in a slim pouch: 30% faster reloads.",
       "stats": {
@@ -1115,6 +1146,7 @@
         "hipSpreadMul": 0.85
       },
       "replaces": [
+        "b7_base_grip",
         "tag_xm_grip"
       ]
     },
@@ -1146,6 +1178,7 @@
         "rangeMul": 1.4
       },
       "replaces": [
+        "b7_base_barrel",
         "tag_xm_barrel"
       ]
     },
@@ -1155,6 +1188,9 @@
       "slot": "mag",
       "tags": [
         "tag_xm_extbelt"
+      ],
+      "replaces": [
+        "b7_base_mag"
       ],
       "desc": "An 85-round belt in a big pouch. Slower to reload.",
       "stats": {
@@ -1185,6 +1221,7 @@
         "hipSpreadMul": 0.9
       },
       "replaces": [
+        "b7_base_stock",
         "tag_xm_stock"
       ]
     },
@@ -1200,6 +1237,7 @@
         "rangeMul": 1.1
       },
       "replaces": [
+        "b7_base_barrel",
         "tag_xm_barrel"
       ]
     },
@@ -1238,6 +1276,9 @@
       "slot": "stock",
       "tags": [
         "tag_xm_titan"
+      ],
+      "replaces": [
+        "b7_base_mag"
       ],
       "desc": "BO7's Season 2 conversion: a second XM325 in your left hand. Hip fire only, each gun runs its own 500-round belt (1,000 in the counter) fed from your reserve with no reloads and fires 25% slower for 40% less damage per round (together, 50% faster than one gun). Each gun overheats after about 50 rounds of sustained fire. No underbarrel or magazine attachments.",
       "stats": {

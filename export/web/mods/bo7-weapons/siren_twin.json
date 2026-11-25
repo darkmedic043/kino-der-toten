@@ -1,0 +1,125 @@
+{
+ "rip": "bo7_sargas",
+ "mounts": {
+  "sr_tuningfork": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_gun",
+   "node": "sr_tuningfork",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "sr_deflect": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_mag1",
+   "node": "sr_deflect",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "sr_overclock": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_mag1",
+   "node": "sr_overclock",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "extmag": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_mag1",
+   "node": "extmag",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "dualmag": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_mag1",
+   "node": "dualmag",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "sr_resonance": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_gun",
+   "node": "sr_resonance",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "sr_baffle": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_gun",
+   "node": "sr_baffle",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "sr_echo": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_gun",
+   "node": "sr_echo",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "sr_lancet": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_gun",
+   "node": "sr_lancet",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "sr_soma": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_gun",
+   "node": "sr_soma",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "grip": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_gun",
+   "node": "grip",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "laser": {
+   "model": "siren_twin.glb?v=48fa2ecf",
+   "tag": "j_gun",
+   "node": "laser",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  }
+ }
+}

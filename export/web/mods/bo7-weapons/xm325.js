@@ -284,11 +284,11 @@ export function setupXm325(api) {
     hud(); glow();
   });
   // the Leyden and Titan canisters' heat coils (material xm_heat_glow) glow with the meter and flicker while locked
-  let glowGun = null, glowLeft = null, glowMats = [];
+  let glowGun = null, glowLeft = null, glowMats = [], glowParts = -1;
   function glow() {
-    const g = view?.gun, l = view?.leftGun;
-    if (g !== glowGun || l !== glowLeft) {
-      glowGun = g; glowLeft = l; glowMats = [];
+    const g = view?.gun, l = view?.leftGun, parts = (g?.userData.mounts?.length ?? 0) + (l?.userData.mounts?.length ?? 0);   // mounted parts (the BO7 rip's look, bo7-rips twins) arrive after the equip
+    if (g !== glowGun || l !== glowLeft || parts !== glowParts) {
+      glowGun = g; glowLeft = l; glowParts = parts; glowMats = [];
       for (const root of [g, l]) root?.traverse(o => { for (const m of [o.material].flat()) if (m?.name?.startsWith('xm_heat_glow') && !glowMats.includes(m)) glowMats.push(m); });
     }
     if (!glowMats.length) return;

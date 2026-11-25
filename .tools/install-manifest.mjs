@@ -29,7 +29,7 @@ const OWN = [
   /^mods\/(classes\/classes|characters\/characters|progression\/progression|gobblegums\/gums|prestige\/prestige|research\/research|credits\/credits|shop\/catalog|pass\/season(s|-s\d+)?|weapon-levels\/(attachments|camos|games)|movement\/data|player-health\/data|terminal-booth\/placements|hd-weapons\/hd|map-materials\/(hd|hd-materials|normals)|(gun|event|zombie)-sounds\/sounds|_template\/data|lighting\/fixtures)\.json$/,
   /^mods\/terminal-booth\/terminal_booth(_compact)?\.glb$/,        // built in Blender for this fork (.tools/build-terminal-booth.py)
   /^mods\/classes\/garden\/(plants\.glb|icons\/[^/]+\.webp)$/,      // the Gardener's plants and pictures, built in Blender for this fork (.tools/build_garden_plants.py)
-  /^mods\/bo7-weapons\/[^/]+\.glb$/,                               // rebuilt from reference in Blender for this fork (.tools/build-grimhawk.py etc.)
+  /^mods\/bo7-weapons\/[^/]+(\.glb|_twin\.json)$/,                         // rebuilt from reference in Blender for this fork (.tools/build-grimhawk.py etc.)
   /^mods\/melon-weapons\/[^/]+\.glb$/,                             // fork originals: Debt Collector, Hive Launcher (.tools/build-debt-collector.py, build-hive-launcher.py)
   /^mods\/melee\/grave_bell_(view|world)\.glb$/,                   // fork original: the Grave Bell (.tools/build-grave-bell.py)
   /^mods\/bo3-weapons\/(parts\/(aw|mk3)_attachments\.glb|aw-kits\.json)$/,    // the AW guns' Gunsmith parts, built in Blender for this fork (.tools/build_aw_attachments.py, the GKZ-45 Mk3's .tools/build_mk3_attachments.py); not the guns

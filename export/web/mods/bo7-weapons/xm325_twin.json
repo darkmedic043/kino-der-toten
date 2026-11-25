@@ -1,0 +1,145 @@
+{
+ "rip": "bo7_zeus",
+ "mounts": {
+  "xm_comp": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_comp",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_sup": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_sup",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_chief": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_chief",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_fractal": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_fractal",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_cryo": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_cryo",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_leyden": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_mag1",
+   "node": "xm_leyden",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_fastbelt": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_mag1",
+   "node": "xm_fastbelt",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_extbelt": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_mag1",
+   "node": "xm_extbelt",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_titan": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_mag1",
+   "node": "xm_titan",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_vas": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_vas",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_reflex": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_reflex",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_lucius": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_lucius",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_aegis": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_aegis",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "xm_mfs": {
+   "model": "xm325_twin.glb?v=bc4a5982",
+   "tag": "j_gun",
+   "node": "xm_mfs",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  }
+ }
+}

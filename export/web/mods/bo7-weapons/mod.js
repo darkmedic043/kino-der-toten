@@ -87,7 +87,7 @@ export default function setup(api) {
   // and takes the drum's rim, the drum (tag_clip; weapon-levels drives the fitted drum from it) swings down out of view
   // with the hand, a fresh one comes back up and is seated with a slap, and the hand returns to the handguard. Timed to
   // the reload's duration; the M16's mag out / in (and chamber, on an empty reload) sounds play at their beats.
-  const drumFitted = () => session.weapon?.id === ID && String(session.def?.attachments ?? '').split('+').includes('gh_expanse');
+  const drumFitted = () => session.weapon?.id === ID && !session.def?.bo7 && String(session.def?.attachments ?? '').split('+').includes('gh_expanse');   // bo7: the rip's look has its own reload clip (bo7-rips twins)
   const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
   const seg = (u, a, b) => ease((u - a) / (b - a));
   let drum = null;

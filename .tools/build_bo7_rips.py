@@ -445,7 +445,10 @@ FIX = {'aden': {'rpm': 48}, 'coral': {'rpm': 56}, 'drake': {'rpm': 43}, 'caspian
        'falcon': {'burstDelay': .142}, 'kara': {'burstDelay': .351}, 'orion': {'burstDelay': .13}, 'otter': {'burstDelay': .09},
        'scotia': {'burstDelay': .166}, 'solomon': {'burstDelay': .3},
        'baltic': {'chargeTime': .25, 'burstDelay': .175}}   # the XR-3 Ion: each pull charges, then a burst; held: a burst every ~0.525 s (mod.js)
-TWINS = {'zeus', 'atria', 'carina', 'nembus', 'sargas'}   # already in the fork as Blender rebuilds (mods/bo7-weapons, weapons.md)
+# the fork's own specials (mods/bo7-weapons, weapons.md): built as bo7_<g> (never in the box, none of the rip's Gunsmith
+# parts, every stock part hideable), and bo7-rips/mod.js lends their model, clips and sounds to the fork's id, whose custom
+# attachments mount on it (.tools/bo7-twin-parts.mjs)
+TWINS = {'zeus': 'xm325_zm', 'atria': 'grimhawk_zm', 'carina': 'roc_zm', 'nembus': 'havoc_zm', 'sargas': 'siren_zm'}
 UP = {   # Pack-a-Punch names (the fork's own)
     'albatross': 'Actuated Neutralizer 94000', 'condor': 'Peacemaker Mk Infinity', 'egret': 'Egret Eradicator', 'emu': 'Paranormal TR-5100',
     'falcon': 'X9 Renegade', 'finch': 'Insidious Singing Reaper', 'hawk': 'M15 MOD 115', 'heron': 'Voyak Kill-Tank', 'kite': 'Kronos Reaper',
@@ -466,14 +469,14 @@ def gun_table():
     out = {}
     for gid in sorted(json.loads((PIPE/'dumps'/'gunsmith.json').read_text())):
         _, c, *rest = gid.split('_'); g = '_'.join(rest[:-1] if rest[-1] in ('mp', 'zm') else rest)
-        if c not in CLS or g in TWINS or g.endswith('exotic'): continue
+        if c not in CLS or g.endswith('exotic'): continue
         pre = f'sat_vm_{c}_{g}_'
         # pair_only: the Gremlin has only akimbo clips (it is always two guns in BO7): its def is the pair (build_akimbo)
         pair_only = not (EXP/'animations'/(pre+'idle.cast')).exists() and (EXP/'animations'/(pre+'akimbo_r_idle.cast')).exists()
         if not (model_dir(pre+'rec').is_dir() and ((EXP/'animations'/(pre+'idle.cast')).exists() or pair_only)
-                and bank(c, g)): continue
+                and (bank(c, g) or g in TWINS)): continue   # the ROC (carina) has no sound bank in the rips: it keeps the fork's sounds
         f = (WDUMP.get(gid) or {}).get('fields', {})
-        if f.get('type') != ('projectile' if c in PROJ_CLS else 'bullet'): continue   # the Grimhawk and ROC fire bullets
+        if g not in TWINS and f.get('type') != ('projectile' if c in PROJ_CLS else 'bullet'): continue   # the Grimhawk and ROC fire bullets
         num = lambda k, d: float(f[k]) if f.get(k) not in (None, '-') else d
         wc, dmg, mn, rng, head, ref, udmg, umn, pel, price, view = CLS[c]
         ft, burst = num('firetime', ref), int(num('burstcount', 0))
@@ -823,9 +826,10 @@ def build_gun(g):
     # the receiver alone first, for its bone names (optic tags), then the Gunsmith list
     rec_bones = {b['name'] for b in load_model(pre+'rec')[0]}
     for p in base_parts: rec_bones |= {b['name'] for b in load_model(pre+p)[0]}   # the Warden and MXR-17 carry the muzzle tag on the barrel
-    variants, mounts, stat_atts, order = gun_attachments(g, c, gid, rec_bones, EXP/'models')
+    variants, mounts, stat_atts, order = gun_attachments(g, c, gid, rec_bones, EXP/'models') if g not in TWINS else ([], {}, [], [])
     if g in AKIMBO_EXTRA and 'akimbo' not in order: order.append('akimbo')
-    swap = {v[0].split('_'+c+'_'+g+'_')[1].split('_')[0] for v in variants}   # slots that have variants: their stock part gets hide bones
+    if g in TWINS and (EXP/'animations'/(pre+'akimbo_r_idle.cast')).exists(): order.append('akimbo')   # the XM325's Titan Wield
+    swap = set(base_parts) if g in TWINS else {v[0].split('_'+c+'_'+g+'_')[1].split('_')[0] for v in variants}   # slots that have variants: their stock part gets hide bones
     parts = [pre+'rec']+[(pre+p, 'base', 'b7_base_'+PART_SLOT[{'pgrip': 'grip'}.get(p, p)][1]) if p in swap else pre+p for p in base_parts]+variants
     if any(k != BUILTIN_UBGL.get(g) for k in UBGL.get(g, [])): parts.append(('sat_vm_ub_gl_01', 'base', 'b7_ubgl'))   # the launcher, hidden until one is fitted
     if any(a.startswith('b7_optic_') for a in mounts): parts = [(x, 'base', 'b7_base_optic') if isinstance(x, str) and x[len(pre):] in ('reflex', 'scope') else x for x in parts]   # a stock sight that is its own model (the NX Ravager's): folds away under a fitted optic (attachments.json ironSights)
@@ -891,6 +895,7 @@ def build_gun(g):
                    'tagMoves': X['moves'], 'tagRest': X['tag_rest'], 'flashFollowsMuzzle': True})
     weapons[wid] = {'id': wid, 'name': G['name'], 'price': G['price'], 'model': view, 'worldModel': world, 'lazyWorld': True, **common, **st,
                     'upgrade': {'name': G['up'], 'model': view, 'worldModel': world, **common, **{**st, **G['up_stats']}}}
+    if g in TWINS: weapons[wid].update(noBox=True, twinOf=TWINS[g])
     weapons.pop(wid+'_dw', None)
     if G['pair_only']:   # the pair is the gun: own id, in the box, no Akimbo attachment to fit
         notes |= build_akimbo(g, parts, weapons[wid], gun_rest, X['bones']) or set()

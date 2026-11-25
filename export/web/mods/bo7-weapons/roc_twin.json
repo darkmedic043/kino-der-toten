@@ -1,0 +1,225 @@
+{
+ "rip": "bo7_carina",
+ "mounts": {
+  "ro_gunner": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_gunner",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_reflex": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_reflex",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_concuss": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_concuss",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_hush": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_hush",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_tungsten": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_tungsten",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_mfs": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_mag1",
+   "node": "ro_mfs",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "extmag": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_mag1",
+   "node": "extmag",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "dualmag": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_mag1",
+   "node": "dualmag",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_damper": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_damper",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_snap": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_snap",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_buffer": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_buffer",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_kick": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_kick",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_bipod": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_bipod",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_he": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_he",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_sabot": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_sabot",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_thermite": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_thermite",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_flak": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_flak",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_shock": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_shock",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_canister": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_canister",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "ro_mark": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "ro_mark",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "grip": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "grip",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "laser": {
+   "model": "roc_twin.glb?v=0a83e375",
+   "tag": "j_gun",
+   "node": "laser",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  }
+ }
+}

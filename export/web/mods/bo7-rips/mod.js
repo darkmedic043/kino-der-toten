@@ -25,16 +25,52 @@ export async function prepare(data){
   for(const d of Object.values(built.weapons)){d.lazyLoad=true;d.ownSprint=!d.dualWield&&!!d.animations?.sprintLoopAnim;d.viewFov??=VIEW_FOV;d.viewOffset=VIEW_OFFSET[d.weaponClass]??[0,0,0];if(d.upgrade)d.upgrade.viewOffset=d.viewOffset;d.partSlots=PART_SLOTS;const pc=PIERCE_ID[d.id]??(d.projectileType?0:PIERCE[d.weaponClass]??0);if(pc)for(const x of [d,d.upgrade])if(x)x.pierce??=pc;   // the upgrade's own built viewOffset ([2,-.5,-7]) had won over this on Pack-a-Punch: the gun jumped and the arm swung its shoulder into view (2026-11-24, user: "pack a punch seems to completely break fpv")
   }
   Object.assign(data.weapons,built.weapons);
+  await lendTwins(data);
   // their own prestige camos (P1, P2, the animated Master) instead of the generated ones (.tools/build_bo7_prestige.py)
   const pr=await fetch(BASE+'prestige.json').then(r=>r.ok?r.json():null).catch(()=>null);
   if(pr)for(const [id,e] of Object.entries(pr))if(built.weapons[id])PRESTIGE_OWN[id]=e;
   data.boxPool=[...new Set([...(data.boxPool??[]),...Object.keys(built.weapons).filter(id=>!built.weapons[id].noBox)])];   // noBox: akimbo pairs, the melees (bo7_me_*: mods/melee ownClips)
 }
 
+// Twins (docs/fork/weapons.md, BO7 rebuilt): the fork's own BO7 guns (mods/bo7-weapons: Grimhawk, Siren, GDL Havoc, ROC 20mm,
+// XM325) take the rip's look (model, arms, clips, timings, sounds) and keep their id, stats, mechanics and progress. The rip
+// (bo7_<g>, twinOf, noBox) is only the source. The user's own attachment models are fitted onto it by
+// .tools/bo7-twin-parts.mjs (mods/bo7-weapons/<gun>_twin.glb + .json: def.mounts per attachment).
+const LOOK=['model','worldModel','lazyWorld','handsModel','animations','raiseTime','dropTime','sprintInTime','sprintLoopTime','sprintOutTime','sprintOffset','sprintRotation',
+  'reloadTime','reloadEmptyTime','inspectTime','segmentedReload','reloadAmmoAdd','reloadStartAdd','reloadStartTime','reloadEndTime','notetrackSounds','sounds','bo7',
+  'viewOffset','viewFov','lazyLoad','ownSprint','partSlots','tagGroups','tagMoves','tagRest','flashFollowsMuzzle'];
+const TWIN_PARTS={grimhawk_zm:'grimhawk',siren_zm:'siren',havoc_zm:'havoc',roc_zm:'roc',xm325_zm:'xm325'};
+const twins=new Set();
+function lend(f,r){
+  if(!f||!r)return;
+  for(const k of LOOK){if(r[k]===undefined)delete f[k];else f[k]=structuredClone(r[k]);}
+  f.hideTags=[...new Set([...(f.hideTags??[]),...(r.hideTags??[])])];
+}
+async function lendTwins(data){
+  for(const r of Object.values(built.weapons)){
+    const f=data.weapons[r.twinOf];if(!f||r.akimboOf)continue;
+    lend(f,r);lend(f.upgrade,r.upgrade);
+    if(built.sounds?.[r.id])f.bo7Sounds=r.id;
+    const parts=TWIN_PARTS[f.id],j=parts&&await fetch(new URL(`../bo7-weapons/${parts}_twin.json`,BASE)).then(x=>x.ok?x.json():null).catch(()=>null);
+    if(j){const mounts={};for(const [a,m] of Object.entries(j.mounts))mounts[a]={...m,model:new URL(`../bo7-weapons/${m.model}`,BASE).href};
+      f.mounts=mounts;if(f.upgrade)f.upgrade.mounts=mounts;}
+    twins.add(f.id);
+    // the XM325's Titan Wield swaps in the rip's akimbo pair (bo7_zeus_dw) instead of the CZ75 pair (xm325.js syncTitan)
+    const looks=f.xmLooks,dw=built.weapons[r.id+'_dw'];
+    if(looks){
+      const pick=o=>Object.fromEntries(Object.keys(looks.single).map(k=>[k,structuredClone(o?.[k])]));
+      Object.assign(looks.single,pick(f),{ownSprint:f.ownSprint});Object.assign(looks.singleUp,pick(f.upgrade),{ownSprint:f.ownSprint});
+      if(dw){for(const k of Object.keys(looks.dual))looks.dual[k]=structuredClone(dw[k]);Object.assign(looks.dual,{dualWield:true,ownSprint:false});}
+    }
+    // the rip itself is only the source: out of the menus, the box and akimbo.js (its _dw pair too)
+    delete data.weapons[r.id];delete data.weapons[r.id+'_dw'];
+  }
+}
+
 export default async function setup(api){
   if(!built)return;
   const {session,audio,view,host,data,renderer,mysteryBox,features,enemies}=api;
-  const ours=id=>!!built.weapons[id];
+  const ours=id=>!!built.weapons[id]||twins.has(id);
   // the viewmodel camera takes the held gun's viewFov (51° = the engine's own, BO1's); perk bottles and shields keep 51°
   const vc=api.viewCamera,baseFov=vc?.fov??51;
   host.on('update',()=>{if(!vc)return;const busy=api.perkDrink?.current||window.kino?.operator?.handle?.view||window.kino?.rocketShield?.view||window.kino?.knuckles?.active;

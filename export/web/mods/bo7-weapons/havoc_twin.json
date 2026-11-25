@@ -1,0 +1,185 @@
+{
+ "rip": "bo7_nembus",
+ "mounts": {
+  "hv_ballistic": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_ballistic",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_prox": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_prox",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_daisy": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_daisy",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_kinetic": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_kinetic",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_mortar": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_mortar",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_napalm": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_napalm",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_cryo": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_cryo",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_arc": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_arc",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_cluster": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_cluster",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_singularity": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_singularity",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_dash": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_dash",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_actuator": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_actuator",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_extube": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_extube",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_airstrike": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_airstrike",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_tripwire": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_tripwire",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_bandolier": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_bandolier",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "hv_breacher": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "hv_breacher",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  },
+  "laser": {
+   "model": "havoc_twin.glb?v=54e96f2e",
+   "tag": "j_gun",
+   "node": "laser",
+   "at": [
+    0,
+    0,
+    0
+   ]
+  }
+ }
+}
