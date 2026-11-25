@@ -415,6 +415,13 @@ the flash hiders could not be taken off). The rip's iron sights and muzzle tips 
 for the twins (`TWIN_SLOT_PARTS`: optic hides the sight, muzzle the tip). Parts that sit on no bone of their own are cut by
 material (`TWIN_CUT`: the Havoc's laser box `laser_box_07` → `b7_hide_laser`, its stock material → the `b7_base_stock` head,
 which `hv_breacher` `replaces`); `TWIN_SLOT_EXTRA` adds a twin's own slot entries (the Havoc's optic and laser hide the box).
+**Every gun's irons fold under an optic** (2026-11-25, user: "make sure sights remove iron sights"): `SLOT_PARTS['optic']`
+includes `sight`, so any optic-slot attachment hides `b7_hide_sight` (the raised irons on `tag_sight_on`) and shows
+`b7_show_sight` (the folded copy on `tag_sight_off`, where the rip has one: Condor, Hawk...; others just lose the irons).
+Guns whose irons sit on no sight bone are cut by material in `SIGHT_CUT` (the Kite's `kite_sights` rear sight). Left as is:
+the pistols (Alcor, Orion, Atlas, Timir: irons are part of the slide, as in BO7), Albatross and Solomon (no optics), Crossbow.
+Magnified optics (`scope: acog` etc.) hide the whole viewmodel in ADS behind the scopes mod's DOM overlay, so a canvas grab
+of their ADS shows no gun: expected. Test: `scratch/bo7/irons.js` with `window.__IRONS=[[gun, optic]]`.
 Check a twin's split with `scratch/bo7/render-tw.py` (Blender; red = hidden by a slot, blue = shown).
 **Camo on the fitted parts**: twin mounts are marked `camo` in `lendTwins` (not the ones on `j_mag*`); mounts.js tags them
 `userData.camoMount` and paints them with the gun's `userData.camoLook`, and camo.js only skips mounts without that flag.

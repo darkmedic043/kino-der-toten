@@ -867,15 +867,18 @@ def build_akimbo(g, parts, single, gun_rest, bones, split=frozenset()):
     return notes
 
 # A Gunsmith slot (attachments.json) -> the BO7 slot names of the show/hide geometry it switches (build split)
-SLOT_PARTS = {'optic': ['optic', 'rail'], 'laser': ['laser'], 'under': ['ub', 'grip', 'bipod'], 'stock': ['stock'], 'mag': ['mag'], 'grip': ['pistolgrip']}
-# the specials (TWINS) also switch BO7's iron sights (folded under an optic) and flash hider (off under a muzzle part), user
-# 2026-11-24; the rips' other guns keep theirs (their own Gunsmith never did this)
+SLOT_PARTS = {'optic': ['optic', 'rail', 'sight'], 'laser': ['laser'], 'under': ['ub', 'grip', 'bipod'], 'stock': ['stock'], 'mag': ['mag'], 'grip': ['pistolgrip']}
+# 'sight' = BO7's iron sights (SPLIT_ALIAS): up on tag_sight_on, folded on tag_sight_off; an optic folds them (or takes them off,
+# where the gun has no folded copy) on every gun (user 2026-11-25: "make sure sights remove iron sights"; was the specials only).
+# The specials (TWINS) also switch the flash hider (off under a muzzle part), user 2026-11-24
 SPLIT_ALIAS = {'tag_sight_on': ('hide', 'sight'), 'tag_sight_on2': ('hide', 'sight'), 'tag_sight_off': ('show', 'sight'),
                'tag_sight_off2': ('show', 'sight'), 'tag_tip': ('hide', 'tip')}
-TWIN_SLOT_PARTS = {'optic': ['sight'], 'muzzle': ['tip']}
+TWIN_SLOT_PARTS = {'muzzle': ['tip']}   # (their irons fold through SLOT_PARTS optic, as on every gun)
 # parts baked into a twin's receiver, cut out by material: the GDL Havoc's yellow laser box (off under a fitted laser) and
 # stock (b7_base_stock: off under the Breacher Stock, attachments.json replaces)
 TWIN_CUT = {'nembus': {'laser_box_07': ('hide', 'laser'), 'material_3454d321808ea03c': ('head', 'b7_base_stock')}}
+# irons baked into a receiver with no sight bones, cut out by material so an optic takes them off (the Kite's rear sight)
+SIGHT_CUT = {'kite': {'kite_sights': ('hide', 'sight')}}
 TWIN_SLOT_EXTRA = {'nembus': {'optic': ['laser']}}   # the Havoc's laser box sits on the optic rail (the user's "yellow sight"): an optic takes it off too
 # BO7's empty-slot look that is an attachment in all but name: off on the plain gun too (user 2026-11-24, the Coda 9's
 # laser module box; every gun starts basic). Fitting the slot hides it as usual.
@@ -903,7 +906,7 @@ def build_gun(g):
     if g in TWINS: split |= {p for v in TWIN_SLOT_PARTS.values() for p in v}
     if any(k != BUILTIN_UBGL.get(g) for k in UBGL.get(g, [])): parts.append(('sat_vm_ub_gl_01', 'base', 'b7_ubgl'))   # the launcher, hidden until one is fitted
     if any(a.startswith('b7_optic_') for a in mounts): parts = [(x, 'base', 'b7_base_optic') if isinstance(x, str) and x[len(pre):] in ('reflex', 'scope') else x for x in parts]   # a stock sight that is its own model (the NX Ravager's): folds away under a fitted optic (attachments.json ironSights)
-    view, gun_rest = build(parts, f'bo7_{g}_view', animated=animated_bones(pre), split=split, cut=TWIN_CUT.get(g))
+    view, gun_rest = build(parts, f'bo7_{g}_view', animated=animated_bones(pre), split=split, cut={**TWIN_CUT.get(g, {}), **SIGHT_CUT.get(g, {})} or None)
     X = build.extra
     slot_parts = {}   # Gunsmith slot -> {show: [...], hide: [...]} (gunsmith.js applyStats); every slot (the twins' fork attachments aren't in order)
     for kind, bs in X['slots']:
