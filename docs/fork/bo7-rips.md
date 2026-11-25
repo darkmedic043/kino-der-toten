@@ -68,7 +68,7 @@ Run Python with `-I` and keep scripts outside the rips folder (it imports `castl
 ## The gun table (`gun_table()`)
 
 Generated, not hand-written: a codename is a gun when its class is in `CLS`, it is no twin (`TWINS`: the five BO7 guns
-rebuilt in `mods/bo7-weapons`, built apart as look sources, see Twins), its receiver model, idle clip and sound bank exist, and the weapon dump calls it
+already rebuilt in `mods/bo7-weapons`), its receiver model, idle clip and sound bank exist, and the weapon dump calls it
 a bullet gun (launchers, the crossbow and exotics are out). Names come from the dump's display names (`NAMES` fills
 gaps), PaP names from `UP` (invented, one per gun). Stats: a per-class base (`CLS`: damage, min damage, range, mag
 multiplier, spread, PaP damage...) scaled by the gun's fire interval from the dump, `k = clamp((fireTime/ref)^0.7, .75,
@@ -258,7 +258,7 @@ Three guns per page: six with full textures passed the watchdog (renderer 2.48 G
   `meleeChargeAnim`). They are melee-slot entries in `mods/melee/melee.json` with `ownClips` (weapons.md Dedicated
   melee), picked in the loadout's melee picker; not in the gun list or the box. Most have no foley in the rips.
 - Not done: maru (Executioner's Duet, two blades with separate l_/r_ clips) and the ballistic knife (a projectile
-  gun in BO7's files); the wonder weapons left out on purpose; the twins (zeus, atria, carina, nembus, sargas) only lend their look (Twins).
+  gun in BO7's files); the wonder weapons and their twins (zeus, atria, carina, nembus, sargas) left out on purpose.
 
 ## Gun behaviour (2026-11-24, user: "make sure the guns behave correctly ... the m8a1 should be a 4 round burst, ... echo 12 ... the cbrs requires you to turn the mag every 1/3 of the mag")
 
@@ -377,15 +377,6 @@ Left as they are, because they match BO7: the TR51, the Sokol, the A.R.C. M1, th
 - **Pierce**: `PIERCE` in mod.js (sniper 3, LMG 2, rifle 1; Zeus 2) sets `def.pierce` on base and upgrade unless the def has its own; projectiles pierce nothing. FMJ is now `pierceAdd: 1` (gunsmith.js adds it to the gun's own, the Gunsmith lists "Pierces 1 more zombie").
 - **Melee pictures in the loadout** (user: "set up icons for the knives too"): the menu's melee picker and slot only drew a picture for a melee.json entry with its own `worldModel`, so the six BO7 melees (`ownClips`) had none. `home.js` `meleeArt()` also takes the `melee_<key>` def's world model (the rip's, made by mods/melee prepare), and `thumb()` lays an upright melee on its side, flat side to the camera (as hud-bo7's icon does). Checked: all 8 melees have a picture (`scratch/bo7/melee-thumbs.mjs`).
 - **ADS last-shot and rechamber clips** (user: "the chamber for some guns breaks the animation"): the rips name them three ways (`fire_last_ads`, `fire_ads_last`, `ads_fire_last`/`ads_rechamber`); a role whose clip was missing fell back to the hip fire clip. `clip_name()` in the build tries each spelling (`CLIP_ALIAS`).
-
-## Twins: the rebuilt specials on the rips (2026-11-24)
-
-`TWINS` (build_bo7_rips.py) builds atria, sargas, nembus, carina and zeus as `bo7_<codename>` with `twinOf` (the fork id) and
-`noBox`, plus zeus' akimbo pair `bo7_zeus_dw` (left model `bo7_zeus_left.glb`). At setup `lendTwins` (mod.js) copies the `LOOK` keys
-(model, arms, clips, timings, sounds, view offset, part slots, tag groups...) onto `grimhawk_zm`, `siren_zm`, `havoc_zm`, `roc_zm`,
-`xm325_zm` and their upgrades, merges `hideTags`, loads `mods/bo7-weapons/<gun>_twin.json` into `def.mounts` (the user's own
-attachment models fitted onto the rip, `.tools/bo7-twin-parts.mjs`, weapons.md), points the XM325's Titan Wield (`xmLooks.dual`)
-at `bo7_zeus_dw`, then deletes the rip and its `_dw` from the weapon list. The fork guns keep their ids, stats, mechanics and progress.
 
 ## Known limits / next
 
