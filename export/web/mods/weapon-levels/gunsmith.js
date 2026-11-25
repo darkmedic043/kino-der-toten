@@ -143,6 +143,7 @@ function shownTags(def,list,cat){
     const main=a.tags.find(t=>has.has(t));if(main)show.add(main);
     for(const t of a.extraTags??[])if(has.has(t))show.add(t);
     if(a.slot==='optic')for(const t of cat.mountTags)if(has.has(t))show.add(t);
+    for(const t of def.slotParts?.[a.slot]?.show??[])show.add(t);   // BO7 rips: a rail or plate drawn only with something in that slot (build_bo7_rips.py split)
   }
   return show;
 }
@@ -177,6 +178,7 @@ function applyStats(obj,list,cat,show){
   if(obj.hideTags)obj.hideTags=obj.hideTags.filter(t=>!show.has(t));
   // optics that replace the stock scope hide it
   for(const a of list)for(const t of a.replaces??[])if(obj.hideTags&&!obj.hideTags.includes(t))obj.hideTags.push(t);
+  for(const a of list)for(const t of obj.slotParts?.[a.slot]?.hide??[])if(obj.hideTags&&!obj.hideTags.includes(t))obj.hideTags.push(t);   // and the cover or built-in part drawn only while it is empty
   obj.attachments=list.map(a=>a.id).join('+');
   // attachment models the weapon-levels mod mounts on the viewmodel's tags
   if(obj.mounts)obj.mounted=list.filter(a=>obj.mounts[a.id]).map(a=>a.id);

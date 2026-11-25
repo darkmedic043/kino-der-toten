@@ -15,7 +15,7 @@ Clips: rotations are local and absolute; translations marked relative are offset
 (checked by FK on the idle: j_gun lands 38 cm ahead of tag_view only read that way). The engine wants absolute
 positions for the arms and offsets for gun parts (animation.js makeClip), so arms get rest + offset.
 """
-import sys, json, math, pathlib, subprocess, hashlib, csv, io, random
+import sys, json, math, pathlib, subprocess, hashlib, csv, io, random, re
 import numpy as np
 from PIL import Image
 
@@ -186,7 +186,7 @@ def quantize_glb(path, extras=None):
     body = struct.pack('<II', len(js), 0x4E4F534A)+js+struct.pack('<II', len(out), 0x004E4942)+bytes(out)
     path.write_bytes(struct.pack('<III', 0x46546C67, 2, 12+len(body))+body)
 
-def build(parts, out_name, light=False, rename=None, keep=None, animated=frozenset(), decimate=None, extras=None):
+def build(parts, out_name, light=False, rename=None, keep=None, animated=frozenset(), decimate=None, extras=None, split=frozenset()):
     """Cast models -> one engine GLB. parts[0] is the base; each later part's root bone is a bone of the same name
     in what's built so far and is merged into it (its other bones and its meshes follow it there).
     A part given as (name, 'base'|'var', head) is a swappable Gunsmith part (docs/fork/bo7-rips.md, Attachments):
@@ -196,10 +196,15 @@ def build(parts, out_name, light=False, rename=None, keep=None, animated=frozens
       attach tag); one the clips move (the mag's j_mag1) hangs from the real bone of that name so the variant follows the
       reload, the rest from the variant's own parents. Its tag_* bones under the attach tag are recorded as moves:
       the base tag goes where the variant has it (the muzzle on a longer barrel), applied in mounts.js syncTagGroups.
-    Materials of these parts are named head~<material>, so a hidden part's meshes can stop drawing too."""
+    Materials of these parts are named head~<material>, so a hidden part's meshes can stop drawing too.
+    split: BO7 slot names (optic, laser, ub, stock...) whose tag_<slot>_show / tag_<slot>_hide geometry (a rail drawn only
+    with an attachment in that slot, a cover or built-in laser box drawn only without one) gets its own hide bones,
+    b7_show_<slot> / b7_hide_<slot> (later ones b7_..__<n>), identity children of the bone it hung from; build.extra['slots']
+    lists them. Without split, BO7's both states are drawn at once (the Coda 9's rail and laser box, user 2026-11-24)."""
     bones, meshes, mats, mat_ix = [], [], [], {}
     index = {}
     moves, tag_rest = {}, {}
+    slot_heads = {}   # (kind, slot) -> follower count
     def add_bone(name, parent, wp, wr):
         bones.append({'name': name, 'parent': parent, 'wpos': wp, 'wrot': wr / np.linalg.norm(wr)}); index[name] = len(bones)-1; return len(bones)-1
     def local(i, wp, wr):   # world -> local to bone i
@@ -236,6 +241,14 @@ def build(parts, out_name, light=False, rename=None, keep=None, animated=frozens
             for j in sorted(used):
                 r = bones[remap[j]]; wmap[j] = add_bone(head if j == 0 else head+'__'+sk[j]['name'], remap[j], r['wpos'], r['wrot'])
         wb_of = lambda j: wmap.get(j, remap[j])
+        if split:   # show/hide geometry onto its own hide bones (see the docstring)
+            carry = {int(j) for m in ms if m['wb'] is not None for jj, ww in zip(m['wb'], m['wv']) for j, x in zip(jj, ww) if x > 1e-4}
+            for j, b in enumerate(sk):
+                mm = re.match(r'tag_(\w+)_(show|hide)$', b['name'])
+                if not mm or mm.group(1) not in split or j not in carry: continue
+                key = (mm.group(2), mm.group(1)); n = slot_heads.get(key, 0); slot_heads[key] = n+1
+                hb = f'b7_{key[0]}_{key[1]}'+(f'__{n}' if n else ''); r = bones[wb_of(j)]
+                wmap[j] = add_bone(hb, wb_of(j), r['wpos'], r['wrot'])
         for h, m in mt.items():
             short = m['name'].replace('\\', '/').split('/')[-1]
             if (part, h) in mat_ix: continue
@@ -273,7 +286,7 @@ def build(parts, out_name, light=False, rename=None, keep=None, animated=frozens
             p = bones[b['parent']]; lp = qrot(qinv(p['wrot']), b['wpos']-p['wpos'])
         else: lp = b['wpos']
         rest[(rename or {}).get(b['name'], b['name'])] = lp
-    build.extra = {'moves': moves, 'tag_rest': tag_rest, 'bones': [b['name'] for b in bones]}
+    build.extra = {'moves': moves, 'tag_rest': tag_rest, 'bones': [b['name'] for b in bones], 'slots': sorted(slot_heads)}
     return WEB+'models/'+str(out.relative_to(MOD/'models'))+ver(out), rest
 
 # ---- animations ---------------------------------------------------------------------------------------
@@ -769,7 +782,7 @@ AKIMBO_BOTH = [('raiseAnim', 'raise'), ('firstRaiseAnim', 'raise_first'), ('quic
 # AKIMBO_EXTRA: guns with akimbo clips but no Akimbo unlock in the Gunsmith dump (the Akita, the Kogot-7): the pair is built anyway
 AKIMBO_EXTRA = {'akita', 'hyena'}
 
-def build_akimbo(g, parts, single, gun_rest, bones):
+def build_akimbo(g, parts, single, gun_rest, bones, split=frozenset()):
     G = GUN[g]; c = G['cls']; pre = f'sat_vm_{c}_{g}_'
     real = lambda n: (EXP/'animations'/(n+'.cast')).exists()
     side = next((pre+x for x in ('akimbo_', '') if real(pre+x+'r_idle') or real(pre+x+'r_idle_belt')), None)
@@ -782,11 +795,11 @@ def build_akimbo(g, parts, single, gun_rest, bones):
     if belt:
         isbag = lambda p: (p if isinstance(p, str) else p[0]).startswith(pre+'mag')
         parts = [p for p in parts if not isbag(p)]+[pre+'mag_belt']
-        right, gun_rest = build(parts, f'bo7_{g}_dw_view', animated=animated_bones(pre))
+        right, gun_rest = build(parts, f'bo7_{g}_dw_view', animated=animated_bones(pre), split=split)
     lren = {n: 'j_gun1' if n == 'j_gun' else n+'_le' for n in bones}
     lclips = [sfx(side+'l_'+nm) for *_, nm, _ in AKIMBO_SIDED]+[sfx(side+'l_'+nm) for _, nm in AKIMBO_BOTH]
     anim = animated_bones(pre) | {cc['bone'] for f in lclips if has(f) for cc in castlib.animation(EXP/'animations'/(f+'.cast'))['curves']}
-    left, left_rest = build(parts, f'bo7_{g}_left', animated=frozenset(anim), rename=lren)
+    left, left_rest = build(parts, f'bo7_{g}_left', animated=frozenset(anim), rename=lren, split=split)
     right_only = lambda n: n not in LEFT_ARM
     left_only = lambda n: n in LEFT_ARM or (n.endswith('_le') and n not in arms_rest) or n == 'j_gun1'
     A, LA, T, notes = {}, {}, {}, set()
@@ -819,6 +832,14 @@ def build_akimbo(g, parts, single, gun_rest, bones):
     print(f'  {g}: akimbo pair', len(A), 'clips +', len(LA), 'left')
     return notes
 
+# A Gunsmith slot (attachments.json) -> the BO7 slot names of the show/hide geometry it switches (build split)
+SLOT_PARTS = {'optic': ['optic', 'rail'], 'laser': ['laser'], 'under': ['ub', 'grip', 'bipod'], 'stock': ['stock'], 'mag': ['mag'], 'grip': ['pistolgrip']}
+# BO7's empty-slot look that is an attachment in all but name: off on the plain gun too (user 2026-11-24, the Coda 9's
+# laser module box; every gun starts basic). Fitting the slot hides it as usual.
+PLAIN_OFF = {'atlas': ['laser'], 'macaw': ['grip']}
+# a fixed stock that is a Gunsmith part here instead (the Coda 9's brace, user 2026-11-24): hidden until fitted
+OPTIONAL_STOCK = {'atlas': 'b7_stock_brace'}
+
 def build_gun(g):
     G = GUN[g]; c = G['cls']; pre = f'sat_vm_{c}_{g}_'
     gid = f'sat_{c}_{g}_mp'
@@ -831,13 +852,23 @@ def build_gun(g):
     if g in TWINS and (EXP/'animations'/(pre+'akimbo_r_idle.cast')).exists(): order.append('akimbo')   # the XM325's Titan Wield
     swap = set(base_parts) if g in TWINS else {v[0].split('_'+c+'_'+g+'_')[1].split('_')[0] for v in variants}   # slots that have variants: their stock part gets hide bones
     parts = [pre+'rec']+[(pre+p, 'base', 'b7_base_'+PART_SLOT[{'pgrip': 'grip'}.get(p, p)][1]) if p in swap else pre+p for p in base_parts]+variants
+    if g in OPTIONAL_STOCK:
+        parts = [(x, 'base', OPTIONAL_STOCK[g]) if x == pre+'stock' else x for x in parts]; variants = variants+[(pre+'stock', 'base', OPTIONAL_STOCK[g])]
+        order.insert(next((i+1 for i, a in enumerate(order) if a.startswith('b7_barrel_')), len(order)), OPTIONAL_STOCK[g])
+    slots_of = {a: next((s for s, pfx in (('optic', 'b7_optic_'), ('laser', 'b7_laser_'), ('under', 'b7_under_'), ('under', 'b7_ub_'), ('stock', 'b7_stock_'),
+                                         ('mag', 'b7_mag_'), ('grip', 'b7_grip_')) if a.startswith(pfx)), None) for a in order}
+    split = {p for v in SLOT_PARTS.values() for p in v}   # every slot: one with no attachment here keeps its empty look (the 1911's optic plate went off)
     if any(k != BUILTIN_UBGL.get(g) for k in UBGL.get(g, [])): parts.append(('sat_vm_ub_gl_01', 'base', 'b7_ubgl'))   # the launcher, hidden until one is fitted
     if any(a.startswith('b7_optic_') for a in mounts): parts = [(x, 'base', 'b7_base_optic') if isinstance(x, str) and x[len(pre):] in ('reflex', 'scope') else x for x in parts]   # a stock sight that is its own model (the NX Ravager's): folds away under a fitted optic (attachments.json ironSights)
-    view, gun_rest = build(parts, f'bo7_{g}_view', animated=animated_bones(pre))
+    view, gun_rest = build(parts, f'bo7_{g}_view', animated=animated_bones(pre), split=split)
     X = build.extra
+    slot_parts = {}   # Gunsmith slot -> {show: [...], hide: [...]} (gunsmith.js applyStats)
+    for kind, bs in X['slots']:
+        for s in {s for s in slots_of.values() if s and bs in SLOT_PARTS[s]}: slot_parts.setdefault(s, {}).setdefault(kind, []).append(f'b7_{kind}_{bs}')
+    plain_hide = [f'b7_show_{bs}' for kind, bs in X['slots'] if kind == 'show']+[f'b7_hide_{bs}' for kind, bs in X['slots'] if kind == 'hide' and bs in PLAIN_OFF.get(g, [])]
     print(f'  {g}: {len(variants)} part variants, {len(mounts)} mounted, {len(stat_atts)} stat-only;', ' '.join(order))
     wpre = f'sat_wm_{c}_{g}_'
-    world, _ = build([wpre+'rec']+[wpre+p for p in ('bar', 'mag', 'pgrip', 'stock', *EXTRA_PARTS.get(g, [])) if model_dir(wpre+p).is_dir()], f'bo7_{g}_world', light=True, decimate=WORLD_KEEP, extras=REST)
+    world, _ = build([wpre+'rec']+[wpre+p for p in ('bar', 'mag', 'pgrip', *(() if g in OPTIONAL_STOCK else ('stock',)), *EXTRA_PARTS.get(g, [])) if model_dir(wpre+p).is_dir()], f'bo7_{g}_world', light=True, decimate=WORLD_KEEP, extras=REST)
     A, T, notes = {}, {}, set()
     for role, nm, loop in ([] if G['pair_only'] else ROLES):
         full = pre+clip_name(pre, nm)
@@ -884,7 +915,7 @@ def build_gun(g):
               'raiseTime': T.get('raiseAnim', .6), 'dropTime': T.get('dropAnim', .5), 'sprintInTime': T.get('sprintInAnim', .3),
               'sprintLoopTime': T.get('sprintLoopAnim', .8), 'sprintOutTime': T.get('sprintOutAnim', .3), 'sprintOffset': [0, 0, 0], 'sprintRotation': [0, 0, 0],
               'reloadTime': round(T.get('reloadAnim', 2.5)*.8, 3), 'reloadEmptyTime': round(T.get('reloadEmptyAnim', 3)*.8, 3), 'inspectTime': T.get('inspectAnim'),
-              'hideTags': [v[2] for v in variants]+(['b7_ubgl'] if att_anims else []), **({'attachAnims': att_anims} if att_anims else {}), 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands_url, 'animations': A, 'weaponClass': G['wclass'], 'bo7': True,
+              'hideTags': [v[2] for v in variants]+(['b7_ubgl'] if att_anims else [])+plain_hide, **({'slotParts': slot_parts} if slot_parts else {}), **({'attachAnims': att_anims} if att_anims else {}), 'sounds': {}, 'notetrackSounds': {}, 'handsModel': hands_url, 'animations': A, 'weaponClass': G['wclass'], 'bo7': True,
               'viewOffset': G.get('view', [2, -.5, -7]), **seg}
     if seg: common['reloadTime'] = common['reloadEmptyTime'] = T['reloadAnim']
     wid = 'bo7_'+g
@@ -898,13 +929,13 @@ def build_gun(g):
     if g in TWINS: weapons[wid].update(noBox=True, twinOf=TWINS[g])
     weapons.pop(wid+'_dw', None)
     if G['pair_only']:   # the pair is the gun: own id, in the box, no Akimbo attachment to fit
-        notes |= build_akimbo(g, parts, weapons[wid], gun_rest, X['bones']) or set()
+        notes |= build_akimbo(g, parts, weapons[wid], gun_rest, X['bones'], split) or set()
         p = weapons.pop(wid+'_dw', None)
         if not p: raise RuntimeError(g+': pair-only gun without akimbo clips')
         for d in (p, p['upgrade']):
             d.pop('akimboOf', None); d.pop('noBox', None); d['id'] = wid; d['attachOrder'] = [a for a in d['attachOrder'] if a != 'akimbo']
         p['upgrade'].pop('id'); weapons[wid] = p; sounds[wid] = gun_sounds(g, c, notes)
-    elif 'akimbo' in order: build_akimbo(g, parts, weapons[wid], gun_rest, X['bones'])
+    elif 'akimbo' in order: build_akimbo(g, parts, weapons[wid], gun_rest, X['bones'], split)
 
 # ---- melees (docs/fork/bo7-rips.md, Melees) ---------------------------------------------------------------------------
 # A melee is a def bo7_me_<g> with BO7's own clips on the BO7 hands: idle, raise, drop, sprint, inspect, two light swings

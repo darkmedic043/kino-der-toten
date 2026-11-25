@@ -2960,6 +2960,18 @@
       ]
     },
     {
+      "id": "b7_stock_brace",
+      "name": "Brace Stock",
+      "slot": "stock",
+      "tags": [
+        "b7_stock_brace"
+      ],
+      "desc": "The Coda 9's folding brace, out: 20% less aimed recoil.",
+      "stats": {
+        "adsRecoilScale": 0.8
+      }
+    },
+    {
       "id": "b7_stock_adsmove",
       "name": "Tactical Stock",
       "slot": "stock",

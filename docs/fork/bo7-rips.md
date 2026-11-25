@@ -139,6 +139,18 @@ BO7 parts are separate models, so the build makes three kinds (`gun_attachments(
 - **Mounts** (optics, lasers, muzzles, underbarrels shared between guns): one GLB each in `models/att/`, fitted on the
   receiver's tags (`mounts`).
 - **Stat-only** (ammo types, perks of the gun): `statAttachments`.
+- **Slot-state geometry (plain guns, 2026-11-24, user: "every gun should be basic with the ability to add attachments",
+  the Coda 9 with a stock and a laser box on):** BO7 models carry `tag_<slot>_show` verts (a rail, an optic plate: drawn
+  only when the slot holds something) and `tag_<slot>_hide` verts (a cover, a built-in laser box, a default foregrip:
+  drawn only while it's empty). `build(split=...)` hangs them on `b7_show_<slot>` / `b7_hide_<slot>` (then `__1`...),
+  for every BO7 slot name in `SLOT_PARTS` (: optic → optic+rail, laser, under → ub+grip+bipod,
+  stock, mag, grip → pistolgrip); the `b7_show_*` heads start in `hideTags`, and `def.slotParts {slot: {show, hide}}`
+  tells gunsmith.js which to show and which to hide per fitted slot (`shownTags`/`applyStats`). `PLAIN_OFF` turns an
+  empty-slot piece that is an attachment in all but name off on the plain gun too (the Coda 9's laser module, the
+  Maddox RFB's foregrip). `OPTIONAL_STOCK` makes a fixed stock a Gunsmith part (the Coda 9's `b7_stock_brace`, "Brace
+  Stock"; left off its world model). Akimbo left guns are built with the same split. Slots a gun has no attachment for
+  get their empty look (the show part never comes on: the 1911's optic plate). Bipods on the Hawker and Shadow SK stay (BO7's empty look).
+  Check: `blender -b -P scratch/bo7/render-hs.py -- scratch/bo7/hs <gun>` (plain gun; red = show, blue = hide).
 `attachOrder` sorts the Gunsmith rows (gunsmith.js). The catalogue entries (`b7_*` in `weapon-levels/attachments.json`)
 come from `scratch/bo7/catalogue.py <attachments.json> <the gun's gunsmith.json>` (rerun-safe; rerun when a build prints
 an id the catalogue lacks).
