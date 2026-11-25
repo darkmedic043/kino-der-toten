@@ -803,6 +803,9 @@
       "tags": [
         "tag_hv_breacher"
       ],
+      "replaces": [
+        "b7_base_stock"
+      ],
       "desc": "Shock-absorbing stock. Your own blasts never hurt you; standing close to one throws you into the air instead (Havoc jumps)."
     },
     {

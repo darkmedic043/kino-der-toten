@@ -321,7 +321,10 @@ export function applyCamo(root,camo){
   // gold camo was painted over a screen's textured housing; the user saw it as a texture glitch)
   // mounted attachments (mounts.js: optics, lasers, muzzles, grips) keep theirs too: in play they arrive after the camo and
   // stayed plain, but a camo picked in the Gunsmith after they were mounted painted them (2026-11-24)
-  const walk=(o,fn)=>{if(o.userData?.charm||o.userData?.mountId!=null)return;fn(o);for(const c of o.children)walk(c,fn);};
+  // except parts that are the gun's own body (userData.camoMount: the specials' parts the user modelled, mods/bo7-rips lendTwins),
+  // which take the camo the gun has when they arrive (camoLook, mounts.js)
+  const walk=(o,fn)=>{if(o.userData?.charm||(o.userData?.mountId!=null&&!o.userData.camoMount&&o!==root))return;fn(o);for(const c of o.children)walk(c,fn);};
+  if(root&&root.userData?.mountId==null)root.userData.camoLook=camo;
   if(root)walk(root,o=>{
     if(!o.isMesh)return;
     const list=Array.isArray(o.material)?o.material:[o.material];

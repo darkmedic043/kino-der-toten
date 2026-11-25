@@ -225,7 +225,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     const i=g.index?g.index.getX(0):0;let best=0,bw=-1;for(let k=0;k<4;k++){const w=sw.getComponent(i,k);if(w>bw){bw=w;best=si.getComponent(i,k);}}
     for(let b=o.skeleton.bones[best];b;b=b.parent)if(b.isBone&&b.scale.x<1e-3)return false;return true;};
   function partCentre(s){
-    const key=s+'|'+[...(gun.userData.shown??[])].join(',');
+    const key=s+'|'+[...(gun.userData.shown??[])].join(',')+'|'+(gun.userData.mounts?.length??0);   // mounted models load later: a centre cached before them was null
     if(centres.has(key)){const c=centres.get(key);return c&&gun.localToWorld(c.clone());}
     const sum=new THREE.Vector3();let n=0;gun.updateMatrixWorld(true);
     gun.traverse(o=>{if(!o.isMesh||!o.visible||partOf(o)!==s||!visibleChain(o))return;
@@ -235,7 +235,8 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   }
   const home=new Map();
   const anchorOf=s=>{
-    if(!gun||NO_PART.has(s))return null;   // the cosmetic rows and akimbo have no part to point at
+    if(!gun||NO_PART.has(s)&&s!=='ammo')return null;   // the cosmetic rows and akimbo have no part to point at
+    if(s==='ammo')return partCentre(s);   // ammo has one only as a mounted model (the GDL Havoc's and ROC's canisters)
     const part=partCentre(s);if(part)return part;
     if(home.has(s))return gun.localToWorld(home.get(s).clone());
     // the named fallback (a tag or anchor bone), looked up once per gun: BO3 guns land here every frame, and a name search
@@ -673,12 +674,16 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
   canvas.addEventListener('wheel',e=>{distGoal=THREE.MathUtils.clamp(distGoal*(1+Math.sign(e.deltaY)*.1),radius*1.2,radius*5);e.preventDefault();},{passive:false});
   const onKey=e=>{if(e.code==='Escape'){e.stopPropagation();e.preventDefault();if(stkArm||stkDrag){stkCancel();return;}close();}};
   addEventListener('keydown',onKey,true);
+  let slotYaw=null;   // aim(): the side a selected slot's part is on
   let viewX=-.03,viewGoal=-.03;   // horizontal framing (a fraction of the width; aim() moves it for the sticker view)
   function aim(){
     const p=slot==='charm'&&charmTab==='screens'&&screenObj?new THREE.Vector3().setFromMatrixPosition(screenObj.object.matrix):slot==='charm'?(charmRoot&&charmAnchor?charmRoot.localToWorld(charmAnchor.at.clone()).addScaledVector(DOWN,radius*.08):null):slot&&anchorOf(slot);
     // the charm hangs on the gun's left: turn round to that side
     charmYaw=null;if(slot==='charm'&&charmRoot){const n=new THREE.Vector3().setFromMatrixColumn(charmRoot.matrixWorld,1);charmYaw=Math.atan2(n.x,n.z);}
     if(p){focusGoal.copy(p);distGoal=radius*(slot==='charm'?1.3:2);}else{focusGoal.set(0,0,0);distGoal=radius*3.1;}
+    // a part on one side of the gun (the GDL Havoc's and ROC's ammo canisters, on the left): turn to that side (user 2026-11-24)
+    slotYaw=null;if(p&&gun&&slot!=='charm'&&slot!=='sticker'){const bx=new THREE.Box3().setFromObject(gun,true),cz=(bx.min.z+bx.max.z)/2,hz=(bx.max.z-bx.min.z)/2,dz=p.z-cz;
+      if(Math.abs(dz)>hz*.25){const want=dz<0?STK_GAME:STK_OTHER,near=Math.cos(yaw)<0===dz<0;if(!near)slotYaw=want;}}
     // stickers: the whole gun, mounted attachments included, in the clear space between the slot list and the sticker panel
     // (the panel covered the muzzle end, so a silencer or brake couldn't take one)
     viewGoal=-.03;
@@ -699,6 +704,7 @@ export async function openGunsmith({cat,weapons,profile,id,ids,onChange,onClose,
     focus.lerp(focusGoal,1-Math.exp(-dt*6));dist+=(distGoal-dist)*(1-Math.exp(-dt*6));
     if(!dragging&&!slot)yaw+=dt*.12;
     else if(!dragging&&slot==='sticker'&&stkYaw!=null){const d=Math.atan2(Math.sin(stkYaw-yaw),Math.cos(stkYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));if(Math.abs(d)<.005)stkYaw=null;}
+    else if(!dragging&&slotYaw!=null){const d=Math.atan2(Math.sin(slotYaw-yaw),Math.cos(slotYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));if(Math.abs(d)<.005)slotYaw=null;}
     else if(!dragging&&slot==='charm'&&charmYaw!=null){const d=Math.atan2(Math.sin(charmYaw-yaw),Math.cos(charmYaw-yaw));yaw+=d*(1-Math.exp(-dt*5));}
     camera.position.set(focus.x+Math.sin(yaw)*Math.cos(pitch)*dist,focus.y+Math.sin(pitch)*dist,focus.z+Math.cos(yaw)*Math.cos(pitch)*dist);
     // keep the gun off-centre toward the free middle of the screen

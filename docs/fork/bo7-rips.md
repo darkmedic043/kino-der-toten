@@ -290,6 +290,12 @@ Three guns per page: six with full textures passed the watchdog (renderer 2.48 G
   only `j_gun` from the idle's first frame (filling every unkeyed bone left the whole rig at its bind; `NOFILL=1` turns
   it off). Joined clips (fire + rechamber) scale the second clip's frames by fps: fire clips are 60 fps, rechambers 30,
   and the rechamber ran at double speed.
+- **Not into the ADS pose clips** (2026-11-25, user: "the rechamber on the strider is broken"): the fill also gave every
+  `ads_up`/`ads_down` clip a `tag_weapon` track. animation.js `applyAim` lays the ADS pose over every idle and fire frame,
+  so that track pinned the gun to the right wrist and cancelled the rechamber's own gun motion: when the hand left the
+  grip to work the bolt, the gun swung into the camera with it (every bolt and pump gun). The fill now skips
+  `ads_(up|down)$`; no BO7 ADS pose cast keys `j_gun`, so those clips carry only `tag_ads` (checked: 110 of 110).
+  Check: `scratch/bo7/rech.js` (hip and ADS fire frames, guns from `window.__GUNS` via an `INIT` script).
 
 ## Underbarrels, fire mods, ammo, kits (2026-11-24, user: "make sure all attachments are properly imported, like the echo-12 launcher upgrade, firing mods, underbarrel launchers")
 
@@ -398,6 +404,28 @@ Left as they are, because they match BO7: the TR51, the Sokol, the A.R.C. M1, th
 `xm325_zm` and their upgrades, merges `hideTags`, loads `mods/bo7-weapons/<gun>_twin.json` into `def.mounts` (the user's own
 attachment models fitted onto the rip, `.tools/bo7-twin-parts.mjs`, weapons.md), points the XM325's Titan Wield (`xmLooks.dual`)
 at `bo7_zeus_dw`, then deletes the rip and its `_dw` from the weapon list. The fork guns keep their ids, stats, mechanics and progress.
+
+**Rip parts the user's attachments replace** (2026-11-24, user: the Havoc's stock and "yellow sight", the XM325's and ROC's irons,
+the flash hiders could not be taken off). The rip's iron sights and muzzle tips hang off bones the split loop didn't know:
+`SPLIT_ALIAS` maps `tag_sight_on/_on2` → `b7_hide_sight`, `tag_sight_off/_off2` → `b7_show_sight` and `tag_tip` → `b7_hide_tip`
+for the twins (`TWIN_SLOT_PARTS`: optic hides the sight, muzzle the tip). Parts that sit on no bone of their own are cut by
+material (`TWIN_CUT`: the Havoc's laser box `laser_box_07` → `b7_hide_laser`, its stock material → the `b7_base_stock` head,
+which `hv_breacher` `replaces`); `TWIN_SLOT_EXTRA` adds a twin's own slot entries (the Havoc's optic and laser hide the box).
+Check a twin's split with `scratch/bo7/render-tw.py` (Blender; red = hidden by a slot, blue = shown).
+**Camo on the fitted parts**: twin mounts are marked `camo` in `lendTwins` (not the ones on `j_mag*`); mounts.js tags them
+`userData.camoMount` and paints them with the gun's `userData.camoLook`, and camo.js only skips mounts without that flag.
+Their `*_body` materials (`gh|sr|hv|ro|xm`) are in camos.json `wrap.guns`, so the camo is projected in gun space like the rip
+(through their UVs it came out as a dark, luminance-scaled patch).
+**Gunsmith side turn**: selecting a slot whose part sits well to one side of the gun (the Havoc's and ROC's ammo canisters on the
+left) turns the view to that side (`slotYaw` in gunsmith-view.js aim()); `anchorOf('ammo')` returns the mounted part's centre.
+`partCentre`'s cache key includes the mount count, or the null cached before the mounts loaded stuck (the view never turned).
+
+## Colour maps from the original PNGs (2026-11-24, user: "quite abit of textures a little srewed up, liek the akita")
+
+The pipeline's colour WebPs keep the game's alpha (unused as colour), and lossy WebP drops the colour under fully transparent
+texels: 8,940 of 11,120 came out with pink/white speckle over most panels (the Akita's receiver in ADS). `tex_loader` now reads
+colour from Saluki's original PNG of the same image (`orig_png`: one `find` over `<pipeline>/exports` for `image_*.png`,
+about 4 s) as RGB; normals and ORM still come from the WebPs. Rebuilt every gun and the shared attachments (`all --force`).
 
 ## Known limits / next
 

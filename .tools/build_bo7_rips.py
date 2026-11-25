@@ -15,7 +15,7 @@ Clips: rotations are local and absolute; translations marked relative are offset
 (checked by FK on the idle: j_gun lands 38 cm ahead of tag_view only read that way). The engine wants absolute
 positions for the arms and offsets for gun parts (animation.js makeClip), so arms get rest + offset.
 """
-import sys, json, math, pathlib, subprocess, hashlib, csv, io, random, re
+import os, sys, json, math, pathlib, subprocess, hashlib, csv, io, random, re
 import numpy as np
 from PIL import Image
 
@@ -44,6 +44,19 @@ for out in sorted(PIPE.glob('out*')):
 
 def ver(path): return '?v='+hashlib.md5(pathlib.Path(path).read_bytes()).hexdigest()[:8]
 
+# The game's colour maps carry an alpha BO7 doesn't use as colour, and the pipeline kept it in its WebPs: lossy WebP throws
+# away the colour under fully transparent texels (libwebp without `exact`), so 8,940 of its 11,120 colour maps came out with
+# pink and white speckle over most panels (the Akita's receiver, user 2026-11-24 "quite abit of textures a little srewed up").
+# Colour is taken from Saluki's original PNG of the same image instead, alpha dropped.
+_PNG = None
+def orig_png(webp):
+    global _PNG
+    if _PNG is None:
+        _PNG = {}
+        for f in subprocess.run(['find', str(PIPE/'exports'), '-path', '*_images*', '-name', 'image_*.png'], capture_output=True, text=True).stdout.split():
+            _PNG.setdefault(os.path.basename(f)[:-4], f)
+    return _PNG.get(webp.name.rsplit('_', 1)[0])
+
 def tex_loader(light):
     def load(stem, kind):
         mname, suf = stem.rsplit('_', 1)
@@ -51,7 +64,9 @@ def tex_loader(light):
         if light and key != 'color': return None
         p = TEX.get(mname, {}).get(key)
         if not p or not p.exists(): return None
+        if key == 'color' and (o := orig_png(p)): p = o
         im = Image.open(p); im.load()
+        if key == 'color' and im.mode != 'RGB': im = im.convert('RGB')
         size = 256 if light else (512 if key == 'orm' else 1024)
         if max(im.size) > size: im = im.resize((max(1, im.width*size//max(im.size)), max(1, im.height*size//max(im.size))), Image.LANCZOS)
         if im.mode not in ('RGB', 'RGBA'): im = im.convert('RGB')
@@ -186,7 +201,7 @@ def quantize_glb(path, extras=None):
     body = struct.pack('<II', len(js), 0x4E4F534A)+js+struct.pack('<II', len(out), 0x004E4942)+bytes(out)
     path.write_bytes(struct.pack('<III', 0x46546C67, 2, 12+len(body))+body)
 
-def build(parts, out_name, light=False, rename=None, keep=None, animated=frozenset(), decimate=None, extras=None, split=frozenset()):
+def build(parts, out_name, light=False, rename=None, keep=None, animated=frozenset(), decimate=None, extras=None, split=frozenset(), cut=None):
     """Cast models -> one engine GLB. parts[0] is the base; each later part's root bone is a bone of the same name
     in what's built so far and is merged into it (its other bones and its meshes follow it there).
     A part given as (name, 'base'|'var', head) is a swappable Gunsmith part (docs/fork/bo7-rips.md, Attachments):
@@ -200,7 +215,9 @@ def build(parts, out_name, light=False, rename=None, keep=None, animated=frozens
     split: BO7 slot names (optic, laser, ub, stock...) whose tag_<slot>_show / tag_<slot>_hide geometry (a rail drawn only
     with an attachment in that slot, a cover or built-in laser box drawn only without one) gets its own hide bones,
     b7_show_<slot> / b7_hide_<slot> (later ones b7_..__<n>), identity children of the bone it hung from; build.extra['slots']
-    lists them. Without split, BO7's both states are drawn at once (the Coda 9's rail and laser box, user 2026-11-24)."""
+    lists them. Without split, BO7's both states are drawn at once (the Coda 9's rail and laser box, user 2026-11-24).
+    SPLIT_ALIAS names other bones that work the same way (iron sights up/folded, the flash hider), only when in split.
+    cut: {material name part: (kind, slot) | ('head', name)}: a mesh of that material goes wholly onto that hide bone."""
     bones, meshes, mats, mat_ix = [], [], [], {}
     index = {}
     moves, tag_rest = {}, {}
@@ -245,8 +262,9 @@ def build(parts, out_name, light=False, rename=None, keep=None, animated=frozens
             carry = {int(j) for m in ms if m['wb'] is not None for jj, ww in zip(m['wb'], m['wv']) for j, x in zip(jj, ww) if x > 1e-4}
             for j, b in enumerate(sk):
                 mm = re.match(r'tag_(\w+)_(show|hide)$', b['name'])
-                if not mm or mm.group(1) not in split or j not in carry: continue
-                key = (mm.group(2), mm.group(1)); n = slot_heads.get(key, 0); slot_heads[key] = n+1
+                key = (mm.group(2), mm.group(1)) if mm else SPLIT_ALIAS.get(b['name'])
+                if not key or key[1] not in split or j not in carry: continue
+                n = slot_heads.get(key, 0); slot_heads[key] = n+1
                 hb = f'b7_{key[0]}_{key[1]}'+(f'__{n}' if n else ''); r = bones[wb_of(j)]
                 wmap[j] = add_bone(hb, wb_of(j), r['wpos'], r['wrot'])
         for h, m in mt.items():
@@ -255,13 +273,26 @@ def build(parts, out_name, light=False, rename=None, keep=None, animated=frozens
             if keep and not keep(short): mat_ix[(part, h)] = None; continue
             mat_ix[(part, h)] = len(mats)
             mats.append({'name': (head+'~'+short) if head else short, 'diffuse': short+'_c.png', 'normal': short+'_n.png'})
+        cut_of = {}   # a mesh whose material names a cut: all its vertices onto that head (the GDL Havoc's laser box and stock)
+        for h, m in mt.items():
+            k = next((v for sub, v in (cut or {}).items() if sub in m['name']), None)
+            if k: cut_of[h] = k
         for m in ms:
             mi = mat_ix.get((part, m['material']))
             if mi is None: continue
+            if m['material'] in cut_of and m['wb'] is not None:
+                key = cut_of[m['material']]; j0 = int(m['wb'][0][m['wv'][0].argmax()])
+                n = slot_heads.get(key, 0) if key[0] in ('show', 'hide') else 0
+                if key[0] in ('show', 'hide'): slot_heads[key] = n+1
+                hb = (f'b7_{key[0]}_{key[1]}'+(f'__{n}' if n else '')) if key[0] in ('show', 'hide') else key[1]
+                r = bones[wb_of(j0)]; hj = index.get(hb) if key[0] not in ('show', 'hide') else None
+                hj = hj if hj is not None else add_bone(hb, wb_of(j0), r['wpos'], r['wrot'])
+                m = {**m, '_hj': hj}
             pos = qrot(xf_q, m['vp']*CM) + xf_t
             nrm = qrot(xf_q, m['vn']) if m['vn'] is not None else None
             uv = m['uv'][0] if m['uv'] else np.zeros((len(pos), 2))
-            if m['wb'] is not None:
+            if '_hj' in m: w = [[(m['_hj'], 1.)]]*len(pos)
+            elif m['wb'] is not None:
                 w = [[(wb_of(int(j)), float(x)) for j, x in zip(jj, ww) if x > 1e-4] or [(wb_of(0), 1.)] for jj, ww in zip(m['wb'], m['wv'])]
             else: w = [[(wb_of(0), 1.)]]*len(pos)
             fc = m['f']
@@ -323,7 +354,10 @@ def clip(name, arms_rest, gun_rest, loop=False, then=None, base=None, gun_rename
                 v = np.stack([qmul(v0, q) for q in v]) if c['prop'] == 'rq' else v+v0
                 by[c['bone']][c['prop']] = {**o, 'mode': c['mode'], 'values': v.reshape(-1)}
     m = __import__('re').match(r'(sat_vm_[a-z]+_[a-z0-9]+_)', name)
-    if not __import__('os').environ.get('NOFILL') and not base and not keep and not gun_rename and m and name != m[1]+'idle' and (EXP/'animations'/(m[1]+'idle.cast')).exists():
+    # (not the ADS pose clips: the engine lays ads_up over every idle and fire frame (animation.js applyAim), and a filled j_gun there
+    # pinned the gun to the right wrist, so a bolt gun's rechamber carried the gun up into the face with the hand, 2026-11-25, user:
+    # "the rechamber on the strider is broken")
+    if not __import__('os').environ.get('NOFILL') and not base and not keep and not gun_rename and m and name != m[1]+'idle' and not re.search(r'ads_(up|down)$', name) and (EXP/'animations'/(m[1]+'idle.cast')).exists():
         # bones the clip doesn't key at all hold the idle pose: the AAROW's, CBRS-3's and Ryden's fire, the TR51's raise etc. leave out j_gun
         # (child of the right wrist), which then sat at its bind far off screen (the launcher vanished on every shot)
         for c in castlib.animation(EXP/'animations'/(m[1]+'idle.cast'))['curves']:
@@ -834,6 +868,15 @@ def build_akimbo(g, parts, single, gun_rest, bones, split=frozenset()):
 
 # A Gunsmith slot (attachments.json) -> the BO7 slot names of the show/hide geometry it switches (build split)
 SLOT_PARTS = {'optic': ['optic', 'rail'], 'laser': ['laser'], 'under': ['ub', 'grip', 'bipod'], 'stock': ['stock'], 'mag': ['mag'], 'grip': ['pistolgrip']}
+# the specials (TWINS) also switch BO7's iron sights (folded under an optic) and flash hider (off under a muzzle part), user
+# 2026-11-24; the rips' other guns keep theirs (their own Gunsmith never did this)
+SPLIT_ALIAS = {'tag_sight_on': ('hide', 'sight'), 'tag_sight_on2': ('hide', 'sight'), 'tag_sight_off': ('show', 'sight'),
+               'tag_sight_off2': ('show', 'sight'), 'tag_tip': ('hide', 'tip')}
+TWIN_SLOT_PARTS = {'optic': ['sight'], 'muzzle': ['tip']}
+# parts baked into a twin's receiver, cut out by material: the GDL Havoc's yellow laser box (off under a fitted laser) and
+# stock (b7_base_stock: off under the Breacher Stock, attachments.json replaces)
+TWIN_CUT = {'nembus': {'laser_box_07': ('hide', 'laser'), 'material_3454d321808ea03c': ('head', 'b7_base_stock')}}
+TWIN_SLOT_EXTRA = {'nembus': {'optic': ['laser']}}   # the Havoc's laser box sits on the optic rail (the user's "yellow sight"): an optic takes it off too
 # BO7's empty-slot look that is an attachment in all but name: off on the plain gun too (user 2026-11-24, the Coda 9's
 # laser module box; every gun starts basic). Fitting the slot hides it as usual.
 PLAIN_OFF = {'atlas': ['laser'], 'macaw': ['grip']}
@@ -855,16 +898,16 @@ def build_gun(g):
     if g in OPTIONAL_STOCK:
         parts = [(x, 'base', OPTIONAL_STOCK[g]) if x == pre+'stock' else x for x in parts]; variants = variants+[(pre+'stock', 'base', OPTIONAL_STOCK[g])]
         order.insert(next((i+1 for i, a in enumerate(order) if a.startswith('b7_barrel_')), len(order)), OPTIONAL_STOCK[g])
-    slots_of = {a: next((s for s, pfx in (('optic', 'b7_optic_'), ('laser', 'b7_laser_'), ('under', 'b7_under_'), ('under', 'b7_ub_'), ('stock', 'b7_stock_'),
-                                         ('mag', 'b7_mag_'), ('grip', 'b7_grip_')) if a.startswith(pfx)), None) for a in order}
     split = {p for v in SLOT_PARTS.values() for p in v}   # every slot: one with no attachment here keeps its empty look (the 1911's optic plate went off)
+    sp = {k: v+(TWIN_SLOT_PARTS.get(k, [])+TWIN_SLOT_EXTRA.get(g, {}).get(k, []) if g in TWINS else []) for k, v in {**SLOT_PARTS, **{k: [] for k in TWIN_SLOT_PARTS}}.items()}
+    if g in TWINS: split |= {p for v in TWIN_SLOT_PARTS.values() for p in v}
     if any(k != BUILTIN_UBGL.get(g) for k in UBGL.get(g, [])): parts.append(('sat_vm_ub_gl_01', 'base', 'b7_ubgl'))   # the launcher, hidden until one is fitted
     if any(a.startswith('b7_optic_') for a in mounts): parts = [(x, 'base', 'b7_base_optic') if isinstance(x, str) and x[len(pre):] in ('reflex', 'scope') else x for x in parts]   # a stock sight that is its own model (the NX Ravager's): folds away under a fitted optic (attachments.json ironSights)
-    view, gun_rest = build(parts, f'bo7_{g}_view', animated=animated_bones(pre), split=split)
+    view, gun_rest = build(parts, f'bo7_{g}_view', animated=animated_bones(pre), split=split, cut=TWIN_CUT.get(g))
     X = build.extra
-    slot_parts = {}   # Gunsmith slot -> {show: [...], hide: [...]} (gunsmith.js applyStats)
+    slot_parts = {}   # Gunsmith slot -> {show: [...], hide: [...]} (gunsmith.js applyStats); every slot (the twins' fork attachments aren't in order)
     for kind, bs in X['slots']:
-        for s in {s for s in slots_of.values() if s and bs in SLOT_PARTS[s]}: slot_parts.setdefault(s, {}).setdefault(kind, []).append(f'b7_{kind}_{bs}')
+        for s in [s for s, v in sp.items() if bs in v]: slot_parts.setdefault(s, {}).setdefault(kind, []).append(f'b7_{kind}_{bs}')
     plain_hide = [f'b7_show_{bs}' for kind, bs in X['slots'] if kind == 'show']+[f'b7_hide_{bs}' for kind, bs in X['slots'] if kind == 'hide' and bs in PLAIN_OFF.get(g, [])]
     print(f'  {g}: {len(variants)} part variants, {len(mounts)} mounted, {len(stat_atts)} stat-only;', ' '.join(order))
     wpre = f'sat_wm_{c}_{g}_'

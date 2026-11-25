@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { restick } from '../stickers/stickers.js';
+import { applyCamo } from './camo.js';
 
 // tag_weapon space to a bone's, from the rest pose (bones move while a clip plays, the skeleton's inverses don't)
 function restSpace(gun,bone){
@@ -127,7 +128,9 @@ export async function mountParts(gun,def,ids=def?.mounted??[],stillCurrent=()=>t
     if(m.node){   // one node of a shared model: nothing below needs patching
       part=part.getObjectByName(m.node);if(!part)continue;
       part.removeFromParent();part.matrixAutoUpdate=false;part.matrix.copy(placement(gun,bone,m,mirror&&!m.hand));
-      part.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});part.userData.mountId=mid;bone.add(part);gun.userData.mounts.push(part);addBeam(part,gun);continue;
+      part.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});part.userData.mountId=mid;bone.add(part);gun.userData.mounts.push(part);addBeam(part,gun);
+      if(m.camo){part.userData.camoMount=true;if(gun.userData.camoLook)applyCamo(part,gun.userData.camoLook);}   // the specials' own parts wear the gun's camo (camo.js)
+      continue;
     }
     part.updateMatrixWorld(true);let root=null;part.traverse(o=>{if(!root&&o.isBone)root=o;});
     part.matrixAutoUpdate=false;if(root)part.matrix.copy(root.matrixWorld).invert();

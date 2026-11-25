@@ -475,7 +475,7 @@
     }
   },
   "wrap": {
-    "guns": "^(mtl_sat_|material_[0-9a-f]{12}|b7_|mtl_(m1_irons|titan45|range_pistol|optics_target|weapon_reddot|iron_sights_color|caddy_pistol|blunderbuss|player_emblem|range_blunderbuss|range_fancy|maul|ak12_stock|mp_fusion_shotgun|mdl|lmg_shotgun|rw1|sentry_gun|uts_19|sac3_glass|exo_weapon))",
+    "guns": "^(mtl_sat_|material_[0-9a-f]{12}|b7_|(gh|sr|hv|ro|xm)_body$|mtl_(m1_irons|titan45|range_pistol|optics_target|weapon_reddot|iron_sights_color|caddy_pistol|blunderbuss|player_emblem|range_blunderbuss|range_fancy|maul|ak12_stock|mp_fusion_shotgun|mdl|lmg_shotgun|rw1|sentry_gun|uts_19|sac3_glass|exo_weapon))",
     "skip": "bullet|cartridge|speedloader|powderhorn|_glow|_gas|_glass|optic|_ret|reddot|screen|decal|_text|emblem|sights|ironsight|sentry_gun_barrels|ammo|_display|_lens|_reticle",
     "scale": 0.02,
     "warm": [0.6, 0.75],

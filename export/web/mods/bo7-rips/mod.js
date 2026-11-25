@@ -38,7 +38,7 @@ export async function prepare(data){
 // .tools/bo7-twin-parts.mjs (mods/bo7-weapons/<gun>_twin.glb + .json: def.mounts per attachment).
 const LOOK=['model','worldModel','lazyWorld','handsModel','animations','raiseTime','dropTime','sprintInTime','sprintLoopTime','sprintOutTime','sprintOffset','sprintRotation',
   'reloadTime','reloadEmptyTime','inspectTime','segmentedReload','reloadAmmoAdd','reloadStartAdd','reloadStartTime','reloadEndTime','notetrackSounds','sounds','bo7',
-  'viewOffset','viewFov','lazyLoad','ownSprint','partSlots','tagGroups','tagMoves','tagRest','flashFollowsMuzzle'];
+  'viewOffset','viewFov','lazyLoad','ownSprint','partSlots','tagGroups','tagMoves','tagRest','flashFollowsMuzzle','slotParts'];
 const TWIN_PARTS={grimhawk_zm:'grimhawk',siren_zm:'siren',havoc_zm:'havoc',roc_zm:'roc',xm325_zm:'xm325'};
 const twins=new Set();
 function lend(f,r){
@@ -52,7 +52,7 @@ async function lendTwins(data){
     lend(f,r);lend(f.upgrade,r.upgrade);
     if(built.sounds?.[r.id])f.bo7Sounds=r.id;
     const parts=TWIN_PARTS[f.id],j=parts&&await fetch(new URL(`../bo7-weapons/${parts}_twin.json`,BASE)).then(x=>x.ok?x.json():null).catch(()=>null);
-    if(j){const mounts={};for(const [a,m] of Object.entries(j.mounts))mounts[a]={...m,model:new URL(`../bo7-weapons/${m.model}`,BASE).href};
+    if(j){const mounts={};for(const [a,m] of Object.entries(j.mounts))mounts[a]={...m,model:new URL(`../bo7-weapons/${m.model}`,BASE).href,camo:!/^j_mag/.test(m.tag??'')};   // camo: the parts wear the gun's camo, mags keep their own (camo.js VITAL)
       f.mounts=mounts;if(f.upgrade)f.upgrade.mounts=mounts;}
     twins.add(f.id);
     // the XM325's Titan Wield swaps in the rip's akimbo pair (bo7_zeus_dw) instead of the CZ75 pair (xm325.js syncTitan)
