@@ -8,6 +8,7 @@
 // Everything is a sync.js event, so a team shares the steps; the clocks run on each client from the same event.
 import * as THREE from 'three';
 import { exfilRewards } from '../exfil/mod.js';
+import { settings } from '../../settings.js';
 
 const DOOR = [-1821, 1434, -1066];
 const ROCKS = [[[-807.9, 1378, 74.1], [-667.5, 1500, 269.2]], [[-758, 1370, 178.1], [-686.9, 1422, 268.9]], [[-748.5, 1422, 179.2], [-714, 1446, 238]],
@@ -18,6 +19,30 @@ const KEY = [-346, 1412, 1011], RADIO = [-1311, 1292, 1490], VENT = [-1817, 1503
 const RADIO_MOVE = { from: [-1829, 1495, -1064], to: [-1767, 1498, -1096], time: 3 };
 const NODES = [[-792, 1892, -652], [928, 1734, -848], [-992, 1744, 2149], [1092, 1744, 938]];
 const LINES = { scientist1: 5.35, scientist2: 50.3, scientist3: 6.83, scientist3_2: 15.9, scientist4: 16.4, scientist5: 5.07, scientist6: 25.6, scientist7: 34.9 };
+// subtitles, [start s, text] (transcribed from the clips; user 2026-11-26: "add subtitles for the scientist in nuketown")
+const SUBS = {
+  scientist1: [[0, 'Hello? Hello? Please! Please tell me that\'s a human!']],
+  scientist2: [[0, 'Holy shit! I\'ve been stuck down here ever since this freak outbreak of these horrors.'],
+    [6.3, 'They came through the portal. I told Dr. Phillips that we shouldn\'t mess around with the next... never mind.'],
+    [10.8, 'I think we can get out of this place.'], [14.7, 'With all this radiation penetrating my flesh, that just could not be good for me.'],
+    [19.2, 'I have been trying for around three days to contact the Pentagon, since we\'re the government\'s pets.'],
+    [25, 'I\'m assuming you are well equipped and aren\'t going to die anytime soon,'], [28.9, 'so you can get me what I need, and we can all get the hell out of here.'],
+    [34.1, 'Okay, listen carefully. I need you to go to the cabinets down the corridor and grab a file with the login details for me.'],
+    [41, 'It\'s in a red room, and you need to get them from Locker Block 3.'], [45, 'I repeat, Locker Block 3. If there\'s any issues, come and tell me.']],
+  scientist3: [[0, 'You have the file? Great! Slide \'em under the door,'], [3, 'and then I can call the Pentagon to get us out of this shithole.']],
+  scientist3_2: [[0, 'What?! You can\'t get to it?! Ugh, this place is falling apart!'], [4, 'Jesus, uh, okay. You need to get rid of them somehow.'],
+    [8, 'A pickaxe, explosives, even if you have weapons that pack enough punch.'], [11, 'Just find something to move those damn rocks!']],
+  scientist4: [[0, 'Right, I\'ve got the passcodes, but I need you to get me the radio so I can talk to them.'], [6, 'First, you need to get a key to open this vent.'],
+    [8.7, 'I did have one, but one of those undead scum took it, and the radio.'], [13.6, 'Just find it and bring it back to me.']],
+  scientist5: [[0, 'Ah, perfect. Pass the radio through so I can get us the hell out of here.']],
+  scientist6: [[0, 'Okay, let\'s give it a whirl.'], [6.6, 'Fucking technology! Why aren\'t you working now?'],
+    [11.6, 'Seems that there weren\'t enough communication transmitters working to get a signal to the Pentagon.'],
+    [17.1, 'I can\'t activate the transmitters from here. You\'ll have to activate them manually.'], [21.1, 'There are buttons that will activate them above ground. Quickly!']],
+  scientist7: [[0, 'Uh, hello, hello! My name is Dr. Dexter Mannings. We are stuck at the Sedan nuclear testing site.'],
+    [6.3, 'There has been some sort of genetic outbreak. We need immediate evac. Please! Send someone quickly!'], [13.2, 'Oh, Jesus Christ!'],
+    [14.6, 'I\'m dead! I\'m dead! I won\'t make it!'], [22.6, 'I\'ve already called the Pentagon to come for you. Just hold off until they get here!'], [28.5, 'It\'s too late for me!']],
+};
+const SPEAKER = 'Dr. Mannings';
 const MELEE_REACH = 120, TALK_REACH = 250, RETURN_REACH = 200, HOLD = 300, GAIN = 1;
 const TRUCK = { drop: 10000, fall: 20, trigger: [-39, 1722, 2298], at: [-38, 1680, 2488],
   seats: [[-10, 1722, 2386], [-66, 1722, 2386], [-14, 1722, 2450], [-64, 1722, 2450]],
@@ -31,7 +56,7 @@ const OBJECTIVES = {
   5: 'Disable the four failsafe nodes',
   6: 'Survive until the truck lands, then get in',
 };
-const css = `#nt-ee-timer{position:fixed;left:50%;top:44px;transform:translateX(-50%);color:#ffe9c0;font:700 22px/1 sans-serif;letter-spacing:.08em;text-shadow:0 1px 3px #000;z-index:30;pointer-events:none}`;
+const css = `#nt-ee-timer{position:fixed;left:50%;top:44px;transform:translateX(-50%);color:#ffe9c0;font:700 22px/1 sans-serif;letter-spacing:.08em;text-shadow:0 1px 3px #000;z-index:30;pointer-events:none} #nt-ee-sub{position:fixed;left:50%;bottom:27%;transform:translateX(-50%);max-width:56vw;text-align:center;font:600 15px/1.35 system-ui,sans-serif;color:#f2f2f2;background:rgba(0,0,0,.55);padding:5px 12px;border-radius:4px;pointer-events:none;z-index:30} #nt-ee-sub b{color:#9fe0ff}`;
 
 const near = (c, r, g, b) => { const h = typeof c === 'number' ? c : new THREE.Color(c).getHex(THREE.SRGBColorSpace); return Math.abs((h >> 16 & 255) / 255 - r) + Math.abs((h >> 8 & 255) / 255 - g) + Math.abs((h & 255) / 255 - b) < .25; };
 
@@ -49,11 +74,19 @@ export function setupEasterEgg(c) {
 
   const style = document.createElement('style'); style.textContent = css; document.head.append(style);
   const timer = document.createElement('div'); timer.id = 'nt-ee-timer'; timer.hidden = true; document.body.append(timer);
-  host.on('warmHud', on => { timer.hidden = !on; if (on) timer.textContent = '5:00'; });
+  // subtitles: plain text, no blur or shadow (no new Skia shaders mid-game); Settings → Audio → Voice subtitles turns them off
+  const sub = document.createElement('div'); sub.id = 'nt-ee-sub'; sub.hidden = true; document.body.append(sub);
+  let subTimers = [];
+  const subStop = () => { for (const t of subTimers) clearTimeout(t); subTimers = []; sub.hidden = true; };
+  const subShow = text => { sub.innerHTML = ''; const b = document.createElement('b'); b.textContent = SPEAKER + ': '; sub.append(b, text); sub.hidden = false; };
+  const subtitles = name => { subStop(); const cues = SUBS[name]; if (!cues || settings.voiceSubs === false) return;
+    for (const [t, text] of cues) subTimers.push(setTimeout(() => subShow(text), t * 1000));
+    subTimers.push(setTimeout(subStop, (LINES[name] ?? cues.at(-1)[0] + 4) * 1000 + 400)); };
+  host.on('warmHud', on => { timer.hidden = !on; if (on) timer.textContent = '5:00'; if (on) subShow(SUBS.scientist1[0][1]); else sub.hidden = true; });
 
   // a line from behind the door; `then` runs when it has played out
   let line = null, voice = null;
-  const say = (name, then) => { try { voice?.pause(); } catch {} voice = sound(name, GAIN); e.talk = LINES[name] ?? 1; line = then ?? null; };
+  const say = (name, then) => { try { voice?.pause(); } catch {} voice = sound(name, GAIN); subtitles(name); e.talk = LINES[name] ?? 1; line = then ?? null; };
   const go = to => sync.act('ntEe', { to });
   sync.on('ntEe', d => { if (d.to > e.step) e.step = d.to; });
   sync.on('ntSay', d => say(d.name, d.to ? () => { if (sync.isHost) go(d.to); } : null));
@@ -182,7 +215,7 @@ export function setupEasterEgg(c) {
 
   const reset = () => {
     Object.assign(e, { step: 1, talk: 0, rocks: false, files: false, knifed: false, warned: false, paperT: null, key: false, radio: false, vent: false, radioT: null, nodes: [false, false, false, false], buzzed: false, said7: false, left: null, infinite: false, dropT: null, landed: false, ride: null, seat: 0, done: false, won: false });
-    line = null; try { voice?.pause(); } catch {} voice = null; timer.hidden = true; timer.textContent = '5:00';
+    line = null; try { voice?.pause(); } catch {} voice = null; subStop(); timer.hidden = true; timer.textContent = '5:00';
     show(rocks, true); for (const k of rockClips) k.enabled = true; world.collision?.invalidateCache?.();
     show(files, true); show(paper, false); show(key, false); show(radio, false); show(radioVent, false); show(vent, true); show(truck, false); show(chutes, false);
     lift(paper, V(0, 0, 0)); lift(radioVent, V(0, 0, 0)); lift(truck, V(0, 0, 0)); lift(chutes, V(0, 0, 0));
