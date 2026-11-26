@@ -205,11 +205,11 @@ A Nova crawler shot dead (`z.gasDeath`: bullet, not melee, not a Nuke) used to l
   - Health: hurt (hits of 20+), lowHealth (under 35), down, revived, reviveTeammate, gameOver.
   - Weapons and shopping: reload, noAmmo, wallBuy, boxSpin (a wrapped `mysteryBox.start`), box (taken), pap.
   - Items and abilities: perk, powerup, gum, ability (`abilityUsed`), abilityReady (new host event from `mods/classes` `ready()`).
-  - Map: door, power, horde (12 or more zombies within 650), idle (50 s without a kill), inspect, exfil and exfilWin (`exfilStart`/`exfilEnd`), easterEgg, teammateJoined (net `joined`).
+  - Map: door, power, horde (12 or more zombies within 650), idle (120 s without a kill or a line), inspect, exfil and exfilWin (`exfilStart`/`exfilEnd`), easterEgg, teammateJoined (net `joined`).
   - A new event needs an entry in `EVENTS`, a trigger in mod.js, and lines.
 - **Pacing**:
   - Priority 3 always plays and cuts off the current line. Lower priorities wait while a line is playing.
-  - Every line also waits for a global gap (`GAP`: 9 / 4.5 / 2.5 s for Rare / Normal / Chatty) and rolls its chance, scaled by `CHANCE`.
+  - Every line also waits for a global gap (`GAP`: 20 / 12 / 6 s for Rare / Normal / Chatty) and rolls its chance, scaled by `CHANCE` (.3 / .6 / 1.1). Lowered on 2026-11-26 (user: "seems to happen way too often"; was 9 / 4.5 / 2.5 s and .45 / 1 / 1.6), with longer cooldowns on eliteKill 40, boss 45, hurt 45, perk and box 25, powerup 30, idle 150.
   - Each event deals from a shuffled bag, so no line repeats until all of them have played.
   - `kino.voice.say(ev, force)` plays a line from the console (`force` skips the checks).
 - **Caption**: plain text with no blur or shadow, so it adds no new Skia shader mid-game. It is painted by `warmHud`. Settings → Voice subtitles turns it off.
@@ -220,7 +220,7 @@ A Nova crawler shot dead (`z.gasDeath`: bullet, not melee, not a Nuke) used to l
   3. Run `python3 .tools/build-voice.py <audio> picks.json export/web/mods/operator-voice/voices/<id>`. It produces mono, loudness-normalised (-16 LUFS) Vorbis clips with 20/50 ms fades.
 - **Conversations between two operators** (2026-11-22, user: "set up a system where 2 characters can interact"):
   - Data: `voices/<voice id>/convos.json`, `[{id, lines: [{v: voice id of the speaker, f: clip, t: caption}]}]`, clips in that folder's `convo/`. A conversation lives in ONE operator's folder (either one; `convoFor` reads both players' folders). Venator's folder holds his three with Seven (`seven_vatican`, `seven_friend`, `seven_benediction`).
-  - When: co-op only, both operators within 1400 units, neither down. 14 s after the start (chance = chatter's `CONVO` + .25) and after a round end (4.5 s later, at most one every 150 s). Chance by chatter: Off 0, Rare .2, Normal .4, Chatty .65. Each conversation plays once a match per pair.
+  - When: co-op only, both operators within 1400 units, neither down. 14 s after the start (chance = chatter's `CONVO` + .15) and after a round end (4.5 s later, at most one every 240 s). Chance by chatter: Off 0, Rare .12, Normal .25, Chatty .45 (+.15 at the start). Each conversation plays once a match per pair.
   - Who starts: the player with the lower co-op id sends `{t:'convo', o: folder, k: convo id, who: {voice id: player id}}`, and both clients play the same lines in order (gap 0.28 s after each clip). Your lines come from you; a teammate's lines come from their body, with the right name on the caption. `kino.coopRemotes()` (multiplayer mod) lists the teammates.
   - Pacing: while a conversation plays, single lines below priority 3 wait. A priority-3 line (or `say(ev, true)`) cuts the conversation off.
   - Console: `kino.voice.convo('deadlock_seven')` plays one of your conversations with that operator (or with a conversation id) solo, both voices from you. `kino.voice.convos()` lists your folder's.

@@ -18,16 +18,16 @@ import { settings } from '../../settings.js';
 // always plays (cutting off a lower line); 2 ignores the chance roll on Rare.
 const EVENTS = {
   start: [3, 1, 0], roundStart: [1, .55, 0], roundEnd: [1, .45, 0], dogRound: [2, 1, 0],
-  kill: [0, .06, 14], headshot: [0, .1, 16], meleeKill: [0, .15, 18], multiKill: [1, .6, 20], eliteKill: [2, 1, 10], streak: [1, .7, 45],
-  hurt: [0, .25, 20], lowHealth: [2, 1, 30], down: [3, 1, 0], revived: [2, 1, 0], reviveTeammate: [2, 1, 0], gameOver: [3, 1, 0],
-  reload: [0, .07, 25], noAmmo: [1, .8, 30], perk: [1, .8, 10], box: [1, .7, 10], pap: [2, 1, 0], wallBuy: [0, .4, 25],
-  powerup: [1, .5, 15], ability: [1, .6, 20], gum: [0, .5, 30], door: [0, .45, 30], power: [2, 1, 0], horde: [1, .6, 60],
-  idle: [0, 1, 70], inspect: [0, .6, 25],
-  roundEndTeam: [1, .45, 0], lastZombie: [1, .6, 0], boss: [2, 1, 20], boxSpin: [0, .45, 20], abilityReady: [1, .5, 30],
+  kill: [0, .06, 14], headshot: [0, .1, 16], meleeKill: [0, .15, 18], multiKill: [1, .6, 20], eliteKill: [2, 1, 40], streak: [1, .7, 45],
+  hurt: [0, .25, 45], lowHealth: [2, 1, 30], down: [3, 1, 0], revived: [2, 1, 0], reviveTeammate: [2, 1, 0], gameOver: [3, 1, 0],
+  reload: [0, .07, 25], noAmmo: [1, .8, 30], perk: [1, .8, 25], box: [1, .7, 25], pap: [2, 1, 0], wallBuy: [0, .4, 25],
+  powerup: [1, .5, 30], ability: [1, .6, 20], gum: [0, .5, 30], door: [0, .45, 30], power: [2, 1, 0], horde: [1, .6, 60],
+  idle: [0, 1, 150], inspect: [0, .6, 25],
+  roundEndTeam: [1, .45, 0], lastZombie: [1, .6, 0], boss: [2, 1, 45], boxSpin: [0, .45, 20], abilityReady: [1, .5, 30],
   exfil: [2, 1, 0], exfilWin: [3, 1, 0], easterEgg: [3, 1, 0], teammateJoined: [2, 1, 0],
 };
-const GAP = [Infinity, 9, 4.5, 2.5];   // seconds between any two lines, per chatter setting
-const CHANCE = [0, .45, 1, 1.6];
+const GAP = [Infinity, 20, 12, 6];   // seconds between any two lines, per chatter setting (was 9/4.5/2.5 until 2026-11-26: too chatty)
+const CHANCE = [0, .3, .6, 1.1];
 
 export default async function setup(api){
   const { host, audio, session, enemies, camera, mysteryBox, mod } = api;
@@ -143,9 +143,9 @@ export default async function setup(api){
     }
     return false;
   }
-  const CONVO = [0, .2, .4, .65];   // chance between rounds, per chatter setting
-  host.on('start', () => { heard.clear();convoAt = -999;setTimeout(() => { if (Math.random() < CONVO[Math.round(settings.voiceChat ?? 2)] + .25) startConvo(); }, 14000); });
-  host.on('roundEnd', () => setTimeout(() => { if (now() - convoAt > 150 && Math.random() < CONVO[Math.round(settings.voiceChat ?? 2)]) startConvo(); }, 4500));
+  const CONVO = [0, .12, .25, .45];   // chance between rounds, per chatter setting
+  host.on('start', () => { heard.clear();convoAt = -999;setTimeout(() => { if (Math.random() < CONVO[Math.round(settings.voiceChat ?? 2)] + .15) startConvo(); }, 14000); });
+  host.on('roundEnd', () => setTimeout(() => { if (now() - convoAt > 240 && Math.random() < CONVO[Math.round(settings.voiceChat ?? 2)]) startConvo(); }, 4500));
   // kino.voice.convo('deadlock_seven' | conversation id) plays one here, the other speaker unplaced (testing)
   async function convo(arg){
     const pool = [];
@@ -246,7 +246,7 @@ export default async function setup(api){
       if (boss) say('boss');else if (near >= 12) say('horde');
       if (!lastOne && alive === 1 && session.phase === 'fighting' && session.total > 3 && session.spawned >= session.total) { lastOne = true;say('lastZombie'); }   // the round's last zombie
     }
-    if (session.phase === 'fighting' && t - lastKill > 50 && t - lastAny > 50) { lastKill = t;say('idle'); }
+    if (session.phase === 'fighting' && t - lastKill > 120 && t - lastAny > 120) { lastKill = t;say('idle'); }
   });
 }
 
