@@ -12,10 +12,15 @@ export const RESEARCH_KEY='kino.mods.research';
 export async function loadResearchConfig(base=import.meta.url){
   const r=await fetch(new URL('research.json',base));if(!r.ok)throw new Error('research.json HTTP '+r.status);return r.json();
 }
+// augments replaced by new ones: a save that researched (or equipped) the old one has the new one (2026-11-26, QED rework)
+const RENAMED={'e.qed.stabiliser':'e.qed.strangematter','e.qed.collapsethewave':'e.qed.manyworlds'};
+const ren=id=>RENAMED[id]??id;
 export function loadResearch(){
   let p;try{p=JSON.parse(localStorage.getItem(RESEARCH_KEY));}catch{}
   p=p&&typeof p==='object'?p:{};
-  return {active:p.active??null,progress:{...p.progress},done:Array.isArray(p.done)?p.done:[],equip:{...p.equip}};
+  const progress={};for(const [k,v] of Object.entries(p.progress??{}))progress[ren(k)]=v;
+  const equip={};for(const [k,e] of Object.entries(p.equip??{}))equip[k]=e&&typeof e==='object'?Object.fromEntries(Object.entries(e).map(([s,id])=>[s,id&&ren(id)])):e;
+  return {active:p.active?ren(p.active):null,progress,done:Array.isArray(p.done)?[...new Set(p.done.map(ren))]:[],equip};
 }
 export function saveResearch(r){try{localStorage.setItem(RESEARCH_KEY,JSON.stringify(r));}catch{}}
 

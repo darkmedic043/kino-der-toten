@@ -7,7 +7,7 @@
 //   walking into it teleports you somewhere else on the map.
 // - QED: a random effect where it lands (11 outcomes, good and bad, as in BO1).
 // Research augments (window.kino.equipAug, research mod): gersch.* (reach, long, collapse, twin, slow, points, safe, extra)
-// and qed.* (reroll, blast, double, refund, jackpot, stable, pure, extra).
+// and qed.* (reroll, keepperks, blast, double, refund, jackpot, strange, worlds, extra).
 import * as THREE from 'three';
 import { loadModel } from '../../animation.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -122,14 +122,18 @@ export default async function setup(api){
     const f=efx();if(f&&aug('qed.blast'))for(const z of f.near(at,300))f.pct(z,aug('qed.blast'));   // Quantum Blast
     for(let n=0;n<(aug('qed.double')?2:1);n++)qedRoll(at,say,near);   // Superposition
   }
+  tac.qedAt=qed;   // tests: a QED going off at a point
   const BAD=[6,7,8,9];
+  // rolls 0-10 are BO1's eleven outcomes; Strange Matter and Many Worlds add three each after them (2026-11-26, user:
+  // "maybe make some with more effects it can have"), so the bad ones also come up less often
   function qedRoll(at,say,near){
-    const pick=()=>{let r=Math.floor(Math.random()*11);if(aug('qed.stable'))while(r===7||r===8)r=Math.floor(Math.random()*11);return r;};
+    const more=[...(aug('qed.strange')?['dilation','phase','drop']:[]),...(aug('qed.worlds')?['horizon','storm','fortune']:[])];
+    const pick=()=>{let r=Math.floor(Math.random()*(11+more.length));if(aug('qed.keepperks'))while(r===7)r=Math.floor(Math.random()*(11+more.length));return r;};   // Loaded Dice: never Perk Disruption
     let roll=pick();
-    if(aug('qed.pure'))while(BAD.includes(roll))roll=pick();   // Collapse the Wave
-    else if(BAD.includes(roll)&&Math.random()<aug('qed.reroll'))roll=pick();   // Loaded Dice
+    if(BAD.includes(roll)&&Math.random()<aug('qed.reroll'))roll=pick();   // Loaded Dice
     const jack=1+aug('qed.jackpot');
     if(BAD.includes(roll)&&aug('qed.refund')){tac.id='zombie_quantum_bomb';tac.count=Math.min(tac.count+1,maxOf(tac.id));}   // Entanglement
+    if(roll>=11){qedMore(more[roll-11],at,say,near);return;}
     if(roll===0){window.kino.debug.collectPowerup?.('full_ammo');say('Max Ammo');}
     else if(roll===1){for(const z of near(650))enemies.hurt(z,z.health,false,false,'explosion');say('Quantum explosion');}
     else if(roll===2){const all=Object.keys(data.perkDrinks??{}).filter(p=>!session.perks.has(p)&&perkOk(p));const p=all[Math.floor(Math.random()*all.length)];if(p){session.perks.add(p);session.health=session.maxHealth;if(jack>1)refillAmmo();say('Free '+(data.perkDrinks[p].name??'perk'));}else say('Nothing happened');}
@@ -141,6 +145,15 @@ export default async function setup(api){
     else if(roll===8){if(session.weapon)session.weapon.mag=0;say('Magazine emptied');}
     else if(roll===9){for(let i=0;i<4;i++){const a=Math.random()*6.28;enemies.spawn?.(at.clone().add(new THREE.Vector3(Math.cos(a)*120,0,Math.sin(a)*120)),null,'zombie');}say('Reinforcements incoming');}
     else{const w=session.weapon,d=w&&data.weapons[w.id];if(d?.upgrade&&!w.upgraded){w.upgraded=true;w.mag=session.def.clipSize;w.reserve=session.def.maxAmmo;api.equipView?.();say('Weapon upgraded');}else{session.points+=500*jack;say(`+${500*jack} points`);}}
+  }
+  function qedMore(kind,at,say,near){
+    const f=efx();
+    if(kind==='dilation'){if(f)for(const z of near(600))f.slow(z,.6,8);say('Time dilation');}
+    else if(kind==='phase'){session.effects.invulnerable=Math.max(session.effects.invulnerable??0,session.time+6);say('Phase shift');}
+    else if(kind==='drop'){if(f?.drop)f.drop(at.clone());else window.kino.debug.collectPowerup?.('full_ammo');say('Quantum drop');}
+    else if(kind==='horizon'){blackHole(at.clone());say('Event horizon');}
+    else if(kind==='storm'){if(f)for(const z of near(500)){f.stun(z,3);f.bleed(z,.15,5);window.kino.fx?.burn?.(z.root.position.clone().addScaledVector(up,40));}say('Quantum storm');}
+    else if(kind==='fortune'){window.kino.debug.collectPowerup?.('insta_kill');window.kino.debug.collectPowerup?.('double_points');say('Fortune');}
   }
   function refillAmmo(){for(const w of session.inventory??[]){const d=data.weapons[w.id];if(!d)continue;const u=w.upgraded?d.upgrade??d:d;w.mag=u.clipSize??w.mag;w.reserve=u.maxAmmo??w.reserve;}}
   const fx=[];

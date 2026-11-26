@@ -2948,9 +2948,10 @@
     {
      "name": "Loaded Dice",
      "kind": "minor",
-     "desc": "A bad outcome is rerolled 40% of the time.",
+     "desc": "A bad outcome is rerolled half the time, and Perk Disruption always is.",
      "effects": {
-      "qed.reroll": 0.4
+      "qed.reroll": 0.5,
+      "qed.keepperks": 1
      },
      "id": "e.qed.loadeddice"
     },
@@ -3000,22 +3001,22 @@
      "id": "e.qed.jackpot"
     },
     {
-     "name": "Stabiliser",
+     "name": "Strange Matter",
      "kind": "minor",
-     "desc": "The Magazine Emptied and Perk Disruption outcomes can't happen.",
+     "desc": "Three more outcomes: Time Dilation (zombies within 600 slowed 60% for 8 s), Phase Shift (6 s untouchable) and Quantum Drop (a random power-up where it lands).",
      "effects": {
-      "qed.stable": 1
+      "qed.strange": 1
      },
-     "id": "e.qed.stabiliser"
+     "id": "e.qed.strangematter"
     },
     {
-     "name": "Collapse the Wave",
+     "name": "Many Worlds",
      "kind": "major",
-     "desc": "Bad outcomes never happen.",
+     "desc": "Three more outcomes: Event Horizon (a Gersh black hole where it lands), Quantum Storm (zombies within 500 stunned 3 s and losing 15% of their health a second for 5 s) and Fortune (Insta-Kill and Double Points at once).",
      "effects": {
-      "qed.pure": 1
+      "qed.worlds": 1
      },
-     "id": "e.qed.collapsethewave"
+     "id": "e.qed.manyworlds"
     }
    ]
   },
