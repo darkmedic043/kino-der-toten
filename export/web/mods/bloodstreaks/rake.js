@@ -17,7 +17,6 @@ const DIR = new URL('../maps/nuketown/', import.meta.url).href;
 export const RAKE_URL = DIR + 'rake/rake.glb', RAKE_ICON = DIR + 'rake/icon.webp';
 export const RAKE = { perPlayer: 5, pool: 16, uses: 20, reach: 40, swing: .14, fall: .55, angle: 1.15, length: 71.3, sweep: 70, shock: 140, bleed: 120 };
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-const css = `#rake-carry{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);padding:4px 12px;background:#0008;color:#ffe9c0;font:600 14px/1.3 sans-serif;letter-spacing:.04em;border-radius:3px;z-index:30;pointer-events:none}`;
 
 export async function setupRakes(api) {
   const { host, session, player, enemies, scene, world, features, toast, audio } = api;
@@ -46,11 +45,9 @@ export async function setupRakes(api) {
   } catch (e) { console.warn('[rakes] no rake model (run .tools/build_nuketown_rake.py)', e?.message ?? e); }
 
   const R = { ready: parts.length > 0, hand: 0, list: [] };
-  const style = document.createElement('style'); style.textContent = css; document.head.append(style);
-  const carry = document.createElement('div'); carry.id = 'rake-carry'; carry.hidden = true; document.body.append(carry);
   const keyName = () => (binds().claymore ?? 'Digit4').replace(/^(Digit|Key)/, '');
-  const paint = () => { carry.hidden = !R.hand; if (R.hand) carry.textContent = `Rake${R.hand > 1 ? ' ×' + R.hand : ''} · press ${keyName()} to place it at your feet`; };
-  host.on('warmHud', on => { if (on) { carry.hidden = false; carry.textContent = 'Rake ×3'; } else paint(); });
+  const paint = () => R.onHand?.();   // the rakes in hand show on the Bloodstreak HUD (bloodstreaks/mod.js); the centre-screen reminder went (user, 2026-11-26)
+  R.keyName = keyName;
 
   const mineOut = () => R.list.filter(r => r.on && r.by === me()).length;
   if (R.ready) for (let i = 0; i < RAKE.pool; i++) {

@@ -668,3 +668,4 @@
 - 2026-11-26: QED augments reworked (user: "three of the augments are about bad outcomes, preferably get rid of the one that completely removed them, maybe make some with more effects"): Collapse the Wave and Stabiliser replaced by Many Worlds and Strange Matter (six new outcomes), Loaded Dice 50% + never Perk Disruption, old ids migrated in saves; QED legendary in the box (research.md).
 - 2026-11-26: Nuketown's scientist gets subtitles (`SUBS` in `mods/nuketown/easter-egg.js`, transcribed with whisper.cpp; user: "add subtitles for the scientist in nuketown"; waw-ports.md).
 - 2026-11-26: operator voice lines less often (GAP 20/12/6 s, CHANCE .3/.6/1.1, longer cooldowns, fewer conversations; user: "seems to happen way too often"). gameplay.md Operator voice lines.
+- 2026-11-26: Bloodstreaks above the gun beside the gobblegums in the BO7 HUD (a row), the rakes in hand as a chip there; the centre-screen rake reminder removed; map-test `SHOT=`. bloodstreaks.md.

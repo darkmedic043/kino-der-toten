@@ -5,7 +5,8 @@
 // first, as in Black Ops: reaching a cost earns that streak, and reaching the dearest one starts the meter over. Earned
 // streaks are banked (two of each at most) on the command wheel (hold U) until used. Going down drains the meter; banked
 // streaks are kept. Each streak has a Research track (research.json, kind 'bloodstreak': rake.* numbers via kino.equipAug).
-// HUD: a column of the equipped streaks on the right, each filling with blood toward its cost (no blur: painted at load).
+// HUD: the equipped streaks, each filling with blood toward its cost (no blur: painted at load), then the rakes in hand.
+// A column on the right in the classic layout; hud-bo7 moves #bloodstreaks above the gun, a row beside the gobblegums.
 // window.kino.bloodstreaks: {blood, add(n), refresh(), earned, slots, give(id)}
 import { equippedStreaks, STREAKS } from '../armory/mod.js';
 import { setupRakes, RAKE_ICON } from './rake.js';
@@ -16,13 +17,19 @@ const ICONS = { rake_trap: RAKE_ICON };
 const css = `#bloodstreaks{position:fixed;right:26px;top:40%;z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:7px;pointer-events:none;
   font:600 13px/1 'Barlow Condensed','Arial Narrow',Arial,sans-serif;color:#ece8de;text-shadow:0 1px 3px #000c}
 body.menu-open #bloodstreaks{visibility:hidden}
+#bloodstreaks .row{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+#bloodstreaks .row:empty,#bloodstreaks .n:empty{display:none}
 #bloodstreaks .bs{position:relative;width:46px;height:46px;background:#0009;border:1px solid #ffffff38}
 #bloodstreaks .bs::before{content:"";position:absolute;inset:0;background:#8e1a10;opacity:.75;clip-path:inset(calc((1 - var(--f,0)) * 100%) 0 0 0)}
 #bloodstreaks .bs img{position:absolute;inset:5px;width:36px;height:36px;object-fit:contain}
 #bloodstreaks .bs b{position:absolute;left:-30px;bottom:2px;width:26px;text-align:right;color:#a9a397;font-size:12px}
 #bloodstreaks .bs i{position:absolute;right:-1px;top:-1px;padding:2px 4px;background:#d0402e;color:#fff;font-style:normal;font-size:12px;text-shadow:none;display:none}
 #bloodstreaks .bs.ready{border-color:#ff6a4f}#bloodstreaks .bs.ready::before{opacity:.95}#bloodstreaks .bs.ready i{display:block}
-#bloodstreaks .n{letter-spacing:1px;color:#d9a59c}`;
+#bloodstreaks .n{letter-spacing:1px;color:#d9a59c}
+#bloodstreaks .hand{display:flex;align-items:center;gap:5px;color:#ffe9c0;letter-spacing:1px}
+#bloodstreaks .hand[hidden]{display:none}
+#bloodstreaks .hand img{width:24px;height:24px;object-fit:contain}
+#bloodstreaks .hand kbd{font:inherit;font-size:11px;padding:1px 4px;border:1px solid #ffffff66;color:#fff;text-shadow:none}`;
 
 export default async function setup(api) {
   const { host, session } = api;
@@ -36,13 +43,21 @@ export default async function setup(api) {
   // ---- the HUD column
   const style = document.createElement('style'); style.textContent = css; document.head.append(style);
   const el = document.createElement('div'); el.id = 'bloodstreaks'; el.hidden = true; document.body.append(el);
+  el.innerHTML = `<div class="row"></div><div class="n"></div><div class="hand" hidden><img src="${RAKE_ICON}" alt=""><span></span><kbd></kbd></div>`;
+  const row = el.querySelector('.row'), hand = el.querySelector('.hand');
+  // rakes in hand (a streak's or one from Nuketown's stations): a chip with the count and the key that places them
+  function paintHand(n = rakes.hand) {
+    hand.hidden = !(n > 0); if (n > 0) { hand.querySelector('span').textContent = `RAKE ×${n}`; hand.querySelector('kbd').textContent = rakes.keyName?.() ?? '4'; }
+    el.hidden = !S.slots.length && hand.hidden;
+  }
+  rakes.onHand = () => paintHand();
   let built = '', painted = '';
   function build(slots) {
     const key = slots.map(s => s.id).join(); if (key === built) return; built = key; painted = '';
-    el.innerHTML = [...slots].reverse().map(s => `<div class="bs" data-id="${s.id}"><img src="${icon(s.id)}" alt=""><b>${s.cost}</b><i></i></div>`).join('') + '<div class="n"></div>';
+    row.innerHTML = [...slots].reverse().map(s => `<div class="bs" data-id="${s.id}"><img src="${icon(s.id)}" alt=""><b>${s.cost}</b><i></i></div>`).join('');
   }
   function paint(force) {
-    el.hidden = !S.slots.length; if (!S.slots.length) return;
+    paintHand(); if (!S.slots.length) { build([]); el.querySelector('.n').textContent = ''; return; }
     build(S.slots);
     const key = Math.floor(S.blood * 2) + '|' + S.slots.map(s => S.earned[s.id] ?? 0).join(); if (key === painted && !force) return; painted = key;
     let prev = 0;
@@ -57,7 +72,7 @@ export default async function setup(api) {
     if (!on) { paint(true); return; }
     build(S.slots.length ? S.slots : STREAKS.slice(0, 1)); el.hidden = false;
     for (const box of el.querySelectorAll('.bs')) { box.style.setProperty('--f', .5); box.classList.add('ready'); box.querySelector('i').textContent = '×2'; }
-    el.querySelector('.n').textContent = '30 / 60 BLOOD';
+    el.querySelector('.n').textContent = '30 / 60 BLOOD'; paintHand(3); el.hidden = false;
   });
 
   // ---- the meter

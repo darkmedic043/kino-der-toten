@@ -18,7 +18,18 @@ its stations hand out the shared rake).
   didn't pick one). A restart (`reset`) clears the meter and the bank.
 - HUD `#bloodstreaks`: a column on the right (top 40%), one box per equipped streak with its icon, filling with blood
   toward its cost (`--f` + `clip-path`, no blur), a badge when one is banked, and `x / 60 BLOOD` under it. Painted at load
-  in `warmHud`. Hidden with nothing equipped.
+  in `warmHud`. Hidden with nothing equipped and no rakes in hand.
+- **BO7 layout** (2026-11-26, user: "itd be cool for the blood streaks to appear above the gun here, right next to where
+  the gobblegums would show"): hud-bo7 adopts `#bloodstreaks` into `.streaks`, a row (cheapest left) fixed at right 215,
+  bottom 330: above the gun dial, left of the gum stack and its name/keys labels (at right 84 they overlapped). The
+  classic (touch) layout keeps the right-hand column.
+- **Rakes in hand** are a chip under the meter (`.hand`: rake icon, `RAKE ×n`, the claymore key), also with no streak
+  equipped (Nuketown's stations). It replaced the centre-screen "Rake · press 4 to place it at your feet" line
+  (`#rake-carry`, removed 2026-11-26 at the user's request); `rake.js` calls `R.onHand()` on every change. The 4 s toast
+  when rakes are handed out stays.
+- Look test: `VW=1280 VH=720 INIT=scratch/bloodstreaks/init-desk.js PLAY=scratch/bloodstreaks/hud.js
+  SHOT=scratch/bloodstreaks/hud.png MAP=sandbox ... map-test.mjs`. `init-desk.js` makes `(pointer: coarse)` false: headless
+  Chromium matches it, so hud-bo7 stays off without it. `SHOT=<png>` (new) screenshots the page after the PLAY step.
 - API: `blood`, `earned`, `slots`, `add(n)`, `refresh()` (the Armory calls it on equip), `give(id)`, `active(id)` (Research
   counts a streak as active while you have rakes in hand or down: ×activeMul research XP).
 

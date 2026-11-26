@@ -115,6 +115,15 @@ body.bo7-hud.using-pad #bo7-right #equip-hud kbd{top:auto!important;width:16px;h
 #bo7-right #gum-hud .name{font-weight:600;font-size:14px;white-space:nowrap}
 #bo7-right #gum-hud .keys{font-size:11px;white-space:nowrap}
 #bo7-right #gum-hud .act{align-items:flex-end;white-space:nowrap;order:-1;margin-bottom:4px}
+/* Bloodstreaks: a row left of the gobblegum stack and its labels, above the gun (user, 2026-11-26: "appear above the gun, right next to
+   where the gobblegums would show"); cheapest on the left, the blood count and the rakes in hand under it */
+#bo7-right .dial .streaks{position:fixed;right:215px;bottom:330px}   /* clear of the gum name and keys, which hang left of the gum */
+#bo7-right #bloodstreaks{position:static;align-items:flex-end;gap:5px;font-family:var(--bo7-font);font-size:12px;letter-spacing:1px}
+#bo7-right #bloodstreaks .row{flex-direction:row-reverse;gap:6px}
+#bo7-right #bloodstreaks .bs{width:38px;height:38px;background:radial-gradient(circle at 45% 40%,#1a1b1fe6,#09090be6 72%);border-color:#ffffff30}
+#bo7-right #bloodstreaks .bs img{inset:4px;width:30px;height:30px}
+#bo7-right #bloodstreaks .bs b{left:auto;right:2px;bottom:2px;width:auto;font-size:10px;color:#ffffffaa}
+#bo7-right #bloodstreaks .hand img{width:20px;height:20px}
 /* bubbles merged into the dial (user, 2026-10-16; 2026-10-24: like BO7's field upgrade): the class ability at its
    upper right, the operator weapon at its lower right, at -30 / +30 degrees, the same meshed disc overlapping the
    ring by 10 px, their meter as an orange arc round the outer side (segmented like the magazine arc) */

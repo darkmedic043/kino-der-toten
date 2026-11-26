@@ -8,7 +8,7 @@
 //                  and under the gun the ammo mod's icon and the Pack-a-Punch level (user, 2026-10-24, from a BO7
 //                  screenshot); bubbles attached to the dial's right edge like BO7's field upgrade: the class ability
 //                  at its upper right, the operator weapon (operator-weapons) at its lower right, key badge below;
-//                  gobblegums stacked vertically above the dial
+//                  gobblegums stacked vertically above the dial, the Bloodstreaks in a row to their left (user, 2026-11-26)
 //   bottom centre · perks, with power-up timers above them
 //   top right    · the round
 // Load it last (mods.json): the nodes it adopts must exist. Touch devices keep the classic layout (touch-extras
@@ -38,7 +38,7 @@ export default async function setup(api){
       <div class="eq"></div>
       <div class="sat ability" data-dir="-30"><div class="disc"></div><svg class="ring" viewBox="0 0 100 100"><path class="arc-track"/><path class="arc"/></svg></div>
       <div class="sat operator" data-dir="30"><div class="disc"></div><svg class="ring" viewBox="0 0 100 100"><path class="arc-track"/><path class="arc"/></svg></div>
-      <div class="gums"></div></div>`);
+      <div class="gums"></div><div class="streaks"></div></div>`);
   const perks=make('bo7-perks','<div class="fx"></div><div class="row"></div>');
   const round=make('bo7-round','<span class="lbl">ROUND</span><b class="n"></b><span class="rem"></span>');
   const q=(el,s)=>el.querySelector(s);
@@ -82,7 +82,7 @@ export default async function setup(api){
     [()=>$('hud-portrait'),q(left,'.pf')],[()=>healthTrack,q(left,'.bar')],[()=>pointsEl,q(left,'.pts')],[()=>$('progression-hud'),q(left,'.xp')],
     [()=>$('weapon-name'),q(right,'.wname')],[()=>$('weapon-level'),q(right,'.wname')],[()=>$('ammo-mod-tag'),q(right,'.wname')],
     [()=>$('ammo'),q(right,'.count')],[()=>$('reload-label'),q(right,'.reload')],
-    [()=>$('equip-hud'),q(right,'.eq')],[()=>$('class-skill'),q(right,'.ability')],[()=>$('operator-weapon'),q(right,'.operator')],[()=>$('gum-hud'),q(right,'.gums')],
+    [()=>$('equip-hud'),q(right,'.eq')],[()=>$('class-skill'),q(right,'.ability')],[()=>$('operator-weapon'),q(right,'.operator')],[()=>$('gum-hud'),q(right,'.gums')],[()=>$('bloodstreaks'),q(right,'.streaks')],
     [()=>$('perks'),q(perks,'.row')],[()=>$('effects'),q(perks,'.fx')],[()=>$('remaining'),q(round,'.rem')],
   ];
   function place(){for(const [get,parent] of adopt){const n=get();if(n&&n.parentNode!==parent)parent.append(n);}}
